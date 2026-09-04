@@ -5,13 +5,14 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./form-ui.css": "./src/form-ui.css"
+    "./tokens.stylex": "./src/tokens.stylex.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "bun test"
   },
   "peerDependencies": {
+    "@stylexjs/stylex": "0.19.0",
     "react": "^18",
     "react-dom": "^18",
     "zod": "^4.4.3"
@@ -20,6 +21,7 @@
     "workflow-engine": "file:../.."
   },
   "devDependencies": {
+    "@stylexjs/stylex": "0.19.0",
     "@types/react": "^19",
     "@types/react-dom": "^19"
   }

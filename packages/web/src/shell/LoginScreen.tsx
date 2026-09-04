@@ -1,8 +1,36 @@
 import { useState } from "react";
+import * as stylex from "@stylexjs/stylex";
 import { login, AppClientError } from "../api/client.js";
 import { t } from "./catalog.js";
 import type { UiLocale } from "../i18n/locale.js";
 import type { Session } from "./session.js";
+import { colors, space } from "form-ui/tokens.stylex";
+
+/** `.shell-screen`, `.shell-login-form` (+ its `label`) and `.shell-error`
+ * from `shell.css`, as StyleX. `.shell-login` carries no rule of its own;
+ * it stays a literal hook class beside the compiled `screen` style. */
+const styles = stylex.create({
+  screen: {
+    maxWidth: "46rem",
+    marginInline: "auto",
+    paddingBlock: space.s6,
+    paddingInline: space.s3,
+  },
+  form: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s3,
+  },
+  formLabel: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s1,
+    fontSize: "0.85rem",
+  },
+  error: {
+    color: colors.refusal,
+  },
+});
 
 interface LoginScreenProps {
   locale: UiLocale;
@@ -37,29 +65,30 @@ export function LoginScreen({ locale, onLoggedIn }: LoginScreenProps) {
     }
   };
 
+  const screenProps = stylex.props(styles.screen);
   return (
-    <main className="shell-screen shell-login">
+    <main className={`shell-login ${screenProps.className}`} style={screenProps.style}>
       <form
-        className="shell-login-form"
+        {...stylex.props(styles.form)}
         onSubmit={(e) => {
           e.preventDefault();
           void submit();
         }}
       >
         <h1>{t(locale, "login.title")}</h1>
-        <label>
+        <label {...stylex.props(styles.formLabel)}>
           {t(locale, "login.email")}
           <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" />
         </label>
-        <label>
+        <label {...stylex.props(styles.formLabel)}>
           {t(locale, "login.password")}
           <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
         </label>
         <button type="submit" className="btn btn-primary" disabled={loading}>
           {t(locale, "login.submit")}
         </button>
-        {failed && <p className="shell-error">{t(locale, "login.failed")}</p>}
-        {error && <p className="shell-error">{error}</p>}
+        {failed && <p {...stylex.props(styles.error)}>{t(locale, "login.failed")}</p>}
+        {error && <p {...stylex.props(styles.error)}>{error}</p>}
       </form>
     </main>
   );

@@ -44,35 +44,6 @@ describe("area boundaries", () => {
     }
   });
 
-  it("no class name is defined in two areas' stylesheets", () => {
-    const byArea = new Map<string, Set<string>>();
-    for (const area of AREAS) {
-      let files: string[];
-      try {
-        files = walk(join(SRC, "areas", area)).filter((f) => f.endsWith(".css"));
-      } catch {
-        continue;
-      }
-      const names = new Set<string>();
-      for (const file of files) {
-        // Selector positions only. A class named in a comment is not a
-        // definition, and neither is the `.css` of an `@import` filename.
-        const css = readFileSync(file, "utf8")
-          .replace(/\/\*[\s\S]*?\*\//g, "")
-          .replace(/^\s*@import[^;]*;/gm, "");
-        for (const m of css.matchAll(/\.([a-zA-Z][\w-]*)/g)) names.add(m[1]!);
-      }
-      byArea.set(area, names);
-    }
-    const areas = [...byArea.keys()];
-    for (let i = 0; i < areas.length; i++) {
-      for (let j = i + 1; j < areas.length; j++) {
-        const shared = [...byArea.get(areas[i]!)!].filter((n) => byArea.get(areas[j]!)!.has(n));
-        expect(shared, `${areas[i]} and ${areas[j]} both define`).toEqual([]);
-      }
-    }
-  });
-
   it("the app area does not reach the engine's runtime or database modules", () => {
     for (const file of areaFiles("app")) {
       for (const spec of importsOf(file)) {

@@ -1,9 +1,12 @@
 import { useEffect, useRef } from "react";
+import * as stylex from "@stylexjs/stylex";
 import { Workflow, LayoutTemplate } from "lucide-react";
 import { matchRoute, routePath, ROUTE_ROLE, type Route } from "./routing.js";
 import { useAreaRoute, PROFILE_PATH, type NavigateOptions } from "../../shell/routing.js";
 import { t } from "./catalog.js";
 import { Chrome } from "../../shell/Chrome.js";
+import { navStyles } from "../../shell/navStyles.js";
+import { space } from "form-ui/tokens.stylex";
 import { ProcessesScreen } from "./screens/ProcessesScreen.js";
 import { EditScreen } from "./screens/EditScreen.js";
 import { VersionsScreen } from "./screens/VersionsScreen.js";
@@ -12,11 +15,24 @@ import { ToolsScreen } from "./screens/ToolsScreen.js";
 import { PlayerScreen } from "./screens/PlayerScreen.js";
 import { TemplatesScreen } from "./screens/TemplatesScreen.js";
 import type { AreaRootProps } from "../../shell/App.js";
-import "./app.css";
 
 // The only role this file names on its own. Every other per-screen role comes
 // from `ROUTE_ROLE`, so the nav and the guard cannot disagree with the map.
 const TEMPLATES_ROLE = "system:templates";
+
+/** `.studio-empty-role` from `app.css`. */
+const styles = stylex.create({
+  emptyRole: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: "100vh",
+    textAlign: "center",
+    gap: space.s3,
+    padding: space.s4,
+  },
+});
 
 /**
  * The same explanatory state the shell shows an actor with no studio role,
@@ -26,7 +42,7 @@ const TEMPLATES_ROLE = "system:templates";
  */
 function MissingRole({ roles }: { roles: readonly string[] }) {
   return (
-    <main className="studio-empty-role">
+    <main {...stylex.props(styles.emptyRole)}>
       <h1>Not your screen</h1>
       <p>
         This screen needs the {roles.join(" or ")} role. Your account does not have it.
@@ -75,13 +91,19 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
     if (strandedOnDefault) navigate({ name: "templates" });
   }, [strandedOnDefault, navigate]);
 
+  const processesCurrent = route.name === "processes" || route.name === "edit";
+  const processesProps = stylex.props(processesCurrent && navStyles.navCurrent);
+  const toolsProps = stylex.props(route.name === "tools" && navStyles.navCurrent);
+  const templatesProps = stylex.props(route.name === "templates" && navStyles.navCurrent);
+
   const nav = (
-    <nav className="shell-nav">
+    <nav {...stylex.props(navStyles.nav)}>
       {may(ROUTE_ROLE.processes) && (
         <button
           type="button"
-          className="btn btn-secondary"
-          aria-current={route.name === "processes" || route.name === "edit" ? "page" : undefined}
+          className={`btn btn-secondary ${processesProps.className}`}
+          style={processesProps.style}
+          aria-current={processesCurrent ? "page" : undefined}
           onClick={() => guardedNavigate({ name: "processes" })}
         >
           <Workflow size={18} strokeWidth={1.75} aria-hidden="true" />
@@ -91,7 +113,8 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
       {may(ROUTE_ROLE.tools) && (
         <button
           type="button"
-          className="btn btn-secondary"
+          className={`btn btn-secondary ${toolsProps.className}`}
+          style={toolsProps.style}
           aria-current={route.name === "tools" ? "page" : undefined}
           onClick={() => guardedNavigate({ name: "tools" })}
         >
@@ -101,7 +124,8 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
       {may(ROUTE_ROLE.templates) && (
         <button
           type="button"
-          className="btn btn-secondary"
+          className={`btn btn-secondary ${templatesProps.className}`}
+          style={templatesProps.style}
           aria-current={route.name === "templates" ? "page" : undefined}
           onClick={() => guardedNavigate({ name: "templates" })}
         >

@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent } from "react";
+import * as stylex from "@stylexjs/stylex";
+import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { useDraft } from "../draft/store";
 import { t } from "../catalog.js";
 import { resolveDraftLocalizedText } from "../draft/localized-text";
@@ -22,6 +24,241 @@ import {
   type BulkTarget,
 } from "./fieldMatrixLogic";
 
+const styles = stylex.create({
+  matrixScroll: {
+    overflow: "auto",
+    overscrollBehavior: "contain",
+    border: `1px solid ${colors.border}`,
+    maxHeight: "32rem",
+  },
+  // The dock mount's own cap (D10): 15rem sits just under the dock body's
+  // 16rem, leaving the grid nearly the whole budget.
+  matrixScrollCompact: {
+    maxHeight: "15rem",
+  },
+  matrixTable: {
+    borderCollapse: "separate",
+    borderSpacing: 0,
+    fontSize: "0.9rem",
+  },
+  // `.studio-matrix-corner`/`.studio-matrix-col-header`/`.studio-matrix-row-header`
+  // share position/background/text-align/vertical-align in app.css's own
+  // combined selector; each entry below folds that declaration in.
+  matrixColHeader: {
+    position: "sticky",
+    background: colors.surface,
+    textAlign: "left",
+    verticalAlign: "top",
+    top: 0,
+    width: "11rem",
+    padding: space.s2,
+    borderBottom: `2px solid ${colors.divider}`,
+    zIndex: 2,
+  },
+  matrixCorner: {
+    position: "sticky",
+    background: colors.surface,
+    textAlign: "left",
+    verticalAlign: "top",
+    top: 0,
+    width: "11rem",
+    padding: space.s2,
+    borderBottom: `2px solid ${colors.divider}`,
+    left: 0,
+    zIndex: 3,
+  },
+  matrixColLabel: {
+    display: "block",
+    fontFamily: fonts.body,
+    fontSize: "11px",
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+    color: colors.textMuted,
+  },
+  matrixColKey: {
+    display: "block",
+    fontFamily: fonts.mono,
+    fontSize: "0.8rem",
+    color: colors.text,
+    overflowWrap: "anywhere",
+  },
+  matrixColNote: {
+    display: "block",
+    fontFamily: fonts.mono,
+    fontSize: "10px",
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+    color: colors.textMuted,
+    marginTop: space.s1,
+  },
+  matrixRowHeader: {
+    position: "sticky",
+    background: colors.surface,
+    textAlign: "left",
+    verticalAlign: "top",
+    left: 0,
+    width: "11rem",
+    paddingBlock: space.s2,
+    paddingInline: space.s3,
+    borderRight: `2px solid ${colors.divider}`,
+    borderBottom: `1px solid ${colors.border}`,
+  },
+  // A group field's children indent once, matching the rail's own cap.
+  matrixRowHeaderIndented: {
+    paddingLeft: space.s6,
+  },
+  matrixRowHeaderGroup: {
+    color: colors.text,
+    fontWeight: 600,
+  },
+  matrixFieldKey: {
+    display: "block",
+    fontFamily: fonts.mono,
+    fontSize: "0.85rem",
+    overflowWrap: "anywhere",
+  },
+  matrixFieldType: {
+    display: "block",
+    fontFamily: fonts.mono,
+    fontSize: "11px",
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+    color: colors.textMuted,
+  },
+  matrixCell: {
+    borderBottom: `1px solid ${colors.border}`,
+    borderRight: `1px solid ${colors.border}`,
+    paddingBlock: space.s1,
+    paddingInline: space.s2,
+    verticalAlign: "top",
+    minWidth: "6rem",
+    cursor: "default",
+    ":focus-visible": {
+      outline: `2px solid ${colors.accent}`,
+      outlineOffset: "-2px",
+    },
+  },
+  matrixCellFlagged: {
+    boxShadow: `inset 0 0 0 2px color-mix(in srgb, ${colors.refusal} 55%, transparent)`,
+  },
+  matrixCellHatched: {
+    backgroundImage: `repeating-linear-gradient(-45deg, ${colors.surfaceMuted}, ${colors.surfaceMuted} 3px, ${colors.surface} 3px, ${colors.surface} 8px)`,
+    cursor: "not-allowed",
+  },
+  matrixCellLive: {
+    ":hover": {
+      background: colors.surfaceMuted,
+    },
+  },
+  matrixCellFlags: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, 1.75rem)",
+    columnGap: 0,
+    justifyItems: "center",
+    alignItems: "center",
+  },
+  matrixDash: {
+    display: "block",
+    fontFamily: fonts.mono,
+    color: colors.neutral500,
+  },
+  // `.studio-matrix-cell input[aria-disabled="true"]`: the gated checkbox's
+  // own computed style already knows `gated`.
+  matrixFlagCheckboxDisabled: {
+    opacity: 0.45,
+  },
+  matrixFlagVisible: {
+    accentColor: colors.flagVisible,
+  },
+  matrixFlagRequired: {
+    accentColor: colors.flagRequired,
+  },
+  matrixFlagReadonly: {
+    accentColor: colors.flagReadonly,
+  },
+  matrixCel: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: space.s1,
+    minWidth: 0,
+    paddingBlock: space.s1,
+    paddingInline: 0,
+  },
+  matrixCelStamp: {
+    fontFamily: fonts.mono,
+    fontSize: "11px",
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+    color: colors.accent,
+    border: "2px solid currentcolor",
+    paddingBlock: 0,
+    paddingInline: space.s1,
+    flex: "none",
+  },
+  matrixCelSrc: {
+    fontFamily: fonts.mono,
+    fontSize: "10px",
+    color: colors.textMuted,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    minWidth: 0,
+  },
+  matrixFlags: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, 1.75rem)",
+    columnGap: 0,
+    justifyItems: "center",
+    marginTop: space.s2,
+  },
+  matrixFlagBadge: {
+    fontFamily: fonts.mono,
+    fontSize: "11px",
+    lineHeight: 1.6,
+    textTransform: "uppercase",
+    letterSpacing: "0.04em",
+    width: "1.75rem",
+    textAlign: "center",
+    color: colors.textMuted,
+    background: "none",
+    border: `1px solid ${colors.border}`,
+    paddingBlock: 0,
+    paddingInline: space.s1,
+    cursor: "pointer",
+    ":hover": {
+      background: colors.surfaceMuted,
+      color: colors.text,
+    },
+  },
+  // `[aria-pressed="true"]`: a JS-computed choice reading the same
+  // `aria-pressed` the button already carries.
+  matrixFlagBadgePressed: {
+    color: colors.accentContrast,
+    background: colors.accent,
+    borderColor: colors.accent,
+  },
+  matrixFlagEmpty: {
+    height: "1.125rem",
+    visibility: "hidden",
+  },
+});
+
+// `CellState`'s three values, exhaustive: `blank` earns no extra style,
+// matching today's stylesheet (task 6.1's re-audit). Untyped, since
+// `matrixCellLive` carries only a `:hover` key and so infers a narrower
+// shape than the general `StyleXStyles` type accepts.
+const MATRIX_CELL_STATE_STYLE = {
+  hatched: styles.matrixCellHatched,
+  live: styles.matrixCellLive,
+  blank: undefined,
+} satisfies Record<CellState, unknown>;
+
+const MATRIX_FLAG_ACCENT_STYLE: Record<FlagKey, stylex.StyleXStyles> = {
+  visible: styles.matrixFlagVisible,
+  required: styles.matrixFlagRequired,
+  readonly: styles.matrixFlagReadonly,
+};
+
 export const FLAG_KEYS: FlagKey[] = ["visible", "required", "readonly"];
 const FLAG_LETTER: Record<FlagKey, string> = { visible: "VIS", required: "REQ", readonly: "RO" };
 export const FLAG_LABEL_KEY = {
@@ -44,9 +281,9 @@ function cellKey(row: number, col: number): string {
  * of, so there is no boolean to show (`studio-app`'s live-cell requirement). */
 function CelStamp({ label, src }: { label: string; src: string }) {
   return (
-    <span className="studio-matrix-cel" title={`${label}: ${src}`}>
-      <span className="studio-matrix-cel-stamp">{t("formEditor.markCel")}</span>
-      <span className="studio-matrix-cel-src">{src}</span>
+    <span {...stylex.props(styles.matrixCel)} title={`${label}: ${src}`}>
+      <span {...stylex.props(styles.matrixCelStamp)}>{t("formEditor.markCel")}</span>
+      <span {...stylex.props(styles.matrixCelSrc)}>{src}</span>
     </span>
   );
 }
@@ -78,24 +315,24 @@ function BulkBadges({
     (key) => eligibleTargetEntries(allSteps, targets, key, written, technicalFieldIds).length > 0,
   );
   return (
-    <span className="studio-matrix-flags">
-      {FLAG_KEYS.map((key) =>
-        eligible.includes(key) ? (
+    <span {...stylex.props(styles.matrixFlags)}>
+      {FLAG_KEYS.map((key) => {
+        if (!eligible.includes(key)) return <span key={key} aria-hidden="true" {...stylex.props(styles.matrixFlagEmpty)} />;
+        const pressed = bulkBadgeOn(allSteps, targets, key, written, technicalFieldIds);
+        return (
           <button
             key={key}
             type="button"
-            className="studio-matrix-flag-badge"
-            aria-pressed={bulkBadgeOn(allSteps, targets, key, written, technicalFieldIds)}
+            {...stylex.props(styles.matrixFlagBadge, pressed && styles.matrixFlagBadgePressed)}
+            aria-pressed={pressed}
             aria-label={t(FLAG_LABEL_KEY[key])}
             title={t(FLAG_LABEL_KEY[key])}
             onClick={() => onToggle(key)}
           >
             {FLAG_LETTER[key]}
           </button>
-        ) : (
-          <span key={key} aria-hidden="true" className="studio-matrix-flag-empty" />
-        ),
-      )}
+        );
+      })}
     </span>
   );
 }
@@ -109,6 +346,10 @@ interface Props {
    * wrapper (`FieldMatrixPanel`) sets this; the dock mount leaves it unset,
    * per design.md decision 6. */
   showBulkBadges?: boolean;
+  /** Caps the scroll box at 15rem instead of its own 32rem default, to fit
+   * the dock body's 16rem budget (D10). Only `EditorDock.tsx`'s mount sets
+   * this. */
+  compact?: boolean;
 }
 
 /**
@@ -129,7 +370,7 @@ interface Props {
  * inside itself (design.md decision 6). The canvas dock's Field matrix tab
  * mounts this component directly.
  */
-export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: Props) {
+export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false, compact = false }: Props) {
   const { draft, mutate, contentLocale } = useDraft();
   const baseLocale = draft.baseLocale ?? "en";
   const rows = useMemo(() => matrixRows(draft.fields), [draft.fields]);
@@ -239,26 +480,25 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
   };
 
   return (
-    <div className="studio-matrix-scroll" tabIndex={0} aria-label={t("fieldMatrix.scrollRegionLabel")}>
-      <table
-        className="studio-matrix-table"
-        role="grid"
-        aria-label={t("fieldMatrix.heading")}
-        onKeyDown={onGridKeyDown}
-      >
+    <div
+      {...stylex.props(styles.matrixScroll, compact && styles.matrixScrollCompact)}
+      tabIndex={0}
+      aria-label={t("fieldMatrix.scrollRegionLabel")}
+    >
+      <table {...stylex.props(styles.matrixTable)} role="grid" aria-label={t("fieldMatrix.heading")} onKeyDown={onGridKeyDown}>
         <thead>
           <tr>
-            <th scope="col" className="studio-matrix-corner" />
+            <th scope="col" {...stylex.props(styles.matrixCorner)} />
             {drawnSteps.map(({ step, index: stepIndex }, colIndex) => {
               const inert = step.view === undefined;
               const colTargets = showBulkBadges ? columnLiveTargets(rows, step, stepIndex) : [];
               return (
-                <th key={step.id ?? colIndex} scope="col" className="studio-matrix-col-header" data-inert={inert || undefined}>
-                  <span className="studio-matrix-col-label">
+                <th key={step.id ?? colIndex} scope="col" {...stylex.props(styles.matrixColHeader)} data-inert={inert || undefined}>
+                  <span {...stylex.props(styles.matrixColLabel)}>
                     {resolveDraftLocalizedText(step.label, contentLocale, baseLocale) || step.key || t("steps.unnamedStep")}
                   </span>
-                  <span className="studio-matrix-col-key">{step.key}</span>
-                  {inert && <span className="studio-matrix-col-note">{t("fieldMatrix.columnInertNote")}</span>}
+                  <span {...stylex.props(styles.matrixColKey)}>{step.key}</span>
+                  {inert && <span {...stylex.props(styles.matrixColNote)}>{t("fieldMatrix.columnInertNote")}</span>}
                   {showBulkBadges && colTargets.length > 0 && (
                     <BulkBadges
                       targets={colTargets}
@@ -278,12 +518,18 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
             const rowTargets = showBulkBadges ? rowLiveTargets(allSteps, row.id) : [];
             return (
               <tr key={row.id} data-group={row.isGroup || undefined}>
-                <th scope="row" className="studio-matrix-row-header" data-depth={row.depth} data-technical={technicalIds.has(row.id) || undefined}>
-                  <span className="studio-matrix-field-key">{row.key === "" ? t("panelsScreen.unnamedField") : row.key}</span>
-                  <span
-                    className="studio-matrix-field-type"
-                    aria-label={`${t("fieldMatrix.rowTypeLabel")}: ${row.type}`}
-                  >
+                <th
+                  scope="row"
+                  {...stylex.props(
+                    styles.matrixRowHeader,
+                    row.depth === 1 && styles.matrixRowHeaderIndented,
+                    row.isGroup && styles.matrixRowHeaderGroup,
+                  )}
+                  data-depth={row.depth}
+                  data-technical={technicalIds.has(row.id) || undefined}
+                >
+                  <span {...stylex.props(styles.matrixFieldKey)}>{row.key === "" ? t("panelsScreen.unnamedField") : row.key}</span>
+                  <span {...stylex.props(styles.matrixFieldType)} aria-label={`${t("fieldMatrix.rowTypeLabel")}: ${row.type}`}>
                     {row.type}
                   </span>
                   {technicalIds.has(row.id) && (
@@ -316,7 +562,7 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
                       }}
                       role="gridcell"
                       tabIndex={isFocusCell ? (activated ? -1 : 0) : -1}
-                      className="studio-matrix-cell"
+                      {...stylex.props(styles.matrixCell, MATRIX_CELL_STATE_STYLE[state], flagged && styles.matrixCellFlagged)}
                       data-state={state}
                       data-flagged={flagged || undefined}
                       title={flagged ? t("fieldMatrix.flaggedCellMark") : undefined}
@@ -330,7 +576,7 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
                       }}
                     >
                       {entry && (
-                        <span className="studio-matrix-cell-flags">
+                        <span {...stylex.props(styles.matrixCellFlags)}>
                           {FLAG_KEYS.map((key) => {
                             const raw = entry[key];
                             if (isExpression(raw)) {
@@ -341,7 +587,7 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
                               <input
                                 key={key}
                                 type="checkbox"
-                                className={`studio-matrix-flag-${key}`}
+                                {...stylex.props(MATRIX_FLAG_ACCENT_STYLE[key], gated && styles.matrixFlagCheckboxDisabled)}
                                 aria-label={t(FLAG_LABEL_KEY[key])}
                                 aria-disabled={gated || undefined}
                                 tabIndex={gated || !isActiveCell ? -1 : undefined}
@@ -356,7 +602,7 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
                         </span>
                       )}
                       {!entry && state === "blank" && (
-                        <span className="studio-matrix-dash" aria-hidden="true">
+                        <span {...stylex.props(styles.matrixDash)} aria-hidden="true">
                           –
                         </span>
                       )}

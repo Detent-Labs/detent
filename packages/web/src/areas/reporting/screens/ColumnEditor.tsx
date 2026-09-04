@@ -1,3 +1,5 @@
+import * as stylex from "@stylexjs/stylex";
+import { colors, fonts, space } from "form-ui/tokens.stylex";
 import {
   addFieldColumn,
   addMergeColumn,
@@ -18,6 +20,118 @@ import type { ColumnChoice, ReportColumn } from "../api/types.js";
  * up/down buttons rather than drag-and-drop — keyboard-reachable with no new
  * dependency, and the list is short enough that a button pair costs nothing.
  */
+/** `app.css`'s column-editor rules, as StyleX. `.rep-field-picker select`
+ * never matched any element even before this migration: the class it
+ * gates always sits on the `<select>` itself, never a wrapper, so no
+ * descendant `select` exists for it to reach. This migration drops the
+ * dead className rather than inventing a style for a rule that never
+ * applied anything. */
+const styles = stylex.create({
+  empty: {
+    fontSize: "0.85rem",
+    color: colors.textMuted,
+    marginTop: 0,
+    marginInline: 0,
+    marginBottom: space.s3,
+    maxWidth: "46rem",
+    borderLeftWidth: 2,
+    borderLeftStyle: "solid",
+    borderLeftColor: colors.border,
+    paddingLeft: space.s3,
+  },
+  columnList: {
+    listStyle: "none",
+    marginTop: 0,
+    marginInline: 0,
+    marginBottom: space.s3,
+    padding: 0,
+    borderTopWidth: 1,
+    borderTopStyle: "solid",
+    borderTopColor: colors.border,
+  },
+  columnRow: {
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.border,
+    paddingBlock: space.s2,
+    paddingInline: 0,
+  },
+  columnRowHead: {
+    display: "flex",
+    alignItems: "center",
+    gap: space.s2,
+    flexWrap: "wrap",
+  },
+  columnIndex: {
+    fontFamily: fonts.mono,
+    fontVariantNumeric: "tabular-nums",
+    color: colors.textMuted,
+    minWidth: "1.5em",
+  },
+  stamp: {
+    display: "inline-block",
+    fontFamily: fonts.mono,
+    fontSize: 11,
+    fontWeight: 600,
+    textTransform: "uppercase",
+    letterSpacing: "0.08em",
+    borderWidth: 2,
+    borderStyle: "solid",
+    borderColor: "currentcolor",
+    paddingBlock: 2,
+    paddingInline: 7,
+  },
+  columnRowActions: {
+    display: "flex",
+    gap: space.s1,
+    marginLeft: "auto",
+  },
+  mergeSources: {
+    marginTop: space.s2,
+    marginRight: 0,
+    marginBottom: 0,
+    marginLeft: `calc(1.5em + ${space.s2})`,
+    paddingLeft: space.s3,
+    borderLeftWidth: 2,
+    borderLeftStyle: "solid",
+    borderLeftColor: colors.border,
+  },
+  scope: {
+    fontSize: "0.85rem",
+    color: colors.textMuted,
+    marginTop: 0,
+    marginInline: 0,
+    marginBottom: space.s3,
+    maxWidth: "46rem",
+  },
+  mergeSourcesList: {
+    listStyle: "none",
+    marginTop: 0,
+    marginInline: 0,
+    marginBottom: space.s2,
+    padding: 0,
+  },
+  mergeSourceRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: space.s2,
+    paddingBlock: space.s1,
+    paddingInline: 0,
+  },
+  figure: {
+    fontFamily: fonts.mono,
+    fontVariantNumeric: "tabular-nums",
+    fontSize: "0.85rem",
+    whiteSpace: "nowrap",
+  },
+  columnAdd: {
+    display: "flex",
+    alignItems: "center",
+    gap: space.s2,
+    flexWrap: "wrap",
+  },
+});
+
 export function ColumnEditor({
   columns,
   choices,
@@ -37,13 +151,13 @@ export function ColumnEditor({
     <section>
       <h2>{t(locale, "builder.columnsTitle")}</h2>
       {columns.length === 0 ? (
-        <p className="rep-empty">{t(locale, "builder.columnsEmpty")}</p>
+        <p {...stylex.props(styles.empty)}>{t(locale, "builder.columnsEmpty")}</p>
       ) : (
-        <ol className="rep-column-list">
+        <ol {...stylex.props(styles.columnList)}>
           {columns.map((col, i) => (
-            <li key={i} className="rep-column-row">
-              <div className="rep-column-row-head">
-                <span className="rep-column-index" translate="no">
+            <li key={i} {...stylex.props(styles.columnRow)}>
+              <div {...stylex.props(styles.columnRowHead)}>
+                <span {...stylex.props(styles.columnIndex)} translate="no">
                   {i + 1}
                 </span>
                 {col.type === "field" ? (
@@ -55,9 +169,9 @@ export function ColumnEditor({
                     locale={locale}
                   />
                 ) : (
-                  <span className="rep-stamp">{t(locale, "builder.mergeColumnLabel")}</span>
+                  <span {...stylex.props(styles.stamp)}>{t(locale, "builder.mergeColumnLabel")}</span>
                 )}
-                <div className="rep-column-row-actions">
+                <div {...stylex.props(styles.columnRowActions)}>
                   <button type="button" className="btn btn-secondary" onClick={() => onChange(moveColumn(columns, i, -1))} disabled={i === 0}>
                     {t(locale, "builder.moveUp")}
                   </button>
@@ -75,12 +189,12 @@ export function ColumnEditor({
                 </div>
               </div>
               {col.type === "merge" && (
-                <div className="rep-merge-sources">
-                  <p className="rep-scope">{t(locale, "builder.mergeSources")}</p>
-                  <ol>
+                <div {...stylex.props(styles.mergeSources)}>
+                  <p {...stylex.props(styles.scope)}>{t(locale, "builder.mergeSources")}</p>
+                  <ol {...stylex.props(styles.mergeSourcesList)}>
                     {col.fieldIds.map((fieldId, sourceIndex) => (
-                      <li key={sourceIndex} className="rep-merge-source-row">
-                        <span translate="no" className="rep-figure">
+                      <li key={sourceIndex} {...stylex.props(styles.mergeSourceRow)}>
+                        <span translate="no" {...stylex.props(styles.figure)}>
                           {fieldId}
                         </span>
                         <button type="button" className="btn btn-secondary" onClick={() => onChange(removeMergeSource(columns, i, sourceIndex))}>
@@ -103,7 +217,7 @@ export function ColumnEditor({
           ))}
         </ol>
       )}
-      <div className="rep-column-add">
+      <div {...stylex.props(styles.columnAdd)}>
         <FieldPicker
           value=""
           choices={available}
@@ -144,7 +258,7 @@ function FieldPicker({
 }) {
   const placeholder = addLabel ?? t(locale, "builder.fieldPickerPlaceholder");
   return (
-    <select className="rep-field-picker" aria-label={placeholder} value={value} onChange={(e) => onChange(e.target.value)}>
+    <select aria-label={placeholder} value={value} onChange={(e) => onChange(e.target.value)}>
       <option value="" disabled>
         {placeholder}
       </option>

@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState, type DragEvent } from "react";
+import * as stylex from "@stylexjs/stylex";
+import { colors, fonts, space } from "form-ui/tokens.stylex";
 import type { FieldId, Step, View, ViewNote } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
 import type { DraftField } from "../draft/fields";
@@ -27,6 +29,320 @@ import { effectiveFlag, gatedKeys, setFlag, writtenFieldCounts, type FlagKey, ty
 
 type DraftStep = DraftOf<Step>;
 type DraftView = DraftOf<View>;
+
+const styles = stylex.create({
+  formStripOverride: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s1,
+    minWidth: "10rem",
+  },
+  formStripField: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s1,
+  },
+  formCel: {
+    fontFamily: fonts.mono,
+    fontSize: "11px",
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+    color: colors.accent,
+    border: "2px solid currentcolor",
+    paddingBlock: 0,
+    paddingInline: space.s1,
+  },
+  studioDevview: {
+    marginBlock: space.s2,
+    marginInline: 0,
+    border: `1px solid ${colors.border}`,
+    paddingBlock: space.s1,
+    paddingInline: space.s2,
+  },
+  studioDevviewSummary: {
+    cursor: "pointer",
+    color: colors.textMuted,
+    fontFamily: fonts.mono,
+    fontSize: "0.85rem",
+  },
+  formStrip: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "flex-start",
+    gap: space.s3,
+    marginTop: space.s4,
+    paddingTop: space.s3,
+    borderTop: `2px solid ${colors.divider}`,
+  },
+  formStripHeading: {
+    flexBasis: "100%",
+    fontFamily: fonts.mono,
+    margin: 0,
+  },
+  studioWarning: {
+    color: colors.refusal,
+    borderLeft: `3px solid ${colors.accent400}`,
+    paddingLeft: space.s2,
+  },
+  formEditorPage: {
+    display: "flex",
+    flexDirection: "column",
+    border: `1px solid ${colors.border}`,
+  },
+  formEditorHeader: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: space.s3,
+    paddingBlock: space.s3,
+    paddingInline: space.s4,
+    borderBottom: `2px solid ${colors.divider}`,
+  },
+  // `.studio-form-editor-header .studio-back`.
+  studioBack: {
+    display: "block",
+    paddingLeft: 0,
+    marginBottom: 0,
+  },
+  // `.studio-form-editor-header h2`: a descendant selector on a bare `<h2>`.
+  formEditorHeading: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: space.s2,
+    margin: 0,
+  },
+  formEditorStep: {
+    fontFamily: fonts.mono,
+    fontSize: "0.8em",
+    color: colors.textMuted,
+  },
+  formEditorBody: {
+    display: "grid",
+    gridTemplateColumns: "16rem minmax(0, 1fr)",
+    alignItems: "start",
+  },
+  formPalette: {
+    borderRight: `2px solid ${colors.divider}`,
+  },
+  formPaletteHeading: {
+    fontSize: "11px",
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+    color: colors.textMuted,
+    margin: 0,
+    paddingBlock: space.s2,
+    paddingInline: space.s3,
+    borderBottom: `1px solid ${colors.border}`,
+  },
+  // `.studio-form-palette-heading + .studio-form-palette-heading` and
+  // `.studio-form-palette-list + .studio-form-palette-heading`: this file
+  // knows at each of the three headings whether the sibling before it
+  // matches, so the adjacency becomes a per-heading conditional.
+  formPaletteHeadingBordered: {
+    borderTop: `2px solid ${colors.divider}`,
+  },
+  formPaletteList: {
+    listStyle: "none",
+    margin: 0,
+    padding: 0,
+  },
+  // `.studio-form-palette-field`, merged with the shared
+  // `.studio-form-palette-field, .studio-form-card-body { user-select: none;
+  // touch-action: manipulation }` declaration (D6) and its own `:hover`.
+  formPaletteField: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: space.s2,
+    width: "100%",
+    background: "none",
+    color: "inherit",
+    border: "none",
+    borderBottom: `1px solid ${colors.border}`,
+    paddingBlock: space.s2,
+    paddingInline: space.s3,
+    font: "inherit",
+    textAlign: "left",
+    cursor: "grab",
+    userSelect: "none",
+    touchAction: "manipulation",
+    ":hover": {
+      background: colors.surfaceMuted,
+    },
+  },
+  formPaletteFieldMint: {
+    borderStyle: "dashed",
+  },
+  formPaletteKey: {
+    flex: 1,
+    minWidth: 0,
+    fontFamily: fonts.mono,
+    overflowWrap: "anywhere",
+  },
+  formPaletteType: {
+    fontFamily: fonts.mono,
+    color: colors.textMuted,
+  },
+  formAddNote: {
+    marginBlock: space.s2,
+    marginInline: space.s3,
+  },
+  formCanvasRegion: {
+    overflowY: "auto",
+    overscrollBehavior: "contain",
+    paddingBlock: space.s3,
+    paddingInline: space.s4,
+    minWidth: 0,
+  },
+  formColumns: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: space.s2,
+    paddingBottom: space.s3,
+    borderBottom: `2px solid ${colors.divider}`,
+    marginBottom: space.s3,
+  },
+  formColumnsLabel: {
+    fontSize: "11px",
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+    color: colors.textMuted,
+  },
+  // `[aria-pressed="true"]`: a JS-computed choice reading the same
+  // `aria-pressed` the button already carries.
+  formColumnsOptionPressed: {
+    boxShadow: `inset 3px 0 0 ${colors.accent}`,
+  },
+  // `.studio-form-canvas` merges its own base declaration with the
+  // `[data-columns="2"]` variant (D5's parameterized-style-function
+  // pattern, the same shape `form-ui/FieldForm.tsx` already uses).
+  formCanvasOneCol: {
+    listStyle: "none",
+    margin: 0,
+    padding: 0,
+    display: "grid",
+    gridTemplateColumns: "1fr",
+    gap: space.s2,
+  },
+  formCanvasTwoCol: {
+    listStyle: "none",
+    margin: 0,
+    padding: 0,
+    display: "grid",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gap: space.s2,
+  },
+  // `.studio-form-canvas[data-columns="2"] > [data-span="2"]`.
+  formCardSpanTwo: {
+    gridColumn: "span 2",
+  },
+  // `.studio-form-canvas > .empty`, merged with `.studio-form-canvas-tail`'s
+  // own shared grid-column/color declaration (D6).
+  formCanvasEmpty: {
+    gridColumn: "1 / -1",
+    color: colors.textMuted,
+  },
+  formCanvasTail: {
+    gridColumn: "1 / -1",
+    color: colors.textMuted,
+    border: `1px dashed ${colors.border}`,
+    paddingBlock: space.s2,
+    paddingInline: space.s3,
+  },
+  formCard: {
+    display: "flex",
+    alignItems: "stretch",
+    border: `1px solid ${colors.border}`,
+    minWidth: 0,
+  },
+  // `[data-selected]`/`[data-conditional]`: JS-computed choices reading the
+  // same booleans the data attributes already carry.
+  formCardSelected: {
+    boxShadow: `inset 3px 0 0 ${colors.accent}`,
+  },
+  formCardConditional: {
+    borderStyle: "dashed",
+  },
+  formCardEdge: {
+    flex: `0 0 ${space.s2}`,
+    borderRight: `1px solid ${colors.border}`,
+  },
+  // `.studio-form-card-body`, merged with the same shared user-select/
+  // touch-action declaration `formPaletteField` carries (D6), plus `:hover`.
+  formCardBody: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: space.s2,
+    flex: 1,
+    minWidth: 0,
+    background: "none",
+    color: "inherit",
+    border: "none",
+    paddingBlock: space.s2,
+    paddingInline: space.s3,
+    font: "inherit",
+    textAlign: "left",
+    cursor: "grab",
+    userSelect: "none",
+    touchAction: "manipulation",
+    ":hover": {
+      background: colors.surfaceMuted,
+    },
+  },
+  formCardKey: {
+    flex: 1,
+    minWidth: 0,
+    fontFamily: fonts.mono,
+    overflowWrap: "anywhere",
+  },
+  formCardNotePreview: {
+    flex: 1,
+    minWidth: 0,
+    overflowWrap: "anywhere",
+  },
+  formCardMarks: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: space.s1,
+  },
+  // `.studio-form-mark, .studio-form-card-span, .studio-form-card-type`'s
+  // shared declaration.
+  formMachineMark: {
+    fontFamily: fonts.mono,
+    fontSize: "11px",
+    color: colors.textMuted,
+  },
+  formCardSpan: {
+    fontVariantNumeric: "tabular-nums",
+  },
+  formCardMoves: {
+    display: "flex",
+    alignItems: "center",
+    gap: space.s1,
+    paddingRight: space.s2,
+  },
+  formStripEmpty: {
+    marginTop: space.s4,
+    paddingTop: space.s3,
+    borderTop: `2px solid ${colors.divider}`,
+    color: colors.textMuted,
+  },
+  formEditorFooter: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: space.s3,
+    paddingBlock: space.s3,
+    paddingInline: space.s4,
+    borderTop: `2px solid ${colors.divider}`,
+  },
+  studioDialogNote: {
+    color: colors.textMuted,
+    fontSize: "0.9rem",
+  },
+  // `.studio-form-editor-footer .studio-dialog-note`.
+  studioDialogNoteInFooter: {
+    margin: 0,
+  },
+});
 
 /** What the pointer is currently carrying. A palette drag either places an
  * existing catalog field or mints a new one; a card drag reorders one. All
@@ -74,8 +390,8 @@ function OverrideField({
 }) {
   const cel = isExpression(value);
   return (
-    <div className="studio-form-strip-override">
-      <label className="studio-form-strip-field">
+    <div {...stylex.props(styles.formStripOverride)}>
+      <label {...stylex.props(styles.formStripField)}>
         {label}
         <input
           type="checkbox"
@@ -84,9 +400,9 @@ function OverrideField({
           onChange={(e) => onChange(e.target.checked)}
         />
       </label>
-      {cel && <span className="studio-form-cel">{t("formEditor.markCel")}</span>}
-      <details className="studio-devview">
-        <summary>{t("formEditor.developerView")}</summary>
+      {cel && <span {...stylex.props(styles.formCel)}>{t("formEditor.markCel")}</span>}
+      <details {...stylex.props(styles.studioDevview)}>
+        <summary {...stylex.props(styles.studioDevviewSummary)}>{t("formEditor.developerView")}</summary>
         <BooleanOrExpressionInput label={label} value={value} flagKey={flagKey} stepId={stepId} onChange={onChange} />
       </details>
     </div>
@@ -135,8 +451,8 @@ export function FormEditorStrip({
   // offered unchanged.
   const isTechnical = row.ref !== undefined && technicalFieldIds.has(row.ref);
   return (
-    <section className="studio-form-strip" aria-label={t("formEditor.stripLabel")}>
-      <h3 className="studio-form-strip-heading">{label}</h3>
+    <section {...stylex.props(styles.formStrip)} aria-label={t("formEditor.stripLabel")}>
+      <h3 {...stylex.props(styles.formStripHeading)}>{label}</h3>
       <OverrideField
         label={t("formEditor.visible")}
         stepId={stepId}
@@ -168,7 +484,7 @@ export function FormEditorStrip({
           `form-ui` reads no span on it, so the control would write a value
           nothing renders. */}
       {!isGroup && (
-        <label className="studio-form-strip-field">
+        <label {...stylex.props(styles.formStripField)}>
           {t("formEditor.span")}
           <select value={String(row.span ?? 1)} onChange={(e) => onChangeSpan(Number(e.target.value) as 1 | 2)}>
             <option value="1">1</option>
@@ -178,7 +494,7 @@ export function FormEditorStrip({
       )}
       {/* Move-to-group, the third keyboard move command. A group is named by
           its key, which is what `ViewField.group` carries. */}
-      <label className="studio-form-strip-field">
+      <label {...stylex.props(styles.formStripField)}>
         {t("formEditor.group")}
         <select value={row.group ?? ""} onChange={(e) => onChangeGroup(e.target.value === "" ? undefined : e.target.value)}>
           <option value="">{t("formEditor.noGroup")}</option>
@@ -218,24 +534,24 @@ export interface NoteEditorStripProps {
 export function NoteEditorStrip({ row, stepId, baseLocale, groupKeys, onChangeText, onChangeVisible, onChangeSpan, onChangeGroup }: NoteEditorStripProps) {
   const { contentLocale } = useDraft();
   return (
-    <section className="studio-form-strip" aria-label={t("formEditor.stripLabel")}>
-      <h3 className="studio-form-strip-heading">{t("formEditor.noteHeading")}</h3>
-      <label className="studio-form-strip-field">
+    <section {...stylex.props(styles.formStrip)} aria-label={t("formEditor.stripLabel")}>
+      <h3 {...stylex.props(styles.formStripHeading)}>{t("formEditor.noteHeading")}</h3>
+      <label {...stylex.props(styles.formStripField)}>
         {t("formEditor.noteText")}
         <LocalizedTextInput value={row.text} onChange={onChangeText} />
       </label>
       {missingTranslationWarning(row.text, contentLocale, baseLocale) && (
-        <p className="studio-warning">{missingTranslationWarning(row.text, contentLocale, baseLocale)}</p>
+        <p {...stylex.props(styles.studioWarning)}>{missingTranslationWarning(row.text, contentLocale, baseLocale)}</p>
       )}
       <OverrideField label={t("formEditor.visible")} stepId={stepId} flagKey="visible" value={row.visible} onChange={onChangeVisible} />
-      <label className="studio-form-strip-field">
+      <label {...stylex.props(styles.formStripField)}>
         {t("formEditor.span")}
         <select value={String(row.span ?? 1)} onChange={(e) => onChangeSpan(Number(e.target.value) as 1 | 2)}>
           <option value="1">1</option>
           <option value="2">2</option>
         </select>
       </label>
-      <label className="studio-form-strip-field">
+      <label {...stylex.props(styles.formStripField)}>
         {t("formEditor.group")}
         <select value={row.group ?? ""} onChange={(e) => onChangeGroup(e.target.value === "" ? undefined : e.target.value)}>
           <option value="">{t("formEditor.noGroup")}</option>
@@ -409,46 +725,48 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
   const selectedRow = selected !== undefined ? rows[selected] : undefined;
 
   return (
-    <div className="studio-form-editor-page">
-      <header className="studio-form-editor-header">
-        <button type="button" className="btn btn-ghost studio-back" onClick={onBack}>
+    <div {...stylex.props(styles.formEditorPage)}>
+      <header {...stylex.props(styles.formEditorHeader)}>
+        <button type="button" className="btn btn-ghost" {...stylex.props(styles.studioBack)} onClick={onBack}>
           {t("formEditor.backToCanvas")}
         </button>
-        <h2 id="form-editor-heading">
+        <h2 id="form-editor-heading" {...stylex.props(styles.formEditorHeading)}>
           {t("formEditor.heading")}
-          <span className="studio-form-editor-step">{resolveDraftLocalizedText(step.label, contentLocale, draft.baseLocale ?? "en") || step.key || t("steps.unnamedStep")}</span>
+          <span {...stylex.props(styles.formEditorStep)}>{resolveDraftLocalizedText(step.label, contentLocale, draft.baseLocale ?? "en") || step.key || t("steps.unnamedStep")}</span>
         </h2>
       </header>
 
-      <div className="studio-form-editor-body">
-        <nav className="studio-form-palette" aria-label={t("formEditor.paletteLabel")}>
-          <h3 className="studio-form-palette-heading">{t("formEditor.paletteHeading")}</h3>
+      <div {...stylex.props(styles.formEditorBody)}>
+        <nav {...stylex.props(styles.formPalette)} aria-label={t("formEditor.paletteLabel")}>
+          <h3 {...stylex.props(styles.formPaletteHeading)}>{t("formEditor.paletteHeading")}</h3>
           {palette.length === 0 ? (
             <p className="empty">{t("formEditor.paletteEmpty")}</p>
           ) : (
-            <ul className="studio-form-palette-list">
+            <ul {...stylex.props(styles.formPaletteList)}>
               {palette.map((id) => (
                 <li key={id}>
                   {/* Draggable for a pointer, and a plain activation for a
                       keyboard: the same append the drop would make at the end. */}
                   <button
                     type="button"
-                    className="studio-form-palette-field"
+                    {...stylex.props(styles.formPaletteField)}
                     draggable
                     onDragStart={() => setDragging({ kind: "palette", ref: id })}
                     onDragEnd={() => setDragging(undefined)}
                     onClick={() => setRows(insertViewField(rows, id, rows.length))}
                   >
-                    <span className="studio-form-palette-key">{labelFor(id)}</span>
-                    <span className="studio-form-palette-type">{typeLabel(fieldFor(id)?.type)}</span>
+                    <span {...stylex.props(styles.formPaletteKey)}>{labelFor(id)}</span>
+                    <span {...stylex.props(styles.formPaletteType)}>{typeLabel(fieldFor(id)?.type)}</span>
                   </button>
                 </li>
               ))}
             </ul>
           )}
 
-          <h3 className="studio-form-palette-heading">{t("formEditor.mintHeading")}</h3>
-          <ul className="studio-form-palette-list">
+          <h3 {...stylex.props(styles.formPaletteHeading, palette.length > 0 && styles.formPaletteHeadingBordered)}>
+            {t("formEditor.mintHeading")}
+          </h3>
+          <ul {...stylex.props(styles.formPaletteList)}>
             {PALETTE_FIELD_KINDS.map((kind) => (
               <li key={kind}>
                 {/* A dashed border, not a new color: the same "not there yet"
@@ -457,13 +775,13 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
                     until the drop or the click mints it. */}
                 <button
                   type="button"
-                  className="studio-form-palette-field studio-form-palette-field-mint"
+                  {...stylex.props(styles.formPaletteField, styles.formPaletteFieldMint)}
                   draggable
                   onDragStart={() => setDragging({ kind: "mint", fieldKind: kind })}
                   onDragEnd={() => setDragging(undefined)}
                   onClick={() => mintAndPlace(kind, rows.length)}
                 >
-                  <span className="studio-form-palette-key">{t(MINT_KIND_LABEL[kind])}</span>
+                  <span {...stylex.props(styles.formPaletteKey)}>{t(MINT_KIND_LABEL[kind])}</span>
                 </button>
               </li>
             ))}
@@ -472,24 +790,25 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
           {/* A note belongs to no catalog, so it sits beside the palette
               rather than inside it (studio-form-editor: "An author places a
               note on the form canvas"). */}
-          <h3 className="studio-form-palette-heading">{t("formEditor.noteSectionHeading")}</h3>
-          <button type="button" className="btn btn-secondary studio-form-add-note" onClick={insertNote}>
+          <h3 {...stylex.props(styles.formPaletteHeading, styles.formPaletteHeadingBordered)}>{t("formEditor.noteSectionHeading")}</h3>
+          <button type="button" className="btn btn-secondary" {...stylex.props(styles.formAddNote)} onClick={insertNote}>
             {t("formEditor.addNote")}
           </button>
         </nav>
 
-        <div className="studio-form-canvas-region">
+        <div {...stylex.props(styles.formCanvasRegion)}>
           {/* The visible label names the group rather than a second aria-label
               repeating it, so a screen reader announces one name, not two. */}
-          <div className="studio-form-columns" role="group" aria-labelledby="form-editor-columns-label">
-            <span className="studio-form-columns-label" id="form-editor-columns-label">
+          <div {...stylex.props(styles.formColumns)} role="group" aria-labelledby="form-editor-columns-label">
+            <span {...stylex.props(styles.formColumnsLabel)} id="form-editor-columns-label">
               {t("formEditor.columnsLabel")}
             </span>
             {([1, 2] as const).map((n) => (
               <button
                 key={n}
                 type="button"
-                className="btn btn-secondary studio-form-columns-option"
+                className="btn btn-secondary"
+                {...stylex.props(columns === n && styles.formColumnsOptionPressed)}
                 aria-pressed={columns === n}
                 onClick={() => setColumns(n)}
               >
@@ -498,8 +817,12 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
             ))}
           </div>
 
-          <ol className="studio-form-canvas" data-columns={columns} aria-label={t("formEditor.canvasLabel")}>
-            {rows.length === 0 && <li className="empty">{t("formEditor.canvasEmpty")}</li>}
+          <ol
+            {...stylex.props(columns === 2 ? styles.formCanvasTwoCol : styles.formCanvasOneCol)}
+            data-columns={columns}
+            aria-label={t("formEditor.canvasLabel")}
+          >
+            {rows.length === 0 && <li {...stylex.props(styles.formCanvasEmpty)}>{t("formEditor.canvasEmpty")}</li>}
             {rows.map((row, rowIndex) => {
               const isField = isDraftViewField(row);
               const field = isField ? fieldFor(row.ref) : undefined;
@@ -515,10 +838,17 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
                 dropAt(dropSlot(rowIndex, side));
               };
               const allowDrop = (e: DragEvent) => e.preventDefault();
+              const cardProps = stylex.props(
+                styles.formCard,
+                selected === rowIndex && styles.formCardSelected,
+                hiddenByExpression && styles.formCardConditional,
+                columns === 2 && span === 2 && styles.formCardSpanTwo,
+              );
               return (
                 <li
                   key={cardKey}
-                  className={isField ? "studio-form-card" : "studio-form-card studio-form-card-note"}
+                  className={isField ? cardProps.className : `studio-form-card-note ${cardProps.className}`}
+                  style={cardProps.style}
                   data-span={span}
                   data-selected={selected === rowIndex || undefined}
                   data-conditional={hiddenByExpression || undefined}
@@ -529,31 +859,31 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
                       names a side, and the side is what decides the slot. A
                       span-2 card owns its row, so both of its halves are the
                       same card and only these edges split it. */}
-                  <span className="studio-form-card-edge" onDragOver={allowDrop} onDrop={dropOn("before")} aria-hidden="true" />
+                  <span {...stylex.props(styles.formCardEdge)} onDragOver={allowDrop} onDrop={dropOn("before")} aria-hidden="true" />
                   <button
                     type="button"
-                    className="studio-form-card-body"
+                    {...stylex.props(styles.formCardBody)}
                     draggable
                     onDragStart={() => setDragging({ kind: "card", index: rowIndex })}
                     onDragEnd={() => setDragging(undefined)}
                     aria-pressed={selected === rowIndex}
                     onClick={() => setSelected(selected === rowIndex ? undefined : rowIndex)}
                   >
-                    <span className={isField ? "studio-form-card-key" : "studio-form-card-note-preview"}>{cardLabel}</span>
-                    <span className="studio-form-card-marks">
-                      {isField && row.required === true && <span className="studio-form-mark">{t("formEditor.markRequired")}</span>}
-                      {isField && row.readonly === true && <span className="studio-form-mark">{t("formEditor.markReadonly")}</span>}
-                      {celMarked && <span className="studio-form-cel">{t("formEditor.markCel")}</span>}
-                      <span className="studio-form-card-span">
+                    <span {...stylex.props(isField ? styles.formCardKey : styles.formCardNotePreview)}>{cardLabel}</span>
+                    <span {...stylex.props(styles.formCardMarks)}>
+                      {isField && row.required === true && <span {...stylex.props(styles.formMachineMark)}>{t("formEditor.markRequired")}</span>}
+                      {isField && row.readonly === true && <span {...stylex.props(styles.formMachineMark)}>{t("formEditor.markReadonly")}</span>}
+                      {celMarked && <span {...stylex.props(styles.formCel)}>{t("formEditor.markCel")}</span>}
+                      <span {...stylex.props(styles.formMachineMark, styles.formCardSpan)}>
                         {span}/{columns}
                       </span>
                     </span>
-                    <span className="studio-form-card-type">{cardType}</span>
+                    <span {...stylex.props(styles.formMachineMark)}>{cardType}</span>
                   </button>
                   {/* The keyboard route to the same array change a drag makes.
                       A drag handle alone leaves reordering unreachable without
                       a pointer. */}
-                  <span className="studio-form-card-moves">
+                  <span {...stylex.props(styles.formCardMoves)}>
                     <button type="button" className="btn btn-secondary" disabled={rowIndex === 0} onClick={() => move(rowIndex, -1)}>
                       {t("formEditor.moveUp")}
                     </button>
@@ -574,7 +904,7 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
             })}
             {/* The tail slot, so a card can be dropped past the last one. */}
             <li
-              className="studio-form-canvas-tail"
+              {...stylex.props(styles.formCanvasTail)}
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => {
                 e.preventDefault();
@@ -611,13 +941,13 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
               onChangeGroup={(group) => updateRow(selected!, { group })}
             />
           ) : (
-            <p className="studio-form-strip-empty">{t("formEditor.selectAField")}</p>
+            <p {...stylex.props(styles.formStripEmpty)}>{t("formEditor.selectAField")}</p>
           )}
         </div>
       </div>
 
-      <footer className="studio-form-editor-footer">
-        <p className="studio-dialog-note">{t("formEditor.navigateAwayKeepsChanges")}</p>
+      <footer {...stylex.props(styles.formEditorFooter)}>
+        <p {...stylex.props(styles.studioDialogNote, styles.studioDialogNoteInFooter)}>{t("formEditor.navigateAwayKeepsChanges")}</p>
       </footer>
     </div>
   );

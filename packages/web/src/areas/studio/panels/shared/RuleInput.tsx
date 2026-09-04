@@ -1,4 +1,6 @@
 import { useMemo, useRef, useState } from "react";
+import * as stylex from "@stylexjs/stylex";
+import { colors, fonts, space } from "form-ui/tokens.stylex";
 import type { Expression } from "workflow-engine/schema";
 import type { DraftOf } from "../../draft/types";
 import type { DraftField } from "../../draft/fields";
@@ -7,6 +9,61 @@ import { t } from "../../catalog.js";
 import { ExpressionInput } from "./ExpressionInput";
 import { RuleBuilder } from "./RuleBuilder";
 import { buildRuleOperands, fromRuleCel, ruleOperandSignature, toRuleCel, type RuleCondition } from "./ruleLogic";
+
+const styles = stylex.create({
+  conditionInput: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s2,
+    minWidth: 0,
+  },
+  conditionFooter: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    gap: space.s2,
+  },
+  conditionParseError: {
+    margin: 0,
+    color: colors.refusal,
+    fontSize: "0.85rem",
+  },
+  conditionMode: {
+    background: "none",
+    color: colors.accent,
+    padding: 0,
+    flex: "none",
+  },
+  // `.condition-mode-disclosure[aria-expanded="true"]`: a JS-computed choice
+  // reading the same `aria-expanded` the button already carries.
+  conditionModeExpanded: {
+    color: colors.text,
+  },
+  conditionReadout: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: space.s2,
+    margin: 0,
+    minWidth: 0,
+    flex: "1 1 20ch",
+  },
+  conditionReadoutLabel: {
+    fontFamily: fonts.body,
+    fontSize: "11px",
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+    color: colors.textMuted,
+    flex: "none",
+  },
+  // `.condition-readout code`: a descendant selector on a bare `<code>`.
+  conditionReadoutCode: {
+    fontFamily: fonts.mono,
+    fontSize: "0.85rem",
+    minWidth: 0,
+    overflowWrap: "anywhere",
+  },
+});
 
 interface Props {
   /** The field whose `validation.rule` this edits — supplies "this answer"'s
@@ -71,7 +128,7 @@ export function RuleInput({ field, value, onChange }: Props) {
 
   if (devOpen || unparseable) {
     return (
-      <div className="condition-input rule-input">
+      <div className={`condition-input rule-input ${stylex.props(styles.conditionInput).className}`}>
         <ExpressionInput
           value={value}
           onChange={(next) => {
@@ -79,15 +136,15 @@ export function RuleInput({ field, value, onChange }: Props) {
             onChange(next);
           }}
         />
-        <div className="condition-footer">
+        <div {...stylex.props(styles.conditionFooter)}>
           {unparseable && (
-            <p className="condition-parse-error" role="status">
+            <p {...stylex.props(styles.conditionParseError)} role="status">
               {t("condition.unparseable")}
             </p>
           )}
           <button
             type="button"
-            className="condition-mode condition-mode-disclosure"
+            {...stylex.props(styles.conditionMode, styles.conditionModeExpanded)}
             aria-expanded={true}
             onClick={() => setDevOpen(false)}
             disabled={unparseable}
@@ -100,14 +157,14 @@ export function RuleInput({ field, value, onChange }: Props) {
   }
 
   return (
-    <div className="condition-input rule-input">
+    <div className={`condition-input rule-input ${stylex.props(styles.conditionInput).className}`}>
       <RuleBuilder condition={condition} operands={operands} onChange={commit} />
-      <div className="condition-footer">
-        <p className="condition-readout">
-          <span className="condition-readout-label">{t("condition.celReadout")}</span>
-          <code>{preview ?? t("condition.celEmpty")}</code>
+      <div {...stylex.props(styles.conditionFooter)}>
+        <p {...stylex.props(styles.conditionReadout)}>
+          <span {...stylex.props(styles.conditionReadoutLabel)}>{t("condition.celReadout")}</span>
+          <code {...stylex.props(styles.conditionReadoutCode)}>{preview ?? t("condition.celEmpty")}</code>
         </p>
-        <button type="button" className="condition-mode condition-mode-disclosure" aria-expanded={false} onClick={() => setDevOpen(true)}>
+        <button type="button" {...stylex.props(styles.conditionMode)} aria-expanded={false} onClick={() => setDevOpen(true)}>
           {t("condition.developerView")}
         </button>
       </div>

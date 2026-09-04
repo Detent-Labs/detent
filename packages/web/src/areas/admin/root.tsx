@@ -1,8 +1,11 @@
 import { useEffect } from "react";
+import * as stylex from "@stylexjs/stylex";
 import { ListChecks, Send, Timer, Users, GitCompareArrows, Users2, Table2, Languages } from "lucide-react";
 import { matchRoute, routePath, ROUTE_ROLE, type Route } from "./routing.js";
 import { useAreaRoute, PROFILE_PATH } from "../../shell/routing.js";
 import { Chrome } from "../../shell/Chrome.js";
+import { navStyles } from "../../shell/navStyles.js";
+import { space } from "form-ui/tokens.stylex";
 import { InstancesScreen } from "./screens/InstancesScreen.js";
 import { InstanceScreen } from "./screens/InstanceScreen.js";
 import { OutboxScreen } from "./screens/OutboxScreen.js";
@@ -16,10 +19,23 @@ import { UiStringsScreen } from "./screens/UiStringsScreen.js";
 import { t, tFill, type CatalogKey } from "./catalog.js";
 import type { UiLocale } from "../../i18n/locale.js";
 import type { AreaRootProps } from "../../shell/App.js";
-import "./app.css";
 
 const ADMIN_ROLE = "system:admin";
 const DATALISTS_ROLE = "system:datalists";
+
+/** `.admin-empty-role` from `app.css`. */
+const styles = stylex.create({
+  emptyRole: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: "100vh",
+    textAlign: "center",
+    gap: space.s3,
+    padding: space.s4,
+  },
+});
 
 /** The role each tab's screen needs; `ROUTE_ROLE` in `routing.ts` carries the same rule per route. */
 const TABS: { name: Route["name"]; labelKey: CatalogKey; role: string; Icon: typeof ListChecks }[] = [
@@ -39,7 +55,7 @@ const TABS: { name: Route["name"]; labelKey: CatalogKey; role: string; Icon: typ
  */
 function MissingRole({ role, locale }: { role: string; locale: UiLocale }) {
   return (
-    <main className="admin-empty-role">
+    <main {...stylex.props(styles.emptyRole)}>
       <h1>{t(locale, "role.title")}</h1>
       <p>{tFill(locale, "role.body", { role })}</p>
     </main>
@@ -59,25 +75,27 @@ export function AdminArea({ session, locale, localPath, go, onUnauthorized, onLo
   }, [strandedOnDefault, navigate]);
 
   const nav = (
-    <nav className="shell-nav">
-      {TABS.filter((tab) => may(tab.role)).map((tab) => (
-        <button
-          key={tab.name}
-          type="button"
-          className="btn btn-secondary"
-          aria-current={
-            route.name === tab.name ||
-            (tab.name === "instances" && route.name === "instance") ||
-            (tab.name === "dataLists" && route.name === "dataList")
-              ? "page"
-              : undefined
-          }
-          onClick={() => navigate({ name: tab.name } as Route)}
-        >
-          <tab.Icon size={18} strokeWidth={1.75} aria-hidden="true" />
-          {t(locale, tab.labelKey)}
-        </button>
-      ))}
+    <nav {...stylex.props(navStyles.nav)}>
+      {TABS.filter((tab) => may(tab.role)).map((tab) => {
+        const isCurrent =
+          route.name === tab.name ||
+          (tab.name === "instances" && route.name === "instance") ||
+          (tab.name === "dataLists" && route.name === "dataList");
+        const tabProps = stylex.props(isCurrent && navStyles.navCurrent);
+        return (
+          <button
+            key={tab.name}
+            type="button"
+            className={`btn btn-secondary ${tabProps.className}`}
+            style={tabProps.style}
+            aria-current={isCurrent ? "page" : undefined}
+            onClick={() => navigate({ name: tab.name } as Route)}
+          >
+            <tab.Icon size={18} strokeWidth={1.75} aria-hidden="true" />
+            {t(locale, tab.labelKey)}
+          </button>
+        );
+      })}
     </nav>
   );
 

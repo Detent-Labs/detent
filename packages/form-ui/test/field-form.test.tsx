@@ -240,7 +240,7 @@ describe("FieldForm: a grouped control carries its label as a legend", () => {
   it("carries the required state on the fieldset, the element the group's state describes", () => {
     const html = grouped("radio", "string", true);
     expect(html).toMatch(/<fieldset[^>]*aria-required="true"/);
-    expect(html).toContain("form-ui-required-marker");
+    expect(html).toContain("requiredMarker");
   });
 
   it("carries the invalid state and the issue description on the fieldset", () => {
@@ -317,7 +317,7 @@ describe("FieldForm: notes", () => {
     expect(html).not.toContain("<select");
     expect(html).not.toContain("<textarea");
     expect(html).not.toContain("<label");
-    expect(html).not.toContain("form-ui-required-marker");
+    expect(html).not.toContain("requiredMarker");
   });
 });
 
@@ -329,12 +329,12 @@ describe("FieldForm: readonly and required", () => {
 
   it("shows a required marker when required is set", () => {
     const html = renderFields([{ field: baseField({ id: "f1" }), value: undefined, required: true, readonly: false }]);
-    expect(html).toContain("form-ui-required-marker");
+    expect(html).toContain("requiredMarker");
   });
 
   it("shows no required marker when required is not set", () => {
     const html = renderFields([{ field: baseField({ id: "f1" }), value: undefined, required: false, readonly: false }]);
-    expect(html).not.toContain("form-ui-required-marker");
+    expect(html).not.toContain("requiredMarker");
   });
 });
 
@@ -377,7 +377,7 @@ describe("FieldForm: per-field validation errors", () => {
   it("attaches a matching issue beside its field, as a localized message rather than the raw kind", () => {
     const issuesByField = new Map<string, SubmissionIssue[]>([["f1", [{ kind: "required-missing", fieldId: "f1" }]]]);
     const html = renderFields([{ field: baseField({ id: "f1" }), value: undefined, required: false, readonly: false }], {}, issuesByField);
-    expect(html).toContain("form-ui-field-issues");
+    expect(html).toContain("fieldIssues");
     expect(html).toContain("This field is required.");
     expect(html).not.toContain(">required-missing<");
   });
@@ -390,7 +390,7 @@ describe("FieldForm: per-field validation errors", () => {
 
   it("renders no issue list when there are no issues for a field", () => {
     const html = renderFields([{ field: baseField({ id: "f1" }), value: undefined, required: false, readonly: false }]);
-    expect(html).not.toContain("form-ui-field-issues");
+    expect(html).not.toContain("fieldIssues");
   });
 
   it("puts the issue list as a sibling of the label, not nested inside it", () => {
@@ -550,7 +550,7 @@ describe("FieldForm: fields render across the view's column count, honoring span
       plain("m1", undefined, "g1"),
     ], 2);
     // The group's own container carries the form's count; it declares none.
-    expect(html).toContain('<fieldset class="form-ui-field form-ui-field-group" data-span="2" data-columns="2"');
+    expect(html).toContain('<fieldset class="fieldStack groupStack groupGridTwoCol" data-span="2" data-columns="2"');
   });
 
   it("ignores a span declared on a group", () => {
@@ -561,7 +561,7 @@ describe("FieldForm: fields render across the view's column count, honoring span
       { field: baseField({ id: "g1", key: "g1", type: "group" }), value: undefined, required: false, readonly: false, span: 1 },
       plain("m1", undefined, "g1"),
     ], 2);
-    expect(html).toContain('<fieldset class="form-ui-field form-ui-field-group" data-span="2" data-columns="2"');
+    expect(html).toContain('<fieldset class="fieldStack groupStack groupGridTwoCol" data-span="2" data-columns="2"');
   });
 
   it("wraps the grid in the element the collapse rule measures", () => {
@@ -569,9 +569,9 @@ describe("FieldForm: fields render across the view's column count, honoring span
     // descendants of the container rather than the container itself. Without
     // this wrapper the collapse rule would silently never fire on the grid.
     const html = renderGrid([plain("f1")], 2);
-    expect(html).toContain('<div class="form-ui-form">');
+    expect(html).toContain('<div class="form">');
     // The wrapper is outside the grid, not beside it.
-    expect(html.indexOf('class="form-ui-form"')).toBeLessThan(html.indexOf('class="form-ui-field-form"'));
+    expect(html.indexOf('class="form"')).toBeLessThan(html.indexOf('class="gridTwoCol"'));
   });
 
   it("a group member's own span clamps inside the group's grid", () => {

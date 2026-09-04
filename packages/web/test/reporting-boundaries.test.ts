@@ -6,7 +6,10 @@
  *
  * The first check used to read `packages/reporting/package.json`. One manifest
  * now serves every area and the app area genuinely needs `form-ui`, so absence
- * is asserted over this area's own imports instead.
+ * is asserted over this area's own imports instead. `form-ui/tokens.stylex` is
+ * exempt from that check: every area reads the shared design tokens
+ * (`stylex-phase-2-areas`), and only the step-form renderer, `form-ui`'s
+ * default export, is the thing this canary guards against.
  *
  * These are canaries. All hold today by construction; the test is what fails
  * when a later change wires in `form-ui` or calls a route outside the prefix.
@@ -34,7 +37,10 @@ const clientSource = readFileSync(join(AREA, "api/client.ts"), "utf8");
 
 test("the shared step-form renderer is absent from this area's imports", () => {
   for (const file of sources) {
-    expect(importsOf(file).filter((s) => s === "form-ui" || s.startsWith("form-ui/")), file).toEqual([]);
+    expect(
+      importsOf(file).filter((s) => (s === "form-ui" || s.startsWith("form-ui/")) && s !== "form-ui/tokens.stylex"),
+      file,
+    ).toEqual([]);
   }
 });
 

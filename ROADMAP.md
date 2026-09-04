@@ -310,6 +310,43 @@ Specs: `development-toolchain`, `devcontainer-preflight`, `worktree-isolation`,
     Specs: `definition-contract`, `runtime-api`, `studio-app`,
     `studio-form-editor`, `studio-checks-rail`.
 
+45. **StyleX styling model for `packages/web`/`packages/form-ui`: PHASES 0-5
+    DONE.** `stylex-phase-0-tooling` installed the
+    compiler, split `tokens.css`'s element rules into `global.css`, moved
+    the design-token module to `packages/form-ui`, gave `bun test` a
+    stub-preload story, and migrated the shell header and register tab as
+    the pilot. `stylex-phase-1-form-ui` migrated `packages/form-ui`'s field
+    renderer and `PathButtons`, deleted `form-ui.css` and its package
+    export, and gave `PathButtons` a `style` prop for its wrapper.
+    `stylex-phase-2-areas` migrated the shell's remaining nav wrapper and
+    the shell, app, admin and reporting areas' own stylesheets. Each area's
+    file now carries only its reduced-motion reset block. `stylex-phase-3-studio`
+    migrated every studio screen outside `canvas/`; `app.css` then carried
+    only its `canvas/`-owned rules, the reduced-motion block, and
+    `.studio-dialog::backdrop`, which stays literal permanently since
+    `::backdrop` fails a real `@stylexjs/unplugin` build. `stylex-phase-4-canvas`
+    migrated `canvas/CanvasView.tsx` and `canvas/EditRail.tsx`; `app.css`
+    now carries only the reduced-motion block and `.studio-dialog::backdrop`.
+    Two class names stay literal by that change's own mandate:
+    `canvas-node` and `panzoom-exclude`. Full reasoning, the measured
+    evaluation and the six-phase plan sit in phase 0's `design.md`, at
+    `openspec/changes/archive/2026-09-03-stylex-phase-0-tooling/design.md`.
+
+    `stylex-phase-5-cleanup` deleted `shell.css` and the four areas'
+    `app.css` files, closing the migration. `global.css` now carries
+    every rule they still held: the shell's flex frame, one deduped
+    `prefers-reduced-motion` block, and `.studio-dialog::backdrop`.
+    `.btn`/`.app-back` stay literal in `tokens.css` permanently, with no
+    further phase to convert their last consumer. Each phase is its own
+    OpenSpec change against `web-styling`.
+
+    Reopen triggers: two consecutive StyleX releases that each cost a build
+    fix reopen the compiler-version pin. A phase whose measured effort
+    argues for a split reopens the one-change-per-phase plan.
+
+    Specs: `web-styling`, `development-toolchain`, `unified-shell`,
+    `form-ui`.
+
 ## Done
 
 Stage detail: `docs/roadmap-history.md`. Same numbers, same order.

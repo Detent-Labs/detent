@@ -1,7 +1,29 @@
 import { useState } from "react";
+import * as stylex from "@stylexjs/stylex";
+import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { useDraft } from "../../draft/store";
 import { t } from "../../catalog.js";
 import { localeGapCount, resolveAddLocaleAttempt } from "../../draft/localized-text";
+
+/** `.studio-header-bar-locale-badge` and `.studio-header-bar-menu-
+ * add-locale` from `app.css`. */
+const styles = stylex.create({
+  localeBadge: {
+    fontFamily: fonts.mono,
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: colors.border,
+    background: colors.surface,
+    color: colors.text,
+    paddingBlock: space.s1,
+    paddingInline: space.s2,
+  },
+  addLocale: {
+    display: "flex",
+    alignItems: "center",
+    gap: space.s2,
+  },
+});
 
 /**
  * The switch alone: a compact control for the header row (studio-canvas: "A
@@ -25,7 +47,7 @@ export function ContentLocaleBadge() {
   return (
     <select
       aria-label={t("contentLocale.legend")}
-      className="studio-header-bar-locale-badge"
+      {...stylex.props(styles.localeBadge)}
       value={contentLocale}
       onChange={(e) => setContentLocale(e.target.value)}
     >
@@ -68,7 +90,7 @@ export function AddLocaleControl() {
   };
 
   return (
-    <div className="studio-header-bar-menu-add-locale">
+    <div {...stylex.props(styles.addLocale)}>
       <input
         type="text"
         placeholder={t("contentLocale.addPlaceholder")}

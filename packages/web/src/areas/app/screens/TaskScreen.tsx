@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Stamp } from "lucide-react";
+import * as stylex from "@stylexjs/stylex";
+import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { FieldForm, PathButtons, filterToEditable, resolveFieldsLocale, isResolvedViewField } from "form-ui";
 import type { SubmissionIssue } from "form-ui";
 import {
@@ -40,6 +42,107 @@ function readFileAsBase64(file: File): Promise<string> {
 
 /** Ties the disabled Claim button to its reason. One task renders at a time, so a literal is enough. */
 const CLAIM_BLOCKED_REASON_ID = "app-task-claim-blocked-reason";
+
+/** `app.css`'s task-screen rules, as StyleX. `.app-back` stays a literal
+ * hook: it belongs to the deferred `.btn`/`.app-back` family (design.md D1). */
+const styles = stylex.create({
+  screen: {
+    maxWidth: "46rem",
+    marginInline: "auto",
+    paddingTop: space.s4,
+    paddingInline: space.s3,
+    paddingBottom: space.s6,
+  },
+  stamp: {
+    display: "inline-block",
+    fontFamily: fonts.mono,
+    fontSize: 11,
+    fontWeight: 600,
+    textTransform: "uppercase",
+    letterSpacing: "0.08em",
+    borderWidth: 2,
+    borderStyle: "solid",
+    borderColor: "currentcolor",
+    paddingBlock: 2,
+    paddingInline: 7,
+  },
+  stampCase: {
+    color: colors.accent,
+    marginBottom: space.s3,
+  },
+  error: {
+    color: colors.refusal,
+  },
+  taskDraftNotice: {
+    fontSize: "0.85em",
+    color: colors.textMuted,
+  },
+  taskTimestamp: {
+    fontFamily: fonts.mono,
+  },
+  taskActions: {
+    display: "flex",
+    gap: space.s2,
+    marginBlock: space.s4,
+    marginInline: 0,
+  },
+  taskDelegate: {
+    display: "inline-flex",
+    gap: space.s2,
+    alignItems: "center",
+  },
+  taskSaveNote: {
+    fontSize: "0.85em",
+    color: colors.textMuted,
+  },
+  taskComments: {
+    marginTop: space.s4,
+  },
+  taskCommentList: {
+    listStyle: "none",
+    margin: 0,
+    padding: 0,
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s2,
+  },
+  taskCommentMeta: {
+    display: "block",
+    fontSize: "0.85em",
+    opacity: 0.7,
+  },
+  taskCommentForm: {
+    display: "flex",
+    gap: space.s2,
+    alignItems: "flex-start",
+    marginTop: space.s2,
+  },
+  taskCommentTextarea: {
+    flex: 1,
+  },
+  taskAttachments: {
+    marginTop: space.s4,
+  },
+  taskAttachmentList: {
+    listStyle: "none",
+    margin: 0,
+    padding: 0,
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s2,
+  },
+  taskAttachmentItem: {
+    display: "flex",
+    alignItems: "center",
+    gap: space.s2,
+  },
+  taskAttachmentForm: {
+    display: "flex",
+    gap: space.s2,
+    alignItems: "center",
+    marginTop: space.s2,
+  },
+});
 
 interface TaskScreenProps {
   instanceId: string;
@@ -245,22 +348,23 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
     }
   }
 
+  const screenProps = stylex.props(styles.screen);
   return (
-    <main className="app-screen app-task">
+    <main className={`app-task ${screenProps.className}`} style={screenProps.style}>
       <button type="button" className="btn btn-ghost app-back" onClick={() => navigate({ name: "tasks" })}>
         {t(locale, "task.backToTasks")}
       </button>
 
       {view && (
-        <span className="app-stamp app-stamp-case">
+        <span {...stylex.props(styles.stamp, styles.stampCase)}>
           {instanceId.slice(0, 12)} · {view.step.key}
         </span>
       )}
 
-      {outcome && <p className="app-error">{outcome.message}</p>}
+      {outcome && <p {...stylex.props(styles.error)}>{outcome.message}</p>}
 
       {unmatchedIssues.length > 0 && (
-        <div className="app-error">
+        <div {...stylex.props(styles.error)}>
           <p>{t(locale, "task.unmatchedIssues")}</p>
           <ul>
             {unmatchedIssues.map((issue, i) => (
@@ -273,8 +377,8 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
       )}
 
       {view && draftRestoredAt && (
-        <p className="app-task-draft-notice">
-          {t(locale, "task.formDraftRestored")} <span className="app-task-timestamp">{new Date(draftRestoredAt).toLocaleString()}</span>
+        <p {...stylex.props(styles.taskDraftNotice)}>
+          {t(locale, "task.formDraftRestored")} <span {...stylex.props(styles.taskTimestamp)}>{new Date(draftRestoredAt).toLocaleString()}</span>
         </p>
       )}
 
@@ -289,7 +393,7 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
             columns={view.columns ?? 1}
           />
 
-          <div className="app-task-actions">
+          <div {...stylex.props(styles.taskActions)}>
             {claimControls.state === "claimable" && (
               <button type="button" className="btn btn-primary" disabled={loading} onClick={() => void doClaim()}>
                 <Stamp size={18} strokeWidth={1.75} aria-hidden="true" />
@@ -297,7 +401,7 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
               </button>
             )}
             {(claimControls.state === "blocked-not-candidate" || claimControls.state === "blocked-claimed-by-other") && (
-              <span className="app-task-claim-blocked">
+              <span>
                 {/* aria-disabled, not the disabled attribute: a disabled button
                     leaves the tab order and assistive technology skips it, so
                     the reason would reach only sighted pointer users. No click
@@ -321,7 +425,7 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
               </button>
             )}
             {claimControls.state === "mine" && (
-              <span className="app-task-delegate">
+              <span {...stylex.props(styles.taskDelegate)}>
                 <input
                   type="text"
                   value={delegateTarget}
@@ -345,27 +449,28 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
           </div>
 
           {savedAt && (
-            <p className="app-task-save-note">
-              {t(locale, "task.formDraftSaved")} <span className="app-task-timestamp">{new Date(savedAt).toLocaleString()}</span>
+            <p {...stylex.props(styles.taskSaveNote)}>
+              {t(locale, "task.formDraftSaved")} <span {...stylex.props(styles.taskTimestamp)}>{new Date(savedAt).toLocaleString()}</span>
             </p>
           )}
 
           {maySubmit(claimControls) && <PathButtons paths={view.availablePaths} onSubmit={(pathId) => void doSubmit(pathId)} loading={loading} />}
 
-          <section className="app-task-comments">
+          <section {...stylex.props(styles.taskComments)}>
             <h2>{t(locale, "task.commentsHeading")}</h2>
-            <ul>
+            <ul {...stylex.props(styles.taskCommentList)}>
               {comments.map((c) => (
                 <li key={c.id}>
-                  <span className="app-task-comment-meta">
+                  <span {...stylex.props(styles.taskCommentMeta)}>
                     {c.actorId} · {new Date(c.createdAt).toLocaleString()}
                   </span>
                   <p>{c.text}</p>
                 </li>
               ))}
             </ul>
-            <div className="app-task-comment-form">
+            <div {...stylex.props(styles.taskCommentForm)}>
               <textarea
+                {...stylex.props(styles.taskCommentTextarea)}
                 value={commentText}
                 disabled={loading}
                 placeholder={t(locale, "task.commentPlaceholder")}
@@ -377,11 +482,11 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
             </div>
           </section>
 
-          <section className="app-task-attachments">
+          <section {...stylex.props(styles.taskAttachments)}>
             <h2>{t(locale, "task.attachmentsHeading")}</h2>
-            <ul>
+            <ul {...stylex.props(styles.taskAttachmentList)}>
               {attachments.map((a) => (
-                <li key={a.id}>
+                <li key={a.id} {...stylex.props(styles.taskAttachmentItem)}>
                   <span>{a.filename}</span>
                   <button type="button" className="btn btn-secondary" disabled={loading} onClick={() => void doDownloadAttachment(a)}>
                     {t(locale, "task.attachmentDownloadLabel")}
@@ -389,7 +494,7 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
                 </li>
               ))}
             </ul>
-            <div className="app-task-attachment-form">
+            <div {...stylex.props(styles.taskAttachmentForm)}>
               <input ref={fileInputRef} type="file" disabled={loading} />
               <button type="button" className="btn btn-secondary" disabled={loading} onClick={() => void doUploadAttachment()}>
                 {t(locale, "task.attachmentUploadLabel")}

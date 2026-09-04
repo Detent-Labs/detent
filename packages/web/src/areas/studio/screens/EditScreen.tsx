@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
+import * as stylex from "@stylexjs/stylex";
+import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { DraftProvider, useDraft } from "../draft/store.js";
 import { draftFields } from "../draft/fields.js";
 import type { Draft } from "../draft/types.js";
@@ -29,6 +31,151 @@ import { describeCaughtError } from "../errors.js";
 import { useFail } from "../../../shell/useFail.js";
 import { FormEditorScreen } from "./FormEditorScreen.js";
 import type { NavigateOptions } from "../../../shell/routing.js";
+
+const styles = stylex.create({
+  studioScreen: {
+    maxWidth: "60rem",
+    marginInline: "auto",
+    marginBlock: 0,
+    paddingTop: space.s4,
+    paddingInline: space.s3,
+    paddingBottom: space.s6,
+  },
+  // `.studio-edit-screen` widens past `.studio-screen`'s 60rem cap and takes
+  // the height `.shell` leaves it.
+  studioEditScreen: {
+    maxWidth: "none",
+    display: "flex",
+    flex: "1 1 auto",
+    flexDirection: "column",
+  },
+  studioHeaderNav: {
+    display: "flex",
+    gap: space.s3,
+    marginBottom: space.s2,
+    marginTop: 0,
+  },
+  studioBack: {
+    display: "block",
+    paddingLeft: 0,
+    marginBottom: space.s3,
+  },
+  // `.studio-header-nav .studio-back`.
+  studioBackInNav: {
+    display: "block",
+    paddingLeft: 0,
+    marginBottom: 0,
+  },
+  // `.draft-incomplete` already zeroes its own top margin, so it needs no
+  // extra help from `.studio-edit-screen > *` (below).
+  draftIncomplete: {
+    marginBlockStart: 0,
+    marginBlockEnd: space.s3,
+    marginInline: 0,
+  },
+  // Every OTHER `.studio-error-banner` in this file renders as a direct
+  // child of `.studio-edit-screen`'s own flex column, which used to zero a
+  // direct child's own top margin (`.studio-edit-screen > *`, a flex column
+  // does not collapse adjacent margins the way block layout does). The two
+  // early-return states below render inside a plain `.studio-screen`
+  // instead, so they keep the banner's own full top-and-bottom margin.
+  errorBanner: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: space.s3,
+    border: `2px solid ${colors.refusal}`,
+    paddingBlock: space.s2,
+    paddingInline: space.s3,
+    marginBlock: space.s3,
+    marginInline: 0,
+  },
+  errorBannerInEditScreen: {
+    marginBlockStart: 0,
+    marginBlockEnd: space.s3,
+    marginInline: 0,
+  },
+  errorBannerStamp: {
+    flex: "none",
+    fontFamily: fonts.mono,
+    fontSize: 11,
+    fontWeight: 600,
+    letterSpacing: "0.05em",
+    textTransform: "uppercase",
+    color: colors.refusal,
+    border: "2px solid currentcolor",
+    paddingBlock: 2,
+    paddingInline: 7,
+    transform: "rotate(-2deg)",
+  },
+  errorBannerMessage: {
+    flex: 1,
+    color: colors.text,
+  },
+  studioSurfaceToggle: {
+    display: "flex",
+    gap: space.s2,
+    marginBottom: space.s3,
+  },
+  // `button[aria-selected="true"]`: a JS-computed choice reading the same
+  // `aria-selected` the tab already carries.
+  surfaceToggleTabSelected: {
+    fontWeight: 600,
+    textDecoration: "underline",
+  },
+  studioCanvasLayout: {
+    display: "grid",
+    flex: "1 1 auto",
+    gridTemplateColumns: "12rem minmax(0, 1fr) 22rem",
+    gap: space.s3,
+    alignItems: "stretch",
+    minHeight: "36rem",
+  },
+  canvasInspector: {
+    minWidth: 0,
+    overflowY: "auto",
+    border: `1px solid ${colors.border}`,
+    padding: space.s3,
+  },
+  canvasSelection: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-start",
+    gap: space.s3,
+  },
+  canvasSelectionHeading: {
+    display: "flex",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    gap: space.s2,
+    width: "100%",
+    paddingBottom: space.s2,
+    borderBottom: `2px solid ${colors.divider}`,
+  },
+  canvasSelectionCount: {
+    fontFamily: fonts.mono,
+    fontVariantNumeric: "tabular-nums",
+  },
+  // `.canvas-group-name` (stylex-phase-3-studio's D2) is now fully compiled
+  // (stylex-phase-4-canvas's D5): `canvas/CanvasView.tsx`'s own SVG `<text>`
+  // reads its own independent style for `font-family`/`font-size`/`fill`,
+  // and this label's only borrowed property, `cursor: grab`, moved here.
+  // The label-above-control shape design-language.md's own field rule
+  // states is this file's addition.
+  canvasGroupNameField: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s1,
+    cursor: "grab",
+  },
+  // `.canvas-selection .studio-checks-rail-docked`: `ChecksRail`'s own root
+  // no longer carries a literal class this descendant selector can reach,
+  // so this screen wraps that one call site instead (the same pattern
+  // `PanelsScreen.tsx` uses for its own `ChecksRail` mount, Group 6).
+  canvasSelectionChecksRail: {
+    width: "100%",
+    marginTop: "auto",
+  },
+});
 
 interface EditScreenProps {
   processId: string;
@@ -413,19 +560,24 @@ function EditorArea({ processId, formStepId, panel, stepId, token, go, initialRe
   });
 
   return (
-    <main className="studio-screen studio-edit-screen">
-      <nav className="studio-header-nav">
-        <button type="button" className="btn btn-ghost studio-back" onClick={() => navigate({ name: "processes" })}>
+    <main {...stylex.props(styles.studioScreen, styles.studioEditScreen)}>
+      <nav {...stylex.props(styles.studioHeaderNav)}>
+        <button type="button" className="btn btn-ghost" {...stylex.props(styles.studioBackInNav)} onClick={() => navigate({ name: "processes" })}>
           ← Back to processes
         </button>
-        <button type="button" className="btn btn-ghost studio-back" onClick={() => navigate({ name: "versions", processId })}>
+        <button
+          type="button"
+          className="btn btn-ghost"
+          {...stylex.props(styles.studioBackInNav)}
+          onClick={() => navigate({ name: "versions", processId })}
+        >
           Versions
         </button>
-        <button type="button" className="btn btn-ghost studio-back" onClick={() => navigate({ name: "play", processId })}>
+        <button type="button" className="btn btn-ghost" {...stylex.props(styles.studioBackInNav)} onClick={() => navigate({ name: "play", processId })}>
           Player
         </button>
       </nav>
-      {!validation.zodValid && <p className="draft-incomplete">{t("app.draftIncomplete")}</p>}
+      {!validation.zodValid && <p {...stylex.props(styles.draftIncomplete)}>{t("app.draftIncomplete")}</p>}
       {/* Renders on both surfaces (studio-json-view: DraftToolbar and the
           content-locale switcher "SHALL remain visible and usable
           regardless of which surface is active") — only its "Process, saved
@@ -445,11 +597,23 @@ function EditorArea({ processId, formStepId, panel, stepId, token, go, initialRe
         baseVersion={dockBaseVersion}
         go={go}
         surfaceToggle={
-          <div className="studio-surface-toggle" role="tablist">
-            <button type="button" role="tab" aria-selected={surface === "structure"} onClick={() => setSurface("structure")}>
+          <div {...stylex.props(styles.studioSurfaceToggle)} role="tablist">
+            <button
+              type="button"
+              role="tab"
+              {...stylex.props(surface === "structure" && styles.surfaceToggleTabSelected)}
+              aria-selected={surface === "structure"}
+              onClick={() => setSurface("structure")}
+            >
               {t("edit.structureTab")}
             </button>
-            <button type="button" role="tab" aria-selected={surface === "json"} onClick={() => setSurface("json")}>
+            <button
+              type="button"
+              role="tab"
+              {...stylex.props(surface === "json" && styles.surfaceToggleTabSelected)}
+              aria-selected={surface === "json"}
+              onClick={() => setSurface("json")}
+            >
               {t("edit.jsonTab")}
             </button>
           </div>
@@ -475,14 +639,14 @@ function EditorArea({ processId, formStepId, panel, stepId, token, go, initialRe
                 onBack={() => navigate({ name: "edit", processId })}
               />
             ) : (
-              <div className="studio-error-banner" role="alert">
-                <span className="studio-error-banner-stamp">{t("error.failed")}</span>
-                <span className="studio-error-banner-message">{t("formEditor.stepNotFound")}</span>
+              <div {...stylex.props(styles.errorBanner, styles.errorBannerInEditScreen)} role="alert">
+                <span {...stylex.props(styles.errorBannerStamp)}>{t("error.failed")}</span>
+                <span {...stylex.props(styles.errorBannerMessage)}>{t("formEditor.stepNotFound")}</span>
               </div>
             )
           ) : (
             <>
-            <div className="studio-canvas-layout">
+            <div {...stylex.props(styles.studioCanvasLayout)}>
               <EditRail
                 onDrop={onPaletteDrop}
                 onDragMove={onPaletteDragMove}
@@ -512,10 +676,10 @@ function EditorArea({ processId, formStepId, panel, stepId, token, go, initialRe
                   their own collapsed `ChecksRail`; this column never mounts a
                   second copy beside one of them. */}
               {selectedStepIds.length > 1 ? (
-                <aside className="canvas-inspector canvas-selection">
-                  <div className="canvas-selection-heading">
+                <aside {...stylex.props(styles.canvasInspector, styles.canvasSelection)}>
+                  <div {...stylex.props(styles.canvasSelectionHeading)}>
                     <span className="canvas-selection-label">{t("canvas.selectionHeading")}</span>
-                    <span className="canvas-selection-count">{selectedStepIds.length}</span>
+                    <span {...stylex.props(styles.canvasSelectionCount)}>{selectedStepIds.length}</span>
                   </div>
                   <button type="button" className="btn btn-secondary" onClick={deleteSelection}>
                     {t("canvas.selectionRemove")}
@@ -530,7 +694,7 @@ function EditorArea({ processId, formStepId, panel, stepId, token, go, initialRe
                     if (matched) {
                       return (
                         <>
-                          <label className="canvas-group-name">
+                          <label {...stylex.props(styles.canvasGroupNameField)}>
                             {t("canvas.groupName")}
                             <input
                               value={matched.name}
@@ -586,10 +750,12 @@ function EditorArea({ processId, formStepId, panel, stepId, token, go, initialRe
                       </button>
                     );
                   })()}
-                  <ChecksRail validation={validation} canPublish={canPublish} collapsed />
+                  <div {...stylex.props(styles.canvasSelectionChecksRail)}>
+                    <ChecksRail validation={validation} canPublish={canPublish} collapsed />
+                  </div>
                 </aside>
               ) : inspectedStepId !== undefined || selectedPathId !== undefined ? (
-                <aside className="canvas-inspector">
+                <aside {...stylex.props(styles.canvasInspector)}>
                   <StepsPanel
                     fields={fields}
                     token={token}
@@ -667,17 +833,17 @@ export function EditScreen({ processId, formStepId, panel, stepId, token, go, na
   useEffect(() => load(), [load]);
 
   if (state.kind === "loading") {
-    return <main className="studio-screen">Loading…</main>;
+    return <main {...stylex.props(styles.studioScreen)}>Loading…</main>;
   }
   if (state.kind === "error") {
     return (
-      <main className="studio-screen">
-        <button type="button" className="btn btn-ghost studio-back" onClick={() => navigate({ name: "processes" })}>
+      <main {...stylex.props(styles.studioScreen)}>
+        <button type="button" className="btn btn-ghost" {...stylex.props(styles.studioBack)} onClick={() => navigate({ name: "processes" })}>
           ← Back to processes
         </button>
-        <div className="studio-error-banner" role="alert">
-          <span className="studio-error-banner-stamp">{t("error.failed")}</span>
-          <span className="studio-error-banner-message">{state.message}</span>
+        <div {...stylex.props(styles.errorBanner)} role="alert">
+          <span {...stylex.props(styles.errorBannerStamp)}>{t("error.failed")}</span>
+          <span {...stylex.props(styles.errorBannerMessage)}>{state.message}</span>
           <button type="button" className="btn btn-secondary" onClick={() => load()}>
             {t("error.retry")}
           </button>
@@ -687,13 +853,13 @@ export function EditScreen({ processId, formStepId, panel, stepId, token, go, na
   }
   if (state.kind === "not-found") {
     return (
-      <main className="studio-screen">
-        <button type="button" className="btn btn-ghost studio-back" onClick={() => navigate({ name: "processes" })}>
+      <main {...stylex.props(styles.studioScreen)}>
+        <button type="button" className="btn btn-ghost" {...stylex.props(styles.studioBack)} onClick={() => navigate({ name: "processes" })}>
           ← Back to processes
         </button>
-        <div className="studio-error-banner" role="alert">
-          <span className="studio-error-banner-stamp">{t("error.failed")}</span>
-          <span className="studio-error-banner-message">No draft exists for this process.</span>
+        <div {...stylex.props(styles.errorBanner)} role="alert">
+          <span {...stylex.props(styles.errorBannerStamp)}>{t("error.failed")}</span>
+          <span {...stylex.props(styles.errorBannerMessage)}>No draft exists for this process.</span>
         </div>
       </main>
     );

@@ -1,5 +1,4 @@
 import { describe, expect, it } from "bun:test";
-import { readFileSync } from "node:fs";
 import { computeFit, MIN_SCALE, FIT_GUTTER, type Box, type Insets, type Fit } from "../src/areas/studio/canvas/fit.js";
 
 /**
@@ -167,45 +166,6 @@ describe("canvas fit: bounds", () => {
     const element = { width: 1200, height: 800 };
     const tiny: Box = { x: 0, y: 0, width: 100, height: 50 };
     expect(computeFit(tiny, element, INSETS).scale).toBe(1);
-  });
-});
-
-/**
- * The arithmetic above cannot frame what the drawing surface refuses to draw.
- * An inline `<svg>` carries `overflow: hidden` from the UA stylesheet, and
- * Panzoom transforms that element, so the clip window travels with the
- * content. `docs/browser-checks.md` holds the visual half of this check.
- * These two assertions hold the CSS that makes it possible.
- */
-describe("canvas fit: the clipping surface", () => {
-  const css = readFileSync(new URL("../src/areas/studio/app.css", import.meta.url), "utf-8");
-
-  function rule(selector: string): string {
-    const body = css.match(new RegExp(`\\${selector}\\s*\\{([^}]*)\\}`));
-    if (!body) throw new Error(`no rule for ${selector} in app.css`);
-    return body[1] as string;
-  }
-
-  it("does not let the canvas SVG clip its own graph", () => {
-    expect(rule(".canvas-svg")).toContain("overflow: visible");
-  });
-
-  it("keeps the clipping edge on the wrap", () => {
-    expect(rule(".canvas-wrap")).toContain("overflow: hidden");
-  });
-
-  it("paints the grid on the wrap, which the zoom does not move", () => {
-    expect(rule(".canvas-wrap")).toContain("background-image");
-    expect(rule(".canvas-svg")).not.toContain("background-image");
-  });
-
-  it("drives the grid's size and offset from the transform, not from fixed pixels", () => {
-    // The wrap holds still, but its grid does not: CanvasView writes these
-    // three properties on every `panzoomchange`. A fixed `20px` here would put
-    // the dots back out of step with the lattice at any scale but 1.
-    const wrap = rule(".canvas-wrap");
-    expect(wrap).toContain("background-size: var(--canvas-grid-size) var(--canvas-grid-size)");
-    expect(wrap).toContain("background-position: var(--canvas-grid-offset-x) var(--canvas-grid-offset-y)");
   });
 });
 

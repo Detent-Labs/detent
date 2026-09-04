@@ -117,6 +117,32 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   whether it accepts anything beyond plain text; a tab panel groups other
   entries under a label, so it nests rather than sitting flat like the other
   four). Nothing is designed yet for any of the four.
+- Studio's native `<dialog>` confirm dialogs do not fully hold a keyboard
+  user inside them. `stylex-phase-3-studio`'s own task 11.5 keyboard walk
+  found two gaps, both pre-existing and unrelated to that phase's CSS-only
+  change: verified via the untouched JS in `ProcessHeaderBar.tsx`'s
+  `useConfirmDialog` and `ProcessesScreen.tsx`'s `StartPickerDialog`.
+
+  First: Tab from the publish- and discard-confirm dialogs' focused Cancel
+  button lands on `<body>`, not the Publish button before it in DOM order.
+  `useConfirmDialog`'s own comment already names the cause candidate: three
+  separate focus mechanisms race on open (an `autoFocus` prop, React 19's
+  own commit-time `.focus()`, and `showModal()`'s native focusing steps),
+  and the last of those three re-focuses the declining control after
+  `showModal()` already ran. That late re-focus is the untested candidate
+  cause: it may never register with the browser's own tab-order
+  bookkeeping for the modal.
+
+  Second: `StartPickerDialog` and `PromotionPreviewDialog` (`+ New
+  process`, "Import a promoted version") call `showModal()` on mount with
+  no cleanup. Escape and Cancel both close the dialog and drop focus to
+  `<body>` instead of returning it to the button that opened it.
+  `useConfirmDialog`'s own cleanup effect is the fix these two dialogs
+  lack; neither component uses that hook.
+
+  No follow-up change tracks this yet. It belongs to `studio-publish` or
+  `spa-accessibility`, not `web-styling`: a CSS migration cannot cause or
+  fix either gap.
 
 ## Decided, not yet built (each needs its own OpenSpec change)
 - **Archivo as the written face.** The Type section of
@@ -1048,3 +1074,105 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   permanently dirty draft makes the publish dialog always state its
   unsaved-changes sentence and always save first, which gives no wrong
   result.
+- **StyleX adopted as `packages/web`'s and `packages/form-ui`'s styling
+  model.** `stylex-phase-0-tooling` installed the compiler, settled the
+  token home in `packages/form-ui/src/tokens.stylex.ts`, gave `bun test` a
+  stub-preload story, and migrated the shell header and register tab as the
+  pilot. Full reasoning sits in that change's `design.md`, whose Migration
+  Plan names the six-phase path: phase 0 (this change), then form-ui,
+  shell/app/admin/reporting, studio non-canvas, canvas, and a cleanup phase
+  that deletes the remaining hand-written area stylesheets. Each later
+  phase is its own OpenSpec change against `web-styling`.
+
+  Reopen triggers: two consecutive StyleX releases that each cost a build
+  fix reopen the compiler-version decision (design.md's Risks).
+  `unstable_moduleResolution.rootDir` alone resolved the form-ui-exported
+  token module from `packages/web`, closing D8's one open question without
+  the `aliases` option.
+
+  Whether phase 2 splits into two changes is resolved: it does not.
+  `stylex-phase-2-areas`'s own design.md D8 weighed phase 1's paid
+  propose-review-apply-verify-archive overhead against paying it four
+  times, once per area, for no independent-review benefit. Each area
+  keeps its own commit boundary instead, so a mid-flight split would
+  still cost little if the change proved unwieldy.
+
+  Phase 1 (`stylex-phase-1-form-ui`) is done: `packages/form-ui`'s field
+  renderer and `PathButtons` compile from StyleX, `form-ui.css` and its
+  package export are gone, and `PathButtons` gained a `style` prop so a
+  caller can extend its wrapper. Its own design.md introduced a pattern
+  `web-styling` now states generally — a layout choice with a fixed set of
+  outcomes is chosen among named styles in code, never read from a `data-*`
+  attribute by a stylesheet — for phase 2 to build on rather than
+  re-derive. Phases 2 through 5 remain: shell/app/admin/reporting, studio
+  non-canvas, the canvas, and the cleanup phase that deletes the remaining
+  hand-written area stylesheets.
+
+  Phase 2 (`stylex-phase-2-areas`) is done: the shell's remaining nav
+  wrapper and all four areas' stylesheets compile from StyleX now.
+  `shell.css`, `app/app.css`, `admin/app.css` and `reporting/app.css`
+  each carry only their D10/D11 literal reset block. `InstanceStatus`
+  and `statusTone`'s closed unions became exhaustive `badgeTone`/
+  `stampTone` lookups; `OutboxRow.status`'s open-ended string became a
+  `Partial<Record<string, ...>>` lookup with the same no-op fallback the
+  pre-migration CSS gave an unmatched status. Phases 3 through 5 remain:
+  studio non-canvas, the canvas, and the cleanup phase that deletes the
+  remaining hand-written stylesheets.
+
+  Phase 3 (`stylex-phase-3-studio`) is done: every studio screen
+  outside `canvas/` compiles from StyleX now. `app.css` carries only
+  its `canvas/`-owned rules, the reduced-motion block, and
+  `.studio-dialog::backdrop`, which stays literal permanently: every
+  dialog still composes the `studio-dialog` class for that one rule,
+  since `::backdrop` fails a real `@stylexjs/unplugin` build (design.md
+  D12). Its own cleanup pass found the `.canvas-*` prefix was never
+  the true phase 4 boundary (D14): five prefixed rules belonged to
+  this phase's own `EditScreen.tsx`, and ten unprefixed rules belonged
+  to `canvas/EditRail.tsx`. Phases 4 and 5 remain: the canvas, and the
+  cleanup phase that deletes the remaining hand-written stylesheets.
+
+  Phase 0's own Migration Plan row claimed `:popover-open` would see
+  its first use in phase 3. That claim was wrong: phase 0 already used
+  it for the shell account menu, and phase 2 reused it. `::backdrop`
+  is the pseudo-element that saw genuine first use in phase 3, and
+  design.md D12 is where its real-build failure is recorded.
+
+  Phase 4 (`stylex-phase-4-canvas`) is done: `canvas/CanvasView.tsx`
+  and `canvas/EditRail.tsx` compile from StyleX now. `app.css` carries
+  only the reduced-motion block and `.studio-dialog::backdrop`.
+
+  Two class names stay literal, by the change's own mandate.
+  `canvas-node` backs `elementFor()`'s keyboard-focus `querySelector`.
+  `panzoom-exclude` backs Panzoom's own exclude-class contract.
+  `elementFor()`'s other two selectors moved off class qualifiers
+  instead. A new `data-kind="edge"` attribute replaces the
+  `.canvas-edge-group` qualifier. `.canvas-group-disclosure` dropped
+  its own qualifier, since `data-group-id` was already unique.
+
+  The change also closed `stylex-phase-3-studio`'s D2 deferral on
+  `.canvas-group-name`. `EditScreen.tsx`'s group-rename label now
+  reads its own compiled style. Both consumers of that shared class
+  converted together.
+
+  Phase 5 (`stylex-phase-5-cleanup`) is done, closing the six-phase
+  migration. `shell.css` and the four areas' `app.css` files are gone.
+  `global.css` now carries every rule they still held: the shell's
+  `.shell`/`.shell > *` flex frame, one `prefers-reduced-motion` block,
+  and `.studio-dialog::backdrop`. The reduced-motion block used to be
+  four near-identical copies; three used `transition`/`animation: none`
+  and the fourth, reporting's, used `animation-duration`/
+  `transition-duration: 0.01ms`. One block, using reporting's technique,
+  replaces all four, since nothing in the repo depends on the
+  difference and the near-zero-duration form still lets a value applied
+  through `transitionend` take effect.
+
+  `.btn`/`.app-back` stay literal in `tokens.css` permanently: phase 2's
+  D1 deferred their conversion to whichever phase converted the last
+  file still writing that literal string, and no such phase followed.
+  A dispatched sweep also corrected every literal-class citation this
+  migration left stale in `.claude/rules/design-language.md`,
+  `.claude/rules/ui-glossary.md` and six passages of
+  `docs/current-state.md`. `packages/web/test/boundaries.test.ts` lost
+  its own class-collision test: a compiled StyleX class cannot collide
+  across areas the way a hand-written one could, so the risk the test
+  guarded is gone, not merely unchecked.

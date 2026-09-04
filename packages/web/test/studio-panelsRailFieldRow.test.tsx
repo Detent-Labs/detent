@@ -21,12 +21,12 @@ describe("PanelsRailFieldRow", () => {
     const withIssue = renderToStaticMarkup(
       <PanelsRailFieldRow label="Amount" typeLabel="Number" depth={0} issues={2} selected={false} onClick={() => {}} />,
     );
-    expect(withIssue).toContain("studio-panels-rail-issues");
+    expect(withIssue).toContain("panelsRailIssues");
     expect(withIssue).toContain(">2<");
 
     const withoutIssue = renderToStaticMarkup(
       <PanelsRailFieldRow label="Amount" typeLabel="Number" depth={0} issues={0} selected={false} onClick={() => {}} />,
     );
-    expect(withoutIssue).not.toContain("studio-panels-rail-issues");
+    expect(withoutIssue).not.toContain("panelsRailIssues");
   });
 });

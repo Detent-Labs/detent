@@ -2282,3 +2282,227 @@ This one stays manual for a mechanical reason. Only a double click sets the
 internal `renaming` state. A static render draws the initial state alone, and
 the web package carries no DOM harness. So the rename branch never renders in
 a test.
+
+### The StyleX pilot: computed styles, not source (`stylex-phase-0-tooling`)
+
+Source: `stylex-phase-0-tooling` tasks 6.1 and 7.5. `web-styling` requires
+this probe for every migrated screen. A `bun:test` render string cannot read
+a compiled class hash or a computed value, so this stays manual.
+
+Build the production bundle and open it on the engine's own port, per
+`WEB_ROOT`. Open DevTools and inspect the shell header in each of the four
+areas.
+
+Pass: the header and the register tab carry hash-only classes, such as
+`x1a2b3c4`. Neither carries `shell-header` or `shell-tab`. Read the computed
+`background-color`, `border-bottom-color`, `padding` and the tab's
+`clip-path`. Pass: each equals the value `shell.css` declared on `main`
+before this change.
+
+Resize the viewport below 30rem. Pass: the header wraps onto a second line,
+the rule the header's own `flexWrap` condition carries. Hover the register
+tab, then Tab to it. Pass: both states still paint, unaffected by the move
+out of `shell.css`.
+
+Open a process draft's field catalog. Select a text field. Read "How it will
+look". Pass: the rendered control's computed `font-size`, `padding` and
+`border` equal the values named below, in "The form-ui field renderer".
+
+### The form-ui field renderer: Player and Task screens probe identical (`stylex-phase-1-form-ui`)
+
+Source: `stylex-phase-1-form-ui` task 6.1. `form-ui`'s field renderer and
+`PathButtons` compile from StyleX; this probe is that change's exit
+criterion.
+
+Build the production bundle and open it on the engine's own port. Open a
+running instance in the studio area's Player. Open the same step on the
+app area's Task screen. A third site renders the same component: the
+field catalog's "How it will look" preview. Select a text field's input
+in DevTools on each.
+
+Pass: the computed `font-size` is 14px, `padding` is `var(--space-2)`,
+and `border` is `1px solid var(--color-border)`. All three sites match,
+identically. `form-ui.css` declared these values before this change. The
+compiled style must equal them exactly.
+
+Open `PathButtons`. Pass: the wrapper's computed `gap` is `var(--space-2)`.
+The button element still carries the literal `btn btn-primary` class,
+unmigrated.
+
+Resize the Player's own pane, and the Task screen's container, below
+34rem. Pass: a two-column form's fields collapse to one column on both,
+at the same width. The container query reads the form's own width, not
+the viewport's.
+
+Throughout: zero console errors on either screen.
+
+### The four areas: outbox badge, duration bar, and two stamp mechanisms (`stylex-phase-2-areas`)
+
+Source: `stylex-phase-2-areas` task 7.1. The shell, app, admin and
+reporting areas compile from StyleX now. `shell.css`, `app/app.css`,
+`admin/app.css` and `reporting/app.css` carry only their D10/D11 literal
+blocks. Every rule that once lived in them is a compiled style now. Seed
+the database before this check, per `docs/decisions.md`'s seed script.
+
+Build the production bundle and open it on the engine's own port. Open
+the account menu in the shell header, from any area. Pass: the menu still
+opens as a native `:popover-open` state, unaffected by the move of
+`.shell-nav` into `packages/web/src/shell/navStyles.ts`.
+
+Open the app area's My-tasks screen. Pass: each row's status stamp reads
+`stampTone`, exhaustive over the four `statusTone` values. Its computed
+`border`, `padding` and letter-spacing match what `app.css` declared
+before this change. Hover a task's step name. Pass: the underline
+paints, whether the browser applies it through
+`stylex.when.ancestor(':hover')` or a plain descendant hover. Both
+compile to the same visible result.
+
+Open the admin area's Outbox screen. Pass: each row's status badge reads
+`badgeTone`, an open-ended lookup keyed by the row's own status string.
+A status with no matching tone, such as `claimed`, renders the bare
+badge shape with no extra style. That matches the pre-migration
+fallback. Open the Instances screen. Pass: each row's status badge reads
+the exhaustive `InstanceStatus`-keyed `badgeTone` instead, with the same
+five tones the design language names.
+
+Open the reporting area's cycle-time or bottleneck view. Pass: each
+duration rule's fill still sets its width through a literal inline
+`style`, not a compiled value (design.md D5). The fill's computed
+`background-color` and the rule's `border-bottom` match `app.css`'s
+pre-migration values.
+
+Throughout: zero console errors on any of the four screens.
+
+### Studio, non-canvas: form editor, panels, dock, dialogs (`stylex-phase-3-studio`)
+
+Source: `stylex-phase-3-studio` task 10.1. Every studio screen outside
+`canvas/` compiles from StyleX now. Its `app.css` carries only its
+`canvas/`-owned rules, plus the reduced-motion block and
+`.studio-dialog::backdrop` (design.md D11/D12/D14). Seed the database
+first, per `docs/decisions.md`'s seed script.
+
+Build the production bundle and open it on the engine's own port, not
+`bun run dev` (Studio's dev-mode crash is pre-existing and unrelated,
+`docs/decisions.md`). Open a draft's form editor. Pass: the field
+list and the canvas both render with no console error. Toggle the
+column count. Pass: the canvas's computed `grid-template-columns`
+switches between `1fr` and two tracks, matching `app.css`'s
+pre-migration `[data-columns="2"]` rule.
+
+Open the panels screen from the edit rail. Pass: the index rail, the
+open view and the checks rail render as three columns. Their widths
+match what `app.css` declared before this change. Switch between the
+field catalog, data sources, contract and field matrix views. Pass:
+each view keeps its own edit state across the switch.
+
+Open the canvas dock. Pass: it opens and collapses. Switch its three
+tabs (Changes, Field matrix, Paths). Pass: each renders with no
+console error. The field matrix tab's own scroll box caps at 15rem,
+half its stand-alone 32rem (D10).
+
+Open each of the four dialogs in turn. Two open from the header
+bar's `⋮` menu, publish-confirm and discard-confirm. Two open from
+the Processes screen, promotion-preview and start-picker. Pass: each
+opens as a native `<dialog>`, with a visible `::backdrop` behind it.
+
+Read the backdrop's computed `background-color` in DevTools. Pass:
+it matches `rgb(0 0 0 / 45%)`, `app.css`'s own pre-migration value,
+still literal per D12. Close each dialog. Pass: no console error, on
+any of the four.
+
+Throughout: zero console errors on any studio screen this phase
+touched.
+
+### Studio canvas: CanvasView.tsx and EditRail.tsx compiled (`stylex-phase-4-canvas`)
+
+Source: `stylex-phase-4-canvas` task 6.5/6.6. `canvas/CanvasView.tsx` and
+`canvas/EditRail.tsx` compile from StyleX now. `app.css` carries only two
+permanent, non-canvas rules: the reduced-motion block and
+`.studio-dialog::backdrop`. Build the production bundle and open it on
+the engine's own port. Do not use `bun run dev`: Studio's dev-mode crash
+is pre-existing and unrelated (`docs/decisions.md`). Seed the database
+first, per `docs/decisions.md`'s seed script.
+
+**The two deleted CSS-text tests, read visually instead.** Open a draft's
+canvas. Pass: the SVG does not clip the graph at its own edge. Its
+computed `overflow` reads `visible`. `.canvas-wrap` clips it instead, at
+a computed `overflow` of `hidden`.
+
+Read the wrap's computed `background-image` in DevTools. Pass: it is the
+dot-grid gradient, and the SVG itself carries none. Pan and zoom. Pass:
+the dots track the transform. A node dragged onto a dot stays under it at
+any zoom.
+
+Expand a group. Pass: its disclosure button's computed size is 20 by 20,
+inset 4 inside its 28-by-28 `<foreignObject>` host. Read the button's own
+computed `width` and `height` in DevTools. `app.css` no longer carries
+the rule.
+
+**Keyboard walk, in Chromium and in Firefox.** Tab into the canvas. Pass:
+focus lands on the initial step. The canvas takes one stop in the page's
+tab order. Arrow to a second step, then Right onto one of its outgoing
+paths.
+
+Pass: the focused node draws its dashed accent ring. The focused path
+draws its accent halo. Both match the visual weight this phase's
+stylesheet declared, in both browsers.
+
+Press Escape, then Tab. Pass: focus leaves the canvas. Double-click a
+group's rename label inside the selection summary (select a group's
+members first). Pass: the cursor over the label still reads as a grab
+hand. D5 folded this into `EditScreen.tsx`'s own compiled style, closing
+out `stylex-phase-3-studio`'s deferral.
+
+**Drag probe: Panzoom exclusion.** Start a pointer drag on a step node.
+Pass: the node moves; the canvas does not pan. Start a drag on an edge's
+route, a waypoint handle, and the inline rename field (double-click a
+node first). Pass: none of the three pans the canvas either.
+
+Start a drag on empty canvas space. Pass: the canvas pans. This confirms
+the exclusion covers exactly the elements that need it, not the whole
+surface.
+
+Throughout: zero console errors, in both browsers.
+
+### Shell and area stylesheets deleted (`stylex-phase-5-cleanup`)
+
+Source: `stylex-phase-5-cleanup`, the migration's last phase.
+`shell.css` and the four areas' `app.css` files are gone. `global.css`
+now carries every rule they still held. Three things moved in: the
+shell's own flex frame, one `prefers-reduced-motion` block, and
+`.studio-dialog::backdrop`.
+
+This change dedupes the reduced-motion block from four copies to one.
+It picks the near-zero-duration technique reporting already used.
+`boundaries.test.ts` no longer carries its own class-collision test. A
+compiled StyleX class cannot collide across areas the way a
+hand-written one could.
+
+Build the production bundle and open it on the engine's own port. Do
+not use `bun run dev`: Studio's dev-mode crash is pre-existing and
+unrelated (`docs/decisions.md`). Seed the database first, per
+`docs/decisions.md`'s seed script.
+
+**One screen per area, no visual regression.** Open My-tasks in the app
+area. Pass: the shell frame still fills the viewport, and the screen
+still centers under its own `max-width`. Open the instances list in the
+admin area. Pass: a status badge still renders its stamp, and a focused
+row control still shows the accent ring.
+
+Open a report screen in the reporting area. Pass: the `DurationRule`
+hairline still renders with its accent fill. Open the process list, then
+one open draft's edit screen, in the studio area. Pass: a `<dialog>`
+(the publish dialog, or the rename dialog) still darkens the page behind
+it through its `::backdrop`.
+
+**Reduced-motion probe.** Set the browser's `prefers-reduced-motion` to
+`reduce`. Trigger a transition in one screen per area. Try the shell's
+account menu, an admin table row, a reporting tab, and the studio
+checks rail. Pass:
+none shows visible motion, in any of the four.
+
+The three areas that switched technique, from `transition: none` to
+`animation-duration`/`transition-duration: 0.01ms`, read exactly as
+instant as reporting. Reporting used the near-zero technique already.
+
+Throughout: zero console errors, in every area.

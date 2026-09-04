@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import * as stylex from "@stylexjs/stylex";
+import { colors, fonts, space } from "form-ui/tokens.stylex";
 import type { Step } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
 import type { DraftField } from "../draft/fields";
@@ -21,6 +23,162 @@ import { stepIssueCount } from "../draft/panel-rail";
 import { nextStepKey, configuredFieldCount } from "./stepsPanelLogic.js";
 
 type DraftStep = DraftOf<Step>;
+
+const styles = stylex.create({
+  // `.steps-panel label`: a descendant selector on every bare `<label>`
+  // inside the identity zone.
+  stepsPanelLabel: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s1,
+    fontSize: "0.9rem",
+  },
+  stepsPanelEmpty: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-start",
+    gap: space.s3,
+  },
+  stepsPanelEmptyCopy: {
+    color: colors.textMuted,
+    margin: 0,
+  },
+  stepInspectorHeading: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: space.s2,
+    paddingBottom: space.s2,
+    borderBottom: `2px solid ${colors.divider}`,
+    marginBottom: space.s2,
+  },
+  stepIdentityZone: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s2,
+    paddingBottom: space.s3,
+    borderBottom: `2px solid ${colors.divider}`,
+    marginBottom: space.s3,
+  },
+  studioWarning: {
+    color: colors.refusal,
+    borderLeft: `3px solid ${colors.accent400}`,
+    paddingLeft: space.s2,
+  },
+  studioSegmented: {
+    display: "flex",
+    gap: 0,
+    border: "none",
+    padding: 0,
+    marginBlock: space.s2,
+    marginInline: 0,
+  },
+  studioSegmentedLegend: {
+    fontFamily: fonts.body,
+    fontSize: "11px",
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+    color: colors.textMuted,
+    paddingBlockEnd: space.s1,
+    paddingBlockStart: 0,
+    paddingInline: 0,
+    width: "100%",
+  },
+  segmentedOption: {
+    flex: "1 1 auto",
+    background: "none",
+    color: colors.text,
+    border: `1px solid ${colors.border}`,
+    paddingBlock: space.s1,
+    paddingInline: space.s2,
+    font: "inherit",
+    cursor: "pointer",
+    ":hover": {
+      background: colors.surfaceMuted,
+    },
+  },
+  // `.studio-segmented-option + .studio-segmented-option`: every option
+  // after the first in this row.
+  segmentedOptionAfterFirst: {
+    borderLeft: "none",
+  },
+  segmentedOptionPressed: {
+    borderColor: colors.accent,
+    color: colors.accent,
+    boxShadow: `inset 0 -2px 0 ${colors.accent}`,
+  },
+  studioNote: {
+    color: colors.textMuted,
+    minHeight: "1.25rem",
+    marginBlockEnd: space.s2,
+    marginBlockStart: 0,
+    marginInline: 0,
+  },
+  stepIdentityView: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: space.s2,
+  },
+  stepIdentityViewBuild: {
+    fontFamily: fonts.body,
+    fontSize: "11px",
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+    color: colors.accent,
+  },
+  stepBehaviorTabs: {
+    display: "flex",
+    gap: space.s3,
+    borderBottom: `1px solid ${colors.border}`,
+    marginBottom: space.s3,
+  },
+  stepBehaviorTab: {
+    background: "none",
+    border: "none",
+    borderBottomWidth: 2,
+    borderBottomStyle: "solid",
+    borderBottomColor: "transparent",
+    paddingBlock: space.s1,
+    paddingInline: 0,
+    fontFamily: fonts.body,
+    color: colors.textMuted,
+    cursor: "pointer",
+  },
+  // `[aria-selected="true"]`: a JS-computed choice reading the same
+  // `aria-selected` the tab already carries.
+  stepBehaviorTabSelected: {
+    borderBottomColor: colors.accent,
+    color: colors.text,
+  },
+  studioDeveloperViewPre: {
+    fontFamily: fonts.mono,
+    fontSize: "0.8rem",
+    whiteSpace: "pre-wrap",
+    overflowWrap: "anywhere",
+    background: colors.surfaceMuted,
+    border: `1px solid ${colors.border}`,
+    padding: space.s2,
+  },
+  stepDiagnostics: {
+    borderTop: `2px solid ${colors.divider}`,
+    marginTop: space.s3,
+    paddingTop: space.s3,
+  },
+  stepSectionIssues: {
+    marginBlock: space.s2,
+    marginInline: 0,
+  },
+  stepSectionIssueStamp: {
+    fontFamily: fonts.mono,
+    fontVariantNumeric: "tabular-nums",
+    color: colors.refusal,
+    border: "2px solid currentcolor",
+    paddingBlock: 0,
+    paddingInline: space.s1,
+  },
+  stepSectionIssueClear: {
+    color: colors.textMuted,
+  },
+});
 
 /** The behavior zone's tab row. Subprocess joins only when the step's
  * performed-by control reads Subprocess. Unlike the retired `openSection`,
@@ -147,8 +305,8 @@ export function StepsPanel({ fields, token, selectedStepId, onSelectStep, select
     // always-reachable way to add the first step") is the one remaining
     // always-reachable way to add a step.
     return (
-      <div className="steps-panel steps-panel-empty">
-        <p className="steps-panel-empty-copy">{t("stepSections.noSelection")}</p>
+      <div className="steps-panel" {...stylex.props(styles.stepsPanelEmpty)}>
+        <p {...stylex.props(styles.stepsPanelEmptyCopy)}>{t("stepSections.noSelection")}</p>
       </div>
     );
   }
@@ -169,18 +327,18 @@ export function StepsPanel({ fields, token, selectedStepId, onSelectStep, select
 
   return (
     <div className="steps-panel">
-      <div className="step-inspector-heading">
+      <div {...stylex.props(styles.stepInspectorHeading)}>
         <strong>{resolveDraftLocalizedText(step.label, contentLocale, baseLocale) || step.key || t("steps.unnamedStep")}</strong>
         <span>{step.type ?? "task"}</span>
         {step.terminal && <span className="badge">{t("steps.terminalBadge")}</span>}
       </div>
 
-      <div className="step-identity-zone">
-        <label>
+      <div {...stylex.props(styles.stepIdentityZone)}>
+        <label {...stylex.props(styles.stepsPanelLabel)}>
           key
           <input type="text" value={step.key ?? ""} onChange={(e) => updateStep({ key: e.target.value })} />
         </label>
-        <label>
+        <label {...stylex.props(styles.stepsPanelLabel)}>
           label
           <LocalizedTextInput value={step.label} onChange={updateStepLabel} />
         </label>
@@ -188,25 +346,29 @@ export function StepsPanel({ fields, token, selectedStepId, onSelectStep, select
             phrasing content, and the design language keeps a field's own
             messages beside the label. */}
         {missingTranslationWarning(step.label, contentLocale, draft.baseLocale) && (
-          <p className="studio-warning">{missingTranslationWarning(step.label, contentLocale, draft.baseLocale)}</p>
+          <p {...stylex.props(styles.studioWarning)}>{missingTranslationWarning(step.label, contentLocale, draft.baseLocale)}</p>
         )}
-        <label>
+        <label {...stylex.props(styles.stepsPanelLabel)}>
           description
           <LocalizedTextInput value={step.description} onChange={(description) => updateStep({ description })} />
         </label>
         {missingTranslationWarning(step.description, contentLocale, draft.baseLocale) && (
-          <p className="studio-warning">{missingTranslationWarning(step.description, contentLocale, draft.baseLocale)}</p>
+          <p {...stylex.props(styles.studioWarning)}>{missingTranslationWarning(step.description, contentLocale, draft.baseLocale)}</p>
         )}
 
         {/* "performed by": a three-option restyle of the existing type/terminal
             controls (studio-canvas). Sets the same two fields; adds nothing new. */}
-        <fieldset className="studio-segmented" aria-label={t("stepSections.performedByLabel")}>
-          <legend>{t("stepSections.performedByLabel")}</legend>
-          {PERFORMED_BY_OPTIONS.map((option) => (
+        <fieldset {...stylex.props(styles.studioSegmented)} aria-label={t("stepSections.performedByLabel")}>
+          <legend {...stylex.props(styles.studioSegmentedLegend)}>{t("stepSections.performedByLabel")}</legend>
+          {PERFORMED_BY_OPTIONS.map((option, optionIndex) => (
             <button
               key={option}
               type="button"
-              className="studio-segmented-option"
+              {...stylex.props(
+                styles.segmentedOption,
+                optionIndex > 0 && styles.segmentedOptionAfterFirst,
+                performedByFor(step.type, step.terminal) === option && styles.segmentedOptionPressed,
+              )}
               aria-pressed={performedByFor(step.type, step.terminal) === option}
               onClick={() => updateStep(performedByPatch(option) as Partial<DraftStep>)}
             >
@@ -215,7 +377,7 @@ export function StepsPanel({ fields, token, selectedStepId, onSelectStep, select
           ))}
         </fieldset>
         {step.terminal && (
-          <label>
+          <label {...stylex.props(styles.stepsPanelLabel)}>
             outcome (only meaningful on a contracted process)
             {draft.contract?.outcomes?.length ? (
               <select
@@ -236,7 +398,7 @@ export function StepsPanel({ fields, token, selectedStepId, onSelectStep, select
         )}
 
         {isInitialStep ? (
-          <p className="studio-note">{t("stepSections.isInitialStep")}</p>
+          <p {...stylex.props(styles.studioNote)}>{t("stepSections.isInitialStep")}</p>
         ) : (
           <button
             type="button"
@@ -252,21 +414,21 @@ export function StepsPanel({ fields, token, selectedStepId, onSelectStep, select
           </button>
         )}
 
-        <button type="button" className="btn btn-secondary step-identity-view" onClick={() => navigate(step.id!)}>
+        <button type="button" className="btn btn-secondary" {...stylex.props(styles.stepIdentityView)} onClick={() => navigate(step.id!)}>
           <span className="step-section-name">
             {configuredFieldCountValue} / {fields.length} {t("stepSections.viewFieldsConfigured")}
           </span>
-          <span className="step-identity-view-build">{t("stepSections.viewBuildForm")}</span>
+          <span {...stylex.props(styles.stepIdentityViewBuild)}>{t("stepSections.viewBuildForm")}</span>
         </button>
       </div>
 
-      <div className="step-behavior-tabs" role="tablist" aria-label={t("stepSections.behaviorZoneLabel")}>
+      <div {...stylex.props(styles.stepBehaviorTabs)} role="tablist" aria-label={t("stepSections.behaviorZoneLabel")}>
         {tabs.map((tab) => (
           <button
             key={tab}
             type="button"
             role="tab"
-            className="step-behavior-tab"
+            {...stylex.props(styles.stepBehaviorTab, activeTab === tab && styles.stepBehaviorTabSelected)}
             aria-selected={activeTab === tab}
             onClick={() => chooseTab(tab)}
           >
@@ -284,7 +446,7 @@ export function StepsPanel({ fields, token, selectedStepId, onSelectStep, select
             registryTypes={registry?.assignmentStrategyTypes}
             registrySchemas={registry?.assignmentStrategySchemas}
           />
-          {assignmentWarningText && <p className="studio-warning">{assignmentWarningText}</p>}
+          {assignmentWarningText && <p {...stylex.props(styles.studioWarning)}>{assignmentWarningText}</p>}
         </section>
       )}
 
@@ -292,7 +454,7 @@ export function StepsPanel({ fields, token, selectedStepId, onSelectStep, select
         <section>
           <h4>{t("steps.pathsHeading")}</h4>
           {step.terminal ? (
-            <p className="studio-note">{t("stepSections.pathsEmptyTerminal")}</p>
+            <p {...stylex.props(styles.studioNote)}>{t("stepSections.pathsEmptyTerminal")}</p>
           ) : (
             <PathsPanel
               paths={step.paths}
@@ -380,14 +542,14 @@ export function StepsPanel({ fields, token, selectedStepId, onSelectStep, select
         </section>
       )}
 
-      <div className="step-diagnostics">
-        <p className="step-section-issues">
+      <div {...stylex.props(styles.stepDiagnostics)}>
+        <p {...stylex.props(styles.stepSectionIssues)}>
           {issueTotal > 0 ? (
-            <span className="step-section-issue-stamp">
+            <span {...stylex.props(styles.stepSectionIssueStamp)}>
               {t("stepSections.issueCount")}: {issueTotal}
             </span>
           ) : (
-            <span className="step-section-issue-clear">{t("stepSections.noIssues")}</span>
+            <span {...stylex.props(styles.stepSectionIssueClear)}>{t("stepSections.noIssues")}</span>
           )}
         </p>
 
@@ -402,7 +564,7 @@ export function StepsPanel({ fields, token, selectedStepId, onSelectStep, select
         </button>
         {rawJsonOpen && (
           <section id="step-raw-json" className="studio-developer-view">
-            <pre>{JSON.stringify(step, null, 2)}</pre>
+            <pre {...stylex.props(styles.studioDeveloperViewPre)}>{JSON.stringify(step, null, 2)}</pre>
           </section>
         )}
 

@@ -1,4 +1,6 @@
 import { useMemo, useRef, useState } from "react";
+import * as stylex from "@stylexjs/stylex";
+import { colors, fonts, space } from "form-ui/tokens.stylex";
 import type { Expression } from "workflow-engine/schema";
 import type { DraftOf } from "../../draft/types";
 import { useDraft } from "../../draft/store";
@@ -6,6 +8,61 @@ import { t } from "../../catalog.js";
 import { ExpressionInput } from "./ExpressionInput";
 import { ConditionBuilder } from "./ConditionBuilder";
 import { buildOperands, fromCel, operandSignature, toCel, type Condition } from "./conditionLogic";
+
+const styles = stylex.create({
+  conditionInput: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s2,
+    minWidth: 0,
+  },
+  conditionFooter: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    gap: space.s2,
+  },
+  conditionParseError: {
+    margin: 0,
+    color: colors.refusal,
+    fontSize: "0.85rem",
+  },
+  conditionMode: {
+    background: "none",
+    color: colors.accent,
+    padding: 0,
+    flex: "none",
+  },
+  // `.condition-mode-disclosure[aria-expanded="true"]`: a JS-computed choice
+  // reading the same `aria-expanded` the button already carries.
+  conditionModeExpanded: {
+    color: colors.text,
+  },
+  conditionReadout: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: space.s2,
+    margin: 0,
+    minWidth: 0,
+    flex: "1 1 20ch",
+  },
+  conditionReadoutLabel: {
+    fontFamily: fonts.body,
+    fontSize: "11px",
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+    color: colors.textMuted,
+    flex: "none",
+  },
+  // `.condition-readout code`: a descendant selector on a bare `<code>`.
+  conditionReadoutCode: {
+    fontFamily: fonts.mono,
+    fontSize: "0.85rem",
+    minWidth: 0,
+    overflowWrap: "anywhere",
+  },
+});
 
 interface Props {
   value: DraftOf<Expression> | undefined;
@@ -98,7 +155,7 @@ export function ConditionInput({ value, onChange, stepId, placeholder, toggleVar
     toggleVariant === "disclosure" ? (
       <button
         type="button"
-        className="condition-mode condition-mode-disclosure"
+        {...stylex.props(styles.conditionMode, expanded && styles.conditionModeExpanded)}
         aria-expanded={expanded}
         onClick={onClick}
         disabled={disabled}
@@ -106,14 +163,14 @@ export function ConditionInput({ value, onChange, stepId, placeholder, toggleVar
         {t("condition.developerView")}
       </button>
     ) : (
-      <button type="button" className="condition-mode" onClick={onClick} disabled={disabled}>
+      <button type="button" {...stylex.props(styles.conditionMode)} onClick={onClick} disabled={disabled}>
         {expanded ? t("condition.useBuilder") : t("condition.editAsCel")}
       </button>
     );
 
   if (celMode || unparseable) {
     return (
-      <div className="condition-input">
+      <div {...stylex.props(styles.conditionInput)}>
         <ExpressionInput
           value={value}
           placeholder={placeholder}
@@ -122,9 +179,9 @@ export function ConditionInput({ value, onChange, stepId, placeholder, toggleVar
             onChange(next);
           }}
         />
-        <div className="condition-footer">
+        <div {...stylex.props(styles.conditionFooter)}>
           {unparseable && (
-            <p className="condition-parse-error" role="status">
+            <p {...stylex.props(styles.conditionParseError)} role="status">
               {t("condition.unparseable")}
             </p>
           )}
@@ -135,12 +192,12 @@ export function ConditionInput({ value, onChange, stepId, placeholder, toggleVar
   }
 
   return (
-    <div className="condition-input">
+    <div {...stylex.props(styles.conditionInput)}>
       <ConditionBuilder condition={condition} operands={operands} onChange={commit} />
-      <div className="condition-footer">
-        <p className="condition-readout">
-          <span className="condition-readout-label">{t("condition.celReadout")}</span>
-          <code>{preview ?? t("condition.celEmpty")}</code>
+      <div {...stylex.props(styles.conditionFooter)}>
+        <p {...stylex.props(styles.conditionReadout)}>
+          <span {...stylex.props(styles.conditionReadoutLabel)}>{t("condition.celReadout")}</span>
+          <code {...stylex.props(styles.conditionReadoutCode)}>{preview ?? t("condition.celEmpty")}</code>
         </p>
         {toggleButton(false, () => setCelMode(true))}
       </div>

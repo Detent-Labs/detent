@@ -1,10 +1,82 @@
 import { useEffect, useState } from "react";
+import * as stylex from "@stylexjs/stylex";
 import { fetchAccount, patchAccount } from "../api/client.js";
 import { useFail } from "./useFail.js";
 import { t } from "./catalog.js";
 import { ABSENT, accountChanges, editSeed, rolesText, type ProfileEdits } from "./profileFields.js";
 import type { AccountView } from "../api/types.js";
 import type { UiLocale } from "../i18n/locale.js";
+import { colors, fonts, space } from "form-ui/tokens.stylex";
+
+/** `.shell-screen` (duplicated locally, same shape as `LoginScreen.tsx`'s —
+ * the two share no component) plus `.shell-error` and every `.shell-profile-*`
+ * rule from `shell.css`. `.shell-profile` itself carries no rule of its own;
+ * it stays a literal hook class beside the compiled `screen` style. The
+ * `.shell-profile-value input` descendant selector becomes a style applied
+ * directly to this file's one `<input>`, since this component owns it. */
+const styles = stylex.create({
+  screen: {
+    maxWidth: "46rem",
+    marginInline: "auto",
+    paddingBlock: space.s6,
+    paddingInline: space.s3,
+  },
+  error: {
+    color: colors.refusal,
+  },
+  facts: {
+    margin: 0,
+    borderTopWidth: 2,
+    borderTopStyle: "solid",
+    borderTopColor: colors.divider,
+  },
+  row: {
+    display: "grid",
+    gridTemplateColumns: {
+      default: "minmax(7rem, 11rem) 1fr",
+      "@media (max-width: 30rem)": "1fr",
+    },
+    gap: `${space.s1} ${space.s4}`,
+    alignItems: "baseline",
+    paddingBlock: space.s3,
+    paddingInline: 0,
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.border,
+  },
+  term: {
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: "0.1em",
+    color: colors.textMuted,
+  },
+  value: {
+    margin: 0,
+    overflowWrap: "anywhere",
+  },
+  machine: {
+    fontFamily: fonts.mono,
+  },
+  valueInput: {
+    width: "100%",
+    maxWidth: "22rem",
+  },
+  actions: {
+    display: "flex",
+    alignItems: "center",
+    gap: space.s3,
+    marginTop: space.s4,
+  },
+  status: {
+    margin: 0,
+    fontSize: "0.85rem",
+    color: colors.textMuted,
+  },
+  note: {
+    maxWidth: "34rem",
+    color: colors.textMuted,
+  },
+});
 
 interface ProfilePageProps {
   token: string;
@@ -70,26 +142,28 @@ export function ProfilePage({ token, locale, onSaved, onUnauthorized }: ProfileP
     }
   };
 
+  const screenProps = stylex.props(styles.screen);
+
   if (loadFailed) {
     return (
-      <main className="shell-screen shell-profile">
+      <main className={`shell-profile ${screenProps.className}`} style={screenProps.style}>
         <h1>{t(locale, "profile.title")}</h1>
-        <p className="shell-error">{t(locale, "error.generic")}</p>
+        <p {...stylex.props(styles.error)}>{t(locale, "error.generic")}</p>
       </main>
     );
   }
 
   if (!account || !edits) {
     return (
-      <main className="shell-screen shell-profile">
+      <main className={`shell-profile ${screenProps.className}`} style={screenProps.style}>
         <h1>{t(locale, "profile.title")}</h1>
-        <p className="shell-profile-status">{t(locale, "area.loading")}</p>
+        <p {...stylex.props(styles.status)}>{t(locale, "area.loading")}</p>
       </main>
     );
   }
 
   return (
-    <main className="shell-screen shell-profile">
+    <main className={`shell-profile ${screenProps.className}`} style={screenProps.style}>
       <h1>{t(locale, "profile.title")}</h1>
       {account.editable ? (
         <form
@@ -98,24 +172,24 @@ export function ProfilePage({ token, locale, onSaved, onUnauthorized }: ProfileP
             void submit(edits);
           }}
         >
-          <dl className="shell-profile-facts">
-            <div className="shell-profile-row">
-              <dt className="shell-profile-term">{t(locale, "profile.email")}</dt>
-              <dd className="shell-profile-value">{account.email ?? ABSENT}</dd>
+          <dl {...stylex.props(styles.facts)}>
+            <div {...stylex.props(styles.row)}>
+              <dt {...stylex.props(styles.term)}>{t(locale, "profile.email")}</dt>
+              <dd {...stylex.props(styles.value)}>{account.email ?? ABSENT}</dd>
             </div>
-            <div className="shell-profile-row">
-              <dt className="shell-profile-term">{t(locale, "profile.roles")}</dt>
-              <dd className="shell-profile-value shell-profile-machine">{rolesText(account.roles)}</dd>
+            <div {...stylex.props(styles.row)}>
+              <dt {...stylex.props(styles.term)}>{t(locale, "profile.roles")}</dt>
+              <dd {...stylex.props(styles.value, styles.machine)}>{rolesText(account.roles)}</dd>
             </div>
-            <div className="shell-profile-row">
-              <dt className="shell-profile-term">{t(locale, "profile.manager")}</dt>
-              <dd className="shell-profile-value shell-profile-machine">{account.managerUserId ?? ABSENT}</dd>
+            <div {...stylex.props(styles.row)}>
+              <dt {...stylex.props(styles.term)}>{t(locale, "profile.manager")}</dt>
+              <dd {...stylex.props(styles.value, styles.machine)}>{account.managerUserId ?? ABSENT}</dd>
             </div>
-            <div className="shell-profile-row">
-              <dt className="shell-profile-term">
+            <div {...stylex.props(styles.row)}>
+              <dt {...stylex.props(styles.term)}>
                 <label htmlFor="profile-displayName">{t(locale, "profile.displayName")}</label>
               </dt>
-              <dd className="shell-profile-value">
+              <dd {...stylex.props(styles.value)}>
                 <input
                   id="profile-displayName"
                   type="text"
@@ -123,14 +197,15 @@ export function ProfilePage({ token, locale, onSaved, onUnauthorized }: ProfileP
                   disabled={saving}
                   autoComplete="name"
                   onChange={(e) => setEdits({ ...edits, displayName: e.target.value })}
+                  {...stylex.props(styles.valueInput)}
                 />
               </dd>
             </div>
-            <div className="shell-profile-row">
-              <dt className="shell-profile-term">
+            <div {...stylex.props(styles.row)}>
+              <dt {...stylex.props(styles.term)}>
                 <label htmlFor="profile-locale">{t(locale, "profile.locale")}</label>
               </dt>
-              <dd className="shell-profile-value">
+              <dd {...stylex.props(styles.value)}>
                 <select
                   id="profile-locale"
                   value={edits.locale}
@@ -143,29 +218,29 @@ export function ProfilePage({ token, locale, onSaved, onUnauthorized }: ProfileP
               </dd>
             </div>
           </dl>
-          <div className="shell-profile-actions">
+          <div {...stylex.props(styles.actions)}>
             <button type="submit" className="btn btn-primary" disabled={saving}>
               {t(locale, "profile.save")}
             </button>
-            <p className="shell-profile-status" role="status">
+            <p {...stylex.props(styles.status)} role="status">
               {saved ? t(locale, "profile.saved") : ""}
             </p>
           </div>
-          {saveFailed ? <p className="shell-error">{t(locale, "profile.saveFailed")}</p> : null}
+          {saveFailed ? <p {...stylex.props(styles.error)}>{t(locale, "profile.saveFailed")}</p> : null}
         </form>
       ) : (
         <>
-          <dl className="shell-profile-facts">
-            <div className="shell-profile-row">
-              <dt className="shell-profile-term">{t(locale, "profile.id")}</dt>
-              <dd className="shell-profile-value shell-profile-machine">{account.id}</dd>
+          <dl {...stylex.props(styles.facts)}>
+            <div {...stylex.props(styles.row)}>
+              <dt {...stylex.props(styles.term)}>{t(locale, "profile.id")}</dt>
+              <dd {...stylex.props(styles.value, styles.machine)}>{account.id}</dd>
             </div>
-            <div className="shell-profile-row">
-              <dt className="shell-profile-term">{t(locale, "profile.roles")}</dt>
-              <dd className="shell-profile-value shell-profile-machine">{rolesText(account.roles)}</dd>
+            <div {...stylex.props(styles.row)}>
+              <dt {...stylex.props(styles.term)}>{t(locale, "profile.roles")}</dt>
+              <dd {...stylex.props(styles.value, styles.machine)}>{rolesText(account.roles)}</dd>
             </div>
           </dl>
-          <p className="shell-profile-note">{t(locale, "profile.federated")}</p>
+          <p {...stylex.props(styles.note)}>{t(locale, "profile.federated")}</p>
         </>
       )}
     </main>

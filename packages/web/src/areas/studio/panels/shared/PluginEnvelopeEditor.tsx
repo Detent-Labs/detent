@@ -1,8 +1,28 @@
 import { useState, type ReactNode } from "react";
+import * as stylex from "@stylexjs/stylex";
+import { space } from "form-ui/tokens.stylex";
 import type { Plugin } from "workflow-engine/schema";
 import type { DraftOf } from "../../draft/types";
 import type { ConfigFieldDescriptor } from "../../api/types.js";
 import { t } from "../../catalog.js";
+
+const styles = stylex.create({
+  pluginField: {
+    border: 0,
+    margin: 0,
+    padding: 0,
+    minWidth: 0,
+  },
+  // `.plugin-field > legend`: a direct-child selector on a bare `<legend>`.
+  pluginFieldLegend: {
+    padding: 0,
+  },
+  pluginFieldOption: {
+    display: "flex",
+    alignItems: "center",
+    gap: space.s1,
+  },
+});
 
 type DraftPlugin = DraftOf<Plugin>;
 
@@ -89,10 +109,10 @@ function EnumArrayField({
   const toggle = (option: string, on: boolean) =>
     onChange(options.filter((o) => (o === option ? on : selected.includes(o))));
   return (
-    <fieldset className="plugin-field">
-      <legend>{descriptor.key}</legend>
+    <fieldset {...stylex.props(styles.pluginField)}>
+      <legend {...stylex.props(styles.pluginFieldLegend)}>{descriptor.key}</legend>
       {options.map((option) => (
-        <label key={option} className="plugin-field-option">
+        <label key={option} {...stylex.props(styles.pluginFieldOption)}>
           <input type="checkbox" checked={selected.includes(option)} onChange={(e) => toggle(option, e.target.checked)} />
           {option}
         </label>
@@ -116,7 +136,7 @@ function GeneratedField({
   }
   const error = validateField(descriptor, value);
   return (
-    <label className="plugin-field">
+    <label {...stylex.props(styles.pluginField)}>
       {descriptor.key}
       {descriptor.kind === "string" && (
         <input type="text" value={typeof value === "string" ? value : ""} onChange={(e) => onChange(e.target.value)} />

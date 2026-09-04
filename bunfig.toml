@@ -3,4 +3,4 @@
 # pollers, a seed, or a browser session against the devcontainer's Postgres.
 # See test/preload-db.ts for the measurement behind it.
 [test]
-preload = ["./test/preload-db.ts"]
+preload = ["./test/preload-db.ts", "./test/preload-stylex.ts"]
