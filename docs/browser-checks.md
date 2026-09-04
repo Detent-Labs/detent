@@ -2372,3 +2372,43 @@ duration rule's fill still sets its width through a literal inline
 pre-migration values.
 
 Throughout: zero console errors on any of the four screens.
+
+### Studio, non-canvas: form editor, panels, dock, dialogs (`stylex-phase-3-studio`)
+
+Source: `stylex-phase-3-studio` task 10.1. Every studio screen outside
+`canvas/` compiles from StyleX now. Its `app.css` carries only its
+`canvas/`-owned rules, plus the reduced-motion block and
+`.studio-dialog::backdrop` (design.md D11/D12/D14). Seed the database
+first, per `docs/decisions.md`'s seed script.
+
+Build the production bundle and open it on the engine's own port, not
+`bun run dev` (Studio's dev-mode crash is pre-existing and unrelated,
+`docs/decisions.md`). Open a draft's form editor. Pass: the field
+list and the canvas both render with no console error. Toggle the
+column count. Pass: the canvas's computed `grid-template-columns`
+switches between `1fr` and two tracks, matching `app.css`'s
+pre-migration `[data-columns="2"]` rule.
+
+Open the panels screen from the edit rail. Pass: the index rail, the
+open view and the checks rail render as three columns. Their widths
+match what `app.css` declared before this change. Switch between the
+field catalog, data sources, contract and field matrix views. Pass:
+each view keeps its own edit state across the switch.
+
+Open the canvas dock. Pass: it opens and collapses. Switch its three
+tabs (Changes, Field matrix, Paths). Pass: each renders with no
+console error. The field matrix tab's own scroll box caps at 15rem,
+half its stand-alone 32rem (D10).
+
+Open each of the four dialogs in turn. Two open from the header
+bar's `⋮` menu, publish-confirm and discard-confirm. Two open from
+the Processes screen, promotion-preview and start-picker. Pass: each
+opens as a native `<dialog>`, with a visible `::backdrop` behind it.
+
+Read the backdrop's computed `background-color` in DevTools. Pass:
+it matches `rgb(0 0 0 / 45%)`, `app.css`'s own pre-migration value,
+still literal per D12. Close each dialog. Pass: no console error, on
+any of the four.
+
+Throughout: zero console errors on any studio screen this phase
+touched.

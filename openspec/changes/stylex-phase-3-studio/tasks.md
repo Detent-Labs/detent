@@ -358,15 +358,29 @@
 
 ## 10. Docs and roadmap
 
-- [ ] 10.1 Add a probe per region to `docs/browser-checks.md`'s
+- [x] 10.1 Add a probe per region to `docs/browser-checks.md`'s
   StyleX section. Name the form editor's two-column preview, the
   panels screen's three-column layout, and the dock's tab switching.
   Name all four dialogs' open/close/`::backdrop` behavior too.
-- [ ] 10.2 Change `docs/decisions.md`'s StyleX entry and `ROADMAP.md`
+
+  Added "Studio, non-canvas: form editor, panels, dock, dialogs" after
+  phase 2's own section. Covers the column toggle, and the panels
+  screen's three-column layout with its per-view edit-state
+  persistence. Also covers the dock's three tabs, the field matrix's
+  15rem cap (D10), and all four dialogs' open/`::backdrop`/close
+  cycle.
+- [x] 10.2 Change `docs/decisions.md`'s StyleX entry and `ROADMAP.md`
   stage 45. Mark phase 3 done. Name phase 4 (canvas) and phase 5
   (cleanup) as what remains. Correct phase 0's own Migration Plan row
   too. It claims `:popover-open` sees first use in phase 3. It does
   not: phase 0 already used it for the shell account menu.
+
+  Added a phase 3 paragraph to `docs/decisions.md`'s StyleX entry. It
+  names D12's `::backdrop` real-build finding and D14's scope
+  correction. `ROADMAP.md` stage 45 now reads "PHASES 0-3 DONE.
+  PHASES 4-5 NOT BUILT." Phase 0's archived design.md Migration Plan
+  row now states the `:popover-open` claim was wrong. It names this
+  task as the correction.
 
 ## 11. Verification
 

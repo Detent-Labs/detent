@@ -310,8 +310,8 @@ Specs: `development-toolchain`, `devcontainer-preflight`, `worktree-isolation`,
     Specs: `definition-contract`, `runtime-api`, `studio-app`,
     `studio-form-editor`, `studio-checks-rail`.
 
-45. **StyleX styling model for `packages/web`/`packages/form-ui`: PHASES 0-2
-    DONE. PHASES 3-5 NOT BUILT.** `stylex-phase-0-tooling` installed the
+45. **StyleX styling model for `packages/web`/`packages/form-ui`: PHASES 0-3
+    DONE. PHASES 4-5 NOT BUILT.** `stylex-phase-0-tooling` installed the
     compiler, split `tokens.css`'s element rules into `global.css`, moved
     the design-token module to `packages/form-ui`, gave `bun test` a
     stub-preload story, and migrated the shell header and register tab as
@@ -320,15 +320,19 @@ Specs: `development-toolchain`, `devcontainer-preflight`, `worktree-isolation`,
     export, and gave `PathButtons` a `style` prop for its wrapper.
     `stylex-phase-2-areas` migrated the shell's remaining nav wrapper and
     the shell, app, admin and reporting areas' own stylesheets. Each area's
-    file now carries only its reduced-motion reset block. Full reasoning,
+    file now carries only its reduced-motion reset block. `stylex-phase-3-studio`
+    migrated every studio screen outside `canvas/`; `app.css` now carries
+    only its `canvas/`-owned rules, the reduced-motion block, and
+    `.studio-dialog::backdrop`, which stays literal permanently since
+    `::backdrop` fails a real `@stylexjs/unplugin` build. Full reasoning,
     the measured evaluation and the six-phase plan sit in phase 0's
     `design.md`, at
     `openspec/changes/archive/2026-09-03-stylex-phase-0-tooling/design.md`.
 
-    Phase 3 migrates studio outside the canvas. Phase 4 migrates the
-    canvas. Phase 5 deletes the remaining hand-written area stylesheets and
-    updates the design docs that still name a literal class. Each phase is
-    its own OpenSpec change against `web-styling`.
+    Phase 4 migrates the canvas. Phase 5 deletes the remaining
+    hand-written area stylesheets and updates the design docs that still
+    name a literal class. Each phase is its own OpenSpec change against
+    `web-styling`.
 
     Reopen triggers: two consecutive StyleX releases that each cost a build
     fix reopen the compiler-version pin. A phase whose measured effort

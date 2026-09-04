@@ -1092,3 +1092,21 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   pre-migration CSS gave an unmatched status. Phases 3 through 5 remain:
   studio non-canvas, the canvas, and the cleanup phase that deletes the
   remaining hand-written stylesheets.
+
+  Phase 3 (`stylex-phase-3-studio`) is done: every studio screen
+  outside `canvas/` compiles from StyleX now. `app.css` carries only
+  its `canvas/`-owned rules, the reduced-motion block, and
+  `.studio-dialog::backdrop`, which stays literal permanently: every
+  dialog still composes the `studio-dialog` class for that one rule,
+  since `::backdrop` fails a real `@stylexjs/unplugin` build (design.md
+  D12). Its own cleanup pass found the `.canvas-*` prefix was never
+  the true phase 4 boundary (D14): five prefixed rules belonged to
+  this phase's own `EditScreen.tsx`, and ten unprefixed rules belonged
+  to `canvas/EditRail.tsx`. Phases 4 and 5 remain: the canvas, and the
+  cleanup phase that deletes the remaining hand-written stylesheets.
+
+  Phase 0's own Migration Plan row claimed `:popover-open` would see
+  its first use in phase 3. That claim was wrong: phase 0 already used
+  it for the shell account menu, and phase 2 reused it. `::backdrop`
+  is the pseudo-element that saw genuine first use in phase 3, and
+  design.md D12 is where its real-build failure is recorded.
