@@ -1870,7 +1870,7 @@ draft.
 
 ### Requirement: The Steps panel's configured-field count reads field entries alone
 
-The Steps panel SHALL report how many of the catalog's fields a step's view
+The Form section SHALL report how many of the catalog's fields a step's view
 configures. That line reads `N / M`, where `M` is the catalog's own size.
 
 The first number SHALL count field entries alone. A note occupies no catalog
@@ -1878,18 +1878,18 @@ row. Counting one would report a step as binding more of the catalog than it
 does. The second number never moves for a note, because the catalog holds
 none.
 
-This count sits on the Steps panel, not in the form editor. The form editor
+This count sits in the Form section, not in the form editor. The form editor
 displays no count of its own.
 
 #### Scenario: A note raises no configured-field count
 
 - **WHEN** a step's view holds one field entry and three notes
-- **THEN** the Steps panel reports that step's configured fields as 1
+- **THEN** the Form section reports that step's configured fields as 1
 
 #### Scenario: A step holding notes alone reports none configured
 
 - **WHEN** a step's view holds notes alone
-- **THEN** the Steps panel reports that step's configured fields as 0
+- **THEN** the Form section reports that step's configured fields as 0
 
 ### Requirement: The process header declares the process's base locale
 

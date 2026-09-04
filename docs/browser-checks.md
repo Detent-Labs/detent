@@ -146,7 +146,7 @@ Pass: the panels screen opens, the canvas is gone, and the address bar reads
 `/studio/processes/<id>/edit/panels/fields`.
 
 Read the third column. Pass: it lists every open check, grouped, in full. It
-is not the one-line summary the inspector shows.
+is not the one-line summary the ribbon bar shows.
 
 Type a name into the Contract view's outcome input without adding it. Switch
 to Fields, then back. Pass: the typed text is still there. A remount would
@@ -180,31 +180,27 @@ set to dark (`prefers-color-scheme: dark`). Work through every component
 `studio-canvas-first-structure-editor` and `studio-canvas-first-form-builder`
 added:
 
-- **Merged rail** (`EditRail`, `studio-edit-header-cleanup`): the "Add to
-  canvas" group's default state. Check its drag-hover state too (the
-  ghost that follows the pointer during a drag), for each of
-  Step/Subprocess/End. The "Process" group's three rows (Fields, Data
-  sources, Contract), each showing its own count.
-- **Checks rail, beside the canvas** (nothing selected): the expanded
-  grouped-list state, each source group (zod, structural, cel, registry,
-  duration). Check the held-back state too (a later group waiting on an
-  earlier one), and the all-clear state.
-- **Checks rail, collapsed in the inspector** (`studio-edit-header-cleanup`):
-  a step or a path selected. Check the collapsed one-line summary at the
-  inspector's bottom edge. It carries three states: a count, "no count"
-  when clear, the held-back indicator. Expand it in place. The grouped
-  list beneath must match the standalone rail's own states above. It
-  draws no border or padding of its own, so it never doubles the
-  inspector's box.
-- **Selection-driven inspector**: a selected step's identity zone and
-  behavior tabs. Its diagnostics drawer too, including the "View raw
-  JSON" toggle (expanded and collapsed). A selected path's own inspector
-  too, including its own path-guard "Developer view" toggle (raw CEL,
-  expanded and collapsed). That path-guard toggle is a distinct,
-  out-of-scope control from the step's "View raw JSON" toggle. The
-  no-selection state is the checks rail beside the canvas, covered above:
-  the inspector itself never renders with nothing selected
-  (`studio-edit-header-cleanup`).
+- **Palette** (`CanvasPalette`, `studio-step-bench`): the expanded ribbon's
+  "Add to canvas" group, in its default state. Check its drag-hover state
+  too (the ghost that follows the pointer during a drag), for each of
+  Step/Subprocess/End.
+- **Steps register** (`studio-step-bench`): the ruled rows, each with its
+  role stamp and its issue count. The current row too. The foot's six
+  process rows (Fields, Data sources, Contract, Field matrix, Changes,
+  Paths), each showing its own count.
+- **Checks rail, collapsed in the ribbon bar** (`studio-step-bench`): the
+  one-line summary. It carries three states: a count, "no count" when
+  clear, the held-back indicator. Expand it in place. The grouped list
+  beneath shows each source group (zod, structural, cel, registry,
+  duration). Check the held-back state there too (a later group waiting on
+  an earlier one), and the all-clear state.
+- **Configuration pane**: a selected step's masthead, including the "View
+  raw JSON" toggle (expanded and collapsed). Its section register too, with
+  heads open and closed. A selected path's own pane too, including its
+  path-guard "Developer view" toggle (raw CEL, expanded and collapsed).
+  That path-guard toggle is a distinct, out-of-scope control from the
+  step's "View raw JSON" toggle. With nothing selected the pane shows the
+  register's first step (`studio-step-bench`).
 - **Canvas-edge guard label**: a plain-English summary and a raw-CEL
   fallback.
 - **Process-identity header bar**: clean, dirty, and just-published states.
@@ -376,9 +372,8 @@ Source: `studio-canvas-fills-vertically` tasks 2.1, 2.2 and 2.6.
 Seed the database. Open a draft on the canvas edit screen, in a window 1440px
 tall or taller.
 
-Pass: the three columns end at the top edge of the collapsed dock, which
-`studio-editor-dock` added below them. The canvas stands taller than 36rem. No
-page scrollbar appears.
+Pass: the ribbon and the bench together fill the window's height. The bench's
+two columns stand taller than 36rem. No page scrollbar appears.
 
 Resize the window under 700px tall. Pass: the columns hold at 36rem, and the
 page scrolls to reach their bottom edge. That is the floor, and it renders what
@@ -758,8 +753,8 @@ whole gesture vocabulary. Hold it to build a selection. Release it to work as
 before.
 
 Click one step, then shift-click a second. Pass: both draw with the accent
-outline, and the third column reports a count of 2. Shift-click the second one
-again. Pass: it drops out, the count is gone, and the first step's inspector is
+outline, and the configuration pane reports a count of 2. Shift-click the second one
+again. Pass: it drops out, the count is gone, and the first step's own view is
 back.
 
 Click a fifth step with no shift held. Pass: the canvas draws that step alone
@@ -784,11 +779,11 @@ selected step.
 Press a member of a selection and release without moving. Pass: nothing moves.
 
 Select three steps and choose Remove steps. Pass: those three are gone, the
-others stay, and the column shows the full checks rail again. If one of them
-was the initial step, the start marker moved to a remaining step.
+others stay, and the pane shows the register's first remaining step. If one
+of them was the initial step, the start marker moved to a remaining step.
 
-Select two steps and read the bottom of the column. Pass: the collapsed checks
-summary still sits there, with the same count the inspector shows.
+Select two steps and read the ribbon bar. Pass: the collapsed checks summary
+still sits there, with the same count it showed for one step.
 
 Now pan the canvas with a plain drag. Pass: it pans, as it always did. The
 marquee took nothing away.
@@ -823,8 +818,8 @@ Zoom in and read a corner. Pass: the arc is a quarter circle, and it does not
 overshoot the corner it rounds.
 
 Click a route where it turns, well away from a straight line between the two
-steps. Pass: that path selects. Its row highlights in the inspector, so the
-pointer follows the drawn route.
+steps. Pass: that path selects. Its row highlights in the configuration
+pane, so the pointer follows the drawn route.
 
 Look at the area a five-segment route encloses. Pass: it is empty canvas. A
 filled shape there means the hit area lost its `fill: none`.
@@ -950,7 +945,7 @@ whole again.
 Open Studio and a draft with four or more steps. Most of this entry is a
 visual judgment against the drawn boxes.
 
-Click one step, then shift-click a second. Pass: the third column offers
+Click one step, then shift-click a second. Pass: the configuration pane offers
 "Group these steps". Activate it. Pass: a hairline box encloses both nodes,
 carrying the name "Group", and the grid dots stay visible through it. Watch
 for the defect: a box that hides a node, which means it drew in front.
@@ -1043,9 +1038,9 @@ the card leaves the list and the "Add a note" button still offers a fresh
 one. Click "Add a note". Pass: a new card appears, seeded with non-empty
 placeholder text, selected, its own strip open.
 
-Open the diagnostics drawer. Pass: it still reads issues for this step,
-never blanks. Clear the new note's `text` box to empty and reopen the
-drawer. Pass: it names exactly one Zod issue, the missing base-locale
+Read the masthead's issue count. Pass: it still reads issues for this step,
+never blanks. Clear the new note's `text` box to empty and read the count
+again. Pass: it names exactly one Zod issue, the missing base-locale
 entry, and every other check the step already carried still shows. Restore
 the text or remove the card before leaving.
 
@@ -1113,11 +1108,6 @@ deactivates without focus jumping back to the grid.
 Switch the studio's content locale to German. Pass: no column clips or
 overflows at 1280px. No column width visibly derives from the English
 step label; a German label wraps inside its column instead.
-
-Open the canvas dock's Field matrix tab. Pass: it shows no toolbar, no
-count line, no legend and no bulk badge. Its cells still take writes
-inline. The dock body holds its own 16rem cap; the grid's own scroll box
-fits inside it with no double scrollbar.
 
 Open `subprocess-loan-parent` for one more check: badge-to-checkbox
 alignment (`field-matrix-badge-alignment`). Mark `result`
@@ -1218,59 +1208,56 @@ reads "Arrange". The studio catalog carries English only, the same
 finding the field matrix's own walk above already made. The toolbar's
 three buttons stay well inside a 1280px viewport either way.
 
-### The editor dock (`studio-editor-dock`)
+### The canvas ribbon and the bench (`studio-step-bench`)
 
-Source: `studio-editor-dock` tasks 9.6 to 9.14.
+Source: `studio-step-bench` tasks 5.2 to 5.4.
 
-<!-- "canvas edit screen" is the glossary name of the screen. The linter reads
-     its "edit" as a synonym of "change". -->
-<!-- antislop: allow synonym-rotation -->
+Seed the database and open a draft on the structure surface.
 
-Seed the database and open a draft on the canvas edit screen.
+Pass: the ribbon shows its bar and a fit-scale band, and no palette. The bar
+holds one `<button type="button">` carrying `aria-expanded="false"` and
+`aria-controls="studio-canvas-ribbon-body"`. It also holds the collapsed
+checks summary.
 
-Pass: the dock sits below the three columns, collapsed. It shows one control
-row and no tab body. That control is a `<button type="button">` carrying
-`aria-expanded="false"` and `aria-controls="studio-dock-body"`.
+Activate the control. Pass: the full canvas shows, with the palette. Drag a
+Step entry onto the canvas. Pass: a new step lands at the drop point.
 
-Open the dock. Pass: three tabs appear, Changes active. The grid holds at or
-above 36rem, and the canvas stays visible above the dock.
+Reload. Pass: the ribbon shows its band again. Expand it, save the draft,
+then read the saved `layout` blob. Pass: it carries no key naming the ribbon.
 
-Measure the height at a 1440 by 900 window. The header rows take 186px. The
-grid therefore draws 40rem collapsed and 36rem open, and the page then
-scrolls. Both numbers are the point of the check. Read them rather than
-judging them.
+Choose the checks summary. Pass: its grouped list opens in place and pushes
+the bench down. It casts no shadow, and it states the publish verdict.
 
-Choose Paths. Pass: `purchase-requisition` gives 22 rows over five columns.
-Each row names the step the path leaves and the step it enters. An automatic
-path shows its priority and its guard's CEL.
+Choose a row in the steps register. Pass: the configuration pane opens that
+step, the row carries `aria-current`, and its node reads as selected.
 
-A manual path with neither reads "No priority" and "No guard". The body holds
-16rem. It scrolls inside itself.
+Resize to 1000px wide. Pass: the steps register collapses to a disclosure
+above the configuration pane, and no column clips.
 
-Choose Field matrix. Pass: the grid draws inside the dock. Scroll it and watch
-the column header. Pass: the header stays put.
+### The Changes and Paths panels views (`studio-step-bench`)
 
-That is the check that earns this walk. Lifting `.studio-matrix-scroll`'s cap
-leaves the header behind. The cap comes down instead. `overflow: auto` keeps
-that box a scroll container with nothing to scroll.
+Source: `studio-step-bench` tasks 3.1 and 3.2.
 
-Rename the process without saving, then read Changes. Pass: the entry reads
+Seed the database and open a draft on the structure surface.
+
+Open Paths from the steps register's foot. Pass: `purchase-requisition` gives
+22 rows over five columns. Each row names the step the path leaves and the
+step it enters. An automatic path shows its priority and its guard's CEL.
+
+A manual path with neither reads "No priority" and "No guard".
+
+Rename the process without saving, then open Changes. Pass: the entry reads
 `label.en`, its first value is the published name and its second is the unsaved
 one. That order is the whole point. The reverse reads every addition as a
 removal.
 
-Save, then publish from the header menu. Pass: the tab refetches with no
+Save, then publish from the header menu. Pass: the view refetches with no
 reload, and it reports that the draft matches the version just published.
 
-Open the panels screen, the form editor, and the JSON surface in turn. Pass:
-none of the three shows the dock, control included. The JSON one is a rule
-rather than a preference. The Field matrix tab writes the draft body, and
-`studio-json-view` keeps every such component out of reach there.
-
 Narrow the window to 1024px wide with Paths open. Pass: the table scrolls
-inside the dock. Neither the page nor the screen scrolls sideways.
+inside its own view. Neither the page nor the screen scrolls sideways.
 
-Switch the account menu's Language to German. Pass: the dock still reads
+Switch the account menu's Language to German. Pass: both views still read
 English. The studio catalog carries English only, the same finding the two
 walks above already made.
 
@@ -1298,7 +1285,7 @@ own render stability.
 Source: `canvas-edge-affordances` tasks 6.6-6.8.
 
 Open a draft holding at least one path between two steps. Drag a Step from
-the edit rail and hold it over that path before releasing.
+the expanded ribbon and hold it over that path before releasing.
 
 Pass: the path renders in a heavier, accent-colored stroke while the drag
 holds over it. No other path does. Release. Pass: a new step lands at the
@@ -1411,19 +1398,19 @@ session. `studio-draftToolbarState.test.ts` pins that exact bug at the unit
 level. Here the real save/conflict/reload sequence drives it in a browser
 instead.
 
-### Selecting a path switches the inspector to the source step's Paths tab with the row highlighted
+### Selecting a path opens the source step's Paths section with the row highlighted
 
-Source: `redesign-step-inspector`.
+Source: `redesign-step-inspector`, `studio-step-bench`.
 
 On the canvas, select a step. Then click one of its outgoing path edges. A
 guard label works as a click target.
 
-Pass: the inspector switches to the path's source step. The Paths tab
-shows, marked current in the behavior tab row. The selected path's own row
-shows a highlight border, distinct from the tab's other rows.
+Pass: the configuration pane switches to the path's source step. The Paths
+section shows its body. The selected path's own row shows a highlight
+border, distinct from the section's other rows.
 
-This exercises `defaultTabFor`'s `selectedPathId ? "paths" : "assignment"`
-ternary, called from `StepsPanel.tsx`'s selection effect.
+This exercises `defaultOpenSections`, seeded from `sectionSummary.ts` and
+read by `StepsPanel.tsx`.
 
 ### The no-assignment warning renders on a non-terminal step and not on a terminal one
 
@@ -1500,7 +1487,7 @@ scale it draws as roughly a 5 to 10 pixel circle. `playwright-cli
 mousewheel 0 -- -N` zoomed the canvas in enough to hit it. Pass the `--`
 explicitly. A bare negative delta parses as a flag instead.
 
-A tall inspector column can also push the canvas element far down the
+A tall configuration pane can also push the canvas element far down the
 page. That is a pre-existing layout property, unrelated to this change.
 Reading `getBoundingClientRect()` fresh before each interaction, instead of
 reusing an earlier snapshot's ref, handled that on its own.
@@ -1642,9 +1629,7 @@ flag:" followed by three swatches, one per `visible`/`required`/`readonly`.
 Pass: every live cell's checked `visible` checkbox renders the same blue.
 Every checked `required` checkbox renders the same gold-brown, and every
 checked `readonly` checkbox the same violet. Each swatch's color matches
-the grid's own. Reopen the same process on the canvas dock's Field matrix
-tab. Pass: the same three colors render there, with no toolbar and no
-legend.
+the grid's own.
 
 Through the JSON surface, give a view entry `required: true` and
 `visible: false` directly. This bypasses the checkbox's own gating, which
@@ -1705,7 +1690,7 @@ observe it.
 Open a draft with at least two named steps on the canvas.
 
 Drag a connect handle from one named step to another. Pass: the new path
-appears in the inspector's Paths tab with a derived `label` reading
+appears in the configuration pane's Paths section with a derived `label` reading
 `"<source step> → <target step>"`, and a non-empty `key`.
 
 Drag a connect handle from a step to empty canvas. Pass: the gesture creates
@@ -1713,7 +1698,7 @@ both a new step and a path to it. The new step carries no name yet. The new
 path's label names it with the "unnamed step" placeholder, on the target
 side.
 
-Drop a step from the edit rail's palette onto an existing path. Pass: the
+Drop a step from the expanded ribbon's palette onto an existing path. Pass: the
 retargeted path keeps its own `key`/`label` unchanged. The new path from
 the dropped step carries the "unnamed step" placeholder on its source side.
 
@@ -2191,7 +2176,7 @@ Scroll the page so the canvas sits below the fold, then press each arrow. Pass:
 focus moves and the page holds still. An arrow that scrolls the page means a
 missing `preventDefault`.
 
-Focus a step and press Enter. Pass: the inspector beside the canvas switches to
+Focus a step and press Enter. Pass: the configuration pane switches to
 that step, and the node draws as selected.
 
 Press Escape from that node. Pass: the outline lands on the `<svg>` itself.
@@ -2267,14 +2252,14 @@ the node you clicked, not from the one the keyboard last held.
 
 Click a group's disclosure with the pointer, then press Enter. Pass: the group
 toggles and nothing else happens. A stop left on a step would let that one
-Enter both toggle the group and open the step's inspector.
+Enter toggle the group and open the step.
 
 These two stay manual for the same reason as the check below. A pointer press
 and a focus move are both invisible to `renderToStaticMarkup`, and the web
 package carries no DOM harness.
 
 Double-click a node's label to open the inline rename, then read that node's
-`<g>` in the inspector. Pass: it carries no `role`, no `aria-label` and no
+`<g>` in the configuration pane. Pass: it carries no `role`, no `aria-label` and no
 `tabindex` while the field is open. ARIA forbids a focusable input inside a
 button, and the node is a button everywhere else.
 
@@ -2373,7 +2358,7 @@ pre-migration values.
 
 Throughout: zero console errors on any of the four screens.
 
-### Studio, non-canvas: form editor, panels, dock, dialogs (`stylex-phase-3-studio`)
+### Studio, non-canvas: form editor, panels, dialogs (`stylex-phase-3-studio`)
 
 Source: `stylex-phase-3-studio` task 10.1. Every studio screen outside
 `canvas/` compiles from StyleX now. Its `app.css` carries only its
@@ -2389,16 +2374,14 @@ column count. Pass: the canvas's computed `grid-template-columns`
 switches between `1fr` and two tracks, matching `app.css`'s
 pre-migration `[data-columns="2"]` rule.
 
-Open the panels screen from the edit rail. Pass: the index rail, the
+Open the panels screen from the steps register. Pass: the index rail, the
 open view and the checks rail render as three columns. Their widths
 match what `app.css` declared before this change. Switch between the
 field catalog, data sources, contract and field matrix views. Pass:
 each view keeps its own edit state across the switch.
 
-Open the canvas dock. Pass: it opens and collapses. Switch its three
-tabs (Changes, Field matrix, Paths). Pass: each renders with no
-console error. The field matrix tab's own scroll box caps at 15rem,
-half its stand-alone 32rem (D10).
+Open the Changes and Paths views in turn. Pass: each renders with no
+console error.
 
 Open each of the four dialogs in turn. Two open from the header
 bar's `⋮` menu, publish-confirm and discard-confirm. Two open from
@@ -2413,10 +2396,10 @@ any of the four.
 Throughout: zero console errors on any studio screen this phase
 touched.
 
-### Studio canvas: CanvasView.tsx and EditRail.tsx compiled (`stylex-phase-4-canvas`)
+### Studio canvas: CanvasView.tsx compiled (`stylex-phase-4-canvas`)
 
-Source: `stylex-phase-4-canvas` task 6.5/6.6. `canvas/CanvasView.tsx` and
-`canvas/EditRail.tsx` compile from StyleX now. `app.css` carries only two
+Source: `stylex-phase-4-canvas` task 6.5/6.6. `canvas/CanvasView.tsx`
+compiles from StyleX now. `app.css` carries only two
 permanent, non-canvas rules: the reduced-motion block and
 `.studio-dialog::backdrop`. Build the production bundle and open it on
 the engine's own port. Do not use `bun run dev`: Studio's dev-mode crash

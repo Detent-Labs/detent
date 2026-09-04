@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
 import type { DataSourceDef } from "workflow-engine/schema";
@@ -28,6 +28,8 @@ import { DataSourcesPanel } from "../panels/DataSourcesPanel";
 import { ContractPanel } from "../panels/ContractPanel";
 import { FieldMatrixPanel } from "../panels/FieldMatrixPanel";
 import { ChecksRail } from "../panels/ChecksRail";
+import { ChangesView } from "../panels/ChangesView";
+import { PathsView } from "../panels/PathsView";
 
 /** Below this width the three regions — index rail, definition half, effect
  * half — no longer fit beside one another. The rail holds its 16rem, and a
@@ -285,6 +287,8 @@ const VIEW_LABEL: Record<PanelView, CatalogKey> = {
   dataSources: "dataSources.heading",
   contract: "contract.heading",
   matrix: "fieldMatrix.heading",
+  changes: "panelsScreen.linkChanges",
+  paths: "panelsScreen.linkPaths",
 };
 
 /** One `EntityType` per view — the dimension `resolveLoc` reports an issue in
@@ -295,10 +299,11 @@ const VIEW_LABEL: Record<PanelView, CatalogKey> = {
  * `view`-source count also includes `checkUnwrittenTechnicalFields`'
  * field-anchored finding, which the Fields view's own `issueCountForEntityType`
  * badge surfaces correctly (design.md Risks). */
-const VIEW_ENTITY_TYPE: Record<Exclude<PanelView, "matrix">, EntityType> = {
+const VIEW_ENTITY_TYPE: Record<Exclude<PanelView, "matrix" | "changes">, EntityType> = {
   fields: "field",
   dataSources: "dataSource",
   contract: "contract",
+  paths: "path",
 };
 
 interface PanelsRailFieldRowProps {
@@ -429,6 +434,8 @@ export function PanelsRailFieldRow({
 
 interface Props {
   openView: PanelView;
+  /** For the Changes view's base-version fetch. */
+  processId: string;
   onBack: () => void;
   onOpenView: (view: PanelView) => void;
   /** "Show on the canvas" (task 6.3): navigates back to the canvas with the
@@ -439,12 +446,16 @@ interface Props {
    * screen, so the loaded draft's report is already in scope one level up and
    * needs no second fetch. */
   canPublish: boolean;
+  /** The published version the draft sits on, folded over `publishResult`
+   * by `EditorArea`, so a publish moves it and the Changes view refetches
+   * with no reload. */
+  baseVersion: number | null;
 }
 
 /**
- * The four process-wide panels — field catalogue, data sources, contract,
- * field matrix — on their own routed screen (`studio-app`'s panels-screen
- * requirements).
+ * The six process-wide panels — field catalogue, data sources, contract,
+ * field matrix, changes, paths — on their own routed screen (`studio-app`'s
+ * panels-screen requirements). The last two arrived with the dock's removal.
  *
  * It replaced a native `<dialog>`. The overlay hid the checks rail while an
  * author edited field keys and data source keys, and those two produce most of
@@ -453,7 +464,7 @@ interface Props {
  * address, which `showModal()` on component state could not: no link reached a
  * view, Back did not close it, and a reload landed on the canvas.
  *
- * All four views stay MOUNTED and three hide. Rendering only the open one
+ * All six views stay MOUNTED and five hide. Rendering only the open one
  * would drop `ContractPanel`'s half-typed outcome name (its own `useState`)
  * and refetch `DataSourcesPanel`'s list keys on every switch, and it would
  * drop the field matrix's selected cell. `hidden` keeps the subtree and
@@ -464,7 +475,7 @@ interface Props {
  * thing that persists. The note beside Back states that, so leaving never
  * reads as a cancel.
  */
-export function PanelsScreen({ openView, onBack, onOpenView, onShowStep, token, canPublish }: Props) {
+export function PanelsScreen({ openView, processId, onBack, onOpenView, onShowStep, token, canPublish, baseVersion }: Props) {
   const { draft, mutate, validation, contentLocale } = useDraft();
 
   const railFields = flattenRailFields(draft.fields);
@@ -485,6 +496,12 @@ export function PanelsScreen({ openView, onBack, onOpenView, onShowStep, token, 
   // breakpoint `panelsRailListClosed` ignores it and the list always shows,
   // so a window widened while the rail is closed does not lose the rail.
   const [railOpen, setRailOpen] = useState(false);
+
+  // The Changes rail count. `panelEntityCounts` derives from the draft alone
+  // and the difference is a fetch away, so the view reports its own count up.
+  // `useCallback`: it is an effect dependency inside the view.
+  const [changesCount, setChangesCount] = useState<number | undefined>(undefined);
+  const onChangesCount = useCallback((count: number | undefined) => setChangesCount(count), []);
 
   const topLevelFieldIds = (draft.fields ?? [])
     .map((f) => f.id)
@@ -665,7 +682,11 @@ export function PanelsScreen({ openView, onBack, onOpenView, onShowStep, token, 
               const issues =
                 view === "matrix"
                   ? issueCountForSource(validation.issues, "view")
-                  : issueCountForEntityType(validation.issues, VIEW_ENTITY_TYPE[view]);
+                  : // The Changes view reports a diff, not a validation dimension,
+                    // so no `EntityType` names its findings and it carries none.
+                    view === "changes"
+                    ? 0
+                    : issueCountForEntityType(validation.issues, VIEW_ENTITY_TYPE[view]);
               return (
                 <li key={view}>
                   <button
@@ -675,7 +696,9 @@ export function PanelsScreen({ openView, onBack, onOpenView, onShowStep, token, 
                     onClick={() => onOpenView(view)}
                   >
                     <span {...stylex.props(styles.panelsRailName)}>{t(VIEW_LABEL[view])}</span>
-                    <span {...stylex.props(styles.panelsRailCount)}>{entityCount[view]}</span>
+                    <span {...stylex.props(styles.panelsRailCount)}>
+                      {view === "changes" ? (changesCount ?? entityCount.changes) : entityCount[view]}
+                    </span>
                     {issues > 0 && <span {...stylex.props(styles.panelsRailIssues)}>{issues}</span>}
                   </button>
                   {/* Contract holds one editor, so it carries no sub-list. A
@@ -788,7 +811,7 @@ export function PanelsScreen({ openView, onBack, onOpenView, onShowStep, token, 
         </nav>
 
         <main {...stylex.props(styles.panelsScreenView, styles.panelsScreenLayoutChild)}>
-          {/* All four mount; `hidden` shows one. See the component note. */}
+          {/* All six mount; `hidden` shows one. See the component note. */}
           <div hidden={openView !== "fields"}>
             <FieldCatalogPanel
               token={token}
@@ -812,6 +835,18 @@ export function PanelsScreen({ openView, onBack, onOpenView, onShowStep, token, 
           </div>
           <div hidden={openView !== "matrix"}>
             <FieldMatrixPanel />
+          </div>
+          <div hidden={openView !== "changes"}>
+            <ChangesView
+              processId={processId}
+              token={token}
+              draft={draft}
+              baseVersion={baseVersion}
+              onCount={onChangesCount}
+            />
+          </div>
+          <div hidden={openView !== "paths"}>
+            <PathsView draft={draft} contentLocale={contentLocale} />
           </div>
         </main>
 

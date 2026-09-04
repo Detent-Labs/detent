@@ -1,9 +1,9 @@
 /**
- * The dock's Paths tab derives one row per path across the whole draft, kept
- * out of React so it can be tested (`studio-canvas`'s Paths-tab requirement).
+ * The Paths view derives one row per path across the whole draft, kept out
+ * of React so it can be tested (`studio-app`'s Paths-view requirement).
  *
  * Nothing here mutates, and nothing here reads a locale. Both label values
- * stay `DraftLocalizedText`; `EditorDock` resolves them against the draft's
+ * stay `DraftLocalizedText`; `PathsView` resolves them against the draft's
  * own `contentLocale`. That keeps this module's test free of i18n setup.
  */
 import type { Path, Step } from "workflow-engine/schema";

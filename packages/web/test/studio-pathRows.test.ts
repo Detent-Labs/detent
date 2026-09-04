@@ -1,5 +1,5 @@
 /**
- * The dock's Paths-tab row derivation (`dock/pathRows.ts`), tested as a pure
+ * The dock's Paths-tab row derivation (`panels/pathRows.ts`), tested as a pure
  * function against literal fixtures — no DOM, no rendering.
  *
  * The guarded-manual-path cases exist because `definition.ts` puts `guard` on
@@ -12,7 +12,7 @@
 import { describe, expect, it } from "bun:test";
 import type { Step } from "workflow-engine/schema";
 import type { DraftOf } from "../src/areas/studio/draft/types.js";
-import { pathRows } from "../src/areas/studio/dock/pathRows.js";
+import { pathRows } from "../src/areas/studio/panels/pathRows.js";
 
 type DraftStep = DraftOf<Step>;
 

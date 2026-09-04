@@ -339,6 +339,8 @@ export const en = {
   "panelsScreen.linkDataSources": "Data sources",
   "panelsScreen.linkContract": "Contract",
   "panelsScreen.linkFieldMatrix": "Field matrix",
+  "panelsScreen.linkChanges": "Changes",
+  "panelsScreen.linkPaths": "Paths",
   "panelsScreen.railLabel": "Editors",
   "panelsScreen.unnamedField": "(unnamed field)",
   "panelsScreen.unnamedDataSource": "(unnamed data source)",
@@ -368,9 +370,15 @@ export const en = {
   "fieldMatrix.flaggedCellMark": "Flagged in Checks",
   "fieldMatrix.technicalRowMark": "Technical",
 
+  "stepSections.entry": "Entry",
   "stepSections.assignment": "Assignment",
+  "stepSections.form": "Form",
   "stepSections.paths": "Paths",
   "stepSections.timers": "Timers",
+  "stepSections.exit": "Exit",
+  "stepSections.terminalNoPathsOrTimers": "A terminal step has no outgoing path and no timer.",
+  "stepSections.noAssignmentWarning":
+    "This step has no assignment. Only the starter or an admin can act on it, and it stays out of everyone's My-tasks inbox. Publishing still works.",
   "stepSections.actions": "Actions",
   "stepSections.subprocess": "Subprocess spec",
   "stepSections.developerView": "View raw JSON",
@@ -389,6 +397,22 @@ export const en = {
   "stepSections.viewFieldsConfigured": "fields configured",
   "stepSections.noSelection": "Select a step or a path to edit it.",
   "stepSections.renameLabel": "Step name",
+  "stepSections.keyField": "key",
+  "stepSections.labelField": "label",
+  "stepSections.idField": "id",
+  "stepSections.descriptionField": "description",
+  "stepSections.outcomeField": "outcome",
+  "stepSections.outcomeHint": "An outcome binds only on a contracted process.",
+  "stepSections.moreActions": "More step actions",
+  "stepSections.registerLabel": "Step configuration",
+  "stepSections.emptyValue": "—",
+
+  // The role a step's stamp reads, in the steps register and in the
+  // configuration pane's masthead. `draft/roleStamp.ts` picks which one.
+  "stepRole.initial": "Initial",
+  "stepRole.task": "Task",
+  "stepRole.subprocess": "Subprocess",
+  "stepRole.end": "End",
 
   "palette.heading": "Add to canvas",
   "palette.step": "Step",
@@ -465,6 +489,11 @@ export const en = {
   "canvas.pathLabelNoTrigger": "trigger not set",
   "canvas.groupDisclosure": "Steps in {group}",
   "canvas.svgLabel": "Process graph",
+
+  "ribbon.expand": "Expand the canvas",
+  "ribbon.collapse": "Collapse the canvas",
+  "stepsRegister.label": "Steps",
+  "stepsRegister.addFirstStep": "Add the first step",
 
   "dock.region": "Editor dock",
   "dock.expand": "Open the dock",

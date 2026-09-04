@@ -1729,13 +1729,13 @@ Stage-by-stage status is in `ROADMAP.md`.
   column, deliberately not Mermaid (display-only, no drag affordance) and not
   a graph-editing library (the interaction surface — drag a node, drag from a
   handle — is small and fixed, and the domain graph has no parallelism to
-  support). `StepsPanel` is mounted unconditionally as a fixed-width inspector
-  beside the canvas — its `activeTab` behavior-zone state, previously internal
-  `useState`, is now an optional controlled prop (`selectedStepId`/
-  `onSelectStep`, uncontrolled when `onSelectStep` is omitted) so canvas
-  selection can drive it without ever hiding the panel's own identity zone or
+  support). `StepsPanel` is mounted unconditionally as a fixed-width pane
+  beside the canvas — its selection, previously internal
+  `useState`, is now a controlled prop pair (`selectedStepId`/
+  `onSelectStep`) so canvas
+  selection can drive it without ever hiding the panel's own masthead or
   "+ Add step" action; selecting a path edge resolves to its *source* step
-  and shows that step's Paths tab (no standalone `PathsPanel` mount — it is
+  and opens that step's Paths section (no standalone `PathsPanel` mount — it is
   already nested there). `src/schema/definition.ts` gained
   `checkPathTriggerConsistency`, extracted from the step `superRefine`'s
   inline all-manual-or-all-automatic / unique-automatic-priority check (same
@@ -1815,9 +1815,9 @@ Stage-by-stage status is in `ROADMAP.md`.
   the canvas selects a set of steps, not one.
 
   `EditorArea` holds `selectedStepIds: string[]`. A set of one drives the
-  inspector exactly as the single id did. A set of several drives a summary
-  instead — a count, a Remove steps control, and the same collapsed checks rail
-  the inspector shows — because the inspector edits one step.
+  configuration pane exactly as the single id did. A set of several drives a
+  summary instead — a count and a Remove steps control — because the pane
+  edits one step.
 
   `canvas/selection.ts` exports `toggleSelection`, `normalizeRect` and
   `nodesInRect`, all pure and covered by
@@ -1925,8 +1925,8 @@ Stage-by-stage status is in `ROADMAP.md`.
   the drag preview stays a straight line from it: a control that moved under
   the pointer is harder to press, and a drag in flight has no target to face.
 - Canvas edge insert (`packages/web/src/areas/studio/draft/insertOnPath.ts`,
-  `canvas/CanvasView.tsx`, `screens/EditScreen.tsx`, `canvas/EditRail.tsx`,
-  `canvas-edge-affordances`, roadmap #31): an edit-rail drag released over a
+  `canvas/CanvasView.tsx`, `screens/EditScreen.tsx`, `canvas/CanvasPalette.tsx`,
+  `canvas-edge-affordances`, roadmap #31): a palette drag released over a
   rendered path inserts the dragged step into it instead of placing it
   free-standing. `EditScreen.onPaletteDrop` resolves the path under the
   release point through `elementFromPoint`'s `closest("[data-path-id]")`, the
@@ -1938,12 +1938,12 @@ Stage-by-stage status is in `ROADMAP.md`.
   The insert clears the split path's stored waypoints in the same
   `saveState.layout` write that places the new step, the same reason
   `Arrange` already clears every waypoint. While the drag is live,
-  `EditRail.onDragMove` reports the pointer's moving position, and the path
+  `CanvasPalette.onDragMove` reports the pointer's moving position, and the path
   it currently sits over renders in a drop-target stroke
   (`.canvas-edge-insert-target`) — heavier, in the accent, no other control.
   An `end` step never takes this branch: a terminal step has no outgoing
   path, so it drops free-standing, as it always has. No delete affordance
-  ships on an edge; the inspector deletes a path already, and a control on
+  ships on an edge; the configuration pane deletes a path already, and a control on
   the edge would be a second way to do one thing.
 - Canvas edge waypoints (`packages/web/src/areas/studio/canvas/`,
   `canvas-edge-waypoints`, roadmap #33): a path may carry a list of
@@ -2012,8 +2012,9 @@ Stage-by-stage status is in `ROADMAP.md`.
   incoming path back to its source.
 
   Up and Down move through the order `workflow.steps` holds, or through the fan
-  a focused path belongs to. Enter selects the focused step and opens its
-  inspector, exactly as a click does. Escape moves the roving stop to the
+  a focused path belongs to. Enter selects the focused step and opens it in
+  the configuration pane, exactly as a click does. Escape moves the roving
+  stop to the
   `<svg>` itself, so Tab leaves the canvas rather than re-entering it. No axis
   wraps, and an arrow key from a root focus goes to the entry point.
 
@@ -2252,10 +2253,10 @@ Stage-by-stage status is in `ROADMAP.md`.
   `routing.ts`'s `edit` variant gains an optional `formStepId`. It
   matches `/processes/:id/edit/form/:stepId`. `EditorArea` branches on
   it. It renders `FormEditorScreen` in place of the canvas and
-  inspector. Both sit inside the same mounted `DraftProvider`.
+  configuration pane. Both sit inside the same mounted `DraftProvider`.
 
   A navigation away and back shows the same draft state a re-opened
-  modal would have. The Draft never unmounts. `StepsPanel`'s identity-zone
+  modal would have. The Draft never unmounts. `StepsPanel`'s Form-section
   view button navigates there now. It no longer opens local dialog state.
   It carries no `aria-haspopup` any more. It is a navigation target now,
   not a disclosure or a dialog trigger.
@@ -3261,7 +3262,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   every running instance on a version.
 
   `GET /registry` widens while the Tools SCREEN does not. The route has two
-  consumers. One is the Tools screen. The other is the inspector's
+  consumers. One is the Tools screen. The other is the configuration pane's
   plugin-config form, which turns a registered type's config schema into a
   form. An author refused the route falls back to raw JSON for every action
   config.
@@ -4178,7 +4179,7 @@ meets `scope=started` should infer no new permission tier from it.
   its tenant from the request host.
 
 - Process Studio, the panels screen (`packages/web/src/areas/studio/screens/
-  PanelsScreen.tsx`, `routing.ts`, `canvas/EditRail.tsx`, `studio-app`,
+  PanelsScreen.tsx`, `routing.ts`, `canvas/StepsRegister.tsx`, `studio-app`,
   `studio-checks-rail`): stage 36. The field catalog, the data sources and the
   contract sat behind one native `<dialog>`. It measured `min(72rem, 92vw)` by
   `88vh`. They sit on a routed screen now, at
@@ -4202,9 +4203,9 @@ meets `scope=started` should infer no new permission tier from it.
   the accessibility tree, with no CSS.
 
   `panelEntityCounts` in `draft/panel-rail.ts` is the one source of the count
-  beside each view's name. The canvas edit rail and the screen's index rail
+  beside each view's name. The steps register and the screen's index rail
   both read it. Each carried its own copy of the three expressions before, and
-  the two did not agree. The canvas rail counted `draftFields`, which keeps a
+  the two did not agree. The register counted `draftFields`, which keeps a
   field carrying no id. The screen counted rail rows, which drop one.
 
   The screen carries no Save, the rule the overlay already had. Every panel
@@ -4353,72 +4354,80 @@ meets `scope=started` should infer no new permission tier from it.
   that finds both reads every file naming `process.env.PORT`, `startHttpServer`
   or `Bun.serve`.
 
-- The editor dock (`packages/web/src/areas/studio/dock/`,
-  `screens/EditScreen.tsx`, `studio-canvas`): the canvas edit screen left
-  its lower band empty on a tall window. `EditScreen.tsx`'s
-  `studioCanvasLayout` compiled style grows the grid with the viewport,
-  and the canvas fills its middle column. The 12rem `EditRail` and the
-  22rem `ChecksRail` do not. The dock is a collapsible strip below that
-  grid, full width, collapsed by default.
+- The step bench (`screens/EditScreen.tsx`, `canvas/StepsRegister.tsx`,
+  `panels/StepsPanel.tsx`, `studio-canvas`): the structure surface was a
+  three-column grid of an edit rail, the canvas and an inspector, with a
+  dock below. It is now a ribbon over a bench. `studio-step-bench` made that
+  replacement and deleted `dock/` and `canvas/EditRail.tsx`.
 
-  It is a flex SIBLING of the grid, never a fourth grid child. That template is
-  a strict three columns, so a fourth child lands in an implicit fourth one.
-  The parent, `EditScreen.tsx`'s `studioEditScreen` compiled style, is
-  already a flex column, and item 1 gave the grid `flex: 1 1 auto` with
-  `min-height: 36rem`. The dock takes
-  `flex: 0 0 auto`. The grid therefore yields its height down to that floor,
-  and the page scrolls past it.
+  `EditScreen.tsx`'s `structureSurface` compiled style is a flex column. The
+  `ribbon` style takes `flex: none`, and the `bench` style takes
+  `flex: 1 1 auto` with `min-height: 36rem`. The ribbon therefore takes its
+  height first, and the page scrolls past the bench's floor.
 
-  Measured at 1440 by 900: the grid draws 40rem collapsed and 36rem open, over
-  186px of header rows.
+  The ribbon's body holds the same `CanvasView` in both states. Its band is
+  12rem tall and its open state 30rem. Only the height and the palette
+  differ, so every canvas gesture stays live in both.
 
-  It renders in the canvas sub-state of the Structure surface alone. That is a
-  rule rather than a preference. The Field matrix tab writes the draft body
-  through `setFlag`. The capability `studio-json-view` keeps every such
-  component out of reach while the JSON surface is active. Mounting the dock
-  inside the ladder's last arm satisfies that rule for free.
+  `canvas/CanvasPalette.tsx` carries the palette the edit rail once held. It
+  lists inside the expanded ribbon alone. A draft holding no step reaches the
+  same draft mutation through the steps register's own add control.
 
-  Three tabs ship. All three mount while the dock is open, and `hidden` reveals
-  one. That is the reveal-rather-than-mount rule `PanelsScreen` already
-  follows.
+  The ribbon persists nothing. Its open flag is `EditorArea` component state.
+  The `layout` blob takes no key: it is per-draft, so one author's expanded
+  ribbon would open for every author.
 
-  The Changes tab runs `diffJson(strippedBase, draft)` over the LIVE draft,
+  The ribbon's bar carries the collapsed `ChecksRail` under an `inBar` prop.
+  That is the structure surface's one summary. Expanding it grows the bar and
+  pushes the bench down, and it casts no shadow.
+
+  `StepsRegister` lists one row per step. `draft/registerOrder.ts` orders
+  them by reachability from `initialStep`, unreachable steps next, terminal
+  steps last. `draft/roleStamp.ts` maps each step to `initial`, `task`,
+  `subprocess` or `end`, with its tone. Both are pure modules with a
+  `bun:test` behind them. The register's foot carries the six process links,
+  now including Changes and Paths.
+
+  `StepsPanel` opens with a masthead that does not scroll. Below it stands a
+  register of sections.
+
+  The module `panels/sectionsFor.ts` yields the section list for a
+  performed-by value. Its neighbor `panels/sectionSummary.ts` yields each
+  section's value, its issue count and the default open set. The open set
+  lives in `EditorArea` state, keyed by step id, for the reason the ribbon's
+  flag does. The change deleted `BehaviorTab`, `defaultTabFor` and both reset
+  effects.
+
+  The dock's three tabs became panels-screen views. There are six names in
+  `PANEL_VIEWS` now. The modules `panels/ChangesView.tsx` and
+  `panels/PathsView.tsx` carry the first two, and the field matrix was
+  already a view.
+
+  The Changes view runs `diffJson(strippedBase, draft)` over the LIVE draft,
   unsaved edits included. Base first is load-bearing. The function reports a
   key present in its second argument alone as `added`, and it reads `from` off
   the first. So the draft-first order `VersionsScreen.diffAgainstBase()` uses
   would read every addition as a removal.
 
-  The Field matrix tab mounts `FieldMatrixPanel`, which takes no props and
-  shares the one `DraftProvider`. The Paths tab is the one new view. It gives
-  one row per path over source step, trigger, priority, guard and target.
-
-  The module `dock/pathRows.ts` carries that derivation as a pure function,
-  with `packages/web/test/studio-dock-path-rows.test.ts` behind it. Every row
-  carries `guardSrc`, with no branch on the trigger. The schema puts `guard` on
-  the path beside `trigger`, and `resolveAvailablePaths` evaluates a manual
-  path's guard before offering it. The inspector `PathsPanel` shows the guard
-  editor for an automatic path only. Switching a guarded path back to manual
-  keeps the guard, so a real draft reaches that state.
+  The Paths view gives one row per path over source step, trigger, priority,
+  guard and target. The module `panels/pathRows.ts` carries that derivation
+  as a pure function, with `packages/web/test/studio-pathRows.test.ts` behind
+  it. Every row carries `guardSrc`, with no branch on the trigger. The schema
+  puts `guard` on the path beside `trigger`, and `resolveAvailablePaths`
+  evaluates a manual path's guard before offering it. The Paths section's
+  `PathsPanel` shows the guard editor for an automatic path only. Switching a
+  guarded path back to
+  manual keeps the guard, so a real draft reaches that state.
 
   `EditorAreaProps` gained `loadedBaseVersion`, which `EditScreen.load`
   discarded before. That prop cannot move, because `load` depends on
   `processId`, `token` and `onUnauthorized` alone. So `EditorArea` derives
-  `publishResult?.version ?? loadedBaseVersion`. The Changes tab then refetches
-  after a publish with no reload.
+  `publishResult?.version ?? loadedBaseVersion`. The Changes view then
+  refetches after a publish with no reload.
 
-  The dock persists nothing. The open flag and the active tab are `EditorArea`
-  component state. The `layout` blob takes no key: it is per-draft, so one
-  author's open dock would open for every author.
-
-  The browser check found what no test could. `FieldMatrixGrid.tsx`'s
-  `matrixScroll` style caps at 32rem and scrolls itself. Its
-  `matrixScrollCompact` variant, which the dock's own `compact` prop
-  selects, scopes that cap DOWN to 11rem rather than lifting it.
-
-  Lifting it looks right and breaks the sticky headers. The declaration
-  `overflow: auto` keeps that box a scroll container. A `position: sticky`
-  header therefore resolves against it, not against the dock body. The column
-  header moved 858px to 608px under a 250px scroll.
+  `FieldMatrixGrid.tsx` lost its `compact` prop and its `matrixScrollCompact`
+  style with the dock. Its `matrixScroll` style still caps at 32rem and
+  scrolls itself, and `FieldMatrixPanel` is its one mount.
 
 ## Instance audit log (`instance-audit-log-chain`)
 
@@ -4662,8 +4671,8 @@ role check answers wrong in both directions.
 
 The component `EditScreen` passes the loaded value into `EditorArea` as a prop.
 That component folds whatever `reload()` re-read over it, the way
-`dockBaseVersion` folds a publish result's version. The field deliberately does
-not join `DraftSaveState`.
+`changesBaseVersion` folds a publish result's version. The field deliberately
+does not join `DraftSaveState`.
 
 The component `PublishMenuItem` in `ProcessHeaderBar.tsx` renders the `⋮`
 menu's Publish item. It renders the reason line beneath that item when the
@@ -4683,5 +4692,5 @@ The header bar returns a fragment. A failed save, discard or publish renders as
 a `studio-error-banner` block with an alert role. The save conflict beside it
 takes the same shape. Both sit as siblings of the header, rather than as items
 inside its wrapping flex row. The missing form step, the absent draft and the
-dock's failed diff load now carry that shape too. An open dialog hides the
+Changes view's failed diff load now carry that shape too. An open dialog hides the
 banner, because the dialog reports the same failure.

@@ -92,10 +92,6 @@ function countLine(declared: number, fields: number, steps: number, cells: numbe
  * toolbar (inert-column filter, count line, legend) and the column/row bulk
  * toggle badges the grid draws when `showBulkBadges` is set (design.md
  * decision 6, `field-matrix-toolbar-and-inline-editing`).
- *
- * The canvas dock's Field matrix tab mounts `FieldMatrixGrid` directly, not
- * this wrapper, so it gains none of the chrome added here
- * (`studio-canvas`'s dock requirements).
  */
 export function FieldMatrixPanel() {
   const { draft } = useDraft();

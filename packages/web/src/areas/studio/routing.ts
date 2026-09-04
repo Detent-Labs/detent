@@ -1,9 +1,9 @@
-/** The four process-wide views, in rail order. The panels screen re-exports
+/** The six process-wide views, in rail order. The panels screen re-exports
  * this as its own; routing owns it so the route type needs no import from a
  * component. */
-export type PanelView = "fields" | "dataSources" | "contract" | "matrix";
+export type PanelView = "fields" | "dataSources" | "contract" | "matrix" | "changes" | "paths";
 
-export const PANEL_VIEWS: PanelView[] = ["fields", "dataSources", "contract", "matrix"];
+export const PANEL_VIEWS: PanelView[] = ["fields", "dataSources", "contract", "matrix", "changes", "paths"];
 
 const isPanelView = (v: string): v is PanelView => (PANEL_VIEWS as string[]).includes(v);
 
@@ -80,7 +80,7 @@ export function routePath(route: Route): string {
     case "edit":
       if (route.formStepId)
         return `/processes/${encodeURIComponent(route.processId)}/edit/form/${encodeURIComponent(route.formStepId)}`;
-      // `panel` needs no encoding: it is one of four literals, not user input.
+      // `panel` needs no encoding: it is one of six literals, not user input.
       if (route.panel) return `/processes/${encodeURIComponent(route.processId)}/edit/panels/${route.panel}`;
       if (route.stepId) return `/processes/${encodeURIComponent(route.processId)}/edit/step/${encodeURIComponent(route.stepId)}`;
       return `/processes/${encodeURIComponent(route.processId)}/edit`;

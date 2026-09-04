@@ -1636,8 +1636,8 @@ carrying a translation in the chosen locale.
 
 The canvas SHALL let the developer rename a step's label directly on
 its node. Renaming SHALL NOT need editing the step through the
-inspector's identity zone. Committing the rename SHALL write
-`step.label` through the same Draft mutation the identity zone's label
+configuration pane's masthead. Committing the rename SHALL write
+`step.label` through the same Draft mutation the masthead's label
 input already calls.
 
 The field SHALL open seeded with the step's label resolved for the content
@@ -1656,7 +1656,7 @@ translation, rather than committing a copy of the key as a label.
 
 - **WHEN** the developer edits a node's inline text field and commits it
 - **THEN** the step's `label` updates through the same Draft mutation the
-  identity zone's label input calls
+  masthead's label input calls
 
 #### Scenario: A step with no translation opens an empty field
 
@@ -1673,25 +1673,25 @@ translation, rather than committing a copy of the key as a label.
 
 ### Requirement: The identity zone's step key auto-derives from the step label
 
-The identity zone's key field SHALL auto-fill from the selected step's
+The masthead's key field SHALL auto-fill from the selected step's
 label as the developer types. This holds for a step whose key is empty. It
 also holds for a step whose key still matches what derivation would
 produce from the label's prior value. Derivation SHALL follow the same
 rule the header bar's process key uses.
 
 This auto-fill and lock behavior SHALL apply through both label-editing
-routes. Those routes are the identity zone's own label input, and the
+routes. Those routes are the masthead's own label input, and the
 canvas node's inline rename. The two routes are one label-editing surface
 for this purpose. A rename through either route SHALL keep the step's key
 in agreement with the other. A key locked by a hand-edit made through
 either route SHALL stay locked through the other.
 
-The identity zone SHALL append `_2` when the derived key collides with
+The masthead SHALL append `_2` when the derived key collides with
 another step's key in the draft's workflow. If that also collides, the
-identity zone SHALL append `_3`. It SHALL keep incrementing the suffix
+masthead SHALL append `_3`. It SHALL keep incrementing the suffix
 until the candidate is unique among the draft's steps.
 
-The first edit typed directly into the identity zone's key field SHALL
+The first edit typed directly into the masthead's key field SHALL
 disable this auto-fill for that step. That holds for the rest of the
 draft's lifetime in the browser.
 
@@ -1733,7 +1733,7 @@ draft's lifetime in the browser.
 - **AND** the developer types "Manager review" via the inline rename,
   having never touched its key field
 - **THEN** the step's key reads `manager_review`. Typing the same label
-  into the identity zone would produce the same result
+  into the masthead would produce the same result
 
 #### Scenario: Editing a non-base-locale translation leaves an already-derived step key untouched
 
@@ -1741,17 +1741,17 @@ draft's lifetime in the browser.
   then switches the studio's content locale
 - **AND** the developer types a translation into the step label's
   non-base-locale entry
-- **AND** the developer does this via either the identity zone or the
+- **AND** the developer does this via either the masthead or the
   canvas node's inline rename
 - **THEN** the step's key stays unchanged
 
 ### Requirement: The identity zone's type and terminal controls render as a "performed by" segmented control
 
-The identity zone SHALL render the step's existing `type` and
+The masthead SHALL render the step's existing `type` and
 `terminal` fields as a three-option segmented control, labeled
 "performed by". The options are participant (type `task`), subprocess
 (type `subprocess`), and nothing/terminal. This SHALL set the same
-fields the identity zone's type control sets today; it adds no new
+fields the masthead's type control sets today; it adds no new
 field.
 
 #### Scenario: Choosing a "performed by" option sets the step's type
@@ -1759,7 +1759,7 @@ field.
 - **WHEN** the developer selects the subprocess option in a step's
   "performed by" control
 - **THEN** the step's `type` becomes `subprocess`, the same field the
-  identity zone's type control already sets
+  masthead's type control already sets
 
 ### Requirement: The initial step shows a distinct stamp
 
@@ -1849,8 +1849,8 @@ rather than omit it.
 
 ### Requirement: The identity zone constrains a terminal step's outcome to the process's declared outcomes
 
-When the draft's contract declares one or more `outcomes`, the identity
-zone's `outcome` field SHALL offer only those values, not free text.
+When the draft's contract declares one or more `outcomes`, the
+masthead's `outcome` field SHALL offer only those values, not free text.
 Without a contract, or with a contract that declares no outcomes, the field
 carries no validated meaning. It SHALL stay a free-text field.
 
@@ -1858,14 +1858,14 @@ carries no validated meaning. It SHALL stay a free-text field.
 
 - **WHEN** the developer selects a terminal step on a draft whose contract
   declares one or more outcomes
-- **THEN** the identity zone's outcome field offers only those declared
+- **THEN** the masthead's outcome field offers only those declared
   outcomes as choices
 
 #### Scenario: An outcome field stays free text without a declared outcome list
 
 - **WHEN** the developer selects a terminal step on a draft with no
   contract, or a contract that declares no outcomes
-- **THEN** the identity zone's outcome field accepts any text
+- **THEN** the masthead's outcome field accepts any text
 
 ### Requirement: A step lands on the canvas lattice
 
