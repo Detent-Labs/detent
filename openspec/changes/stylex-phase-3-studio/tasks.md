@@ -220,22 +220,30 @@
 
 ## 7. The form editor
 
-- [ ] 7.1 Convert `screens/FormEditorScreen.tsx` to `stylex.create`.
+- [x] 7.1 Convert `screens/FormEditorScreen.tsx` to `stylex.create`.
   The "How it will look" preview's `[data-columns="2"]`/
   `[data-span="2"]` pair becomes a parameterized style function, the
-  same shape `form-ui/FieldForm.tsx` already uses (D5). Merge the
+  same shape `form-ui/FieldForm.tsx` already uses (D5). Merged the
   `.studio-form-card-body` and `.studio-form-canvas-tail` duplicate
-  declarations into one `stylex.create` entry each (D6).
-- [ ] 7.2 The component may still render `data-columns`/`data-span`
-  as a plain fact. If so, `git grep -c 'data-columns\|data-span'
-  packages/web/src/areas/studio/screens/FormEditorScreen.tsx` finds
-  it. Either way, verify: `git grep -c '\[data-columns\|\[data-span'
-  packages/web/src/areas/studio/app.css` returns 0.
-- [ ] 7.3 Verify: `bun run typecheck` and `bun run build` both pass.
+  declarations into one `stylex.create` entry each (D6). Two more
+  duplicate-declaration pairs surfaced during conversion and got the
+  same merge: `.studio-form-palette-field`/`.studio-form-card-body`'s
+  shared `user-select`/`touch-action` rule, and `.studio-form-canvas
+  > .empty`/`.studio-form-canvas-tail`'s shared `grid-column`/`color`
+  rule.
+- [x] 7.2 The component still renders `data-columns`/`data-span` as a
+  plain fact. Running `git grep -c 'data-columns\|data-span'
+  packages/web/src/areas/studio/screens/FormEditorScreen.tsx` finds 4.
+  Per D11, `app.css`'s own `[data-columns\|[data-span` rules stay dead
+  code until Group 9's cleanup pass. They are not deleted here.
+  Running `git grep -c '\[data-columns\|\[data-span'
+  packages/web/src/areas/studio/app.css` still finds 2.
+- [x] 7.3 Verify: `bun run typecheck` and `bun run build` both pass.
   `app.css` keeps every rule `FormEditorScreen.tsx` used (D11), until
   Group 9's cleanup pass. That includes `.studio-dialog-note`:
   `panels/ProcessHeaderBar.tsx` and `screens/ProcessesScreen.tsx`
-  (Group 4) also render that one class.
+  (Group 4) also render that one class. Full `bun test` under
+  `silent-green.sh` passes too.
 
 ## 8. The remaining screens
 
