@@ -14,7 +14,7 @@
     "@panzoom/panzoom": "^4.6.0",
     "@stylexjs/stylex": "0.19.0",
     "form-ui": "file:../form-ui",
-    "lucide-react": "1.33.0",
+    "lucide-react": "1.38.0",
     "react": "^19",
     "react-dom": "^19",
     "workflow-engine": "file:../..",
