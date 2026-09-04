@@ -384,17 +384,28 @@
 
 ## 11. Verification
 
-- [ ] 11.1 Run `bun run typecheck`. Verify: exit 0 for the engine and
+- [x] 11.1 Run `bun run typecheck`. Verify: exit 0 for the engine and
   both packages.
-- [ ] 11.2 Run `bun run build`. Verify: exit 0, and the closeBundle
+
+  Exit 0 for both `form-ui` and `web`.
+- [x] 11.2 Run `bun run build`. Verify: exit 0, and the closeBundle
   assertion still passes.
-- [ ] 11.3 Run the full `bun test` with `DATABASE_URL` set, through
+
+  Exit 0. `assert-compiled-styles-linked: verified assets/
+  index-Bx3HH8g3.css`.
+- [x] 11.3 Run the full `bun test` with `DATABASE_URL` set, through
   `scripts/gates/silent-green.sh`. Verify: zero failures, skip count
   at the floor, gate exit 0.
-- [ ] 11.4 Run `sh scripts/gates/range.sh < /dev/null | sh
-  scripts/gates/prose.sh` and the same for `whitespace.sh`, over this
-  change's own commits. Verify: both exit 0.
-- [ ] 11.5 Build the production bundle and serve it from `WEB_ROOT`,
+
+  3818 pass, 1 pre-existing skip, 0 fail, 11121 `expect()` calls, 207
+  files. Gate exit 0.
+- [x] 11.4 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`
+  and the same for `whitespace.sh`, over this change's own commits.
+  Verify: both exit 0.
+
+  Both exit 0. The range covers the full `origin/main..HEAD` span,
+  this branch's entire StyleX work.
+- [x] 11.5 Build the production bundle and serve it from `WEB_ROOT`,
   not `bun run dev` (Studio's dev-mode crash is pre-existing and
   unrelated). Run each probe from task 10.1 in a real browser via
   `playwright-cli`, with seeded data.
@@ -410,3 +421,41 @@
 
   Verify: every probe passes. Every keyboard walk completes with no
   trap or dead end. No console error appears on any screen.
+
+  All probes passed. `EditScreen.tsx` renders correctly, and so does
+  the panels screen's three-column layout. The field matrix renders
+  correctly too, stand-alone and docked at its 15rem cap. The dock's
+  tab switching works. All four dialogs show a `::backdrop`. Its
+  computed value, `rgba(0, 0, 0, 0.45)`, matches D12's literal
+  value. Zero console errors on any screen this session visited.
+
+  The column toggle switches `grid-template-columns` between `968px`
+  (one column) and `480px 480px` (two), matching the pre-migration
+  `[data-columns="2"]` rule. Two-column mode crowds a placed card's
+  key text into character-by-character wrapping. Its own row of
+  three action buttons squeezes that key column down to almost
+  nothing. `app.css`'s baseline carries the identical
+  `flex`/`min-width`/`overflow-wrap` properties. This is
+  pre-existing, not a migration regression. One-column mode (968px)
+  renders every card cleanly on one line.
+
+  The panels rail's own Tab order walks cleanly, no trap or dead
+  end. The dock's tab row does too: Tab focuses each tab, Enter
+  activates it. Zero console errors either way.
+
+  The keyboard walk found two dialog-focus gaps. Neither traces to
+  any line this phase touched.
+
+  A full write-up sits in `docs/decisions.md`'s Open questions.
+
+  Two dialogs share `useConfirmDialog`. Tab from either one's
+  focused Cancel button lands on `<body>`, not wrapped back to
+  Publish.
+
+  A third dialog, `StartPickerDialog`, returns focus to `<body>` on
+  close instead of to its own trigger, unlike the shared-hook pair.
+  Escape still closes every dialog, and close still returns focus
+  correctly
+  for the `useConfirmDialog` pair. Neither gap is CSS-caused. The two
+  components' own focus code carries no diff in this change, verified
+  against this change's own commits.

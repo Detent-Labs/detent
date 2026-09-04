@@ -117,6 +117,32 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   whether it accepts anything beyond plain text; a tab panel groups other
   entries under a label, so it nests rather than sitting flat like the other
   four). Nothing is designed yet for any of the four.
+- Studio's native `<dialog>` confirm dialogs do not fully hold a keyboard
+  user inside them. `stylex-phase-3-studio`'s own task 11.5 keyboard walk
+  found two gaps, both pre-existing and unrelated to that phase's CSS-only
+  change: verified via the untouched JS in `ProcessHeaderBar.tsx`'s
+  `useConfirmDialog` and `ProcessesScreen.tsx`'s `StartPickerDialog`.
+
+  First: Tab from the publish- and discard-confirm dialogs' focused Cancel
+  button lands on `<body>`, not the Publish button before it in DOM order.
+  `useConfirmDialog`'s own comment already names the cause candidate: three
+  separate focus mechanisms race on open (an `autoFocus` prop, React 19's
+  own commit-time `.focus()`, and `showModal()`'s native focusing steps),
+  and the last of those three re-focuses the declining control after
+  `showModal()` already ran. That late re-focus is the untested candidate
+  cause: it may never register with the browser's own tab-order
+  bookkeeping for the modal.
+
+  Second: `StartPickerDialog` and `PromotionPreviewDialog` (`+ New
+  process`, "Import a promoted version") call `showModal()` on mount with
+  no cleanup. Escape and Cancel both close the dialog and drop focus to
+  `<body>` instead of returning it to the button that opened it.
+  `useConfirmDialog`'s own cleanup effect is the fix these two dialogs
+  lack; neither component uses that hook.
+
+  No follow-up change tracks this yet. It belongs to `studio-publish` or
+  `spa-accessibility`, not `web-styling`: a CSS migration cannot cause or
+  fix either gap.
 
 ## Decided, not yet built (each needs its own OpenSpec change)
 - **Archivo as the written face.** The Type section of
