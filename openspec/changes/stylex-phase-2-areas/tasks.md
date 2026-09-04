@@ -236,10 +236,10 @@
   canary's actual target is the step-form renderer, `form-ui`'s bare
   export, not the shared token module every area now reads. Narrowed the
   filter to exempt `form-ui/tokens.stylex` by name, and re-ran clean.
-- [ ] 8.4 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`
+- [x] 8.4 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`
   and the same for `whitespace.sh`, over this change's own commit(s).
   Verify: both exit 0.
-- [ ] 8.5 Build the production bundle and serve it from `WEB_ROOT`, not
+- [x] 8.5 Build the production bundle and serve it from `WEB_ROOT`, not
   `bun run dev` (Studio's dev-mode crash is pre-existing and unrelated).
   Run each area's probe from task 7.1 in a real browser via
   `playwright-cli`, with seeded data. Cover the shell's account menu and
@@ -250,3 +250,25 @@
   Confirm the account menu's `:popover-open` state (task 2.2) renders
   correctly. Confirm the app area's ancestor-hover state (task 3.2) does
   too, whichever mechanism each ended up using.
+
+  Ran against the already-running devcontainer server (WEB_ROOT serving
+  the fresh production build), logged in as the seeded demo superuser.
+  The shell's account menu opened as a genuine `:popover-open` element,
+  `matches(':popover-open')` true. It carried compiled hash-only classes
+  and the correct background and border.
+
+  The admin area's Outbox screen showed a `delivered` badge with no
+  matching `badgeTone` entry. It fell back to the bare badge shape,
+  matching the pre-migration no-op. The Instances screen showed a
+  `running` badge in the accent tone.
+
+  The app area's "Cases I started" screen showed a `Running` stamp. A
+  real `hover()` gesture on a task's step name flipped its computed
+  `text-decoration-line` from `none` to `underline`. That confirms
+  `stylex.when.ancestor(':hover')` fires correctly.
+
+  The reporting area's cycle-time view showed a duration rule whose fill
+  kept a literal inline `width: 1%`. The fill's `background-color` and
+  the rule's `border-bottom`/`height` matched the pre-migration values.
+  Studio loaded cleanly too, confirming D9's shared nav-wrapper
+  migration. Zero console errors on every screen.
