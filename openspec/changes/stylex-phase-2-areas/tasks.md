@@ -257,10 +257,18 @@
   `matches(':popover-open')` true. It carried compiled hash-only classes
   and the correct background and border.
 
-  The admin area's Outbox screen showed a `delivered` badge with no
-  matching `badgeTone` entry. It fell back to the bare badge shape,
-  matching the pre-migration no-op. The Instances screen showed a
-  `running` badge in the accent tone.
+  The admin area's Outbox screen showed a `delivered` badge in the
+  settled tone, correctly matched through `badgeTone`. The Instances
+  screen showed a `running` badge in the accent tone. Seeded data
+  carried no outbox row with a status `badgeTone` leaves unmapped
+  (`claimed` is the only one).
+
+  A direct call confirmed that fallback instead. It called
+  `stylex.props` at runtime, on the real compiled `badge` style
+  object. That object came straight out of the production bundle.
+  `undefined` stood in for the second argument. The call returned the
+  bare `badge` shape's className alone, matching a call with only
+  `badge` supplied, with no error.
 
   The app area's "Cases I started" screen showed a `Running` stamp. A
   real `hover()` gesture on a task's step name flipped its computed
@@ -272,3 +280,25 @@
   the rule's `border-bottom`/`height` matched the pre-migration values.
   Studio loaded cleanly too, confirming D9's shared nav-wrapper
   migration. Zero console errors on every screen.
+
+## 9. openspec-verify-change findings
+
+Verification found two delta specs describing a pattern the code does
+not use. The `end-user-app` spec claimed every task stamp picks its tone
+from a typed lookup with an unmapped-status fallback. In fact
+`TasksScreen.tsx` applies one tone unconditionally. `.app-stamp-mine`
+and `.app-stamp-open` already shared one declaration before this
+change. And `StartedScreen.tsx`/`InvolvedScreen.tsx` use an exhaustive
+`Record`, over all four `InstanceStatus` values. No unmapped case is
+reachable there either.
+
+The `admin-app` spec made the same claim, for the instance badge and for
+a data list's retired-flag badge. The instance badge reads the same
+exhaustive, closed `InstanceStatus` union. The retired-flag badge is a
+plain two-value ternary, not a lookup at all. Only the outbox delivery
+status is genuinely open-ended: `OutboxRow.status` is a bare `string`.
+
+Both delta specs now name the closed-union and boolean cases apart from
+the genuinely open-ended one. Each now matches its own screen. `bun run
+scripts/openspec-review-check.ts stylex-phase-2-areas` still reports
+0/0/0 after the fix.
