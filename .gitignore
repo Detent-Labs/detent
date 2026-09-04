@@ -44,6 +44,9 @@ Thumbs.db
 # temp files
 tmp/
 
+# Cache
+.ruff_cache/
+
 # Regenerated reports (/ponytail-audit, /ponytail-debt)
 PONYTAIL-AUDIT.md
 PONYTAIL-DEBT.md
