@@ -4,10 +4,15 @@
 
 The panels screen has four process-wide views. They are the field
 catalog, the field matrix's toolbar and legend, the data sources
-panel, and the contract panel. The panels screen and all four SHALL
-render from compiled component styles. Each reads
-`form-ui/tokens.stylex`. The rendered result SHALL match the previous
-stylesheet declaration for declaration.
+panel, and the contract panel. The panels screen, the field catalog,
+the field matrix and the data sources panel SHALL render from compiled
+component styles. Each reads `form-ui/tokens.stylex`. The rendered
+result SHALL match the previous stylesheet declaration for
+declaration.
+
+The contract panel renders no class this migration covers. It already
+satisfies this requirement, unchanged, since it carries no rule to
+compile.
 
 The field matrix's cell state, hatched, blank or live, SHALL pick its
 style from an exhaustive check. That check covers this closed,

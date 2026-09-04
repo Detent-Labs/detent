@@ -33,10 +33,14 @@ declaration.
 
 ### Requirement: The inspector's Paths and Timers tabs render from compiled styles
 
-`panels/PathsPanel.tsx` and `panels/TimersPanel.tsx`, the inspector's
-own behavior-zone tabs, SHALL render from compiled component styles.
-The rendered result SHALL match the previous stylesheet declaration for
+`panels/PathsPanel.tsx`, one of the inspector's own behavior-zone
+tabs, SHALL render from compiled component styles. The rendered
+result SHALL match the previous stylesheet declaration for
 declaration.
+
+`panels/TimersPanel.tsx`, the inspector's other behavior-zone tab,
+renders no class this migration covers. It already satisfies this
+requirement, unchanged, since it carries no rule to compile.
 
 #### Scenario: The Paths tab keeps its look
 

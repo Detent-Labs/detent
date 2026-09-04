@@ -74,9 +74,10 @@ for it. Does `::backdrop` compile and paint correctly under StyleX
 
 ### Modified Capabilities
 
-- `studio-app`: the panels screen compiles from StyleX. So do its four
-  process-wide views. Those are the field catalog, the field matrix's
-  toolbar and legend, the data sources panel, and the contract panel.
+- `studio-app`: the panels screen compiles from StyleX. So do three of
+  its four process-wide views. Those are the field catalog, the field
+  matrix's toolbar and legend, and the data sources panel. The fourth,
+  the contract panel, carries no rule to compile and needs no change.
   So does the process list (`ProcessesScreen.tsx`), its two dialogs,
   the templates screen, the versions screen, and the content-locale
   switcher.
@@ -96,10 +97,16 @@ for it. Does `::backdrop` compile and paint correctly under StyleX
 - `studio-tools`: the Tools screen compiles from StyleX.
 - `studio-migration-plan-form`: the migration-plan screen and its form
   compile from StyleX.
-- `web-styling`: this proposal expects no new general requirement here.
-  This phase's `::backdrop` and shared-class cases already fit the
-  requirements phase 2 added. A requirement or scenario gets added here
-  only if the real-build check in task 2.1 finds a gap those miss.
+
+This proposal carries no `web-styling` delta. An isolated
+`@stylexjs/babel-plugin` transform, run ahead of this proposal,
+already confirmed `::backdrop` compiles correctly. That satisfies
+phase 2's own "A phase verifies an unproven compiler feature against a
+real build first" requirement. This phase's shared-class cases fit
+phase 2's "A shared class stays literal until its last consumer
+migrates" requirement too. Neither needs a new requirement or
+scenario. Task 2.1 re-runs the same transform check formally, during
+apply.
 
 ## Impact
 
