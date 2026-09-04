@@ -118,3 +118,15 @@ preserved across leaving and re-entering the JSON surface.
 - **WHEN** the developer edits the JSON text without clicking Apply
 - **THEN** Canvas and Panels (when shown) continue to reflect the draft as it
   stood before the edit
+
+### Requirement: The JSON surface renders from compiled styles
+
+`panels/JsonView.tsx` SHALL compile from typed StyleX style objects,
+reading `form-ui/tokens.stylex`. The resulting layout SHALL match the
+previous stylesheet declaration for declaration.
+
+#### Scenario: The JSON surface keeps its look
+
+- **WHEN** a browser opens the JSON surface
+- **THEN** its computed layout, spacing, color and border equal the
+  values the deleted stylesheet declared
