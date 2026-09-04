@@ -167,12 +167,14 @@
   the two `when.ancestor(":focus-visible")` rules.
 - [x] 6.3 Run the full `bun test` suite with `DATABASE_URL` set, piped
   through `scripts/gates/silent-green.sh`. Confirm 0 failures and the
-  skip count at the existing floor. Done: `bun run check` inside the
-  devcontainer, captured to a log and run through
-  `scripts/gates/silent-green.sh` on the host (the gate script has no
-  git dependency, so it runs directly against a captured log). 3813
-  pass, 1 skip (at the floor), 0 fail across 207 files; the `test:tz`
-  suite adds 20 pass, 0 fail. Gate exits 0.
+  skip count at the existing floor.
+
+  Done: ran `bun run check` inside the devcontainer and captured its
+  output to a log. The gate script needs no git access. It ran
+  directly against that log on the host. The gate exits 0. The suite
+  passed 3813 of 3814 tests, with 1 skip at the floor and 0 failures,
+  across 207 files. The `test:tz` suite added 20 more passes and 0
+  failures.
 - [x] 6.4 Run the antislop and whitespace gates over every Markdown file
   this change touched (`docs/browser-checks.md`, `docs/decisions.md`,
   `ROADMAP.md`, and this change's own `proposal.md`/`design.md`/`tasks.md`/
@@ -187,24 +189,28 @@
   into the canvas, and arrow through at least one node and one path.
   Confirm the focus ring/halo appears exactly as before. Repeat the same
   walk in Firefox. Verify both browsers show the same focus/selection
-  visuals the deleted stylesheet declared. Done: served from
-  `http://127.0.0.1:3350/`, logged in as `demo-superuser@example.test`,
-  opened an existing draft's canvas. Real Tab/ArrowRight/ArrowDown/
-  ArrowLeft key presses moved a roving focus across an edge group and
-  two step nodes in both Chromium and Firefox; `document.activeElement`
-  confirmed `canvas-node` and `panzoom-exclude` stayed literal
-  (unhashed) throughout, alongside the compiled `x-default-marker`
-  ancestor marker on both node and edge groups. Screenshots in each
-  browser show the node's dashed focus ring and the edge's bold focus
-  halo rendering distinctly from the plain (solid) selection outline.
+  visuals the deleted stylesheet declared.
+
+  Done: served the build from `http://127.0.0.1:3350/`. Logged in as
+  `demo-superuser@example.test`. Opened an existing draft's canvas.
+
+  Tab, ArrowRight, ArrowDown, and ArrowLeft moved a roving focus across
+  an edge group and two step nodes. This held in both Chromium and
+  Firefox. Also, `document.activeElement` confirmed `canvas-node` and
+  `panzoom-exclude` stayed literal and unhashed throughout. The
+  compiled `x-default-marker` ancestor marker composed on both node and
+  edge groups. A screenshot in each browser shows the node's dashed
+  focus ring. It shows the edge's bold focus halo too, rendering
+  distinct from the plain, solid selection outline.
 - [x] 6.6 Via `playwright-cli` against the same production build, run a drag
   probe. Start a pointer drag on a step node and confirm the canvas does not
   pan (Panzoom's exclude-class still holds). Then start a drag on empty
-  canvas space and confirm it does pan. Verify both outcomes. Done: read
-  Panzoom's inline `transform` on the `svg[role="application"]` element
-  before and after each drag. A drag on a step node left the transform
-  byte-for-byte unchanged (`scale(0.704619) translate(-97.5px,
-  184.968px)` both before and after). A drag on empty canvas space
-  changed it (`translate(-239.421px, 270.12px)`), confirming Panzoom
-  panned only when the press started outside every `panzoom-exclude`
-  element.
+  canvas space and confirm it does pan. Verify both outcomes.
+
+  Done: read Panzoom's inline `transform` on the
+  `svg[role="application"]` element, before and after each drag. A
+  drag on a step node left the transform byte-for-byte unchanged. It
+  read `scale(0.704619) translate(-97.5px, 184.968px)` both before and
+  after. A drag on empty canvas space changed it to
+  `translate(-239.421px, 270.12px)`. Panzoom panned only when the
+  press started outside every `panzoom-exclude` element.
