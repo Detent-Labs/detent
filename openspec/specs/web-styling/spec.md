@@ -91,18 +91,30 @@ and no error.
 
 ### Requirement: One global stylesheet carries what the compiler cannot
 
-The shell SHALL keep one hand-written global stylesheet for the reset, the
-`:focus-visible` ring and the element defaults. The compiler has no global
-selector. That sheet SHALL stay under about 60 lines. Every other style
-SHALL be a component style, once its phase migrates it.
+The shell SHALL keep one hand-written global stylesheet. It covers the
+reset, the `:focus-visible` ring, and the element defaults. It also
+covers every permanent literal survivor no later migration phase can
+compile away. The compiler has no global selector, no universal
+selector, and no `::backdrop` pseudo-element.
+That sheet SHALL stay under about 120 lines. Every other style SHALL be a
+component style, once its phase migrates it.
 
-A `prefers-reduced-motion` block belongs to the area whose animation it
-suppresses. Those blocks migrate with their areas, not into this sheet.
+The sheet carries four such survivors: the shell's own flex frame (`.shell`,
+`.shell > *`), one `prefers-reduced-motion` block covering every screen, and
+`.studio-dialog::backdrop`. No area keeps its own copy of any of these; no
+area stylesheet exists to hold one.
 
 #### Scenario: A reset rule lives in the global sheet
 
 - **WHEN** a contributor looks for the universal `box-sizing` rule
 - **THEN** it is in the global stylesheet and nowhere else
+
+#### Scenario: A dialog's backdrop keeps its one literal rule
+
+- **WHEN** any area opens a `<dialog>` composing the literal `studio-dialog`
+  class
+- **THEN** its `::backdrop` renders the global stylesheet's rule, since no
+  compiled style can target a pseudo-element outside the DOM tree
 
 ### Requirement: Two class names stay literal
 
