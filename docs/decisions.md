@@ -1152,5 +1152,27 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   The change also closed `stylex-phase-3-studio`'s D2 deferral on
   `.canvas-group-name`. `EditScreen.tsx`'s group-rename label now
   reads its own compiled style. Both consumers of that shared class
-  converted together. Phase 5 remains: the cleanup phase that deletes
-  the remaining hand-written stylesheets.
+  converted together.
+
+  Phase 5 (`stylex-phase-5-cleanup`) is done, closing the six-phase
+  migration. `shell.css` and the four areas' `app.css` files are gone.
+  `global.css` now carries every rule they still held: the shell's
+  `.shell`/`.shell > *` flex frame, one `prefers-reduced-motion` block,
+  and `.studio-dialog::backdrop`. The reduced-motion block used to be
+  four near-identical copies; three used `transition`/`animation: none`
+  and the fourth, reporting's, used `animation-duration`/
+  `transition-duration: 0.01ms`. One block, using reporting's technique,
+  replaces all four, since nothing in the repo depends on the
+  difference and the near-zero-duration form still lets a value applied
+  through `transitionend` take effect.
+
+  `.btn`/`.app-back` stay literal in `tokens.css` permanently: phase 2's
+  D1 deferred their conversion to whichever phase converted the last
+  file still writing that literal string, and no such phase followed.
+  A dispatched sweep also corrected every literal-class citation this
+  migration left stale in `.claude/rules/design-language.md`,
+  `.claude/rules/ui-glossary.md` and six passages of
+  `docs/current-state.md`. `packages/web/test/boundaries.test.ts` lost
+  its own class-collision test: a compiled StyleX class cannot collide
+  across areas the way a hand-written one could, so the risk the test
+  guarded is gone, not merely unchecked.

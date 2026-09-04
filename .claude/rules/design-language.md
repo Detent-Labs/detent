@@ -83,9 +83,12 @@ each one stays in this language.
 time. The other three areas live in the account menu. The actor's roles
 decide which of those the menu shows.
 
-**The stamp** (`.app-stamp`, `.admin-badge`, `.rep-stamp`). Mono, uppercase,
-tracked, with a 2px outline in the current color. Five tones exist and no
-sixth: adding one counts as a design change, not a screen decision.
+**The stamp.** Every area compiles its own `stamp` style, keyed by a
+`stampTone`/`badgeTone` lookup off the value it marks (`app`'s
+`TasksScreen.tsx`, `admin`'s `InstancesScreen.tsx`, `reporting`'s
+`components.tsx`, among others). Mono, uppercase, tracked, with a 2px
+outline in the current color. Five tones exist and no sixth: adding one
+counts as a design change, not a screen decision.
 
 The stamp tilts only where it marks an error, in the error banner or the
 boundary fallback. Inside a row or table cell it sits straight: a tilted
@@ -101,21 +104,22 @@ button wider than its text. A disabled action drops to 45% opacity. Focus
 always shows as a 2px accent ring at 2px offset. A destructive action stays
 outlined in the accent and never turns red.
 
-**The register row** (`.app-task-list`, `.app-task-row`). Three columns: a
-stamp, an identity, and a right-aligned quantity in the mono face, like a
+**The register row**, each app-area screen's own `taskList`/`taskRow`
+style pair (`TasksScreen.tsx` and its siblings). Three columns: a stamp,
+an identity, and a right-aligned quantity in the mono face, like a
 ledger's amount column. The row's identifying content is a real control. The
 row itself carries no click handler.
 
-Studio's index rail (`.studio-panels-rail-entry`, `.studio-panels-rail-field`)
-follows a plainer version of the same rule. A hairline sits between entries,
-content stays flush left, and the mono-faced count or type name sits
-right-aligned. It carries no stamp, so the rule holds without the first
-column.
+Studio's index rail (`PanelsScreen.tsx`'s `panelsRailRow`/`panelsRailName`/
+`panelsRailType` styles) follows a plainer version of the same rule. A
+hairline sits between entries, content stays flush left, and the
+mono-faced count or type name sits right-aligned. It carries no stamp,
+so the rule holds without the first column.
 
-**The measuring rule** (`.rep-rule`). Reports' one chart form is a hairline
-with an accent fill whose length carries a quantity. The figure prints
-beside it in the mono face. The bar carries `aria-hidden`. The number is the
-content.
+**The measuring rule**, `reporting/components.tsx`'s `DurationRule`.
+Reports' one chart form is a hairline with an accent fill whose length
+carries a quantity. The figure prints beside it in the mono face. The
+bar carries `aria-hidden`. The number is the content.
 
 **Fields.** Label sits above control, both flush left, 4px apart. A field
 never sits on a filled surface: the border is the field. A focused field
@@ -130,22 +134,36 @@ will appear, with no skeleton and no spinner.
 
 ## Rules for building
 
-**Class names.** Class names follow `prefix-block-element`, one hyphen per
-level, with no deeper nesting. A variant becomes a suffix class, such as
-`.admin-badge-faulted` or `.rep-rule-fill-danger`. A state never becomes a
-class. Style targets the attribute the DOM already carries:
+**Component styles compile.** Every component in `packages/web` and
+`packages/form-ui` declares its styles as a typed `stylex.create()`
+object beside its own module, per `web-styling`'s styling model. A
+compiled class hashes, so no rule in this section applies to it. No doc
+anywhere should cite one of these classes by name; it changes on the
+next build.
+
+A DOM state never drives a hand-written selector. Style picks among
+named compiled styles in code instead, reading the same attribute the
+DOM already carries for anyone else who needs it:
 `[aria-current="page"]`, `[aria-expanded="true"]`, `:disabled`,
 `:focus-visible`.
 
-An area never styles another area's prefix. Shared motifs move to `shell/`,
-or engineers duplicate them on purpose. No component reads a primitive.
-Components read roles only.
+An area never reads another area's style object. Shared motifs move to
+`shell/`, or engineers duplicate them on purpose. No component reads a
+primitive. Components read roles only.
 
-**The StyleX pilot.** The shell header and register tab compile from typed
-style objects instead. A compiled class hashes, so the
-`prefix-block-element` convention above does not apply to it. No rule this
-file states changes. `web-styling` carries the styling model a migrated
-component follows, and later phases migrate the rest.
+**Class names, for the few that stay literal.** `.btn`/`.btn-primary`/
+`.btn-secondary`/`.btn-ghost`/`.btn-destructive`/`.app-back`
+(`tokens.css`) are the one family that never compiles: 208 call sites
+across every area made per-call-site compilation counterproductive for
+a deliberately shared button style (`web-styling`'s "A shared class
+stays literal until its last consumer migrates"). They follow
+`prefix-block-element`, one hyphen per level, with no deeper nesting: a
+variant becomes a suffix class. `canvas-node`, `panzoom-exclude` and
+`.studio-dialog` are the other three literal exceptions, each pinned by
+a non-styling reason `web-styling` states (a keyboard-focus selector, a
+pan-library contract, a `::backdrop` the compiler cannot reach). No
+other literal class exists anywhere in `packages/web` or
+`packages/form-ui`.
 
 **Labels and locales.** Every string a person reads comes from a catalog.
 EN and DE ship in the shell, app, admin and reporting catalogs, each reached

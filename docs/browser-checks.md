@@ -2462,4 +2462,43 @@ Start a drag on empty canvas space. Pass: the canvas pans. This confirms
 the exclusion covers exactly the elements that need it, not the whole
 surface.
 
+### Shell and area stylesheets deleted (`stylex-phase-5-cleanup`)
+
+Source: `stylex-phase-5-cleanup`, the migration's last phase.
+`shell.css` and the four areas' `app.css` files are gone. `global.css`
+now carries every rule they still held: the shell's `.shell`/`.shell >
+*` flex frame, one `prefers-reduced-motion` block (deduped from four,
+onto the near-zero-duration technique reporting already used), and
+`.studio-dialog::backdrop`. `boundaries.test.ts` no longer carries its
+own class-collision test; a compiled StyleX class cannot collide across
+areas the way a hand-written one could.
+
+Build the production bundle and open it on the engine's own port. Do
+not use `bun run dev`: Studio's dev-mode crash is pre-existing and
+unrelated (`docs/decisions.md`). Seed the database first, per
+`docs/decisions.md`'s seed script.
+
+**One screen per area, no visual regression.** Open My-tasks in the app
+area. Pass: the shell frame still fills the viewport, and the screen
+still centers under its own `max-width`. Open the instances list in the
+admin area. Pass: a status badge still renders its stamp, and a focused
+row control still shows the accent ring.
+
+Open a report screen in the reporting area. Pass: the `DurationRule`
+hairline still renders with its accent fill. Open the process list, then
+one open draft's edit screen, in the studio area. Pass: a `<dialog>`
+(the publish dialog, or the rename dialog) still darkens the page behind
+it through its `::backdrop`.
+
+**Reduced-motion probe.** Set the browser's `prefers-reduced-motion` to
+`reduce`. Trigger a transition in one screen per area: the account
+menu's open/close in the shell, a hover state in the admin table, a tab
+switch in reporting, the checks rail's dock/undock in studio. Pass: none
+shows visible motion, in any of the four. The three areas that switched
+technique (`transition: none` to `animation-duration`/
+`transition-duration: 0.01ms`) read exactly as instant as reporting,
+which used the near-zero technique already.
+
+Throughout: zero console errors, in every area.
+
 Throughout: zero console errors, in both browsers.

@@ -310,8 +310,8 @@ Specs: `development-toolchain`, `devcontainer-preflight`, `worktree-isolation`,
     Specs: `definition-contract`, `runtime-api`, `studio-app`,
     `studio-form-editor`, `studio-checks-rail`.
 
-45. **StyleX styling model for `packages/web`/`packages/form-ui`: PHASES 0-4
-    DONE. PHASE 5 NOT BUILT.** `stylex-phase-0-tooling` installed the
+45. **StyleX styling model for `packages/web`/`packages/form-ui`: PHASES 0-5
+    DONE.** `stylex-phase-0-tooling` installed the
     compiler, split `tokens.css`'s element rules into `global.css`, moved
     the design-token module to `packages/form-ui`, gave `bun test` a
     stub-preload story, and migrated the shell header and register tab as
@@ -332,9 +332,13 @@ Specs: `development-toolchain`, `devcontainer-preflight`, `worktree-isolation`,
     evaluation and the six-phase plan sit in phase 0's `design.md`, at
     `openspec/changes/archive/2026-09-03-stylex-phase-0-tooling/design.md`.
 
-    Phase 5 deletes the remaining hand-written area stylesheets and
-    updates the design docs that still name a literal class. Each phase
-    is its own OpenSpec change against `web-styling`.
+    `stylex-phase-5-cleanup` deleted `shell.css` and the four areas'
+    `app.css` files, closing the migration. `global.css` now carries
+    every rule they still held: the shell's flex frame, one deduped
+    `prefers-reduced-motion` block, and `.studio-dialog::backdrop`.
+    `.btn`/`.app-back` stay literal in `tokens.css` permanently, with no
+    further phase to convert their last consumer. Each phase is its own
+    OpenSpec change against `web-styling`.
 
     Reopen triggers: two consecutive StyleX releases that each cost a build
     fix reopen the compiler-version pin. A phase whose measured effort

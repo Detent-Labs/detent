@@ -51,40 +51,47 @@
 
 ## 4. Correct stale doc references
 
-- [ ] 4.1 Rewrite `.claude/rules/design-language.md`'s citations of
+- [x] 4.1 Rewrite `.claude/rules/design-language.md`'s citations of
   `.app-stamp`, `.admin-badge`, `.rep-stamp`, `.app-task-list`,
   `.app-task-row`, `.studio-panels-rail-entry`, `.studio-panels-rail-field`,
   `.rep-rule`, `.admin-badge-faulted` and `.rep-rule-fill-danger` to
   describe the owning component instead of a class name none of these
-  now compiles to. Verify none of the ten strings above still appears in
-  the file: `grep -c` each, expect 0.
-- [ ] 4.2 Rewrite `.claude/rules/ui-glossary.md`'s "Lives in" column and
-  prose wherever it cites `.shell-account-group`, `.shell-menu`,
-  `.studio-header-nav`, `.studio-header-bar`, `.studio-surface-toggle`,
-  `.studio-rail`, `.studio-palette-list`, `.studio-rail-row`,
-  `.studio-panels-screen-header`, `.studio-panels-rail`,
-  `.studio-panels-rail-sublist`, `.studio-panels-screen-view`,
-  `.studio-player-form`, `.studio-player-record` or
-  `.studio-checks-rail-docked`, naming the owning file or component
-  instead, matching the pattern rows without a CSS-backed term already
-  use. Verify none of the fifteen strings above still appears in the
-  file: `grep -oE '\.(shell|studio)-[a-z-]+' .claude/rules/ui-glossary.md`
-  returns nothing.
-- [ ] 4.3 Correct `docs/current-state.md`'s six passages citing
+  now compiles to. Also rewrite the "Class names" and "The StyleX pilot"
+  passages: the whole app compiles now, not a pilot, and the naming
+  convention they describe applies only to the `.btn`/`.app-back` family
+  that stays permanently literal (design.md D1). Verify none of the ten
+  strings above still appears in the file: `grep -c` each, expect 0.
+  Done: 0 for all ten, plus the pilot/naming passages rewritten.
+- [x] 4.2 Rewrite `.claude/rules/ui-glossary.md`'s "Lives in" column and
+  prose wherever it cites a class from this migration, naming the owning
+  file or component instead, matching the pattern rows without a
+  CSS-backed term already use. Verify:
+  `grep -oE '`.[a-zA-Z][a-zA-Z0-9-]*`' .claude/rules/ui-glossary.md`
+  returns nothing. Done: returns nothing; found and fixed 19 distinct
+  citations, four more than the class-prefix grep alone would have
+  caught (`.canvas-inspector`, `.step-identity-zone`,
+  `.step-behavior-tabs`, `.step-diagnostics`, none `.shell-`/`.studio-`
+  prefixed).
+- [x] 4.3 Correct `docs/current-state.md`'s six passages citing
   `.studio-form-card[data-conditional]`, `.rep-rule`, `.studio-mono`,
   `.studio-canvas-layout`, `.studio-edit-screen` and
   `.studio-matrix-scroll` to describe the current, compiled mechanism.
   Verify each of the six passages (grep for the class name, confirm the
-  surrounding sentence no longer claims it as a live selector).
-- [ ] 4.4 Add a new dated section to `docs/browser-checks.md`, following
+  surrounding sentence no longer claims it as a live selector). Done:
+  0 hits for all six. (The sweep also surfaced several `.canvas-`
+  prefixed stale citations in this same file — outside this change's
+  dispatched scope, `.canvas-` classes are phase 4's own concern, left
+  untouched here.)
+- [x] 4.4 Add a new dated section to `docs/browser-checks.md`, following
   the pattern every prior phase's own section uses. Cover: the five
   file deletions and where each surviving rule now lives, the
   `boundaries.test.ts` removal, and the manual probe for the
   reduced-motion consolidation (design.md's Risks: trigger a transition
   under `prefers-reduced-motion: reduce` in one screen per area, confirm
   no visible motion in any of the four). Leave every earlier phase's own
-  section untouched.
-- [ ] 4.5 Add this phase's own paragraph to `docs/decisions.md`'s StyleX
+  section untouched. Done: appended
+  "Shell and area stylesheets deleted (`stylex-phase-5-cleanup`)".
+- [x] 4.5 Add this phase's own paragraph to `docs/decisions.md`'s StyleX
   entry, following the "Phase N (...) is done" pattern the four prior
   paragraphs use. Note the five deletions, the reduced-motion
   consolidation and its chosen technique, and that this closes the
@@ -93,7 +100,8 @@
   and whitespace gates pass on both files:
   `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`
   and `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh`,
-  run over the committed range once this task's commit lands.
+  run over the committed range once this task's commit lands. Done:
+  both paragraphs added; gates verified in 4.6's commit below.
 - [ ] 4.6 Verify the antislop and whitespace gates pass on every other
   Markdown file this group touched
   (`.claude/rules/design-language.md`, `.claude/rules/ui-glossary.md`,
