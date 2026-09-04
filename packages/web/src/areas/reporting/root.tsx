@@ -16,7 +16,6 @@ import { ReportBuilderScreen } from "./screens/ReportBuilderScreen.js";
 import { DateRangeControl } from "./components.js";
 import { t, type CatalogKey } from "./catalog.js";
 import type { AreaRootProps } from "../../shell/App.js";
-import "./app.css";
 
 const VIEWS: { name: ViewName; labelKey: CatalogKey }[] = [
   { name: "cycle-time", labelKey: "nav.cycleTime" },

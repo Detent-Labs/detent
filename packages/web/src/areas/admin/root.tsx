@@ -19,7 +19,6 @@ import { UiStringsScreen } from "./screens/UiStringsScreen.js";
 import { t, tFill, type CatalogKey } from "./catalog.js";
 import type { UiLocale } from "../../i18n/locale.js";
 import type { AreaRootProps } from "../../shell/App.js";
-import "./app.css";
 
 const ADMIN_ROLE = "system:admin";
 const DATALISTS_ROLE = "system:datalists";

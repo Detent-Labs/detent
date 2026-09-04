@@ -3,7 +3,6 @@ import { App } from "./shell/App.js";
 import { loadUiStringOverrides } from "./i18n/overrides.js";
 import "./shell/tokens.css";
 import "./shell/global.css";
-import "./shell/shell.css";
 
 // Dev only. The StyleX plugin appends compiled CSS to the built stylesheet,
 // but in dev it serves that CSS at a virtual URL and injects nothing into

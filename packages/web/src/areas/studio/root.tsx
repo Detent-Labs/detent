@@ -15,7 +15,6 @@ import { ToolsScreen } from "./screens/ToolsScreen.js";
 import { PlayerScreen } from "./screens/PlayerScreen.js";
 import { TemplatesScreen } from "./screens/TemplatesScreen.js";
 import type { AreaRootProps } from "../../shell/App.js";
-import "./app.css";
 
 // The only role this file names on its own. Every other per-screen role comes
 // from `ROUTE_ROLE`, so the nav and the guard cannot disagree with the map.

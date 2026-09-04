@@ -14,17 +14,17 @@
 
 ## 2. Delete the five stylesheets and their imports
 
-- [ ] 2.1 Delete `packages/web/src/shell/shell.css`. Remove `import
+- [x] 2.1 Delete `packages/web/src/shell/shell.css`. Remove `import
   "./shell/shell.css";` from `packages/web/src/main.tsx`. Verify `bun run
   build` still succeeds and the built page still renders the shell frame
-  (checked fully in Group 5's browser probe).
-- [ ] 2.2 Delete `packages/web/src/areas/admin/app.css`,
+  (checked fully in Group 5's browser probe). Done: build exits 0.
+- [x] 2.2 Delete `packages/web/src/areas/admin/app.css`,
   `packages/web/src/areas/app/app.css`,
   `packages/web/src/areas/reporting/app.css`,
   `packages/web/src/areas/studio/app.css`. Remove each area's own
   `import "./app.css";` from its `root.tsx`. Verify `bun run typecheck`
-  and `bun run build` both pass.
-- [ ] 2.3 Verify `find packages -iname "*.css"` (or `git ls-files
+  and `bun run build` both pass. Done: both exit 0.
+- [x] 2.3 Verify `find packages -iname "*.css"` (or `git ls-files
   "packages/**/*.css"`) lists exactly two files:
   `packages/web/src/shell/tokens.css` and
   `packages/web/src/shell/global.css`. Verify `git grep -n '\.css'
@@ -34,6 +34,11 @@
   handling), or one of the accepted category-4 historical comments this
   change leaves untouched. No match is a live import of a deleted file,
   and none sits in `boundaries.test.ts` (Group 3 removes its own two).
+  Done: both `find`/`git ls-files` list exactly the two files. The grep
+  drops from 78 to 71 matches (the 5 removed imports plus the 2 lines
+  gone with their deleted files); the 62 non-tokens/global matches split
+  exactly as designed: 2 in `boundaries.test.ts` (Group 3's job), 2 in
+  `vite.config.ts`, and 58 historical comments across 47 files.
 
 ## 3. Retire the now-vacuous boundary test
 

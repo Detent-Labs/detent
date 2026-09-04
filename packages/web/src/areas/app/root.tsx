@@ -11,7 +11,6 @@ import { StartScreen } from "./screens/StartScreen.js";
 import { StartedScreen } from "./screens/StartedScreen.js";
 import { InvolvedScreen } from "./screens/InvolvedScreen.js";
 import type { AreaRootProps } from "../../shell/App.js";
-import "./app.css";
 
 /**
  * The participant area's root. It owns its screens and its own route table;
