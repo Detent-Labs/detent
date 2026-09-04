@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
+import * as stylex from "@stylexjs/stylex";
+import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { stripCompiledContent } from "workflow-engine/schema/strip-compiled";
 import { listTemplates, saveTemplate, deleteTemplate, listProcesses, getVersionBody } from "../api/client.js";
 import { useFail } from "../../../shell/useFail.js";
@@ -20,6 +22,59 @@ interface TemplatesScreenProps {
  * half of the pair to open.
  */
 type Source = { processId: string; version: number };
+
+const styles = stylex.create({
+  studioScreen: {
+    maxWidth: "60rem",
+    marginInline: "auto",
+    marginBlock: 0,
+    paddingTop: space.s4,
+    paddingInline: space.s3,
+    paddingBottom: space.s6,
+  },
+  studioNote: {
+    color: colors.textMuted,
+    minHeight: "1.25rem",
+    marginBlockEnd: space.s2,
+    marginBlockStart: 0,
+    marginInline: 0,
+  },
+  studioControls: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: space.s2,
+    marginBottom: space.s3,
+    alignItems: "center",
+  },
+  studioError: {
+    color: colors.refusal,
+  },
+  studioEmpty: {
+    color: colors.textMuted,
+    paddingBlock: space.s4,
+    paddingInline: 0,
+  },
+  studioTable: {
+    width: "100%",
+    borderCollapse: "collapse",
+    fontSize: "0.9rem",
+  },
+  studioTableHeadCell: {
+    textAlign: "left",
+    fontFamily: fonts.body,
+    fontSize: "11px",
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+    color: colors.textMuted,
+    padding: space.s2,
+    borderBottom: `2px solid ${colors.divider}`,
+  },
+  studioTableCell: {
+    padding: space.s2,
+    borderBottom: `1px solid ${colors.border}`,
+    verticalAlign: "top",
+  },
+});
 
 const sourceValue = (s: Source): string => `${s.processId}:${s.version}`;
 
@@ -95,14 +150,14 @@ export function TemplatesScreen({ token, locale, onUnauthorized }: TemplatesScre
   const canCreate = templateKey.trim() !== "" && selected !== "" && !creating;
 
   return (
-    <main className="studio-screen">
+    <main {...stylex.props(styles.studioScreen)}>
       <h1>Templates</h1>
-      <p className="studio-note">
+      <p {...stylex.props(styles.studioNote)}>
         A starting body for a new process. A template is a snapshot: editing one changes no process already created from it.
       </p>
 
       <form
-        className="studio-controls"
+        {...stylex.props(styles.studioControls)}
         onSubmit={(e) => {
           e.preventDefault();
           if (canCreate) void create();
@@ -133,34 +188,34 @@ export function TemplatesScreen({ token, locale, onUnauthorized }: TemplatesScre
       </form>
 
       {error && (
-        <p className="studio-error" role="alert">
+        <p {...stylex.props(styles.studioError)} role="alert">
           {error}
         </p>
       )}
 
       {items.length === 0 && !loading && !error && (
-        <p className="studio-empty">No templates yet. Create one from a published version of a process.</p>
+        <p {...stylex.props(styles.studioEmpty)}>No templates yet. Create one from a published version of a process.</p>
       )}
 
       {items.length > 0 && (
-        <table className="studio-table">
+        <table {...stylex.props(styles.studioTable)}>
           <thead>
             <tr>
-              <th>Key</th>
-              <th>Name</th>
-              <th>Last change</th>
-              <th />
+              <th {...stylex.props(styles.studioTableHeadCell)}>Key</th>
+              <th {...stylex.props(styles.studioTableHeadCell)}>Name</th>
+              <th {...stylex.props(styles.studioTableHeadCell)}>Last change</th>
+              <th {...stylex.props(styles.studioTableHeadCell)} />
             </tr>
           </thead>
           <tbody>
             {items.map((template) => (
               <tr key={template.templateKey}>
-                <td>{template.templateKey}</td>
-                <td>{templateDisplayName(template.label, locale, template.templateKey)}</td>
-                <td>
+                <td {...stylex.props(styles.studioTableCell)}>{template.templateKey}</td>
+                <td {...stylex.props(styles.studioTableCell)}>{templateDisplayName(template.label, locale, template.templateKey)}</td>
+                <td {...stylex.props(styles.studioTableCell)}>
                   {new Date(template.updatedAt).toLocaleString()} · {template.createdBy}
                 </td>
-                <td>
+                <td {...stylex.props(styles.studioTableCell)}>
                   <button type="button" className="btn btn-secondary" onClick={() => void remove(template.templateKey)}>
                     Delete
                   </button>

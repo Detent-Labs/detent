@@ -1,7 +1,34 @@
 import { useState } from "react";
+import * as stylex from "@stylexjs/stylex";
+import { colors, fonts, space } from "form-ui/tokens.stylex";
 import type { Draft } from "../draft/types";
 import { t } from "../catalog.js";
 import { parseDraftText, formatDraftText } from "./draftJsonLogic";
+
+const styles = stylex.create({
+  studioJsonEditor: {
+    display: "block",
+    width: "100%",
+    marginTop: space.s1,
+    fontFamily: fonts.mono,
+    fontSize: "0.85rem",
+    border: `1px solid ${colors.border}`,
+    padding: space.s2,
+    background: colors.surface,
+    resize: "vertical",
+  },
+  studioControls: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: space.s2,
+    marginBottom: space.s3,
+    alignItems: "center",
+  },
+  studioJsonError: {
+    color: colors.refusal,
+    whiteSpace: "pre-line",
+  },
+});
 
 interface JsonViewProps {
   draft: Draft;
@@ -34,19 +61,19 @@ export function JsonView({ draft, onApply }: JsonViewProps) {
       <label>
         {t("jsonView.label")}
         <textarea
-          className="studio-json-editor"
+          {...stylex.props(styles.studioJsonEditor)}
           rows={24}
           value={text}
           onChange={(e) => setText(e.target.value)}
           spellCheck={false}
         />
       </label>
-      <div className="studio-controls">
+      <div {...stylex.props(styles.studioControls)}>
         <button type="button" className="btn btn-secondary" onClick={apply}>
           {t("jsonView.apply")}
         </button>
       </div>
-      {error && <p className="studio-error studio-json-error">{error}</p>}
+      {error && <p {...stylex.props(styles.studioJsonError)}>{error}</p>}
     </div>
   );
 }

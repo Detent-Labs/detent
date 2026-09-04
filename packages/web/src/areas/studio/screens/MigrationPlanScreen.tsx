@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
+import * as stylex from "@stylexjs/stylex";
+import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { getMigrationPlan, putMigrationPlan, getOrphanKeys, getVersionBody } from "../api/client.js";
 import {
   EMPTY_ROWS,
@@ -27,6 +29,114 @@ interface MigrationPlanScreenProps {
 }
 
 type Surface = "form" | "json";
+
+const styles = stylex.create({
+  studioScreen: {
+    maxWidth: "60rem",
+    marginInline: "auto",
+    marginBlock: 0,
+    paddingTop: space.s4,
+    paddingInline: space.s3,
+    paddingBottom: space.s6,
+  },
+  studioBack: {
+    display: "block",
+    paddingLeft: 0,
+    marginBottom: space.s3,
+  },
+  errorBanner: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: space.s3,
+    border: `2px solid ${colors.refusal}`,
+    paddingBlock: space.s2,
+    paddingInline: space.s3,
+    marginBlock: space.s3,
+    marginInline: 0,
+  },
+  errorBannerStamp: {
+    flex: "none",
+    fontFamily: fonts.mono,
+    fontSize: 11,
+    fontWeight: 600,
+    letterSpacing: "0.05em",
+    textTransform: "uppercase",
+    color: colors.refusal,
+    border: "2px solid currentcolor",
+    paddingBlock: 2,
+    paddingInline: 7,
+    transform: "rotate(-2deg)",
+  },
+  errorBannerMessage: {
+    flex: 1,
+    color: colors.text,
+  },
+  studioEmpty: {
+    color: colors.textMuted,
+    paddingBlock: space.s4,
+    paddingInline: 0,
+  },
+  studioConflict: {
+    border: `2px solid ${colors.refusal}`,
+    paddingBlock: space.s3,
+    paddingInline: space.s3,
+    marginBlock: space.s3,
+    marginInline: 0,
+    color: colors.refusal,
+  },
+  studioSurfaceToggle: {
+    display: "flex",
+    gap: space.s2,
+    marginBottom: space.s3,
+  },
+  surfaceToggleTabSelected: {
+    fontWeight: 600,
+    textDecoration: "underline",
+  },
+  studioWarning: {
+    color: colors.refusal,
+    borderLeft: `3px solid ${colors.accent400}`,
+    paddingLeft: space.s2,
+  },
+  studioJsonEditor: {
+    display: "block",
+    width: "100%",
+    marginTop: space.s1,
+    fontFamily: fonts.mono,
+    fontSize: "0.85rem",
+    border: `1px solid ${colors.border}`,
+    padding: space.s2,
+    background: colors.surface,
+    resize: "vertical",
+  },
+  studioControls: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: space.s2,
+    marginBottom: space.s3,
+    alignItems: "center",
+  },
+  studioError: {
+    color: colors.refusal,
+  },
+  studioDiff: {
+    listStyle: "none",
+    marginBlockStart: space.s3,
+    marginBlockEnd: 0,
+    marginInline: 0,
+    padding: 0,
+    fontSize: "0.85rem",
+  },
+  studioDiffItem: {
+    paddingBlock: space.s1,
+    paddingInline: 0,
+    borderBottom: `1px solid ${colors.border}`,
+  },
+  studioDiffCode: {
+    fontFamily: fonts.mono,
+    fontSize: "0.8rem",
+  },
+});
 
 /**
  * studio-migration-planning spec: author a plan (fieldMap/stepMap/transforms/onUnmappable)
@@ -144,46 +254,58 @@ export function MigrationPlanScreen({ processId, from, to, token, navigate, onUn
   };
 
   return (
-    <main className="studio-screen">
-      <button type="button" className="btn btn-ghost studio-back" onClick={() => navigate({ name: "versions", processId })}>
+    <main {...stylex.props(styles.studioScreen)}>
+      <button
+        type="button"
+        className="btn btn-ghost"
+        {...stylex.props(styles.studioBack)}
+        onClick={() => navigate({ name: "versions", processId })}
+      >
         {t("migrationPlan.back")}
       </button>
       <h1>
         Migration plan {fromVersion} → {toVersion}
       </h1>
       {loadError && (
-        <div className="studio-error-banner" role="alert">
-          <span className="studio-error-banner-stamp">{t("error.failed")}</span>
-          <span className="studio-error-banner-message">{loadError}</span>
+        <div {...stylex.props(styles.errorBanner)} role="alert">
+          <span {...stylex.props(styles.errorBannerStamp)}>{t("error.failed")}</span>
+          <span {...stylex.props(styles.errorBannerMessage)}>{loadError}</span>
           <button type="button" className="btn btn-secondary" onClick={() => load()} disabled={loading}>
             {t("error.retry")}
           </button>
         </div>
       )}
       {loading ? (
-        <p className="studio-empty">{t("migrationPlan.loading")}</p>
+        <p {...stylex.props(styles.studioEmpty)}>{t("migrationPlan.loading")}</p>
       ) : loadError ? null : (
         <>
           {appliedAt && (
-            <p className="studio-conflict">
+            <p {...stylex.props(styles.studioConflict)}>
               Applied at {new Date(appliedAt).toLocaleString()} — {t("migrationPlan.frozen")}
             </p>
           )}
-          <div className="studio-surface-toggle" role="tablist" aria-label={t("migrationPlan.surfaceLabel")}>
+          <div {...stylex.props(styles.studioSurfaceToggle)} role="tablist" aria-label={t("migrationPlan.surfaceLabel")}>
             <button
               type="button"
               role="tab"
+              {...stylex.props(surface === "form" && styles.surfaceToggleTabSelected)}
               aria-selected={surface === "form"}
               disabled={!catalogs}
               onClick={() => showSurface("form")}
             >
               {t("migrationPlan.surfaceForm")}
             </button>
-            <button type="button" role="tab" aria-selected={surface === "json"} onClick={() => showSurface("json")}>
+            <button
+              type="button"
+              role="tab"
+              {...stylex.props(surface === "json" && styles.surfaceToggleTabSelected)}
+              aria-selected={surface === "json"}
+              onClick={() => showSurface("json")}
+            >
               {t("migrationPlan.surfaceJson")}
             </button>
           </div>
-          {!catalogs && <p className="studio-warning">{t("migrationPlan.formUnavailable")}</p>}
+          {!catalogs && <p {...stylex.props(styles.studioWarning)}>{t("migrationPlan.formUnavailable")}</p>}
 
           {surface === "form" && catalogs ? (
             <MigrationSpecEditor rows={rows} catalogs={catalogs} onChange={setRows} />
@@ -191,7 +313,7 @@ export function MigrationPlanScreen({ processId, from, to, token, navigate, onUn
             <label>
               {t("migrationPlan.jsonLabel")}
               <textarea
-                className="studio-json-editor"
+                {...stylex.props(styles.studioJsonEditor)}
                 rows={16}
                 value={text}
                 onChange={(e) => setText(e.target.value)}
@@ -199,20 +321,20 @@ export function MigrationPlanScreen({ processId, from, to, token, navigate, onUn
               />
             </label>
           )}
-          <div className="studio-controls">
+          <div {...stylex.props(styles.studioControls)}>
             <button type="button" className="btn btn-primary" disabled={saving} onClick={() => void save()}>
               {saving ? t("migrationPlan.saving") : t("migrationPlan.save")}
             </button>
           </div>
           {error && (
-            <p className="studio-error" role="alert">
+            <p {...stylex.props(styles.studioError)} role="alert">
               {error}
             </p>
           )}
 
           <fieldset>
             <legend>{t("migrationPlan.orphanLegend")}</legend>
-            <div className="studio-controls">
+            <div {...stylex.props(styles.studioControls)}>
               <button type="button" className="btn btn-secondary" disabled={scanning} onClick={() => void scanOrphans(fromVersion)}>
                 Scan v{fromVersion}
               </button>
@@ -222,17 +344,17 @@ export function MigrationPlanScreen({ processId, from, to, token, navigate, onUn
             </div>
             {orphans &&
               (orphans.orphans.length === 0 && orphans.unreadable.length === 0 ? (
-                <p className="studio-empty">{t("migrationPlan.orphanEmpty")}</p>
+                <p {...stylex.props(styles.studioEmpty)}>{t("migrationPlan.orphanEmpty")}</p>
               ) : (
-                <ul className="studio-diff">
+                <ul {...stylex.props(styles.studioDiff)}>
                   {orphans.orphans.map((o) => (
-                    <li key={o.instanceId}>
-                      <code>{o.instanceId}</code>: {o.keys.join(", ")}
+                    <li key={o.instanceId} {...stylex.props(styles.studioDiffItem)}>
+                      <code {...stylex.props(styles.studioDiffCode)}>{o.instanceId}</code>: {o.keys.join(", ")}
                     </li>
                   ))}
                   {orphans.unreadable.map((id) => (
-                    <li key={id}>
-                      <code>{id}</code>: {t("migrationPlan.orphanUnreadable")}
+                    <li key={id} {...stylex.props(styles.studioDiffItem)}>
+                      <code {...stylex.props(styles.studioDiffCode)}>{id}</code>: {t("migrationPlan.orphanUnreadable")}
                     </li>
                   ))}
                 </ul>

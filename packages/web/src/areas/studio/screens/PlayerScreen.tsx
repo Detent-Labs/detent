@@ -1,4 +1,6 @@
 import { useCallback, useState } from "react";
+import * as stylex from "@stylexjs/stylex";
+import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { FieldForm, PathButtons, filterToEditable, resolveFieldsLocale, isResolvedViewField } from "form-ui";
 import type { SubmissionIssue } from "form-ui";
 import { createInstance, createTestInstance, getInstanceView, submitPath, claimStep, releaseClaim, getInstanceRecord, StudioClientError } from "../api/client.js";
@@ -16,6 +18,90 @@ interface PlayerScreenProps {
   navigate: (route: Route) => void;
   onUnauthorized: () => void;
 }
+
+const styles = stylex.create({
+  studioScreen: {
+    maxWidth: "60rem",
+    marginInline: "auto",
+    marginBlock: 0,
+    paddingTop: space.s4,
+    paddingInline: space.s3,
+    paddingBottom: space.s6,
+  },
+  // The screen is the size container the two-pane fold measures. A
+  // container query matches descendants, so this cannot sit on the layout
+  // element it governs.
+  studioPlayerScreen: {
+    containerType: "inline-size",
+    containerName: "studio-player",
+  },
+  studioBack: {
+    display: "block",
+    paddingLeft: 0,
+    marginBottom: space.s3,
+  },
+  studioControls: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: space.s2,
+    marginBottom: space.s3,
+    alignItems: "center",
+  },
+  studioError: {
+    color: colors.refusal,
+  },
+  studioPlayerLayout: {
+    display: "grid",
+    gridTemplateColumns: {
+      default: "minmax(0, 1fr) minmax(0, 1fr)",
+      "@container studio-player (max-width: 64rem)": "1fr",
+    },
+    gap: space.s6,
+    alignItems: "start",
+  },
+  studioConflict: {
+    border: `2px solid ${colors.refusal}`,
+    paddingBlock: space.s3,
+    paddingInline: space.s3,
+    marginBlock: space.s3,
+    marginInline: 0,
+    color: colors.refusal,
+  },
+  studioPlayerTestBadge: {
+    display: "inline-block",
+    fontFamily: fonts.mono,
+    fontSize: "11px",
+    fontWeight: 600,
+    textTransform: "uppercase",
+    letterSpacing: "0.08em",
+    border: "2px solid currentcolor",
+    paddingBlock: "2px",
+    paddingInline: "7px",
+    color: colors.accent,
+  },
+  studioEmpty: {
+    color: colors.textMuted,
+    paddingBlock: space.s4,
+    paddingInline: 0,
+  },
+  studioDiff: {
+    listStyle: "none",
+    marginBlockStart: space.s3,
+    marginBlockEnd: 0,
+    marginInline: 0,
+    padding: 0,
+    fontSize: "0.85rem",
+  },
+  studioDiffItem: {
+    paddingBlock: space.s1,
+    paddingInline: 0,
+    borderBottom: `1px solid ${colors.border}`,
+  },
+  studioDiffCode: {
+    fontFamily: fonts.mono,
+    fontSize: "0.8rem",
+  },
+});
 
 const RECORD_PAGE_LIMIT = 100;
 
@@ -170,16 +256,15 @@ export function PlayerScreen({ processId, token, navigate, onUnauthorized }: Pla
   }
 
   return (
-    // `studio-player-screen` is the size container the two-pane fold measures.
-    <main className="studio-screen studio-player-screen">
-      <button type="button" className="btn btn-ghost studio-back" onClick={() => navigate({ name: "edit", processId })}>
+    <main {...stylex.props(styles.studioScreen, styles.studioPlayerScreen)}>
+      <button type="button" className="btn btn-ghost" {...stylex.props(styles.studioBack)} onClick={() => navigate({ name: "edit", processId })}>
         ← Back to process
       </button>
       <h1>Player</h1>
 
       <fieldset>
         <legend>Instance access</legend>
-        <div className="studio-controls">
+        <div {...stylex.props(styles.studioControls)}>
           <button type="button" className="btn btn-primary" disabled={loading} onClick={() => void doCreate()}>
             Create new instance
           </button>
@@ -191,16 +276,16 @@ export function PlayerScreen({ processId, token, navigate, onUnauthorized }: Pla
           Open existing instance id
           <input type="text" value={openInstanceIdInput} onChange={(e) => setOpenInstanceIdInput(e.target.value)} />
         </label>
-        <div className="studio-controls">
+        <div {...stylex.props(styles.studioControls)}>
           <button type="button" className="btn btn-secondary" disabled={loading || !openInstanceIdInput} onClick={() => void doOpen()}>
             Open
           </button>
         </div>
       </fieldset>
 
-      {outcome && <p className="studio-error">{outcome}</p>}
+      {outcome && <p {...stylex.props(styles.studioError)}>{outcome}</p>}
       {unmatchedIssues.length > 0 && (
-        <ul className="studio-error">
+        <ul {...stylex.props(styles.studioError)}>
           {unmatchedIssues.map((issue, i) => (
             <li key={i}>
               {issue.fieldId}: {issue.kind}
@@ -210,14 +295,14 @@ export function PlayerScreen({ processId, token, navigate, onUnauthorized }: Pla
       )}
 
       {view && instanceId && (
-        <div className="studio-player-layout">
+        <div {...stylex.props(styles.studioPlayerLayout)}>
           <section className="studio-player-form">
-            <p className="studio-conflict">
+            <p {...stylex.props(styles.studioConflict)}>
               instance {instanceId} · step {view.step.key} · status {view.status}
               {isTestInstance(view) && (
                 <>
                   {" "}
-                  <span className="studio-player-test-badge">Test</span>
+                  <span {...stylex.props(styles.studioPlayerTestBadge)}>Test</span>
                 </>
               )}
             </p>
@@ -231,7 +316,7 @@ export function PlayerScreen({ processId, token, navigate, onUnauthorized }: Pla
               columns={view.columns ?? 1}
             />
 
-            <div className="studio-controls">
+            <div {...stylex.props(styles.studioControls)}>
               {!claimedByMe && (
                 <button type="button" className="btn btn-primary" disabled={loading} onClick={() => void doClaim()}>
                   Claim
@@ -252,14 +337,14 @@ export function PlayerScreen({ processId, token, navigate, onUnauthorized }: Pla
 
           <section className="studio-player-record">
             <h2>Record</h2>
-            {recordError && <p className="studio-error">{recordError}</p>}
-            {record.length === 0 && !recordError && <p className="studio-empty">No history yet.</p>}
-            <ul className="studio-diff">
+            {recordError && <p {...stylex.props(styles.studioError)}>{recordError}</p>}
+            {record.length === 0 && !recordError && <p {...stylex.props(styles.studioEmpty)}>No history yet.</p>}
+            <ul {...stylex.props(styles.studioDiff)}>
               {record.map((el, i) => {
                 const d = describeRecordElement(el);
                 return (
-                  <li key={i}>
-                    <code>{new Date(d.at).toLocaleString()}</code> — {d.summary}
+                  <li key={i} {...stylex.props(styles.studioDiffItem)}>
+                    <code {...stylex.props(styles.studioDiffCode)}>{new Date(d.at).toLocaleString()}</code> — {d.summary}
                   </li>
                 );
               })}

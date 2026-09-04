@@ -247,25 +247,42 @@
 
 ## 8. The remaining screens
 
-- [ ] 8.1 Convert `screens/EditScreen.tsx` to `stylex.create`. Keep
+- [x] 8.1 Convert `screens/EditScreen.tsx` to `stylex.create`. Kept
   `.canvas-group-name` a literal, unhashed class on the group-rename
-  label (D2). Compose it with the label's own new compiled style
-  through string concatenation, never through `stylex.props` itself:
-  `` className={`canvas-group-name ${stylex.props(styles.x).className}`} ``.
-- [ ] 8.2 Convert `panels/PathsPanel.tsx` and `panels/StepsPanel.tsx`.
+  label (D2). Composed it with the label's own new compiled style
+  through string concatenation, never through `stylex.props` itself.
+  Two more classes render only here, not in `canvas/`:
+  `.canvas-inspector` and `.canvas-selection*`. Unlike
+  `.canvas-group-name`, both convert.
+
+  Found a second app.css cascade dependency this file's own
+  conversion had to reproduce in code (D13). Its rule,
+  `.studio-edit-screen > *`, zeroed every direct child's own top
+  margin. Two real children,
+  `.studio-dock` and `.studio-error-banner`, relied on it differently.
+  `ProcessHeaderBar.tsx`'s own `errorBanner` style (Group 4) picks up
+  the fix too, since its one render site is always this screen's
+  direct child.
+- [x] 8.2 Convert `panels/PathsPanel.tsx` and `panels/StepsPanel.tsx`.
   The latter covers the inspector's identity zone, its behavior-zone
   tab list and its diagnostics drawer.
-- [ ] 8.3 Convert `screens/VersionsScreen.tsx`,
+- [x] 8.3 Convert `screens/VersionsScreen.tsx`,
   `screens/TemplatesScreen.tsx`, `screens/PlayerScreen.tsx` and
-  `screens/ToolsScreen.tsx`.
-- [ ] 8.4 Convert `screens/MigrationPlanScreen.tsx` and
+  `screens/ToolsScreen.tsx`. `PlayerScreen.tsx`'s own two-pane reflow
+  uses the same `@container` conditional-value pattern phase 0/1
+  already proved, over `form-ui/FieldForm.tsx`'s own fold.
+- [x] 8.4 Convert `screens/MigrationPlanScreen.tsx` and
   `panels/MigrationSpecEditor.tsx`, including the raw-JSON textarea
   fallback state.
-- [ ] 8.5 Convert `panels/JsonView.tsx`.
-- [ ] 8.6 Verify: `bun run typecheck` and `bun run build` both pass.
+- [x] 8.5 Convert `panels/JsonView.tsx`.
+- [x] 8.6 Verify: `bun run typecheck` and `bun run build` both pass.
   `app.css` keeps every rule this phase's files used (D11). Group 9's
   cleanup pass is next. By then every non-canvas file has converted,
-  so nothing left in `app.css` is still depended on.
+  so nothing left in `app.css` is still depended on. Full `bun test`
+  under `silent-green.sh` passes too: 3818 pass, 1 pre-existing skip,
+  0 fail. A preview run of task 9.1's own grep already confirms this.
+  Every remaining match is one of the dead classes precedent already
+  covers.
 
 ## 9. Cleanup
 

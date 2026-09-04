@@ -210,6 +210,10 @@ const styles = stylex.create({
     marginBottom: space.s3,
     alignItems: "center",
   },
+  // `.studio-edit-screen > *` used to zero every direct child's own
+  // top margin, since a flex column does not collapse adjacent ones the
+  // way block layout does. This banner is always a non-first child of
+  // that (now-compiled-away) column, so the zero moves here permanently.
   errorBanner: {
     display: "flex",
     alignItems: "baseline",
@@ -219,7 +223,8 @@ const styles = stylex.create({
     borderColor: colors.refusal,
     paddingBlock: space.s2,
     paddingInline: space.s3,
-    marginBlock: space.s3,
+    marginBlockStart: 0,
+    marginBlockEnd: space.s3,
     marginInline: 0,
   },
   errorBannerStamp: {

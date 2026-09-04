@@ -375,6 +375,30 @@ Each file still gets its own local `stylex.create` entry per shape
 when the now-dead source CSS leaves the file. It does not change how
 many times its shape gets defined in code.
 
+**D13. A flex column's margin zero moves to each real child.**
+`app.css`'s `.studio-edit-screen > *` zeroed every direct child's own
+top margin. A flex column does not collapse adjacent margins. Block
+layout does. This rule kept `EditScreen.tsx`'s stack from doubling
+its gaps.
+
+A wildcard child selector has no code-side equivalent. Group 8
+checked every real child instead. Most already had no top margin of
+their own, a `<div>`'s own browser default. Two did not.
+
+`.studio-dock`'s own later rule already overrode the wildcard back to
+its own `margin-top`, in the source CSS. `EditorDock.tsx`'s own
+`dock` style, from Group 3, needed no change for that reason: it
+already carried the full value. `.studio-error-banner`'s own rule
+carried no such override, so the wildcard's zero was its true
+effective value as a direct child.
+
+Two call sites this phase converts bake that zero in directly now:
+`ProcessHeaderBar.tsx`'s own banner, and `EditScreen.tsx`'s own
+form-not-found fallback. `EditScreen.tsx`'s other two
+`.studio-error-banner` renders sit outside `.studio-edit-screen`
+entirely, in the loading and not-found early-return states. Both keep
+the banner's own full top-and-bottom margin, unchanged.
+
 ## Risks / Trade-offs
 
 - [`::backdrop` does not compile or paint as designed] → this
