@@ -54,7 +54,7 @@
 
 ## 3. The dock
 
-- [ ] 3.1 Convert `dock/EditorDock.tsx` to `stylex.create`, reading
+- [x] 3.1 Convert `dock/EditorDock.tsx` to `stylex.create`, reading
   `form-ui/tokens.stylex`. Cover the collapsed strip, the tab row and
   each tab's content frame.
 
@@ -67,7 +67,10 @@
   (task 1.4's finding). That is a one-rule, one-site class, unrelated
   to the dock, folded in here as the nearest open group. Verify:
   `bun run typecheck` passes.
-- [ ] 3.2 Verify: `bun run build` succeeds. `app.css` keeps every rule
+
+  Done, committed with Group 3. This checkbox stayed unmarked at the
+  time; confirmed against the actual source this session.
+- [x] 3.2 Verify: `bun run build` succeeds. `app.css` keeps every rule
   this task's own files used. Each stays dead code until Group 9's
   single cleanup pass deletes it (D11). Deleting per group cannot
   tell a dead rule from one a later group's file still renders.
@@ -79,6 +82,9 @@
   own markup. That markup mounts inside the dock's Field matrix tab.
   None of it is a class `EditorDock.tsx` itself renders. Task 6.7
   updates it, once `FieldMatrixGrid.tsx` converts.
+
+  Done, committed with Group 3. Same unmarked-checkbox oversight as
+  3.1.
 
 ## 4. The header bar and the four dialogs
 
@@ -114,16 +120,24 @@
   Verified again after the fix: all four now compute `rgba(0, 0, 0,
   0.45)`, matching the value `app.css:891` declared before this
   change. No console error appeared on either screen.
-- [ ] 4.4 Change `studio-processHeaderBar-publishGate.test.tsx`'s
+- [x] 4.4 Change `studio-processHeaderBar-publishGate.test.tsx`'s
   literal `studio-error-banner` assertions to the stub-derived key
   name. Its `not.toContain("studio-conflict")` assertion needs no
   change: `ProcessHeaderBar.tsx` never renders that class, before or
   after this conversion, so the check stays trivially true. Verify:
   `bun test packages/web/test/
   studio-processHeaderBar-publishGate.test.tsx` passes.
-- [ ] 4.5 Verify: `bun run typecheck` and `bun run build` both pass.
+
+  Done, committed with Group 4. Same unmarked-checkbox oversight as
+  3.1. Re-ran the file this session: 17 pass, 0 fail, asserting
+  `errorBanner` and `not.toContain("studio-conflict")` exactly as
+  planned.
+- [x] 4.5 Verify: `bun run typecheck` and `bun run build` both pass.
   `app.css` keeps every rule these two files used (D11). Group 9's
   cleanup pass deletes it, once every group finishes.
+
+  Done, committed with Group 4, and re-confirmed by every full
+  typecheck/build this session ran afterward.
 
 ## 5. The field catalog and its shared editors
 
