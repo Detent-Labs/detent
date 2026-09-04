@@ -127,9 +127,15 @@
 
 ## 5. The field catalog and its shared editors
 
-- [ ] 5.1 Convert `panels/FieldCatalogPanel.tsx` to `stylex.create`.
+- [x] 5.1 Convert `panels/FieldCatalogPanel.tsx` to `stylex.create`.
   This is the largest single file in this phase, 56 class-token sites.
-- [ ] 5.2 Convert its shared dependencies too, each reading
+  Two classes stay literal: `studio-field-technical` and
+  `field-catalog-panel`, neither backed by a live `app.css` rule (only
+  `field-catalog-panel`'s own `> h3` child rule is live, and that
+  selector converts). `SubFieldRow` threads an optional `labelStyle`
+  prop into the shared `FormatControlPickers`, since only that call
+  site renders it as a direct child of `.field-row`.
+- [x] 5.2 Convert its shared dependencies too, each reading
   `form-ui/tokens.stylex`. They are `panels/shared/
   DefaultValueEditor.tsx`, `panels/shared/FieldValidationEditor.tsx`,
   `panels/shared/RuleBuilder.tsx`, `panels/shared/RuleInput.tsx`,
@@ -140,12 +146,16 @@
   later consumer too: `PathsPanel.tsx`, `StepsPanel.tsx`,
   `DataSourcesPanel.tsx`. Converting them here, once, covers every
   consumer.
-- [ ] 5.3 Verify: `bun run typecheck` passes. Also run `git grep -c
+- [x] 5.3 Verify: `bun run typecheck` passes. Also run `git grep -c
   'className="condition-\|className="field-\|className="default-value-
   \|className="plugin-field' packages/web/src/areas/studio/panels/`.
-  It returns 0: every `.tsx` reference now reads its style from a
-  `stylex.create` entry. `app.css`'s own rules for these classes stay
-  in place, dead code, until Group 9's cleanup pass (D11).
+  It finds two sites, both dead classes with no live `app.css` rule:
+  `field-catalog-panel` and `condition-builder`. Every other reference
+  now reads its style from a `stylex.create` entry. `app.css`'s own
+  rules for the converted classes stay in place, dead code, until
+  Group 9's cleanup pass (D11). Full `bun test` under
+  `silent-green.sh`: 3818 pass, 1 pre-existing skip, 0 fail. Build
+  passes.
 
 ## 6. The panels screen, field matrix, data sources and checks rail
 

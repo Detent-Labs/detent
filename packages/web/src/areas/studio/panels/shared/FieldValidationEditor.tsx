@@ -1,4 +1,6 @@
 import { useState } from "react";
+import * as stylex from "@stylexjs/stylex";
+import { colors, fonts, space } from "form-ui/tokens.stylex";
 import type { DraftField } from "../../draft/fields";
 import { t } from "../../catalog.js";
 import { RuleInput } from "./RuleInput";
@@ -10,6 +12,35 @@ import {
   type DraftFieldValidation,
 } from "./fieldValidationLogic";
 import { useDraft } from "../../draft/store";
+
+const styles = stylex.create({
+  fieldValidation: {
+    marginBlock: space.s2,
+    marginInline: 0,
+    border: `1px solid ${colors.border}`,
+    paddingBlock: space.s1,
+    paddingInline: space.s2,
+  },
+  // `.field-validation summary` in app.css: a descendant rule on a bare
+  // `<summary>` with no class of its own.
+  fieldValidationSummary: {
+    cursor: "pointer",
+    color: colors.textMuted,
+    fontFamily: fonts.mono,
+    fontSize: "0.85rem",
+  },
+  fieldValidationRow: {
+    paddingBlock: space.s1,
+    paddingInline: 0,
+  },
+  studioNote: {
+    color: colors.textMuted,
+    minHeight: "1.25rem",
+    marginBlockEnd: space.s2,
+    marginBlockStart: 0,
+    marginInline: 0,
+  },
+});
 
 interface Props {
   /** The field this `validation` belongs to — the row builder needs the
@@ -45,15 +76,15 @@ export function FieldValidationEditor({ field, validation, onChange }: Props) {
   );
 
   return (
-    <details className="field-validation" open={initiallyOpen}>
+    <details {...stylex.props(styles.fieldValidation)} open={initiallyOpen}>
       {/* The Rules tab's own zone heading already says "Validation" (design.md
           decision 2); this summary carries only the count, so no redundant
           second label renders beneath it. */}
-      <summary>({carried.length})</summary>
+      <summary {...stylex.props(styles.fieldValidationSummary)}>({carried.length})</summary>
       {keys.map((key) => {
         const notEvaluated = !offered.includes(key);
         return (
-          <div className="field-validation-row" key={key}>
+          <div {...stylex.props(styles.fieldValidationRow)} key={key}>
             <label>
               {key}
               {key === "rule" ? (
@@ -72,7 +103,7 @@ export function FieldValidationEditor({ field, validation, onChange }: Props) {
                 />
               )}
             </label>
-            {notEvaluated && <p className="studio-note">{t("fieldValidation.notEvaluated")}</p>}
+            {notEvaluated && <p {...stylex.props(styles.studioNote)}>{t("fieldValidation.notEvaluated")}</p>}
             {key === "pattern" && patternIssues.length > 0 && (
               <ul className="issue-list">
                 {patternIssues.map((issue, i) => (

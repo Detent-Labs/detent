@@ -1,5 +1,66 @@
+import * as stylex from "@stylexjs/stylex";
+import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { t } from "../../catalog.js";
 import { inputTypeFor, isComplete, operatorsFor, type CmpOp, type Condition, type Operand, type Row } from "./conditionLogic";
+
+const styles = stylex.create({
+  conditionEmpty: {
+    margin: 0,
+    color: colors.textMuted,
+    fontSize: "0.9rem",
+  },
+  conditionRows: {
+    listStyle: "none",
+    margin: 0,
+    padding: 0,
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s1,
+  },
+  conditionRow: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: space.s2,
+    padding: space.s2,
+    border: `1px solid ${colors.border}`,
+    background: colors.surfaceMuted,
+  },
+  conditionRowIncomplete: {
+    borderColor: colors.accent400,
+    borderStyle: "dashed",
+  },
+  conditionJoiner: {
+    background: "none",
+    color: colors.accent,
+    fontFamily: fonts.mono,
+    fontWeight: 600,
+    paddingBlock: 0,
+    paddingInline: space.s1,
+    minWidth: "2.5ch",
+  },
+  conditionRaw: {
+    flex: "1 1 20ch",
+    minWidth: 0,
+    fontFamily: fonts.mono,
+  },
+  conditionFlag: {
+    color: colors.refusal,
+    fontSize: "0.85rem",
+  },
+  conditionRemove: {
+    background: "none",
+    color: colors.textMuted,
+    fontSize: "1.1rem",
+    lineHeight: 1,
+    paddingBlock: space.s1,
+    paddingInline: space.s2,
+    marginLeft: "auto",
+    ":hover": {
+      color: colors.refusal,
+    },
+  },
+});
 
 interface Props {
   condition: Condition;
@@ -94,7 +155,7 @@ export function ConditionBuilder({ condition, operands, onChange }: Props) {
   if (!condition.rows.length) {
     return (
       <div className="condition-builder">
-        <p className="condition-empty">{t("condition.empty")}</p>
+        <p {...stylex.props(styles.conditionEmpty)}>{t("condition.empty")}</p>
         <button type="button" className="btn btn-ghost condition-add" onClick={addRow} disabled={!operands.length}>
           {t("condition.addRow")}
         </button>
@@ -104,14 +165,14 @@ export function ConditionBuilder({ condition, operands, onChange }: Props) {
 
   return (
     <div className="condition-builder">
-      <ol className="condition-rows">
+      <ol {...stylex.props(styles.conditionRows)}>
         {condition.rows.map((row, index) => {
           const operand = row.kind === "cmp" ? byPath.get(row.operand) : undefined;
           const complete = isComplete(row, byPath);
           return (
-            <li key={index} className={`condition-row${complete ? "" : " is-incomplete"}`}>
+            <li key={index} {...stylex.props(styles.conditionRow, !complete && styles.conditionRowIncomplete)}>
               {index > 0 && (
-                <button type="button" className="condition-joiner" onClick={flipJoiner} title={t("condition.joinerHint")}>
+                <button type="button" {...stylex.props(styles.conditionJoiner)} onClick={flipJoiner} title={t("condition.joinerHint")}>
                   {condition.joiner}
                 </button>
               )}
@@ -119,7 +180,7 @@ export function ConditionBuilder({ condition, operands, onChange }: Props) {
               {row.kind === "raw" ? (
                 <input
                   type="text"
-                  className="cel-input condition-raw"
+                  className={`cel-input ${stylex.props(styles.conditionRaw).className}`}
                   aria-label={t("condition.rawRow")}
                   value={row.src}
                   spellCheck={false}
@@ -167,11 +228,11 @@ export function ConditionBuilder({ condition, operands, onChange }: Props) {
                 </>
               )}
 
-              {!complete && <span className="condition-flag">{t("condition.incomplete")}</span>}
+              {!complete && <span {...stylex.props(styles.conditionFlag)}>{t("condition.incomplete")}</span>}
 
               <button
                 type="button"
-                className="condition-remove"
+                {...stylex.props(styles.conditionRemove)}
                 aria-label={t("condition.removeRow")}
                 onClick={() => removeRow(index)}
               >

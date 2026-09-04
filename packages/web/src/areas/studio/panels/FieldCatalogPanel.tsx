@@ -1,6 +1,8 @@
 import { Fragment, useEffect, useState } from "react";
+import * as stylex from "@stylexjs/stylex";
 import type { BaseFieldType, DataSourceDef, Expression, FieldControl, FieldDef, FieldFormat, FieldOption } from "workflow-engine/schema";
 import { FieldForm } from "form-ui";
+import { colors, fonts, space } from "form-ui/tokens.stylex";
 import type { DraftOf } from "../draft/types";
 import { useDraft, type Mutate } from "../draft/store";
 import { t, type CatalogKey } from "../catalog.js";
@@ -34,6 +36,237 @@ import { ConditionInput } from "./shared/ConditionInput";
 type DraftField = DraftOf<FieldDef>;
 type DraftDataSource = DraftOf<DataSourceDef>;
 type DraftOption = DraftOf<FieldOption>;
+
+/** Every class this file's own markup renders, from `app.css`. `fieldRow`,
+ * `panelHeading` and `fieldRowLabel` each duplicate a shape
+ * `panels/DataSourcesPanel.tsx` shares under a combined selector
+ * (`.field-row, .data-source-row` and its `> label`/`> h3` siblings); this
+ * file compiles its own half and leaves that file's own literal classes
+ * alone, per D9. The combined source rules survive in `app.css`, dead
+ * code, until Group 9's cleanup pass (D11). */
+const styles = stylex.create({
+  panelHeading: {
+    marginBlockEnd: space.s3,
+    marginBlockStart: 0,
+    marginInline: 0,
+    paddingBottom: space.s2,
+    borderBottomWidth: 2,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.divider,
+  },
+  fieldRow: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-start",
+    gap: space.s2,
+  },
+  // Direct children only (`.field-row > label`): applies inside
+  // `SubFieldRow`'s own flat layout alone. `FieldEditor`'s own labels sit
+  // one level deeper, inside a `.field-tab-panel`, and take no such style.
+  fieldRowLabel: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s1,
+    fontSize: "0.9rem",
+    width: "100%",
+  },
+  studioMono: {
+    fontFamily: fonts.mono,
+  },
+  optionRow: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: space.s2,
+    width: "100%",
+  },
+  fieldTabs: {
+    display: "flex",
+    gap: space.s3,
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.border,
+    marginBottom: space.s2,
+  },
+  fieldTabButton: {
+    background: "none",
+    border: "none",
+    borderBottomWidth: 2,
+    borderBottomStyle: "solid",
+    borderBottomColor: "transparent",
+    paddingBlock: space.s1,
+    paddingInline: 0,
+    fontFamily: fonts.body,
+    color: colors.textMuted,
+    cursor: "pointer",
+  },
+  fieldTabButtonSelected: {
+    borderBottomColor: colors.accent,
+    color: colors.text,
+  },
+  fieldTabPanel: {
+    flexDirection: "column",
+    alignItems: "flex-start",
+    gap: space.s2,
+    width: "100%",
+  },
+  // `[hidden]`'s own UA default (`display: none`) wins with no override.
+  // This applies only while visible, the code-side equivalent of
+  // `.field-tab-panel:not([hidden]) { display: flex }` (D3).
+  fieldTabPanelVisible: {
+    display: "flex",
+  },
+  usageList: {
+    listStyle: "none",
+    margin: 0,
+    padding: 0,
+    width: "100%",
+  },
+  usageListItem: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: space.s2,
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.border,
+    paddingBlock: space.s1,
+    paddingInline: 0,
+  },
+  usageListItemLabel: {
+    flex: 1,
+  },
+  // `.field-preview, .field-usage { width: 100% }` combined: both
+  // `<details>` elements below share this one style.
+  fullWidthDetails: {
+    width: "100%",
+  },
+  detailsSummary: {
+    cursor: "pointer",
+    fontSize: "0.9rem",
+    fontWeight: 800,
+  },
+  fieldPreviewBody: {
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: colors.border,
+    padding: space.s3,
+    width: "100%",
+    marginTop: space.s2,
+  },
+  fieldLabelRow: {
+    display: "flex",
+    alignItems: "flex-end",
+    gap: space.s2,
+    width: "100%",
+  },
+  fieldLabelRowLabel: {
+    flex: 1,
+  },
+  fieldTranslationBadge: {
+    flex: "none",
+    fontSize: "0.8rem",
+    color: colors.textMuted,
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: colors.border,
+    paddingBlock: 2,
+    paddingInline: space.s2,
+  },
+  fieldZone: {
+    width: "100%",
+  },
+  // `.field-zone + .field-zone`: every zone but the first in its own tab
+  // panel. Each tab panel's own JSX applies this to every zone past the
+  // first, never to the first (D3's DOM-attribute-to-code-choice rule,
+  // generalized to a sibling-position selector).
+  fieldZoneBordered: {
+    borderTopWidth: 2,
+    borderTopStyle: "solid",
+    borderTopColor: colors.divider,
+    marginTop: space.s3,
+    paddingTop: space.s3,
+  },
+  fieldZoneHeading: {
+    marginBlockEnd: space.s2,
+    marginBlockStart: 0,
+    marginInline: 0,
+    fontSize: "0.9rem",
+    fontWeight: 800,
+  },
+  fieldTabRemove: {
+    width: "100%",
+    borderTopWidth: 2,
+    borderTopStyle: "solid",
+    borderTopColor: colors.divider,
+    marginTop: space.s3,
+    paddingTop: space.s3,
+  },
+  studioColumnMapping: {
+    marginTop: space.s3,
+    borderTopWidth: 1,
+    borderTopStyle: "solid",
+    borderTopColor: colors.border,
+    paddingTop: space.s2,
+  },
+  studioColumnMappingHeading: {
+    marginBlockEnd: space.s2,
+    marginBlockStart: 0,
+    marginInline: 0,
+    fontSize: 11,
+    letterSpacing: "0.05em",
+    textTransform: "uppercase",
+    color: colors.textMuted,
+  },
+  studioColumnMappingRow: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: space.s2,
+    flexWrap: "wrap",
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.border,
+    paddingBlock: space.s2,
+    paddingInline: 0,
+  },
+  studioColumnMappingRowSelect: {
+    fontFamily: fonts.mono,
+  },
+  studioWarning: {
+    color: colors.refusal,
+    borderLeftWidth: 3,
+    borderLeftStyle: "solid",
+    borderLeftColor: colors.accent400,
+    paddingLeft: space.s2,
+  },
+  // `.studio-column-mapping-row .studio-warning`: the stale-column warning
+  // takes the whole line under the row instead of squeezing beside three
+  // controls.
+  studioWarningInMappingRow: {
+    flexBasis: "100%",
+    margin: 0,
+  },
+  studioNote: {
+    color: colors.textMuted,
+    minHeight: "1.25rem",
+    marginBlockEnd: space.s2,
+    marginBlockStart: 0,
+    marginInline: 0,
+  },
+  studioDevview: {
+    marginBlock: space.s2,
+    marginInline: 0,
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: colors.border,
+    paddingBlock: space.s1,
+    paddingInline: space.s2,
+  },
+  studioDevviewSummary: {
+    cursor: "pointer",
+    color: colors.textMuted,
+    fontFamily: fonts.mono,
+    fontSize: "0.85rem",
+  },
+});
 
 const BASE_FIELD_TYPES: BaseFieldType[] = ["string", "number", "boolean", "list", "file", "group"];
 
@@ -79,7 +312,19 @@ function changeType(field: DraftField, raw: string, onChange: (patch: Partial<Dr
  * A type whose row allows no member hides that picker outright. An empty
  * picker states nothing, and a `file` field shows neither.
  */
-function FormatControlPickers({ field, onChange }: { field: DraftField; onChange: (patch: Partial<DraftField>) => void }) {
+function FormatControlPickers({
+  field,
+  onChange,
+  labelStyle,
+}: {
+  field: DraftField;
+  onChange: (patch: Partial<DraftField>) => void;
+  /** `SubFieldRow`'s own flat `.field-row` wraps this component inline, so
+   * its labels land as direct `.field-row` children too (`fieldRowLabel`,
+   * D9). `FieldEditor` nests it one level deeper, inside a tab panel, and
+   * passes nothing. */
+  labelStyle?: stylex.StyleXStyles;
+}) {
   const allowed = allowedForType(field.type);
   const format = field.format;
   const control = field.control;
@@ -87,10 +332,10 @@ function FormatControlPickers({ field, onChange }: { field: DraftField; onChange
     <>
       {allowed.formats.length > 0 && (
         <>
-          <label>
+          <label {...stylex.props(labelStyle)}>
             format
             <select
-              className="studio-mono"
+              {...stylex.props(styles.studioMono)}
               value={format ?? ""}
               onChange={(e) => onChange({ format: e.target.value === "" ? undefined : (e.target.value as FieldFormat) })}
             >
@@ -102,15 +347,15 @@ function FormatControlPickers({ field, onChange }: { field: DraftField; onChange
               ))}
             </select>
           </label>
-          {format !== undefined && <p className="studio-note">{FIELD_FORMAT_LABELS[format].note}</p>}
+          {format !== undefined && <p {...stylex.props(styles.studioNote)}>{FIELD_FORMAT_LABELS[format].note}</p>}
         </>
       )}
       {allowed.controls.length > 0 && (
         <>
-          <label>
+          <label {...stylex.props(labelStyle)}>
             control
             <select
-              className="studio-mono"
+              {...stylex.props(styles.studioMono)}
               value={control ?? ""}
               onChange={(e) => onChange({ control: e.target.value === "" ? undefined : (e.target.value as FieldControl) })}
             >
@@ -122,7 +367,7 @@ function FormatControlPickers({ field, onChange }: { field: DraftField; onChange
               ))}
             </select>
           </label>
-          {control !== undefined && <p className="studio-note">{FIELD_CONTROL_LABELS[control].note}</p>}
+          {control !== undefined && <p {...stylex.props(styles.studioNote)}>{FIELD_CONTROL_LABELS[control].note}</p>}
         </>
       )}
     </>
@@ -224,17 +469,17 @@ function SubFieldRow({ field, dataSources, lists, mutate, onChange, onRemove }: 
   return (
     // The anchor the shared modal's rail scrolls to. Recursive, so a nested
     // group child carries its own id and the rail reaches it too.
-    <div className="field-row" id={field.id === undefined ? undefined : `field-row-${field.id}`}>
-      <label>
+    <div {...stylex.props(styles.fieldRow)} id={field.id === undefined ? undefined : `field-row-${field.id}`}>
+      <label {...stylex.props(styles.fieldRowLabel)}>
         key
         <input
           type="text"
-          className="studio-mono"
+          {...stylex.props(styles.studioMono)}
           value={field.key ?? ""}
           onChange={(e) => onChange({ key: e.target.value })}
         />
       </label>
-      <label>
+      <label {...stylex.props(styles.fieldRowLabel)}>
         label
         <LocalizedTextInput value={field.label} onChange={updateLabel} />
       </label>
@@ -242,20 +487,20 @@ function SubFieldRow({ field, dataSources, lists, mutate, onChange, onRemove }: 
           phrasing content, and the design language keeps a field's own
           messages beside the label. */}
       {missingTranslationWarning(field.label, contentLocale, draft.baseLocale) && (
-        <p className="studio-warning">{missingTranslationWarning(field.label, contentLocale, draft.baseLocale)}</p>
+        <p {...stylex.props(styles.studioWarning)}>{missingTranslationWarning(field.label, contentLocale, draft.baseLocale)}</p>
       )}
-      <label>
+      <label {...stylex.props(styles.fieldRowLabel)}>
         description
         <LocalizedTextInput value={field.description} onChange={(description) => onChange({ description })} />
       </label>
       {missingTranslationWarning(field.description, contentLocale, draft.baseLocale) && (
-        <p className="studio-warning">
+        <p {...stylex.props(styles.studioWarning)}>
           {missingTranslationWarning(field.description, contentLocale, draft.baseLocale)}
         </p>
       )}
-      <label>
+      <label {...stylex.props(styles.fieldRowLabel)}>
         type
-        <select className="studio-mono" value={typeSelectValue} onChange={(e) => changeType(field, e.target.value, onChange)}>
+        <select {...stylex.props(styles.studioMono)} value={typeSelectValue} onChange={(e) => changeType(field, e.target.value, onChange)}>
           {BASE_FIELD_TYPES.map((bft) => (
             <option key={bft} value={bft}>
               {bft}
@@ -264,8 +509,8 @@ function SubFieldRow({ field, dataSources, lists, mutate, onChange, onRemove }: 
           <option value="__custom__">{t("fieldCatalog.customTypeOption")}</option>
         </select>
       </label>
-      <FormatControlPickers field={field} onChange={onChange} />
-      <label className="studio-field-technical">
+      <FormatControlPickers field={field} onChange={onChange} labelStyle={styles.fieldRowLabel} />
+      <label className="studio-field-technical" {...stylex.props(styles.fieldRowLabel)}>
         {t("fieldCatalog.technicalLabel")}
         <input
           type="checkbox"
@@ -276,8 +521,8 @@ function SubFieldRow({ field, dataSources, lists, mutate, onChange, onRemove }: 
       </label>
 
       {custom && (
-        <details className="studio-devview">
-          <summary>{t("fieldCatalog.developerView")}</summary>
+        <details {...stylex.props(styles.studioDevview)}>
+          <summary {...stylex.props(styles.studioDevviewSummary)}>{t("fieldCatalog.developerView")}</summary>
           <PluginEnvelopeEditor
             label={t("fieldCatalog.customTypeLabel")}
             value={field.type as DraftOf<FieldDef>["type"] & object}
@@ -311,7 +556,7 @@ function SubFieldRow({ field, dataSources, lists, mutate, onChange, onRemove }: 
             const optionWarning = missingTranslationWarning(opt.label, contentLocale, draft.baseLocale);
             return (
               <Fragment key={i}>
-                <div className="option-row">
+                <div {...stylex.props(styles.optionRow)}>
                   <input
                     type="text"
                     placeholder={t("fieldCatalog.optionValuePlaceholder")}
@@ -329,7 +574,7 @@ function SubFieldRow({ field, dataSources, lists, mutate, onChange, onRemove }: 
                     {t("fieldCatalog.removeOption")}
                   </button>
                 </div>
-                {optionWarning && <p className="studio-warning">{optionWarning}</p>}
+                {optionWarning && <p {...stylex.props(styles.studioWarning)}>{optionWarning}</p>}
               </Fragment>
             );
           })}
@@ -343,16 +588,17 @@ function SubFieldRow({ field, dataSources, lists, mutate, onChange, onRemove }: 
             chosen row then writes. Hidden where a mapping cannot publish, and
             hiding it never deletes what the field already carries. */}
         {showsColumnMapping(field, dataSources) && (
-          <div className="studio-column-mapping">
-            <p className="studio-column-mapping-heading">{t("columnMapping.heading")}</p>
+          <div {...stylex.props(styles.studioColumnMapping)}>
+            <p {...stylex.props(styles.studioColumnMappingHeading)}>{t("columnMapping.heading")}</p>
             {columns.length === 0 ? (
-              <p className="studio-note">{t("columnMapping.noColumns")}</p>
+              <p {...stylex.props(styles.studioNote)}>{t("columnMapping.noColumns")}</p>
             ) : (
               <>
                 {mappingRows.map((row) => (
-                  <div className="studio-column-mapping-row" key={row.column}>
+                  <div {...stylex.props(styles.studioColumnMappingRow)} key={row.column}>
                     <select
                       aria-label={t("columnMapping.columnAria")}
+                      {...stylex.props(styles.studioColumnMappingRowSelect)}
                       value={row.column}
                       onChange={(e) => renameMapping(row.column, e.target.value)}
                     >
@@ -368,6 +614,7 @@ function SubFieldRow({ field, dataSources, lists, mutate, onChange, onRemove }: 
                     <span aria-hidden="true">-&gt;</span>
                     <select
                       aria-label={t("columnMapping.targetAria")}
+                      {...stylex.props(styles.studioColumnMappingRowSelect)}
                       value={row.target}
                       onChange={(e) => setMapping(row.column, e.target.value)}
                     >
@@ -381,7 +628,9 @@ function SubFieldRow({ field, dataSources, lists, mutate, onChange, onRemove }: 
                     <button type="button" className="btn btn-secondary" onClick={() => removeMapping(row.column)}>
                       {t("columnMapping.removeRow")}
                     </button>
-                    {row.stale && <p className="studio-warning">{t("columnMapping.staleColumn")}</p>}
+                    {row.stale && (
+                      <p {...stylex.props(styles.studioWarning, styles.studioWarningInMappingRow)}>{t("columnMapping.staleColumn")}</p>
+                    )}
                   </div>
                 ))}
                 <button type="button" className="btn btn-secondary" onClick={addMapping} disabled={unmapped === undefined}>
@@ -568,10 +817,10 @@ function FieldEditor({ field, dataSources, lists, focusFieldId, onChange, onRemo
   };
 
   return (
-    <div className="field-row" id={field.id === undefined ? undefined : `field-row-${field.id}`}>
+    <div {...stylex.props(styles.fieldRow)} id={field.id === undefined ? undefined : `field-row-${field.id}`}>
       <IssueList entityId={field.id} />
 
-      <div className="field-tabs" role="tablist" aria-label={t("fieldCatalog.tabsLabel")}>
+      <div {...stylex.props(styles.fieldTabs)} role="tablist" aria-label={t("fieldCatalog.tabsLabel")}>
         {FIELD_TABS.map((tab) => (
           <button
             key={tab}
@@ -579,24 +828,25 @@ function FieldEditor({ field, dataSources, lists, focusFieldId, onChange, onRemo
             role="tab"
             aria-selected={activeTab === tab}
             onClick={() => setActiveTab(tab)}
+            {...stylex.props(styles.fieldTabButton, activeTab === tab && styles.fieldTabButtonSelected)}
           >
             {t(TAB_LABEL[tab])}
           </button>
         ))}
       </div>
 
-      <div hidden={activeTab !== "field"} className="field-tab-panel">
+      <div hidden={activeTab !== "field"} {...stylex.props(styles.fieldTabPanel, activeTab === "field" && styles.fieldTabPanelVisible)}>
         <label>
           key
           <input
             type="text"
-            className="studio-mono"
+            {...stylex.props(styles.studioMono)}
             value={field.key ?? ""}
             onChange={(e) => onChange({ key: e.target.value })}
           />
         </label>
-        <div className="field-label-row">
-          <label className="field-label-row-label">
+        <div {...stylex.props(styles.fieldLabelRow)}>
+          <label {...stylex.props(styles.fieldLabelRowLabel)}>
             label
             <LocalizedTextInput value={field.label} onChange={updateLabel} />
           </label>
@@ -604,7 +854,7 @@ function FieldEditor({ field, dataSources, lists, focusFieldId, onChange, onRemo
               (design.md decision 1): names only the active contentLocale's
               own gap, since the content-locale switcher now carries the
               draft-wide per-locale count. */}
-          <span className="field-translation-badge">
+          <span {...stylex.props(styles.fieldTranslationBadge)}>
             {contentLocale === baseLocale
               ? t("fieldCatalog.baseLocaleMark")
               : fieldLocaleGaps(field, contentLocale, baseLocale) === 0
@@ -613,20 +863,20 @@ function FieldEditor({ field, dataSources, lists, focusFieldId, onChange, onRemo
           </span>
         </div>
         {missingTranslationWarning(field.label, contentLocale, draft.baseLocale) && (
-          <p className="studio-warning">{missingTranslationWarning(field.label, contentLocale, draft.baseLocale)}</p>
+          <p {...stylex.props(styles.studioWarning)}>{missingTranslationWarning(field.label, contentLocale, draft.baseLocale)}</p>
         )}
         <label>
           description
           <LocalizedTextInput value={field.description} onChange={(description) => onChange({ description })} />
         </label>
         {missingTranslationWarning(field.description, contentLocale, draft.baseLocale) && (
-          <p className="studio-warning">
+          <p {...stylex.props(styles.studioWarning)}>
             {missingTranslationWarning(field.description, contentLocale, draft.baseLocale)}
           </p>
         )}
         <label>
           type
-          <select className="studio-mono" value={typeSelectValue} onChange={(e) => changeType(field, e.target.value, onChange)}>
+          <select {...stylex.props(styles.studioMono)} value={typeSelectValue} onChange={(e) => changeType(field, e.target.value, onChange)}>
             {BASE_FIELD_TYPES.map((bft) => (
               <option key={bft} value={bft}>
                 {FIELD_TYPE_LABELS[bft].name}
@@ -635,7 +885,7 @@ function FieldEditor({ field, dataSources, lists, focusFieldId, onChange, onRemo
             <option value="__custom__">{t("fieldCatalog.customTypeOption")}</option>
           </select>
         </label>
-        {typeof field.type === "string" && <p className="studio-note">{FIELD_TYPE_LABELS[field.type].note}</p>}
+        {typeof field.type === "string" && <p {...stylex.props(styles.studioNote)}>{FIELD_TYPE_LABELS[field.type].note}</p>}
         <FormatControlPickers field={field} onChange={onChange} />
         <label className="studio-field-technical">
           {t("fieldCatalog.technicalLabel")}
@@ -648,8 +898,8 @@ function FieldEditor({ field, dataSources, lists, focusFieldId, onChange, onRemo
         </label>
 
         {custom && (
-          <details className="studio-devview">
-            <summary>{t("fieldCatalog.developerView")}</summary>
+          <details {...stylex.props(styles.studioDevview)}>
+            <summary {...stylex.props(styles.studioDevviewSummary)}>{t("fieldCatalog.developerView")}</summary>
             <PluginEnvelopeEditor
               label={t("fieldCatalog.customTypeLabel")}
               value={field.type as DraftOf<FieldDef>["type"] & object}
@@ -679,30 +929,30 @@ function FieldEditor({ field, dataSources, lists, focusFieldId, onChange, onRemo
         )}
 
         {preview && (
-          <details className="field-preview">
-            <summary>{t("fieldCatalog.previewHeading")}</summary>
-            {previewNote !== undefined && <p className="studio-note">{t(previewNote)}</p>}
+          <details {...stylex.props(styles.fullWidthDetails)}>
+            <summary {...stylex.props(styles.detailsSummary)}>{t("fieldCatalog.previewHeading")}</summary>
+            {previewNote !== undefined && <p {...stylex.props(styles.studioNote)}>{t(previewNote)}</p>}
             {/* Sample controls take no keyboard or pointer interaction — every
                 synthesized entry is already forced `readonly`, and `inert`
                 additionally takes the whole container out of the tab order
                 and the accessibility tree, rather than inventing a
                 non-interactive landmark pattern (design.md decision 5). */}
-            <div className="field-preview-body" inert>
+            <div {...stylex.props(styles.fieldPreviewBody)} inert>
               <FieldForm fields={preview.fields} values={preview.values} onChange={() => {}} locale={contentLocale} />
             </div>
           </details>
         )}
 
-        <details className="field-usage">
-          <summary>{t("fieldCatalog.usedInHeading")}</summary>
+        <details {...stylex.props(styles.fullWidthDetails)}>
+          <summary {...stylex.props(styles.detailsSummary)}>{t("fieldCatalog.usedInHeading")}</summary>
           {usage.length === 0 ? (
-            <p className="studio-note">{t("fieldCatalog.usedInEmpty")}</p>
+            <p {...stylex.props(styles.studioNote)}>{t("fieldCatalog.usedInEmpty")}</p>
           ) : (
-            <ul>
+            <ul {...stylex.props(styles.usageList)}>
               {usage.map((row) => (
-                <li key={row.stepId}>
-                  <span>{row.stepLabel || t("steps.unnamedStep")}</span>
-                  <span className="studio-mono">{row.modes.join(", ")}</span>
+                <li key={row.stepId} {...stylex.props(styles.usageListItem)}>
+                  <span {...stylex.props(styles.usageListItemLabel)}>{row.stepLabel || t("steps.unnamedStep")}</span>
+                  <span {...stylex.props(styles.studioMono)}>{row.modes.join(", ")}</span>
                   <button type="button" className="btn btn-secondary" onClick={() => onShowStep(row.stepId)}>
                     {t("fieldCatalog.showOnCanvas")}
                   </button>
@@ -712,16 +962,16 @@ function FieldEditor({ field, dataSources, lists, focusFieldId, onChange, onRemo
           )}
         </details>
 
-        <div className="field-tab-remove">
+        <div {...stylex.props(styles.fieldTabRemove)}>
           <button type="button" className="btn btn-ghost" onClick={onRemove}>
             {t("fieldCatalog.removeField")}
           </button>
         </div>
       </div>
 
-      <div hidden={activeTab !== "values"} className="field-tab-panel">
-        <div className="field-zone">
-          <h4 className="field-zone-heading">{t("fieldCatalog.whereValuesHeading")}</h4>
+      <div hidden={activeTab !== "values"} {...stylex.props(styles.fieldTabPanel, activeTab === "values" && styles.fieldTabPanelVisible)}>
+        <div {...stylex.props(styles.fieldZone)}>
+          <h4 {...stylex.props(styles.fieldZoneHeading)}>{t("fieldCatalog.whereValuesHeading")}</h4>
           <fieldset>
             <label>
               dataSource
@@ -743,7 +993,7 @@ function FieldEditor({ field, dataSources, lists, focusFieldId, onChange, onRemo
                 const optionWarning = missingTranslationWarning(opt.label, contentLocale, draft.baseLocale);
                 return (
                   <Fragment key={i}>
-                    <div className="option-row">
+                    <div {...stylex.props(styles.optionRow)}>
                       <input
                         type="text"
                         placeholder={t("fieldCatalog.optionValuePlaceholder")}
@@ -761,7 +1011,7 @@ function FieldEditor({ field, dataSources, lists, focusFieldId, onChange, onRemo
                         {t("fieldCatalog.removeOption")}
                       </button>
                     </div>
-                    {optionWarning && <p className="studio-warning">{optionWarning}</p>}
+                    {optionWarning && <p {...stylex.props(styles.studioWarning)}>{optionWarning}</p>}
                   </Fragment>
                 );
               })}
@@ -772,22 +1022,23 @@ function FieldEditor({ field, dataSources, lists, focusFieldId, onChange, onRemo
           </fieldset>
         </div>
 
-        <div className="field-zone">
-          <h4 className="field-zone-heading">{t("defaultValue.heading")}</h4>
+        <div {...stylex.props(styles.fieldZone, styles.fieldZoneBordered)}>
+          <h4 {...stylex.props(styles.fieldZoneHeading)}>{t("defaultValue.heading")}</h4>
           <DefaultValueEditor field={field} onChange={(next) => onChange({ default: next })} />
         </div>
 
         {showsColumnMapping(field, dataSources) && (
-          <div className="field-zone">
-            <h4 className="field-zone-heading">{t("columnMapping.heading")}</h4>
+          <div {...stylex.props(styles.fieldZone, styles.fieldZoneBordered)}>
+            <h4 {...stylex.props(styles.fieldZoneHeading)}>{t("columnMapping.heading")}</h4>
             {columns.length === 0 ? (
-              <p className="studio-note">{t("columnMapping.noColumns")}</p>
+              <p {...stylex.props(styles.studioNote)}>{t("columnMapping.noColumns")}</p>
             ) : (
               <>
                 {mappingRows.map((row) => (
-                  <div className="studio-column-mapping-row" key={row.column}>
+                  <div {...stylex.props(styles.studioColumnMappingRow)} key={row.column}>
                     <select
                       aria-label={t("columnMapping.columnAria")}
+                      {...stylex.props(styles.studioColumnMappingRowSelect)}
                       value={row.column}
                       onChange={(e) => renameMapping(row.column, e.target.value)}
                     >
@@ -801,6 +1052,7 @@ function FieldEditor({ field, dataSources, lists, focusFieldId, onChange, onRemo
                     <span aria-hidden="true">-&gt;</span>
                     <select
                       aria-label={t("columnMapping.targetAria")}
+                      {...stylex.props(styles.studioColumnMappingRowSelect)}
                       value={row.target}
                       onChange={(e) => setMapping(row.column, e.target.value)}
                     >
@@ -814,7 +1066,9 @@ function FieldEditor({ field, dataSources, lists, focusFieldId, onChange, onRemo
                     <button type="button" className="btn btn-secondary" onClick={() => removeMapping(row.column)}>
                       {t("columnMapping.removeRow")}
                     </button>
-                    {row.stale && <p className="studio-warning">{t("columnMapping.staleColumn")}</p>}
+                    {row.stale && (
+                      <p {...stylex.props(styles.studioWarning, styles.studioWarningInMappingRow)}>{t("columnMapping.staleColumn")}</p>
+                    )}
                   </div>
                 ))}
                 <button type="button" className="btn btn-secondary" onClick={addMapping} disabled={unmapped === undefined}>
@@ -826,21 +1080,21 @@ function FieldEditor({ field, dataSources, lists, focusFieldId, onChange, onRemo
         )}
       </div>
 
-      <div hidden={activeTab !== "rules"} className="field-tab-panel">
-        <div className="field-zone">
-          <h4 className="field-zone-heading">{t("fieldCatalog.onlyAskWhenHeading")}</h4>
+      <div hidden={activeTab !== "rules"} {...stylex.props(styles.fieldTabPanel, activeTab === "rules" && styles.fieldTabPanelVisible)}>
+        <div {...stylex.props(styles.fieldZone)}>
+          <h4 {...stylex.props(styles.fieldZoneHeading)}>{t("fieldCatalog.onlyAskWhenHeading")}</h4>
           {visibleState.kind === "none" ? (
-            <p className="studio-note">{t("fieldCatalog.conditionNoSteps")}</p>
+            <p {...stylex.props(styles.studioNote)}>{t("fieldCatalog.conditionNoSteps")}</p>
           ) : (
             <>
-              <p className="studio-note">
+              <p {...stylex.props(styles.studioNote)}>
                 {t("fieldCatalog.conditionScopeNote").replace(
                   "{steps}",
                   visibleState.stepIds.map((id) => usageStepLabel(usage, id)).join(", "),
                 )}
               </p>
               {visibleState.kind === "divergent" && (
-                <p className="studio-warning">
+                <p {...stylex.props(styles.studioWarning)}>
                   {t("fieldCatalog.conditionDivergentNote").replace(
                     "{steps}",
                     visibleState.stepIds.map((id) => usageStepLabel(usage, id)).join(", "),
@@ -848,7 +1102,7 @@ function FieldEditor({ field, dataSources, lists, focusFieldId, onChange, onRemo
                 </p>
               )}
               {visibleState.kind === "divergent" && visibleState.literalStepIds.length > 0 && (
-                <p className="studio-warning">
+                <p {...stylex.props(styles.studioWarning)}>
                   {t("fieldCatalog.conditionLiteralNote").replace(
                     "{steps}",
                     visibleState.literalStepIds.map((id) => usageStepLabel(usage, id)).join(", "),
@@ -864,8 +1118,8 @@ function FieldEditor({ field, dataSources, lists, focusFieldId, onChange, onRemo
           )}
         </div>
 
-        <div className="field-zone">
-          <h4 className="field-zone-heading">{t("fieldCatalog.validationHeading")}</h4>
+        <div {...stylex.props(styles.fieldZone, styles.fieldZoneBordered)}>
+          <h4 {...stylex.props(styles.fieldZoneHeading)}>{t("fieldCatalog.validationHeading")}</h4>
           <FieldValidationEditor field={field} validation={field.validation} onChange={(validation) => onChange({ validation })} />
         </div>
       </div>
@@ -906,7 +1160,7 @@ export function FieldCatalogPanel({ token, selectedId, focusFieldId, onAdd, onRe
 
   return (
     <div className="field-catalog-panel">
-      <h3>{t("fieldCatalog.heading")}</h3>
+      <h3 {...stylex.props(styles.panelHeading)}>{t("fieldCatalog.heading")}</h3>
       {field === undefined ? (
         <p className="empty">{t("fieldCatalog.empty")}</p>
       ) : (
