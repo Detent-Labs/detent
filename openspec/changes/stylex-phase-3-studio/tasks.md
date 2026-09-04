@@ -286,7 +286,7 @@
 
 ## 9. Cleanup
 
-- [ ] 9.1 Verify no stray `studio-*`/bare-class reference survives
+- [x] 9.1 Verify no stray `studio-*`/bare-class reference survives
   outside `canvas/`. That proves it is safe to delete `app.css`'s
   remaining non-canvas rules in one pass (D11).
 
@@ -298,7 +298,19 @@
   packages/web/src/areas/studio/ --include='*.tsx'`.
 
   Exclude `canvas/` from the result by eye. It returns 0.
-- [ ] 9.2 Delete every rule `app.css` still carries outside its
+
+  This repo's git rejects `--include` as an unknown option. Used a
+  glob pathspec instead: `-- 'packages/web/src/areas/studio/**/
+  *.tsx'`, piped through `grep -v '/canvas/'`. Seven matches remain,
+  all already-confirmed dead classes with no live reference:
+  `DataSourcesPanel.tsx` (`data-sources-panel`),
+  `FieldCatalogPanel.tsx` (`studio-field-technical` twice,
+  `field-catalog-panel`), `FieldMatrixGrid.tsx`
+  (`studio-matrix-row-technical`), `JsonView.tsx`
+  (`studio-json-view`), `StepsPanel.tsx` (`steps-panel` twice),
+  `ConditionBuilder.tsx` (`condition-builder` twice), `PlayerScreen.tsx`
+  (`studio-player-form` and `studio-player-record`). Zero live strays.
+- [x] 9.2 Delete every rule `app.css` still carries outside its
   `.canvas-*`-prefixed set, in one pass, except two permanent keepers.
   Every group left its own migrated rules in place on purpose (D11).
   Task 9.1 just confirmed nothing outside `canvas/` still depends on
@@ -312,19 +324,37 @@
 
   Re-run the rule-count grep from task 1.1. Unlike every earlier
   phase, this file does not shrink to a single literal block. Canvas
-  has no stylesheet of its own, so `app.css` keeps its 50 `.canvas-*`
-  rules for phase 4.
+  has no stylesheet of its own, so `app.css` keeps rules for phase 4.
 
-  Verify: it now finds 52 distinct rule blocks. `.canvas-*` prefixes
-  50 of them. Two more classes ride along too, `.canvas-group-name`
-  and `.canvas-edge-focus-halo`, D2's deferral and phase 4's own
-  duplicate. The 51st and 52nd are the
-  reduced-motion block and `.studio-dialog::backdrop`, this phase's
-  own two permanent keepers. Also verify: `bun run typecheck` and
-  `bun run build` both pass.
-- [ ] 9.3 Verify `tokens.css`'s `.btn` family and `app.css`'s
+  This task's own prediction (52 total, 50 `.canvas-*`-prefixed) was
+  wrong, not the deletion. D14 (design.md) found the `.canvas-*`
+  prefix is not the real phase 4 boundary. Five prefixed rules
+  (`.canvas-inspector`, `.canvas-selection` and its three
+  descendants) are `EditScreen.tsx`'s own. Group 8 already converted
+  them away.
+
+  Ten unprefixed rules (`.studio-palette-*`, `.studio-rail*`) belong
+  to `canvas/EditRail.tsx` alone. The original 314 wrongly counted
+  those ten. The corrected pass deletes the five and keeps the ten.
+
+  Verify: the rule-count grep now finds 58 distinct rule blocks, 45
+  of them `.canvas-*`-prefixed. The other 13 are the ten
+  `canvas/EditRail.tsx` rules above, `.studio-dialog::backdrop`, and
+  the reduced-motion block. That block's own nested `* { }` line
+  counts as its own line under this grep. Also verify: `bun run
+  typecheck` and `bun run build` both pass. Both did.
+- [x] 9.3 Verify `tokens.css`'s `.btn` family and `app.css`'s
   `.canvas-*` rules stay byte-identical to the commit before this
   phase started. This change touches neither (D1).
+
+  `tokens.css` carries no diff against `HEAD` at all: `git diff HEAD
+  -- packages/web/src/shell/tokens.css` prints nothing. For
+  `app.css`, the same prune script that produced task 9.2's result
+  ran again, against the pre-phase-3 baseline
+  (`0bba8c6:packages/web/src/areas/studio/app.css`). Its own kept set
+  from that baseline diffed byte-for-byte identical against the
+  committed file. Every surviving rule keeps its pre-phase bytes,
+  including the fifteen D14 reclassified.
 
 ## 10. Docs and roadmap
 

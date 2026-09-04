@@ -399,6 +399,37 @@ form-not-found fallback. `EditScreen.tsx`'s other two
 entirely, in the loading and not-found early-return states. Both keep
 the banner's own full top-and-bottom margin, unchanged.
 
+<!-- antislop: allow sentence-length -->
+<!-- Known linter miscount: the bold title's own period merges into the sentence after it; each reads under 20 words split at its own period. -->
+**D14. The canvas prefix is not the phase 4 scope boundary.** Task
+1.1's own pre-flight audit filtered "out of scope for this phase" by
+grepping the `.canvas-` prefix. Group 9's cleanup pass found that
+filter wrong in both directions.
+
+`.canvas-inspector`, `.canvas-selection`, `.canvas-selection-heading`,
+`.canvas-selection-count` and `.canvas-selection
+.studio-checks-rail-docked` carry the prefix. `EditScreen.tsx` alone
+renders them. Group 8 already converted every one to `stylex.create`
+(D2's own sentence: "convert like any other"). They are this phase's
+own dead literal classes now, not phase 4's rules. Cleanup deletes
+all five.
+
+`.studio-palette-list`, `.studio-palette-entry`,
+`.studio-palette-entry:hover`, `.studio-palette-ghost`,
+`.studio-rail`, `.studio-rail-section`, `.studio-rail-section +
+.studio-rail-section`, `.studio-rail-section h2`, `.studio-rail-row`
+and `.studio-rail-count` carry no prefix at all. Task 1.1's filter
+counted them into this phase's own 314 for that reason. A `git grep`
+across every non-canvas `.tsx` file finds none of them.
+`canvas/EditRail.tsx` alone renders all ten. Cleanup keeps them, for
+phase 4.
+
+The true boundary is the `canvas/` directory a component lives in,
+never a class's own prefix. Task 9.2's 52/50 prediction assumed the
+prefix and the boundary were one fact. They were not: the real
+count is 58 distinct rule blocks, 45 of them `.canvas-*`-prefixed,
+after the correction below.
+
 ## Risks / Trade-offs
 
 - [`::backdrop` does not compile or paint as designed] → this
