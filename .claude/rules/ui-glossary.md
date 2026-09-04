@@ -30,11 +30,11 @@ whichever area is open and renders the same header row around it every time.
 
 | Term | Names | Lives in |
 |---|---|---|
-| header | the one fixed row atop every area, holding the register tab, the area nav and the account group | `Chrome.tsx`, `.shell-header` |
-| register tab | the label naming the open area, at the header's left edge; full definition in `design-language.md` | `.shell-tab` |
+| header | the one fixed row atop every area, holding the register tab, the area nav and the account group | `Chrome.tsx` |
+| register tab | the label naming the open area, at the header's left edge; full definition in `design-language.md` | `Chrome.tsx` |
 | area nav | the open area's own navigation buttons, right of the register tab | passed into `Chrome` as its `nav` prop |
-| account group | the identity span and the account menu trigger, right-aligned in the header | `.shell-account-group` |
-| account menu | the popover the account group opens: profile, language, area switch, logout | `.shell-menu` |
+| account group | the identity span and the account menu trigger, right-aligned in the header | `Chrome.tsx` |
+| account menu | the popover the account group opens: profile, language, area switch, logout | `Chrome.tsx` |
 
 The area switch lives inside the account menu, not as a persistent tab row.
 The switcher filters the current area out of the actor's permitted set. An
@@ -50,9 +50,9 @@ surface.
 
 | Term | Names | Lives in |
 |---|---|---|
-| screen nav | the row above the header bar: Back to processes, Versions, Player | `.studio-header-nav` |
-| header bar | the process-identity row: name, key, revision, dirty/saved state, the `⋮` menu | `panels/ProcessHeaderBar.tsx`, `.studio-header-bar` |
-| surface toggle | the Structure/JSON switch, inside the header bar | `.studio-surface-toggle` |
+| screen nav | the row above the header bar: Back to processes, Versions, Player | `EditScreen.tsx` |
+| header bar | the process-identity row: name, key, revision, dirty/saved state, the `⋮` menu | `panels/ProcessHeaderBar.tsx` |
+| surface toggle | the Structure/JSON switch, inside the header bar | `EditScreen.tsx`, passed into `ProcessHeaderBar` as its `surfaceToggle` prop |
 | structure surface | the editing view: edit rail, canvas, inspector or checks rail, dock | `EditScreen.tsx`, `surface === "structure"` |
 | JSON surface | the raw definition view, the structure surface's one alternative | `panels/JsonView.tsx` |
 
@@ -62,13 +62,13 @@ below belongs to the structure surface alone.
 | Term | Names | Lives in |
 |---|---|---|
 | canvas | the graph surface an author draws a process on | `canvas/CanvasView.tsx` |
-| edit rail | the column left of the canvas, holding the palette and the process links | `canvas/EditRail.tsx`, `.studio-rail` |
-| palette | the edit rail's "Add to canvas" section: drag a Step, Subprocess or End onto the canvas | `.studio-palette-list` |
-| process links | the edit rail's "Process" section: one row per panels-screen view, each with a count | `.studio-rail-row` |
-| inspector | the `<aside>` beside the canvas, editing one selected step or path | `EditScreen.tsx`, `.canvas-inspector` |
-| identity zone | the inspector's always-visible top zone: key, label, description, performed-by, and the view button | `panels/StepsPanel.tsx`, `.step-identity-zone` |
-| behavior zone | the inspector's tab row: Assignment, Paths, Actions, Timers, and Subprocess when it applies | `panels/StepsPanel.tsx`, `.step-behavior-tabs` |
-| diagnostics drawer | the inspector's bottom zone: the issue count, the "View raw JSON" toggle, and the docked checks rail | `panels/StepsPanel.tsx`, `.step-diagnostics` |
+| edit rail | the column left of the canvas, holding the palette and the process links | `canvas/EditRail.tsx` |
+| palette | the edit rail's "Add to canvas" section: drag a Step, Subprocess or End onto the canvas | `canvas/EditRail.tsx`, its `paletteList` style |
+| process links | the edit rail's "Process" section: one row per panels-screen view, each with a count | `canvas/EditRail.tsx`, its `railRow` style |
+| inspector | the `<aside>` beside the canvas, editing one selected step or path | `EditScreen.tsx` |
+| identity zone | the inspector's always-visible top zone: key, label, description, performed-by, and the view button | `panels/StepsPanel.tsx` |
+| behavior zone | the inspector's tab row: Assignment, Paths, Actions, Timers, and Subprocess when it applies | `panels/StepsPanel.tsx` |
+| diagnostics drawer | the inspector's bottom zone: the issue count, the "View raw JSON" toggle, and the docked checks rail | `panels/StepsPanel.tsx` |
 | checks rail | the validation issue list, grouped by check | `panels/ChecksRail.tsx` |
 | dock | the collapsible strip below the canvas columns | `dock/EditorDock.tsx` |
 | dock tab | one of the dock's three views: Changes, Field matrix, Paths. The Field matrix tab mounts `FieldMatrixGrid`, the bare grid, with no toolbar | `dock/EditorDock.tsx`, `DOCK_TABS` |
@@ -83,10 +83,10 @@ the checks rail.
 | Term | Names | Lives in |
 |---|---|---|
 | panels screen | the routed screen holding the four process-wide views | `screens/PanelsScreen.tsx` |
-| panels screen header | the top bar: Back to canvas, the open view's name, a save-with-draft note | `.studio-panels-screen-header` |
-| index rail | the left column: one entry per view, with a count and an issue badge | `.studio-panels-rail` |
-| rail sublist | the index rail's own entry list, under the fields or data sources view alone: one row per entity | `.studio-panels-rail-sublist` |
-| open view | the center column: whichever of the four views is not `hidden` | `.studio-panels-screen-view` |
+| panels screen header | the top bar: Back to canvas, the open view's name, a save-with-draft note | `screens/PanelsScreen.tsx` |
+| index rail | the left column: one entry per view, with a count and an issue badge | `screens/PanelsScreen.tsx`, its `panelsRail` style |
+| rail sublist | the index rail's own entry list, under the fields or data sources view alone: one row per entity | `screens/PanelsScreen.tsx` |
+| open view | the center column: whichever of the four views is not `hidden` | `screens/PanelsScreen.tsx`, its `openView` prop |
 | field catalog | the open view that lists and edits the process's field definitions | `panels/FieldCatalogPanel.tsx` |
 | field tabs | the Field / Values / Rules tab set inside the field catalog's editor, for the one selected top-level field | `panels/FieldCatalogPanel.tsx`, `FieldEditor` |
 | data sources | the open view that lists and edits the process's data source definitions | `panels/DataSourcesPanel.tsx` |
@@ -130,10 +130,10 @@ once an instance is open.
 |---|---|---|
 | player | the routed screen that drives one instance for preview | `screens/PlayerScreen.tsx` |
 | instance access | the `<fieldset>` above the panes: create a new instance, or open one by id | `PlayerScreen.tsx` |
-| form pane | the left pane: the status line, the step form, the claim controls, the path buttons | `.studio-player-form` |
+| form pane | the left pane: the status line, the step form, the claim controls, the path buttons | `PlayerScreen.tsx` |
 | step form | the field-by-field renderer both the player and the app area's Task screen mount | `FieldForm`, `packages/form-ui` |
 | path buttons | the manual-path submit controls below the step form | `PathButtons`, `packages/form-ui` |
-| record pane | the right pane: the open instance's merged transition/event history | `.studio-player-record` |
+| record pane | the right pane: the open instance's merged transition/event history | `PlayerScreen.tsx` |
 
 The record pane shows the same merged record the admin area's instance
 detail shows, from one shared function: `describeRecordElement`.
@@ -158,8 +158,8 @@ contract, and the field matrix. The component name carries the word
 
 **dock** names the strip below the canvas columns, and nothing else. It is a
 noun here. Several live specs still use "dock" as a verb for the collapsed
-checks rail. The class `.studio-checks-rail-docked` carries that verb too.
-Neither reading names the strip.
+checks rail. `ChecksRail.tsx`'s own compiled style for that presentation
+carries the same verb in its name. Neither reading names the strip.
 
 The checks rail renders in three places. It sits beside the canvas in full
 until an author selects a step. The inspector then shows a second instance,

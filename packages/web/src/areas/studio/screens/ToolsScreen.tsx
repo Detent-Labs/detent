@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import * as stylex from "@stylexjs/stylex";
+import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { checkAgainstFields } from "workflow-engine/cel/check";
 import { getRegistry, listProcesses, listVersions, getDraft, getVersionBody } from "../api/client.js";
 import type { ProcessSummary, VersionSummary, RegistryInfo } from "../api/types.js";
@@ -7,6 +9,68 @@ import type { Route } from "../routing.js";
 import { describeCaughtError } from "../errors.js";
 import { t } from "../catalog.js";
 import { useFail } from "../../../shell/useFail.js";
+
+const styles = stylex.create({
+  studioScreen: {
+    maxWidth: "60rem",
+    marginInline: "auto",
+    marginBlock: 0,
+    paddingTop: space.s4,
+    paddingInline: space.s3,
+    paddingBottom: space.s6,
+  },
+  studioBack: {
+    display: "block",
+    paddingLeft: 0,
+    marginBottom: space.s3,
+  },
+  errorBanner: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: space.s3,
+    border: `2px solid ${colors.refusal}`,
+    paddingBlock: space.s2,
+    paddingInline: space.s3,
+    marginBlock: space.s3,
+    marginInline: 0,
+  },
+  errorBannerStamp: {
+    flex: "none",
+    fontFamily: fonts.mono,
+    fontSize: 11,
+    fontWeight: 600,
+    letterSpacing: "0.05em",
+    textTransform: "uppercase",
+    color: colors.refusal,
+    border: "2px solid currentcolor",
+    paddingBlock: 2,
+    paddingInline: 7,
+    transform: "rotate(-2deg)",
+  },
+  errorBannerMessage: {
+    flex: 1,
+    color: colors.text,
+  },
+  studioEmpty: {
+    color: colors.textMuted,
+    paddingBlock: space.s4,
+    paddingInline: 0,
+  },
+  studioError: {
+    color: colors.refusal,
+  },
+  studioJsonEditor: {
+    display: "block",
+    width: "100%",
+    marginTop: space.s1,
+    fontFamily: fonts.mono,
+    fontSize: "0.85rem",
+    border: `1px solid ${colors.border}`,
+    padding: space.s2,
+    background: colors.surface,
+    resize: "vertical",
+  },
+});
 
 interface ToolsScreenProps {
   token: string;
@@ -106,22 +170,22 @@ export function ToolsScreen({ token, navigate, onUnauthorized }: ToolsScreenProp
   }, [expression, fields, catalogSource]);
 
   return (
-    <main className="studio-screen">
-      <button type="button" className="btn btn-ghost studio-back" onClick={() => navigate({ name: "processes" })}>
+    <main {...stylex.props(styles.studioScreen)}>
+      <button type="button" className="btn btn-ghost" {...stylex.props(styles.studioBack)} onClick={() => navigate({ name: "processes" })}>
         ← Back to processes
       </button>
       <h1>Tools</h1>
       {loadError && (
-        <div className="studio-error-banner" role="alert">
-          <span className="studio-error-banner-stamp">{t("error.failed")}</span>
-          <span className="studio-error-banner-message">{loadError}</span>
+        <div {...stylex.props(styles.errorBanner)} role="alert">
+          <span {...stylex.props(styles.errorBannerStamp)}>{t("error.failed")}</span>
+          <span {...stylex.props(styles.errorBannerMessage)}>{loadError}</span>
           <button type="button" className="btn btn-secondary" onClick={() => load()} disabled={loading}>
             {t("error.retry")}
           </button>
         </div>
       )}
       {loading ? (
-        <p className="studio-empty">Loading…</p>
+        <p {...stylex.props(styles.studioEmpty)}>Loading…</p>
       ) : (
         <>
           <fieldset>
@@ -136,7 +200,7 @@ export function ToolsScreen({ token, navigate, onUnauthorized }: ToolsScreenProp
                 ))}
               </ul>
             ) : (
-              <p className="studio-empty">No action-handler types registered.</p>
+              <p {...stylex.props(styles.studioEmpty)}>No action-handler types registered.</p>
             )}
             <h2>Data sources</h2>
             {registry && registry.dataSourceTypes.length > 0 ? (
@@ -148,7 +212,7 @@ export function ToolsScreen({ token, navigate, onUnauthorized }: ToolsScreenProp
                 ))}
               </ul>
             ) : (
-              <p className="studio-empty">No data-source types registered.</p>
+              <p {...stylex.props(styles.studioEmpty)}>No data-source types registered.</p>
             )}
             <h2>Assignment strategies</h2>
             {registry && registry.assignmentStrategyTypes.length > 0 ? (
@@ -160,7 +224,7 @@ export function ToolsScreen({ token, navigate, onUnauthorized }: ToolsScreenProp
                 ))}
               </ul>
             ) : (
-              <p className="studio-empty">No assignment-strategy types registered.</p>
+              <p {...stylex.props(styles.studioEmpty)}>No assignment-strategy types registered.</p>
             )}
           </fieldset>
 
@@ -191,11 +255,11 @@ export function ToolsScreen({ token, navigate, onUnauthorized }: ToolsScreenProp
                 </select>
               </label>
             )}
-            {catalogError && <p className="studio-error">{catalogError}</p>}
+            {catalogError && <p {...stylex.props(styles.studioError)}>{catalogError}</p>}
             <label>
               Expression
               <textarea
-                className="studio-json-editor"
+                {...stylex.props(styles.studioJsonEditor)}
                 rows={4}
                 value={expression}
                 onChange={(e) => setExpression(e.target.value)}
@@ -206,9 +270,9 @@ export function ToolsScreen({ token, navigate, onUnauthorized }: ToolsScreenProp
             </label>
             {checkResult &&
               (checkResult.ok ? (
-                <p className="studio-empty">Parses and type-checks against this catalog.</p>
+                <p {...stylex.props(styles.studioEmpty)}>Parses and type-checks against this catalog.</p>
               ) : (
-                <p className="studio-error">{checkResult.message}</p>
+                <p {...stylex.props(styles.studioError)}>{checkResult.message}</p>
               ))}
           </fieldset>
         </>

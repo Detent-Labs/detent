@@ -27,7 +27,7 @@ describe("FieldMatrixPanel's legend", () => {
         <FieldMatrixPanel />
       </DraftProvider>,
     );
-    const legendMatch = html.match(/<div class="studio-matrix-legend">([\s\S]*?)<\/div>/);
+    const legendMatch = html.match(/<div class="matrixLegend">([\s\S]*?)<\/div>/);
     expect(legendMatch).not.toBeNull();
     // Scoped to top-level legend entries via data-legend-entry, not a blanket
     // <span> count — the seventh entry's swatches are spans of their own.
@@ -43,8 +43,8 @@ describe("FieldMatrixPanel's legend", () => {
       </DraftProvider>,
     );
     expect(html).toContain("color names its own flag:");
-    expect(html).toContain('class="studio-matrix-legend-swatch-color studio-matrix-legend-swatch-visible"');
-    expect(html).toContain('class="studio-matrix-legend-swatch-color studio-matrix-legend-swatch-required"');
-    expect(html).toContain('class="studio-matrix-legend-swatch-color studio-matrix-legend-swatch-readonly"');
+    expect(html).toContain('class="matrixLegendSwatchColor matrixLegendSwatchVisible"');
+    expect(html).toContain('class="matrixLegendSwatchColor matrixLegendSwatchRequired"');
+    expect(html).toContain('class="matrixLegendSwatchColor matrixLegendSwatchReadonly"');
   });
 });

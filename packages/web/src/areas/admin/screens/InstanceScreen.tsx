@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
+import * as stylex from "@stylexjs/stylex";
+import { colors, fonts, space } from "form-ui/tokens.stylex";
 import {
   cancelInstance,
   redactInstance,
@@ -21,6 +23,7 @@ import { ErrorBanner } from "../../../shell/ErrorBanner.js";
 import { labelText } from "./instancesLogic.js";
 import { t, tFill } from "../catalog.js";
 import type { UiLocale } from "../../../i18n/locale.js";
+import type { InstanceStatus } from "../api/types.js";
 
 interface InstanceScreenProps {
   instanceId: string;
@@ -32,6 +35,113 @@ interface InstanceScreenProps {
 
 const RECORD_PAGE_LIMIT = 200;
 const AUDIT_PAGE_LIMIT = 200;
+
+/** `app.css`'s screen/detail-header/timeline/badge rules, as StyleX.
+ * `InstanceStatus` is a closed union, so `badgeTone` is exhaustive
+ * (design.md D3). */
+const styles = stylex.create({
+  screen: {
+    maxWidth: "60rem",
+    marginInline: "auto",
+    paddingTop: space.s4,
+    paddingInline: space.s3,
+    paddingBottom: space.s6,
+  },
+  back: {
+    display: "block",
+    paddingLeft: 0,
+    marginBottom: space.s3,
+  },
+  empty: {
+    color: colors.textMuted,
+    paddingBlock: space.s4,
+    paddingInline: 0,
+  },
+  detailHeader: {
+    borderWidth: 2,
+    borderStyle: "solid",
+    borderColor: colors.divider,
+    padding: space.s3,
+    marginBottom: space.s4,
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(10rem, 1fr))",
+    gap: space.s3,
+  },
+  detailTerm: {
+    fontSize: "0.7rem",
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+    color: colors.textMuted,
+    margin: 0,
+  },
+  detailValue: {
+    margin: 0,
+    fontFamily: fonts.mono,
+    fontSize: "0.85rem",
+    wordBreak: "break-all",
+  },
+  badge: {
+    display: "inline-block",
+    fontFamily: fonts.mono,
+    fontSize: 11,
+    fontWeight: 600,
+    textTransform: "uppercase",
+    letterSpacing: "0.08em",
+    borderWidth: 2,
+    borderStyle: "solid",
+    borderColor: "currentcolor",
+    paddingBlock: 2,
+    paddingInline: 7,
+  },
+  badgeOpen: {
+    color: colors.accent,
+  },
+  badgeSettled: {
+    color: colors.text,
+  },
+  badgeDormant: {
+    color: { default: "#726e6e", "@media (prefers-color-scheme: dark)": colors.neutral500 },
+  },
+  badgeRefusal: {
+    color: colors.surface,
+    backgroundColor: colors.refusal,
+    borderColor: colors.refusal,
+  },
+  loadMore: {
+    marginTop: space.s3,
+  },
+  timeline: {
+    listStyle: "none",
+    margin: 0,
+    padding: 0,
+    borderTopWidth: 1,
+    borderTopStyle: "solid",
+    borderTopColor: colors.border,
+  },
+  timelineItem: {
+    paddingBlock: space.s2,
+    paddingInline: 0,
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.border,
+    fontSize: "0.9rem",
+  },
+  timelineMeta: {
+    color: colors.textMuted,
+    fontSize: "0.8rem",
+    fontFamily: fonts.body,
+  },
+  timelineKey: {
+    fontFamily: fonts.mono,
+  },
+});
+
+const badgeTone: Record<InstanceStatus, typeof styles.badgeOpen> = {
+  running: styles.badgeOpen,
+  completed: styles.badgeSettled,
+  cancelled: styles.badgeDormant,
+  faulted: styles.badgeRefusal,
+};
 
 /** A `string` prints bare; anything else (number, boolean, or JSON `null`) prints as its JSON literal, so an authored `null` reads as the text "null". */
 function formatAuditValue(value: unknown): string {
@@ -189,13 +299,18 @@ export function InstanceScreen({ instanceId, navigate, token, locale, onUnauthor
 
   if (!view) {
     return (
-      <main className="admin-screen">
-        <button type="button" className="btn btn-ghost admin-back" onClick={() => navigate({ name: "instances" })}>
+      <main {...stylex.props(styles.screen)}>
+        <button
+          type="button"
+          className={`btn btn-ghost ${stylex.props(styles.back).className}`}
+          style={stylex.props(styles.back).style}
+          onClick={() => navigate({ name: "instances" })}
+        >
           {t(locale, "instance.back")}
         </button>
         {loading && <p>{t(locale, "common.loading")}</p>}
         {!loading && error && <ErrorBanner error={error} locale={locale} onRetry={refresh} />}
-        {!loading && !error && <p className="admin-empty">{t(locale, "instance.notFound")}</p>}
+        {!loading && !error && <p {...stylex.props(styles.empty)}>{t(locale, "instance.notFound")}</p>}
       </main>
     );
   }
@@ -204,52 +319,59 @@ export function InstanceScreen({ instanceId, navigate, token, locale, onUnauthor
   const derived = deriveFromRecord(recordList.items);
 
   return (
-    <main className="admin-screen">
-      <button type="button" className="btn btn-ghost admin-back" onClick={() => navigate({ name: "instances" })}>
+    <main {...stylex.props(styles.screen)}>
+      <button
+        type="button"
+        className={`btn btn-ghost ${stylex.props(styles.back).className}`}
+        style={stylex.props(styles.back).style}
+        onClick={() => navigate({ name: "instances" })}
+      >
         {t(locale, "instance.back")}
       </button>
       <h1>{instanceId}</h1>
 
-      <dl className="admin-detail-header">
+      <dl {...stylex.props(styles.detailHeader)}>
         <div>
-          <dt>{t(locale, "instance.process")}</dt>
-          <dd>{view.processId}</dd>
+          <dt {...stylex.props(styles.detailTerm)}>{t(locale, "instance.process")}</dt>
+          <dd {...stylex.props(styles.detailValue)}>{view.processId}</dd>
         </div>
         <div>
-          <dt>{t(locale, "instance.version")}</dt>
-          <dd>{view.version}</dd>
+          <dt {...stylex.props(styles.detailTerm)}>{t(locale, "instance.version")}</dt>
+          <dd {...stylex.props(styles.detailValue)}>{view.version}</dd>
         </div>
         <div>
-          <dt>{t(locale, "instance.definitionHash")}</dt>
-          <dd>{definitionHash}</dd>
+          <dt {...stylex.props(styles.detailTerm)}>{t(locale, "instance.definitionHash")}</dt>
+          <dd {...stylex.props(styles.detailValue)}>{definitionHash}</dd>
         </div>
         <div>
-          <dt>{t(locale, "instance.status")}</dt>
-          <dd>
-            <span className={`admin-badge admin-badge-${view.status}`}>{view.status}</span>
+          <dt {...stylex.props(styles.detailTerm)}>{t(locale, "instance.status")}</dt>
+          <dd {...stylex.props(styles.detailValue)}>
+            <span {...stylex.props(styles.badge, badgeTone[view.status])}>{view.status}</span>
           </dd>
         </div>
         <div>
-          <dt>{t(locale, "instance.currentStep")}</dt>
-          <dd>{(baseLocale ? labelText(view.step.label, baseLocale) : "") || view.step.key}</dd>
+          <dt {...stylex.props(styles.detailTerm)}>{t(locale, "instance.currentStep")}</dt>
+          <dd {...stylex.props(styles.detailValue)}>{(baseLocale ? labelText(view.step.label, baseLocale) : "") || view.step.key}</dd>
         </div>
         <div>
-          <dt>{t(locale, "instance.transitionSeq")}</dt>
-          <dd>{derived.transitionSeq ?? "—"}</dd>
+          <dt {...stylex.props(styles.detailTerm)}>{t(locale, "instance.transitionSeq")}</dt>
+          <dd {...stylex.props(styles.detailValue)}>{derived.transitionSeq ?? "—"}</dd>
         </div>
         <div>
-          <dt>{t(locale, "instance.claimState")}</dt>
-          <dd>{derived.claimedBy ? tFill(locale, "instance.claimedBy", { actor: derived.claimedBy }) : t(locale, "instance.unclaimed")}</dd>
+          <dt {...stylex.props(styles.detailTerm)}>{t(locale, "instance.claimState")}</dt>
+          <dd {...stylex.props(styles.detailValue)}>
+            {derived.claimedBy ? tFill(locale, "instance.claimedBy", { actor: derived.claimedBy }) : t(locale, "instance.unclaimed")}
+          </dd>
         </div>
         <div>
-          <dt>{t(locale, "instance.armedTimer")}</dt>
-          <dd>{timer ? new Date(timer.nextTimerAt).toLocaleString(locale) : t(locale, "instance.noTimer")}</dd>
+          <dt {...stylex.props(styles.detailTerm)}>{t(locale, "instance.armedTimer")}</dt>
+          <dd {...stylex.props(styles.detailValue)}>{timer ? new Date(timer.nextTimerAt).toLocaleString(locale) : t(locale, "instance.noTimer")}</dd>
         </div>
         {view.redactedAt && (
           <div>
-            <dt>{t(locale, "instance.dataRedaction")}</dt>
-            <dd>
-              <span className="admin-badge admin-badge-redacted">
+            <dt {...stylex.props(styles.detailTerm)}>{t(locale, "instance.dataRedaction")}</dt>
+            <dd {...stylex.props(styles.detailValue)}>
+              <span {...stylex.props(styles.badge, styles.badgeDormant)}>
                 {tFill(locale, "instance.redactedOn", { at: new Date(view.redactedAt).toLocaleString(locale) })}
               </span>
             </dd>
@@ -274,21 +396,21 @@ export function InstanceScreen({ instanceId, navigate, token, locale, onUnauthor
       {error && <ErrorBanner error={error} locale={locale} onRetry={refresh} retryDisabled={loading} />}
 
       <h2>{t(locale, "instance.recordTitle")}</h2>
-      {recordList.items.length === 0 && !loading && !error && <p className="admin-empty">{t(locale, "instance.recordEmpty")}</p>}
-      <ul className="admin-timeline">
+      {recordList.items.length === 0 && !loading && !error && <p {...stylex.props(styles.empty)}>{t(locale, "instance.recordEmpty")}</p>}
+      <ul {...stylex.props(styles.timeline)}>
         {recordList.items.map((el, i) => {
           const d = describeElement(el);
           return (
-            <li key={i}>
-              <div className="admin-timeline-meta">{new Date(d.at).toLocaleString(locale)}</div>
+            <li key={i} {...stylex.props(styles.timelineItem)}>
+              <div {...stylex.props(styles.timelineMeta)}>{new Date(d.at).toLocaleString(locale)}</div>
               <div>{d.summary}</div>
-              {d.detail && <div className="admin-timeline-meta">{d.detail}</div>}
+              {d.detail && <div {...stylex.props(styles.timelineMeta)}>{d.detail}</div>}
             </li>
           );
         })}
       </ul>
       {recordList.cursor && (
-        <div className="admin-load-more">
+        <div {...stylex.props(styles.loadMore)}>
           <button type="button" className="btn btn-secondary" onClick={() => void recordList.loadMore()} disabled={loading || recordList.loading}>
             {t(locale, "instance.loadMoreHistory")}
           </button>
@@ -299,33 +421,33 @@ export function InstanceScreen({ instanceId, navigate, token, locale, onUnauthor
         {t(locale, "audit.title")}{" "}
         {verify &&
           (verify.ok ? (
-            <span className="admin-badge admin-badge-verified">{t(locale, "audit.verified")}</span>
+            <span {...stylex.props(styles.badge, styles.badgeSettled)}>{t(locale, "audit.verified")}</span>
           ) : (
-            <span className="admin-badge admin-badge-chain-failed">{tFill(locale, "audit.verificationFailed", { seq: verify.failedSeq ?? "?" })}</span>
+            <span {...stylex.props(styles.badge, styles.badgeRefusal)}>{tFill(locale, "audit.verificationFailed", { seq: verify.failedSeq ?? "?" })}</span>
           ))}
       </h2>
-      {auditList.items.length === 0 && !loading && !error && <p className="admin-empty">{t(locale, "audit.empty")}</p>}
-      <ul className="admin-timeline">
+      {auditList.items.length === 0 && !loading && !error && <p {...stylex.props(styles.empty)}>{t(locale, "audit.empty")}</p>}
+      <ul {...stylex.props(styles.timeline)}>
         {auditList.items.map((e) => (
-          <li key={e.seq}>
-            <div className="admin-timeline-meta">
-              {new Date(e.at).toLocaleString(locale)} · <code className="admin-timeline-key">{e.actor ?? "—"}</code> ·{" "}
-              <code className="admin-timeline-key">{e.source ?? "—"}</code>
+          <li key={e.seq} {...stylex.props(styles.timelineItem)}>
+            <div {...stylex.props(styles.timelineMeta)}>
+              {new Date(e.at).toLocaleString(locale)} · <code {...stylex.props(styles.timelineKey)}>{e.actor ?? "—"}</code> ·{" "}
+              <code {...stylex.props(styles.timelineKey)}>{e.source ?? "—"}</code>
             </div>
             <div>
-              <code className="admin-timeline-key">{e.fieldId}</code> {t(locale, e.op === "redact" ? "audit.opRedact" : "audit.opSet")}{" "}
+              <code {...stylex.props(styles.timelineKey)}>{e.fieldId}</code> {t(locale, e.op === "redact" ? "audit.opRedact" : "audit.opSet")}{" "}
               {"value" in e ? (
-                <code className="admin-timeline-key">{formatAuditValue(e.value)}</code>
+                <code {...stylex.props(styles.timelineKey)}>{formatAuditValue(e.value)}</code>
               ) : (
-                <span className="admin-badge admin-badge-redacted">{t(locale, "audit.redacted")}</span>
+                <span {...stylex.props(styles.badge, styles.badgeDormant)}>{t(locale, "audit.redacted")}</span>
               )}
             </div>
-            {e.reason && <div className="admin-timeline-meta">{tFill(locale, "audit.reason", { reason: e.reason })}</div>}
+            {e.reason && <div {...stylex.props(styles.timelineMeta)}>{tFill(locale, "audit.reason", { reason: e.reason })}</div>}
           </li>
         ))}
       </ul>
       {auditList.cursor && (
-        <div className="admin-load-more">
+        <div {...stylex.props(styles.loadMore)}>
           <button type="button" className="btn btn-secondary" onClick={() => void auditList.loadMore()} disabled={loading || auditList.loading}>
             {t(locale, "audit.loadMore")}
           </button>

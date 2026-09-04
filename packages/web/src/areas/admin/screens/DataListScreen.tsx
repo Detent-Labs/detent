@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
+import * as stylex from "@stylexjs/stylex";
+import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { getDataList, updateDataList, putDataListValues, deleteDataList } from "../api/client.js";
 import type { DataListDetail } from "../api/types.js";
 import { useRefresh } from "../useRefresh.js";
@@ -20,6 +22,164 @@ import {
 import type { Route } from "../routing.js";
 import { t, tFill } from "../catalog.js";
 import type { UiLocale } from "../../../i18n/locale.js";
+
+/** `app.css`'s screen/controls/field/table/badge/timeline rules, as StyleX.
+ * `field` merges `.admin-field`'s two source declarations (design.md D12).
+ * `tableWidthOverride` composes after `table` for the one values table
+ * inside `.admin-table-scroll`, replicating the child-combinator override. */
+const styles = stylex.create({
+  screen: {
+    maxWidth: "60rem",
+    marginInline: "auto",
+    paddingTop: space.s4,
+    paddingInline: space.s3,
+    paddingBottom: space.s6,
+  },
+  rowLink: {
+    background: "none",
+    borderWidth: 0,
+    margin: 0,
+    padding: 0,
+    font: "inherit",
+    color: "inherit",
+    textAlign: "left",
+    cursor: "pointer",
+    textDecoration: { default: "none", ":hover": "underline" },
+  },
+  controls: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: space.s2,
+    marginBottom: space.s3,
+    alignItems: "center",
+  },
+  controlsField: {
+    backgroundColor: colors.surface,
+    color: colors.text,
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: colors.border,
+  },
+  field: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s1,
+    fontSize: "0.75rem",
+    fontFamily: fonts.body,
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+    color: colors.textMuted,
+  },
+  fieldInput: {
+    fontFamily: fonts.body,
+    fontSize: "0.9rem",
+    textTransform: "none",
+    letterSpacing: "normal",
+    color: colors.text,
+  },
+  note: {
+    color: colors.textMuted,
+    fontSize: "0.85rem",
+    maxWidth: "60ch",
+  },
+  empty: {
+    color: colors.textMuted,
+    paddingBlock: space.s4,
+    paddingInline: 0,
+  },
+  table: {
+    width: "100%",
+    borderCollapse: "collapse",
+    fontSize: "0.9rem",
+  },
+  tableWidthOverride: {
+    width: "auto",
+    minWidth: "100%",
+  },
+  tableScroll: {
+    overflowX: "auto",
+  },
+  th: {
+    textAlign: "left",
+    fontFamily: fonts.body,
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+    color: colors.textMuted,
+    padding: space.s2,
+    borderBottomWidth: 2,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.divider,
+  },
+  td: {
+    padding: space.s2,
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.border,
+    verticalAlign: "top",
+  },
+  tr: {
+    background: { default: "none", ":hover": colors.surfaceMuted },
+  },
+  rowRetired: {
+    color: colors.textMuted,
+  },
+  mono: {
+    fontFamily: fonts.mono,
+    fontSize: "0.8rem",
+  },
+  monoNumber: {
+    textAlign: "right",
+  },
+  badge: {
+    display: "inline-block",
+    fontFamily: fonts.mono,
+    fontSize: 11,
+    fontWeight: 600,
+    textTransform: "uppercase",
+    letterSpacing: "0.08em",
+    borderWidth: 2,
+    borderStyle: "solid",
+    borderColor: "currentcolor",
+    paddingBlock: 2,
+    paddingInline: 7,
+  },
+  badgeSettled: {
+    color: colors.text,
+  },
+  badgeRefusal: {
+    color: colors.surface,
+    backgroundColor: colors.refusal,
+    borderColor: colors.refusal,
+  },
+  error: {
+    color: colors.refusal,
+  },
+  timeline: {
+    listStyle: "none",
+    margin: 0,
+    padding: 0,
+    borderTopWidth: 1,
+    borderTopStyle: "solid",
+    borderTopColor: colors.border,
+  },
+  timelineItem: {
+    paddingBlock: space.s2,
+    paddingInline: 0,
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.border,
+    fontSize: "0.9rem",
+  },
+  timelineMeta: {
+    color: colors.textMuted,
+    fontSize: "0.8rem",
+    fontFamily: fonts.body,
+  },
+  timelineKey: {
+    fontFamily: fonts.mono,
+  },
+});
 
 interface DataListScreenProps {
   listKey: string;
@@ -147,8 +307,8 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
   };
 
   return (
-    <main className="admin-screen">
-      <button type="button" className="admin-row-link" onClick={() => navigate({ name: "dataLists" })}>
+    <main {...stylex.props(styles.screen)}>
+      <button type="button" {...stylex.props(styles.rowLink)} onClick={() => navigate({ name: "dataLists" })}>
         {t(locale, "dataList.back")}
       </button>
       <h1>{listKey}</h1>
@@ -157,10 +317,11 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
 
       {detail && (
         <>
-          <div className="admin-controls">
-            <label className="admin-field">
+          <div {...stylex.props(styles.controls)}>
+            <label {...stylex.props(styles.field)}>
               {t(locale, "dataList.name")}
               <input
+                {...stylex.props(styles.fieldInput)}
                 value={label}
                 onChange={(e) => {
                   setLabel(e.target.value);
@@ -168,9 +329,10 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
                 }}
               />
             </label>
-            <label className="admin-field">
+            <label {...stylex.props(styles.field)}>
               {t(locale, "dataList.description")}
               <input
+                {...stylex.props(styles.fieldInput)}
                 value={description}
                 onChange={(e) => {
                   setDescription(e.target.value);
@@ -181,17 +343,17 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
           </div>
 
           <h2>{t(locale, "dataList.columnsTitle")}</h2>
-          <p className="admin-note">{t(locale, "dataList.columnsNote")}</p>
+          <p {...stylex.props(styles.note)}>{t(locale, "dataList.columnsNote")}</p>
           {columns.length === 0 ? (
-            <p className="admin-empty">{t(locale, "dataList.columnsEmpty")}</p>
+            <p {...stylex.props(styles.empty)}>{t(locale, "dataList.columnsEmpty")}</p>
           ) : (
-            <table className="admin-table">
+            <table {...stylex.props(styles.table)}>
               <thead>
                 <tr>
-                  <th>{t(locale, "dataList.colColumnKey")}</th>
-                  <th>{t(locale, "dataList.colColumnLabel")}</th>
-                  <th>{t(locale, "dataList.colColumnType")}</th>
-                  <th />
+                  <th {...stylex.props(styles.th)}>{t(locale, "dataList.colColumnKey")}</th>
+                  <th {...stylex.props(styles.th)}>{t(locale, "dataList.colColumnLabel")}</th>
+                  <th {...stylex.props(styles.th)}>{t(locale, "dataList.colColumnType")}</th>
+                  <th {...stylex.props(styles.th)} />
                 </tr>
               </thead>
               <tbody>
@@ -199,10 +361,10 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
                     key is what the input edits, so keying on it would remount
                     the field and drop focus on every keystroke. */}
                 {columns.map((column, i) => (
-                  <tr key={i}>
-                    <td>
+                  <tr key={i} {...stylex.props(styles.tr)}>
+                    <td {...stylex.props(styles.td)}>
                       <input
-                        className="admin-mono"
+                        {...stylex.props(styles.mono)}
                         value={column.key}
                         onChange={(e) => patchColumn(i, { key: e.target.value })}
                         aria-label={tFill(locale, "dataList.columnKeyAria", { n: i + 1 })}
@@ -211,14 +373,14 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
                         placeholder="unit_price…"
                       />
                     </td>
-                    <td>
+                    <td {...stylex.props(styles.td)}>
                       <input
                         value={column.label}
                         onChange={(e) => patchColumn(i, { label: e.target.value })}
                         aria-label={tFill(locale, "dataList.columnLabelAria", { n: i + 1 })}
                       />
                     </td>
-                    <td>
+                    <td {...stylex.props(styles.td)}>
                       <select
                         value={column.type}
                         onChange={(e) => patchColumn(i, { type: e.target.value as ColumnRow["type"] })}
@@ -229,7 +391,7 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
                         <option value="boolean">{t(locale, "dataList.typeBoolean")}</option>
                       </select>
                     </td>
-                    <td>
+                    <td {...stylex.props(styles.td)}>
                       <button
                         type="button"
                         className="btn btn-secondary"
@@ -247,7 +409,7 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
             </table>
           )}
 
-          <div className="admin-controls">
+          <div {...stylex.props(styles.controls)}>
             <button
               type="button"
               className="btn btn-secondary"
@@ -264,17 +426,17 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
           {/* The one admin table whose width an operator decides: it grows a
               column per declared column. It scrolls inside this container, so
               the page never scrolls sideways. */}
-          <div className="admin-table-scroll">
-          <table className="admin-table">
+          <div {...stylex.props(styles.tableScroll)}>
+          <table {...stylex.props(styles.table, styles.tableWidthOverride)}>
             <thead>
               <tr>
-                <th>{t(locale, "dataList.colValue")}</th>
-                <th>{tFill(locale, "dataList.colLabel", { locale })}</th>
+                <th {...stylex.props(styles.th)}>{t(locale, "dataList.colValue")}</th>
+                <th {...stylex.props(styles.th)}>{tFill(locale, "dataList.colLabel", { locale })}</th>
                 {columns.map((column, i) => (
-                  <th key={i}>{column.label || column.key}</th>
+                  <th {...stylex.props(styles.th)} key={i}>{column.label || column.key}</th>
                 ))}
-                <th>{t(locale, "dataList.colState")}</th>
-                <th />
+                <th {...stylex.props(styles.th)}>{t(locale, "dataList.colState")}</th>
+                <th {...stylex.props(styles.th)} />
               </tr>
             </thead>
             <tbody>
@@ -283,8 +445,8 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
                 // input edits, so keying on it would remount the field — and
                 // drop focus — on every keystroke. Rows are only appended and
                 // edited in place, never reordered.
-                <tr key={i} className={row.retired ? "admin-row-retired" : undefined}>
-                  <td>
+                <tr key={i} {...stylex.props(styles.tr, row.retired && styles.rowRetired)}>
+                  <td {...stylex.props(styles.td)}>
                     <input
                       value={row.value}
                       onChange={(e) => patch(i, { value: e.target.value })}
@@ -294,7 +456,7 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
                       placeholder="cost_centre_a…"
                     />
                   </td>
-                  <td>
+                  <td {...stylex.props(styles.td)}>
                     <input value={row.label} onChange={(e) => patch(i, { label: e.target.value })} aria-label={tFill(locale, "dataList.valueLabelAria", { n: i + 1 })} />
                   </td>
                   {/* A retired value's attributes are readonly: the values
@@ -304,7 +466,7 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
                     const aria = tFill(locale, "dataList.attributeAria", { column: column.label || column.key, n: i + 1 });
                     if (column.type === "boolean") {
                       return (
-                        <td key={ci}>
+                        <td {...stylex.props(styles.td)} key={ci}>
                           <input
                             type="checkbox"
                             checked={row.attributes[column.key] === "true"}
@@ -316,10 +478,10 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
                       );
                     }
                     return (
-                      <td key={ci}>
+                      <td {...stylex.props(styles.td)} key={ci}>
                         <input
                           type={column.type === "number" ? "number" : "text"}
-                          className={column.type === "number" ? "admin-mono" : undefined}
+                          {...stylex.props(column.type === "number" && styles.mono, column.type === "number" && styles.monoNumber)}
                           value={row.attributes[column.key] ?? ""}
                           readOnly={row.retired}
                           onChange={(e) => patchAttribute(i, column.key, e.target.value)}
@@ -328,12 +490,12 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
                       </td>
                     );
                   })}
-                  <td>
-                    <span className={`admin-badge admin-badge-${row.retired ? "disabled" : "enabled"}`}>
+                  <td {...stylex.props(styles.td)}>
+                    <span {...stylex.props(styles.badge, row.retired ? styles.badgeRefusal : styles.badgeSettled)}>
                       {t(locale, row.retired ? "dataList.stateRetired" : "dataList.stateOffered")}
                     </span>
                   </td>
-                  <td>
+                  <td {...stylex.props(styles.td)}>
                     <button type="button" className="btn btn-secondary" onClick={() => patch(i, { retired: !row.retired })}>
                       {t(locale, row.retired ? "dataList.offerAgain" : "dataList.retire")}
                     </button>
@@ -353,13 +515,13 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
               build strips React's duplicate-key warning, so nothing says so.
               The list is fully re-derived every render and never reordered, so
               the index is the honest key. */}
-          <ul className="admin-error" aria-live="polite">
+          <ul {...stylex.props(styles.error)} aria-live="polite">
             {problems.map((problem, i) => (
               <li key={i}>{problem}</li>
             ))}
           </ul>
 
-          <div className="admin-controls">
+          <div {...stylex.props(styles.controls)}>
             <button
               type="button"
               className="btn btn-secondary"
@@ -373,27 +535,27 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
             <button type="button" className="btn btn-primary" onClick={() => void save()} disabled={saving || problems.length > 0}>
               {saving ? t(locale, "common.saving") : t(locale, "common.saveChanges")}
             </button>
-            <span className="admin-note" aria-live="polite">
+            <span {...stylex.props(styles.note)} aria-live="polite">
               {saved ? t(locale, "common.saved") : ""}
             </span>
           </div>
 
-          <p className="admin-note">{t(locale, "dataList.retiredNote")}</p>
+          <p {...stylex.props(styles.note)}>{t(locale, "dataList.retiredNote")}</p>
 
           <h2>{t(locale, "dataList.usedByTitle")}</h2>
           {detail.usedBy.length === 0 ? (
-            <p className="admin-empty">{t(locale, "dataList.usedByEmpty")}</p>
+            <p {...stylex.props(styles.empty)}>{t(locale, "dataList.usedByEmpty")}</p>
           ) : (
-            <ul className="admin-timeline">
+            <ul {...stylex.props(styles.timeline)}>
               {detail.usedBy.map((use) => (
-                <li key={`${use.processId}-${use.version}`}>
-                  {use.processId} <span className="admin-timeline-meta">v{use.version}</span>{" "}
+                <li key={`${use.processId}-${use.version}`} {...stylex.props(styles.timelineItem)}>
+                  {use.processId} <span {...stylex.props(styles.timelineMeta)}>v{use.version}</span>{" "}
                   {use.columns.length === 0 ? (
-                    <span className="admin-timeline-meta">{t(locale, "dataList.usedByNoColumns")}</span>
+                    <span {...stylex.props(styles.timelineMeta)}>{t(locale, "dataList.usedByNoColumns")}</span>
                   ) : (
-                    <span className="admin-timeline-meta">
+                    <span {...stylex.props(styles.timelineMeta)}>
                       {t(locale, "dataList.usedByColumns")}{" "}
-                      <code className="admin-timeline-key">{use.columns.join(", ")}</code>
+                      <code {...stylex.props(styles.timelineKey)}>{use.columns.join(", ")}</code>
                     </span>
                   )}
                 </li>
@@ -401,7 +563,7 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
             </ul>
           )}
 
-          <div className="admin-controls">
+          <div {...stylex.props(styles.controls)}>
             <button type="button" className="btn btn-secondary btn-destructive" onClick={() => void remove()} disabled={saving || detail.usedBy.length > 0}>
               {t(locale, "dataList.delete")}
             </button>

@@ -40,7 +40,7 @@ describe("The checks rail's all-clear box", () => {
   it("reports the validation verdict and the publish verdict as two sentences", () => {
     const html = renderToStaticMarkup(<ChecksRail validation={clear} canPublish={true} />);
 
-    expect(html).toContain("studio-checks-rail-clear");
+    expect(html).toContain("checksRailClear");
     expect(html).toContain("No open issues.");
     expect(html).toContain("This draft is ready to publish.");
   });
@@ -71,7 +71,7 @@ describe("The checks rail's all-clear box", () => {
     };
     const html = renderToStaticMarkup(<ChecksRail validation={withIssue} canPublish={false} />);
 
-    expect(html).not.toContain("studio-checks-rail-clear");
+    expect(html).not.toContain("checksRailClear");
     expect(html).not.toContain("publish permission");
   });
 });

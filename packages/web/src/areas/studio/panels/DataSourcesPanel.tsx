@@ -1,3 +1,5 @@
+import * as stylex from "@stylexjs/stylex";
+import { colors, fonts, space } from "form-ui/tokens.stylex";
 import type { DataSourceDef } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
 import { useDraft } from "../draft/store";
@@ -15,6 +17,38 @@ import type { ConfigFieldDescriptor } from "../api/types.js";
 
 type DraftDataSource = DraftOf<DataSourceDef>;
 
+const styles = stylex.create({
+  panelHeading: {
+    margin: 0,
+    marginBottom: space.s3,
+    paddingBottom: space.s2,
+    borderBottom: `2px solid ${colors.divider}`,
+  },
+  dataSourceRow: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-start",
+    gap: space.s2,
+  },
+  // `.data-source-row > label`: direct children only, `PluginEnvelopeEditor`
+  // nests its own labels several levels deeper and keeps its own styling.
+  dataSourceRowLabel: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s1,
+    fontSize: "0.9rem",
+    width: "100%",
+  },
+  studioMono: {
+    fontFamily: fonts.mono,
+  },
+  studioWarning: {
+    color: colors.refusal,
+    borderLeft: `3px solid ${colors.accent400}`,
+    paddingLeft: space.s2,
+  },
+});
+
 interface DataSourceRowProps {
   ds: DraftDataSource;
   listKeys: string[] | undefined;
@@ -30,12 +64,12 @@ function DataSourceRow({ ds, listKeys, registryTypes, registrySchemas, token, ow
   const warning = unknownListKeyWarning(ds.type, ds.config, listKeys);
   const listKey = listKeyOf(ds.config);
   return (
-    <div className="data-source-row">
-      <label>
+    <div {...stylex.props(styles.dataSourceRow)}>
+      <label {...stylex.props(styles.dataSourceRowLabel)}>
         key
         <input
           type="text"
-          className="studio-mono"
+          {...stylex.props(styles.studioMono)}
           value={ds.key ?? ""}
           onChange={(e) => onChange({ key: e.target.value })}
         />
@@ -54,7 +88,7 @@ function DataSourceRow({ ds, listKeys, registryTypes, registrySchemas, token, ow
         }}
       />
       {ds.type === DB_LIST_TYPE && listKeys !== undefined && (
-        <label>
+        <label {...stylex.props(styles.dataSourceRowLabel)}>
           {t("dataSources.dataListLabel")}
           <select value={listKey} onChange={(e) => onChange({ config: { ...ds.config, listKey: e.target.value } })}>
             <option value="">{t("dataSources.pickListKey")}</option>
@@ -66,7 +100,7 @@ function DataSourceRow({ ds, listKeys, registryTypes, registrySchemas, token, ow
           </select>
         </label>
       )}
-      {warning && <p className="studio-warning">{warning}</p>}
+      {warning && <p {...stylex.props(styles.studioWarning)}>{warning}</p>}
       <IssueList entityId={ds.id} />
       <button type="button" className="btn btn-secondary" onClick={onRemove}>
         {t("dataSources.removeDataSource")}
@@ -116,7 +150,7 @@ export function DataSourcesPanel({ token, selectedId, onAdd, onRemove }: Props) 
 
   return (
     <div className="data-sources-panel">
-      <h3>{t("dataSources.heading")}</h3>
+      <h3 {...stylex.props(styles.panelHeading)}>{t("dataSources.heading")}</h3>
       {ds === undefined ? (
         <p className="empty">{t("dataSources.empty")}</p>
       ) : (

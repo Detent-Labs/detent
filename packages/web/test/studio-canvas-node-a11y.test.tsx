@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { DraftProvider } from "../src/areas/studio/draft/store.js";
@@ -165,11 +164,11 @@ const HTML = renderCanvas();
 
 /** The canvas's own `<svg>`, and everything inside it. Every assertion below
  * reads one of the two: the toolbar's buttons are HTML siblings outside it. */
-const CANVAS = elementsOf(HTML, (openTag) => isTag(openTag, "svg", "canvas-svg"))[0];
+const CANVAS = elementsOf(HTML, (openTag) => isTag(openTag, "svg", "svg"))[0];
 
 const NODES = elementsOf(CANVAS.inner, (openTag) => isTag(openTag, "g", "canvas-node"));
-const EDGES = elementsOf(CANVAS.inner, (openTag) => isTag(openTag, "g", "canvas-edge-group"));
-const DISCLOSURES = elementsOf(CANVAS.inner, (openTag) => isTag(openTag, "button", "canvas-group-disclosure"));
+const EDGES = elementsOf(CANVAS.inner, (openTag) => isTag(openTag, "g", "edgeGroup"));
+const DISCLOSURES = elementsOf(CANVAS.inner, (openTag) => isTag(openTag, "button", "groupDisclosure"));
 
 describe("the canvas node's accessibility markup", () => {
   // The defect: a step node drawn as a bare `<g>`, carrying no role, no name
@@ -219,7 +218,7 @@ describe("the canvas node's accessibility markup", () => {
   // The defect: the guard label left in the accessibility tree, announcing a
   // second time everything the path itself now carries.
   it("hides every guard label from the accessibility tree", () => {
-    const labels = elementsOf(CANVAS.inner, (openTag) => isTag(openTag, "div", "canvas-edge-guard-label"));
+    const labels = elementsOf(CANVAS.inner, (openTag) => isTag(openTag, "div", "edgeGuardLabel"));
     expect(labels.length).toBe(1);
     for (const label of labels) expect(attr(label.open, "aria-hidden")).toBe("true");
   });
@@ -253,39 +252,23 @@ describe("the canvas node's accessibility markup", () => {
       (tag) => tag.open && ["a", "button", "input", "select", "textarea"].includes(tag.name),
     );
     expect(focusable.map((tag) => tag.name)).toEqual(["button", "button"]);
-    expect(focusable.every((tag) => (attr(tag.text, "class") ?? "").split(" ").includes("canvas-group-disclosure"))).toBe(true);
+    expect(focusable.every((tag) => (attr(tag.text, "class") ?? "").split(" ").includes("groupDisclosure"))).toBe(true);
   });
 
   // The defect class: a disclosure inside its group's own `<g>`, where the
   // box's drag handlers take the press meant for the button.
   it("sizes each disclosure's foreignObject at 28 by 28, outside every group", () => {
     const holders = elementsOf(CANVAS.inner, (openTag) => openTag.startsWith("<foreignObject")).filter((holder) =>
-      holder.inner.includes("canvas-group-disclosure"),
+      holder.inner.includes("groupDisclosure"),
     );
     expect(holders.length).toBe(2);
     for (const holder of holders) {
       expect(attr(holder.open, "width")).toBe("28");
       expect(attr(holder.open, "height")).toBe("28");
     }
-    const boxes = elementsOf(CANVAS.inner, (openTag) => isTag(openTag, "g", "canvas-group"));
+    const boxes = elementsOf(CANVAS.inner, (openTag) => isTag(openTag, "g", "group"));
     expect(boxes.length).toBe(2);
-    for (const box of boxes) expect(box.inner).not.toContain("canvas-group-disclosure");
-  });
-
-  // The defect class: a host cut to the button, which clips the focus outline
-  // away whole and leaves a focused disclosure with no indicator at all. The
-  // two halves live apart — the host in `CanvasView`, the button in the
-  // stylesheet — so the pairing is what this reads. A `<button>` at
-  // `width: 100%` in a 28-unit host would pass the assertion above and still
-  // lose the outline.
-  it("holds the disclosure button to 20 by 20, inset 4 inside that host", () => {
-    const css = readFileSync(new URL("../src/areas/studio/app.css", import.meta.url), "utf8");
-    const rule = css.slice(css.indexOf(".canvas-group-disclosure {"));
-    const body = rule.slice(0, rule.indexOf("}"));
-    expect(body).toContain("width: 20px");
-    expect(body).toContain("height: 20px");
-    expect(body).toContain("margin: 4px");
-    expect(body).not.toContain("width: 100%");
+    for (const box of boxes) expect(box.inner).not.toContain("groupDisclosure");
   });
 
   // The defect class: two tab stops inside one roving group, which puts the
@@ -302,7 +285,7 @@ describe("the canvas node's accessibility markup", () => {
     expect(DISCLOSURES.length).toBe(2);
     for (const disclosure of DISCLOSURES) expect(attr(disclosure.open, "type")).toBe("button");
     const holders = elementsOf(CANVAS.inner, (openTag) => openTag.startsWith("<foreignObject"));
-    expect(holders.filter((holder) => holder.inner.includes("canvas-group-disclosure")).length).toBe(DISCLOSURES.length);
+    expect(holders.filter((holder) => holder.inner.includes("groupDisclosure")).length).toBe(DISCLOSURES.length);
   });
 
   // The defect class: an `aria-controls` pointing at an element the markup

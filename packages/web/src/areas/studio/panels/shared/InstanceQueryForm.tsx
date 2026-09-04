@@ -1,7 +1,74 @@
+import * as stylex from "@stylexjs/stylex";
+import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { t } from "../../catalog.js";
 import { listProcesses } from "../../api/client.js";
 import { useFetchOnce } from "./useFetchOnce.js";
 import { useTargetProcessCatalog, type TargetRef } from "./useTargetProcessCatalog.js";
+
+const styles = stylex.create({
+  instanceQueryForm: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-start",
+    gap: space.s3,
+    width: "100%",
+  },
+  // `.instance-query-form > label`: direct children only, the one top-level
+  // process picker.
+  instanceQueryFormLabel: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s1,
+    fontSize: "0.9rem",
+    width: "100%",
+  },
+  instanceQueryFormFieldset: {
+    border: 0,
+    margin: 0,
+    padding: 0,
+    minWidth: 0,
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-start",
+    gap: space.s1,
+    width: "100%",
+  },
+  // `.instance-query-form-steps > legend` and its three siblings: direct
+  // children only.
+  instanceQueryFormLegend: {
+    padding: 0,
+    fontSize: "0.9rem",
+    fontWeight: 800,
+  },
+  instanceQueryFormOption: {
+    display: "flex",
+    alignItems: "center",
+    gap: space.s1,
+  },
+  instanceQueryFormLabelField: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-start",
+    gap: space.s1,
+    width: "100%",
+  },
+  instanceQueryFormRow: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: space.s2,
+    width: "100%",
+    borderBottom: `1px solid ${colors.border}`,
+    paddingBottom: space.s2,
+  },
+  studioMono: {
+    fontFamily: fonts.mono,
+  },
+  studioWarning: {
+    color: colors.refusal,
+    borderLeft: `3px solid ${colors.accent400}`,
+    paddingLeft: space.s2,
+  },
+});
 
 interface WhereEntry {
   fieldId?: string;
@@ -21,7 +88,7 @@ interface Props {
 /** A picked reference the target catalog does not carry — the publish-time reference check reports this rather than rejecting it, so the form marks it too. */
 function StaleMark({ id, known }: { id: string; known: boolean }) {
   if (!id || known) return null;
-  return <span className="studio-warning">{t("instanceQuery.staleReference")}</span>;
+  return <span {...stylex.props(styles.studioWarning)}>{t("instanceQuery.staleReference")}</span>;
 }
 
 const STATUSES = ["running", "completed", "cancelled", "faulted"] as const;
@@ -81,8 +148,8 @@ export function InstanceQueryForm({ token, config, onChange, ownFields }: Props)
   };
 
   return (
-    <div className="instance-query-form">
-      <label>
+    <div {...stylex.props(styles.instanceQueryForm)}>
+      <label {...stylex.props(styles.instanceQueryFormLabel)}>
         {t("instanceQuery.process")}
         <select value={processId} onChange={(e) => set({ processId: e.target.value })}>
           <option value="">{t("instanceQuery.pickProcess")}</option>
@@ -96,34 +163,34 @@ export function InstanceQueryForm({ token, config, onChange, ownFields }: Props)
 
       {processId && (
         <>
-          <fieldset className="instance-query-form-steps">
-            <legend>{t("instanceQuery.steps")}</legend>
+          <fieldset {...stylex.props(styles.instanceQueryFormFieldset)}>
+            <legend {...stylex.props(styles.instanceQueryFormLegend)}>{t("instanceQuery.steps")}</legend>
             {catalog?.steps.map((s) => (
-              <label key={s.id} className="instance-query-form-option">
+              <label key={s.id} {...stylex.props(styles.instanceQueryFormOption)}>
                 <input type="checkbox" checked={stepIds.includes(s.id)} onChange={() => toggleStep(s.id)} />
-                {s.label} <span className="studio-mono">({s.key})</span>
+                {s.label} <span {...stylex.props(styles.studioMono)}>({s.key})</span>
               </label>
             ))}
             {stepIds
               .filter((id) => !knownStepIds.has(id))
               .map((id) => (
-                <p key={id} className="studio-warning">
-                  {t("instanceQuery.staleReference")} <span className="studio-mono">{id}</span>
+                <p key={id} {...stylex.props(styles.studioWarning)}>
+                  {t("instanceQuery.staleReference")} <span {...stylex.props(styles.studioMono)}>{id}</span>
                 </p>
               ))}
           </fieldset>
 
-          <fieldset className="instance-query-form-statuses">
-            <legend>{t("instanceQuery.statuses")}</legend>
+          <fieldset {...stylex.props(styles.instanceQueryFormFieldset)}>
+            <legend {...stylex.props(styles.instanceQueryFormLegend)}>{t("instanceQuery.statuses")}</legend>
             {STATUSES.map((s) => (
-              <label key={s} className="instance-query-form-option">
+              <label key={s} {...stylex.props(styles.instanceQueryFormOption)}>
                 <input type="checkbox" checked={statuses.includes(s)} onChange={() => toggleStatus(s)} />
                 {s}
               </label>
             ))}
           </fieldset>
 
-          <div className="instance-query-form-label-field">
+          <div {...stylex.props(styles.instanceQueryFormLabelField)}>
             <label>
               {t("instanceQuery.labelField")}
               <select value={labelFieldId} onChange={(e) => set({ labelFieldId: e.target.value })}>
@@ -138,10 +205,10 @@ export function InstanceQueryForm({ token, config, onChange, ownFields }: Props)
             <StaleMark id={labelFieldId} known={knownFieldIds.has(labelFieldId)} />
           </div>
 
-          <fieldset className="instance-query-form-where">
-            <legend>{t("instanceQuery.comparisons")}</legend>
+          <fieldset {...stylex.props(styles.instanceQueryFormFieldset)}>
+            <legend {...stylex.props(styles.instanceQueryFormLegend)}>{t("instanceQuery.comparisons")}</legend>
             {where.map((w, i) => (
-              <div key={i} className="instance-query-form-where-row">
+              <div key={i} {...stylex.props(styles.instanceQueryFormRow)}>
                 <select value={w.fieldId ?? ""} onChange={(e) => updateWhere(i, { fieldId: e.target.value })}>
                   <option value="">{t("instanceQuery.pickField")}</option>
                   {fieldOptions.map((f) => (
@@ -177,7 +244,7 @@ export function InstanceQueryForm({ token, config, onChange, ownFields }: Props)
                 ) : (
                   <input
                     type="text"
-                    className="studio-mono"
+                    {...stylex.props(styles.studioMono)}
                     value={typeof w.value === "string" ? w.value : w.value === undefined ? "" : JSON.stringify(w.value)}
                     onChange={(e) => updateWhere(i, { value: e.target.value })}
                   />
@@ -193,13 +260,13 @@ export function InstanceQueryForm({ token, config, onChange, ownFields }: Props)
             </button>
           </fieldset>
 
-          <fieldset className="instance-query-form-attributes">
-            <legend>{t("instanceQuery.attributes")}</legend>
+          <fieldset {...stylex.props(styles.instanceQueryFormFieldset)}>
+            <legend {...stylex.props(styles.instanceQueryFormLegend)}>{t("instanceQuery.attributes")}</legend>
             {Object.entries(attributes).map(([key, fieldId]) => (
-              <div key={key} className="instance-query-form-attribute-row">
+              <div key={key} {...stylex.props(styles.instanceQueryFormRow)}>
                 <input
                   type="text"
-                  className="studio-mono"
+                  {...stylex.props(styles.studioMono)}
                   placeholder={t("instanceQuery.columnKey")}
                   value={key}
                   onChange={(e) => updateAttributeKey(key, e.target.value)}

@@ -36,15 +36,15 @@ describe("PanelsRailFieldRow", () => {
     const html = renderToStaticMarkup(<PanelsRailFieldRow {...BASE} />);
     expect(html).toContain(">Amount<");
     expect(html).toContain(">Number<");
-    expect(html).not.toContain("studio-panels-rail-key");
+    expect(html).not.toContain("panelsRailKey");
   });
 
   it("shows the issue mark only when the row carries one", () => {
     const withIssue = renderToStaticMarkup(<PanelsRailFieldRow {...BASE} issues={2} />);
-    expect(withIssue).toContain("studio-panels-rail-issues");
+    expect(withIssue).toContain("panelsRailIssues");
     expect(withIssue).toContain(">2<");
 
-    expect(renderToStaticMarkup(<PanelsRailFieldRow {...BASE} />)).not.toContain("studio-panels-rail-issues");
+    expect(renderToStaticMarkup(<PanelsRailFieldRow {...BASE} />)).not.toContain("panelsRailIssues");
   });
 
   // The keyboard half of the move gesture (spa-accessibility): a real control
@@ -90,7 +90,7 @@ describe("PanelsRailFieldRow", () => {
     const html = renderToStaticMarkup(
       <PanelsRailFieldRow {...BASE} moveTargets={[{ id: undefined, label: "Top level" }]} />,
     );
-    expect(html).toContain("studio-panels-rail-move");
+    expect(html).toContain("panelsRailMove");
     expect(html).toContain("disabled");
     // A disabled control still carries a name.
     expect(html).toContain('aria-label="Move this field to"');

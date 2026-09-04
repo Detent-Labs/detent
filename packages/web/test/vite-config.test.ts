@@ -4,7 +4,7 @@
  * of running a full `vite build`, so a regression here fails fast in `bun test`.
  */
 import { test, expect, afterEach } from "bun:test";
-import { contentSecurityPolicy } from "../vite.config.js";
+import { contentSecurityPolicy } from "../csp.js";
 
 type MetaTag = { tag: string; attrs: Record<string, string>; injectTo: string };
 

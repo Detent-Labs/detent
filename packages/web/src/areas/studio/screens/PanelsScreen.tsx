@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import * as stylex from "@stylexjs/stylex";
+import { colors, fonts, space } from "form-ui/tokens.stylex";
 import type { DataSourceDef } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
 import type { DraftField } from "../draft/fields";
@@ -26,6 +28,244 @@ import { DataSourcesPanel } from "../panels/DataSourcesPanel";
 import { ContractPanel } from "../panels/ContractPanel";
 import { FieldMatrixPanel } from "../panels/FieldMatrixPanel";
 import { ChecksRail } from "../panels/ChecksRail";
+
+/** Below this width the three regions — index rail, definition half, effect
+ * half — no longer fit beside one another. The rail holds its 16rem, and a
+ * half needs about 22rem before a two-word label starts wrapping every line.
+ * At 64rem the rail takes 16rem and the open view the remaining 47rem, so
+ * each half clears 22rem with room over. `FieldCatalogPanel` stacks its two
+ * halves at the same width, so the whole screen turns at once. */
+const NARROW = "@media (max-width: 64rem)";
+
+const styles = stylex.create({
+  studioBack: {
+    display: "block",
+    paddingLeft: 0,
+    marginBottom: space.s3,
+  },
+  panelsScreenHeader: {
+    display: "flex",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    gap: space.s3,
+    paddingBottom: space.s2,
+    borderBottom: `2px solid ${colors.divider}`,
+  },
+  panelsScreenHeading: {
+    flex: 1,
+    margin: 0,
+    fontSize: "1rem",
+  },
+  panelsScreenNote: {
+    margin: 0,
+    color: colors.textMuted,
+  },
+  // Two columns, not three (task 7.6). The checks rail's own 22rem column
+  // went to the open view when the rail moved to the screen's bottom edge as
+  // the collapsed summary, and the Fields view's two halves are what needed
+  // it: each half now clears 22rem well above the stacking breakpoint.
+  //
+  // Below the breakpoint the rail and the open view fall under one another,
+  // in source order: list, then the view.
+  panelsScreenLayout: {
+    display: "grid",
+    flex: "1 1 0",
+    gridTemplateColumns: { default: "16rem minmax(0, 1fr)", [NARROW]: "minmax(0, 1fr)" },
+    gridTemplateRows: { default: "none", [NARROW]: "auto minmax(0, 1fr)" },
+    gap: space.s3,
+    alignItems: "stretch",
+    minHeight: "36rem",
+    overflow: "hidden",
+  },
+  // `.studio-panels-screen-layout > *`: applied to each direct child (nav,
+  // main, and `ChecksRail`'s own root) so none imposes a height floor on
+  // the row.
+  panelsScreenLayoutChild: {
+    minHeight: 0,
+  },
+  panelsScreenView: {
+    overflowY: "auto",
+    overscrollBehavior: "contain",
+    minWidth: 0,
+  },
+  // Below the breakpoint the rail gives up its column, so its right edge no
+  // longer separates anything; the disclosure header's own bottom edge takes
+  // that role. The cap keeps an opened list from taking the whole row and
+  // squeezing the open view to nothing. It stays in rem, like every other
+  // length on this screen: the height comes from the edit screen's flex
+  // chain, and a viewport unit here would measure something else. The base
+  // `overflowY: auto` then scrolls the list inside that cap.
+  panelsRail: {
+    borderRight: { default: `2px solid ${colors.divider}`, [NARROW]: "none" },
+    maxHeight: { default: "none", [NARROW]: "20rem" },
+    overflowY: "auto",
+    overscrollBehavior: "contain",
+  },
+  // The rail's own header, drawn only below the breakpoint. A wide screen
+  // stands the rail in its own column, where a control that hides that
+  // column would only take a row of it. `display: none` also keeps the
+  // control out of the tab order and out of the accessibility tree there,
+  // so no dead toggle stands beside the list.
+  //
+  // Flush left, hairline below, at the register-row weight the entries
+  // beneath it take — the header reads as the list's first row, not as a
+  // bar over it.
+  panelsRailDisclosure: {
+    display: { default: "none", [NARROW]: "flex" },
+    alignItems: "baseline",
+    gap: space.s2,
+    width: "100%",
+    background: "none",
+    color: "inherit",
+    border: "none",
+    borderBottom: `2px solid ${colors.divider}`,
+    paddingBlock: space.s2,
+    paddingInline: space.s3,
+    font: "inherit",
+    textAlign: "left",
+    cursor: "pointer",
+  },
+  panelsRailList: {
+    listStyle: "none",
+    margin: 0,
+    padding: 0,
+  },
+  // The one state the disclosure header carries, read off the same
+  // `railOpen` the button's `aria-expanded` reports: below the breakpoint a
+  // closed rail hides its list. Above it the list always shows, so a window
+  // widened while the rail is closed does not lose the rail.
+  panelsRailListClosed: {
+    display: { default: "block", [NARROW]: "none" },
+  },
+  // `.studio-panels-rail-entry`/`.studio-panels-rail-field` share one
+  // declaration in app.css; one style key covers both call sites here.
+  panelsRailRow: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: space.s2,
+    width: "100%",
+    background: "none",
+    color: "inherit",
+    border: "none",
+    borderBottom: `1px solid ${colors.border}`,
+    paddingBlock: space.s2,
+    paddingInline: space.s3,
+    font: "inherit",
+    textAlign: "left",
+    cursor: "pointer",
+    ":hover": {
+      background: colors.surfaceMuted,
+    },
+  },
+  // `[aria-current="true"]`: a JS-computed choice reading the same
+  // `aria-current` the button already carries.
+  panelsRailRowCurrent: {
+    boxShadow: `inset 3px 0 0 ${colors.accent}`,
+  },
+  panelsRailRowIndented: {
+    paddingLeft: space.s6,
+  },
+  // A Fields row holds two controls: the row itself and its move control.
+  // The wrapper carries the hairline and the indentation the single button
+  // carried before, so the pair still reads as one register row. One line,
+  // no wrap: the move control is a fixed cell, so nothing on this row is
+  // measured off an English label (task 8.2).
+  panelsRailFieldRow: {
+    display: "flex",
+    alignItems: "baseline",
+    borderBottom: `1px solid ${colors.border}`,
+  },
+  // The row a pointer has picked up. Reduced opacity alone, no transform:
+  // the drop target is the row under the cursor, and moving the source would
+  // say the list re-orders live, which it does not.
+  panelsRailFieldRowDragging: {
+    opacity: 0.5,
+  },
+  // Inside a row the button shares the line, so it takes the remainder
+  // rather than the `width: 100%` its standalone form uses for "+ Add field"
+  // and the data-source entries. The wrapper draws the hairline.
+  panelsRailFieldInRow: {
+    flex: "1 1 9rem",
+    minWidth: 0,
+    width: "auto",
+    borderBottom: "none",
+    cursor: "grab",
+  },
+  panelsRailName: {
+    flex: 1,
+    minWidth: 0,
+    overflowWrap: "anywhere",
+  },
+  // The written face carries two weights and no third, so the selected
+  // row's name takes 800 rather than a tint the hover wash would collide
+  // with. The view names the edited field nowhere else as text — its label
+  // is the value inside an editable input — and the rail runs to 22 rows,
+  // so the row's own mark is the only answer to "which field am I editing".
+  panelsRailNameSelected: {
+    fontWeight: 800,
+  },
+  // The field's kind — a word an author reads, so the written face, not
+  // mono. `minWidth: 0` and the wrap keep a long German kind name
+  // ("Mehrfachauswahl") inside the rail's 16rem column (task 8.2).
+  panelsRailType: {
+    minWidth: 0,
+    fontSize: "0.8rem",
+    color: colors.textMuted,
+    overflowWrap: "anywhere",
+  },
+  // The move target picker. A select rather than a direction button, because
+  // a drop reaches every group and the keyboard has to reach the same set.
+  // Its options carry group labels, which are prose, so it truncates instead
+  // of wrapping: the closed control shares a 16rem column with the row's own
+  // name and kind, and the option list opens over the rail at full width.
+  // 0.8rem matches `panelsRailType` on the same row. De-emphasized against
+  // the row it sits on: the row's own job is selecting a field, and the move
+  // is the rarer act. Disabled, it keeps its place — every field entry
+  // carries one, as `studio-app` requires — and states that it has nothing
+  // to do rather than vanishing between renders.
+  panelsRailMove: {
+    flex: "0 1 auto",
+    minWidth: 0,
+    maxWidth: "7rem",
+    background: colors.surface,
+    color: { default: colors.textMuted, ":hover": colors.text, ":disabled": colors.textMuted },
+    border: `1px solid ${colors.border}`,
+    paddingBlock: space.s1,
+    paddingInline: space.s2,
+    font: "inherit",
+    fontSize: "0.8rem",
+    lineHeight: 1.4,
+    textOverflow: "ellipsis",
+    opacity: { default: 1, ":disabled": 0.5 },
+    cursor: { default: "pointer", ":disabled": "not-allowed" },
+  },
+  // The live region the move announces through. Off screen, never
+  // `display: none`: a hidden region is announced by no engine.
+  visuallyHidden: {
+    position: "absolute",
+    width: 1,
+    height: 1,
+    margin: -1,
+    padding: 0,
+    overflow: "hidden",
+    clipPath: "inset(50%)",
+    whiteSpace: "nowrap",
+    border: 0,
+  },
+  panelsRailCount: {
+    fontFamily: fonts.mono,
+    fontVariantNumeric: "tabular-nums",
+    color: colors.textMuted,
+  },
+  panelsRailIssues: {
+    fontFamily: fonts.mono,
+    fontVariantNumeric: "tabular-nums",
+    color: colors.refusal,
+    border: "2px solid currentcolor",
+    paddingBlock: 0,
+    paddingInline: space.s1,
+  },
+});
 
 export { PANEL_VIEWS, type PanelView };
 
@@ -120,7 +360,11 @@ export function PanelsRailFieldRow({
   const moveSentence = t("panelsScreen.moveTargetLabel");
   return (
     <div
-      className="studio-panels-rail-field-row"
+      {...stylex.props(
+        styles.panelsRailFieldRow,
+        depth === 1 && styles.panelsRailRowIndented,
+        dragging && styles.panelsRailFieldRowDragging,
+      )}
       data-depth={depth}
       data-dragging={dragging ? "true" : undefined}
       onDragOver={(e) => e.preventDefault()}
@@ -131,17 +375,17 @@ export function PanelsRailFieldRow({
     >
       <button
         type="button"
-        className="studio-panels-rail-field"
+        {...stylex.props(styles.panelsRailRow, styles.panelsRailFieldInRow, selected && styles.panelsRailRowCurrent)}
         draggable
         onDragStart={onDragStart}
         onDragEnd={onDragEnd}
         aria-current={selected ? "true" : undefined}
         onClick={onClick}
       >
-        <span className="studio-panels-rail-name">{label}</span>
-        {typeLabel && <span className="studio-panels-rail-type">{typeLabel}</span>}
+        <span {...stylex.props(styles.panelsRailName, selected && styles.panelsRailNameSelected)}>{label}</span>
+        {typeLabel && <span {...stylex.props(styles.panelsRailType)}>{typeLabel}</span>}
         {issues > 0 && (
-          <span className="studio-panels-rail-issues" aria-label={`${issues} ${t("panelsScreen.issueMark")}`}>
+          <span {...stylex.props(styles.panelsRailIssues)} aria-label={`${issues} ${t("panelsScreen.issueMark")}`}>
             {issues}
           </span>
         )}
@@ -155,7 +399,7 @@ export function PanelsRailFieldRow({
           control reads the membership it also writes. */}
       <select
         id={moveControlId}
-        className="studio-panels-rail-move"
+        {...stylex.props(styles.panelsRailMove)}
         disabled={moveTargets.length < 2}
         aria-label={moveSentence}
         title={moveSentence}
@@ -227,8 +471,8 @@ export function PanelsScreen({ openView, onBack, onOpenView, onShowStep, token, 
   // Whether the index rail's list shows below the breakpoint, where the rail
   // is a disclosure header rather than a column. It starts closed: the header
   // exists so the open view reaches the top of a narrow window. Above the
-  // breakpoint app.css ignores it and the list always shows, so a window
-  // widened while the rail is closed does not lose the rail.
+  // breakpoint `panelsRailListClosed` ignores it and the list always shows,
+  // so a window widened while the rail is closed does not lose the rail.
   const [railOpen, setRailOpen] = useState(false);
 
   const topLevelFieldIds = (draft.fields ?? [])
@@ -369,32 +613,36 @@ export function PanelsScreen({ openView, onBack, onOpenView, onShowStep, token, 
       {/* The view's name sits here, not above the panel: each panel renders
           its own heading, and a second copy directly above it read as a
           duplicate on screen. */}
-      <header className="studio-panels-screen-header">
-        <button type="button" className="btn btn-ghost studio-back" onClick={onBack}>
+      <header {...stylex.props(styles.panelsScreenHeader)}>
+        <button type="button" className="btn btn-ghost" {...stylex.props(styles.studioBack)} onClick={onBack}>
           {t("panelsScreen.backToCanvas")}
         </button>
-        <h1 className="studio-panels-screen-heading">{t(VIEW_LABEL[openView])}</h1>
-        <p className="studio-panels-screen-note">{t("panelsScreen.keepsChanges")}</p>
+        <h1 {...stylex.props(styles.panelsScreenHeading)}>{t(VIEW_LABEL[openView])}</h1>
+        <p {...stylex.props(styles.panelsScreenNote)}>{t("panelsScreen.keepsChanges")}</p>
       </header>
 
-      <div className="studio-panels-screen-layout">
-        <nav className="studio-panels-rail" aria-label={t("panelsScreen.railLabel")} data-open={railOpen ? "true" : undefined}>
-          {/* The rail's disclosure header. It renders always and app.css draws
-              it only below the breakpoint, where the three regions stack and
-              the rail would otherwise push the open view a screen down. Above
-              that width the button is `display: none`, so it leaves the tab
-              order and the accessibility tree, and the list shows whatever
-              `railOpen` says. */}
+      <div {...stylex.props(styles.panelsScreenLayout)}>
+        <nav
+          {...stylex.props(styles.panelsRail, styles.panelsScreenLayoutChild)}
+          aria-label={t("panelsScreen.railLabel")}
+          data-open={railOpen ? "true" : undefined}
+        >
+          {/* The rail's disclosure header. It renders always and its style
+              draws it only below the breakpoint, where the three regions
+              stack and the rail would otherwise push the open view a screen
+              down. Above that width the button is `display: none`, so it
+              leaves the tab order and the accessibility tree, and the list
+              shows whatever `railOpen` says. */}
           <button
             type="button"
-            className="studio-panels-rail-disclosure"
+            {...stylex.props(styles.panelsRailDisclosure)}
             aria-expanded={railOpen}
             aria-controls="studio-panels-rail-list"
             onClick={() => setRailOpen((open) => !open)}
           >
             {t("panelsScreen.railLabel")}
           </button>
-          <ul className="studio-panels-rail-list" id="studio-panels-rail-list">
+          <ul {...stylex.props(styles.panelsRailList, !railOpen && styles.panelsRailListClosed)} id="studio-panels-rail-list">
             {PANEL_VIEWS.map((view) => {
               // The matrix's badge counts `source: "view"` findings instead: its
               // issues share `entityType: "step"` with every other per-step
@@ -411,19 +659,19 @@ export function PanelsScreen({ openView, onBack, onOpenView, onShowStep, token, 
                 <li key={view}>
                   <button
                     type="button"
-                    className="studio-panels-rail-entry"
+                    {...stylex.props(styles.panelsRailRow, openView === view && styles.panelsRailRowCurrent)}
                     aria-current={openView === view ? "true" : undefined}
                     onClick={() => onOpenView(view)}
                   >
-                    <span className="studio-panels-rail-name">{t(VIEW_LABEL[view])}</span>
-                    <span className="studio-panels-rail-count">{entityCount[view]}</span>
-                    {issues > 0 && <span className="studio-panels-rail-issues">{issues}</span>}
+                    <span {...stylex.props(styles.panelsRailName)}>{t(VIEW_LABEL[view])}</span>
+                    <span {...stylex.props(styles.panelsRailCount)}>{entityCount[view]}</span>
+                    {issues > 0 && <span {...stylex.props(styles.panelsRailIssues)}>{issues}</span>}
                   </button>
                   {/* Contract holds one editor, so it carries no sub-list. A
                       sub-list renders only under the open view: two at once
                       would overflow the rail's 16rem column. */}
                   {view === "fields" && view === openView && (
-                    <ul className="studio-panels-rail-sublist">
+                    <ul {...stylex.props(styles.panelsRailList)}>
                       {railFields.map((row) => {
                         const rowIssues = issueCountForEntityId(validation.issues, row.id);
                         const field = fieldsById.get(row.id);
@@ -476,14 +724,14 @@ export function PanelsScreen({ openView, onBack, onOpenView, onShowStep, token, 
                         );
                       })}
                       <li>
-                        <button type="button" className="studio-panels-rail-field" onClick={addField}>
+                        <button type="button" {...stylex.props(styles.panelsRailRow)} onClick={addField}>
                           {t("fieldCatalog.addField")}
                         </button>
                       </li>
                     </ul>
                   )}
                   {view === "dataSources" && view === openView && (
-                    <ul className="studio-panels-rail-sublist">
+                    <ul {...stylex.props(styles.panelsRailList)}>
                       {dataSources.map((ds) => {
                         if (ds.id === undefined) return null;
                         const dsIssues = issueCountForEntityId(validation.issues, ds.id);
@@ -491,18 +739,15 @@ export function PanelsScreen({ openView, onBack, onOpenView, onShowStep, token, 
                           <li key={ds.id}>
                             <button
                               type="button"
-                              className="studio-panels-rail-field"
+                              {...stylex.props(styles.panelsRailRow)}
                               aria-current={selectedDataSourceId === ds.id ? "true" : undefined}
                               onClick={() => setSelectedDataSourceId(ds.id)}
                             >
-                              <span className="studio-panels-rail-name">
+                              <span {...stylex.props(styles.panelsRailName)}>
                                 {ds.key === "" || ds.key === undefined ? t("panelsScreen.unnamedDataSource") : ds.key}
                               </span>
                               {dsIssues > 0 && (
-                                <span
-                                  className="studio-panels-rail-issues"
-                                  aria-label={`${dsIssues} ${t("panelsScreen.issueMark")}`}
-                                >
+                                <span {...stylex.props(styles.panelsRailIssues)} aria-label={`${dsIssues} ${t("panelsScreen.issueMark")}`}>
                                   {dsIssues}
                                 </span>
                               )}
@@ -511,7 +756,7 @@ export function PanelsScreen({ openView, onBack, onOpenView, onShowStep, token, 
                         );
                       })}
                       <li>
-                        <button type="button" className="studio-panels-rail-field" onClick={addDataSource}>
+                        <button type="button" {...stylex.props(styles.panelsRailRow)} onClick={addDataSource}>
                           {t("dataSources.addDataSource")}
                         </button>
                       </li>
@@ -526,12 +771,12 @@ export function PanelsScreen({ openView, onBack, onOpenView, onShowStep, token, 
               row's own name off mid-word. It renders always: a live region
               added to the DOM at the same moment its text arrives is announced
               by no engine reliably. */}
-          <p className="studio-visually-hidden" role="status" aria-live="polite" aria-label={t("panelsScreen.moveAnnouncerLabel")}>
+          <p {...stylex.props(styles.visuallyHidden)} role="status" aria-live="polite" aria-label={t("panelsScreen.moveAnnouncerLabel")}>
             {announcement}
           </p>
         </nav>
 
-        <main className="studio-panels-screen-view">
+        <main {...stylex.props(styles.panelsScreenView, styles.panelsScreenLayoutChild)}>
           {/* All four mount; `hidden` shows one. See the component note. */}
           <div hidden={openView !== "fields"}>
             <FieldCatalogPanel
@@ -565,8 +810,9 @@ export function PanelsScreen({ openView, onBack, onOpenView, onShowStep, token, 
           third column (task 7.4). The draft-wide checks and the publish
           verdict ride here; a check on the selected field stands at its own
           zone inside the open view instead. The column that stood here went to
-          the open view, which the Fields view's two halves needed. */}
-      <ChecksRail validation={validation} canPublish={canPublish} collapsed />
+          the open view, which the Fields view's two halves needed. `framed`:
+          this screen boxes nothing, so the rail draws its own three edges. */}
+      <ChecksRail validation={validation} canPublish={canPublish} collapsed framed />
     </>
   );
 }

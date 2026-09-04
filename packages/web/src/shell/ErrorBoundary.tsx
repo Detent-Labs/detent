@@ -1,7 +1,46 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { TriangleAlert } from "lucide-react";
+import * as stylex from "@stylexjs/stylex";
 import { t } from "./catalog.js";
 import type { UiLocale } from "../i18n/locale.js";
+import { colors, fonts, space } from "form-ui/tokens.stylex";
+
+/** `.shell-boundary-fallback` (merged with the shared `.shell-empty` base
+ * it overrides) and `.shell-boundary-stamp`, from `shell.css`. */
+const styles = stylex.create({
+  fallback: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-start",
+    gap: space.s3,
+    maxWidth: "46rem",
+    marginInline: "auto",
+    marginBlock: 0,
+    padding: space.s8,
+    color: colors.textMuted,
+    borderWidth: 2,
+    borderStyle: "solid",
+    borderColor: colors.divider,
+    backgroundColor: colors.surfaceMuted,
+  },
+  stamp: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: space.s1,
+    fontFamily: fonts.mono,
+    fontSize: 16,
+    fontWeight: 600,
+    textTransform: "uppercase",
+    letterSpacing: "0.05em",
+    color: colors.refusal,
+    borderWidth: 2,
+    borderStyle: "solid",
+    borderColor: "currentcolor",
+    paddingBlock: 4,
+    paddingInline: 12,
+    transform: "rotate(-2deg)",
+  },
+});
 
 interface ErrorBoundaryProps {
   locale: UiLocale;
@@ -37,8 +76,8 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     if (this.state.error) {
       const locale = this.props.locale;
       return (
-        <main className="shell-boundary-fallback">
-          <span className="shell-boundary-stamp">
+        <main {...stylex.props(styles.fallback)}>
+          <span {...stylex.props(styles.stamp)}>
             <TriangleAlert size={18} strokeWidth={1.75} aria-hidden="true" />
             {t(locale, "error.generic")}
           </span>

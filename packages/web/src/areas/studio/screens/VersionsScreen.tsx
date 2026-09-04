@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
+import * as stylex from "@stylexjs/stylex";
+import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { listVersions, getVersionBody, getDraft } from "../api/client.js";
 import type { VersionSummary } from "../api/types.js";
 import type { ProcessBody } from "workflow-engine/schema";
@@ -9,6 +11,117 @@ import type { Route } from "../routing.js";
 import { describeCaughtError } from "../errors.js";
 import { useFail } from "../../../shell/useFail.js";
 import { t } from "../catalog.js";
+
+const styles = stylex.create({
+  studioScreen: {
+    maxWidth: "60rem",
+    marginInline: "auto",
+    marginBlock: 0,
+    paddingTop: space.s4,
+    paddingInline: space.s3,
+    paddingBottom: space.s6,
+  },
+  studioBack: {
+    display: "block",
+    paddingLeft: 0,
+    marginBottom: space.s3,
+  },
+  errorBanner: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: space.s3,
+    border: `2px solid ${colors.refusal}`,
+    paddingBlock: space.s2,
+    paddingInline: space.s3,
+    marginBlock: space.s3,
+    marginInline: 0,
+  },
+  errorBannerStamp: {
+    flex: "none",
+    fontFamily: fonts.mono,
+    fontSize: 11,
+    fontWeight: 600,
+    letterSpacing: "0.05em",
+    textTransform: "uppercase",
+    color: colors.refusal,
+    border: "2px solid currentcolor",
+    paddingBlock: 2,
+    paddingInline: 7,
+    transform: "rotate(-2deg)",
+  },
+  errorBannerMessage: {
+    flex: 1,
+    color: colors.text,
+  },
+  studioEmpty: {
+    color: colors.textMuted,
+    paddingBlock: space.s4,
+    paddingInline: 0,
+  },
+  studioTable: {
+    width: "100%",
+    borderCollapse: "collapse",
+    fontSize: "0.9rem",
+  },
+  studioTableHeadCell: {
+    textAlign: "left",
+    fontFamily: fonts.body,
+    fontSize: "11px",
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+    color: colors.textMuted,
+    padding: space.s2,
+    borderBottom: `2px solid ${colors.divider}`,
+  },
+  studioTableCell: {
+    padding: space.s2,
+    borderBottom: `1px solid ${colors.border}`,
+    verticalAlign: "top",
+  },
+  studioControls: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: space.s2,
+    marginBottom: space.s3,
+    alignItems: "center",
+  },
+  studioError: {
+    color: colors.refusal,
+  },
+  studioDiff: {
+    listStyle: "none",
+    marginBlockStart: space.s3,
+    marginBlockEnd: 0,
+    marginInline: 0,
+    padding: 0,
+    fontSize: "0.85rem",
+  },
+  studioDiffItem: {
+    paddingBlock: space.s1,
+    paddingInline: 0,
+    borderBottom: `1px solid ${colors.border}`,
+  },
+  studioDiffCode: {
+    fontFamily: fonts.mono,
+    fontSize: "0.8rem",
+  },
+  // `.studio-diff-added code:first-child`.
+  studioDiffAddedFirstCode: {
+    color: colors.neutral900,
+  },
+  // `.studio-diff-removed code:first-child`.
+  studioDiffRemovedFirstCode: {
+    color: colors.refusal,
+  },
+});
+
+// `DiffKind`'s three values, exhaustive: `changed` earns no extra style on
+// its leading `<code>`, matching today's stylesheet.
+const DIFF_KIND_FIRST_CODE_STYLE = {
+  added: styles.studioDiffAddedFirstCode,
+  removed: styles.studioDiffRemovedFirstCode,
+  changed: undefined,
+} satisfies Record<DiffEntry["kind"], unknown>;
 
 interface VersionsScreenProps {
   processId: string;
@@ -142,44 +255,44 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized }: V
   };
 
   return (
-    <main className="studio-screen">
-      <button type="button" className="btn btn-ghost studio-back" onClick={() => navigate({ name: "edit", processId })}>
+    <main {...stylex.props(styles.studioScreen)}>
+      <button type="button" className="btn btn-ghost" {...stylex.props(styles.studioBack)} onClick={() => navigate({ name: "edit", processId })}>
         ← Back to process
       </button>
       <h1>Versions</h1>
       {loadError && (
-        <div className="studio-error-banner" role="alert">
-          <span className="studio-error-banner-stamp">{t("error.failed")}</span>
-          <span className="studio-error-banner-message">{loadError}</span>
+        <div {...stylex.props(styles.errorBanner)} role="alert">
+          <span {...stylex.props(styles.errorBannerStamp)}>{t("error.failed")}</span>
+          <span {...stylex.props(styles.errorBannerMessage)}>{loadError}</span>
           <button type="button" className="btn btn-secondary" onClick={() => load()} disabled={loading}>
             {t("error.retry")}
           </button>
         </div>
       )}
       {loading ? (
-        <p className="studio-empty">Loading…</p>
+        <p {...stylex.props(styles.studioEmpty)}>Loading…</p>
       ) : versions.length === 0 ? (
-        !loadError && <p className="studio-empty">No published versions yet.</p>
+        !loadError && <p {...stylex.props(styles.studioEmpty)}>No published versions yet.</p>
       ) : (
         <>
-          <table className="studio-table">
+          <table {...stylex.props(styles.studioTable)}>
             <thead>
               <tr>
-                <th>Version</th>
-                <th>Hash</th>
-                <th>Published</th>
-                <th>A</th>
-                <th>B</th>
-                <th>Promote</th>
+                <th {...stylex.props(styles.studioTableHeadCell)}>Version</th>
+                <th {...stylex.props(styles.studioTableHeadCell)}>Hash</th>
+                <th {...stylex.props(styles.studioTableHeadCell)}>Published</th>
+                <th {...stylex.props(styles.studioTableHeadCell)}>A</th>
+                <th {...stylex.props(styles.studioTableHeadCell)}>B</th>
+                <th {...stylex.props(styles.studioTableHeadCell)}>Promote</th>
               </tr>
             </thead>
             <tbody>
               {versions.map((v) => (
                 <tr key={v.version}>
-                  <td>v{v.version}</td>
-                  <td>{v.definitionHash.slice(0, 12)}</td>
-                  <td>{new Date(v.publishedAt).toLocaleString()}</td>
-                  <td>
+                  <td {...stylex.props(styles.studioTableCell)}>v{v.version}</td>
+                  <td {...stylex.props(styles.studioTableCell)}>{v.definitionHash.slice(0, 12)}</td>
+                  <td {...stylex.props(styles.studioTableCell)}>{new Date(v.publishedAt).toLocaleString()}</td>
+                  <td {...stylex.props(styles.studioTableCell)}>
                     <input
                       type="radio"
                       name="diff-a"
@@ -188,7 +301,7 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized }: V
                       onChange={() => setSelection((s) => ({ ...s, a: v.version }))}
                     />
                   </td>
-                  <td>
+                  <td {...stylex.props(styles.studioTableCell)}>
                     <input
                       type="radio"
                       name="diff-b"
@@ -197,7 +310,7 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized }: V
                       onChange={() => setSelection((s) => ({ ...s, b: v.version }))}
                     />
                   </td>
-                  <td>
+                  <td {...stylex.props(styles.studioTableCell)}>
                     <button
                       type="button"
                       className="btn btn-secondary"
@@ -212,7 +325,7 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized }: V
               ))}
             </tbody>
           </table>
-          <div className="studio-controls">
+          <div {...stylex.props(styles.studioControls)}>
             <button type="button" className="btn btn-secondary" disabled={!canDiff(selection)} onClick={() => void diffSelected()}>
               Diff selected
             </button>
@@ -231,25 +344,25 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized }: V
           </div>
         </>
       )}
-      {error && <p className="studio-error">{error}</p>}
+      {error && <p {...stylex.props(styles.studioError)}>{error}</p>}
       {diff &&
         (diff.length === 0 ? (
-          <p className="studio-empty">No differences.</p>
+          <p {...stylex.props(styles.studioEmpty)}>No differences.</p>
         ) : (
-          <ul className="studio-diff">
+          <ul {...stylex.props(styles.studioDiff)}>
             {diff.map((d, i) => (
-              <li key={i} className={`studio-diff-${d.kind}`}>
-                <code>{d.path}</code> — {d.kind}
+              <li key={i} {...stylex.props(styles.studioDiffItem)}>
+                <code {...stylex.props(styles.studioDiffCode, DIFF_KIND_FIRST_CODE_STYLE[d.kind])}>{d.path}</code> — {d.kind}
                 {d.kind !== "added" && (
                   <>
                     {" "}
-                    from <code>{JSON.stringify(d.from)}</code>
+                    from <code {...stylex.props(styles.studioDiffCode)}>{JSON.stringify(d.from)}</code>
                   </>
                 )}
                 {d.kind !== "removed" && (
                   <>
                     {" "}
-                    to <code>{JSON.stringify(d.to)}</code>
+                    to <code {...stylex.props(styles.studioDiffCode)}>{JSON.stringify(d.to)}</code>
                   </>
                 )}
               </li>

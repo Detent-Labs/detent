@@ -1,9 +1,65 @@
 import { useState } from "react";
+import * as stylex from "@stylexjs/stylex";
+import { colors, space } from "form-ui/tokens.stylex";
 import type { DraftField } from "../../draft/fields";
 import { t } from "../../catalog.js";
 import { asExpression, defaultValueDisabledReason, literalControlKind, parseCelDefault, toggleMultiselectValue } from "./defaultValueLogic";
 
 type DraftDefault = DraftField["default"];
+
+/** Every class this file's own markup renders, from `app.css`. */
+const styles = stylex.create({
+  defaultValueZone: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-start",
+    gap: space.s2,
+    width: "100%",
+  },
+  studioNote: {
+    color: colors.textMuted,
+    minHeight: "1.25rem",
+    marginBlockEnd: space.s2,
+    marginBlockStart: 0,
+    marginInline: 0,
+  },
+  // `.default-value-disabled .studio-note { margin: 0 }`: the disabled
+  // note's own zero-margin override.
+  studioNoteInDisabledZone: {
+    margin: 0,
+  },
+  conditionParseError: {
+    margin: 0,
+    color: colors.refusal,
+    fontSize: "0.85rem",
+  },
+  defaultValueFooter: {
+    display: "flex",
+    gap: space.s3,
+  },
+  conditionMode: {
+    background: "none",
+    color: colors.accent,
+    padding: 0,
+    flex: "none",
+  },
+  defaultValueCheckbox: {
+    display: "flex",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.s2,
+  },
+  defaultValueOptions: {
+    border: "none",
+    padding: 0,
+    margin: 0,
+  },
+  pluginFieldOption: {
+    display: "flex",
+    alignItems: "center",
+    gap: space.s1,
+  },
+});
 
 interface Props {
   field: DraftField;
@@ -27,8 +83,8 @@ export function DefaultValueEditor({ field, onChange }: Props) {
 
   if (disabledReason) {
     return (
-      <div className="default-value-zone default-value-disabled">
-        <p className="studio-note">
+      <div {...stylex.props(styles.defaultValueZone)}>
+        <p {...stylex.props(styles.studioNote, styles.studioNoteInDisabledZone)}>
           {disabledReason === "group" ? t("defaultValue.groupDisabledNote") : t("defaultValue.typeDisabledNote")}
         </p>
       </div>
@@ -59,7 +115,7 @@ export function DefaultValueEditor({ field, onChange }: Props) {
   };
 
   return (
-    <div className="default-value-zone">
+    <div {...stylex.props(styles.defaultValueZone)}>
       {celMode ? (
         <>
           <label>
@@ -67,7 +123,7 @@ export function DefaultValueEditor({ field, onChange }: Props) {
             <textarea rows={2} className="cel-input" value={celText} onChange={(e) => commitCel(e.target.value)} />
           </label>
           {celInvalid && (
-            <p className="condition-parse-error" role="status">
+            <p {...stylex.props(styles.conditionParseError)} role="status">
               {t("defaultValue.unparseable")}
             </p>
           )}
@@ -75,12 +131,12 @@ export function DefaultValueEditor({ field, onChange }: Props) {
       ) : (
         <LiteralDefaultInput field={field} value={current} onChange={onChange} />
       )}
-      <div className="default-value-footer">
-        <button type="button" className="condition-mode" onClick={celMode ? () => setCelMode(false) : switchToCel}>
+      <div {...stylex.props(styles.defaultValueFooter)}>
+        <button type="button" {...stylex.props(styles.conditionMode)} onClick={celMode ? () => setCelMode(false) : switchToCel}>
           {celMode ? t("defaultValue.useValue") : t("defaultValue.editAsCel")}
         </button>
         {current !== undefined && (
-          <button type="button" className="condition-mode" onClick={clear}>
+          <button type="button" {...stylex.props(styles.conditionMode)} onClick={clear}>
             {t("defaultValue.clear")}
           </button>
         )}
@@ -94,7 +150,7 @@ function LiteralDefaultInput({ field, value, onChange }: { field: DraftField; va
 
   if (kind === "boolean") {
     return (
-      <label className="default-value-checkbox">
+      <label {...stylex.props(styles.defaultValueCheckbox)}>
         {t("defaultValue.literalLabel")}
         <input type="checkbox" checked={value === true} onChange={(e) => onChange(e.target.checked)} />
       </label>
@@ -132,7 +188,7 @@ function LiteralDefaultInput({ field, value, onChange }: { field: DraftField; va
   // field — which declares none — takes its own instead, never both.
   if (kind === "none") {
     const personNote = field.format === "person" && field.dataSource === undefined;
-    return <p className="studio-note">{t(personNote ? "defaultValue.personNoOptions" : "defaultValue.dataSourceNoOptions")}</p>;
+    return <p {...stylex.props(styles.studioNote)}>{t(personNote ? "defaultValue.personNoOptions" : "defaultValue.dataSourceNoOptions")}</p>;
   }
   if (kind === "options") {
     return (
@@ -152,10 +208,10 @@ function LiteralDefaultInput({ field, value, onChange }: { field: DraftField; va
   if (kind === "options-multi") {
     const selected = Array.isArray(value) ? (value as string[]) : [];
     return (
-      <fieldset className="default-value-options">
+      <fieldset {...stylex.props(styles.defaultValueOptions)}>
         <legend>{t("defaultValue.literalLabel")}</legend>
         {(field.options ?? []).map((opt, i) => (
-          <label key={i} className="plugin-field-option">
+          <label key={i} {...stylex.props(styles.pluginFieldOption)}>
             <input
               type="checkbox"
               checked={selected.includes(opt.value ?? "")}

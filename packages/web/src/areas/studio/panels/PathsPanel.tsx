@@ -1,4 +1,6 @@
 import { useState } from "react";
+import * as stylex from "@stylexjs/stylex";
+import { colors, fonts, space } from "form-ui/tokens.stylex";
 import type { Path, PathTrigger, Step, StepId } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
 import type { DraftField } from "../draft/fields";
@@ -12,6 +14,80 @@ import type { ConfigFieldDescriptor } from "../api/types.js";
 
 type DraftPath = DraftOf<Path>;
 type DraftStep = DraftOf<Step>;
+
+const styles = stylex.create({
+  pathsPanel: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s3,
+  },
+  pathRow: {
+    border: `1px solid ${colors.border}`,
+    paddingBlock: space.s2,
+    paddingInline: space.s3,
+  },
+  pathRowSelected: {
+    boxShadow: `inset 3px 0 0 ${colors.accent}`,
+    borderColor: colors.accent,
+  },
+  studioSegmented: {
+    display: "flex",
+    gap: 0,
+    border: "none",
+    padding: 0,
+    marginBlock: space.s2,
+    marginInline: 0,
+  },
+  studioSegmentedLegend: {
+    fontFamily: fonts.body,
+    fontSize: "11px",
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+    color: colors.textMuted,
+    paddingBlockEnd: space.s1,
+    paddingBlockStart: 0,
+    paddingInline: 0,
+    width: "100%",
+  },
+  segmentedOption: {
+    flex: "1 1 auto",
+    background: "none",
+    color: colors.text,
+    border: `1px solid ${colors.border}`,
+    paddingBlock: space.s1,
+    paddingInline: space.s2,
+    font: "inherit",
+    cursor: "pointer",
+    ":hover": {
+      background: colors.surfaceMuted,
+    },
+  },
+  // `.studio-segmented-option + .studio-segmented-option`: this file always
+  // renders exactly two options, so the second one's own style applies the
+  // sibling override statically.
+  segmentedOptionSecond: {
+    borderLeft: "none",
+  },
+  segmentedOptionPressed: {
+    borderColor: colors.accent,
+    color: colors.accent,
+    boxShadow: `inset 0 -2px 0 ${colors.accent}`,
+  },
+  studioOnlyWhen: {
+    border: `1px solid ${colors.border}`,
+    paddingBlock: space.s2,
+    paddingInline: space.s3,
+    marginBlock: space.s2,
+    marginInline: 0,
+  },
+  studioOnlyWhenLegend: {
+    fontFamily: fonts.body,
+    fontSize: "11px",
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+    color: colors.textMuted,
+  },
+});
 
 interface Props {
   paths: DraftPath[] | undefined;
@@ -72,10 +148,13 @@ export function PathsPanel({
   const updatePath = (index: number, patch: Partial<DraftPath>) => onChange(updateAt(list, index, patch));
 
   return (
-    <div className="paths-panel">
+    <div {...stylex.props(styles.pathsPanel)}>
       {list.length === 0 && <p className="empty">{t("paths.empty")}</p>}
       {list.map((path, index) => (
-        <div className={`path-row${path.id && path.id === selectedPathId ? " path-row-selected" : ""}`} key={path.id ?? index}>
+        <div
+          {...stylex.props(styles.pathRow, path.id !== undefined && path.id === selectedPathId && styles.pathRowSelected)}
+          key={path.id ?? index}
+        >
           <label>
             key
             <input type="text" value={path.key ?? ""} onChange={(e) => updatePath(index, { key: e.target.value })} />
@@ -108,11 +187,11 @@ export function PathsPanel({
           {/* "triggered by": a two-option restyle of the existing `trigger`
               field (studio-condition-builder). Sets the same field the plain
               select used to set; adds nothing new. */}
-          <fieldset className="studio-segmented" aria-label={t("paths.triggeredByLabel")}>
-            <legend>{t("paths.triggeredByLabel")}</legend>
+          <fieldset {...stylex.props(styles.studioSegmented)} aria-label={t("paths.triggeredByLabel")}>
+            <legend {...stylex.props(styles.studioSegmentedLegend)}>{t("paths.triggeredByLabel")}</legend>
             <button
               type="button"
-              className="studio-segmented-option"
+              {...stylex.props(styles.segmentedOption, (path.trigger ?? "manual") === "manual" && styles.segmentedOptionPressed)}
               aria-pressed={(path.trigger ?? "manual") === "manual"}
               onClick={() => updatePath(index, { trigger: "manual" as PathTrigger })}
             >
@@ -120,7 +199,11 @@ export function PathsPanel({
             </button>
             <button
               type="button"
-              className="studio-segmented-option"
+              {...stylex.props(
+                styles.segmentedOption,
+                styles.segmentedOptionSecond,
+                path.trigger === "automatic" && styles.segmentedOptionPressed,
+              )}
               aria-pressed={path.trigger === "automatic"}
               onClick={() => updatePath(index, { trigger: "automatic" as PathTrigger })}
             >
@@ -129,8 +212,8 @@ export function PathsPanel({
           </fieldset>
 
           {path.trigger === "automatic" && (
-            <fieldset className="studio-only-when">
-              <legend>{t("condition.onlyWhenHeading")}</legend>
+            <fieldset {...stylex.props(styles.studioOnlyWhen)}>
+              <legend {...stylex.props(styles.studioOnlyWhenLegend)}>{t("condition.onlyWhenHeading")}</legend>
               <label>
                 priority
                 <input

@@ -1552,10 +1552,11 @@ Stage-by-stage status is in `ROADMAP.md`.
   source-only, no-build package extracted from the editor's Player field
   renderer so both the editor's Player and the end-user app render step forms
   through the identical component tree — a fix to one benefits both, and what
-  an author previews is what a participant gets. Only the end-user app
-  currently imports `form-ui/form-ui.css`; the editor's Player does not, so
-  its forms are presently unstyled (a known gap, not a design choice — see
-  `form-ui`'s spec). Two small engine-side additions: `InstanceSummary` gained
+  an author previews is what a participant gets. `packages/form-ui` ships no
+  stylesheet; its field renderer and path buttons compile from StyleX style
+  objects instead (`stylex-phase-1-form-ui`), so both consumers render
+  identically styled with no CSS import of their own. Two small engine-side
+  additions: `InstanceSummary` gained
   `processLabel`/`stepLabel`/`processBaseLocale` (resolved through the pinned
   version body) so the inbox can render without shipping whole process bodies
   to end-user browsers, and `POST /instances/:id/cancel` accepts
@@ -2267,8 +2268,9 @@ Stage-by-stage status is in `ROADMAP.md`.
 
   A mid-mutation reader never sees one change without the other. A mint
   entry draws with a dashed border. That reuses the canvas card's own
-  "not there yet" vocabulary (`.studio-form-card[data-conditional]`). It
-  borrows no new color.
+  "not there yet" vocabulary: `FormEditorScreen.tsx`'s
+  `formCardConditional` compiled style, the same one a conditional field
+  card already picks. It borrows no new color.
 
   `field.validation.rule`'s row builder (`RuleBuilder`/`RuleInput`,
   `panels/shared/ruleLogic.ts`) is a new component, not `ConditionBuilder`
@@ -2372,10 +2374,10 @@ Stage-by-stage status is in `ROADMAP.md`.
   `getInstanceView`, `submitPath`, `claimStep`, `releaseClaim`, and
   `getInstanceRecord`, reusing the package's existing `request()`/
   `StudioClientError`, and `form-ui` became a new dependency of
-  the studio area (it had none before Player existed) — including the
-  `form-ui/form-ui.css` import at the Player's own entry point that
-  `packages/editor`'s Player never had, leaving its forms unstyled; Studio's
-  Player closes that gap rather than reproducing it.
+  the studio area (it had none before Player existed). `packages/editor`'s
+  Player never styled its forms; Studio's Player closes that gap, first via
+  a shared stylesheet and, since `stylex-phase-1-form-ui`, via `form-ui`'s
+  own compiled StyleX styles.
 
   Showing the merged record beside Player needed an authorization change,
   not just a new route: `getInstanceRecord` (`src/runtime/api.ts`) gained an
@@ -2949,9 +2951,10 @@ Stage-by-stage status is in `ROADMAP.md`.
   renders aggregated numbers and never a step form. Read-only: it presents no
   control that changes engine state.
 
-  Its one visual device is `.rep-rule`, a hairline measuring rule whose fill
-  length carries a quantity. All three views bind a different quantity to the
-  same rule. Switching views therefore re-sorts and re-scales one picture
+  Its one visual device is `DurationRule` (`components.tsx`), a hairline
+  measuring rule whose fill length carries a quantity. All three views bind
+  a different quantity to the same rule. Switching views therefore
+  re-sorts and re-scales one picture
   rather than showing three unrelated ones. That is the honest picture, since
   cycle-time's per-step breakdown and bottleneck read the same traversals.
   Colour appears only in the SLA view, where it means breached, not large.
@@ -4271,9 +4274,10 @@ meets `scope=started` should infer no new permission tier from it.
   a Remove.
 
   Both panels gained the field CSS the area already states elsewhere. A
-  label sits above its control. A 2px rule sits under each heading. A new
-  `.studio-mono` utility marks the `key` inputs and the `type` select, the
-  values the engine matches exactly. `key`, `label`, `description`, `type`
+  label sits above its control. A 2px rule sits under each heading.
+  `FieldCatalogPanel.tsx`'s `studioMono` compiled style marks the `key`
+  inputs and the `type` select, the values the engine matches exactly.
+  `key`, `label`, `description`, `type`
   and `dataSource` stay literal, uncatalogued labels. `catalogs/studio.ts`'s
   own header already excludes raw contract vocabulary shown as a bare field
   label from translation.
@@ -4350,17 +4354,18 @@ meets `scope=started` should infer no new permission tier from it.
   or `Bun.serve`.
 
 - The editor dock (`packages/web/src/areas/studio/dock/`,
-  `screens/EditScreen.tsx`, `areas/studio/app.css`, `studio-canvas`): the
-  canvas edit screen left its lower band empty on a tall window. The grid
-  `.studio-canvas-layout` grows with the viewport, and the canvas fills its
-  middle column. The 12rem `EditRail` and the 22rem `ChecksRail` do not. The
-  dock is a collapsible strip below that grid, full width, collapsed by
-  default.
+  `screens/EditScreen.tsx`, `studio-canvas`): the canvas edit screen left
+  its lower band empty on a tall window. `EditScreen.tsx`'s
+  `studioCanvasLayout` compiled style grows the grid with the viewport,
+  and the canvas fills its middle column. The 12rem `EditRail` and the
+  22rem `ChecksRail` do not. The dock is a collapsible strip below that
+  grid, full width, collapsed by default.
 
   It is a flex SIBLING of the grid, never a fourth grid child. That template is
   a strict three columns, so a fourth child lands in an implicit fourth one.
-  The parent `.studio-edit-screen` is already a flex column, and item 1 gave
-  the grid `flex: 1 1 auto` with `min-height: 36rem`. The dock takes
+  The parent, `EditScreen.tsx`'s `studioEditScreen` compiled style, is
+  already a flex column, and item 1 gave the grid `flex: 1 1 auto` with
+  `min-height: 36rem`. The dock takes
   `flex: 0 0 auto`. The grid therefore yields its height down to that floor,
   and the page scrolls past it.
 
@@ -4405,9 +4410,10 @@ meets `scope=started` should infer no new permission tier from it.
   component state. The `layout` blob takes no key: it is per-draft, so one
   author's open dock would open for every author.
 
-  The browser check found what no test could. The rule
-  `.studio-matrix-scroll` caps at 32rem and scrolls itself. The dock scopes
-  that cap DOWN to 11rem rather than lifting it.
+  The browser check found what no test could. `FieldMatrixGrid.tsx`'s
+  `matrixScroll` style caps at 32rem and scrolls itself. Its
+  `matrixScrollCompact` variant, which the dock's own `compact` prop
+  selects, scopes that cap DOWN to 11rem rather than lifting it.
 
   Lifting it looks right and breaks the sticky headers. The declaration
   `overflow: auto` keeps that box a scroll container. A `position: sticky`

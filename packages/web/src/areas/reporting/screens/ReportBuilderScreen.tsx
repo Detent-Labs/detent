@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import * as stylex from "@stylexjs/stylex";
+import { colors, fonts, space } from "form-ui/tokens.stylex";
 import {
   createReport,
   downloadReportCsv,
@@ -27,6 +29,86 @@ import type { ClientError, ColumnChoice, DataComparison, ReportExecutionResult }
 
 const STATUSES = ["running", "completed", "cancelled", "faulted"] as const;
 const OPERATORS = ["eq", "ne", "in"] as const;
+
+/** `app.css`'s screen/controls/scope/comparison rules, as StyleX. The
+ * status checkboxes below keep their own literal inline layout style
+ * (display/alignItems/gap) exactly as it renders today; `controlsLabel`
+ * composes alongside it, contributing only the properties the inline
+ * style leaves untouched (`flexDirection`, `fontSize`). */
+const styles = stylex.create({
+  screen: {
+    maxWidth: "60rem",
+    marginInline: "auto",
+    paddingTop: space.s4,
+    paddingInline: space.s3,
+    paddingBottom: space.s6,
+  },
+  scope: {
+    fontSize: "0.85rem",
+    color: colors.textMuted,
+    marginTop: 0,
+    marginInline: 0,
+    marginBottom: space.s3,
+    maxWidth: "46rem",
+  },
+  empty: {
+    fontSize: "0.85rem",
+    color: colors.textMuted,
+    marginTop: 0,
+    marginInline: 0,
+    marginBottom: space.s3,
+    maxWidth: "46rem",
+    borderLeftWidth: 2,
+    borderLeftStyle: "solid",
+    borderLeftColor: colors.border,
+    paddingLeft: space.s3,
+  },
+  controls: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: space.s3,
+    alignItems: "flex-end",
+    paddingBottom: space.s3,
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.border,
+  },
+  controlsLabel: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s1,
+    fontSize: "0.9rem",
+  },
+  controlsLabelSpan: {
+    fontFamily: fonts.body,
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: "0.08em",
+    color: colors.textMuted,
+  },
+  comparisonRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: space.s2,
+    flexWrap: "wrap",
+    paddingBlock: space.s2,
+    paddingInline: 0,
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.border,
+  },
+  srOnly: {
+    position: "absolute",
+    width: 1,
+    height: 1,
+    padding: 0,
+    margin: -1,
+    overflow: "hidden",
+    clip: "rect(0, 0, 0, 0)",
+    whiteSpace: "nowrap",
+    borderWidth: 0,
+  },
+});
 
 export function ReportBuilderScreen({
   reportId,
@@ -155,24 +237,28 @@ export function ReportBuilderScreen({
   };
 
   return (
-    <main className="rep-screen">
+    <main {...stylex.props(styles.screen)}>
       <h1>{t(locale, reportId ? "builder.titleEdit" : "builder.titleNew")}</h1>
-      <p className="rep-scope" translate="no">
+      <p {...stylex.props(styles.scope)} translate="no">
         {t(locale, "builder.process")}: {processLabel ?? draft.processId}
       </p>
 
-      <label className="rep-controls">
+      <label {...stylex.props(styles.controls)}>
         <span>{t(locale, "builder.name")}</span>
         <input type="text" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
       </label>
-      {!isValidReportName(draft.name) && <p className="rep-scope">{t(locale, "builder.nameRequired")}</p>}
+      {!isValidReportName(draft.name) && <p {...stylex.props(styles.scope)}>{t(locale, "builder.nameRequired")}</p>}
 
       <section>
         <h2>{t(locale, "builder.filtersTitle")}</h2>
-        <fieldset className="rep-controls">
+        <fieldset {...stylex.props(styles.controls)}>
           <legend>{t(locale, "builder.status")}</legend>
           {STATUSES.map((s) => (
-            <label key={s} style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+            <label
+              key={s}
+              className={stylex.props(styles.controlsLabel).className}
+              style={{ display: "flex", alignItems: "center", gap: "4px" }}
+            >
               <input
                 type="checkbox"
                 checked={draft.status.includes(s)}
@@ -184,17 +270,17 @@ export function ReportBuilderScreen({
             </label>
           ))}
         </fieldset>
-        <div className="rep-controls">
-          <label>
-            <span>{t(locale, "range.from")}</span>
+        <div {...stylex.props(styles.controls)}>
+          <label {...stylex.props(styles.controlsLabel)}>
+            <span {...stylex.props(styles.controlsLabelSpan)}>{t(locale, "range.from")}</span>
             <input
               type="date"
               value={draft.createdAfter ? draft.createdAfter.slice(0, 10) : ""}
               onChange={(e) => setDraft({ ...draft, createdAfter: e.target.value ? new Date(e.target.value).toISOString() : "" })}
             />
           </label>
-          <label>
-            <span>{t(locale, "range.to")}</span>
+          <label {...stylex.props(styles.controlsLabel)}>
+            <span {...stylex.props(styles.controlsLabelSpan)}>{t(locale, "range.to")}</span>
             <input
               type="date"
               value={draft.createdBefore ? draft.createdBefore.slice(0, 10) : ""}
@@ -204,7 +290,7 @@ export function ReportBuilderScreen({
         </div>
 
         <h3>{t(locale, "builder.dataWhereTitle")}</h3>
-        {draft.dataWhere.length === 0 && <p className="rep-empty">{t(locale, "builder.dataWhereEmpty")}</p>}
+        {draft.dataWhere.length === 0 && <p {...stylex.props(styles.empty)}>{t(locale, "builder.dataWhereEmpty")}</p>}
         {draft.dataWhere.map((cmp, i) => (
           <ComparisonRow
             key={i}
@@ -244,7 +330,7 @@ export function ReportBuilderScreen({
         locale={locale}
       />
 
-      <div className="rep-controls">
+      <div {...stylex.props(styles.controls)}>
         <button type="button" className="btn btn-secondary" onClick={runPreview} disabled={previewLoading || draft.columns.length === 0}>
           {t(locale, previewLoading ? "builder.previewing" : "builder.preview")}
         </button>
@@ -279,7 +365,7 @@ function ComparisonRow({
   locale: UiLocale;
 }) {
   return (
-    <div className="rep-comparison-row">
+    <div {...stylex.props(styles.comparisonRow)}>
       <select value={comparison.fieldId} onChange={(e) => onChange({ ...comparison, fieldId: e.target.value })}>
         {choices.map((c) => (
           <option key={c.fieldId} value={c.fieldId}>
@@ -295,7 +381,7 @@ function ComparisonRow({
         ))}
       </select>
       <label>
-        <span className="sr-only">{t(locale, "builder.comparisonValue")}</span>
+        <span {...stylex.props(styles.srOnly)}>{t(locale, "builder.comparisonValue")}</span>
         <input
           type="text"
           value={typeof comparison.value === "string" ? comparison.value : JSON.stringify(comparison.value)}
@@ -304,7 +390,7 @@ function ComparisonRow({
           }
         />
       </label>
-      {comparison.operator === "in" && <span className="rep-scope">{t(locale, "builder.comparisonValueHint")}</span>}
+      {comparison.operator === "in" && <span {...stylex.props(styles.scope)}>{t(locale, "builder.comparisonValueHint")}</span>}
       <button type="button" className="btn btn-secondary" onClick={onRemove}>
         {t(locale, "builder.removeComparison")}
       </button>

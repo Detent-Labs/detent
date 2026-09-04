@@ -98,7 +98,7 @@ describe("ProcessHeaderBar's failure region", () => {
     const html = renderHeader({ actions: { error: "You don't have permission to do that." } });
 
     expect(html).toContain('role="alert"');
-    expect(html).toContain("studio-error-banner");
+    expect(html).toContain("errorBanner");
     expect(html).toContain("You don&#x27;t have permission to do that.");
     // The violating input: the shape this change replaced.
     expect(html).not.toContain('<p class="studio-error">');
@@ -107,13 +107,13 @@ describe("ProcessHeaderBar's failure region", () => {
   it("puts the banner outside the header element, so it is not one more flex item", () => {
     const html = renderHeader({ actions: { error: "refused" } });
 
-    expect(html.indexOf("studio-error-banner")).toBeGreaterThan(html.indexOf("</header>"));
+    expect(html.indexOf("errorBanner")).toBeGreaterThan(html.indexOf("</header>"));
   });
 
   it("gives the save conflict the same banner shape, keeping its Reload button", () => {
     const html = renderHeader({ conflict: true });
 
-    expect(html).toContain("studio-error-banner");
+    expect(html).toContain("errorBanner");
     expect(html).toContain('role="alert"');
     expect(html).toContain("Reload");
     expect(html).not.toContain("studio-conflict");
@@ -122,7 +122,7 @@ describe("ProcessHeaderBar's failure region", () => {
   it("suppresses the banner while a dialog is open, so one failure announces once", () => {
     const html = renderHeader({ actions: { error: "refused", pendingDialog: "publish" } });
 
-    expect(html).not.toContain("studio-error-banner");
+    expect(html).not.toContain("errorBanner");
     // The dialog reports it instead, inside itself.
     expect(html).toContain("<dialog");
     expect(html).toContain("refused");
@@ -131,7 +131,7 @@ describe("ProcessHeaderBar's failure region", () => {
   it("renders no failure region at all when nothing failed", () => {
     const html = renderHeader({});
 
-    expect(html).not.toContain("studio-error-banner");
+    expect(html).not.toContain("errorBanner");
     expect(html).not.toContain('role="alert"');
   });
 });

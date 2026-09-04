@@ -75,8 +75,8 @@ function nodeLines(html: string): NodeLines[] {
     .slice(1)
     .map((chunk) => ({
       stepId: /<g data-step-id="([^"]*)"/.exec(chunk)?.[1] ?? "",
-      label: /class="canvas-node-label">([^<]*)</.exec(chunk)?.[1],
-      key: /class="canvas-node-key">([^<]*)</.exec(chunk)?.[1],
+      label: /class="nodeLabel">([^<]*)</.exec(chunk)?.[1],
+      key: /class="nodeKey">([^<]*)</.exec(chunk)?.[1],
     }));
 }
 

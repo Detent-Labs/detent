@@ -211,7 +211,10 @@ design change, not a screen decision.
 green. A destructive action stays outlined in the accent and never turns red.
 
 **The Role Rule.** A component reads a semantic role, never a ramp step and
-never a hex. The three flag tokens are the only exception.
+never a hex. The three flag tokens are the only exception. A component
+compiled with StyleX reads that role from
+`packages/form-ui/src/tokens.stylex.ts`, which aliases the same custom
+property `tokens.css` declares.
 
 ## Typography
 

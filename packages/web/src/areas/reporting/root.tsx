@@ -1,8 +1,11 @@
 import { useState } from "react";
+import * as stylex from "@stylexjs/stylex";
 import { ChartNoAxesColumn, FileSpreadsheet } from "lucide-react";
 import { matchRoute, routePath, type Route, type ViewName } from "./routing.js";
 import { useAreaRoute, PROFILE_PATH } from "../../shell/routing.js";
 import { Chrome } from "../../shell/Chrome.js";
+import { navStyles } from "../../shell/navStyles.js";
+import { colors, space } from "form-ui/tokens.stylex";
 import { defaultRange, rangeIsValid, type DateRange } from "./screens/reportingLogic.js";
 import { ProcessPickerScreen } from "./screens/ProcessPickerScreen.js";
 import { CycleTimeScreen } from "./screens/CycleTimeScreen.js";
@@ -13,7 +16,6 @@ import { ReportBuilderScreen } from "./screens/ReportBuilderScreen.js";
 import { DateRangeControl } from "./components.js";
 import { t, type CatalogKey } from "./catalog.js";
 import type { AreaRootProps } from "../../shell/App.js";
-import "./app.css";
 
 const VIEWS: { name: ViewName; labelKey: CatalogKey }[] = [
   { name: "cycle-time", labelKey: "nav.cycleTime" },
@@ -29,6 +31,26 @@ const VIEWS: { name: ViewName; labelKey: CatalogKey }[] = [
  */
 const BASE_LOCALE = "en";
 
+/** `.rep-screen` from `app.css`. This root's own `.rep-error` call site
+ * carries no stamp, so it keeps the refusal tone — the other half of
+ * `components.tsx`'s two-way choice (design.md D12's per-call-site
+ * bucket-2 rule). */
+const styles = stylex.create({
+  screen: {
+    maxWidth: "60rem",
+    marginInline: "auto",
+    paddingTop: space.s4,
+    paddingInline: space.s3,
+    paddingBottom: space.s6,
+  },
+  errorRefusal: {
+    fontSize: "0.9rem",
+    color: colors.refusal,
+    marginBlock: space.s3,
+    marginInline: 0,
+  },
+});
+
 /**
  * The process-owner area's root. The `system:reports` gate that used to live
  * here is now the shell's, read from one table (`shell/areas.ts`); the server's
@@ -43,33 +65,44 @@ export function ReportingArea({ session, locale, localPath, go, onLocaleChange, 
   // over, and falls back to the id rather than rendering a blank heading.
   const [processLabel, setProcessLabel] = useState<string | undefined>();
 
+  const pickerCurrent = route.name === "picker";
+  const reportsCurrent = route.name === "reports" || route.name === "newReport" || route.name === "report";
+  const pickerProps = stylex.props(pickerCurrent && navStyles.navCurrent);
+  const reportsProps = stylex.props(reportsCurrent && navStyles.navCurrent);
+
   const nav = (
-    <nav className="shell-nav">
+    <nav {...stylex.props(navStyles.nav)}>
       <button
         type="button"
-        className="btn btn-secondary rep-home"
-        aria-current={route.name === "picker" ? "page" : undefined}
+        className={`btn btn-secondary rep-home ${pickerProps.className}`}
+        style={pickerProps.style}
+        aria-current={pickerCurrent ? "page" : undefined}
         onClick={() => navigate({ name: "picker" })}
       >
         <ChartNoAxesColumn size={18} strokeWidth={1.75} aria-hidden="true" />
         {t(locale, "nav.processes")}
       </button>
       {route.name === "view" &&
-        VIEWS.map((v) => (
-          <button
-            key={v.name}
-            type="button"
-            className="btn btn-secondary"
-            aria-current={route.view === v.name ? "page" : undefined}
-            onClick={() => navigate({ name: "view", view: v.name, processId: route.processId })}
-          >
-            {t(locale, v.labelKey)}
-          </button>
-        ))}
+        VIEWS.map((v) => {
+          const viewProps = stylex.props(route.view === v.name && navStyles.navCurrent);
+          return (
+            <button
+              key={v.name}
+              type="button"
+              className={`btn btn-secondary ${viewProps.className}`}
+              style={viewProps.style}
+              aria-current={route.view === v.name ? "page" : undefined}
+              onClick={() => navigate({ name: "view", view: v.name, processId: route.processId })}
+            >
+              {t(locale, v.labelKey)}
+            </button>
+          );
+        })}
       <button
         type="button"
-        className="btn btn-secondary"
-        aria-current={route.name === "reports" || route.name === "newReport" || route.name === "report" ? "page" : undefined}
+        className={`btn btn-secondary ${reportsProps.className}`}
+        style={reportsProps.style}
+        aria-current={reportsCurrent ? "page" : undefined}
         onClick={() => navigate({ name: "reports" })}
       >
         <FileSpreadsheet size={18} strokeWidth={1.75} aria-hidden="true" />
@@ -123,11 +156,11 @@ export function ReportingArea({ session, locale, localPath, go, onLocaleChange, 
           onSaved={(reportId) => navigate({ name: "report", reportId })}
         />
       ) : (
-        <main className="rep-screen">
+        <main {...stylex.props(styles.screen)}>
           <h1>{processLabel ?? route.processId}</h1>
           <DateRangeControl range={range} onChange={setRange} locale={locale} />
           {!rangeIsValid(range) ? (
-            <p className="rep-error" role="alert">
+            <p {...stylex.props(styles.errorRefusal)} role="alert">
               {t(locale, "range.invalid")}
             </p>
           ) : route.view === "cycle-time" ? (

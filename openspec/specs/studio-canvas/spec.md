@@ -3078,3 +3078,128 @@ rendering.
 - **WHEN** a test gives the row derivation a list of steps
 - **THEN** it returns one row per path, in the draft's own order
 - **AND** the test needs no DOM or canvas rendering
+
+### Requirement: The process-identity header bar renders from compiled styles
+
+`panels/ProcessHeaderBar.tsx` renders the process-identity header bar,
+per this capability's own "A process-identity header bar shows draft
+and publish status" requirement. The header bar SHALL render from
+compiled component styles. Its two dialogs are each a different
+capability's own concern. Only the header bar itself is this
+requirement's scope.
+
+#### Scenario: The header bar keeps its look
+
+- **WHEN** a browser renders the process-identity header bar
+- **THEN** its computed layout, spacing, color and border equal the
+  values the deleted stylesheet declared
+
+### Requirement: The inspector's identity zone and diagnostics drawer render from compiled styles
+
+`panels/StepsPanel.tsx` renders three named regions. They are the
+inspector's identity zone, its behavior-zone tab list, and its
+diagnostics drawer (`.claude/rules/ui-glossary.md`'s own names for
+them). All three SHALL render from compiled component styles. The
+rendered result SHALL match the previous stylesheet declaration for
+declaration.
+
+#### Scenario: The inspector's own chrome keeps its look
+
+- **WHEN** a browser selects a step and opens the inspector
+- **THEN** all three regions keep their computed layout, spacing, color
+  and border
+- **AND** every value matches the deleted stylesheet's own
+
+### Requirement: The inspector's Paths and Timers tabs render from compiled styles
+
+`panels/PathsPanel.tsx`, one of the inspector's own behavior-zone
+tabs, SHALL render from compiled component styles. The rendered
+result SHALL match the previous stylesheet declaration for
+declaration.
+
+`panels/TimersPanel.tsx`, the inspector's other behavior-zone tab,
+renders no class this migration covers. It already satisfies this
+requirement, unchanged, since it carries no rule to compile.
+
+#### Scenario: The Paths tab keeps its look
+
+- **WHEN** a browser opens the inspector's Paths tab
+- **THEN** its computed layout, spacing, color and border equal the
+  values the deleted stylesheet declared
+
+### Requirement: The dock's own layout renders from compiled styles
+
+`dock/EditorDock.tsx` SHALL render from compiled component styles. That
+covers the dock's collapsed strip, its tab row, and each tab's content
+frame. The rendered result SHALL match the previous stylesheet
+declaration for declaration.
+
+`canvas/CanvasView.tsx` and `canvas/EditRail.tsx` render the three
+columns above the dock, and this requirement leaves both untouched.
+This requirement covers only the dock itself.
+
+#### Scenario: The dock keeps its look and its tab switch still works
+
+- **WHEN** a browser expands the dock and switches between its tabs
+- **THEN** the dock's computed layout equals the value the deleted
+  stylesheet declared
+- **AND** each tab still shows its own content on selection
+
+### Requirement: The edit screen's own layout renders from compiled styles
+
+`screens/EditScreen.tsx`, the layout the structure view sits in, SHALL
+compile from typed StyleX style objects. The rendered result SHALL
+match the previous stylesheet declaration for declaration.
+
+#### Scenario: The edit screen keeps its look
+
+- **WHEN** a browser opens the edit screen's structure view
+- **THEN** its computed layout equals the value the deleted stylesheet
+  declared
+
+#### Scenario: The group-rename label still renders correctly, unmigrated
+
+<!-- This scenario's title predates this requirement's last change and
+     now describes a state that change ended. The body below states
+     the corrected, current fact; the title stays so a future delta
+     against it recognizes this as the same scenario evolving, not one
+     dropped and a new one added. -->
+- **WHEN** the inspector shows a group's rename label
+- **THEN** it carries no literal `canvas-group-name` class
+- **AND** its computed style, including its `cursor: grab` affordance,
+  equals the value the deleted stylesheet declared
+
+### Requirement: The canvas renders from compiled styles
+
+`canvas/CanvasView.tsx` and `canvas/EditRail.tsx` SHALL render from compiled
+component styles, reading `form-ui/tokens.stylex`. The rendered result
+SHALL match the previous stylesheet declaration for declaration. This
+covers every pointer-driven state (drag, selection, insert-target,
+group-collapsed) and every keyboard-driven state (roving focus ring,
+`:focus-visible` halo).
+
+`canvas-node` and `panzoom-exclude` SHALL remain literal, unhashed class
+strings on every element that carries them today. Keyboard-focus targeting
+and Panzoom's own exclude-class contract both read one of these two strings
+directly, outside the compiled-style system.
+
+#### Scenario: The canvas keeps its look and its keyboard model
+
+- **WHEN** a browser renders the canvas edit screen
+- **AND** a developer walks its nodes and edges with the keyboard, in
+  Chromium and in Firefox
+- **THEN** the canvas's computed layout, spacing, color and border equal
+  the values the deleted stylesheet declared
+- **AND** the keyboard traversal, selection and focus-ring behavior stay
+  exactly as they were before
+
+#### Scenario: Panzoom still excludes every node and edge group from panning
+
+- **WHEN** a developer starts a pointer drag on one of the canvas's
+  excluded elements
+- **AND** the element is a step node, an edge group, a waypoint handle,
+  or the inline rename field
+- **THEN** the press reaches the canvas's own handlers and does not pan
+  the canvas
+- **AND** each of those elements still carries the literal
+  `panzoom-exclude` class Panzoom's own exclude-class option reads

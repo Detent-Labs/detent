@@ -1,8 +1,142 @@
 import type { ReactNode } from "react";
 import type { LocaleCode } from "workflow-engine/schema";
+import * as stylex from "@stylexjs/stylex";
 import { isResolvedViewField, type ResolvedViewEntry, type ResolvedViewField, type ResolvedViewNote, type SubmissionIssue } from "./types.js";
 import { booleanLabels, resolveText } from "./locale.js";
 import { issueMessage } from "./issue-messages.js";
+import { colors, fonts, space } from "./tokens.stylex.js";
+
+/** Every `form-ui.css` rule, as StyleX. A layout choice with a fixed set of
+ * outcomes (`columns`, `span`) is chosen among named styles in code — see
+ * `web-styling`'s "A DOM-attribute variant becomes a code-side style
+ * choice". The `data-columns`/`data-span` attributes below still render;
+ * nothing in this module reads them back. */
+const styles = stylex.create({
+  form: {
+    containerType: "inline-size",
+    containerName: "form-ui-form",
+  },
+  gridOneCol: {
+    display: "grid",
+    gridTemplateColumns: "1fr",
+    gap: space.s4,
+  },
+  gridTwoCol: {
+    display: "grid",
+    gridTemplateColumns: {
+      default: "repeat(2, minmax(0, 1fr))",
+      "@container form-ui-form (max-width: 34rem)": "1fr",
+    },
+    gap: space.s4,
+  },
+  groupStack: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s4,
+    border: "none",
+    padding: 0,
+    margin: 0,
+  },
+  groupGridTwoCol: {
+    display: "grid",
+    gridTemplateColumns: {
+      default: "repeat(2, minmax(0, 1fr))",
+      "@container form-ui-form (max-width: 34rem)": "1fr",
+    },
+    gap: space.s4,
+  },
+  spanTwo: {
+    gridColumn: {
+      default: "span 2",
+      "@container form-ui-form (max-width: 34rem)": "auto",
+    },
+  },
+  groupLegendFullWidth: {
+    gridColumn: "1 / -1",
+  },
+  fieldStack: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s1,
+  },
+  fieldLabel: {
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: "0.1em",
+    color: colors.textMuted,
+  },
+  control: {
+    fontFamily: "inherit",
+    fontSize: 14,
+    padding: space.s2,
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: {
+      default: colors.border,
+      ":focus-visible": colors.accent,
+    },
+    outlineOffset: {
+      default: "initial",
+      ":focus-visible": 0,
+    },
+    background: colors.surface,
+    color: colors.text,
+  },
+  textareaResize: {
+    resize: "vertical",
+  },
+  checkboxRadioReset: {
+    padding: 0,
+    border: "none",
+    background: "none",
+    accentColor: colors.accent,
+  },
+  fieldOptions: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s1,
+    border: "none",
+    padding: 0,
+    margin: 0,
+  },
+  optionsLegendSpacing: {
+    padding: 0,
+    marginBottom: space.s1,
+  },
+  option: {
+    display: "flex",
+    alignItems: "center",
+    gap: space.s2,
+    fontSize: 14,
+  },
+  groupLegend: {
+    fontFamily: fonts.heading,
+    fontWeight: fonts.headingWeight,
+    fontSize: 16,
+    padding: 0,
+  },
+  requiredMarker: {
+    marginLeft: space.s1,
+    color: colors.accent,
+  },
+  fieldIssues: {
+    margin: 0,
+    padding: 0,
+    listStyle: "none",
+    fontFamily: fonts.mono,
+    fontSize: 12,
+    color: colors.refusal,
+  },
+  note: {
+    margin: 0,
+    padding: `0 0 0 ${space.s3}`,
+    borderLeftWidth: 2,
+    borderLeftStyle: "solid",
+    borderLeftColor: colors.border,
+    fontSize: 14,
+    color: colors.text,
+  },
+});
 
 interface FieldFormProps {
   fields: ResolvedViewEntry[];
@@ -116,8 +250,8 @@ export function FieldForm({ fields, values, onChange, locale, issuesByField, col
     // The wrapper carries the size container the collapse rule measures. A
     // container query matches descendants of the container, never the element
     // declaring it, so the grid cannot be its own container.
-    <div className="form-ui-form">
-      <div className="form-ui-field-form" data-columns={columns}>
+    <div {...stylex.props(styles.form)}>
+      <div {...stylex.props(columns === 2 ? styles.gridTwoCol : styles.gridOneCol)} data-columns={columns}>
         {roots.map(({ entry, index }) => (
           <ViewEntryInput
             key={entryKey(entry, index)}
@@ -141,7 +275,7 @@ export function FieldForm({ fields, values, onChange, locale, issuesByField, col
 function NoteText({ note, locale, columns = 1 }: { note: ResolvedViewNote; locale: LocaleCode; columns?: 1 | 2 }) {
   const span = effectiveSpan(note.span, columns);
   return (
-    <p className="form-ui-note" data-span={span}>
+    <p {...stylex.props(styles.note, span === 2 && styles.spanTwo)} data-span={span}>
       {resolveText(note.text, locale, locale)}
     </p>
   );
@@ -178,8 +312,12 @@ export function FieldInput({ field, allFields, values, onChange, locale, issuesB
   if (def.type === "group") {
     const children = allFields.map((c, i) => ({ c, i })).filter(({ c }) => c.group === def.key);
     return (
-      <fieldset className="form-ui-field form-ui-field-group" data-span={span} data-columns={columns}>
-        <legend>{label}</legend>
+      <fieldset
+        {...stylex.props(styles.fieldStack, styles.groupStack, columns === 2 && styles.groupGridTwoCol)}
+        data-span={span}
+        data-columns={columns}
+      >
+        <legend {...stylex.props(styles.groupLegend, columns === 2 && styles.groupLegendFullWidth)}>{label}</legend>
         {children.map(({ c, i }) => (
           <ViewEntryInput
             key={entryKey(c, i)}
@@ -252,15 +390,31 @@ export function FieldInput({ field, allFields, values, onChange, locale, issuesB
             { on: true, text: yes },
             { on: false, text: no },
           ].map((o) => (
-            <label className="form-ui-option" key={String(o.on)}>
-              <input type="radio" name={def.id} disabled={disabled} checked={value === o.on} onChange={() => onChange(def.id, o.on)} />
+            <label {...stylex.props(styles.option)} key={String(o.on)}>
+              <input
+                type="radio"
+                name={def.id}
+                disabled={disabled}
+                checked={value === o.on}
+                onChange={() => onChange(def.id, o.on)}
+                {...stylex.props(styles.control, styles.checkboxRadioReset)}
+              />
               <span>{o.text}</span>
             </label>
           ))}
         </>
       );
     } else {
-      control = <input type="checkbox" disabled={disabled} checked={!!value} onChange={(e) => onChange(def.id, e.target.checked)} {...a11yProps} />;
+      control = (
+        <input
+          type="checkbox"
+          disabled={disabled}
+          checked={!!value}
+          onChange={(e) => onChange(def.id, e.target.checked)}
+          {...stylex.props(styles.control, styles.checkboxRadioReset)}
+          {...a11yProps}
+        />
+      );
     }
   } else if (def.type === "number") {
     control = (
@@ -272,6 +426,7 @@ export function FieldInput({ field, allFields, values, onChange, locale, issuesB
         disabled={disabled}
         value={value === undefined || value === null ? "" : String(value)}
         onChange={(e) => onChange(def.id, e.target.value === "" ? undefined : Number(e.target.value))}
+        {...stylex.props(styles.control)}
         {...a11yProps}
       />
     );
@@ -280,8 +435,16 @@ export function FieldInput({ field, allFields, values, onChange, locale, issuesB
     control = (
       <>
         {optionEntries.map((o) => (
-          <label className="form-ui-option" key={o.value}>
-            <input type="radio" name={def.id} value={o.value} disabled={disabled} checked={value === o.value} onChange={() => onChange(def.id, o.value)} />
+          <label {...stylex.props(styles.option)} key={o.value}>
+            <input
+              type="radio"
+              name={def.id}
+              value={o.value}
+              disabled={disabled}
+              checked={value === o.value}
+              onChange={() => onChange(def.id, o.value)}
+              {...stylex.props(styles.control, styles.checkboxRadioReset)}
+            />
             <span>{o.text}</span>
           </label>
         ))}
@@ -292,7 +455,7 @@ export function FieldInput({ field, allFields, values, onChange, locale, issuesB
     control = (
       <>
         {optionEntries.map((o) => (
-          <label className="form-ui-option" key={o.value}>
+          <label {...stylex.props(styles.option)} key={o.value}>
             <input
               type="checkbox"
               value={o.value}
@@ -306,6 +469,7 @@ export function FieldInput({ field, allFields, values, onChange, locale, issuesB
                   optionEntries.filter((c) => (c.value === o.value ? e.target.checked : checked.includes(c.value))).map((c) => c.value),
                 )
               }
+              {...stylex.props(styles.control, styles.checkboxRadioReset)}
             />
             <span>{o.text}</span>
           </label>
@@ -319,6 +483,7 @@ export function FieldInput({ field, allFields, values, onChange, locale, issuesB
         disabled={disabled}
         value={checked}
         onChange={(e) => onChange(def.id, Array.from(e.target.selectedOptions).map((o) => o.value))}
+        {...stylex.props(styles.control)}
         {...a11yProps}
       >
         {optionElements}
@@ -326,14 +491,27 @@ export function FieldInput({ field, allFields, values, onChange, locale, issuesB
     );
   } else if (hasOptions && def.type === "string") {
     control = (
-      <select disabled={disabled} value={(value as string) ?? ""} onChange={(e) => onChange(def.id, e.target.value)} {...a11yProps}>
+      <select
+        disabled={disabled}
+        value={(value as string) ?? ""}
+        onChange={(e) => onChange(def.id, e.target.value)}
+        {...stylex.props(styles.control)}
+        {...a11yProps}
+      >
         <option value="" />
         {optionElements}
       </select>
     );
   } else if (def.type === "string" && def.control === "multiline") {
     control = (
-      <textarea disabled={disabled} rows={4} value={(value as string) ?? ""} onChange={(e) => onChange(def.id, e.target.value)} {...a11yProps} />
+      <textarea
+        disabled={disabled}
+        rows={4}
+        value={(value as string) ?? ""}
+        onChange={(e) => onChange(def.id, e.target.value)}
+        {...stylex.props(styles.control, styles.textareaResize)}
+        {...a11yProps}
+      />
     );
   } else {
     // One text-input branch for three cases: a `file` field, a plugin
@@ -347,33 +525,34 @@ export function FieldInput({ field, allFields, values, onChange, locale, issuesB
         disabled={disabled}
         value={(value as string) ?? ""}
         onChange={(e) => onChange(def.id, e.target.value)}
+        {...stylex.props(styles.control)}
         {...a11yProps}
       />
     );
   }
 
   const marker = field.required && (
-    <span className="form-ui-required-marker" title="required">
+    <span {...stylex.props(styles.requiredMarker)} title="required">
       *
     </span>
   );
 
   return (
-    <div className="form-ui-field" data-span={span}>
+    <div {...stylex.props(styles.fieldStack, span === 2 && styles.spanTwo)} data-span={span}>
       {grouped ? (
         // The group's own state lives on the <fieldset>: it is the element the
         // required and invalid state describes, and the element the issue list
         // describes. Each input inside carries its own <label>.
-        <fieldset className="form-ui-field-options" {...a11yProps}>
-          <legend className="form-ui-field-label">
+        <fieldset {...stylex.props(styles.fieldOptions)} {...a11yProps}>
+          <legend {...stylex.props(styles.fieldLabel, styles.optionsLegendSpacing)}>
             {label}
             {marker}
           </legend>
           {control}
         </fieldset>
       ) : (
-        <label className="form-ui-field-control">
-          <span className="form-ui-field-label">
+        <label {...stylex.props(styles.fieldStack)}>
+          <span {...stylex.props(styles.fieldLabel)}>
             {label}
             {marker}
           </span>
@@ -381,7 +560,7 @@ export function FieldInput({ field, allFields, values, onChange, locale, issuesB
         </label>
       )}
       {hasIssues && (
-        <ul className="form-ui-field-issues" id={issuesId}>
+        <ul {...stylex.props(styles.fieldIssues)} id={issuesId}>
           {issues.map((issue, i) => (
             <li key={i}>{issueMessage(issue, locale)}</li>
           ))}

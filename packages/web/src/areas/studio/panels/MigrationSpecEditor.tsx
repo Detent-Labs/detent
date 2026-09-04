@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import * as stylex from "@stylexjs/stylex";
+import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { t } from "../catalog.js";
 import {
   checkPlan,
@@ -13,6 +15,86 @@ import {
   type TransformRow,
   type UnmappablePolicy,
 } from "../screens/migrationPlanLogic.js";
+
+const styles = stylex.create({
+  studioMapEditor: {
+    display: "grid",
+    gap: space.s3,
+    marginBottom: space.s3,
+  },
+  studioMapSection: {
+    border: `1px solid ${colors.border}`,
+    padding: space.s3,
+  },
+  studioMapSectionLegend: {
+    fontFamily: fonts.body,
+    fontSize: "11px",
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+    color: colors.textMuted,
+    paddingBlock: 0,
+    paddingInline: space.s1,
+  },
+  studioMapHint: {
+    marginBlockEnd: space.s3,
+    marginBlockStart: 0,
+    marginInline: 0,
+    fontSize: "0.85rem",
+    color: colors.textMuted,
+    maxWidth: "60ch",
+    textWrap: "pretty",
+  },
+  studioMapRow: {
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) auto minmax(0, 1fr) auto",
+    gap: space.s2,
+    alignItems: "center",
+    paddingBlock: space.s1,
+    paddingInline: 0,
+    maxWidth: "64rem",
+  },
+  // `.studio-map-section .studio-empty`: every `.studio-empty` this file
+  // renders sits inside a `Section`'s own fieldset.
+  studioEmpty: {
+    color: colors.textMuted,
+    paddingBlockStart: 0,
+    paddingBlockEnd: space.s2,
+    paddingInline: 0,
+  },
+  studioMapArrow: {
+    fontFamily: fonts.mono,
+    color: colors.textMuted,
+  },
+  studioMapPicker: {
+    fontFamily: fonts.mono,
+    fontSize: "0.85rem",
+    minWidth: 0,
+    padding: space.s1,
+    border: `1px solid ${colors.border}`,
+    background: colors.surface,
+    color: colors.text,
+  },
+  studioMapExpression: {
+    fontFamily: fonts.mono,
+    fontSize: "0.85rem",
+    minWidth: 0,
+    padding: space.s1,
+    border: `1px solid ${colors.border}`,
+    background: colors.surface,
+    color: colors.text,
+  },
+  studioMapUnresolved: {
+    borderColor: colors.accent400,
+    borderStyle: "dashed",
+    color: colors.refusal,
+  },
+  studioMapError: {
+    gridColumn: "1 / -1",
+    margin: 0,
+    fontSize: "0.85rem",
+    color: colors.refusal,
+  },
+});
 
 interface Props {
   rows: PlanRows;
@@ -44,7 +126,7 @@ function EntryPicker({ value, entries, label, describedBy, invalid, onChange }: 
   const unresolved = isUnresolved(value, entries);
   return (
     <select
-      className={unresolved ? "studio-map-picker studio-map-unresolved" : "studio-map-picker"}
+      {...stylex.props(styles.studioMapPicker, unresolved && styles.studioMapUnresolved)}
       aria-label={label}
       aria-describedby={describedBy}
       aria-invalid={invalid || undefined}
@@ -67,9 +149,9 @@ function EntryPicker({ value, entries, label, describedBy, invalid, onChange }: 
 
 function Section({ legend, hint, children }: { legend: string; hint: string; children: ReactNode }) {
   return (
-    <fieldset className="studio-map-section">
-      <legend>{legend}</legend>
-      <p className="studio-map-hint">{hint}</p>
+    <fieldset {...stylex.props(styles.studioMapSection)}>
+      <legend {...stylex.props(styles.studioMapSectionLegend)}>{legend}</legend>
+      <p {...stylex.props(styles.studioMapHint)}>{hint}</p>
       {children}
     </fieldset>
   );
@@ -101,12 +183,12 @@ export function MigrationSpecEditor({ rows, catalogs, onChange }: Props) {
     to: readonly StepEntry[],
   ) => (
     <>
-      {list.length === 0 && <p className="studio-empty">{t("migrationForm.noRows")}</p>}
+      {list.length === 0 && <p {...stylex.props(styles.studioEmpty)}>{t("migrationForm.noRows")}</p>}
       {list.map((row, index) => {
         const rowIssues = issuesFor(row.rowId);
         const errorId = rowIssues.length > 0 ? `${kind}-error-${row.rowId}` : undefined;
         return (
-          <div className="studio-map-row" key={row.rowId}>
+          <div {...stylex.props(styles.studioMapRow)} key={row.rowId}>
             <EntryPicker
               value={row.from}
               entries={from}
@@ -115,7 +197,7 @@ export function MigrationSpecEditor({ rows, catalogs, onChange }: Props) {
               invalid={rowIssues.length > 0}
               onChange={(id) => setList(list.map((r, i) => (i === index ? { ...r, from: id } : r)))}
             />
-            <span className="studio-map-arrow" aria-hidden="true">
+            <span {...stylex.props(styles.studioMapArrow)} aria-hidden="true">
               →
             </span>
             <EntryPicker
@@ -130,7 +212,7 @@ export function MigrationSpecEditor({ rows, catalogs, onChange }: Props) {
               {t("migrationForm.removeRow")}
             </button>
             {errorId && (
-              <p className="studio-map-error studio-error" id={errorId}>
+              <p {...stylex.props(styles.studioMapError)} id={errorId}>
                 {rowIssues.map((i) => i.message).join("; ")}
               </p>
             )}
@@ -151,7 +233,7 @@ export function MigrationSpecEditor({ rows, catalogs, onChange }: Props) {
   const unmappableIssues = issuesFor(UNMAPPABLE_ROW_ID);
 
   return (
-    <div className="studio-map-editor" aria-live="polite">
+    <div {...stylex.props(styles.studioMapEditor)} aria-live="polite">
       <Section legend={t("migrationForm.stepMapLegend")} hint={t("migrationForm.stepMapHint")}>
         {mapRows("stepMap", rows.stepMap, setStepMap, sourceSteps, targetSteps)}
       </Section>
@@ -161,9 +243,9 @@ export function MigrationSpecEditor({ rows, catalogs, onChange }: Props) {
       </Section>
 
       <Section legend={t("migrationForm.transformsLegend")} hint={t("migrationForm.transformsHint")}>
-        {rows.transforms.length === 0 && <p className="studio-empty">{t("migrationForm.noRows")}</p>}
+        {rows.transforms.length === 0 && <p {...stylex.props(styles.studioEmpty)}>{t("migrationForm.noRows")}</p>}
         {rows.transforms.map((row, index) => (
-          <div className="studio-map-row" key={row.rowId}>
+          <div {...stylex.props(styles.studioMapRow)} key={row.rowId}>
             <EntryPicker
               value={row.target}
               entries={catalogs.target.fields}
@@ -171,11 +253,11 @@ export function MigrationSpecEditor({ rows, catalogs, onChange }: Props) {
               invalid={false}
               onChange={(id) => setTransforms(rows.transforms.map((r, i) => (i === index ? { ...r, target: id } : r)))}
             />
-            <span className="studio-map-arrow" aria-hidden="true">
+            <span {...stylex.props(styles.studioMapArrow)} aria-hidden="true">
               ←
             </span>
             <input
-              className="studio-map-expression"
+              {...stylex.props(styles.studioMapExpression)}
               type="text"
               spellCheck={false}
               autoComplete="off"
@@ -207,7 +289,7 @@ export function MigrationSpecEditor({ rows, catalogs, onChange }: Props) {
       </Section>
 
       <Section legend={t("migrationForm.unmappableLegend")} hint={t("migrationForm.unmappableHint")}>
-        <div className="studio-map-row">
+        <div {...stylex.props(styles.studioMapRow)}>
           <label>
             onUnmappable
             <select value={rows.onUnmappable} onChange={(e) => setPolicy(e.target.value as UnmappablePolicy)}>
@@ -218,7 +300,7 @@ export function MigrationSpecEditor({ rows, catalogs, onChange }: Props) {
           </label>
           {rows.onUnmappable === "route-to-step" && (
             <>
-              <span className="studio-map-arrow" aria-hidden="true">
+              <span {...stylex.props(styles.studioMapArrow)} aria-hidden="true">
                 →
               </span>
               <EntryPicker
@@ -232,7 +314,7 @@ export function MigrationSpecEditor({ rows, catalogs, onChange }: Props) {
             </>
           )}
           {unmappableIssues.length > 0 && (
-            <p className="studio-map-error studio-error" id="unmappable-error">
+            <p {...stylex.props(styles.studioMapError)} id="unmappable-error">
               {unmappableIssues.map((i) => i.message).join("; ")}
             </p>
           )}
