@@ -483,7 +483,7 @@ A note SHALL appear in no field usage list. A note SHALL mark no catalog field
 as used, so the palette keeps offering every field the notes sit beside.
 
 The count of a step's configured fields lives outside the form editor, on the
-Steps panel. The `studio-app` capability states its rule.
+Form section. The `studio-app` capability states its rule.
 
 #### Scenario: A note leaves the usage list alone
 

@@ -6,6 +6,7 @@ import { draftFields } from "../draft/fields.js";
 import type { Draft } from "../draft/types.js";
 import { t } from "../catalog.js";
 import { StepsPanel } from "../panels/StepsPanel.js";
+import type { SectionName } from "../panels/sectionsFor.js";
 import { PanelsScreen } from "./PanelsScreen.js";
 import { useDraftToolbarActions } from "../panels/DraftToolbar.js";
 import { ProcessHeaderBar } from "../panels/ProcessHeaderBar.js";
@@ -17,7 +18,9 @@ import type { Route, PanelView } from "../routing.js";
 import { initialSaveState, type DraftSaveState } from "./draftSaveLogic.js";
 import { isDirty } from "./draftToolbarState.js";
 import { CanvasView, groupMembersDomId } from "../canvas/CanvasView.js";
-import { EditRail } from "../canvas/EditRail.js";
+import { CanvasPalette } from "../canvas/CanvasPalette.js";
+import { StepsRegister } from "../canvas/StepsRegister.js";
+import { registerOrder } from "../draft/registerOrder.js";
 import { snapToGrid, svgPointFromClient, DEFAULT_EDGE_STYLE, type Point, type EdgeStyle } from "../canvas/geometry.js";
 import { canGroup, groupMatching, type StepGroup } from "../canvas/groups.js";
 import { arrangeSteps, hasHandPlacedStep } from "../canvas/arrange.js";
@@ -26,11 +29,18 @@ import { newStep, type StepKind } from "../draft/createStep.js";
 import { addToDraftArray } from "../draft/draft-array-crud.js";
 import { insertOnPath } from "../draft/insertOnPath.js";
 import { JsonView } from "../panels/JsonView.js";
-import { EditorDock, type DockTab } from "../dock/EditorDock.js";
 import { describeCaughtError } from "../errors.js";
 import { useFail } from "../../../shell/useFail.js";
 import { FormEditorScreen } from "./FormEditorScreen.js";
 import type { NavigateOptions } from "../../../shell/routing.js";
+
+/** The width below which the bench stands one column. `PanelsScreen` turns its
+ * own index rail at this same width, for the same reason. */
+const NARROW = "@media (max-width: 64rem)";
+
+/** The ribbon's body: what its control names in `aria-controls`, and what a
+ * palette drop resolves the live canvas through. */
+const RIBBON_BODY_ID = "studio-canvas-ribbon-body";
 
 const styles = stylex.create({
   studioScreen: {
@@ -122,10 +132,64 @@ const styles = stylex.create({
     fontWeight: 600,
     textDecoration: "underline",
   },
-  studioCanvasLayout: {
+  // The structure surface: the ribbon across the top, the bench beneath it.
+  structureSurface: {
+    display: "flex",
+    flex: "1 1 auto",
+    flexDirection: "column",
+    gap: space.s3,
+    minHeight: 0,
+  },
+  ribbon: {
+    display: "flex",
+    flexDirection: "column",
+    flex: "none",
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: colors.border,
+  },
+  // The bar holds the ribbon's own control and the checks summary. An expanded
+  // checks list grows this row and pushes the bench down; it floats over
+  // nothing and casts no shadow (`studio-checks-rail`).
+  ribbonBar: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: space.s3,
+    paddingBlock: space.s2,
+    paddingInline: space.s3,
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.border,
+  },
+  ribbonControl: {
+    flex: "none",
+    marginBottom: 0,
+  },
+  // The two states differ in height and in whether the palette lists. The same
+  // `CanvasView` mounts in both, so every canvas interaction stays live: the
+  // band draws a shorter canvas, not a lesser one.
+  ribbonBody: {
+    display: "flex",
+    minHeight: 0,
+  },
+  // The band clears the canvas toolbar that overlays its top-left corner and
+  // still shows the graph beneath it.
+  ribbonBodyBand: {
+    height: "12rem",
+  },
+  ribbonBodyOpen: {
+    height: "30rem",
+  },
+  // The steps register beside the configuration pane. Below the breakpoint the
+  // register gives up its column and the two fall under one another, in source
+  // order — the rule `PanelsScreen`'s own index rail follows, at that same
+  // width. The floor is what the ribbon takes height from; past it the page
+  // scrolls.
+  bench: {
     display: "grid",
     flex: "1 1 auto",
-    gridTemplateColumns: "12rem minmax(0, 1fr) 22rem",
+    gridTemplateColumns: { default: "18rem minmax(0, 1fr)", [NARROW]: "minmax(0, 1fr)" },
+    gridTemplateRows: { default: "none", [NARROW]: "auto minmax(0, 1fr)" },
     gap: space.s3,
     alignItems: "stretch",
     minHeight: "36rem",
@@ -167,14 +231,6 @@ const styles = stylex.create({
     gap: space.s1,
     cursor: "grab",
   },
-  // `.canvas-selection .studio-checks-rail-docked`: `ChecksRail`'s own root
-  // no longer carries a literal class this descendant selector can reach,
-  // so this screen wraps that one call site instead (the same pattern
-  // `PanelsScreen.tsx` uses for its own `ChecksRail` mount, Group 6).
-  canvasSelectionChecksRail: {
-    width: "100%",
-    marginTop: "auto",
-  },
 });
 
 interface EditScreenProps {
@@ -212,7 +268,8 @@ interface EditorAreaProps {
   go: (href: string, opts?: NavigateOptions) => void;
   initialRevision: number;
   initialLayout: Record<string, unknown>;
-  /** The published version this draft sits on, for the dock's Changes tab.
+  /** The published version this draft sits on, for the panels screen's
+   * Changes view.
    * Not `initialBaseVersion`: `initialRevision` and `initialLayout` seed a
    * useState, and this one seeds nothing. `EditScreen` never refreshes the
    * loaded record — `load` depends on processId/token/onUnauthorized alone —
@@ -232,8 +289,8 @@ interface EditorAreaProps {
 }
 
 /** Rendered inside DraftProvider, so it can read/replace the Draft via
- * useDraft() — and pass that access down to every panel it mounts, `EditRail`
- * and `StepsPanel` included. `useDraftToolbarActions` (below) is the one
+ * useDraft() — and pass that access down to every panel it mounts,
+ * `StepsRegister` and `StepsPanel` included. `useDraftToolbarActions` (below) is the one
  * remaining direct consumer of `DraftToolbarProps`; `DraftToolbar` itself no
  * longer mounts here (design.md: "DraftToolbar keeps its logic.
  * ProcessHeaderBar renders the buttons."). */
@@ -252,13 +309,16 @@ function EditorArea({ processId, formStepId, panel, stepId, token, go, initialRe
   // selection, which the drag never touches until release.
   const [insertTargetPathId, setInsertTargetPathId] = useState<string | undefined>(undefined);
   const [surface, setSurface] = useState<"structure" | "json">("structure");
-  // The dock persists nothing. Component state, so both survive a canvas
-  // selection and a trip to the panels screen (this component stays mounted
-  // across the ladder), and a reload returns the dock to collapsed. Neither
-  // goes into `saveState.layout`: that blob is per-draft, so one author's
-  // open dock would open for every author of the draft.
-  const [dockOpen, setDockOpen] = useState(false);
-  const [dockTab, setDockTab] = useState<DockTab>("changes");
+  // Whether the canvas ribbon shows its full height with the palette, or its
+  // fit-scale band. Nothing persists it: it lives here alone, so a reload
+  // returns the ribbon to collapsed and a save writes no key for it into the
+  // draft's `layout` blob (`studio-canvas`).
+  const [ribbonOpen, setRibbonOpen] = useState(false);
+  // Which sections the configuration pane holds open, per step id. It lives
+  // here for the reason the dock's own flag did: `StepsPanel` unmounts
+  // whenever the selection leaves a step, and the draft's `layout` blob is
+  // per-draft, so one author's open set must not reach another (design.md).
+  const sectionOpen = useState<Record<string, SectionName[]>>({});
   const fields = draftFields(draft);
 
   const steps = draft.workflow?.steps ?? [];
@@ -275,8 +335,8 @@ function EditorArea({ processId, formStepId, panel, stepId, token, go, initialRe
   // the conflict reload re-runs it. A publish DOES move the stored base
   // version — `markDraftPublished` sets `base_version` inside the publish
   // transaction — and the response carries the new number, so fold it over.
-  const dockBaseVersion = publishResult?.version ?? loadedBaseVersion;
-  // Folded exactly like `dockBaseVersion` above: the loaded prop underneath,
+  const changesBaseVersion = publishResult?.version ?? loadedBaseVersion;
+  // Folded exactly like `changesBaseVersion` above: the loaded prop underneath,
   // and whatever `reload()` last re-read on top. `undefined` means nothing has
   // re-read it yet, which is why the fold uses `??` and not a truthiness test —
   // a re-read `false` has to win over a loaded `true`.
@@ -419,6 +479,13 @@ function EditorArea({ processId, formStepId, panel, stepId, token, go, initialRe
   // in that state").
   const inspectedStepId = selectedStepIds.length === 1 ? selectedStepIds[0] : undefined;
 
+  // The step the configuration pane shows, and the row the steps register
+  // reads as current. Selecting none shows the register's own first step
+  // (`studio-canvas`), so the pane never stands empty on a draft holding a
+  // step. One piece of state drives both regions: the ribbon's canvas and the
+  // register cannot disagree about which step is current.
+  const paneStepId = inspectedStepId ?? registerOrder(steps, draft.workflow?.initialStep)[0]?.id;
+
   /** Deletes every step in the set, the way `StepsPanel.removeStep` deletes
    * one. A path pointing at a deleted step stays as it is; the single delete
    * leaves one the same way, and the checks rail reports it. */
@@ -448,7 +515,7 @@ function EditorArea({ processId, formStepId, panel, stepId, token, go, initialRe
     return pathId && sourceStepId ? { pathId, sourceStepId } : undefined;
   };
 
-  /** `EditRail.onDragMove` (task 4.1): fired on every pointer move a rail drag
+  /** `CanvasPalette.onDragMove`: fired on every pointer move a palette drag
    * makes. An `end` drag resolves to no target — a terminal step never lands
    * inside a path, so nothing may suggest that it does. */
   const onPaletteDragMove = (kind: StepKind, clientX: number, clientY: number) => {
@@ -467,13 +534,34 @@ function EditorArea({ processId, formStepId, panel, stepId, token, go, initialRe
     });
   };
 
-  /** The rail's own drag-to-place (task 2.3), through the same `newStep`/
-   * `addToDraftArray` creation path every step-creating control in this
-   * screen shares. Screen coordinates in, since `EditRail` holds no canvas
-   * geometry of its own: `elementFromPoint` finds the live `.canvas-svg`
-   * element (or none, when the drop misses the canvas), and
-   * `svgPointFromClient` converts through its current pan/zoom transform —
-   * the same conversion `CanvasView`'s own node/handle drags use.
+  /** The one draft-mutation method every step-creating control on this screen
+   * shares: the palette's drop, and the steps register's own add control on a
+   * draft holding no step (`studio-canvas`'s palette requirement). */
+  const appendStep = (created: ReturnType<typeof newStep>) => {
+    addToDraftArray(
+      mutate,
+      (d) => {
+        d.workflow ??= {};
+        d.workflow.steps ??= [];
+        d.workflow.initialStep ??= created.id;
+        return d.workflow.steps;
+      },
+      created,
+    );
+  };
+
+  const onAddFirstStep = () => {
+    const created = newStep("task", seedLocalizedText(contentLocale));
+    appendStep(created);
+    if (created.id) onSelectStep(created.id);
+  };
+
+  /** The palette's own drag-to-place, through that same creation path. Screen
+   * coordinates in, since the palette holds no canvas geometry of its own:
+   * `elementFromPoint` finds the live canvas (or none, when the drop misses
+   * it), and `svgPointFromClient` converts through its current pan/zoom
+   * transform — the same conversion `CanvasView`'s own node and handle drags
+   * use.
    *
    * A drop over a rendered path inserts the new step into it instead of
    * placing it free-standing (design.md: "The gesture is a drop, not a
@@ -484,16 +572,13 @@ function EditorArea({ processId, formStepId, panel, stepId, token, go, initialRe
   const onPaletteDrop = (kind: StepKind, clientX: number, clientY: number) => {
     setInsertTargetPathId(undefined);
     const target = document.elementFromPoint(clientX, clientY);
-    // Resolve through `.canvas-wrap`, not through the SVG under the pointer.
-    // Panzoom scales the SVG element itself, so a zoomed-out canvas leaves
-    // most of the wrap outside the SVG's own box, while the wrap still paints
-    // the grid and still shows the graph. Every point the author reads as
-    // canvas therefore places a step. `svgPointFromClient` maps a point
-    // outside the box just as well: an inverse CTM is a linear map, not a
-    // bounded one.
-    const svg =
-      target?.closest(".canvas-wrap")?.querySelector<SVGSVGElement>("svg.canvas-svg") ??
-      target?.closest<SVGSVGElement>("svg.canvas-svg");
+    // Resolve through the ribbon's body, not through the SVG under the
+    // pointer. Panzoom scales the SVG element itself, so a zoomed-out canvas
+    // leaves most of the body outside the SVG's own box, while the body still
+    // shows the graph. Every point the author reads as canvas therefore places
+    // a step. `svgPointFromClient` maps a point outside the box just as well:
+    // an inverse CTM is a linear map, not a bounded one.
+    const svg = target?.closest(`#${RIBBON_BODY_ID}`)?.querySelector<SVGSVGElement>("svg");
     if (!svg) return; // dropped outside the canvas — no placement
     // Rounded here, the same way a drag's release is: a dropped step lands on
     // the lattice the author can see.
@@ -519,16 +604,7 @@ function EditorArea({ processId, formStepId, panel, stepId, token, go, initialRe
       return;
     }
 
-    addToDraftArray(
-      mutate,
-      (d) => {
-        d.workflow ??= {};
-        d.workflow.steps ??= [];
-        d.workflow.initialStep ??= created.id;
-        return d.workflow.steps;
-      },
-      created,
-    );
+    appendStep(created);
     if (created.id) {
       onMoveStep(created.id, point);
       onSelectStep(created.id);
@@ -594,7 +670,7 @@ function EditorArea({ processId, formStepId, panel, stepId, token, go, initialRe
         structureActive={surface === "structure"}
         processId={processId}
         canPublish={canPublish}
-        baseVersion={dockBaseVersion}
+        baseVersion={changesBaseVersion}
         go={go}
         surfaceToggle={
           <div {...stylex.props(styles.studioSurfaceToggle)} role="tablist">
@@ -624,11 +700,13 @@ function EditorArea({ processId, formStepId, panel, stepId, token, go, initialRe
           {panel !== undefined ? (
             <PanelsScreen
               openView={panel}
+              processId={processId}
               onBack={() => navigate({ name: "edit", processId })}
               onOpenView={(view) => navigate({ name: "edit", processId, panel: view })}
               onShowStep={(targetStepId) => navigate({ name: "edit", processId, stepId: targetStepId })}
               token={token}
               canPublish={canPublish}
+              baseVersion={changesBaseVersion}
             />
           ) : formStepId !== undefined ? (
             formStep ? (
@@ -645,36 +723,63 @@ function EditorArea({ processId, formStepId, panel, stepId, token, go, initialRe
               </div>
             )
           ) : (
-            <>
-            <div {...stylex.props(styles.studioCanvasLayout)}>
-              <EditRail
-                onDrop={onPaletteDrop}
-                onDragMove={onPaletteDragMove}
-                onOpenPanel={(view) => navigate({ name: "edit", processId, panel: view })}
-              />
-              <CanvasView
-                layout={saveState.layout}
-                onMoveStep={onMoveStep}
-                onArrange={onArrange}
-                selectedStepIds={selectedStepIds}
-                onSelectStep={onSelectStep}
-                onSelectSteps={onSelectSteps}
-                selectedPathId={selectedPathId}
-                edgeStyle={edgeStyle}
-                onEdgeStyleChange={onEdgeStyleChange}
-                waypoints={waypoints}
-                onWaypointsChange={onWaypointsChange}
-                groups={groups}
-                onGroupsChange={onGroupsChange}
-                insertTargetPathId={insertTargetPathId}
-              />
-              {/* The third column has three states (studio-canvas). Nothing
-                  selected shows the full checks rail. One step or a path
-                  shows the inspector. Several steps show the group summary,
-                  since the inspector edits one step and a set of several
-                  names none for it. The inspector and the summary each dock
-                  their own collapsed `ChecksRail`; this column never mounts a
-                  second copy beside one of them. */}
+            <div {...stylex.props(styles.structureSurface)}>
+              {/* The canvas ribbon. Its bar carries the ribbon's own control
+                  and the checks summary; its body carries the same
+                  `CanvasView` in both states, so every canvas interaction
+                  stays live whether the ribbon shows its band or its full
+                  height. Only the height and the palette differ. */}
+              <section {...stylex.props(styles.ribbon)}>
+                <div {...stylex.props(styles.ribbonBar)}>
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    {...stylex.props(styles.ribbonControl)}
+                    aria-expanded={ribbonOpen}
+                    aria-controls={RIBBON_BODY_ID}
+                    onClick={() => setRibbonOpen((open) => !open)}
+                  >
+                    {t(ribbonOpen ? "ribbon.collapse" : "ribbon.expand")}
+                  </button>
+                  <ChecksRail validation={validation} canPublish={canPublish} collapsed inBar />
+                </div>
+                <div
+                  id={RIBBON_BODY_ID}
+                  {...stylex.props(styles.ribbonBody, ribbonOpen ? styles.ribbonBodyOpen : styles.ribbonBodyBand)}
+                >
+                  {ribbonOpen && <CanvasPalette onDrop={onPaletteDrop} onDragMove={onPaletteDragMove} />}
+                  <CanvasView
+                    layout={saveState.layout}
+                    onMoveStep={onMoveStep}
+                    onArrange={onArrange}
+                    selectedStepIds={selectedStepIds}
+                    onSelectStep={onSelectStep}
+                    onSelectSteps={onSelectSteps}
+                    selectedPathId={selectedPathId}
+                    edgeStyle={edgeStyle}
+                    onEdgeStyleChange={onEdgeStyleChange}
+                    waypoints={waypoints}
+                    onWaypointsChange={onWaypointsChange}
+                    groups={groups}
+                    onGroupsChange={onGroupsChange}
+                    insertTargetPathId={insertTargetPathId}
+                  />
+                </div>
+              </section>
+              <div {...stylex.props(styles.bench)}>
+                <StepsRegister
+                  currentStepId={paneStepId}
+                  onSelectStep={(target) => onSelectStep(target)}
+                  onOpenPanel={(view) => navigate({ name: "edit", processId, panel: view })}
+                  onAddFirstStep={onAddFirstStep}
+                />
+              {/* The configuration pane has two states (studio-canvas). A set
+                  of several steps shows the selection count and its delete
+                  control, since the pane edits one step and a set of several
+                  names none for it. Anything else shows that one step — the
+                  register's own first when the developer has selected none.
+                  Neither state docks a `ChecksRail`: the ribbon's bar carries
+                  the one summary this surface stands. */}
               {selectedStepIds.length > 1 ? (
                 <aside {...stylex.props(styles.canvasInspector, styles.canvasSelection)}>
                   <div {...stylex.props(styles.canvasSelectionHeading)}>
@@ -750,45 +855,22 @@ function EditorArea({ processId, formStepId, panel, stepId, token, go, initialRe
                       </button>
                     );
                   })()}
-                  <div {...stylex.props(styles.canvasSelectionChecksRail)}>
-                    <ChecksRail validation={validation} canPublish={canPublish} collapsed />
-                  </div>
                 </aside>
-              ) : inspectedStepId !== undefined || selectedPathId !== undefined ? (
+              ) : (
                 <aside {...stylex.props(styles.canvasInspector)}>
                   <StepsPanel
                     fields={fields}
                     token={token}
-                    selectedStepId={inspectedStepId}
+                    selectedStepId={paneStepId}
                     onSelectStep={onSelectStep}
                     selectedPathId={selectedPathId}
                     navigate={(stepId) => navigate({ name: "edit", processId, formStepId: stepId })}
-                    canPublish={canPublish}
+                    sectionOpen={sectionOpen}
                   />
                 </aside>
-              ) : (
-                <ChecksRail validation={validation} canPublish={canPublish} />
               )}
+              </div>
             </div>
-            {/* The dock is a flex SIBLING of the grid, not a fourth grid
-              * child: `.studio-canvas-layout`'s template is a strict three
-              * columns, so a fourth child would land in an implicit fourth
-              * one. `.studio-edit-screen` is already a flex column, and the
-              * grid inside it carries `flex: 1 1 auto` with `min-height:
-              * 36rem`, so the grid yields its height to the dock down to that
-              * floor and the page scrolls past it. Item 1 built that pair. */}
-            <EditorDock
-              processId={processId}
-              token={token}
-              draft={draft}
-              contentLocale={contentLocale}
-              baseVersion={dockBaseVersion}
-              open={dockOpen}
-              onOpenChange={setDockOpen}
-              tab={dockTab}
-              onTabChange={setDockTab}
-            />
-            </>
           )}
         </>
       ) : (

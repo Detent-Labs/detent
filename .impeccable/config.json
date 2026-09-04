@@ -20,6 +20,12 @@
         ],
         "createdAt": "2026-09-04T16:46:20.965Z",
         "reason": "0.8rem is the studio's own secondary step; the rail's kind word already takes it (main's panelsRailType), and the move control beside it matches that word on the same row. A documented ramp step would read larger than the word it sits beside and invert the hierarchy. Scoped to this file; it silences no other off-ramp size."
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#726e6e",
+        "createdAt": "2026-09-04T21:20:03.437Z",
+        "reason": "design.json records it as .ds-stamp-dormant; the detector reads the token palette only. Copied verbatim from app-area InvolvedScreen.tsx's stampDormant."
       }
     ]
   }

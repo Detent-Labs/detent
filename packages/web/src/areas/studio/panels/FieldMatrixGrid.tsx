@@ -31,11 +31,6 @@ const styles = stylex.create({
     border: `1px solid ${colors.border}`,
     maxHeight: "32rem",
   },
-  // The dock mount's own cap (D10): 15rem sits just under the dock body's
-  // 16rem, leaving the grid nearly the whole budget.
-  matrixScrollCompact: {
-    maxHeight: "15rem",
-  },
   matrixTable: {
     borderCollapse: "separate",
     borderSpacing: 0,
@@ -339,17 +334,11 @@ function BulkBadges({
 
 interface Props {
   /** Drops a step with no `view` from the grid's columns, per the panels
-   * screen's "Hide inert columns" toggle. Always `false` for the canvas
-   * dock's mount, which offers no filter (`studio-canvas`). */
+   * screen's "Hide inert columns" toggle. */
   hideInert?: boolean;
   /** Shows the column and row bulk toggle badges. Only the panels-screen
-   * wrapper (`FieldMatrixPanel`) sets this; the dock mount leaves it unset,
-   * per design.md decision 6. */
+   * wrapper (`FieldMatrixPanel`) sets this, per design.md decision 6. */
   showBulkBadges?: boolean;
-  /** Caps the scroll box at 15rem instead of its own 32rem default, to fit
-   * the dock body's 16rem budget (D10). Only `EditorDock.tsx`'s mount sets
-   * this. */
-  compact?: boolean;
 }
 
 /**
@@ -367,10 +356,9 @@ interface Props {
  *
  * This component carries no toolbar, legend or count line — those belong to
  * `FieldMatrixPanel`, the panels-screen wrapper that renders this grid
- * inside itself (design.md decision 6). The canvas dock's Field matrix tab
- * mounts this component directly.
+ * inside itself (design.md decision 6).
  */
-export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false, compact = false }: Props) {
+export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: Props) {
   const { draft, mutate, contentLocale } = useDraft();
   const baseLocale = draft.baseLocale ?? "en";
   const rows = useMemo(() => matrixRows(draft.fields), [draft.fields]);
@@ -481,7 +469,7 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false, com
 
   return (
     <div
-      {...stylex.props(styles.matrixScroll, compact && styles.matrixScrollCompact)}
+      {...stylex.props(styles.matrixScroll)}
       tabIndex={0}
       aria-label={t("fieldMatrix.scrollRegionLabel")}
     >

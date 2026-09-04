@@ -24,7 +24,7 @@ export function panelEntityCounts(draft: {
   fields?: DraftField[];
   dataSources?: unknown[];
   contract?: { outcomes?: unknown[] };
-  workflow?: { steps?: { view?: { fields?: DraftViewEntry[] } }[] };
+  workflow?: { steps?: { view?: { fields?: DraftViewEntry[] }; paths?: unknown[] }[] };
 }): Record<PanelView, number> {
   return {
     fields: flattenRailFields(draft.fields).length,
@@ -34,6 +34,11 @@ export function panelEntityCounts(draft: {
       (sum, step) => sum + (step.view?.fields?.filter(isDraftViewField).length ?? 0),
       0,
     ),
+    // The Changes count is the difference against the base version, which no
+    // draft-only expression can produce: it needs a fetch. `ChangesView`
+    // reports its own count up to the rail, and 0 stands until that lands.
+    changes: 0,
+    paths: (draft.workflow?.steps ?? []).reduce((sum, step) => sum + (step.paths?.length ?? 0), 0),
   };
 }
 

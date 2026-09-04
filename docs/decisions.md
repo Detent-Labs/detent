@@ -990,29 +990,28 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   without making it impossible. It also costs a second read of the parent
   row on every return delivery. Do not re-propose the hoist without a
   measurement showing the bounded hold is itself the problem.
-- **The editor dock: three surviving decisions.** The dock itself shipped
-  under `studio-editor-dock` (archived), and `docs/current-state.md` and
-  `.claude/rules/ui-glossary.md` describe it as built. Three decisions from
-  that design pass outlive the build log and still govern later dock work.
-  - The Player was rejected for this band and stays rejected. A step form
-    needs height, and the dock's whole premise is that it takes little.
-    Docking the Player would either squeeze the canvas below its floor or
-    show one field at a time. `screens/PlayerScreen.tsx` keeps its own
-    route. Do not re-propose it as a tab without a design that answers the
-    height.
-  - Two candidate tabs are deferred, not rejected. A translation-coverage
-    grid would map every `LocalizedText` against every locale and mark the
-    gaps that the `baseLocale` invariant permits. A CEL scratchpad would
-    evaluate an expression against the draft's field catalog through
-    `cel/check`. Tabs are additive, so each one costs a single entry in a
-    list once the dock exists.
-  - The dock persists nothing, deliberately. Open state and active tab live
-    in `EditorArea` component state, so they survive a selection change and
-    reset on a reload. The dock claims no key in `saveState.layout` — that
-    blob is per-draft, so one author's open dock would open for every author
-    of the draft. A later "remember my dock" requirement needs a per-author
-    preference store, which no area has today; it does not need a different
-    dock.
+- **The editor dock: three decisions that outlived it.** The dock shipped
+  under `studio-editor-dock` (archived), and `studio-step-bench` deleted it.
+  The canvas became a ribbon, so no strip stands below the columns to hold a
+  dock. Three decisions from that design pass outlive both the build log and
+  the dock itself.
+  - The Player stays rejected. Its reason was height, and a step form still
+    needs more than a band gives. `screens/PlayerScreen.tsx` keeps its own
+    route. Do not re-propose it as a panels-screen view without a design
+    that answers the height.
+  - Two candidates stay deferred, not rejected. Each one is a panels-screen
+    view now, not a dock tab. A translation-coverage grid would map every
+    `LocalizedText` against every locale and mark the gaps that the
+    `baseLocale` invariant permits. A CEL scratchpad would evaluate an
+    expression against the draft's field catalog through `cel/check`. The
+    panels screen's index rail is that list now, so neither one grew cheaper
+    or dearer.
+  - The ribbon persists nothing, deliberately. Its open state lives in
+    `EditorArea` component state, so it survives a selection change and
+    resets on a reload. The ribbon claims no key in `saveState.layout`, and
+    that blob is per-draft. One author's expanded ribbon would open for every
+    author of the draft. A later "remember my ribbon" requirement needs a
+    per-author preference store, which no area has today.
 - **"Long text" was rejected as a type and shipped as a control.**
   `field-catalog-redesign` listed the ten `baseFieldType` values under
   friendly names and stopped there, because the contract carried no multiline

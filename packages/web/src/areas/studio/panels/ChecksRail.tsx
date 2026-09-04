@@ -50,6 +50,16 @@ const styles = stylex.create({
     paddingBottom: space.s3,
     paddingLeft: space.s3,
   },
+  // The canvas ribbon's bar, where the summary stands beside the ribbon's own
+  // control rather than at a region's bottom edge. The docked variant's top
+  // divider separates the rail from what sits above it; in the bar nothing
+  // does, so both it and the margin that carried it drop.
+  checksRailInBar: {
+    flex: "1 1 auto",
+    minWidth: 0,
+    marginTop: 0,
+    borderTopWidth: 0,
+  },
   // `.studio-checks-rail h2`: a descendant selector on a bare `<h2>`.
   checksRailHeading: {
     marginTop: 0,
@@ -178,6 +188,10 @@ interface Props {
    * rail: it then draws its own right, bottom and left edges. The inspector's
    * docked instance leaves it false and takes `.canvas-inspector`'s box. */
   framed?: boolean;
+  /** True in the canvas ribbon's bar alone, where the summary stands beside
+   * the ribbon's control instead of at a region's bottom edge. It drops the
+   * docked variant's top divider and takes the bar's remaining width. */
+  inBar?: boolean;
 }
 
 /**
@@ -186,7 +200,7 @@ interface Props {
  * placement already filters; this is one more view over it, not a second
  * validation pass.
  */
-export function ChecksRail({ validation, canPublish, collapsed = false, framed = false }: Props) {
+export function ChecksRail({ validation, canPublish, collapsed = false, framed = false, inBar = false }: Props) {
   const [expanded, setExpanded] = useState(false);
   const groups = groupChecksBySource(validation);
   const clear = allChecksClear(groups);
@@ -201,7 +215,12 @@ export function ChecksRail({ validation, canPublish, collapsed = false, framed =
       // rail draws none, since `.canvas-inspector` already provides one, and
       // at the panels screen's bottom edge it draws three of its four edges
       // itself (`framed`), since that screen boxes nothing.
-      {...stylex.props(styles.checksRail, collapsed && styles.checksRailDocked, framed && styles.checksRailFramed)}
+      {...stylex.props(
+        styles.checksRail,
+        collapsed && styles.checksRailDocked,
+        framed && styles.checksRailFramed,
+        inBar && styles.checksRailInBar,
+      )}
       aria-label={t("checksRail.heading")}
     >
       {showSummary ? (

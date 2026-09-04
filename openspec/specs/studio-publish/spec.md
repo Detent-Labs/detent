@@ -279,8 +279,13 @@ caller may publish.
 
 The rail SHALL read the same report the Publish control reads. That report is
 the `canPublish` field `process-drafts` owns. Every placement of the rail SHALL
-receive it. The rail renders beside the canvas, at the step inspector's bottom
-edge, and on the panels screen.
+receive it. The rail renders in the canvas ribbon's bar, and on the panels
+screen.
+
+Two placements stand where three stood. The step bench replaced two of them
+with one summary in the ribbon bar. Those two were the inspector's bottom
+edge and the standing column beside the canvas. The rule itself holds. Every
+placement states the same verdict.
 
 The all-clear state SHALL carry two statements. One names the validation
 verdict. The other names the publish verdict. Each SHALL come from its own
@@ -313,9 +318,9 @@ shows.
 
 #### Scenario: Every placement of the rail states the same verdict
 
-- **WHEN** the rail renders beside the canvas, at the step inspector's bottom
-  edge, or on the panels screen
-- **THEN** each placement states the publish verdict the others state
+- **WHEN** the rail renders in the canvas ribbon's bar, or on the panels
+  screen
+- **THEN** each placement states the publish verdict the other states
 
 ### Requirement: The publish-confirmation dialog renders from compiled styles
 
