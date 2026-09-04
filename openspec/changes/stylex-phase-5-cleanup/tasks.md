@@ -126,26 +126,33 @@
   run over the committed range once this task's commit lands. Done:
   both paragraphs added; gates verified in 4.6's commit below.
 
-- [ ] 4.6 Verify the antislop and whitespace gates pass on every other
+- [x] 4.6 Verify the antislop and whitespace gates pass on every other
   Markdown file this group touched. That set is
   `.claude/rules/design-language.md`, `.claude/rules/ui-glossary.md`,
   `docs/current-state.md` and `docs/browser-checks.md`. Use the same
-  two commands as 4.5, run over the committed range.
+  two commands as 4.5, run over the committed range. Done: both gates
+  exit 0 at HEAD (`d5b06487`), independently re-run.
 
 ## 5. Verification
 
-- [ ] 5.1 Run `bun run typecheck` and confirm zero errors.
+- [x] 5.1 Run `bun run typecheck` and confirm zero errors. Done: exits
+  0 (verified via `bun run check`, which runs typecheck first).
 
-- [ ] 5.2 Run `bun run build` and confirm it succeeds.
+- [x] 5.2 Run `bun run build` and confirm it succeeds. Done: exits 0.
 
-- [ ] 5.3 Run the full `bun test` suite with `DATABASE_URL` set, piped
+- [x] 5.3 Run the full `bun test` suite with `DATABASE_URL` set, piped
   through `scripts/gates/silent-green.sh`. Confirm 0 failures and the
-  skip count at the existing floor.
+  skip count at the existing floor. Done: `bun run check` captured to a
+  log inside the devcontainer, gate run against it on the host. 3812
+  pass (one fewer than phase 4's 3813, since Group 3 deleted one test),
+  1 skip at the floor, 0 fail, across 207 files. The `test:tz` suite
+  adds 20 pass, 0 fail. Gate exits 0.
 
-- [ ] 5.4 Run the antislop and whitespace gates over every Markdown file
+- [x] 5.4 Run the antislop and whitespace gates over every Markdown file
   this change touched, over the committed range. That set includes
   this change's own `proposal.md`/`design.md`/`tasks.md`/delta spec.
-  Confirm both pass with no rising finding count.
+  Confirm both pass with no rising finding count. Done: both exit 0 at
+  HEAD (`d5b06487`).
 
 <!-- "edit screen" is the glossary name of the screen. The linter reads
      its "edit" as a synonym of "change". -->
