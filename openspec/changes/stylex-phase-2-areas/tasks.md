@@ -221,13 +221,21 @@
 
 ## 8. Verification
 
-- [ ] 8.1 Run `bun run typecheck`. Verify: exit 0 for the engine and both
+- [x] 8.1 Run `bun run typecheck`. Verify: exit 0 for the engine and both
   packages.
-- [ ] 8.2 Run `bun run build`. Verify: exit 0, and the closeBundle
+- [x] 8.2 Run `bun run build`. Verify: exit 0, and the closeBundle
   assertion still passes.
-- [ ] 8.3 Run the full `bun test` with `DATABASE_URL` set, through
+- [x] 8.3 Run the full `bun test` with `DATABASE_URL` set, through
   `scripts/gates/silent-green.sh`. Verify: zero failures, skip count at
   the floor, gate exit 0.
+
+  A first run failed one canary:
+  `reporting-boundaries.test.ts`'s "the shared step-form renderer is
+  absent from this area's imports" forbade any `form-ui/*` import. Every
+  reporting file's new `form-ui/tokens.stylex` import tripped it. The
+  canary's actual target is the step-form renderer, `form-ui`'s bare
+  export, not the shared token module every area now reads. Narrowed the
+  filter to exempt `form-ui/tokens.stylex` by name, and re-ran clean.
 - [ ] 8.4 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`
   and the same for `whitespace.sh`, over this change's own commit(s).
   Verify: both exit 0.
