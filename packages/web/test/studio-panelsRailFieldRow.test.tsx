@@ -71,10 +71,19 @@ describe("PanelsRailFieldRow", () => {
   });
 
   // The picker states the membership it writes, so a row inside a group opens
-  // on that group rather than on the top level.
+  // on that group rather than on the top level. React renders the selection
+  // as `selected` on the option, never as a `value` attribute on the select,
+  // so the option's own `value=` proves nothing on its own.
   it("selects the group the field sits in today", () => {
     const html = renderToStaticMarkup(<PanelsRailFieldRow {...BASE} currentTargetId="field_group_2" />);
-    expect(html).toContain('value="field_group_2"');
+    expect(html).toContain('value="field_group_2" selected=""');
+    expect(html).not.toContain('value="" selected=""');
+  });
+
+  it("selects the top level for a field that sits in no group", () => {
+    const html = renderToStaticMarkup(<PanelsRailFieldRow {...BASE} currentTargetId={undefined} />);
+    expect(html).toContain('value="" selected=""');
+    expect(html).not.toContain('value="field_group_2" selected=""');
   });
 
   it("disables the move control when the row has nowhere to move", () => {

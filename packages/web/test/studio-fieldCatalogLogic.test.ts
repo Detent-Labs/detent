@@ -1,7 +1,12 @@
 import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 import { FIELD_KINDS } from "workflow-engine/schema";
-import { droppedByKindChange, moveFieldToGroup, nextFieldKey } from "../src/areas/studio/panels/fieldCatalogLogic.js";
+import {
+  droppedByKindChange,
+  groupTargetsFor,
+  moveFieldToGroup,
+  nextFieldKey,
+} from "../src/areas/studio/panels/fieldCatalogLogic.js";
 import { mergeLocalizedTextEntry } from "../src/areas/studio/draft/localized-text.js";
 import { mintCatalogField } from "../src/areas/studio/draft/mintField.js";
 import { draftFields, type DraftField } from "../src/areas/studio/draft/fields.js";
@@ -258,5 +263,56 @@ describe("moveFieldToGroup over examples/purchase-requisition.json", () => {
     const after = runValidation(moved, undefined, {}, {});
     expect(after.zodValid).toBe(true);
     expect(after.issues).toEqual(before.issues);
+  });
+});
+
+/**
+ * The picker's set and the write's set are one claim, stated in two places.
+ * `studio-app` requires the keyboard to reach every destination a drop
+ * reaches, so a target this helper offers must survive `moveFieldToGroup`,
+ * and a target the write accepts must not go missing here.
+ */
+describe("groupTargetsFor", () => {
+  it("offers every group and nothing else", () => {
+    const fields = [fld("field_a", "a"), grp("field_g", "g", []), grp("field_h", "h", [])];
+
+    expect(groupTargetsFor(fields, "field_a")).toEqual(["field_g", "field_h"]);
+  });
+
+  it("keeps the group the field sits in, so the picker can state where it is", () => {
+    const fields = [grp("field_g", "g", [fld("field_a", "a")]), grp("field_h", "h", [])];
+
+    expect(groupTargetsFor(fields, "field_a")).toEqual(["field_g", "field_h"]);
+  });
+
+  it("drops the field itself and every group inside it", () => {
+    const fields = [grp("field_g", "g", [grp("field_inner", "inner", [])]), grp("field_h", "h", [])];
+
+    expect(groupTargetsFor(fields, "field_g")).toEqual(["field_h"]);
+  });
+
+  it("offers nothing for a field the catalog does not carry", () => {
+    expect(groupTargetsFor([grp("field_g", "g", [])], "field_missing")).toEqual([]);
+  });
+
+  // Every target this helper names has to survive the write, or the picker
+  // offers a move that silently does nothing.
+  it("names only targets the write accepts", () => {
+    const fields = [fld("field_a", "a"), grp("field_g", "g", []), grp("field_h", "h", [fld("field_b", "b")])];
+
+    for (const target of groupTargetsFor(fields, "field_a")) {
+      expect(moveFieldToGroup(fields, "field_a", target)).not.toBe(fields);
+    }
+  });
+
+  // A field can sit inside a parent that is no group: `changeKind` rewrites a
+  // field's type and leaves its `fields` alone. The helper drops that parent,
+  // since it is nobody's destination, and the write still moves the child out.
+  it("drops a parent that is no longer a group, and the move out still works", () => {
+    const orphaning = { ...grp("field_g", "g", [fld("field_a", "a")]), type: "string" as const };
+    const fields = [orphaning];
+
+    expect(groupTargetsFor(fields, "field_a")).toEqual([]);
+    expect(ids(moveFieldToGroup(fields, "field_a", undefined))).toEqual(["field_g", "field_a"]);
   });
 });

@@ -435,10 +435,25 @@ export function PanelsScreen({ openView, onBack, onOpenView, onShowStep, token, 
                         // Every place this field may sit: the top level, then
                         // each group a drop could also reach. Built per row
                         // because the excluded set is the row's own subtree.
-                        const moveTargets = [
-                          { id: undefined, label: t("panelsScreen.moveTargetTopLevel") },
-                          ...groupTargetsFor(draft.fields ?? [], row.id).map((id) => ({ id, label: fieldWord(id) })),
-                        ];
+                        //
+                        // The current parent rides along when it is not one of
+                        // those groups. A field can sit inside a parent that is
+                        // no group: `changeKind` rewrites a field's type and
+                        // leaves its `fields` in place, so a group turned into
+                        // a Text field keeps its children, and `flattenRailFields`
+                        // keeps drawing them. The picker's value has to name an
+                        // option the picker holds, or React drops the selection
+                        // and the row reads as top-level while it is nested.
+                        // That parent is nobody else's destination, so it is
+                        // listed here alone, and only to state where this one
+                        // field sits today.
+                        const parentId = parentGroupId(row.id);
+                        const groupTargets = groupTargetsFor(draft.fields ?? [], row.id);
+                        const orphanedParent = parentId !== undefined && !groupTargets.includes(parentId) ? [parentId] : [];
+                        const moveTargets = [undefined, ...orphanedParent, ...groupTargets].map((id) => ({
+                          id,
+                          label: id === undefined ? t("panelsScreen.moveTargetTopLevel") : fieldWord(id),
+                        }));
                         return (
                           <li key={row.id}>
                             <PanelsRailFieldRow
@@ -449,7 +464,7 @@ export function PanelsScreen({ openView, onBack, onOpenView, onShowStep, token, 
                               selected={selectedFieldId === row.rootId}
                               onClick={() => selectField(row.rootId, row.id)}
                               moveTargets={moveTargets}
-                              currentTargetId={parentGroupId(row.id)}
+                              currentTargetId={parentId}
                               moveControlId={moveControlId(row.id)}
                               onMoveTo={(targetId) => moveField(row.id, targetId)}
                               onDragStart={() => setDragFieldId(row.id)}

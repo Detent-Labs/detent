@@ -2290,13 +2290,20 @@ Source: `studio-field-authoring-surface` task 9.3.
 Open `purchase_requisition`'s draft at `/edit/panels/fields`. The rail lists
 22 fields, four of them indented once under the `Line Item` group.
 
-Focus the arrow beside `Vendor` and press Enter. Pass: `Vendor` indents under
-`Line Item`. The live region reads "Vendor moved into Line Item." Focus stays
-on the same control. That control's name flips to "Move out of the group".
+Tab to the move picker beside `Vendor`. Open it. Pass: it lists "Top level"
+and every group the catalog carries. Its own value reads "Top level".
 
-Press Enter again. Pass: `Vendor` un-indents. The region reads "Vendor moved
-out of Line Item, to the top level." Focus stays put. Measured 2026-09-04:
-all four held.
+Pick `Line Item`. Pass: `Vendor` indents under `Line Item`. The live region
+reads "Vendor moved into Line Item." Focus stays on the same control. The
+picker's value now reads `Line Item`.
+
+Pick "Top level" on that same control. Pass: `Vendor` un-indents. The region
+reads "Vendor moved out of Line Item, to the top level." Focus stays put.
+
+Add a second group. Read the picker again. Pass: it names both groups. The
+single arrow this replaced could not pass that check. It reached the nearest
+group above and no other. Measured 2026-09-04 on a draft carrying two groups:
+every row named both groups and the top level.
 
 A move out appends the field to the end of the top level. It does not return
 it to the place it came from. That is what the helper writes, and the rail
@@ -2304,13 +2311,12 @@ shows it.
 
 Drag `Vendor`'s row onto `Line Item`'s row with the pointer. Pass: the same
 indent and the same announcement. Drag it onto a row outside any group. Pass:
-the same move out. Both gestures reach one helper. A difference between them
-is a defect.
+the same move out. Both gestures reach one helper, and both reach the same
+set of destinations. A difference between them is a defect.
 
-The arrow is the whole visible control. Its accessible name is the sentence,
-on its `aria-label` and its `title`. Read the name, not the glyph. A check
-that reads ">Move into the group above<" reads markup this view no longer
-draws.
+The picker is the whole visible control. Its accessible name is "Move this
+field to", on its `aria-label` and its `title`. A catalog with no group at all
+renders it disabled, carrying "Top level" alone.
 
 Neither gesture survives a `renderToStaticMarkup` test. An HTML5 drag needs a
 real pointer. An effect writes the live region's text after the move commits.
@@ -2358,7 +2364,7 @@ at either width. That count covered every element inside both halves and the
 rail.
 
 Read the rail last. Its kind word is the one German string in a fixed column.
-The move control beside it is an arrow rather than a sentence. Neither grows
+The move control beside it truncates rather than wrapping. Neither grows
 with the translation.
 
 A `bun:test` assertion covers the catalog's key set. It cannot see a clipped
