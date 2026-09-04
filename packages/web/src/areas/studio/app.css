@@ -1358,14 +1358,25 @@
    sentence's English reading, which is what lets the German one grow freely
    (task 8.2). `flex: 0 0 auto` beside the row button's `flex: 1` keeps the
    pair on one line at every width the rail takes. */
+/* The move target picker. A select rather than a direction button, because a
+   drop reaches every group and the keyboard has to reach the same set. Its
+   options carry group labels, which are prose, so it truncates instead of
+   wrapping: the closed control shares a 16rem column with the row's own name
+   and kind, and the option list opens over the rail at full width. 0.8rem
+   matches `.studio-panels-rail-type` on the same row, the size the shared
+   detector waiver in `.impeccable/config.json` already names. */
 .studio-panels-rail-move {
-  flex: 0 0 auto;
-  background: none;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 7rem;
+  background: var(--color-surface);
   color: var(--color-text-muted);
-  border: none;
-  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  padding: var(--space-1) var(--space-2);
   font: inherit;
-  line-height: 1;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  text-overflow: ellipsis;
   cursor: pointer;
 }
 
@@ -1373,9 +1384,10 @@
   color: var(--color-text);
 }
 
-/* No group stands where this row could move. The control keeps its place, so
-   every field entry carries one as `studio-app` requires, and states that it
-   has nothing to do rather than vanishing between renders. */
+/* No group stands where this row could move, so the picker offers the top
+   level alone. The control keeps its place, so every field entry carries one
+   as `studio-app` requires, and states that it has nothing to do rather than
+   vanishing between renders. */
 .studio-panels-rail-move:disabled {
   color: var(--color-text-muted);
   opacity: 0.5;

@@ -9,7 +9,7 @@ import { addToDraftArray } from "../draft/draft-array-crud";
 import { resolveDraftLocalizedText, seedLocalizedText } from "../draft/localized-text";
 import { flattenDraftFields } from "../draft/fields";
 import { fieldKindWord } from "../draft/field-type-labels";
-import { moveFieldToGroup } from "../panels/fieldCatalogLogic";
+import { groupTargetsFor, moveFieldToGroup } from "../panels/fieldCatalogLogic";
 import {
   flattenRailFields,
   issueCountForEntityId,
@@ -58,23 +58,27 @@ interface PanelsRailFieldRowProps {
   issues: number;
   selected: boolean;
   onClick: () => void;
-  /** Where this row's move control sends the field — `"group"` into the group
-   * above it, `"top"` back out to the top level. `undefined` where no move is
-   * available, which renders the control disabled rather than dropping it:
-   * `studio-app` requires every field entry to carry one.
+  /** Every place this row's field may sit, the top level first and then each
+   * group it may join. One entry alone renders the control disabled rather
+   * than dropping it: `studio-app` requires every field entry to carry one.
    *
-   * A direction, not a sentence, because the row draws the two differently.
-   * The visible mark is an arrow along the indentation axis; the sentence is
-   * the control's accessible name and its tooltip. Measured before that
-   * split: the sentence wrapped to a line of its own on all 22 rows of
-   * `purchase_requisition`, putting the rail at 1867px inside a 576px pane.
-   * The arrow also cannot clip in German, which is what the sentence's own
-   * wrap was there to survive. */
-  moveTo: "group" | "top" | undefined;
+   * The set matches what a drop can reach, which is the point of the picker.
+   * A single direction control reached the nearest group above and no other,
+   * so a keyboard user could not name a second group at all.
+   *
+   * Each label is already resolved. The picker never prints a label at full
+   * width: the option list opens over the rail, and the closed control shows
+   * one truncated line. Measured before the truncation: a wrapped move
+   * sentence on all 22 rows of `purchase_requisition` put the rail at 1867px
+   * inside a 576px pane. */
+  moveTargets: { id: string | undefined; label: string }[];
+  /** The group this field sits in today, `undefined` at the top level. The
+   * picker's own value, so the control states the membership it writes. */
+  currentTargetId: string | undefined;
   /** The id the move control's own element takes, so the screen can put focus
    * back on it after the move re-orders the list (`spa-accessibility`). */
   moveControlId: string;
-  onMove: () => void;
+  onMoveTo: (targetId: string | undefined) => void;
   /** The pointer half of the same move. The row is the drag source and every
    * row is a drop target: dropping on a group moves the dragged field in,
    * dropping on a row outside any group moves it out. */
@@ -104,17 +108,16 @@ export function PanelsRailFieldRow({
   issues,
   selected,
   onClick,
-  moveTo,
+  moveTargets,
+  currentTargetId,
   moveControlId,
-  onMove,
+  onMoveTo,
   onDragStart,
   onDragEnd,
   onDrop,
   dragging,
 }: PanelsRailFieldRowProps) {
-  // A disabled control still needs a name, so the unavailable case takes the
-  // into-the-group wording rather than none.
-  const moveSentence = t(moveTo === "top" ? "panelsScreen.moveOutOfGroup" : "panelsScreen.moveIntoGroup");
+  const moveSentence = t("panelsScreen.moveTargetLabel");
   return (
     <div
       className="studio-panels-rail-field-row"
@@ -143,23 +146,28 @@ export function PanelsRailFieldRow({
           </span>
         )}
       </button>
-      {/* The sentence is the accessible name and the tooltip; the arrow is
-          what the eye reads. Both directions point along the indentation
-          axis, the one thing the rail draws membership with: into the group
-          indents, out of it un-indents. `aria-hidden` on the glyph so the
-          name a screen reader announces is the sentence alone, never "right
-          arrow". */}
-      <button
-        type="button"
+      {/* A target picker, not a direction button. The drop can reach any
+          group by falling on its row, so the keyboard names every group too
+          (`spa-accessibility`: the keyboard reaches what the drag reaches).
+          One arrow reached the nearest group above and nothing else, which
+          left a keyboard user unable to name a second group at all. The
+          picker's own value states where the field sits today, so the
+          control reads the membership it also writes. */}
+      <select
         id={moveControlId}
         className="studio-panels-rail-move"
-        disabled={moveTo === undefined}
+        disabled={moveTargets.length < 2}
         aria-label={moveSentence}
         title={moveSentence}
-        onClick={onMove}
+        value={currentTargetId ?? ""}
+        onChange={(e) => onMoveTo(e.target.value === "" ? undefined : e.target.value)}
       >
-        <span aria-hidden="true">{moveTo === "top" ? "←" : "→"}</span>
-      </button>
+        {moveTargets.map((target) => (
+          <option key={target.id ?? ""} value={target.id ?? ""}>
+            {target.label}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }
@@ -269,12 +277,11 @@ export function PanelsScreen({ openView, onBack, onOpenView, onShowStep, token, 
   };
 
   // The deepest row a rail click named — a top-level field's own id, or a
-  // group child's. `FieldCatalogPanel` owns the scroll: a child's anchor
-  // sits inside the Field tab alone (task 3.4), which stays `hidden` when a
-  // group's own editor is already open on Values or Rules (no field.id
-  // change, so no remount resets the tab). Scrolling here, before that tab
-  // switch commits, would target a hidden, zero-height element and land
-  // nowhere visible.
+  // group child's. `FieldCatalogPanel` owns the scroll, because the anchor
+  // this names belongs to a row that panel renders. A click on a group child
+  // changes no `field.id`, so the panel does not remount, and only the panel
+  // knows when the row for that child is on screen. Scrolling from here would
+  // race that render and land nowhere.
   const [focusFieldId, setFocusFieldId] = useState<string | undefined>(undefined);
 
   const selectField = (rootId: string, deepestId: string) => {
@@ -312,19 +319,6 @@ export function PanelsScreen({ openView, onBack, onOpenView, onShowStep, token, 
   /** The group a rail row currently hangs in, or `undefined` at the top level. */
   const parentGroupId = (fieldId: string): string | undefined =>
     flattenDraftFields(draft.fields).find((f) => (f.fields ?? []).some((c) => c.id === fieldId))?.id;
-
-  /** The group a top-level row's own move control targets: the nearest `group`
-   * field standing above it in the rail's own order. That is what the control's
-   * label says, so the row and the label cannot name different targets.
-   * `undefined` where no group stands above, which disables the control. */
-  const groupAbove = (fieldId: string): string | undefined => {
-    const index = railFields.findIndex((row) => row.id === fieldId);
-    for (let i = index - 1; i >= 0; i--) {
-      const candidate = fieldsById.get(railFields[i].id);
-      if (candidate?.type === "group") return candidate.id;
-    }
-    return undefined;
-  };
 
   /**
    * The one write both gestures reach (design.md Risks: a keyboard move must
@@ -438,11 +432,13 @@ export function PanelsScreen({ openView, onBack, onOpenView, onShowStep, token, 
                         // definition half's kind picker shows for this field
                         // (task 7.3).
                         const typeLabel = field ? fieldKindWord(field) : undefined;
-                        // A row already inside a group moves out; one at the
-                        // top level moves into the nearest group above it.
-                        const inGroup = parentGroupId(row.id);
-                        const target = inGroup === undefined ? groupAbove(row.id) : undefined;
-                        const movable = inGroup !== undefined || target !== undefined;
+                        // Every place this field may sit: the top level, then
+                        // each group a drop could also reach. Built per row
+                        // because the excluded set is the row's own subtree.
+                        const moveTargets = [
+                          { id: undefined, label: t("panelsScreen.moveTargetTopLevel") },
+                          ...groupTargetsFor(draft.fields ?? [], row.id).map((id) => ({ id, label: fieldWord(id) })),
+                        ];
                         return (
                           <li key={row.id}>
                             <PanelsRailFieldRow
@@ -452,9 +448,10 @@ export function PanelsScreen({ openView, onBack, onOpenView, onShowStep, token, 
                               issues={rowIssues}
                               selected={selectedFieldId === row.rootId}
                               onClick={() => selectField(row.rootId, row.id)}
-                              moveTo={movable ? (inGroup !== undefined ? "top" : "group") : undefined}
+                              moveTargets={moveTargets}
+                              currentTargetId={parentGroupId(row.id)}
                               moveControlId={moveControlId(row.id)}
-                              onMove={() => moveField(row.id, inGroup !== undefined ? undefined : target)}
+                              onMoveTo={(targetId) => moveField(row.id, targetId)}
                               onDragStart={() => setDragFieldId(row.id)}
                               onDragEnd={() => setDragFieldId(undefined)}
                               onDrop={() => dropOnRow(row.id)}

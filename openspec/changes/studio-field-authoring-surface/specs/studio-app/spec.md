@@ -1270,6 +1270,12 @@ SHALL move the same field from the same entry, per
 `spa-accessibility`'s in-list reordering requirement. Both gestures
 SHALL reach one write.
 
+The two gestures SHALL reach the same set of destinations. A drop names
+its target by the row it lands on, so it reaches every group. The
+keyboard's control SHALL therefore name every group too, and the top
+level beside them. A control offering one direction fails this rule. It
+reaches the nearest group alone. Every other group then needs a pointer.
+
 A move may nest a field below the rail's own two-level indentation cap.
 The rail SHALL then draw that field at the cap. The draft's own field
 tree SHALL keep whatever depth the move produces.
@@ -1291,6 +1297,13 @@ that field's own two halves.
   the documented move keystroke
 - **THEN** the draft carries that field at the top level, and the
   group's remaining children keep their order
+
+#### Scenario: The keyboard reaches every group the pointer reaches
+
+- **WHEN** the developer moves a top-level field with the keyboard, on a
+  draft carrying two group fields
+- **THEN** the move control names both groups and the top level
+- **AND** the field reaches whichever group the developer picks
 
 #### Scenario: A move rewrites no reference
 

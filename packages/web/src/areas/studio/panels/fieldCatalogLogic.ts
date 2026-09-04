@@ -107,3 +107,25 @@ export function moveFieldToGroup(
 
   return graft(pruned);
 }
+
+/**
+ * Every group the field may join, as ids, in rail order.
+ *
+ * The keyboard's target picker offers exactly this set plus the top level,
+ * so it reaches every destination a drop reaches. `moveFieldToGroup` refuses
+ * the same three cases this filter drops, and refusing twice is deliberate:
+ * the picker must not offer a target the write would then reject.
+ *
+ * Excludes the field itself, and every group inside it, since a group cannot
+ * move into its own subtree. Keeps the current parent, so the picker can
+ * show where the field sits today.
+ */
+export function groupTargetsFor(fields: DraftField[], fieldId: string): string[] {
+  const flat = flattenDraftFields(fields);
+  const moved = flat.find((f) => f.id === fieldId);
+  if (!moved) return [];
+  const inside = new Set(flattenDraftFields(moved.fields).map((f) => f.id));
+  return flat
+    .filter((f) => f.type === "group" && f.id !== undefined && f.id !== fieldId && !inside.has(f.id))
+    .map((f) => f.id as string);
+}

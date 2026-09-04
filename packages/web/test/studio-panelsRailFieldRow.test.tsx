@@ -11,9 +11,14 @@ const BASE = {
   issues: 0,
   selected: false,
   onClick: NOOP,
-  moveTo: "group" as const,
+  moveTargets: [
+    { id: undefined, label: "Top level" },
+    { id: "field_group_1", label: "Billing" },
+    { id: "field_group_2", label: "Delivery" },
+  ],
+  currentTargetId: undefined,
   moveControlId: "studio-panels-rail-move-field_1",
-  onMove: NOOP,
+  onMoveTo: NOOP,
   onDragStart: NOOP,
   onDragEnd: NOOP,
   onDrop: NOOP,
@@ -42,38 +47,44 @@ describe("PanelsRailFieldRow", () => {
     expect(renderToStaticMarkup(<PanelsRailFieldRow {...BASE} />)).not.toContain("studio-panels-rail-issues");
   });
 
-  // The keyboard half of the move gesture (spa-accessibility): a real button
+  // The keyboard half of the move gesture (spa-accessibility): a real control
   // in the tab order, beside the row rather than nested inside it, carrying
   // the id the screen re-focuses after the move.
-  it("draws the move control as its own button, outside the row button", () => {
+  it("draws the move control outside the row button", () => {
     const html = renderToStaticMarkup(<PanelsRailFieldRow {...BASE} />);
     expect(html).toContain('id="studio-panels-rail-move-field_1"');
-    // Two buttons, and the first one closes before the second opens: a button
-    // nested inside a button is invalid markup a browser silently unnests.
-    expect(html.split("<button").length - 1).toBe(2);
+    // One button, and it closes before the picker opens: a control nested
+    // inside a button is invalid markup a browser silently unnests.
+    expect(html.split("<button").length - 1).toBe(1);
     expect(html.indexOf("</button>")).toBeLessThan(html.indexOf('id="studio-panels-rail-move-field_1"'));
   });
 
-  // The eye reads an arrow along the indentation axis; the assistive
-  // technology reads the sentence. The glyph is hidden from the name so the
-  // announcement is the sentence alone.
-  it("names the move by its sentence and marks it with a direction arrow", () => {
-    const into = renderToStaticMarkup(<PanelsRailFieldRow {...BASE} />);
-    expect(into).toContain('aria-label="Move into the group above"');
-    expect(into).toContain(">→<");
-    expect(into).not.toContain(">Move into the group above<");
+  // The defect this replaced: one arrow reached the nearest group above and
+  // nothing else, so a keyboard user could not name a second group at all.
+  // A drop reaches every group, so the picker offers every group.
+  it("offers every destination a drop reaches", () => {
+    const html = renderToStaticMarkup(<PanelsRailFieldRow {...BASE} />);
+    expect(html).toContain('aria-label="Move this field to"');
+    expect(html).toContain(">Top level<");
+    expect(html).toContain(">Billing<");
+    expect(html).toContain(">Delivery<");
+  });
 
-    const outOf = renderToStaticMarkup(<PanelsRailFieldRow {...BASE} moveTo="top" />);
-    expect(outOf).toContain('aria-label="Move out of the group"');
-    expect(outOf).toContain(">←<");
+  // The picker states the membership it writes, so a row inside a group opens
+  // on that group rather than on the top level.
+  it("selects the group the field sits in today", () => {
+    const html = renderToStaticMarkup(<PanelsRailFieldRow {...BASE} currentTargetId="field_group_2" />);
+    expect(html).toContain('value="field_group_2"');
   });
 
   it("disables the move control when the row has nowhere to move", () => {
-    const html = renderToStaticMarkup(<PanelsRailFieldRow {...BASE} moveTo={undefined} />);
+    const html = renderToStaticMarkup(
+      <PanelsRailFieldRow {...BASE} moveTargets={[{ id: undefined, label: "Top level" }]} />,
+    );
     expect(html).toContain("studio-panels-rail-move");
     expect(html).toContain("disabled");
     // A disabled control still carries a name.
-    expect(html).toContain('aria-label="Move into the group above"');
+    expect(html).toContain('aria-label="Move this field to"');
   });
 
   it("marks the row a pointer has picked up", () => {
