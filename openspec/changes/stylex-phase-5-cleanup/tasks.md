@@ -42,11 +42,12 @@
 
 ## 3. Retire the now-vacuous boundary test
 
-- [ ] 3.1 Delete `packages/web/test/boundaries.test.ts`'s `it("no class
+- [x] 3.1 Delete `packages/web/test/boundaries.test.ts`'s `it("no class
   name is defined in two areas' stylesheets", ...)` test (design.md,
   Risks). Verify the file's three remaining `it` blocks under `describe("area
   boundaries", ...)` and the `describe("one package, one build", ...)`
   block still pass: `bun test packages/web/test/boundaries.test.ts`.
+  Done: 7 pass, 0 fail.
 
 ## 4. Correct stale doc references
 
