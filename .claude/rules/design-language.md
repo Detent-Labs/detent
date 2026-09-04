@@ -83,10 +83,10 @@ each one stays in this language.
 time. The other three areas live in the account menu. The actor's roles
 decide which of those the menu shows.
 
-**The stamp.** Every area compiles its own `stamp` style, keyed by a
-`stampTone`/`badgeTone` lookup off the value it marks (`app`'s
-`TasksScreen.tsx`, `admin`'s `InstancesScreen.tsx`, `reporting`'s
-`components.tsx`, among others). Mono, uppercase, tracked, with a 2px
+**The stamp.** Every area compiles its own `stamp` style. Each keys the
+style off a `stampTone`/`badgeTone` lookup on the value it marks. Three
+examples: `app`'s `TasksScreen.tsx`, `admin`'s `InstancesScreen.tsx`,
+`reporting`'s `components.tsx`. Mono, uppercase, tracked, with a 2px
 outline in the current color. Five tones exist and no sixth: adding one
 counts as a design change, not a screen decision.
 
@@ -136,14 +136,14 @@ will appear, with no skeleton and no spinner.
 
 **Component styles compile.** Every component in `packages/web` and
 `packages/form-ui` declares its styles as a typed `stylex.create()`
-object beside its own module, per `web-styling`'s styling model. A
-compiled class hashes, so no rule in this section applies to it. No doc
-anywhere should cite one of these classes by name; it changes on the
-next build.
+object. Each one sits beside its own module, per `web-styling`'s
+styling model. A compiled class hashes, so no rule in this section
+applies to it. No doc anywhere should cite one of these classes by
+name; it changes on the next build.
 
 A DOM state never drives a hand-written selector. Style picks among
-named compiled styles in code instead, reading the same attribute the
-DOM already carries for anyone else who needs it:
+named compiled styles in code instead. That code still reads the same
+attribute the DOM already carries, for anyone else who needs it:
 `[aria-current="page"]`, `[aria-expanded="true"]`, `:disabled`,
 `:focus-visible`.
 
@@ -151,19 +151,22 @@ An area never reads another area's style object. Shared motifs move to
 `shell/`, or engineers duplicate them on purpose. No component reads a
 primitive. Components read roles only.
 
-**Class names, for the few that stay literal.** `.btn`/`.btn-primary`/
-`.btn-secondary`/`.btn-ghost`/`.btn-destructive`/`.app-back`
-(`tokens.css`) are the one family that never compiles: 208 call sites
-across every area made per-call-site compilation counterproductive for
-a deliberately shared button style (`web-styling`'s "A shared class
-stays literal until its last consumer migrates"). They follow
+**Class names, for the few that stay literal.** One family never
+compiles.
+
+It lives in `tokens.css`: `.btn`, `.btn-primary`, `.btn-secondary`,
+`.btn-ghost`, `.btn-destructive`, `.app-back`. 208 call sites across
+every area made per-call-site compilation counterproductive. This
+family stays shared on purpose (`web-styling`'s "A shared class stays
+literal until its last consumer migrates"). It follows
 `prefix-block-element`, one hyphen per level, with no deeper nesting: a
-variant becomes a suffix class. `canvas-node`, `panzoom-exclude` and
-`.studio-dialog` are the other three literal exceptions, each pinned by
-a non-styling reason `web-styling` states (a keyboard-focus selector, a
-pan-library contract, a `::backdrop` the compiler cannot reach). No
-other literal class exists anywhere in `packages/web` or
-`packages/form-ui`.
+variant becomes a suffix class.
+
+Three other literal exceptions exist: `canvas-node`, `panzoom-exclude`
+and `.studio-dialog`. `web-styling` pins each to its own non-styling
+reason. Those reasons are a keyboard-focus selector, a pan-library
+contract, and a `::backdrop` the compiler cannot reach. No other
+literal class exists anywhere in `packages/web` or `packages/form-ui`.
 
 **Labels and locales.** Every string a person reads comes from a catalog.
 EN and DE ship in the shell, app, admin and reporting catalogs, each reached

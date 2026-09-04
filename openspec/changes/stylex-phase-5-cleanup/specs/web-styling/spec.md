@@ -2,10 +2,11 @@
 
 ### Requirement: One global stylesheet carries what the compiler cannot
 
-The shell SHALL keep one hand-written global stylesheet for the reset, the
-`:focus-visible` ring, the element defaults, and every permanent literal
-survivor no later migration phase can compile away. The compiler has no
-global selector, no universal selector, and no `::backdrop` pseudo-element.
+The shell SHALL keep one hand-written global stylesheet. It covers the
+reset, the `:focus-visible` ring, and the element defaults. It also
+covers every permanent literal survivor no later migration phase can
+compile away. The compiler has no global selector, no universal
+selector, and no `::backdrop` pseudo-element.
 That sheet SHALL stay under about 120 lines. Every other style SHALL be a
 component style, once its phase migrates it.
 
@@ -42,8 +43,8 @@ compiled style's own class name. `stylex.props` composes style objects
 with each other. It does not accept a literal string as one of its
 arguments.
 
-`.btn` and `.app-back` are this migration's terminal case: no further
-phase exists to convert their last remaining consumer, so both SHALL
+`.btn` and `.app-back` are this migration's terminal case. No further
+phase exists to convert their last remaining consumer. Both SHALL
 stay literal in `tokens.css` permanently, not merely until some future
 phase.
 

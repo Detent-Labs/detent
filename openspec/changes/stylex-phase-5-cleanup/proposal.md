@@ -3,7 +3,7 @@
 Phases 0-4 moved every compilable rule in `packages/web` and
 `packages/form-ui` onto StyleX. Five hand-written stylesheets remain:
 `shell.css` and the four areas' `app.css` files. Each now holds only the
-handful of rules StyleX cannot compile — a universal selector, a
+handful of rules StyleX cannot compile: a universal selector, a
 `prefers-reduced-motion` block, or `::backdrop`. This is phase 5 of that
 migration, the last one, per `stylex-phase-0-tooling`'s Migration Plan.
 
@@ -16,11 +16,13 @@ migration, the last one, per `stylex-phase-0-tooling`'s Migration Plan.
   `.studio-dialog::backdrop`.
 - Delete `shell.css` and all four areas' `app.css` files, and their five
   import statements.
+<!-- The quoted string is the removed test's exact title, unchanged. -->
+<!-- antislop: allow passive-voice -->
 - Delete `boundaries.test.ts`'s `"no class name is defined in two areas'
   stylesheets"` test. It walks each area's own `.css` files for a
-  collision; once none exist, it passes on two empty sets forever,
-  proving nothing. A compiled StyleX class cannot collide across areas
-  the way a hand-written one could, so the risk it guarded is gone too.
+  collision. Once none exist it passes on two empty sets forever. It
+  proves nothing. A compiled StyleX class cannot collide across areas
+  the way a hand-written one could. The risk it guarded is gone too.
 - Correct every literal-class citation the sweep found stale in
   `.claude/rules/design-language.md`, `.claude/rules/ui-glossary.md`, and
   six passages in `docs/current-state.md`. Each cites a class name no
@@ -28,11 +30,11 @@ migration, the last one, per `stylex-phase-0-tooling`'s Migration Plan.
 - Add this phase's own dated section to `docs/browser-checks.md` and its
   own paragraph to `docs/decisions.md`, following the pattern every prior
   phase used. Mark `ROADMAP.md` stage 45 done.
-- Close two decisions the migration left open: `.btn`/`.app-back` stay
-  permanently literal in `tokens.css` (no further phase exists to convert
-  their last consumer), and this change does not rewrite the roughly 45
-  historical code comments across `packages/web/src` that cite a deleted
-  stylesheet's file name by name — see design.md.
+- Close two decisions the migration left open. `.btn`/`.app-back` stay
+  permanently literal in `tokens.css`: no further phase exists to
+  convert their last consumer. This change also leaves alone the
+  roughly 45 historical comments in `packages/web/src` naming a
+  deleted stylesheet. See design.md.
 - No ESLint plugin. See design.md's rejected-alternative note.
 
 ## Capabilities
@@ -43,12 +45,13 @@ migration, the last one, per `stylex-phase-0-tooling`'s Migration Plan.
 
 ### Modified Capabilities
 
-- `web-styling`: the global stylesheet's requirement changes to describe
-  its final, consolidated scope — every permanent literal survivor this
-  migration could not compile away — instead of a per-area split that no
-  longer exists. The shared-class requirement gains a closing note that
-  `.btn`/`.app-back` are the two classes that reach this migration's end
-  still shared, and now stay literal permanently.
+- `web-styling`: the global stylesheet's requirement changes to
+  describe its final, consolidated scope. That scope is every
+  permanent literal survivor this migration could not compile away. It
+  replaces the old per-area split, which no longer exists. The
+  shared-class requirement gains a closing sentence. `.btn`/`.app-back`
+  are the two classes that still reach this migration's end shared.
+  They now stay literal permanently.
 
 ## Impact
 

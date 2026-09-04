@@ -2462,16 +2462,21 @@ Start a drag on empty canvas space. Pass: the canvas pans. This confirms
 the exclusion covers exactly the elements that need it, not the whole
 surface.
 
+Throughout: zero console errors, in both browsers.
+
 ### Shell and area stylesheets deleted (`stylex-phase-5-cleanup`)
 
 Source: `stylex-phase-5-cleanup`, the migration's last phase.
 `shell.css` and the four areas' `app.css` files are gone. `global.css`
-now carries every rule they still held: the shell's `.shell`/`.shell >
-*` flex frame, one `prefers-reduced-motion` block (deduped from four,
-onto the near-zero-duration technique reporting already used), and
-`.studio-dialog::backdrop`. `boundaries.test.ts` no longer carries its
-own class-collision test; a compiled StyleX class cannot collide across
-areas the way a hand-written one could.
+now carries every rule they still held. Three things moved in: the
+shell's own flex frame, one `prefers-reduced-motion` block, and
+`.studio-dialog::backdrop`.
+
+This change dedupes the reduced-motion block from four copies to one.
+It picks the near-zero-duration technique reporting already used.
+`boundaries.test.ts` no longer carries its own class-collision test. A
+compiled StyleX class cannot collide across areas the way a
+hand-written one could.
 
 Build the production bundle and open it on the engine's own port. Do
 not use `bun run dev`: Studio's dev-mode crash is pre-existing and
@@ -2491,14 +2496,13 @@ one open draft's edit screen, in the studio area. Pass: a `<dialog>`
 it through its `::backdrop`.
 
 **Reduced-motion probe.** Set the browser's `prefers-reduced-motion` to
-`reduce`. Trigger a transition in one screen per area: the account
-menu's open/close in the shell, a hover state in the admin table, a tab
-switch in reporting, the checks rail's dock/undock in studio. Pass: none
-shows visible motion, in any of the four. The three areas that switched
-technique (`transition: none` to `animation-duration`/
-`transition-duration: 0.01ms`) read exactly as instant as reporting,
-which used the near-zero technique already.
+`reduce`. Trigger a transition in one screen per area. Try the shell's
+account menu, an admin table row, a reporting tab, and the studio
+checks rail. Pass:
+none shows visible motion, in any of the four.
+
+The three areas that switched technique, from `transition: none` to
+`animation-duration`/`transition-duration: 0.01ms`, read exactly as
+instant as reporting. Reporting used the near-zero technique already.
 
 Throughout: zero console errors, in every area.
-
-Throughout: zero console errors, in both browsers.

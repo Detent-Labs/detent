@@ -158,9 +158,8 @@ contract, and the field matrix. The component name carries the word
 
 **dock** names the strip below the canvas columns, and nothing else. It is a
 noun here. Several live specs still use "dock" as a verb for the collapsed
-checks rail, and `ChecksRail.tsx`'s own compiled style for that
-presentation carries the same verb in its name. Neither reading names the
-strip.
+checks rail. `ChecksRail.tsx`'s own compiled style for that presentation
+carries the same verb in its name. Neither reading names the strip.
 
 The checks rail renders in three places. It sits beside the canvas in full
 until an author selects a step. The inspector then shows a second instance,
