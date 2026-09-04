@@ -82,23 +82,38 @@
 
 ## 4. The header bar and the four dialogs
 
-- [ ] 4.1 Convert `panels/ProcessHeaderBar.tsx` to `stylex.create`.
+- [x] 4.1 Convert `panels/ProcessHeaderBar.tsx` to `stylex.create`.
   Cover the header bar itself (`studio-canvas`'s own requirement), the
   publish-confirmation dialog (`studio-publish`) and the
   discard-confirmation dialog (`studio-app`'s own requirement for it).
   Also convert `panels/shared/ContentLocaleSwitcher.tsx`, which this
   file imports (`studio-app`'s own content-locale-switcher
-  requirement). `.studio-dialog`/`.studio-dialog::backdrop` compile
-  per Group 2's confirmed pattern.
-- [ ] 4.2 Convert `screens/ProcessesScreen.tsx` to `stylex.create`.
+  requirement). `.studio-dialog` compiles; `::backdrop` does not (D12,
+  found by task 4.3). Both dialogs compose the literal `studio-dialog`
+  class alongside their own compiled style, so `app.css`'s literal
+  `::backdrop` rule keeps matching.
+- [x] 4.2 Convert `screens/ProcessesScreen.tsx` to `stylex.create`.
   Cover the process list itself and its two dialogs, the
   promotion-preview dialog and the start-picker dialog (both
-  `studio-app`'s own requirement).
-- [ ] 4.3 Build the production bundle and open it in a real browser
-  via `playwright-cli`. Open the publish-confirmation dialog. Read its
-  computed `::backdrop` `background-color` in DevTools. Verify: it
-  matches the value `app.css:891` declared before this change. This is
-  D4's second check, now that a real dialog carries the compiled rule.
+  `studio-app`'s own requirement). Both compose the literal
+  `.studio-dialog` class too (D12).
+- [x] 4.3 Build the production bundle and open it in a real browser
+  via `playwright-cli`. Open all four dialogs in turn (publish-confirm
+  and discard-confirm from `panels/ProcessHeaderBar.tsx`,
+  promotion-preview and start-picker from
+  `screens/ProcessesScreen.tsx`). Read each one's computed `::backdrop`
+  `background-color` in DevTools.
+
+  This is D4's second check, now that a real dialog carries the
+  compiled rule. It found none: the production bundle carried no
+  compiled `::backdrop` rule anywhere, on any of the four. Task 2.1's
+  isolated transform check had compiled one correctly. Fixed per D12:
+  every dialog's `stylex.create` entry drops the `"::backdrop"` key,
+  and composes the literal `studio-dialog` class instead.
+
+  Verified again after the fix: all four now compute `rgba(0, 0, 0,
+  0.45)`, matching the value `app.css:891` declared before this
+  change. No console error appeared on either screen.
 - [ ] 4.4 Change `studio-processHeaderBar-publishGate.test.tsx`'s
   literal `studio-error-banner` assertions to the stub-derived key
   name. Its `not.toContain("studio-conflict")` assertion needs no
@@ -232,20 +247,28 @@
 
   Exclude `canvas/` from the result by eye. It returns 0.
 - [ ] 9.2 Delete every rule `app.css` still carries outside its
-  `.canvas-*`-prefixed set, in one pass. Every group left its own
-  migrated rules in place on purpose (D11). Task 9.1 just confirmed
-  nothing outside `canvas/` still depends on any of them. Keep the
-  `@media (prefers-reduced-motion: reduce)` block: every area's
-  `app.css` keeps this one, phase 1's own "one global stylesheet
-  carries what the compiler cannot" pattern.
+  `.canvas-*`-prefixed set, in one pass, except two permanent keepers.
+  Every group left its own migrated rules in place on purpose (D11).
+  Task 9.1 just confirmed nothing outside `canvas/` still depends on
+  any of them. Keep the `@media (prefers-reduced-motion: reduce)`
+  block: every area's `app.css` keeps this one, phase 1's own "one
+  global stylesheet carries what the compiler cannot" pattern. Keep
+  `.studio-dialog::backdrop` too, permanently (D12): every dialog
+  still composes the literal `studio-dialog` class for this one rule
+  alone. `.studio-dialog`'s own base declaration deletes normally; the
+  compiled style already covers it.
 
   Re-run the rule-count grep from task 1.1. Unlike every earlier
   phase, this file does not shrink to a single literal block. Canvas
   has no stylesheet of its own, so `app.css` keeps its 50 `.canvas-*`
-  rules for phase 4. Verify: it now finds exactly 50 distinct rule
-  blocks, all `.canvas-*` prefixed. Two more classes ride along too,
-  `.canvas-group-name` and `.canvas-edge-focus-halo`, D2's deferral
-  and phase 4's own duplicate. Also verify: `bun run typecheck` and
+  rules for phase 4.
+
+  Verify: it now finds 52 distinct rule blocks. `.canvas-*` prefixes
+  50 of them. Two more classes ride along too, `.canvas-group-name`
+  and `.canvas-edge-focus-halo`, D2's deferral and phase 4's own
+  duplicate. The 51st and 52nd are the
+  reduced-motion block and `.studio-dialog::backdrop`, this phase's
+  own two permanent keepers. Also verify: `bun run typecheck` and
   `bun run build` both pass.
 - [ ] 9.3 Verify `tokens.css`'s `.btn` family and `app.css`'s
   `.canvas-*` rules stay byte-identical to the commit before this

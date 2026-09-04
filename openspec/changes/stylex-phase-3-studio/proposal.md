@@ -37,13 +37,16 @@ for it. Does `::backdrop` compile and paint correctly under StyleX
   JS-computed style choices, in their own component's code. This
   follows `web-styling`'s "A DOM-attribute variant becomes a code-side
   style choice" rule.
-- Four native `<dialog>` elements keep their
-  `.studio-dialog`/`.studio-dialog::backdrop` shape, now compiled. Two
-  sit in `panels/ProcessHeaderBar.tsx`: publish-confirm and
-  discard-confirm. Two more sit in `screens/ProcessesScreen.tsx`:
-  promotion-preview and start-picker. `::backdrop` is a first use for
-  this repo's StyleX adoption. Task 2.1 verifies it against a real
-  build first, before any later dialog-conversion task depends on it.
+- Four native `<dialog>` elements keep their `.studio-dialog` shape,
+  now compiled. Two sit in `panels/ProcessHeaderBar.tsx`:
+  publish-confirm and discard-confirm. Two more sit in
+  `screens/ProcessesScreen.tsx`: promotion-preview and start-picker.
+  `::backdrop` was a first use for this repo's StyleX adoption. Task
+  2.1's isolated transform check passed. Task 4.3's real-build check
+  did not: it found no compiled `::backdrop` rule in the production
+  bundle at all (design.md D12). Every dialog composes the literal
+  `.studio-dialog` class permanently, alongside its own compiled
+  style, so `app.css`'s literal `::backdrop` rule keeps matching.
 - Three duplicate rule declarations inside this phase's scope merge
   into one `stylex.create` entry each: `.studio-matrix-row-header`,
   `.studio-form-card-body`, `.studio-form-canvas-tail`. This follows the
@@ -91,7 +94,7 @@ for it. Does `::backdrop` compile and paint correctly under StyleX
 - `studio-form-editor`: the form editor compiles from StyleX. Its
   two-column preview switch becomes a parameterized style function.
 - `studio-publish`: the publish-confirmation dialog compiles from
-  StyleX, including its `::backdrop`.
+  StyleX. Its `::backdrop` stays a literal rule permanently (D12).
 - `studio-json-view`: the JSON view compiles from StyleX.
 - `studio-player`: the Player screen compiles from StyleX.
 - `studio-tools`: the Tools screen compiles from StyleX.
@@ -100,11 +103,17 @@ for it. Does `::backdrop` compile and paint correctly under StyleX
 
 This proposal carries no `web-styling` delta. An isolated
 `@stylexjs/babel-plugin` transform, run ahead of this proposal,
-already confirmed `::backdrop` compiles correctly. That satisfies
-phase 2's own "A phase verifies an unproven compiler feature against a
-real build first" requirement. This phase's shared-class cases fit
-phase 2's "A shared class stays literal until its last consumer
-migrates" requirement too. Neither needs a new requirement or
+confirmed `::backdrop` compiles correctly on its own. A later
+real-build check (task 4.3) found the production bundle carried no
+compiled `::backdrop` rule at all. Every dialog keeps that one rule
+literal instead (design.md D12).
+
+Verify first, then fall back to literal CSS on a failed real-build
+check. That is what phase 2's own "A phase verifies an unproven
+compiler feature against a real build first" requirement asks.
+This phase's shared-class cases fit phase 2's "A shared
+class stays literal until its last consumer migrates" requirement
+too. Neither needs a new requirement or
 scenario. Task 2.1 re-runs the same transform check formally, during
 apply.
 

@@ -186,16 +186,48 @@ fallback stays ready if it fails. No dialog conversion task assumes
 `::backdrop` works before that check runs. This is the same discipline
 phase 2 applied to `:popover-open`/`when.ancestor`.
 
-Two checks run. One is an isolated `@stylexjs/babel-plugin` transform
-script. It gets written to the repo root, then deleted. It confirms
-the compiler emits a working `::backdrop` rule. The other check opens
-a real production build in a browser, with an actual dialog open. It
-confirms the rule paints too.
+Two checks run, at two different times. Task 2.1 runs the first: an
+isolated `@stylexjs/babel-plugin` transform script, written to the repo
+root then deleted. It confirms the compiler emits a working
+`::backdrop` rule on its own. The second check needs a real compiled
+dialog to open, so it cannot run before one exists. Task 4.3 runs it,
+once Group 4 converts the first dialog file.
 
-Task 2.1 runs both checks. No task from 2.2 onward touches a dialog
-file first. If a check fails, `.studio-dialog::backdrop`'s one rule
-stays a literal, unhashed residual class. That is the same fallback
-`web-styling` names for a failed first-use feature.
+**The second check failed. D12 records the finding and the fallback
+this design already named.**
+
+**D12. `::backdrop` fails its second check (D4).** Every dialog
+composes the literal `.studio-dialog` class permanently now, for
+`::backdrop` alone. Task 4.3's real-build check found no compiled
+`::backdrop` rule anywhere in the production bundle. That held on all
+four dialogs. Task 2.1's isolated transform check had compiled one
+correctly.
+
+`@stylexjs/unplugin` (0.19.0) wraps the same `@stylexjs/babel-plugin`
+build (0.19.0) that isolated check already confirmed works on its own.
+The gap sits in the unplugin's own CSS collection step, not in the
+compiler itself. That step is out of this phase's own scope to fix.
+
+Every dialog's own `stylex.create` entry drops the `"::backdrop"` key
+entirely, since the real build never emits it. `app.css`'s literal
+`.studio-dialog::backdrop` rule stays, permanently, a third exception
+beside `.btn` and `.app-back` (D1). Every dialog composes the literal
+`studio-dialog` class alongside its own compiled style, so that rule
+keeps matching:
+
+```
+className={`studio-dialog ${stylex.props(styles.dialog).className}`}
+```
+
+`.studio-dialog`'s OWN base declaration (`max-width`, `border`,
+`padding`, and the rest) still deletes normally at Group 9. The
+compiled style already covers every one of those properties. The
+literal declaration is redundant, not load-bearing, once dropped.
+Only its `::backdrop` line needs the permanent carve-out.
+
+A real browser confirmed the fix on all four dialogs (task 4.3). Each
+one's `::backdrop` now computes `rgba(0, 0, 0, 0.45)`. That matches
+`app.css:891`'s declared value before this change.
 
 **D5. `.studio-form-canvas[data-columns="2"]`/`[data-span="2"]` reuses
 `form-ui/FieldForm.tsx`'s own columns/span pattern exactly.** Same
@@ -345,9 +377,10 @@ many times its shape gets defined in code.
 
 ## Risks / Trade-offs
 
-- [`::backdrop` does not compile or paint as designed] → D4's
-  real-build check runs first, with a literal-CSS fallback plan
-  already named.
+- [`::backdrop` does not compile or paint as designed] → this
+  happened. D4's real-build check caught it, before any dialog task
+  shipped depending on it. D12 records the finding and the permanent
+  literal-class fallback every dialog now carries.
 - [A `CellState`/`data-depth` case looks closed but has a reachable
   open branch] → task 3.x re-audits it first. That re-audit covers
   `FieldMatrixGrid.tsx`'s own group, before writing any style for it.

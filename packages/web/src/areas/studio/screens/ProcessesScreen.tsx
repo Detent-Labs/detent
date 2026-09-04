@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import * as stylex from "@stylexjs/stylex";
 import { Upload } from "lucide-react";
+import { colors, fonts, space, shadow } from "form-ui/tokens.stylex";
 import {
   listProcesses,
   listDrafts,
@@ -25,6 +27,160 @@ import type { Route } from "../routing.js";
 import { describeCaughtError } from "../errors.js";
 import { t } from "../catalog.js";
 import { is401, useFail } from "../../../shell/useFail.js";
+
+/** Every class this file's own markup renders, from `app.css`. `dialog*`
+ * duplicates `panels/ProcessHeaderBar.tsx`'s own near-identical shapes on
+ * purpose (D9); the source rules survive, dead code, until Group 9's
+ * cleanup pass (D11). */
+const styles = stylex.create({
+  // `::backdrop` itself stays a literal fallback (D12): the real production
+  // build carries no compiled `::backdrop` rule anywhere in its output.
+  // `studio-dialog` composes alongside this style on every `<dialog>`
+  // below, so `app.css`'s literal `.studio-dialog::backdrop` rule keeps
+  // matching.
+  dialog: {
+    maxWidth: "34rem",
+    borderWidth: 2,
+    borderStyle: "solid",
+    borderColor: colors.divider,
+    padding: space.s4,
+    background: colors.surface,
+    color: colors.text,
+    overscrollBehavior: "contain",
+    boxShadow: shadow.lg,
+  },
+  dialogFacts: {
+    display: "grid",
+    gridTemplateColumns: "max-content 1fr",
+    gap: `${space.s1} ${space.s3}`,
+    marginBlock: space.s3,
+    marginInline: 0,
+  },
+  dialogFactsDt: {
+    fontFamily: fonts.body,
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+    color: colors.textMuted,
+  },
+  dialogFactsDd: {
+    margin: 0,
+    minWidth: 0,
+    overflowWrap: "anywhere",
+  },
+  warning: {
+    color: colors.refusal,
+    borderLeftWidth: 3,
+    borderLeftStyle: "solid",
+    borderLeftColor: colors.accent400,
+    paddingLeft: space.s2,
+  },
+  dialogNote: {
+    color: colors.textMuted,
+    fontSize: "0.9rem",
+  },
+  dialogError: {
+    color: colors.refusal,
+    whiteSpace: "pre-line",
+  },
+  controls: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: space.s2,
+    marginBottom: space.s3,
+    alignItems: "center",
+  },
+  dialogChoices: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s2,
+    marginBottom: space.s3,
+  },
+  empty: {
+    color: colors.textMuted,
+    paddingBlock: space.s4,
+    paddingInline: 0,
+  },
+  screen: {
+    maxWidth: "60rem",
+    marginInline: "auto",
+    marginBlock: 0,
+    paddingBlock: `${space.s4} ${space.s6}`,
+    paddingInline: space.s3,
+  },
+  fileLabel: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: space.s1,
+    fontFamily: fonts.body,
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+    color: colors.textMuted,
+  },
+  note: {
+    color: colors.textMuted,
+    minHeight: "1.25rem",
+    marginBlockEnd: space.s2,
+    marginBlockStart: 0,
+    marginInline: 0,
+  },
+  errorBanner: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: space.s3,
+    borderWidth: 2,
+    borderStyle: "solid",
+    borderColor: colors.refusal,
+    paddingBlock: space.s2,
+    paddingInline: space.s3,
+    marginBlock: space.s3,
+    marginInline: 0,
+  },
+  errorBannerStamp: {
+    flex: "none",
+    fontFamily: fonts.mono,
+    fontSize: 11,
+    fontWeight: 600,
+    letterSpacing: "0.05em",
+    textTransform: "uppercase",
+    color: colors.refusal,
+    borderWidth: 2,
+    borderStyle: "solid",
+    borderColor: "currentcolor",
+    paddingBlock: 2,
+    paddingInline: 7,
+    transform: "rotate(-2deg)",
+  },
+  errorBannerMessage: {
+    flex: 1,
+    color: colors.text,
+  },
+  table: {
+    width: "100%",
+    borderCollapse: "collapse",
+    fontSize: "0.9rem",
+  },
+  tableHeadCell: {
+    textAlign: "left",
+    fontFamily: fonts.body,
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+    color: colors.textMuted,
+    padding: space.s2,
+    borderBottomWidth: 2,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.divider,
+  },
+  tableCell: {
+    padding: space.s2,
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.border,
+    verticalAlign: "top",
+  },
+});
 
 interface ProcessesScreenProps {
   token: string;
@@ -55,35 +211,42 @@ interface PromotionPreviewDialogProps {
 function PromotionPreviewDialog({ preview, collision, error, busy, onCancel, onConfirm }: PromotionPreviewDialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => ref.current?.showModal(), []);
+  const dialogProps = stylex.props(styles.dialog);
 
   return (
-    <dialog ref={ref} className="studio-dialog" aria-labelledby="promotion-preview-heading" onCancel={onCancel}>
+    <dialog
+      ref={ref}
+      className={`studio-dialog ${dialogProps.className}`}
+      style={dialogProps.style}
+      aria-labelledby="promotion-preview-heading"
+      onCancel={onCancel}
+    >
       <h2 id="promotion-preview-heading">Import a published version</h2>
-      <dl className="studio-dialog-facts">
-        <dt>Process</dt>
-        <dd>{preview.label ?? preview.key ?? preview.processId}</dd>
-        <dt>Key</dt>
-        <dd>
+      <dl {...stylex.props(styles.dialogFacts)}>
+        <dt {...stylex.props(styles.dialogFactsDt)}>Process</dt>
+        <dd {...stylex.props(styles.dialogFactsDd)}>{preview.label ?? preview.key ?? preview.processId}</dd>
+        <dt {...stylex.props(styles.dialogFactsDt)}>Key</dt>
+        <dd {...stylex.props(styles.dialogFactsDd)}>
           <code>{preview.key === "" ? "—" : preview.key}</code>
         </dd>
-        <dt>Process id</dt>
-        <dd>
+        <dt {...stylex.props(styles.dialogFactsDt)}>Process id</dt>
+        <dd {...stylex.props(styles.dialogFactsDd)}>
           <code>{preview.processId}</code>
         </dd>
-        <dt>Source version</dt>
-        <dd>{preview.version === undefined ? "—" : `v${preview.version}`}</dd>
-        <dt>Source hash</dt>
-        <dd>
+        <dt {...stylex.props(styles.dialogFactsDt)}>Source version</dt>
+        <dd {...stylex.props(styles.dialogFactsDd)}>{preview.version === undefined ? "—" : `v${preview.version}`}</dd>
+        <dt {...stylex.props(styles.dialogFactsDt)}>Source hash</dt>
+        <dd {...stylex.props(styles.dialogFactsDd)}>
           <code>{preview.definitionHash ?? "—"}</code>
         </dd>
       </dl>
       {collision === undefined ? null : (
-        <p className="studio-warning">
+        <p {...stylex.props(styles.warning)}>
           Another process (<code>{collision}</code>) already publishes under the key <code>{preview.key}</code>. Importing
           leaves both, and a published process cannot be deleted.
         </p>
       )}
-      <p className="studio-dialog-note">
+      <p {...stylex.props(styles.dialogNote)}>
         This environment assigns its own version number. The definition keeps its process id, so a subprocess reference
         stays valid once its child is promoted too.
       </p>
@@ -92,11 +255,11 @@ function PromotionPreviewDialog({ preview, collision, error, busy, onCancel, onC
           render INSIDE the dialog: `showModal()` puts this element in the top
           layer, so anything on the screen behind it is inert and dimmed. */}
       {error === undefined ? null : (
-        <p className="studio-error studio-json-error" role="alert">
+        <p {...stylex.props(styles.dialogError)} role="alert">
           {error}
         </p>
       )}
-      <div className="studio-controls">
+      <div {...stylex.props(styles.controls)}>
         <button type="button" className="btn btn-primary" onClick={onConfirm} disabled={busy}>
           {busy ? "Publishing…" : "Publish here"}
         </button>
@@ -128,11 +291,18 @@ interface StartPickerDialogProps {
 function StartPickerDialog({ templates, onCancel, onPick }: StartPickerDialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => ref.current?.showModal(), []);
+  const dialogProps = stylex.props(styles.dialog);
 
   return (
-    <dialog ref={ref} className="studio-dialog" aria-labelledby="start-picker-heading" onCancel={onCancel}>
+    <dialog
+      ref={ref}
+      className={`studio-dialog ${dialogProps.className}`}
+      style={dialogProps.style}
+      aria-labelledby="start-picker-heading"
+      onCancel={onCancel}
+    >
       <h2 id="start-picker-heading">Start a new process</h2>
-      <div className="studio-dialog-choices">
+      <div {...stylex.props(styles.dialogChoices)}>
         <button type="button" className="btn btn-primary" onClick={() => onPick(undefined)}>
           Empty process
         </button>
@@ -142,8 +312,8 @@ function StartPickerDialog({ templates, onCancel, onPick }: StartPickerDialogPro
           </button>
         ))}
       </div>
-      {templates.length === 0 && <p className="studio-empty">No templates exist yet. A curator creates them on the Templates screen.</p>}
-      <div className="studio-controls">
+      {templates.length === 0 && <p {...stylex.props(styles.empty)}>No templates exist yet. A curator creates them on the Templates screen.</p>}
+      <div {...stylex.props(styles.controls)}>
         <button type="button" className="btn btn-ghost" onClick={onCancel}>
           Cancel
         </button>
@@ -317,13 +487,13 @@ export function ProcessesScreen({ token, navigate, onUnauthorized }: ProcessesSc
   };
 
   return (
-    <main className="studio-screen">
+    <main {...stylex.props(styles.screen)}>
       {picking && <StartPickerDialog templates={templates} onCancel={() => setPicking(false)} onPick={(key) => void startProcess(key)} />}
-      <div className="studio-controls">
+      <div {...stylex.props(styles.controls)}>
         <button type="button" className="btn btn-primary" onClick={() => void newProcess()}>
           + New process
         </button>
-        <label className="studio-file-label" htmlFor="promotion-import">
+        <label {...stylex.props(styles.fileLabel)} htmlFor="promotion-import">
           <Upload size={18} strokeWidth={1.75} aria-hidden="true" />
           Import a promoted version
         </label>
@@ -341,11 +511,11 @@ export function ProcessesScreen({ token, navigate, onUnauthorized }: ProcessesSc
       {/* Only a file the guard rejected lands here — no dialog is open then. A
           publish failure renders inside the dialog instead. */}
       {importError === undefined || pending !== undefined ? null : (
-        <p className="studio-error studio-json-error" role="alert">
+        <p {...stylex.props(styles.dialogError)} role="alert">
           {importError}
         </p>
       )}
-      <p className="studio-note" aria-live="polite">
+      <p {...stylex.props(styles.note)} aria-live="polite">
         {importResult ?? ""}
       </p>
       {pending === undefined ? null : (
@@ -359,33 +529,33 @@ export function ProcessesScreen({ token, navigate, onUnauthorized }: ProcessesSc
         />
       )}
       {error && (
-        <div className="studio-error-banner" role="alert">
-          <span className="studio-error-banner-stamp">{t("error.failed")}</span>
-          <span className="studio-error-banner-message">{error}</span>
+        <div {...stylex.props(styles.errorBanner)} role="alert">
+          <span {...stylex.props(styles.errorBannerStamp)}>{t("error.failed")}</span>
+          <span {...stylex.props(styles.errorBannerMessage)}>{error}</span>
           <button type="button" className="btn btn-secondary" onClick={() => void load()} disabled={loading}>
             {t("error.retry")}
           </button>
         </div>
       )}
       {loading && rows.length === 0 ? (
-        <p className="studio-empty">Loading…</p>
+        <p {...stylex.props(styles.empty)}>Loading…</p>
       ) : rows.length === 0 ? (
-        !error && <p className="studio-empty">No processes yet.</p>
+        !error && <p {...stylex.props(styles.empty)}>No processes yet.</p>
       ) : (
-        <table className="studio-table">
+        <table {...stylex.props(styles.table)}>
           <thead>
             <tr>
-              <th>Process</th>
-              <th>Draft</th>
-              <th>Published</th>
-              <th></th>
+              <th {...stylex.props(styles.tableHeadCell)}>Process</th>
+              <th {...stylex.props(styles.tableHeadCell)}>Draft</th>
+              <th {...stylex.props(styles.tableHeadCell)}>Published</th>
+              <th {...stylex.props(styles.tableHeadCell)}></th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row) => (
               <tr key={row.processId}>
-                <td>{row.published?.key ?? row.processId}</td>
-                <td>
+                <td {...stylex.props(styles.tableCell)}>{row.published?.key ?? row.processId}</td>
+                <td {...stylex.props(styles.tableCell)}>
                   {row.draft ? (
                     <>
                       saved by {row.draft.updatedBy} at {new Date(row.draft.updatedAt).toLocaleString()} (rev {row.draft.revision})
@@ -394,8 +564,8 @@ export function ProcessesScreen({ token, navigate, onUnauthorized }: ProcessesSc
                     "—"
                   )}
                 </td>
-                <td>{row.published ? <>v{row.published.version} · {row.published.definitionHash.slice(0, 12)}</> : "—"}</td>
-                <td>
+                <td {...stylex.props(styles.tableCell)}>{row.published ? <>v{row.published.version} · {row.published.definitionHash.slice(0, 12)}</> : "—"}</td>
+                <td {...stylex.props(styles.tableCell)}>
                   {row.draft ? (
                     <>
                       <button type="button" className="btn btn-secondary" onClick={() => navigate({ name: "edit", processId: row.processId })}>

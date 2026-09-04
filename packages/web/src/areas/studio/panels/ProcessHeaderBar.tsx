@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import * as stylex from "@stylexjs/stylex";
 import { MoreVertical, Users2 } from "lucide-react";
+import { colors, fonts, space, shadow } from "form-ui/tokens.stylex";
 import { t } from "../catalog.js";
 import { useDraft } from "../draft/store.js";
 import { resolveBaseLocaleChange } from "../screens/processHeaderLogic.js";
@@ -16,6 +18,230 @@ import { areaHref, type NavigateOptions } from "../../../shell/routing.js";
 /** The Publish item points `aria-describedby` here when the permission is
  * absent. One header bar renders per screen, so one constant id suffices. */
 const PUBLISH_REASON_ID = "studio-publish-unavailable-reason";
+
+/** Every class this file's own markup renders, from `app.css`. Two
+ * dialog-shaped groups (`dialog*`) duplicate `ProcessesScreen.tsx`'s own
+ * near-identical shapes on purpose (D9); the source rules survive in
+ * `app.css`, dead code, until Group 9's cleanup pass (D11). */
+const styles = stylex.create({
+  headerBar: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "baseline",
+    gap: space.s3,
+    paddingBottom: space.s3,
+    borderBottomWidth: 2,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.divider,
+    marginBottom: space.s3,
+  },
+  headerBarName: {
+    margin: 0,
+    fontFamily: fonts.heading,
+    fontWeight: fonts.headingWeight,
+    fontSize: "1rem",
+    textTransform: "none",
+    letterSpacing: "normal",
+    color: colors.text,
+  },
+  // Strips the global input chrome so the process label reads as heading
+  // text until focused; the global `input:focus-visible` rule still
+  // supplies the accent ring on top of this border-bottom override.
+  headerBarNameInput: {
+    border: "none",
+    borderBottomWidth: 1,
+    borderBottomStyle: "dashed",
+    borderBottomColor: {
+      default: colors.border,
+      ":focus-visible": colors.accent,
+    },
+    borderRadius: 0,
+    padding: 0,
+    background: "transparent",
+    font: "inherit",
+    color: "inherit",
+    width: "auto",
+    minWidth: "8ch",
+  },
+  warning: {
+    color: colors.refusal,
+    borderLeftWidth: 3,
+    borderLeftStyle: "solid",
+    borderLeftColor: colors.accent400,
+    paddingLeft: space.s2,
+  },
+  headerBarKey: {
+    fontFamily: fonts.mono,
+    color: colors.textMuted,
+  },
+  headerBarBadge: {
+    fontFamily: fonts.mono,
+    color: colors.textMuted,
+  },
+  headerBarDirty: {
+    color: colors.refusal,
+  },
+  headerBarSaved: {
+    color: colors.textMuted,
+  },
+  headerBarTimestamp: {
+    fontFamily: fonts.mono,
+    color: colors.textMuted,
+  },
+  headerBarPublished: {
+    fontFamily: fonts.mono,
+    color: colors.text,
+  },
+  headerBarMenu: {
+    position: "relative",
+    marginLeft: "auto",
+  },
+  headerBarMenuPanel: {
+    position: "absolute",
+    right: 0,
+    top: `calc(100% + ${space.s1})`,
+    zIndex: 1,
+    minWidth: "16rem",
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s2,
+    padding: space.s2,
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: colors.border,
+    background: colors.surface,
+  },
+  // A menu row, not a committing action away from this surface, so it stays
+  // out of the primary/secondary/ghost taxonomy (design-language.md).
+  menuItem: {
+    display: "block",
+    width: "100%",
+    textAlign: "left",
+    background: {
+      default: "none",
+      ":hover": `color-mix(in srgb, ${colors.text} 7%, transparent)`,
+    },
+    color: colors.text,
+    paddingBlock: space.s1,
+    paddingInline: space.s2,
+  },
+  // The permission state uses `aria-disabled`, since a natively disabled
+  // button never has its `aria-describedby` read (studio-publish). This
+  // style applies from a JS-computed check covering both spellings (D3).
+  menuItemDisabled: {
+    opacity: 0.45,
+  },
+  headerBarMenuGroup: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s1,
+    paddingTop: space.s2,
+    borderTopWidth: 2,
+    borderTopStyle: "solid",
+    borderTopColor: colors.divider,
+  },
+  headerBarMenuLabel: {
+    fontFamily: fonts.body,
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: "0.1em",
+    color: colors.textMuted,
+  },
+  headerBarMenuRow: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s1,
+    fontSize: "0.85rem",
+  },
+  headerBarMenuLink: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "flex-start",
+    gap: space.s2,
+    width: "100%",
+  },
+  // `::backdrop` itself stays a literal fallback (D12): the real production
+  // build carries no compiled `::backdrop` rule anywhere in its output,
+  // though the isolated task 2.1 transform check compiled one correctly.
+  // `studio-dialog` composes alongside this style on every `<dialog>` below,
+  // so `app.css`'s literal `.studio-dialog::backdrop` rule keeps matching.
+  dialog: {
+    maxWidth: "34rem",
+    borderWidth: 2,
+    borderStyle: "solid",
+    borderColor: colors.divider,
+    padding: space.s4,
+    background: colors.surface,
+    color: colors.text,
+    overscrollBehavior: "contain",
+    boxShadow: shadow.lg,
+  },
+  dialogFacts: {
+    display: "grid",
+    gridTemplateColumns: "max-content 1fr",
+    gap: `${space.s1} ${space.s3}`,
+    marginBlock: space.s3,
+    marginInline: 0,
+  },
+  dialogFactsDt: {
+    fontFamily: fonts.body,
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+    color: colors.textMuted,
+  },
+  dialogFactsDd: {
+    margin: 0,
+    minWidth: 0,
+    overflowWrap: "anywhere",
+  },
+  dialogNote: {
+    color: colors.textMuted,
+    fontSize: "0.9rem",
+  },
+  dialogError: {
+    color: colors.refusal,
+    whiteSpace: "pre-line",
+  },
+  controls: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: space.s2,
+    marginBottom: space.s3,
+    alignItems: "center",
+  },
+  errorBanner: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: space.s3,
+    borderWidth: 2,
+    borderStyle: "solid",
+    borderColor: colors.refusal,
+    paddingBlock: space.s2,
+    paddingInline: space.s3,
+    marginBlock: space.s3,
+    marginInline: 0,
+  },
+  errorBannerStamp: {
+    flex: "none",
+    fontFamily: fonts.mono,
+    fontSize: 11,
+    fontWeight: 600,
+    letterSpacing: "0.05em",
+    textTransform: "uppercase",
+    color: colors.refusal,
+    borderWidth: 2,
+    borderStyle: "solid",
+    borderColor: "currentcolor",
+    paddingBlock: 2,
+    paddingInline: 7,
+    transform: "rotate(-2deg)",
+  },
+  errorBannerMessage: {
+    flex: 1,
+    color: colors.text,
+  },
+});
 
 /**
  * The `⋮` menu's Publish item, with the reason line that renders beneath it
@@ -43,6 +269,7 @@ const PUBLISH_REASON_ID = "studio-publish-unavailable-reason";
  */
 export function PublishMenuItem({ canPublish, publishing, onPublish }: { canPublish: boolean; publishing: boolean; onPublish: () => void }) {
   const gate = publishAvailability(canPublish);
+  const itemDisabled = publishing || !gate.available;
   return (
     <div role="group">
       <button
@@ -55,11 +282,12 @@ export function PublishMenuItem({ canPublish, publishing, onPublish }: { canPubl
           if (!gate.available) return;
           onPublish();
         }}
+        {...stylex.props(styles.menuItem, itemDisabled && styles.menuItemDisabled)}
       >
         {publishing ? t("draftToolbar.publishing") : t("draftToolbar.publish")}
       </button>
       {gate.reasonKey && (
-        <span id={PUBLISH_REASON_ID} className="studio-header-bar-menu-label">
+        <span id={PUBLISH_REASON_ID} {...stylex.props(styles.headerBarMenuLabel)}>
           {t(gate.reasonKey)}
         </span>
       )}
@@ -141,36 +369,43 @@ function PublishConfirmDialog({
   onConfirm,
 }: ConfirmDialogProps & { processId: string; nextVersion: string; dirty: boolean }) {
   const { ref, declineRef } = useConfirmDialog(triggerRef);
+  const dialogProps = stylex.props(styles.dialog);
 
   return (
-    <dialog ref={ref} className="studio-dialog" aria-labelledby="publish-confirm-heading" onCancel={onCancel}>
+    <dialog
+      ref={ref}
+      className={`studio-dialog ${dialogProps.className}`}
+      style={dialogProps.style}
+      aria-labelledby="publish-confirm-heading"
+      onCancel={onCancel}
+    >
       <h2 id="publish-confirm-heading">{t("draftToolbar.publishDialogHeading")}</h2>
-      <dl className="studio-dialog-facts">
-        <dt>{t("draftToolbar.dialogProcess")}</dt>
-        <dd>{processLabel}</dd>
-        <dt>{t("draftToolbar.dialogProcessId")}</dt>
-        <dd>
+      <dl {...stylex.props(styles.dialogFacts)}>
+        <dt {...stylex.props(styles.dialogFactsDt)}>{t("draftToolbar.dialogProcess")}</dt>
+        <dd {...stylex.props(styles.dialogFactsDd)}>{processLabel}</dd>
+        <dt {...stylex.props(styles.dialogFactsDt)}>{t("draftToolbar.dialogProcessId")}</dt>
+        <dd {...stylex.props(styles.dialogFactsDd)}>
           <code>{processId}</code>
         </dd>
-        <dt>{t("draftToolbar.dialogRevision")}</dt>
-        <dd>{revision}</dd>
+        <dt {...stylex.props(styles.dialogFactsDt)}>{t("draftToolbar.dialogRevision")}</dt>
+        <dd {...stylex.props(styles.dialogFactsDd)}>{revision}</dd>
         {/* "Next version", not "Version": the engine assigns the number, and
             another environment can promote one between this load and this
             publish. The header's own published stamp reports what the engine
             actually assigned. */}
-        <dt>{t("draftToolbar.publishDialogNextVersion")}</dt>
-        <dd>
+        <dt {...stylex.props(styles.dialogFactsDt)}>{t("draftToolbar.publishDialogNextVersion")}</dt>
+        <dd {...stylex.props(styles.dialogFactsDd)}>
           <code>{nextVersion}</code>
         </dd>
       </dl>
-      {dirty && <p className="studio-dialog-note">{t("draftToolbar.publishDialogUnsaved")}</p>}
-      <p className="studio-dialog-note">{t("draftToolbar.publishDialogImmutable")}</p>
+      {dirty && <p {...stylex.props(styles.dialogNote)}>{t("draftToolbar.publishDialogUnsaved")}</p>}
+      <p {...stylex.props(styles.dialogNote)}>{t("draftToolbar.publishDialogImmutable")}</p>
       {error !== null && (
-        <p className="studio-error studio-json-error" role="alert">
+        <p {...stylex.props(styles.dialogError)} role="alert">
           {error}
         </p>
       )}
-      <div className="studio-controls">
+      <div {...stylex.props(styles.controls)}>
         <button type="button" className="btn btn-primary" onClick={onConfirm} disabled={busy}>
           {busy ? t("draftToolbar.publishing") : t("draftToolbar.publish")}
         </button>
@@ -196,29 +431,36 @@ function PublishConfirmDialog({
  */
 function DiscardConfirmDialog({ processLabel, revision, lastSavedAt, error, busy, triggerRef, onCancel, onConfirm }: ConfirmDialogProps & { lastSavedAt: Date | undefined }) {
   const { ref, declineRef } = useConfirmDialog(triggerRef);
+  const dialogProps = stylex.props(styles.dialog);
 
   return (
-    <dialog ref={ref} className="studio-dialog" aria-labelledby="discard-confirm-heading" onCancel={onCancel}>
+    <dialog
+      ref={ref}
+      className={`studio-dialog ${dialogProps.className}`}
+      style={dialogProps.style}
+      aria-labelledby="discard-confirm-heading"
+      onCancel={onCancel}
+    >
       <h2 id="discard-confirm-heading">{t("draftToolbar.discardDialogHeading")}</h2>
-      <dl className="studio-dialog-facts">
-        <dt>{t("draftToolbar.dialogProcess")}</dt>
-        <dd>{processLabel}</dd>
-        <dt>{t("draftToolbar.dialogRevision")}</dt>
-        <dd>{revision}</dd>
+      <dl {...stylex.props(styles.dialogFacts)}>
+        <dt {...stylex.props(styles.dialogFactsDt)}>{t("draftToolbar.dialogProcess")}</dt>
+        <dd {...stylex.props(styles.dialogFactsDd)}>{processLabel}</dd>
+        <dt {...stylex.props(styles.dialogFactsDt)}>{t("draftToolbar.dialogRevision")}</dt>
+        <dd {...stylex.props(styles.dialogFactsDd)}>{revision}</dd>
         {lastSavedAt && (
           <>
-            <dt>{t("draftToolbar.discardDialogLastSaved")}</dt>
-            <dd>{lastSavedAt.toLocaleTimeString()}</dd>
+            <dt {...stylex.props(styles.dialogFactsDt)}>{t("draftToolbar.discardDialogLastSaved")}</dt>
+            <dd {...stylex.props(styles.dialogFactsDd)}>{lastSavedAt.toLocaleTimeString()}</dd>
           </>
         )}
       </dl>
-      <p className="studio-dialog-note">{t("draftToolbar.discardDialogKeepsPublished")}</p>
+      <p {...stylex.props(styles.dialogNote)}>{t("draftToolbar.discardDialogKeepsPublished")}</p>
       {error !== null && (
-        <p className="studio-error studio-json-error" role="alert">
+        <p {...stylex.props(styles.dialogError)} role="alert">
           {error}
         </p>
       )}
-      <div className="studio-controls">
+      <div {...stylex.props(styles.controls)}>
         <button type="button" className="btn btn-destructive" onClick={onConfirm} disabled={busy}>
           {t("draftToolbar.discard")}
         </button>
@@ -366,9 +608,12 @@ export function ProcessHeaderBar({
   const dialogOpen = actions.pendingDialog !== null;
   const processLabel = resolveDraftLocalizedText(draft.label, contentLocale, draft.baseLocale ?? "en") ?? t("headerBar.unnamedProcess");
 
+  const headerBarNameInputProps = stylex.props(styles.headerBarNameInput);
+  const headerBarMenuLinkProps = stylex.props(styles.headerBarMenuLink);
+
   return (
     <>
-    <header className="studio-header-bar">
+    <header {...stylex.props(styles.headerBar)}>
       {/* The one h1 this route renders (task 5.1 removed the screen's old
           generic "Process Studio" <h1>, the duplicate-status pair
           proposal.md names as the problem this change fixes): every other
@@ -393,11 +638,13 @@ export function ProcessHeaderBar({
           `mutate()`. A disabled input drops out of the tab order and fires
           no onChange, so it satisfies "not reachable" while still showing
           the current value. */}
-      <h1 className="studio-header-bar-name">
+      <h1 {...stylex.props(styles.headerBarName)}>
         <LocalizedTextInput
           value={draft.label}
           placeholder={t("headerBar.unnamedProcess")}
           disabled={!structureActive}
+          className={headerBarNameInputProps.className}
+          style={headerBarNameInputProps.style}
           onChange={(next) => {
             const baseLocale = draft.baseLocale ?? "en";
             const priorDerivedKey = deriveKey(resolveDraftLocalizedText(draft.label, baseLocale, baseLocale) ?? "");
@@ -412,27 +659,27 @@ export function ProcessHeaderBar({
         />
       </h1>
       {missingTranslationWarning(draft.label, contentLocale, draft.baseLocale) && (
-        <p className="studio-warning">{missingTranslationWarning(draft.label, contentLocale, draft.baseLocale)}</p>
+        <p {...stylex.props(styles.warning)}>{missingTranslationWarning(draft.label, contentLocale, draft.baseLocale)}</p>
       )}
       {/* Read-only; the editable key control lives in the ⋮ menu's "Process,
           saved with the draft" group. studio-canvas's header-bar requirement
           names this display explicitly: "the process name and the key in
           the mono face." */}
-      {draft.key && <span className="studio-header-bar-key">{draft.key}</span>}
+      {draft.key && <span {...stylex.props(styles.headerBarKey)}>{draft.key}</span>}
       <IssueList entityId="process" />
-      <span className="studio-header-bar-badge">
+      <span {...stylex.props(styles.headerBarBadge)}>
         {t("headerBar.revision")} {revision}
       </span>
-      <span className={isDirty ? "studio-header-bar-dirty" : "studio-header-bar-saved"}>
+      <span {...stylex.props(isDirty ? styles.headerBarDirty : styles.headerBarSaved)}>
         {isDirty ? t("headerBar.unsaved") : t("headerBar.saved")}
       </span>
       {!isDirty && lastSavedAt && (
-        <span className="studio-header-bar-timestamp">
+        <span {...stylex.props(styles.headerBarTimestamp)}>
           {t("headerBar.lastSaved")} {lastSavedAt.toLocaleTimeString()}
         </span>
       )}
       {publishResult && (
-        <span className="studio-header-bar-published">
+        <span {...stylex.props(styles.headerBarPublished)}>
           {t("headerBar.published")} v{publishResult.version} ({publishResult.definitionHash.slice(0, 12)})
         </span>
       )}
@@ -440,7 +687,7 @@ export function ProcessHeaderBar({
       <ContentLocaleBadge />
       {surfaceToggle}
 
-      <div className="studio-header-bar-menu" ref={menuRef}>
+      <div {...stylex.props(styles.headerBarMenu)} ref={menuRef}>
         <button
           ref={menuTriggerRef}
           type="button"
@@ -453,16 +700,22 @@ export function ProcessHeaderBar({
           <MoreVertical size={18} strokeWidth={1.75} aria-hidden="true" />
         </button>
         {menuOpen && (
-          <div className="studio-header-bar-menu-panel" role="menu">
+          <div {...stylex.props(styles.headerBarMenuPanel)} role="menu">
             <button
               type="button"
               role="menuitem"
               disabled={actions.saving}
               onClick={() => runMenuAction(actions.save)}
+              {...stylex.props(styles.menuItem, actions.saving && styles.menuItemDisabled)}
             >
               {actions.saving ? t("draftToolbar.saving") : t("draftToolbar.save")}
             </button>
-            <button type="button" role="menuitem" onClick={() => runMenuAction(actions.discard)}>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => runMenuAction(actions.discard)}
+              {...stylex.props(styles.menuItem)}
+            >
               {t("draftToolbar.discard")}
             </button>
             <PublishMenuItem canPublish={canPublish} publishing={actions.publishing} onPublish={() => runMenuAction(actions.publish)} />
@@ -475,11 +728,11 @@ export function ProcessHeaderBar({
                 DraftToolbar. Only key and baseLocale actually mutate the
                 draft body, so only they are structureActive-gated within
                 it. */}
-            <div className="studio-header-bar-menu-group">
-              <span className="studio-header-bar-menu-label">{t("headerBar.menuGroupDraft")}</span>
+            <div {...stylex.props(styles.headerBarMenuGroup)}>
+              <span {...stylex.props(styles.headerBarMenuLabel)}>{t("headerBar.menuGroupDraft")}</span>
               {structureActive && (
                 <>
-                  <label className="studio-header-bar-menu-row">
+                  <label {...stylex.props(styles.headerBarMenuRow)}>
                     key
                     <input
                       type="text"
@@ -495,7 +748,7 @@ export function ProcessHeaderBar({
                       LocalizedText below it is mandatory, so the declaration
                       precedes the first localized value it governs (same
                       ordering the old ProcessHeader fieldset used). */}
-                  <label className="studio-header-bar-menu-row">
+                  <label {...stylex.props(styles.headerBarMenuRow)}>
                     baseLocale
                     <input type="text" value={draft.baseLocale ?? ""} onChange={(e) => changeBaseLocale(e.target.value)} />
                   </label>
@@ -512,7 +765,8 @@ export function ProcessHeaderBar({
                   concern (studio-canvas). */}
               <button
                 type="button"
-                className="btn btn-secondary studio-header-bar-menu-link"
+                className={`btn btn-secondary ${headerBarMenuLinkProps.className}`}
+                style={headerBarMenuLinkProps.style}
                 onClick={() => runMenuAction(() => go(`${areaHref("admin", "/groups")}?processId=${encodeURIComponent(processId)}`))}
               >
                 <Users2 size={18} strokeWidth={1.75} aria-hidden="true" />
@@ -549,15 +803,15 @@ export function ProcessHeaderBar({
           failure inside itself, and two alert regions for one failure announce
           it twice (spa-error-reporting). */}
       {!dialogOpen && actions.error && (
-        <div className="studio-error-banner" role="alert">
-          <span className="studio-error-banner-stamp">{t("error.failed")}</span>
-          <span className="studio-error-banner-message">{actions.error}</span>
+        <div {...stylex.props(styles.errorBanner)} role="alert">
+          <span {...stylex.props(styles.errorBannerStamp)}>{t("error.failed")}</span>
+          <span {...stylex.props(styles.errorBannerMessage)}>{actions.error}</span>
         </div>
       )}
       {!dialogOpen && conflict && (
-        <div className="studio-error-banner" role="alert">
-          <span className="studio-error-banner-stamp">{t("error.failed")}</span>
-          <span className="studio-error-banner-message">{t("draftToolbar.conflictMessage")}</span>
+        <div {...stylex.props(styles.errorBanner)} role="alert">
+          <span {...stylex.props(styles.errorBannerStamp)}>{t("error.failed")}</span>
+          <span {...stylex.props(styles.errorBannerMessage)}>{t("draftToolbar.conflictMessage")}</span>
           <button type="button" className="btn btn-secondary" onClick={actions.reload}>
             {t("draftToolbar.conflictReload")}
           </button>
