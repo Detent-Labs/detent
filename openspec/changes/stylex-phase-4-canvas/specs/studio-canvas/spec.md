@@ -3,10 +3,11 @@
 ### Requirement: The canvas renders from compiled styles
 
 `canvas/CanvasView.tsx` and `canvas/EditRail.tsx` SHALL render from compiled
-component styles, reading `form-ui/tokens.stylex`. The rendered result SHALL
-match the previous stylesheet declaration for declaration, including every
-pointer-driven state (drag, selection, insert-target, group-collapsed) and
-every keyboard-driven state (roving focus ring, `:focus-visible` halo).
+component styles, reading `form-ui/tokens.stylex`. The rendered result
+SHALL match the previous stylesheet declaration for declaration. This
+covers every pointer-driven state (drag, selection, insert-target,
+group-collapsed) and every keyboard-driven state (roving focus ring,
+`:focus-visible` halo).
 
 `canvas-node` and `panzoom-exclude` SHALL remain literal, unhashed class
 strings on every element that carries them today. Keyboard-focus targeting
@@ -15,18 +16,23 @@ directly, outside the compiled-style system.
 
 #### Scenario: The canvas keeps its look and its keyboard model
 
-- **WHEN** a browser renders the canvas edit screen and a developer walks its
-  nodes and edges with the keyboard, in Chromium and in Firefox
-- **THEN** the canvas's computed layout, spacing, color and border equal the
-  values the deleted stylesheet declared, and the keyboard traversal,
-  selection and focus-ring behavior are unchanged from before this change
+- **WHEN** a browser renders the canvas edit screen
+- **AND** a developer walks its nodes and edges with the keyboard, in
+  Chromium and in Firefox
+- **THEN** the canvas's computed layout, spacing, color and border equal
+  the values the deleted stylesheet declared
+- **AND** the keyboard traversal, selection and focus-ring behavior stay
+  exactly as they were before
 
 #### Scenario: Panzoom still excludes every node and edge group from panning
 
-- **WHEN** a developer starts a pointer drag on a step node, an edge group, a
-  waypoint handle, or the inline rename field
-- **THEN** the press reaches the canvas's own handlers and does not pan the
-  canvas, because each of those elements still carries the literal
+- **WHEN** a developer starts a pointer drag on one of the canvas's
+  excluded elements
+- **AND** the element is a step node, an edge group, a waypoint handle,
+  or the inline rename field
+- **THEN** the press reaches the canvas's own handlers and does not pan
+  the canvas
+- **AND** each of those elements still carries the literal
   `panzoom-exclude` class Panzoom's own exclude-class option reads
 
 ## MODIFIED Requirements
