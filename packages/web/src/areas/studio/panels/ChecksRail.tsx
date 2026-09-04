@@ -9,20 +9,24 @@ const styles = stylex.create({
   checksRail: {
     minWidth: 0,
     overflowY: "auto",
-    border: `1px solid ${colors.border}`,
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: colors.border,
     padding: space.s3,
   },
   // The docked, collapsed presentation (`.studio-checks-rail-docked`):
   // `.canvas-inspector` already draws the bordered box around the whole
   // inspector, so this variant draws none of its own.
   checksRailDocked: {
-    border: "none",
+    borderWidth: 0,
     paddingTop: space.s3,
     paddingRight: 0,
     paddingBottom: 0,
     paddingLeft: 0,
     marginTop: space.s3,
-    borderTop: `2px solid ${colors.divider}`,
+    borderTopWidth: 2,
+    borderTopStyle: "solid",
+    borderTopColor: colors.divider,
   },
   // The panels screen's own docked instance, the sibling directly below
   // that screen's two columns. The docked variant above drops all four
@@ -32,10 +36,19 @@ const styles = stylex.create({
   // edge stays: it is the boundary against the columns, the structural
   // weight.
   checksRailFramed: {
-    borderRight: `1px solid ${colors.border}`,
-    borderBottom: `1px solid ${colors.border}`,
-    borderLeft: `1px solid ${colors.border}`,
-    padding: space.s3,
+    borderRightWidth: 1,
+    borderBottomWidth: 1,
+    borderLeftWidth: 1,
+    borderRightStyle: "solid",
+    borderBottomStyle: "solid",
+    borderLeftStyle: "solid",
+    borderRightColor: colors.border,
+    borderBottomColor: colors.border,
+    borderLeftColor: colors.border,
+    paddingTop: space.s3,
+    paddingRight: space.s3,
+    paddingBottom: space.s3,
+    paddingLeft: space.s3,
   },
   // `.studio-checks-rail h2`: a descendant selector on a bare `<h2>`.
   checksRailHeading: {
@@ -43,7 +56,9 @@ const styles = stylex.create({
   },
   checksRailClear: {
     color: colors.text,
-    border: `2px solid ${colors.text}`,
+    borderWidth: 2,
+    borderStyle: "solid",
+    borderColor: colors.text,
     padding: space.s2,
     marginBlockEnd: space.s3,
     marginBlockStart: 0,
@@ -52,10 +67,9 @@ const styles = stylex.create({
   checksGroup: {
     paddingBlock: space.s2,
     paddingInline: 0,
-    borderTop: `1px solid ${colors.border}`,
-    ":first-of-type": {
-      borderTop: "none",
-    },
+    borderTopWidth: { default: 1, ":first-of-type": 0 },
+    borderTopStyle: "solid",
+    borderTopColor: colors.border,
   },
   checksGroupHeading: {
     marginBlockEnd: space.s1,
@@ -70,7 +84,9 @@ const styles = stylex.create({
   checksGroupHeldBack: {
     margin: 0,
     color: colors.refusal,
-    borderLeft: `3px solid color-mix(in srgb, ${colors.refusal} 55%, transparent)`,
+    borderLeftWidth: 3,
+    borderLeftStyle: "solid",
+    borderLeftColor: `color-mix(in srgb, ${colors.refusal} 55%, transparent)`,
     paddingLeft: space.s2,
     fontSize: "0.85rem",
   },
@@ -87,16 +103,17 @@ const styles = stylex.create({
   checksGroupIssue: {
     paddingBlock: space.s1,
     paddingInline: 0,
-    borderTop: `1px solid ${colors.border}`,
+    borderTopWidth: { default: 1, ":first-child": 0 },
+    borderTopStyle: "solid",
+    borderTopColor: colors.border,
     fontSize: "0.85rem",
-    ":first-child": {
-      borderTop: "none",
-    },
   },
   checksGroupNote: {
     margin: 0,
     paddingTop: space.s1,
-    borderTop: `1px solid ${colors.border}`,
+    borderTopWidth: 1,
+    borderTopStyle: "solid",
+    borderTopColor: colors.border,
     color: colors.textMuted,
     fontSize: "0.8rem",
   },
@@ -106,10 +123,12 @@ const styles = stylex.create({
     justifyContent: "space-between",
     gap: space.s2,
     width: "100%",
-    background: "none",
+    backgroundColor: { default: "transparent", ":hover": colors.surfaceMuted },
     color: "inherit",
-    border: "none",
-    borderTop: `2px solid ${colors.divider}`,
+    borderWidth: 0,
+    borderTopWidth: 2,
+    borderTopStyle: "solid",
+    borderTopColor: colors.divider,
     paddingTop: space.s2,
     paddingRight: 0,
     paddingBottom: 0,
@@ -117,15 +136,12 @@ const styles = stylex.create({
     font: "inherit",
     textAlign: "left",
     cursor: "pointer",
-    ":hover": {
-      background: colors.surfaceMuted,
-    },
   },
   // `.studio-checks-rail-docked .studio-checks-rail-summary`: this file
   // knows `collapsed` at both render sites, so the descendant override
   // becomes a second style applied alongside the base one.
   checksRailSummaryDocked: {
-    borderTop: "none",
+    borderTopWidth: 0,
     paddingTop: 0,
   },
   checksRailSummaryHeading: {

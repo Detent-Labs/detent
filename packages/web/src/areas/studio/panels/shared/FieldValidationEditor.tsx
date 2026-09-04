@@ -16,7 +16,9 @@ const styles = stylex.create({
   fieldValidation: {
     marginBlock: space.s2,
     marginInline: 0,
-    border: `1px solid ${colors.border}`,
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: colors.border,
     paddingBlock: space.s1,
     paddingInline: space.s2,
   },

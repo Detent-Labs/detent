@@ -53,8 +53,8 @@ const NARROW = "@media (max-width: 64rem)";
  * screen after the next change. The accent at low mix, so the row reads as
  * touched, never as wrong — the refusal tone belongs to a check. */
 const usageTint = stylex.keyframes({
-  from: { background: `color-mix(in srgb, ${colors.accent} 18%, transparent)` },
-  to: { background: "transparent" },
+  from: { backgroundColor: `color-mix(in srgb, ${colors.accent} 18%, transparent)` },
+  to: { backgroundColor: "transparent" },
 });
 
 /** Every style this file's own markup renders. `fieldRow`, `panelHeading`
