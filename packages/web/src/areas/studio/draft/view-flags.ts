@@ -254,30 +254,37 @@ export function checkViewFlags(body: Draft): EditorIssue[] {
 
   steps.forEach((step, stepIndex) => {
     if (!step.id) return;
-    for (const entry of (step.view?.fields ?? []).filter(isDraftViewField)) {
-      if (!entry.ref) continue;
+    // The entry's own index in `view.fields`, not its position among the
+    // field-bearing ones: the `loc` has to address the body as it stands.
+    (step.view?.fields ?? []).forEach((raw, entryIndex) => {
+      if (!isDraftViewField(raw)) return;
+      const entry = raw;
+      if (!entry.ref) return;
       const field = fieldsById.get(entry.ref);
-      if (isGroupField(field)) continue;
+      if (isGroupField(field)) return;
       const label = readerLabel(field, entry.ref);
+      const at = (key: FlagKey) => `workflow.steps[${stepIndex}].view.fields[${entryIndex}].${key}`;
 
       if (entry.visible === false && entry.required === true) {
         issues.push({
           entityType: "step",
-          entityId: step.id,
+          entityId: step.id!,
           source: "view",
           message: `Field "${label}" is required but hidden (visible: false), so its requirement is never enforced.`,
+          loc: at("required"),
         });
       }
 
       if (entry.readonly === true && entry.required === true && written(entry.ref, stepIndex) === 0) {
         issues.push({
           entityType: "step",
-          entityId: step.id,
+          entityId: step.id!,
           source: "view",
           message: `Field "${label}" is required and read-only here, and nothing writes it: every submission will fail.`,
+          loc: at("readonly"),
         });
       }
-    }
+    });
   });
 
   return issues;
@@ -360,6 +367,9 @@ export function checkUnwrittenTechnicalFields(body: Draft): EditorIssue[] {
       entityId: field.id,
       source: "view",
       message: `Field "${readerLabel(field, field.id)}" is technical, and no structural source writes it: it can never hold a value.`,
+      // The id form `resolveLoc` reads after a bare "fields" token, since this
+      // walks a flattened map and holds no positional index.
+      loc: `fields.${field.id}.technical`,
     });
   }
 

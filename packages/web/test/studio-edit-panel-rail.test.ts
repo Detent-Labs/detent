@@ -25,7 +25,7 @@ const PATH_ACTION = "action_00000000-0000-4000-8000-0000000000b5";
 const FIRE_ACTION = "action_00000000-0000-4000-8000-0000000000b6";
 
 function issue(entityType: EditorIssue["entityType"], entityId: string, source: EditorIssue["source"] = "cel"): EditorIssue {
-  return { entityType, entityId, message: "bad", source };
+  return { entityType, entityId, message: "bad", source, loc: `${entityType}.${entityId}` };
 }
 
 describe("flattenRailFields", () => {

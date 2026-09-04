@@ -1162,7 +1162,11 @@
 .studio-panels-screen-layout {
   display: grid;
   flex: 1 1 0;
-  grid-template-columns: 16rem minmax(0, 1fr) 22rem;
+  /* Two columns, not three (task 7.6). The checks rail's own 22rem column
+     went to the open view when the rail moved to the screen's bottom edge as
+     the collapsed summary, and the Fields view's two halves are what needed
+     it: each half now clears 22rem well above the stacking breakpoint. */
+  grid-template-columns: 16rem minmax(0, 1fr);
   gap: var(--space-3);
   align-items: stretch;
   min-height: 36rem;
@@ -1195,6 +1199,29 @@
   overscroll-behavior: contain;
 }
 
+/* The rail's own header, drawn only below the breakpoint (the media query at
+   the end of this section turns it on). A wide screen stands the rail in its
+   own column, where a control that hides that column would only take a row of
+   it. `display: none` also keeps the control out of the tab order and out of
+   the accessibility tree there, so no dead toggle stands beside the list.
+
+   Flush left, hairline below, at the register-row weight the entries beneath
+   it take — the header reads as the list's first row, not as a bar over it. */
+.studio-panels-rail-disclosure {
+  display: none;
+  align-items: baseline;
+  gap: var(--space-2);
+  width: 100%;
+  background: none;
+  color: inherit;
+  border: none;
+  border-bottom: 2px solid var(--color-divider);
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
 .studio-panels-rail-list,
 .studio-panels-rail-sublist {
   list-style: none;
@@ -1225,10 +1252,26 @@
   background: var(--color-surface-muted);
 }
 
-/* The open view. aria-current is the attribute the DOM already carries, so no
-   state class exists for it. */
-.studio-panels-rail-entry[aria-current="true"] {
+/* The open view, and the selected field inside it. aria-current is the
+   attribute the DOM already carries, so no state class exists for it.
+
+   The field row takes the same mark as the view entry above it, because it
+   answers the same question one level down. Measured before this rule: the
+   selected row computed the same background, weight and shadow as every other
+   row, so the mark reached a screen reader and nothing reached an eye. The
+   view names the edited field nowhere else as text — its label is the value
+   inside an editable input — and the rail runs to 22 rows, so the row's own
+   mark is the only answer to "which field am I editing". It is also what
+   makes `studio-app`'s "the moved field stays selected" observable. */
+.studio-panels-rail-entry[aria-current="true"],
+.studio-panels-rail-field[aria-current="true"] {
   box-shadow: inset 3px 0 0 var(--color-accent);
+}
+
+/* The written face carries two weights and no third, so the selected row's
+   name takes 800 rather than a tint the hover wash would then collide with. */
+.studio-panels-rail-field[aria-current="true"] .studio-panels-rail-name {
+  font-weight: 800;
 }
 
 .studio-panels-rail-name {
@@ -1237,9 +1280,14 @@
   overflow-wrap: anywhere;
 }
 
+/* The field's kind — a word an author reads, so the written face, not mono.
+   `min-width: 0` and the wrap keep a long German kind name ("Mehrfachauswahl")
+   inside the rail's 16rem column instead of overflowing it (task 8.2). */
 .studio-panels-rail-type {
+  min-width: 0;
   font-size: 0.8rem;
   color: var(--color-text-muted);
+  overflow-wrap: anywhere;
 }
 
 /* A quantity the reader compares down a column, so mono with tabular figures.
@@ -1261,8 +1309,173 @@
 
 /* A group field's children indent once. A field nested deeper takes depth 0 —
    `flattenRailFields` caps it there, so no third step exists. */
-.studio-panels-rail-field[data-depth="1"] {
+.studio-panels-rail-field[data-depth="1"],
+.studio-panels-rail-field-row[data-depth="1"] {
   padding-left: var(--space-6);
+}
+
+/* A Fields row holds two controls: the row itself and its move control. The
+   wrapper carries the hairline and the indentation the single button carried
+   before, so the pair still reads as one register row.
+
+   One line, no wrap: the move control is an arrow in a fixed cell, so nothing
+   on this row is measured off an English label and the German reading changes
+   no width (task 8.2). The row button takes the rest, and its own name wraps
+   inside it. */
+.studio-panels-rail-field-row {
+  display: flex;
+  align-items: baseline;
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* Inside a row the button shares the line, so it takes the remainder rather
+   than the `width: 100%` its standalone form uses for "+ Add field" and the
+   data-source entries. */
+.studio-panels-rail-field-row > .studio-panels-rail-field {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+}
+
+.studio-panels-rail-field-row > .studio-panels-rail-field {
+  flex: 1 1 9rem;
+  border-bottom: none;
+  cursor: grab;
+}
+
+/* The row a pointer has picked up. Reduced opacity alone, no transform: the
+   drop target is the row under the cursor, and moving the source would say
+   the list re-orders live, which it does not. */
+.studio-panels-rail-field-row[data-dragging="true"] {
+  opacity: 0.5;
+}
+
+/* The move control. De-emphasized against the row it sits on — the row's own
+   job is selecting a field, and the move is the rarer act. Ghost weight, no
+   border, and it wraps rather than truncating. */
+/* An arrow, so the control takes a fixed cell rather than a line of its own.
+   Its accessible name is the full sentence; nothing here is measured off that
+   sentence's English reading, which is what lets the German one grow freely
+   (task 8.2). `flex: 0 0 auto` beside the row button's `flex: 1` keeps the
+   pair on one line at every width the rail takes. */
+.studio-panels-rail-move {
+  flex: 0 0 auto;
+  background: none;
+  color: var(--color-text-muted);
+  border: none;
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.studio-panels-rail-move:hover:not(:disabled) {
+  color: var(--color-text);
+}
+
+/* No group stands where this row could move. The control keeps its place, so
+   every field entry carries one as `studio-app` requires, and states that it
+   has nothing to do rather than vanishing between renders. */
+.studio-panels-rail-move:disabled {
+  color: var(--color-text-muted);
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* The live region the move announces through. Off screen, never
+   `display: none`: a hidden region is announced by no engine. */
+.studio-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* The Fields view's two halves: what the field is, then where it acts
+   (design.md, the chosen direction). With the index rail beside them the
+   screen reads as three upright regions — list, definition, effect.
+
+   `1fr 1fr` and no fixed width anywhere: a German heading runs up to forty
+   percent longer than its English one, and a column measured off the English
+   label clips it. `minmax(0, 1fr)` lets a long word wrap instead of pushing
+   the track wider than its share.
+
+   The 2px rule between them is the structural weight, the same one
+   `.studio-panels-screen-header` draws. The halves are two major sections of
+   one screen, not two rows of a register. */
+.field-catalog-halves {
+  display: grid;
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.field-catalog-half + .field-catalog-half {
+  padding-left: var(--space-4);
+  border-left: 2px solid var(--color-divider);
+}
+
+/* Below the breakpoint the three regions fall under one another, in the
+   reading order the design states: list, definition, effect.
+
+   The breakpoint is where the three no longer fit: the rail holds its 16rem,
+   and a half needs about 22rem before a two-word label starts wrapping every
+   line. That arithmetic is what task 7.6 freed the checks rail's column for.
+   At 64rem the rail takes 16rem and the open view the remaining 47rem, so
+   each half clears 22rem with room over. The standing third column left the
+   view 26rem there, and a 13rem half wrapped every label. One query stacks
+   both grids, so the order comes out of the source order alone and no rule
+   has to restate it. */
+@media (max-width: 64rem) {
+  .studio-panels-screen-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  /* The rail gives up its column, so its right edge no longer separates
+     anything. The disclosure header's own bottom edge takes that role.
+
+     The cap keeps an opened list from taking the whole row and squeezing the
+     open view to nothing. It stays in rem, like every other length on this
+     screen: the height comes from `.studio-edit-screen`'s flex chain, and a
+     viewport unit here would measure something else. The base rule's
+     `overflow-y: auto` then scrolls the list inside that cap. */
+  .studio-panels-rail {
+    border-right: none;
+    max-height: 20rem;
+  }
+
+  .studio-panels-rail-disclosure {
+    display: flex;
+  }
+
+  /* The one state the header carries. `aria-expanded` sits on the button, so
+     the nav repeats it as the attribute a descendant selector can read. */
+  .studio-panels-rail[data-open="true"] .studio-panels-rail-list {
+    display: block;
+  }
+
+  .studio-panels-rail-list {
+    display: none;
+  }
+
+  .field-catalog-halves {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Stacked, the rule between the halves is a top edge, not a left one. */
+  .field-catalog-half + .field-catalog-half {
+    padding-left: 0;
+    padding-top: var(--space-4);
+    border-left: none;
+    border-top: 2px solid var(--color-divider);
+  }
 }
 
 /* --- Field catalog and data source detail panels ------------------------ */
@@ -1290,6 +1503,8 @@
    nest their own `<label>`s inside a `<fieldset>`/`<details>` of their own,
    several levels deeper, and keep whatever styling they already carry. */
 .field-row > label,
+.field-zone > label,
+.field-label-row > label,
 .data-source-row > label {
   display: flex;
   flex-direction: column;
@@ -1306,89 +1521,87 @@
 }
 
 /* The one row the design language calls out by name: three controls (a
-   value, a label, remove) on one line, not stacked. */
+   value, a label, remove) on one line, not stacked.
+
+   It wraps rather than overflowing (task 8.2). Measured at 1280px, the two
+   halves give each zone 486px and this row's three children asked for 530:
+   two inputs at their intrinsic 190px and a Remove button at the width of its
+   own English label. A German label takes that button wider still, so the
+   line has to be allowed to break. The inputs shrink with it — `min-width: 0`
+   overrides an input's own intrinsic minimum, which flex otherwise honours. */
 .option-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   gap: var(--space-2);
   width: 100%;
 }
 
-/* --- The field tabs (field-catalog-redesign) ----------------------------- */
-/* The same accent-underline pattern `.studio-dock-tabs` already takes over
-   the same enum-of-three shape, not `.studio-surface-toggle`'s bold/
-   underline pair — one tab-set look per area is enough, and the dock's is
-   the closer sibling: three fixed tabs, one panel each. */
-.field-tabs {
-  display: flex;
-  gap: var(--space-3);
-  border-bottom: 1px solid var(--color-border);
-  margin-bottom: var(--space-2);
-}
-
-.field-tabs button {
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  padding: var(--space-1) 0;
-  font-family: var(--font-body);
-  color: var(--color-text-muted);
-  cursor: pointer;
-}
-
-.field-tabs button[aria-selected="true"] {
-  border-bottom-color: var(--color-accent);
-  color: var(--color-text);
-}
-
-/* An author-origin `display` beats the UA stylesheet's `[hidden] { display:
-   none }` regardless of specificity (the same cascade bug `.shell-menu` hit,
-   per browser-checks.md's Chrome.tsx account menu entry): an unguarded
-   `display: flex` here would keep every inactive tab panel laid out and
-   visible despite its own `hidden` attribute. */
-.field-tab-panel:not([hidden]) {
-  display: flex;
-}
-
-.field-tab-panel {
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-2);
-  width: 100%;
+.option-row > input,
+.option-row > label {
+  flex: 1 1 8rem;
+  min-width: 0;
 }
 
 /* The usage list: hairline-divided register rows, flush left, the same rule
    the panels rail's own rows already take. */
-.field-usage ul {
+.field-usage-list {
   list-style: none;
   margin: 0;
   padding: 0;
   width: 100%;
 }
 
-.field-usage li {
+/* Wraps for the same reason `.option-row` does: the row's own control carries
+   a sentence, and its German reading is longer than its English one. */
+.field-usage-list li {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   gap: var(--space-2);
   border-bottom: 1px solid var(--color-border);
   padding: var(--space-1) 0;
 }
 
-.field-usage li span:first-child {
-  flex: 1;
+.field-usage-list li span:first-child {
+  flex: 1 1 8rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
-/* The preview and the usage list are native `<details>` now (field-catalog-
-   editor-rework design.md decision 1): the browser tracks open/closed as DOM
-   state, so no component state exists for either. Closed by default via the
-   markup's own absent `open` attribute. */
-.field-preview,
-.field-usage {
+/* The one motion the two halves carry (task 8.1). A write in the definition
+   half tints the steps that write reached, so the author sees the connection
+   between the halves rather than having to infer it. It fades out on its own:
+   the tint is a pointer, not a state, and a state would still be on screen
+   after the next change.
+
+   The accent at low mix, so the row reads as touched, never as wrong — the
+   refusal tone belongs to a check. `@keyframes`, not a transition: the row
+   remounts on each write, and only an animation runs from the top on mount.
+   The reduced-motion block at the head of this file switches it off. */
+@keyframes field-usage-tint {
+  from {
+    background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+  }
+
+  to {
+    background: transparent;
+  }
+}
+
+.field-usage-list li[data-tinted="true"] {
+  animation: field-usage-tint 1.2s ease-out;
+}
+
+/* The preview is a native `<details>`: the browser tracks open/closed as DOM
+   state, so no component state exists for it. Closed by default via the
+   markup's own absent `open` attribute. The usage list left its disclosure
+   and stands open in its zone. */
+.field-preview {
   width: 100%;
 }
 
-.field-preview > summary,
-.field-usage > summary {
+.field-preview > summary {
   cursor: pointer;
   font-size: 0.9rem;
   font-weight: 800;
@@ -1433,7 +1646,8 @@
 /* A zone is a heading plus content; a 2px structural rule separates it from
    the zone before it — the same weight `.field-catalog-panel > h3` already
    uses for "between major sections." No rule renders above the first zone,
-   and none renders after a zone that does not mount (design.md decision 2). */
+   and none renders after a zone that does not mount, so a Column mapping
+   zone the field does not earn leaves its neighbour's edge alone. */
 .field-zone {
   width: 100%;
 }
@@ -1450,14 +1664,72 @@
   font-weight: 800;
 }
 
+/* A checkbox IS its own label's control, so it sits beside the words rather
+   than under them. The column rule above states the ordinary field, where
+   the control is a box of its own below the label. The type selector matches
+   that rule's own specificity, and sits after it, so this wins. */
+label.studio-field-checkbox {
+  flex-direction: row;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
 /* Remove field: below the same structural rule, de-emphasized (`.btn-ghost`)
    rather than one more `.btn-secondary` in the stack above it — it reads as
-   the tab's least frequent action, not an ordinary item in the list. */
-.field-tab-remove {
+   the definition half's least frequent action, not an ordinary item in the
+   list. */
+.field-half-remove {
   width: 100%;
   border-top: 2px solid var(--color-divider);
   margin-top: var(--space-3);
   padding-top: var(--space-3);
+}
+
+/* A zone holding a check takes the refusal tone at its own heading, so an
+   author scanning the two halves sees which zone is wrong with nothing to
+   open. State reads off the attribute the DOM already carries, never off a
+   state class. */
+.field-zone-heading[data-checked="failed"] {
+  color: var(--color-refusal);
+}
+
+/* The check list itself. It stood only inside a panel's own stack before the
+   zones put it beside a heading, and carried no rule of its own until then:
+   flush left, no marker, the refusal tone the heading above it takes. Scoped
+   to this view, so the checks rail's own list keeps whatever it has. */
+.field-catalog-panel .issue-list {
+  list-style: none;
+  margin: 0 0 var(--space-2);
+  padding: 0;
+  width: 100%;
+  color: var(--color-refusal);
+  font-size: 0.9rem;
+}
+
+/* The effect half's empty state and the empty catalog's start state. Both
+   say why they are empty and offer the way on, and both take the empty tone
+   `.studio-empty` carries — neither is a failure. */
+.field-effect-empty,
+.field-catalog-start {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+/* No font-size of its own: the heading takes the browser's own `h4` step,
+   which sits below `.field-catalog-panel > h3` above it. The written face
+   carries headings at weight 800. */
+.field-catalog-start-heading {
+  margin: 0;
+  font-weight: 800;
+}
+
+/* The start state carries the screen's only prose, and body copy sits in one
+   measure. The surrounding flex column already spaces it. */
+.field-catalog-start > .studio-empty {
+  max-width: 60ch;
+  padding: 0;
 }
 
 /* --- The Default-value editor (field-catalog-editor-rework) ------------- */
@@ -2692,6 +2964,24 @@ tr[data-group="true"] .studio-matrix-row-header {
 .studio-checks-rail-docked .studio-checks-rail-summary {
   border-top: none;
   padding-top: 0;
+}
+
+/* The panels screen's own docked instance (task 7.4), the sibling directly
+   below the two columns. The rule above draws one edge and drops three,
+   because `.canvas-inspector` already boxes the inspector's instance. This
+   screen boxes nothing, so the summary draws the other three itself, at the
+   1px weight `.studio-checks-rail` takes when it stands on its own. The 2px
+   top edge stays: it is the boundary against the columns, and that is the
+   structural weight.
+
+   No wrapper class stands between the layout and the rail. The adjacent
+   sibling is what "the screen's bottom edge" means here, so the selector
+   states the placement rather than a second name for it. */
+.studio-panels-screen-layout + .studio-checks-rail-docked {
+  border-right: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+  border-left: 1px solid var(--color-border);
+  padding: var(--space-3);
 }
 
 /* --- Selection-driven step inspector ------------------------------------ */

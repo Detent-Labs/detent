@@ -427,6 +427,70 @@ export const ALLOWED_BY_TYPE: Record<BaseFieldType, { formats: readonly FieldFor
   group: { formats: [], controls: [] },
 };
 
+/**
+ * The named field kinds an authoring surface offers. One entry names, in one
+ * word, the `{type, format, control}` triple a field declares — the studio's
+ * kind picker writes exactly the keys an entry carries and drops the rest, so
+ * the serialized definition keeps the shape it has today. This adds no key to
+ * the definition contract.
+ *
+ * Every triple here is one `ALLOWED_BY_TYPE` admits, so
+ * `compile.ts::checkFieldFormatControl` accepts a body declaring any of them.
+ * `test/field-kinds.test.ts` compiles one body per entry to hold that.
+ *
+ * Curated, not exhaustive: `ALLOWED_BY_TYPE` admits twenty-five combinations
+ * and this names sixteen. A triple no kind names stays reachable through the
+ * JSON view. Each triple appears once, so a field resolves back to at most one
+ * kind (`fieldKindOf`).
+ */
+export type FieldKindName =
+  | "text"
+  | "longText"
+  | "radioChoice"
+  | "date"
+  | "dateTime"
+  | "email"
+  | "person"
+  | "number"
+  | "wholeNumber"
+  | "yesNo"
+  | "yesNoRadio"
+  | "multiChoice"
+  | "checkboxChoice"
+  | "people"
+  | "file"
+  | "group";
+
+export const FIELD_KINDS: Record<FieldKindName, { type: BaseFieldType; format?: FieldFormat; control?: FieldControl }> = {
+  text: { type: "string" },
+  longText: { type: "string", control: "multiline" },
+  radioChoice: { type: "string", control: "radio" },
+  date: { type: "string", format: "date" },
+  dateTime: { type: "string", format: "datetime" },
+  email: { type: "string", format: "email" },
+  person: { type: "string", format: "person" },
+  number: { type: "number" },
+  wholeNumber: { type: "number", format: "integer" },
+  yesNo: { type: "boolean" },
+  yesNoRadio: { type: "boolean", control: "radio" },
+  multiChoice: { type: "list" },
+  checkboxChoice: { type: "list", control: "checkboxes" },
+  people: { type: "list", format: "person" },
+  file: { type: "file" },
+  group: { type: "group" },
+};
+
+/** The kind a declared field reads as, or `undefined` for a triple
+ * `FIELD_KINDS` names no kind for — a plugin envelope, or one of the nine
+ * combinations the curated table omits. The rail row and the kind picker both
+ * read this, so neither can name a different word for the same field. */
+export function fieldKindOf(field: { type?: unknown; format?: unknown; control?: unknown }): FieldKindName | undefined {
+  for (const [name, kind] of Object.entries(FIELD_KINDS) as [FieldKindName, (typeof FIELD_KINDS)[FieldKindName]][]) {
+    if (kind.type === field.type && kind.format === field.format && kind.control === field.control) return name;
+  }
+  return undefined;
+}
+
 const DATE_FORMAT = /^\d{4}-\d{2}-\d{2}$/;
 // An ISO-8601 date and time: seconds, a fractional part and a zone offset are
 // each optional. That covers what `<input type="datetime-local">` produces

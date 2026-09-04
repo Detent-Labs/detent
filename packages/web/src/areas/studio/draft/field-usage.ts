@@ -106,6 +106,64 @@ export function applyVisibleOverride(draft: Draft, fieldId: string, visible: Dra
   }
 }
 
+/** The field catalog's "Ask for this" row reads a field's cross-step
+ * `required` state as one of three shapes, the twin of `FieldVisibleState`
+ * above. `"none"`: no step view references the field. `"uniform"`: every
+ * referencing view agrees, and `value` is what they agree on. `"divergent"`:
+ * the views disagree, or at least one holds an expression — the row writes a
+ * boolean alone, so an expression it cannot represent counts as a
+ * disagreement. `differingStepIds` names the steps a write would overwrite.
+ *
+ * An absent `required` key reads as `false`. The definition contract makes
+ * that the view entry's own default, so an entry that never carried the key
+ * agrees with one carrying `required: false`. */
+export type FieldRequiredState =
+  | { kind: "none" }
+  | { kind: "uniform"; stepIds: string[]; value: boolean }
+  | { kind: "divergent"; stepIds: string[]; differingStepIds: string[] };
+
+export function fieldRequiredOverrides(draft: Draft, fieldId: string): FieldRequiredState {
+  const entries: { stepId: string; required: BoolOrExpr }[] = [];
+  for (const step of draft.workflow?.steps ?? []) {
+    if (step.id === undefined) continue;
+    for (const entry of (step.view?.fields ?? []).filter(isDraftViewField)) {
+      if (entry.ref !== fieldId) continue;
+      entries.push({ stepId: step.id, required: entry.required });
+    }
+  }
+
+  if (entries.length === 0) return { kind: "none" };
+  const stepIds = entries.map((e) => e.stepId);
+
+  const value = entries[0]!.required === true;
+  const differingStepIds = entries
+    .filter((e) => isExpression(e.required) || (e.required === true) !== value)
+    .map((e) => e.stepId);
+  if (differingStepIds.length > 0) return { kind: "divergent", stepIds, differingStepIds };
+
+  return { kind: "uniform", stepIds, value };
+}
+
+/**
+ * The "Ask for this" row's writer, a `mutate` recipe body of
+ * `applyVisibleOverride`'s shape. Writes `required: true` on every view entry
+ * referencing the field, or deletes the key for `false`: the definition
+ * contract reads an absent `required` as `false`, so writing the literal
+ * would add a key that says what its absence already says.
+ *
+ * The catalog itself keeps no `required` key. Requiredness lives in the view
+ * alone, and this control does not bend that rule.
+ */
+export function applyRequiredOverride(draft: Draft, fieldId: string, required: boolean): void {
+  for (const step of draft.workflow?.steps ?? []) {
+    for (const entry of (step.view?.fields ?? []).filter(isDraftViewField)) {
+      if (entry.ref !== fieldId) continue;
+      if (required) entry.required = true;
+      else delete entry.required;
+    }
+  }
+}
+
 /** Every `view.fields[]` entry across every step that names `fieldId` and
  * carries a `required` or `readonly` key — the set the Technical checkbox's
  * clearing pass deletes. Counted separately from `applyTechnicalMarker` so

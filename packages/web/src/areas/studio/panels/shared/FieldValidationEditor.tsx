@@ -9,7 +9,6 @@ import {
   type ValidationKey,
   type DraftFieldValidation,
 } from "./fieldValidationLogic";
-import { useDraft } from "../../draft/store";
 
 interface Props {
   /** The field this `validation` belongs to — the row builder needs the
@@ -19,11 +18,10 @@ interface Props {
   onChange: (validation: DraftFieldValidation | undefined) => void;
 }
 
-/** A field's own `validation` object: a collapsed section inside `FieldRow`,
- * offering the keys its declared type suits plus any it already carries. */
+/** A field's own `validation` object: a collapsed section inside the
+ * Validation zone and inside a group child's own row, offering the keys its
+ * declared type suits plus any it already carries. */
 export function FieldValidationEditor({ field, validation, onChange }: Props) {
-  const { validation: draft } = useDraft();
-  const fieldId = field.id;
   const offered = offeredKeys(field.type ?? "string");
   const carried = carriedKeys(validation);
   const keys = Array.from(new Set([...offered, ...carried]));
@@ -35,20 +33,14 @@ export function FieldValidationEditor({ field, validation, onChange }: Props) {
 
   const patch = (key: ValidationKey, value: DraftFieldValidation[ValidationKey]) => onChange(patchValidation(validation, key, value));
 
-  // `EditorIssue` carries no structured field-path suffix (`resolveLoc`
-  // collapses every structural issue on this field to the same `entityId`),
-  // so the pattern-specific ones are the ones whose message names `pattern`
-  // — `compile.ts::checkPatterns`' own wording, the only check that ever
-  // produces one.
-  const patternIssues = draft.issues.filter(
-    (issue) => issue.entityType === "field" && issue.entityId === fieldId && issue.message.includes("pattern"),
-  );
-
   return (
     <details className="field-validation" open={initiallyOpen}>
-      {/* The Rules tab's own zone heading already says "Validation" (design.md
-          decision 2); this summary carries only the count, so no redundant
-          second label renders beneath it. */}
+      {/* The Validation zone's own heading already says "Validation"; this
+          summary carries only the count, so no redundant second label
+          renders beneath it. A check on a validation rule stands at that
+          zone, read off its own `loc` (`panels/fieldCheckZone.ts`), and a
+          group child's check stands in that row's own list — so this editor
+          draws no check list of its own. */}
       <summary>({carried.length})</summary>
       {keys.map((key) => {
         const notEvaluated = !offered.includes(key);
@@ -73,15 +65,6 @@ export function FieldValidationEditor({ field, validation, onChange }: Props) {
               )}
             </label>
             {notEvaluated && <p className="studio-note">{t("fieldValidation.notEvaluated")}</p>}
-            {key === "pattern" && patternIssues.length > 0 && (
-              <ul className="issue-list">
-                {patternIssues.map((issue, i) => (
-                  <li key={i} className={`issue issue-${issue.source}`}>
-                    [{issue.source}] {issue.message}
-                  </li>
-                ))}
-              </ul>
-            )}
           </div>
         );
       })}

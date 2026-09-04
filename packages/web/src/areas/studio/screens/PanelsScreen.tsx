@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { DataSourceDef } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
 import type { DraftField } from "../draft/fields";
@@ -8,7 +8,8 @@ import { mintId } from "../draft/ids";
 import { addToDraftArray } from "../draft/draft-array-crud";
 import { resolveDraftLocalizedText, seedLocalizedText } from "../draft/localized-text";
 import { flattenDraftFields } from "../draft/fields";
-import { FIELD_TYPE_LABELS } from "../draft/field-type-labels";
+import { fieldKindWord } from "../draft/field-type-labels";
+import { moveFieldToGroup } from "../panels/fieldCatalogLogic";
 import {
   flattenRailFields,
   issueCountForEntityId,
@@ -57,33 +58,109 @@ interface PanelsRailFieldRowProps {
   issues: number;
   selected: boolean;
   onClick: () => void;
+  /** Where this row's move control sends the field — `"group"` into the group
+   * above it, `"top"` back out to the top level. `undefined` where no move is
+   * available, which renders the control disabled rather than dropping it:
+   * `studio-app` requires every field entry to carry one.
+   *
+   * A direction, not a sentence, because the row draws the two differently.
+   * The visible mark is an arrow along the indentation axis; the sentence is
+   * the control's accessible name and its tooltip. Measured before that
+   * split: the sentence wrapped to a line of its own on all 22 rows of
+   * `purchase_requisition`, putting the rail at 1867px inside a 576px pane.
+   * The arrow also cannot clip in German, which is what the sentence's own
+   * wrap was there to survive. */
+  moveTo: "group" | "top" | undefined;
+  /** The id the move control's own element takes, so the screen can put focus
+   * back on it after the move re-orders the list (`spa-accessibility`). */
+  moveControlId: string;
+  onMove: () => void;
+  /** The pointer half of the same move. The row is the drag source and every
+   * row is a drop target: dropping on a group moves the dragged field in,
+   * dropping on a row outside any group moves it out. */
+  onDragStart: () => void;
+  onDragEnd: () => void;
+  onDrop: () => void;
+  dragging: boolean;
 }
 
 /**
- * A Fields rail row: the resolved label, the friendly type, the issue mark —
- * one line (field-catalog-editor-rework). The row prints no `key`; the key
- * stays visible in the Field tab once an author selects that field, where
+ * A Fields rail row: the resolved label, the field's kind, the issue mark,
+ * and the move control beside them. The row prints no `key`; the key stays
+ * visible in the definition half once an author selects that field, where
  * the engine's exact-match value already lives. Pulled out of the render
  * loop so it can be exercised directly, the same reason `FormEditorStrip`
  * sits beside `FormEditorScreen`.
+ *
+ * Two controls, two sibling buttons rather than one nested in the other: a
+ * button inside a button is invalid markup, and the move has to be a real
+ * control in the tab order (`spa-accessibility`). The wrapper carries the
+ * row's hairline and its indentation, so the two read as one row.
  */
-export function PanelsRailFieldRow({ label, typeLabel, depth, issues, selected, onClick }: PanelsRailFieldRowProps) {
+export function PanelsRailFieldRow({
+  label,
+  typeLabel,
+  depth,
+  issues,
+  selected,
+  onClick,
+  moveTo,
+  moveControlId,
+  onMove,
+  onDragStart,
+  onDragEnd,
+  onDrop,
+  dragging,
+}: PanelsRailFieldRowProps) {
+  // A disabled control still needs a name, so the unavailable case takes the
+  // into-the-group wording rather than none.
+  const moveSentence = t(moveTo === "top" ? "panelsScreen.moveOutOfGroup" : "panelsScreen.moveIntoGroup");
   return (
-    <button
-      type="button"
-      className="studio-panels-rail-field"
+    <div
+      className="studio-panels-rail-field-row"
       data-depth={depth}
-      aria-current={selected ? "true" : undefined}
-      onClick={onClick}
+      data-dragging={dragging ? "true" : undefined}
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={(e) => {
+        e.preventDefault();
+        onDrop();
+      }}
     >
-      <span className="studio-panels-rail-name">{label}</span>
-      {typeLabel && <span className="studio-panels-rail-type studio-mono">{typeLabel}</span>}
-      {issues > 0 && (
-        <span className="studio-panels-rail-issues" aria-label={`${issues} ${t("panelsScreen.issueMark")}`}>
-          {issues}
-        </span>
-      )}
-    </button>
+      <button
+        type="button"
+        className="studio-panels-rail-field"
+        draggable
+        onDragStart={onDragStart}
+        onDragEnd={onDragEnd}
+        aria-current={selected ? "true" : undefined}
+        onClick={onClick}
+      >
+        <span className="studio-panels-rail-name">{label}</span>
+        {typeLabel && <span className="studio-panels-rail-type">{typeLabel}</span>}
+        {issues > 0 && (
+          <span className="studio-panels-rail-issues" aria-label={`${issues} ${t("panelsScreen.issueMark")}`}>
+            {issues}
+          </span>
+        )}
+      </button>
+      {/* The sentence is the accessible name and the tooltip; the arrow is
+          what the eye reads. Both directions point along the indentation
+          axis, the one thing the rail draws membership with: into the group
+          indents, out of it un-indents. `aria-hidden` on the glyph so the
+          name a screen reader announces is the sentence alone, never "right
+          arrow". */}
+      <button
+        type="button"
+        id={moveControlId}
+        className="studio-panels-rail-move"
+        disabled={moveTo === undefined}
+        aria-label={moveSentence}
+        title={moveSentence}
+        onClick={onMove}
+      >
+        <span aria-hidden="true">{moveTo === "top" ? "←" : "→"}</span>
+      </button>
+    </div>
   );
 }
 
@@ -95,7 +172,7 @@ interface Props {
    * named step preselected, through the `edit` route's step target. */
   onShowStep: (stepId: string) => void;
   token: string;
-  /** For this screen's own `ChecksRail` column. `EditorArea` mounts this
+  /** For this screen's own docked `ChecksRail`. `EditorArea` mounts this
    * screen, so the loaded draft's report is already in scope one level up and
    * needs no second fetch. */
   canPublish: boolean;
@@ -108,10 +185,10 @@ interface Props {
  *
  * It replaced a native `<dialog>`. The overlay hid the checks rail while an
  * author edited field keys and data source keys, and those two produce most of
- * what that rail reports. A screen gives the rail its own column. The route
- * also gives a view an address, which `showModal()` on component state could
- * not: no link reached a view, Back did not close it, and a reload landed on
- * the canvas.
+ * what that rail reports. A screen keeps the rail on screen, docked at the
+ * bottom edge as the collapsed summary. The route also gives a view an
+ * address, which `showModal()` on component state could not: no link reached a
+ * view, Back did not close it, and a reload landed on the canvas.
  *
  * All four views stay MOUNTED and three hide. Rendering only the open one
  * would drop `ContractPanel`'s half-typed outcome name (its own `useState`)
@@ -138,6 +215,13 @@ export function PanelsScreen({ openView, onBack, onOpenView, onShowStep, token, 
   // resolving-on-every-render against the current draft gives for free.
   const [selectedFieldIdState, setSelectedFieldId] = useState<string | undefined>(undefined);
   const [selectedDataSourceIdState, setSelectedDataSourceId] = useState<string | undefined>(undefined);
+
+  // Whether the index rail's list shows below the breakpoint, where the rail
+  // is a disclosure header rather than a column. It starts closed: the header
+  // exists so the open view reaches the top of a narrow window. Above the
+  // breakpoint app.css ignores it and the list always shows, so a window
+  // widened while the rail is closed does not lose the rail.
+  const [railOpen, setRailOpen] = useState(false);
 
   const topLevelFieldIds = (draft.fields ?? [])
     .map((f) => f.id)
@@ -199,6 +283,90 @@ export function PanelsScreen({ openView, onBack, onOpenView, onShowStep, token, 
     setFocusFieldId(deepestId);
   };
 
+  // The move gesture's own three pieces of state. `dragFieldId` is the row a
+  // pointer picked up; `announcement` is what the live region below reads out
+  // after a move; `refocusId` is the move control the keyboard has to get back
+  // (`spa-accessibility`: the moving entry keeps focus across the move).
+  const [dragFieldId, setDragFieldId] = useState<string | undefined>(undefined);
+  const [announcement, setAnnouncement] = useState("");
+  const [refocusId, setRefocusId] = useState<string | undefined>(undefined);
+
+  // React reorders keyed rows by moving the existing DOM nodes, which usually
+  // carries focus along. It does not where the move changes which controls the
+  // row renders, so the screen names the control it wants and takes it back
+  // itself rather than resting on the reconciler.
+  useEffect(() => {
+    if (refocusId === undefined) return;
+    document.getElementById(refocusId)?.focus();
+    setRefocusId(undefined);
+  }, [refocusId]);
+
+  const moveControlId = (fieldId: string) => `studio-panels-rail-move-${fieldId}`;
+
+  const fieldWord = (fieldId: string | undefined) => {
+    const field = fieldId === undefined ? undefined : fieldsById.get(fieldId);
+    const label = field ? resolveDraftLocalizedText(field.label, contentLocale, baseLocale) : undefined;
+    return label || t("panelsScreen.unnamedField");
+  };
+
+  /** The group a rail row currently hangs in, or `undefined` at the top level. */
+  const parentGroupId = (fieldId: string): string | undefined =>
+    flattenDraftFields(draft.fields).find((f) => (f.fields ?? []).some((c) => c.id === fieldId))?.id;
+
+  /** The group a top-level row's own move control targets: the nearest `group`
+   * field standing above it in the rail's own order. That is what the control's
+   * label says, so the row and the label cannot name different targets.
+   * `undefined` where no group stands above, which disables the control. */
+  const groupAbove = (fieldId: string): string | undefined => {
+    const index = railFields.findIndex((row) => row.id === fieldId);
+    for (let i = index - 1; i >= 0; i--) {
+      const candidate = fieldsById.get(railFields[i].id);
+      if (candidate?.type === "group") return candidate.id;
+    }
+    return undefined;
+  };
+
+  /**
+   * The one write both gestures reach (design.md Risks: a keyboard move must
+   * not become a second write path beside the drag). It re-hangs the field,
+   * keeps it selected through its new top-level ancestor, announces where it
+   * landed, and hands focus back to the row's own move control.
+   */
+  const moveField = (fieldId: string, targetGroupId: string | undefined) => {
+    const fields = draft.fields ?? [];
+    const next = moveFieldToGroup(fields, fieldId, targetGroupId);
+    if (next === fields) return;
+
+    const fromGroupId = parentGroupId(fieldId);
+    mutate((d) => {
+      d.fields = next;
+    });
+
+    // Read the new place off the moved tree, not off the target argument: a
+    // move into a nested group makes some ancestor the top-level row, and that
+    // ancestor is what the selection has to name.
+    const landed = flattenRailFields(next).find((row) => row.id === fieldId);
+    if (landed) {
+      setSelectedFieldId(landed.rootId);
+      setFocusFieldId(fieldId);
+    }
+    setAnnouncement(
+      targetGroupId === undefined
+        ? t("panelsScreen.movedToTopLevel").replace("{field}", fieldWord(fieldId)).replace("{group}", fieldWord(fromGroupId))
+        : t("panelsScreen.movedIntoGroup").replace("{field}", fieldWord(fieldId)).replace("{group}", fieldWord(targetGroupId)),
+    );
+    setRefocusId(moveControlId(fieldId));
+  };
+
+  /** Where a drop on `targetId` sends the dragged field: into it when it is a
+   * group, out to the top level when it is not. */
+  const dropOnRow = (targetId: string) => {
+    if (dragFieldId === undefined || dragFieldId === targetId) return;
+    const target = fieldsById.get(targetId);
+    moveField(dragFieldId, target?.type === "group" ? targetId : undefined);
+    setDragFieldId(undefined);
+  };
+
   return (
     // A fragment, so the header and the layout are `.studio-edit-screen`'s own
     // flex children, as `.studio-canvas-layout` is. The layout's height comes
@@ -216,8 +384,23 @@ export function PanelsScreen({ openView, onBack, onOpenView, onShowStep, token, 
       </header>
 
       <div className="studio-panels-screen-layout">
-        <nav className="studio-panels-rail" aria-label={t("panelsScreen.railLabel")}>
-          <ul className="studio-panels-rail-list">
+        <nav className="studio-panels-rail" aria-label={t("panelsScreen.railLabel")} data-open={railOpen ? "true" : undefined}>
+          {/* The rail's disclosure header. It renders always and app.css draws
+              it only below the breakpoint, where the three regions stack and
+              the rail would otherwise push the open view a screen down. Above
+              that width the button is `display: none`, so it leaves the tab
+              order and the accessibility tree, and the list shows whatever
+              `railOpen` says. */}
+          <button
+            type="button"
+            className="studio-panels-rail-disclosure"
+            aria-expanded={railOpen}
+            aria-controls="studio-panels-rail-list"
+            onClick={() => setRailOpen((open) => !open)}
+          >
+            {t("panelsScreen.railLabel")}
+          </button>
+          <ul className="studio-panels-rail-list" id="studio-panels-rail-list">
             {PANEL_VIEWS.map((view) => {
               // The matrix's badge counts `source: "view"` findings instead: its
               // issues share `entityType: "step"` with every other per-step
@@ -251,7 +434,15 @@ export function PanelsScreen({ openView, onBack, onOpenView, onShowStep, token, 
                         const rowIssues = issueCountForEntityId(validation.issues, row.id);
                         const field = fieldsById.get(row.id);
                         const label = field ? resolveDraftLocalizedText(field.label, contentLocale, baseLocale) : undefined;
-                        const typeLabel = field && typeof field.type === "string" ? FIELD_TYPE_LABELS[field.type].name : undefined;
+                        // The kind, not the base type: the same word the
+                        // definition half's kind picker shows for this field
+                        // (task 7.3).
+                        const typeLabel = field ? fieldKindWord(field) : undefined;
+                        // A row already inside a group moves out; one at the
+                        // top level moves into the nearest group above it.
+                        const inGroup = parentGroupId(row.id);
+                        const target = inGroup === undefined ? groupAbove(row.id) : undefined;
+                        const movable = inGroup !== undefined || target !== undefined;
                         return (
                           <li key={row.id}>
                             <PanelsRailFieldRow
@@ -261,6 +452,13 @@ export function PanelsScreen({ openView, onBack, onOpenView, onShowStep, token, 
                               issues={rowIssues}
                               selected={selectedFieldId === row.rootId}
                               onClick={() => selectField(row.rootId, row.id)}
+                              moveTo={movable ? (inGroup !== undefined ? "top" : "group") : undefined}
+                              moveControlId={moveControlId(row.id)}
+                              onMove={() => moveField(row.id, inGroup !== undefined ? undefined : target)}
+                              onDragStart={() => setDragFieldId(row.id)}
+                              onDragEnd={() => setDragFieldId(undefined)}
+                              onDrop={() => dropOnRow(row.id)}
+                              dragging={dragFieldId === row.id}
                             />
                           </li>
                         );
@@ -311,6 +509,14 @@ export function PanelsScreen({ openView, onBack, onOpenView, onShowStep, token, 
               );
             })}
           </ul>
+          {/* The move's own announcement. Polite, so it waits for a screen
+              reader to finish whatever it is reading rather than cutting the
+              row's own name off mid-word. It renders always: a live region
+              added to the DOM at the same moment its text arrives is announced
+              by no engine reliably. */}
+          <p className="studio-visually-hidden" role="status" aria-live="polite" aria-label={t("panelsScreen.moveAnnouncerLabel")}>
+            {announcement}
+          </p>
         </nav>
 
         <main className="studio-panels-screen-view">
@@ -341,11 +547,14 @@ export function PanelsScreen({ openView, onBack, onOpenView, onShowStep, token, 
           </div>
         </main>
 
-        {/* Full grouped list, not the collapsed summary: that form exists
-            because a canvas selection takes the third column for an inspector,
-            and this screen carries neither. */}
-        <ChecksRail validation={validation} canPublish={canPublish} />
       </div>
+
+      {/* The collapsed summary at the screen's bottom edge, not a standing
+          third column (task 7.4). The draft-wide checks and the publish
+          verdict ride here; a check on the selected field stands at its own
+          zone inside the open view instead. The column that stood here went to
+          the open view, which the Fields view's two halves needed. */}
+      <ChecksRail validation={validation} canPublish={canPublish} collapsed />
     </>
   );
 }

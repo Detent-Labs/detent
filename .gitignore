@@ -64,6 +64,7 @@ docs/superpowers/
 # as a rise to the prose gate. The report is a generated archive for
 # /impeccable polish to read back, not this project's prose to rewrite.
 .impeccable/critique/
+.impeccable/questions/
 
 # Impeccable's installed skill and agent files. Vendored third-party content,
 # reinstalled per machine like .claude/skills/antislop/ above. Tracking them

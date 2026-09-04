@@ -67,7 +67,7 @@ describe("The checks rail's all-clear box", () => {
     const withIssue: ValidationResult = {
       ...clear,
       zodValid: false,
-      issues: [{ source: "zod", entityType: "process", entityId: "proc_a", message: "steps must not be empty" }],
+      issues: [{ source: "zod", entityType: "process", entityId: "proc_a", message: "steps must not be empty", loc: "" }],
     };
     const html = renderToStaticMarkup(<ChecksRail validation={withIssue} canPublish={false} />);
 

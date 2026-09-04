@@ -1,49 +1,52 @@
 import { describe, expect, it } from "bun:test";
-import { baseFieldType, fieldControl, fieldFormat } from "workflow-engine/schema";
-import { FIELD_CONTROL_LABELS, FIELD_FORMAT_LABELS, FIELD_TYPE_LABELS } from "../src/areas/studio/draft/field-type-labels.js";
+import { FIELD_KINDS, fieldKindOf } from "workflow-engine/schema";
+import { studioCatalog } from "../src/i18n/catalogs/studio.js";
+import { fieldKindLabel, fieldKindWord } from "../src/areas/studio/draft/field-type-labels.js";
 
-describe("FIELD_TYPE_LABELS", () => {
-  it("maps every baseFieldType value exactly once", () => {
-    const keys = Object.keys(FIELD_TYPE_LABELS).sort();
-    expect(keys).toEqual([...baseFieldType.options].sort());
-  });
-
-  it("gives every entry a non-empty name and note", () => {
-    for (const type of baseFieldType.options) {
-      const entry = FIELD_TYPE_LABELS[type];
+/** The rail row's word and the kind picker's word come from this one lookup,
+ * so the two cannot disagree about a field (task 1.5). Every word reads
+ * through the studio catalog, so an operator can override it (task 4.2). */
+describe("fieldKindLabel", () => {
+  it("answers a non-empty name and note for every entry of the engine's kind table", () => {
+    for (const name of Object.keys(FIELD_KINDS) as (keyof typeof FIELD_KINDS)[]) {
+      const entry = fieldKindLabel(name);
       expect(entry.name.length).toBeGreaterThan(0);
       expect(entry.note.length).toBeGreaterThan(0);
     }
   });
 
-  // The custom plugin envelope keeps its own catalog-driven label
-  // (`fieldCatalog.customTypeOption`) rather than an entry here — this
-  // record covers only the six `BaseFieldType` values.
-  it("carries no entry for the custom plugin envelope", () => {
-    expect(Object.prototype.hasOwnProperty.call(FIELD_TYPE_LABELS, "__custom__")).toBe(false);
+  it("reads each word from the studio catalog, not from a literal", () => {
+    for (const name of Object.keys(FIELD_KINDS) as (keyof typeof FIELD_KINDS)[]) {
+      expect(fieldKindLabel(name).name).toBe(studioCatalog.en[`fieldKind.${name}.name`]);
+      expect(fieldKindLabel(name).note).toBe(studioCatalog.en[`fieldKind.${name}.note`]);
+    }
   });
 
-  it("names no type the contract no longer carries", () => {
-    for (const gone of ["select", "multiselect", "date", "datetime", "reference"]) {
-      expect(Object.prototype.hasOwnProperty.call(FIELD_TYPE_LABELS, gone)).toBe(false);
-    }
+  it("names a word for the kind a date field reads as", () => {
+    const kind = fieldKindOf({ type: "string", format: "date" });
+    expect(kind).toBe("date");
+    expect(fieldKindLabel(kind!).name).toBe("Date");
   });
 });
 
-describe("FIELD_FORMAT_LABELS and FIELD_CONTROL_LABELS", () => {
-  it("map every fieldFormat member exactly once, with a non-empty name and note", () => {
-    expect(Object.keys(FIELD_FORMAT_LABELS).sort()).toEqual([...fieldFormat.options].sort());
-    for (const f of fieldFormat.options) {
-      expect(FIELD_FORMAT_LABELS[f].name.length).toBeGreaterThan(0);
-      expect(FIELD_FORMAT_LABELS[f].note.length).toBeGreaterThan(0);
-    }
+/** The rail row and the kind picker print one word for one field (task 7.3).
+ * The three answers below are the three the picker itself offers. */
+describe("fieldKindWord", () => {
+  it("names the kind for a declared triple the table carries", () => {
+    expect(fieldKindWord({ type: "string", format: "date" })).toBe("Date");
+    expect(fieldKindWord({ type: "list", control: "checkboxes" })).toBe(
+      studioCatalog.en["fieldKind.checkboxChoice.name"],
+    );
   });
 
-  it("map every fieldControl member exactly once, with a non-empty name and note", () => {
-    expect(Object.keys(FIELD_CONTROL_LABELS).sort()).toEqual([...fieldControl.options].sort());
-    for (const c of fieldControl.options) {
-      expect(FIELD_CONTROL_LABELS[c].name.length).toBeGreaterThan(0);
-      expect(FIELD_CONTROL_LABELS[c].note.length).toBeGreaterThan(0);
-    }
+  it("names the picker's own custom-type word for a plugin envelope", () => {
+    expect(fieldKindWord({ type: { type: "org.rating", config: {} } })).toBe(
+      studioCatalog.en["fieldCatalog.customTypeOption"],
+    );
+  });
+
+  it("prints the raw triple for a combination the curated table names no kind for", () => {
+    expect(fieldKindOf({ type: "number", control: "radio" })).toBeUndefined();
+    expect(fieldKindWord({ type: "number", control: "radio" })).toBe("number / radio");
   });
 });

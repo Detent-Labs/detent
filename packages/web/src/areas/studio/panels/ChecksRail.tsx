@@ -11,10 +11,12 @@ interface Props {
    * cannot verify: an actor without `system:publish` read "ready to publish"
    * here while the menu 900px away refused the act (studio-publish). */
   canPublish: boolean;
-  /** True when this rail docks at the step inspector's bottom edge: it opens
-   * as a one-line summary and expands in place when chosen. False beside the
-   * canvas, where nothing is selected and the full grouped list always shows.
-   * See `studio-checks-rail`'s collapsed-summary requirement. */
+  /** True when this rail docks at a bottom edge and opens as a one-line
+   * summary, expanding in place when chosen. Two sites take it: the step
+   * inspector's bottom edge, and the panels screen's, below that screen's two
+   * columns (task 7.4). False beside the canvas, where nothing is selected and
+   * the full grouped list always shows. See `studio-checks-rail`'s
+   * collapsed-summary requirement. */
   collapsed?: boolean;
 }
 
@@ -33,11 +35,13 @@ export function ChecksRail({ validation, canPublish, collapsed = false }: Props)
 
   return (
     <aside
-      // `collapsed` also marks the docked instance StepsPanel mounts at its
-      // bottom edge (true whether the summary or, once chosen, the expanded
-      // list shows) — it never draws its own border/padding there, since
-      // `.canvas-inspector` already provides that box (app.css:
-      // `.studio-checks-rail-docked`).
+      // `collapsed` also marks a docked instance (true whether the summary
+      // or, once chosen, the expanded list shows). The two docked sites draw
+      // their own box differently: at the step inspector's bottom edge the
+      // rail draws none, since `.canvas-inspector` already provides one, and
+      // at the panels screen's bottom edge it draws three of its four edges
+      // itself, since that screen boxes nothing (app.css:
+      // `.studio-checks-rail-docked` and the sibling rule below it).
       className={collapsed ? "studio-checks-rail studio-checks-rail-docked" : "studio-checks-rail"}
       aria-label={t("checksRail.heading")}
     >

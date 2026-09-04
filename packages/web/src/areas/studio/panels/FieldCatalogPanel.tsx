@@ -1,5 +1,5 @@
-import { Fragment, useEffect, useState } from "react";
-import type { BaseFieldType, DataSourceDef, Expression, FieldControl, FieldDef, FieldFormat, FieldOption } from "workflow-engine/schema";
+import { Fragment, useEffect, useState, type ReactNode } from "react";
+import { FIELD_KINDS, fieldKindOf, type DataSourceDef, type Expression, type FieldDef, type FieldKindName, type FieldOption } from "workflow-engine/schema";
 import { FieldForm } from "form-ui";
 import type { DraftOf } from "../draft/types";
 import { useDraft, type Mutate } from "../draft/store";
@@ -11,18 +11,21 @@ import { PluginEnvelopeEditor } from "./shared/PluginEnvelopeEditor";
 import { useDataLists } from "./shared/useDataLists.js";
 import { columnMappingRows, declaredColumns, mappableTargets, showsColumnMapping } from "./columnMappingLogic.js";
 import type { StudioDataList } from "../api/types.js";
-import { IssueList } from "./shared/IssueList";
+import { IssueItems, IssueList } from "./shared/IssueList";
 import { LocalizedTextInput } from "./shared/LocalizedTextInput";
 import { FieldValidationEditor } from "./shared/FieldValidationEditor";
 import { DefaultValueEditor } from "./shared/DefaultValueEditor";
-import { fieldLocaleGaps, missingTranslationWarning, seedLocalizedText } from "../draft/localized-text";
+import { fieldLocaleGaps, missingTranslationWarning, resolveDraftLocalizedText, seedLocalizedText } from "../draft/localized-text";
 import { draftFields } from "../draft/fields";
-import { allowedForType, droppedByTypeChange, nextFieldKey } from "./fieldCatalogLogic.js";
-import { FIELD_CONTROL_LABELS, FIELD_FORMAT_LABELS, FIELD_TYPE_LABELS } from "../draft/field-type-labels";
+import { droppedByKindChange, nextFieldKey } from "./fieldCatalogLogic.js";
+import { fieldCheckZone, type FieldCheckZone } from "./fieldCheckZone.js";
+import { fieldKindLabel } from "../draft/field-type-labels";
 import {
+  applyRequiredOverride,
   applyTechnicalMarker,
   applyVisibleOverride,
   countTechnicalClearKeys,
+  fieldRequiredOverrides,
   fieldUsage,
   fieldVisibleOverrides,
   type FieldUsageRow,
@@ -30,101 +33,94 @@ import {
 } from "../draft/field-usage";
 import { previewViewFields } from "../draft/field-preview";
 import { ConditionInput } from "./shared/ConditionInput";
+import type { EditorIssue } from "../draft/issues";
 
 type DraftField = DraftOf<FieldDef>;
 type DraftDataSource = DraftOf<DataSourceDef>;
 type DraftOption = DraftOf<FieldOption>;
 
-const BASE_FIELD_TYPES: BaseFieldType[] = ["string", "number", "boolean", "list", "file", "group"];
+/** The picker's own value for the plugin envelope — a kind name the engine's
+ * table never carries, so it cannot collide with one. */
+const CUSTOM_KIND = "__custom__";
+const KIND_NAMES = Object.keys(FIELD_KINDS) as FieldKindName[];
 
 function isCustomType(type: DraftField["type"]): type is DraftOf<FieldDef>["type"] & object {
   return typeof type === "object" && type !== null;
 }
 
 /**
- * Applies a type switch, dropping a `format` or a `control` the new type
- * refuses and naming that drop before it happens.
+ * Applies a kind switch, dropping the `format` or `control` the new kind does
+ * not name and saying so before it happens.
  *
- * Leaving the key in place would let the developer publish a body
- * `checkFieldFormatControl` rejects, and neither picker would still offer the
- * refused member, so no control on screen would say why.
+ * A kind names one `{type, format, control}` triple, so the switch writes all
+ * three at once. A key the entry omits is written as `undefined`, which
+ * serializes as absent — the definition keeps exactly the keys it carries
+ * today. Leaving a key in place would let the developer publish a body
+ * `checkFieldFormatControl` rejects, and the picker would offer nothing that
+ * says why.
  */
-function changeType(field: DraftField, raw: string, onChange: (patch: Partial<DraftField>) => void): void {
-  const type: DraftField["type"] = raw === "__custom__" ? { type: "", config: {} } : (raw as BaseFieldType);
-  const dropped = droppedByTypeChange(field, type);
-  if (dropped.length > 0) {
-    // One key per whole sentence: a translator reads the sentence, never two
-    // halves glued around a key name.
-    const message =
-      dropped.length === 2
-        ? t("fieldCatalog.typeDropsBothConfirm")
-        : dropped[0] === "format"
-          ? t("fieldCatalog.typeDropsFormatConfirm")
-          : t("fieldCatalog.typeDropsControlConfirm");
-    if (!confirm(message)) return;
+function changeKind(field: DraftField, raw: string, onChange: (patch: Partial<DraftField>) => void): void {
+  if (raw === CUSTOM_KIND) {
+    if (!confirmDrops(droppedByKindChange(field, undefined))) return;
+    onChange({ type: { type: "", config: {} }, format: undefined, control: undefined });
+    return;
   }
-  onChange({
-    type,
-    ...(dropped.includes("format") ? { format: undefined } : {}),
-    ...(dropped.includes("control") ? { control: undefined } : {}),
-  });
+  const entry = FIELD_KINDS[raw as FieldKindName];
+  if (entry === undefined) return;
+  if (!confirmDrops(droppedByKindChange(field, entry))) return;
+  onChange({ type: entry.type, format: entry.format, control: entry.control });
+}
+
+/** One key per whole sentence: a translator reads the sentence, never two
+ * halves glued around a key name. */
+function confirmDrops(dropped: ("format" | "control")[]): boolean {
+  if (dropped.length === 0) return true;
+  const message =
+    dropped.length === 2
+      ? t("fieldCatalog.typeDropsBothConfirm")
+      : dropped[0] === "format"
+        ? t("fieldCatalog.typeDropsFormatConfirm")
+        : t("fieldCatalog.typeDropsControlConfirm");
+  return confirm(message);
 }
 
 /**
- * The format picker and the control picker, below the type picker at both
- * editing sites. Each offers the selected type's own allowed members, read
- * from the one table the compile pass verdicts against, plus an entry for
- * declaring no member at all.
+ * The one picker that says what kind of field this is, at both editing
+ * sites. It reads the engine package's own `FIELD_KINDS` table over the
+ * exports map, so the studio declares no second table to drift from it.
  *
- * A type whose row allows no member hides that picker outright. An empty
- * picker states nothing, and a `file` field shows neither.
+ * A field whose triple the curated table names no kind for keeps its own
+ * entry, printing the raw triple in the mono face. That entry is a machine
+ * value, so no catalog key translates it. Picking any other entry replaces
+ * the triple; the JSON view stays the route back to an unnamed one.
  */
-function FormatControlPickers({ field, onChange }: { field: DraftField; onChange: (patch: Partial<DraftField>) => void }) {
-  const allowed = allowedForType(field.type);
-  const format = field.format;
-  const control = field.control;
+function KindPicker({ field, onChange }: { field: DraftField; onChange: (patch: Partial<DraftField>) => void }) {
+  const custom = isCustomType(field.type);
+  const kind = custom ? undefined : fieldKindOf(field);
+  const unnamed = !custom && kind === undefined;
+  const rawTriple = [field.type, field.format, field.control].filter((m) => typeof m === "string").join(" / ");
   return (
     <>
-      {allowed.formats.length > 0 && (
-        <>
-          <label>
-            format
-            <select
-              className="studio-mono"
-              value={format ?? ""}
-              onChange={(e) => onChange({ format: e.target.value === "" ? undefined : (e.target.value as FieldFormat) })}
-            >
-              <option value="">{t("fieldCatalog.noneOption")}</option>
-              {allowed.formats.map((f) => (
-                <option key={f} value={f}>
-                  {FIELD_FORMAT_LABELS[f].name}
-                </option>
-              ))}
-            </select>
-          </label>
-          {format !== undefined && <p className="studio-note">{FIELD_FORMAT_LABELS[format].note}</p>}
-        </>
-      )}
-      {allowed.controls.length > 0 && (
-        <>
-          <label>
-            control
-            <select
-              className="studio-mono"
-              value={control ?? ""}
-              onChange={(e) => onChange({ control: e.target.value === "" ? undefined : (e.target.value as FieldControl) })}
-            >
-              <option value="">{t("fieldCatalog.noneOption")}</option>
-              {allowed.controls.map((c) => (
-                <option key={c} value={c}>
-                  {FIELD_CONTROL_LABELS[c].name}
-                </option>
-              ))}
-            </select>
-          </label>
-          {control !== undefined && <p className="studio-note">{FIELD_CONTROL_LABELS[control].note}</p>}
-        </>
-      )}
+      <label>
+        {t("fieldCatalog.kindLabel")}
+        {/* The written face, not mono: a kind name is a word an author reads,
+            not a value the engine matches. The one exception is the raw
+            triple below, which is exactly such a value. */}
+        <select value={custom ? CUSTOM_KIND : (kind ?? "")} onChange={(e) => changeKind(field, e.target.value, onChange)}>
+          {unnamed && (
+            <option className="studio-mono" value="">
+              {rawTriple}
+            </option>
+          )}
+          {KIND_NAMES.map((name) => (
+            <option key={name} value={name}>
+              {fieldKindLabel(name).name}
+            </option>
+          ))}
+          <option value={CUSTOM_KIND}>{t("fieldCatalog.customTypeOption")}</option>
+        </select>
+      </label>
+      {kind !== undefined && <p className="studio-note">{fieldKindLabel(kind).note}</p>}
     </>
   );
 }
@@ -143,11 +139,13 @@ interface SubFieldRowProps {
 }
 
 /**
- * A group field's own child, and any of ITS children in turn — unchanged
- * from the single `FieldRow` this whole panel used before the tab set
- * (design.md decision 1). Carries no tab set of its own: `FieldEditor`
- * (below) is recursive-into-flat, not recursive-into-tabbed, so nesting a
- * child inside a tabbed parent never nests a `tablist` inside a `tablist`.
+ * A group field's own child, and any of ITS children in turn — the flat,
+ * recursive field row this whole panel used before the two halves. It draws
+ * no halves of its own, so nesting a child inside the selected field never
+ * nests a second definition half inside the first.
+ *
+ * It keeps its own check list (`IssueList` below). A child row is not the
+ * selected field, and the halves' zones describe the selected field alone.
  */
 function SubFieldRow({ field, dataSources, lists, mutate, onChange, onRemove }: SubFieldRowProps) {
   const { draft, contentLocale } = useDraft();
@@ -161,7 +159,6 @@ function SubFieldRow({ field, dataSources, lists, mutate, onChange, onRemove }: 
     onChange(derivedKey === undefined ? { label } : { label, key: derivedKey });
   };
   const custom = isCustomType(field.type);
-  const typeSelectValue = typeof field.type === "object" && field.type !== null ? "__custom__" : (field.type ?? "string");
   const hasOptions = (field.options?.length ?? 0) > 0;
   const hasDataSource = field.dataSource !== undefined;
   const isGroup = field.type === "group";
@@ -226,7 +223,7 @@ function SubFieldRow({ field, dataSources, lists, mutate, onChange, onRemove }: 
     // group child carries its own id and the rail reaches it too.
     <div className="field-row" id={field.id === undefined ? undefined : `field-row-${field.id}`}>
       <label>
-        key
+        {t("fieldCatalog.keyLabel")}
         <input
           type="text"
           className="studio-mono"
@@ -235,7 +232,7 @@ function SubFieldRow({ field, dataSources, lists, mutate, onChange, onRemove }: 
         />
       </label>
       <label>
-        label
+        {t("fieldCatalog.labelLabel")}
         <LocalizedTextInput value={field.label} onChange={updateLabel} />
       </label>
       {/* Sibling of the label, never nested inside it: a <label> takes
@@ -245,7 +242,7 @@ function SubFieldRow({ field, dataSources, lists, mutate, onChange, onRemove }: 
         <p className="studio-warning">{missingTranslationWarning(field.label, contentLocale, draft.baseLocale)}</p>
       )}
       <label>
-        description
+        {t("fieldCatalog.descriptionLabel")}
         <LocalizedTextInput value={field.description} onChange={(description) => onChange({ description })} />
       </label>
       {missingTranslationWarning(field.description, contentLocale, draft.baseLocale) && (
@@ -253,19 +250,8 @@ function SubFieldRow({ field, dataSources, lists, mutate, onChange, onRemove }: 
           {missingTranslationWarning(field.description, contentLocale, draft.baseLocale)}
         </p>
       )}
-      <label>
-        type
-        <select className="studio-mono" value={typeSelectValue} onChange={(e) => changeType(field, e.target.value, onChange)}>
-          {BASE_FIELD_TYPES.map((bft) => (
-            <option key={bft} value={bft}>
-              {bft}
-            </option>
-          ))}
-          <option value="__custom__">{t("fieldCatalog.customTypeOption")}</option>
-        </select>
-      </label>
-      <FormatControlPickers field={field} onChange={onChange} />
-      <label className="studio-field-technical">
+      <KindPicker field={field} onChange={onChange} />
+      <label className="studio-field-checkbox">
         {t("fieldCatalog.technicalLabel")}
         <input
           type="checkbox"
@@ -289,7 +275,7 @@ function SubFieldRow({ field, dataSources, lists, mutate, onChange, onRemove }: 
       <fieldset>
         <legend>{t("fieldCatalog.optionsLegend")}</legend>
         <label>
-          dataSource
+          {t("fieldCatalog.dataSourceLabel")}
           <select
             value={field.dataSource ?? ""}
             disabled={hasOptions}
@@ -424,17 +410,27 @@ function SubFieldRow({ field, dataSources, lists, mutate, onChange, onRemove }: 
   );
 }
 
-type FieldTab = "field" | "values" | "rules";
-const FIELD_TABS: FieldTab[] = ["field", "values", "rules"];
-const TAB_LABEL: Record<FieldTab, CatalogKey> = {
-  field: "fieldCatalog.tabField",
-  values: "fieldCatalog.tabValues",
-  rules: "fieldCatalog.tabRules",
-};
-
 function usageStepLabel(usage: FieldUsageRow[], stepId: string): string {
   const label = usage.find((u) => u.stepId === stepId)?.stepLabel;
   return label && label !== "" ? label : t("steps.unnamedStep");
+}
+
+/**
+ * One zone of either half: a heading, the checks that zone owns, then the
+ * controls. The heading takes the refusal tone while the zone holds a check,
+ * so an author scanning the halves sees which zone is wrong with nothing to
+ * open.
+ */
+function Zone({ heading, issues, children }: { heading: string; issues: EditorIssue[]; children: ReactNode }) {
+  return (
+    <div className="field-zone">
+      <h4 className="field-zone-heading" data-checked={issues.length > 0 ? "failed" : undefined}>
+        {heading}
+      </h4>
+      <IssueItems issues={issues} />
+      {children}
+    </div>
+  );
 }
 
 interface FieldEditorProps {
@@ -443,53 +439,76 @@ interface FieldEditorProps {
   lists: StudioDataList[] | undefined;
   /** The rail row a click most recently named — the selected top-level
    * field's own id, or one of its children's. Undefined outside a rail
-   * click (a reload, an Add). Drives the scroll-and-switch effect below;
-   * it is not cleared after use; re-focusing the same row twice in a row
-   * is a harmless no-op the second time. */
+   * click (a reload, an Add). Drives the scroll effect below; it is not
+   * cleared after use, and re-focusing the same row twice in a row is a
+   * harmless no-op the second time. */
   focusFieldId: string | undefined;
+  /** The step the effect half's empty state routes to — the draft's initial
+   * step, or `undefined` while the workflow carries no step to reach. */
+  routeStepId: string | undefined;
   onChange: (patch: Partial<DraftField>) => void;
   onRemove: () => void;
   onShowStep: (stepId: string) => void;
 }
 
 /**
- * The tabbed editor for the SELECTED TOP-LEVEL field alone (design.md
- * decision 1): Field / Values / Rules, with the field's own `IssueList`
- * above the tab set so an issue stays visible on every tab. All three panels
- * stay mounted, and the two inactive ones carry `hidden` — the developer
- * view's half-typed config and each builder's incomplete row live in
- * component state, not the draft, and would drop on unmount.
+ * The editor for the SELECTED TOP-LEVEL field alone, in two halves under one
+ * heading: what the field is, then where it acts in the process. Neither half
+ * sits behind a disclosure, and the view carries no tab set.
  *
- * A group field's children render inside the Field tab through the
- * unchanged, flat `SubFieldRow` — never through this component recursively,
- * so one `tablist` exists per open editor, never one per nested field.
+ * Every zone stays mounted while the field stays selected. Each builder holds
+ * an incomplete row the draft does not carry, and the developer view holds a
+ * half-typed config in component state; unmounting would drop both.
+ *
+ * A group field's children render inside the definition half through the flat
+ * `SubFieldRow` — never through this component recursively, so one pair of
+ * halves exists per open editor.
  */
-function FieldEditor({ field, dataSources, lists, focusFieldId, onChange, onRemove, onShowStep }: FieldEditorProps) {
-  const { draft, mutate, contentLocale } = useDraft();
-  const [activeTab, setActiveTab] = useState<FieldTab>("field");
+function FieldEditor({
+  field,
+  dataSources,
+  lists,
+  focusFieldId,
+  routeStepId,
+  onChange: writeField,
+  onRemove,
+  onShowStep,
+}: FieldEditorProps) {
+  const { draft, mutate, contentLocale, validation } = useDraft();
 
-  // A rail click on a group's child (`focusFieldId !== field.id`) needs the
-  // Field tab active before the scroll below can find anything visible: the
-  // child's `field-row-<id>` anchor sits inside SubFieldRow, mounted only in
-  // that tab's panel (task 3.4). A click on the field's own top-level row
-  // (`focusFieldId === field.id`) still passes through here harmlessly —
-  // that row's own anchor sits on the outer wrapper below, outside every
-  // tab panel, so switching tabs for it is a no-op past the first render.
+  // How many times the definition half has been written since this field was
+  // selected. It rides in the usage rows' React key, so each write remounts
+  // them and the tint animation runs again — a data attribute alone cannot
+  // restart a running animation.
+  const [definitionWrites, setDefinitionWrites] = useState(0);
+
+  /**
+   * Every write the DEFINITION half makes. It bumps the counter above, so the
+   * effect half's usage rows tint and the author sees which steps the change
+   * reached (`studio-app`: a change in the definition half tints the affected
+   * row in the effect half).
+   *
+   * The effect half's own writes bypass it. The column mapping calls
+   * `writeField` directly below, and the condition and requiredness controls
+   * write step views through `mutate`. A row must not tint at its own
+   * keystroke, only at the definition's.
+   */
+  const onChange = (patch: Partial<DraftField>) => {
+    setDefinitionWrites((n) => n + 1);
+    writeField(patch);
+  };
+
+  // A rail click on a group's child scrolls to that child's own
+  // `field-row-<id>` anchor, which sits inside `SubFieldRow` in the
+  // definition half. Nothing hides it any more, so this needs no tab switch
+  // ahead of it. A stale `focusFieldId` naming a since-removed row finds
+  // nothing and is a no-op.
   useEffect(() => {
-    if (focusFieldId !== undefined) setActiveTab("field");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (focusFieldId === undefined) return;
+    document.getElementById(`field-row-${focusFieldId}`)?.scrollIntoView({ block: "start" });
   }, [focusFieldId]);
 
-  // Runs after the effect above has committed `activeTab: "field"`, so the
-  // target is unhidden by the time this reads its position. A stale
-  // `focusFieldId` naming a since-removed row finds nothing and is a no-op.
-  useEffect(() => {
-    if (focusFieldId === undefined || activeTab !== "field") return;
-    document.getElementById(`field-row-${focusFieldId}`)?.scrollIntoView({ block: "start" });
-  }, [focusFieldId, activeTab]);
-
   const custom = isCustomType(field.type);
-  const typeSelectValue = typeof field.type === "object" && field.type !== null ? "__custom__" : (field.type ?? "string");
   const hasOptions = (field.options?.length ?? 0) > 0;
   const hasDataSource = field.dataSource !== undefined;
 
@@ -500,8 +519,10 @@ function FieldEditor({ field, dataSources, lists, focusFieldId, onChange, onRemo
   const targets = mappableTargets(field, draft.fields ?? []);
   const unmapped = columns.find((c) => !mappingRows.some((r) => r.column === c));
 
+  // `writeField`, not `onChange`: a column mapping sits in the effect half, so
+  // its own edit must not tint the usage rows beside it.
   const writeMapping = (next: Record<string, string>) =>
-    onChange({ columnMapping: (Object.keys(next).length === 0 ? undefined : next) as DraftField["columnMapping"] });
+    writeField({ columnMapping: (Object.keys(next).length === 0 ? undefined : next) as DraftField["columnMapping"] });
 
   const setMapping = (column: string, target: string) => {
     const next = { ...((field.columnMapping ?? {}) as Record<string, string>) };
@@ -542,6 +563,7 @@ function FieldEditor({ field, dataSources, lists, focusFieldId, onChange, onRemo
   };
   const usage = fieldId ? fieldUsage(draft, fieldId, contentLocale, baseLocale) : [];
   const visibleState = fieldId ? fieldVisibleOverrides(draft, fieldId) : ({ kind: "none" } as const);
+  const requiredState = fieldId ? fieldRequiredOverrides(draft, fieldId) : ({ kind: "none" } as const);
   const preview = previewViewFields(field, contentLocale, baseLocale);
   // Two fields preview with no option list, and the row names which one. A
   // bare person field declares no data source, so it takes its own wording
@@ -567,164 +589,92 @@ function FieldEditor({ field, dataSources, lists, focusFieldId, onChange, onRemo
     mutate((d) => applyTechnicalMarker(d, fieldId, next));
   };
 
+  const writeRequired = (next: boolean) => {
+    if (fieldId === undefined) return;
+    mutate((d) => applyRequiredOverride(d, fieldId, next));
+  };
+
+  // Each zone owns the checks whose `loc` names it; a `loc` naming no zone
+  // this view draws stands at the top of the definition half, so no check
+  // goes unshown for want of a matching zone.
+  const fieldIssues = validation.issues.filter((i) => i.entityId === fieldId);
+  const zoned = (zone: FieldCheckZone) => fieldIssues.filter((i) => fieldCheckZone(i.loc) === zone);
+  const unplaced = fieldIssues.filter((i) => fieldCheckZone(i.loc) === undefined);
+
+  const requiredDisabled = technicalChecked || requiredState.kind === "none";
+
   return (
     <div className="field-row" id={field.id === undefined ? undefined : `field-row-${field.id}`}>
-      <IssueList entityId={field.id} />
+      <div className="field-catalog-halves">
+        <section className="field-catalog-half" aria-label={t("fieldCatalog.definitionHalfLabel")}>
+          <IssueItems issues={unplaced} />
 
-      <div className="field-tabs" role="tablist" aria-label={t("fieldCatalog.tabsLabel")}>
-        {FIELD_TABS.map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            role="tab"
-            aria-selected={activeTab === tab}
-            onClick={() => setActiveTab(tab)}
-          >
-            {t(TAB_LABEL[tab])}
-          </button>
-        ))}
-      </div>
-
-      <div hidden={activeTab !== "field"} className="field-tab-panel">
-        <label>
-          key
-          <input
-            type="text"
-            className="studio-mono"
-            value={field.key ?? ""}
-            onChange={(e) => onChange({ key: e.target.value })}
-          />
-        </label>
-        <div className="field-label-row">
-          <label className="field-label-row-label">
-            label
-            <LocalizedTextInput value={field.label} onChange={updateLabel} />
-          </label>
-          {/* Replaces the shipped per-locale translation-status list
-              (design.md decision 1): names only the active contentLocale's
-              own gap, since the content-locale switcher now carries the
-              draft-wide per-locale count. */}
-          <span className="field-translation-badge">
-            {contentLocale === baseLocale
-              ? t("fieldCatalog.baseLocaleMark")
-              : fieldLocaleGaps(field, contentLocale, baseLocale) === 0
-                ? t("fieldCatalog.translationComplete")
-                : t("fieldCatalog.translationGap").replace("{count}", String(fieldLocaleGaps(field, contentLocale, baseLocale)))}
-          </span>
-        </div>
-        {missingTranslationWarning(field.label, contentLocale, draft.baseLocale) && (
-          <p className="studio-warning">{missingTranslationWarning(field.label, contentLocale, draft.baseLocale)}</p>
-        )}
-        <label>
-          description
-          <LocalizedTextInput value={field.description} onChange={(description) => onChange({ description })} />
-        </label>
-        {missingTranslationWarning(field.description, contentLocale, draft.baseLocale) && (
-          <p className="studio-warning">
-            {missingTranslationWarning(field.description, contentLocale, draft.baseLocale)}
-          </p>
-        )}
-        <label>
-          type
-          <select className="studio-mono" value={typeSelectValue} onChange={(e) => changeType(field, e.target.value, onChange)}>
-            {BASE_FIELD_TYPES.map((bft) => (
-              <option key={bft} value={bft}>
-                {FIELD_TYPE_LABELS[bft].name}
-              </option>
-            ))}
-            <option value="__custom__">{t("fieldCatalog.customTypeOption")}</option>
-          </select>
-        </label>
-        {typeof field.type === "string" && <p className="studio-note">{FIELD_TYPE_LABELS[field.type].note}</p>}
-        <FormatControlPickers field={field} onChange={onChange} />
-        <label className="studio-field-technical">
-          {t("fieldCatalog.technicalLabel")}
-          <input
-            type="checkbox"
-            checked={technicalChecked}
-            disabled={isGroup}
-            onChange={(e) => toggleTechnical(e.target.checked)}
-          />
-        </label>
-
-        {custom && (
-          <details className="studio-devview">
-            <summary>{t("fieldCatalog.developerView")}</summary>
-            <PluginEnvelopeEditor
-              label={t("fieldCatalog.customTypeLabel")}
-              value={field.type as DraftOf<FieldDef>["type"] & object}
-              onChange={(type) => onChange({ type })}
-            />
-          </details>
-        )}
-
-        {field.type === "group" && (
-          <fieldset>
-            <legend>{t("fieldCatalog.groupChildrenHeading")}</legend>
-            {(field.fields ?? []).map((sub, i) => (
-              <SubFieldRow
-                key={sub.id ?? i}
-                field={sub}
-                dataSources={dataSources}
-                lists={lists}
-                mutate={mutate}
-                onChange={(patch) => updateSubField(i, patch)}
-                onRemove={() => removeSubField(i)}
-              />
-            ))}
-            <button type="button" className="btn btn-secondary" onClick={addSubField}>
-              {t("fieldCatalog.addSubField")}
-            </button>
-          </fieldset>
-        )}
-
-        {preview && (
-          <details className="field-preview">
-            <summary>{t("fieldCatalog.previewHeading")}</summary>
-            {previewNote !== undefined && <p className="studio-note">{t(previewNote)}</p>}
-            {/* Sample controls take no keyboard or pointer interaction — every
-                synthesized entry is already forced `readonly`, and `inert`
-                additionally takes the whole container out of the tab order
-                and the accessibility tree, rather than inventing a
-                non-interactive landmark pattern (design.md decision 5). */}
-            <div className="field-preview-body" inert>
-              <FieldForm fields={preview.fields} values={preview.values} onChange={() => {}} locale={contentLocale} />
+          <Zone heading={t("fieldCatalog.whatAsksHeading")} issues={zoned("asks")}>
+            <div className="field-label-row">
+              <label className="field-label-row-label">
+                {t("fieldCatalog.labelLabel")}
+                <LocalizedTextInput value={field.label} onChange={updateLabel} />
+              </label>
+              {/* Names only the active contentLocale's own gap: the
+                  content-locale switcher carries the draft-wide per-locale
+                  count. */}
+              <span className="field-translation-badge">
+                {contentLocale === baseLocale
+                  ? t("fieldCatalog.baseLocaleMark")
+                  : fieldLocaleGaps(field, contentLocale, baseLocale) === 0
+                    ? t("fieldCatalog.translationComplete")
+                    : t("fieldCatalog.translationGap").replace("{count}", String(fieldLocaleGaps(field, contentLocale, baseLocale)))}
+              </span>
             </div>
-          </details>
-        )}
-
-        <details className="field-usage">
-          <summary>{t("fieldCatalog.usedInHeading")}</summary>
-          {usage.length === 0 ? (
-            <p className="studio-note">{t("fieldCatalog.usedInEmpty")}</p>
-          ) : (
-            <ul>
-              {usage.map((row) => (
-                <li key={row.stepId}>
-                  <span>{row.stepLabel || t("steps.unnamedStep")}</span>
-                  <span className="studio-mono">{row.modes.join(", ")}</span>
-                  <button type="button" className="btn btn-secondary" onClick={() => onShowStep(row.stepId)}>
-                    {t("fieldCatalog.showOnCanvas")}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </details>
-
-        <div className="field-tab-remove">
-          <button type="button" className="btn btn-ghost" onClick={onRemove}>
-            {t("fieldCatalog.removeField")}
-          </button>
-        </div>
-      </div>
-
-      <div hidden={activeTab !== "values"} className="field-tab-panel">
-        <div className="field-zone">
-          <h4 className="field-zone-heading">{t("fieldCatalog.whereValuesHeading")}</h4>
-          <fieldset>
+            {missingTranslationWarning(field.label, contentLocale, draft.baseLocale) && (
+              <p className="studio-warning">{missingTranslationWarning(field.label, contentLocale, draft.baseLocale)}</p>
+            )}
             <label>
-              dataSource
+              {t("fieldCatalog.descriptionLabel")}
+              <LocalizedTextInput value={field.description} onChange={(description) => onChange({ description })} />
+            </label>
+            {missingTranslationWarning(field.description, contentLocale, draft.baseLocale) && (
+              <p className="studio-warning">
+                {missingTranslationWarning(field.description, contentLocale, draft.baseLocale)}
+              </p>
+            )}
+            <label>
+              {t("fieldCatalog.keyLabel")}
+              <input
+                type="text"
+                className="studio-mono"
+                value={field.key ?? ""}
+                onChange={(e) => onChange({ key: e.target.value })}
+              />
+            </label>
+          </Zone>
+
+          <Zone heading={t("fieldCatalog.whatKindHeading")} issues={zoned("kind")}>
+            <KindPicker field={field} onChange={onChange} />
+            <label className="studio-field-checkbox">
+              {t("fieldCatalog.technicalLabel")}
+              <input
+                type="checkbox"
+                checked={technicalChecked}
+                disabled={isGroup}
+                onChange={(e) => toggleTechnical(e.target.checked)}
+              />
+            </label>
+            {custom && (
+              <details className="studio-devview">
+                <summary>{t("fieldCatalog.developerView")}</summary>
+                <PluginEnvelopeEditor
+                  label={t("fieldCatalog.customTypeLabel")}
+                  value={field.type as DraftOf<FieldDef>["type"] & object}
+                  onChange={(type) => onChange({ type })}
+                />
+              </details>
+            )}
+          </Zone>
+
+          <Zone heading={t("fieldCatalog.whereValuesHeading")} issues={zoned("values")}>
+            <label>
+              {t("fieldCatalog.dataSourceLabel")}
               <select
                 value={field.dataSource ?? ""}
                 disabled={hasOptions}
@@ -769,105 +719,208 @@ function FieldEditor({ field, dataSources, lists, focusFieldId, onChange, onRemo
                 {t("fieldCatalog.addOption")}
               </button>
             </div>
-          </fieldset>
-        </div>
+          </Zone>
 
-        <div className="field-zone">
-          <h4 className="field-zone-heading">{t("defaultValue.heading")}</h4>
-          <DefaultValueEditor field={field} onChange={(next) => onChange({ default: next })} />
-        </div>
+          <Zone heading={t("defaultValue.heading")} issues={zoned("default")}>
+            <DefaultValueEditor field={field} onChange={(next) => onChange({ default: next })} />
+          </Zone>
 
-        {showsColumnMapping(field, dataSources) && (
-          <div className="field-zone">
-            <h4 className="field-zone-heading">{t("columnMapping.heading")}</h4>
-            {columns.length === 0 ? (
-              <p className="studio-note">{t("columnMapping.noColumns")}</p>
+          <Zone heading={t("fieldCatalog.validationHeading")} issues={zoned("validation")}>
+            <FieldValidationEditor field={field} validation={field.validation} onChange={(validation) => onChange({ validation })} />
+          </Zone>
+
+          {isGroup && (
+            <fieldset>
+              <legend>{t("fieldCatalog.groupChildrenHeading")}</legend>
+              {(field.fields ?? []).map((sub, i) => (
+                <SubFieldRow
+                  key={sub.id ?? i}
+                  field={sub}
+                  dataSources={dataSources}
+                  lists={lists}
+                  mutate={mutate}
+                  onChange={(patch) => updateSubField(i, patch)}
+                  onRemove={() => removeSubField(i)}
+                />
+              ))}
+              <button type="button" className="btn btn-secondary" onClick={addSubField}>
+                {t("fieldCatalog.addSubField")}
+              </button>
+            </fieldset>
+          )}
+
+          {preview && (
+            <details className="field-preview">
+              <summary>{t("fieldCatalog.previewHeading")}</summary>
+              {previewNote !== undefined && <p className="studio-note">{t(previewNote)}</p>}
+              {/* Sample controls take no keyboard or pointer interaction — every
+                  synthesized entry is already forced `readonly`, and `inert`
+                  additionally takes the whole container out of the tab order
+                  and the accessibility tree. */}
+              <div className="field-preview-body" inert>
+                <FieldForm fields={preview.fields} values={preview.values} onChange={() => {}} locale={contentLocale} />
+              </div>
+            </details>
+          )}
+
+          <div className="field-half-remove">
+            <button type="button" className="btn btn-ghost" onClick={onRemove}>
+              {t("fieldCatalog.removeField")}
+            </button>
+          </div>
+        </section>
+
+        <section className="field-catalog-half" aria-label={t("fieldCatalog.effectHalfLabel")}>
+          <Zone heading={t("fieldCatalog.usedInHeading")} issues={[]}>
+            {usage.length === 0 ? (
+              // The empty tone, never the refusal tone: a field no step asks
+              // for yet is an unfinished draft, not a broken one. The route
+              // reaches the canvas on the initial step, which is where an
+              // author puts the field on a view.
+              <div className="field-effect-empty">
+                <p className="studio-empty">{t("fieldCatalog.usedInEmpty")}</p>
+                {routeStepId !== undefined && (
+                  <button type="button" className="btn btn-secondary" onClick={() => onShowStep(routeStepId)}>
+                    {t("fieldCatalog.effectEmptyRoute")}
+                  </button>
+                )}
+              </div>
+            ) : (
+              <ul className="field-usage-list">
+                {usage.map((row) => (
+                  // The key carries the write counter, so a definition change
+                  // remounts the row and its tint animation runs from the top.
+                  <li key={`${row.stepId}:${definitionWrites}`} data-tinted={definitionWrites > 0 ? "true" : undefined}>
+                    <span>{row.stepLabel || t("steps.unnamedStep")}</span>
+                    <span className="studio-mono">{row.modes.join(", ")}</span>
+                    <button type="button" className="btn btn-secondary" onClick={() => onShowStep(row.stepId)}>
+                      {t("fieldCatalog.showOnCanvas")}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Zone>
+
+          <Zone heading={t("fieldCatalog.onlyAskWhenHeading")} issues={[]}>
+            {visibleState.kind === "none" ? (
+              <p className="studio-note">{t("fieldCatalog.conditionNoSteps")}</p>
             ) : (
               <>
-                {mappingRows.map((row) => (
-                  <div className="studio-column-mapping-row" key={row.column}>
-                    <select
-                      aria-label={t("columnMapping.columnAria")}
-                      value={row.column}
-                      onChange={(e) => renameMapping(row.column, e.target.value)}
-                    >
-                      {row.stale && <option value={row.column}>{row.column}</option>}
-                      {columns.map((c) => (
-                        <option key={c} value={c}>
-                          {c}
-                        </option>
-                      ))}
-                    </select>
-                    <span aria-hidden="true">-&gt;</span>
-                    <select
-                      aria-label={t("columnMapping.targetAria")}
-                      value={row.target}
-                      onChange={(e) => setMapping(row.column, e.target.value)}
-                    >
-                      <option value="">{t("fieldCatalog.noneOption")}</option>
-                      {targets.map((f) => (
-                        <option key={f.id} value={f.id}>
-                          {f.key === "" || f.key === undefined ? f.id : f.key}
-                        </option>
-                      ))}
-                    </select>
-                    <button type="button" className="btn btn-secondary" onClick={() => removeMapping(row.column)}>
-                      {t("columnMapping.removeRow")}
-                    </button>
-                    {row.stale && <p className="studio-warning">{t("columnMapping.staleColumn")}</p>}
-                  </div>
-                ))}
-                <button type="button" className="btn btn-secondary" onClick={addMapping} disabled={unmapped === undefined}>
-                  {t("columnMapping.addRow")}
-                </button>
-              </>
-            )}
-          </div>
-        )}
-      </div>
-
-      <div hidden={activeTab !== "rules"} className="field-tab-panel">
-        <div className="field-zone">
-          <h4 className="field-zone-heading">{t("fieldCatalog.onlyAskWhenHeading")}</h4>
-          {visibleState.kind === "none" ? (
-            <p className="studio-note">{t("fieldCatalog.conditionNoSteps")}</p>
-          ) : (
-            <>
-              <p className="studio-note">
-                {t("fieldCatalog.conditionScopeNote").replace(
-                  "{steps}",
-                  visibleState.stepIds.map((id) => usageStepLabel(usage, id)).join(", "),
-                )}
-              </p>
-              {visibleState.kind === "divergent" && (
-                <p className="studio-warning">
-                  {t("fieldCatalog.conditionDivergentNote").replace(
+                <p className="studio-note">
+                  {t("fieldCatalog.conditionScopeNote").replace(
                     "{steps}",
                     visibleState.stepIds.map((id) => usageStepLabel(usage, id)).join(", "),
                   )}
                 </p>
-              )}
-              {visibleState.kind === "divergent" && visibleState.literalStepIds.length > 0 && (
-                <p className="studio-warning">
-                  {t("fieldCatalog.conditionLiteralNote").replace(
-                    "{steps}",
-                    visibleState.literalStepIds.map((id) => usageStepLabel(usage, id)).join(", "),
-                  )}
-                </p>
-              )}
-              <ConditionInput
-                value={visibleState.kind === "uniform" ? visibleState.value : undefined}
-                onChange={writeVisible}
-                toggleVariant="link"
-              />
-            </>
-          )}
-        </div>
+                {visibleState.kind === "divergent" && (
+                  <p className="studio-warning">
+                    {t("fieldCatalog.conditionDivergentNote").replace(
+                      "{steps}",
+                      visibleState.stepIds.map((id) => usageStepLabel(usage, id)).join(", "),
+                    )}
+                  </p>
+                )}
+                {visibleState.kind === "divergent" && visibleState.literalStepIds.length > 0 && (
+                  <p className="studio-warning">
+                    {t("fieldCatalog.conditionLiteralNote").replace(
+                      "{steps}",
+                      visibleState.literalStepIds.map((id) => usageStepLabel(usage, id)).join(", "),
+                    )}
+                  </p>
+                )}
+                <ConditionInput
+                  value={visibleState.kind === "uniform" ? visibleState.value : undefined}
+                  onChange={writeVisible}
+                  toggleVariant="link"
+                />
+              </>
+            )}
+          </Zone>
 
-        <div className="field-zone">
-          <h4 className="field-zone-heading">{t("fieldCatalog.validationHeading")}</h4>
-          <FieldValidationEditor field={field} validation={field.validation} onChange={(validation) => onChange({ validation })} />
-        </div>
+          {/* The catalog declares no `required` key of its own, so this writes
+              the view and never the field. Two states disable it: a technical
+              field is written by the process, and a field no step view
+              references has nothing to write. */}
+          <Zone heading={t("fieldCatalog.askForThisHeading")} issues={[]}>
+            {requiredState.kind !== "none" && (
+              <p className="studio-note">
+                {t("fieldCatalog.requiredScopeNote").replace(
+                  "{steps}",
+                  requiredState.stepIds.map((id) => usageStepLabel(usage, id)).join(", "),
+                )}
+              </p>
+            )}
+            {requiredState.kind === "divergent" && (
+              <p className="studio-warning">
+                {t("fieldCatalog.requiredDivergentNote").replace(
+                  "{steps}",
+                  requiredState.differingStepIds.map((id) => usageStepLabel(usage, id)).join(", "),
+                )}
+              </p>
+            )}
+            <label className="studio-field-checkbox">
+              {t("fieldCatalog.requiredLabel")}
+              <input
+                type="checkbox"
+                checked={requiredState.kind === "uniform" && requiredState.value}
+                disabled={requiredDisabled}
+                onChange={(e) => writeRequired(e.target.checked)}
+              />
+            </label>
+            {requiredState.kind === "none" && <p className="studio-note">{t("fieldCatalog.requiredNoSteps")}</p>}
+            {technicalChecked && <p className="studio-note">{t("fieldCatalog.requiredTechnicalNote")}</p>}
+          </Zone>
+
+          {/* A column mapping writes into other fields, so it is effect, not
+              definition. Its absence draws no rule of its own. */}
+          {showsColumnMapping(field, dataSources) && (
+            <Zone heading={t("columnMapping.heading")} issues={zoned("columnMapping")}>
+              {columns.length === 0 ? (
+                <p className="studio-note">{t("columnMapping.noColumns")}</p>
+              ) : (
+                <>
+                  {mappingRows.map((row) => (
+                    <div className="studio-column-mapping-row" key={row.column}>
+                      <select
+                        aria-label={t("columnMapping.columnAria")}
+                        value={row.column}
+                        onChange={(e) => renameMapping(row.column, e.target.value)}
+                      >
+                        {row.stale && <option value={row.column}>{row.column}</option>}
+                        {columns.map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                      </select>
+                      <span aria-hidden="true">-&gt;</span>
+                      <select
+                        aria-label={t("columnMapping.targetAria")}
+                        value={row.target}
+                        onChange={(e) => setMapping(row.column, e.target.value)}
+                      >
+                        <option value="">{t("fieldCatalog.noneOption")}</option>
+                        {targets.map((f) => (
+                          <option key={f.id} value={f.id}>
+                            {f.key === "" || f.key === undefined ? f.id : f.key}
+                          </option>
+                        ))}
+                      </select>
+                      <button type="button" className="btn btn-secondary" onClick={() => removeMapping(row.column)}>
+                        {t("columnMapping.removeRow")}
+                      </button>
+                      {row.stale && <p className="studio-warning">{t("columnMapping.staleColumn")}</p>}
+                    </div>
+                  ))}
+                  <button type="button" className="btn btn-secondary" onClick={addMapping} disabled={unmapped === undefined}>
+                    {t("columnMapping.addRow")}
+                  </button>
+                </>
+              )}
+            </Zone>
+          )}
+        </section>
       </div>
     </div>
   );
@@ -879,9 +932,8 @@ interface Props {
    * catalog holds none at all — the screen otherwise keeps it resolved. */
   selectedId: string | undefined;
   /** The rail row a click most recently named (`PanelsScreen.selectField`'s
-   * `deepestId`) — forwarded to `FieldEditor` so a group child's row can pull
-   * the Field tab active and scroll to itself, whether or not the selection
-   * itself changed. */
+   * `deepestId`) — forwarded to `FieldEditor` so a group child's row can
+   * scroll to itself, whether or not the selection itself changed. */
   focusFieldId: string | undefined;
   onAdd: () => void;
   onRemove: (index: number) => void;
@@ -889,7 +941,7 @@ interface Props {
 }
 
 export function FieldCatalogPanel({ token, selectedId, focusFieldId, onAdd, onRemove, onShowStep }: Props) {
-  const { draft, mutate } = useDraft();
+  const { draft, mutate, contentLocale } = useDraft();
   const fields = draft.fields ?? [];
   const dataSources = draft.dataSources ?? [];
   // The same hook `DataSourcesPanel` reads, so the key picker beside this one
@@ -899,35 +951,56 @@ export function FieldCatalogPanel({ token, selectedId, focusFieldId, onAdd, onRe
   const index = fields.findIndex((f) => f.id === selectedId);
   const field = index === -1 ? undefined : fields[index];
 
+  const steps = draft.workflow?.steps ?? [];
+  const routeStepId = draft.workflow?.initialStep ?? steps[0]?.id;
+
   const updateField = (patch: Partial<DraftField>) => {
     if (index === -1) return;
     updateInDraftArray(mutate, (d) => d.fields?.[index], patch);
   };
 
+  // The start state replaces both halves, since neither has a field to
+  // describe. It takes the empty tone: a draft with no field yet is a new
+  // draft, not a broken one. Its control is the same call the rail's Add
+  // entry makes, so the two cannot mint different fields.
+  if (field === undefined) {
+    return (
+      <div className="field-catalog-panel">
+        <h3>{t("fieldCatalog.heading")}</h3>
+        <div className="field-catalog-start">
+          <h4 className="field-catalog-start-heading">{t("fieldCatalog.startHeading")}</h4>
+          <p className="studio-empty">{t("fieldCatalog.startBody")}</p>
+          <button type="button" className="btn btn-primary" onClick={onAdd}>
+            {t("fieldCatalog.addFirstField")}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="field-catalog-panel">
-      <h3>{t("fieldCatalog.heading")}</h3>
-      {field === undefined ? (
-        <p className="empty">{t("fieldCatalog.empty")}</p>
-      ) : (
-        // Remounts on a field switch (design.md decision 1): this also
-        // resets `FieldEditor`'s own active-tab state to the Field tab, for
-        // free, the same way the selection change already resets everything
-        // else that component holds. A rail click that stays on the SAME
-        // top-level field — a different child of the group already open —
-        // does not remount, so `focusFieldId` (below) forces the Field tab
-        // active on its own.
-        <FieldEditor
-          key={field.id ?? index}
-          field={field}
-          dataSources={dataSources}
-          lists={lists}
-          focusFieldId={focusFieldId}
-          onChange={updateField}
-          onRemove={() => onRemove(index)}
-          onShowStep={onShowStep}
-        />
-      )}
+      {/* The field, not the panel. The screen heading one line above already
+          reads "Field catalog", and repeating it left the edited field named
+          nowhere as text — its label lives inside an editable input, which no
+          heading and no rail row spells out. An author working a 22-field
+          catalog had nothing to read back but the selection mark. */}
+      <h3>{resolveDraftLocalizedText(field.label, contentLocale, draft.baseLocale ?? "en") || t("panelsScreen.unnamedField")}</h3>
+      {/* Remounts on a field switch: that resets everything the editor holds
+          in component state — each builder's incomplete row, the developer
+          view's half-typed config — the same way the selection change
+          already resets the rest. */}
+      <FieldEditor
+        key={field.id ?? index}
+        field={field}
+        dataSources={dataSources}
+        lists={lists}
+        focusFieldId={focusFieldId}
+        routeStepId={routeStepId}
+        onChange={updateField}
+        onRemove={() => onRemove(index)}
+        onShowStep={onShowStep}
+      />
       <button type="button" className="btn btn-secondary" onClick={onAdd}>
         {t("fieldCatalog.addField")}
       </button>
