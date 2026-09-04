@@ -139,7 +139,7 @@ the panels write today. The screen's own Save, Discard and Publish
 toolbar SHALL remain the only thing that persists.
 
 Leaving the screen SHALL discard nothing. The screen SHALL state that
-plainly, so leaving never reads as a cancel.
+plainly, so leaving never reads as a discard.
 
 A panel's own unsubmitted input SHALL survive a switch between views.
 The contract panel holds a half-typed outcome name in component state.
@@ -155,10 +155,11 @@ The issue count says how many of them are wrong. Only the issue count
 takes the refusal tone. An entry SHALL carry no issue count when the
 view holds no issue.
 
-For the Fields view and for the Data sources view the rail SHALL also
-list that view's own entities and an Add entry. Choosing an entity SHALL
-select it. The view SHALL render that one entity's editor. The Add entry
-SHALL add an entity, through the call the panel's own add control makes.
+Under the Fields view and the Data sources view, the rail SHALL also
+list that view's own entities. It SHALL list an Add entry too. Choosing
+an entity SHALL select it. The view SHALL show that one entity's editor.
+The Add entry SHALL add an entity, through the call the panel's own add
+control makes.
 A group field's children indent one level under it.
 
 A field entry SHALL carry a control that moves the field into a group
@@ -170,7 +171,7 @@ Contract holds a single editor, so its rail entry SHALL carry no
 sub-list. The field matrix draws a grid, so its entry SHALL carry none
 either.
 
-The rail SHALL render a sub-list only under the open view. Two
+The rail SHALL show a sub-list only under the open view. Two
 sub-lists at once fill the column.
 
 A group field SHALL keep one recursive editor. Choosing a child in the
@@ -530,11 +531,11 @@ before this step" means none of these already write the field:
 A step dominating another is the same relation the compile pass's
 `definition-contract` check (`checkUnsatisfiableRequiredReadonly`) now
 uses. The two SHALL share one dominance computation over the draft's
-`workflow.steps`, so neither can disagree with the other about which
-step guarantees a value by the time a given step is submitted. A step
-editable only on a step that does NOT dominate this cell's own step —
-reachable solely after it, or only via a different branch — does NOT
-count, and gating stays engaged.
+`workflow.steps`. Neither can then disagree with the other about which
+step guarantees a value before a given step submits. A step editable
+only on a step that does NOT dominate this cell's own step does NOT
+count. That covers a step reachable solely after it, or only via a
+different branch. Gating stays engaged.
 
 Where a cell already carries `required: true` and `readonly: true`
 before either gate engages, neither checkbox SHALL disable. The
@@ -963,7 +964,7 @@ that the field resolves at runtime. An author previews what a
 participant gets. A field declaring `format: "person"` and neither
 `options` nor `dataSource` SHALL preview the same way, for the
 identical reason: the draft cannot reach the live `allowedGroups`
-expansion either. That field SHALL get its own row wording, naming the
+expansion either. That field SHALL get its own row wording. It names the
 people list rather than a data source it does not declare.
 
 <!-- antislop: allow sentence-length -->
