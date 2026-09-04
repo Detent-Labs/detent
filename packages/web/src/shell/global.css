@@ -3,6 +3,13 @@
  * compiler has no global selector, so this sheet stays hand-written. Every
  * value below reads a token `tokens.css` declares — this sheet carries no
  * value of its own.
+ *
+ * Four more rules live here since `stylex-phase-5-cleanup`: the shell's own
+ * flex frame, one `prefers-reduced-motion` reset (deduped from four
+ * near-identical area copies), and a dialog's `::backdrop`. None compiles:
+ * each reaches an element StyleX's per-call-site model cannot reach — the
+ * flex frame every screen sits in, every element on the page at once, or a
+ * browser-generated pseudo-element outside the DOM tree.
  */
 
 * {
@@ -75,4 +82,37 @@ h2 {
   letter-spacing: 0.08em;
   color: var(--color-text-muted);
   margin: var(--space-4) 0 var(--space-2);
+}
+
+/* A column, so the screen below the header has a height to grow into. A screen
+   opts in with its own `flex-grow`; one that asks for nothing keeps its content
+   height, and the page scrolls as before. */
+.shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* Every area screen centers itself with `margin: 0 auto` under a `max-width`.
+   A flex item with auto inline margins is never stretched: it shrink-wraps to
+   its content and the margins absorb the rest. That collapsed the canvas
+   column from about 1000px to 302px. An explicit width restores what these
+   screens had as block boxes, and the auto margins still center them under
+   their own `max-width`. */
+.shell > * {
+  width: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* `stylex-phase-3-studio`'s only literal exception: `::backdrop` fails a real
+   `@stylexjs/unplugin` build (design.md D12), so every `<dialog>` still
+   composes the literal `studio-dialog` class for this one rule. */
+.studio-dialog::backdrop {
+  background: rgb(0 0 0 / 45%);
 }
