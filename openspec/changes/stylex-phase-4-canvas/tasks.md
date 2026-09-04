@@ -122,14 +122,14 @@
   existing `data-step-id`-based structural split, and update any found the
   same way. Verify the file passes. Done: two regexes updated to
   `nodeLabel`/`nodeKey`; 5 pass, 0 fail.
-- [ ] 4.5 Add a "Studio canvas (`stylex-phase-4-canvas`)" section to
+- [x] 4.5 Add a "Studio canvas (`stylex-phase-4-canvas`)" section to
   `docs/browser-checks.md` covering what the two deleted CSS-text tests
   used to assert (the clipping surface's `overflow: visible` /
   `.canvas-group-disclosure`'s declared size), as a manual probe. Verify the
   antislop and whitespace gates pass on this file
   (`sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` and
   `.../whitespace.sh`, run over the committed range once this task's commit
-  lands).
+  lands). Done: both gates pass with no rising finding count.
 
 ## 5. Docs and roadmap
 

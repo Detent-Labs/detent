@@ -2412,3 +2412,45 @@ any of the four.
 
 Throughout: zero console errors on any studio screen this phase
 touched.
+
+### Studio canvas: CanvasView.tsx and EditRail.tsx compiled (`stylex-phase-4-canvas`)
+
+Source: `stylex-phase-4-canvas` task 6.5/6.6. `canvas/CanvasView.tsx` and
+`canvas/EditRail.tsx` compile from StyleX now. `app.css` carries only its
+two permanent, non-canvas rules: the reduced-motion block and
+`.studio-dialog::backdrop`. Build the production bundle and open it on
+the engine's own port, not `bun run dev` (Studio's dev-mode crash is
+pre-existing and unrelated, `docs/decisions.md`). Seed the database
+first, per `docs/decisions.md`'s seed script.
+
+**The two deleted CSS-text tests, read visually instead.** Open a draft's
+canvas. Pass: the SVG does not clip the graph at its own edge (its
+computed `overflow` is `visible`), and `.canvas-wrap` clips it instead
+(computed `overflow: hidden`). Read the wrap's computed `background-image`
+in DevTools. Pass: it is the dot-grid gradient, and the SVG itself carries
+none. Pan and zoom. Pass: the dots track the transform, staying under a
+node dragged onto one at any zoom. Expand a group. Pass: its disclosure
+button's computed size is 20 by 20, inset 4 inside its 28-by-28
+`<foreignObject>` host — read the button's own computed `width`/`height`
+in DevTools, not `app.css` (which no longer carries the rule).
+
+**Keyboard walk, in Chromium and in Firefox.** Tab into the canvas. Pass:
+focus lands on the initial step, and the canvas takes one stop in the
+page's tab order. Arrow to a second step, then Right onto one of its
+outgoing paths. Pass: the focused node draws its dashed accent ring, and
+the focused path draws its accent halo — both at the same visual weight
+this phase's stylesheet declared, in both browsers. Press Escape, then
+Tab. Pass: focus leaves the canvas. Double-click a group's rename label
+inside the selection summary (select a group's members first). Pass: the
+cursor over the label still reads as a grab hand (D5 folded this into
+`EditScreen.tsx`'s own compiled style, closing out
+`stylex-phase-3-studio`'s deferral).
+
+**Drag probe: Panzoom exclusion.** Start a pointer drag on a step node.
+Pass: the node moves; the canvas does not pan. Start a drag on an edge's
+route, a waypoint handle, and the inline rename field (double-click a
+node first). Pass: none of the three pans the canvas either. Start a drag
+on empty canvas space. Pass: the canvas pans, confirming the exclusion is
+scoped to exactly the elements that need it and not to the whole surface.
+
+Throughout: zero console errors, in both browsers.
