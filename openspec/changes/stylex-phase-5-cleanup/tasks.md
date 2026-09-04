@@ -179,17 +179,17 @@
   My-tasks renders correctly in app. The reporting cycle-time view
   renders its correct empty state (no completed instances in range,
   confirmed via the API response). The canvas, the process list, and
-  the discard-draft dialog all render correctly in studio; its
+  the discard-draft dialog all render correctly in studio. Its
   `::backdrop` visibly darkens the page behind it. The reduced-motion
   probe emulated `prefers-reduced-motion: reduce` and read every
   element's computed `transitionDuration`/`animationDuration`: all
   report `1e-05s` (0.01ms), matching the consolidated global.css rule
   exactly.
 
-- [x] 5.6 Confirm the exit bar: `find packages -iname "*.css"` (or `git
-  ls-files "packages/**/*.css"`) lists only `tokens.css` and
-  `global.css`, and every `git grep '\.css' packages/` match reviewed in
-  task 2.3 still holds. Done: both list exactly the two files. The
+- [x] 5.6 Confirm the exit bar. `find packages -iname "*.css"` (or `git
+  ls-files "packages/**/*.css"`) should list only `tokens.css` and
+  `global.css`. Every `git grep '\.css' packages/` match reviewed in
+  task 2.3 should still hold. Done: both list exactly the two files. The
   grep total reads 69, two fewer than task 2.3's 71, matching Group
   3's deletion of `boundaries.test.ts`'s own two matches. This closes
   the six-phase StyleX migration.
