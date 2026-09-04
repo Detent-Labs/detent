@@ -130,11 +130,11 @@
 - [x] 5.1 Convert `panels/FieldCatalogPanel.tsx` to `stylex.create`.
   This is the largest single file in this phase, 56 class-token sites.
   Two classes stay literal: `studio-field-technical` and
-  `field-catalog-panel`, neither backed by a live `app.css` rule (only
-  `field-catalog-panel`'s own `> h3` child rule is live, and that
-  selector converts). `SubFieldRow` threads an optional `labelStyle`
-  prop into the shared `FormatControlPickers`, since only that call
-  site renders it as a direct child of `.field-row`.
+  `field-catalog-panel`. Neither has a live `app.css` rule; the
+  panel's own `> h3` child selector converts instead.
+  `SubFieldRow` threads an optional `labelStyle` prop into the
+  shared `FormatControlPickers`. Only `SubFieldRow` renders it as a
+  direct child of `.field-row`.
 - [x] 5.2 Convert its shared dependencies too, each reading
   `form-ui/tokens.stylex`. They are `panels/shared/
   DefaultValueEditor.tsx`, `panels/shared/FieldValidationEditor.tsx`,
@@ -146,7 +146,8 @@
   later consumer too: `PathsPanel.tsx`, `StepsPanel.tsx`,
   `DataSourcesPanel.tsx`. Converting them here, once, covers every
   consumer.
-- [x] 5.3 Verify: `bun run typecheck` passes. Also run `git grep -c
+- [x] 5.3 Verify: `bun run typecheck` and `bun run build` both pass.
+  Also run `git grep -c
   'className="condition-\|className="field-\|className="default-value-
   \|className="plugin-field' packages/web/src/areas/studio/panels/`.
   It finds two sites, both dead classes with no live `app.css` rule:
@@ -154,8 +155,8 @@
   now reads its style from a `stylex.create` entry. `app.css`'s own
   rules for the converted classes stay in place, dead code, until
   Group 9's cleanup pass (D11). Full `bun test` under
-  `silent-green.sh`: 3818 pass, 1 pre-existing skip, 0 fail. Build
-  passes.
+  `silent-green.sh` passes too: 3818 tests, 1 pre-existing skip, 0
+  fail.
 
 ## 6. The panels screen, field matrix, data sources and checks rail
 
