@@ -47,10 +47,10 @@ describe("EditorDock's Field matrix tab", () => {
       </DraftProvider>,
     );
 
-    expect(html).toContain("studio-matrix-table");
-    expect(html).not.toContain("studio-matrix-toolbar");
-    expect(html).not.toContain("studio-matrix-flag-badge");
-    expect(html).not.toContain("studio-matrix-count");
+    expect(html).toContain("matrixTable");
+    expect(html).not.toContain("matrixToolbar");
+    expect(html).not.toContain("matrixFlagBadge");
+    expect(html).not.toContain("matrixCount");
   });
 
   it("keys each live cell's checkbox class on its own flag, and gates readonly with aria-disabled", () => {
@@ -72,9 +72,9 @@ describe("EditorDock's Field matrix tab", () => {
 
     // field_vendor's only view entry carries required: true and no other
     // writer, so gatedKeys disables readonly (draft/view-flags.ts).
-    expect(html).toContain('class="studio-matrix-flag-visible"');
-    expect(html).toContain('class="studio-matrix-flag-required"');
-    const readonlyInput = html.match(/<input[^>]*class="studio-matrix-flag-readonly"[^>]*>/)?.[0];
+    expect(html).toContain('class="matrixFlagVisible"');
+    expect(html).toContain('class="matrixFlagRequired"');
+    const readonlyInput = html.match(/<input[^>]*class="matrixFlagReadonly[^"]*"[^>]*>/)?.[0];
     expect(readonlyInput).toBeDefined();
     expect(readonlyInput).toContain('aria-disabled="true"');
     expect(readonlyInput).not.toContain(" disabled");

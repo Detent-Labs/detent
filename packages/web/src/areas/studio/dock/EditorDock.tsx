@@ -46,9 +46,10 @@ const BODY_ID = "studio-dock-body";
  * purpose (D9) rather than shared: `.studio-empty` and the error-banner
  * shape each appear near-identically in ten other studio files.
  *
- * `dockBody` keeps its own literal `studio-dock-body` class alongside this
- * compiled style (D10): `app.css`'s `.studio-dock-body .studio-matrix-scroll`
- * still depends on it until `FieldMatrixGrid.tsx` converts in Group 6.
+ * `dockBody` no longer keeps a literal `studio-dock-body` class (D10):
+ * `FieldMatrixGrid.tsx`'s scroll box now picks its own 15rem cap from a
+ * `compact` prop, so `app.css`'s `.studio-dock-body .studio-matrix-scroll`
+ * rule has nothing left here to match. It stays dead code until Group 9.
  */
 const styles = stylex.create({
   dock: {
@@ -259,15 +260,12 @@ export function EditorDock({ processId, token, draft, contentLocale, baseVersion
        * keeps its selected cell across a tab switch. A collapsed dock mounts
        * none of the three. */}
       {open && (
-        // `studio-dock-body` stays a literal class alongside the compiled
-        // style (D10): `app.css`'s `.studio-dock-body .studio-matrix-scroll`
-        // still depends on it until `FieldMatrixGrid.tsx` converts.
-        <div id={BODY_ID} className={`studio-dock-body ${dockBodyProps.className}`} style={dockBodyProps.style}>
+        <div id={BODY_ID} {...dockBodyProps}>
           <div hidden={tab !== "changes"}>
             <ChangesTab processId={processId} token={token} draft={draft} baseVersion={baseVersion} />
           </div>
           <div hidden={tab !== "matrix"}>
-            <FieldMatrixGrid />
+            <FieldMatrixGrid compact />
           </div>
           <div hidden={tab !== "paths"}>
             <PathsTab draft={draft} contentLocale={contentLocale} />

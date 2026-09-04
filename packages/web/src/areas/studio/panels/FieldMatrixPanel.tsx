@@ -1,8 +1,73 @@
 import { useState } from "react";
+import * as stylex from "@stylexjs/stylex";
+import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { useDraft } from "../draft/store";
 import { t } from "../catalog.js";
 import { matrixRows, matrixCounts, filterInertSteps } from "./fieldMatrixLogic";
 import { FieldMatrixGrid, FLAG_KEYS, FLAG_LABEL_KEY } from "./FieldMatrixGrid";
+
+const styles = stylex.create({
+  matrix: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s3,
+  },
+  matrixToolbar: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "baseline",
+    gap: space.s3,
+    paddingBottom: space.s2,
+    borderBottom: `2px solid ${colors.divider}`,
+  },
+  matrixCount: {
+    fontFamily: fonts.mono,
+    fontVariantNumeric: "tabular-nums",
+    fontSize: "0.8rem",
+    color: colors.textMuted,
+  },
+  matrixLegend: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "baseline",
+    gap: space.s3,
+    marginLeft: "auto",
+    fontSize: "0.75rem",
+    color: colors.textMuted,
+  },
+  matrixLegendSwatches: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: space.s2,
+    marginLeft: space.s1,
+  },
+  matrixLegendSwatch: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: space.s1,
+  },
+  matrixLegendSwatchColor: {
+    display: "inline-block",
+    width: "10px",
+    height: "10px",
+    border: `1px solid ${colors.border}`,
+  },
+  matrixLegendSwatchVisible: {
+    background: colors.flagVisible,
+  },
+  matrixLegendSwatchRequired: {
+    background: colors.flagRequired,
+  },
+  matrixLegendSwatchReadonly: {
+    background: colors.flagReadonly,
+  },
+});
+
+const FLAG_SWATCH_STYLE: Record<(typeof FLAG_KEYS)[number], stylex.StyleXStyles> = {
+  visible: styles.matrixLegendSwatchVisible,
+  required: styles.matrixLegendSwatchRequired,
+  readonly: styles.matrixLegendSwatchReadonly,
+};
 
 const LEGEND_KEYS = [
   "fieldMatrix.legendBulk",
@@ -41,31 +106,28 @@ export function FieldMatrixPanel() {
   const counts = matrixCounts(rows, drawnSteps.map((d) => d.step));
 
   return (
-    <div className="studio-matrix">
-      <div className="studio-matrix-toolbar">
+    <div {...stylex.props(styles.matrix)}>
+      <div {...stylex.props(styles.matrixToolbar)}>
         <button
           type="button"
-          className="btn btn-secondary studio-matrix-inert-toggle"
+          className="btn btn-secondary"
           aria-pressed={hideInert}
           onClick={() => setHideInert((v) => !v)}
         >
           {t("fieldMatrix.hideInertToggle")}
         </button>
-        <span className="studio-matrix-count">
+        <span {...stylex.props(styles.matrixCount)}>
           {countLine(counts.declaredEntries, counts.fieldCount, counts.stepCount, counts.undeclaredCells)}
         </span>
-        <div className="studio-matrix-legend">
+        <div {...stylex.props(styles.matrixLegend)}>
           {LEGEND_KEYS.map((key) => (
             <span key={key} data-legend-entry>
               {t(key)}
               {key === "fieldMatrix.legendColors" && (
-                <span className="studio-matrix-legend-swatches">
+                <span {...stylex.props(styles.matrixLegendSwatches)}>
                   {FLAG_KEYS.map((flagKey) => (
-                    <span key={flagKey} className="studio-matrix-legend-swatch">
-                      <span
-                        className={`studio-matrix-legend-swatch-color studio-matrix-legend-swatch-${flagKey}`}
-                        aria-hidden="true"
-                      />
+                    <span key={flagKey} {...stylex.props(styles.matrixLegendSwatch)}>
+                      <span {...stylex.props(styles.matrixLegendSwatchColor, FLAG_SWATCH_STYLE[flagKey])} aria-hidden="true" />
                       {t(FLAG_LABEL_KEY[flagKey])}
                     </span>
                   ))}

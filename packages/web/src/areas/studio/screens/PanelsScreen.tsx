@@ -1,4 +1,6 @@
 import { useState } from "react";
+import * as stylex from "@stylexjs/stylex";
+import { colors, fonts, space } from "form-ui/tokens.stylex";
 import type { DataSourceDef } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
 import type { DraftField } from "../draft/fields";
@@ -25,6 +27,114 @@ import { DataSourcesPanel } from "../panels/DataSourcesPanel";
 import { ContractPanel } from "../panels/ContractPanel";
 import { FieldMatrixPanel } from "../panels/FieldMatrixPanel";
 import { ChecksRail } from "../panels/ChecksRail";
+
+const styles = stylex.create({
+  studioBack: {
+    display: "block",
+    paddingLeft: 0,
+    marginBottom: space.s3,
+  },
+  panelsScreenHeader: {
+    display: "flex",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    gap: space.s3,
+    paddingBottom: space.s2,
+    borderBottom: `2px solid ${colors.divider}`,
+  },
+  panelsScreenHeading: {
+    flex: 1,
+    margin: 0,
+    fontSize: "1rem",
+  },
+  panelsScreenNote: {
+    margin: 0,
+    color: colors.textMuted,
+  },
+  panelsScreenLayout: {
+    display: "grid",
+    flex: "1 1 0",
+    gridTemplateColumns: "16rem minmax(0, 1fr) 22rem",
+    gap: space.s3,
+    alignItems: "stretch",
+    minHeight: "36rem",
+    overflow: "hidden",
+  },
+  // `.studio-panels-screen-layout > *`: applied to each direct child (nav,
+  // main, and `ChecksRail`'s own root) so none imposes a height floor on
+  // the row.
+  panelsScreenLayoutChild: {
+    minHeight: 0,
+  },
+  panelsScreenView: {
+    overflowY: "auto",
+    overscrollBehavior: "contain",
+    minWidth: 0,
+  },
+  panelsRail: {
+    borderRight: `2px solid ${colors.divider}`,
+    overflowY: "auto",
+    overscrollBehavior: "contain",
+  },
+  panelsRailList: {
+    listStyle: "none",
+    margin: 0,
+    padding: 0,
+  },
+  // `.studio-panels-rail-entry`/`.studio-panels-rail-field` share one
+  // declaration in app.css; one style key covers both call sites here.
+  panelsRailRow: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: space.s2,
+    width: "100%",
+    background: "none",
+    color: "inherit",
+    border: "none",
+    borderBottom: `1px solid ${colors.border}`,
+    paddingBlock: space.s2,
+    paddingInline: space.s3,
+    font: "inherit",
+    textAlign: "left",
+    cursor: "pointer",
+    ":hover": {
+      background: colors.surfaceMuted,
+    },
+  },
+  // `[aria-current="true"]`: a JS-computed choice reading the same
+  // `aria-current` the button already carries.
+  panelsRailRowCurrent: {
+    boxShadow: `inset 3px 0 0 ${colors.accent}`,
+  },
+  panelsRailRowIndented: {
+    paddingLeft: space.s6,
+  },
+  panelsRailName: {
+    flex: 1,
+    minWidth: 0,
+    overflowWrap: "anywhere",
+  },
+  panelsRailType: {
+    fontSize: "0.8rem",
+    color: colors.textMuted,
+  },
+  panelsRailCount: {
+    fontFamily: fonts.mono,
+    fontVariantNumeric: "tabular-nums",
+    color: colors.textMuted,
+  },
+  panelsRailIssues: {
+    fontFamily: fonts.mono,
+    fontVariantNumeric: "tabular-nums",
+    color: colors.refusal,
+    border: "2px solid currentcolor",
+    paddingBlock: 0,
+    paddingInline: space.s1,
+  },
+  studioMono: {
+    fontFamily: fonts.mono,
+  },
+});
 
 export { PANEL_VIEWS, type PanelView };
 
@@ -71,15 +181,15 @@ export function PanelsRailFieldRow({ label, typeLabel, depth, issues, selected, 
   return (
     <button
       type="button"
-      className="studio-panels-rail-field"
+      {...stylex.props(styles.panelsRailRow, depth === 1 && styles.panelsRailRowIndented)}
       data-depth={depth}
       aria-current={selected ? "true" : undefined}
       onClick={onClick}
     >
-      <span className="studio-panels-rail-name">{label}</span>
-      {typeLabel && <span className="studio-panels-rail-type studio-mono">{typeLabel}</span>}
+      <span {...stylex.props(styles.panelsRailName)}>{label}</span>
+      {typeLabel && <span {...stylex.props(styles.panelsRailType, styles.studioMono)}>{typeLabel}</span>}
       {issues > 0 && (
-        <span className="studio-panels-rail-issues" aria-label={`${issues} ${t("panelsScreen.issueMark")}`}>
+        <span {...stylex.props(styles.panelsRailIssues)} aria-label={`${issues} ${t("panelsScreen.issueMark")}`}>
           {issues}
         </span>
       )}
@@ -207,17 +317,17 @@ export function PanelsScreen({ openView, onBack, onOpenView, onShowStep, token, 
       {/* The view's name sits here, not above the panel: each panel renders
           its own heading, and a second copy directly above it read as a
           duplicate on screen. */}
-      <header className="studio-panels-screen-header">
-        <button type="button" className="btn btn-ghost studio-back" onClick={onBack}>
+      <header {...stylex.props(styles.panelsScreenHeader)}>
+        <button type="button" className="btn btn-ghost" {...stylex.props(styles.studioBack)} onClick={onBack}>
           {t("panelsScreen.backToCanvas")}
         </button>
-        <h1 className="studio-panels-screen-heading">{t(VIEW_LABEL[openView])}</h1>
-        <p className="studio-panels-screen-note">{t("panelsScreen.keepsChanges")}</p>
+        <h1 {...stylex.props(styles.panelsScreenHeading)}>{t(VIEW_LABEL[openView])}</h1>
+        <p {...stylex.props(styles.panelsScreenNote)}>{t("panelsScreen.keepsChanges")}</p>
       </header>
 
-      <div className="studio-panels-screen-layout">
-        <nav className="studio-panels-rail" aria-label={t("panelsScreen.railLabel")}>
-          <ul className="studio-panels-rail-list">
+      <div {...stylex.props(styles.panelsScreenLayout)}>
+        <nav {...stylex.props(styles.panelsRail, styles.panelsScreenLayoutChild)} aria-label={t("panelsScreen.railLabel")}>
+          <ul {...stylex.props(styles.panelsRailList)}>
             {PANEL_VIEWS.map((view) => {
               // The matrix's badge counts `source: "view"` findings instead: its
               // issues share `entityType: "step"` with every other per-step
@@ -234,19 +344,19 @@ export function PanelsScreen({ openView, onBack, onOpenView, onShowStep, token, 
                 <li key={view}>
                   <button
                     type="button"
-                    className="studio-panels-rail-entry"
+                    {...stylex.props(styles.panelsRailRow, openView === view && styles.panelsRailRowCurrent)}
                     aria-current={openView === view ? "true" : undefined}
                     onClick={() => onOpenView(view)}
                   >
-                    <span className="studio-panels-rail-name">{t(VIEW_LABEL[view])}</span>
-                    <span className="studio-panels-rail-count">{entityCount[view]}</span>
-                    {issues > 0 && <span className="studio-panels-rail-issues">{issues}</span>}
+                    <span {...stylex.props(styles.panelsRailName)}>{t(VIEW_LABEL[view])}</span>
+                    <span {...stylex.props(styles.panelsRailCount)}>{entityCount[view]}</span>
+                    {issues > 0 && <span {...stylex.props(styles.panelsRailIssues)}>{issues}</span>}
                   </button>
                   {/* Contract holds one editor, so it carries no sub-list. A
                       sub-list renders only under the open view: two at once
                       would overflow the rail's 16rem column. */}
                   {view === "fields" && view === openView && (
-                    <ul className="studio-panels-rail-sublist">
+                    <ul {...stylex.props(styles.panelsRailList)}>
                       {railFields.map((row) => {
                         const rowIssues = issueCountForEntityId(validation.issues, row.id);
                         const field = fieldsById.get(row.id);
@@ -266,14 +376,14 @@ export function PanelsScreen({ openView, onBack, onOpenView, onShowStep, token, 
                         );
                       })}
                       <li>
-                        <button type="button" className="studio-panels-rail-field" onClick={addField}>
+                        <button type="button" {...stylex.props(styles.panelsRailRow)} onClick={addField}>
                           {t("fieldCatalog.addField")}
                         </button>
                       </li>
                     </ul>
                   )}
                   {view === "dataSources" && view === openView && (
-                    <ul className="studio-panels-rail-sublist">
+                    <ul {...stylex.props(styles.panelsRailList)}>
                       {dataSources.map((ds) => {
                         if (ds.id === undefined) return null;
                         const dsIssues = issueCountForEntityId(validation.issues, ds.id);
@@ -281,18 +391,15 @@ export function PanelsScreen({ openView, onBack, onOpenView, onShowStep, token, 
                           <li key={ds.id}>
                             <button
                               type="button"
-                              className="studio-panels-rail-field"
+                              {...stylex.props(styles.panelsRailRow)}
                               aria-current={selectedDataSourceId === ds.id ? "true" : undefined}
                               onClick={() => setSelectedDataSourceId(ds.id)}
                             >
-                              <span className="studio-panels-rail-name">
+                              <span {...stylex.props(styles.panelsRailName)}>
                                 {ds.key === "" || ds.key === undefined ? t("panelsScreen.unnamedDataSource") : ds.key}
                               </span>
                               {dsIssues > 0 && (
-                                <span
-                                  className="studio-panels-rail-issues"
-                                  aria-label={`${dsIssues} ${t("panelsScreen.issueMark")}`}
-                                >
+                                <span {...stylex.props(styles.panelsRailIssues)} aria-label={`${dsIssues} ${t("panelsScreen.issueMark")}`}>
                                   {dsIssues}
                                 </span>
                               )}
@@ -301,7 +408,7 @@ export function PanelsScreen({ openView, onBack, onOpenView, onShowStep, token, 
                         );
                       })}
                       <li>
-                        <button type="button" className="studio-panels-rail-field" onClick={addDataSource}>
+                        <button type="button" {...stylex.props(styles.panelsRailRow)} onClick={addDataSource}>
                           {t("dataSources.addDataSource")}
                         </button>
                       </li>
@@ -313,7 +420,7 @@ export function PanelsScreen({ openView, onBack, onOpenView, onShowStep, token, 
           </ul>
         </nav>
 
-        <main className="studio-panels-screen-view">
+        <main {...stylex.props(styles.panelsScreenView, styles.panelsScreenLayoutChild)}>
           {/* All four mount; `hidden` shows one. See the component note. */}
           <div hidden={openView !== "fields"}>
             <FieldCatalogPanel
@@ -343,8 +450,13 @@ export function PanelsScreen({ openView, onBack, onOpenView, onShowStep, token, 
 
         {/* Full grouped list, not the collapsed summary: that form exists
             because a canvas selection takes the third column for an inspector,
-            and this screen carries neither. */}
-        <ChecksRail validation={validation} canPublish={canPublish} />
+            and this screen carries neither. The wrapper alone carries
+            `.studio-panels-screen-layout > *`'s min-height: 0 (D11's own
+            child-selector case): `ChecksRail` renders in three other places
+            too, so that grid-item rule belongs to this screen, not to it. */}
+        <div {...stylex.props(styles.panelsScreenLayoutChild)}>
+          <ChecksRail validation={validation} canPublish={canPublish} />
+        </div>
       </div>
     </>
   );

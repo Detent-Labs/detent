@@ -160,33 +160,45 @@
 
 ## 6. The panels screen, field matrix, data sources and checks rail
 
-- [ ] 6.1 Re-audit `FieldMatrixGrid.tsx`'s `CellState` group before
+- [x] 6.1 Re-audit `FieldMatrixGrid.tsx`'s `CellState` group before
   writing any style for it (D3, the same per-group re-verification
-  phase 2 ran before each area). Confirm `fieldMatrixLogic.ts`'s
+  phase 2 ran before each area). Confirmed `fieldMatrixLogic.ts`'s
   `CellState` is still the closed three-value union `"hatched" |
   "blank" | "live"`, and that `app.css` still styles only `hatched`
   and `live`.
-- [ ] 6.2 Convert `screens/PanelsScreen.tsx` to `stylex.create`.
-- [ ] 6.3 Convert `panels/FieldMatrixGrid.tsx`. Merge the
+- [x] 6.2 Convert `screens/PanelsScreen.tsx` to `stylex.create`.
+- [x] 6.3 Convert `panels/FieldMatrixGrid.tsx`. Merge the
   `.studio-matrix-row-header` duplicate declaration into one
   `stylex.create` entry (D6). Pick `CellState`'s style from an
-  exhaustive check over its three values. `blank` gets no extra
+  exhaustive lookup over its three values. `blank` gets no extra
   style. This matches today's stylesheet.
 
-  Its scroll box takes a `compact?: boolean` prop. Or it reads its
-  mount context some other way. It can then pick the 15rem cap
-  `dock/EditorDock.tsx` needs instead of its own 32rem default (D10).
+  The lookup carries no explicit `Record<CellState, StyleXStyles>`
+  type. The `live` entry holds only a `:hover` key, a narrower shape
+  than the general `StyleXStyles` type accepts. A `satisfies
+  Record<CellState, unknown>` clause keeps the exhaustiveness check
+  instead.
 
-  Drop `.studio-dock-body`'s retained literal class from
+  Its scroll box takes a `compact?: boolean` prop, picking the 15rem
+  cap `dock/EditorDock.tsx` needs instead of its own 32rem default
+  (D10).
+
+  Dropped `.studio-dock-body`'s retained literal class from
   `EditorDock.tsx`'s own JSX, now that the scroll box picks its cap
   in code. `app.css`'s `.studio-dock-body .studio-matrix-scroll` rule
   itself waits for Group 9's cleanup pass, like every other rule
   (D11).
-- [ ] 6.4 Convert `panels/FieldMatrixPanel.tsx`.
-- [ ] 6.5 Convert `panels/DataSourcesPanel.tsx` and its dependency
+- [x] 6.4 Convert `panels/FieldMatrixPanel.tsx`.
+- [x] 6.5 Convert `panels/DataSourcesPanel.tsx` and its dependency
   `panels/shared/InstanceQueryForm.tsx`.
-- [ ] 6.6 Convert `panels/ChecksRail.tsx`.
-- [ ] 6.7 Change five field-matrix/panels test files' literal class
+- [x] 6.6 Convert `panels/ChecksRail.tsx`. It mounts in three other
+  files too (`StepsPanel.tsx`, `EditScreen.tsx`, both Group 8), so its
+  own signature stays untouched. `PanelsScreen.tsx`'s own call site
+  wraps it in a plain compiled `<div>` instead, carrying
+  `.studio-panels-screen-layout > *`'s min-height: 0. That grid-item
+  rule belongs to the screen. It does not belong on a component three
+  other screens also mount.
+- [x] 6.7 Change five field-matrix/panels test files' literal class
   assertions to the stub-derived key names.
 
   The five files are `studio-fieldMatrixGrid-bulkBadges.test.tsx`,
@@ -195,12 +207,16 @@
   `studio-checksRail-publishVerdict.test.tsx`, and
   `studio-editorDock-fieldMatrixTab.test.tsx` (task 3.2's finding).
   Its assertions target `FieldMatrixGrid.tsx`'s own markup. They wait
-  for this task, not `EditorDock.tsx`'s own conversion.
+  for this task, not `EditorDock.tsx`'s own conversion. Two of the
+  bulk-badge assertions switched from a plain substring match to a
+  `\b`-bounded regex: `matrixFlagBadge` is also a prefix of
+  `matrixFlagBadgePressed`.
 
-  Verify: `bun test` against all five passes.
-- [ ] 6.8 Verify: `bun run typecheck` and `bun run build` both pass.
+  Verify: `bun test` against all five passes. It does: 11/11.
+- [x] 6.8 Verify: `bun run typecheck` and `bun run build` both pass.
   `app.css` keeps every rule this group's files used (D11) until
-  Group 9's cleanup pass.
+  Group 9's cleanup pass. Full `bun test` under `silent-green.sh`
+  passes too: 3818 tests, 1 pre-existing skip, 0 fail.
 
 ## 7. The form editor
 

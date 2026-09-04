@@ -40,8 +40,8 @@ describe("FieldMatrixGrid's BulkBadges", () => {
     // The fixture's single live cell drives both the submit column's
     // header and the result row's header, so each renders its own
     // BulkBadges — one eligible badge and two empty slots apiece.
-    const badgeCount = (html.match(/studio-matrix-flag-badge/g) ?? []).length;
-    const emptyCount = (html.match(/studio-matrix-flag-empty/g) ?? []).length;
+    const badgeCount = (html.match(/\bmatrixFlagBadge\b/g) ?? []).length;
+    const emptyCount = (html.match(/\bmatrixFlagEmpty\b/g) ?? []).length;
     expect(badgeCount).toBe(2);
     expect(emptyCount).toBe(4);
   });
