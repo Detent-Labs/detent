@@ -1,19 +1,19 @@
 ## 1. Pre-flight audit
 
-- [ ] 1.1 Re-run this design's own rule-count grep against
+- [x] 1.1 Re-run this design's own rule-count grep against
   `packages/web/src/areas/studio/app.css` at the branch tip. Verify:
   364 distinct rule blocks total, 50 `.canvas-*`-prefixed (phase 4's
   scope), 314 in this phase's own scope.
 <!-- antislop: allow synonym-rotation -->
 <!-- The git subcommand name, not the prose verb "render". -->
-- [ ] 1.2 Re-run the duplicate-declaration grep
+- [x] 1.2 Re-run the duplicate-declaration grep
   (`git show HEAD:<file> | grep -oP '^[^{]+(?=\{)' | sed
   's/[[:space:]]*$//' | sort | uniq -c | sort -rn | awk '$1>1'`).
   Verify: five duplicates total. `.studio-matrix-row-header`,
   `.studio-form-card-body` and `.studio-form-canvas-tail` are this
   phase's own scope (D6). `.canvas-group-name` and
   `.canvas-edge-focus-halo` are phase 4's, untouched here.
-- [ ] 1.3 Confirm the zero-scope files carry no CSS-backed class to
+- [x] 1.3 Confirm the zero-scope files carry no CSS-backed class to
   convert. Five files render only role/text/structure markup, or the
   deferred `.btn` family. They are `panels/ContractPanel.tsx`,
   `panels/ActionListEditor.tsx`, `panels/SubprocessSpecEditor.tsx`,
@@ -28,14 +28,14 @@
 
   `panels/DraftToolbar.tsx`'s own `studio-`-prefixed substrings are
   import paths and catalog keys, not classes. It gets no task either.
-- [ ] 1.4 Confirm `screens/studio/root.tsx` needs no further change.
+- [x] 1.4 Confirm `screens/studio/root.tsx` needs no further change.
   It already imports and applies `navStyles` from phase 2's own Group
   2 work. Verify: `grep -n "navStyles" packages/web/src/areas/studio/
   root.tsx` prints the existing import and both `stylex.props` calls.
 
 ## 2. The `::backdrop` verification
 
-- [ ] 2.1 Write an isolated `@stylexjs/babel-plugin` transform script
+- [x] 2.1 Write an isolated `@stylexjs/babel-plugin` transform script
   at the repo root. It compiles a `stylex.create()` call with a
   `"::backdrop"` key nested inside a style entry, alongside regular
   border properties. Run it. Verify: the compiled metadata contains a
