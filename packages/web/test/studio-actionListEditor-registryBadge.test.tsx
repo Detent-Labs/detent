@@ -91,7 +91,7 @@ describe("ActionListEditor's registry badge", () => {
     const html = renderRow(
       action,
       baseValidation({
-        issues: [{ entityType: "action", entityId: "action_b", message: "action type 'not.registered' is not registered", source: "registry" }],
+        issues: [{ entityType: "action", entityId: "action_b", message: "action type 'not.registered' is not registered", source: "registry", loc: "" }],
       }),
     );
 

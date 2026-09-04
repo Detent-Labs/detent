@@ -19,6 +19,7 @@ function keyedStrings<T extends Record<string, unknown>>(input: T): { [K in keyo
 mock.module("@stylexjs/stylex", () => ({
   create: keyedStrings,
   defineVars: keyedStrings,
+  keyframes: () => "keyframes",
   props: (...classNames: unknown[]) => ({
     className: classNames.filter((name): name is string => typeof name === "string" && name.length > 0).join(" "),
   }),

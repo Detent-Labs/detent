@@ -550,9 +550,10 @@ An unrecognized `:view` SHALL fall back to the edit screen's own
 canvas. The routing table already answers an unrecognized path with the
 process list, and this is that rule one level down.
 
-The screen SHALL lay out three columns, in order: an index rail, the
-open view, and the checks rail. See the `studio-checks-rail` capability
-for what the rail shows here.
+The screen SHALL lay out two columns, in order: an index rail and the
+open view. The checks rail SHALL dock its one-line summary at the
+screen's bottom edge instead of standing in a third column. See the
+`studio-checks-rail` capability for what the rail shows here.
 
 The panels screen SHALL replace the canvas while it is open. It SHALL
 offer one control back to it.
@@ -571,24 +572,30 @@ browser's Back control therefore still returns to the panels screen
 the navigation came from, per `unified-shell`'s navigation
 requirement.
 
-The three columns SHALL fill the height the screen's header rows leave,
-above the floor the canvas layout uses. A taller window
-therefore shows taller columns, and no empty band sits below them. This
-is the rule `studio-canvas` states for the canvas edit screen, and the
-panels screen stands in the same well.
+The two columns SHALL fill the height the screen's header rows leave.
+They SHALL stop above the docked summary, and above the floor the canvas
+layout uses. A taller window therefore shows taller columns, and no
+empty band sits below them. This is the rule `studio-canvas` states for the canvas edit
+screen, and the panels screen stands in the same well.
 
 #### Scenario: The columns fill a tall window
 
 - **WHEN** the developer opens the panels screen on a window taller
   than the floor
-- **THEN** the three columns reach the bottom of the well, and no empty
-  band sits below them
+- **THEN** the two columns reach the docked summary, and no empty band
+  sits below them
 
 #### Scenario: A short window holds the floor
 
 - **WHEN** the developer opens the panels screen on a window shorter
   than the floor
 - **THEN** the columns hold that floor and the page scrolls
+
+#### Scenario: The screen stands no checks column
+
+- **WHEN** the developer opens the panels screen
+- **THEN** two columns stand beside each other, and the checks summary
+  sits docked at the screen's bottom edge
 
 #### Scenario: A view has its own address
 
@@ -634,7 +641,7 @@ the panels write today. The screen's own Save, Discard and Publish
 toolbar SHALL remain the only thing that persists.
 
 Leaving the screen SHALL discard nothing. The screen SHALL state that
-plainly, so leaving never reads as a cancel.
+plainly, so leaving never reads as a discard.
 
 A panel's own unsubmitted input SHALL survive a switch between views.
 The contract panel holds a half-typed outcome name in component state.
@@ -650,17 +657,23 @@ The issue count says how many of them are wrong. Only the issue count
 takes the refusal tone. An entry SHALL carry no issue count when the
 view holds no issue.
 
-For the Fields view and for the Data sources view the rail SHALL also
-list that view's own entities and an Add entry. Choosing an entity SHALL
-select it. The view SHALL render that one entity's editor. The Add entry
-SHALL add an entity, through the call the panel's own add control makes.
+Under the Fields view and the Data sources view, the rail SHALL also
+list that view's own entities. It SHALL list an Add entry too. Choosing
+an entity SHALL select it. The view SHALL show that one entity's editor.
+The Add entry SHALL add an entity, through the call the panel's own add
+control makes.
 A group field's children indent one level under it.
+
+A field entry SHALL carry a control that moves the field into a group
+and out of it. The move requirement below states the gesture, its
+keyboard equivalent and what the move writes. A data source entry
+SHALL carry no such control, since a data source nests under nothing.
 
 Contract holds a single editor, so its rail entry SHALL carry no
 sub-list. The field matrix draws a grid, so its entry SHALL carry none
 either.
 
-The rail SHALL render a sub-list only under the open view. Two
+The rail SHALL show a sub-list only under the open view. Two
 sub-lists at once fill the column.
 
 A group field SHALL keep one recursive editor. Choosing a child in the
@@ -691,10 +704,15 @@ entry rather than a deeper indent. This is a rail-rendering rule only:
 the draft's own field tree SHALL keep whatever depth it declares.
 
 The Fields rail entry SHALL name a field by its resolved label alone, on
-one line. The field's friendly type and the issue mark SHALL sit beside
-it. The row SHALL NOT print the field's key. The key stays in the Field
-tab once an author selects that field. The engine's own exact-match
-value already lives there.
+one line. The field's kind name and the issue mark SHALL sit beside it.
+The row SHALL NOT print the field's key. The key stays in the definition
+half's "What this field asks" zone, once an author selects that field.
+The engine's own exact-match value already lives there.
+
+The kind name SHALL come from the same table the kind picker reads. A
+row naming the base type while the picker beside it names the kind would
+give one field two vocabularies. The row therefore reads "Date" where
+the picker reads "Date".
 
 The rail SHALL keep the fallback name it shows today. It SHALL trigger
 on an EMPTY RESOLVED LABEL rather than an empty key. The label is the
@@ -787,6 +805,13 @@ fallback exactly as an empty-key field did before.
 - **THEN** the draft carries one more field, the rail lists it, and the
   view renders that new field
 
+#### Scenario: A field entry offers the move control
+
+- **WHEN** the developer opens the Fields view on a draft carrying a
+  group field and a top-level field
+- **THEN** each field entry carries a move control, and no data source
+  entry carries one
+
 #### Scenario: Removing a field selects its neighbour
 
 - **WHEN** the developer removes the selected field from a draft that
@@ -834,462 +859,22 @@ fallback exactly as an empty-key field did before.
 
 - **WHEN** the developer opens the Fields view on a draft whose fields
   each carry a `key`
-- **THEN** every rail row shows the resolved label, the friendly type
-  and any issue mark
+- **THEN** every rail row shows the resolved label, the kind name and
+  any issue mark
 - **AND** no row prints a `key`
 
-### Requirement: The Fields and Data sources views take the area's field rule
+#### Scenario: The rail row and the picker name one kind
 
-Both views SHALL render their editors under the design language's field
-rule. The rule `.steps-panel label` states it in the area today. A
-label SHALL sit above its control. A `key` and a `type` SHALL print in
-mono, because the engine matches both exactly. A hairline SHALL divide
-rail rows, and a rule SHALL sit under a view's heading. No corner SHALL
-take a radius.
+- **WHEN** the developer selects a `{type: "string", format: "date"}`
+  field
+- **THEN** the rail row and the kind picker both name that field's kind,
+  with the same word
 
-The Fields view SHALL edit one field through three tabs, in order:
-Field, Values, Rules. The field's checks (`IssueList`) SHALL show
-once, above the tab set, so an issue stays visible whatever tab is
-open.
+### Requirement: The field catalog's definition half offers a Technical control
 
-The tab set SHALL edit the selected TOP-LEVEL field alone. A group
-field's children SHALL render inside the Field tab through the area's
-existing flat, recursive field row. They SHALL carry no tab set of
-their own. Nesting a tab set inside a tab set would let an issue on a
-child hide behind a tab. That is exactly what a field's own
-unconsolidated checks did before this change.
-
-The Field tab SHALL show the key, the label, the description and the
-type picker without a click. It SHALL also hold the Technical control,
-always visible outside either disclosure, directly below the type
-picker.
-
-Translation status SHALL show as a badge beside the label input. The
-badge SHALL name the current locale's missing count. The field SHALL
-carry no separate translation-status list. Adding a language SHALL
-stay draft-scoped in the content-locale switcher. The preview ("How
-it will look") and the usage list ("Used in") SHALL each sit inside a
-collapsed `<details>` disclosure. Both SHALL start closed.
-
-A group field's children SHALL stay outside any disclosure, inside the
-Field tab's always-visible content. The developer view SHALL keep its
-own existing, separate `<details>` disclosure, untouched by this
-change. Remove field SHALL sit below a rule at the tab's end. It SHALL
-read as the tab's least frequent action, not one more item in the stack
-above it.
-
-The Values tab SHALL divide into zones, each under its own heading. A
-rule SHALL separate each zone from its neighbour. "Where values come
-from" (the data source and the options) and "Default value" SHALL
-always show.
-
-"Column mapping" SHALL show as a third zone only when the field's data
-source is mappable, per the existing `showsColumnMapping` rule. It is
-not a fourth control stacked beside the other two. Its absence draws
-no rule of its own.
-
-The Rules tab SHALL divide into two zones under the same rule. The
-zones are "Only ask this when" (the condition) and "Validation" (the
-field's validation rules).
-
-The Default value zone SHALL offer a literal input matching the
-field's type and its declared format. For a field carrying static
-`options` that input SHALL be a `<select>` bound to those options, or
-the multi-value equivalent when the field's type is `list`. For a
-`string` field declaring a `format` it SHALL be that format's own
-native input.
-
-Either control SHALL offer no option when the field is
-`dataSource`-bound, since the draft carries no resolved rows for one.
-That is the same carve-out named below for the preview. The CEL toggle
-SHALL still work there. A field declaring `format: "person"` and
-neither `options` nor `dataSource` SHALL get the identical carve-out,
-whether its type is `string` or `list`: the draft resolves no
-`allowedGroups`-sourced people list either, since that resolution needs
-a live database read the draft editor does not have. The CEL toggle
-still works there too.
-
-The note the zone shows in the person case SHALL name the people list,
-not a data source. The existing note names a data source by hand, and
-this field declares none; an author reading it would learn the wrong
-thing about their own draft.
-
-For a `file` field the whole Default value zone SHALL show disabled. It
-SHALL state that the type accepts no default here. This mirrors "Only
-ask this when" 's own disabled state for a field no step view
-references.
-
-For a `group` field the whole Default value zone SHALL also show
-disabled. It SHALL state that a group's own default is never read. A
-group carries no slot of its own in the flat data payload. A literal
-or CEL default written there would silently never apply. That is the
-same issue this change exists to close for `FieldDef.default` in
-general.
-
-Every other type gets a link-styled toggle. It SHALL switch the zone
-to a raw CEL text input for an expression default. This mirrors the
-toggle affordance the Rules tab's condition row already uses. The zone
-SHALL NOT mount the guard-shaped condition-builder component. A
-default is a value, not a boolean. It needs no comparison-row builder.
-
-Writing through the literal input SHALL set the field's `default` key
-to that literal value. Writing through the CEL input SHALL set it to `{
-lang: "cel", src }`. Clearing either input SHALL remove the `default`
-key.
-
-All three tab panels SHALL stay mounted while a field stays selected.
-Switching a tab SHALL reveal and hide them, rather than mount them.
-This is the rule the four views take one level up. It holds here for
-the same reason. The developer view holds a half-typed config in
-component state. Each builder holds an incomplete row the draft does
-not carry.
-
-A disclosure inside the Field tab SHALL keep its own open/closed state,
-independent of the active tab. Switching away from Field and back SHALL
-NOT reset an open disclosure to closed.
-
-The type picker SHALL list the six base field types under friendly
-names, each with a short note. It SHALL write the raw `baseFieldType`
-value to the draft. It SHALL offer no type the contract does not carry.
-It SHALL keep the custom plugin envelope.
-
-A format picker and a control picker SHALL sit below the type picker.
-Each SHALL offer the members the selected type allows, per the table
-the `definition-contract` capability states. Each SHALL also offer an
-entry for declaring no member at all. Each SHALL write the raw member
-value to the draft. Each SHALL drop its key when the developer picks
-the empty entry. A type whose row allows no member SHALL hide that
-picker outright.
-
-Switching the type SHALL drop a `format` or a `control` the new type
-does not allow. It SHALL name that drop before it happens. Leaving the
-key in place lets the developer publish a body the compile pass
-rejects. No control on screen would show why.
-
-"How it will look" SHALL preview the field through the shared form
-component, read-only, inside its disclosure. Every previewed entry's
-`readonly` SHALL read `true`, and the preview's container SHALL carry
-`inert`.
-
-The preview runs over a synthesized single-field view. For a group
-field it synthesizes the group's own entry, plus one entry per
-descendant. That reaches every depth, not only the group's immediate
-children.
-
-A group holding a group SHALL preview both levels. That is the
-grouping the shared form component itself applies. The synthesis
-SHALL also carry the sample values in the shape that component reads
-them, keyed by field id.
-
-A dataSource-backed field SHALL preview with no option list. The
-draft carries no resolved rows for one. The row stating so SHALL name
-that the field resolves at runtime. An author previews what a
-participant gets. A field declaring `format: "person"` and neither
-`options` nor `dataSource` SHALL preview the same way, for the
-identical reason: the draft cannot reach the live `allowedGroups`
-expansion either. That field SHALL get its own row wording, naming the
-people list rather than a data source it does not declare.
-
-The preview's sample value SHALL match the shape the field's own type
-takes. A `format` narrows the value domain, so a formatted field
-previews that format's sample rather than its type's — but a `{type:
-"list"}` field holds an array whatever its format, so its sample SHALL
-be the format's sample inside an array. A scalar there would draw a
-multi-select with nothing selected, since the shared form component
-reads a non-array value as an empty selection.
-
-"Used in" SHALL list, inside its disclosure, every step whose view
-references the field, with the modes those references set. A "Show on
-the canvas" control on a row SHALL return to the canvas with that step
-preselected.
-
-"Only ask this when" is a third condition-builder site, alongside the
-path guard and the view-override sites `studio-condition-builder`
-already names. It SHALL read the `visible` overrides of every step
-view that references the field. When those views disagree, the row
-SHALL state that plainly. A `visible` override is `boolean` or an
-expression. The row edits expressions alone. A referencing view holding
-a literal SHALL therefore count as a disagreement, and the row SHALL
-name it.
-
-When no step view references the field, the row SHALL show disabled.
-It SHALL state that no step asks for it yet.
-
-The row's operand picker SHALL withhold `child.*`. The row writes one
-expression across steps of mixed type, and a `visible` override admits
-`child` on a subprocess step alone.
-
-Updating the condition SHALL write the same override to every
-referencing view, and SHALL name the write before it happens. Where a
-referencing view holds a literal, the notice SHALL name that step.
-Clearing the condition SHALL drop the `visible` key from every
-referencing view. It SHALL name that scope before it happens, on the
-same terms a write does. The field SHALL NOT store a field-level
-condition.
-
-#### Scenario: A field editor states its labels above its controls
-
-- **WHEN** the developer opens the Fields view on any field
-- **THEN** each label sits above its own control, and no label sits
-  beside one
-
-#### Scenario: A key prints in mono
-
-- **WHEN** the developer opens the Fields view on any field
-- **THEN** the field's key and its type print in the mono face
-
-#### Scenario: The type picker writes a raw type
-
-- **WHEN** the developer chooses "Text" in the type picker
-- **THEN** the draft's field type reads `string`, and the definition
-  serializes unchanged
-
-#### Scenario: The format picker offers what the type allows
-
-- **WHEN** the developer selects a `string` field and opens the format
-  picker
-- **THEN** it offers `date`, `datetime`, `email` and `person`, plus an
-  entry for declaring no format
-- **AND** it offers no other member
-
-#### Scenario: The format picker offers person for a list field
-
-- **WHEN** the developer selects a `list` field and opens the format
-  picker
-- **THEN** it offers `person` alone, plus an entry for declaring no
-  format
-
-#### Scenario: A type with no allowed control hides the control picker
-
-- **WHEN** the developer selects a `file` field
-- **THEN** neither the format picker nor the control picker renders
-
-#### Scenario: Switching the type drops a member the new type refuses
-
-- **WHEN** the developer switches a `{type: "string", format: "date"}`
-  field to `number`
-- **THEN** the studio names the drop, and the draft's field carries no
-  `format` key afterwards
-
-#### Scenario: The Field tab shows identity without a click
-
-- **WHEN** the developer opens the Fields view on any field
-- **THEN** the key, the label, the description and the type picker show
-  without opening any disclosure
-- **AND** the preview and the usage list each start closed
-
-#### Scenario: The Technical checkbox shows without opening either disclosure
-
-- **WHEN** the developer opens the Fields view on any non-group field
-- **THEN** the Technical checkbox shows below the type picker, with
-  neither the preview nor the usage list disclosure open
-
-#### Scenario: Translation status shows as a badge
-
-- **WHEN** the studio's `contentLocale` is `de`, and a field's label
-  carries a base-locale value but no `de` value
-- **THEN** a badge beside the label input names its missing count for
-  the active content locale
-- **AND** no separate translation-status list renders
-- **AND** the badge names no locale of its own. The content-locale
-  switcher already names `de` once, in the toolbar
-
-#### Scenario: A disclosure survives a tab switch
-
-- **WHEN** the developer opens the preview disclosure on the Field tab,
-  switches to the Rules tab, then switches back
-- **THEN** the preview disclosure is still open
-
-#### Scenario: Remove field sits below a rule
-
-- **WHEN** the developer opens the Fields view on any field
-- **THEN** Remove field is the tab's last control, below a rule that
-  separates it from every other control
-
-#### Scenario: The Values tab always shows its first two zones, ruled apart
-
-- **WHEN** the developer opens the Values tab on any field
-- **THEN** "Where values come from" and "Default value" each show
-  under their own heading, with a rule between them
-
-#### Scenario: The Values tab shows a third ruled zone only for a mappable field
-
-- **WHEN** the developer opens the Values tab on a field whose data
-  source is mappable
-- **THEN** "Column mapping" also shows, as a third zone ruled apart
-  from "Default value"
-
-#### Scenario: An unmappable field shows no Column mapping zone
-
-- **WHEN** the developer opens the Values tab on a field whose data
-  source is not mappable
-- **THEN** no "Column mapping" heading renders, and "Default value"
-  draws no rule below it for a zone that isn't there
-
-#### Scenario: The Rules tab shows two ruled zones
-
-- **WHEN** the developer opens the Rules tab on any field
-- **THEN** "Only ask this when" and "Validation" each show under their
-  own heading, with a rule between them
-
-#### Scenario: A literal default writes the field's raw value
-
-- **WHEN** the developer types `100` into a Number field's Default
-  value input, with the CEL toggle off
-- **THEN** the draft's field carries `default: 100`
-
-#### Scenario: A CEL default writes an expression
-
-- **WHEN** the developer switches the Default value zone to CEL and
-  types `data.subtotal * 1.1`
-- **THEN** the draft's field carries `default: { lang: "cel", src:
-  "data.subtotal * 1.1" }`
-
-#### Scenario: Clearing the default drops the key
-
-- **WHEN** the developer clears a field's Default value input, whether
-  literal or CEL
-- **THEN** the draft's field carries no `default` key
-
-#### Scenario: A literal default on a Choice field uses its own options
-
-- **WHEN** the developer chooses one of a `string` field's own
-  `options` in its Default value zone, with the CEL toggle off
-- **THEN** the draft's field carries `default` set to that option's
-  value
-
-#### Scenario: A dataSource-bound field's default offers no option list
-
-- **WHEN** the developer opens the Default value zone on a
-  `dataSource`-bound `string` field
-- **THEN** the literal control offers no option, and the CEL toggle
-  still lets the developer write an expression default
-
-#### Scenario: A bare person field's default offers no option list
-
-- **WHEN** the developer opens the Default value zone on a `{type:
-  "string", format: "person"}` field declaring neither `options` nor
-  `dataSource`
-- **THEN** the literal control offers no option, and the CEL toggle
-  still lets the developer write an expression default
-- **AND** the note names the people list, not a data source
-
-#### Scenario: A bare person list's default offers no checkbox group
-
-- **WHEN** the developer opens the Default value zone on a `{type:
-  "list", format: "person"}` field declaring neither `options` nor
-  `dataSource`
-- **THEN** the literal control offers no option, rather than a checkbox
-  group over an empty option set, and the CEL toggle still lets the
-  developer write an expression default
-
-#### Scenario: The Default value zone disables for a reference or file field
-
-- **WHEN** the developer opens the Values tab on a `file` field
-- **THEN** the Default value zone shows disabled, and states that the
-  type accepts no default here
-
-#### Scenario: A formatted string field's default uses that format's input
-
-- **WHEN** the developer opens the Default value zone on a
-  `{type: "string", format: "date"}` field, with the CEL toggle off
-- **THEN** the literal input is a native date input
-
-#### Scenario: The Default value zone disables for a group field
-
-- **WHEN** the developer opens the Values tab on a `group` field
-- **THEN** the Default value zone shows disabled, and states that a
-  group's own default is never read
-
-#### Scenario: The preview shows one field, read-only
-
-- **WHEN** the developer opens a field's preview
-- **THEN** the shared form component shows that field with sample
-  values
-- **AND** none of the preview's controls take keyboard or pointer
-  interaction
-
-#### Scenario: A group field previews its group and its children
-
-- **WHEN** the developer opens the preview on a group field carrying
-  two children
-- **THEN** the shared form component draws the group and both children
-  inside it
-
-#### Scenario: A bare person field previews with no option list
-
-- **WHEN** the developer opens the preview on a `{type: "string",
-  format: "person"}` field declaring neither `options` nor `dataSource`
-- **THEN** the preview shows no option list, and the row states that
-  the field's people list resolves at runtime, naming no data source
-
-#### Scenario: A person list previews an array sample
-
-- **WHEN** the developer opens the preview on a `{type: "list", format:
-  "person"}` field
-- **THEN** the synthesized sample value is an array holding the person
-  format's own sample, not that sample as a bare scalar
-- **AND** the `{type: "string"}` twin still previews the scalar
-
-#### Scenario: A tab switch keeps a half-typed developer view
-
-- **WHEN** the developer types a config the developer view cannot parse
-  yet, switches to the Rules tab, and switches back
-- **THEN** the typed text is still in the input
-
-#### Scenario: Used in lists steps and modes
-
-- **WHEN** a field's ref appears in two step views, one with
-  `required` and one with `readonly`
-- **THEN** the usage list names both steps and both modes
-
-#### Scenario: A condition writes every referencing view
-
-- **WHEN** the developer sets "Only ask this when" on a field that
-  two step views reference
-- **THEN** both views carry the same `visible` override, and the row
-  named both steps before the write
-
-#### Scenario: Clearing the condition names its scope
-
-- **WHEN** the developer clears "Only ask this when" on a field that
-  two step views reference
-- **THEN** the row named both steps before the clear, and neither view
-  carries a `visible` key afterwards
-
-#### Scenario: The condition row names diverging views
-
-- **WHEN** one referencing view carries a different `visible`
-  override than the others
-- **THEN** the condition row says so and names the differing step
-
-#### Scenario: A literal override counts as a disagreement
-
-- **WHEN** one referencing view carries `visible: false` and another
-  carries an expression
-- **THEN** the condition row says the views disagree and names the step
-  holding the literal
-- **AND** the write notice names that step too
-
-#### Scenario: The condition row offers no child operand
-
-- **WHEN** the developer opens "Only ask this when" on a field a
-  subprocess step's view references
-- **THEN** the operand picker offers the catalog and the instance and
-  actor context, and it offers no `child.outcome` or `child.data` entry
-
-#### Scenario: An unreferenced field disables the condition row
-
-- **WHEN** the developer opens "Only ask this when" on a field no step
-  view references
-- **THEN** the row shows disabled and states that no step asks for
-  the field yet
-
-### Requirement: The field catalog's Field tab offers a Technical control
-
-The field catalog's Field tab SHALL offer a Technical checkbox for the
-selected field. It SHALL offer one for each of a group's children in the
-same tab. Checking it SHALL write `technical: true`. Unchecking it SHALL delete
+The field catalog's definition half SHALL offer a Technical checkbox for
+the selected field. It SHALL offer one for each of a group's children in
+the same half. Checking it SHALL write `technical: true`. Unchecking it SHALL delete
 the `technical` key. Every other view-flag control in the studio already
 follows that same convention for its own default value.
 
@@ -1350,7 +935,7 @@ field. Offering the control there would only invite a rejected publish.
 
 #### Scenario: A group's child offers the control
 
-- **WHEN** the field catalog's Field tab draws the recursive field row
+- **WHEN** the field catalog's definition half draws the recursive field row
   for a field nested inside the selected `type: "group"` field
 - **THEN** that row offers the Technical checkbox
 
@@ -1506,7 +1091,7 @@ boolean-or-CEL switch.
 CEL authoring for `required` and `readonly` happens only on the
 field's own strip, `studio-form-editor`'s "Developer view" disclosure.
 CEL authoring for `visible` happens there too, or on the field
-catalog's Rules tab "Only ask this when" row. That row writes the
+catalog's "Only ask this when" row. That row writes the
 same `visible` override across every referencing step view.
 
 Each checkbox SHALL carry no visible label. It SHALL carry an
@@ -1540,6 +1125,8 @@ Where a live cell's own `visible` resolves to a literal `false`, that
 cell's `required` and `readonly` checkboxes SHALL disable. That is the
 same gating the field matrix applied before this change.
 
+<!-- antislop: allow sentence-length passive-voice -->
+<!-- Why: copied byte for byte from the live requirement. -->
 Where no other source in the draft, **guaranteed to be written before
 this cell's own step is submitted**, writes a live cell's field, its
 `required` and `readonly` checkboxes SHALL gate each other. Checking
@@ -1548,6 +1135,8 @@ read `true`. Checking `readonly` SHALL disable `required`, while
 `required` does not already read `true`. "No other source, guaranteed
 before this step" means none of these already write the field:
 
+<!-- antislop: allow run-ons sentence-length -->
+<!-- Why: copied byte for byte from the live requirement. -->
 - an action's `output`, where the action sits on a step that
   **dominates** this cell's own step (every path from `initialStep` to
   this cell's step passes through the action's step), or on this
@@ -1561,14 +1150,16 @@ before this step" means none of these already write the field:
   true`) for the same field, on a step that dominates this cell's own
   step
 
+<!-- antislop: allow sentence-length passive-voice run-ons em-dash -->
+<!-- Why: copied byte for byte from the live requirement. -->
 A step dominating another is the same relation the compile pass's
 `definition-contract` check (`checkUnsatisfiableRequiredReadonly`) now
 uses. The two SHALL share one dominance computation over the draft's
-`workflow.steps`, so neither can disagree with the other about which
-step guarantees a value by the time a given step is submitted. A step
-editable only on a step that does NOT dominate this cell's own step —
-reachable solely after it, or only via a different branch — does NOT
-count, and gating stays engaged.
+`workflow.steps`. Neither can then disagree with the other about which
+step guarantees a value before a given step submits. A step editable
+only on a step that does NOT dominate this cell's own step does NOT
+count. That covers a step reachable solely after it, or only via a
+different branch. Gating stays engaged.
 
 Where a cell already carries `required: true` and `readonly: true`
 before either gate engages, neither checkbox SHALL disable. The
@@ -1587,7 +1178,7 @@ row as the cell's other controls. The matrix SHALL offer no control
 there, boolean or otherwise. It SHALL offer no way to switch that flag
 back to a boolean from inside the matrix. Editing that flag stays
 possible on the field's own strip. For `visible` alone it is also
-possible on the field catalog's Rules tab condition row.
+possible on the field catalog's condition row.
 
 A disabled checkbox that reads checked SHALL keep its flag's own
 color. The same opacity rule every other disabled control in the
@@ -1674,6 +1265,8 @@ That same reduced opacity still applies to it.
 
 #### Scenario: A field something else writes keeps both controls free
 
+<!-- antislop: allow sentence-length -->
+<!-- Why: copied byte for byte from the live requirement. -->
 - **WHEN** the developer checks a live cell's `required` box
 - **AND** an action output, a subprocess output mapping, a column
   mapping, a contract input field, or another editable view entry for
@@ -1683,6 +1276,8 @@ That same reduced opacity still applies to it.
 
 #### Scenario: A field editable only on a non-dominating step keeps gating engaged
 
+<!-- antislop: allow sentence-length -->
+<!-- Why: copied byte for byte from the live requirement. -->
 - **WHEN** the developer checks the first step's live cell for a
   field's `required` box
 - **AND** the field's only other editable placement is on a step
@@ -1691,6 +1286,8 @@ That same reduced opacity still applies to it.
 
 #### Scenario: An own-step post-gate output does not clear gating
 
+<!-- antislop: allow sentence-length em-dash passive-voice -->
+<!-- Why: copied byte for byte from the live requirement. -->
 - **WHEN** the developer checks a live cell's `required` box
 - **AND** the field's only other writer is an action's `output` on the
   cell's own step at `onExit`, `onPath`, or `onCancel`
@@ -1701,6 +1298,8 @@ That same reduced opacity still applies to it.
 
 #### Scenario: An entry already carrying both flags stays editable
 
+<!-- antislop: allow sentence-length -->
+<!-- Why: copied byte for byte from the live requirement. -->
 - **WHEN** a live cell already carries `required: true` and
   `readonly: true`, on a field nothing else in the draft, guaranteed
   before that cell's own step, writes
@@ -2736,3 +2335,719 @@ stylesheet declaration for declaration.
 - **WHEN** a browser renders the header bar's content-locale switcher
 - **THEN** its computed layout, spacing, color and border equal the
   values the deleted stylesheet declared
+
+### Requirement: Both process-wide field views take the area's field rule
+
+<!-- antislop: allow synonym-rotation -->
+<!-- Why: carried from the live requirement, with the mono rule scoped to the key. -->
+Both views SHALL render their editors under the design language's field
+rule. The rule `.steps-panel label` states it in the area today. A
+label SHALL sit above its control. A `key` SHALL print in mono, because
+the engine matches it exactly. A hairline SHALL divide rail rows, and a
+rule SHALL sit under a view's heading. No corner SHALL take a radius.
+
+#### Scenario: A field editor states its labels above its controls
+
+- **WHEN** the developer opens the Fields view on any field
+- **THEN** each label sits above its own control, and no label sits
+  beside one
+
+#### Scenario: A key prints in mono
+
+- **WHEN** the developer opens the Fields view on any field
+- **THEN** the field's key prints in the mono face
+
+#### Scenario: The Data sources view takes the same rule
+
+- **WHEN** the developer opens the Data sources view on any data source
+- **THEN** each label sits above its own control, a hairline divides the
+  rail rows, and no corner takes a radius
+
+### Requirement: The Fields view divides into a definition half and an effect half
+
+The Fields view SHALL edit one field through two halves under one
+heading. The definition half comes first, the effect half second. The
+view SHALL carry no tab set.
+
+The definition half says what the field is. It SHALL hold five zones. Their
+order reads "What this field asks", "What kind of field", "Where values
+come from", "Default value", "Validation". Each zone SHALL sit under its
+own heading, with a rule between it and its neighbour.
+
+"What this field asks" holds the label, the description and the key.
+"What kind of field" holds the kind picker and the Technical control.
+"Where values come from" holds the data source and the options.
+
+The effect half says where the field acts in the process. It SHALL hold
+four zones, in this order: "Used in", "Only ask this when", "Ask for
+this" and "Column mapping". The same heading and rule treatment holds.
+
+"Used in" lists every step whose view references the field, with the
+modes those references set. "Only ask this when" holds the condition.
+"Ask for this" holds the requiredness.
+
+Neither half SHALL sit behind a disclosure. Both SHALL show as the view
+opens. A closed disclosure over the usage list is what this change
+removes. Returning one would undo the change.
+
+A change in the definition half SHALL tint the affected row in the
+effect half. That tint SHALL be the only motion the two halves carry.
+
+#### Scenario: The view draws two halves and no tab set
+
+- **WHEN** the developer opens the Fields view on any field
+- **THEN** the definition half and the effect half both show, side by
+  side under one heading
+- **AND** no tab set renders
+
+#### Scenario: A definition change tints its effect row
+
+- **WHEN** the developer changes the label of a field two step views
+  reference
+- **THEN** both rows for those steps tint in the effect half
+
+### Requirement: A field's checks stand at the zone each one belongs to
+
+The Fields view SHALL place a check on the selected field at the zone
+the check names. A check on the key stands in "What this field asks". A
+check on an option stands in "Where values come from". A check on a
+validation rule stands in "Validation".
+
+A check the view cannot place SHALL stand at the top of the definition
+half. No check SHALL go unshown for want of a matching zone.
+
+Placement SHALL read the check's own location in the body. A check
+carries that location today. The studio's issue model drops it, so this
+rule needs the model to carry it through. The `studio-app` capability
+states no shape for that model. What it states is the outcome: two
+checks on one field, naming two zones, stand apart.
+
+A group's child rows SHALL keep their own check list. A child row is not
+the selected field, and the zones describe the selected field alone. The
+child row's list SHALL show the child's own checks, as it does today.
+
+The view SHALL carry no consolidated check list of its own. The
+draft-wide roll-up and the publish gate sit in the docked summary the
+`studio-checks-rail` capability states.
+
+A zone holding a check SHALL take the refusal tone at its own heading.
+An author scanning the halves then sees which zone is wrong, with
+nothing to open.
+
+#### Scenario: A key check stands at the key's zone
+
+- **WHEN** the selected field's key breaks the identifier grammar
+- **THEN** the check shows inside "What this field asks", and that
+  zone's heading takes the refusal tone
+
+#### Scenario: An unplaceable check stands at the top
+
+- **WHEN** the selected field carries a check naming no zone the view
+  draws
+- **THEN** the check shows at the top of the definition half
+
+#### Scenario: The view carries no consolidated list
+
+- **WHEN** the developer opens the Fields view on a field carrying two
+  checks in two zones
+- **THEN** each check shows at its own zone, and no list gathers both
+  in one place
+
+#### Scenario: A group's child row keeps its own list
+
+- **WHEN** the developer selects a group field whose child carries a
+  check
+- **THEN** that child's row shows the check in its own list, and the
+  group's zones show the group's own checks
+
+### Requirement: The effect half states its own empty state
+
+The effect half SHALL show an empty state for as long as no step view
+references the selected field. It SHALL say that no step asks for the
+field yet.
+
+It SHALL offer the route from there to a step view. That route SHALL
+reach the canvas with a step preselected, on the terms the panels
+screen's own step-target rule states.
+
+The empty state SHALL take the empty tone, never the refusal tone. A
+field no step asks for yet is an unfinished draft, not a broken one.
+
+#### Scenario: An unused field draws the empty state
+
+- **WHEN** the developer selects a field no step view references
+- **THEN** the effect half says that no step asks for the field yet
+- **AND** it offers the route to a step view, in the empty tone
+
+#### Scenario: The empty state clears when a step references the field
+
+- **WHEN** a step view gains a reference to the selected field
+- **THEN** the effect half lists that step, and the empty state goes
+
+### Requirement: The Fields view's definition half states values, a default and a preview
+
+The two halves SHALL edit the selected TOP-LEVEL field alone. A group
+field's children SHALL render inside the definition half through the
+area's existing flat, recursive field row. They SHALL carry no halves
+of their own.
+
+Translation status SHALL show as a badge beside the label input. The
+badge SHALL name the current locale's missing count. The field SHALL
+carry no separate translation-status list. Adding a language SHALL stay
+draft-scoped in the content-locale switcher.
+
+"How it will look" SHALL sit in the definition half, inside a collapsed
+`<details>` disclosure. It SHALL start closed. The developer view SHALL
+keep its own existing, separate `<details>` disclosure, untouched by
+this change. A group field's children SHALL stay outside any
+disclosure.
+
+Remove field SHALL sit below a rule at the definition half's end. It
+SHALL read as the half's least frequent action.
+
+Every zone SHALL stay mounted while a field stays selected. A
+disclosure SHALL keep its own open state for as long as the same field
+stays selected. Each builder holds an incomplete row the draft does not
+carry. The developer view holds a half-typed config in component state.
+
+<!-- antislop: allow sentence-length -->
+<!-- Why: the live requirement's own words, rewrapped so no code span breaks across a line. -->
+The Default value zone SHALL offer a literal input matching the field's
+type and its declared format. For a field carrying static `options`
+that input SHALL be a `<select>` bound to those options, or the
+multi-value equivalent when the field's type is `list`.
+For a `string` field declaring a `format` it SHALL be that format's own
+native input.
+
+<!-- antislop: allow sentence-length -->
+<!-- Why: copied byte for byte from the live requirement. -->
+Either control SHALL offer no option when the field is
+`dataSource`-bound, since the draft carries no resolved rows for one.
+That is the same carve-out named below for the preview. The CEL toggle
+SHALL still work there. A field declaring `format: "person"` and
+neither `options` nor `dataSource` SHALL get the identical carve-out,
+whether its type is `string` or `list`: the draft resolves no
+`allowedGroups`-sourced people list either, since that resolution needs
+a live database read the draft editor does not have. The CEL toggle
+still works there too.
+
+<!-- antislop: allow sentence-length -->
+<!-- Why: copied byte for byte from the live requirement. -->
+The note the zone shows in the person case SHALL name the people list,
+not a data source. The existing note names a data source by hand, and
+this field declares none; an author reading it would learn the wrong
+thing about their own draft.
+
+For a `file` field the whole Default value zone SHALL show disabled. It
+SHALL state that the type accepts no default here. This mirrors "Only
+ask this when" 's own disabled state for a field no step view
+references.
+
+For a `group` field the whole Default value zone SHALL also show
+disabled. It SHALL state that a group's own default is never read. A
+group carries no slot of its own in the flat data payload. A literal
+or CEL default written there would silently never apply.
+
+Every other type gets a link-styled toggle. It SHALL switch the zone
+to a raw CEL text input for an expression default. This mirrors the
+toggle affordance the condition zone already uses. The zone SHALL NOT
+mount the guard-shaped condition-builder component. A default is a
+value, not a boolean. It needs no comparison-row builder.
+
+Writing through the literal input SHALL set the field's `default` key
+to that literal value. Writing through the CEL input SHALL set it to `{
+lang: "cel", src }`. Clearing either input SHALL remove the `default`
+key.
+
+"How it will look" SHALL preview the field through the shared form
+component, read-only, inside its disclosure. Every previewed entry's
+`readonly` SHALL read `true`, and the preview's container SHALL carry
+`inert`.
+
+The preview runs over a synthesized single-field view. For a group
+field it synthesizes the group's own entry, plus one entry per
+descendant. That reaches every depth, not only the group's immediate
+children.
+
+A group holding a group SHALL preview both levels. That is the
+grouping the shared form component itself applies. The synthesis
+SHALL also carry the sample values in the shape that component reads
+them, keyed by field id.
+
+<!-- antislop: allow sentence-length -->
+<!-- Why: copied byte for byte from the live requirement. -->
+A dataSource-backed field SHALL preview with no option list. The
+draft carries no resolved rows for one. The row stating so SHALL name
+that the field resolves at runtime. An author previews what a
+participant gets. A field declaring `format: "person"` and neither
+`options` nor `dataSource` SHALL preview the same way, for the
+identical reason: the draft cannot reach the live `allowedGroups`
+expansion either. That field SHALL get its own row wording. It names the
+people list rather than a data source it does not declare.
+
+<!-- antislop: allow sentence-length -->
+<!-- Why: the live requirement's own words, with its em-dash rewritten as two sentences. -->
+The preview's sample value SHALL match the shape the field's own type
+takes. A `format` narrows the value domain, so a formatted field
+previews that format's sample rather than its type's. A `{type:
+"list"}` field holds an array whatever its format, so its sample SHALL
+be the format's sample inside an array. A scalar there would draw a
+multi-select with nothing selected, since the shared form component
+reads a non-array value as an empty selection.
+
+#### Scenario: A group's children render without halves of their own
+
+- **WHEN** the developer selects a `group` field carrying two children
+- **THEN** both children render as recursive field rows inside the
+  definition half
+- **AND** neither child draws a definition half of its own
+
+#### Scenario: Translation status shows as a badge
+
+- **WHEN** the studio's `contentLocale` is `de`, and a field's label
+  carries a base-locale value but no `de` value
+- **THEN** a badge beside the label input names its missing count for
+  the active content locale
+- **AND** no separate translation-status list renders
+- **AND** the badge names no locale of its own. The content-locale
+  switcher already names `de` once, in the toolbar
+
+#### Scenario: A disclosure survives a selection that returns
+
+- **WHEN** the developer opens the preview disclosure, selects another
+  field, and selects the first field again
+- **THEN** the preview disclosure state follows the rule the view
+  states, and no half remounts
+
+#### Scenario: Remove field sits below a rule
+
+- **WHEN** the developer opens the Fields view on any field
+- **THEN** Remove field is the definition half's last control, below a
+  rule that separates it from every other control
+
+#### Scenario: The definition half shows its zones ruled apart
+
+- **WHEN** the developer opens the Fields view on any field
+- **THEN** the five zone headings show, in the order the requirement
+  names
+- **AND** a rule sits between each zone and its neighbour
+
+#### Scenario: A literal default writes the field's raw value
+
+- **WHEN** the developer types `100` into a Number field's Default
+  value input, with the CEL toggle off
+- **THEN** the draft's field carries `default: 100`
+
+#### Scenario: A CEL default writes an expression
+
+- **WHEN** the developer switches the Default value zone to CEL and
+  types `data.subtotal * 1.1`
+- **THEN** the draft's field carries `default: { lang: "cel", src:
+  "data.subtotal * 1.1" }`
+
+#### Scenario: Clearing the default drops the key
+
+- **WHEN** the developer clears a field's Default value input, whether
+  literal or CEL
+- **THEN** the draft's field carries no `default` key
+
+#### Scenario: A literal default on a Choice field uses its own options
+
+- **WHEN** the developer chooses one of a `string` field's own
+  `options` in its Default value zone, with the CEL toggle off
+- **THEN** the draft's field carries `default` set to that option's
+  value
+
+#### Scenario: A dataSource-bound field's default offers no option list
+
+- **WHEN** the developer opens the Default value zone on a
+  `dataSource`-bound `string` field
+- **THEN** the literal control offers no option, and the CEL toggle
+  still lets the developer write an expression default
+
+#### Scenario: A bare person field's default offers no option list
+
+- **WHEN** the developer opens the Default value zone on a `{type:
+  "string", format: "person"}` field declaring neither `options` nor
+  `dataSource`
+- **THEN** the literal control offers no option, and the CEL toggle
+  still lets the developer write an expression default
+- **AND** the note names the people list, not a data source
+
+#### Scenario: A bare person list's default offers no checkbox group
+
+- **WHEN** the developer opens the Default value zone on a `{type:
+  "list", format: "person"}` field declaring neither `options` nor
+  `dataSource`
+<!-- antislop: allow sentence-length -->
+<!-- Why: copied byte for byte from the live requirement. -->
+- **THEN** the literal control offers no option, rather than a checkbox
+  group over an empty option set, and the CEL toggle still lets the
+  developer write an expression default
+
+#### Scenario: The Default value zone disables for a reference or file field
+
+- **WHEN** the developer opens the Fields view on a `file` field
+- **THEN** the Default value zone shows disabled, and states that the
+  type accepts no default here
+
+#### Scenario: A formatted string field's default uses that format's input
+
+- **WHEN** the developer opens the Default value zone on a
+  `{type: "string", format: "date"}` field, with the CEL toggle off
+- **THEN** the literal input is a native date input
+
+#### Scenario: The Default value zone disables for a group field
+
+- **WHEN** the developer opens the Fields view on a `group` field
+- **THEN** the Default value zone shows disabled, and states that a
+  group's own default is never read
+
+#### Scenario: The preview shows one field, read-only
+
+- **WHEN** the developer opens a field's preview
+- **THEN** the shared form component shows that field with sample
+  values
+- **AND** none of the preview's controls take keyboard or pointer
+  interaction
+
+#### Scenario: A group field previews its group and its children
+
+- **WHEN** the developer opens the preview on a group field carrying
+  two children
+- **THEN** the shared form component draws the group and both children
+  inside it
+
+#### Scenario: A bare person field previews with no option list
+
+- **WHEN** the developer opens the preview on a `{type: "string",
+  format: "person"}` field declaring neither `options` nor `dataSource`
+<!-- antislop: allow sentence-length -->
+<!-- Why: copied byte for byte from the live requirement. -->
+- **THEN** the preview shows no option list, and the row states that
+  the field's people list resolves at runtime, naming no data source
+
+#### Scenario: A person list previews an array sample
+
+- **WHEN** the developer opens the preview on a `{type: "list", format:
+  "person"}` field
+<!-- antislop: allow sentence-length -->
+<!-- Why: copied byte for byte from the live requirement. -->
+- **THEN** the synthesized sample value is an array holding the person
+  format's own sample, not that sample as a bare scalar
+- **AND** the `{type: "string"}` twin still previews the scalar
+
+### Requirement: The Fields view's effect half states usage, a condition and requiredness
+
+"Column mapping" SHALL show in the effect half only when the field's
+data source is mappable, per the existing `showsColumnMapping` rule.
+Its absence draws no rule of its own. It sits in the effect half
+because a column mapping writes into other fields. That is effect, not
+definition.
+
+"Used in" SHALL list every step whose view references the field, with
+the modes those references set. A "Show on the canvas" control on a row
+SHALL return to the canvas with that step preselected.
+
+"Only ask this when" is a third condition-builder site, alongside the
+path guard and the view-override sites `studio-condition-builder`
+already names. It SHALL read the `visible` overrides of every step
+view that references the field. When those views disagree, the row
+SHALL state that plainly. A `visible` override is `boolean` or an
+expression. The row edits expressions alone. A referencing view holding
+a literal SHALL therefore count as a disagreement, and the row SHALL
+name it.
+
+When no step view references the field, the row SHALL show disabled.
+It SHALL state that no step asks for it yet.
+
+The row's operand picker SHALL withhold `child.*`. The row writes one
+expression across steps of mixed type, and a `visible` override admits
+`child` on a subprocess step alone.
+
+Updating the condition SHALL write the same override to every
+referencing view, and SHALL name the write before it happens. Where a
+referencing view holds a literal, the notice SHALL name that step.
+Clearing the condition SHALL drop the `visible` key from every
+referencing view. It SHALL name that scope before it happens, on the
+same terms a write does. The field SHALL NOT store a field-level
+condition.
+
+"Ask for this" SHALL read and write the `required` override of every
+step view that references the field. The catalog declares no `required`
+key of its own, so this control writes the view and never the field.
+That is the definition contract's own rule, and this control does not
+bend it.
+
+When those views disagree, the row SHALL state that plainly and name
+the differing step. Updating SHALL name the write before it happens,
+on the same terms the condition row takes. A technical field SHALL show
+the row disabled, since `technical` already forces `required: false` on
+every step. A field no step view references SHALL show it disabled too.
+
+#### Scenario: A mappable field shows Column mapping in the effect half
+
+- **WHEN** the developer opens the Fields view on a field whose data
+  source is mappable
+- **THEN** "Column mapping" shows in the effect half, ruled apart from
+  its neighbour
+
+#### Scenario: An unmappable field shows no Column mapping zone
+
+- **WHEN** the developer opens the Fields view on a field whose data
+  source is not mappable
+- **THEN** no "Column mapping" heading renders, and its neighbour draws
+  no rule below it for a zone that isn't there
+
+#### Scenario: Used in lists steps and modes
+
+- **WHEN** a field's ref appears in two step views, one with
+  `required` and one with `readonly`
+- **THEN** the usage list names both steps and both modes
+
+#### Scenario: A condition writes every referencing view
+
+- **WHEN** the developer sets "Only ask this when" on a field that
+  two step views reference
+- **THEN** both views carry the same `visible` override, and the row
+  named both steps before the write
+
+#### Scenario: Clearing the condition names its scope
+
+- **WHEN** the developer clears "Only ask this when" on a field that
+  two step views reference
+- **THEN** the row named both steps before the clear, and neither view
+  carries a `visible` key afterwards
+
+#### Scenario: The condition row names diverging views
+
+- **WHEN** one referencing view carries a different `visible`
+  override than the others
+- **THEN** the condition row says so and names the differing step
+
+#### Scenario: A literal override counts as a disagreement
+
+- **WHEN** one referencing view carries `visible: false` and another
+  carries an expression
+- **THEN** the condition row says the views disagree and names the step
+  holding the literal
+- **AND** the write notice names that step too
+
+#### Scenario: The condition row offers no child operand
+
+- **WHEN** the developer opens "Only ask this when" on a field a
+  subprocess step's view references
+- **THEN** the operand picker offers the catalog and the instance and
+  actor context, and it offers no `child.outcome` or `child.data` entry
+
+#### Scenario: An unreferenced field disables the condition row
+
+- **WHEN** the developer opens "Only ask this when" on a field no step
+  view references
+- **THEN** the row shows disabled and states that no step asks for
+  the field yet
+
+#### Scenario: Ask for this writes every referencing view
+
+- **WHEN** the developer turns "Ask for this" on for a field that two
+  step views reference
+- **THEN** both views carry `required: true`, and the row named both
+  steps before the write
+
+#### Scenario: Ask for this names disagreeing views
+
+- **WHEN** one referencing view carries `required: true` and another
+  carries no `required` key
+- **THEN** the row says the views disagree and names the differing step
+
+#### Scenario: A technical field disables Ask for this
+
+- **WHEN** the developer selects a field carrying `technical: true`
+- **THEN** "Ask for this" shows disabled, and the draft's view entries
+  keep no `required` key
+
+### Requirement: A field moves into a group and out of it from the catalog rail
+
+The catalog rail SHALL move a field into a group field and out of it,
+in place. The move SHALL neither remove the group nor rebuild it. It
+SHALL neither remove the moved field nor rebuild it.
+
+The move SHALL write one thing: the field's place in the draft's field
+array. The field SHALL keep its `id`, its `key` and every other key it
+carries. No CEL expression, no view entry and no column mapping SHALL
+change.
+
+That holds because a group carries no entry in the flat data payload,
+and `FieldDef.key` is unique across every depth. A leaf field takes a
+flat address through its own key, whatever group it sits in. Views and
+column mappings reference the `id`. The `definition-contract` capability
+states both rules, and this requirement rests on them rather than
+restating them.
+
+A pointer SHALL move the field by dragging its rail entry. The keyboard
+SHALL move the same field from the same entry, per
+`spa-accessibility`'s in-list reordering requirement. Both gestures
+SHALL reach one write.
+
+The two gestures SHALL reach the same set of destinations. A drop names
+its target by the row it lands on, so it reaches every group. The
+keyboard's control SHALL therefore name every group too, and the top
+level beside them. A control offering one direction fails this rule. It
+reaches the nearest group alone. Every other group then needs a pointer.
+
+A move may nest a field below the rail's own two-level indentation cap.
+The rail SHALL then draw that field at the cap. The draft's own field
+tree SHALL keep whatever depth the move produces.
+That split is the rail-rendering rule the panels screen already states.
+
+A move SHALL keep the moved field selected. The view SHALL keep showing
+that field's own two halves.
+
+#### Scenario: A field moves into a group with a pointer
+
+- **WHEN** the developer drags a top-level field's rail entry onto a
+  group field's entry
+- **THEN** the draft carries that field inside the group's `fields`
+  array, and the group keeps its own `id` and `key`
+
+#### Scenario: A field moves out of a group with the keyboard
+
+- **WHEN** the developer focuses a group child's rail entry and presses
+  the documented move keystroke
+- **THEN** the draft carries that field at the top level, and the
+  group's remaining children keep their order
+
+#### Scenario: The keyboard reaches every group the pointer reaches
+
+- **WHEN** the developer moves a top-level field with the keyboard, on a
+  draft carrying two group fields
+- **THEN** the move control names both groups and the top level
+- **AND** the field reaches whichever group the developer picks
+
+#### Scenario: A move rewrites no reference
+
+- **WHEN** the developer moves a field that two step views reference
+  and one column mapping targets
+- **THEN** both view entries and the column mapping still resolve, and
+  neither carries a changed `id`
+
+#### Scenario: A move keeps the key
+
+- **WHEN** the developer moves a field whose `key` is `amount` into a
+  group
+- **THEN** the field's `key` still reads `amount`, and every CEL
+  expression naming `data.amount` still resolves
+
+#### Scenario: The moved field stays selected
+
+- **WHEN** the developer moves the selected field into a group
+- **THEN** the view still shows that field's definition half and its
+  effect half
+
+### Requirement: An empty field catalog offers a start state
+
+The Fields view SHALL show a start state when the draft carries no
+field at all. That state SHALL replace both halves, since neither has a
+field to describe.
+
+The start state SHALL do more than report the count. It SHALL name what
+a field is for in this process. It SHALL carry the control that adds the
+first field. That control SHALL be the same call the rail's Add entry
+makes.
+
+The start state SHALL take the empty tone. A draft with no field yet is
+a new draft, not a broken one.
+
+The state SHALL go as soon as the draft carries one field. The view
+SHALL then select that field and show its two halves.
+
+#### Scenario: A fresh draft shows the start state
+
+- **WHEN** the developer opens the Fields view on a draft carrying no
+  field
+- **THEN** the view shows the start state instead of the two halves
+- **AND** it carries a control that adds the first field
+
+#### Scenario: Adding the first field leaves the start state
+
+- **WHEN** the developer chooses the start state's add control
+- **THEN** the draft carries one field, the view selects it, and it
+  shows that field's definition half and effect half
+
+#### Scenario: The start state takes the empty tone
+
+- **WHEN** the developer opens the Fields view on a draft carrying no
+  field
+- **THEN** the start state carries no refusal tone and no issue mark
+
+### Requirement: The field catalog picks a named field kind
+
+The field catalog SHALL offer one picker naming a field kind. A kind
+names, in one entry, the `type`, the `format` and the `control` a field
+declares. The catalog SHALL NOT ask an author to pick those three
+separately.
+
+The kind picker SHALL read its entries from a named table the engine
+package exports beside `ALLOWED_BY_TYPE`. The studio SHALL reach that
+table over the engine package's `exports` map, the same boundary it
+already uses for `ALLOWED_BY_TYPE`. The studio SHALL declare no table
+of its own. A second table in the browser package would drift from the
+engine's, and the drift would first show at publish.
+
+Choosing a kind SHALL write the raw `type`, `format` and `control`
+values that entry names. It SHALL drop a key the entry does not name.
+The serialized definition SHALL carry exactly the keys it carries
+today. This change adds no key to the definition contract.
+
+Every entry in the table SHALL name a `{type, format, control}` triple
+the publish-time format-and-control check accepts. A table entry the
+check would reject is unpublishable, so it may not exist.
+
+Changing the kind SHALL name what it drops before it happens, on the
+terms `droppedByTypeChange` already states for a type change. An
+author changing kind on a field carrying an incompatible `format` or
+`control` SHALL see that drop named first.
+
+A field the table names no kind for SHALL keep an escape route. The
+picker SHALL offer the plugin envelope. The JSON view SHALL stay the
+route for any triple the table omits.
+
+#### Scenario: The picker names a kind, not three members
+
+- **WHEN** the developer opens the kind picker on any field
+- **THEN** each entry names one kind, and the view offers no separate
+  format picker and no separate control picker
+
+#### Scenario: Choosing a kind writes the raw members
+
+- **WHEN** the developer picks the kind naming `{type: "string",
+  format: "date"}`
+- **THEN** the draft's field carries `type: "string"` and `format:
+  "date"`, and it carries no `control` key
+
+#### Scenario: Changing the kind names the drop
+
+- **WHEN** the developer changes a `{type: "string", format: "date"}`
+  field to a kind naming `{type: "number"}`
+- **THEN** the studio names the drop before it happens, and the draft's
+  field carries no `format` key afterwards
+
+#### Scenario: Every table entry publishes
+
+- **WHEN** a definition declares a field for each entry the table names
+- **THEN** the publish-time format-and-control check accepts every one
+  of them
+
+#### Scenario: A plugin-typed field keeps its envelope
+
+- **WHEN** the developer opens the kind picker on a field carrying a
+  plugin type
+- **THEN** the picker offers the plugin envelope, and choosing it keeps
+  the field's own `{type, config}` shape
+
+#### Scenario: The definition serializes unchanged
+
+- **WHEN** the developer sets every field in a draft through the kind
+  picker and publishes
+- **THEN** the serialized body carries the same keys the same draft
+  carried before this change, and its `definitionHash` matches

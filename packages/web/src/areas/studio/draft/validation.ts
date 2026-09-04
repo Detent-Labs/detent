@@ -13,8 +13,17 @@ function pushIssues(
   source: IssueSource,
 ): void {
   for (const item of items) {
-    issues.push({ ...resolveLoc(body, item.loc), message: item.message, source });
+    issues.push({ ...resolveLoc(body, item.loc), message: item.message, source, loc: item.loc });
   }
+}
+
+/** A Zod issue's path array in the dotted-and-bracketed form every other
+ * validator already reports: a number segment becomes a bracketed index on the
+ * segment before it, so `["fields", 0, "validation", "pattern"]` reads
+ * `fields[0].validation.pattern`. `resolveLoc` takes either form; a reader
+ * placing a check inside an entity needs one form alone. */
+function joinLoc(path: readonly (string | number)[]): string {
+  return path.reduce<string>((acc, seg) => (typeof seg === "number" ? `${acc}[${seg}]` : acc === "" ? seg : `${acc}.${seg}`), "");
 }
 
 /** Every dimension `validateStructure`/`validateReferences` report, merged
@@ -81,15 +90,14 @@ export function runValidation(
   const issues: EditorIssue[] = [];
 
   for (const issue of structure.zodIssues) {
+    // Zod v4 widened an issue path to `PropertyKey[]`. A JSON body carries
+    // no symbol key, so a symbol segment addresses nothing here.
+    const path = issue.path.filter((seg): seg is string | number => typeof seg !== "symbol");
     issues.push({
-      // Zod v4 widened an issue path to `PropertyKey[]`. A JSON body carries
-      // no symbol key, so a symbol segment addresses nothing here.
-      ...resolveLoc(
-        draft,
-        issue.path.filter((seg): seg is string | number => typeof seg !== "symbol"),
-      ),
+      ...resolveLoc(draft, path),
       message: issue.message,
       source: "zod",
+      loc: joinLoc(path),
     });
   }
 

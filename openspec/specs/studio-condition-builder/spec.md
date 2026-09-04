@@ -14,17 +14,15 @@ existing condition back by parsing it. A hand-written guard and a built
 one therefore stay one artifact.
 
 ## Requirements
-
 ### Requirement: The builder is the default surface at every condition site
 
 The studio SHALL offer a row builder as the default editor for a path guard.
 It SHALL offer the same builder for `visible`, `required` and `readonly`,
-wherever the studio edits one. That includes the field catalog's Rules tab
-"Only ask this when" row. That row edits a field's `visible` override
-across every step view that references the field.
+wherever the studio edits one. That includes the field catalog's
+"Only ask this when" row, which sits in the Fields view's effect half. That
+row edits a field's `visible` override across every step view that references
+the field.
 
-<!-- antislop: allow synonym-rotation -->
-<!-- Why: "surface" is this capability's own noun for the raw-CEL escape hatch (the requirement header names it, and the "The CEL surface stays reachable from every builder site" requirement below does too). "show" is the unrelated verb for what the builder does with the CEL it produces. Not a rotated synonym. -->
 Below the rows the builder SHALL show the CEL it produces, on a
 read-only line.
 
@@ -49,8 +47,8 @@ A timer deadline is not a condition and keeps its text input.
 
 #### Scenario: The field catalog's condition row opens on the builder
 
-- **WHEN** a developer opens "Only ask this when" on the field catalog's
-  Rules tab
+- **WHEN** a developer opens "Only ask this when" in the field catalog's
+  effect half
 - **THEN** the same row builder appears, editing the `visible` override the
   row writes to every referencing step view
 

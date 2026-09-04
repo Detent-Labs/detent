@@ -69,8 +69,8 @@ describe("groupChecksBySource", () => {
     const groups = groupChecksBySource(
       validation({
         issues: [
-          { entityType: "step", entityId: "step_a", message: "m1", source: "structural" },
-          { entityType: "step", entityId: "step_a", message: "m2", source: "cel" },
+          { entityType: "step", entityId: "step_a", message: "m1", source: "structural", loc: "" },
+          { entityType: "step", entityId: "step_a", message: "m2", source: "cel", loc: "" },
         ],
       }),
     );
@@ -97,7 +97,7 @@ describe("groupChecksBySource", () => {
       validation({
         zodValid: true,
         dimensions: { duration: "ran", structural: "not-run" },
-        issues: [{ entityType: "timer", entityId: "timer_x", message: "bad duration", source: "duration" }],
+        issues: [{ entityType: "timer", entityId: "timer_x", message: "bad duration", source: "duration", loc: "" }],
       }),
     );
     expect(groups.find((g) => g.source === "duration")!.heldBack).toBe(false);
@@ -112,7 +112,7 @@ describe("groupChecksBySource", () => {
       validation({
         zodValid: true,
         dimensions: { structural: "ran" },
-        issues: [{ entityType: "field", entityId: "field_x", message: "bad key", source: "structural" }],
+        issues: [{ entityType: "field", entityId: "field_x", message: "bad key", source: "structural", loc: "" }],
       }),
     );
     expect(groups.find((g) => g.source === "structural")!.heldBack).toBe(false);
@@ -153,7 +153,7 @@ describe("allChecksClear", () => {
 
   it("is false when a group carries an open issue", () => {
     const groups = groupChecksBySource(
-      validation({ issues: [{ entityType: "step", entityId: "s", message: "m", source: "cel" }] }),
+      validation({ issues: [{ entityType: "step", entityId: "s", message: "m", source: "cel", loc: "" }] }),
     );
     expect(allChecksClear(groups)).toBe(false);
   });
@@ -168,9 +168,9 @@ describe("totalOpenIssueCount", () => {
     const groups = groupChecksBySource(
       validation({
         issues: [
-          { entityType: "timer", entityId: "timer_a", message: "m1", source: "duration" },
-          { entityType: "step", entityId: "step_a", message: "m2", source: "cel" },
-          { entityType: "step", entityId: "step_a", message: "m3", source: "cel" },
+          { entityType: "timer", entityId: "timer_a", message: "m1", source: "duration", loc: "" },
+          { entityType: "step", entityId: "step_a", message: "m2", source: "cel", loc: "" },
+          { entityType: "step", entityId: "step_a", message: "m3", source: "cel", loc: "" },
         ],
       }),
     );
@@ -203,8 +203,8 @@ describe("the view group", () => {
         zodValid: true,
         dimensions: { structural: "ran" },
         issues: [
-          { entityType: "step", entityId: "s", message: "view finding", source: "view" },
-          { entityType: "field", entityId: "field_x", message: "bad key", source: "structural" },
+          { entityType: "step", entityId: "s", message: "view finding", source: "view", loc: "" },
+          { entityType: "field", entityId: "field_x", message: "bad key", source: "structural", loc: "" },
         ],
       }),
     );

@@ -33,6 +33,12 @@ export interface EditorIssue {
   entityId: string;
   message: string;
   source: IssueSource;
+  /** The check's own location in the body, in the dotted-and-bracketed form
+   * `tokenize` reads: `fields[0].validation.pattern`. `resolveLoc` collapses a
+   * location to the entity it names, which is all the rails need; a surface
+   * placing a check inside one entity needs the part that resolution drops.
+   * The Fields view's zones read it through `panels/fieldCheckZone.ts`. */
+  loc: string;
 }
 
 interface Token {

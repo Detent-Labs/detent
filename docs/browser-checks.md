@@ -2506,3 +2506,91 @@ The three areas that switched technique, from `transition: none` to
 instant as reporting. Reporting used the near-zero technique already.
 
 Throughout: zero console errors, in every area.
+
+### The Fields view's move gesture (`studio-field-authoring-surface`)
+
+Source: `studio-field-authoring-surface` task 9.3.
+
+Open `purchase_requisition`'s draft at `/edit/panels/fields`. The rail lists
+22 fields, four of them indented once under the `Line Item` group.
+
+Tab to the move picker beside `Vendor`. Open it. Pass: it lists "Top level"
+and every group the catalog carries. Its own value reads "Top level".
+
+Pick `Line Item`. Pass: `Vendor` indents under `Line Item`. The live region
+reads "Vendor moved into Line Item." Focus stays on the same control. The
+picker's value now reads `Line Item`.
+
+Pick "Top level" on that same control. Pass: `Vendor` un-indents. The region
+reads "Vendor moved out of Line Item, to the top level." Focus stays put.
+
+Add a second group. Read the picker again. Pass: it names both groups. The
+single arrow this replaced could not pass that check. It reached the nearest
+group above and no other. Measured 2026-09-04 on a draft carrying two groups:
+every row named both groups and the top level.
+
+A move out appends the field to the end of the top level. It does not return
+it to the place it came from. That is what the helper writes, and the rail
+shows it.
+
+Drag `Vendor`'s row onto `Line Item`'s row with the pointer. Pass: the same
+indent and the same announcement. Drag it onto a row outside any group. Pass:
+the same move out. Both gestures reach one helper, and both reach the same
+set of destinations. A difference between them is a defect.
+
+The picker is the whole visible control. Its accessible name is "Move this
+field to", on its `aria-label` and its `title`. A catalog with no group at all
+renders it disabled, carrying "Top level" alone.
+
+Neither gesture survives a `renderToStaticMarkup` test. An HTML5 drag needs a
+real pointer. An effect writes the live region's text after the move commits.
+The web package carries no DOM harness.
+
+### The Fields view at a narrow width (`studio-field-authoring-surface`)
+
+Source: `studio-field-authoring-surface` task 9.3.
+
+Open the same route and narrow the window to 900px, then to 420px.
+
+Pass: the three regions stack in the reading order list, definition, effect.
+The rail collapses to a disclosure header reading "Editors", a real `<button>`
+carrying `aria-expanded="false"`. Press it. Pass: `aria-expanded` reads
+`true`, and the entry list shows. The rail caps at 20rem. It scrolls inside
+that cap rather than pushing the open view off screen.
+
+Pass: `document.documentElement.scrollWidth` equals `clientWidth` at 1440,
+900 and 420. The page never scrolls sideways. Measured 2026-09-04: 1440/1440,
+900/900, 420/420.
+
+A media query is invisible to a static render, and so is the width that
+triggers it.
+
+### The Fields view in German (`studio-field-authoring-surface`)
+
+Source: `studio-field-authoring-surface` task 9.3.
+
+The studio catalog ships English alone. The German reading therefore arrives
+two ways. One is an authored label in a German content locale. The other is a
+`studio`/`de` override on the UI-strings screen. Both make the same demand.
+No control on this screen may take its width from an English label.
+
+Open the same route with German text in place of every label this view draws.
+Use "Wonach dieses Feld fragt", "Woher die Werte kommen" and "Auf der
+Zeichenfläche anzeigen". Use the kind words "Ja/Nein", "Mehrfachauswahl" and
+"Gruppe".
+
+Pass: no heading, no button and no rail row clips. A label that wraps to two
+lines is correct; one cut off at its container's edge is not. Pass: the page
+still scrolls only downward at 1440 and at 420.
+
+Measured 2026-09-04: zero elements reported `scrollWidth` past `clientWidth`
+at either width. That count covered every element inside both halves and the
+rail.
+
+Read the rail last. Its kind word is the one German string in a fixed column.
+The move control beside it truncates rather than wrapping. Neither grows
+with the translation.
+
+A `bun:test` assertion covers the catalog's key set. It cannot see a clipped
+control, and it cannot see a German sentence that reads wrong beside its own
+control.

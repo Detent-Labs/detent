@@ -9,8 +9,17 @@
         "files": [
           "packages/web/src/areas/studio/app.css"
         ],
-        "createdAt": "2026-09-01T22:35:22.159Z",
+        "createdAt": "2026-09-04T16:43:09.209Z",
         "reason": "Detent has no cards; the left rule IS the depth vocabulary (design-language.md: 'Alignment and rules organize the page, not shadow, color, or radius'). All three sites are text-adjacent rules with reasoned comments, not card accents."
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "0.8rem",
+        "files": [
+          "packages/web/src/areas/studio/screens/PanelsScreen.tsx"
+        ],
+        "createdAt": "2026-09-04T16:46:20.965Z",
+        "reason": "0.8rem is the studio's own secondary step; the rail's kind word already takes it (main's panelsRailType), and the move control beside it matches that word on the same row. A documented ramp step would read larger than the word it sits beside and invert the hierarchy. Scoped to this file; it silences no other off-ramp size."
       }
     ]
   }

@@ -9,20 +9,46 @@ const styles = stylex.create({
   checksRail: {
     minWidth: 0,
     overflowY: "auto",
-    border: `1px solid ${colors.border}`,
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: colors.border,
     padding: space.s3,
   },
   // The docked, collapsed presentation (`.studio-checks-rail-docked`):
   // `.canvas-inspector` already draws the bordered box around the whole
   // inspector, so this variant draws none of its own.
   checksRailDocked: {
-    border: "none",
+    borderWidth: 0,
     paddingTop: space.s3,
     paddingRight: 0,
     paddingBottom: 0,
     paddingLeft: 0,
     marginTop: space.s3,
-    borderTop: `2px solid ${colors.divider}`,
+    borderTopWidth: 2,
+    borderTopStyle: "solid",
+    borderTopColor: colors.divider,
+  },
+  // The panels screen's own docked instance, the sibling directly below
+  // that screen's two columns. The docked variant above drops all four
+  // edges because `.canvas-inspector` boxes the inspector's instance. That
+  // screen boxes nothing, so this one draws the other three edges itself,
+  // at the 1px weight the rail takes when it stands on its own. The 2px top
+  // edge stays: it is the boundary against the columns, the structural
+  // weight.
+  checksRailFramed: {
+    borderRightWidth: 1,
+    borderBottomWidth: 1,
+    borderLeftWidth: 1,
+    borderRightStyle: "solid",
+    borderBottomStyle: "solid",
+    borderLeftStyle: "solid",
+    borderRightColor: colors.border,
+    borderBottomColor: colors.border,
+    borderLeftColor: colors.border,
+    paddingTop: space.s3,
+    paddingRight: space.s3,
+    paddingBottom: space.s3,
+    paddingLeft: space.s3,
   },
   // `.studio-checks-rail h2`: a descendant selector on a bare `<h2>`.
   checksRailHeading: {
@@ -30,7 +56,9 @@ const styles = stylex.create({
   },
   checksRailClear: {
     color: colors.text,
-    border: `2px solid ${colors.text}`,
+    borderWidth: 2,
+    borderStyle: "solid",
+    borderColor: colors.text,
     padding: space.s2,
     marginBlockEnd: space.s3,
     marginBlockStart: 0,
@@ -39,10 +67,9 @@ const styles = stylex.create({
   checksGroup: {
     paddingBlock: space.s2,
     paddingInline: 0,
-    borderTop: `1px solid ${colors.border}`,
-    ":first-of-type": {
-      borderTop: "none",
-    },
+    borderTopWidth: { default: 1, ":first-of-type": 0 },
+    borderTopStyle: "solid",
+    borderTopColor: colors.border,
   },
   checksGroupHeading: {
     marginBlockEnd: space.s1,
@@ -57,7 +84,9 @@ const styles = stylex.create({
   checksGroupHeldBack: {
     margin: 0,
     color: colors.refusal,
-    borderLeft: `3px solid color-mix(in srgb, ${colors.refusal} 55%, transparent)`,
+    borderLeftWidth: 3,
+    borderLeftStyle: "solid",
+    borderLeftColor: `color-mix(in srgb, ${colors.refusal} 55%, transparent)`,
     paddingLeft: space.s2,
     fontSize: "0.85rem",
   },
@@ -74,16 +103,17 @@ const styles = stylex.create({
   checksGroupIssue: {
     paddingBlock: space.s1,
     paddingInline: 0,
-    borderTop: `1px solid ${colors.border}`,
+    borderTopWidth: { default: 1, ":first-child": 0 },
+    borderTopStyle: "solid",
+    borderTopColor: colors.border,
     fontSize: "0.85rem",
-    ":first-child": {
-      borderTop: "none",
-    },
   },
   checksGroupNote: {
     margin: 0,
     paddingTop: space.s1,
-    borderTop: `1px solid ${colors.border}`,
+    borderTopWidth: 1,
+    borderTopStyle: "solid",
+    borderTopColor: colors.border,
     color: colors.textMuted,
     fontSize: "0.8rem",
   },
@@ -93,10 +123,12 @@ const styles = stylex.create({
     justifyContent: "space-between",
     gap: space.s2,
     width: "100%",
-    background: "none",
+    backgroundColor: { default: "transparent", ":hover": colors.surfaceMuted },
     color: "inherit",
-    border: "none",
-    borderTop: `2px solid ${colors.divider}`,
+    borderWidth: 0,
+    borderTopWidth: 2,
+    borderTopStyle: "solid",
+    borderTopColor: colors.divider,
     paddingTop: space.s2,
     paddingRight: 0,
     paddingBottom: 0,
@@ -104,15 +136,12 @@ const styles = stylex.create({
     font: "inherit",
     textAlign: "left",
     cursor: "pointer",
-    ":hover": {
-      background: colors.surfaceMuted,
-    },
   },
   // `.studio-checks-rail-docked .studio-checks-rail-summary`: this file
   // knows `collapsed` at both render sites, so the descendant override
   // becomes a second style applied alongside the base one.
   checksRailSummaryDocked: {
-    borderTop: "none",
+    borderTopWidth: 0,
     paddingTop: 0,
   },
   checksRailSummaryHeading: {
@@ -138,11 +167,17 @@ interface Props {
    * cannot verify: an actor without `system:publish` read "ready to publish"
    * here while the menu 900px away refused the act (studio-publish). */
   canPublish: boolean;
-  /** True when this rail docks at the step inspector's bottom edge: it opens
-   * as a one-line summary and expands in place when chosen. False beside the
-   * canvas, where nothing is selected and the full grouped list always shows.
-   * See `studio-checks-rail`'s collapsed-summary requirement. */
+  /** True when this rail docks at a bottom edge and opens as a one-line
+   * summary, expanding in place when chosen. Two sites take it: the step
+   * inspector's bottom edge, and the panels screen's, below that screen's two
+   * columns (task 7.4). False beside the canvas, where nothing is selected and
+   * the full grouped list always shows. See `studio-checks-rail`'s
+   * collapsed-summary requirement. */
   collapsed?: boolean;
+  /** True at the panels screen's bottom edge alone, where nothing boxes the
+   * rail: it then draws its own right, bottom and left edges. The inspector's
+   * docked instance leaves it false and takes `.canvas-inspector`'s box. */
+  framed?: boolean;
 }
 
 /**
@@ -151,7 +186,7 @@ interface Props {
  * placement already filters; this is one more view over it, not a second
  * validation pass.
  */
-export function ChecksRail({ validation, canPublish, collapsed = false }: Props) {
+export function ChecksRail({ validation, canPublish, collapsed = false, framed = false }: Props) {
   const [expanded, setExpanded] = useState(false);
   const groups = groupChecksBySource(validation);
   const clear = allChecksClear(groups);
@@ -160,11 +195,13 @@ export function ChecksRail({ validation, canPublish, collapsed = false }: Props)
 
   return (
     <aside
-      // `collapsed` also marks the docked instance StepsPanel mounts at its
-      // bottom edge (true whether the summary or, once chosen, the expanded
-      // list shows) — it never draws its own border/padding there, since
-      // `.canvas-inspector` already provides that box.
-      {...stylex.props(styles.checksRail, collapsed && styles.checksRailDocked)}
+      // `collapsed` also marks a docked instance (true whether the summary
+      // or, once chosen, the expanded list shows). The two docked sites draw
+      // their own box differently: at the step inspector's bottom edge the
+      // rail draws none, since `.canvas-inspector` already provides one, and
+      // at the panels screen's bottom edge it draws three of its four edges
+      // itself (`framed`), since that screen boxes nothing.
+      {...stylex.props(styles.checksRail, collapsed && styles.checksRailDocked, framed && styles.checksRailFramed)}
       aria-label={t("checksRail.heading")}
     >
       {showSummary ? (

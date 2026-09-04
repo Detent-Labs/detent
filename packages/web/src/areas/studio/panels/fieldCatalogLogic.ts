@@ -1,5 +1,6 @@
-import { ALLOWED_BY_TYPE, type BaseFieldType, type FieldControl, type FieldFormat } from "workflow-engine/schema";
+import type { FieldControl, FieldFormat } from "workflow-engine/schema";
 import { deriveKey, dedupeKey, shouldAutoDeriveKey } from "../draft/deriveKey.js";
+import { flattenDraftFields, type DraftField } from "../draft/fields.js";
 import { resolveDraftLocalizedText, type DraftLocalizedText } from "../draft/localized-text.js";
 
 /**
@@ -31,31 +32,100 @@ export function nextFieldKey(
   return dedupeKey(newDerived, taken);
 }
 
-/** The `format` members a type allows, and the `control` members it allows —
- * the same table `compile.ts::checkFieldFormatControl` verdicts a body
- * against, read here so the two pickers can only offer a pair that publishes.
- * A plugin envelope has no row: it declares neither key, since its own
- * semantics live in its config. */
-export function allowedForType(type: unknown): { formats: readonly FieldFormat[]; controls: readonly FieldControl[] } {
-  if (typeof type !== "string") return { formats: [], controls: [] };
-  return ALLOWED_BY_TYPE[type as BaseFieldType] ?? { formats: [], controls: [] };
+/**
+ * Which of a field's two presentation keys a switch to `kind` must drop.
+ *
+ * A kind names one `{type, format, control}` triple, and the picker writes
+ * all three at once. A key the entry does not name has to go: leaving it in
+ * place would let the developer publish a body
+ * `compile.ts::checkFieldFormatControl` rejects, with nothing on screen
+ * saying why — a `{type: "number"}` field carrying `format: "date"` fails at
+ * publish, and the picker names no kind that still carries `date`.
+ *
+ * `undefined` names the plugin envelope, which declares neither key: its own
+ * semantics live in its config.
+ */
+export function droppedByKindChange(
+  field: { format?: FieldFormat; control?: FieldControl },
+  kind: { format?: FieldFormat; control?: FieldControl } | undefined,
+): ("format" | "control")[] {
+  const dropped: ("format" | "control")[] = [];
+  if (field.format !== undefined && field.format !== kind?.format) dropped.push("format");
+  if (field.control !== undefined && field.control !== kind?.control) dropped.push("control");
+  return dropped;
 }
 
 /**
- * Which of a field's two presentation keys a switch to `nextType` must drop.
+ * Re-hangs one field inside the draft's field tree: into a `group` field's
+ * own `fields` array, or back out to the top level when `targetGroupId` is
+ * `undefined`. The one write both the rail's pointer drag and its keyboard
+ * move reach, so the two gestures cannot drift (design.md Risks: "A keyboard
+ * move is a second write path beside the drag").
  *
- * Leaving one in place would let the developer publish a body the compile
- * pass rejects, with no control on screen showing why: a `{type: "number"}`
- * field carrying `format: "date"` fails at publish, and neither picker offers
- * `date` any more to say so.
+ * The move writes the field's place and nothing else. The field keeps its
+ * `id`, its `key` and every other key it carries, and the group keeps its
+ * own. Nothing else in the body needs rewriting: a group carries no entry in
+ * the flat `data` namespace, `FieldDef.key` is unique across every depth, and
+ * views and column mappings reference the `id` (design.md, decision: group
+ * change). So no CEL expression, no view entry and no column mapping changes.
+ *
+ * Answers the array it was given, unchanged, where the move is not one to
+ * make: no field carries `fieldId`, `targetGroupId` names no `group` field,
+ * the target is the moved field itself or one of its own descendants (which
+ * would drop the subtree), or the field already hangs where it would land.
  */
-export function droppedByTypeChange(
-  field: { format?: FieldFormat; control?: FieldControl },
-  nextType: unknown,
-): ("format" | "control")[] {
-  const allowed = allowedForType(nextType);
-  const dropped: ("format" | "control")[] = [];
-  if (field.format !== undefined && !allowed.formats.includes(field.format)) dropped.push("format");
-  if (field.control !== undefined && !allowed.controls.includes(field.control)) dropped.push("control");
-  return dropped;
+export function moveFieldToGroup(
+  fields: DraftField[],
+  fieldId: string,
+  targetGroupId: string | undefined,
+): DraftField[] {
+  const flat = flattenDraftFields(fields);
+  const moved = flat.find((f) => f.id === fieldId);
+  if (!moved) return fields;
+
+  if (targetGroupId !== undefined) {
+    if (targetGroupId === fieldId) return fields;
+    const target = flat.find((f) => f.id === targetGroupId);
+    if (!target || target.type !== "group") return fields;
+    if (flattenDraftFields(moved.fields).some((f) => f.id === targetGroupId)) return fields;
+  }
+
+  const currentParent = flat.find((f) => (f.fields ?? []).some((c) => c.id === fieldId));
+  if (currentParent?.id === targetGroupId) return fields;
+
+  const prune = (list: DraftField[]): DraftField[] =>
+    list.filter((f) => f.id !== fieldId).map((f) => (f.fields ? { ...f, fields: prune(f.fields) } : f));
+
+  const pruned = prune(fields);
+  if (targetGroupId === undefined) return [...pruned, moved];
+
+  const graft = (list: DraftField[]): DraftField[] =>
+    list.map((f) => {
+      if (f.id === targetGroupId) return { ...f, fields: [...(f.fields ?? []), moved] };
+      return f.fields ? { ...f, fields: graft(f.fields) } : f;
+    });
+
+  return graft(pruned);
+}
+
+/**
+ * Every group the field may join, as ids, in rail order.
+ *
+ * The keyboard's target picker offers exactly this set plus the top level,
+ * so it reaches every destination a drop reaches. `moveFieldToGroup` refuses
+ * the same three cases this filter drops, and refusing twice is deliberate:
+ * the picker must not offer a target the write would then reject.
+ *
+ * Excludes the field itself, and every group inside it, since a group cannot
+ * move into its own subtree. Keeps the current parent, so the picker can
+ * show where the field sits today.
+ */
+export function groupTargetsFor(fields: DraftField[], fieldId: string): string[] {
+  const flat = flattenDraftFields(fields);
+  const moved = flat.find((f) => f.id === fieldId);
+  if (!moved) return [];
+  const inside = new Set(flattenDraftFields(moved.fields).map((f) => f.id));
+  return flat
+    .filter((f) => f.type === "group" && f.id !== undefined && f.id !== fieldId && !inside.has(f.id))
+    .map((f) => f.id as string);
 }

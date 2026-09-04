@@ -9,7 +9,6 @@ issue for the loaded draft by source. Both give an author one place to
 see everything holding a publish back.
 
 ## Requirements
-
 ### Requirement: The rail lists every open issue, grouped by source
 
 The canvas edit screen SHALL show a checks rail in its third column, per
@@ -264,33 +263,6 @@ three needs a compiled body.
 - **AND** the CEL group's own issue list carries no entry for that site
 - **AND** the group never presents that site as a clear pass
 - **AND** a visible control beside that action shows the not-checked state
-
-### Requirement: The rail adds a consolidated view; it does not replace per-entity issue placements
-
-`IssueList` SHALL keep rendering its existing per-entity views. Those
-views sit under the process header, on a step card, and on a path row.
-They also sit on the panels screen's Fields view, above the field
-editor's tab set. The checks rail is one more consolidated view over
-the same `validation.issues[]` array. It does not replace those
-placements.
-
-A field's own `IssueList` SHALL sit above the tab set rather than
-inside one tab. The field's validation rules sit on the Rules tab.
-Inside that tab, an issue would hide whenever the author opened
-another one.
-
-#### Scenario: An issue shows in both its entity placement and the rail
-
-- **WHEN** a path guard carries a CEL issue
-- **THEN** that issue shows in the path's own `IssueList` placement and
-  in the checks rail's CEL group
-
-#### Scenario: A field's issue stays visible on every tab
-
-- **WHEN** a field carries a validation issue and the developer opens
-  the Values tab
-- **THEN** that field's `IssueList` still shows the issue above the tab
-  set
 
 ### Requirement: Every publish blocker is visible in the rail with all groups clear
 
@@ -558,34 +530,81 @@ the publish-blocking half of this pair.
   writes it
 - **THEN** the rail shows no entry for it under this finding
 
-### Requirement: The rail lists in full on the panels screen
+### Requirement: The rail adds a consolidated view; a field's checks stand at their zones
 
-The panels screen SHALL show the rail's grouped list, in the third of
-its three columns. The rail shows that same state on the canvas, when
-the developer has selected nothing.
+`IssueList` SHALL keep rendering its existing per-entity views. Those
+views sit under the process header, on a step card, and on a path row.
+The checks rail is one more consolidated view over the same
+`validation.issues[]` array. It does not replace those placements.
 
-The rail SHALL NOT collapse to its one-line summary here. The collapse
-rule exists because a selection takes the third column for an
-inspector. The panels screen carries no selection and no inspector.
+The Fields view is the one placement that changes. A field's own check
+SHALL stand at the zone the check names, per the `studio-app`
+capability's zone requirement. The view SHALL mount no `IssueList`
+gathering that field's checks in one place.
 
-The rail SHALL report the same issues it reports on the canvas. Both
-screens read one `validation.issues[]`, so a count on one and a count
-on the other cannot disagree.
+The reason the old placement existed still holds, and the zone rule
+answers it. A check inside one tab hid whenever the author opened
+another tab. Zones open none, so no check hides.
 
-This placement is the reason the screen exists. An author on it edits
-field keys and data source keys. Those two produce most of what the
-rail reports, and a rail behind a backdrop reports to nobody.
+#### Scenario: An issue shows in both its entity placement and the rail
 
-#### Scenario: The panels screen shows the grouped list
+- **WHEN** a path guard carries a CEL issue
+- **THEN** that issue shows in the path's own `IssueList` placement and
+  in the checks rail's CEL group
 
-- **WHEN** the developer opens the panels screen on a draft holding
-  issues in two groups
-- **THEN** the third column lists both groups, in full
+#### Scenario: A field's check shows at its zone and in the rail
 
-#### Scenario: The rail does not collapse without a selection
+- **WHEN** a field carries a validation issue
+- **THEN** the check shows in the definition half's "Validation" zone,
+  and the docked summary counts it
 
-- **WHEN** the developer opens the panels screen
-- **THEN** the rail shows its grouped list, not its one-line summary
+#### Scenario: No zone hides a field's check
+
+- **WHEN** a field carries checks naming two different zones
+- **THEN** both checks show at once, and neither waits on the author
+  opening anything
+
+### Requirement: The rail docks its collapsed summary on the panels screen
+
+The panels screen SHALL dock the rail's one-line summary at the screen's
+bottom edge. It SHALL NOT stand the grouped list in a column of its own.
+
+The `collapsed` form is the one to mount here. That form exists and serves
+two sites today. One of them docks at the bottom edge of the canvas
+inspector, per the collapse requirement above. No new component comes about.
+The summary keeps every rule that requirement states. Those are the single
+count, the held-back indicator, and the refusal to read as clear while a
+group holds back.
+
+Choosing the summary SHALL expand the grouped list in place, over the screen.
+The list SHALL then show the same groups it shows on the canvas.
+
+The rail SHALL report the same issues it reports on the canvas. Both screens
+read one `validation.issues[]`, so a count on one and a count on the other
+cannot disagree.
+
+A check belonging to one entity SHALL also stand at that entity's own place
+in the open view. The `studio-app` capability states where. This rail carries
+the draft-wide roll-up and the publish gate. It is not the only place an
+author reads a field's own finding.
+
+The standing column this requirement asked for is gone. Its width goes to the
+open view. The column came about because a `<dialog>` once covered the rail;
+the reason was visibility while editing, not the column itself. A docked
+summary keeps that visibility and returns the width.
+
+#### Scenario: The panels screen docks the summary
+
+- **WHEN** the developer opens the panels screen on a draft holding issues in
+  two groups
+- **THEN** a one-line summary sits at the screen's bottom edge, carrying the
+  total count
+- **AND** no third column stands beside the open view
+
+#### Scenario: The summary expands to the grouped list
+
+- **WHEN** the developer chooses the docked summary on the panels screen
+- **THEN** the grouped list opens in place and lists both groups, in full
 
 #### Scenario: A fix on the screen clears its own entry
 
@@ -594,9 +613,16 @@ rail reports, and a rail behind a backdrop reports to nobody.
 
 #### Scenario: The two screens agree on the count
 
-- **WHEN** the developer reads the rail on the panels screen, then
-  returns to the canvas with nothing selected
-- **THEN** both list the same entries
+- **WHEN** the developer reads the summary on the panels screen, then returns
+  to the canvas with nothing selected
+- **THEN** the summary's count equals the entry count the canvas rail lists
+
+#### Scenario: A held-back group reaches the docked summary
+
+- **WHEN** the panels screen opens on a draft whose structural group holds
+  back for want of a compiled body
+- **THEN** the docked summary shows the held-back indicator, and it does not
+  read as clear
 
 ### Requirement: The checks rail renders from compiled styles
 

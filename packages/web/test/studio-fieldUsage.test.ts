@@ -5,6 +5,8 @@ import {
   countTechnicalClearKeys,
   fieldUsage,
   fieldVisibleOverrides,
+  fieldRequiredOverrides,
+  applyRequiredOverride,
   needsTechnicalToggleConfirm,
 } from "../src/areas/studio/draft/field-usage.js";
 import type { Draft } from "../src/areas/studio/draft/types.js";
@@ -210,5 +212,64 @@ describe("needsTechnicalToggleConfirm", () => {
 
   it("needs no confirmation when unchecking, whatever the count", () => {
     expect(needsTechnicalToggleConfirm(false, countTechnicalClearKeys(draft(), "field_vendor"))).toBe(false);
+  });
+});
+
+/** The "Ask for this" row's read, write and disagreement (task 6.7). The
+ * fixture already carries the disagreement: `step_a` asks for the vendor and
+ * `step_b` carries no `required` key at all. */
+describe("fieldRequiredOverrides", () => {
+  it("answers none for a field no step view references", () => {
+    expect(fieldRequiredOverrides(draft(), "field_group")).toEqual({ kind: "none" });
+  });
+
+  it("answers uniform false where the one referencing view carries no required key", () => {
+    expect(fieldRequiredOverrides(draft(), "field_qty")).toEqual({ kind: "uniform", stepIds: ["step_c"], value: false });
+  });
+
+  it("names the differing step where two views disagree", () => {
+    expect(fieldRequiredOverrides(draft(), "field_vendor")).toEqual({
+      kind: "divergent",
+      stepIds: ["step_a", "step_b"],
+      differingStepIds: ["step_b"],
+    });
+  });
+
+  it("counts an expression as a disagreement, since the row writes a boolean alone", () => {
+    const d = draft();
+    // The draft's view entry is a union with the note shape, which declares
+    // no `required` key; the cast reaches the field entry the fixture builds.
+    (d.workflow!.steps![1]!.view!.fields![0] as { required?: unknown }).required = { lang: "cel", src: "data.vendor != ''" };
+    const state = fieldRequiredOverrides(d, "field_vendor");
+    expect(state.kind).toBe("divergent");
+    expect(state.kind === "divergent" && state.differingStepIds).toEqual(["step_b"]);
+  });
+});
+
+describe("applyRequiredOverride", () => {
+  it("writes required: true on every referencing view", () => {
+    const d = draft();
+    applyRequiredOverride(d, "field_vendor", true);
+    expect(fieldRequiredOverrides(d, "field_vendor")).toEqual({
+      kind: "uniform",
+      stepIds: ["step_a", "step_b"],
+      value: true,
+    });
+  });
+
+  it("drops the key rather than writing a literal false", () => {
+    const d = draft();
+    applyRequiredOverride(d, "field_vendor", false);
+    for (const step of d.workflow!.steps!) {
+      for (const entry of step.view?.fields ?? []) {
+        expect("required" in entry).toBe(false);
+      }
+    }
+  });
+
+  it("leaves a view entry naming another field alone", () => {
+    const d = draft();
+    applyRequiredOverride(d, "field_vendor", true);
+    expect("required" in d.workflow!.steps![2]!.view!.fields![0]!).toBe(false);
   });
 });
