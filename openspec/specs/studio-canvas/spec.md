@@ -408,276 +408,6 @@ without an outcome key.
 - **WHEN** a terminal step is bound to an `outcome` in a contracted process
 - **THEN** the step renders the terminal marker carrying that outcome's key
 
-### Requirement: Selecting a node or edge shows its detail in a three-zone, tab-driven inspector beside the canvas
-
-<!-- Why: "edit" in this requirement's "canvas edit screen" term names a -->
-<!-- distinct UI surface, not a synonym choice against "change" (SHALL/ -->
-<!-- state-change wording) elsewhere in this requirement. -->
-<!-- antislop: allow synonym-rotation -->
-
-`StepsPanel` SHALL mount as a fixed-width column in the canvas edit
-screen's third position. It replaces the `studio-checks-rail`
-capability's checks rail there whenever the developer selects exactly
-one step, or a path.
-
-When the developer selects no step and no path, the third column SHALL
-show the checks rail. It SHALL NOT show the inspector at all in that
-state.
-
-A selection of more than one step reaches neither of those two. The
-third column SHALL show that selection's own count and delete control
-instead. The selection-set requirements above state both.
-
-Selecting a step node on the canvas SHALL show that one step in the
-inspector. The inspector SHALL lay the step out in three zones. The
-zones are an always-visible identity zone, a tab-driven behavior zone,
-and a diagnostics drawer. This replaces the checks rail. It also
-replaces any prior step's or path's content.
-
-The identity zone SHALL carry no disclosure. It SHALL always show key,
-label, description, a performed-by control, the initial-step control,
-and the view button. The performed-by control SHALL offer participant,
-subprocess, and terminal. The identity zone SHALL also show an outcome
-field when the selected step carries `terminal: true`.
-
-The identity zone SHALL keep the missing-translation warning beside
-the step's label input and beside its description input. Those are two
-of the six `LocalizedTextInput` sites `studio-app` requires a warning
-at.
-
-The identity zone SHALL also carry a control to set the selected step
-as the draft's `initialStep`. Today `StepsPanel` renders that control
-as a button inside its identity section, hidden until the identity
-entry opens. The no-selection state hides the whole panel. The control
-moves into the always-visible identity zone instead.
-
-The behavior zone SHALL show a tab row: Assignment, Paths, Actions,
-Timers. Subprocess joins that row only when the selected step's
-performed-by control reads Subprocess. Exactly one tab's content SHALL
-show at a time. Choosing a different tab SHALL replace the shown
-content. It SHALL NOT expand a second panel alongside it.
-
-Selecting a step node SHALL show its Assignment tab by default. Moving
-the selection to a different step SHALL reset the shown tab back to
-Assignment. The one exception: a selection that arrives through a path
-edge click selects the Paths tab instead (see below).
-
-Changing the performed-by control away from Subprocess while the
-Subprocess tab shows SHALL move the shown tab to Assignment. The
-Subprocess tab no longer lists once performed-by reads something
-else, so it cannot stay shown.
-
-`StepsPanel` already nests `PathsPanel` under the paths tab. No panel's
-own fields, validation, or mutation logic SHALL differ from today's.
-Only how an author reaches each panel is different.
-
-The subprocess tab SHALL keep the cross-process check fieldset beside
-the spec editor. That fieldset holds the file input which loads a child
-body. `checkSubprocessChildRefs` runs against nothing without it.
-Dropping the fieldset would leave that check with no route.
-
-A step carrying `terminal: true` SHALL show an empty state on the Paths
-tab, in place of a path editor. The empty state SHALL name that a
-terminal step has no outgoing paths. A step carrying `terminal: true`
-SHALL also suppress the assignment tab's no-assignment warning. Both
-mirror the existing rule that already exempts a terminal step from
-needing an assignment elsewhere:
-`terminal === true || assignment !== undefined`.
-
-Selecting a path edge SHALL resolve to its *source* step. It SHALL show
-that step's inspector the same way, with its Paths tab selected. A path
-is not independently addressable. It only exists nested under its
-step. The selected path's own row SHALL also highlight within the
-shown paths tab, through the existing `selectedPathId` prop on
-`PathsPanel`.
-
-<!-- Why: "Build the form" below is a literal UI label, not a synonym -->
-<!-- choice against "create" elsewhere in this file. -->
-<!-- antislop: allow synonym-rotation -->
-The view button SHALL navigate to the form editor's routed page (see
-the `studio-form-editor` capability). It SHALL NOT be a tab. It SHALL
-NOT expand any content in place. It SHALL show a form-status summary
-and a "Build the form" label beside that summary. A step's form
-benefits from a full-screen page of its own, not an inline scroll
-target. This is the inspector's one control that navigates away
-instead of showing content in the column.
-
-A behavior-zone tab is a `<button type="button" role="tab">` inside a
-`role="tablist"`, carrying `aria-selected` for its own state. The
-`spa-accessibility` capability's tab pattern governs this shape. The
-studio area's other tab rows already use the same pattern. That set
-includes the field catalog's field tabs, the dock tabs, and the
-structure/JSON surface toggle. The identity zone's fields carry no
-disclosure or tab semantics. They are plain, always-shown form
-controls.
-
-Creating the first step in an empty draft SHALL NOT depend on a prior
-selection. The palette stays reachable regardless of selection; see
-the palette requirement below.
-
-The checks rail's own no-selection presentation carries no "+ Add
-step" button. The palette's Step entry is the sole always-reachable way
-to add the first step; see the palette requirement below.
-
-#### Scenario: An empty draft with nothing selected shows the checks rail
-
-- **WHEN** a draft with no step selected and no path selected is open
-- **THEN** the third column shows the checks rail, not the inspector
-
-#### Scenario: Selecting a step shows its identity zone and behavior tabs
-
-- **WHEN** the developer clicks a step node on the canvas
-- **THEN** the inspector shows that step's identity zone and behavior
-  tab row, replacing whatever the third column showed before
-- **AND** the Assignment tab shows by default
-
-#### Scenario: Selecting a different step resets the shown tab
-
-- **WHEN** the developer has the Timers tab shown for one step and
-  clicks a different step node
-- **THEN** the inspector shows the new step with its Assignment tab
-
-#### Scenario: Choosing a behavior tab replaces the shown content
-
-- **WHEN** the developer chooses the Assignment, Paths, Actions, Timers,
-  or Subprocess tab for the selected step
-- **THEN** the inspector shows that tab's content in place of whichever
-  tab's content showed before
-
-#### Scenario: Leaving Subprocess moves the shown tab to Assignment
-
-- **WHEN** the developer has the Subprocess tab shown and changes the
-  performed-by control away from Subprocess
-- **THEN** the Subprocess tab no longer lists, and the Assignment tab
-  shows
-
-#### Scenario: The inspector carries the assignment tab
-
-- **WHEN** the developer selects a non-terminal step with no
-  `assignment`
-- **THEN** the Assignment tab shows, and its editor carries the
-  no-assignment warning
-
-#### Scenario: A terminal step suppresses the no-assignment warning
-
-<!-- Why: the linter's sentence splitter merges this WHEN/THEN pair, -->
-<!-- since OpenSpec scenario bullets carry no terminal period. -->
-<!-- antislop: allow sentence-length -->
-- **WHEN** the developer selects a step carrying `terminal: true` and no
-  `assignment`, and chooses its Assignment tab
-- **THEN** the assignment editor shows with no no-assignment warning
-
-#### Scenario: A terminal step's Paths tab shows an empty state
-
-<!-- Why: the linter's sentence splitter merges this WHEN/THEN pair, -->
-<!-- since OpenSpec scenario bullets carry no terminal period. -->
-<!-- antislop: allow sentence-length -->
-- **WHEN** the developer selects a step carrying `terminal: true` and
-  chooses its Paths tab
-- **THEN** the tab shows an empty state naming that a terminal step has
-  no outgoing paths, and no path editor renders
-
-#### Scenario: The identity zone keeps its translation warnings
-
-- **WHEN** the studio's `contentLocale` is `de`, a step's `label`
-  carries the base-locale value but no `de` value, and the developer
-  selects that step
-- **THEN** the missing-translation warning renders beside that step's
-  label input in the identity zone
-
-#### Scenario: The identity zone sets the draft's initial step
-
-- **WHEN** the developer activates the selected step's "set as initial
-  step" control in the identity zone
-- **THEN** the draft's `workflow.initialStep` names that step's id
-
-#### Scenario: The subprocess tab keeps the cross-process check
-
-- **WHEN** the developer selects a step of type `subprocess` and
-  chooses its Subprocess tab
-- **THEN** the cross-process check fieldset renders beside the spec
-  editor, and its file input still loads a child body
-
-#### Scenario: The step issue count covers an issue on its path
-
-- **WHEN** a step carries no issue of its own and one of its paths
-  carries a guard that fails validation
-- **THEN** the inspector's diagnostics drawer reports one issue for
-  that step
-
-#### Scenario: A behavior tab activates with the keyboard
-
-- **WHEN** a keyboard user tabs to a behavior-zone tab button and
-  presses Enter or Space
-- **THEN** that tab's content shows, and `aria-selected` reads true on
-  that tab alone
-
-#### Scenario: Choosing the view button opens the form editor
-
-- **WHEN** the developer chooses the view button for the selected step
-- **THEN** the form editor's routed page opens for that step, and the
-  behavior zone's shown tab does not change
-
-#### Scenario: The view button shows a form-status summary
-
-- **WHEN** the developer selects a step carrying a partially configured
-  view
-- **THEN** the view button shows a status summary of the form and a
-  "Build the form" label
-
-#### Scenario: Selecting a path edge shows its source step's Paths tab
-
-- **WHEN** the developer clicks a path edge on the canvas
-- **THEN** the inspector shows that edge's source step, with the Paths
-  tab shown
-- **AND** the clicked path's own row highlights within the paths tab
-
-#### Scenario: Deselecting swaps the column back to the checks rail
-
-- **WHEN** the developer clicks empty canvas space while a step or path
-  stays selected
-- **THEN** the third column shows the checks rail again, not the
-  inspector
-
-#### Scenario: A first step is addable with nothing selected
-
-- **WHEN** an empty draft has no step, and the developer has selected
-  nothing
-- **THEN** the palette's Step entry stays visible and usable
-
-### Requirement: The step inspector's diagnostics drawer discloses the step's raw data
-
-<!-- Why: "Remove step" below is a literal UI label, not a synonym choice -->
-<!-- against "delete" elsewhere in this file. -->
-<!-- antislop: allow synonym-rotation -->
-The step inspector SHALL carry a diagnostics drawer at the bottom of
-the inspector. The drawer SHALL sit visually separate from the
-identity and behavior zones. The drawer SHALL hold the selected step's
-issue count, a "View raw JSON" toggle, and the existing docked checks
-rail. It SHALL also hold the step's "Remove step" control. Expanding
-the toggle SHALL show the selected step's raw JSON, read-only.
-
-The "View raw JSON" toggle SHALL be a `<button type="button">`. It
-SHALL carry `aria-expanded` for its own state and `aria-controls`
-naming the JSON region it discloses, per the `spa-accessibility`
-capability's disclosure requirement.
-
-The toggle replaces the former "Developer view" disclosure entry,
-which was a peer of the seven content sections. It is distinct from
-the path-guard's CEL "Developer view" toggle. The
-`studio-condition-builder` capability describes that other toggle.
-
-#### Scenario: The diagnostics drawer's raw-JSON toggle shows the step's JSON
-
-- **WHEN** the developer expands a selected step's "View raw JSON"
-  toggle in the diagnostics drawer
-- **THEN** the step's raw underlying JSON renders read-only
-
-#### Scenario: Diagnostics drawer offers step removal
-
-- **WHEN** the developer selects a step
-- **THEN** the diagnostics drawer shows a "Remove step" control
-
 ### Requirement: The canvas supports pan and zoom over the process graph
 
 The canvas SHALL support panning by dragging empty canvas space. The canvas
@@ -1335,106 +1065,397 @@ a profile rather than added speculatively.
 - **WHEN** a step is added, removed, or repositioned in the stored layout
 - **THEN** the computations re-run and the canvas reflects the change
 
-### Requirement: The canvas edit screen lays out a palette, the canvas, the inspector, and a checks rail
+### Requirement: The structure surface lays out a canvas ribbon, a steps register and the configuration pane
 
-The canvas edit screen SHALL show three columns, in order. The first is
-a rail. It holds the place-on-canvas palette. Below the palette sits the
-`studio-app` capability's Process section: the Fields, Data sources,
-Contract, and Field matrix links.
+The structure surface SHALL show three regions. The canvas ribbon spans the
+full width above. Beneath it, the steps register stands on the left and the
+configuration pane on the right.
 
-The second column is the canvas. The third column shows either the
-`studio-checks-rail` capability's checks rail or the selection-driven
-inspector, never both at once.
+The ribbon SHALL start collapsed on every load. A collapsed ribbon shows a
+bar and a band. The bar holds the ribbon's control and the checks summary.
+The band draws the graph at fit scale. An expanded ribbon shows the full
+canvas with the palette.
 
-The third column SHALL show the checks rail when the developer has
-selected no step and no path. It SHALL show the inspector when the
-developer selects exactly one step, or a path. It SHALL show the
-selection's own count and delete control when the selection holds more
-than one step. See the `studio-checks-rail` capability for the rail's own
-collapsed presentation in the step-selected state.
+Every canvas interaction the other requirements of this capability state
+SHALL stay live in both states. The two differ in height, and in whether the
+palette lists. The band draws a shorter canvas, not a lesser one.
 
-Below the three columns, and across their full width, the screen SHALL
-show the dock. The dock starts collapsed, and a collapsed dock shows its
-control alone.
+The ribbon's control SHALL be a `<button type="button">`. It carries
+`aria-expanded` for its state and `aria-controls` naming the ribbon's body.
 
-The screen's own header rows and the dock take their height first. The
-three columns SHALL fill what remains, above a floor of 36rem. A window
-taller than that floor therefore shows a taller canvas, and no empty band
-below the dock. A window shorter than the floor holds the columns at the
-floor, and the page scrolls. The columns keep their widths. The two side
-columns stay fixed, and the canvas between them takes the rest.
+Nothing SHALL persist the ribbon's open state. It lives in the screen's own
+component state. A reload returns the ribbon to collapsed. The draft's
+`layout` blob SHALL carry no key for it.
 
-Opening the dock SHALL NOT push the columns below that floor. The dock
-takes its height from the columns until they reach 36rem. Past that point
-the page scrolls instead.
+Selection SHALL cross both ways. Selecting a node on the canvas opens that
+step in the configuration pane and marks its row in the register. Choosing a
+row in the register opens that step and marks its node.
 
-#### Scenario: All three columns appear
+The configuration pane SHALL show the register's first step when the
+developer has selected none. It SHALL show the selection's own count and
+delete control when the selection holds more than one step.
 
-- **WHEN** the canvas edit screen loads
-- **THEN** the rail, the canvas, and the third column each appear as
-  their own column
+The screen's header rows and the collapsed ribbon take their height first.
+The register and the pane SHALL fill what remains, above a floor of 36rem.
+Expanding the ribbon takes height from both down to that floor. Past it, the
+page scrolls.
 
-#### Scenario: The third column shows the checks rail with nothing selected
+Below 64rem of width the steps register SHALL collapse to a disclosure. The
+panels screen's index rail already follows that rule, at that same
+breakpoint.
 
-- **WHEN** the developer has selected no step and no path
-- **THEN** the third column shows the checks rail, not the inspector
+#### Scenario: The three regions appear
 
-#### Scenario: The third column shows the inspector once the developer selects a step
+- **WHEN** the structure surface loads
+- **THEN** the ribbon, the steps register and the configuration pane each
+  appear as their own region
 
-- **WHEN** the developer selects one step, or a path
-- **THEN** the third column shows the inspector, not the full checks
-  rail
+#### Scenario: The ribbon starts collapsed
 
-#### Scenario: The third column shows the count with several steps selected
+- **WHEN** the developer opens the structure surface
+- **THEN** the ribbon shows its bar and the fit-scale band, and no palette
+
+#### Scenario: The control expands and collapses the ribbon
+
+- **WHEN** the developer activates the ribbon's control
+- **THEN** the full canvas shows, with the palette
+- **AND** activating the control again returns the ribbon to its band
+
+#### Scenario: A canvas selection opens the pane
+
+- **WHEN** the developer clicks a step node in the ribbon
+- **THEN** the configuration pane shows that step, and its register row
+  reads as current
+
+#### Scenario: A register selection marks the node
+
+- **WHEN** the developer chooses a step's row in the register
+- **THEN** the configuration pane shows that step, and its node reads as
+  selected in the ribbon
+
+#### Scenario: Several steps show the count
 
 - **WHEN** the developer selects more than one step
-- **THEN** the third column shows the selection count and its delete
-  control
-- **AND** it shows neither the inspector nor the full checks rail
+- **THEN** the configuration pane shows the selection count and its delete
+  control, not a step
 
-#### Scenario: A tall window grows the columns rather than leaving a band below them
+#### Scenario: A reload returns the ribbon to collapsed
 
-- **WHEN** the canvas edit screen loads in a window whose remaining height
-  is above the floor
-- **THEN** the three columns end at the top edge of the collapsed dock,
-  and the canvas is taller than 36rem
+- **WHEN** the developer expands the ribbon and reloads the screen
+- **THEN** the ribbon shows its band
 
-#### Scenario: A short window holds the columns at the floor
+#### Scenario: Saving a draft writes no ribbon state
 
-- **WHEN** the canvas edit screen loads in a window whose remaining height
-  is below the floor
-- **THEN** the three columns keep the 36rem floor and the page scrolls to
-  reach their bottom edge
+- **WHEN** the developer expands the ribbon and saves the draft
+- **THEN** the saved `layout` blob carries no key naming the ribbon
 
-#### Scenario: An open dock takes height from the columns down to the floor
+#### Scenario: A short window holds the floor
 
-- **WHEN** the developer opens the dock in a window whose remaining height
-  is well above the floor
-- **THEN** the columns lose the dock's height and stay at or above 36rem
-- **AND** the canvas stays visible above the dock
+- **WHEN** the structure surface loads in a window shorter than the floor
+- **THEN** the register and the pane keep 36rem and the page scrolls
+
+### Requirement: The steps register lists every step in reachability order
+
+The steps register SHALL show one ruled row per step in the draft. Each row
+carries the step's role stamp, its label resolved for the content locale,
+and its issue count. The count prints only above zero, as a refusal-tone
+stamp.
+
+The role stamp SHALL read `Initial` for the draft's `initialStep`, `End`
+for a step carrying `terminal: true`, `Subprocess` for a step of that type,
+and `Task` otherwise. Those four use the existing stamp tones.
+
+Rows SHALL follow reachability from the initial step. Terminal steps come
+last, in the draft's own order. A step no path reaches comes after the
+reachable ones and before the terminal ones.
+
+A row's identifying content SHALL be a real `<button type="button">`. The
+row itself carries no click handler. The current step's row carries
+`aria-current="true"`.
+
+Below the steps, the register SHALL carry the process links. Those are
+Fields, Data sources, Contract, Field matrix, Changes and Paths. Each opens
+the panels screen at its own view, per `studio-app`. Each shows its count
+where one exists.
+
+#### Scenario: Every step takes a row
+
+- **WHEN** a draft holds seven steps
+- **THEN** the register shows seven rows
+
+#### Scenario: Rows follow reachability
+
+- **WHEN** a draft's initial step reaches step B, and B reaches terminal
+  step C
+- **THEN** the register lists the initial step, then B, then C
+
+#### Scenario: An issue count prints on its row
+
+- **WHEN** one step carries two open issues and another carries none
+- **THEN** the first row shows a count of two, and the second shows no
+  count
+
+#### Scenario: A row is a real control
+
+- **WHEN** a keyboard user tabs into the register
+- **THEN** each row's identifying content takes focus as a button, and the
+  current row carries `aria-current`
+
+### Requirement: The configuration pane's masthead names the step
+
+The configuration pane SHALL open with a masthead above the section
+register. The masthead does not scroll with the register.
+
+The masthead SHALL carry the step's role stamp, its label, its key and its
+id. It SHALL also carry the description, the performed-by control, the
+initial-step control, the issue count, and an overflow control. The label
+edits inline. The key and
+the id print in the mono face. The description edits as localized text.
+
+The masthead SHALL keep the missing-translation warning beside the label and
+beside the description. Those are two of the six `LocalizedTextInput` sites
+`studio-app` requires a warning at. Each warning is a sibling of its field,
+never nested inside a label.
+
+The initial-step control SHALL show only when the step is not the draft's
+`initialStep`. When it is, the role stamp reads `Initial` and no control
+appears.
+
+The outcome field does not sit here. A terminal step's outcome is what it
+produces on departure, so the Exit section holds it. The register requirement
+below states that. The field's own hint states that an outcome binds only on
+a contracted process, and no label carries a parenthetical.
+
+<!-- Why: "Remove step" below is a literal UI label, not a synonym choice -->
+<!-- against "delete" elsewhere in this file. -->
+<!-- antislop: allow synonym-rotation -->
+The overflow control SHALL open two entries: "View raw JSON" and "Remove
+step". The first shows the step's raw JSON, read-only, in place below the
+masthead. It carries `aria-expanded` and `aria-controls`. The second removes
+the step, as the diagnostics drawer's control did.
+
+The issue count SHALL total the step's own issues and those of its paths,
+timers and actions. It prints as a refusal-tone stamp above zero.
+
+#### Scenario: The masthead shows the step's identity
+
+- **WHEN** the developer selects a step
+- **THEN** the masthead shows its role stamp, label, key, id, description
+  and performed-by control
+
+#### Scenario: The label edits inline
+
+- **WHEN** the developer edits the label in the masthead
+- **THEN** the draft's step label updates, and the key derives per the
+  masthead's key-derivation requirement
+
+#### Scenario: The masthead keeps its translation warnings
+
+- **WHEN** the content locale is `de` and the step's label carries no `de`
+  value
+- **THEN** the missing-translation warning renders beside the label
+
+#### Scenario: The masthead sets the initial step
+
+- **WHEN** the developer activates "Set as initial step" in the masthead
+- **THEN** the draft's `workflow.initialStep` names that step, the stamp
+  reads `Initial`, and the control disappears
+
+#### Scenario: The overflow shows raw JSON
+
+- **WHEN** the developer chooses "View raw JSON" from the overflow
+- **THEN** the step's raw JSON renders read-only below the masthead
+
+#### Scenario: The overflow offers step removal
+
+- **WHEN** the developer chooses "Remove step" from the overflow
+- **THEN** the step leaves the draft, and the pane shows the register's
+  first remaining step
+
+#### Scenario: The issue count covers a path's issue
+
+- **WHEN** a step carries no issue of its own and one of its paths carries
+  a failing guard
+- **THEN** the masthead's count reads one
+
+### Requirement: The configuration pane shows the step as a register of sections in runtime order
+
+Below the masthead, the configuration pane SHALL show a register of
+sections in a fixed order. That order is Entry, Assignment, Form, Paths,
+Timers, Exit. A Subprocess section joins after Exit when performed-by reads
+Subprocess.
+
+Every section head SHALL show at all times. A head carries the section's
+name and its resolved value or count, right-aligned in the mono face. An
+empty section prints `—` as its value. A head carrying issues also shows
+their count as a refusal-tone stamp.
+
+Each head SHALL be a `<button type="button">` carrying `aria-expanded` and
+`aria-controls`. Choosing it expands or collapses the section in place.
+Several sections stay open at once. The pane keeps each step's open set
+for as long as the draft stays loaded.
+
+A section carrying content or an issue SHALL open by default. An empty one
+stays closed.
+
+The sections SHALL hold what follows. No section's own fields, validation or
+mutation logic differs from the panel it hosts.
+
+- Entry holds the `onEntry` actions.
+- Assignment holds the assignment strategy and the no-assignment warning.
+<!-- Why: "Build the form" below is a literal UI label, not a synonym -->
+<!-- choice against "create" elsewhere in this file. -->
+<!-- antislop: allow synonym-rotation -->
+- Form holds the configured-field count, a "Build the form" control, and no
+  editor. That control navigates to the form editor's routed page.
+- Paths holds the paths editor.
+- Timers holds the timers editor.
+- Exit holds the `onExit` and `onCancel` actions, and the outcome field on a
+  terminal step.
+- Subprocess holds the spec editor and the cross-process check fieldset.
+  That fieldset's file input loads a child body, and
+  `checkSubprocessChildRefs` runs against nothing without it.
+
+Selecting a path edge on the canvas SHALL resolve to its source step. The
+pane opens that step with its Paths section expanded and the path's own row
+highlighted.
+
+#### Scenario: Every section head shows
+
+- **WHEN** the developer selects a step with three paths, two timers and no
+  entry actions
+- **THEN** the pane shows all six heads, with Paths reading 3, Timers 2, and
+  Entry reading `—`
+
+#### Scenario: Sections with content open by default
+
+- **WHEN** the developer selects that same step
+- **THEN** Paths and Timers show their bodies, and Entry shows none
+
+#### Scenario: A head expands its section in place
+
+- **WHEN** the developer chooses a collapsed section's head
+- **THEN** that section's body shows below its head, and no other section
+  changes state
+
+#### Scenario: Several sections stay open together
+
+- **WHEN** the developer expands Paths and then expands Timers
+- **THEN** both bodies show
+
+#### Scenario: The open set survives a selection change
+
+- **WHEN** the developer collapses Paths on step A, selects step B, and
+  returns to step A
+- **THEN** Paths on step A is still collapsed
+
+#### Scenario: A section head carries its issue count
+
+- **WHEN** one of the step's paths carries a failing guard
+- **THEN** the Paths head shows an issue count of one
+
+#### Scenario: Entry and Exit split the three action lists
+
+- **WHEN** the developer selects a step with one `onEntry` and one `onExit`
+  action
+- **THEN** Entry reads 1 action, Exit reads 1 action, and each body holds
+  the matching editor
+
+#### Scenario: The Form section navigates to the form editor
+
+- **WHEN** the developer chooses "Build the form" in the Form section
+- **THEN** the form editor's routed page opens for that step
+
+#### Scenario: The Subprocess section keeps the cross-process check
+
+- **WHEN** the developer selects a step of type `subprocess`
+- **THEN** the Subprocess section holds the spec editor and the
+  cross-process fieldset, whose file input still loads a child body
+
+#### Scenario: A path edge opens its source step's Paths section
+
+- **WHEN** the developer clicks a path edge on the canvas
+- **THEN** the pane shows the edge's source step, Paths shows its body, and
+  the clicked path's row carries the highlight
+
+#### Scenario: A head activates with the keyboard
+
+- **WHEN** a keyboard user focuses a section head and presses Enter or
+  Space
+- **THEN** the section toggles, and `aria-expanded` reflects the new state
+
+### Requirement: The configuration pane's sections follow the performed-by control
+
+The section register SHALL change shape with the masthead's performed-by
+control.
+
+When performed-by reads Terminal, the pane SHALL omit the Paths and Timers
+sections. In their place one line states that a terminal step has no
+outgoing path and no timer. The Assignment section SHALL show no
+no-assignment warning on a terminal step. That mirrors the existing rule:
+`terminal === true || assignment !== undefined`.
+
+When performed-by reads Subprocess, the pane SHALL omit the Assignment and
+Form sections and add the Subprocess section. A subprocess step is a
+wait-state with no participant form.
+
+When performed-by changes, the register SHALL re-render to the new shape at
+once. A section that no longer lists cannot stay open.
+
+#### Scenario: A terminal step omits Paths and Timers
+
+- **WHEN** the developer selects a step carrying `terminal: true`
+- **THEN** the pane shows no Paths head and no Timers head, and one line
+  states why
+
+#### Scenario: A terminal step suppresses the no-assignment warning
+
+- **WHEN** the developer selects a step carrying `terminal: true` and no
+  `assignment`
+- **THEN** the Assignment section shows no no-assignment warning
+
+#### Scenario: A subprocess step swaps Assignment and Form for Subprocess
+
+- **WHEN** the developer selects a step of type `subprocess`
+- **THEN** the pane shows no Assignment head and no Form head, and shows a
+  Subprocess head
+
+#### Scenario: Leaving Subprocess drops its section
+
+- **WHEN** the developer changes performed-by from Subprocess to
+  Participant
+- **THEN** the Subprocess head disappears, and Assignment and Form appear
 
 ### Requirement: A palette offers Step, Subprocess, and End as an always-available way to add a step
 
-The canvas edit screen SHALL show a palette listing Step, Subprocess, and
-End. Each entry SHALL be a drag source. Dragging one onto the canvas
-SHALL add a step of that kind at the drop point. That SHALL use
-the same Draft-mutation method `StepsPanel`'s own "add step" action
-already calls.
+The expanded canvas ribbon SHALL show a palette listing Step, Subprocess,
+and End. Each entry SHALL be a drag source. Dragging one onto the canvas
+SHALL add a step of that kind at the drop point. That SHALL use the same
+draft-mutation method the steps register's own add control calls.
 
-The palette SHALL stay visible and usable regardless of canvas selection.
+The palette SHALL stay usable regardless of canvas selection.
+
+A draft holding no step SHALL offer an add control in the steps register.
+That control SHALL add a step of type `task`. The collapsed ribbon shows no
+palette, so the register carries the one always-reachable way to add the
+first step.
 
 #### Scenario: Dragging a palette entry adds a step
 
-- **WHEN** the developer drags the Step entry from the palette onto the
-  canvas
+- **WHEN** the developer expands the ribbon and drags the Step entry onto
+  the canvas
 - **THEN** a new step of type `task` exists at the drop point
-- **AND** it is added through the same method `StepsPanel`'s "add step"
-  action calls
 
 #### Scenario: The palette works with nothing selected
 
 - **WHEN** the developer selects nothing on the canvas
-- **THEN** every palette entry stays visible and usable
+- **THEN** every palette entry stays usable
+
+#### Scenario: An empty draft adds its first step from the register
+
+- **WHEN** a draft holds no step and the ribbon stays collapsed
+- **THEN** the steps register shows an add control, and activating it adds a
+  step of type `task`
 
 ### Requirement: A process-identity header bar shows draft and publish status
 
@@ -1671,7 +1692,7 @@ translation, rather than committing a copy of the key as a label.
 - **THEN** the rename commits, and the canvas handler neither selects the step
   nor opens the inspector
 
-### Requirement: The identity zone's step key auto-derives from the step label
+### Requirement: The masthead's step key auto-derives from the step label
 
 The masthead's key field SHALL auto-fill from the selected step's
 label as the developer types. This holds for a step whose key is empty. It
@@ -1745,7 +1766,7 @@ draft's lifetime in the browser.
   canvas node's inline rename
 - **THEN** the step's key stays unchanged
 
-### Requirement: The identity zone's type and terminal controls render as a "performed by" segmented control
+### Requirement: The masthead's type and terminal controls render as a "performed by" segmented control
 
 The masthead SHALL render the step's existing `type` and
 `terminal` fields as a three-option segmented control, labeled
@@ -1847,7 +1868,7 @@ rather than omit it.
 - **THEN** its rect carries `rx="0"`, matching the subprocess rect inside the
   same node
 
-### Requirement: The identity zone constrains a terminal step's outcome to the process's declared outcomes
+### Requirement: The masthead constrains a terminal step's outcome to the process's declared outcomes
 
 When the draft's contract declares one or more `outcomes`, the
 masthead's `outcome` field SHALL offer only those values, not free text.
@@ -2826,259 +2847,6 @@ sequence reaches that path, and the canvas draws a pointer-only control.
 - **THEN** it announces the group's expanded state through `aria-expanded`,
   the same attribute the canvas button carries
 
-### Requirement: A dock below the canvas columns collapses and opens
-
-The canvas edit screen SHALL carry a dock. It is one strip below the three
-columns, and it spans their full width. A control on the dock opens it and
-closes it. The dock starts collapsed on every load of the screen.
-
-<!-- antislop: allow synonym-rotation -->
-<!-- Why: CLAUDE.md fixes "surface" as a domain term with no synonym, and
-     `.claude/rules/ui-glossary.md` fixes "JSON surface" as this view's one
-     name. The rule reads that word as a synonym for "show". -->
-The screen SHALL show the dock in the canvas sub-state of the Structure
-surface alone. The form editor and the panels screen each replace the
-canvas, so neither one shows the dock. The screen SHALL show no dock while
-the JSON surface is active either. The dock's Field matrix tab mutates the
-draft body, and `studio-json-view` keeps every such component out of reach
-there.
-
-The dock's control SHALL be a `<button type="button">`. It carries
-`aria-expanded` for its own state, and `aria-controls` naming the dock's
-body. `spa-accessibility` asks a disclosure for all three.
-
-The dock SHALL persist neither its open state nor its active tab. Both live
-in the screen's own component state. They survive a new canvas selection,
-and a reload returns the dock to collapsed.
-
-The draft's `layout` blob SHALL carry no key for the dock. That blob rides
-the draft body, so a stored open state would reach every author of that
-draft.
-
-#### Scenario: The dock starts collapsed
-
-- **WHEN** the developer opens the canvas edit screen
-- **THEN** the dock shows its control and no tab body
-
-#### Scenario: The control opens and closes the dock
-
-- **WHEN** the developer activates the dock's control
-- **THEN** the dock shows the active tab's body
-- **AND** activating the control again hides that body
-
-#### Scenario: The dock survives a new canvas selection
-
-- **WHEN** the developer opens the dock and then selects a step
-- **THEN** the dock stays open on the same tab
-
-#### Scenario: A reload returns the dock to collapsed
-
-- **WHEN** the developer opens the dock and then reloads the screen
-- **THEN** the dock shows its control and no tab body
-
-#### Scenario: The form editor and the panels screen show no dock
-
-- **WHEN** the developer opens the form editor or the panels screen
-- **THEN** neither screen shows the dock
-
-#### Scenario: The JSON surface shows no dock
-
-- **WHEN** the developer switches to the JSON surface
-- **THEN** the screen shows no dock, neither a tab body nor the control
-
-#### Scenario: The control states what it discloses
-
-- **WHEN** the dock renders, collapsed or open
-- **THEN** its control is a `<button type="button">` carrying
-  `aria-expanded` for its state
-- **AND** it carries `aria-controls` naming the dock's body
-
-#### Scenario: Saving a draft writes no dock state
-
-- **WHEN** the developer opens the dock and saves the draft
-- **THEN** the saved `layout` blob carries no key naming the dock
-
-### Requirement: The dock offers three tabs, one active at a time
-
-The dock SHALL offer three tabs, in this order: Changes, Field matrix and
-Paths. Exactly one tab is active. Opening the dock for the first time shows
-the first tab.
-
-Each tab body SHALL scroll inside the dock's own bounded height. The dock
-never grows to fit its content, and the page never scrolls sideways because
-of a tab.
-
-Neither the Paths tab nor the Field matrix tab offers a filter. Both scroll
-instead.
-
-#### Scenario: The first tab is active on the first open
-
-- **WHEN** the developer opens the dock for the first time on a screen
-- **THEN** the Changes tab is active
-
-#### Scenario: Selecting a tab replaces the body
-
-- **WHEN** the developer selects the Paths tab
-- **THEN** the dock shows the Paths body, and it hides the Changes body
-
-#### Scenario: A long body scrolls inside the dock
-
-- **WHEN** a tab's content is taller than the dock
-- **THEN** that body scrolls inside the dock, and the dock keeps its
-  height
-
-<!-- antislop: allow synonym-rotation -->
-<!-- Why: "Changes" is this tab's own name, and "change" is what a publish
-     does to a published version. The rule reads both as synonyms for the
-     "edit" in "canvas edit screen", which names a screen. -->
-### Requirement: The Changes tab shows what a publish would change
-
-The Changes tab SHALL show the difference between the draft and the version
-the draft sits on. It answers the question a publish raises, and the
-developer stays on the canvas to read it.
-
-The tab SHALL read the draft as the editor holds it, including edits the
-developer has not saved. The `process-version-inspection` capability's
-versions screen reads the saved draft from the server instead.
-
-Both use one difference computation. The tab SHALL pass the base version
-first and the draft second. Every entry then runs from the published value
-toward the draft value, the direction a publish moves.
-
-That order decides how an entry reads. A key the draft adds reads as added,
-and a key it drops reads as removed. The reverse order inverts both, and it
-prints a changed entry's two values the wrong way round.
-
-A list compares whole. The difference computation treats an array as one
-value. A draft that adds one catalog field reports one changed entry over
-that whole list. It reports no added entry.
-
-<!-- antislop: allow synonym-rotation -->
-<!-- The compile pass's cancel sink is the engine's own term. -->
-The tab SHALL strip the compiled content from the base version's body
-first. The versions screen gives that body the same treatment. The compile
-pass injects a cancel sink, and no developer authored it.
-
-A process with no base version SHALL read as a first publish. The tab says
-so, and it shows no difference.
-
-An empty difference SHALL read as such. The tab says the draft matches its
-base version.
-
-#### Scenario: A draft over a published version shows its difference
-
-- **WHEN** the developer opens the Changes tab on a draft of a published
-  process
-- **THEN** the tab shows what the draft changes against its base version
-
-#### Scenario: An unsaved edit reaches the tab
-
-- **WHEN** the developer renames a step and opens the Changes tab without
-  saving
-- **THEN** the tab lists that rename
-- **AND** the entry's first value is the published label, and its second is
-  the unsaved one
-
-#### Scenario: A publish moves the base and the tab follows it
-
-- **WHEN** the developer publishes the draft from the header bar with the
-  Changes tab open
-- **THEN** the tab reads the newly published version, with no reload
-- **AND** it reports that the draft matches that version
-
-#### Scenario: A never-published process reads as a first publish
-
-- **WHEN** the developer opens the Changes tab on a process with no base
-  version
-- **THEN** the tab says the publish would be the first one, and it shows
-  no difference
-
-#### Scenario: A draft matching its base reads as no difference
-
-- **WHEN** the developer opens the Changes tab on a draft nobody has edited
-  since it seeded from its base version
-- **THEN** the tab says the draft matches that version
-
-### Requirement: The Field matrix tab mounts the field matrix
-
-The Field matrix tab SHALL mount the `studio-app` capability's field
-matrix, the grid of every catalog field against every step. The developer
-edits a cell's flags there, exactly as on the panels screen.
-
-The panels screen SHALL keep its own field matrix and its route. The dock
-adds a second place to reach that grid. It removes none.
-
-#### Scenario: The tab shows the grid
-
-- **WHEN** the developer selects the Field matrix tab
-- **THEN** the dock shows the grid of catalog fields against workflow
-  steps
-
-#### Scenario: The panels route still reaches the grid
-
-- **WHEN** the developer opens the field matrix view of the panels screen
-- **THEN** that screen shows the grid, as it does today
-
-### Requirement: The Paths tab lists every path in the process
-
-The Paths tab SHALL show one row per path across the whole draft. The five
-columns are source step, trigger, priority, guard and target. A canvas
-draws a path as a line, and a line hides those five values.
-
-Rows SHALL follow the draft's own order. The steps order the rows first,
-and each step's own path order orders the rows inside it.
-
-A path with no guard SHALL read as such, and so SHALL a path with no
-priority. The tab states each absence rather than leaving a blank cell
-unexplained. A guard is independent of the trigger. A manual path can carry
-one. That guard decides whether the participant may take the path, so the
-tab SHALL show it.
-
-A draft with no path at all SHALL show an empty state naming that fact.
-
-The row derivation SHALL live in a pure module with `bun:test` coverage,
-the convention `packages/web/src/areas/app/screens/inboxLogic.ts` sets. It
-takes the draft's steps and returns the rows. The test needs no DOM and no
-rendering.
-
-#### Scenario: Every path takes a row
-
-- **WHEN** the developer selects the Paths tab on a draft holding four
-  steps and five paths
-- **THEN** the tab shows five rows
-
-#### Scenario: A row names its source step and its target step
-
-- **WHEN** the tab shows a path's row
-- **THEN** that row names the step the path leaves and the step it enters
-
-#### Scenario: A manual path with no guard reads as carrying none
-
-- **WHEN** a step's manual paths carry no guard and no priority
-- **THEN** each of their rows reads as carrying no priority and no guard
-
-#### Scenario: A manual path carrying a guard shows it
-
-- **WHEN** a manual path carries a guard
-- **THEN** its row shows that guard's CEL source
-
-#### Scenario: An automatic path shows its priority and its guard source
-
-- **WHEN** a step carries two automatic paths, one guarded
-- **THEN** each row shows that path's priority
-- **AND** the guarded row shows its guard's CEL source
-
-#### Scenario: A draft with no path shows an empty state
-
-- **WHEN** the developer selects the Paths tab on a draft holding no path
-- **THEN** the tab says the process has no path yet
-
-#### Scenario: The row derivation holds without rendering
-
-- **WHEN** a test gives the row derivation a list of steps
-- **THEN** it returns one row per path, in the draft's own order
-- **AND** the test needs no DOM or canvas rendering
-
 ### Requirement: The process-identity header bar renders from compiled styles
 
 `panels/ProcessHeaderBar.tsx` renders the process-identity header bar,
@@ -3094,56 +2862,43 @@ requirement's scope.
 - **THEN** its computed layout, spacing, color and border equal the
   values the deleted stylesheet declared
 
-### Requirement: The inspector's identity zone and diagnostics drawer render from compiled styles
-
-`panels/StepsPanel.tsx` renders three named regions. They are the
-inspector's identity zone, its behavior-zone tab list, and its
-diagnostics drawer (`.claude/rules/ui-glossary.md`'s own names for
-them). All three SHALL render from compiled component styles. The
-rendered result SHALL match the previous stylesheet declaration for
-declaration.
-
-#### Scenario: The inspector's own chrome keeps its look
-
-- **WHEN** a browser selects a step and opens the inspector
-- **THEN** all three regions keep their computed layout, spacing, color
-  and border
-- **AND** every value matches the deleted stylesheet's own
-
 ### Requirement: The inspector's Paths and Timers tabs render from compiled styles
 
-`panels/PathsPanel.tsx`, one of the inspector's own behavior-zone
-tabs, SHALL render from compiled component styles. The rendered
-result SHALL match the previous stylesheet declaration for
-declaration.
+`panels/PathsPanel.tsx`, the body of the configuration pane's Paths
+section, SHALL render from compiled component styles. The rendered result
+SHALL match the previous stylesheet declaration for declaration.
 
-`panels/TimersPanel.tsx`, the inspector's other behavior-zone tab,
-renders no class this migration covers. It already satisfies this
-requirement, unchanged, since it carries no rule to compile.
+`panels/TimersPanel.tsx`, the body of the Timers section, renders no class
+this migration covers. It already satisfies this requirement, unchanged.
 
 #### Scenario: The Paths tab keeps its look
 
-- **WHEN** a browser opens the inspector's Paths tab
-- **THEN** its computed layout, spacing, color and border equal the
-  values the deleted stylesheet declared
+- **WHEN** a browser opens the configuration pane's Paths section
+- **THEN** its computed layout, spacing, color and border equal the values
+  the deleted stylesheet declared
 
-### Requirement: The dock's own layout renders from compiled styles
+### Requirement: The bench renders from compiled styles
 
-`dock/EditorDock.tsx` SHALL render from compiled component styles. That
-covers the dock's collapsed strip, its tab row, and each tab's content
-frame. The rendered result SHALL match the previous stylesheet
-declaration for declaration.
+The steps register, the masthead, the section register and the ribbon's
+own chrome SHALL render from compiled component styles, reading
+`form-ui/tokens.stylex`. No literal class name appears in any of the four
+beyond the `.btn` family and the three exceptions `web-styling` pins.
 
-`canvas/CanvasView.tsx` and `canvas/EditRail.tsx` render the three
-columns above the dock, and this requirement leaves both untouched.
-This requirement covers only the dock itself.
+Every string a person reads in the four SHALL come from the studio catalog.
+That includes the no-assignment warning, the section names, and the
+terminal step's one-line explanation.
 
-#### Scenario: The dock keeps its look and its tab switch still works
+#### Scenario: The bench carries no stray literal class
 
-- **WHEN** a browser expands the dock and switches between its tabs
-- **THEN** the dock's computed layout equals the value the deleted
-  stylesheet declared
-- **AND** each tab still shows its own content on selection
+- **WHEN** a browser renders the bench
+- **THEN** no element inside the four regions carries a literal class
+  beyond the `.btn` family, `canvas-node`, `panzoom-exclude` and
+  `studio-dialog`
+
+#### Scenario: The no-assignment warning reads from the catalog
+
+- **WHEN** the developer selects a non-terminal step with no assignment
+- **THEN** the warning's text resolves through the studio catalog's `t`
 
 ### Requirement: The edit screen's own layout renders from compiled styles
 

@@ -117,7 +117,7 @@ reader announces reports nothing to a blind user.
 
 This requirement binds the studio edit screen's own chrome. That means the
 process header bar, the two failure paragraphs `EditScreen.tsx` renders
-directly, and the editor dock.
+directly, and the canvas ribbon's bar.
 
 Every other component that screen mounts keeps the rule above. So does every
 other screen in `packages/web`. That rule asks a screen to render a failure,
@@ -146,7 +146,13 @@ Four further paragraphs on that screen take the second shape:
 - the save conflict
 - the missing form step
 - the absent draft
-- the dock's failed diff load
+- the failed diff load of the panels screen's Changes view
+
+<!-- Why: "edit screen" names a screen; a change is a draft mutation. -->
+<!-- antislop: allow synonym-rotation -->
+The dock hosted that fourth paragraph until now. The Changes view hosts it
+today, on the panels screen. The rule follows the paragraph rather than the
+host, so the shape it must take does not move.
 
 When a modal dialog is open, the failure SHALL render inside that dialog
 rather than behind it. A modal puts everything behind it out of reach, so the
@@ -169,6 +175,12 @@ developer can neither read nor dismiss a banner there.
 
 - **WHEN** the edit screen renders any one of its failure states
 - **THEN** each one renders in the same alert banner shape as the others
+
+#### Scenario: The Changes view's failed diff load takes that shape
+
+- **WHEN** the panels screen's Changes view fails to load its base version
+- **THEN** the failure renders in the same alert banner shape, in a live
+  region
 
 #### Scenario: A failure under an open modal renders inside it
 

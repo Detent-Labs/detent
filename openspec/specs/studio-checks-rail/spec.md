@@ -46,16 +46,12 @@ requirement below for the step-selected state.
 
 ### Requirement: The rail collapses to a one-line issue-count summary when the developer selects a step
 
-Selecting a step or a path swaps the third column's content. It SHALL
-show the inspector, not the full checks rail. The inspector SHALL dock a
-one-line checks summary at its bottom edge.
-
-Selecting more than one step swaps that content again. The third column
-SHALL then show the selection's own count and delete control, which the
-`studio-canvas` capability states. That summary SHALL dock the same
-one-line checks summary at its bottom edge. An author therefore reads the
-issue count in every state of the column but one. The full rail's own state
-needs no summary, since its grouped list already carries the count.
+<!-- Why: "structure surface" is the domain term for this screen, per CLAUDE.md. -->
+<!-- antislop: allow synonym-rotation -->
+On the structure surface the rail SHALL show its one-line summary in the
+canvas ribbon's bar. It sits beside the ribbon's control. The bench stands no
+column for the full rail, so the summary shows in every state of the
+surface. It no longer depends on what the developer has selected.
 
 The summary SHALL show a single count. That count totals every open entry in
 `validation.issues[]`. It spans the zod, structural, CEL, registry, duration,
@@ -78,25 +74,39 @@ group's config-validation half can hold back on its own. When it does, with
 the group's type-resolution half clear, the summary SHALL NOT enter this
 state.
 
-Choosing the summary SHALL expand it to the same grouped list the full
-rail shows when the developer selects nothing.
+Choosing the summary SHALL expand the same grouped list the full rail
+shows. On the bench it expands in place below the ribbon's bar, as a
+disclosure. It pushes the register and the configuration pane down. It
+floats over nothing and casts no shadow. Choosing the summary again
+collapses it.
+
+The summary SHALL be a `<button type="button">` carrying `aria-expanded`
+and `aria-controls` naming the grouped list.
+
+The panels screen keeps its own docked summary, per the requirement that
+states it.
 
 #### Scenario: Selecting a step collapses the rail to a summary
 
-- **WHEN** the developer selects a step
-- **THEN** the third column shows the inspector, and a one-line checks
-  summary docks at its bottom edge
+- **WHEN** the developer selects a step on the structure surface
+- **THEN** the ribbon's bar shows the one-line checks summary, and no full
+  rail stands in a column
+
+#### Scenario: The summary shows with nothing selected
+
+- **WHEN** the developer opens the structure surface and selects nothing
+- **THEN** the ribbon's bar still shows the one-line checks summary
 
 #### Scenario: The summary counts every open issue
 
 - **WHEN** the loaded draft carries three open issues across two groups
-- **THEN** the collapsed summary shows a count of three
+- **THEN** the summary shows a count of three
 
 #### Scenario: A registry type-resolution issue enters the collapsed count
 
 - **WHEN** the loaded draft compiles, and names an action type the registry
   response does not hold
-- **THEN** the collapsed summary's count includes that registry issue
+- **THEN** the summary's count includes that registry issue
 - **AND** the registry group's own config-validation half stays held back
   without changing that count
 
@@ -104,7 +114,7 @@ rail shows when the developer selects nothing.
 
 - **WHEN** the loaded draft passes every zod, structural, CEL, registry,
   duration, and view check
-- **THEN** the collapsed summary shows no count
+- **THEN** the summary shows no count
 - **AND** it does not show a held-back indicator, even though the
   registry group's config-validation half stays held back
 
@@ -112,21 +122,27 @@ rail shows when the developer selects nothing.
 
 - **WHEN** the loaded draft is not Zod-valid, so every one of those six
   groups holds back
-- **THEN** the collapsed summary shows a held-back indicator
+- **THEN** the summary shows a held-back indicator
 - **AND** it does not show "no count"
 
 #### Scenario: Choosing the summary expands the full grouped list
 
-- **WHEN** the developer chooses the collapsed summary
-- **THEN** the inspector's checks area expands to the same grouped list
-  the full rail shows
+- **WHEN** the developer chooses the summary in the ribbon bar
+- **THEN** the grouped list expands below the bar, and the register and
+  the configuration pane move down to make room
+
+#### Scenario: Choosing the summary again collapses the list
+
+- **WHEN** the grouped list shows and the developer chooses the summary
+  again
+- **THEN** the list collapses, and the bench returns to its height
 
 #### Scenario: Selecting several steps keeps the docked summary
 
 - **WHEN** the developer selects more than one step
-- **THEN** the third column shows the selection count and its delete
+- **THEN** the configuration pane shows the selection count and its delete
   control
-- **AND** the one-line checks summary docks at that summary's bottom edge
+- **AND** the ribbon's bar still shows the one-line checks summary
 
 ### Requirement: The rail reflects the held-back state of a structurally invalid draft
 
