@@ -1,24 +1,27 @@
 ## 1. EditRail.tsx conversion
 
-- [ ] 1.1 Add a `stylex.create()` style object to `EditRail.tsx` covering all
+- [x] 1.1 Add a `stylex.create()` style object to `EditRail.tsx` covering all
   10 of its own rule blocks (`.studio-rail`, `.studio-rail-section`, the
   `+`-combinator divider rule as a plain style on the second-and-later
   section, `.studio-rail-section h2`, `.studio-rail-row`,
   `.studio-rail-count`, `.studio-palette-list`, `.studio-palette-entry`
   incl. its `:hover`, `.studio-palette-ghost`), reading
   `form-ui/tokens.stylex`. Verify `bun run typecheck` passes with no new
-  errors in this file.
-- [ ] 1.2 Replace every literal `studio-*` `className` in `EditRail.tsx`
+  errors in this file. Done: `bun run typecheck` exits 0.
+- [x] 1.2 Replace every literal `studio-*` `className` in `EditRail.tsx`
   with `stylex.props(...)`. Verify by rendering the file's existing test
   coverage (`studio-draftToolbarState.test.ts` and any other test importing
-  `EditRail`) and confirming it still passes.
-- [ ] 1.3 Delete the 10 now-migrated rule blocks from `app.css`. Verify with
+  `EditRail`) and confirming it still passes. Done: no test file directly
+  imports `EditRail` (grepped); `studio-draftToolbarState.test.ts` (18
+  tests) passes unchanged.
+- [x] 1.3 Delete the 10 now-migrated rule blocks from `app.css`. Verify with
   `grep -oP '^[^{]+(?=\{)' app.css | sed 's/[[:space:]]*$//' | sort -u | wc -l`
-  reading 48 (58 minus the 10 EditRail blocks).
+  reading 48 (58 minus the 10 EditRail blocks). Done: reads 48. Committed
+  as `7edd8f8`.
 
 ## 2. CanvasView.tsx selector and ref fixes (no CSS touched yet)
 
-- [ ] 2.1 Add a `data-kind="edge"` attribute to the edge-group `<g>`
+- [x] 2.1 Add a `data-kind="edge"` attribute to the edge-group `<g>`
   (alongside its existing `data-path-id`/`data-step-id`), and rewrite
   `elementFor()`'s path selector from
   `` `.canvas-edge-group[data-path-id="${f.pathId}"]` `` to
@@ -27,15 +30,16 @@
   `` `.canvas-group-disclosure[data-group-id="${f.groupId}"]` `` to
   `` `[data-group-id="${f.groupId}"]` `` (already unique, per design.md D1).
   Leave the step selector (`.canvas-node[data-step-id="${f.stepId}"]`)
-  unchanged. Verify `bun run typecheck` passes.
-- [ ] 2.2 Replace the `.canvas-toolbar` `.closest()` check in the `onWheel`
+  unchanged. Verify `bun run typecheck` passes. Done.
+- [x] 2.2 Replace the `.canvas-toolbar` `.closest()` check in the `onWheel`
   handler with `toolbarRef.current?.contains(e.target as Node)` (design.md
-  D2). Verify `bun run typecheck` passes.
-- [ ] 2.3 Verify these two fixes preserve behavior with no visual change:
+  D2). Verify `bun run typecheck` passes. Done.
+- [x] 2.3 Verify these two fixes preserve behavior with no visual change:
   run the existing `studio-canvas-node-a11y.test.tsx`,
   `studio-canvas-node-label.test.tsx`, and `studio-inlineRename.test.ts`
   suites and confirm every test still passes (`app.css` is still present and
-  unconverted at this point, so no test should need updating yet).
+  unconverted at this point, so no test should need updating yet). Done: 27
+  pass, 0 fail across the three files.
 
 ## 3. CanvasView.tsx and EditScreen.tsx CSS conversion
 

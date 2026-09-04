@@ -244,12 +244,12 @@ export function CanvasView({
     panzoomRef.current = panzoom;
     // The manual `wheel` listener binds to the same `.canvas-wrap` element,
     // for the same reason. `zoomWithWheel` carries no `panzoom-exclude`
-    // check of its own, so the toolbar needs an explicit guard here — by
-    // class name, not a general `.closest(".panzoom-exclude")` walk, since
-    // every node and edge already carries that class and already receives
-    // wheel-zoom today (design.md - Decisions).
+    // check of its own, so the toolbar needs an explicit guard here — the
+    // toolbar's own ref, not a general `.closest(".panzoom-exclude")` walk,
+    // since every node and edge already carries that class and already
+    // receives wheel-zoom today (stylex-phase-4-canvas design.md D2).
     const onWheel = (e: WheelEvent) => {
-      if ((e.target as Element).closest(".canvas-toolbar")) return;
+      if (toolbarRef.current?.contains(e.target as Node)) return;
       panzoom.zoomWithWheel(e);
     };
     wrap?.addEventListener("wheel", onWheel);
@@ -386,8 +386,8 @@ export function CanvasView({
       f.kind === "step"
         ? `.canvas-node[data-step-id="${f.stepId}"]`
         : f.kind === "path"
-          ? `.canvas-edge-group[data-path-id="${f.pathId}"]`
-          : `.canvas-group-disclosure[data-group-id="${f.groupId}"]`;
+          ? `[data-kind="edge"][data-path-id="${f.pathId}"]`
+          : `[data-group-id="${f.groupId}"]`;
     return svg.querySelector<SVGElement | HTMLElement>(selector);
   };
 
@@ -1183,6 +1183,7 @@ export function CanvasView({
               <g
                 key={path.id ?? `${step.id}-${pathIndex}`}
                 className={`canvas-edge-group panzoom-exclude${isSelected ? " canvas-edge-group-selected" : ""}${isInsertTarget ? " canvas-edge-insert-target" : ""}`}
+                data-kind="edge"
                 data-path-id={path.id}
                 data-step-id={path.id !== undefined ? step.id : undefined}
                 role="button"
