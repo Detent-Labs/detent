@@ -28,10 +28,16 @@
 
   `panels/DraftToolbar.tsx`'s own `studio-`-prefixed substrings are
   import paths and catalog keys, not classes. It gets no task either.
-- [x] 1.4 Confirm `screens/studio/root.tsx` needs no further change.
-  It already imports and applies `navStyles` from phase 2's own Group
-  2 work. Verify: `grep -n "navStyles" packages/web/src/areas/studio/
-  root.tsx` prints the existing import and both `stylex.props` calls.
+- [x] 1.4 Confirm `screens/studio/root.tsx`'s `navStyles` usage needs
+  no further change. It already imports and applies `navStyles` from
+  phase 2's own Group 2 work. Verify: `grep -n "navStyles"
+  packages/web/src/areas/studio/root.tsx` prints the existing import
+  and both `stylex.props` calls.
+
+  This file carries one more site past `navStyles`: its own `<main
+  className="studio-empty-role">`, backed by a real rule at
+  `app.css:29`. Task 3.1 below converts it, since it is the smallest
+  remaining group open when this was found.
 
 ## 2. The `::backdrop` verification
 
@@ -50,13 +56,26 @@
 
 - [ ] 3.1 Convert `dock/EditorDock.tsx` to `stylex.create`, reading
   `form-ui/tokens.stylex`. Cover the collapsed strip, the tab row and
-  each tab's content frame. Verify: `bun run typecheck` passes.
-- [ ] 3.2 Change `studio-editorDock-fieldMatrixTab.test.tsx`'s literal
-  `studio-matrix-*` class assertions to the stub-derived key names.
-  Verify: `bun test packages/web/test/studio-editorDock-
-  fieldMatrixTab.test.tsx` passes.
-- [ ] 3.3 Delete the migrated rules from `app.css`. Verify:
-  `bun run build` succeeds.
+  each tab's content frame. `.studio-dock-body` keeps its literal
+  class name too, composed alongside its own new compiled style
+  (D10), since `.studio-dock-body .studio-matrix-scroll` still
+  depends on it until Group 6 converts `FieldMatrixGrid.tsx`. Also
+  convert `screens/studio/root.tsx`'s own `.studio-empty-role` (task
+  1.4's finding), a one-rule, one-site class unrelated to the dock but
+  folded in here as the nearest open group. Verify: `bun run
+  typecheck` passes.
+- [ ] 3.2 Verify: `bun run build` succeeds. `app.css` keeps every rule
+  this task's own files used, dead code until Group 9's single
+  cleanup pass deletes it (D11) — deleting per group cannot tell a
+  truly dead rule from one a later group's file still renders, and 41
+  of this phase's 314 rules render in more than one file.
+
+  `studio-editorDock-fieldMatrixTab.test.tsx` needs no change here.
+  Its literal-class assertions (`studio-matrix-table`,
+  `studio-matrix-flag-*` and the rest) target `FieldMatrixGrid.tsx`'s
+  own markup, mounted inside the dock's Field matrix tab, not any
+  class `EditorDock.tsx` itself renders. Task 6.7 updates it, once
+  `FieldMatrixGrid.tsx` converts.
 
 ## 4. The header bar and the four dialogs
 
@@ -78,11 +97,15 @@
   matches the value `app.css:891` declared before this change. This is
   D4's second check, now that a real dialog carries the compiled rule.
 - [ ] 4.4 Change `studio-processHeaderBar-publishGate.test.tsx`'s
-  literal `studio-error-banner`/`studio-conflict` class assertions to
-  the stub-derived key names. Verify: `bun test packages/web/test/
+  literal `studio-error-banner` assertions to the stub-derived key
+  name. Its `not.toContain("studio-conflict")` assertion needs no
+  change: `ProcessHeaderBar.tsx` never renders that class, before or
+  after this conversion, so the check stays trivially true. Verify:
+  `bun test packages/web/test/
   studio-processHeaderBar-publishGate.test.tsx` passes.
-- [ ] 4.5 Delete the migrated rules from `app.css`. Verify:
-  `bun run typecheck` and `bun run build` both pass.
+- [ ] 4.5 Verify: `bun run typecheck` and `bun run build` both pass.
+  `app.css` keeps every rule these two files used (D11); Group 9's
+  cleanup pass deletes it once every group is done.
 
 ## 5. The field catalog and its shared editors
 
@@ -102,7 +125,9 @@
 - [ ] 5.3 Verify: `bun run typecheck` passes. Also run `git grep -c
   'className="condition-\|className="field-\|className="default-value-
   \|className="plugin-field' packages/web/src/areas/studio/panels/`.
-  It finds nothing outside `app.css`'s own now-deleted rules.
+  It returns 0: every `.tsx` reference now reads its style from a
+  `stylex.create` entry. `app.css`'s own rules for these classes stay
+  in place, dead code, until Group 9's cleanup pass (D11).
 
 ## 6. The panels screen, field matrix, data sources and checks rail
 
@@ -117,22 +142,33 @@
   `.studio-matrix-row-header` duplicate declaration into one
   `stylex.create` entry (D6). Pick `CellState`'s style from an
   exhaustive check over its three values; `blank` gets no extra style,
-  matching today's stylesheet.
+  matching today's stylesheet. Its scroll box takes a `compact?:
+  boolean` prop (or reads its mount context some other way) so it can
+  pick the 15rem cap `dock/EditorDock.tsx` needs instead of its own
+  32rem default (D10). Drop `.studio-dock-body`'s retained literal
+  class from `EditorDock.tsx`'s own JSX now that the scroll box picks
+  its cap in code — `app.css`'s `.studio-dock-body .studio-matrix-
+  scroll` rule itself waits for Group 9's cleanup pass like every
+  other rule (D11).
 - [ ] 6.4 Convert `panels/FieldMatrixPanel.tsx`.
 - [ ] 6.5 Convert `panels/DataSourcesPanel.tsx` and its dependency
   `panels/shared/InstanceQueryForm.tsx`.
 - [ ] 6.6 Convert `panels/ChecksRail.tsx`.
-- [ ] 6.7 Change the four remaining field-matrix/panels test files'
-  literal class assertions to the stub-derived key names.
+- [ ] 6.7 Change five field-matrix/panels test files' literal class
+  assertions to the stub-derived key names.
 
   They are `studio-fieldMatrixGrid-bulkBadges.test.tsx`,
   `studio-fieldMatrixPanel-legend.test.tsx`,
-  `studio-panelsRailFieldRow.test.tsx` and
-  `studio-checksRail-publishVerdict.test.tsx`.
+  `studio-panelsRailFieldRow.test.tsx`,
+  `studio-checksRail-publishVerdict.test.tsx`, and
+  `studio-editorDock-fieldMatrixTab.test.tsx` (task 3.2's finding: its
+  assertions target `FieldMatrixGrid.tsx`'s own markup, so they wait
+  for this task, not `EditorDock.tsx`'s own conversion).
 
-  Verify: `bun test` against all four passes.
-- [ ] 6.8 Delete the migrated rules from `app.css`. Verify:
-  `bun run typecheck` and `bun run build` both pass.
+  Verify: `bun test` against all five passes.
+- [ ] 6.8 Verify: `bun run typecheck` and `bun run build` both pass.
+  `app.css` keeps every rule this group's files used (D11) until
+  Group 9's cleanup pass.
 
 ## 7. The form editor
 
@@ -147,8 +183,11 @@
   packages/web/src/areas/studio/screens/FormEditorScreen.tsx` finds
   it. Either way, verify: `git grep -c '\[data-columns\|\[data-span'
   packages/web/src/areas/studio/app.css` returns 0.
-- [ ] 7.3 Delete the migrated rules from `app.css`. Verify:
-  `bun run typecheck` and `bun run build` both pass.
+- [ ] 7.3 Verify: `bun run typecheck` and `bun run build` both pass.
+  `app.css` keeps every rule `FormEditorScreen.tsx` used (D11) until
+  Group 9's cleanup pass, including `.studio-dialog-note`: `panels/
+  ProcessHeaderBar.tsx` and `screens/ProcessesScreen.tsx` (Group 4)
+  also render that one class.
 
 ## 8. The remaining screens
 
@@ -167,21 +206,16 @@
   `panels/MigrationSpecEditor.tsx`, including the raw-JSON textarea
   fallback state.
 - [ ] 8.5 Convert `panels/JsonView.tsx`.
-- [ ] 8.6 Delete the migrated rules from `app.css`. Verify:
-  `bun run typecheck` and `bun run build` both pass.
+- [ ] 8.6 Verify: `bun run typecheck` and `bun run build` both pass.
+  `app.css` keeps every rule this phase's files used (D11); Group 9's
+  cleanup pass is next, and by now every non-canvas file has
+  converted, so nothing left in it is still depended on.
 
 ## 9. Cleanup
 
-- [ ] 9.1 Verify `app.css`'s remaining rule count. Unlike every
-  earlier phase, this file does not shrink to a single literal block.
-  Canvas has no stylesheet of its own, so `app.css` keeps its 50
-  `.canvas-*` rules for phase 4. Re-run the rule-count grep from task
-  1.1. Verify: it now finds exactly 50 distinct rule blocks, all
-  `.canvas-*` prefixed. Two more classes ride along too, `.canvas-
-  group-name` and `.canvas-edge-focus-halo`, D2's deferral and phase
-  4's own duplicate.
-- [ ] 9.2 Verify no stray `studio-*`/bare-class reference survives
-  outside `canvas/`.
+- [ ] 9.1 Verify no stray `studio-*`/bare-class reference survives
+  outside `canvas/`, proving it is safe to delete `app.css`'s
+  remaining non-canvas rules in one pass (D11).
 
   <!-- antislop: allow sentence-length -->
   <!-- One grep command; its alternation pattern counts as words. -->
@@ -191,6 +225,22 @@
   packages/web/src/areas/studio/ --include='*.tsx'`.
 
   Exclude `canvas/` from the result by eye. It returns 0.
+- [ ] 9.2 Delete every rule `app.css` still carries outside its
+  `.canvas-*`-prefixed set, in one pass — every group left its own
+  migrated rules in place on purpose (D11), and task 9.1 just
+  confirmed nothing outside `canvas/` still depends on any of them.
+  Keep the `@media (prefers-reduced-motion: reduce)` block: every
+  area's `app.css` keeps this one, phase 1's own "one global
+  stylesheet carries what the compiler cannot" pattern.
+
+  Re-run the rule-count grep from task 1.1. Unlike every earlier
+  phase, this file does not shrink to a single literal block: canvas
+  has no stylesheet of its own, so `app.css` keeps its 50 `.canvas-*`
+  rules for phase 4. Verify: it now finds exactly 50 distinct rule
+  blocks, all `.canvas-*` prefixed. Two more classes ride along too,
+  `.canvas-group-name` and `.canvas-edge-focus-halo`, D2's deferral
+  and phase 4's own duplicate. Also verify: `bun run typecheck` and
+  `bun run build` both pass.
 - [ ] 9.3 Verify `tokens.css`'s `.btn` family and `app.css`'s
   `.canvas-*` rules stay byte-identical to the commit before this
   phase started. This change touches neither (D1).

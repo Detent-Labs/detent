@@ -6,6 +6,7 @@ import { useAreaRoute, PROFILE_PATH, type NavigateOptions } from "../../shell/ro
 import { t } from "./catalog.js";
 import { Chrome } from "../../shell/Chrome.js";
 import { navStyles } from "../../shell/navStyles.js";
+import { space } from "form-ui/tokens.stylex";
 import { ProcessesScreen } from "./screens/ProcessesScreen.js";
 import { EditScreen } from "./screens/EditScreen.js";
 import { VersionsScreen } from "./screens/VersionsScreen.js";
@@ -20,6 +21,20 @@ import "./app.css";
 // from `ROUTE_ROLE`, so the nav and the guard cannot disagree with the map.
 const TEMPLATES_ROLE = "system:templates";
 
+/** `.studio-empty-role` from `app.css`. */
+const styles = stylex.create({
+  emptyRole: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: "100vh",
+    textAlign: "center",
+    gap: space.s3,
+    padding: space.s4,
+  },
+});
+
 /**
  * The same explanatory state the shell shows an actor with no studio role,
  * named per screen. Names every role that admits the screen, not just one: a
@@ -28,7 +43,7 @@ const TEMPLATES_ROLE = "system:templates";
  */
 function MissingRole({ roles }: { roles: readonly string[] }) {
   return (
-    <main className="studio-empty-role">
+    <main {...stylex.props(styles.emptyRole)}>
       <h1>Not your screen</h1>
       <p>
         This screen needs the {roles.join(" or ")} role. Your account does not have it.

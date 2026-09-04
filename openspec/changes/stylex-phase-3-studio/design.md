@@ -278,6 +278,62 @@ This matches `design-language.md`'s own "duplicate on purpose" rule.
 It also matches every prior phase's own call. One standing exception
 exists, `navStyles.ts`. It stays unchanged and untouched here.
 
+**D10. `.studio-dock-body .studio-matrix-scroll` keeps `.studio-dock-body`
+alive as a literal hook class on the DOM element, independent of
+`app.css`'s own deletion schedule (D11).** This descendant rule caps
+`FieldMatrixGrid.tsx`'s own scroll box at 15rem, shrunk from its 32rem
+default, only while it renders inside the dock. `FieldMatrixGrid.tsx`
+stays unconverted until Group 6, so `.studio-matrix-scroll` keeps
+rendering as a literal class until then. Compiling away
+`.studio-dock-body`'s own literal name from the rendered DOM in Group 3
+would break the descendant match immediately, three groups before the
+file on its other end migrates — regardless of whether the CSS text
+backing it still sits in `app.css` or not.
+
+Group 3 converts `.studio-dock-body`'s own properties
+(`max-height`/`overflow`/`margin-top`) into a compiled style, and
+composes it alongside the retained literal string on the element
+itself, the same way D2 composes `.canvas-group-name`:
+
+```
+className={`studio-dock-body ${stylex.props(styles.dockBody).className}`}
+```
+
+Group 6 drops that literal composition, once `FieldMatrixGrid.tsx`
+compiles its own scroll box and can size it from a prop instead of a
+descendant selector.
+
+**D11. `app.css` sheds every non-canvas rule in one pass, in Group 9,
+not incrementally per group.** Audit found far more of D9's
+near-identical shapes than `.studio-dialog` alone. 41 of this phase's
+280 in-scope class names render in two or more files, spread across
+five different groups — `.studio-empty`, the
+`.studio-error-banner`/`-stamp`/`-message` set,
+`.studio-diff`/`.studio-diff-<kind>`, `.studio-controls`,
+`.studio-warning`, `.studio-back`, `.studio-screen`, `.studio-table`
+and 32 more. Converting the file `dock/EditorDock.tsx` renders in
+Group 3 does not make `.studio-empty`'s source rule dead: six more
+files across Groups 4 and 8 still render that literal class until
+their own turn comes.
+
+A per-group "delete the migrated rules" task, scoped to only that
+group's own files, cannot tell a truly dead rule from one four other
+groups still depend on without re-deriving this whole audit at every
+step. Deleting nothing keeps every group's own verify step
+(`bun run build`) meaningful — an unused rule sitting in `app.css`
+breaks no build — and moves the one delete-everything pass to a point
+where it is safe by construction: after Group 8 finishes, no
+non-canvas file renders a literal class from `app.css` at all, so nothing
+remains to protect. Task 9.1 confirms that first (the old task 9.2),
+then task 9.2 deletes every non-canvas rule in `app.css` in one pass
+and confirms the count (the old task 9.1's own check moves after the
+deletion it used to only describe).
+
+Each file still gets its own local `stylex.create` entry per shape
+(D9); no shared module appears anywhere. This decision only changes
+when the now-dead source CSS leaves the file, not how many times its
+shape gets defined in code.
+
 ## Risks / Trade-offs
 
 - [`::backdrop` does not compile or paint as designed] → D4's
