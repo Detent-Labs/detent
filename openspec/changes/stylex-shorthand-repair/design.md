@@ -31,8 +31,10 @@ of them are `boundaries.test.ts` and `studio-guidedSurfaceStyle.test.ts`.
 
 - No new color, weight, spacing or radius. A converted declaration asks for
   what its shorthand asked for.
-- No sweep of other shorthands. `padding` and `font` compile to atoms today,
-  measured against the same bundle.
+- No sweep of other shorthands. Three measured against the same bundle
+  compile to atoms today: `padding`, `font` and `borderLeft`. The last one
+  matters most. A side shorthand survives, so the dropped set is these two
+  keys and not shorthands as a class.
 - No ESLint. One rule does not pay for a lint toolchain this repo has lived
   without.
 - No change to the design language. `design-language.md` and `DESIGN.md` stay

@@ -53,7 +53,7 @@
 - [ ] 6.6 Walk the four surfaces in a browser at 1440x900
 - [x] 6.7 Confirm the field matrix legend swatch draws its frame and its fill
 - [ ] 6.8 Confirm a register row fills on hover in all three areas
-- [ ] 6.9 Run `/impeccable critique` on the field matrix route
+- [x] 6.9 Run `/impeccable critique` on the field matrix route
 - [ ] 6.10 Run `/impeccable audit` on the field matrix route
 - [x] 6.11 Run the prose gate over every changed Markdown file
 - [x] 6.12 Run the whitespace gate over the pushed range
