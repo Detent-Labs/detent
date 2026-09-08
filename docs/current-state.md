@@ -4359,7 +4359,7 @@ meets `scope=started` should infer no new permission tier from it.
 
 - The process surface (`screens/EditScreen.tsx`, `panels/ProcessTabRow.tsx`,
   `panels/StepsRail.tsx`, `panels/StepPage.tsx`, `panels/FormsTab.tsx`,
-  `panels/FormPreview.tsx`, `panels/DraftNavControls.tsx`,
+  `panels/FormPreview.tsx`,
   `studio-process-tabs`, `studio-step-page`, `studio-forms-overview`,
   `studio-guided-vocabulary`): stage 62. A draft opened on two screens before
   this. The edit screen carried a canvas ribbon over a bench. A separate
