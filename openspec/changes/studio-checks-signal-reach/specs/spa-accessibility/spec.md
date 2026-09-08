@@ -2,6 +2,8 @@
 
 ### Requirement: A tab set matches the area's tab pattern
 
+<!-- antislop: allow synonym-rotation -->
+<!-- Why: "surface" above names a studio authoring surface. "render" here is the tab panel's own display verb, an unrelated concept, not a rotated synonym. -->
 A tab set SHALL group its tabs in a `tablist`. Each tab SHALL be a
 button carrying `role="tab"`. The active tab SHALL carry
 `aria-selected`. The active tab's panel SHALL render, and the others
