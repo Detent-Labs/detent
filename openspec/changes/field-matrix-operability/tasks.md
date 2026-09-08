@@ -30,17 +30,17 @@
 
 ## 4. The rest
 
-- [ ] 4.1 Add the empty state for a process declaring no field
-- [ ] 4.2 Add the empty state for a filter leaving no column
-- [ ] 4.3 Add both catalog sentences for those states
-- [ ] 4.4 Give the Hide-inert toggle a pressed style, picked in code
-- [ ] 4.5 Give a gated cell a reason in its `title`
-- [ ] 4.6 Give the same reason to a screen reader on that cell
-- [ ] 4.7 Add the catalog sentence for each of the two gating cases
-- [ ] 4.8 Raise the blank cell's dash to the contrast floor
-- [ ] 4.8b Give that dash a semantic role; it reads `neutral500` today
-- [ ] 4.9 Measure the badge and checkbox spacing against the 24 pixel floor
-- [ ] 4.10 Change the spacing only where the measurement falls short
+- [x] 4.1 Add the empty state for a process declaring no field
+- [x] 4.2 Add the empty state for a filter leaving no column
+- [x] 4.3 Add both catalog sentences for those states
+- [x] 4.4 Give the Hide-inert toggle a pressed style, picked in code
+- [x] 4.5 Give a gated cell a reason in its `title`
+- [x] 4.6 Give the same reason to a screen reader on that cell
+- [x] 4.7 Add the catalog sentence for each of the two gating cases
+- [x] 4.8 Raise the blank cell's dash to the contrast floor
+- [x] 4.8b Give that dash a semantic role; it reads `neutral500` today
+- [x] 4.9 Measure the badge and checkbox spacing against the 24 pixel floor
+- [x] 4.10 Change the spacing only where the measurement falls short
 
 ## 5. Verification
 

@@ -431,6 +431,16 @@ export const en = {
   "fieldMatrix.bulkSetColumn": "Sets this flag on step {name}. Cells it writes: {total}. Already set: {set}.",
   "fieldMatrix.bulkClearColumn": "Clears this flag from step {name}. Cells it writes: {total}.",
   "fieldMatrix.bulkSetRow": "Sets this flag for field {name}. Cells it writes: {total}. Already set: {set}.",
+  // The matrix drew a header row above nothing at all, which
+  // `design-language.md` forbids: "An empty state says so in words. It never
+  // shows as an empty table." The two causes need different words, because
+  // one is a process to fix and the other a filter to clear.
+  "fieldMatrix.emptyNoFields": "This process declares no field yet, so the matrix has nothing to line up.",
+  "fieldMatrix.emptyNoColumns": "Hide inert columns is on, and it leaves no step to show. Turn it off to see them.",
+  // A gated checkbox carried `aria-disabled` and swallowed the click without
+  // a word. Each case says which rule gates it.
+  "fieldMatrix.gatedNotWritten": "Nothing writes this field before this step, so the flag would strand the participant.",
+  "fieldMatrix.gatedTechnical": "The definition contract rejects this flag on a technical field.",
   "fieldMatrix.bulkClearRow": "Clears this flag from field {name}. Cells it writes: {total}.",
   "fieldMatrix.technicalRowMark": "Technical",
 
