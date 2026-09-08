@@ -76,6 +76,9 @@ function renderHeader(findings: PublishFinding[]): string {
         structureActive={true}
         processId="proc_a"
         go={() => {}}
+        onToggleJson={() => {}}
+        onVersions={() => {}}
+        onPlayer={() => {}}
       />
     </DraftContext.Provider>,
   );

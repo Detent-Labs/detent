@@ -79,25 +79,28 @@ editor SHALL keep winning where both arrive.
 - **WHEN** an author opens `/studio/processes/p1/edit/nonsense`
 - **THEN** the Canvas tab is the open one
 
-### Requirement: An overflow menu holds what is not a tab
+### Requirement: The header bar's menu holds what is not a tab
 
-The tab row SHALL carry an overflow control at its trailing edge. The menu
-SHALL hold the JSON surface, Versions and Player. The Structure and JSON pair
-beside the header bar SHALL NOT stand any more.
+The header bar's `⋮` menu SHALL carry a second group, "Views", below the
+process's own "Process, saved with the draft" group. The Views group SHALL
+hold the JSON surface, Versions and Player. The tab row SHALL have no
+trailing control of its own. Its trailing edge is the last tab.
 
-The JSON entry SHALL name its own state. An author reads from it whether the
-entry opens the JSON surface or leaves it.
+The JSON entry SHALL name its own state. An author reads from it whether
+the entry opens the JSON surface or leaves it.
 
-#### Scenario: The JSON surface opens from the overflow menu
+#### Scenario: The JSON surface opens from the header bar's menu
 
-- **WHEN** an author opens the overflow menu and picks the JSON entry
+- **WHEN** an author opens the header bar's `⋮` menu and picks the JSON
+  entry
 - **THEN** the JSON surface replaces the tab body
 - **AND** the entry now names leaving that surface
 
-#### Scenario: The header bar carries no surface pair
+#### Scenario: The tab row has no trailing control
 
-- **WHEN** an author reads the header bar
-- **THEN** no Structure control and no JSON control stand in it
+- **WHEN** an author reads the tab row
+- **THEN** its trailing edge is the last tab, with no overflow control
+  after it
 
 ### Requirement: Checks stands in the area nav with a state dot
 

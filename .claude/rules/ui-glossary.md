@@ -17,7 +17,7 @@ pairs that go wrong span both sections, so both live in one file.
 ## 1. Chrome: the parts of the screen
 
 "Chrome" is the general UI term for an application's fixed frame. It names
-the persistent controls around the content, not the content itself. A menu
+the persistent controls around the content rather than the content itself. A menu
 bar, a toolbar, a scrollbar are chrome; the document inside them is not.
 The term predates the Google Chrome browser. That browser took its name from
 this term, because it deliberately shows almost none of it. In this
@@ -36,7 +36,7 @@ whichever area is open and renders the same header row around it every time.
 | account group | the identity span and the account menu trigger, right-aligned in the header | `Chrome.tsx` |
 | account menu | the popover the account group opens: profile, language, area switch, logout | `Chrome.tsx` |
 
-The area switch lives inside the account menu, not as a persistent tab row.
+The area switch lives inside the account menu rather than as a persistent tab row.
 The switcher filters the current area out of the actor's permitted set. An
 actor permitted only one area gets an empty set from that filter. The
 switcher then renders nothing, so that actor sees no trace of the other
@@ -52,9 +52,8 @@ nav, the header bar, the tab row, then one tab body.
 | process surface | the one screen a draft opens on: the tab row and the body under it | `screens/EditScreen.tsx` |
 | screen nav | the row above the header bar. It holds Back to processes and nothing else | `screens/EditScreen.tsx` |
 | header bar | the process-identity row: name, key, revision, dirty/saved state, Save, Discard draft, Publish, the `⋮` menu | `panels/ProcessHeaderBar.tsx` |
-| tab row | the row of ten tabs over the body, with the overflow menu at its end | `panels/ProcessTabRow.tsx` |
+| tab row | the row of ten tabs over the body | `panels/ProcessTabRow.tsx` |
 | tab | one of the ten. The authoring order runs Canvas, Steps, Fields, Data sources, Paths, Forms, Field matrix, Contract, Changes and Checks | `routing.ts` |
-| overflow menu | the tab row's own menu: the JSON surface, Versions and Player | `panels/ProcessTabRow.tsx` |
 | structure surface | the ten tab bodies together, the JSON surface's one alternative | `EditScreen.tsx`, its `structureActive` prop |
 | JSON surface | the raw definition view, the structure surface's one alternative | `panels/JsonView.tsx` |
 
@@ -67,7 +66,8 @@ Checks stands in the area nav, never on the surface. Save, Discard draft and
 Publish stand in the header bar instead, right-aligned ahead of the `⋮` menu.
 `panels/ProcessHeaderBar.tsx` renders them there. The area nav's own
 component, `DraftNavControls.tsx`, renders Checks into the element `root.tsx`
-reserves there.
+reserves there. The Views group in that menu holds the JSON surface, Versions
+and Player.
 
 Every other term below belongs to one tab.
 
@@ -112,11 +112,11 @@ field catalog's own editor. It stands apart from the register tab, the shell's
 own header label. It stands apart from a tab on the tab row as well. All three
 are tab patterns, and each keeps its own name.
 
-The step page carries no tab row of its own. Its two columns of open sections
+The step page has no tab row of its own. Its two columns of open sections
 take the place of one.
 
 **inert** carries two readings here, both HTML terms used for their literal
-meaning, not a rotated synonym for either. The field matrix stamps a step
+meaning rather than a rotated synonym for either. The field matrix stamps a step
 column `data-inert` when that step declares no view: a state fact about the
 column. Two preview containers carry the `inert` HTML attribute itself. Those
 are the field catalog's, and the form editor's participant preview. That is a
@@ -150,7 +150,7 @@ detail shows, from one shared function: `describeRecordElement`.
 The form preview mounts that same `FieldForm`. So the form editor, the player
 and the Task screen all draw one renderer.
 
-**rail** names a class of component, not one component. A rail is a
+**rail** names a class of component rather than one component. A rail is a
 fixed-width column beside a screen's main content, scrolled on its own. It
 holds a register list, or a validation list. Three rails exist.
 

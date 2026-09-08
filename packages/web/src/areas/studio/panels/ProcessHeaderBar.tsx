@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import * as stylex from "@stylexjs/stylex";
-import { MoreVertical, Users2 } from "lucide-react";
+import { FileJson, History, MoreVertical, Play, Users2 } from "lucide-react";
 import { colors, fonts, space, shadow } from "form-ui/tokens.stylex";
 import { t } from "../catalog.js";
 import { useDraft } from "../draft/store.js";
@@ -183,6 +183,14 @@ const styles = stylex.create({
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
+  // No top border: the panel's own border already divides this group from
+  // whatever is above the menu. `headerBarMenuGroup` below carries the
+  // divider instead, for every group after the first.
+  headerBarMenuGroupFirst: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s1,
+  },
   headerBarMenuGroup: {
     display: "flex",
     flexDirection: "column",
@@ -211,6 +219,12 @@ const styles = stylex.create({
     justifyContent: "flex-start",
     gap: space.s2,
     width: "100%",
+    // Overrides the global `.btn` class's centered text: the flex row above
+    // already left-aligns the icon and label as items, but a label long
+    // enough to wrap (`manageGroups`) still centers its own wrapped line
+    // without this, since text-align governs a flex item's own inline
+    // content independently of the row's justify-content.
+    textAlign: "left",
   },
   // `.studio-edit-screen > *` used to zero every direct child's own
   // top margin, since a flex column does not collapse adjacent ones the
@@ -552,6 +566,12 @@ interface Props {
   /** Cross-area navigation. The link is the only user: it calls
    * `go(href)` to reach the admin area's Groups screen — never a mutation. */
   go: (href: string, opts?: NavigateOptions) => void;
+  /** Flips the JSON surface. `ProcessTabRow` keeps its own `jsonOpen` prop —
+   * this menu derives the same fact from `structureActive` (`= !jsonOpen`)
+   * instead of taking a second, redundant copy. */
+  onToggleJson: () => void;
+  onVersions: () => void;
+  onPlayer: () => void;
 }
 
 /**
@@ -561,12 +581,20 @@ interface Props {
  * version stay a read-only pass-through of state the process surface owns —
  * no logic of their own.
  *
- * The `⋮` menu carries one group, "Process, saved with the draft": the
- * editable key, the base locale, the add-locale control and the link to the
- * admin area's assignment groups. It carries no Save, no Discard and no
- * Publish — those three stand in this row instead, right-aligned ahead of
- * the menu trigger (`studio-process-tabs`). Checks alone stands in the
- * studio's area nav.
+ * The `⋮` menu carries two groups. "Process, saved with the draft" holds
+ * the editable key, the base locale, the add-locale control and the link to
+ * the admin area's assignment groups. "Views" holds the JSON surface toggle,
+ * Versions and Player — navigation to other views of this process, so
+ * unlike the first group it stays reachable whichever surface is active.
+ * The menu carries no Save, no Discard and no Publish — those three stand
+ * in this row instead, right-aligned ahead of the menu trigger
+ * (`studio-process-tabs`). Checks alone stands in the studio's area nav.
+ *
+ * The panel mixes form fields with command buttons in its first group, so
+ * it carries no `role="menu"`; the trigger's `aria-haspopup="true"` names a
+ * plain disclosure instead. Escape closes the panel and returns focus to
+ * the trigger, the one thing a keyboard-only dismissal must do that an
+ * outside click has no equivalent for.
  *
  * Save, Discard draft and Publish are wired to the same `actions`
  * (`useDraftToolbarActions`, called once by `EditScreen.tsx`) the error
@@ -604,10 +632,14 @@ export function ProcessHeaderBar({
   structureActive,
   processId,
   go,
+  onToggleJson,
+  onVersions,
+  onPlayer,
 }: Props) {
   const { draft, mutate, contentLocale, setContentLocale } = useDraft();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const publishTriggerRef = useRef<HTMLButtonElement>(null);
   const discardTriggerRef = useRef<HTMLButtonElement>(null);
 
@@ -621,7 +653,15 @@ export function ProcessHeaderBar({
     const onDocument = (e: MouseEvent) => {
       if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false);
     };
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setMenuOpen(false);
+    // Refocuses the trigger on Escape, unlike the outside-click close below:
+    // a mouse dismissal has nowhere sensible to send focus, but a keyboard
+    // dismissal must return it to the control that opened the menu, or a
+    // keyboard-only user lands on `<body>` with no sense of where they are.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setMenuOpen(false);
+      triggerRef.current?.focus();
+    };
     document.addEventListener("mousedown", onDocument);
     document.addEventListener("keydown", onKey);
     return () => {
@@ -754,50 +794,63 @@ export function ProcessHeaderBar({
           <button
             type="button"
             className="btn btn-secondary studio-header-bar-menu-trigger"
-            aria-haspopup="menu"
+            aria-haspopup="true"
             aria-expanded={menuOpen}
             aria-label={t("headerBar.menuTrigger")}
+            ref={triggerRef}
             onClick={() => setMenuOpen((open) => !open)}
           >
             <MoreVertical size={18} strokeWidth={1.75} aria-hidden="true" />
           </button>
           {menuOpen && (
-            <div {...stylex.props(styles.headerBarMenuPanel)} role="menu">
-              {/* One group and nothing beside it (`studio-process-tabs`: the
-                  header bar's own menu carries none of the area nav's one
-                  control, and none of Save, Discard draft or Publish either).
-                  AddLocaleControl renders on both surfaces:
-                  add-locale only calls setContentLocale (view state), never
-                  mutate() — studio-json-view names "the content-locale
-                  switcher" exempt from the JSON-surface reachability ban. Only
-                  key and baseLocale actually mutate the draft body, so only
-                  they are structureActive-gated within it. */}
-              <div {...stylex.props(styles.headerBarMenuGroup)}>
+            <div {...stylex.props(styles.headerBarMenuPanel)}>
+              {/* Two groups (`studio-header-menu-merge`): process-identity
+                  settings here, then Views below. Neither Save, Discard
+                  draft, Publish nor Checks stands in this menu at all — the
+                  three sit in this row instead, and Checks stays in the area
+                  nav. Neither group is a command-only list either — this one
+                  mixes form fields with buttons — so the panel carries no
+                  `role="menu"`/`menuitem` pair; a real ARIA menu widget must
+                  hold only commands and would promise arrow-key navigation
+                  this panel does not implement. AddLocaleControl renders on
+                  both surfaces: add-locale only calls setContentLocale (view
+                  state), never mutate() — studio-json-view names "the
+                  content-locale switcher" exempt from the JSON-surface
+                  reachability ban. Only key and baseLocale actually mutate
+                  the draft body, so only they are structureActive-gated, and
+                  by `disabled` rather than by unmounting: the process label
+                  field right above this menu (in the header row's own
+                  `<h1>`) uses the same disabled-in-place pattern for the
+                  same gate, and a group whose heading stays put while its
+                  rows silently vanish reads as broken, not as gated. */}
+              <div {...stylex.props(styles.headerBarMenuGroupFirst)}>
                 <span {...stylex.props(styles.headerBarMenuLabel)}>{t("headerBar.menuGroupDraft")}</span>
-                {structureActive && (
-                  <>
-                    <label {...stylex.props(styles.headerBarMenuRow)}>
-                      key
-                      <input
-                        type="text"
-                        value={draft.key ?? ""}
-                        onChange={(e) =>
-                          mutate((d) => {
-                            d.key = e.target.value;
-                          })
-                        }
-                      />
-                    </label>
-                    {/* Before label: baseLocale decides which entry of every
-                        LocalizedText below it is mandatory, so the declaration
-                        precedes the first localized value it governs (same
-                        ordering the old ProcessHeader fieldset used). */}
-                    <label {...stylex.props(styles.headerBarMenuRow)}>
-                      baseLocale
-                      <input type="text" value={draft.baseLocale ?? ""} onChange={(e) => changeBaseLocale(e.target.value)} />
-                    </label>
-                  </>
-                )}
+                <label {...stylex.props(styles.headerBarMenuRow)}>
+                  key
+                  <input
+                    type="text"
+                    disabled={!structureActive}
+                    value={draft.key ?? ""}
+                    onChange={(e) =>
+                      mutate((d) => {
+                        d.key = e.target.value;
+                      })
+                    }
+                  />
+                </label>
+                {/* Before label: baseLocale decides which entry of every
+                    LocalizedText below it is mandatory, so the declaration
+                    precedes the first localized value it governs (same
+                    ordering the old ProcessHeader fieldset used). */}
+                <label {...stylex.props(styles.headerBarMenuRow)}>
+                  baseLocale
+                  <input
+                    type="text"
+                    disabled={!structureActive}
+                    value={draft.baseLocale ?? ""}
+                    onChange={(e) => changeBaseLocale(e.target.value)}
+                  />
+                </label>
                 <AddLocaleControl />
                 {/* Pure navigation, never gated by `structureActive`: it
                     mutates nothing the JSON surface itself edits, the same
@@ -815,6 +868,40 @@ export function ProcessHeaderBar({
                 >
                   <Users2 size={18} strokeWidth={1.75} aria-hidden="true" />
                   {t("headerBar.manageGroups")}
+                </button>
+              </div>
+              {/* What the tab row's own overflow menu carried before this
+                  menu absorbed it: navigation to other views of the same
+                  process, never a draft-body mutation, so it stays reachable
+                  whichever surface is active — unlike the group above. */}
+              <div {...stylex.props(styles.headerBarMenuGroup)}>
+                <span {...stylex.props(styles.headerBarMenuLabel)}>{t("headerBar.menuGroupViews")}</span>
+                <button
+                  type="button"
+                  className={`btn btn-secondary ${headerBarMenuLinkProps.className}`}
+                  style={headerBarMenuLinkProps.style}
+                  onClick={() => runMenuAction(onToggleJson)}
+                >
+                  <FileJson size={18} strokeWidth={1.75} aria-hidden="true" />
+                  {t(structureActive ? "headerBar.jsonOpen" : "headerBar.jsonLeave")}
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-secondary ${headerBarMenuLinkProps.className}`}
+                  style={headerBarMenuLinkProps.style}
+                  onClick={() => runMenuAction(onVersions)}
+                >
+                  <History size={18} strokeWidth={1.75} aria-hidden="true" />
+                  {t("headerBar.versions")}
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-secondary ${headerBarMenuLinkProps.className}`}
+                  style={headerBarMenuLinkProps.style}
+                  onClick={() => runMenuAction(onPlayer)}
+                >
+                  <Play size={18} strokeWidth={1.75} aria-hidden="true" />
+                  {t("headerBar.player")}
                 </button>
               </div>
             </div>
