@@ -91,7 +91,7 @@ change that produced them.
 - `packages/web/src/areas/studio/screens/draftToolbarState.ts`:
   `PublishAvailability.reasonKey` gains a second literal.
   `publishAvailability` takes a new `blocked` parameter.
-- `packages/web/src/areas/studio/panels/DraftNavControls.tsx`:
+- `packages/web/src/areas/studio/panels/ProcessHeaderBar.tsx`:
   `PublishNavControl` gains a `blocked` prop, a new compiled style for the
   blocked-reason text, and a fixed `aria-describedby` condition. That
   condition keys off the reason instead of availability.

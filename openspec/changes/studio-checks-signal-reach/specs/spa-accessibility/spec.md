@@ -12,9 +12,8 @@ own stop in the tab order, the way a button is. Enter or Space activates
 the focused tab.
 
 A tab set carrying many tabs in one line that scrolls sideways MAY
-instead follow the roving-tabindex pattern. The row's tabs are one stop in
-the page's tab order. A control the row carries beside its tabs keeps its
-own stop. Exactly one tab carries `tabindex="0"`, and the rest
+instead follow the roving-tabindex pattern. The row is one stop in the
+page's tab order. Exactly one tab carries `tabindex="0"`, and the rest
 `tabindex="-1"`. That one is the active tab until an arrow key moves
 focus, and the focused tab afterwards. The left and right arrow keys move
 focus one tab at a time within the row. They do not activate the newly
@@ -39,12 +38,11 @@ other tab set keeps the plain-button pattern.
 - **THEN** the active tab reports `aria-selected`, and the hidden
   panels leave the accessibility tree
 
-#### Scenario: A roving-tabindex row keeps one tab stop for its tabs
+#### Scenario: A roving-tabindex row keeps one tab stop
 
 - **WHEN** a keyboard user tabs toward a many-tab row following the
   roving-tabindex pattern
 - **THEN** focus lands once, on the row's active tab
-- **AND** any control the row carries beside its tabs keeps its own stop
 
 #### Scenario: Arrow keys move focus within a roving-tabindex row
 
