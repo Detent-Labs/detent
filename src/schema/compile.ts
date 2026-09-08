@@ -1,7 +1,7 @@
 /**
  * Publish-time compile pass.
  *
- * Validates every duration-typed value (see `validateDurations`) and the nine
+ * Validates every duration-typed value (see `validateDurations`) and the twelve
  * structural write-path checks below (see `structuralIssues`), then injects
  * the engine-owned cancel-sink — and, for a contracted process, the
  * reserved "cancelled" outcome bound to it — into a ProcessBody. This runs
@@ -19,7 +19,7 @@
  * cover keys that no read reproduces, and the resulting pin would never
  * rehydrate.
  *
- * Every check in this module — durations and the eleven structural checks alike —
+ * Every check in this module — durations and the twelve structural checks alike —
  * runs on BOTH compile branches, ahead of the `publishedProcessBody`-valid
  * early return: that placement is what makes a check unbypassable by a
  * hand-written body that merely satisfies `publishedProcessBody` (which
@@ -116,7 +116,7 @@ export function validateDurations(body: ProcessBody): DurationIssue[] {
 }
 
 // ============================================================
-// Structural write-path checks. Eight checks, one placement: called from
+// Structural write-path checks. Twelve checks, one placement: called from
 // compileProcessBody immediately after validateDurations, so every one of
 // them runs on a body BEFORE it takes either compile branch. Modelled on
 // DurationIssue/DurationValidationError — same {loc, value, message} shape —
@@ -135,7 +135,7 @@ export interface CompileIssue {
   message: string;
 }
 
-/** A body about to be published violates one of the nine structural write-path checks. */
+/** A body about to be published violates one of the twelve structural write-path checks. */
 export class CompileValidationError extends Error {
   constructor(readonly issues: CompileIssue[]) {
     super(issues.map((i) => `${i.loc}: ${i.message} (${JSON.stringify(i.value)})`).join("; "));
@@ -954,6 +954,66 @@ function checkRedactableFields(body: ProcessBody): CompileIssue[] {
 }
 
 // ============================================================
+// 7c. View group back-reference: a view entry's `group` names a group field's
+// key, and that same view carries an entry referencing that group field.
+// `form-ui` draws only the entries carrying no `group`, and a group field then
+// draws the entries naming its own key. An entry failing either half leaves
+// the form with no message at all: it is not a field the participant can skip,
+// it is a field nobody can see. Three published examples carried the shape and
+// drew 37 empty forms between them.
+//
+// An empty `group` reads as no group, matching what the renderer already does
+// with it, so this check passes over one.
+//
+// The rule does NOT ask the view group to follow the catalog's own nesting.
+// The view carries presentation: `purchase-requisition.json` places `quantity`
+// under five different headings across five steps, and one catalog tree cannot
+// hold a field in five places.
+//
+// Operates on duck-typed input, like checkReservedActionPrefix,
+// checkUnknownKeys and checkTechnicalFields: it runs before any Zod parse of
+// the authored body, on both compile branches.
+// ============================================================
+
+function checkViewGroupReferences(body: ProcessBody): CompileIssue[] {
+  const issues: CompileIssue[] = [];
+  const groupIdByKey = new Map<string, string>();
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  walkFieldsIndexed(body.fields as any, "fields", (f) => {
+    if (f?.type !== "group") return;
+    if (typeof f?.key !== "string" || typeof f?.id !== "string") return;
+    groupIdByKey.set(f.key, f.id);
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (body.workflow?.steps ?? []).forEach((s: any, si: number) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const entries: any[] = s?.view?.fields ?? [];
+    const refs = new Set(entries.filter((e) => typeof e?.ref === "string").map((e) => e.ref as string));
+    entries.forEach((vf, vi) => {
+      const group = vf?.group;
+      if (typeof group !== "string" || group === "") return;
+      const loc = `steps[${si}].view.fields[${vi}].group`;
+      const groupId = groupIdByKey.get(group);
+      if (groupId === undefined) {
+        issues.push({ loc, value: group, message: "a view entry's group must name a group field's key" });
+        return;
+      }
+      if (!refs.has(groupId)) {
+        issues.push({
+          loc,
+          value: group,
+          message: "a view entry's group names a group field this view does not carry",
+        });
+      }
+    });
+  });
+
+  return issues;
+}
+
+// ============================================================
 // 8. Unsatisfiable required+readonly pair: reject a view entry declaring
 // literal required: true and literal readonly: true on a step carrying a
 // manual path, when no source in the body writes the field it names,
@@ -1153,7 +1213,8 @@ function checkUnsatisfiableRequiredReadonly(body: ProcessBody): CompileIssue[] {
  * `compileProcessBody` on the raw body, before either compile branch, so
  * neither the authored-input branch nor the already-compiled early return can
  * skip it. `checkReservedActionPrefix`, `checkUnknownKeys`,
- * `checkTechnicalFields` and `checkUnsatisfiableRequiredReadonly` operate on
+ * `checkTechnicalFields`, `checkViewGroupReferences` and
+ * `checkUnsatisfiableRequiredReadonly` operate on
  * the body duck-typed (it has not yet been Zod-parsed at this point); the
  * remaining four operate on the `ProcessBody`-typed parameter, which is a lie
  * at this exact call site for the same reason — the type is honest again
@@ -1170,6 +1231,7 @@ function structuralIssues(body: ProcessBody): CompileIssue[] {
     ...checkLengthBounds(body),
     ...checkTechnicalFields(body),
     ...checkRedactableFields(body),
+    ...checkViewGroupReferences(body),
     ...checkUnsatisfiableRequiredReadonly(body),
     ...checkGroupReference(body),
     ...checkActorFromFieldReference(body),
@@ -1182,7 +1244,7 @@ export function compileProcessBody(body: ProcessBody): ProcessBody {
   const durations = validateDurations(body);
   if (durations.length > 0) throw new DurationValidationError(durations);
 
-  // The eleven structural checks, same placement as validateDurations and for
+  // The twelve structural checks, same placement as validateDurations and for
   // the same reason: ahead of the publishedProcessBody-valid early return
   // below, so a hand-written body that merely satisfies that schema (which
   // checks only the cancel-sink count) cannot skip any of them.

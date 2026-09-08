@@ -537,6 +537,14 @@ describe("compile: a body violating a new check still reads (no new Zod refineme
     b.workflow.steps[0].view = { fields: [{ ref: "field_amount", required: true, readonly: true }] };
     expect(processBody.safeParse(b).success).toBe(true);
   });
+
+  it("a view group naming no group field parses on read", () => {
+    // The three examples this check was written for were published before it
+    // existed. Their instances stay pinned to those bodies and must rehydrate.
+    const b: any = baseBody();
+    b.workflow.steps[0].view = { fields: [{ ref: "field_amount", group: "Personal details" }] };
+    expect(processBody.safeParse(b).success).toBe(true);
+  });
 });
 
 // table-shaped-data-sources: a structural check. `columnMapping`
@@ -1199,6 +1207,90 @@ describe("compile: org.actor-from-field fieldId names a person-formatted field",
   it("rejects the violation even on a body that already satisfies publishedProcessBody", () => {
     const compiled: any = compileProcessBody(actorBody("field_approver", personField) as ProcessBody);
     compiled.fields[1].format = "email";
+    expect(publishedProcessBody.safeParse(compiled).success).toBe(true);
+    expect(() => compileProcessBody(compiled)).toThrow(CompileValidationError);
+  });
+});
+
+// view-group-reference-integrity: `form-ui` draws only the entries carrying
+// no `group`, and a group field then draws the entries naming its own key. An
+// entry whose `group` names nothing, or names a group field the view leaves
+// out, therefore vanishes from the form with no message. Three published
+// examples carried the shape and drew 37 empty forms between them.
+describe("compile: a view entry's group names a group field the view carries", () => {
+  /** `baseBody` plus one group field, and a view on step_a the caller fills. */
+  const grouped = (entries: any[]): any => {
+    const b: any = baseBody();
+    b.fields.push({ id: "field_person", key: "person", label: { en: "Person" }, type: "group" });
+    b.workflow.steps[0].view = { fields: entries };
+    return b;
+  };
+
+  it("rejects a group naming no field in the catalog", () => {
+    const err = rejects(grouped([{ ref: "field_amount", group: "Personal details" }]));
+    expect(err.issues.some((i) => i.loc === "steps[0].view.fields[0].group")).toBe(true);
+    expect(err.message).toContain("must name a group field's key");
+  });
+
+  it("rejects a group naming a field that is not a group field", () => {
+    // `amount` is a real catalog key, so this passes a key-existence check and
+    // still renders nothing: the renderer needs a group field to draw the
+    // container.
+    const err = rejects(grouped([{ ref: "field_amount", group: "amount" }]));
+    expect(err.message).toContain("must name a group field's key");
+  });
+
+  it("rejects a group naming a group field the view leaves out", () => {
+    const err = rejects(grouped([{ ref: "field_amount", group: "person" }]));
+    expect(err.issues.some((i) => i.loc === "steps[0].view.fields[0].group")).toBe(true);
+    expect(err.message).toContain("this view does not carry");
+  });
+
+  it("rejects a note entry carrying the same fault", () => {
+    const err = rejects(grouped([{ kind: "note", text: { en: "Hello." }, group: "person" }]));
+    expect(err.issues.some((i) => i.loc === "steps[0].view.fields[0].group")).toBe(true);
+  });
+
+  it("accepts a view carrying the group field beside its members", () => {
+    const b = grouped([
+      { ref: "field_person" },
+      { ref: "field_amount", group: "person" },
+      { kind: "note", text: { en: "Hello." }, group: "person" },
+    ]);
+    expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
+  });
+
+  it("reads an empty group as no group, the way the renderer does", () => {
+    // `!entry.group` is true for "", so form-ui already draws such an entry at
+    // the form's root. Rejecting it would refuse a body that renders.
+    const b = grouped([{ ref: "field_amount", group: "" }]);
+    expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
+  });
+
+  it("groups a top-level field under a childless group field", () => {
+    // The purchase-requisition shape. The view carries presentation, so a
+    // `group` need not follow the catalog's nesting: that file places
+    // `quantity` under five headings across five steps, and no single catalog
+    // tree holds a field in five places. The renderer never reads a group
+    // field's own `fields`, so a childless container draws its members all
+    // the same.
+    const b = grouped([{ ref: "field_person" }, { ref: "field_amount", group: "person" }]);
+    expect(b.fields.find((f: any) => f.id === "field_person").fields).toBeUndefined();
+    expect(b.fields.find((f: any) => f.id === "field_amount").type).toBe("number");
+    expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
+  });
+
+  it("still rejects a second step that leaves the container out", () => {
+    // Per step, not per body: one correct view does not excuse another.
+    const b = grouped([{ ref: "field_person" }, { ref: "field_amount", group: "person" }]);
+    b.workflow.steps[1].view = { fields: [{ ref: "field_amount", group: "person" }] };
+    const err = rejects(b);
+    expect(err.issues.some((i) => i.loc === "steps[1].view.fields[0].group")).toBe(true);
+  });
+
+  it("rejects the violation even on a body that already satisfies publishedProcessBody", () => {
+    const compiled: any = compileProcessBody(grouped([{ ref: "field_person" }]) as ProcessBody);
+    compiled.workflow.steps[0].view.fields.push({ ref: "field_amount", group: "nope" });
     expect(publishedProcessBody.safeParse(compiled).success).toBe(true);
     expect(() => compileProcessBody(compiled)).toThrow(CompileValidationError);
   });
