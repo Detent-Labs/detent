@@ -125,8 +125,8 @@ const styles = stylex.create({
     display: "block",
     width: "100%",
     textAlign: "left",
-    background: {
-      default: "none",
+    backgroundColor: {
+      default: "transparent",
       ":hover": `color-mix(in srgb, ${colors.text} 7%, transparent)`,
     },
     color: colors.text,

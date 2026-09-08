@@ -19,6 +19,6 @@ export const navStyles = stylex.create({
   // StyleX `background` declaration here would out-specificity `.btn-
   // secondary`'s own `:hover`/`:active` rules on every OTHER tab too.
   navCurrent: {
-    background: `color-mix(in srgb, ${colors.text} 7%, transparent)`,
+    backgroundColor: `color-mix(in srgb, ${colors.text} 7%, transparent)`,
   },
 });
