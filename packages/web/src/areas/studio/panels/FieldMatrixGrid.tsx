@@ -176,6 +176,11 @@ const styles = stylex.create({
   // design language forbids a component from touching and which measured
   // 2.586:1 on this ground. `textMuted` is the role that means this, and it
   // measures 5.835:1.
+  matrixEmptyIdle: {
+    height: 0,
+    paddingBlock: 0,
+    overflow: "hidden",
+  },
   matrixEmpty: {
     color: colors.textMuted,
     marginBlock: 0,
@@ -606,15 +611,29 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
   // An empty state says so in words, and names which of its two causes
   // applies (`studio-app`: "The field matrix states an empty result in
   // words"). A header row above no row is what this replaces.
-  if (rows.length === 0 || drawnSteps.length === 0) {
-    return (
-      <p {...stylex.props(styles.matrixEmpty)} role="status">
-        {t(rows.length === 0 ? "fieldMatrix.emptyNoFields" : "fieldMatrix.emptyNoColumns")}
-      </p>
-    );
-  }
+  //
+  // The live region stays mounted either way. A `role="status"` that appears
+  // in the same frame as its own text is generally not announced: a screen
+  // reader watches a region it already knows about. Idle, it holds no text
+  // and takes no space, and `height: 0` keeps it in the accessibility tree
+  // where `display: none` would not.
+  const empty = rows.length === 0 || drawnSteps.length === 0;
+  const emptyWords = empty
+    ? t(rows.length === 0 ? "fieldMatrix.emptyNoFields" : "fieldMatrix.emptyNoColumns")
+    : "";
+
+  const liveRegion = (
+    <p {...stylex.props(styles.matrixEmpty, !empty && styles.matrixEmptyIdle)} role="status">
+      {emptyWords}
+    </p>
+  );
+
+  if (empty) return liveRegion;
 
   return (
+    <>
+      {liveRegion}
+      {(
     <div
       {...stylex.props(styles.matrixScroll)}
       tabIndex={0}
@@ -625,6 +644,7 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
           <tr>
             <th
               scope="col"
+              aria-label={t("fieldMatrix.cornerLabel")}
               {...stylex.props(styles.matrixCorner)}
               ref={(el) => {
                 if (!showBulkBadges) return;
@@ -798,6 +818,8 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
           })}
         </tbody>
       </table>
-    </div>
+        </div>
+      )}
+    </>
   );
 }

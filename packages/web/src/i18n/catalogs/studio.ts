@@ -435,6 +435,10 @@ export const en = {
   // `design-language.md` forbids: "An empty state says so in words. It never
   // shows as an empty table." The two causes need different words, because
   // one is a process to fix and the other a filter to clear.
+  // The corner cell heads the field column. It became a focus position when
+  // the headers joined the roving model, so it needs a name: an author
+  // arriving there by arrow key otherwise lands on silence.
+  "fieldMatrix.cornerLabel": "Fields, down the side. Steps, across the top.",
   "fieldMatrix.emptyNoFields": "This process declares no field yet, so the matrix has nothing to line up.",
   "fieldMatrix.emptyNoColumns": "Hide inert columns is on, and it leaves no step to show. Turn it off to see them.",
   // A gated checkbox carried `aria-disabled` and swallowed the click without
