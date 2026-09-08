@@ -50,22 +50,29 @@ identity/views separation.
 - `studio-json-view`: the requirement that the JSON surface "opens from
   the tab row's overflow menu" changes. It now opens from the header
   bar's `⋮` menu.
+- `studio-canvas`: found by `/openspec-verify-change`, after the
+  original review missed it. Its "A process-identity header bar shows
+  draft and publish status" requirement claimed the menu holds one
+  heading. It also claimed the JSON surface opens from the tab row's
+  overflow menu. Both claims are now false. The delta corrects them and
+  defers the new "Views" heading's own contents to `studio-process-tabs`.
 
 Checked, no delta needed:
 - `studio-app`: its two `baseLocale`-lives-in-the-header's-`⋮`-menu
-  requirements stay true, unchanged. The menu still carries `baseLocale`;
-  nothing moves it to a tab. Its "JSON surface renders no link into the
-  panels screen" scenario stays true too. It asserts the tab row stands
-  away once JSON is open, regardless of which control opened it. Its
-  leaving-with-unsaved-changes requirement names the Versions/Player
-  links generically, never their host menu.
+  requirements stay true, unchanged: the menu still carries `baseLocale`,
+  and nothing moves it to a tab. Its "JSON surface renders no link into
+  the panels screen" scenario stays true too. It asserts the tab row
+  stands away once JSON is open, regardless of which control opened it.
+  Its leaving-with-unsaved-changes requirement names the Versions/Player
+  links generically, never their host menu. Two of its own requirements
+  call the header-bar `⋮` menu an "overflow menu," echoing this change's
+  retired term. Both stay true regardless; this stays out of scope.
 - `studio-checks-rail`: only cross-references the tab row's tab set,
   never its overflow control.
-- `studio-canvas`, `studio-publish`: each names `ProcessHeaderBar.tsx`
-  once, both times for its "renders from compiled component styles"
-  requirement. This change reuses the existing `headerBarMenuLink`
-  compiled style for the three new entries. It does not add inline or
-  uncompiled markup, so both stay true.
+- `studio-publish`: names `ProcessHeaderBar.tsx` once, for its "renders
+  from compiled component styles" requirement. This change reuses the
+  existing `headerBarMenuLink` compiled style for the three new entries.
+  It does not add inline or uncompiled markup, so that stays true.
 
 ## Impact
 
@@ -98,7 +105,8 @@ Checked, no delta needed:
   JSON/Versions/Player fact to wherever this file next describes
   `ProcessHeaderBar.tsx`.
 - `openspec/specs/studio-process-tabs/spec.md`,
-  `openspec/specs/studio-json-view/spec.md`: requirement text per
+  `openspec/specs/studio-json-view/spec.md`,
+  `openspec/specs/studio-canvas/spec.md`: requirement text per
   Capabilities above.
 
 No engine, HTTP, or definition-contract impact.

@@ -68,11 +68,11 @@
   `studio-processHeaderBar-findingFallback.test.tsx`, add
   `onToggleJson={() => {}}`, `onVersions={() => {}}`, `onPlayer={() => {}}`
   to each file's `<ProcessHeaderBar>` test helper, matching the existing
-  no-op style already used for `go={() => {}}`. Add one new test (in the
-  publish-gate file, beside its other `describe` blocks) asserting the
-  `⋮` trigger's closed-state markup: `aria-haspopup="menu"`,
-  `aria-expanded="false"`, no `role="menu"` present. This is the equivalent
-  of the case deleted from `ProcessTabRow`'s test in 5.1, since that
+  no-op style already used for `go={() => {}}`. Add a test (in the
+  publish-gate file) asserting the `⋮` trigger's closed-state markup:
+  `aria-expanded="false"`, no `role="menu"`. Task 8.2 later changes this
+  test's `aria-haspopup` value from `"menu"` to `"true"`. This is the
+  equivalent of the case deleted from `ProcessTabRow`'s test in 5.1. That
   coverage had no counterpart on this component before. Verify: `bun test
   packages/web/test/studio-processHeaderBar-publishGate.test.tsx
   packages/web/test/studio-processHeaderBar-findingFallback.test.tsx`
@@ -184,3 +184,23 @@ change. Each one fixes how an already-specified control behaves.
   `bun run typecheck`, `bun run build`, the full `bun test` suite piped
   through `sh scripts/gates/silent-green.sh`, and the whitespace gate.
   Report each command's real output.
+
+## 9. `/openspec-verify-change` follow-up
+
+`/openspec-verify-change` found one CRITICAL gap the original review
+missed. `studio-canvas`'s own header-bar requirement claimed one heading.
+It also named the tab row as where the JSON surface opens from. Both
+claims are false after this change. Two SUGGESTION-level findings landed
+inline instead
+(tasks.md's own `aria-haspopup` staleness, fixed above in 5.2's text; the
+`studio-app` wording observation, left as a proposal.md note, out of
+scope).
+
+- [x] 9.1 Add `openspec/changes/studio-header-menu-merge/specs/studio-canvas/spec.md`:
+  a MODIFIED delta for "A process-identity header bar shows draft and
+  publish status." It corrects the one-heading and JSON-surface-location
+  claims, deferring the "Views" heading's contents to
+  `studio-process-tabs`. List `studio-canvas` under Modified Capabilities
+  in `proposal.md`. Verify: `openspec validate --changes
+  studio-header-menu-merge --strict` passes; antislop clean on the new
+  file.
