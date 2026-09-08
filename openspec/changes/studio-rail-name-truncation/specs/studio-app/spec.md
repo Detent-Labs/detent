@@ -25,7 +25,7 @@ Each of those four tabs SHALL carry two numbers, and they SHALL read as differen
 things. The entity count says how many fields, data sources, outcomes or live
 cells the tab holds. The `studio-process-tabs` capability states which tab prints
 one. The issue count says how many of them are wrong. Only the issue count takes
-the refusal tone. A tab SHALL carry no issue count while its subject holds no
+the refusal tone. A tab SHALL have no issue count while its subject has no
 issue.
 
 The Fields tab and the Data sources tab SHALL each stand an entity rail beside
@@ -38,7 +38,7 @@ makes. A group field's children indent one level under it.
 
 A field entry SHALL carry a control that moves the field into a group and out of
 it. The move requirement below states the gesture, its keyboard equivalent and
-what the move writes. A data source entry SHALL carry no such control, since a
+what the move writes. A data source entry SHALL have no such control, since a
 data source nests under nothing.
 
 Contract holds a single editor, so its tab SHALL stand no entity rail. The field
@@ -75,13 +75,14 @@ SHALL keep whatever depth it declares.
 The Fields rail entry SHALL name a field by its resolved label alone, on one
 line. A label too long for the rail's width SHALL truncate there rather than
 wrap onto a second line. The field's kind name and the issue mark SHALL sit
-beside it, on that same line; a kind name too long for its own share of the
-line SHALL truncate the same way. The row SHALL NOT print the field's key. The
-key stays in the definition half's "What this field asks" zone, once an author
-selects that field. The engine's own exact-match value already lives there.
-The Data sources rail entry names its data source through the same rail-row
-name element; an over-long data source key SHALL truncate on its one line the
-identical way.
+beside it, on that same line. A kind name too long for its own share of the
+line SHALL truncate the same way.
+
+The row SHALL NOT print the field's key. The key stays in the definition
+half's "What this field asks" zone, once an author selects that field. The
+engine's own exact-match value already lives there. The Data sources rail
+entry names its data source through the same rail-row name element. An
+over-long data source key SHALL truncate on its one line the identical way.
 
 The kind name SHALL come from the same table the kind picker reads. A row naming
 the base type while the picker beside it names the kind would give one field two
@@ -115,7 +116,7 @@ empty-key field did before.
 #### Scenario: The screen offers no Save of its own
 
 - **WHEN** the author inspects an open tab
-- **THEN** it carries no Save control, and it states that it keeps every
+- **THEN** it has no Save control, and it states that it keeps every
   change
 
 #### Scenario: The rail lists each view with its entity count
@@ -134,13 +135,13 @@ empty-key field did before.
 #### Scenario: A view with no issue shows no issue count
 
 - **WHEN** a draft's two data sources both validate
-- **THEN** the Data sources tab reads two and carries no issue count
+- **THEN** the Data sources tab reads two and has no issue count
 
 #### Scenario: A twice-nested group field takes its own rail entry
 
 - **WHEN** a group field holds a group field holding a leaf field
-- **THEN** the leaf field takes a top-level rail entry, not a third indent
-  level. The draft keeps its own nesting
+- **THEN** the leaf field takes its own top-level rail entry, instead of a
+  third indent level. The draft keeps its own nesting
 
 #### Scenario: The Fields view renders the selected field alone
 
@@ -241,20 +242,20 @@ empty-key field did before.
 #### Scenario: A long field name truncates instead of wrapping
 
 - **WHEN** a field's resolved label is longer than the rail entry's own
-  width, especially once a group child's indent narrows it further
-- **THEN** the rail entry shows the label truncated on its one line, and
+  width, especially once indented under a group
+- **THEN** the rail entry shows the label truncated on its one line. It
   prints no character of it on a line of its own
 
 #### Scenario: A long kind name truncates instead of wrapping
 
 - **WHEN** a field's kind name is longer than its own share of the rail
   entry's line
-- **THEN** the rail entry truncates the kind name on that same line, and
+- **THEN** the rail entry truncates the kind name on that same line. It
   prints no character of it on a line of its own
 
 #### Scenario: A long data source key truncates instead of wrapping
 
 - **WHEN** a data source's `key` is longer than the Data sources rail
   entry's own width
-- **THEN** the rail entry shows the key truncated on its one line, and
+- **THEN** the rail entry shows the key truncated on its one line. It
   prints no character of it on a line of its own
