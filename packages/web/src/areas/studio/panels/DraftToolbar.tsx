@@ -68,10 +68,10 @@ export interface DraftToolbarActions {
 
 /**
  * The save/discard/publish logic `DraftToolbar` has always owned — pending
- * flags, the network calls, the 401 and conflict handling — extracted so
- * `ProcessHeaderBar`'s `⋮` menu can call it too, per design.md's
- * "DraftToolbar keeps its logic. ProcessHeaderBar renders the buttons.".
- * This is the one place the logic lives; neither caller reimplements it.
+ * flags, the network calls, the 401 and conflict handling — lives in this one
+ * hook. `EditScreen.tsx` calls it once and threads the result down as props,
+ * so whichever component renders the buttons (`ProcessHeaderBar` today) never
+ * reimplements the logic itself.
  *
  * It raises no native browser prompt. Publish and discard each open the
  * application's own modal dialog instead: `publish()` and `discard()` only set

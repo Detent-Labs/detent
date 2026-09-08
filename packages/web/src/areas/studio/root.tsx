@@ -70,11 +70,13 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
   // read only inside a click handler (design.md: "Report dirtiness upward
   // through one callback prop into a ref").
   const dirtyRef = useRef(false);
-  // The element the studio's four draft controls render into: Checks, Save,
-  // Discard draft and Publish (`studio-process-tabs`). They belong to the open
-  // draft, whose state lives inside `EditScreen`'s own `DraftProvider`, and
-  // this nav sits outside it — so the nav reserves the place and the surface
-  // fills it through a portal. A callback ref rather than a plain one: this
+  // The element the studio's one draft control, Checks, renders into
+  // (`studio-process-tabs`). It belongs to the open draft, whose state lives
+  // inside `EditScreen`'s own `DraftProvider`, and this nav sits outside it —
+  // so the nav reserves the place and the surface fills it through a portal.
+  // Save, Discard draft and Publish render directly in the header bar
+  // instead, inside `EditScreen`'s own tree — no portal, no reserved slot.
+  // A callback ref rather than a plain one: this
   // has to re-render once the element exists, and it clears itself to null on
   // unmount, which is exactly when the draft controls should stand down.
   const [navSlot, setNavSlot] = useState<HTMLElement | null>(null);
