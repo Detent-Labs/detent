@@ -124,6 +124,18 @@ only the cancel-sink count.
   declaring `visible: false`. The compile pass checks this
   (`compile.ts::checkUnsatisfiableRequiredReadonly`), not a Zod refinement on
   `viewField` — see `definition-contract`'s placement rule.
+- A non-empty `view.fields[].group` names the `key` of a `type: "group"` field
+  the body declares at any depth, and the same view carries a `ref` entry for
+  that group field. `form-ui` draws only the entries with no `group`, and a
+  group field then draws the entries naming its key, so an entry failing
+  either half leaves the form with no message. An empty `group` reads as no
+  group, matching the renderer. The rule reaches a note entry too, and it does
+  not ask the view group to follow the catalog's own nesting: the view carries
+  presentation, and `purchase-requisition.json` heads one field under five
+  groups across five steps. The compile pass checks this
+  (`compile.ts::checkViewGroupReferences`). A Zod refinement on `viewField`
+  would strand the pinned instances of three bodies published before the
+  check — see `definition-contract`'s placement rule.
 - A step whose `assignment.strategy.type === "org.group-members"` and whose
   `config.groupId` is a string must name a group id already present in the
   body's own `allowedGroups`. The compile pass checks this
