@@ -68,6 +68,9 @@ const EXAMPLES: { path: string; fixedProcessId?: ProcessId }[] = [
   // access_request publishes only after seedGroup below has written
   // DEMO_GROUP_ID: its allowedGroups entry faces validateGroupScope.
   { path: "../examples/access-request.json" },
+  // Order-free: neither names a process id, a group or a data source.
+  { path: "../examples/it-onboarding.json" },
+  { path: "../examples/it-offboarding.json" },
 ];
 
 /**
