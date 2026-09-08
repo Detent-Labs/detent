@@ -363,6 +363,10 @@ export const en = {
   "tabs.contract": "Contract",
   "tabs.changes": "Changes",
   "tabs.checks": "Checks",
+  // Visually-hidden text appended to the Checks tab's count when it carries
+  // the blocker color, so the state reaches a screen reader too — color
+  // alone conveys nothing there (`studio-process-tabs`).
+  "tabs.checksBlocking": "blocking a publish",
 
   // The Forms tab: one plate per step that declares a view
   // (`studio-forms-overview`).
@@ -575,14 +579,6 @@ export const en = {
   "checksRail.clearNeedsPublishPermission": "Publishing needs the publish permission for this process.",
   "checksRail.configHeldBack": "Plugin config check held back — verified at publish.",
   "checksRail.unknownKeysHeldBack": "Unknown-key check held back — verified at publish.",
-  // The area nav's collapsed summary. One whole sentence per state, so the
-  // count and the dot's own reading reach a screen reader together.
-  "checksRail.summaryBlocker": "Checks: {count} open issues, one of which refuses a publish.",
-  "checksRail.summaryBlockerOne": "Checks: one open issue, and it refuses a publish.",
-  "checksRail.summaryAdvisory": "Checks: {count} open issues, none of which refuses a publish.",
-  "checksRail.summaryAdvisoryOne": "Checks: one open issue, and it refuses no publish.",
-  "checksRail.summaryClear": "Checks: no open issue.",
-  "checksRail.summaryHeldBack": "Checks: held back until earlier checks pass.",
   // A rail narrowed to one step, and the control that widens it again
   // (`studio-forms-overview`: a card's badge opens Checks on its own step).
   "checksRail.narrowedTo": "Showing the checks on {step}.",

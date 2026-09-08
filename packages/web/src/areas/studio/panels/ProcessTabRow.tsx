@@ -66,12 +66,39 @@ const styles = stylex.create({
     fontVariantNumeric: "tabular-nums",
     color: colors.textMuted,
   },
+  // The Checks tab's own count when the draft's worst open issue is a
+  // blocker: the one tab whose count also reads as a publish-readiness
+  // signal. `colors.refusal` is the same token the checks rail's own
+  // held-back and blocker states already read (`studio-process-tabs`).
+  tabCountBlocker: {
+    color: colors.refusal,
+  },
+  // Off screen, never `display: none`: a hidden node is announced by no
+  // engine. Carries the blocker state's text equivalent, since the color
+  // above reaches no screen reader (`EntityTabs.tsx`'s own move-announcer
+  // style is the precedent for this exact pattern in this area).
+  visuallyHidden: {
+    position: "absolute",
+    width: 1,
+    height: 1,
+    margin: -1,
+    padding: 0,
+    overflow: "hidden",
+    clipPath: "inset(50%)",
+    whiteSpace: "nowrap",
+    borderWidth: 0,
+  },
 });
 
 interface Props {
   open: ProcessTab;
   /** What each tab prints beside its name. `undefined` prints nothing. */
   counts: Record<ProcessTab, number | undefined>;
+  /** True when the loaded draft's worst open issue is a blocker. Colors only
+   * the Checks tab's own count; every other tab's count stays uncolored,
+   * clear or advisory-only leaves the Checks count uncolored too
+   * (`studio-process-tabs`). */
+  checksBlocked: boolean;
   onOpen: (tab: ProcessTab) => void;
   /** True while the JSON surface stands in place of the tab body. No tab
    * reports itself selected while it is open — the header bar's `⋮` menu is
@@ -89,7 +116,7 @@ interface Props {
  * arrow key, so the row introduces no second model beside the one the rest of
  * the area follows.
  */
-export function ProcessTabRow({ open, counts, onOpen, jsonOpen }: Props) {
+export function ProcessTabRow({ open, counts, checksBlocked, onOpen, jsonOpen }: Props) {
   return (
     <div {...stylex.props(styles.row)} role="tablist" aria-label={t("tabs.rowLabel")}>
       {PROCESS_TABS.map((tab) => {
@@ -98,6 +125,7 @@ export function ProcessTabRow({ open, counts, onOpen, jsonOpen }: Props) {
         // while it is open (`studio-app`: "The surface SHALL stand no tab
         // while the JSON surface is open").
         const selected = !jsonOpen && tab === open;
+        const blocked = tab === "checks" && checksBlocked;
         return (
           <button
             key={tab}
@@ -110,7 +138,10 @@ export function ProcessTabRow({ open, counts, onOpen, jsonOpen }: Props) {
             onClick={() => onOpen(tab)}
           >
             <span>{t(TAB_LABEL[tab])}</span>
-            {count !== undefined && <span {...stylex.props(styles.tabCount)}>{count}</span>}
+            {count !== undefined && (
+              <span {...stylex.props(styles.tabCount, blocked && styles.tabCountBlocker)}>{count}</span>
+            )}
+            {blocked && <span {...stylex.props(styles.visuallyHidden)}>{t("tabs.checksBlocking")}</span>}
           </button>
         );
       })}

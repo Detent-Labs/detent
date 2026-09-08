@@ -96,37 +96,19 @@ export function allChecksClear(groups: readonly CheckGroup[]): boolean {
   return groups.every((g) => !g.heldBack && g.issues.length === 0);
 }
 
-/** The collapsed checks summary's one read of `groups`: a count, "clear", or
- * "held-back". Held-back outranks a raw sum on purpose — the collapsed-summary
- * requirement (`studio-checks-rail`) forbids a held-back group from reading as
- * clear or as a plain count of zero, the same rule the group-level held-back
- * state already carries into the expanded view. `registryConfigHeldBack`/
- * `unknownKeysHeldBack` are excluded from both checks below, for the same
- * reason `allChecksClear` excludes them: they stay permanently held back for
- * the whole studio session, so folding either in would make this function
- * return `{kind: "held-back"}` for every draft, including one otherwise
- * fully clear. */
-export type OpenIssueSummary = { kind: "count"; count: number } | { kind: "clear" } | { kind: "held-back" };
-
-export function totalOpenIssueCount(groups: readonly CheckGroup[]): OpenIssueSummary {
-  if (groups.some((g) => g.heldBack)) return { kind: "held-back" };
-  const count = groups.reduce((sum, g) => sum + g.issues.length, 0);
-  return count === 0 ? { kind: "clear" } : { kind: "count", count };
-}
-
-/** What the area nav's Checks dot reads (`studio-checks-rail`): the worst open
- * issue, over three states and no fourth. */
+/** What the Checks tab's colored count reads (`studio-process-tabs`): the
+ * worst open issue, over three states and no fourth. */
 export type ChecksDotState = "blocker" | "advisory" | "clear";
 
 /**
- * The dot's own read of `groups`. The `view` group holds the studio's own
- * findings over a draft the engine would publish, so its entries are advisory:
- * they never refuse a publish. Every other group is an engine validator, so one
- * open entry there blocks.
+ * The severity read of `groups`, consumed by the Checks tab's colored count
+ * and by the publish-confirm dialog's own blocked state. The `view` group
+ * holds the studio's own findings over a draft the engine would publish, so
+ * its entries are advisory: they never refuse a publish. Every other group
+ * is an engine validator, so one open entry there blocks.
  *
- * A held-back group takes the blocker color, never the clear one. Its checks
- * have not run, so nothing yet says the draft would publish, and the
- * collapsed-summary requirement already forbids reading that state as clear.
+ * A held-back group takes the blocker state, never the clear one. Its checks
+ * have not run, so nothing yet says the draft would publish.
  */
 export function checksDotState(groups: readonly CheckGroup[]): ChecksDotState {
   if (groups.some((g) => g.heldBack || (g.source !== "view" && g.issues.length > 0))) return "blocker";

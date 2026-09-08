@@ -19,15 +19,32 @@ const NO_COUNTS = Object.fromEntries(PROCESS_TABS.map((tab) => [tab, undefined])
   number | undefined
 >;
 
-function render(over: { open?: ProcessTab; counts?: Partial<Record<ProcessTab, number>>; jsonOpen?: boolean } = {}): string {
+function render(
+  over: {
+    open?: ProcessTab;
+    counts?: Partial<Record<ProcessTab, number>>;
+    checksBlocked?: boolean;
+    jsonOpen?: boolean;
+  } = {},
+): string {
   return renderToStaticMarkup(
     <ProcessTabRow
       open={over.open ?? "canvas"}
       counts={{ ...NO_COUNTS, ...over.counts }}
+      checksBlocked={over.checksBlocked ?? false}
       onOpen={() => {}}
       jsonOpen={over.jsonOpen ?? false}
     />,
   );
+}
+
+/** The Checks tab's own `<button>`, whole, for asserting its class or its
+ * content against the other tabs' buttons. */
+function checksTabButton(html: string): string {
+  const buttons = html.match(/<button[^>]*>[\s\S]*?<\/button>/g) ?? [];
+  const found = buttons.find((b) => b.includes(`id="${tabDomId("checks")}"`));
+  if (found === undefined) throw new Error("no Checks tab button in rendered output");
+  return found;
 }
 
 /** Every `<button ...>` open tag in a rendered string, in DOM order. */
@@ -102,6 +119,40 @@ describe("Each tab's count", () => {
 
   it("prints a zero rather than hiding it, so an emptied tab still reads its state", () => {
     expect(render({ counts: { steps: 0 } })).toContain(">0<");
+  });
+});
+
+/**
+ * The color itself is a visual judgment (`docs/browser-checks.md`'s "The
+ * Checks tab's colored count" entry) — `development-toolchain`'s split rule
+ * keeps it there, since no defect record exists for this new behavior. What
+ * a static-markup test CAN see: the blocker style class joins the Checks
+ * count's own class list and no other tab's, and the visually-hidden text
+ * equivalent (`tabs.checksBlocking`) appears exactly when blocked.
+ */
+describe("The Checks tab's count under a blocker", () => {
+  it("carries a different class on its button than the same render with no blocker", () => {
+    const counts = { checks: 2 };
+    const clear = checksTabButton(render({ counts, checksBlocked: false }));
+    const blocked = checksTabButton(render({ counts, checksBlocked: true }));
+
+    expect(blocked).not.toBe(clear);
+  });
+
+  it("leaves every other tab's button untouched between a blocked and a clear render", () => {
+    const counts = { steps: 4, fields: 12 };
+    const clear = buttonTags(render({ counts, checksBlocked: false })).find((b) => b.includes(tabDomId("steps")));
+    const blocked = buttonTags(render({ counts, checksBlocked: true })).find((b) => b.includes(tabDomId("steps")));
+
+    expect(blocked).toBe(clear);
+  });
+
+  it("states the blocking fact in visually-hidden text only when blocked", () => {
+    const clear = checksTabButton(render({ counts: { checks: 2 }, checksBlocked: false }));
+    const blocked = checksTabButton(render({ counts: { checks: 2 }, checksBlocked: true }));
+
+    expect(clear).not.toContain("blocking a publish");
+    expect(blocked).toContain("blocking a publish");
   });
 });
 
