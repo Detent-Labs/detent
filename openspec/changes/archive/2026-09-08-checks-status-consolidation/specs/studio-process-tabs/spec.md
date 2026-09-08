@@ -62,10 +62,10 @@ state reaches a screen reader too. Color alone reaches none.
 
 ## ADDED Requirements
 
-### Requirement: The area nav carries no draft control
+### Requirement: The area nav stands empty of draft controls
 
-The studio's area nav SHALL carry no draft control while a draft stands
-open. Save, Discard draft and Publish stand in the header bar, as this
+The studio's area nav SHALL stand empty of draft controls while a draft
+stands open. Save, Discard draft and Publish stand in the header bar, as this
 capability's own requirement below states. The Checks tab's own count
 reports the checks state, as the count requirement above states. No control
 outside the tab row SHALL duplicate that state.
@@ -73,9 +73,8 @@ outside the tab row SHALL duplicate that state.
 #### Scenario: The area nav stands empty of draft controls
 
 - **WHEN** an author opens a draft
-- **THEN** the studio's area nav carries no Save, Discard draft, Publish or
-  Checks control
-- **AND** the header bar carries Save, Discard draft and Publish
+- **THEN** the studio's area nav is empty of draft controls
+- **AND** Save, Discard draft and Publish stand in the header bar instead
 
 ## REMOVED Requirements
 
@@ -92,5 +91,5 @@ what it holds" requirement.
 **Migration**: An author reaches the Checks tab through the tab row alone,
 as with every other tab. The tab row's "Checks" count now carries the color
 the removed control's dot used to carry. See "A tab carries the count of
-what it holds" above. See "The area nav carries no draft control" above
+what it holds" above. See "The area nav stands empty of draft controls" above
 too.

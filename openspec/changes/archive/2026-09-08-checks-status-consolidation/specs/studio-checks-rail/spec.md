@@ -46,7 +46,7 @@ accessible-name sentence. That site is gone now.
 
 **Migration**: An author reads the Checks tab's own count and color instead.
 See `studio-process-tabs`'s "A tab carries the count of what it holds"
-requirement. See its "The area nav carries no draft control" requirement
+requirement. See its "The area nav stands empty of draft controls" requirement
 too.
 
 The held-back indicator this requirement described for the collapsed form

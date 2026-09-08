@@ -23,7 +23,7 @@
 
 ## 3. Documentation
 
-- [x] 3.1 Change `.claude/rules/ui-glossary.md`'s process-surface section. "Checks, Save, Discard draft and Publish stand in the area nav" becomes an empty area nav, with the three standing in the header bar. The "dock" paragraph's "two forms" of the checks rail becomes one form: the full grouped list on the Checks tab. Verify: no remaining sentence in that file claims a fourth area-nav control or a collapsed rail form.
+- [x] 3.1 Change `.claude/rules/ui-glossary.md`'s process-surface section. "Checks, Save, Discard draft and Publish stand in the area nav" becomes an empty area nav. The three now stand in the header bar. The "dock" paragraph's "two forms" of the checks rail becomes one form: the full grouped list on the Checks tab. Verify: no remaining sentence in that file claims a fourth area-nav control or a collapsed rail form.
 <!-- antislop: allow paragraph-length -->
 <!-- Same trap as 1.3 above: a paragraph break inside this checkbox bullet truncates the task in `openspec instructions`' JSON output, so this stays one paragraph. -->
 - [x] 3.2 Directly change `openspec/specs/studio-checks-rail/spec.md`'s `## Purpose` section. Do this instead of via this change's delta. Per this repo's OpenSpec convention, an existing capability's Purpose changes on the live spec directly. Drop the "Both forms"/"two forms" framing now that only the full grouped list remains. Leave the pre-existing "third column"/"inspector's bottom edge" architecture description alone. This change did not cause that drift. The drift predates it and stands apart from it. Verify: the Purpose section no longer says "both forms."

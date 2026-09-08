@@ -133,10 +133,10 @@ the entry opens the JSON surface or leaves it.
 - **THEN** its trailing edge is the last tab, with no overflow control
   after it
 
-### Requirement: The area nav carries no draft control
+### Requirement: The area nav stands empty of draft controls
 
-The studio's area nav SHALL carry no draft control while a draft stands
-open. Save, Discard draft and Publish stand in the header bar, as this
+The studio's area nav SHALL stand empty of draft controls while a draft
+stands open. Save, Discard draft and Publish stand in the header bar, as this
 capability's own requirement below states. The Checks tab's own count
 reports the checks state, as the count requirement above states. No control
 outside the tab row SHALL duplicate that state.
@@ -144,9 +144,8 @@ outside the tab row SHALL duplicate that state.
 #### Scenario: The area nav stands empty of draft controls
 
 - **WHEN** an author opens a draft
-- **THEN** the studio's area nav carries no Save, Discard draft, Publish or
-  Checks control
-- **AND** the header bar carries Save, Discard draft and Publish
+- **THEN** the studio's area nav is empty of draft controls
+- **AND** Save, Discard draft and Publish stand in the header bar instead
 
 ### Requirement: Save, Discard draft and Publish stand in the header bar
 
