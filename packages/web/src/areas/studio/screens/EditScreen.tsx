@@ -689,12 +689,11 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, go, navSlot
     }
   };
 
-  // The save/discard/publish logic itself (design.md: "DraftToolbar keeps
-  // its logic. ProcessHeaderBar renders the buttons.") — called directly
-  // here, not through a mounted `<DraftToolbar>` element, so this is the
-  // only instance of that state. Mounting both would run two independent
-  // copies of saving/error/publishing state, the exact "second copy" design.md
-  // rejects.
+  // The save/discard/publish logic itself, called directly here rather than
+  // through a mounted `<DraftToolbar>` element, so this is the only instance
+  // of that state. `ProcessHeaderBar` renders the buttons that call it.
+  // Mounting `<DraftToolbar>` as well would run a second, independent copy
+  // of saving/error/publishing state.
   const actions = useDraftToolbarActions({
     processId,
     token,
@@ -773,7 +772,10 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, go, navSlot
           switcher "SHALL remain visible and usable regardless of which
           surface is active") — only its "Process, saved with the draft" menu
           group is surface-gated, via `structureActive`, since that group's
-          controls mutate the draft body. */}
+          controls mutate the draft body. Save, Discard draft and Publish
+          render here too now (`studio-process-tabs`) and share that same
+          unconditional visibility — nothing about their presence depends on
+          `structureActive`. */}
       <ProcessHeaderBar
         revision={saveState.revision}
         isDirty={dirtyNow}
@@ -781,29 +783,23 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, go, navSlot
         publishResult={publishResult}
         conflict={saveState.conflict}
         actions={actions}
+        canPublish={canPublish}
+        baseVersion={changesBaseVersion}
+        validation={validation}
+        processLabel={processLabel}
         structureActive={!jsonOpen}
         processId={processId}
         go={go}
       />
-      {/* Checks, Save, Discard draft and Publish stand in the studio's area
-          nav (`studio-process-tabs`). That nav renders outside
-          `DraftProvider`, so the surface reaches it through the element
-          `root.tsx` reserves there rather than by lifting the draft's own
-          state out of the provider. */}
+      {/* Checks stands in the studio's area nav (`studio-process-tabs`).
+          That nav renders outside `DraftProvider`, so the surface reaches it
+          through the element `root.tsx` reserves there rather than by
+          lifting the draft's own state out of the provider. Save, Discard
+          draft and Publish render directly in `ProcessHeaderBar` above,
+          inside this component's own tree — no portal needed for them. */}
       {navSlot !== null &&
         createPortal(
-          <DraftNavControls
-            processId={processId}
-            processLabel={processLabel}
-            revision={saveState.revision}
-            isDirty={dirtyNow}
-            lastSavedAt={lastSavedAt}
-            validation={validation}
-            canPublish={canPublish}
-            baseVersion={changesBaseVersion}
-            actions={actions}
-            onOpenChecks={() => goToTab("checks")}
-          />,
+          <DraftNavControls validation={validation} canPublish={canPublish} onOpenChecks={() => goToTab("checks")} />,
           navSlot,
         )}
       {formStepId !== undefined ? (
