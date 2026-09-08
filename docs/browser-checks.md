@@ -2609,3 +2609,35 @@ draws a 2px frame in the current color.
 Then leave the studio. Hover a row on My tasks, on the admin instances list, and
 on a reporting list. Pass: each row fills with the muted surface under the
 pointer. That fill reached no list screen before this change.
+
+### The field matrix's three-state badge and its keyboard (`field-matrix-operability`)
+
+A bulk press cannot be undone, and the badge said nothing about its reach. It
+also read two states over three-state data. A column with some cells set then
+looked exactly like a column with none.
+
+Open the studio's Field matrix tab on a process whose steps disagree about a
+flag. The process `expense_approval` does. Pass: some badges draw filled in
+the flag's color. Some draw as an outline in that color. Some draw a plain
+neutral outline. The seeded process shows nine of the middle kind.
+
+Point at one badge. Pass: the tooltip names the step or the field, the count
+the press writes, and the count already set. Point at a badge on a different
+step. Pass: the tooltip names that step instead.
+
+Now put the pointer away and use the keyboard. Tab toward the grid. Pass:
+focus lands on the scroll region, then on one cell, and never on a badge. It
+took thirty stops before.
+
+Arrow up from the top row. Pass: focus reaches the column header. Press
+Enter, then Tab. Pass: the badges in that header take the keyboard.
+
+Open a process that declares no field. Pass: the tab says so in words and
+draws no table. Engage Hide inert columns where every step is inert. Pass:
+the words name the filter instead.
+
+Press Hide inert columns. Pass: the control's own look changes, alongside the
+state it announces.
+
+Point at a checkbox the studio gates, on a technical field's row. Pass: it
+says the definition contract rejects that flag there.
