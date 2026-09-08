@@ -40,6 +40,14 @@ describe("FieldForm: every BaseFieldType renders its expected input", () => {
     expect(html).toContain("checked=");
   });
 
+  it("boolean -> checkbox stays at its intrinsic size instead of stretching to the row", () => {
+    /** `test/preload-stylex.ts` stubs `stylex.props()` to space-join each
+     * applied style's own key name into `className`, so this checks the
+     * `checkboxUnstretched` style is applied, not a compiled CSS value. */
+    const html = renderFields([{ field: baseField({ id: "f1", type: "boolean" }), value: true, required: false, readonly: false }], { f1: true });
+    expect(html).toContain("checkboxUnstretched");
+  });
+
   it("list -> a multiple <select> built from the resolved options", () => {
     const html = renderFields([
       {
@@ -152,6 +160,7 @@ describe("FieldForm: a control picks the input", () => {
     expect(html.match(/type="radio"/g)).toHaveLength(2);
     expect(html).toContain("Yes");
     expect(html).toContain("No");
+    expect(html).not.toContain("checkboxUnstretched");
   });
 
   it("boolean + radio at locale de reads its own German entries", () => {
@@ -187,6 +196,7 @@ describe("FieldForm: a control picks the input", () => {
     expect(html.match(/type="checkbox"/g)).toHaveLength(3);
     expect(html.match(/checked=""/g)).toHaveLength(2);
     expect(html).not.toContain("<select");
+    expect(html).not.toContain("checkboxUnstretched");
   });
 
   it("a radio control with no options falls back to the type's default input", () => {
