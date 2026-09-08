@@ -62,12 +62,13 @@ ten bodies stay mounted at once, and `hidden` shows one. A body keeps its own
 edit state across a switch: a half-typed outcome name, a selected field.
 Unmounting on every switch would lose that state.
 
-Checks stands in the area nav, never on the surface. Save, Discard draft and
-Publish stand in the header bar instead, right-aligned ahead of the `⋮` menu.
-`panels/ProcessHeaderBar.tsx` renders them there. The area nav's own
-component, `DraftNavControls.tsx`, renders Checks into the element `root.tsx`
-reserves there. The Views group in that menu holds the JSON surface, Versions
-and Player.
+Save, Discard draft and Publish stand in the header bar, right-aligned ahead
+of the `⋮` menu. `panels/ProcessHeaderBar.tsx` renders them there. The Views
+group in that menu holds the JSON surface, Versions and Player.
+
+The studio's area nav carries no draft control. Checks stands as a tab, on
+the tab row below, and its own count carries the severity color no area-nav
+control duplicates.
 
 Every other term below belongs to one tab.
 
@@ -165,9 +166,9 @@ the Fields tab and on the Data sources tab.
 one per section body.
 
 **dock** names nothing here any more, as a verb or as a noun. Nothing docks.
-The checks rail takes two forms instead. The Checks tab stands the full
-grouped list. The area nav stands the one-line summary, with a state dot and a
-count. Pressing it opens that tab.
+The checks rail takes one form: the Checks tab stands the full grouped list.
+The Checks tab's own count carries the severity color; no other control
+duplicates it.
 
 ## 2. Domain terms as the UI shows them
 

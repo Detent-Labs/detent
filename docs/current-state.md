@@ -4397,14 +4397,14 @@ meets `scope=started` should infer no new permission tier from it.
   state, so an author reads what pressing it does
   (`studio-header-menu-merge`).
 
-  The component `DraftNavControls.tsx` renders Checks into the studio's area
-  nav. That nav renders outside `DraftProvider`, so the surface reaches it
-  through a portal. The element `root.tsx` reserves is the portal's target.
-  The function `checksDotState` in `draft/checksRail.ts` decides the Checks
-  dot: blocker, advisory or clear. Save, Discard draft and Publish render
-  directly in `ProcessHeaderBar.tsx` instead, right-aligned ahead of its `⋮`
-  menu trigger. That component already sits inside `EditScreen.tsx`'s own
-  tree, so it renders them without a portal.
+  Save, Discard draft and Publish render directly in `ProcessHeaderBar.tsx`,
+  right-aligned ahead of its `⋮` menu trigger. That component already sits
+  inside `EditScreen.tsx`'s own tree, so it renders them without a portal.
+  The studio's area nav carries no draft control, and `root.tsx` reserves no
+  element for one. The Checks tab's own count, in `ProcessTabRow.tsx`,
+  carries the severity color instead: the function `checksDotState` in
+  `draft/checksRail.ts` decides blocker, advisory or clear, and only the
+  blocker state colors the count.
 
   The rail component `StepsRail.tsx` lists one numbered row per step. The
   module `draft/registerOrder.ts` orders them by reachability from

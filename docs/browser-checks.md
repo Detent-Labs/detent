@@ -2641,3 +2641,29 @@ state it announces.
 
 Point at a checkbox the studio gates, on a technical field's row. Pass: it
 says the definition contract rejects that flag there.
+
+### The Checks tab's colored count (`checks-status-consolidation`)
+
+The area nav's own Checks control is gone. Its severity signal moved onto
+the Checks tab's own count in the tab row instead. Whether `colors.refusal`
+reads well there, in both color schemes, is a visual judgment no `bun:test`
+assertion can make. `development-toolchain`'s split rule keeps it here,
+since no defect record exists for it yet.
+
+Open a draft with no open issue. Pass: the area nav carries three controls,
+Save, Discard draft and Publish, and no fourth. The tab row's Checks count
+reads in the tab row's ordinary color, the same as every other tab's count.
+
+Introduce a blocking issue (an unreachable step works) without leaving the
+Paths tab. Pass: the Checks tab's count turns to the refusal color. It
+stays visible without switching tabs, while every other tab's count stays
+as it was. Switch to the dark scheme and repeat. Pass: the color still
+reads well against the tab row's ground, and no light-mode value leaks
+through.
+
+Fix the issue. Pass: the count returns to the ordinary color, with no
+reload. Introduce an advisory-only issue (a view-flag finding) instead.
+Pass: the count stays in the ordinary color. Only a blocker recolors it.
+
+Click the Checks tab. Pass: the full grouped list opens exactly as it did
+before this change.

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import type { ActionId, ProcessBody } from "workflow-engine/schema";
 import type { RegistryDescription } from "workflow-engine/engine/registry";
-import { allChecksClear, groupChecksBySource, totalOpenIssueCount } from "../src/areas/studio/draft/checksRail.js";
+import { allChecksClear, groupChecksBySource } from "../src/areas/studio/draft/checksRail.js";
 import { runValidation } from "../src/areas/studio/draft/validation.js";
 import type { ValidationResult } from "../src/areas/studio/draft/validation.js";
 import type { Draft } from "../src/areas/studio/draft/types.js";
@@ -159,37 +159,6 @@ describe("allChecksClear", () => {
   });
 });
 
-describe("totalOpenIssueCount", () => {
-  it("counts every open issue across groups", () => {
-    // A "structural" issue is deliberately excluded here: heldBackFor keys
-    // cel/registry's own held-back state off the structural group's own
-    // issue count, so a structural-source entry would hold both back and
-    // this fixture would no longer exercise a plain sum across groups.
-    const groups = groupChecksBySource(
-      validation({
-        issues: [
-          { entityType: "timer", entityId: "timer_a", message: "m1", source: "duration", loc: "" },
-          { entityType: "step", entityId: "step_a", message: "m2", source: "cel", loc: "" },
-          { entityType: "step", entityId: "step_a", message: "m3", source: "cel", loc: "" },
-        ],
-      }),
-    );
-    expect(totalOpenIssueCount(groups)).toEqual({ kind: "count", count: 3 });
-  });
-
-  it("is clear when every group ran and holds no issue", () => {
-    const groups = groupChecksBySource(validation({}));
-    expect(totalOpenIssueCount(groups)).toEqual({ kind: "clear" });
-  });
-
-  it("is held-back when any group holds back, never a plain count of zero", () => {
-    const groups = groupChecksBySource(
-      validation({ zodValid: false, dimensions: { duration: "not-run", structural: "not-run" }, issues: [] }),
-    );
-    expect(totalOpenIssueCount(groups)).toEqual({ kind: "held-back" });
-  });
-});
-
 describe("the view group", () => {
   it("holds back on a Zod-invalid draft, like every other group", () => {
     const groups = groupChecksBySource(validation({ zodValid: false, dimensions: { duration: "not-run", structural: "not-run" } }));
@@ -269,13 +238,13 @@ it("6.5 a bad process.start input mapping reaches the rail", () => {
   expect(celIssue!.message).toContain("bad_field");
 });
 
-it("6.9 the collapsed summary's count includes a registry type-resolution issue, unaffected by the config-validation half's held-back state", () => {
+it("6.9 a registry type-resolution issue reaches the rail, unaffected by the config-validation half's held-back state", () => {
   const result = runValidation(draftWithAction("custom.unregistered"), EMPTY_REGISTRY, {}, {});
   const groups = groupChecksBySource(result);
-  const summary = totalOpenIssueCount(groups);
-  expect(summary.kind).toBe("count");
-  if (summary.kind === "count") expect(summary.count).toBeGreaterThan(0);
-  expect(groups.find((g) => g.source === "registry")!.registryConfigHeldBack).toBe(true);
+  const registryGroup = groups.find((g) => g.source === "registry")!;
+  expect(registryGroup.heldBack).toBe(false);
+  expect(registryGroup.issues.length).toBeGreaterThan(0);
+  expect(registryGroup.registryConfigHeldBack).toBe(true);
 });
 
 describe("6.12 an unwritten technical field reaches the view group even when structural compilation fails", () => {

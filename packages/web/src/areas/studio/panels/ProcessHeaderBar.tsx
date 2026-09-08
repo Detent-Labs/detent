@@ -588,7 +588,8 @@ interface Props {
  * unlike the first group it stays reachable whichever surface is active.
  * The menu carries no Save, no Discard and no Publish — those three stand
  * in this row instead, right-aligned ahead of the menu trigger
- * (`studio-process-tabs`). Checks alone stands in the studio's area nav.
+ * (`studio-process-tabs`). The studio's area nav carries no draft control:
+ * the Checks tab's own count reports that state instead.
  *
  * The panel mixes form fields with command buttons in its first group, so
  * it carries no `role="menu"`; the trigger's `aria-haspopup="true"` names a

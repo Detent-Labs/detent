@@ -43,6 +43,15 @@ toolbar's count line. Canvas and Contract SHALL print no count.
 
 A count SHALL follow an edit at once, without a reload.
 
+The Checks count SHALL also carry a state color. It SHALL carry the blocker
+color when the loaded draft's worst open issue is a blocker. It SHALL carry
+its ordinary, uncolored state in every other case. That covers a clear
+draft, and a draft whose open issues are all advisory. No other tab's count
+carries a state color.
+
+The blocker color SHALL carry a text equivalent, visually hidden, so the
+state reaches a screen reader too. Color alone reaches none.
+
 #### Scenario: Adding a step raises the Steps count
 
 - **WHEN** an author adds a step on the Canvas tab
@@ -58,6 +67,28 @@ A count SHALL follow an edit at once, without a reload.
 - **WHEN** one view entry draws a view finding
 - **THEN** the Field matrix tab reads one
 - **AND** the matrix toolbar keeps its own declared-entry total
+
+#### Scenario: A blocking issue colors the Checks count
+
+- **WHEN** a draft holds one step that leads nowhere
+- **THEN** the Checks tab's count carries the blocker color
+- **AND** the count itself reads the number of open issues
+
+#### Scenario: A clear draft's Checks count has no state color
+
+- **WHEN** the loaded draft has no open issue
+- **THEN** the Checks tab's count reads 0, in the tab row's ordinary color
+
+#### Scenario: An advisory-only draft's Checks count has no state color
+
+- **WHEN** the loaded draft's open issues are all advisory, none a blocker
+- **THEN** the Checks tab's count reads the issue count, in the tab row's
+  ordinary color
+
+#### Scenario: The blocker state carries a text equivalent
+
+- **WHEN** the loaded draft's worst open issue is a blocker
+- **THEN** the Checks tab's accessible name states that fact in words
 
 ### Requirement: The open tab stands in the address
 
@@ -102,25 +133,20 @@ the entry opens the JSON surface or leaves it.
 - **THEN** its trailing edge is the last tab, with no overflow control
   after it
 
-### Requirement: Checks stands in the area nav with a state dot
+### Requirement: The area nav carries no draft control
 
-The studio's area nav SHALL carry one control, Checks. The header bar's own
-menu SHALL carry no Checks control. The Checks control SHALL carry a dot and
-the open issue count. The dot SHALL read the worst open issue. One color marks
-a blocker, one marks an advisory issue, and one marks a clear draft.
+The studio's area nav SHALL carry no draft control while a draft stands
+open. Save, Discard draft and Publish stand in the header bar, as this
+capability's own requirement below states. The Checks tab's own count
+reports the checks state, as the count requirement above states. No control
+outside the tab row SHALL duplicate that state.
 
-Pressing Checks SHALL open the Checks tab.
+#### Scenario: The area nav stands empty of draft controls
 
-#### Scenario: A blocking issue colors the dot
-
-- **WHEN** a draft holds one step that leads nowhere
-- **THEN** the Checks dot carries the blocker color
-- **AND** the count beside it reads the number of open issues
-
-#### Scenario: Checks opens its own tab
-
-- **WHEN** an author presses the Checks control in the area nav
-- **THEN** the Checks tab is the open one
+- **WHEN** an author opens a draft
+- **THEN** the studio's area nav carries no Save, Discard draft, Publish or
+  Checks control
+- **AND** the header bar carries Save, Discard draft and Publish
 
 ### Requirement: Save, Discard draft and Publish stand in the header bar
 
