@@ -101,10 +101,16 @@ const styles = stylex.create({
   },
   // `.draft-incomplete` already zeroes its own top margin, so it needs no
   // extra help from `.studio-edit-screen > *` (below).
+  //
+  // `colors.refusal` joins the plain-color family the Checks count and the
+  // Publish reason already read for the same kind of fact. It stays out of
+  // the `errorBanner`/`errorBannerStamp` family below, which this file
+  // reserves for a load or a request that comes back wrong.
   draftIncomplete: {
     marginBlockStart: 0,
     marginBlockEnd: space.s3,
     marginInline: 0,
+    color: colors.refusal,
   },
   // Every OTHER `.studio-error-banner` in this file renders as a direct
   // child of `.studio-edit-screen`'s own flex column, which used to zero a

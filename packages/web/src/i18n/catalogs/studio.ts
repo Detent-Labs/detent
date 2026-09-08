@@ -30,6 +30,10 @@ export const en = {
   "draftToolbar.publish": "Publish",
   "draftToolbar.publishing": "Publishing…",
   "draftToolbar.publishUnavailable": "Needs the publish permission for this process",
+  // Beside Publish while the draft's worst open issue is a blocker. The
+  // control stays available: the click still opens the confirmation dialog,
+  // which states the same warning (`studio-publish`).
+  "draftToolbar.publishBlockedReason": "Blocked by an open issue",
   "draftToolbar.dialogCancel": "Cancel",
   "draftToolbar.dialogProcess": "Process",
   "draftToolbar.dialogProcessId": "Process id",
@@ -367,6 +371,10 @@ export const en = {
   // the blocker color, so the state reaches a screen reader too — color
   // alone conveys nothing there (`studio-process-tabs`).
   "tabs.checksBlocking": "blocking a publish",
+  // What the tab row's live region reads when the Checks count crosses from
+  // clear to blocker. A full sentence, unlike the fragment above: a live
+  // region reads on its own rather than joining an accessible name.
+  "tabs.checksBlockingAnnounced": "A blocking issue appeared in Checks.",
 
   // The Forms tab: one plate per step that declares a view
   // (`studio-forms-overview`).
