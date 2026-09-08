@@ -169,10 +169,20 @@ const styles = stylex.create({
     justifyItems: "center",
     alignItems: "center",
   },
+  // The blank cell's dash. It read `neutral500`, a ramp step, which the
+  // design language forbids a component from touching and which measured
+  // 2.586:1 on this ground. `textMuted` is the role that means this, and it
+  // measures 5.835:1.
+  matrixEmpty: {
+    color: colors.textMuted,
+    marginBlock: 0,
+    paddingBlock: space.s4,
+    paddingInline: space.s3,
+  },
   matrixDash: {
     display: "block",
     fontFamily: fonts.mono,
-    color: colors.neutral500,
+    color: colors.textMuted,
   },
   // `.studio-matrix-cell input[aria-disabled="true"]`: the gated checkbox's
   // own computed style already knows `gated`.
@@ -585,6 +595,17 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
     });
   };
 
+  // An empty state says so in words, and names which of its two causes
+  // applies (`studio-app`: "The field matrix states an empty result in
+  // words"). A header row above no row is what this replaces.
+  if (rows.length === 0 || drawnSteps.length === 0) {
+    return (
+      <p {...stylex.props(styles.matrixEmpty)} role="status">
+        {t(rows.length === 0 ? "fieldMatrix.emptyNoFields" : "fieldMatrix.emptyNoColumns")}
+      </p>
+    );
+  }
+
   return (
     <div
       {...stylex.props(styles.matrixScroll)}
@@ -728,12 +749,19 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
                               return <CelStamp key={key} label={t(FLAG_LABEL_KEY[key])} src={raw.src ?? ""} />;
                             }
                             const gated = key !== "visible" && isFlagGated(entry, written, technicalIds, key, stepIndex);
+                            // A gated control that says nothing reads as
+                            // broken. The two rules that gate a cell carry
+                            // different reasons, so the words say which one.
+                            const gateReason = gated
+                              ? t(technicalIds.has(row.id) ? "fieldMatrix.gatedTechnical" : "fieldMatrix.gatedNotWritten")
+                              : undefined;
                             return (
                               <input
                                 key={key}
                                 type="checkbox"
                                 {...stylex.props(MATRIX_FLAG_ACCENT_STYLE[key], gated && styles.matrixFlagCheckboxDisabled)}
-                                aria-label={t(FLAG_LABEL_KEY[key])}
+                                aria-label={gateReason ? `${t(FLAG_LABEL_KEY[key])}. ${gateReason}` : t(FLAG_LABEL_KEY[key])}
+                                title={gateReason}
                                 aria-disabled={gated || undefined}
                                 tabIndex={gated || !isActiveCell ? -1 : undefined}
                                 checked={effectiveFlag(raw, key) === true}
