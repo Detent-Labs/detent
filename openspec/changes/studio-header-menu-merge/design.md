@@ -116,6 +116,33 @@ two triggers, rather than merge them. That keeps the identity/views
 separation `studio-guided-surface` deliberately built. The user chose to
 merge anyway. This design does not re-litigate that call.
 
+**Post-implementation: five `/impeccable critique` findings, fixed here.**
+The mandatory dual-agent critique (`CLAUDE.md`'s design-skill gate) ran
+against the merged menu after implementation. It found two P1
+accessibility gaps, one P2 consistency gap, and two P3 polish issues, all
+inside `ProcessHeaderBar.tsx`. All five landed in this same change rather
+than a follow-up, since the user chose that scope directly. The fixes:
+
+- Escape now returns focus to the `⋮` trigger instead of `<body>`. A
+  dedicated `triggerRef` holds the button; the existing Escape handler
+  calls `.focus()` on it after closing.
+- The panel drops `role="menu"` for a plain disclosure
+  (`aria-haspopup="true"`). It mixes form fields with command buttons in
+  its first group. A true ARIA menu needs menuitem children and
+  arrow-key navigation, neither of which fit here. This predates the
+  merge; the merge only doubled the affected item count.
+- `key`/`baseLocale` carry `disabled` while `structureActive` is false,
+  instead of unmounting. Risk #2 below named this exact gap. The
+  critique reproduced it live: the group's heading stayed put while its
+  rows silently vanished. This is the fix.
+- `headerBarMenuLink`'s text now stays flush left (`textAlign: 'left'`).
+  That overrides the global `.btn` class's centered text on the one
+  label long enough to wrap.
+- The first menu group drops its own top border
+  (`headerBarMenuGroupFirst`, a new style beside `headerBarMenuGroup`).
+  The panel's own border already divides it from what's above; only a
+  second-or-later group needs its own divider.
+
 ## Risks / Trade-offs
 
 - [Risk] This reverses part of a requirement set written the same day
@@ -127,9 +154,10 @@ merge anyway. This design does not re-litigate that call.
   `key`/`baseLocale` inputs reappear inside the same panel the click just
   happened in. The open menu's own content grows by two fields at that
   moment. This gating already exists today; this change only makes it
-  visible in the same panel instead of a different one. Mitigation: no
-  code change needed. The browser check (`tasks.md`) should confirm this
-  does not read as janky, and fix the layout only if it does.
+  visible in the same panel instead of a different one. Mitigation:
+  `/impeccable critique` confirmed this reads as janky, live. See the new
+  Decisions entry above: `key`/`baseLocale` carry `disabled` instead of
+  unmounting, so the group keeps its row count and heading either way.
 - [Risk] Views now sits one group below identity, in the same list. That
   is one physical inch further from the trigger than the tab row's
   dedicated overflow was. Mitigation: accepted. The panel holds two short

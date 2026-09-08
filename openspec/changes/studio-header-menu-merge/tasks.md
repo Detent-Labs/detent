@@ -121,16 +121,18 @@ enough on its own.
   piped through `sh scripts/gates/silent-green.sh`. Check the skip count,
   not only the pass count. For the DB-backed suites, only the full run is
   the signal, never a single-file rerun.
-- [ ] 7.4 Antislop prose gate over every Markdown file this change
+- [x] 7.4 Antislop prose gate over every Markdown file this change
   touched. Run: `sh scripts/gates/range.sh < /dev/null | sh
   scripts/gates/prose.sh`.
-- [ ] 7.5 Whitespace/CRLF gate over the same range: `sh
+- [x] 7.5 Whitespace/CRLF gate over the same range: `sh
   scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh`.
 - [x] 7.6 Real-browser check, on a production build. This project's
   `bun run dev` crashes Studio on first validation, so build and serve
   instead. Sign in as an author/developer, open a draft's process surface,
   and open the header bar's `⋮` menu. Pass:
-  - the existing "Process, saved with the draft" group stays unchanged
+  - the existing "Process, saved with the draft" group keeps its fields
+    and order (task group 8 changes how `key`/`baseLocale` gate, not
+    what the group holds)
   - a "Views" group stands below it, with three iconed entries: JSON,
     Versions, Player
   - the JSON entry's label matches its current state, and toggling it
@@ -144,3 +146,41 @@ enough on its own.
   the two changed files, and resolve any findings. Then run
   `/impeccable critique` and `/impeccable audit` against this route, per
   this repo's UI verification convention.
+
+## 8. Critique fixes
+
+`/impeccable critique`'s dual-agent run (task 7.6) found five issues, all
+in `ProcessHeaderBar.tsx`. The user chose to fix all five in this same
+change (see design.md's new Decisions entry). None need a delta-spec
+change. Each one fixes how an already-specified control behaves.
+
+- [x] 8.1 [P1] Escape returns focus to the `⋮` trigger. Add a
+  `triggerRef`; the existing Escape `useEffect` calls
+  `triggerRef.current?.focus()` after `setMenuOpen(false)`. Verify:
+  `bun run typecheck` passes; live check, `document.activeElement` is the
+  trigger button after Tab-into-panel then Escape.
+- [x] 8.2 [P1] Drop `role="menu"` from the panel; the trigger's
+  `aria-haspopup` becomes `"true"`. Update
+  `studio-processHeaderBar-publishGate.test.tsx`'s closed-state assertion
+  to match. Verify: `bun test
+  packages/web/test/studio-processHeaderBar-publishGate.test.tsx` passes.
+  Live check: `document.querySelectorAll('[role="menu"]')` excludes this
+  panel (`Chrome.tsx`'s account menu is the one legitimate survivor).
+- [x] 8.3 [P2] `key`/`baseLocale` inputs carry `disabled={!structureActive}`
+  instead of the prior conditional unmount, matching the process label's
+  pattern for the same gate. Verify: `bun run typecheck` passes. Live
+  check: toggle the JSON surface and reopen the menu; both fields stay
+  visible and disabled.
+- [x] 8.4 [P3] `headerBarMenuLink` gets `textAlign: "left"`, so its text
+  stays flush left. That overrides the global `.btn` class's default
+  center alignment, visible on the one label long enough to wrap.
+  Verify: live check, the wrapped second line stays flush left under the
+  icon.
+- [x] 8.5 [P3] The first menu group uses a new `headerBarMenuGroupFirst`
+  style with no top border. `headerBarMenuGroup` (bordered) now applies
+  only from the second group on. Verify: live check, no divider sits
+  between the panel's own border and the first group's heading.
+- [x] 8.6 Re-run the full verification group (7.1-7.3, 7.5) after 8.1-8.5:
+  `bun run typecheck`, `bun run build`, the full `bun test` suite piped
+  through `sh scripts/gates/silent-green.sh`, and the whitespace gate.
+  Report each command's real output.
