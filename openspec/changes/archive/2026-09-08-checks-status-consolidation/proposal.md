@@ -21,8 +21,8 @@ color itself. Such a control does not earn its own place in the nav.
   <!-- "Discard" here names only the fixed "Discard draft" button label, never a word choice competing with "remove"; every occurrence in this file pairs it with "draft". -->
   Remove the Checks control from the studio's area nav.
 
-  While a draft is open, the area nav then carries no draft control at
-  all. Save, Discard draft and Publish stand in the header bar.
+  While a draft is open, the area nav then stands empty of draft
+  controls. The header bar carries the draft's own three instead.
 
   **BREAKING** for anyone relying on the area nav's Checks control as a
   reachability path or an accessibility landmark. The Checks tab remains
@@ -59,7 +59,7 @@ color itself. Such a control does not earn its own place in the nav.
 
 ### Modified Capabilities
 
-- `studio-process-tabs`: the area nav carries no draft control now.
+- `studio-process-tabs`: the area nav stands empty of draft controls now.
   Checks was the last one it held. The Checks tab's own count carries a
   state color instead, reading the worst open issue. No other tab's count
   does that.
@@ -72,7 +72,7 @@ color itself. Such a control does not earn its own place in the nav.
 
 ## Impact
 
-- `packages/web/src/areas/studio/panels/DraftNavControls.tsx`: delete the
+- `packages/web/src/areas/studio/panels/DraftNavControls.tsx`: remove the
   file. The `ChecksRail` mount was its whole body, so nothing remains once
   that goes. `root.tsx` drops the element it reserved for it.
 - `packages/web/src/areas/studio/panels/ChecksRail.tsx`: drop the
@@ -115,8 +115,7 @@ color itself. Such a control does not earn its own place in the nav.
 - `docs/authoring-guide.md`: the four-control/dot-and-count paragraph.
 - `docs/current-state.md` (advisory, not gated per CLAUDE.md, but touched
   by this change directly): the passage naming `DraftNavControls` and
-  `checksDotState`. It says `DraftNavControls` renders "Checks, Save,
-  Discard draft and Publish." It also says `checksDotState` decides "the
-  Checks dot."
+  `checksDotState`. That passage described the area nav's own control set,
+  and the state dot `checksDotState` decided for it.
 - This change leaves the engine, schema, and definition-contract code
   alone. It leaves `packages/form-ui` and every non-studio area alone too.
