@@ -2577,3 +2577,30 @@ with the translation.
 A `bun:test` assertion covers the catalog's key set. It cannot see a clipped
 control, and it cannot see a German sentence that reads wrong beside its own
 control.
+
+### Borders and fills that the compiler dropped (`stylex-shorthand-repair`)
+
+StyleX emits no `border` rule and no `background` rule, so 113 declarations
+compiled away and 80 of them asked for something that should paint. The suite
+now bans both keys at the source. It cannot see a border, since the harness
+lays out nothing and resolves no custom property.
+
+Open the studio's Field matrix tab on a process with several fields. Pass: the
+legend's three swatches each draw a 10px box with a 1px frame and a fill. Scroll
+the grid sideways and down. Pass: the sticky row and column headers carry a
+solid fill, and no cell shows through them.
+
+Open the Canvas tab. Pass: every node draws its own frame. A selected node
+draws an accent frame, and a node with an issue draws a refusal frame. Drag one node
+over another. Pass: the drop target draws a dashed accent frame over an 8% tint.
+
+Open the JSON view from the tab row's overflow menu. Pass: the text area draws a
+1px frame on the surface fill, not on the page ground.
+
+Force an error on the process surface. Saving a draft whose engine call fails is
+the quickest route. Pass: the banner draws a 2px refusal frame, and its stamp
+draws a 2px frame in the current color.
+
+Then leave the studio. Hover a row on My tasks, on the admin instances list, and
+on a reporting list. Pass: each row fills with the muted surface under the
+pointer. That fill reached no list screen before this change.
