@@ -51,9 +51,9 @@
 - [x] 6.4 Pipe the log through `scripts/gates/silent-green.sh`
 - [x] 6.5 Parse the built stylesheet and assert it now carries border atoms
 - [ ] 6.6 Walk the four surfaces in a browser at 1440x900
-- [ ] 6.7 Confirm the field matrix legend swatch draws its frame and its fill
+- [x] 6.7 Confirm the field matrix legend swatch draws its frame and its fill
 - [ ] 6.8 Confirm a register row fills on hover in all three areas
 - [ ] 6.9 Run `/impeccable critique` on the field matrix route
 - [ ] 6.10 Run `/impeccable audit` on the field matrix route
-- [ ] 6.11 Run the prose gate over every changed Markdown file
-- [ ] 6.12 Run the whitespace gate over the pushed range
+- [x] 6.11 Run the prose gate over every changed Markdown file
+- [x] 6.12 Run the whitespace gate over the pushed range

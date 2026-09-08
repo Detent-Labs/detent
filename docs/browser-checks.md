@@ -2590,9 +2590,14 @@ legend's three swatches each draw a 10px box with a 1px frame and a fill. Scroll
 the grid sideways and down. Pass: the sticky row and column headers carry a
 solid fill, and no cell shows through them.
 
-Open the Canvas tab. Pass: every node draws its own frame. A selected node
-draws an accent frame, and a node with an issue draws a refusal frame. Drag one node
-over another. Pass: the drop target draws a dashed accent frame over an 8% tint.
+Open the Canvas tab. A step node is an SVG group. It paints by stroke and
+fill, so no CSS border reaches it. What this change restored here is the frame
+around the canvas itself. Pass: the viewport draws a 1px frame and the muted
+fill under its dot grid.
+
+Drag on empty canvas to pull a selection marquee. Pass: the marquee draws a
+dashed accent frame over an 8% accent tint. Double-click a node to rename it.
+Pass: the input draws an accent frame on the surface fill.
 
 Open the JSON view from the tab row's overflow menu. Pass: the text area draws a
 1px frame on the surface fill, not on the page ground.
