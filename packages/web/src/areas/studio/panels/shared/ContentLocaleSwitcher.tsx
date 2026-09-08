@@ -13,7 +13,7 @@ const styles = stylex.create({
     borderWidth: 1,
     borderStyle: "solid",
     borderColor: colors.border,
-    background: colors.surface,
+    backgroundColor: colors.surface,
     color: colors.text,
     paddingBlock: space.s1,
     paddingInline: space.s2,

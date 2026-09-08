@@ -40,7 +40,7 @@ const styles = stylex.create({
   // text until focused; the global `input:focus-visible` rule still
   // supplies the accent ring on top of this border-bottom override.
   headerBarNameInput: {
-    border: "none",
+    borderStyle: "none",
     borderBottomWidth: 1,
     borderBottomStyle: "dashed",
     borderBottomColor: {
@@ -49,7 +49,7 @@ const styles = stylex.create({
     },
     borderRadius: 0,
     padding: 0,
-    background: "transparent",
+    backgroundColor: "transparent",
     font: "inherit",
     color: "inherit",
     width: "auto",
@@ -101,7 +101,7 @@ const styles = stylex.create({
     borderWidth: 1,
     borderStyle: "solid",
     borderColor: colors.border,
-    background: colors.surface,
+    backgroundColor: colors.surface,
   },
   headerBarMenuGroup: {
     display: "flex",

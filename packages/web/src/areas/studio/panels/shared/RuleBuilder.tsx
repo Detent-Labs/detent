@@ -31,15 +31,17 @@ const styles = stylex.create({
     alignItems: "center",
     gap: space.s2,
     padding: space.s2,
-    border: `1px solid ${colors.border}`,
-    background: colors.surfaceMuted,
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceMuted,
   },
   conditionRowIncomplete: {
     borderColor: colors.accent400,
     borderStyle: "dashed",
   },
   conditionJoiner: {
-    background: "none",
+    backgroundColor: "transparent",
     color: colors.accent,
     fontFamily: fonts.mono,
     fontWeight: 600,
@@ -58,7 +60,7 @@ const styles = stylex.create({
   ruleValueKind: {
     display: "flex",
     gap: 0,
-    border: "none",
+    borderStyle: "none",
     padding: 0,
     margin: 0,
   },
@@ -66,16 +68,18 @@ const styles = stylex.create({
   // override, for the same reason.
   segmentedOption: {
     flex: "none",
-    background: "none",
+    backgroundColor: "transparent",
     color: colors.text,
-    border: `1px solid ${colors.border}`,
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: colors.border,
     paddingBlock: "2px",
     paddingInline: space.s2,
     font: "inherit",
     cursor: "pointer",
     fontSize: "0.8rem",
     ":hover": {
-      background: colors.surfaceMuted,
+      backgroundColor: colors.surfaceMuted,
     },
   },
   // `.studio-segmented-option + .studio-segmented-option { border-left: none }`:
@@ -96,7 +100,7 @@ const styles = stylex.create({
     fontSize: "0.85rem",
   },
   conditionRemove: {
-    background: "none",
+    backgroundColor: "transparent",
     color: colors.textMuted,
     fontSize: "1.1rem",
     lineHeight: 1,

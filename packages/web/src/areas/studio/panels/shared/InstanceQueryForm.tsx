@@ -23,7 +23,7 @@ const styles = stylex.create({
     width: "100%",
   },
   instanceQueryFormFieldset: {
-    border: 0,
+    borderWidth: 0,
     margin: 0,
     padding: 0,
     minWidth: 0,

@@ -28,7 +28,9 @@ const styles = stylex.create({
   matrixScroll: {
     overflow: "auto",
     overscrollBehavior: "contain",
-    border: `1px solid ${colors.border}`,
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: colors.border,
     maxHeight: "32rem",
   },
   matrixTable: {
@@ -41,7 +43,7 @@ const styles = stylex.create({
   // combined selector; each entry below folds that declaration in.
   matrixColHeader: {
     position: "sticky",
-    background: colors.surface,
+    backgroundColor: colors.surface,
     textAlign: "left",
     verticalAlign: "top",
     top: 0,
@@ -52,7 +54,7 @@ const styles = stylex.create({
   },
   matrixCorner: {
     position: "sticky",
-    background: colors.surface,
+    backgroundColor: colors.surface,
     textAlign: "left",
     verticalAlign: "top",
     top: 0,
@@ -88,7 +90,7 @@ const styles = stylex.create({
   },
   matrixRowHeader: {
     position: "sticky",
-    background: colors.surface,
+    backgroundColor: colors.surface,
     textAlign: "left",
     verticalAlign: "top",
     left: 0,
@@ -142,7 +144,7 @@ const styles = stylex.create({
   },
   matrixCellLive: {
     ":hover": {
-      background: colors.surfaceMuted,
+      backgroundColor: colors.surfaceMuted,
     },
   },
   matrixCellFlags: {
@@ -185,7 +187,9 @@ const styles = stylex.create({
     textTransform: "uppercase",
     letterSpacing: "0.06em",
     color: colors.accent,
-    border: "2px solid currentcolor",
+    borderWidth: 2,
+    borderStyle: "solid",
+    borderColor: "currentcolor",
     paddingBlock: 0,
     paddingInline: space.s1,
     flex: "none",
@@ -215,13 +219,15 @@ const styles = stylex.create({
     width: "1.75rem",
     textAlign: "center",
     color: colors.textMuted,
-    background: "none",
-    border: `1px solid ${colors.border}`,
+    backgroundColor: "transparent",
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: colors.border,
     paddingBlock: 0,
     paddingInline: space.s1,
     cursor: "pointer",
     ":hover": {
-      background: colors.surfaceMuted,
+      backgroundColor: colors.surfaceMuted,
       color: colors.text,
     },
   },
@@ -229,7 +235,7 @@ const styles = stylex.create({
   // `aria-pressed` the button already carries.
   matrixFlagBadgePressed: {
     color: colors.accentContrast,
-    background: colors.accent,
+    backgroundColor: colors.accent,
     borderColor: colors.accent,
   },
   matrixFlagEmpty: {
