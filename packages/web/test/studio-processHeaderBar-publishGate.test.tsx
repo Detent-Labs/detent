@@ -81,6 +81,9 @@ function renderHeader(over: { actions?: Partial<DraftToolbarActions>; conflict?:
         structureActive={true}
         processId="proc_a"
         go={() => {}}
+        onToggleJson={() => {}}
+        onVersions={() => {}}
+        onPlayer={() => {}}
       />
     </DraftContext.Provider>,
   );
@@ -145,5 +148,21 @@ describe("What the header bar no longer carries", () => {
     // so focus can return to the pressed control when either closes.
     expect(renderHeader({ actions: { pendingDialog: "publish" } })).not.toContain("<dialog");
     expect(renderHeader({ actions: { pendingDialog: "discard" } })).not.toContain("<dialog");
+  });
+});
+
+/**
+ * `studio-header-menu-merge`: the `⋮` menu now carries what the tab row's
+ * own overflow menu used to (JSON surface, Versions, Player), so this
+ * trigger's closed-state markup gets the same coverage that menu's trigger
+ * had before it was deleted.
+ */
+describe("The header bar's ⋮ menu", () => {
+  it("stays closed until something opens it", () => {
+    const html = renderHeader({});
+
+    expect(html).toContain('aria-haspopup="menu"');
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).not.toContain('role="menu"');
   });
 });

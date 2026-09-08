@@ -2599,7 +2599,7 @@ Drag on empty canvas to pull a selection marquee. Pass: the marquee draws a
 dashed accent frame over an 8% accent tint. Double-click a node to rename it.
 Pass: the input draws an accent frame on the surface fill.
 
-Open the JSON view from the tab row's overflow menu. Pass: the text area draws a
+Open the JSON view from the header bar's `⋮` menu. Pass: the text area draws a
 1px frame, and it sits on the surface fill rather than the page ground.
 
 Force an error on the process surface. Saving a draft whose engine call fails is

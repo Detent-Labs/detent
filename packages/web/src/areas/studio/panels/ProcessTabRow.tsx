@@ -1,6 +1,4 @@
-import { useEffect, useRef, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
-import { MoreHorizontal } from "lucide-react";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { t, type CatalogKey } from "../catalog.js";
 import { PROCESS_TABS, type ProcessTab } from "../routing.js";
@@ -68,44 +66,6 @@ const styles = stylex.create({
     fontVariantNumeric: "tabular-nums",
     color: colors.textMuted,
   },
-  // The overflow control keeps the trailing edge whatever the row scrolls to.
-  overflow: {
-    position: "relative",
-    flex: "none",
-    marginLeft: "auto",
-    display: "flex",
-    alignItems: "stretch",
-  },
-  overflowPanel: {
-    position: "absolute",
-    right: 0,
-    top: "100%",
-    zIndex: 1,
-    minWidth: "16rem",
-    display: "flex",
-    flexDirection: "column",
-    gap: space.s2,
-    padding: space.s2,
-    borderWidth: 1,
-    borderStyle: "solid",
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  menuItem: {
-    display: "block",
-    width: "100%",
-    textAlign: "left",
-    backgroundColor: {
-      default: "transparent",
-      ":hover": `color-mix(in srgb, ${colors.text} 7%, transparent)`,
-    },
-    color: colors.text,
-    borderWidth: 0,
-    paddingBlock: space.s1,
-    paddingInline: space.s2,
-    font: "inherit",
-    cursor: "pointer",
-  },
 });
 
 interface Props {
@@ -113,51 +73,23 @@ interface Props {
   /** What each tab prints beside its name. `undefined` prints nothing. */
   counts: Record<ProcessTab, number | undefined>;
   onOpen: (tab: ProcessTab) => void;
-  /** True while the JSON surface stands in place of the tab body. The row
-   * still renders: the overflow entry is how an author leaves that surface. */
+  /** True while the JSON surface stands in place of the tab body. No tab
+   * reports itself selected while it is open — the header bar's `⋮` menu is
+   * what opens and leaves that surface; this row only reads the state. */
   jsonOpen: boolean;
-  onToggleJson: () => void;
-  onVersions: () => void;
-  onPlayer: () => void;
 }
 
 /**
- * The process surface's tab row (`studio-process-tabs`). Ten tabs in authoring
- * order, then the overflow menu holding what is not a tab: the JSON surface,
- * Versions and Player.
+ * The process surface's tab row (`studio-process-tabs`). Ten tabs in
+ * authoring order, and nothing else — the trailing edge is the last tab.
  *
  * The keyboard model is the area's own, per `spa-accessibility`'s tab pattern:
  * every tab is its own stop in the tab order, the way a button is, and Enter or
  * Space opens the focused one. It carries no roving tab stop and binds no
  * arrow key, so the row introduces no second model beside the one the rest of
  * the area follows.
- *
- * The JSON entry names its own state, so an author reads from the entry whether
- * it opens the surface or leaves it.
  */
-export function ProcessTabRow({ open, counts, onOpen, jsonOpen, onToggleJson, onVersions, onPlayer }: Props) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    const onDocument = (e: MouseEvent) => {
-      if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setMenuOpen(false);
-    document.addEventListener("mousedown", onDocument);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDocument);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [menuOpen]);
-
-  const runMenuAction = (action: () => void) => {
-    setMenuOpen(false);
-    action();
-  };
-
+export function ProcessTabRow({ open, counts, onOpen, jsonOpen }: Props) {
   return (
     <div {...stylex.props(styles.row)} role="tablist" aria-label={t("tabs.rowLabel")}>
       {PROCESS_TABS.map((tab) => {
@@ -182,36 +114,6 @@ export function ProcessTabRow({ open, counts, onOpen, jsonOpen, onToggleJson, on
           </button>
         );
       })}
-      <div {...stylex.props(styles.overflow)} ref={menuRef}>
-        <button
-          type="button"
-          className="btn btn-ghost"
-          aria-haspopup="menu"
-          aria-expanded={menuOpen}
-          aria-label={t("tabs.overflowTrigger")}
-          onClick={() => setMenuOpen((o) => !o)}
-        >
-          <MoreHorizontal size={18} strokeWidth={1.75} aria-hidden="true" />
-        </button>
-        {menuOpen && (
-          <div {...stylex.props(styles.overflowPanel)} role="menu">
-            <button
-              type="button"
-              role="menuitem"
-              {...stylex.props(styles.menuItem)}
-              onClick={() => runMenuAction(onToggleJson)}
-            >
-              {t(jsonOpen ? "tabs.overflowJsonLeave" : "tabs.overflowJsonOpen")}
-            </button>
-            <button type="button" role="menuitem" {...stylex.props(styles.menuItem)} onClick={() => runMenuAction(onVersions)}>
-              {t("tabs.overflowVersions")}
-            </button>
-            <button type="button" role="menuitem" {...stylex.props(styles.menuItem)} onClick={() => runMenuAction(onPlayer)}>
-              {t("tabs.overflowPlayer")}
-            </button>
-          </div>
-        )}
-      </div>
     </div>
   );
 }

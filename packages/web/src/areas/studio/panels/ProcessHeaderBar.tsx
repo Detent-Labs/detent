@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
-import { MoreVertical, Users2 } from "lucide-react";
+import { FileJson, History, MoreVertical, Play, Users2 } from "lucide-react";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { t } from "../catalog.js";
 import { useDraft } from "../draft/store.js";
@@ -200,6 +200,12 @@ interface Props {
   /** Cross-area navigation. The link is the only user: it calls
    * `go(href)` to reach the admin area's Groups screen — never a mutation. */
   go: (href: string, opts?: NavigateOptions) => void;
+  /** Flips the JSON surface. `ProcessTabRow` keeps its own `jsonOpen` prop —
+   * this menu derives the same fact from `structureActive` (`= !jsonOpen`)
+   * instead of taking a second, redundant copy. */
+  onToggleJson: () => void;
+  onVersions: () => void;
+  onPlayer: () => void;
 }
 
 /**
@@ -209,11 +215,13 @@ interface Props {
  * version stay a read-only pass-through of state the process surface owns —
  * no logic of their own.
  *
- * The `⋮` menu carries one group, "Process, saved with the draft": the
- * editable key, the base locale, the add-locale control and the link to the
- * admin area's assignment groups. It carries no Save, no Discard and no
- * Publish. Those four stand in the studio's area nav, beside Checks
- * (`studio-process-tabs`).
+ * The `⋮` menu carries two groups. "Process, saved with the draft" holds
+ * the editable key, the base locale, the add-locale control and the link to
+ * the admin area's assignment groups. "Views" holds the JSON surface toggle,
+ * Versions and Player — navigation to other views of this process, so
+ * unlike the first group it stays reachable whichever surface is active.
+ * The menu carries no Save, no Discard and no Publish. Those four stand in
+ * the studio's area nav, beside Checks (`studio-process-tabs`).
  *
  * `DraftToolbar`'s error message and its save-conflict banner render as
  * alert banners after the header row, and its publish-success confirmation
@@ -240,6 +248,9 @@ export function ProcessHeaderBar({
   structureActive,
   processId,
   go,
+  onToggleJson,
+  onVersions,
+  onPlayer,
 }: Props) {
   const { draft, mutate, contentLocale, setContentLocale } = useDraft();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -420,6 +431,40 @@ export function ProcessHeaderBar({
               >
                 <Users2 size={18} strokeWidth={1.75} aria-hidden="true" />
                 {t("headerBar.manageGroups")}
+              </button>
+            </div>
+            {/* What the tab row's own overflow menu carried before this
+                menu absorbed it: navigation to other views of the same
+                process, never a draft-body mutation, so it stays reachable
+                whichever surface is active — unlike the group above. */}
+            <div {...stylex.props(styles.headerBarMenuGroup)}>
+              <span {...stylex.props(styles.headerBarMenuLabel)}>{t("headerBar.menuGroupViews")}</span>
+              <button
+                type="button"
+                className={`btn btn-secondary ${headerBarMenuLinkProps.className}`}
+                style={headerBarMenuLinkProps.style}
+                onClick={() => runMenuAction(onToggleJson)}
+              >
+                <FileJson size={18} strokeWidth={1.75} aria-hidden="true" />
+                {t(structureActive ? "headerBar.jsonOpen" : "headerBar.jsonLeave")}
+              </button>
+              <button
+                type="button"
+                className={`btn btn-secondary ${headerBarMenuLinkProps.className}`}
+                style={headerBarMenuLinkProps.style}
+                onClick={() => runMenuAction(onVersions)}
+              >
+                <History size={18} strokeWidth={1.75} aria-hidden="true" />
+                {t("headerBar.versions")}
+              </button>
+              <button
+                type="button"
+                className={`btn btn-secondary ${headerBarMenuLinkProps.className}`}
+                style={headerBarMenuLinkProps.style}
+                onClick={() => runMenuAction(onPlayer)}
+              >
+                <Play size={18} strokeWidth={1.75} aria-hidden="true" />
+                {t("headerBar.player")}
               </button>
             </div>
           </div>
