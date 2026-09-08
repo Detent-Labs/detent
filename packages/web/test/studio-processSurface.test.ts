@@ -80,15 +80,31 @@ describe("what the surface no longer carries", () => {
 
   it("keeps the header bar menu clear of Save, Discard draft and Publish", () => {
     const code = stripComments(read("src/areas/studio/panels/ProcessHeaderBar.tsx"));
+    // The three stand in the header row itself now, ahead of the menu
+    // trigger — scope the "clear of" assertion to the menu's own slice, or a
+    // whole-file search would find them there and fail.
+    // The slice ends where the confirmation dialogs begin, not at </header>:
+    // PublishConfirmDialog's own `busy={actions.saving || actions.publishing}`
+    // prop sits between the menu and </header>, and "actions.publishing"
+    // contains "actions.publish" as a substring.
+    const menuAt = code.indexOf("styles.headerBarMenu)} ref={menuRef}");
+    const dialogsAt = code.indexOf('actions.pendingDialog === "publish"', menuAt);
+    const menu = code.slice(menuAt, dialogsAt);
 
-    expect(code).not.toContain("actions.save");
-    expect(code).not.toContain("actions.discard");
-    expect(code).not.toContain("actions.publish");
+    expect(menuAt).toBeGreaterThan(-1);
+    expect(dialogsAt).toBeGreaterThan(-1);
+    expect(menu).not.toContain("actions.save");
+    expect(menu).not.toContain("actions.discard");
+    expect(menu).not.toContain("actions.publish");
     // The menu keeps its one group: the process key, the base locale, the
     // add-locale control and the admin groups link.
-    expect(code).toContain("headerBar.menuGroupDraft");
-    expect(code).toContain("AddLocaleControl");
-    expect(code).toContain("headerBar.manageGroups");
+    expect(menu).toContain("headerBar.menuGroupDraft");
+    expect(menu).toContain("AddLocaleControl");
+    expect(menu).toContain("headerBar.manageGroups");
+    // They render somewhere in the file — the header row's own top-level code.
+    expect(code).toContain("actions.save");
+    expect(code).toContain("actions.discard");
+    expect(code).toContain("actions.publish");
   });
 });
 
@@ -131,9 +147,12 @@ describe("the canvas opens the Steps tab, and keeps its own selection behavior",
 });
 
 describe("every new component's styles compile", () => {
+  // `DraftNavControls.tsx` left this list when `studio-draft-actions-to-
+  // header-bar` narrowed it to a pass-through around `ChecksRail`: it
+  // declares no markup of its own left to style, so it carries no
+  // `stylex.create(` any more, by design rather than by omission.
   const NEW_FILES = [
     "src/areas/studio/panels/ProcessTabRow.tsx",
-    "src/areas/studio/panels/DraftNavControls.tsx",
     "src/areas/studio/panels/EntityTabs.tsx",
     "src/areas/studio/panels/StepsRail.tsx",
     "src/areas/studio/panels/StepPage.tsx",

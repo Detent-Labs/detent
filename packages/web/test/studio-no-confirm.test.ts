@@ -26,9 +26,9 @@ import { describe, expect, it } from "bun:test";
  */
 const FILES = [
   "src/areas/studio/panels/DraftToolbar.tsx",
+  // Both confirmation dialogs live here, with the controls that open them
+  // (`studio-process-tabs`).
   "src/areas/studio/panels/ProcessHeaderBar.tsx",
-  // Both confirmation dialogs moved here with the controls that open them,
-  // which the studio's area nav now carries (`studio-process-tabs`).
   "src/areas/studio/panels/DraftNavControls.tsx",
 ];
 
