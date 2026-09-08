@@ -78,6 +78,32 @@ describe("the field matrix's empty state", () => {
   it("carries a live region, so the change is announced", () => {
     expect(render(NO_FIELDS)).toContain('role="status"');
   });
+
+  it("keeps that live region mounted while the grid has rows", () => {
+    // A `role="status"` that appears in the same frame as its own text is
+    // generally not announced. The region has to be there first, holding
+    // nothing, for a screen reader to be watching it.
+    const html = render(TECHNICAL);
+    expect(html).toContain('role="status"');
+    expect(html).toContain("<table");
+  });
+
+  it("gives the idle region no height, without hiding it from the tree", () => {
+    // `display: none` would take it out of the accessibility tree, which
+    // defeats the point.
+    const grid = read("src/areas/studio/panels/FieldMatrixGrid.tsx");
+    const block = grid.slice(grid.indexOf("matrixEmptyIdle: {"));
+    const body = block.slice(0, block.indexOf("},"));
+    expect(body).toContain("height: 0");
+    expect(body).not.toContain("display");
+  });
+
+  it("names the corner cell it made a focus stop", () => {
+    // ArrowUp then ArrowLeft lands there. It held no text and no name.
+    const html = render(TECHNICAL);
+    const corner = html.slice(html.indexOf("<th"), html.indexOf("</th>"));
+    expect(corner).toContain("aria-label=");
+  });
 });
 
 describe("a gated cell's reason", () => {
