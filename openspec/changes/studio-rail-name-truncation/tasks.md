@@ -84,15 +84,16 @@
   timezone-dependent test, unrelated to this fix. Checking the captured
   log with `sh scripts/gates/silent-green.sh` reported no finding.
   `studio-panelsRailFieldRow.test.tsx` passed unchanged.
-- [ ] 3.4 The antislop prose gate covers every Markdown file this fix
+- [x] 3.4 The antislop prose gate covers every Markdown file this fix
   touched: `proposal.md`, `design.md`, `tasks.md`,
-  `specs/studio-app/spec.md`. Running the following over that range
-  reports zero rising findings:
+  `specs/studio-app/spec.md`. This gate needs a real commit. It stayed
+  blind to this fix until commit `0e5ba1fe` landed (see
+  `gates-cannot-see-uncommitted-work` in memory). That first run found
+  105 findings across the three narrative files, plus 13 in the delta
+  spec. Commit `7f9b4aea` cleaned all of them. Running the following
+  over that range now reports zero rising findings:
   `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`.
-  `range.sh`'s fallback is `origin/main..HEAD`, a commit range that stays
-  blind to uncommitted work (see `gates-cannot-see-uncommitted-work` in
-  memory). This needs a commit to exist before it checks anything real.
-- [ ] 3.5 The whitespace/CRLF gate runs over the same range. Running the
+- [x] 3.5 The whitespace/CRLF gate runs over the same range. Running the
   following reports zero findings:
   `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh`.
   It carries the same commit-range caveat as 3.4.
