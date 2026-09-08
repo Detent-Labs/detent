@@ -4400,7 +4400,7 @@ meets `scope=started` should infer no new permission tier from it.
   Save, Discard draft and Publish render directly in `ProcessHeaderBar.tsx`,
   right-aligned ahead of its `⋮` menu trigger. That component already sits
   inside `EditScreen.tsx`'s own tree, so it renders them without a portal.
-  The studio's area nav carries no draft control, and `root.tsx` reserves no
+  The studio's area nav has no draft control, and `root.tsx` reserves no
   element for one. The Checks tab's own count, in `ProcessTabRow.tsx`,
   carries the severity color instead: the function `checksDotState` in
   `draft/checksRail.ts` decides blocker, advisory or clear, and only the

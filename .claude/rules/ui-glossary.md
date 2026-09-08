@@ -66,9 +66,9 @@ Save, Discard draft and Publish stand in the header bar, right-aligned ahead
 of the `⋮` menu. `panels/ProcessHeaderBar.tsx` renders them there. The Views
 group in that menu holds the JSON surface, Versions and Player.
 
-The studio's area nav carries no draft control. Checks stands as a tab, on
-the tab row below, and its own count carries the severity color no area-nav
-control duplicates.
+The studio's area nav has no draft control. Checks stands as a tab, on the
+tab row below. Its own count carries the severity color, and no other
+control duplicates it.
 
 Every other term below belongs to one tab.
 
