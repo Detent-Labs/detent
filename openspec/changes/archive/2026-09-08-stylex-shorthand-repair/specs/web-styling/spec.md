@@ -21,13 +21,13 @@ found.
 
 - **WHEN** a contributor adds `border: "1px solid red"` to a style object
 - **THEN** `bun test` fails
-- **AND** the failure names that file and that line
+- **AND** the message names that file and that line
 
 #### Scenario: A background shorthand fails the suite
 
 - **WHEN** a contributor adds `background: "red"` to a style object
 - **THEN** `bun test` fails
-- **AND** the failure names that file and that line
+- **AND** the message names that file and that line
 
 #### Scenario: A declared border reaches the stylesheet
 
