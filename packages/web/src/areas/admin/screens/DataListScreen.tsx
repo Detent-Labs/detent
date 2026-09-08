@@ -36,7 +36,7 @@ const styles = stylex.create({
     paddingBottom: space.s6,
   },
   rowLink: {
-    background: "none",
+    backgroundColor: "transparent",
     borderWidth: 0,
     margin: 0,
     padding: 0,
@@ -119,7 +119,7 @@ const styles = stylex.create({
     verticalAlign: "top",
   },
   tr: {
-    background: { default: "none", ":hover": colors.surfaceMuted },
+    backgroundColor: { default: "transparent", ":hover": colors.surfaceMuted },
   },
   rowRetired: {
     color: colors.textMuted,

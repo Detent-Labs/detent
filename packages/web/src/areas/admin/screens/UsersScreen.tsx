@@ -103,7 +103,7 @@ const styles = stylex.create({
     verticalAlign: "top",
   },
   tr: {
-    background: { default: "none", ":hover": colors.surfaceMuted },
+    backgroundColor: { default: "transparent", ":hover": colors.surfaceMuted },
   },
   roleEditor: {
     display: "flex",
@@ -159,7 +159,7 @@ const styles = stylex.create({
     borderColor: { default: colors.border, ":hover": colors.accent },
     paddingBlock: 2,
     paddingInline: 7,
-    background: "none",
+    backgroundColor: "transparent",
     color: { default: colors.textMuted, ":hover": colors.accent },
     cursor: "pointer",
   },

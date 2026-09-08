@@ -91,7 +91,7 @@ const styles = stylex.create({
     verticalAlign: "top",
   },
   tr: {
-    background: { default: "none", ":hover": colors.surfaceMuted },
+    backgroundColor: { default: "transparent", ":hover": colors.surfaceMuted },
   },
   badge: {
     display: "inline-block",
