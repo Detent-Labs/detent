@@ -69,10 +69,10 @@ const styles = stylex.create({
     verticalAlign: "top",
   },
   tr: {
-    background: { default: "none", ":hover": colors.surfaceMuted },
+    backgroundColor: { default: "transparent", ":hover": colors.surfaceMuted },
   },
   rowLink: {
-    background: "none",
+    backgroundColor: "transparent",
     borderWidth: 0,
     margin: 0,
     padding: 0,

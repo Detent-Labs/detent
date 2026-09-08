@@ -36,7 +36,7 @@ const styles = stylex.create({
     borderStyle: "solid",
     borderColor: colors.divider,
     padding: space.s4,
-    background: colors.surface,
+    backgroundColor: colors.surface,
     color: colors.text,
     overscrollBehavior: "contain",
     boxShadow: shadow.lg,

@@ -30,7 +30,7 @@ const styles = stylex.create({
     fontSize: "0.85rem",
   },
   conditionMode: {
-    background: "none",
+    backgroundColor: "transparent",
     color: colors.accent,
     padding: 0,
     flex: "none",

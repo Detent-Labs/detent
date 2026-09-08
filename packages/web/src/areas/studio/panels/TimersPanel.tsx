@@ -21,7 +21,7 @@ const styles = stylex.create({
     display: "flex",
     alignItems: "flex-end",
     gap: space.s2,
-    border: "none",
+    borderStyle: "none",
     marginInline: 0,
     padding: 0,
   },

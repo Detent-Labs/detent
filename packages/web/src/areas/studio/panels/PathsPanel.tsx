@@ -22,7 +22,9 @@ const styles = stylex.create({
     gap: space.s3,
   },
   pathRow: {
-    border: `1px solid ${colors.border}`,
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: colors.border,
     paddingBlock: space.s2,
     paddingInline: space.s3,
   },
@@ -62,7 +64,9 @@ const styles = stylex.create({
     // dropped the pressed option's accent text to 1.69:1.
     backgroundColor: "transparent",
     color: colors.text,
-    border: `1px solid ${colors.border}`,
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: colors.border,
     paddingBlock: space.s1,
     paddingInline: space.s2,
     font: "inherit",
@@ -75,7 +79,7 @@ const styles = stylex.create({
   // renders exactly two options, so the second one's own style applies the
   // sibling override statically.
   segmentedOptionSecond: {
-    borderLeft: "none",
+    borderLeftStyle: "none",
   },
   segmentedOptionPressed: {
     borderColor: colors.accent,

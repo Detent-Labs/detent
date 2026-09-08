@@ -18,7 +18,9 @@ const styles = stylex.create({
     alignItems: "baseline",
     gap: space.s3,
     paddingBottom: space.s2,
-    borderBottom: `2px solid ${colors.divider}`,
+    borderBottomWidth: 2,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.divider,
   },
   matrixCount: {
     fontFamily: fonts.mono,
@@ -50,16 +52,18 @@ const styles = stylex.create({
     display: "inline-block",
     width: "10px",
     height: "10px",
-    border: `1px solid ${colors.border}`,
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: colors.border,
   },
   matrixLegendSwatchVisible: {
-    background: colors.flagVisible,
+    backgroundColor: colors.flagVisible,
   },
   matrixLegendSwatchRequired: {
-    background: colors.flagRequired,
+    backgroundColor: colors.flagRequired,
   },
   matrixLegendSwatchReadonly: {
-    background: colors.flagReadonly,
+    backgroundColor: colors.flagReadonly,
   },
 });
 

@@ -23,7 +23,7 @@ const styles = stylex.create({
     width: "100%",
   },
   instanceQueryFormFieldset: {
-    border: 0,
+    borderWidth: 0,
     margin: 0,
     padding: 0,
     minWidth: 0,
@@ -57,7 +57,9 @@ const styles = stylex.create({
     alignItems: "baseline",
     gap: space.s2,
     width: "100%",
-    borderBottom: `1px solid ${colors.border}`,
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.border,
     paddingBottom: space.s2,
   },
   studioMono: {
@@ -65,7 +67,9 @@ const styles = stylex.create({
   },
   studioWarning: {
     color: colors.refusal,
-    borderLeft: `3px solid ${colors.accent400}`,
+    borderLeftWidth: 3,
+    borderLeftStyle: "solid",
+    borderLeftColor: colors.accent400,
     paddingLeft: space.s2,
   },
 });

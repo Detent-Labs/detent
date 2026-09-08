@@ -70,7 +70,9 @@ const styles = stylex.create({
     alignItems: "start",
   },
   studioConflict: {
-    border: `2px solid ${colors.refusal}`,
+    borderWidth: 2,
+    borderStyle: "solid",
+    borderColor: colors.refusal,
     paddingBlock: space.s3,
     paddingInline: space.s3,
     marginBlock: space.s3,
@@ -84,7 +86,9 @@ const styles = stylex.create({
     fontWeight: 600,
     textTransform: "uppercase",
     letterSpacing: "0.08em",
-    border: "2px solid currentcolor",
+    borderWidth: 2,
+    borderStyle: "solid",
+    borderColor: "currentcolor",
     paddingBlock: "2px",
     paddingInline: "7px",
     color: colors.accent,
@@ -105,7 +109,9 @@ const styles = stylex.create({
   studioDiffItem: {
     paddingBlock: space.s1,
     paddingInline: 0,
-    borderBottom: `1px solid ${colors.border}`,
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.border,
   },
   studioDiffCode: {
     fontFamily: fonts.mono,

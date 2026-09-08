@@ -296,7 +296,7 @@ const styles = stylex.create({
     fontSize: "0.8rem",
     whiteSpace: "pre-wrap",
     overflowWrap: "anywhere",
-    background: colors.surfaceMuted,
+    backgroundColor: colors.surfaceMuted,
     borderWidth: 1,
     borderStyle: "solid",
     borderColor: colors.border,
