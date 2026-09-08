@@ -1351,9 +1351,10 @@ The header bar SHALL carry a last-saved time. That time is client-only state.
 `EditorArea` sets it on every successful save.
 
 The header bar SHALL carry the content-locale badge the `studio-app`
-capability's content-locale-switcher requirement governs. It SHALL carry no
-Structure control and no JSON control. That pair no longer stands. The JSON
-surface opens from the tab row's overflow menu, per `studio-process-tabs`.
+capability's content-locale-switcher requirement governs. It SHALL have no
+Structure control and no JSON control of its own. That pair no longer stands.
+The JSON surface opens from this same bar's `⋮` menu instead, per
+`studio-process-tabs`.
 
 <!-- Why: "Discard draft" below is the literal button label `DraftToolbar` renders, not a synonym choice against "remove" elsewhere in this file. -->
 <!-- antislop: allow synonym-rotation -->
@@ -1362,19 +1363,19 @@ no Discard draft and no Publish action. The studio's area nav carries those
 three. `DraftToolbar` SHALL keep computing when each action is available and
 what each one does. The area nav calls that logic and holds none of its own.
 
-The menu SHALL hold its remaining controls under one heading: "Process, saved
-with the draft". That heading SHALL hold the editable process key, the
+The menu SHALL hold its remaining controls under two headings. The first,
+"Process, saved with the draft", SHALL hold the editable process key, the
 base-locale control and the add-locale control. The `studio-app` capability's
 base-locale requirement governs the second of those three. The add-locale
 control keeps the behavior it carries today, and no capability declares it
 yet. The
-menu SHALL NOT offer an action-registry selector or any other session-only
-control. Nothing in the studio ever loads a live `Registry` a
+first heading SHALL NOT offer an action-registry selector or any other
+session-only control. Nothing in the studio ever loads a live `Registry` a
 registry-resolution check could run against.
 
-That heading SHALL also hold a "Manage assignment groups for this process"
-link. The link SHALL open the admin area's Groups screen: the `admin-app`
-capability's `/groups` route.
+That first heading SHALL also hold a "Manage assignment groups for this
+process" link. The link SHALL open the admin area's Groups screen: the
+`admin-app` capability's `/groups` route.
 
 <!-- Why: "parameter" below names a URL query parameter, not a synonym choice against the performed-by control's own entries. -->
 <!-- antislop: allow synonym-rotation -->
@@ -1401,6 +1402,9 @@ its generic `area.forbidden` message instead.
 The link SHALL carry no group data of its own. It SHALL trigger no request to
 a `/admin/groups*` route: it is navigation only, so Studio duplicates no group
 CRUD.
+
+The menu's second heading, "Views", SHALL hold navigation to other views of
+this process. `studio-process-tabs` states that heading's own contents.
 
 The header bar's summary fields SHALL stay a read-only pass-through of state
 `EditorArea` owns. Those fields are the process name, the revision badge, the
