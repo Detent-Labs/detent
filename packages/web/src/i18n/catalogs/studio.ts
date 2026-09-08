@@ -422,6 +422,16 @@ export const en = {
   "fieldMatrix.columnInertNote": "No view — inert",
   "fieldMatrix.rowTypeLabel": "Type",
   "fieldMatrix.flaggedCellMark": "Flagged in Checks",
+  // The blast radius a bulk press carries. The studio has no undo for a bulk
+  // write, so the badge states what a press touches before an author presses
+  // it. The flag's own word stays a separate label rather than sitting inside
+  // these sentences, so no sentence gets assembled from fragments. A count
+  // never modifies a bare noun here either, so one wording serves one cell
+  // and twenty without a second key per number.
+  "fieldMatrix.bulkSetColumn": "Sets this flag on step {name}. Cells it writes: {total}. Already set: {set}.",
+  "fieldMatrix.bulkClearColumn": "Clears this flag from step {name}. Cells it writes: {total}.",
+  "fieldMatrix.bulkSetRow": "Sets this flag for field {name}. Cells it writes: {total}. Already set: {set}.",
+  "fieldMatrix.bulkClearRow": "Clears this flag from field {name}. Cells it writes: {total}.",
   "fieldMatrix.technicalRowMark": "Technical",
 
   // The step page's eight section headings (`studio-step-page`). "Time
