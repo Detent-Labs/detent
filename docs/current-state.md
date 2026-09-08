@@ -4389,12 +4389,11 @@ meets `scope=started` should infer no new permission tier from it.
   third, `formEditorReturnTab`, yields the tab the form editor returns to.
 
   The row component `ProcessTabRow.tsx` renders a `tablist` of buttons. Each
-  tab is its own tab stop. The row scrolls sideways and never wraps, and
-  carries no trailing control of its own — it still takes a `jsonOpen` prop,
-  read-only, to suppress every tab's `aria-selected` while the JSON surface
-  stands open. `ProcessHeaderBar.tsx`'s `⋮` menu carries the JSON surface,
-  Versions and Player instead, under a "Views" group beside the menu's
-  existing "Process, saved with the draft" one. The JSON entry names its own
+  tab is its own tab stop. The row scrolls sideways and never wraps, with no
+  trailing control of its own. It still takes a `jsonOpen` prop, read-only,
+  to suppress every tab's `aria-selected` while the JSON surface stands
+  open. `ProcessHeaderBar.tsx`'s `⋮` menu carries the JSON surface, Versions
+  and Player instead, under its "Views" group. The JSON entry names its own
   state, so an author reads what pressing it does
   (`studio-header-menu-merge`).
 
