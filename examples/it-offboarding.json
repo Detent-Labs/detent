@@ -1,0 +1,1869 @@
+{
+  "processId": "proc_it_offboarding",
+  "version": 1,
+  "definitionHash": "e7a26ef3b2fe4986f6aeb90bbda9db210cde69536363e594a0d98f891e108c1d",
+  "status": "published",
+  "publishedAt": "2026-09-08T09:00:00Z",
+  "definition": {
+    "key": "it_offboarding",
+    "label": {
+      "en": "IT Offboarding"
+    },
+    "description": {
+      "en": "The joint IT offboarding process of Opterion Health AG and XAN GmbH. Opterion sends the exit notification; XAN reviews it, confirms the deactivation date, prepares the backup and the forwarding, deactivates the account on the last working day, takes the hardware back, confirms completion, and then holds the account and the backup for their retention periods. Every path is manual: this body carries no action, no timer and no automatic path, so a case advances only when a person presses a button."
+    },
+    "baseLocale": "en",
+    "fields": [
+      {
+        "id": "field_0fb5a2c4-0001-4a1c-8e2f-0fb500000001",
+        "key": "personal_details",
+        "label": {
+          "en": "Personal details"
+        },
+        "description": {
+          "en": "Catalog grouping only. The instance payload stays flat: a reader sees data.full_name, not data.personal_details.full_name."
+        },
+        "type": "group",
+        "fields": [
+          {
+            "id": "field_0fb5a2c4-0002-4a1c-8e2f-0fb500000002",
+            "key": "full_name",
+            "label": {
+              "en": "First and last name"
+            },
+            "description": {
+              "en": "The departing person, exactly as the account is registered in the Opterion tenant."
+            },
+            "type": "string",
+            "validation": {
+              "minLength": 2,
+              "maxLength": 120
+            }
+          },
+          {
+            "id": "field_0fb5a2c4-0003-4a1c-8e2f-0fb500000003",
+            "key": "email_address",
+            "label": {
+              "en": "Email address"
+            },
+            "description": {
+              "en": "The Opterion mailbox that is deactivated, converted or forwarded."
+            },
+            "type": "string",
+            "format": "email"
+          },
+          {
+            "id": "field_0fb5a2c4-0004-4a1c-8e2f-0fb500000004",
+            "key": "person_category",
+            "label": {
+              "en": "Person category"
+            },
+            "description": {
+              "en": "The category decides the lead time. Employees and trainees carry the five-business-day rule; consultants and any other category are notified as soon as possible and XAN adapts the order and depth of the steps to the time available."
+            },
+            "type": "string",
+            "control": "radio",
+            "options": [
+              {
+                "value": "employee",
+                "label": {
+                  "en": "Employee (permanent)"
+                }
+              },
+              {
+                "value": "consultant",
+                "label": {
+                  "en": "Consultant (external)"
+                }
+              },
+              {
+                "value": "trainee",
+                "label": {
+                  "en": "Trainee"
+                }
+              },
+              {
+                "value": "other",
+                "label": {
+                  "en": "Other category, described under Remarks"
+                }
+              }
+            ]
+          },
+          {
+            "id": "field_0fb5a2c4-0005-4a1c-8e2f-0fb500000005",
+            "key": "last_working_day",
+            "label": {
+              "en": "Last working day (= deactivation date)"
+            },
+            "description": {
+              "en": "Account deactivation happens on this date in every case, even where the hardware return runs late."
+            },
+            "type": "string",
+            "format": "date"
+          }
+        ]
+      },
+      {
+        "id": "field_0fb5a2c4-0006-4a1c-8e2f-0fb500000006",
+        "key": "data_backup_and_email",
+        "label": {
+          "en": "Data backup and email"
+        },
+        "description": {
+          "en": "Catalog grouping only, matching the second block of the exit notification template."
+        },
+        "type": "group",
+        "fields": [
+          {
+            "id": "field_0fb5a2c4-0007-4a1c-8e2f-0fb500000007",
+            "key": "m365_backup_confirmed",
+            "label": {
+              "en": "M365 backup by XAN as standard"
+            },
+            "description": {
+              "en": "Mailbox, calendar, contacts, OneDrive contents and Teams chats. XAN performs this backup regardless of an explicit instruction; the box records that Opterion is aware of it."
+            },
+            "type": "boolean"
+          },
+          {
+            "id": "field_0fb5a2c4-0008-4a1c-8e2f-0fb500000008",
+            "key": "home_directory_backup",
+            "label": {
+              "en": "Back up the home directory"
+            },
+            "description": {
+              "en": "The personal directory on the Shared Drive. Backed up only on Opterion's explicit request; other team and project areas stay with Opterion and are out of scope."
+            },
+            "type": "boolean",
+            "control": "radio"
+          },
+          {
+            "id": "field_0fb5a2c4-0009-4a1c-8e2f-0fb500000009",
+            "key": "email_forwarding",
+            "label": {
+              "en": "Set up email forwarding"
+            },
+            "type": "boolean",
+            "control": "radio"
+          },
+          {
+            "id": "field_0fb5a2c4-0010-4a1c-8e2f-0fb500000010",
+            "key": "forwarding_address",
+            "label": {
+              "en": "Forward to this address"
+            },
+            "type": "string",
+            "format": "email"
+          },
+          {
+            "id": "field_0fb5a2c4-0011-4a1c-8e2f-0fb500000011",
+            "key": "forwarding_until",
+            "label": {
+              "en": "Forwarding runs until"
+            },
+            "description": {
+              "en": "Forwarding is always time-limited. Indefinite forwarding is not permitted, so this date is mandatory wherever forwarding is switched on."
+            },
+            "type": "string",
+            "format": "date"
+          },
+          {
+            "id": "field_0fb5a2c4-0012-4a1c-8e2f-0fb500000012",
+            "key": "auto_reply_text",
+            "label": {
+              "en": "Automatic reply"
+            },
+            "description": {
+              "en": "Mandatory wherever forwarding is active. The reply tells the sender that the original recipient no longer reads the message and that it goes elsewhere."
+            },
+            "type": "string",
+            "control": "radio",
+            "options": [
+              {
+                "value": "xan_standard",
+                "label": {
+                  "en": "Standard text set up by XAN"
+                }
+              },
+              {
+                "value": "opterion_custom",
+                "label": {
+                  "en": "Custom text provided by Opterion"
+                }
+              }
+            ]
+          },
+          {
+            "id": "field_0fb5a2c4-0013-4a1c-8e2f-0fb500000013",
+            "key": "auto_reply_custom",
+            "label": {
+              "en": "Custom automatic reply text"
+            },
+            "type": "string",
+            "control": "multiline",
+            "validation": {
+              "maxLength": 2000
+            }
+          },
+          {
+            "id": "field_0fb5a2c4-0014-4a1c-8e2f-0fb500000014",
+            "key": "email_address_handling",
+            "label": {
+              "en": "Handling of the email address after deactivation"
+            },
+            "type": "string",
+            "control": "radio",
+            "options": [
+              {
+                "value": "deactivate",
+                "label": {
+                  "en": "Deactivate, no further incoming mail"
+                }
+              },
+              {
+                "value": "shared_mailbox",
+                "label": {
+                  "en": "Convert to a shared mailbox"
+                }
+              },
+              {
+                "value": "other",
+                "label": {
+                  "en": "Other instruction, described under Remarks"
+                }
+              }
+            ]
+          },
+          {
+            "id": "field_0fb5a2c4-0015-4a1c-8e2f-0fb500000015",
+            "key": "shared_mailbox_owner",
+            "label": {
+              "en": "Responsible for the shared mailbox"
+            },
+            "description": {
+              "en": "Opterion manages the converted mailbox. Name the person or group that takes it over."
+            },
+            "type": "string",
+            "validation": {
+              "maxLength": 120
+            }
+          }
+        ]
+      },
+      {
+        "id": "field_0fb5a2c4-0016-4a1c-8e2f-0fb500000016",
+        "key": "hardware",
+        "label": {
+          "en": "Hardware"
+        },
+        "description": {
+          "en": "Catalog grouping only. Hardware exists only where a device was issued at onboarding; an accounts-only setup makes this whole block empty."
+        },
+        "type": "group",
+        "fields": [
+          {
+            "id": "field_0fb5a2c4-0017-4a1c-8e2f-0fb500000017",
+            "key": "hardware_present",
+            "label": {
+              "en": "Hardware present"
+            },
+            "type": "boolean",
+            "control": "radio"
+          },
+          {
+            "id": "field_0fb5a2c4-0018-4a1c-8e2f-0fb500000018",
+            "key": "device_type_model",
+            "label": {
+              "en": "Device type and model"
+            },
+            "type": "string",
+            "validation": {
+              "maxLength": 200
+            }
+          },
+          {
+            "id": "field_0fb5a2c4-0019-4a1c-8e2f-0fb500000019",
+            "key": "return_method",
+            "label": {
+              "en": "Return method"
+            },
+            "type": "string",
+            "control": "radio",
+            "options": [
+              {
+                "value": "onsite",
+                "label": {
+                  "en": "On-site at Opterion"
+                }
+              },
+              {
+                "value": "shipped",
+                "label": {
+                  "en": "Sent to XAN"
+                }
+              },
+              {
+                "value": "other",
+                "label": {
+                  "en": "Other, described under Remarks"
+                }
+              }
+            ]
+          },
+          {
+            "id": "field_0fb5a2c4-0020-4a1c-8e2f-0fb500000020",
+            "key": "return_date",
+            "label": {
+              "en": "Return or dispatch date"
+            },
+            "description": {
+              "en": "The agreed on-site appointment, or the expected dispatch date for a postal return. Shipping cost, method and liability are agreed case by case."
+            },
+            "type": "string",
+            "format": "date"
+          }
+        ]
+      },
+      {
+        "id": "field_0fb5a2c4-0021-4a1c-8e2f-0fb500000021",
+        "key": "permissions",
+        "label": {
+          "en": "Permissions"
+        },
+        "description": {
+          "en": "Catalog grouping only."
+        },
+        "type": "group",
+        "fields": [
+          {
+            "id": "field_0fb5a2c4-0022-4a1c-8e2f-0fb500000022",
+            "key": "access_excel_confirmed",
+            "label": {
+              "en": "Access Excel updated or prepared"
+            },
+            "description": {
+              "en": "Shared drive_structure and access rights.xlsx has been updated to remove the departing person, or prepared so XAN can apply the change at deactivation. XAN revokes Shared Drive rights against the version of that file current on the deactivation date."
+            },
+            "type": "boolean"
+          }
+        ]
+      },
+      {
+        "id": "field_0fb5a2c4-0023-4a1c-8e2f-0fb500000023",
+        "key": "retention",
+        "label": {
+          "en": "Retention"
+        },
+        "description": {
+          "en": "Catalog grouping only. Both periods start at the deactivation date."
+        },
+        "type": "group",
+        "fields": [
+          {
+            "id": "field_0fb5a2c4-0024-4a1c-8e2f-0fb500000024",
+            "key": "account_retention",
+            "label": {
+              "en": "Account retention after deactivation"
+            },
+            "type": "string",
+            "control": "radio",
+            "options": [
+              {
+                "value": "standard_30_days",
+                "label": {
+                  "en": "Standard, 30 days"
+                }
+              },
+              {
+                "value": "other_duration",
+                "label": {
+                  "en": "Other duration"
+                }
+              },
+              {
+                "value": "archive",
+                "label": {
+                  "en": "Archive the account instead of deleting it"
+                }
+              }
+            ]
+          },
+          {
+            "id": "field_0fb5a2c4-0025-4a1c-8e2f-0fb500000025",
+            "key": "account_retention_other",
+            "label": {
+              "en": "Other account retention duration"
+            },
+            "type": "string",
+            "validation": {
+              "maxLength": 120
+            }
+          },
+          {
+            "id": "field_0fb5a2c4-0026-4a1c-8e2f-0fb500000026",
+            "key": "backup_retention",
+            "label": {
+              "en": "Retention of backed-up data at XAN"
+            },
+            "description": {
+              "en": "Data minimisation and purpose limitation bound this period. XAN notifies Opterion before it expires."
+            },
+            "type": "string",
+            "control": "radio",
+            "options": [
+              {
+                "value": "standard_12_months",
+                "label": {
+                  "en": "Standard, 12 months"
+                }
+              },
+              {
+                "value": "shorter",
+                "label": {
+                  "en": "Shorter"
+                }
+              },
+              {
+                "value": "longer_max_24_months",
+                "label": {
+                  "en": "Longer, at most 24 months"
+                }
+              }
+            ]
+          },
+          {
+            "id": "field_0fb5a2c4-0027-4a1c-8e2f-0fb500000027",
+            "key": "backup_retention_months",
+            "label": {
+              "en": "Backup retention in months"
+            },
+            "description": {
+              "en": "Fill this in for a shorter or a longer period. Twenty-four months is the ceiling."
+            },
+            "type": "number",
+            "format": "integer",
+            "validation": {
+              "min": 1,
+              "max": 24
+            }
+          }
+        ]
+      },
+      {
+        "id": "field_0fb5a2c4-0028-4a1c-8e2f-0fb500000028",
+        "key": "notification",
+        "label": {
+          "en": "Notification"
+        },
+        "description": {
+          "en": "Catalog grouping only. Who sent the exit notification, when, and anything the fixed blocks above do not cover."
+        },
+        "type": "group",
+        "fields": [
+          {
+            "id": "field_0fb5a2c4-0029-4a1c-8e2f-0fb500000029",
+            "key": "early_notice_on_file",
+            "label": {
+              "en": "Early notice already on file"
+            },
+            "description": {
+              "en": "An early notice is optional, carries only the name and the expected last working day, and triggers no operational step. It helps XAN plan licences, hardware logistics and scheduling. It never replaces this notification."
+            },
+            "type": "boolean"
+          },
+          {
+            "id": "field_0fb5a2c4-0030-4a1c-8e2f-0fb500000030",
+            "key": "remarks",
+            "label": {
+              "en": "Remarks"
+            },
+            "description": {
+              "en": "Special instructions, a non-standard person category, or anything else the blocks above do not cover."
+            },
+            "type": "string",
+            "control": "multiline",
+            "validation": {
+              "maxLength": 2000
+            }
+          },
+          {
+            "id": "field_0fb5a2c4-0031-4a1c-8e2f-0fb500000031",
+            "key": "submitted_by",
+            "label": {
+              "en": "Submitted by"
+            },
+            "description": {
+              "en": "Lucy Laidlaw or the designated deputy."
+            },
+            "type": "string",
+            "validation": {
+              "maxLength": 120
+            }
+          },
+          {
+            "id": "field_0fb5a2c4-0032-4a1c-8e2f-0fb500000032",
+            "key": "submitted_on",
+            "label": {
+              "en": "Submitted on"
+            },
+            "type": "string",
+            "format": "date"
+          }
+        ]
+      },
+      {
+        "id": "field_0fb5a2c4-0033-4a1c-8e2f-0fb500000033",
+        "key": "processing_xan",
+        "label": {
+          "en": "Processing (XAN)"
+        },
+        "description": {
+          "en": "Catalog grouping only. Everything XAN records while working the case; Opterion never fills these in."
+        },
+        "type": "group",
+        "fields": [
+          {
+            "id": "field_0fb5a2c4-0034-4a1c-8e2f-0fb500000034",
+            "key": "ticket_no",
+            "label": {
+              "en": "Ticket number (XAN)"
+            },
+            "type": "string",
+            "validation": {
+              "maxLength": 60
+            }
+          },
+          {
+            "id": "field_0fb5a2c4-0035-4a1c-8e2f-0fb500000035",
+            "key": "processed_by",
+            "label": {
+              "en": "Processed by (XAN)"
+            },
+            "type": "string",
+            "validation": {
+              "maxLength": 120
+            }
+          },
+          {
+            "id": "field_0fb5a2c4-0036-4a1c-8e2f-0fb500000036",
+            "key": "clarification_questions",
+            "label": {
+              "en": "Clarification questions"
+            },
+            "type": "string",
+            "control": "multiline",
+            "validation": {
+              "maxLength": 2000
+            }
+          },
+          {
+            "id": "field_0fb5a2c4-0037-4a1c-8e2f-0fb500000037",
+            "key": "clarification_response",
+            "label": {
+              "en": "Response from Opterion"
+            },
+            "type": "string",
+            "control": "multiline",
+            "validation": {
+              "maxLength": 2000
+            }
+          },
+          {
+            "id": "field_0fb5a2c4-0038-4a1c-8e2f-0fb500000038",
+            "key": "deactivation_date_confirmed",
+            "label": {
+              "en": "Deactivation date confirmed in writing"
+            },
+            "description": {
+              "en": "Within at most two business days of a complete notification. Report any deviation at once."
+            },
+            "type": "boolean"
+          },
+          {
+            "id": "field_0fb5a2c4-0039-4a1c-8e2f-0fb500000039",
+            "key": "immediate_lock_written_confirmation",
+            "label": {
+              "en": "Written confirmation of the immediate lock obtained"
+            },
+            "description": {
+              "en": "A phoned instruction is executed first and confirmed in writing afterwards."
+            },
+            "type": "boolean"
+          },
+          {
+            "id": "field_0fb5a2c4-0040-4a1c-8e2f-0fb500000040",
+            "key": "phone_number_released",
+            "label": {
+              "en": "Phone number released"
+            },
+            "description": {
+              "en": "Applies where Microsoft Telephony was assigned. The number goes back to the pool unless Opterion instructs otherwise."
+            },
+            "type": "boolean"
+          },
+          {
+            "id": "field_0fb5a2c4-0041-4a1c-8e2f-0fb500000041",
+            "key": "licences_revoked",
+            "label": {
+              "en": "Licences revoked"
+            },
+            "description": {
+              "en": "M365, Copilot, Telephony, Adobe, EndNote and every other service XAN manages."
+            },
+            "type": "boolean"
+          },
+          {
+            "id": "field_0fb5a2c4-0042-4a1c-8e2f-0fb500000042",
+            "key": "permissions_revoked",
+            "label": {
+              "en": "Shared Drive permissions revoked"
+            },
+            "type": "boolean"
+          },
+          {
+            "id": "field_0fb5a2c4-0043-4a1c-8e2f-0fb500000043",
+            "key": "groups_cleaned_up",
+            "label": {
+              "en": "Groups and role assignments cleaned up"
+            },
+            "description": {
+              "en": "M365 groups, Teams, distribution lists and any special permissions. XAN revokes every active assignment; Opterion need not itemise them."
+            },
+            "type": "boolean"
+          },
+          {
+            "id": "field_0fb5a2c4-0044-4a1c-8e2f-0fb500000044",
+            "key": "mobile_devices_locked",
+            "label": {
+              "en": "Managed mobile devices locked"
+            },
+            "description": {
+              "en": "Where MDM makes it technically possible."
+            },
+            "type": "boolean"
+          },
+          {
+            "id": "field_0fb5a2c4-0045-4a1c-8e2f-0fb500000045",
+            "key": "authenticator_note_sent",
+            "label": {
+              "en": "Authenticator note sent to the departing person"
+            },
+            "description": {
+              "en": "The Opterion entry in Microsoft Authenticator on the private phone stays on the device until the person removes it. XAN has no access to that device and verifies nothing."
+            },
+            "type": "boolean"
+          },
+          {
+            "id": "field_0fb5a2c4-0046-4a1c-8e2f-0fb500000046",
+            "key": "device_condition",
+            "label": {
+              "en": "Device completeness and condition"
+            },
+            "type": "string",
+            "control": "multiline",
+            "validation": {
+              "maxLength": 1000
+            }
+          },
+          {
+            "id": "field_0fb5a2c4-0047-4a1c-8e2f-0fb500000047",
+            "key": "device_status",
+            "label": {
+              "en": "Device status"
+            },
+            "type": "string",
+            "control": "radio",
+            "options": [
+              {
+                "value": "returned_refurbished",
+                "label": {
+                  "en": "Returned and refurbished"
+                }
+              },
+              {
+                "value": "documented_lost",
+                "label": {
+                  "en": "Documented as lost or not returned"
+                }
+              }
+            ]
+          },
+          {
+            "id": "field_0fb5a2c4-0048-4a1c-8e2f-0fb500000048",
+            "key": "inventory_updated",
+            "label": {
+              "en": "Inventory updated"
+            },
+            "description": {
+              "en": "Hardware booked back in and the internal licence overview brought up to date."
+            },
+            "type": "boolean"
+          },
+          {
+            "id": "field_0fb5a2c4-0049-4a1c-8e2f-0fb500000049",
+            "key": "completion_confirmation_sent",
+            "label": {
+              "en": "Completion confirmation sent to Opterion"
+            },
+            "type": "boolean"
+          },
+          {
+            "id": "field_0fb5a2c4-0050-4a1c-8e2f-0fb500000050",
+            "key": "account_final_action",
+            "label": {
+              "en": "Final action on the account"
+            },
+            "type": "string",
+            "control": "radio",
+            "options": [
+              {
+                "value": "permanently_deleted",
+                "label": {
+                  "en": "Permanently deleted"
+                }
+              },
+              {
+                "value": "inactive_archive",
+                "label": {
+                  "en": "Moved to an inactive archive"
+                }
+              }
+            ]
+          },
+          {
+            "id": "field_0fb5a2c4-0051-4a1c-8e2f-0fb500000051",
+            "key": "backup_deleted_on",
+            "label": {
+              "en": "Backup data deleted on"
+            },
+            "type": "string",
+            "format": "date"
+          }
+        ]
+      }
+    ],
+    "workflow": {
+      "initialStep": "step_0fb5b3d5-0001-4a1c-8e2f-0fb500000001",
+      "steps": [
+        {
+          "id": "step_0fb5b3d5-0001-4a1c-8e2f-0fb500000001",
+          "key": "exit_notification",
+          "label": {
+            "en": "Submit the Exit Notification"
+          },
+          "description": {
+            "en": "Lucy Laidlaw or the designated deputy fills in the exit notification and sends it to XAN. This is the binding trigger for the operational process; the lead time starts from receipt of a complete notification. Employees and trainees need at least five business days before the last working day. For consultants and any other category Opterion notifies XAN as soon as possible, which may be shorter, and XAN adapts the order and depth of the steps to the time available. The optional early notice is no step of its own, because it triggers no operational work; record it under Early notice already on file. Opterion is not required to disclose the reason for a departure, and XAN acts on the data given here without reviewing the circumstances. Where circumstances demand it, order an immediate lock instead and let this notification follow."
+          },
+          "type": "task",
+          "assignment": {
+            "strategy": {
+              "type": "static",
+              "config": {
+                "candidates": [
+                  "opterion-request-owner"
+                ]
+              }
+            }
+          },
+          "view": {
+            "fields": [
+              {
+                "ref": "field_0fb5a2c4-0002-4a1c-8e2f-0fb500000002",
+                "required": true,
+                "group": "Personal details"
+              },
+              {
+                "ref": "field_0fb5a2c4-0003-4a1c-8e2f-0fb500000003",
+                "required": true,
+                "group": "Personal details"
+              },
+              {
+                "ref": "field_0fb5a2c4-0004-4a1c-8e2f-0fb500000004",
+                "required": true,
+                "group": "Personal details"
+              },
+              {
+                "ref": "field_0fb5a2c4-0005-4a1c-8e2f-0fb500000005",
+                "required": true,
+                "group": "Personal details"
+              },
+              {
+                "ref": "field_0fb5a2c4-0007-4a1c-8e2f-0fb500000007",
+                "group": "Data backup and email"
+              },
+              {
+                "ref": "field_0fb5a2c4-0008-4a1c-8e2f-0fb500000008",
+                "group": "Data backup and email"
+              },
+              {
+                "ref": "field_0fb5a2c4-0009-4a1c-8e2f-0fb500000009",
+                "group": "Data backup and email"
+              },
+              {
+                "ref": "field_0fb5a2c4-0010-4a1c-8e2f-0fb500000010",
+                "group": "Data backup and email"
+              },
+              {
+                "ref": "field_0fb5a2c4-0011-4a1c-8e2f-0fb500000011",
+                "group": "Data backup and email"
+              },
+              {
+                "ref": "field_0fb5a2c4-0012-4a1c-8e2f-0fb500000012",
+                "group": "Data backup and email"
+              },
+              {
+                "ref": "field_0fb5a2c4-0013-4a1c-8e2f-0fb500000013",
+                "group": "Data backup and email"
+              },
+              {
+                "ref": "field_0fb5a2c4-0014-4a1c-8e2f-0fb500000014",
+                "group": "Data backup and email"
+              },
+              {
+                "ref": "field_0fb5a2c4-0015-4a1c-8e2f-0fb500000015",
+                "group": "Data backup and email"
+              },
+              {
+                "ref": "field_0fb5a2c4-0017-4a1c-8e2f-0fb500000017",
+                "group": "Hardware"
+              },
+              {
+                "ref": "field_0fb5a2c4-0018-4a1c-8e2f-0fb500000018",
+                "group": "Hardware"
+              },
+              {
+                "ref": "field_0fb5a2c4-0019-4a1c-8e2f-0fb500000019",
+                "group": "Hardware"
+              },
+              {
+                "ref": "field_0fb5a2c4-0020-4a1c-8e2f-0fb500000020",
+                "group": "Hardware"
+              },
+              {
+                "ref": "field_0fb5a2c4-0022-4a1c-8e2f-0fb500000022",
+                "required": true,
+                "group": "Permissions"
+              },
+              {
+                "ref": "field_0fb5a2c4-0024-4a1c-8e2f-0fb500000024",
+                "group": "Retention"
+              },
+              {
+                "ref": "field_0fb5a2c4-0025-4a1c-8e2f-0fb500000025",
+                "group": "Retention"
+              },
+              {
+                "ref": "field_0fb5a2c4-0026-4a1c-8e2f-0fb500000026",
+                "group": "Retention"
+              },
+              {
+                "ref": "field_0fb5a2c4-0027-4a1c-8e2f-0fb500000027",
+                "group": "Retention"
+              },
+              {
+                "ref": "field_0fb5a2c4-0029-4a1c-8e2f-0fb500000029",
+                "group": "Notification"
+              },
+              {
+                "ref": "field_0fb5a2c4-0030-4a1c-8e2f-0fb500000030",
+                "group": "Notification"
+              },
+              {
+                "ref": "field_0fb5a2c4-0031-4a1c-8e2f-0fb500000031",
+                "required": true,
+                "group": "Notification"
+              },
+              {
+                "ref": "field_0fb5a2c4-0032-4a1c-8e2f-0fb500000032",
+                "required": true,
+                "group": "Notification"
+              }
+            ]
+          },
+          "paths": [
+            {
+              "id": "path_0fb5c4e6-0001-4a1c-8e2f-0fb500000001",
+              "key": "submit",
+              "label": "Submit exit notification",
+              "to": "step_0fb5b3d5-0003-4a1c-8e2f-0fb500000003",
+              "trigger": "manual"
+            },
+            {
+              "id": "path_0fb5c4e6-0002-4a1c-8e2f-0fb500000002",
+              "key": "order_immediate_lock",
+              "label": "Order immediate lock",
+              "to": "step_0fb5b3d5-0002-4a1c-8e2f-0fb500000002",
+              "trigger": "manual"
+            }
+          ]
+        },
+        {
+          "id": "step_0fb5b3d5-0002-4a1c-8e2f-0fb500000002",
+          "key": "immediate_lock",
+          "label": {
+            "en": "Execute the Immediate Lock"
+          },
+          "description": {
+            "en": "Section 7, the special case. Opterion may order an immediate lock at any time; the assessment of the situation and the reason rest with Opterion alone, and XAN implements the order without reviewing it. XAN locks the M365 account so login is no longer possible, terminates all active sessions with a force sign-out, and locks managed mobile devices wherever MDM makes that technically possible. A phoned instruction is executed without delay and confirmed in writing afterwards. Clarification of the remaining details runs alongside this lock rather than before it, and the standard steps continue from Preparation. Data backup still happens as standard, and Opterion may ask for it to run before the lock."
+          },
+          "type": "task",
+          "assignment": {
+            "strategy": {
+              "type": "static",
+              "config": {
+                "candidates": [
+                  "xan-operator"
+                ]
+              }
+            }
+          },
+          "view": {
+            "fields": [
+              {
+                "ref": "field_0fb5a2c4-0002-4a1c-8e2f-0fb500000002",
+                "readonly": true,
+                "group": "Personal details"
+              },
+              {
+                "ref": "field_0fb5a2c4-0003-4a1c-8e2f-0fb500000003",
+                "readonly": true,
+                "group": "Personal details"
+              },
+              {
+                "ref": "field_0fb5a2c4-0030-4a1c-8e2f-0fb500000030",
+                "readonly": true,
+                "group": "Notification"
+              },
+              {
+                "ref": "field_0fb5a2c4-0034-4a1c-8e2f-0fb500000034",
+                "required": true,
+                "group": "Processing (XAN)"
+              },
+              {
+                "ref": "field_0fb5a2c4-0035-4a1c-8e2f-0fb500000035",
+                "required": true,
+                "group": "Processing (XAN)"
+              },
+              {
+                "ref": "field_0fb5a2c4-0039-4a1c-8e2f-0fb500000039",
+                "required": true,
+                "group": "Processing (XAN)"
+              },
+              {
+                "ref": "field_0fb5a2c4-0044-4a1c-8e2f-0fb500000044",
+                "group": "Processing (XAN)"
+              }
+            ]
+          },
+          "paths": [
+            {
+              "id": "path_0fb5c4e6-0003-4a1c-8e2f-0fb500000003",
+              "key": "lock_executed",
+              "label": "Confirm lock executed",
+              "to": "step_0fb5b3d5-0006-4a1c-8e2f-0fb500000006",
+              "trigger": "manual"
+            }
+          ]
+        },
+        {
+          "id": "step_0fb5b3d5-0003-4a1c-8e2f-0fb500000003",
+          "key": "review_notification",
+          "label": {
+            "en": "Review the Exit Notification"
+          },
+          "description": {
+            "en": "Phase 1. XAN logs the notification with its date and time, links any early notice already on file to it, and checks it for completeness: name, email address and last working day; the data backup instruction; the forwarding target address and end date; the hardware status and return method; the Access Excel confirmation; and both retention periods. An incomplete notification does not start the lead time. Anything missing or unclear opens the clarification loop, which repeats until the information suffices."
+          },
+          "type": "task",
+          "assignment": {
+            "strategy": {
+              "type": "static",
+              "config": {
+                "candidates": [
+                  "xan-operator"
+                ]
+              }
+            }
+          },
+          "view": {
+            "fields": [
+              {
+                "ref": "field_0fb5a2c4-0002-4a1c-8e2f-0fb500000002",
+                "readonly": true,
+                "group": "Personal details"
+              },
+              {
+                "ref": "field_0fb5a2c4-0003-4a1c-8e2f-0fb500000003",
+                "readonly": true,
+                "group": "Personal details"
+              },
+              {
+                "ref": "field_0fb5a2c4-0004-4a1c-8e2f-0fb500000004",
+                "readonly": true,
+                "group": "Personal details"
+              },
+              {
+                "ref": "field_0fb5a2c4-0005-4a1c-8e2f-0fb500000005",
+                "readonly": true,
+                "group": "Personal details"
+              },
+              {
+                "ref": "field_0fb5a2c4-0007-4a1c-8e2f-0fb500000007",
+                "readonly": true,
+                "group": "Data backup and email"
+              },
+              {
+                "ref": "field_0fb5a2c4-0008-4a1c-8e2f-0fb500000008",
+                "readonly": true,
+                "group": "Data backup and email"
+              },
+              {
+                "ref": "field_0fb5a2c4-0009-4a1c-8e2f-0fb500000009",
+                "readonly": true,
+                "group": "Data backup and email"
+              },
+              {
+                "ref": "field_0fb5a2c4-0010-4a1c-8e2f-0fb500000010",
+                "readonly": true,
+                "group": "Data backup and email"
+              },
+              {
+                "ref": "field_0fb5a2c4-0011-4a1c-8e2f-0fb500000011",
+                "readonly": true,
+                "group": "Data backup and email"
+              },
+              {
+                "ref": "field_0fb5a2c4-0014-4a1c-8e2f-0fb500000014",
+                "readonly": true,
+                "group": "Data backup and email"
+              },
+              {
+                "ref": "field_0fb5a2c4-0017-4a1c-8e2f-0fb500000017",
+                "readonly": true,
+                "group": "Hardware"
+              },
+              {
+                "ref": "field_0fb5a2c4-0019-4a1c-8e2f-0fb500000019",
+                "readonly": true,
+                "group": "Hardware"
+              },
+              {
+                "ref": "field_0fb5a2c4-0020-4a1c-8e2f-0fb500000020",
+                "readonly": true,
+                "group": "Hardware"
+              },
+              {
+                "ref": "field_0fb5a2c4-0022-4a1c-8e2f-0fb500000022",
+                "readonly": true,
+                "group": "Permissions"
+              },
+              {
+                "ref": "field_0fb5a2c4-0024-4a1c-8e2f-0fb500000024",
+                "readonly": true,
+                "group": "Retention"
+              },
+              {
+                "ref": "field_0fb5a2c4-0026-4a1c-8e2f-0fb500000026",
+                "readonly": true,
+                "group": "Retention"
+              },
+              {
+                "ref": "field_0fb5a2c4-0027-4a1c-8e2f-0fb500000027",
+                "readonly": true,
+                "group": "Retention"
+              },
+              {
+                "ref": "field_0fb5a2c4-0029-4a1c-8e2f-0fb500000029",
+                "readonly": true,
+                "group": "Notification"
+              },
+              {
+                "ref": "field_0fb5a2c4-0030-4a1c-8e2f-0fb500000030",
+                "readonly": true,
+                "group": "Notification"
+              },
+              {
+                "ref": "field_0fb5a2c4-0034-4a1c-8e2f-0fb500000034",
+                "required": true,
+                "group": "Processing (XAN)"
+              },
+              {
+                "ref": "field_0fb5a2c4-0035-4a1c-8e2f-0fb500000035",
+                "required": true,
+                "group": "Processing (XAN)"
+              },
+              {
+                "ref": "field_0fb5a2c4-0036-4a1c-8e2f-0fb500000036",
+                "group": "Processing (XAN)"
+              }
+            ]
+          },
+          "paths": [
+            {
+              "id": "path_0fb5c4e6-0004-4a1c-8e2f-0fb500000004",
+              "key": "request_clarification",
+              "label": "Request clarification",
+              "to": "step_0fb5b3d5-0004-4a1c-8e2f-0fb500000004",
+              "trigger": "manual"
+            },
+            {
+              "id": "path_0fb5c4e6-0005-4a1c-8e2f-0fb500000005",
+              "key": "confirm_complete",
+              "label": "Confirm notification complete",
+              "to": "step_0fb5b3d5-0005-4a1c-8e2f-0fb500000005",
+              "trigger": "manual"
+            }
+          ]
+        },
+        {
+          "id": "step_0fb5b3d5-0004-4a1c-8e2f-0fb500000004",
+          "key": "clarification",
+          "label": {
+            "en": "Answer the Clarification"
+          },
+          "description": {
+            "en": "The loop back to Opterion. Answer the open questions and correct whatever the notification left out. The loop runs as often as it needs to and closes only once XAN has enough to work with. Under an immediate lock this clarification runs alongside the lock rather than ahead of it."
+          },
+          "type": "task",
+          "assignment": {
+            "strategy": {
+              "type": "static",
+              "config": {
+                "candidates": [
+                  "opterion-request-owner"
+                ]
+              }
+            }
+          },
+          "view": {
+            "fields": [
+              {
+                "ref": "field_0fb5a2c4-0036-4a1c-8e2f-0fb500000036",
+                "readonly": true,
+                "group": "Processing (XAN)"
+              },
+              {
+                "ref": "field_0fb5a2c4-0037-4a1c-8e2f-0fb500000037",
+                "required": true,
+                "group": "Processing (XAN)"
+              },
+              {
+                "ref": "field_0fb5a2c4-0005-4a1c-8e2f-0fb500000005",
+                "group": "Personal details"
+              },
+              {
+                "ref": "field_0fb5a2c4-0009-4a1c-8e2f-0fb500000009",
+                "group": "Data backup and email"
+              },
+              {
+                "ref": "field_0fb5a2c4-0010-4a1c-8e2f-0fb500000010",
+                "group": "Data backup and email"
+              },
+              {
+                "ref": "field_0fb5a2c4-0011-4a1c-8e2f-0fb500000011",
+                "group": "Data backup and email"
+              },
+              {
+                "ref": "field_0fb5a2c4-0014-4a1c-8e2f-0fb500000014",
+                "group": "Data backup and email"
+              },
+              {
+                "ref": "field_0fb5a2c4-0015-4a1c-8e2f-0fb500000015",
+                "group": "Data backup and email"
+              },
+              {
+                "ref": "field_0fb5a2c4-0017-4a1c-8e2f-0fb500000017",
+                "group": "Hardware"
+              },
+              {
+                "ref": "field_0fb5a2c4-0018-4a1c-8e2f-0fb500000018",
+                "group": "Hardware"
+              },
+              {
+                "ref": "field_0fb5a2c4-0019-4a1c-8e2f-0fb500000019",
+                "group": "Hardware"
+              },
+              {
+                "ref": "field_0fb5a2c4-0020-4a1c-8e2f-0fb500000020",
+                "group": "Hardware"
+              },
+              {
+                "ref": "field_0fb5a2c4-0022-4a1c-8e2f-0fb500000022",
+                "group": "Permissions"
+              },
+              {
+                "ref": "field_0fb5a2c4-0024-4a1c-8e2f-0fb500000024",
+                "group": "Retention"
+              },
+              {
+                "ref": "field_0fb5a2c4-0025-4a1c-8e2f-0fb500000025",
+                "group": "Retention"
+              },
+              {
+                "ref": "field_0fb5a2c4-0026-4a1c-8e2f-0fb500000026",
+                "group": "Retention"
+              },
+              {
+                "ref": "field_0fb5a2c4-0027-4a1c-8e2f-0fb500000027",
+                "group": "Retention"
+              },
+              {
+                "ref": "field_0fb5a2c4-0030-4a1c-8e2f-0fb500000030",
+                "group": "Notification"
+              }
+            ]
+          },
+          "paths": [
+            {
+              "id": "path_0fb5c4e6-0006-4a1c-8e2f-0fb500000006",
+              "key": "respond",
+              "label": "Send response",
+              "to": "step_0fb5b3d5-0003-4a1c-8e2f-0fb500000003",
+              "trigger": "manual"
+            }
+          ]
+        },
+        {
+          "id": "step_0fb5b3d5-0005-4a1c-8e2f-0fb500000005",
+          "key": "confirm_deactivation_date",
+          "label": {
+            "en": "Confirm the Deactivation Date"
+          },
+          "description": {
+            "en": "XAN answers within at most two business days of a complete notification, confirming the planned deactivation date in writing. Any deviation is reported at once. Where the lead time falls short of five business days without the consultant rule applying, orderly completion of every step by the last working day cannot be promised, but deactivation on that date is assured in every case."
+          },
+          "type": "task",
+          "assignment": {
+            "strategy": {
+              "type": "static",
+              "config": {
+                "candidates": [
+                  "xan-operator"
+                ]
+              }
+            }
+          },
+          "view": {
+            "fields": [
+              {
+                "ref": "field_0fb5a2c4-0002-4a1c-8e2f-0fb500000002",
+                "readonly": true,
+                "group": "Personal details"
+              },
+              {
+                "ref": "field_0fb5a2c4-0004-4a1c-8e2f-0fb500000004",
+                "readonly": true,
+                "group": "Personal details"
+              },
+              {
+                "ref": "field_0fb5a2c4-0005-4a1c-8e2f-0fb500000005",
+                "readonly": true,
+                "group": "Personal details"
+              },
+              {
+                "ref": "field_0fb5a2c4-0034-4a1c-8e2f-0fb500000034",
+                "readonly": true,
+                "group": "Processing (XAN)"
+              },
+              {
+                "ref": "field_0fb5a2c4-0038-4a1c-8e2f-0fb500000038",
+                "required": true,
+                "group": "Processing (XAN)"
+              },
+              {
+                "ref": "field_0fb5a2c4-0030-4a1c-8e2f-0fb500000030",
+                "group": "Notification"
+              }
+            ]
+          },
+          "paths": [
+            {
+              "id": "path_0fb5c4e6-0007-4a1c-8e2f-0fb500000007",
+              "key": "date_confirmed",
+              "label": "Confirm deactivation date",
+              "to": "step_0fb5b3d5-0006-4a1c-8e2f-0fb500000006",
+              "trigger": "manual"
+            }
+          ]
+        },
+        {
+          "id": "step_0fb5b3d5-0006-4a1c-8e2f-0fb500000006",
+          "key": "preparation",
+          "label": {
+            "en": "Prepare the Offboarding"
+          },
+          "description": {
+            "en": "Phase 2, between the notification and the deactivation date. Back up the M365 data as standard: mailbox, calendar, contacts, OneDrive contents and Teams chats, whether or not anybody asked for it. Back up the personal home directory only where Opterion explicitly asked; other Shared Drive areas stay with Opterion. Prepare the forwarding with its target address and its end date, which is always time-limited, and prepare the automatic reply that becomes mandatory once forwarding is active. Identify every assigned licence, including Microsoft Telephony and its phone number, every group, Teams and distribution list membership, every Shared Drive permission and any special permission; Phase 3 carries them out. Coordinate the hardware return with Opterion and, where it helps, with the departing person: fix an on-site appointment or record the expected dispatch date."
+          },
+          "type": "task",
+          "assignment": {
+            "strategy": {
+              "type": "static",
+              "config": {
+                "candidates": [
+                  "xan-operator"
+                ]
+              }
+            }
+          },
+          "view": {
+            "fields": [
+              {
+                "ref": "field_0fb5a2c4-0002-4a1c-8e2f-0fb500000002",
+                "readonly": true,
+                "group": "Personal details"
+              },
+              {
+                "ref": "field_0fb5a2c4-0005-4a1c-8e2f-0fb500000005",
+                "readonly": true,
+                "group": "Personal details"
+              },
+              {
+                "ref": "field_0fb5a2c4-0007-4a1c-8e2f-0fb500000007",
+                "readonly": true,
+                "group": "Data backup and email"
+              },
+              {
+                "ref": "field_0fb5a2c4-0008-4a1c-8e2f-0fb500000008",
+                "readonly": true,
+                "group": "Data backup and email"
+              },
+              {
+                "ref": "field_0fb5a2c4-0009-4a1c-8e2f-0fb500000009",
+                "readonly": true,
+                "group": "Data backup and email"
+              },
+              {
+                "ref": "field_0fb5a2c4-0010-4a1c-8e2f-0fb500000010",
+                "readonly": true,
+                "group": "Data backup and email"
+              },
+              {
+                "ref": "field_0fb5a2c4-0011-4a1c-8e2f-0fb500000011",
+                "readonly": true,
+                "group": "Data backup and email"
+              },
+              {
+                "ref": "field_0fb5a2c4-0012-4a1c-8e2f-0fb500000012",
+                "readonly": true,
+                "group": "Data backup and email"
+              },
+              {
+                "ref": "field_0fb5a2c4-0013-4a1c-8e2f-0fb500000013",
+                "readonly": true,
+                "group": "Data backup and email"
+              },
+              {
+                "ref": "field_0fb5a2c4-0014-4a1c-8e2f-0fb500000014",
+                "readonly": true,
+                "group": "Data backup and email"
+              },
+              {
+                "ref": "field_0fb5a2c4-0015-4a1c-8e2f-0fb500000015",
+                "readonly": true,
+                "group": "Data backup and email"
+              },
+              {
+                "ref": "field_0fb5a2c4-0017-4a1c-8e2f-0fb500000017",
+                "readonly": true,
+                "group": "Hardware"
+              },
+              {
+                "ref": "field_0fb5a2c4-0018-4a1c-8e2f-0fb500000018",
+                "readonly": true,
+                "group": "Hardware"
+              },
+              {
+                "ref": "field_0fb5a2c4-0019-4a1c-8e2f-0fb500000019",
+                "group": "Hardware"
+              },
+              {
+                "ref": "field_0fb5a2c4-0020-4a1c-8e2f-0fb500000020",
+                "group": "Hardware"
+              },
+              {
+                "ref": "field_0fb5a2c4-0030-4a1c-8e2f-0fb500000030",
+                "group": "Notification"
+              }
+            ]
+          },
+          "paths": [
+            {
+              "id": "path_0fb5c4e6-0008-4a1c-8e2f-0fb500000008",
+              "key": "preparation_complete",
+              "label": "Complete preparation",
+              "to": "step_0fb5b3d5-0007-4a1c-8e2f-0fb500000007",
+              "trigger": "manual"
+            }
+          ]
+        },
+        {
+          "id": "step_0fb5b3d5-0007-4a1c-8e2f-0fb500000007",
+          "key": "deactivation",
+          "label": {
+            "en": "Deactivate the Account"
+          },
+          "description": {
+            "en": "Phase 3, on the last working day. Disable the M365 account so login fails, force a sign-out of every active session, and activate the forwarding and the automatic reply at the same moment. Handle the email address as instructed: deactivate it, or convert it to a shared mailbox. Revoke every licence, release the phone number back into the pool where Microsoft Telephony was assigned, revoke the Shared Drive permissions against the current Access Excel, clean up the group, Teams and distribution list assignments, and lock managed mobile devices wherever MDM allows it. Tell the departing person that the Opterion entry in Microsoft Authenticator on their private phone can be removed. Take the hardware back if it is there. Where the return does not happen today, deactivation still stands on the planned date and the return is settled afterwards."
+          },
+          "type": "task",
+          "assignment": {
+            "strategy": {
+              "type": "static",
+              "config": {
+                "candidates": [
+                  "xan-operator"
+                ]
+              }
+            }
+          },
+          "view": {
+            "fields": [
+              {
+                "ref": "field_0fb5a2c4-0002-4a1c-8e2f-0fb500000002",
+                "readonly": true,
+                "group": "Personal details"
+              },
+              {
+                "ref": "field_0fb5a2c4-0005-4a1c-8e2f-0fb500000005",
+                "readonly": true,
+                "group": "Personal details"
+              },
+              {
+                "ref": "field_0fb5a2c4-0009-4a1c-8e2f-0fb500000009",
+                "readonly": true,
+                "group": "Data backup and email"
+              },
+              {
+                "ref": "field_0fb5a2c4-0010-4a1c-8e2f-0fb500000010",
+                "readonly": true,
+                "group": "Data backup and email"
+              },
+              {
+                "ref": "field_0fb5a2c4-0011-4a1c-8e2f-0fb500000011",
+                "readonly": true,
+                "group": "Data backup and email"
+              },
+              {
+                "ref": "field_0fb5a2c4-0014-4a1c-8e2f-0fb500000014",
+                "readonly": true,
+                "group": "Data backup and email"
+              },
+              {
+                "ref": "field_0fb5a2c4-0015-4a1c-8e2f-0fb500000015",
+                "readonly": true,
+                "group": "Data backup and email"
+              },
+              {
+                "ref": "field_0fb5a2c4-0017-4a1c-8e2f-0fb500000017",
+                "readonly": true,
+                "group": "Hardware"
+              },
+              {
+                "ref": "field_0fb5a2c4-0022-4a1c-8e2f-0fb500000022",
+                "readonly": true,
+                "group": "Permissions"
+              },
+              {
+                "ref": "field_0fb5a2c4-0041-4a1c-8e2f-0fb500000041",
+                "required": true,
+                "group": "Processing (XAN)"
+              },
+              {
+                "ref": "field_0fb5a2c4-0042-4a1c-8e2f-0fb500000042",
+                "required": true,
+                "group": "Processing (XAN)"
+              },
+              {
+                "ref": "field_0fb5a2c4-0043-4a1c-8e2f-0fb500000043",
+                "required": true,
+                "group": "Processing (XAN)"
+              },
+              {
+                "ref": "field_0fb5a2c4-0040-4a1c-8e2f-0fb500000040",
+                "group": "Processing (XAN)"
+              },
+              {
+                "ref": "field_0fb5a2c4-0044-4a1c-8e2f-0fb500000044",
+                "group": "Processing (XAN)"
+              },
+              {
+                "ref": "field_0fb5a2c4-0045-4a1c-8e2f-0fb500000045",
+                "required": true,
+                "group": "Processing (XAN)"
+              }
+            ]
+          },
+          "paths": [
+            {
+              "id": "path_0fb5c4e6-0009-4a1c-8e2f-0fb500000009",
+              "key": "hardware_settled",
+              "label": "Deactivate, hardware settled",
+              "to": "step_0fb5b3d5-0009-4a1c-8e2f-0fb500000009",
+              "trigger": "manual"
+            },
+            {
+              "id": "path_0fb5c4e6-0010-4a1c-8e2f-0fb500000010",
+              "key": "hardware_outstanding",
+              "label": "Deactivate, hardware outstanding",
+              "to": "step_0fb5b3d5-0008-4a1c-8e2f-0fb500000008",
+              "trigger": "manual"
+            }
+          ]
+        },
+        {
+          "id": "step_0fb5b3d5-0008-4a1c-8e2f-0fb500000008",
+          "key": "hardware_return",
+          "label": {
+            "en": "Take the Hardware Back"
+          },
+          "description": {
+            "en": "Receive the device, check it for completeness and condition, factory reset or re-image it, and book it back into inventory for reuse. A postal return lands here whenever it arrives, since account deactivation already happened on the planned date. Under an immediate lock the return is often not arranged yet; coordinating it, including any employment law step, is Opterion's job. A device that is lost or never returned is documented in the inventory as such, and any follow-up falls outside the XAN scope."
+          },
+          "type": "task",
+          "assignment": {
+            "strategy": {
+              "type": "static",
+              "config": {
+                "candidates": [
+                  "xan-operator"
+                ]
+              }
+            }
+          },
+          "view": {
+            "fields": [
+              {
+                "ref": "field_0fb5a2c4-0002-4a1c-8e2f-0fb500000002",
+                "readonly": true,
+                "group": "Personal details"
+              },
+              {
+                "ref": "field_0fb5a2c4-0017-4a1c-8e2f-0fb500000017",
+                "readonly": true,
+                "group": "Hardware"
+              },
+              {
+                "ref": "field_0fb5a2c4-0018-4a1c-8e2f-0fb500000018",
+                "readonly": true,
+                "group": "Hardware"
+              },
+              {
+                "ref": "field_0fb5a2c4-0019-4a1c-8e2f-0fb500000019",
+                "readonly": true,
+                "group": "Hardware"
+              },
+              {
+                "ref": "field_0fb5a2c4-0020-4a1c-8e2f-0fb500000020",
+                "readonly": true,
+                "group": "Hardware"
+              },
+              {
+                "ref": "field_0fb5a2c4-0046-4a1c-8e2f-0fb500000046",
+                "group": "Processing (XAN)"
+              },
+              {
+                "ref": "field_0fb5a2c4-0047-4a1c-8e2f-0fb500000047",
+                "required": true,
+                "group": "Processing (XAN)"
+              },
+              {
+                "ref": "field_0fb5a2c4-0048-4a1c-8e2f-0fb500000048",
+                "required": true,
+                "group": "Processing (XAN)"
+              }
+            ]
+          },
+          "paths": [
+            {
+              "id": "path_0fb5c4e6-0011-4a1c-8e2f-0fb500000011",
+              "key": "device_received",
+              "label": "Record device received",
+              "to": "step_0fb5b3d5-0009-4a1c-8e2f-0fb500000009",
+              "trigger": "manual"
+            },
+            {
+              "id": "path_0fb5c4e6-0012-4a1c-8e2f-0fb500000012",
+              "key": "device_lost",
+              "label": "Document device as lost",
+              "to": "step_0fb5b3d5-0009-4a1c-8e2f-0fb500000009",
+              "trigger": "manual"
+            }
+          ]
+        },
+        {
+          "id": "step_0fb5b3d5-0009-4a1c-8e2f-0fb500000009",
+          "key": "completion",
+          "label": {
+            "en": "Confirm Completion to Opterion"
+          },
+          "description": {
+            "en": "Phase 4. Update the XAN inventory and the internal licence overview, then send the written confirmation to Lucy Laidlaw or the designated deputy: the account is deactivated, the licences are released, the permissions are revoked, and the hardware is back where hardware existed. The operational process is complete once the departed person reaches no M365 or XAN-managed system at all. DocuSign, Datavault and Zoho are closed by Opterion or the responsible department, and HR exit steps, key cards and other non-IT equipment stay outside this process. The two retention steps that follow are deferred and tracked on their own."
+          },
+          "type": "task",
+          "assignment": {
+            "strategy": {
+              "type": "static",
+              "config": {
+                "candidates": [
+                  "xan-operator"
+                ]
+              }
+            }
+          },
+          "view": {
+            "fields": [
+              {
+                "ref": "field_0fb5a2c4-0002-4a1c-8e2f-0fb500000002",
+                "readonly": true,
+                "group": "Personal details"
+              },
+              {
+                "ref": "field_0fb5a2c4-0003-4a1c-8e2f-0fb500000003",
+                "readonly": true,
+                "group": "Personal details"
+              },
+              {
+                "ref": "field_0fb5a2c4-0041-4a1c-8e2f-0fb500000041",
+                "readonly": true,
+                "group": "Processing (XAN)"
+              },
+              {
+                "ref": "field_0fb5a2c4-0042-4a1c-8e2f-0fb500000042",
+                "readonly": true,
+                "group": "Processing (XAN)"
+              },
+              {
+                "ref": "field_0fb5a2c4-0043-4a1c-8e2f-0fb500000043",
+                "readonly": true,
+                "group": "Processing (XAN)"
+              },
+              {
+                "ref": "field_0fb5a2c4-0040-4a1c-8e2f-0fb500000040",
+                "readonly": true,
+                "group": "Processing (XAN)"
+              },
+              {
+                "ref": "field_0fb5a2c4-0047-4a1c-8e2f-0fb500000047",
+                "readonly": true,
+                "group": "Processing (XAN)"
+              },
+              {
+                "ref": "field_0fb5a2c4-0034-4a1c-8e2f-0fb500000034",
+                "readonly": true,
+                "group": "Processing (XAN)"
+              },
+              {
+                "ref": "field_0fb5a2c4-0048-4a1c-8e2f-0fb500000048",
+                "group": "Processing (XAN)"
+              },
+              {
+                "ref": "field_0fb5a2c4-0035-4a1c-8e2f-0fb500000035",
+                "group": "Processing (XAN)"
+              },
+              {
+                "ref": "field_0fb5a2c4-0049-4a1c-8e2f-0fb500000049",
+                "required": true,
+                "group": "Processing (XAN)"
+              }
+            ]
+          },
+          "paths": [
+            {
+              "id": "path_0fb5c4e6-0013-4a1c-8e2f-0fb500000013",
+              "key": "confirmation_sent",
+              "label": "Send completion confirmation",
+              "to": "step_0fb5b3d5-0010-4a1c-8e2f-0fb500000010",
+              "trigger": "manual"
+            }
+          ]
+        },
+        {
+          "id": "step_0fb5b3d5-0010-4a1c-8e2f-0fb500000010",
+          "key": "account_retention",
+          "label": {
+            "en": "Hold and Close the Account"
+          },
+          "description": {
+            "en": "Phase 5, deferred. The account stays in its deactivated state for the retention period, thirty days after deactivation as standard or whatever period Opterion named instead. Once it elapses, the account is permanently deleted or moved to an inactive archive; that choice is Opterion's."
+          },
+          "type": "task",
+          "assignment": {
+            "strategy": {
+              "type": "static",
+              "config": {
+                "candidates": [
+                  "xan-operator"
+                ]
+              }
+            }
+          },
+          "view": {
+            "fields": [
+              {
+                "ref": "field_0fb5a2c4-0002-4a1c-8e2f-0fb500000002",
+                "readonly": true,
+                "group": "Personal details"
+              },
+              {
+                "ref": "field_0fb5a2c4-0005-4a1c-8e2f-0fb500000005",
+                "readonly": true,
+                "group": "Personal details"
+              },
+              {
+                "ref": "field_0fb5a2c4-0024-4a1c-8e2f-0fb500000024",
+                "readonly": true,
+                "group": "Retention"
+              },
+              {
+                "ref": "field_0fb5a2c4-0025-4a1c-8e2f-0fb500000025",
+                "readonly": true,
+                "group": "Retention"
+              },
+              {
+                "ref": "field_0fb5a2c4-0050-4a1c-8e2f-0fb500000050",
+                "required": true,
+                "group": "Processing (XAN)"
+              }
+            ]
+          },
+          "paths": [
+            {
+              "id": "path_0fb5c4e6-0014-4a1c-8e2f-0fb500000014",
+              "key": "account_deleted_or_archived",
+              "label": "Delete or archive account",
+              "to": "step_0fb5b3d5-0011-4a1c-8e2f-0fb500000011",
+              "trigger": "manual"
+            }
+          ]
+        },
+        {
+          "id": "step_0fb5b3d5-0011-4a1c-8e2f-0fb500000011",
+          "key": "backup_retention",
+          "label": {
+            "en": "Hold and Delete the Backup"
+          },
+          "description": {
+            "en": "Phase 5, deferred, and the last operational step. Backed-up data stays at XAN for twelve months after deactivation as standard, at most twenty-four months where Opterion instructs a longer period, and less where Opterion shortens it. Access to that data is granted only on a written request from Lucy Laidlaw or the designated deputy. XAN notifies Opterion before the period expires, and deletes the backup once it does."
+          },
+          "type": "task",
+          "assignment": {
+            "strategy": {
+              "type": "static",
+              "config": {
+                "candidates": [
+                  "xan-operator"
+                ]
+              }
+            }
+          },
+          "view": {
+            "fields": [
+              {
+                "ref": "field_0fb5a2c4-0002-4a1c-8e2f-0fb500000002",
+                "readonly": true,
+                "group": "Personal details"
+              },
+              {
+                "ref": "field_0fb5a2c4-0005-4a1c-8e2f-0fb500000005",
+                "readonly": true,
+                "group": "Personal details"
+              },
+              {
+                "ref": "field_0fb5a2c4-0026-4a1c-8e2f-0fb500000026",
+                "readonly": true,
+                "group": "Retention"
+              },
+              {
+                "ref": "field_0fb5a2c4-0027-4a1c-8e2f-0fb500000027",
+                "readonly": true,
+                "group": "Retention"
+              },
+              {
+                "ref": "field_0fb5a2c4-0051-4a1c-8e2f-0fb500000051",
+                "required": true,
+                "group": "Processing (XAN)"
+              }
+            ]
+          },
+          "paths": [
+            {
+              "id": "path_0fb5c4e6-0015-4a1c-8e2f-0fb500000015",
+              "key": "backup_deleted",
+              "label": "Delete backup data",
+              "to": "step_0fb5b3d5-0012-4a1c-8e2f-0fb500000012",
+              "trigger": "manual"
+            }
+          ]
+        },
+        {
+          "id": "step_0fb5b3d5-0012-4a1c-8e2f-0fb500000012",
+          "key": "closed",
+          "label": {
+            "en": "Offboarding Closed"
+          },
+          "description": {
+            "en": "The case is closed. No access to M365 or any XAN-managed system remains, the licences are released, the backup was taken and then deleted at the end of its retention period, the permissions and group memberships are cleaned up, the hardware is back in inventory or documented as lost, and the completion confirmation went to Opterion."
+          },
+          "type": "task",
+          "terminal": true,
+          "view": {
+            "fields": [
+              {
+                "ref": "field_0fb5a2c4-0002-4a1c-8e2f-0fb500000002",
+                "readonly": true,
+                "group": "Personal details"
+              },
+              {
+                "ref": "field_0fb5a2c4-0003-4a1c-8e2f-0fb500000003",
+                "readonly": true,
+                "group": "Personal details"
+              },
+              {
+                "ref": "field_0fb5a2c4-0004-4a1c-8e2f-0fb500000004",
+                "readonly": true,
+                "group": "Personal details"
+              },
+              {
+                "ref": "field_0fb5a2c4-0005-4a1c-8e2f-0fb500000005",
+                "readonly": true,
+                "group": "Personal details"
+              },
+              {
+                "ref": "field_0fb5a2c4-0047-4a1c-8e2f-0fb500000047",
+                "readonly": true,
+                "group": "Processing (XAN)"
+              },
+              {
+                "ref": "field_0fb5a2c4-0049-4a1c-8e2f-0fb500000049",
+                "readonly": true,
+                "group": "Processing (XAN)"
+              },
+              {
+                "ref": "field_0fb5a2c4-0050-4a1c-8e2f-0fb500000050",
+                "readonly": true,
+                "group": "Processing (XAN)"
+              },
+              {
+                "ref": "field_0fb5a2c4-0051-4a1c-8e2f-0fb500000051",
+                "readonly": true,
+                "group": "Processing (XAN)"
+              },
+              {
+                "ref": "field_0fb5a2c4-0034-4a1c-8e2f-0fb500000034",
+                "readonly": true,
+                "group": "Processing (XAN)"
+              },
+              {
+                "ref": "field_0fb5a2c4-0035-4a1c-8e2f-0fb500000035",
+                "readonly": true,
+                "group": "Processing (XAN)"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,2166 @@
+{
+  "processId": "proc_it_onboarding",
+  "version": 1,
+  "definitionHash": "2d18542602f65058eb936d81dc091e6fedc577821e2b468cf4050cd6036288b0",
+  "status": "published",
+  "publishedAt": "2026-09-08T09:00:00Z",
+  "definition": {
+    "key": "it_onboarding",
+    "label": {
+      "en": "IT Onboarding"
+    },
+    "description": {
+      "en": "The joint IT onboarding process of Opterion Health AG and XAN GmbH. Opterion submits the service request and owns the hardware decision, the quote approval and the escalation choice; XAN, the outsourced IT provider, reviews the request, procures and configures the equipment, sets up the digital work environment, hands over to the new person and documents the case. Every path is manual: the process document defines the operator's checklist, not an automated pipeline."
+    },
+    "baseLocale": "en",
+    "fields": [
+      {
+        "id": "field_2b9f4e10-0001-4a1c-8e2f-000000000001",
+        "key": "personal_details",
+        "label": {
+          "en": "Personal details"
+        },
+        "description": {
+          "en": "The person the request is about. Catalog grouping only — the payload stays flat."
+        },
+        "type": "group",
+        "fields": [
+          {
+            "id": "field_2b9f4e10-0002-4a1c-8e2f-000000000002",
+            "key": "full_name",
+            "label": {
+              "en": "First and last name"
+            },
+            "type": "string",
+            "validation": {
+              "minLength": 2,
+              "maxLength": 120
+            }
+          },
+          {
+            "id": "field_2b9f4e10-0003-4a1c-8e2f-000000000003",
+            "key": "email_address",
+            "label": {
+              "en": "Email address (requested address)"
+            },
+            "type": "string",
+            "format": "email"
+          },
+          {
+            "id": "field_2b9f4e10-0004-4a1c-8e2f-000000000004",
+            "key": "person_category",
+            "label": {
+              "en": "Person category"
+            },
+            "description": {
+              "en": "A category not listed here is stated explicitly under Remarks; XAN and Opterion then align on the scope together."
+            },
+            "type": "string",
+            "control": "radio",
+            "options": [
+              {
+                "value": "employee",
+                "label": {
+                  "en": "Employee"
+                }
+              },
+              {
+                "value": "consultant",
+                "label": {
+                  "en": "Consultant"
+                }
+              },
+              {
+                "value": "trainee",
+                "label": {
+                  "en": "Trainee"
+                }
+              },
+              {
+                "value": "other",
+                "label": {
+                  "en": "Other"
+                }
+              }
+            ]
+          },
+          {
+            "id": "field_2b9f4e10-0005-4a1c-8e2f-000000000005",
+            "key": "role_area",
+            "label": {
+              "en": "Role / area of work"
+            },
+            "description": {
+              "en": "Optional."
+            },
+            "type": "string",
+            "validation": {
+              "maxLength": 120
+            }
+          },
+          {
+            "id": "field_2b9f4e10-0006-4a1c-8e2f-000000000006",
+            "key": "start_date",
+            "label": {
+              "en": "Start date"
+            },
+            "type": "string",
+            "format": "date"
+          },
+          {
+            "id": "field_2b9f4e10-0007-4a1c-8e2f-000000000007",
+            "key": "end_date",
+            "label": {
+              "en": "End date"
+            },
+            "description": {
+              "en": "For fixed-term engagements only."
+            },
+            "type": "string",
+            "format": "date"
+          }
+        ]
+      },
+      {
+        "id": "field_2b9f4e10-0008-4a1c-8e2f-000000000008",
+        "key": "work_model_section",
+        "label": {
+          "en": "Work model"
+        },
+        "type": "group",
+        "fields": [
+          {
+            "id": "field_2b9f4e10-0009-4a1c-8e2f-000000000009",
+            "key": "location",
+            "label": {
+              "en": "Location"
+            },
+            "type": "string",
+            "validation": {
+              "maxLength": 120
+            }
+          },
+          {
+            "id": "field_2b9f4e10-0010-4a1c-8e2f-000000000010",
+            "key": "work_model",
+            "label": {
+              "en": "Work model"
+            },
+            "type": "string",
+            "control": "radio",
+            "options": [
+              {
+                "value": "on_site",
+                "label": {
+                  "en": "On-site (fixed, assigned workstation)"
+                }
+              },
+              {
+                "value": "remote",
+                "label": {
+                  "en": "Remote (no regular on-site presence)"
+                }
+              },
+              {
+                "value": "hybrid",
+                "label": {
+                  "en": "Hybrid (alternating, hot-desk on-site)"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "field_2b9f4e10-0011-4a1c-8e2f-000000000011",
+        "key": "hardware",
+        "label": {
+          "en": "Hardware"
+        },
+        "type": "group",
+        "fields": [
+          {
+            "id": "field_2b9f4e10-0012-4a1c-8e2f-000000000012",
+            "key": "laptop_required",
+            "label": {
+              "en": "Laptop required"
+            },
+            "type": "boolean",
+            "control": "radio"
+          },
+          {
+            "id": "field_2b9f4e10-0013-4a1c-8e2f-000000000013",
+            "key": "hardware_decision",
+            "label": {
+              "en": "Hardware decision"
+            },
+            "description": {
+              "en": "Opterion decides, checked in advance against Laptop Inventory.xlsx. A later change is possible if the original choice proves unsuitable, but may lead to delays."
+            },
+            "type": "string",
+            "control": "radio",
+            "options": [
+              {
+                "value": "spare",
+                "label": {
+                  "en": "Spare device from stock"
+                }
+              },
+              {
+                "value": "new_purchase",
+                "label": {
+                  "en": "New purchase"
+                }
+              },
+              {
+                "value": "no_device",
+                "label": {
+                  "en": "No device"
+                }
+              }
+            ]
+          },
+          {
+            "id": "field_2b9f4e10-0014-4a1c-8e2f-000000000014",
+            "key": "laptop_model",
+            "label": {
+              "en": "Model (for a new purchase)"
+            },
+            "type": "string",
+            "control": "radio",
+            "options": [
+              {
+                "value": "thinkpad_x1",
+                "label": {
+                  "en": "Lenovo ThinkPad X1"
+                }
+              },
+              {
+                "value": "thinkpad_p14s",
+                "label": {
+                  "en": "Lenovo ThinkPad P14s"
+                }
+              },
+              {
+                "value": "thinkpad_p16s",
+                "label": {
+                  "en": "Lenovo ThinkPad P16s"
+                }
+              }
+            ]
+          },
+          {
+            "id": "field_2b9f4e10-0015-4a1c-8e2f-000000000015",
+            "key": "accessories",
+            "label": {
+              "en": "Accessories"
+            },
+            "type": "string",
+            "control": "multiline",
+            "validation": {
+              "maxLength": 1000
+            }
+          }
+        ]
+      },
+      {
+        "id": "field_2b9f4e10-0016-4a1c-8e2f-000000000016",
+        "key": "licences_and_tools",
+        "label": {
+          "en": "Licences and tools"
+        },
+        "type": "group",
+        "fields": [
+          {
+            "id": "field_2b9f4e10-0017-4a1c-8e2f-000000000017",
+            "key": "m365_plan",
+            "label": {
+              "en": "Microsoft 365 plan"
+            },
+            "description": {
+              "en": "Required for every person category."
+            },
+            "type": "string",
+            "control": "radio",
+            "options": [
+              {
+                "value": "basic",
+                "label": {
+                  "en": "Basic"
+                }
+              },
+              {
+                "value": "standard",
+                "label": {
+                  "en": "Standard"
+                }
+              }
+            ]
+          },
+          {
+            "id": "field_2b9f4e10-0018-4a1c-8e2f-000000000018",
+            "key": "copilot",
+            "label": {
+              "en": "Microsoft Copilot"
+            },
+            "type": "boolean"
+          },
+          {
+            "id": "field_2b9f4e10-0019-4a1c-8e2f-000000000019",
+            "key": "ms_phone",
+            "label": {
+              "en": "Microsoft Phone"
+            },
+            "type": "boolean"
+          },
+          {
+            "id": "field_2b9f4e10-0020-4a1c-8e2f-000000000020",
+            "key": "phone_number",
+            "label": {
+              "en": "Phone number"
+            },
+            "description": {
+              "en": "A number Opterion picked from the list of available numbers. Left empty, XAN checks availability and arranges a new number block if needed."
+            },
+            "type": "string",
+            "validation": {
+              "maxLength": 40
+            }
+          },
+          {
+            "id": "field_2b9f4e10-0021-4a1c-8e2f-000000000021",
+            "key": "adobe",
+            "label": {
+              "en": "Adobe"
+            },
+            "type": "string",
+            "control": "radio",
+            "options": [
+              {
+                "value": "no",
+                "label": {
+                  "en": "No"
+                }
+              },
+              {
+                "value": "standard",
+                "label": {
+                  "en": "Standard"
+                }
+              },
+              {
+                "value": "pro",
+                "label": {
+                  "en": "Pro"
+                }
+              }
+            ]
+          },
+          {
+            "id": "field_2b9f4e10-0022-4a1c-8e2f-000000000022",
+            "key": "other_licences",
+            "label": {
+              "en": "Other licences and services"
+            },
+            "description": {
+              "en": "EndNote and the other services XAN manages."
+            },
+            "type": "string",
+            "control": "multiline",
+            "validation": {
+              "maxLength": 1000
+            }
+          }
+        ]
+      },
+      {
+        "id": "field_2b9f4e10-0023-4a1c-8e2f-000000000023",
+        "key": "permissions",
+        "label": {
+          "en": "Permissions"
+        },
+        "type": "group",
+        "fields": [
+          {
+            "id": "field_2b9f4e10-0024-4a1c-8e2f-000000000024",
+            "key": "access_excel_confirmed",
+            "label": {
+              "en": "Shared drive_structure and access rights.xlsx is up to date"
+            },
+            "description": {
+              "en": "XAN configures the Shared Drive permissions from the state of that file at the time of the request. Keeping it current is Opterion's responsibility."
+            },
+            "type": "boolean"
+          },
+          {
+            "id": "field_2b9f4e10-0025-4a1c-8e2f-000000000025",
+            "key": "special_permissions",
+            "label": {
+              "en": "Special permissions / group assignments"
+            },
+            "type": "string",
+            "control": "multiline",
+            "validation": {
+              "maxLength": 2000
+            }
+          }
+        ]
+      },
+      {
+        "id": "field_2b9f4e10-0026-4a1c-8e2f-000000000026",
+        "key": "request_metadata",
+        "label": {
+          "en": "Request metadata"
+        },
+        "type": "group",
+        "fields": [
+          {
+            "id": "field_2b9f4e10-0027-4a1c-8e2f-000000000027",
+            "key": "early_notice_on_file",
+            "label": {
+              "en": "An early notice is already on file"
+            },
+            "description": {
+              "en": "The optional early notice is sent to support@xan.ch as soon as a start is foreseeable and carries name, expected start date and, if known, the hardware requirement. It helps XAN plan capacity, triggers no operational step and does not replace this request."
+            },
+            "type": "boolean"
+          },
+          {
+            "id": "field_2b9f4e10-0028-4a1c-8e2f-000000000028",
+            "key": "remarks",
+            "label": {
+              "en": "Remarks"
+            },
+            "description": {
+              "en": "Anything the fields above do not cover: unusual requirements, a non-standard person category, and the like."
+            },
+            "type": "string",
+            "control": "multiline",
+            "validation": {
+              "maxLength": 2000
+            }
+          },
+          {
+            "id": "field_2b9f4e10-0029-4a1c-8e2f-000000000029",
+            "key": "submitted_by",
+            "label": {
+              "en": "Submitted by"
+            },
+            "type": "string",
+            "validation": {
+              "maxLength": 120
+            }
+          },
+          {
+            "id": "field_2b9f4e10-0030-4a1c-8e2f-000000000030",
+            "key": "submitted_on",
+            "label": {
+              "en": "Submitted on"
+            },
+            "type": "string",
+            "format": "date"
+          }
+        ]
+      },
+      {
+        "id": "field_2b9f4e10-0031-4a1c-8e2f-000000000031",
+        "key": "xan_processing",
+        "label": {
+          "en": "Processing (XAN)"
+        },
+        "type": "group",
+        "fields": [
+          {
+            "id": "field_2b9f4e10-0032-4a1c-8e2f-000000000032",
+            "key": "ticket_no",
+            "label": {
+              "en": "Ticket no. (XAN)"
+            },
+            "type": "string",
+            "validation": {
+              "maxLength": 60
+            }
+          },
+          {
+            "id": "field_2b9f4e10-0033-4a1c-8e2f-000000000033",
+            "key": "processed_by",
+            "label": {
+              "en": "Processed by (XAN)"
+            },
+            "type": "string",
+            "validation": {
+              "maxLength": 120
+            }
+          },
+          {
+            "id": "field_2b9f4e10-0034-4a1c-8e2f-000000000034",
+            "key": "clarification_questions",
+            "label": {
+              "en": "Clarification questions"
+            },
+            "type": "string",
+            "control": "multiline",
+            "validation": {
+              "maxLength": 2000
+            }
+          },
+          {
+            "id": "field_2b9f4e10-0035-4a1c-8e2f-000000000035",
+            "key": "clarification_response",
+            "label": {
+              "en": "Response to the clarification questions"
+            },
+            "type": "string",
+            "control": "multiline",
+            "validation": {
+              "maxLength": 2000
+            }
+          },
+          {
+            "id": "field_2b9f4e10-0036-4a1c-8e2f-000000000036",
+            "key": "proposed_start_date",
+            "label": {
+              "en": "Alternative start date proposed by XAN"
+            },
+            "type": "string",
+            "format": "date"
+          },
+          {
+            "id": "field_2b9f4e10-0037-4a1c-8e2f-000000000037",
+            "key": "quote_reference",
+            "label": {
+              "en": "Quote reference"
+            },
+            "type": "string",
+            "validation": {
+              "maxLength": 60
+            }
+          },
+          {
+            "id": "field_2b9f4e10-0038-4a1c-8e2f-000000000038",
+            "key": "quote_approver_1",
+            "label": {
+              "en": "First authorised signatory"
+            },
+            "type": "string",
+            "validation": {
+              "maxLength": 120
+            }
+          },
+          {
+            "id": "field_2b9f4e10-0039-4a1c-8e2f-000000000039",
+            "key": "quote_approver_2",
+            "label": {
+              "en": "Second authorised signatory"
+            },
+            "type": "string",
+            "validation": {
+              "maxLength": 120
+            }
+          },
+          {
+            "id": "field_2b9f4e10-0040-4a1c-8e2f-000000000040",
+            "key": "order_placed_on",
+            "label": {
+              "en": "Order placed on"
+            },
+            "type": "string",
+            "format": "date"
+          },
+          {
+            "id": "field_2b9f4e10-0041-4a1c-8e2f-000000000041",
+            "key": "expected_delivery_date",
+            "label": {
+              "en": "Expected delivery date"
+            },
+            "type": "string",
+            "format": "date"
+          },
+          {
+            "id": "field_2b9f4e10-0042-4a1c-8e2f-000000000042",
+            "key": "delay_note",
+            "label": {
+              "en": "Delivery delay note"
+            },
+            "description": {
+              "en": "What the distributor reported, and what it means for the start date."
+            },
+            "type": "string",
+            "control": "multiline",
+            "validation": {
+              "maxLength": 2000
+            }
+          },
+          {
+            "id": "field_2b9f4e10-0043-4a1c-8e2f-000000000043",
+            "key": "escalation_option",
+            "label": {
+              "en": "Escalation option chosen by Opterion"
+            },
+            "type": "string",
+            "control": "radio",
+            "options": [
+              {
+                "value": "option_a",
+                "label": {
+                  "en": "A - Spare device as a bridge"
+                }
+              },
+              {
+                "value": "option_b",
+                "label": {
+                  "en": "B - Express order via an alternative distributor"
+                }
+              },
+              {
+                "value": "option_c",
+                "label": {
+                  "en": "C - Wait for the regular delivery"
+                }
+              }
+            ]
+          },
+          {
+            "id": "field_2b9f4e10-0044-4a1c-8e2f-000000000044",
+            "key": "device_model",
+            "label": {
+              "en": "Device model"
+            },
+            "type": "string",
+            "validation": {
+              "maxLength": 120
+            }
+          },
+          {
+            "id": "field_2b9f4e10-0045-4a1c-8e2f-000000000045",
+            "key": "device_serial",
+            "label": {
+              "en": "Device serial number"
+            },
+            "type": "string",
+            "validation": {
+              "maxLength": 60
+            }
+          }
+        ]
+      },
+      {
+        "id": "field_2b9f4e10-0046-4a1c-8e2f-000000000046",
+        "key": "handover",
+        "label": {
+          "en": "Handover"
+        },
+        "type": "group",
+        "fields": [
+          {
+            "id": "field_2b9f4e10-0047-4a1c-8e2f-000000000047",
+            "key": "handover_type",
+            "label": {
+              "en": "Handover type"
+            },
+            "type": "string",
+            "control": "radio",
+            "options": [
+              {
+                "value": "on_site",
+                "label": {
+                  "en": "On-site"
+                }
+              },
+              {
+                "value": "remote_teams",
+                "label": {
+                  "en": "Remote via MS Teams"
+                }
+              }
+            ]
+          },
+          {
+            "id": "field_2b9f4e10-0048-4a1c-8e2f-000000000048",
+            "key": "handover_date",
+            "label": {
+              "en": "Handover date"
+            },
+            "type": "string",
+            "format": "date"
+          },
+          {
+            "id": "field_2b9f4e10-0049-4a1c-8e2f-000000000049",
+            "key": "credentials_handed_over",
+            "label": {
+              "en": "Activation and login credentials handed over"
+            },
+            "type": "boolean"
+          },
+          {
+            "id": "field_2b9f4e10-0050-4a1c-8e2f-000000000050",
+            "key": "mfa_activated",
+            "label": {
+              "en": "MFA activated via Microsoft Authenticator"
+            },
+            "type": "boolean"
+          },
+          {
+            "id": "field_2b9f4e10-0051-4a1c-8e2f-000000000051",
+            "key": "mfa_deadline",
+            "label": {
+              "en": "MFA activation deadline"
+            },
+            "description": {
+              "en": "5 business days from the handover date."
+            },
+            "type": "string",
+            "format": "date"
+          },
+          {
+            "id": "field_2b9f4e10-0052-4a1c-8e2f-000000000052",
+            "key": "inventory_recorded",
+            "label": {
+              "en": "Device recorded in the XAN inventory"
+            },
+            "type": "boolean"
+          },
+          {
+            "id": "field_2b9f4e10-0053-4a1c-8e2f-000000000053",
+            "key": "handover_confirmation_sent",
+            "label": {
+              "en": "Handover confirmation sent to Opterion"
+            },
+            "type": "boolean"
+          }
+        ]
+      }
+    ],
+    "workflow": {
+      "initialStep": "step_7e3a6c50-0001-4a1c-8e2f-000000000001",
+      "steps": [
+        {
+          "id": "step_7e3a6c50-0001-4a1c-8e2f-000000000001",
+          "key": "service_request",
+          "label": {
+            "en": "Submit the Service Request"
+          },
+          "description": {
+            "en": "Lucy Laidlaw or the designated deputy submits the formal service request in writing to support@xan.ch. It is the binding trigger for the operational process: accounts only need at least 5 business days before the start date, a request with hardware at least 10. An optional early notice may already be on file — it helps XAN plan capacity, triggers no operational step and replaces nothing here, so it is recorded as a field rather than as a step of its own. Before submitting, Opterion updates Shared drive_structure and access rights.xlsx, checks Laptop Inventory.xlsx when a laptop is needed, and picks a phone number from the available list when Microsoft Telephony is needed. An incomplete request does not start the process, and too little lead time may postpone the start date or limit the start to accounts only."
+          },
+          "type": "task",
+          "assignment": {
+            "strategy": {
+              "type": "static",
+              "config": {
+                "candidates": [
+                  "opterion-request-owner"
+                ]
+              }
+            }
+          },
+          "view": {
+            "columns": 2,
+            "fields": [
+              {
+                "ref": "field_2b9f4e10-0002-4a1c-8e2f-000000000002",
+                "group": "Personal details",
+                "required": true
+              },
+              {
+                "ref": "field_2b9f4e10-0003-4a1c-8e2f-000000000003",
+                "group": "Personal details",
+                "required": true
+              },
+              {
+                "ref": "field_2b9f4e10-0004-4a1c-8e2f-000000000004",
+                "group": "Personal details",
+                "required": true
+              },
+              {
+                "ref": "field_2b9f4e10-0005-4a1c-8e2f-000000000005",
+                "group": "Personal details"
+              },
+              {
+                "ref": "field_2b9f4e10-0006-4a1c-8e2f-000000000006",
+                "group": "Personal details",
+                "required": true
+              },
+              {
+                "ref": "field_2b9f4e10-0007-4a1c-8e2f-000000000007",
+                "group": "Personal details"
+              },
+              {
+                "ref": "field_2b9f4e10-0009-4a1c-8e2f-000000000009",
+                "group": "Work model",
+                "required": true
+              },
+              {
+                "ref": "field_2b9f4e10-0010-4a1c-8e2f-000000000010",
+                "group": "Work model",
+                "required": true
+              },
+              {
+                "ref": "field_2b9f4e10-0012-4a1c-8e2f-000000000012",
+                "group": "Hardware",
+                "required": true
+              },
+              {
+                "ref": "field_2b9f4e10-0013-4a1c-8e2f-000000000013",
+                "group": "Hardware"
+              },
+              {
+                "ref": "field_2b9f4e10-0014-4a1c-8e2f-000000000014",
+                "group": "Hardware"
+              },
+              {
+                "ref": "field_2b9f4e10-0015-4a1c-8e2f-000000000015",
+                "group": "Hardware",
+                "span": 2
+              },
+              {
+                "ref": "field_2b9f4e10-0017-4a1c-8e2f-000000000017",
+                "group": "Licences and tools",
+                "required": true
+              },
+              {
+                "ref": "field_2b9f4e10-0018-4a1c-8e2f-000000000018",
+                "group": "Licences and tools"
+              },
+              {
+                "ref": "field_2b9f4e10-0019-4a1c-8e2f-000000000019",
+                "group": "Licences and tools"
+              },
+              {
+                "ref": "field_2b9f4e10-0020-4a1c-8e2f-000000000020",
+                "group": "Licences and tools"
+              },
+              {
+                "ref": "field_2b9f4e10-0021-4a1c-8e2f-000000000021",
+                "group": "Licences and tools"
+              },
+              {
+                "ref": "field_2b9f4e10-0022-4a1c-8e2f-000000000022",
+                "group": "Licences and tools",
+                "span": 2
+              },
+              {
+                "ref": "field_2b9f4e10-0024-4a1c-8e2f-000000000024",
+                "group": "Permissions",
+                "required": true
+              },
+              {
+                "ref": "field_2b9f4e10-0025-4a1c-8e2f-000000000025",
+                "group": "Permissions",
+                "span": 2
+              },
+              {
+                "ref": "field_2b9f4e10-0027-4a1c-8e2f-000000000027",
+                "group": "Request metadata"
+              },
+              {
+                "ref": "field_2b9f4e10-0028-4a1c-8e2f-000000000028",
+                "group": "Request metadata",
+                "span": 2
+              },
+              {
+                "ref": "field_2b9f4e10-0029-4a1c-8e2f-000000000029",
+                "group": "Request metadata",
+                "required": true
+              },
+              {
+                "ref": "field_2b9f4e10-0030-4a1c-8e2f-000000000030",
+                "group": "Request metadata",
+                "required": true
+              }
+            ]
+          },
+          "paths": [
+            {
+              "id": "path_4d1b8f60-0001-4a1c-8e2f-000000000001",
+              "key": "submit",
+              "label": "Submit the request",
+              "to": "step_7e3a6c50-0002-4a1c-8e2f-000000000002",
+              "trigger": "manual"
+            }
+          ]
+        },
+        {
+          "id": "step_7e3a6c50-0002-4a1c-8e2f-000000000002",
+          "key": "review_request",
+          "label": {
+            "en": "Review the Request"
+          },
+          "description": {
+            "en": "XAN logs the request in the ticket system with the date and time of receipt, links any early notice already on file, and checks the request for completeness: first and last name, email address, person category, start date and end date for a fixed-term engagement, location and work model, the hardware requirement and decision, the required licences and tools, the Shared Drive permissions per the Access Excel, a pre-selected Microsoft Phone number, and any special permissions or group assignments. XAN responds within a maximum of 2 business days. Anything missing or unclear starts the clarification loop with Lucy Laidlaw or the designated deputy."
+          },
+          "type": "task",
+          "assignment": {
+            "strategy": {
+              "type": "static",
+              "config": {
+                "candidates": [
+                  "xan-operator"
+                ]
+              }
+            }
+          },
+          "view": {
+            "columns": 2,
+            "fields": [
+              {
+                "ref": "field_2b9f4e10-0002-4a1c-8e2f-000000000002",
+                "group": "Personal details",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0003-4a1c-8e2f-000000000003",
+                "group": "Personal details",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0004-4a1c-8e2f-000000000004",
+                "group": "Personal details",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0006-4a1c-8e2f-000000000006",
+                "group": "Personal details",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0007-4a1c-8e2f-000000000007",
+                "group": "Personal details",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0009-4a1c-8e2f-000000000009",
+                "group": "Work model",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0010-4a1c-8e2f-000000000010",
+                "group": "Work model",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0012-4a1c-8e2f-000000000012",
+                "group": "Hardware",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0013-4a1c-8e2f-000000000013",
+                "group": "Hardware",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0014-4a1c-8e2f-000000000014",
+                "group": "Hardware",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0017-4a1c-8e2f-000000000017",
+                "group": "Licences and tools",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0019-4a1c-8e2f-000000000019",
+                "group": "Licences and tools",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0020-4a1c-8e2f-000000000020",
+                "group": "Licences and tools",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0024-4a1c-8e2f-000000000024",
+                "group": "Permissions",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0025-4a1c-8e2f-000000000025",
+                "group": "Permissions",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0027-4a1c-8e2f-000000000027",
+                "group": "Request metadata",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0028-4a1c-8e2f-000000000028",
+                "group": "Request metadata",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0032-4a1c-8e2f-000000000032",
+                "group": "Processing (XAN)",
+                "required": true
+              },
+              {
+                "ref": "field_2b9f4e10-0033-4a1c-8e2f-000000000033",
+                "group": "Processing (XAN)",
+                "required": true
+              },
+              {
+                "ref": "field_2b9f4e10-0034-4a1c-8e2f-000000000034",
+                "group": "Processing (XAN)",
+                "span": 2
+              }
+            ]
+          },
+          "paths": [
+            {
+              "id": "path_4d1b8f60-0002-4a1c-8e2f-000000000002",
+              "key": "request_clarification",
+              "label": "Send clarification questions",
+              "to": "step_7e3a6c50-0003-4a1c-8e2f-000000000003",
+              "trigger": "manual"
+            },
+            {
+              "id": "path_4d1b8f60-0003-4a1c-8e2f-000000000003",
+              "key": "confirm_complete",
+              "label": "Request is complete",
+              "to": "step_7e3a6c50-0004-4a1c-8e2f-000000000004",
+              "trigger": "manual"
+            }
+          ]
+        },
+        {
+          "id": "step_7e3a6c50-0003-4a1c-8e2f-000000000003",
+          "key": "clarification",
+          "label": {
+            "en": "Answer the Clarification Questions"
+          },
+          "description": {
+            "en": "The clarification loop runs between XAN and Opterion and may take several rounds. It ends only once the information is sufficient for processing, so its total duration follows directly from how fast both sides answer."
+          },
+          "type": "task",
+          "assignment": {
+            "strategy": {
+              "type": "static",
+              "config": {
+                "candidates": [
+                  "opterion-request-owner"
+                ]
+              }
+            }
+          },
+          "view": {
+            "columns": 2,
+            "fields": [
+              {
+                "ref": "field_2b9f4e10-0002-4a1c-8e2f-000000000002",
+                "group": "Personal details",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0006-4a1c-8e2f-000000000006",
+                "group": "Personal details",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0034-4a1c-8e2f-000000000034",
+                "group": "Processing (XAN)",
+                "readonly": true,
+                "span": 2
+              },
+              {
+                "ref": "field_2b9f4e10-0035-4a1c-8e2f-000000000035",
+                "group": "Processing (XAN)",
+                "required": true,
+                "span": 2
+              },
+              {
+                "ref": "field_2b9f4e10-0028-4a1c-8e2f-000000000028",
+                "group": "Request metadata",
+                "span": 2
+              }
+            ]
+          },
+          "paths": [
+            {
+              "id": "path_4d1b8f60-0004-4a1c-8e2f-000000000004",
+              "key": "respond",
+              "label": "Send the response",
+              "to": "step_7e3a6c50-0002-4a1c-8e2f-000000000002",
+              "trigger": "manual"
+            }
+          ]
+        },
+        {
+          "id": "step_7e3a6c50-0004-4a1c-8e2f-000000000004",
+          "key": "confirm_feasibility",
+          "label": {
+            "en": "Confirm Feasibility"
+          },
+          "description": {
+            "en": "With the request complete and unambiguous, XAN confirms feasibility for the requested start date within the same 2-business-day window. If the date is not achievable, XAN proposes an alternative and records it here."
+          },
+          "type": "task",
+          "assignment": {
+            "strategy": {
+              "type": "static",
+              "config": {
+                "candidates": [
+                  "xan-operator"
+                ]
+              }
+            }
+          },
+          "view": {
+            "columns": 2,
+            "fields": [
+              {
+                "ref": "field_2b9f4e10-0006-4a1c-8e2f-000000000006",
+                "group": "Personal details",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0012-4a1c-8e2f-000000000012",
+                "group": "Hardware",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0013-4a1c-8e2f-000000000013",
+                "group": "Hardware",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0036-4a1c-8e2f-000000000036",
+                "group": "Processing (XAN)"
+              }
+            ]
+          },
+          "paths": [
+            {
+              "id": "path_4d1b8f60-0005-4a1c-8e2f-000000000005",
+              "key": "confirm_start_date",
+              "label": "Confirm the start date",
+              "to": "step_7e3a6c50-0006-4a1c-8e2f-000000000006",
+              "trigger": "manual"
+            },
+            {
+              "id": "path_4d1b8f60-0006-4a1c-8e2f-000000000006",
+              "key": "propose_alternative",
+              "label": "Propose an alternative date",
+              "to": "step_7e3a6c50-0005-4a1c-8e2f-000000000005",
+              "trigger": "manual"
+            }
+          ]
+        },
+        {
+          "id": "step_7e3a6c50-0005-4a1c-8e2f-000000000005",
+          "key": "alternative_date",
+          "label": {
+            "en": "Accept the Alternative Start Date"
+          },
+          "description": {
+            "en": "Opterion accepts the date XAN proposed, or coordinates further with XAN before accepting. The accepted date governs the rest of the process."
+          },
+          "type": "task",
+          "assignment": {
+            "strategy": {
+              "type": "static",
+              "config": {
+                "candidates": [
+                  "opterion-request-owner"
+                ]
+              }
+            }
+          },
+          "view": {
+            "columns": 2,
+            "fields": [
+              {
+                "ref": "field_2b9f4e10-0006-4a1c-8e2f-000000000006",
+                "group": "Personal details",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0036-4a1c-8e2f-000000000036",
+                "group": "Processing (XAN)",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0028-4a1c-8e2f-000000000028",
+                "group": "Request metadata",
+                "span": 2
+              }
+            ]
+          },
+          "paths": [
+            {
+              "id": "path_4d1b8f60-0007-4a1c-8e2f-000000000007",
+              "key": "accept_alternative",
+              "label": "Accept the alternative date",
+              "to": "step_7e3a6c50-0006-4a1c-8e2f-000000000006",
+              "trigger": "manual"
+            }
+          ]
+        },
+        {
+          "id": "step_7e3a6c50-0006-4a1c-8e2f-000000000006",
+          "key": "hardware_decision",
+          "label": {
+            "en": "Route on the Hardware Decision"
+          },
+          "description": {
+            "en": "The hardware decision comes with the service request: a spare device from stock per Laptop Inventory.xlsx, a new purchase, or no device at all. XAN confirms it here and routes accordingly. A later change is possible if the original choice proves unsuitable, but may lead to delays."
+          },
+          "type": "task",
+          "assignment": {
+            "strategy": {
+              "type": "static",
+              "config": {
+                "candidates": [
+                  "xan-operator"
+                ]
+              }
+            }
+          },
+          "view": {
+            "columns": 2,
+            "fields": [
+              {
+                "ref": "field_2b9f4e10-0012-4a1c-8e2f-000000000012",
+                "group": "Hardware",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0013-4a1c-8e2f-000000000013",
+                "group": "Hardware",
+                "required": true
+              },
+              {
+                "ref": "field_2b9f4e10-0014-4a1c-8e2f-000000000014",
+                "group": "Hardware"
+              },
+              {
+                "ref": "field_2b9f4e10-0015-4a1c-8e2f-000000000015",
+                "group": "Hardware",
+                "span": 2
+              }
+            ]
+          },
+          "paths": [
+            {
+              "id": "path_4d1b8f60-0008-4a1c-8e2f-000000000008",
+              "key": "no_device",
+              "label": "No device needed",
+              "to": "step_7e3a6c50-0014-4a1c-8e2f-000000000014",
+              "trigger": "manual"
+            },
+            {
+              "id": "path_4d1b8f60-0009-4a1c-8e2f-000000000009",
+              "key": "use_spare",
+              "label": "Use a spare device",
+              "to": "step_7e3a6c50-0012-4a1c-8e2f-000000000012",
+              "trigger": "manual"
+            },
+            {
+              "id": "path_4d1b8f60-0010-4a1c-8e2f-000000000010",
+              "key": "new_purchase",
+              "label": "Order a new device",
+              "to": "step_7e3a6c50-0007-4a1c-8e2f-000000000007",
+              "trigger": "manual"
+            }
+          ]
+        },
+        {
+          "id": "step_7e3a6c50-0007-4a1c-8e2f-000000000007",
+          "key": "prepare_quote",
+          "label": {
+            "en": "Prepare the Hardware Quote"
+          },
+          "description": {
+            "en": "XAN prepares the quote for the requested model — Lenovo ThinkPad X1, P14s or P16s — plus the accessories, and sends it to Opterion for approval. New purchases only, and Lucy Laidlaw cannot approve a hardware order alone."
+          },
+          "type": "task",
+          "assignment": {
+            "strategy": {
+              "type": "static",
+              "config": {
+                "candidates": [
+                  "xan-operator"
+                ]
+              }
+            }
+          },
+          "view": {
+            "columns": 2,
+            "fields": [
+              {
+                "ref": "field_2b9f4e10-0014-4a1c-8e2f-000000000014",
+                "group": "Hardware",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0015-4a1c-8e2f-000000000015",
+                "group": "Hardware",
+                "readonly": true,
+                "span": 2
+              },
+              {
+                "ref": "field_2b9f4e10-0032-4a1c-8e2f-000000000032",
+                "group": "Processing (XAN)",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0037-4a1c-8e2f-000000000037",
+                "group": "Processing (XAN)",
+                "required": true
+              }
+            ]
+          },
+          "paths": [
+            {
+              "id": "path_4d1b8f60-0011-4a1c-8e2f-000000000011",
+              "key": "quote_sent",
+              "label": "Send the quote",
+              "to": "step_7e3a6c50-0008-4a1c-8e2f-000000000008",
+              "trigger": "manual"
+            }
+          ]
+        },
+        {
+          "id": "step_7e3a6c50-0008-4a1c-8e2f-000000000008",
+          "key": "quote_approval",
+          "label": {
+            "en": "Approve the Quote"
+          },
+          "description": {
+            "en": "Two authorised signatories at Opterion approve the hardware quote. Both names are recorded here. If the quote is not approved, the request can still fall back to a spare device from stock."
+          },
+          "type": "task",
+          "assignment": {
+            "strategy": {
+              "type": "static",
+              "config": {
+                "candidates": [
+                  "opterion-signatory"
+                ]
+              }
+            }
+          },
+          "view": {
+            "columns": 2,
+            "fields": [
+              {
+                "ref": "field_2b9f4e10-0014-4a1c-8e2f-000000000014",
+                "group": "Hardware",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0015-4a1c-8e2f-000000000015",
+                "group": "Hardware",
+                "readonly": true,
+                "span": 2
+              },
+              {
+                "ref": "field_2b9f4e10-0037-4a1c-8e2f-000000000037",
+                "group": "Processing (XAN)",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0038-4a1c-8e2f-000000000038",
+                "group": "Processing (XAN)",
+                "required": true
+              },
+              {
+                "ref": "field_2b9f4e10-0039-4a1c-8e2f-000000000039",
+                "group": "Processing (XAN)",
+                "required": true
+              }
+            ]
+          },
+          "paths": [
+            {
+              "id": "path_4d1b8f60-0012-4a1c-8e2f-000000000012",
+              "key": "approve",
+              "label": "Approve the quote",
+              "to": "step_7e3a6c50-0009-4a1c-8e2f-000000000009",
+              "trigger": "manual"
+            },
+            {
+              "id": "path_4d1b8f60-0013-4a1c-8e2f-000000000013",
+              "key": "switch_to_spare",
+              "label": "Use a spare device instead",
+              "to": "step_7e3a6c50-0012-4a1c-8e2f-000000000012",
+              "trigger": "manual"
+            }
+          ]
+        },
+        {
+          "id": "step_7e3a6c50-0009-4a1c-8e2f-000000000009",
+          "key": "place_order",
+          "label": {
+            "en": "Place the Order"
+          },
+          "description": {
+            "en": "XAN places the order with the regular distributor and records the order date and the expected delivery date. Standard delivery from the manufacturer takes at least 5 business days; in individual cases it stretches to several weeks, up to about two months."
+          },
+          "type": "task",
+          "assignment": {
+            "strategy": {
+              "type": "static",
+              "config": {
+                "candidates": [
+                  "xan-operator"
+                ]
+              }
+            }
+          },
+          "view": {
+            "columns": 2,
+            "fields": [
+              {
+                "ref": "field_2b9f4e10-0014-4a1c-8e2f-000000000014",
+                "group": "Hardware",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0037-4a1c-8e2f-000000000037",
+                "group": "Processing (XAN)",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0040-4a1c-8e2f-000000000040",
+                "group": "Processing (XAN)",
+                "required": true
+              },
+              {
+                "ref": "field_2b9f4e10-0041-4a1c-8e2f-000000000041",
+                "group": "Processing (XAN)",
+                "required": true
+              }
+            ]
+          },
+          "paths": [
+            {
+              "id": "path_4d1b8f60-0014-4a1c-8e2f-000000000014",
+              "key": "order_placed",
+              "label": "Order placed",
+              "to": "step_7e3a6c50-0010-4a1c-8e2f-000000000010",
+              "trigger": "manual"
+            }
+          ]
+        },
+        {
+          "id": "step_7e3a6c50-0010-4a1c-8e2f-000000000010",
+          "key": "await_delivery",
+          "label": {
+            "en": "Monitor the Delivery"
+          },
+          "description": {
+            "en": "XAN monitors the delivery status. A delay shows up either at the time of ordering, when the expected delivery date exceeds the standard ten business days, or later through a notice from the distributor. XAN notifies Opterion without delay once a delay that threatens the start date becomes known, and records what the distributor reported."
+          },
+          "type": "task",
+          "assignment": {
+            "strategy": {
+              "type": "static",
+              "config": {
+                "candidates": [
+                  "xan-operator"
+                ]
+              }
+            }
+          },
+          "view": {
+            "columns": 2,
+            "fields": [
+              {
+                "ref": "field_2b9f4e10-0006-4a1c-8e2f-000000000006",
+                "group": "Personal details",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0040-4a1c-8e2f-000000000040",
+                "group": "Processing (XAN)",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0041-4a1c-8e2f-000000000041",
+                "group": "Processing (XAN)"
+              },
+              {
+                "ref": "field_2b9f4e10-0042-4a1c-8e2f-000000000042",
+                "group": "Processing (XAN)",
+                "span": 2
+              }
+            ]
+          },
+          "paths": [
+            {
+              "id": "path_4d1b8f60-0015-4a1c-8e2f-000000000015",
+              "key": "delivered",
+              "label": "Device delivered",
+              "to": "step_7e3a6c50-0013-4a1c-8e2f-000000000013",
+              "trigger": "manual"
+            },
+            {
+              "id": "path_4d1b8f60-0016-4a1c-8e2f-000000000016",
+              "key": "delay",
+              "label": "Report a delivery delay",
+              "to": "step_7e3a6c50-0011-4a1c-8e2f-000000000011",
+              "trigger": "manual"
+            }
+          ]
+        },
+        {
+          "id": "step_7e3a6c50-0011-4a1c-8e2f-000000000011",
+          "key": "delay_escalation",
+          "label": {
+            "en": "Decide on the Delay Escalation"
+          },
+          "description": {
+            "en": "XAN prepares the basis for the decision — available spare devices, expected delivery times, and the terms of alternative distributors — and the choice rests with Opterion. Option A issues a spare device as a temporary bridge: once the ordered device arrives and is configured, a swap is arranged with the user and the spare returns to stock. Option B places an express order with an alternative distributor, typically 1 to 5 business days at a higher cost, and still needs the two signatures, which is why it goes back through the quote. Option C keeps the original order and usually means a postponed start date or a limited start on accounts only. Any additional cost and its internal approval are Opterion's own matter."
+          },
+          "type": "task",
+          "assignment": {
+            "strategy": {
+              "type": "static",
+              "config": {
+                "candidates": [
+                  "opterion-request-owner"
+                ]
+              }
+            }
+          },
+          "view": {
+            "columns": 2,
+            "fields": [
+              {
+                "ref": "field_2b9f4e10-0006-4a1c-8e2f-000000000006",
+                "group": "Personal details",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0041-4a1c-8e2f-000000000041",
+                "group": "Processing (XAN)",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0042-4a1c-8e2f-000000000042",
+                "group": "Processing (XAN)",
+                "readonly": true,
+                "span": 2
+              },
+              {
+                "ref": "field_2b9f4e10-0043-4a1c-8e2f-000000000043",
+                "group": "Processing (XAN)",
+                "required": true,
+                "span": 2
+              }
+            ]
+          },
+          "paths": [
+            {
+              "id": "path_4d1b8f60-0017-4a1c-8e2f-000000000017",
+              "key": "option_a_spare_bridge",
+              "label": "Option A: spare device as a bridge",
+              "to": "step_7e3a6c50-0012-4a1c-8e2f-000000000012",
+              "trigger": "manual"
+            },
+            {
+              "id": "path_4d1b8f60-0018-4a1c-8e2f-000000000018",
+              "key": "option_b_express_order",
+              "label": "Option B: express order",
+              "to": "step_7e3a6c50-0007-4a1c-8e2f-000000000007",
+              "trigger": "manual"
+            },
+            {
+              "id": "path_4d1b8f60-0019-4a1c-8e2f-000000000019",
+              "key": "option_c_wait",
+              "label": "Option C: wait for the regular delivery",
+              "to": "step_7e3a6c50-0010-4a1c-8e2f-000000000010",
+              "trigger": "manual"
+            }
+          ]
+        },
+        {
+          "id": "step_7e3a6c50-0012-4a1c-8e2f-000000000012",
+          "key": "prepare_spare",
+          "label": {
+            "en": "Prepare the Spare Device"
+          },
+          "description": {
+            "en": "XAN identifies a suitable device in Laptop Inventory.xlsx and prepares it for setup. Used as a bridge under escalation option A, the spare is temporary: it goes back to stock once the ordered device arrives and the swap with the user has taken place."
+          },
+          "type": "task",
+          "assignment": {
+            "strategy": {
+              "type": "static",
+              "config": {
+                "candidates": [
+                  "xan-operator"
+                ]
+              }
+            }
+          },
+          "view": {
+            "columns": 2,
+            "fields": [
+              {
+                "ref": "field_2b9f4e10-0014-4a1c-8e2f-000000000014",
+                "group": "Hardware",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0015-4a1c-8e2f-000000000015",
+                "group": "Hardware",
+                "readonly": true,
+                "span": 2
+              },
+              {
+                "ref": "field_2b9f4e10-0044-4a1c-8e2f-000000000044",
+                "group": "Processing (XAN)",
+                "required": true
+              },
+              {
+                "ref": "field_2b9f4e10-0045-4a1c-8e2f-000000000045",
+                "group": "Processing (XAN)",
+                "required": true
+              }
+            ]
+          },
+          "paths": [
+            {
+              "id": "path_4d1b8f60-0020-4a1c-8e2f-000000000020",
+              "key": "spare_ready",
+              "label": "Spare device ready",
+              "to": "step_7e3a6c50-0013-4a1c-8e2f-000000000013",
+              "trigger": "manual"
+            }
+          ]
+        },
+        {
+          "id": "step_7e3a6c50-0013-4a1c-8e2f-000000000013",
+          "key": "device_configuration",
+          "label": {
+            "en": "Configure the Device"
+          },
+          "description": {
+            "en": "XAN installs the operating system, installs the required software, enables encryption and configures endpoint security. Allow at least one business day for this. A functional check runs before the handover and covers login, network, software, licences and permissions."
+          },
+          "type": "task",
+          "assignment": {
+            "strategy": {
+              "type": "static",
+              "config": {
+                "candidates": [
+                  "xan-operator"
+                ]
+              }
+            }
+          },
+          "view": {
+            "columns": 2,
+            "fields": [
+              {
+                "ref": "field_2b9f4e10-0015-4a1c-8e2f-000000000015",
+                "group": "Hardware",
+                "readonly": true,
+                "span": 2
+              },
+              {
+                "ref": "field_2b9f4e10-0044-4a1c-8e2f-000000000044",
+                "group": "Processing (XAN)",
+                "required": true
+              },
+              {
+                "ref": "field_2b9f4e10-0045-4a1c-8e2f-000000000045",
+                "group": "Processing (XAN)",
+                "required": true
+              }
+            ]
+          },
+          "paths": [
+            {
+              "id": "path_4d1b8f60-0021-4a1c-8e2f-000000000021",
+              "key": "configured",
+              "label": "Device configured",
+              "to": "step_7e3a6c50-0014-4a1c-8e2f-000000000014",
+              "trigger": "manual"
+            }
+          ]
+        },
+        {
+          "id": "step_7e3a6c50-0014-4a1c-8e2f-000000000014",
+          "key": "digital_setup",
+          "label": {
+            "en": "Set Up the Digital Work Environment"
+          },
+          "description": {
+            "en": "XAN creates the Microsoft 365 user account with the requested email address, assigns the standard M365 licences and the role-specific additions — Adobe, Microsoft Copilot, EndNote and the other services XAN manages — sets up Microsoft Telephony and assigns the number Opterion pre-selected, assigns groups and distribution lists, and sets the Shared Drive permissions from the state of Shared drive_structure and access rights.xlsx at the time of the request. Where Opterion indicated no preference, XAN checks number availability and records the assigned number here."
+          },
+          "type": "task",
+          "assignment": {
+            "strategy": {
+              "type": "static",
+              "config": {
+                "candidates": [
+                  "xan-operator"
+                ]
+              }
+            }
+          },
+          "view": {
+            "columns": 2,
+            "fields": [
+              {
+                "ref": "field_2b9f4e10-0003-4a1c-8e2f-000000000003",
+                "group": "Personal details",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0017-4a1c-8e2f-000000000017",
+                "group": "Licences and tools",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0018-4a1c-8e2f-000000000018",
+                "group": "Licences and tools",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0021-4a1c-8e2f-000000000021",
+                "group": "Licences and tools",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0022-4a1c-8e2f-000000000022",
+                "group": "Licences and tools",
+                "readonly": true,
+                "span": 2
+              },
+              {
+                "ref": "field_2b9f4e10-0019-4a1c-8e2f-000000000019",
+                "group": "Licences and tools",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0020-4a1c-8e2f-000000000020",
+                "group": "Licences and tools"
+              },
+              {
+                "ref": "field_2b9f4e10-0024-4a1c-8e2f-000000000024",
+                "group": "Permissions",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0025-4a1c-8e2f-000000000025",
+                "group": "Permissions",
+                "readonly": true,
+                "span": 2
+              }
+            ]
+          },
+          "paths": [
+            {
+              "id": "path_4d1b8f60-0022-4a1c-8e2f-000000000022",
+              "key": "digital_ready",
+              "label": "Digital environment ready",
+              "to": "step_7e3a6c50-0015-4a1c-8e2f-000000000015",
+              "trigger": "manual"
+            }
+          ]
+        },
+        {
+          "id": "step_7e3a6c50-0015-4a1c-8e2f-000000000015",
+          "key": "schedule_handover",
+          "label": {
+            "en": "Schedule the Handover"
+          },
+          "description": {
+            "en": "The form of handover follows the hardware: on-site is the standard when a device is issued, remote via MS Teams for accounts only. On-site, the handover takes place on the new person's first working day at Opterion and XAN is present that day; unless Opterion names a different date, the first working day is the agreed date. For a fully remote setup XAN agrees the appointment directly with the new person and informs Opterion. The new person needs a personal smartphone that can run the Microsoft Authenticator app, in both forms."
+          },
+          "type": "task",
+          "assignment": {
+            "strategy": {
+              "type": "static",
+              "config": {
+                "candidates": [
+                  "xan-operator"
+                ]
+              }
+            }
+          },
+          "view": {
+            "columns": 2,
+            "fields": [
+              {
+                "ref": "field_2b9f4e10-0006-4a1c-8e2f-000000000006",
+                "group": "Personal details",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0009-4a1c-8e2f-000000000009",
+                "group": "Work model",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0010-4a1c-8e2f-000000000010",
+                "group": "Work model",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0012-4a1c-8e2f-000000000012",
+                "group": "Hardware",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0047-4a1c-8e2f-000000000047",
+                "group": "Handover",
+                "required": true
+              },
+              {
+                "ref": "field_2b9f4e10-0048-4a1c-8e2f-000000000048",
+                "group": "Handover",
+                "required": true
+              }
+            ]
+          },
+          "paths": [
+            {
+              "id": "path_4d1b8f60-0023-4a1c-8e2f-000000000023",
+              "key": "appointment_agreed",
+              "label": "Appointment agreed",
+              "to": "step_7e3a6c50-0016-4a1c-8e2f-000000000016",
+              "trigger": "manual"
+            }
+          ]
+        },
+        {
+          "id": "step_7e3a6c50-0016-4a1c-8e2f-000000000016",
+          "key": "handover",
+          "label": {
+            "en": "Hand Over to the New Person"
+          },
+          "description": {
+            "en": "XAN hands over only the activation and login credentials the person actually needs for productive use — the Principle of Least Privilege — and discloses anything beyond that only on justified request. On site XAN also delivers the configured device and completes the first login and the basic configuration together with the user. In both forms XAN guides the setup of MFA through the Microsoft Authenticator, which is the standard and the recommended point of activation. If the person does not activate MFA at the handover, the deadline is 5 business days from the handover date."
+          },
+          "type": "task",
+          "assignment": {
+            "strategy": {
+              "type": "static",
+              "config": {
+                "candidates": [
+                  "xan-operator"
+                ]
+              }
+            }
+          },
+          "view": {
+            "columns": 2,
+            "fields": [
+              {
+                "ref": "field_2b9f4e10-0002-4a1c-8e2f-000000000002",
+                "group": "Personal details",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0044-4a1c-8e2f-000000000044",
+                "group": "Processing (XAN)",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0045-4a1c-8e2f-000000000045",
+                "group": "Processing (XAN)",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0047-4a1c-8e2f-000000000047",
+                "group": "Handover",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0048-4a1c-8e2f-000000000048",
+                "group": "Handover",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0049-4a1c-8e2f-000000000049",
+                "group": "Handover",
+                "required": true
+              },
+              {
+                "ref": "field_2b9f4e10-0050-4a1c-8e2f-000000000050",
+                "group": "Handover",
+                "required": true
+              },
+              {
+                "ref": "field_2b9f4e10-0051-4a1c-8e2f-000000000051",
+                "group": "Handover",
+                "required": true
+              }
+            ]
+          },
+          "paths": [
+            {
+              "id": "path_4d1b8f60-0024-4a1c-8e2f-000000000024",
+              "key": "handover_done",
+              "label": "Handover completed",
+              "to": "step_7e3a6c50-0017-4a1c-8e2f-000000000017",
+              "trigger": "manual"
+            }
+          ]
+        },
+        {
+          "id": "step_7e3a6c50-0017-4a1c-8e2f-000000000017",
+          "key": "documentation",
+          "label": {
+            "en": "Document and Close"
+          },
+          "description": {
+            "en": "XAN records the device in the XAN inventory with serial number, model and assignment, sends the handover confirmation to Lucy Laidlaw or the designated deputy with a short summary of what was handed over, on what date and what is still open, and closes the ticket. The ticket reaches status Closed only once the MFA follow-up is no longer pending."
+          },
+          "type": "task",
+          "assignment": {
+            "strategy": {
+              "type": "static",
+              "config": {
+                "candidates": [
+                  "xan-operator"
+                ]
+              }
+            }
+          },
+          "view": {
+            "columns": 2,
+            "fields": [
+              {
+                "ref": "field_2b9f4e10-0044-4a1c-8e2f-000000000044",
+                "group": "Processing (XAN)",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0045-4a1c-8e2f-000000000045",
+                "group": "Processing (XAN)",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0048-4a1c-8e2f-000000000048",
+                "group": "Handover",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0050-4a1c-8e2f-000000000050",
+                "group": "Handover",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0052-4a1c-8e2f-000000000052",
+                "group": "Handover",
+                "required": true
+              },
+              {
+                "ref": "field_2b9f4e10-0053-4a1c-8e2f-000000000053",
+                "group": "Handover",
+                "required": true
+              }
+            ]
+          },
+          "paths": [
+            {
+              "id": "path_4d1b8f60-0025-4a1c-8e2f-000000000025",
+              "key": "mfa_activated_close",
+              "label": "MFA activated, close the case",
+              "to": "step_7e3a6c50-0019-4a1c-8e2f-000000000019",
+              "trigger": "manual"
+            },
+            {
+              "id": "path_4d1b8f60-0026-4a1c-8e2f-000000000026",
+              "key": "mfa_pending",
+              "label": "MFA still pending",
+              "to": "step_7e3a6c50-0018-4a1c-8e2f-000000000018",
+              "trigger": "manual"
+            }
+          ]
+        },
+        {
+          "id": "step_7e3a6c50-0018-4a1c-8e2f-000000000018",
+          "key": "mfa_follow_up",
+          "label": {
+            "en": "Follow Up on the MFA Activation"
+          },
+          "description": {
+            "en": "The activation deadline is 5 business days from the handover date. XAN checks the activation status at the end of that window. If MFA is still not set up, XAN notifies Opterion and offers remote support over MS Teams or by phone. The process is not complete until Opterion has been informed."
+          },
+          "type": "task",
+          "assignment": {
+            "strategy": {
+              "type": "static",
+              "config": {
+                "candidates": [
+                  "xan-operator"
+                ]
+              }
+            }
+          },
+          "view": {
+            "columns": 2,
+            "fields": [
+              {
+                "ref": "field_2b9f4e10-0002-4a1c-8e2f-000000000002",
+                "group": "Personal details",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0048-4a1c-8e2f-000000000048",
+                "group": "Handover",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0051-4a1c-8e2f-000000000051",
+                "group": "Handover",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0050-4a1c-8e2f-000000000050",
+                "group": "Handover",
+                "required": true
+              }
+            ]
+          },
+          "paths": [
+            {
+              "id": "path_4d1b8f60-0027-4a1c-8e2f-000000000027",
+              "key": "activated_in_time",
+              "label": "Activated within the deadline",
+              "to": "step_7e3a6c50-0019-4a1c-8e2f-000000000019",
+              "trigger": "manual"
+            },
+            {
+              "id": "path_4d1b8f60-0028-4a1c-8e2f-000000000028",
+              "key": "deadline_elapsed_opterion_notified",
+              "label": "Deadline elapsed, Opterion notified",
+              "to": "step_7e3a6c50-0020-4a1c-8e2f-000000000020",
+              "trigger": "manual"
+            }
+          ]
+        },
+        {
+          "id": "step_7e3a6c50-0019-4a1c-8e2f-000000000019",
+          "key": "completed",
+          "label": {
+            "en": "Completed"
+          },
+          "description": {
+            "en": "Every completion criterion is met: the person has access to the agreed systems, the hardware — where any was issued — is handed over and fully functional, MFA through the Microsoft Authenticator is activated or the 5-business-day deadline has not yet elapsed, and the handover confirmation has reached Lucy Laidlaw or the designated deputy."
+          },
+          "type": "task",
+          "terminal": true,
+          "view": {
+            "columns": 2,
+            "fields": [
+              {
+                "ref": "field_2b9f4e10-0002-4a1c-8e2f-000000000002",
+                "group": "Personal details",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0003-4a1c-8e2f-000000000003",
+                "group": "Personal details",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0006-4a1c-8e2f-000000000006",
+                "group": "Personal details",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0044-4a1c-8e2f-000000000044",
+                "group": "Processing (XAN)",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0045-4a1c-8e2f-000000000045",
+                "group": "Processing (XAN)",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0047-4a1c-8e2f-000000000047",
+                "group": "Handover",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0048-4a1c-8e2f-000000000048",
+                "group": "Handover",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0050-4a1c-8e2f-000000000050",
+                "group": "Handover",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0052-4a1c-8e2f-000000000052",
+                "group": "Handover",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0053-4a1c-8e2f-000000000053",
+                "group": "Handover",
+                "readonly": true
+              }
+            ]
+          }
+        },
+        {
+          "id": "step_7e3a6c50-0020-4a1c-8e2f-000000000020",
+          "key": "completed_mfa_pending",
+          "label": {
+            "en": "Completed with MFA Pending"
+          },
+          "description": {
+            "en": "The 5-business-day activation deadline elapsed with MFA still not set up, and XAN notified Opterion. That notification is what closes the process in this case; XAN keeps offering remote support to the user over MS Teams or by phone."
+          },
+          "type": "task",
+          "terminal": true,
+          "view": {
+            "columns": 2,
+            "fields": [
+              {
+                "ref": "field_2b9f4e10-0002-4a1c-8e2f-000000000002",
+                "group": "Personal details",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0003-4a1c-8e2f-000000000003",
+                "group": "Personal details",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0044-4a1c-8e2f-000000000044",
+                "group": "Processing (XAN)",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0045-4a1c-8e2f-000000000045",
+                "group": "Processing (XAN)",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0048-4a1c-8e2f-000000000048",
+                "group": "Handover",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0051-4a1c-8e2f-000000000051",
+                "group": "Handover",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0050-4a1c-8e2f-000000000050",
+                "group": "Handover",
+                "readonly": true
+              },
+              {
+                "ref": "field_2b9f4e10-0053-4a1c-8e2f-000000000053",
+                "group": "Handover",
+                "readonly": true
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}
