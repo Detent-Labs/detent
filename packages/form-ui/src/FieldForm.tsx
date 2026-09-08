@@ -91,6 +91,14 @@ const styles = stylex.create({
     backgroundColor: "transparent",
     accentColor: colors.accent,
   },
+  /** The standalone checkbox carries no visible border or background (see
+   * `checkboxRadioReset`), so `fieldStack`'s column-flex `stretch` enlarges
+   * its invisible layout box and the browser paints the glyph at that box's
+   * center, not flush left. Grouped radio/checkbox options don't need this:
+   * `styles.option` is a row, where `stretch` only ever touches height. */
+  checkboxUnstretched: {
+    alignSelf: "flex-start",
+  },
   fieldOptions: {
     display: "flex",
     flexDirection: "column",
@@ -411,7 +419,7 @@ export function FieldInput({ field, allFields, values, onChange, locale, issuesB
           disabled={disabled}
           checked={!!value}
           onChange={(e) => onChange(def.id, e.target.checked)}
-          {...stylex.props(styles.control, styles.checkboxRadioReset)}
+          {...stylex.props(styles.control, styles.checkboxRadioReset, styles.checkboxUnstretched)}
           {...a11yProps}
         />
       );
