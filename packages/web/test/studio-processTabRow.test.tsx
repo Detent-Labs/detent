@@ -26,9 +26,6 @@ function render(over: { open?: ProcessTab; counts?: Partial<Record<ProcessTab, n
       counts={{ ...NO_COUNTS, ...over.counts }}
       onOpen={() => {}}
       jsonOpen={over.jsonOpen ?? false}
-      onToggleJson={() => {}}
-      onVersions={() => {}}
-      onPlayer={() => {}}
     />,
   );
 }
@@ -108,15 +105,7 @@ describe("Each tab's count", () => {
   });
 });
 
-describe("The overflow menu", () => {
-  it("stays closed until something opens it", () => {
-    const html = render();
-
-    expect(html).toContain('aria-haspopup="menu"');
-    expect(html).toContain('aria-expanded="false"');
-    expect(html).not.toContain('role="menu"');
-  });
-
+describe("Tab selection while the JSON surface is open", () => {
   it("marks no tab selected while the JSON surface stands open", () => {
     const html = render({ open: "paths", jsonOpen: true });
 

@@ -122,6 +122,9 @@ function renderHeader(over: {
         structureActive={true}
         processId="proc_a"
         go={() => {}}
+        onToggleJson={() => {}}
+        onVersions={() => {}}
+        onPlayer={() => {}}
       />
     </DraftContext.Provider>,
   );
@@ -178,7 +181,10 @@ describe("ProcessHeaderBar's failure region", () => {
  * Task 2.9 and task 2.15 of `studio-guided-surface`. The header bar stands no
  * Structure/JSON pair, and its `⋮` menu carries none of the area nav's one
  * control (Checks) or of Save, Discard draft and Publish, which stand in this
- * row instead (`studio-draft-actions-to-header-bar`).
+ * row instead (`studio-draft-actions-to-header-bar`). `studio-header-menu-merge`
+ * later gave the JSON toggle a home in this same `⋮` menu's own "Views"
+ * group, so this still holds: it names the area nav's one control and the
+ * three header-row actions, not the JSON toggle itself.
  */
 describe("What the header bar no longer carries", () => {
   it("stands no Structure control and no JSON control", () => {
@@ -328,5 +334,21 @@ describe("The Publish control's permission gate", () => {
     expect(html).not.toContain("aria-disabled");
     expect(html).not.toContain("aria-describedby");
     expect(html).not.toContain("Needs the publish permission");
+  });
+});
+
+/**
+ * `studio-header-menu-merge`: the `⋮` menu now carries what the tab row's
+ * own overflow menu used to (JSON surface, Versions, Player), so this
+ * trigger's closed-state markup gets the same coverage that menu's trigger
+ * had before it was deleted.
+ */
+describe("The header bar's ⋮ menu", () => {
+  it("stays closed until something opens it", () => {
+    const html = renderHeader({});
+
+    expect(html).toContain('aria-haspopup="true"');
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).not.toContain('role="menu"');
   });
 });

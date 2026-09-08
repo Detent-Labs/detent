@@ -363,11 +363,6 @@ export const en = {
   "tabs.contract": "Contract",
   "tabs.changes": "Changes",
   "tabs.checks": "Checks",
-  "tabs.overflowTrigger": "More",
-  "tabs.overflowJsonOpen": "Open the JSON surface",
-  "tabs.overflowJsonLeave": "Leave the JSON surface",
-  "tabs.overflowVersions": "Versions",
-  "tabs.overflowPlayer": "Player",
 
   // The Forms tab: one plate per step that declares a view
   // (`studio-forms-overview`).
@@ -562,6 +557,11 @@ export const en = {
   "headerBar.menuTrigger": "More actions",
   "headerBar.menuGroupDraft": "Process, saved with the draft",
   "headerBar.manageGroups": "Manage assignment groups for this process",
+  "headerBar.menuGroupViews": "Views",
+  "headerBar.jsonOpen": "Open the JSON surface",
+  "headerBar.jsonLeave": "Leave the JSON surface",
+  "headerBar.versions": "Versions",
+  "headerBar.player": "Player",
 
   "checksRail.heading": "Checks",
   "checksRail.heldBack": "Held back until earlier checks pass.",
