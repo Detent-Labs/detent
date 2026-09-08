@@ -45,6 +45,7 @@ const styles = stylex.create({
   // share position/background/text-align/vertical-align in app.css's own
   // combined selector; each entry below folds that declaration in.
   matrixColHeader: {
+    outlineOffset: -2,
     position: "sticky",
     backgroundColor: colors.surface,
     textAlign: "left",
@@ -58,6 +59,7 @@ const styles = stylex.create({
     zIndex: 2,
   },
   matrixCorner: {
+    outlineOffset: -2,
     position: "sticky",
     backgroundColor: colors.surface,
     textAlign: "left",
@@ -96,6 +98,7 @@ const styles = stylex.create({
     marginTop: space.s1,
   },
   matrixRowHeader: {
+    outlineOffset: -2,
     position: "sticky",
     backgroundColor: colors.surface,
     textAlign: "left",
@@ -573,8 +576,13 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
   // alone only flips `activated`; nothing else places the browser's focus.
   useEffect(() => {
     if (!activated) return;
-    const td = cellRefs.current.get(cellKey(focus.row, focus.col));
-    td?.querySelector<HTMLElement>("input")?.focus();
+    // A data cell holds checkboxes and a header holds bulk badges, so the
+    // first control is an `input` in one case and a `button` in the other.
+    // Looking only for `input` left an activated header with focus still on
+    // the `th` and the arrow keys already suspended, which reads as a dead
+    // Enter.
+    const cell = cellRefs.current.get(cellKey(focus.row, focus.col));
+    cell?.querySelector<HTMLElement>("input, button")?.focus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activated]);
 
@@ -625,6 +633,7 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
               }}
               tabIndex={showBulkBadges && focus.row === -1 && focus.col === -1 && !activated ? 0 : -1}
               onFocus={() => showBulkBadges && setFocus({ row: -1, col: -1 })}
+              onBlur={activated && focus.row === -1 && focus.col === -1 ? onCellBlur : undefined}
             />
             {drawnSteps.map(({ step, index: stepIndex }, colIndex) => {
               const inert = step.view === undefined;
@@ -642,6 +651,7 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
                   }}
                   tabIndex={showBulkBadges && focus.row === -1 && focus.col === colIndex && !activated ? 0 : -1}
                   onFocus={() => showBulkBadges && setFocus({ row: -1, col: colIndex })}
+                  onBlur={activated && focus.row === -1 && focus.col === colIndex ? onCellBlur : undefined}
                 >
                   <span {...stylex.props(styles.matrixColLabel)}>
                     {resolveDraftLocalizedText(step.label, contentLocale, baseLocale) || step.key || t("steps.unnamedStep")}
@@ -691,6 +701,7 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
                   }}
                   tabIndex={showBulkBadges && focus.col === -1 && focus.row === rowIndex && !activated ? 0 : -1}
                   onFocus={() => showBulkBadges && setFocus({ row: rowIndex, col: -1 })}
+                  onBlur={activated && focus.col === -1 && focus.row === rowIndex ? onCellBlur : undefined}
                 >
                   <span {...stylex.props(styles.matrixFieldKey)}>{row.key === "" ? t("panelsScreen.unnamedField") : row.key}</span>
                   <span {...stylex.props(styles.matrixFieldType)} aria-label={`${t("fieldMatrix.rowTypeLabel")}: ${row.type}`}>

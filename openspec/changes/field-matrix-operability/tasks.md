@@ -54,6 +54,6 @@
 - [x] 5.8 Confirm an arrow key reaches a header badge
 - [x] 5.9 Confirm a fieldless process states its empty result in words
 - [x] 5.10 Add the browser entry to `docs/browser-checks.md`
-- [ ] 5.11 Run `/impeccable audit` on the matrix route
+- [x] 5.11 Run `/impeccable audit` on the matrix route
 - [x] 5.12 Run the prose gate over every changed Markdown file
 - [x] 5.13 Run the whitespace gate over the pushed range

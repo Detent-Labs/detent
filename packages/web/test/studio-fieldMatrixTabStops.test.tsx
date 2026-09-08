@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { DraftProvider } from "../src/areas/studio/draft/store.js";
 import { FieldMatrixGrid } from "../src/areas/studio/panels/FieldMatrixGrid.js";
@@ -89,5 +90,41 @@ describe("the field matrix's tab stops", () => {
     const headers = [...html.matchAll(/<th\b[^>]*>/g)].map((m) => m[0]);
     expect(headers.length).toBeGreaterThan(2);
     for (const h of headers) expect(h).toMatch(/tabindex="(0|-1)"/);
+  });
+});
+
+/**
+ * Two defects the roving-model extension introduced, and an audit caught.
+ *
+ * Enter on a header set `activated` and moved no focus, because the effect
+ * that places focus looked for an `input`. A data cell holds checkboxes; a
+ * header holds bulk badges, which are buttons. Focus stayed on the `th` with
+ * the arrow keys already suspended, so Enter read as dead.
+ *
+ * Leaving an activated header never cleared `activated`, because `onBlur`
+ * was wired on `<td>` alone. The grid's one roving stop vanished and the
+ * header's three badges became orphan tab stops of a header nobody was on.
+ */
+describe("an activated header", () => {
+  const src = readFileSync(new URL("../src/areas/studio/panels/FieldMatrixGrid.tsx", import.meta.url).pathname, "utf8");
+
+  it("looks for a button as well as an input when placing focus", () => {
+    expect(src).toContain('querySelector<HTMLElement>("input, button")');
+    expect(src).not.toContain('querySelector<HTMLElement>("input")');
+  });
+
+  it("clears the activation when focus leaves a header", () => {
+    // One handler, wired on all three header kinds and on the data cell.
+    const wired = (src.match(/onBlur=\{[^}]*onCellBlur/g) ?? []).length;
+    expect(wired).toBe(4);
+  });
+
+  it("pulls the header focus ring inward, the way a cell does", () => {
+    // The global ring uses a positive offset, which clips against a sticky
+    // edge. Every focusable cell in this grid pulls it in.
+    for (const name of ["matrixColHeader", "matrixCorner", "matrixRowHeader"]) {
+      const block = src.slice(src.indexOf(`${name}: {`));
+      expect(block.slice(0, block.indexOf("},"))).toContain("outlineOffset: -2");
+    }
   });
 });
