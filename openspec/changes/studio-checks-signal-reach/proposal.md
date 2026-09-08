@@ -109,6 +109,9 @@ change that produced them.
 - Tests covering `ProcessTabRow`'s keyboard model, `PublishNavControl`'s
   availability logic, `EditScreen`'s banner, and `IssueList`'s rendering all
   need matching changes.
+- `packages/web/test/studio-fieldMatrixTabStops.test.tsx`: its `tabStops`
+  helper gains an `export`. The tab row's own test then reads that one
+  definition.
 - `docs/current-state.md`: the passage stating "Each tab is its own tab
   stop," which the roving-tabindex model replaces.
 - `docs/browser-checks.md`: new manual entries for the live announcement,

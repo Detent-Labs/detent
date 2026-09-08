@@ -33,6 +33,11 @@ set matches the area's tab pattern." That rule currently mandates the
 plain-button model for every tab set in the browser packages, this one
 included.
 
+The `/impeccable shape` pass did not run for these five fixes. Each is a
+color, a weight, a live region, a label element or a keyboard binding.
+None moves an element or changes a screen's structure. Task 8.6 re-runs
+`/impeccable critique` and `/impeccable audit` against the result.
+
 ## Goals / Non-Goals
 
 **Goals:**
@@ -176,6 +181,10 @@ validation state of the draft body rather than a failed request. So that
 one-shape rule does not reach it, and this change leaves
 `spa-error-reporting` untouched.
 
+This requirement lands in `studio-process-tabs`. That capability already
+carries this screen's non-tab chrome rules: the empty area nav, and the
+header bar's three controls.
+
 ### 4. An issue's source: one shared label style, two call sites
 
 `ChecksRail.tsx`'s `checksGroupHeading` style already renders the exact
@@ -302,3 +311,11 @@ None. This design resolves both premise corrections the research pass
 surfaced. Decision 4 answers finding 4's false "ChecksRail already does
 this right" assumption. Decision 5 answers finding 5's conflict with
 `spa-accessibility`. Neither stays open.
+
+One observation stands outside this change's scope. The live
+`studio-publish` spec sends the publish dialog's closing focus to the area
+nav's Publish control. That sits at lines 232-234, and in the scenario at
+277-281. The rebase moved Publish into the header bar, and
+`studio-process-tabs` now requires an empty area nav. This change leaves
+both passages alone. Retargeting them needs its own change against
+`studio-publish`.
