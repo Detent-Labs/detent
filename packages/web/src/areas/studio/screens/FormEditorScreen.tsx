@@ -81,7 +81,9 @@ const styles = stylex.create({
     gap: space.s3,
     marginTop: space.s4,
     paddingTop: space.s3,
-    borderTop: `2px solid ${colors.divider}`,
+    borderTopWidth: 2,
+    borderTopStyle: "solid",
+    borderTopColor: colors.divider,
   },
   formStripHeading: {
     flexBasis: "100%",
@@ -90,7 +92,9 @@ const styles = stylex.create({
   },
   studioWarning: {
     color: colors.refusal,
-    borderLeft: `3px solid ${colors.accent400}`,
+    borderLeftWidth: 3,
+    borderLeftStyle: "solid",
+    borderLeftColor: colors.accent400,
     paddingLeft: space.s2,
   },
   formEditorPage: {
@@ -106,7 +110,9 @@ const styles = stylex.create({
     gap: space.s3,
     paddingBlock: space.s3,
     paddingInline: space.s4,
-    borderBottom: `2px solid ${colors.divider}`,
+    borderBottomWidth: 2,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.divider,
   },
   // `.studio-form-editor-header .studio-back`.
   studioBack: {
@@ -141,7 +147,9 @@ const styles = stylex.create({
     gridColumn: { default: "auto", [PREVIEW_NARROW]: "1 / -1" },
   },
   formPalette: {
-    borderRight: `2px solid ${colors.divider}`,
+    borderRightWidth: 2,
+    borderRightStyle: "solid",
+    borderRightColor: colors.divider,
   },
   formPaletteHeading: {
     fontSize: "11px",
@@ -151,14 +159,18 @@ const styles = stylex.create({
     margin: 0,
     paddingBlock: space.s2,
     paddingInline: space.s3,
-    borderBottom: `1px solid ${colors.border}`,
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.border,
   },
   // `.studio-form-palette-heading + .studio-form-palette-heading` and
   // `.studio-form-palette-list + .studio-form-palette-heading`: this file
   // knows at each of the three headings whether the sibling before it
   // matches, so the adjacency becomes a per-heading conditional.
   formPaletteHeadingBordered: {
-    borderTop: `2px solid ${colors.divider}`,
+    borderTopWidth: 2,
+    borderTopStyle: "solid",
+    borderTopColor: colors.divider,
   },
   formPaletteList: {
     listStyle: "none",
@@ -176,7 +188,9 @@ const styles = stylex.create({
     backgroundColor: "transparent",
     color: "inherit",
     borderStyle: "none",
-    borderBottom: `1px solid ${colors.border}`,
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.border,
     paddingBlock: space.s2,
     paddingInline: space.s3,
     font: "inherit",
@@ -217,7 +231,9 @@ const styles = stylex.create({
     alignItems: "baseline",
     gap: space.s2,
     paddingBottom: space.s3,
-    borderBottom: `2px solid ${colors.divider}`,
+    borderBottomWidth: 2,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.divider,
     marginBottom: space.s3,
   },
   formColumnsLabel: {
@@ -287,7 +303,9 @@ const styles = stylex.create({
   },
   formCardEdge: {
     flex: `0 0 ${space.s2}`,
-    borderRight: `1px solid ${colors.border}`,
+    borderRightWidth: 1,
+    borderRightStyle: "solid",
+    borderRightColor: colors.border,
   },
   // `.studio-form-card-body`, merged with the same shared user-select/
   // touch-action declaration `formPaletteField` carries (D6), plus `:hover`.
@@ -346,7 +364,9 @@ const styles = stylex.create({
   formStripEmpty: {
     marginTop: space.s4,
     paddingTop: space.s3,
-    borderTop: `2px solid ${colors.divider}`,
+    borderTopWidth: 2,
+    borderTopStyle: "solid",
+    borderTopColor: colors.divider,
     color: colors.textMuted,
   },
   formEditorFooter: {
@@ -356,7 +376,9 @@ const styles = stylex.create({
     gap: space.s3,
     paddingBlock: space.s3,
     paddingInline: space.s4,
-    borderTop: `2px solid ${colors.divider}`,
+    borderTopWidth: 2,
+    borderTopStyle: "solid",
+    borderTopColor: colors.divider,
   },
   studioDialogNote: {
     color: colors.textMuted,

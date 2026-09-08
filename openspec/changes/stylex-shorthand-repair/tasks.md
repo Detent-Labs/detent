@@ -52,6 +52,15 @@
 - [x] 5b.5 Assert the flag fills beat the accent's own margin
 - [x] 5b.6 Write the `studio-app` delta for the pressed fill
 
+## 5c. The border sides
+
+- [x] 5c.1 Convert the 33 directional shorthands across 12 files
+- [x] 5c.2 Widen the guard to the four sides and the two logical axes
+- [x] 5c.3 Extend the fixture to cover a side key and an axis key
+- [x] 5c.4 Assert the side longhands still pass the guard
+- [x] 5c.5 Widen the web-styling requirement to all eight keys
+- [x] 5c.6 Confirm the field matrix paints its rules in a browser
+
 ## 6. Verification
 
 - [x] 6.1 Run `bun run typecheck` in the devcontainer

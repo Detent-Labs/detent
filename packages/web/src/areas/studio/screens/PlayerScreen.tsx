@@ -109,7 +109,9 @@ const styles = stylex.create({
   studioDiffItem: {
     paddingBlock: space.s1,
     paddingInline: 0,
-    borderBottom: `1px solid ${colors.border}`,
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.border,
   },
   studioDiffCode: {
     fontFamily: fonts.mono,

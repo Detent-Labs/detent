@@ -86,7 +86,7 @@ const styles = stylex.create({
   // this file always renders exactly two options, so the second one's own
   // style applies the sibling override statically.
   segmentedOptionSecond: {
-    borderLeft: "none",
+    borderLeftStyle: "none",
   },
   // The stamp, read off `aria-pressed` — a JS-computed choice, not a
   // reproduced attribute selector.

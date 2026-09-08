@@ -29,8 +29,20 @@ const TREES = [new URL("../src/", import.meta.url).pathname, new URL("../../form
  */
 const EXEMPT = /tokens\.stylex\.ts$/;
 
-/** The two keys the compiler drops, as they appear at the head of a line. */
-const DROPPED = /^\s*(border|background):\s/;
+/**
+ * The keys the compiler drops, as they appear at the head of a line.
+ *
+ * `border` and `background` are the obvious two. The four sides and the two
+ * logical axes drop the same way, which cost the field matrix every rule it
+ * draws: `matrixCell` asked for a 1px hairline on two edges and computed
+ * `0px/none` on both. An earlier version of this file banned only the first
+ * two, and 33 directional declarations across 12 files survived it.
+ *
+ * The longhands survive. `borderBottomWidth` and its siblings emit atoms,
+ * which is why every element already using them kept painting while the ones
+ * beside it went blank.
+ */
+const DROPPED = /^\s*(border|background|border(Top|Bottom|Left|Right|Block|Inline)):\s/;
 
 function walk(dir: string): string[] {
   return readdirSync(dir).flatMap((entry) => {
@@ -57,7 +69,7 @@ describe("the shorthands StyleX drops", () => {
     expect(modules.length).toBeGreaterThan(200);
   });
 
-  it("no style object declares `border` or `background`", () => {
+  it("no style object declares a shorthand the compiler drops", () => {
     // The message carries every hit, so one run names every site to fix
     // rather than one per run.
     expect(hits(modules)).toEqual([]);
@@ -70,11 +82,20 @@ describe("the shorthands StyleX drops", () => {
     const found = readFileSync(fixture, "utf8")
       .split("\n")
       .flatMap((line, i) => (DROPPED.test(line) ? [i + 1] : []));
-    expect(found).toEqual([3, 4]);
+    expect(found).toEqual([3, 4, 5, 6]);
   });
 
   it("leaves the longhand keys alone", () => {
-    const sample = ["  borderWidth: 1,", "  borderStyle: \"solid\",", "  borderColor: colors.border,", "  backgroundColor: colors.surface,"];
+    const sample = [
+      "  borderWidth: 1,",
+      '  borderStyle: "solid",',
+      "  borderColor: colors.border,",
+      "  backgroundColor: colors.surface,",
+      "  borderBottomWidth: 1,",
+      '  borderBottomStyle: "solid",',
+      "  borderBottomColor: colors.border,",
+      "  borderInlineStartWidth: 2,",
+    ];
     expect(sample.filter((l) => DROPPED.test(l))).toEqual([]);
   });
 

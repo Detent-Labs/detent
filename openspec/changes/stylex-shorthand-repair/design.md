@@ -31,10 +31,11 @@ of them are `boundaries.test.ts` and `studio-guidedSurfaceStyle.test.ts`.
 
 - No new color, weight, spacing or radius. A converted declaration asks for
   what its shorthand asked for.
-- No sweep of other shorthands. Three measured against the same bundle
-  compile to atoms today: `padding`, `font` and `borderLeft`. The last one
-  matters most. A side shorthand survives, so the dropped set is these two
-  keys and not shorthands as a class.
+- No sweep of unrelated shorthands. `padding` and `font` compile to atoms,
+  measured against the same bundle, and stay as they are.
+- The border sides are not unrelated. `borderTop`, `borderBottom`,
+  `borderLeft`, `borderRight` and the two logical axes drop exactly as
+  `border` does, so they convert here too.
 - No ESLint. One rule does not pay for a lint toolchain this repo has lived
   without.
 - No change to the design language. `design-language.md` and `DESIGN.md` stay
@@ -42,7 +43,7 @@ of them are `boundaries.test.ts` and `studio-guidedSurfaceStyle.test.ts`.
 
 ## Decisions
 
-### 1. Longhand, not a helper
+### 1. Plain longhand keys, and no helper
 
 Each site takes the plain longhand keys. A `border` becomes `borderWidth`,
 `borderStyle` and `borderColor`. A `background` becomes `backgroundColor`.
@@ -95,7 +96,7 @@ The sheet stands at 133 lines against a stated bound of about 120. The bound
 moves to about 150 rather than the comment shrinking. That comment records the
 measurement that found the bevel, and it is the only record of it.
 
-### 6. One revealed declaration gets corrected, not shipped
+### 6. One revealed declaration earns a correction
 
 The conversion is faithful everywhere. In one place the declaration it
 revealed is wrong, and this change fixes that place rather than leaving it.
@@ -126,11 +127,18 @@ edge. The browser check covers it.
 **80 sites change what a screen looks like.** That is the change's purpose.
 It is still a visual diff nobody reviewed as a design. Each site asks for what
 its own style already declared. The review question is whether the original
-declaration was right, not whether the conversion was.
+declaration was right. Nobody needs to re-examine the conversion.
 
 **The ban outlives its cause if StyleX changes.** A later version may emit
 both shorthands. The guard would then forbid something that works. Deleting
 the one test is the whole undo, and the longhands stay correct either way.
+
+**The border sides cost a second pass.** The first pass banned `border` and
+`background` alone, on a reading of the compiled bundle that mistook
+longhand atoms for shorthand output. An audit measured the field matrix
+computing `0px/none` on every rule it draws and found the hole. This
+change carries the correction: 33 declarations across 12 files, and the guard
+widened to the six side keys.
 
 **The guard's pattern is textual.** A `border:` key inside a non-style object
 would fail the suite for no reason. No such key exists in either tree today.
@@ -157,7 +165,7 @@ restores today's state, where the declaration compiles away.
 
 ## Open Questions
 
-- The `fieldset` reset clears a UA border for two components that carry no
+- The `fieldset` reset clears a UA border for two components that have no
   style object. Should those two components gain style objects instead? That
   would let the reset go. It is a larger change and it belongs to whoever owns
   `.action-list` and `.plugin-envelope`.

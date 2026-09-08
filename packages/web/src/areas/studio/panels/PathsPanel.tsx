@@ -79,7 +79,7 @@ const styles = stylex.create({
   // renders exactly two options, so the second one's own style applies the
   // sibling override statically.
   segmentedOptionSecond: {
-    borderLeft: "none",
+    borderLeftStyle: "none",
   },
   segmentedOptionPressed: {
     borderColor: colors.accent,

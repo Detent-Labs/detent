@@ -3,13 +3,15 @@
 ### Requirement: A style object declares no property the compiler drops
 
 The compiler emits no rule for a `border` shorthand and none for a
-`background` shorthand. It reports no error and it fails no build. A style
-object in `packages/web` or `packages/form-ui` SHALL therefore declare
-neither key.
+`background` shorthand. It reports no error and it fails no build. The four
+side keys drop the same way, and so do the two logical axis keys. A style
+object in `packages/web` or `packages/form-ui` SHALL declare none of the
+eight.
 
-A style SHALL use `borderWidth`, `borderStyle` and `borderColor` where it
-means a border. It SHALL use `backgroundColor` where it means a fill. This
-holds for a plain value and for a conditional value alike.
+A style SHALL use the width, style and color longhands where it means a
+border. This holds on the whole box and on one edge alike. It SHALL use
+`backgroundColor` where it means a fill. This holds for a plain value and for a conditional
+value alike.
 
 A test SHALL read every module under both source trees. It SHALL fail on
 either key inside a style object. It SHALL name the file and the line it
@@ -66,7 +68,7 @@ compiled style, so no component style clears its UA border.
 - **THEN** its `::backdrop` renders the global stylesheet's rule, since no
   compiled style can target a pseudo-element outside the DOM tree
 
-#### Scenario: A fieldset carries no UA bevel
+#### Scenario: A fieldset has no UA bevel
 
 - **WHEN** any area mounts a `<fieldset>`
 - **THEN** it draws no border, unless its own style object declares one

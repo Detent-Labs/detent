@@ -2600,7 +2600,7 @@ dashed accent frame over an 8% accent tint. Double-click a node to rename it.
 Pass: the input draws an accent frame on the surface fill.
 
 Open the JSON view from the tab row's overflow menu. Pass: the text area draws a
-1px frame on the surface fill, not on the page ground.
+1px frame, and it sits on the surface fill rather than the page ground.
 
 Force an error on the process surface. Saving a draft whose engine call fails is
 the quickest route. Pass: the banner draws a 2px refusal frame, and its stamp

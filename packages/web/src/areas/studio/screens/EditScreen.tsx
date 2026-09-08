@@ -219,7 +219,9 @@ const styles = stylex.create({
     gap: space.s2,
     width: "100%",
     paddingBottom: space.s2,
-    borderBottom: `2px solid ${colors.divider}`,
+    borderBottomWidth: 2,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.divider,
   },
   canvasSelectionCount: {
     fontFamily: fonts.mono,

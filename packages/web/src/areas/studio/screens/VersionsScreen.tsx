@@ -75,11 +75,15 @@ const styles = stylex.create({
     letterSpacing: "0.06em",
     color: colors.textMuted,
     padding: space.s2,
-    borderBottom: `2px solid ${colors.divider}`,
+    borderBottomWidth: 2,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.divider,
   },
   studioTableCell: {
     padding: space.s2,
-    borderBottom: `1px solid ${colors.border}`,
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.border,
     verticalAlign: "top",
   },
   studioControls: {
@@ -103,7 +107,9 @@ const styles = stylex.create({
   studioDiffItem: {
     paddingBlock: space.s1,
     paddingInline: 0,
-    borderBottom: `1px solid ${colors.border}`,
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.border,
   },
   studioDiffCode: {
     fontFamily: fonts.mono,

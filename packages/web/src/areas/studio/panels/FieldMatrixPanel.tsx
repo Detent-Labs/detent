@@ -18,7 +18,9 @@ const styles = stylex.create({
     alignItems: "baseline",
     gap: space.s3,
     paddingBottom: space.s2,
-    borderBottom: `2px solid ${colors.divider}`,
+    borderBottomWidth: 2,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.divider,
   },
   matrixCount: {
     fontFamily: fonts.mono,
