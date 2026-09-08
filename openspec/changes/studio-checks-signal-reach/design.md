@@ -114,7 +114,7 @@ logic would only move, at the cost of a second file reasoning about it.
 alongside `available: true`, a combination the type does not allow today.
 
 Widening `reasonKey` to a second literal keeps the existing rendering path
-in `DraftNavControls.tsx` working unchanged. The existing guard there,
+in `ProcessHeaderBar.tsx` working unchanged. The existing guard there,
 `{gate.reasonKey && ...}`, already renders whenever a reason exists,
 regardless of `available`. Only the button's own `aria-describedby` needs a
 change. It keys off `gate.reasonKey` now, instead of `gate.available`.
@@ -150,10 +150,10 @@ an unrelated administrative fact instead, and keeps its own muted tone.
 The new style composes over the existing one, the same way
 `tabCountBlocker` composes over `tabCount`.
 
-`DraftNavControls.tsx` already computes `blocked` for the confirmation
+`ProcessHeaderBar.tsx` already computes `blocked` for the confirmation
 dialog. This change only threads that existing value into
 `PublishNavControl` too. It adds no new computation, and no new prop into
-`DraftNavControls` itself.
+the header bar itself.
 
 ### 3. The banner's color, without its own new case
 

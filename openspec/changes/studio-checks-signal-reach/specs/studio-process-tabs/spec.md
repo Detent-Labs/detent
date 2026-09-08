@@ -102,12 +102,11 @@ wrapping. It SHALL follow `spa-accessibility`'s roving-tabindex pattern for
 a tab set of that shape. An ordinary tab set instead follows the
 plain-button pattern.
 
-The row's ten tabs SHALL together be one stop in the page's tab order. The
-overflow control at the row's trailing edge keeps its own stop, as it does
-today. Exactly one tab SHALL carry `tabindex="0"`, and the other nine
-`tabindex="-1"`. That one is the open tab until an arrow key moves focus,
-and the focused tab afterwards. Opening a tab SHALL bring focus and
-selection back together.
+The row SHALL be one stop in the page's tab order. Its trailing edge is the
+last tab, so no control beside the tabs takes a stop of its own. Exactly one
+tab SHALL carry `tabindex="0"`, and the other nine `tabindex="-1"`. That one
+is the open tab until an arrow key moves focus, and the focused tab
+afterwards. Opening a tab SHALL bring focus and selection back together.
 
 The left and right arrow keys SHALL move focus one tab at a time within the
 row. Moving past the last tab SHALL wrap focus to the first tab. Moving
@@ -117,12 +116,11 @@ alone. It SHALL NOT open the newly focused tab.
 Enter or Space SHALL open the focused tab. The open tab's body SHALL stand
 open, and the other nine SHALL hide.
 
-#### Scenario: The row's tabs are one tab stop
+#### Scenario: The row is one tab stop
 
 - **WHEN** an author presses Tab from the header bar
 - **THEN** focus lands on the open tab
-- **AND** a further Tab press moves to the overflow control, and the one
-  after that leaves the row
+- **AND** a further Tab press leaves the row
 
 #### Scenario: An arrow key moves focus without opening the tab
 
