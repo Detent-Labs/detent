@@ -54,6 +54,51 @@ function token(css: string, name: string, scheme: "light" | "dark"): string {
 
 const FLAGS = ["visible", "required", "readonly"] as const;
 
+describe("the mixed bulk badge", () => {
+  const grid = read(GRID);
+
+  it("carries one mixed style per flag", () => {
+    for (const flag of FLAGS) {
+      const cap = `${flag[0]!.toUpperCase()}${flag.slice(1)}`;
+      expect(grid).toContain(`matrixFlagBadgeMixed${cap}: {`);
+    }
+  });
+
+  it("differs from the pressed style by the fill", () => {
+    // Mixed and full share the flag's color. The fill is what separates
+    // them, so an author reads flag and state from one mark.
+    for (const flag of FLAGS) {
+      const cap = `${flag[0]!.toUpperCase()}${flag.slice(1)}`;
+      const block = (name: string) => {
+        const start = grid.indexOf(`${name}: {`);
+        expect(start).toBeGreaterThan(-1);
+        return grid.slice(start, grid.indexOf("},", start));
+      };
+      const mixed = block(`matrixFlagBadgeMixed${cap}`);
+      const full = block(`matrixFlagBadgePressed${cap}`);
+      expect(full).toContain(`backgroundColor: colors.flag${cap}`);
+      expect(mixed).not.toContain("backgroundColor");
+      expect(mixed).toContain(`borderColor: colors.flag${cap}`);
+      expect(mixed).toContain(`color: colors.flag${cap}`);
+    }
+  });
+
+  it("picks its style and its aria-pressed from the same state", () => {
+    expect(grid).toContain("badgeStateStyle(state, key)");
+    expect(grid).toContain("badgeAriaPressed(state)");
+    // A tri-state toggle button says "mixed". That is the ARIA value for
+    // exactly this case, so the state reaches assistive tech unaided.
+    expect(grid).toContain('state === "mixed" ? "mixed" : false');
+  });
+
+  it("leaves the empty state carrying neither flag color", () => {
+    const start = grid.indexOf("matrixFlagBadge: {");
+    const base = grid.slice(start, grid.indexOf("},", grid.indexOf(":hover", start)));
+    expect(base).toContain("borderColor: colors.border");
+    expect(base).toContain("color: colors.textMuted");
+  });
+});
+
 describe("the pressed bulk badge", () => {
   const grid = read(GRID);
 

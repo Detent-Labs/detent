@@ -17,6 +17,8 @@ import {
   columnLiveTargets,
   rowLiveTargets,
   bulkBadgeOn,
+  bulkBadgeState,
+  type BulkBadgeState,
   applyBulkToggle,
   eligibleTargetEntries,
   isCellFlagged,
@@ -268,6 +270,22 @@ const styles = stylex.create({
     backgroundColor: colors.flagReadonly,
     borderColor: colors.flagReadonly,
   },
+  // The mixed state: the flag's color on the border and the label, and no
+  // fill. The fill is what separates it from the pressed state, so an author
+  // reads flag and state from one mark. Each flag's color measures 6.4:1 or
+  // better as text on this ground, in both schemes.
+  matrixFlagBadgeMixedVisible: {
+    color: colors.flagVisible,
+    borderColor: colors.flagVisible,
+  },
+  matrixFlagBadgeMixedRequired: {
+    color: colors.flagRequired,
+    borderColor: colors.flagRequired,
+  },
+  matrixFlagBadgeMixedReadonly: {
+    color: colors.flagReadonly,
+    borderColor: colors.flagReadonly,
+  },
   matrixFlagEmpty: {
     height: "1.125rem",
     visibility: "hidden",
@@ -300,6 +318,22 @@ const FLAG_BADGE_PRESSED: Record<FlagKey, stylex.StyleXStyles> = {
   required: styles.matrixFlagBadgePressedRequired,
   readonly: styles.matrixFlagBadgePressedReadonly,
 };
+
+/** The mixed fill, per flag. Same shape as the pressed lookup above. */
+const FLAG_BADGE_MIXED: Record<FlagKey, stylex.StyleXStyles> = {
+  visible: styles.matrixFlagBadgeMixedVisible,
+  required: styles.matrixFlagBadgeMixedRequired,
+  readonly: styles.matrixFlagBadgeMixedReadonly,
+};
+
+/** The style a badge takes for the state its cells are in. */
+const badgeStateStyle = (state: BulkBadgeState, key: FlagKey): stylex.StyleXStyles | false =>
+  state === "full" ? FLAG_BADGE_PRESSED[key] : state === "mixed" ? FLAG_BADGE_MIXED[key] : false;
+
+/** `aria-pressed` takes all three states. A tri-state toggle button says
+ * `mixed`, which is exactly what a partly-set column is. */
+const badgeAriaPressed = (state: BulkBadgeState): boolean | "mixed" =>
+  state === "full" ? true : state === "mixed" ? "mixed" : false;
 export const FLAG_LABEL_KEY = {
   visible: "formEditor.visible",
   required: "formEditor.required",
@@ -329,8 +363,9 @@ function CelStamp({ label, src }: { label: string; src: string }) {
 
 /** The three visible/required/readonly bulk badges a column or row header
  * shows, wherever it carries at least one live cell (`studio-app`'s
- * bulk-toggle requirement). Reads `bulkBadgeOn` for `aria-pressed`, and
- * writes through `applyBulkToggle` inside one `mutate()` call. */
+ * bulk-toggle requirement). Reads `bulkBadgeState` for `aria-pressed`,
+ * which takes all three states, and writes through `applyBulkToggle` inside
+ * one `mutate()` call. */
 function BulkBadges({
   targets,
   allSteps,
@@ -357,13 +392,13 @@ function BulkBadges({
     <span {...stylex.props(styles.matrixFlags)}>
       {FLAG_KEYS.map((key) => {
         if (!eligible.includes(key)) return <span key={key} aria-hidden="true" {...stylex.props(styles.matrixFlagEmpty)} />;
-        const pressed = bulkBadgeOn(allSteps, targets, key, written, technicalFieldIds);
+        const state = bulkBadgeState(allSteps, targets, key, written, technicalFieldIds);
         return (
           <button
             key={key}
             type="button"
-            {...stylex.props(styles.matrixFlagBadge, pressed && FLAG_BADGE_PRESSED[key])}
-            aria-pressed={pressed}
+            {...stylex.props(styles.matrixFlagBadge, badgeStateStyle(state, key))}
+            aria-pressed={badgeAriaPressed(state)}
             aria-label={t(FLAG_LABEL_KEY[key])}
             title={t(FLAG_LABEL_KEY[key])}
             onClick={() => onToggle(key)}
