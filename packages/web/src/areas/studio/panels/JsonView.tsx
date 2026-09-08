@@ -12,9 +12,11 @@ const styles = stylex.create({
     marginTop: space.s1,
     fontFamily: fonts.mono,
     fontSize: "0.85rem",
-    border: `1px solid ${colors.border}`,
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: colors.border,
     padding: space.s2,
-    background: colors.surface,
+    backgroundColor: colors.surface,
     resize: "vertical",
   },
   studioControls: {

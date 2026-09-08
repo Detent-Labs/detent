@@ -8,7 +8,7 @@ import { t } from "../../catalog.js";
 
 const styles = stylex.create({
   pluginField: {
-    border: 0,
+    borderWidth: 0,
     margin: 0,
     padding: 0,
     minWidth: 0,

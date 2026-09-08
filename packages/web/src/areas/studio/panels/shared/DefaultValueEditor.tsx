@@ -38,7 +38,7 @@ const styles = stylex.create({
     gap: space.s3,
   },
   conditionMode: {
-    background: "none",
+    backgroundColor: "transparent",
     color: colors.accent,
     padding: 0,
     flex: "none",
@@ -50,7 +50,7 @@ const styles = stylex.create({
     gap: space.s2,
   },
   defaultValueOptions: {
-    border: "none",
+    borderStyle: "none",
     padding: 0,
     margin: 0,
   },

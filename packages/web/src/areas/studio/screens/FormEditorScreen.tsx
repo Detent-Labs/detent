@@ -53,14 +53,18 @@ const styles = stylex.create({
     textTransform: "uppercase",
     letterSpacing: "0.06em",
     color: colors.accent,
-    border: "2px solid currentcolor",
+    borderWidth: 2,
+    borderStyle: "solid",
+    borderColor: "currentcolor",
     paddingBlock: 0,
     paddingInline: space.s1,
   },
   studioDevview: {
     marginBlock: space.s2,
     marginInline: 0,
-    border: `1px solid ${colors.border}`,
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: colors.border,
     paddingBlock: space.s1,
     paddingInline: space.s2,
   },
@@ -77,7 +81,9 @@ const styles = stylex.create({
     gap: space.s3,
     marginTop: space.s4,
     paddingTop: space.s3,
-    borderTop: `2px solid ${colors.divider}`,
+    borderTopWidth: 2,
+    borderTopStyle: "solid",
+    borderTopColor: colors.divider,
   },
   formStripHeading: {
     flexBasis: "100%",
@@ -86,13 +92,17 @@ const styles = stylex.create({
   },
   studioWarning: {
     color: colors.refusal,
-    borderLeft: `3px solid ${colors.accent400}`,
+    borderLeftWidth: 3,
+    borderLeftStyle: "solid",
+    borderLeftColor: colors.accent400,
     paddingLeft: space.s2,
   },
   formEditorPage: {
     display: "flex",
     flexDirection: "column",
-    border: `1px solid ${colors.border}`,
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: colors.border,
   },
   formEditorHeader: {
     display: "flex",
@@ -100,7 +110,9 @@ const styles = stylex.create({
     gap: space.s3,
     paddingBlock: space.s3,
     paddingInline: space.s4,
-    borderBottom: `2px solid ${colors.divider}`,
+    borderBottomWidth: 2,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.divider,
   },
   // `.studio-form-editor-header .studio-back`.
   studioBack: {
@@ -135,7 +147,9 @@ const styles = stylex.create({
     gridColumn: { default: "auto", [PREVIEW_NARROW]: "1 / -1" },
   },
   formPalette: {
-    borderRight: `2px solid ${colors.divider}`,
+    borderRightWidth: 2,
+    borderRightStyle: "solid",
+    borderRightColor: colors.divider,
   },
   formPaletteHeading: {
     fontSize: "11px",
@@ -145,14 +159,18 @@ const styles = stylex.create({
     margin: 0,
     paddingBlock: space.s2,
     paddingInline: space.s3,
-    borderBottom: `1px solid ${colors.border}`,
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.border,
   },
   // `.studio-form-palette-heading + .studio-form-palette-heading` and
   // `.studio-form-palette-list + .studio-form-palette-heading`: this file
   // knows at each of the three headings whether the sibling before it
   // matches, so the adjacency becomes a per-heading conditional.
   formPaletteHeadingBordered: {
-    borderTop: `2px solid ${colors.divider}`,
+    borderTopWidth: 2,
+    borderTopStyle: "solid",
+    borderTopColor: colors.divider,
   },
   formPaletteList: {
     listStyle: "none",
@@ -167,10 +185,12 @@ const styles = stylex.create({
     alignItems: "baseline",
     gap: space.s2,
     width: "100%",
-    background: "none",
+    backgroundColor: "transparent",
     color: "inherit",
-    border: "none",
-    borderBottom: `1px solid ${colors.border}`,
+    borderStyle: "none",
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.border,
     paddingBlock: space.s2,
     paddingInline: space.s3,
     font: "inherit",
@@ -179,7 +199,7 @@ const styles = stylex.create({
     userSelect: "none",
     touchAction: "manipulation",
     ":hover": {
-      background: colors.surfaceMuted,
+      backgroundColor: colors.surfaceMuted,
     },
   },
   formPaletteFieldMint: {
@@ -211,7 +231,9 @@ const styles = stylex.create({
     alignItems: "baseline",
     gap: space.s2,
     paddingBottom: space.s3,
-    borderBottom: `2px solid ${colors.divider}`,
+    borderBottomWidth: 2,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.divider,
     marginBottom: space.s3,
   },
   formColumnsLabel: {
@@ -257,14 +279,18 @@ const styles = stylex.create({
   formCanvasTail: {
     gridColumn: "1 / -1",
     color: colors.textMuted,
-    border: `1px dashed ${colors.border}`,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: colors.border,
     paddingBlock: space.s2,
     paddingInline: space.s3,
   },
   formCard: {
     display: "flex",
     alignItems: "stretch",
-    border: `1px solid ${colors.border}`,
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: colors.border,
     minWidth: 0,
   },
   // `[data-selected]`/`[data-conditional]`: JS-computed choices reading the
@@ -277,7 +303,9 @@ const styles = stylex.create({
   },
   formCardEdge: {
     flex: `0 0 ${space.s2}`,
-    borderRight: `1px solid ${colors.border}`,
+    borderRightWidth: 1,
+    borderRightStyle: "solid",
+    borderRightColor: colors.border,
   },
   // `.studio-form-card-body`, merged with the same shared user-select/
   // touch-action declaration `formPaletteField` carries (D6), plus `:hover`.
@@ -287,9 +315,9 @@ const styles = stylex.create({
     gap: space.s2,
     flex: 1,
     minWidth: 0,
-    background: "none",
+    backgroundColor: "transparent",
     color: "inherit",
-    border: "none",
+    borderStyle: "none",
     paddingBlock: space.s2,
     paddingInline: space.s3,
     font: "inherit",
@@ -298,7 +326,7 @@ const styles = stylex.create({
     userSelect: "none",
     touchAction: "manipulation",
     ":hover": {
-      background: colors.surfaceMuted,
+      backgroundColor: colors.surfaceMuted,
     },
   },
   formCardKey: {
@@ -336,7 +364,9 @@ const styles = stylex.create({
   formStripEmpty: {
     marginTop: space.s4,
     paddingTop: space.s3,
-    borderTop: `2px solid ${colors.divider}`,
+    borderTopWidth: 2,
+    borderTopStyle: "solid",
+    borderTopColor: colors.divider,
     color: colors.textMuted,
   },
   formEditorFooter: {
@@ -346,7 +376,9 @@ const styles = stylex.create({
     gap: space.s3,
     paddingBlock: space.s3,
     paddingInline: space.s4,
-    borderTop: `2px solid ${colors.divider}`,
+    borderTopWidth: 2,
+    borderTopStyle: "solid",
+    borderTopColor: colors.divider,
   },
   studioDialogNote: {
     color: colors.textMuted,

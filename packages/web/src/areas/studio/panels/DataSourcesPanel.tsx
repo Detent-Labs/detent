@@ -22,7 +22,9 @@ const styles = stylex.create({
     margin: 0,
     marginBottom: space.s3,
     paddingBottom: space.s2,
-    borderBottom: `2px solid ${colors.divider}`,
+    borderBottomWidth: 2,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.divider,
   },
   dataSourceRow: {
     display: "flex",
@@ -44,7 +46,9 @@ const styles = stylex.create({
   },
   studioWarning: {
     color: colors.refusal,
-    borderLeft: `3px solid ${colors.accent400}`,
+    borderLeftWidth: 3,
+    borderLeftStyle: "solid",
+    borderLeftColor: colors.accent400,
     paddingLeft: space.s2,
   },
 });

@@ -42,7 +42,7 @@ const styles = stylex.create({
     alignItems: "baseline",
     gap: space.s3,
     width: "100%",
-    background: { default: "none", ":hover": colors.surfaceMuted },
+    backgroundColor: { default: "transparent", ":hover": colors.surfaceMuted },
     borderWidth: 0,
     padding: `${space.s3} ${space.s2}`,
     font: "inherit",

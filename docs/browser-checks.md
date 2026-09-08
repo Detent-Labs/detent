@@ -2577,3 +2577,35 @@ with the translation.
 A `bun:test` assertion covers the catalog's key set. It cannot see a clipped
 control, and it cannot see a German sentence that reads wrong beside its own
 control.
+
+### Borders and fills that the compiler dropped (`stylex-shorthand-repair`)
+
+StyleX emits no `border` rule and no `background` rule, so 113 declarations
+compiled away and 80 of them asked for something that should paint. The suite
+now bans both keys at the source. It cannot see a border, since the harness
+lays out nothing and resolves no custom property.
+
+Open the studio's Field matrix tab on a process with several fields. Pass: the
+legend's three swatches each draw a 10px box with a 1px frame and a fill. Scroll
+the grid sideways and down. Pass: the sticky row and column headers carry a
+solid fill, and no cell shows through them.
+
+Open the Canvas tab. A step node is an SVG group. It paints by stroke and
+fill, so no CSS border reaches it. What this change restored here is the frame
+around the canvas itself. Pass: the viewport draws a 1px frame and the muted
+fill under its dot grid.
+
+Drag on empty canvas to pull a selection marquee. Pass: the marquee draws a
+dashed accent frame over an 8% accent tint. Double-click a node to rename it.
+Pass: the input draws an accent frame on the surface fill.
+
+Open the JSON view from the tab row's overflow menu. Pass: the text area draws a
+1px frame, and it sits on the surface fill rather than the page ground.
+
+Force an error on the process surface. Saving a draft whose engine call fails is
+the quickest route. Pass: the banner draws a 2px refusal frame, and its stamp
+draws a 2px frame in the current color.
+
+Then leave the studio. Hover a row on My tasks, on the admin instances list, and
+on a reporting list. Pass: each row fills with the muted surface under the
+pointer. That fill reached no list screen before this change.

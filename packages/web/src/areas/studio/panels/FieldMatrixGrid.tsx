@@ -28,7 +28,9 @@ const styles = stylex.create({
   matrixScroll: {
     overflow: "auto",
     overscrollBehavior: "contain",
-    border: `1px solid ${colors.border}`,
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: colors.border,
     maxHeight: "32rem",
   },
   matrixTable: {
@@ -41,24 +43,28 @@ const styles = stylex.create({
   // combined selector; each entry below folds that declaration in.
   matrixColHeader: {
     position: "sticky",
-    background: colors.surface,
+    backgroundColor: colors.surface,
     textAlign: "left",
     verticalAlign: "top",
     top: 0,
     width: "11rem",
     padding: space.s2,
-    borderBottom: `2px solid ${colors.divider}`,
+    borderBottomWidth: 2,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.divider,
     zIndex: 2,
   },
   matrixCorner: {
     position: "sticky",
-    background: colors.surface,
+    backgroundColor: colors.surface,
     textAlign: "left",
     verticalAlign: "top",
     top: 0,
     width: "11rem",
     padding: space.s2,
-    borderBottom: `2px solid ${colors.divider}`,
+    borderBottomWidth: 2,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.divider,
     left: 0,
     zIndex: 3,
   },
@@ -88,15 +94,19 @@ const styles = stylex.create({
   },
   matrixRowHeader: {
     position: "sticky",
-    background: colors.surface,
+    backgroundColor: colors.surface,
     textAlign: "left",
     verticalAlign: "top",
     left: 0,
     width: "11rem",
     paddingBlock: space.s2,
     paddingInline: space.s3,
-    borderRight: `2px solid ${colors.divider}`,
-    borderBottom: `1px solid ${colors.border}`,
+    borderRightWidth: 2,
+    borderRightStyle: "solid",
+    borderRightColor: colors.divider,
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.border,
   },
   // A group field's children indent once, matching the rail's own cap.
   matrixRowHeaderIndented: {
@@ -121,8 +131,12 @@ const styles = stylex.create({
     color: colors.textMuted,
   },
   matrixCell: {
-    borderBottom: `1px solid ${colors.border}`,
-    borderRight: `1px solid ${colors.border}`,
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.border,
+    borderRightWidth: 1,
+    borderRightStyle: "solid",
+    borderRightColor: colors.border,
     paddingBlock: space.s1,
     paddingInline: space.s2,
     verticalAlign: "top",
@@ -142,7 +156,7 @@ const styles = stylex.create({
   },
   matrixCellLive: {
     ":hover": {
-      background: colors.surfaceMuted,
+      backgroundColor: colors.surfaceMuted,
     },
   },
   matrixCellFlags: {
@@ -185,7 +199,9 @@ const styles = stylex.create({
     textTransform: "uppercase",
     letterSpacing: "0.06em",
     color: colors.accent,
-    border: "2px solid currentcolor",
+    borderWidth: 2,
+    borderStyle: "solid",
+    borderColor: "currentcolor",
     paddingBlock: 0,
     paddingInline: space.s1,
     flex: "none",
@@ -215,22 +231,42 @@ const styles = stylex.create({
     width: "1.75rem",
     textAlign: "center",
     color: colors.textMuted,
-    background: "none",
-    border: `1px solid ${colors.border}`,
+    backgroundColor: "transparent",
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: colors.border,
     paddingBlock: 0,
     paddingInline: space.s1,
     cursor: "pointer",
     ":hover": {
-      background: colors.surfaceMuted,
+      backgroundColor: colors.surfaceMuted,
       color: colors.text,
     },
   },
   // `[aria-pressed="true"]`: a JS-computed choice reading the same
   // `aria-pressed` the button already carries.
-  matrixFlagBadgePressed: {
+  //
+  // The fill is the flag's own color, never the accent. Three reasons, in
+  // order. The legend twelve pixels away names these three colors, so a REQ
+  // badge that filled with the accent would contradict the key beside it.
+  // The accent marks state and the one primary action per screen
+  // (`design-language.md`), and Publish already holds it. And the accent
+  // fill clears AA by 0.025 under this badge's own 11px text, at 4.525:1;
+  // each flag color measures 6.4:1 or better, in both schemes.
+  matrixFlagBadgePressedVisible: {
     color: colors.accentContrast,
-    background: colors.accent,
-    borderColor: colors.accent,
+    backgroundColor: colors.flagVisible,
+    borderColor: colors.flagVisible,
+  },
+  matrixFlagBadgePressedRequired: {
+    color: colors.accentContrast,
+    backgroundColor: colors.flagRequired,
+    borderColor: colors.flagRequired,
+  },
+  matrixFlagBadgePressedReadonly: {
+    color: colors.accentContrast,
+    backgroundColor: colors.flagReadonly,
+    borderColor: colors.flagReadonly,
   },
   matrixFlagEmpty: {
     height: "1.125rem",
@@ -256,6 +292,14 @@ const MATRIX_FLAG_ACCENT_STYLE: Record<FlagKey, stylex.StyleXStyles> = {
 
 export const FLAG_KEYS: FlagKey[] = ["visible", "required", "readonly"];
 const FLAG_LETTER: Record<FlagKey, string> = { visible: "VIS", required: "REQ", readonly: "RO" };
+
+/** The pressed fill, per flag. Mirrors `FLAG_SWATCH_STYLE` in the panel's
+ * legend, so the badge and the key it explains read one color each. */
+const FLAG_BADGE_PRESSED: Record<FlagKey, stylex.StyleXStyles> = {
+  visible: styles.matrixFlagBadgePressedVisible,
+  required: styles.matrixFlagBadgePressedRequired,
+  readonly: styles.matrixFlagBadgePressedReadonly,
+};
 export const FLAG_LABEL_KEY = {
   visible: "formEditor.visible",
   required: "formEditor.required",
@@ -318,7 +362,7 @@ function BulkBadges({
           <button
             key={key}
             type="button"
-            {...stylex.props(styles.matrixFlagBadge, pressed && styles.matrixFlagBadgePressed)}
+            {...stylex.props(styles.matrixFlagBadge, pressed && FLAG_BADGE_PRESSED[key])}
             aria-pressed={pressed}
             aria-label={t(FLAG_LABEL_KEY[key])}
             title={t(FLAG_LABEL_KEY[key])}

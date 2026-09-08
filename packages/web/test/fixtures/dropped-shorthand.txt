@@ -1,0 +1,9 @@
+// A fixture, not a module. The guard walks `packages/web/src` and
+// `packages/form-ui/src` only, so it never reaches this file.
+    border: "1px solid red",
+    background: "red",
+    borderBottom: "1px solid red",
+    borderInline: "1px solid red",
+    borderWidth: 1,
+    borderBottomWidth: 1,
+    backgroundColor: "red",
