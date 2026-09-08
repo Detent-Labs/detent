@@ -44,16 +44,16 @@
 
 ## 5. Verification
 
-- [ ] 5.1 Run `bun run typecheck` in the devcontainer
-- [ ] 5.2 Run `bun run build` in the devcontainer
-- [ ] 5.3 Run the full `bun test` with `DATABASE_URL` set
-- [ ] 5.4 Pipe the log through `scripts/gates/silent-green.sh`
-- [ ] 5.5 Walk the matrix in a browser at 1440x900
-- [ ] 5.6 Confirm a mixed column reads differently from an empty one
-- [ ] 5.7 Confirm the grid takes one tab stop, counted by hand
-- [ ] 5.8 Confirm an arrow key reaches a header badge
-- [ ] 5.9 Confirm a fieldless process states its empty result in words
-- [ ] 5.10 Add the browser entry to `docs/browser-checks.md`
+- [x] 5.1 Run `bun run typecheck` in the devcontainer
+- [x] 5.2 Run `bun run build` in the devcontainer
+- [x] 5.3 Run the full `bun test` with `DATABASE_URL` set
+- [x] 5.4 Pipe the log through `scripts/gates/silent-green.sh`
+- [x] 5.5 Walk the matrix in a browser at 1440x900
+- [x] 5.6 Confirm a mixed column reads differently from an empty one
+- [x] 5.7 Confirm the grid takes one tab stop, counted by hand
+- [x] 5.8 Confirm an arrow key reaches a header badge
+- [x] 5.9 Confirm a fieldless process states its empty result in words
+- [x] 5.10 Add the browser entry to `docs/browser-checks.md`
 - [ ] 5.11 Run `/impeccable audit` on the matrix route
-- [ ] 5.12 Run the prose gate over every changed Markdown file
-- [ ] 5.13 Run the whitespace gate over the pushed range
+- [x] 5.12 Run the prose gate over every changed Markdown file
+- [x] 5.13 Run the whitespace gate over the pushed range
