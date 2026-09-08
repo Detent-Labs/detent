@@ -1,7 +1,7 @@
 {
   "processId": "proc_7d41e0b6-5c2a-4f19-9e83-6b0d4a71c58f",
   "version": 1,
-  "definitionHash": "ec2801217906d692c140fac605e04e2a29ab026f484c7c61ac62235858a54744",
+  "definitionHash": "0287388f260f666928d247cf3fccacb8b07b4c1011cbec50a3eaa5ce8be452ec",
   "status": "published",
   "publishedAt": "2026-08-15T09:00:00Z",
   "definition": {
@@ -386,6 +386,105 @@
         "validation": {
           "min": 0
         }
+      },
+      {
+        "id": "field_9c7e5b31-0023-4a1c-8e2f-000000000023",
+        "key": "request",
+        "label": {
+          "en": "Request"
+        },
+        "description": {
+          "en": "Catalog grouping only. Each step's view places fields under this heading."
+        },
+        "type": "group"
+      },
+      {
+        "id": "field_9c7e5b31-0024-4a1c-8e2f-000000000024",
+        "key": "vendor_section",
+        "label": {
+          "en": "Vendor"
+        },
+        "description": {
+          "en": "Catalog grouping only. Each step's view places fields under this heading."
+        },
+        "type": "group"
+      },
+      {
+        "id": "field_9c7e5b31-0025-4a1c-8e2f-000000000025",
+        "key": "decision",
+        "label": {
+          "en": "Decision"
+        },
+        "description": {
+          "en": "Catalog grouping only. Each step's view places fields under this heading."
+        },
+        "type": "group"
+      },
+      {
+        "id": "field_9c7e5b31-0026-4a1c-8e2f-000000000026",
+        "key": "ordered",
+        "label": {
+          "en": "Ordered"
+        },
+        "description": {
+          "en": "Catalog grouping only. Each step's view places fields under this heading."
+        },
+        "type": "group"
+      },
+      {
+        "id": "field_9c7e5b31-0027-4a1c-8e2f-000000000027",
+        "key": "receipt",
+        "label": {
+          "en": "Receipt"
+        },
+        "description": {
+          "en": "Catalog grouping only. Each step's view places fields under this heading."
+        },
+        "type": "group"
+      },
+      {
+        "id": "field_9c7e5b31-0028-4a1c-8e2f-000000000028",
+        "key": "ordered_vs_received",
+        "label": {
+          "en": "Ordered vs received"
+        },
+        "description": {
+          "en": "Catalog grouping only. Each step's view places fields under this heading."
+        },
+        "type": "group"
+      },
+      {
+        "id": "field_9c7e5b31-0029-4a1c-8e2f-000000000029",
+        "key": "resolution",
+        "label": {
+          "en": "Resolution"
+        },
+        "description": {
+          "en": "Catalog grouping only. Each step's view places fields under this heading."
+        },
+        "type": "group"
+      },
+      {
+        "id": "field_9c7e5b31-0030-4a1c-8e2f-000000000030",
+        "key": "order",
+        "label": {
+          "en": "Order"
+        },
+        "description": {
+          "en": "Catalog grouping only. Each step's view places fields under this heading."
+        },
+        "type": "group"
+      },
+      {
+        "id": "field_9c7e5b31-0031-4a1c-8e2f-000000000031",
+        "key": "invoice",
+        "label": {
+          "en": "Invoice"
+        },
+        "description": {
+          "en": "Catalog grouping only. Each step's view places fields under this heading."
+        },
+        "type": "group"
       }
     ],
     "dataSources": [
@@ -440,7 +539,9 @@
             "strategy": {
               "type": "static",
               "config": {
-                "candidates": ["requester"]
+                "candidates": [
+                  "requester"
+                ]
               }
             }
           },
@@ -448,55 +549,64 @@
             "columns": 2,
             "fields": [
               {
+                "ref": "field_9c7e5b31-0023-4a1c-8e2f-000000000023"
+              },
+              {
                 "ref": "field_9c7e5b31-0001-4a1c-8e2f-000000000001",
-                "group": "Request",
+                "group": "request",
                 "required": true
               },
               {
                 "ref": "field_9c7e5b31-0002-4a1c-8e2f-000000000002",
-                "group": "Request",
+                "group": "request",
                 "required": true
               },
               {
                 "ref": "field_9c7e5b31-0010-4a1c-8e2f-000000000010",
-                "group": "Request",
+                "group": "request",
                 "required": true
               },
               {
                 "ref": "field_9c7e5b31-0011-4a1c-8e2f-000000000011",
-                "group": "Request",
+                "group": "request",
                 "required": true,
                 "span": 2
               },
               {
+                "ref": "field_9c7e5b31-0003-4a1c-8e2f-000000000003"
+              },
+              {
                 "ref": "field_9c7e5b31-0004-4a1c-8e2f-000000000004",
-                "group": "Line item",
+                "group": "line_item",
                 "required": true,
                 "span": 2
               },
               {
                 "ref": "field_9c7e5b31-0005-4a1c-8e2f-000000000005",
-                "group": "Line item",
+                "group": "line_item",
                 "required": true
               },
               {
                 "ref": "field_9c7e5b31-0006-4a1c-8e2f-000000000006",
-                "group": "Line item",
+                "group": "line_item",
                 "required": true
               },
               {
                 "ref": "field_9c7e5b31-0007-4a1c-8e2f-000000000007",
-                "group": "Line item",
+                "group": "line_item",
                 "required": true
               },
               {
+                "ref": "field_9c7e5b31-0024-4a1c-8e2f-000000000024"
+              },
+              {
                 "ref": "field_9c7e5b31-0008-4a1c-8e2f-000000000008",
-                "group": "Vendor",
+                "group": "vendor_section",
                 "required": true
               },
               {
                 "ref": "field_9c7e5b31-0009-4a1c-8e2f-000000000009",
-                "group": "Vendor",
+                "group": "vendor_section",
                 "readonly": true
               }
             ]
@@ -538,49 +648,55 @@
             "columns": 2,
             "fields": [
               {
+                "ref": "field_9c7e5b31-0023-4a1c-8e2f-000000000023"
+              },
+              {
                 "ref": "field_9c7e5b31-0004-4a1c-8e2f-000000000004",
-                "group": "Request",
+                "group": "request",
                 "readonly": true,
                 "span": 2
               },
               {
                 "ref": "field_9c7e5b31-0005-4a1c-8e2f-000000000005",
-                "group": "Request",
+                "group": "request",
                 "readonly": true
               },
               {
                 "ref": "field_9c7e5b31-0006-4a1c-8e2f-000000000006",
-                "group": "Request",
+                "group": "request",
                 "readonly": true
               },
               {
                 "ref": "field_9c7e5b31-0007-4a1c-8e2f-000000000007",
-                "group": "Request",
+                "group": "request",
                 "readonly": true
               },
               {
                 "ref": "field_9c7e5b31-0001-4a1c-8e2f-000000000001",
-                "group": "Request",
+                "group": "request",
                 "readonly": true
               },
               {
                 "ref": "field_9c7e5b31-0011-4a1c-8e2f-000000000011",
-                "group": "Request",
+                "group": "request",
                 "readonly": true,
                 "span": 2
               },
               {
+                "ref": "field_9c7e5b31-0025-4a1c-8e2f-000000000025"
+              },
+              {
                 "ref": "field_9c7e5b31-0012-4a1c-8e2f-000000000012",
-                "group": "Decision",
+                "group": "decision",
                 "required": true
               },
               {
                 "ref": "field_9c7e5b31-0015-4a1c-8e2f-000000000015",
-                "group": "Decision"
+                "group": "decision"
               },
               {
                 "ref": "field_9c7e5b31-0013-4a1c-8e2f-000000000013",
-                "group": "Decision",
+                "group": "decision",
                 "span": 2
               }
             ]
@@ -596,7 +712,9 @@
                     "id": "action_4b8c2f60-0001-4a1c-8e2f-000000000001",
                     "type": "notification.email",
                     "config": {
-                      "to": ["manager@example.com"],
+                      "to": [
+                        "manager@example.com"
+                      ],
                       "subject": "Purchase requisition waiting for your approval",
                       "body": "A purchase requisition has waited three days for your decision."
                     },
@@ -694,7 +812,9 @@
             "strategy": {
               "type": "static",
               "config": {
-                "candidates": ["finance-approver"]
+                "candidates": [
+                  "finance-approver"
+                ]
               }
             }
           },
@@ -702,39 +822,45 @@
             "columns": 2,
             "fields": [
               {
+                "ref": "field_9c7e5b31-0023-4a1c-8e2f-000000000023"
+              },
+              {
                 "ref": "field_9c7e5b31-0004-4a1c-8e2f-000000000004",
-                "group": "Request",
+                "group": "request",
                 "readonly": true,
                 "span": 2
               },
               {
                 "ref": "field_9c7e5b31-0005-4a1c-8e2f-000000000005",
-                "group": "Request",
+                "group": "request",
                 "readonly": true
               },
               {
                 "ref": "field_9c7e5b31-0006-4a1c-8e2f-000000000006",
-                "group": "Request",
+                "group": "request",
                 "readonly": true
               },
               {
                 "ref": "field_9c7e5b31-0007-4a1c-8e2f-000000000007",
-                "group": "Request",
+                "group": "request",
                 "readonly": true
               },
               {
                 "ref": "field_9c7e5b31-0001-4a1c-8e2f-000000000001",
-                "group": "Request",
+                "group": "request",
                 "readonly": true
               },
               {
+                "ref": "field_9c7e5b31-0024-4a1c-8e2f-000000000024"
+              },
+              {
                 "ref": "field_9c7e5b31-0008-4a1c-8e2f-000000000008",
-                "group": "Vendor",
+                "group": "vendor_section",
                 "readonly": true
               },
               {
                 "ref": "field_9c7e5b31-0009-4a1c-8e2f-000000000009",
-                "group": "Vendor",
+                "group": "vendor_section",
                 "readonly": true
               },
               {
@@ -745,20 +871,23 @@
                 "span": 2
               },
               {
+                "ref": "field_9c7e5b31-0025-4a1c-8e2f-000000000025"
+              },
+              {
                 "ref": "field_9c7e5b31-0013-4a1c-8e2f-000000000013",
-                "group": "Decision",
+                "group": "decision",
                 "readonly": true,
                 "span": 2
               },
               {
                 "ref": "field_9c7e5b31-0014-4a1c-8e2f-000000000014",
-                "group": "Decision",
+                "group": "decision",
                 "required": true,
                 "span": 2
               },
               {
                 "ref": "field_9c7e5b31-0015-4a1c-8e2f-000000000015",
-                "group": "Decision"
+                "group": "decision"
               }
             ]
           },
@@ -773,7 +902,9 @@
                     "id": "action_4b8c2f60-0002-4a1c-8e2f-000000000002",
                     "type": "notification.email",
                     "config": {
-                      "to": ["finance-approver@example.com"],
+                      "to": [
+                        "finance-approver@example.com"
+                      ],
                       "subject": "Purchase requisition waiting for finance approval",
                       "body": "A purchase requisition has waited five days for a finance decision."
                     },
@@ -916,7 +1047,9 @@
             "strategy": {
               "type": "static",
               "config": {
-                "candidates": ["procurement"]
+                "candidates": [
+                  "procurement"
+                ]
               }
             }
           },
@@ -964,7 +1097,9 @@
             "strategy": {
               "type": "static",
               "config": {
-                "candidates": ["requester"]
+                "candidates": [
+                  "requester"
+                ]
               }
             }
           },
@@ -972,29 +1107,35 @@
             "columns": 2,
             "fields": [
               {
+                "ref": "field_9c7e5b31-0026-4a1c-8e2f-000000000026"
+              },
+              {
                 "ref": "field_9c7e5b31-0004-4a1c-8e2f-000000000004",
-                "group": "Ordered",
+                "group": "ordered",
                 "readonly": true,
                 "span": 2
               },
               {
                 "ref": "field_9c7e5b31-0005-4a1c-8e2f-000000000005",
-                "group": "Ordered",
+                "group": "ordered",
                 "readonly": true
               },
               {
                 "ref": "field_9c7e5b31-0016-4a1c-8e2f-000000000016",
-                "group": "Ordered",
+                "group": "ordered",
                 "readonly": true
               },
               {
+                "ref": "field_9c7e5b31-0027-4a1c-8e2f-000000000027"
+              },
+              {
                 "ref": "field_9c7e5b31-0018-4a1c-8e2f-000000000018",
-                "group": "Receipt",
+                "group": "receipt",
                 "required": true
               },
               {
                 "ref": "field_9c7e5b31-0019-4a1c-8e2f-000000000019",
-                "group": "Receipt",
+                "group": "receipt",
                 "span": 2
               }
             ]
@@ -1010,7 +1151,9 @@
                     "id": "action_4b8c2f60-0004-4a1c-8e2f-000000000004",
                     "type": "notification.email",
                     "config": {
-                      "to": ["procurement@example.com"],
+                      "to": [
+                        "procurement@example.com"
+                      ],
                       "subject": "Purchase order overdue",
                       "body": "A purchase order has been open for 30 days with no goods receipt."
                     },
@@ -1079,7 +1222,9 @@
             "strategy": {
               "type": "static",
               "config": {
-                "candidates": ["procurement"]
+                "candidates": [
+                  "procurement"
+                ]
               }
             }
           },
@@ -1087,24 +1232,30 @@
             "columns": 2,
             "fields": [
               {
+                "ref": "field_9c7e5b31-0028-4a1c-8e2f-000000000028"
+              },
+              {
                 "ref": "field_9c7e5b31-0005-4a1c-8e2f-000000000005",
-                "group": "Ordered vs received",
+                "group": "ordered_vs_received",
                 "readonly": true
               },
               {
                 "ref": "field_9c7e5b31-0018-4a1c-8e2f-000000000018",
-                "group": "Ordered vs received",
+                "group": "ordered_vs_received",
                 "readonly": true
               },
               {
                 "ref": "field_9c7e5b31-0019-4a1c-8e2f-000000000019",
-                "group": "Ordered vs received",
+                "group": "ordered_vs_received",
                 "readonly": true,
                 "span": 2
               },
               {
+                "ref": "field_9c7e5b31-0029-4a1c-8e2f-000000000029"
+              },
+              {
                 "ref": "field_9c7e5b31-0020-4a1c-8e2f-000000000020",
-                "group": "Resolution",
+                "group": "resolution",
                 "required": true,
                 "span": 2
               }
@@ -1145,7 +1296,9 @@
             "strategy": {
               "type": "static",
               "config": {
-                "candidates": ["accounts-payable"]
+                "candidates": [
+                  "accounts-payable"
+                ]
               }
             }
           },
@@ -1153,33 +1306,39 @@
             "columns": 2,
             "fields": [
               {
+                "ref": "field_9c7e5b31-0030-4a1c-8e2f-000000000030"
+              },
+              {
                 "ref": "field_9c7e5b31-0016-4a1c-8e2f-000000000016",
-                "group": "Order",
+                "group": "order",
                 "readonly": true
               },
               {
                 "ref": "field_9c7e5b31-0009-4a1c-8e2f-000000000009",
-                "group": "Order",
+                "group": "order",
                 "readonly": true
               },
               {
                 "ref": "field_9c7e5b31-0005-4a1c-8e2f-000000000005",
-                "group": "Order",
+                "group": "order",
                 "readonly": true
               },
               {
                 "ref": "field_9c7e5b31-0006-4a1c-8e2f-000000000006",
-                "group": "Order",
+                "group": "order",
                 "readonly": true
               },
               {
+                "ref": "field_9c7e5b31-0031-4a1c-8e2f-000000000031"
+              },
+              {
                 "ref": "field_9c7e5b31-0021-4a1c-8e2f-000000000021",
-                "group": "Invoice",
+                "group": "invoice",
                 "required": true
               },
               {
                 "ref": "field_9c7e5b31-0022-4a1c-8e2f-000000000022",
-                "group": "Invoice",
+                "group": "invoice",
                 "required": true
               }
             ]
@@ -1215,7 +1374,9 @@
               "id": "action_4b8c2f60-0005-4a1c-8e2f-000000000005",
               "type": "notification.email",
               "config": {
-                "to": ["accounts-payable@example.com"],
+                "to": [
+                  "accounts-payable@example.com"
+                ],
                 "subject": "Requisition closed",
                 "body": "Goods were received and the invoice was approved for payment."
               },
