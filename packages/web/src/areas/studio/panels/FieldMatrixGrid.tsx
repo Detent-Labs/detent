@@ -17,6 +17,9 @@ import {
   columnLiveTargets,
   rowLiveTargets,
   bulkBadgeOn,
+  bulkBadgeState,
+  bulkBadgeCounts,
+  type BulkBadgeState,
   applyBulkToggle,
   eligibleTargetEntries,
   isCellFlagged,
@@ -42,6 +45,7 @@ const styles = stylex.create({
   // share position/background/text-align/vertical-align in app.css's own
   // combined selector; each entry below folds that declaration in.
   matrixColHeader: {
+    outlineOffset: -2,
     position: "sticky",
     backgroundColor: colors.surface,
     textAlign: "left",
@@ -55,6 +59,7 @@ const styles = stylex.create({
     zIndex: 2,
   },
   matrixCorner: {
+    outlineOffset: -2,
     position: "sticky",
     backgroundColor: colors.surface,
     textAlign: "left",
@@ -93,6 +98,7 @@ const styles = stylex.create({
     marginTop: space.s1,
   },
   matrixRowHeader: {
+    outlineOffset: -2,
     position: "sticky",
     backgroundColor: colors.surface,
     textAlign: "left",
@@ -166,10 +172,25 @@ const styles = stylex.create({
     justifyItems: "center",
     alignItems: "center",
   },
+  // The blank cell's dash. It read `neutral500`, a ramp step, which the
+  // design language forbids a component from touching and which measured
+  // 2.586:1 on this ground. `textMuted` is the role that means this, and it
+  // measures 5.835:1.
+  matrixEmptyIdle: {
+    height: 0,
+    paddingBlock: 0,
+    overflow: "hidden",
+  },
+  matrixEmpty: {
+    color: colors.textMuted,
+    marginBlock: 0,
+    paddingBlock: space.s4,
+    paddingInline: space.s3,
+  },
   matrixDash: {
     display: "block",
     fontFamily: fonts.mono,
-    color: colors.neutral500,
+    color: colors.textMuted,
   },
   // `.studio-matrix-cell input[aria-disabled="true"]`: the gated checkbox's
   // own computed style already knows `gated`.
@@ -268,6 +289,22 @@ const styles = stylex.create({
     backgroundColor: colors.flagReadonly,
     borderColor: colors.flagReadonly,
   },
+  // The mixed state: the flag's color on the border and the label, and no
+  // fill. The fill is what separates it from the pressed state, so an author
+  // reads flag and state from one mark. Each flag's color measures 6.4:1 or
+  // better as text on this ground, in both schemes.
+  matrixFlagBadgeMixedVisible: {
+    color: colors.flagVisible,
+    borderColor: colors.flagVisible,
+  },
+  matrixFlagBadgeMixedRequired: {
+    color: colors.flagRequired,
+    borderColor: colors.flagRequired,
+  },
+  matrixFlagBadgeMixedReadonly: {
+    color: colors.flagReadonly,
+    borderColor: colors.flagReadonly,
+  },
   matrixFlagEmpty: {
     height: "1.125rem",
     visibility: "hidden",
@@ -300,6 +337,22 @@ const FLAG_BADGE_PRESSED: Record<FlagKey, stylex.StyleXStyles> = {
   required: styles.matrixFlagBadgePressedRequired,
   readonly: styles.matrixFlagBadgePressedReadonly,
 };
+
+/** The mixed fill, per flag. Same shape as the pressed lookup above. */
+const FLAG_BADGE_MIXED: Record<FlagKey, stylex.StyleXStyles> = {
+  visible: styles.matrixFlagBadgeMixedVisible,
+  required: styles.matrixFlagBadgeMixedRequired,
+  readonly: styles.matrixFlagBadgeMixedReadonly,
+};
+
+/** The style a badge takes for the state its cells are in. */
+const badgeStateStyle = (state: BulkBadgeState, key: FlagKey): stylex.StyleXStyles | false =>
+  state === "full" ? FLAG_BADGE_PRESSED[key] : state === "mixed" ? FLAG_BADGE_MIXED[key] : false;
+
+/** `aria-pressed` takes all three states. A tri-state toggle button says
+ * `mixed`, which is exactly what a partly-set column is. */
+const badgeAriaPressed = (state: BulkBadgeState): boolean | "mixed" =>
+  state === "full" ? true : state === "mixed" ? "mixed" : false;
 export const FLAG_LABEL_KEY = {
   visible: "formEditor.visible",
   required: "formEditor.required",
@@ -329,16 +382,26 @@ function CelStamp({ label, src }: { label: string; src: string }) {
 
 /** The three visible/required/readonly bulk badges a column or row header
  * shows, wherever it carries at least one live cell (`studio-app`'s
- * bulk-toggle requirement). Reads `bulkBadgeOn` for `aria-pressed`, and
- * writes through `applyBulkToggle` inside one `mutate()` call. */
+ * bulk-toggle requirement). Reads `bulkBadgeState` for `aria-pressed`,
+ * which takes all three states, and writes through `applyBulkToggle` inside
+ * one `mutate()` call. */
 function BulkBadges({
+  active,
   targets,
   allSteps,
   written,
   technicalFieldIds,
+  scope,
   onToggle,
 }: {
   targets: BulkTarget[];
+  /** Which axis this badge group acts on, and what that target is called.
+   * The accessible name carries both, so thirty badges stop sharing three
+   * names between them. */
+  scope: { kind: "column" | "row"; name: string };
+  /** True while this header holds the grid's focus and the author has
+   * activated it. Only then do its badges take the keyboard. */
+  active: boolean;
   allSteps: Parameters<typeof bulkBadgeOn>[0];
   written: WrittenAccessor;
   technicalFieldIds: Set<string>;
@@ -357,15 +420,30 @@ function BulkBadges({
     <span {...stylex.props(styles.matrixFlags)}>
       {FLAG_KEYS.map((key) => {
         if (!eligible.includes(key)) return <span key={key} aria-hidden="true" {...stylex.props(styles.matrixFlagEmpty)} />;
-        const pressed = bulkBadgeOn(allSteps, targets, key, written, technicalFieldIds);
+        const state = bulkBadgeState(allSteps, targets, key, written, technicalFieldIds);
+        const counts = bulkBadgeCounts(allSteps, targets, key, written, technicalFieldIds);
+        // The flag's own word is a complete label. The blast radius is a
+        // complete sentence. Joining two whole labels is not the same as
+        // building one sentence out of fragments.
+        const radius =
+          state === "full"
+            ? t(scope.kind === "column" ? "fieldMatrix.bulkClearColumn" : "fieldMatrix.bulkClearRow")
+                .replace("{total}", String(counts.total))
+                .replace("{name}", scope.name)
+            : t(scope.kind === "column" ? "fieldMatrix.bulkSetColumn" : "fieldMatrix.bulkSetRow")
+                .replace("{total}", String(counts.total))
+                .replace("{set}", String(counts.alreadySet))
+                .replace("{name}", scope.name);
+        const name = `${t(FLAG_LABEL_KEY[key])}. ${radius}`;
         return (
           <button
             key={key}
             type="button"
-            {...stylex.props(styles.matrixFlagBadge, pressed && FLAG_BADGE_PRESSED[key])}
-            aria-pressed={pressed}
-            aria-label={t(FLAG_LABEL_KEY[key])}
-            title={t(FLAG_LABEL_KEY[key])}
+            {...stylex.props(styles.matrixFlagBadge, badgeStateStyle(state, key))}
+            aria-pressed={badgeAriaPressed(state)}
+            tabIndex={active ? undefined : -1}
+            aria-label={name}
+            title={name}
             onClick={() => onToggle(key)}
           >
             {FLAG_LETTER[key]}
@@ -417,16 +495,30 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
 
   const rowCount = rows.length;
   const colCount = drawnSteps.length;
-  const clamp = (n: number, count: number) => Math.max(0, Math.min(n, count - 1));
+  // Headers join the roving model when they carry bulk badges, so a badge
+  // takes no tab stop of its own (`spa-accessibility`: "A control inside a
+  // grid cell joins the grid's roving model"). Row -1 is the header row and
+  // col -1 the header column; together they reach the corner.
+  const headerFloor = showBulkBadges ? -1 : 0;
+  const clamp = (n: number, count: number, min: number) => Math.max(min, Math.min(n, count - 1));
 
   const moveFocus = (next: Focus) => {
     if (rowCount === 0 || colCount === 0) return;
-    const clamped = { row: clamp(next.row, rowCount), col: clamp(next.col, colCount) };
+    const clamped = {
+      row: clamp(next.row, rowCount, headerFloor),
+      col: clamp(next.col, colCount, headerFloor),
+    };
     setFocus(clamped);
     cellRefs.current.get(cellKey(clamped.row, clamped.col))?.focus();
   };
 
   const activate = () => {
+    // A header carrying badges activates the way a live cell does: the
+    // gesture is one Enter, and the controls inside become reachable.
+    if (focus.row === -1 || focus.col === -1) {
+      if (showBulkBadges) setActivated(true);
+      return;
+    }
     const row = rows[focus.row];
     const col = drawnSteps[focus.col];
     if (row && col && cellState(col.step, row.id) === "live") setActivated(true);
@@ -489,8 +581,13 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
   // alone only flips `activated`; nothing else places the browser's focus.
   useEffect(() => {
     if (!activated) return;
-    const td = cellRefs.current.get(cellKey(focus.row, focus.col));
-    td?.querySelector<HTMLElement>("input")?.focus();
+    // A data cell holds checkboxes and a header holds bulk badges, so the
+    // first control is an `input` in one case and a `button` in the other.
+    // Looking only for `input` left an activated header with focus still on
+    // the `th` and the arrow keys already suspended, which reads as a dead
+    // Enter.
+    const cell = cellRefs.current.get(cellKey(focus.row, focus.col));
+    cell?.querySelector<HTMLElement>("input, button")?.focus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activated]);
 
@@ -511,7 +608,32 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
     });
   };
 
+  // An empty state says so in words, and names which of its two causes
+  // applies (`studio-app`: "The field matrix states an empty result in
+  // words"). A header row above no row is what this replaces.
+  //
+  // The live region stays mounted either way. A `role="status"` that appears
+  // in the same frame as its own text is generally not announced: a screen
+  // reader watches a region it already knows about. Idle, it holds no text
+  // and takes no space, and `height: 0` keeps it in the accessibility tree
+  // where `display: none` would not.
+  const empty = rows.length === 0 || drawnSteps.length === 0;
+  const emptyWords = empty
+    ? t(rows.length === 0 ? "fieldMatrix.emptyNoFields" : "fieldMatrix.emptyNoColumns")
+    : "";
+
+  const liveRegion = (
+    <p {...stylex.props(styles.matrixEmpty, !empty && styles.matrixEmptyIdle)} role="status">
+      {emptyWords}
+    </p>
+  );
+
+  if (empty) return liveRegion;
+
   return (
+    <>
+      {liveRegion}
+      {(
     <div
       {...stylex.props(styles.matrixScroll)}
       tabIndex={0}
@@ -520,12 +642,37 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
       <table {...stylex.props(styles.matrixTable)} role="grid" aria-label={t("fieldMatrix.heading")} onKeyDown={onGridKeyDown}>
         <thead>
           <tr>
-            <th scope="col" {...stylex.props(styles.matrixCorner)} />
+            <th
+              scope="col"
+              aria-label={t("fieldMatrix.cornerLabel")}
+              {...stylex.props(styles.matrixCorner)}
+              ref={(el) => {
+                if (!showBulkBadges) return;
+                if (el) cellRefs.current.set(cellKey(-1, -1), el);
+                else cellRefs.current.delete(cellKey(-1, -1));
+              }}
+              tabIndex={showBulkBadges && focus.row === -1 && focus.col === -1 && !activated ? 0 : -1}
+              onFocus={() => showBulkBadges && setFocus({ row: -1, col: -1 })}
+              onBlur={activated && focus.row === -1 && focus.col === -1 ? onCellBlur : undefined}
+            />
             {drawnSteps.map(({ step, index: stepIndex }, colIndex) => {
               const inert = step.view === undefined;
               const colTargets = showBulkBadges ? columnLiveTargets(rows, step, stepIndex) : [];
               return (
-                <th key={step.id ?? colIndex} scope="col" {...stylex.props(styles.matrixColHeader)} data-inert={inert || undefined}>
+                <th
+                  key={step.id ?? colIndex}
+                  scope="col"
+                  {...stylex.props(styles.matrixColHeader)}
+                  data-inert={inert || undefined}
+                  ref={(el) => {
+                    if (!showBulkBadges) return;
+                    if (el) cellRefs.current.set(cellKey(-1, colIndex), el);
+                    else cellRefs.current.delete(cellKey(-1, colIndex));
+                  }}
+                  tabIndex={showBulkBadges && focus.row === -1 && focus.col === colIndex && !activated ? 0 : -1}
+                  onFocus={() => showBulkBadges && setFocus({ row: -1, col: colIndex })}
+                  onBlur={activated && focus.row === -1 && focus.col === colIndex ? onCellBlur : undefined}
+                >
                   <span {...stylex.props(styles.matrixColLabel)}>
                     {resolveDraftLocalizedText(step.label, contentLocale, baseLocale) || step.key || t("steps.unnamedStep")}
                   </span>
@@ -534,6 +681,14 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
                   {showBulkBadges && colTargets.length > 0 && (
                     <BulkBadges
                       targets={colTargets}
+                      active={activated && focus.row === -1 && focus.col === colIndex}
+                      scope={{
+                        kind: "column",
+                        name:
+                          resolveDraftLocalizedText(step.label, contentLocale, baseLocale) ||
+                          step.key ||
+                          t("steps.unnamedStep"),
+                      }}
                       allSteps={allSteps}
                       written={written}
                       technicalFieldIds={technicalIds}
@@ -559,6 +714,14 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
                   )}
                   data-depth={row.depth}
                   data-technical={technicalIds.has(row.id) || undefined}
+                  ref={(el) => {
+                    if (!showBulkBadges) return;
+                    if (el) cellRefs.current.set(cellKey(rowIndex, -1), el);
+                    else cellRefs.current.delete(cellKey(rowIndex, -1));
+                  }}
+                  tabIndex={showBulkBadges && focus.col === -1 && focus.row === rowIndex && !activated ? 0 : -1}
+                  onFocus={() => showBulkBadges && setFocus({ row: rowIndex, col: -1 })}
+                  onBlur={activated && focus.col === -1 && focus.row === rowIndex ? onCellBlur : undefined}
                 >
                   <span {...stylex.props(styles.matrixFieldKey)}>{row.key === "" ? t("panelsScreen.unnamedField") : row.key}</span>
                   <span {...stylex.props(styles.matrixFieldType)} aria-label={`${t("fieldMatrix.rowTypeLabel")}: ${row.type}`}>
@@ -572,6 +735,8 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
                   {showBulkBadges && rowTargets.length > 0 && (
                     <BulkBadges
                       targets={rowTargets}
+                      active={activated && focus.col === -1 && focus.row === rowIndex}
+                      scope={{ kind: "row", name: row.key === "" ? t("panelsScreen.unnamedField") : row.key }}
                       allSteps={allSteps}
                       written={written}
                       technicalFieldIds={technicalIds}
@@ -615,12 +780,19 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
                               return <CelStamp key={key} label={t(FLAG_LABEL_KEY[key])} src={raw.src ?? ""} />;
                             }
                             const gated = key !== "visible" && isFlagGated(entry, written, technicalIds, key, stepIndex);
+                            // A gated control that says nothing reads as
+                            // broken. The two rules that gate a cell carry
+                            // different reasons, so the words say which one.
+                            const gateReason = gated
+                              ? t(technicalIds.has(row.id) ? "fieldMatrix.gatedTechnical" : "fieldMatrix.gatedNotWritten")
+                              : undefined;
                             return (
                               <input
                                 key={key}
                                 type="checkbox"
                                 {...stylex.props(MATRIX_FLAG_ACCENT_STYLE[key], gated && styles.matrixFlagCheckboxDisabled)}
-                                aria-label={t(FLAG_LABEL_KEY[key])}
+                                aria-label={gateReason ? `${t(FLAG_LABEL_KEY[key])}. ${gateReason}` : t(FLAG_LABEL_KEY[key])}
+                                title={gateReason}
                                 aria-disabled={gated || undefined}
                                 tabIndex={gated || !isActiveCell ? -1 : undefined}
                                 checked={effectiveFlag(raw, key) === true}
@@ -646,6 +818,8 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
           })}
         </tbody>
       </table>
-    </div>
+        </div>
+      )}
+    </>
   );
 }

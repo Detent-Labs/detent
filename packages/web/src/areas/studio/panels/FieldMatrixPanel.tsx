@@ -7,6 +7,16 @@ import { matrixRows, matrixCounts, filterInertSteps } from "./fieldMatrixLogic";
 import { FieldMatrixGrid, FLAG_KEYS, FLAG_LABEL_KEY } from "./FieldMatrixGrid";
 
 const styles = stylex.create({
+  // The Hide-inert toggle's engaged look. It carried `aria-pressed` and
+  // nothing painted it, so the state reached assistive technology and never
+  // reached the eye. This is the same treatment `CanvasView`'s own toolbar
+  // toggle uses, picked in code from the value that drives the attribute
+  // rather than from a selector on it (`design-language.md`).
+  hideInertPressed: {
+    borderColor: colors.accent,
+    color: colors.accent,
+    boxShadow: `inset 0 -2px 0 ${colors.accent}`,
+  },
   matrix: {
     display: "flex",
     flexDirection: "column",
@@ -110,7 +120,7 @@ export function FieldMatrixPanel() {
       <div {...stylex.props(styles.matrixToolbar)}>
         <button
           type="button"
-          className="btn btn-secondary"
+          className={`btn btn-secondary ${stylex.props(hideInert && styles.hideInertPressed).className ?? ""}`}
           aria-pressed={hideInert}
           onClick={() => setHideInert((v) => !v)}
         >

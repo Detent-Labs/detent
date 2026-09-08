@@ -178,6 +178,44 @@ export function bulkBadgeOn(
   return eligible.length > 0 && eligible.every(({ entry }) => effectiveFlag(entry[key], key) !== FLAG_DEFAULT[key]);
 }
 
+/** What a bulk badge's eligible cells say about the flag, as three states
+ * rather than two. `bulkBadgeOn` collapses `mixed` and `empty` into one
+ * `false`, which is correct for the write path and wrong for the reader: a
+ * column some of whose cells carry the flag looked exactly like a column
+ * none of whose cells do, and one press flattened it. */
+export type BulkBadgeState = "empty" | "mixed" | "full";
+
+export function bulkBadgeState(
+  steps: DraftStep[],
+  targets: BulkTarget[],
+  key: FlagKey,
+  written: WrittenAccessor,
+  technicalFieldIds: Set<string>,
+): BulkBadgeState {
+  const eligible = eligibleTargetEntries(steps, targets, key, written, technicalFieldIds);
+  if (eligible.length === 0) return "empty";
+  const set = eligible.filter(({ entry }) => effectiveFlag(entry[key], key) !== FLAG_DEFAULT[key]).length;
+  if (set === 0) return "empty";
+  return set === eligible.length ? "full" : "mixed";
+}
+
+/** How many cells a press writes, and how many already hold what it would
+ * set. The studio carries no undo for a bulk write, so a badge states both
+ * before an author presses it. */
+export function bulkBadgeCounts(
+  steps: DraftStep[],
+  targets: BulkTarget[],
+  key: FlagKey,
+  written: WrittenAccessor,
+  technicalFieldIds: Set<string>,
+): { total: number; alreadySet: number } {
+  const eligible = eligibleTargetEntries(steps, targets, key, written, technicalFieldIds);
+  return {
+    total: eligible.length,
+    alreadySet: eligible.filter(({ entry }) => effectiveFlag(entry[key], key) !== FLAG_DEFAULT[key]).length,
+  };
+}
+
 /**
  * A bulk badge's click: flips every eligible target's flag to the opposite
  * of the current "all agree" state, in place on `steps` — the caller's own
