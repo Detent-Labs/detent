@@ -51,7 +51,7 @@ nav, the header bar, the tab row, then one tab body.
 |---|---|---|
 | process surface | the one screen a draft opens on: the tab row and the body under it | `screens/EditScreen.tsx` |
 | screen nav | the row above the header bar. It holds Back to processes and nothing else | `screens/EditScreen.tsx` |
-| header bar | the process-identity row: name, key, revision, dirty/saved state, Save, Discard draft, Publish, the `⋮` menu (Views: JSON, Versions, Player) | `panels/ProcessHeaderBar.tsx` |
+| header bar | the process-identity row: name, key, revision, dirty/saved state, Save, Discard draft, Publish, the `⋮` menu | `panels/ProcessHeaderBar.tsx` |
 | tab row | the row of ten tabs over the body | `panels/ProcessTabRow.tsx` |
 | tab | one of the ten. The authoring order runs Canvas, Steps, Fields, Data sources, Paths, Forms, Field matrix, Contract, Changes and Checks | `routing.ts` |
 | structure surface | the ten tab bodies together, the JSON surface's one alternative | `EditScreen.tsx`, its `structureActive` prop |
@@ -66,7 +66,8 @@ Checks stands in the area nav, never on the surface. Save, Discard draft and
 Publish stand in the header bar instead, right-aligned ahead of the `⋮` menu.
 `panels/ProcessHeaderBar.tsx` renders them there. The area nav's own
 component, `DraftNavControls.tsx`, renders Checks into the element `root.tsx`
-reserves there.
+reserves there. The Views group in that menu holds the JSON surface, Versions
+and Player.
 
 Every other term below belongs to one tab.
 
