@@ -1,15 +1,62 @@
-/** The six process-wide views, in rail order. The panels screen re-exports
- * this as its own; routing owns it so the route type needs no import from a
- * component. */
+/** The six process-wide views, in rail order. `PANEL_VIEW_TAB` maps each
+ * onto its tab, and `panelEntityCounts` still keys on this set; routing owns
+ * it so neither needs an import from a component. */
 export type PanelView = "fields" | "dataSources" | "contract" | "matrix" | "changes" | "paths";
 
 export const PANEL_VIEWS: PanelView[] = ["fields", "dataSources", "contract", "matrix", "changes", "paths"];
 
 const isPanelView = (v: string): v is PanelView => (PANEL_VIEWS as string[]).includes(v);
 
+/** The process surface's ten tabs, in authoring order (`studio-process-tabs`).
+ * The route type names them, so routing owns the list the same way it owns
+ * `PanelView`. */
+export type ProcessTab =
+  | "canvas"
+  | "steps"
+  | "fields"
+  | "dataSources"
+  | "paths"
+  | "forms"
+  | "matrix"
+  | "contract"
+  | "changes"
+  | "checks";
+
+export const PROCESS_TABS: ProcessTab[] = [
+  "canvas",
+  "steps",
+  "fields",
+  "dataSources",
+  "paths",
+  "forms",
+  "matrix",
+  "contract",
+  "changes",
+  "checks",
+];
+
+/** The tab an address naming none opens, and the tab an unknown name falls
+ * back to. */
+export const DEFAULT_TAB: ProcessTab = "canvas";
+
+const isProcessTab = (v: string): v is ProcessTab => (PROCESS_TABS as string[]).includes(v);
+
+/** Each old `edit/panels/:view` name, on the tab that holds it now. The six
+ * names survive the move unchanged, so this reads as an identity map — it is
+ * written out anyway, so a later tab rename cannot silently strand an old
+ * address (design.md: "The old panel routes map onto their tabs"). */
+export const PANEL_VIEW_TAB: Record<PanelView, ProcessTab> = {
+  fields: "fields",
+  dataSources: "dataSources",
+  contract: "contract",
+  matrix: "matrix",
+  changes: "changes",
+  paths: "paths",
+};
+
 export type Route =
   | { name: "processes" }
-  | { name: "edit"; processId: string; formStepId?: string; panel?: PanelView; stepId?: string }
+  | { name: "edit"; processId: string; formStepId?: string; tab?: ProcessTab; stepId?: string }
   | { name: "versions"; processId: string }
   | { name: "migrate"; processId: string; from: string; to: string }
   | { name: "tools" }
@@ -37,15 +84,15 @@ export function matchRoute(path: string): Route {
       formStepId: decodeURIComponent(editFormMatch[2]!),
     };
   }
-  // The panels screen is the second sub-state of `edit`, on the same footing as
-  // the form editor above. An unrecognized view falls through to the plain edit
+  // The retired `edit/panels/:view` address, kept so an open view survives the
+  // move onto the tab row. An unrecognized view falls through to the plain edit
   // route below, so a typo lands on the canvas rather than a dead end.
   const editPanelMatch = /^\/processes\/([^/]+)\/edit\/panels\/([^/]+)$/.exec(path);
   if (editPanelMatch && isPanelView(editPanelMatch[2]!)) {
     return {
       name: "edit",
       processId: decodeURIComponent(editPanelMatch[1]!),
-      panel: editPanelMatch[2],
+      tab: PANEL_VIEW_TAB[editPanelMatch[2]],
     };
   }
   if (editPanelMatch) return { name: "edit", processId: decodeURIComponent(editPanelMatch[1]!) };
@@ -61,6 +108,15 @@ export function matchRoute(path: string): Route {
     if (tail) return { name: "edit", processId: decodeURIComponent(editStepPrefix[1]!), stepId: decodeURIComponent(tail[1]!) };
     return { name: "edit", processId: decodeURIComponent(editStepPrefix[1]!) };
   }
+  // The open tab, the sub-state every other one is ranked before: its tail is
+  // one segment, so it cannot swallow a two-segment form, panels or step
+  // address. An unrecognized name falls through to the plain edit route, which
+  // opens Canvas.
+  const editTabMatch = /^\/processes\/([^/]+)\/edit\/([^/]+)$/.exec(path);
+  if (editTabMatch && isProcessTab(editTabMatch[2]!)) {
+    return { name: "edit", processId: decodeURIComponent(editTabMatch[1]!), tab: editTabMatch[2] };
+  }
+  if (editTabMatch) return { name: "edit", processId: decodeURIComponent(editTabMatch[1]!) };
   const editMatch = /^\/processes\/([^/]+)\/edit$/.exec(path);
   if (editMatch) return { name: "edit", processId: decodeURIComponent(editMatch[1]!) };
   const versionsMatch = /^\/processes\/([^/]+)\/versions$/.exec(path);
@@ -80,8 +136,8 @@ export function routePath(route: Route): string {
     case "edit":
       if (route.formStepId)
         return `/processes/${encodeURIComponent(route.processId)}/edit/form/${encodeURIComponent(route.formStepId)}`;
-      // `panel` needs no encoding: it is one of six literals, not user input.
-      if (route.panel) return `/processes/${encodeURIComponent(route.processId)}/edit/panels/${route.panel}`;
+      // `tab` needs no encoding: it is one of ten literals, not user input.
+      if (route.tab) return `/processes/${encodeURIComponent(route.processId)}/edit/${route.tab}`;
       if (route.stepId) return `/processes/${encodeURIComponent(route.processId)}/edit/step/${encodeURIComponent(route.stepId)}`;
       return `/processes/${encodeURIComponent(route.processId)}/edit`;
     case "versions":

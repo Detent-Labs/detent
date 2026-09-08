@@ -1,31 +1,37 @@
 import type { PerformedBy } from "../draft/performedBy.js";
 
 /**
- * The configuration pane's sections, in runtime order (`studio-canvas`'s
- * "The configuration pane shows the step as a register of sections in runtime
- * order"). Entry, Assignment, Form, Paths, Timers, Exit, with Subprocess
- * joining after Exit.
+ * The step page's sections (`studio-step-page`'s "The step page stands its
+ * sections open in two columns"). Eight names, grouped by subject rather than
+ * by runtime order: two columns cannot carry one order, since an author
+ * reading side by side reads neither.
  *
- * The order is the step's own life, and it is also a dependency order: a timer
- * names a path, a guard reads a field, an assignment can name a person field.
- * Each section references only what sits above it.
+ * `howItEnds` is the end step's own section. It carries the outcome an end
+ * step declares on departure, which stood inside Exit while a terminal step
+ * still had one.
  */
-export type SectionName = "entry" | "assignment" | "form" | "paths" | "timers" | "exit" | "subprocess";
+export type SectionName = "paths" | "assignment" | "subprocess" | "howItEnds" | "entry" | "exit" | "timers" | "form";
 
-const PARTICIPANT: SectionName[] = ["entry", "assignment", "form", "paths", "timers", "exit"];
-const TERMINAL: SectionName[] = ["entry", "assignment", "form", "exit"];
-const SUBPROCESS: SectionName[] = ["entry", "paths", "timers", "exit", "subprocess"];
+/** The leading column, in reading order. It takes about three fifths of the
+ * page: Path to and Assignment carry the routing and the actor, the pair an
+ * author reads first and changes most (design.md). */
+const LEADING: SectionName[] = ["paths", "assignment", "subprocess", "howItEnds"];
+
+/** The trailing column, in reading order. Four narrower sections. */
+const TRAILING: SectionName[] = ["entry", "exit", "timers", "form"];
+
+const PARTICIPANT: SectionName[] = ["paths", "assignment", "entry", "exit", "timers", "form"];
+const TERMINAL: SectionName[] = ["howItEnds", "assignment", "entry", "form"];
+const SUBPROCESS: SectionName[] = ["paths", "subprocess", "entry", "exit", "timers"];
 
 /**
- * Which sections list for a performed-by value (`studio-canvas`'s "The
- * configuration pane's sections follow the performed-by control").
+ * Which sections stand for a performed-by value (`studio-step-page`: "A
+ * section SHALL stand only where the step's kind declares it").
  *
- * Terminal drops Paths and Timers: nothing runs past a terminal step, so it
- * carries no outgoing path and no timer. The pane states that in one line
- * where the two heads stood.
- *
- * Subprocess drops Assignment and Form and gains Subprocess: a subprocess step
- * is a wait-state with no participant form.
+ * An end step carries How the case ends, and no outgoing path: it therefore
+ * carries neither On exit nor Time limit. A subprocess step drops Assignment
+ * and Step form fields and gains Which process it calls, since it is a
+ * wait-state with no participant form.
  *
  * The returned array is fresh on every call, so a caller may sort or slice it
  * without reaching the module's own lists.
@@ -39,4 +45,19 @@ export function sectionsFor(performedBy: PerformedBy): SectionName[] {
     case "participant":
       return [...PARTICIPANT];
   }
+}
+
+/**
+ * One section set, split into the page's two columns. A section the set omits
+ * appears in neither, so the columns of an end step are shorter than a task
+ * step's rather than carrying a blank.
+ */
+export function sectionColumns(sections: readonly SectionName[]): {
+  leading: SectionName[];
+  trailing: SectionName[];
+} {
+  return {
+    leading: LEADING.filter((s) => sections.includes(s)),
+    trailing: TRAILING.filter((s) => sections.includes(s)),
+  };
 }

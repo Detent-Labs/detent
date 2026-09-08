@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { Workflow, LayoutTemplate } from "lucide-react";
 import { matchRoute, routePath, ROUTE_ROLE, type Route } from "./routing.js";
@@ -64,12 +64,20 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
   const { route, navigate } = useAreaRoute<Route>("studio", localPath, matchRoute, routePath, go);
   const may = (roles: readonly string[]) => roles.some((role) => session.roles.includes(role));
 
-  // Whether the open edit screen's draft carries unsaved changes, reported
-  // up from `EditorArea` via `EditScreen`'s `onDirtyChange` prop. A ref, not
+  // Whether the open draft carries unsaved changes, reported up from
+  // `ProcessSurface` via `EditScreen`'s `onDirtyChange` prop. A ref, not
   // `useState`: nothing here renders differently based on dirtiness, it is
   // read only inside a click handler (design.md: "Report dirtiness upward
   // through one callback prop into a ref").
   const dirtyRef = useRef(false);
+  // The element the studio's four draft controls render into: Checks, Save,
+  // Discard draft and Publish (`studio-process-tabs`). They belong to the open
+  // draft, whose state lives inside `EditScreen`'s own `DraftProvider`, and
+  // this nav sits outside it — so the nav reserves the place and the surface
+  // fills it through a portal. A callback ref rather than a plain one: this
+  // has to re-render once the element exists, and it clears itself to null on
+  // unmount, which is exactly when the draft controls should stand down.
+  const [navSlot, setNavSlot] = useState<HTMLElement | null>(null);
   useEffect(() => {
     if (route.name !== "edit") dirtyRef.current = false;
   }, [route.name]);
@@ -133,6 +141,7 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
           Templates
         </button>
       )}
+      {route.name === "edit" && <span ref={setNavSlot} />}
     </nav>
   );
 
@@ -158,10 +167,11 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
             <EditScreen
               processId={route.processId}
               formStepId={route.formStepId}
-              panel={route.panel}
+              tab={route.tab}
               stepId={route.stepId}
               token={session.token}
               go={go}
+              navSlot={navSlot}
               navigate={guardedNavigate}
               onUnauthorized={onUnauthorized}
               onDirtyChange={(d) => {

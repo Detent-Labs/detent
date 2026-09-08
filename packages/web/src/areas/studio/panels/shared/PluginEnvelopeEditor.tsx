@@ -42,6 +42,14 @@ interface Props {
   /** The matching slice of GET /registry's per-type config-schema descriptions, keyed by type. */
   registrySchemas?: Record<string, ConfigFieldDescriptor[]>;
   /**
+   * The word one registered type reads as in the picker. The assignment
+   * position passes the guided layer's own names, so an author picks "The
+   * starter's manager" rather than `org.manager-of-starter`
+   * (`studio-guided-vocabulary`). Omit it to print the registry type itself,
+   * which is what every other position does.
+   */
+  typeLabel?: (type: string) => string;
+  /**
    * A purpose-built editor for one type whose config nests past what the
    * generator covers (a list of objects, for instance) — `"instance.query"`
    * is the first. Takes precedence over both the generated form and the raw
@@ -191,7 +199,16 @@ function GeneratedField({
  * that type. A type with no schema description keeps the raw JSON textarea,
  * exactly as before this capability.
  */
-export function PluginEnvelopeEditor({ label, value, onChange, typePlaceholder, registryTypes, registrySchemas, customConfigEditor }: Props) {
+export function PluginEnvelopeEditor({
+  label,
+  value,
+  onChange,
+  typePlaceholder,
+  registryTypes,
+  registrySchemas,
+  typeLabel,
+  customConfigEditor,
+}: Props) {
   const [configText, setConfigText] = useState(() => JSON.stringify(value?.config ?? {}, null, 2));
   const [configError, setConfigError] = useState<string | null>(null);
   const [showRawJson, setShowRawJson] = useState(false);
@@ -251,7 +268,7 @@ export function PluginEnvelopeEditor({ label, value, onChange, typePlaceholder, 
             )}
             {selectableTypes.map((rt) => (
               <option key={rt} value={rt}>
-                {rt}
+                {typeLabel ? typeLabel(rt) : rt}
               </option>
             ))}
           </select>

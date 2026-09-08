@@ -26,9 +26,14 @@ import { BooleanOrExpressionInput } from "../panels/shared/BooleanOrExpressionIn
 import { LocalizedTextInput } from "../panels/shared/LocalizedTextInput";
 import { isExpression, type BoolOrExpr } from "../panels/shared/overrideMode";
 import { effectiveFlag, gatedKeys, setFlag, writtenFieldCounts, type FlagKey, type WrittenAccessor } from "../draft/view-flags";
+import { FormPreview } from "../panels/FormPreview";
 
 type DraftStep = DraftOf<Step>;
 type DraftView = DraftOf<View>;
+
+/** The width below which the preview no longer fits beside the canvas. The
+ * same breakpoint the step page and the entity tabs already turn at. */
+const PREVIEW_NARROW = "@media (max-width: 64rem)";
 
 const styles = stylex.create({
   formStripOverride: {
@@ -115,10 +120,19 @@ const styles = stylex.create({
     fontSize: "0.8em",
     color: colors.textMuted,
   },
+  // Three columns: the palette, the canvas, and the participant preview in
+  // the trailing pane (`studio-form-editor`). Below the breakpoint the
+  // preview gives up its column and stands under the canvas, the same turn
+  // the step page and the entity tabs already make at this width.
   formEditorBody: {
     display: "grid",
-    gridTemplateColumns: "16rem minmax(0, 1fr)",
+    gridTemplateColumns: { default: "16rem minmax(0, 1fr) minmax(0, 22rem)", [PREVIEW_NARROW]: "16rem minmax(0, 1fr)" },
     alignItems: "start",
+  },
+  // Below the breakpoint the preview gives up its column and stands across
+  // the two the palette and the canvas keep.
+  formEditorPreview: {
+    gridColumn: { default: "auto", [PREVIEW_NARROW]: "1 / -1" },
   },
   formPalette: {
     borderRight: `2px solid ${colors.divider}`,
@@ -590,6 +604,8 @@ interface Props {
  */
 export function FormEditorScreen({ step, index, fields, onBack }: Props) {
   const { draft, mutate, contentLocale } = useDraft();
+  const processLabel =
+    resolveDraftLocalizedText(draft.label, contentLocale, draft.baseLocale ?? "en") || t("headerBar.unnamedProcess");
   const written = useMemo(() => writtenFieldCounts(draft), [draft]);
   // Threaded into both gatedKeys calls below (task 5.2) and this screen's own
   // control-omission logic (task 4.1) — computed once, from the already-flat
@@ -728,7 +744,7 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
     <div {...stylex.props(styles.formEditorPage)}>
       <header {...stylex.props(styles.formEditorHeader)}>
         <button type="button" className="btn btn-ghost" {...stylex.props(styles.studioBack)} onClick={onBack}>
-          {t("formEditor.backToCanvas")}
+          {t("formEditor.back")}
         </button>
         <h2 id="form-editor-heading" {...stylex.props(styles.formEditorHeading)}>
           {t("formEditor.heading")}
@@ -944,6 +960,18 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
             <p {...stylex.props(styles.formStripEmpty)}>{t("formEditor.selectAField")}</p>
           )}
         </div>
+
+        {/* The trailing pane. It reads the same `step` the canvas beside it
+            writes, so every change lands in the preview on the same render
+            (`studio-form-editor`). */}
+        <FormPreview
+          step={step}
+          fields={fields}
+          processLabel={processLabel}
+          contentLocale={contentLocale}
+          baseLocale={draft.baseLocale ?? "en"}
+          style={styles.formEditorPreview}
+        />
       </div>
 
       <footer {...stylex.props(styles.formEditorFooter)}>

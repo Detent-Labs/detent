@@ -24,7 +24,13 @@ import { describe, expect, it } from "bun:test";
  * these two files discuss confirmation, and two of them survive on purpose.
  * Comments are stripped before the match runs, so prose can never fail it.
  */
-const FILES = ["src/areas/studio/panels/DraftToolbar.tsx", "src/areas/studio/panels/ProcessHeaderBar.tsx"];
+const FILES = [
+  "src/areas/studio/panels/DraftToolbar.tsx",
+  "src/areas/studio/panels/ProcessHeaderBar.tsx",
+  // Both confirmation dialogs moved here with the controls that open them,
+  // which the studio's area nav now carries (`studio-process-tabs`).
+  "src/areas/studio/panels/DraftNavControls.tsx",
+];
 
 /** Block comments first, then line comments — the order matters for a `//`
  * inside a block comment. `boundaries.test.ts` strips the same way, for the

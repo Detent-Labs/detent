@@ -1,6 +1,7 @@
 import type { BaseFieldType, FieldFormat, FieldOption, LocalizedText } from "workflow-engine/schema";
-import type { ResolvedViewField } from "form-ui";
-import type { DraftField } from "./fields";
+import type { ResolvedViewEntry, ResolvedViewField } from "form-ui";
+import { flattenDraftFields, type DraftField } from "./fields";
+import { isDraftViewField, type DraftViewEntry } from "./view-layout";
 import { resolveDraftLocalizedText, type DraftLocalizedText } from "./localized-text";
 
 /** `text` resolved to a single entry keyed by `locale`, falling back to
@@ -144,4 +145,54 @@ export function previewViewFields(
 
   walk(field, undefined);
   return { fields, values };
+}
+
+/**
+ * The whole of one step's view, resolved for the form editor's participant
+ * preview (`studio-form-editor`: "A live participant preview stands beside
+ * the form canvas").
+ *
+ * Mirrors `src/runtime/api.ts`'s own `resolveFields` entry for entry: one
+ * resolved entry per view entry, in the view's order, with a group field's
+ * children left where the view places them rather than expanded here. A
+ * literal `visible: false` drops the entry, since a participant never meets
+ * it; a CEL `visible` keeps it, because the studio evaluates no expression
+ * and the engine's own default for an unmatched flag is to show.
+ *
+ * `required` and `readonly` follow the entry's own literal flags, with the
+ * engine's own overrides on a group (neither) and a technical field
+ * (readonly, never required). An expression reads as the engine's default,
+ * so a preview never asserts a value only the runtime can resolve.
+ */
+export function previewViewEntries(
+  view: { fields?: DraftViewEntry[] } | undefined,
+  fields: DraftField[],
+  contentLocale: string,
+  baseLocale: string,
+): { entries: ResolvedViewEntry[]; values: Record<string, unknown> } {
+  const byId = new Map(flattenDraftFields(fields).filter((f) => f.id !== undefined).map((f) => [f.id!, f]));
+  const entries: ResolvedViewEntry[] = [];
+  const values: Record<string, unknown> = {};
+
+  for (const raw of view?.fields ?? []) {
+    if (raw.visible === false) continue;
+    if (!isDraftViewField(raw)) {
+      entries.push({ kind: "note", text: resolvedLabel(raw.text, contentLocale, baseLocale), group: raw.group, span: raw.span });
+      continue;
+    }
+    const field = raw.ref === undefined ? undefined : byId.get(raw.ref);
+    if (field?.id === undefined) continue;
+    const group = field.type === "group";
+    const technical = !group && field.technical === true;
+    const synthesized = synthesizeEntry(field, raw.group, contentLocale, baseLocale);
+    entries.push({
+      ...synthesized,
+      required: group || technical ? false : raw.required === true,
+      readonly: group ? false : technical ? true : raw.readonly === true,
+      span: raw.span,
+    });
+    values[field.id] = synthesized.value;
+  }
+
+  return { entries, values };
 }

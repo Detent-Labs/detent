@@ -50,6 +50,21 @@ button:disabled {
   cursor: not-allowed;
 }
 
+/* A `<fieldset>` carries the UA's `2px groove` until something clears it, and
+   the compiler cannot: StyleX emits no `border` shorthand at all, so every
+   `border: "none"` and `border: 0` a fieldset style declared was dropped and
+   the groove stood. Measured on the step page: nine fieldsets, eight of them
+   `2px groove rgb(240, 240, 240)` — a 3D bevel in a color no token declares,
+   on a system that is flat everywhere. Two of those eight come from
+   `.action-list` and `.plugin-envelope`, class names with no rule anywhere;
+   the same two components mount in eight places across the studio, and
+   `FieldForm`'s group and option sets carry it to a participant's own step
+   form. One element rule covers all of them. A fieldset that means to keep a
+   frame states it in its own style, where the class beats this selector. */
+fieldset {
+  border: none;
+}
+
 input,
 select {
   border: 1px solid var(--color-border);

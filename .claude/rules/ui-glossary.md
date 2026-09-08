@@ -42,81 +42,84 @@ actor permitted only one area gets an empty set from that filter. The
 switcher then renders nothing, so that actor sees no trace of the other
 three areas.
 
-### The edit screen
+### The process surface
 
-A draft opens on this one screen, `EditScreen.tsx`. Top to bottom: the
-screen nav, the header bar, then either the structure surface or the JSON
-surface.
+A draft opens on this one screen, `EditScreen.tsx`. Top to bottom: the screen
+nav, the header bar, the tab row, then one tab body.
 
 | Term | Names | Lives in |
 |---|---|---|
-| screen nav | the row above the header bar: Back to processes, Versions, Player | `EditScreen.tsx` |
+| process surface | the one screen a draft opens on: the tab row and the body under it | `screens/EditScreen.tsx` |
+| screen nav | the row above the header bar. It holds Back to processes and nothing else | `screens/EditScreen.tsx` |
 | header bar | the process-identity row: name, key, revision, dirty/saved state, the `⋮` menu | `panels/ProcessHeaderBar.tsx` |
-| surface toggle | the Structure/JSON switch, inside the header bar | `EditScreen.tsx`, passed into `ProcessHeaderBar` as its `surfaceToggle` prop |
-| structure surface | the editing view: the canvas ribbon over the bench | `EditScreen.tsx`, `surface === "structure"` |
+| tab row | the row of ten tabs over the body, with the overflow menu at its end | `panels/ProcessTabRow.tsx` |
+| tab | one of the ten. The authoring order runs Canvas, Steps, Fields, Data sources, Paths, Forms, Field matrix, Contract, Changes and Checks | `routing.ts` |
+| overflow menu | the tab row's own menu: the JSON surface, Versions and Player | `panels/ProcessTabRow.tsx` |
+| structure surface | the ten tab bodies together, the JSON surface's one alternative | `EditScreen.tsx`, its `structureActive` prop |
 | JSON surface | the raw definition view, the structure surface's one alternative | `panels/JsonView.tsx` |
 
-Both surfaces share the header bar and the surface toggle. Every other term
-below belongs to the structure surface alone.
+The open tab stands in the address, at `/studio/processes/:id/edit/:tab`. All
+ten bodies stay mounted at once, and `hidden` shows one. A body keeps its own
+edit state across a switch: a half-typed outcome name, a selected field.
+Unmounting on every switch would lose that state.
+
+Checks, Save, Discard draft and Publish stand in the area nav, never on the
+surface. The component `DraftNavControls.tsx` renders them into the element
+`root.tsx` reserves there.
+
+Every other term below belongs to one tab.
 
 | Term | Names | Lives in |
 |---|---|---|
-| ribbon | the full-width band above the bench, holding the canvas | `EditScreen.tsx`, its `ribbon` style |
-| ribbon bar | the ribbon's own top row: its expand control and the collapsed checks rail | `EditScreen.tsx`, its `ribbonBar` style |
 | canvas | the graph surface an author draws a process on | `canvas/CanvasView.tsx` |
-| palette | the "Add to canvas" list: drag a Step, Subprocess or End onto the canvas. It lists only while the ribbon stands expanded | `canvas/CanvasPalette.tsx` |
-| bench | the two columns under the ribbon: the steps register and the configuration pane | `EditScreen.tsx`, its `bench` style |
-| steps register | the bench's left column: one ruled row per step, in reachability order | `canvas/StepsRegister.tsx` |
-| process links | the steps register's foot: one row per panels-screen view, each with a count | `canvas/StepsRegister.tsx`, its `foot` style |
-| configuration pane | the bench's right column, editing the one selected step | `panels/StepsPanel.tsx` |
-| masthead | the configuration pane's fixed top zone. It holds the role stamp, the label, the key and the id. It also holds the description, performed-by, the issue count and the overflow | `panels/StepsPanel.tsx` |
-| section register | the configuration pane's collapsible sections, in runtime order. Entry, Assignment, Form, Paths, Timers, Exit, and Subprocess where it applies | `panels/StepsPanel.tsx` |
+| palette | the "Add to canvas" list: drag a Step, Subprocess or End onto the canvas | `canvas/CanvasPalette.tsx` |
+| steps rail | the Steps tab's left column: one numbered row per step, in reachability order | `panels/StepsRail.tsx` |
+| step page | the Steps tab's wide right column, editing the one selected step | `panels/StepPage.tsx` |
+| masthead | the step page's top zone. It holds the step number, the kind phrase, the name, the key, the description, and the issues no section claims | `panels/StepPage.tsx` |
+| section | one subject group on the step page, standing open in one of two columns | `panels/sectionsFor.ts` |
+| Developer view | the step page's disclosure over that step's raw JSON. It stands closed on open | `panels/StepPage.tsx` |
+| entity rail | the Fields and Data sources tabs' own left column: one row per entity | `panels/EntityTabs.tsx` |
+| field catalog | the Fields tab's editor over the process's field definitions | `panels/FieldCatalogPanel.tsx` |
+| field tabs | the Field / Values / Rules tab set inside the field catalog's editor, for the one selected top-level field | `panels/FieldCatalogPanel.tsx`, `FieldEditor` |
+| data sources | the Data sources tab's editor over the process's data source definitions | `panels/DataSourcesPanel.tsx` |
+| contract | the Contract tab, editing the process's `ProcessContract`: input fields, output fields, outcomes | `panels/ContractPanel.tsx` |
+| field matrix | the Field matrix tab's grid of every field against every step | `panels/FieldMatrixPanel.tsx`, `panels/FieldMatrixGrid.tsx` |
+| changes | the Changes tab, listing the draft's difference against the base version | `panels/ChangesView.tsx` |
+| paths | the Paths tab, listing every path in the process, one row each | `panels/PathsView.tsx`, `panels/pathRows.ts` |
+| Forms tab | the tab holding one card per step that declares a view | `panels/FormsTab.tsx` |
+| form card | one bordered plate on the Forms tab. It carries a kicker, a label, a count and a miniature | `panels/formCardRows.ts` |
+| form preview | the form editor's right pane, mounting the renderer a participant meets | `panels/FormPreview.tsx` |
 | checks rail | the validation issue list, grouped by check | `panels/ChecksRail.tsx` |
 
-The bench replaced the inspector column, and *inspector* went with it. Say
-*configuration pane* for the column, and *masthead* for its top zone.
+The tab row replaced the ribbon over the bench. Seven words went with it:
+*ribbon*, *ribbon bar*, *bench*, *steps register*, *configuration pane*,
+*section register* and *process links*. Say *tab row* for the row. Say *steps
+rail* for the numbered column, and *step page* for the editor beside it. The
+word *masthead* survives on the step page, and nowhere else.
 
-### The panels screen
+The process surface replaced the panels screen too. Six words went with it:
+*panels screen*, *panels screen header*, *index rail*, *open view*, *surface
+toggle* and *rail sublist*. Say *tab* for one of the ten. Say *entity rail*
+for the row list the Fields and Data sources tabs keep.
 
-The steps register's process links route here, and so does a click on a
-field group in the checks rail. Top to bottom: the panels screen header,
-then a row of three columns. Those columns are the index rail, the open
-view, and the checks rail.
+*Inspector* retired ahead of both, with the inspector column. The step page is
+what succeeds it. Say *step page*.
 
-| Term | Names | Lives in |
-|---|---|---|
-| panels screen | the routed screen holding the six process-wide views | `screens/PanelsScreen.tsx` |
-| panels screen header | the top bar: Back to canvas, the open view's name, a save-with-draft note | `screens/PanelsScreen.tsx` |
-| index rail | the left column: one entry per view, with a count and an issue badge | `screens/PanelsScreen.tsx`, its `panelsRail` style |
-| rail sublist | the index rail's own entry list, under the fields or data sources view alone: one row per entity | `screens/PanelsScreen.tsx` |
-| open view | the center column: whichever of the six views is not `hidden` | `screens/PanelsScreen.tsx`, its `openView` prop |
-| field catalog | the open view that lists and edits the process's field definitions | `panels/FieldCatalogPanel.tsx` |
-| field tabs | the Field / Values / Rules tab set inside the field catalog's editor, for the one selected top-level field | `panels/FieldCatalogPanel.tsx`, `FieldEditor` |
-| data sources | the open view that lists and edits the process's data source definitions | `panels/DataSourcesPanel.tsx` |
-| contract | the open view that edits the process's `ProcessContract`: input fields, output fields, outcomes | `panels/ContractPanel.tsx` |
-| field matrix | the open view with the grid of every field against every step | `panels/FieldMatrixPanel.tsx`, `panels/FieldMatrixGrid.tsx` |
-| changes | the open view listing the draft's difference against the base version | `panels/ChangesView.tsx` |
-| paths | the open view listing every path in the process, one row each | `panels/PathsView.tsx`, `panels/pathRows.ts` |
+**field tabs** names one thing only: the Field / Values / Rules set inside the
+field catalog's own editor. It stands apart from the register tab, the shell's
+own header label. It stands apart from a tab on the tab row as well. All three
+are tab patterns, and each keeps its own name.
 
-All six views stay mounted at once; `hidden` shows one and hides the other
-five. A view keeps its own edit state across a switch: a half-typed outcome
-name, a selected field. Unmounting on every switch would lose that state.
-
-**field tabs** names one thing only: the Field / Values / Rules set inside
-the field catalog's own editor. It stands apart from the register tab, the
-shell's own header label. It stands apart from the surface toggle too, the
-Structure/JSON switch. All three are tab patterns, and each keeps its own
-name.
-
-The configuration pane carries no tab row. Its section register took the
-place of one.
+The step page carries no tab row of its own. Its two columns of open sections
+take the place of one.
 
 **inert** carries two readings here, both HTML terms used for their literal
 meaning, not a rotated synonym for either. The field matrix stamps a step
 column `data-inert` when that step declares no view: a state fact about the
-column. The field catalog's preview container carries the `inert` HTML
-attribute: a behavior. It and its sample controls take no keyboard or
-pointer interaction, and a screen reader skips them.
+column. Two preview containers carry the `inert` HTML attribute itself. Those
+are the field catalog's, and the form editor's participant preview. That is a
+behavior. Neither takes keyboard or pointer interaction, and a screen reader
+skips both.
 
 The field matrix splits into two components: a bare grid and a wrapper. The
 bare grid, `FieldMatrixGrid`, holds the headers, the cells and the keyboard
@@ -142,32 +145,27 @@ once an instance is open.
 The record pane shows the same merged record the admin area's instance
 detail shows, from one shared function: `describeRecordElement`.
 
+The form preview mounts that same `FieldForm`. So the form editor, the player
+and the Task screen all draw one renderer.
+
 **rail** names a class of component, not one component. A rail is a
 fixed-width column beside a screen's main content, scrolled on its own. It
-holds a register list, or a validation list. Two rails exist.
+holds a register list, or a validation list. Three rails exist.
 
-The checks rail holds the validation issue list. It sits in the ribbon bar,
-or right of the open view on the panels screen. The index rail sits left of
-the open view on the panels screen. It holds the view list.
+The checks rail holds the validation issue list. The steps rail holds the
+numbered step list, on the Steps tab. The entity rail holds the row list, on
+the Fields tab and on the Data sources tab.
 
-**rail** alone names neither. Say *checks rail* or *index rail*, every time.
-The steps register is no rail: it is the bench's own left column, and its
-foot holds the process links.
+**rail** alone names none of the three. Say *checks rail*, *steps rail* or
+*entity rail*, every time.
 
-**panel** alone names nothing either. The configuration pane hosts panel
-components, one per section body.
+**panel** alone names nothing either. The step page hosts panel components,
+one per section body.
 
-`PanelsScreen` holds six views. Those are the field catalog, data sources,
-the contract, the field matrix, Changes and Paths. The component name
-carries the word `Panels`. The views are not section bodies.
-
-**dock** is a verb here, and nothing else. It names the collapsed checks
-rail's presentation, in several live specs and in `ChecksRail.tsx`'s own
-compiled style name. The strip that once carried the noun is gone.
-
-The checks rail renders in two places, collapsed at both. The ribbon bar
-carries the structure surface's one summary. The panels screen carries a
-second, framed beside its open view. Both are the checks rail.
+**dock** names nothing here any more, as a verb or as a noun. Nothing docks.
+The checks rail takes two forms instead. The Checks tab stands the full
+grouped list. The area nav stands the one-line summary, with a state dot and a
+count. Pressing it opens that tab.
 
 ## 2. Domain terms as the UI shows them
 

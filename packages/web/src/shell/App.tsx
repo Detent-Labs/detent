@@ -74,8 +74,9 @@ export function App() {
   // Memoized: passed down as `onUnauthorized`/`onLogout` and, through EditScreen's
   // `load`, into a useCallback dependency array. An inline arrow here gets a new
   // identity on every render, and `App` re-renders on every `go()` call (including
-  // an in-place route change like the form editor's), which would re-fire `load`'s
-  // effect and refetch the draft, discarding unsaved edits.
+  // an in-place route change like a process-surface tab switch or the form
+  // editor's), which would re-fire `load`'s effect and refetch the draft,
+  // discarding unsaved edits.
   const logout = useCallback(() => {
     clearSession();
     setSession(undefined);

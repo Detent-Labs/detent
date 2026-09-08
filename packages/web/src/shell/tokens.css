@@ -56,6 +56,17 @@
   --color-divider: color-mix(in srgb, var(--color-text) 40%, transparent);
   --color-accent: var(--stamp-600);
   --color-accent-contrast: var(--paper-50);
+  /* The accent as it must read on --color-surface-muted, where the plain role
+     falls short. --color-accent measures 4.17:1 there in light and 4.46:1 in
+     dark, both under the 4.5:1 AA text minimum at the 11px size its one
+     consumer uses — the required asterisk in a Forms card miniature
+     (FormsTab.tsx, .miniatureRequired). Same reasoning as --stamp-600 above,
+     and the same fix: a step of the existing accent ramp far enough from the
+     muted ground to clear it. This one picks a different step per scheme, as
+     the ramp comment above says the semantic layer does, because the ramp
+     itself carries no dark override: --color-accent-700 reads 5.91:1 on
+     light's #eae9e9, and --color-accent-400 reads 6.71:1 on dark's #2d2b2b. */
+  --color-accent-on-muted: var(--color-accent-700);
   --color-refusal: var(--refusal-700);
 
   --font-heading: system-ui, sans-serif;
@@ -101,6 +112,11 @@
     --color-flag-visible: #6fa8ff;
     --color-flag-required: #d4a017;
     --color-flag-readonly: #b98aff;
+    /* The one semantic alias that picks its own step per scheme rather than
+       riding a primitive's override: the accent ramp has none, and the step
+       that clears the muted ground in light is the darkest, in dark the
+       lightest. */
+    --color-accent-on-muted: var(--color-accent-400);
   }
 }
 

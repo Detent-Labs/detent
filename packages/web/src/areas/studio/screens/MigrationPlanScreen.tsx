@@ -39,6 +39,15 @@ const styles = stylex.create({
     paddingInline: space.s3,
     paddingBottom: space.s6,
   },
+  // The orphan scan frames its own block at the screen's foot, and did so
+  // with the UA's `2px groove` until `global.css` cleared it for every
+  // fieldset. The frame is this screen's own intent, so it states it: the
+  // 1px hairline in the border role, as on Player and Tools.
+  panel: {
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: colors.border,
+  },
   studioBack: {
     display: "block",
     paddingLeft: 0,
@@ -332,7 +341,7 @@ export function MigrationPlanScreen({ processId, from, to, token, navigate, onUn
             </p>
           )}
 
-          <fieldset>
+          <fieldset {...stylex.props(styles.panel)}>
             <legend>{t("migrationPlan.orphanLegend")}</legend>
             <div {...stylex.props(styles.studioControls)}>
               <button type="button" className="btn btn-secondary" disabled={scanning} onClick={() => void scanOrphans(fromVersion)}>

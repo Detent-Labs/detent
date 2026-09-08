@@ -411,6 +411,7 @@ Stage detail: `docs/roadmap-history.md`. Same numbers, same order.
 | 59 | Per-instance visibility: the report builder narrows per row | `report-row-visibility` | `instance-data-query`, `instance-data-tables`, `instance-visibility-set` |
 | 60 | Per-instance visibility: a took-part screen over `scope=visible` | `involved-cases-screen` | `end-user-app` |
 | 61 | The studio's publish gate, its confirmation dialogs and its failure report | `studio-publish-gate-and-report` | `process-drafts`, `spa-error-reporting`, `studio-app`, `studio-publish` |
+| 62 | One tabbed process surface for a draft, and the plain-language authoring vocabulary over it | `studio-guided-surface` | `studio-app`, `studio-canvas`, `studio-checks-rail`, `studio-form-editor`, `studio-forms-overview`, `studio-guided-vocabulary`, `studio-json-view`, `studio-process-tabs`, `studio-publish`, `studio-step-page` |
 
 ## Changes with no stage
 

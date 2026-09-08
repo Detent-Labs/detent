@@ -64,7 +64,7 @@ export function PathsView({ draft, contentLocale }: { draft: Draft; contentLocal
   const rows = useMemo(() => pathRows(draft.workflow?.steps), [draft]);
   const baseLocale = draft.baseLocale ?? "en";
 
-  if (rows.length === 0) return <p {...stylex.props(styles.empty)}>{t("dock.pathsEmpty")}</p>;
+  if (rows.length === 0) return <p {...stylex.props(styles.empty)}>{t("pathsView.empty")}</p>;
 
   const headCellProps = stylex.props(styles.pathsCell, styles.pathsHeadCell);
 
@@ -72,11 +72,11 @@ export function PathsView({ draft, contentLocale }: { draft: Draft; contentLocal
     <table {...stylex.props(styles.paths)}>
       <thead>
         <tr>
-          <th scope="col" {...headCellProps}>{t("dock.pathsSource")}</th>
-          <th scope="col" {...headCellProps}>{t("dock.pathsTrigger")}</th>
-          <th scope="col" {...headCellProps}>{t("dock.pathsPriority")}</th>
-          <th scope="col" {...headCellProps}>{t("dock.pathsGuard")}</th>
-          <th scope="col" {...headCellProps}>{t("dock.pathsTarget")}</th>
+          <th scope="col" {...headCellProps}>{t("pathsView.source")}</th>
+          <th scope="col" {...headCellProps}>{t("pathsView.trigger")}</th>
+          <th scope="col" {...headCellProps}>{t("pathsView.priority")}</th>
+          <th scope="col" {...headCellProps}>{t("pathsView.guard")}</th>
+          <th scope="col" {...headCellProps}>{t("pathsView.target")}</th>
         </tr>
       </thead>
       <tbody>
@@ -85,10 +85,10 @@ export function PathsView({ draft, contentLocale }: { draft: Draft; contentLocal
             <th scope="row" {...stylex.props(styles.pathsCell)}>{stepCell(row.sourceLabel, row.sourceKey, contentLocale, baseLocale)}</th>
             <td {...stylex.props(styles.pathsCell)}>{row.trigger ?? ""}</td>
             <td {...stylex.props(styles.pathsCell, styles.pathsMono)}>
-              {row.priority === undefined ? <span {...stylex.props(styles.pathsNone)}>{t("dock.pathsNoPriority")}</span> : row.priority}
+              {row.priority === undefined ? <span {...stylex.props(styles.pathsNone)}>{t("pathsView.noPriority")}</span> : row.priority}
             </td>
             <td {...stylex.props(styles.pathsCell, styles.pathsMono)}>
-              {row.guardSrc === undefined ? <span {...stylex.props(styles.pathsNone)}>{t("dock.pathsNoGuard")}</span> : row.guardSrc}
+              {row.guardSrc === undefined ? <span {...stylex.props(styles.pathsNone)}>{t("pathsView.noGuard")}</span> : row.guardSrc}
             </td>
             <td {...stylex.props(styles.pathsCell)}>{stepCell(row.targetLabel, row.targetKey ?? row.targetId, contentLocale, baseLocale)}</td>
           </tr>

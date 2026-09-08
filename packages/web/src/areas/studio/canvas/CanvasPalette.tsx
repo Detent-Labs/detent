@@ -2,7 +2,8 @@ import { useState } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { colors, space } from "form-ui/tokens.stylex";
 import { SquarePlus, Share2, Flag } from "lucide-react";
-import { t, type CatalogKey } from "../catalog.js";
+import { t } from "../catalog.js";
+import { newStepPhrase } from "../draft/guided-labels.js";
 import type { StepKind } from "../draft/createStep.js";
 
 const styles = stylex.create({
@@ -77,16 +78,19 @@ interface Props {
   onDragMove: (kind: StepKind, clientX: number, clientY: number) => void;
 }
 
-const ADD_ENTRIES: { kind: StepKind; label: CatalogKey; Icon: typeof SquarePlus }[] = [
-  { kind: "task", label: "palette.step", Icon: SquarePlus },
-  { kind: "subprocess", label: "palette.subprocess", Icon: Share2 },
-  { kind: "end", label: "palette.end", Icon: Flag },
+/** The three entries name what each one adds, in the guided layer's own
+ * phrases (`studio-guided-vocabulary`): a step someone works, a call to
+ * another process, and an end. */
+const ADD_ENTRIES: { kind: StepKind; Icon: typeof SquarePlus }[] = [
+  { kind: "task", Icon: SquarePlus },
+  { kind: "subprocess", Icon: Share2 },
+  { kind: "end", Icon: Flag },
 ];
 
 /**
  * The palette, the expanded canvas ribbon's left edge (`studio-canvas`'s
- * palette requirement). Drag Step, Subprocess or End onto the canvas to add a
- * step of that kind at the drop point.
+ * palette requirement). Drag one of the three entries onto the canvas to add
+ * a step of that kind at the drop point.
  *
  * The collapsed ribbon shows no palette, so the steps register carries the one
  * always-reachable way to add a first step.
@@ -121,7 +125,7 @@ export function CanvasPalette({ onDrop, onDragMove }: Props) {
         {t("palette.heading")}
       </h2>
       <ul {...stylex.props(styles.paletteList)}>
-        {ADD_ENTRIES.map(({ kind, label, Icon }) => (
+        {ADD_ENTRIES.map(({ kind, Icon }) => (
           <li key={kind}>
             <button
               type="button"
@@ -131,14 +135,14 @@ export function CanvasPalette({ onDrop, onDragMove }: Props) {
               onPointerUp={onPointerUp}
             >
               <Icon size={18} strokeWidth={1.75} aria-hidden="true" />
-              <span>{t(label)}</span>
+              <span>{newStepPhrase(kind)}</span>
             </button>
           </li>
         ))}
       </ul>
       {dragging && (
         <div {...stylex.props(styles.paletteGhost)} style={{ left: dragging.x, top: dragging.y }} aria-hidden="true">
-          {t(ADD_ENTRIES.find((entry) => entry.kind === dragging.kind)!.label)}
+          {newStepPhrase(dragging.kind)}
         </div>
       )}
     </section>

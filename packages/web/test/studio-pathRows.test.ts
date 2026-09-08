@@ -1,5 +1,5 @@
 /**
- * The dock's Paths-tab row derivation (`panels/pathRows.ts`), tested as a pure
+ * The Paths tab's row derivation (`panels/pathRows.ts`), tested as a pure
  * function against literal fixtures — no DOM, no rendering.
  *
  * The guarded-manual-path cases exist because `definition.ts` puts `guard` on
@@ -27,7 +27,7 @@ function step(id: string, key: string, paths: Array<Record<string, unknown>> = [
   return ds({ id, key, label: { en: key.replace(/_/g, " ") }, paths });
 }
 
-describe("dock path rows", () => {
+describe("paths tab rows", () => {
   it("returns one row per path, in step order then path order", () => {
     const steps = [
       step("step_a", "submit", [

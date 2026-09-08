@@ -452,10 +452,10 @@ The engine drops an entry whose type does not match its target field, and the
 submission still succeeds. The instance record names the drop. That mismatch
 comes from operator data, and the participant can do nothing about it.
 
-The Field catalog panel builds a mapping. Under the data source picker it
+The field catalog builds a mapping. Under the data source picker it
 shows one row per mapped column. The first control picks a column key the
-bound list declares. The second picks the catalog field it writes. The panel
-marks a row whose key the list no longer declares.
+bound list declares. The second picks the catalog field it writes. A row whose
+key the list no longer declares carries a mark.
 
 The editor appears for a `string` field bound to a `db.list` source. For any
 other source type, write the mapping as JSON in the studio's raw definition
@@ -465,11 +465,15 @@ view.
 
 One state. Exactly one step is active per running process.
 
-A step is terminal or it is not. A terminal step has no outgoing path, and it
-ends the process. Every other step needs at least one exit.
+A step ends the process or it does not. An end step has no outgoing path,
+and it closes the case. Every other step needs at least one exit.
+
+The JSON marks such a step with `terminal: true`. Studio calls it an end, and
+prints that word wherever it names the step's kind. This guide names the
+property and the word the same way.
 
 The example has seven steps. `capture` is the initial step. `booked` and
-`rejected` are terminal.
+`rejected` are the ends.
 
 ### View
 
@@ -524,7 +528,7 @@ count. Neither does a step reachable only via a different branch. Nothing
 guarantees either one ran first.
 
 Publishing also lets the pair through on a step whose paths are all
-automatic, or on a terminal step. The required check never runs there, so
+automatic, or on an end step. The required check never runs there, so
 the field can never strand anyone. A CEL `required` or `readonly` publishes
 too. Only a literal `true` on both flags trips the rule. A hidden entry
 (`visible: false`) publishes as well, since the engine never resolves
@@ -588,7 +592,7 @@ single step must not mix the two.
 Every path needs a non-empty `key` and a non-empty `label`, whether manual
 or automatic. The studio derives both for you at creation time, from the
 source and target step's own names. You can rename either afterward. A
-manual path's `label` is not just an inspector name. It is the text on the
+manual path's `label` is not a name for Studio alone. It is the text on the
 button a participant clicks to take it.
 
 A manual path waits for a person. The example gives `review` three of them:
@@ -696,6 +700,10 @@ that takes `booking-failed`.
 A duration uses weeks, days, hours, minutes and seconds. Months and years are
 not allowed, because their length depends on the calendar.
 
+Studio words a `duration` as a **Time limit**. That control reads a number and
+a unit, over hours, days and weeks. It writes the ISO-8601 string the body
+carries. A written duration the pair cannot state stays exactly as it is.
+
 ### Assignment
 
 Who may act on a step. A step that needs a person carries an assignment with a
@@ -718,11 +726,11 @@ so a step id still resolves after a migration.
 ### Contract
 
 What a process promises, when another process calls it. A contract names input
-fields, output fields and a list of outcomes. Every terminal step of the
-process binds to one of those outcomes.
+fields, output fields and a list of outcomes. Every end step of the process
+binds to one of those outcomes.
 
-The example declares the outcomes `booked` and `rejected`. Its two terminal
-steps carry exactly those.
+The example declares the outcomes `booked` and `rejected`. Its two end steps
+carry exactly those.
 
 A caller uses a subprocess step, which is a wait-state. The caller guards on
 `child.outcome`, never on a step id inside the child. That is the whole point
@@ -734,8 +742,8 @@ For a worked pair, read `examples/subprocess-loan-parent.json` and
 
 A `process.start` action is the fire-and-forget alternative. It starts
 another process from the current one's data. It does not wait for it: no
-wait-state, no outcome, no contract. Use it when one process's terminal
-step should start an unrelated process, not call one and park for its
+wait-state, no outcome, no contract. Use it when one process's end step
+should start an unrelated process, not call one and park for its
 result.
 
 ## Building a process
@@ -760,44 +768,52 @@ Your installation may list no template. Somebody holding `system:templates`
 creates them on Studio's **Templates** screen, from a published version of a
 process.
 
-The draft toolbar along the top carries **Save**, **Discard draft** and
-**Publish**. It also tells you whether you have unsaved changes.
+Studio's own area nav carries **Checks**, **Save**, **Discard draft** and
+**Publish**. Those four stand there whatever you have open. Checks reads as a
+dot and a count. The dot says whether anything blocks a publish, and pressing
+it lists what Studio found.
 
-The screen has two tabs, **Structure** and **JSON**. Structure is the panels
-described below. JSON is the same draft as raw text, which helps when you want
-to read the whole body at once.
+A draft opens on one screen. A tab row over the body holds ten tabs, and the
+chapters below follow their order. Those are Canvas, Steps, Fields, Data
+sources, Paths, Forms, Field matrix, Contract, Changes and Checks.
+
+The tab row's overflow menu holds three more entries. The **JSON** entry
+prints the same draft as raw text. That helps when you want to read the whole
+body at once. The **Versions** and **Player** entries open their own
+screens.
 
 ### 2. Define the field catalog
 
-Open the **Field catalog** panel and declare every field the process needs.
-Do this first, because a view, a guard and an action output all reference a
-field.
+Open the **Fields** tab and declare every field the process needs. Do this
+first, because a view, a guard and an action output all reference a field.
 
 Give each field a key that matches `/^[a-z_][a-z0-9_]*$/`. A guard reads it as
 `data.<key>`, and the key must survive that.
 
-Does a field take its options from somewhere else? Declare that source
-in the **Data sources** panel. Then point the field at it.
+Does a field take its options from somewhere else? Declare that source on
+the **Data sources** tab. Then point the field at it.
 
 ### 3. Add the steps
 
-Open the **Steps** panel. Add one step per state. Mark the initial step. Mark
-the terminal steps.
+Open the **Steps** tab. A numbered rail lists every step, and one wide page
+edits the step you pick. Add one step per state. Mark the initial step. Mark
+the ends.
 
 Name states, not activities. `Review` is a state. `Send the email` is not, and
 it belongs in an action.
 
 ### 4. Compose the view for each step
 
-Select a step and choose **View** in its section index. That navigates to the
-form editor, a full-screen page reached from the step's inspector.
+Pick a step on the Steps tab and press **Build the form** in its **Step form
+fields** section. That opens the form editor, a full-screen page over that
+step's view. The **Forms** tab reaches the same editor from a card, one per
+step that already declares a form.
 
-The editor has three parts. On the left, a palette lists every catalog field
+The editor has four parts. On the left, a palette lists every catalog field
 this step's view does not yet name. A second palette section mints a new
 field by type: text, choice, date, file, or section. It places the new field
-on the canvas in the same drag. In the middle, a canvas draws the form as a
-participant will see it. Below the canvas, a strip edits whichever card you
-select.
+on the canvas in the same drag. In the middle, a canvas draws the form's
+layout. Below the canvas, a strip edits whichever card you select.
 
 Drag a field from the palette onto the canvas to add it. Drag a card to
 another position to reorder the view. Each card also carries move-up and
@@ -812,16 +828,22 @@ and readonly controls. The definition contract forbids declaring either on
 that field's view entry. The strip therefore offers no path to a rejected
 publish.
 
-The editor writes into the draft as you work. It has no Save button of its
-own: the screen's Save, Discard and Publish still govern what persists.
+On the right stands **What a participant meets**. That pane mounts the same
+renderer the Player mounts and the Tasks area mounts. It follows the view's
+own column count, and it answers no click. Under the fields it draws one
+control per manual path, so you read the buttons a participant will press.
 
-A terminal step usually shows a readonly summary. A step early in the process
+The editor writes into the draft as you work. It has no Save button of its
+own: the area nav's Save, Discard draft and Publish still govern what
+persists.
+
+An end step usually shows a readonly summary. A step early in the process
 usually demands the fields it collects.
 
 ### 5. Draw the paths
 
-Select a step and open its **Paths** section. Add one path per exit, and pick
-its target step.
+Pick a step on the Steps tab and open its **Path to** section. Add one path
+per exit, and pick its target step.
 
 Decide manual or automatic for the whole step at once, because a step must not
 mix them. Choose manual when a person decides. Choose automatic when the data
@@ -847,31 +869,32 @@ JSON button, if you prefer it.
 
 Remember the order. `onExit` runs first, then `onPath`, then `onEntry`.
 
-Add timers in the **Timers** section of a step. A timer with a target path
-forces that transition. A timer without one is a reminder, and it only runs
-its actions.
+Add timers in the **Time limit** section of a step. A timer with a target
+path forces that transition. A timer without one is a reminder, and it only
+runs its actions.
 
 Never leave a wait-state without a timer. A step that waits for an answer that
 never arrives waits forever.
 
 ### 7. Set assignment
 
-For every step a person must act on, set the **assignment strategy** and list
-the candidates. A step nobody acts on needs no assignment.
+For every step a person must act on, open its **Assignment** section and pick
+who acts. A step nobody acts on needs no assignment, and the section says so.
 
 The strategy is a plugin, like an action or a data source. It carries a `type`
-and a `config`. Pick the `type` from the picker, which lists the strategies
-your deployment registers. A `type` nobody registered is a publish error, not
-a surprise at run time.
+and a `config`. The picker lists the strategies your deployment registers,
+under the plain name each one takes. A `type` nobody registered is a publish
+error, not a surprise at run time.
 
-Four strategies ship.
+Four strategies ship. The section prints a plain name and a short note for
+each. The step's Developer view carries the registry `type` beside it.
 
-`static` is the one you get by default. The studio generates a form for it:
-one candidates field, `finance-approver` for example. The engine uses that
-list unchanged.
+**A fixed list of people** is `static`, the one you get by default. Studio
+generates a form for it: one candidates field, `finance-approver` for example.
+The engine uses that list unchanged.
 
-`org.manager-of-starter` resolves the manager of whoever started the
-instance. It takes no config, so its form is empty. Use it for the approval
+**The starter's manager** is `org.manager-of-starter`. It resolves the manager
+of whoever started the instance. It takes no config, so its form is empty. Use it for the approval
 every process needs and no role name can express. One leave request routes to
 Anna's manager, the next to Bernd's, from the same definition.
 
@@ -883,9 +906,9 @@ The list the strategy produces is frozen when the instance enters the step. A
 manager who changes afterwards does not change an instance already waiting.
 Use delegation for the one-off case.
 
-`org.group-members` resolves the current member list of one group, an
-operator administers on the admin Groups screen. Its config carries one key,
-`groupId`.
+**Everyone in a group** is `org.group-members`. It resolves the current
+member list of one group, an operator administers on the admin Groups screen.
+Its config carries one key, `groupId`.
 
 Unlike the two strategies above, this list is NOT frozen at step entry. A
 membership change made after the instance enters the step still reaches it,
@@ -896,9 +919,10 @@ Declare the group's id in the process's own `allowedGroups` list too. A
 publish, naming the step and the group id. That same list is what a person
 field's picker offers, so one entry serves both readers.
 
-`org.actor-from-field` routes the step to whoever the instance's own data
-names. Its config carries one key, `fieldId`. Use it for the approver a
-requester picks, which no fixed list and no group can express.
+**The person a field names** is `org.actor-from-field`. It routes the step to
+whoever the instance's own data names. Its config carries one key, `fieldId`.
+Use it for the approver a requester picks, which no fixed list and no group
+can express.
 
 The field's value decides, read fresh at every step entry. A `user_` value
 makes that account the sole candidate. A `group_` value expands to that
@@ -930,21 +954,22 @@ substitutes no stand-in approver: routing to the wrong person silently is
 worse than a visible stall.
 
 Assign by role, not by person, whenever a role fits. A person leaves the
-company, and the process outlives them. `org.manager-of-starter` is not an
+company, and the process outlives them. The starter's manager is not an
 exception to that rule. It names a relationship, and the relationship
 outlives whoever holds it.
 
 ### 8. Declare a contract, if another process will call this one
 
-Open the **Contract** panel. Name the input fields, the output fields and the
-outcomes. Then bind every terminal step to an outcome.
+Open the **Contract** tab. Name the input fields, the output fields and the
+outcomes. Then bind every end step to an outcome.
 
 Skip this step when nothing calls your process.
 
 ### 9. Run it in the Player
 
-The Player runs your draft. Fill in the forms as a participant would and walk
-the process to a terminal step. Walk it again down a different path.
+The Player runs your draft. Open it from the tab row's overflow menu. Fill in
+the forms as a participant would, and walk the process to an end step. Walk it
+again down a different path.
 
 Find the mistakes here, where a fix costs one change. After you publish, a fix
 costs a new version and a migration.

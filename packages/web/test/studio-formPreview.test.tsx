@@ -1,0 +1,119 @@
+import { describe, expect, it } from "bun:test";
+import { renderToStaticMarkup } from "react-dom/server";
+import type { Step } from "workflow-engine/schema";
+import type { DraftOf } from "../src/areas/studio/draft/types.js";
+import type { DraftField } from "../src/areas/studio/draft/fields.js";
+import { FormPreview } from "../src/areas/studio/panels/FormPreview.js";
+
+/**
+ * The form editor's trailing pane (`studio-form-editor`: "A live participant
+ * preview stands beside the form canvas").
+ *
+ * `development-toolchain`'s split rule sends these to assertions: the order,
+ * the column count, the path controls, the required mark and the `inert`
+ * attribute are all properties of the rendered string. What stays manual is
+ * the browser check that a change in the canvas repaints the pane, which the
+ * shared `step` prop already guarantees at the React level.
+ *
+ * `FormPreview` takes every input as a prop, so it needs no draft context.
+ */
+
+const AMOUNT = "field_00000000-0000-4000-8000-0000000000a1";
+const PURPOSE = "field_00000000-0000-4000-8000-0000000000a2";
+
+const FIELDS: DraftField[] = [
+  { id: AMOUNT, key: "amount", type: "number", label: { en: "Amount" } },
+  { id: PURPOSE, key: "purpose", type: "string", label: { en: "Purpose" } },
+] as unknown as DraftField[];
+
+/** One step, with whatever the case overrides. `over` is untyped on purpose:
+ * every id in the contract is branded, and a fixture states plain strings. */
+function step(over: Record<string, unknown> = {}): DraftOf<Step> {
+  return {
+    id: "step_a",
+    key: "intake",
+    label: { en: "Intake" },
+    type: "task",
+    view: { fields: [{ ref: AMOUNT, required: true }, { ref: PURPOSE }] },
+    ...over,
+  } as unknown as DraftOf<Step>;
+}
+
+function render(s: DraftOf<Step> = step()): string {
+  return renderToStaticMarkup(
+    <FormPreview step={s} fields={FIELDS} processLabel="Expense approval" contentLocale="en" baseLocale="en" />,
+  );
+}
+
+describe("The participant preview", () => {
+  it("names the process and the step above the fields", () => {
+    const html = render();
+
+    expect(html).toContain("Expense approval");
+    expect(html.indexOf("Intake")).toBeLessThan(html.indexOf("Amount"));
+  });
+
+  it("prints the fields in the view's own order", () => {
+    expect(render().indexOf("Amount")).toBeLessThan(render().indexOf("Purpose"));
+  });
+
+  it("prints them in the new order once the view moves one above the other", () => {
+    const moved = render(step({ view: { fields: [{ ref: PURPOSE }, { ref: AMOUNT, required: true }] } }));
+
+    expect(moved.indexOf("Purpose")).toBeLessThan(moved.indexOf("Amount"));
+  });
+
+  it("marks a required entry", () => {
+    // `FieldForm`'s own required marker, the one a participant meets — the
+    // preview declares no mark of its own.
+    expect(render()).toContain('title="required"');
+    expect(render()).toContain('aria-required="true"');
+  });
+
+  it("takes no keyboard focus and no pointer interaction", () => {
+    // `inert` on the container carries both, and takes the whole subtree out
+    // of the accessibility tree with them, so a screen reader passes over it.
+    expect(render()).toMatch(/<div [^>]*inert=""/);
+  });
+});
+
+describe("The preview's column count", () => {
+  it("lays one column where the view declares one", () => {
+    expect(render()).toContain('data-columns="1"');
+  });
+
+  it("lays two columns where the view declares two", () => {
+    const two = render(step({ view: { fields: [{ ref: AMOUNT }, { ref: PURPOSE }], columns: 2 } }));
+
+    expect(two).toContain('data-columns="2"');
+  });
+});
+
+describe("The preview's own controls", () => {
+  it("carries one control per manual path, taking each path's own label", () => {
+    const two = render(
+      step({
+        paths: [
+          { id: "path_1", key: "approve", label: "Approve", to: "step_b", trigger: "manual" },
+          { id: "path_2", key: "reject", label: "Reject", to: "step_c", trigger: "manual" },
+        ],
+      }),
+    );
+
+    expect(two).toContain("Approve");
+    expect(two).toContain("Reject");
+  });
+
+  it("carries one submit control where the step declares only automatic paths", () => {
+    const automatic = render(
+      step({ paths: [{ id: "path_1", key: "onward", label: "Onward", to: "step_b", trigger: "automatic" }] }),
+    );
+
+    expect(automatic).toContain("Submit");
+    expect(automatic).not.toContain("Onward");
+  });
+
+  it("carries one submit control where the step declares no path at all", () => {
+    expect(render(step({ paths: [] }))).toContain("Submit");
+  });
+});

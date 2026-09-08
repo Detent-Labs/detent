@@ -1722,14 +1722,16 @@ Stage-by-stage status is in `ROADMAP.md`.
   Publishing, canvas editing, the JSON surface, and migration planning are not
   part of this change; the existing editor's export path plus `POST
   /processes` remains the only publish path until change 4.
-- Process Studio — canvas (`packages/web/src/areas/studio/canvas/`, `StepsPanel.tsx`,
-  `EditScreen.tsx`, `src/schema/definition.ts`, `studio-canvas`): stage 11's
+- Process Studio — canvas (`packages/web/src/areas/studio/canvas/`, `StepsPanel.tsx`
+  as it then stood, `EditScreen.tsx`, `src/schema/definition.ts`,
+  `studio-canvas`): stage 11's
   second of five changes. `/processes/:id/edit` becomes canvas-primary: a
   hand-rolled SVG canvas (`CanvasView.tsx`) replaces the stacked-panels-only
   column, deliberately not Mermaid (display-only, no drag affordance) and not
   a graph-editing library (the interaction surface — drag a node, drag from a
   handle — is small and fixed, and the domain graph has no parallelism to
-  support). `StepsPanel` is mounted unconditionally as a fixed-width pane
+  support). The configuration pane (`panels/StepsPanel.tsx`, deleted since by
+  `studio-guided-surface`) mounted unconditionally as a fixed-width pane
   beside the canvas — its selection, previously internal
   `useState`, is now a controlled prop pair (`selectedStepId`/
   `onSelectStep`) so canvas
@@ -1743,7 +1745,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   logic) — the canvas's `canvas/connection.ts` wraps it to reject an
   inconsistent drag-to-connect inline, before a path is ever created, using
   the same rule the engine enforces at publish. Node position writes to
-  `EditorArea`'s `saveState.layout` via a new `onMoveStep` callback — not
+  `ProcessSurface`'s `saveState.layout` via a new `onMoveStep` callback — not
   `useDraft()`/`mutate()`, since layout was never part of the Draft model's
   body-mutation surface, it round-trips through `DraftToolbar`'s save call as
   its own state; a created path, by contrast, is a real schema entity and
@@ -1814,7 +1816,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   `canvas/CanvasView.tsx`, `screens/EditScreen.tsx`, `areas/studio/app.css`):
   the canvas selects a set of steps, not one.
 
-  `EditorArea` holds `selectedStepIds: string[]`. A set of one drives the
+  `ProcessSurface` holds `selectedStepIds: string[]`. A set of one drives the
   configuration pane exactly as the single id did. A set of several drives a
   summary instead — a count and a Remove steps control — because the pane
   edits one step.
@@ -1943,8 +1945,8 @@ Stage-by-stage status is in `ROADMAP.md`.
   (`.canvas-edge-insert-target`) — heavier, in the accent, no other control.
   An `end` step never takes this branch: a terminal step has no outgoing
   path, so it drops free-standing, as it always has. No delete affordance
-  ships on an edge; the configuration pane deletes a path already, and a control on
-  the edge would be a second way to do one thing.
+  ships on an edge. The step page's own Path to section deletes a path
+  already, and a control on the edge would be a second way to do one thing.
 - Canvas edge waypoints (`packages/web/src/areas/studio/canvas/`,
   `canvas-edge-waypoints`, roadmap #33): a path may carry a list of
   waypoints, and its route runs from the source anchor through each one in
@@ -2012,8 +2014,8 @@ Stage-by-stage status is in `ROADMAP.md`.
   incoming path back to its source.
 
   Up and Down move through the order `workflow.steps` holds, or through the fan
-  a focused path belongs to. Enter selects the focused step and opens it in
-  the configuration pane, exactly as a click does. Escape moves the roving
+  a focused path belongs to. Enter selects the focused step and opens the
+  Steps tab on it. A pointer press selects alone. Escape moves the roving
   stop to the
   `<svg>` itself, so Tab leaves the canvas rather than re-entering it. No axis
   wraps, and an arrow key from a root focus goes to the entry point.
@@ -2068,8 +2070,8 @@ Stage-by-stage status is in `ROADMAP.md`.
   The node prints the resolved label first and the key second. It draws the key
   line only where the two differ. Every node read its own key twice before
   that.
-  The step headings in `StepsPanel` and `FormEditorScreen` took the same
-  corrected expression.
+  The step headings in the configuration pane and in `FormEditorScreen` took
+  the same corrected expression. `StepPage` carries the first one now.
 
   Accessible names compose from `canvas.nodeLabel`, `canvas.pathLabel` and
   `canvas.groupDisclosure` in the studio catalog. Each conditional segment
@@ -2251,13 +2253,13 @@ Stage-by-stage status is in `ROADMAP.md`.
   deleted) to a full-screen page. It is a `formStepId` sub-state of the
   existing `edit` route. It is not a new top-level route.
   `routing.ts`'s `edit` variant gains an optional `formStepId`. It
-  matches `/processes/:id/edit/form/:stepId`. `EditorArea` branches on
-  it. It renders `FormEditorScreen` in place of the canvas and
-  configuration pane. Both sit inside the same mounted `DraftProvider`.
+  matches `/processes/:id/edit/form/:stepId`. `ProcessSurface` branches on
+  it. It renders `FormEditorScreen` in place of the tab bodies. Both sit
+  inside the same mounted `DraftProvider`.
 
   A navigation away and back shows the same draft state a re-opened
-  modal would have. The Draft never unmounts. `StepsPanel`'s Form-section
-  view button navigates there now. It no longer opens local dialog state.
+  modal would have. The Draft never unmounts. The Form section's own view
+  button navigates there now. It no longer opens local dialog state.
   It carries no `aria-haspopup` any more. It is a navigation target now,
   not a disclosure or a dialog trigger.
 
@@ -2307,14 +2309,14 @@ Stage-by-stage status is in `ROADMAP.md`.
   `studio-json-view`): stage 11's third of five changes, entirely
   client-side — no engine, route or schema change. Adds the third of the edit
   screen's three surfaces alongside Canvas and Panels, switched by a
-  `role="tablist"` Structure/JSON toggle in `EditorArea` (a `surface`
+  `role="tablist"` Structure/JSON toggle in `ProcessSurface` (a `surface`
   `useState`, not a route). The two are **fully mutually exclusive**: every
   draft-body-mutating component (`ProcessHeader`, `FieldCatalogPanel`,
   `DataSourcesPanel`, `ContractPanel`, the canvas and everything nested under
   it) is grouped under "Structure" and unmounted while JSON is shown, so a
   stale textarea can never silently clobber a panel edit made while it was
   open — tightened during review, the change's first draft toggled only
-  Canvas + `StepsPanel`. `DraftToolbar` and the content-locale switcher stay
+  the canvas and the configuration pane. `DraftToolbar` and the content-locale switcher stay
   mounted on both surfaces, since neither mutates the draft body. `JsonView`
   seeds its local `text` from the current
   draft **once, on mount** — no resync effect, and switching away unmounts it
@@ -3262,7 +3264,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   every running instance on a version.
 
   `GET /registry` widens while the Tools SCREEN does not. The route has two
-  consumers. One is the Tools screen. The other is the configuration pane's
+  consumers. One is the Tools screen. The other is the step page's
   plugin-config form, which turns a registered type's config schema into a
   form. An author refused the route falls back to raw JSON for every action
   config.
@@ -3544,8 +3546,8 @@ Stage-by-stage status is in `ROADMAP.md`.
 
 ROADMAP stage 27c. Entirely in the browser. No route, no schema, no engine
 code. The migration-plan screen gained a Mapping/JSON toggle. It uses
-`role="tablist"`, the idiom the edit screen's Structure/JSON toggle already
-uses.
+`role="tablist"`, the idiom the studio already uses. The process surface's own
+tab row carries the same role.
 
 The Mapping side is `panels/MigrationSpecEditor.tsx`, four sections over the
 five `MigrationSpec` keys. The JSON side is the textarea stage 11 shipped,
@@ -3903,7 +3905,7 @@ lacked.
 `docs/browser-checks.md` held four checks when this landed. One is
 `iframe` framing from a second origin. Another is the attachment
 download's Save-not-render behavior. A third is the form editor's pointer
-work. The fourth is the panels screen's own walk. Every UI change since has
+work. The fourth is a walk of the process-wide views. Every UI change since has
 appended its own, so the file is longer than that and no gate counts it.
 
 Each entry names the address rule, the frontend build step, and the
@@ -4178,23 +4180,24 @@ meets `scope=started` should infer no new permission tier from it.
   sits inside the signed payload. `/auth/login` holds no token yet. It takes
   its tenant from the request host.
 
-- Process Studio, the panels screen (`packages/web/src/areas/studio/screens/
-  PanelsScreen.tsx`, `routing.ts`, `canvas/StepsRegister.tsx`, `studio-app`,
+- Process Studio, the six process-wide views (`routing.ts`, `studio-app`,
   `studio-checks-rail`): stage 36. The field catalog, the data sources and the
   contract sat behind one native `<dialog>`. It measured `min(72rem, 92vw)` by
-  `88vh`. They sit on a routed screen now, at
-  `/processes/:id/edit/panels/:view`.
+  `88vh`. Stage 36 moved them onto a routed screen at
+  `/processes/:id/edit/panels/:view`. Stage 62 moved that screen's six views
+  onto the tab row, and the address is `/processes/:id/edit/:tab` now.
 
   The overlay hid the checks rail. An author inside it edited field keys and
   data source keys. Those two produce most of what the rail reports. The rail
   entry showed a count per view, and that number stood in for a list behind
   the backdrop. The screen gives the rail its own column.
 
-  `panel` rides the `edit` route as an optional field, beside `formStepId`.
-  `matchRoute` tries the panels pattern before the plain edit pattern. An
-  unrecognized view falls through to the plain match. A typo therefore lands
-  on the canvas. `routePath` emits the form path when both fields arrive. One
-  route object never yields two paths.
+`tab` rides the `edit` route as an optional field, beside `formStepId`.
+  `matchRoute` tries the form pattern, then the retired panels pattern, then
+  the step pattern, then the tab pattern. An unrecognized name falls through
+  to the plain match. A typo therefore lands on the canvas. `PANEL_VIEW_TAB`
+  maps each old `edit/panels/:view` name onto its tab, so an open view
+  survived the move.
 
   All four views stay MOUNTED, and `hidden` shows one. Rendering the open view
   alone would drop `ContractPanel`'s half-typed outcome name. It would also
@@ -4202,21 +4205,20 @@ meets `scope=started` should infer no new permission tier from it.
   matrix's selected cell. The attribute keeps the subtree and takes it out of
   the accessibility tree, with no CSS.
 
-  `panelEntityCounts` in `draft/panel-rail.ts` is the one source of the count
-  beside each view's name. The steps register and the screen's index rail
-  both read it. Each carried its own copy of the three expressions before, and
-  the two did not agree. The register counted `draftFields`, which keeps a
-  field carrying no id. The screen counted rail rows, which drop one.
+  `panelEntityCounts` in `draft/panel-rail.ts` was the one source of the count
+  beside each view's name. Two callers read it, and each carried its own copy
+  of the three expressions before that. The two did not agree. One counted
+  `draftFields`, which keeps a field carrying no id. The other counted rail
+  rows, which drop one. `draft/process-tabs.ts` carries the tab counts now,
+  and `panelEntityCounts` stays for the callers that still read it.
 
-  The screen carries no Save, the rule the overlay already had. Every panel
-  writes into the in-browser draft, and the edit screen's toolbar persists it.
-  A note beside the back control states that, so leaving never reads as a
-  cancel.
+  No view carries a Save, the rule the overlay already had. Every view writes
+  into the in-browser draft, and the area nav's Save persists it.
 
 - Process Studio, the field matrix (`packages/web/src/areas/studio/panels/
   FieldMatrixPanel.tsx`, `fieldMatrixLogic.ts`, `studio-app`,
-  `spa-accessibility`): stage 41's second half. The panels screen's fourth
-  view, at `/processes/:id/edit/panels/matrix`. Rows are the field catalog,
+  `spa-accessibility`): stage 41's second half. The Field matrix tab, at
+  `/processes/:id/edit/matrix`. Rows are the field catalog,
   `flattenRailFields`' own depth-first order. `line_item` heads its four
   children. Columns are `workflow.steps`, in array order.
 
@@ -4237,7 +4239,7 @@ meets `scope=started` should infer no new permission tier from it.
   `spa-accessibility` capability carries the pattern as its own
   requirement, since a two-dimensional data grid is generic.
 
-  The rail badge needed a new counting function once
+  The badge beside the matrix needed a new counting function once
   `panelEntityCounts` gained a `matrix` key, the live-cell total. A
   `checkViewFlags` finding carries `entityType: "step"`, the type every
   other per-step issue carries too. `panel-rail.ts`'s
@@ -4249,14 +4251,15 @@ meets `scope=started` should infer no new permission tier from it.
   `"step"`. That is an accepted trade-off: the field catalog's own
   `issueCountForEntityType` badge surfaces that finding correctly.
 
-- Process Studio, the panels screen's Fields and Data sources views
-  (`packages/web/src/areas/studio/screens/PanelsScreen.tsx`,
+- Process Studio, the Fields and Data sources views
+  (`packages/web/src/areas/studio/panels/EntityTabs.tsx`,
   `panels/FieldCatalogPanel.tsx`, `panels/DataSourcesPanel.tsx`,
   `draft/panel-rail.ts`, `studio-app`): stage 42. Both views render one
-  entity's editor now, instead of stacking every one. The rail is the
-  master. Choosing an entry selects it, not just scrolls to it. Data sources
-  gained the same rail sub-list Fields already had. A sub-list renders only
-  under its own open view, so two never share the rail's column.
+  entity's editor now, instead of stacking every one. Each view keeps its own
+  entity rail, and that rail is the master. Choosing a row selects it, not
+  just scrolls to it. Data sources gained the entity rail Fields already had.
+  Stage 62 moved both views onto their own tabs, and `FieldsTab` and
+  `DataSourcesTab` in `EntityTabs.tsx` host them.
 
   A row in `RailFieldRow` gained `rootId`. That id names the top-level
   ancestor a row resolves to, regardless of the row's rendered indent depth.
@@ -4264,14 +4267,14 @@ meets `scope=started` should infer no new permission tier from it.
   it. The module `panel-rail.ts` gained `issueCountForEntityId`, joining its
   other counting functions for the per-row issue mark.
 
-  `PanelsScreen` holds both selections as component state. It resolves each
-  against the current draft on every render, with a fallback to the first
-  entity. That matches the reset a canvas round trip already gives every
+  Each tab holds its own selection as component state. It resolves that
+  selection against the current draft on every render, with a fallback to the
+  first entity. That matches the reset a canvas round trip already gives every
   other screen-owned state here.
 
   The components `FieldCatalogPanel` and `DataSourcesPanel` lost their own
-  Add and Remove handlers. The screen owns both now. It needs the new id to
-  select after an Add. It needs the removed index to pick a neighbour after
+  Add and Remove handlers. The hosting tab owns both now. It needs the new id
+  to select after an Add. It needs the removed index to pick a neighbour after
   a Remove.
 
   Both panels gained the field CSS the area already states elsewhere. A
@@ -4354,54 +4357,92 @@ meets `scope=started` should infer no new permission tier from it.
   that finds both reads every file naming `process.env.PORT`, `startHttpServer`
   or `Bun.serve`.
 
-- The step bench (`screens/EditScreen.tsx`, `canvas/StepsRegister.tsx`,
-  `panels/StepsPanel.tsx`, `studio-canvas`): the structure surface was a
-  three-column grid of an edit rail, the canvas and an inspector, with a
-  dock below. It is now a ribbon over a bench. `studio-step-bench` made that
-  replacement and deleted `dock/` and `canvas/EditRail.tsx`.
+- The process surface (`screens/EditScreen.tsx`, `panels/ProcessTabRow.tsx`,
+  `panels/StepsRail.tsx`, `panels/StepPage.tsx`, `panels/FormsTab.tsx`,
+  `panels/FormPreview.tsx`, `panels/DraftNavControls.tsx`,
+  `studio-process-tabs`, `studio-step-page`, `studio-forms-overview`,
+  `studio-guided-vocabulary`): stage 62. A draft opened on two screens before
+  this. The edit screen carried a canvas ribbon over a bench. A separate
+  panels screen carried the six process-wide views behind an index rail. One
+  tabbed surface replaced both.
 
-  `EditScreen.tsx`'s `structureSurface` compiled style is a flex column. The
-  `ribbon` style takes `flex: none`, and the `bench` style takes
-  `flex: 1 1 auto` with `min-height: 36rem`. The ribbon therefore takes its
-  height first, and the page scrolls past the bench's floor.
+  The change deleted four components. Those are `canvas/StepsRegister.tsx`,
+  `panels/StepsPanel.tsx`, `panels/sectionSummary.ts` and
+  `screens/PanelsScreen.tsx`. It deleted the ribbon, the bench and the index
+  rail with them.
 
-  The ribbon's body holds the same `CanvasView` in both states. Its band is
-  12rem tall and its open state 30rem. Only the height and the palette
-  differ, so every canvas gesture stays live in both.
+  The file `EditScreen.tsx` holds one inner component, `ProcessSurface`. That
+  component owns the tab row, the ten bodies and the routing. The module
+  `routing.ts` owns the tab list itself, as `ProcessTab` and `PROCESS_TABS`.
+  The route type names the ten, so a body cannot reach for a name the address
+  refuses.
 
-  `canvas/CanvasPalette.tsx` carries the palette the edit rail once held. It
-  lists inside the expanded ribbon alone. A draft holding no step reaches the
-  same draft mutation through the steps register's own add control.
+  Ten bodies render and nine hide, under the `hidden` attribute the panels
+  screen already used. A body keeps its half-typed values across a switch. The
+  attribute takes a hidden subtree out of the tab order and out of the
+  accessibility tree, with no CSS.
 
-  The ribbon persists nothing. Its open flag is `EditorArea` component state.
-  The `layout` blob takes no key: it is per-draft, so one author's expanded
-  ribbon would open for every author.
+  The module `draft/process-tabs.ts` carries three pure functions. The first,
+  `processTabCounts`, yields the number beside each tab name. It answers
+  `undefined` for Canvas and Contract, which count nothing. The second,
+  `tabForIssue`, maps an issue's entity type onto the tab that owns it. The
+  third, `formEditorReturnTab`, yields the tab the form editor returns to.
 
-  The ribbon's bar carries the collapsed `ChecksRail` under an `inBar` prop.
-  That is the structure surface's one summary. Expanding it grows the bar and
-  pushes the bench down, and it casts no shadow.
+  The row component `ProcessTabRow.tsx` renders a `tablist` of buttons. Each
+  tab is its own tab stop. The row scrolls sideways and never wraps. Its
+  overflow menu holds the JSON surface, Versions and Player. The JSON entry
+  names its own state, so an author reads what pressing it does.
 
-  `StepsRegister` lists one row per step. `draft/registerOrder.ts` orders
-  them by reachability from `initialStep`, unreachable steps next, terminal
-  steps last. `draft/roleStamp.ts` maps each step to `initial`, `task`,
-  `subprocess` or `end`, with its tone. Both are pure modules with a
-  `bun:test` behind them. The register's foot carries the six process links,
-  now including Changes and Paths.
+  The component `DraftNavControls.tsx` renders Checks, Save, Discard draft and
+  Publish into the studio's area nav. That nav renders outside
+  `DraftProvider`, so the surface reaches it through a portal. The element
+  `root.tsx` reserves is the portal's target. The function `checksDotState` in
+  `draft/checksRail.ts` decides the Checks dot: blocker, advisory or clear.
 
-  `StepsPanel` opens with a masthead that does not scroll. Below it stands a
-  register of sections.
+  The rail component `StepsRail.tsx` lists one numbered row per step. The
+  module `draft/registerOrder.ts` orders them by reachability from
+  `initialStep`, unreachable steps next, end steps last. The module
+  `draft/roleStamp.ts` maps each step to `initial`, `task`, `subprocess` or
+  `end`, with its tone. The module `panels/stepRailRow.ts` yields a row's
+  summary line and its issue badge.
 
-  The module `panels/sectionsFor.ts` yields the section list for a
-  performed-by value. Its neighbor `panels/sectionSummary.ts` yields each
-  section's value, its issue count and the default open set. The open set
-  lives in `EditorArea` state, keyed by step id, for the reason the ribbon's
-  flag does. The change deleted `BehaviorTab`, `defaultTabFor` and both reset
-  effects.
+  The page component `StepPage.tsx` stands one step whole. A masthead holds
+  the step number, the kind phrase, the name, the key and the description.
+  Below it every section the step's kind declares stands open, in two columns.
+  The module `panels/sectionsFor.ts` picks the section set and splits it into
+  those columns. The module `panels/sectionIssues.ts` routes each open issue to
+  one section heading.
 
-  The dock's three tabs became panels-screen views. There are six names in
-  `PANEL_VIEWS` now. The modules `panels/ChangesView.tsx` and
-  `panels/PathsView.tsx` carry the first two, and the field matrix was
-  already a view.
+  The section bodies are the configuration pane's own, reparented. The
+  collapse chrome and the runtime ordering went with the pane. Two columns
+  cannot carry one runtime order, so the page groups by subject instead. A 1px
+  hairline rules the gutter. The page falls to one column under 64rem, and the
+  gutter rule goes with the second column.
+
+  The tab component `FormsTab.tsx` plates one card per step declaring a view.
+  The module `panels/formCardRows.ts` yields each card's label, role, field
+  count, miniature entries and issue badge. It is a pure function with its own
+  `bun:test` behind it. A card takes a 1px hairline box. An empty form takes a
+  2px box in the advisory color instead.
+
+  The form editor's trailing pane is `FormPreview.tsx`. It mounts
+  `packages/form-ui`'s own `FieldForm` and `PathButtons`, the two the Player
+  mounts against a real instance. No second renderer exists. The pane carries
+  the `inert` attribute, so it answers no gesture and takes no focus.
+
+  The module `draft/guided-labels.ts` words the authoring controls. The
+  function `assignmentStrategyLabel` names the four shipped strategies, and
+  `assignmentWord` answers for one step. The function `stepKindPhrase` words a
+  step's kind. Each one reads the catalog on every call, so a stored override
+  reaches the word. A registered strategy the curated table misses falls back
+  to its registry type, in mono.
+
+  The module `draft/time-limit.ts` reads a `Timer.duration` as a number and a
+  unit. The function `timeLimitParts` yields the pair, over hours, days and
+  weeks. The function `timeLimitDuration` writes the ISO-8601 string back. The
+  pair `maxTimeLimitCount` and `timeLimitInRange` bound the number against the
+  window `validateDurations` enforces at publish. A duration the pair cannot
+  state keeps its written form, `P1DT4H30M` for one.
 
   The Changes view runs `diffJson(strippedBase, draft)` over the LIVE draft,
   unsaved edits included. Base first is load-bearing. The function reports a
@@ -4414,20 +4455,25 @@ meets `scope=started` should infer no new permission tier from it.
   as a pure function, with `packages/web/test/studio-pathRows.test.ts` behind
   it. Every row carries `guardSrc`, with no branch on the trigger. The schema
   puts `guard` on the path beside `trigger`, and `resolveAvailablePaths`
-  evaluates a manual path's guard before offering it. The Paths section's
+  evaluates a manual path's guard before offering it. The Path to section's
   `PathsPanel` shows the guard editor for an automatic path only. Switching a
-  guarded path back to
-  manual keeps the guard, so a real draft reaches that state.
+  guarded path back to manual keeps the guard, so a real draft reaches that
+  state.
 
-  `EditorAreaProps` gained `loadedBaseVersion`, which `EditScreen.load`
-  discarded before. That prop cannot move, because `load` depends on
-  `processId`, `token` and `onUnauthorized` alone. So `EditorArea` derives
-  `publishResult?.version ?? loadedBaseVersion`. The Changes view then
-  refetches after a publish with no reload.
+  The component `ProcessSurfaceProps` gained `loadedBaseVersion`, which
+  `EditScreen.load` discarded before. That prop cannot move, because `load`
+  depends on `processId`, `token` and `onUnauthorized` alone. So
+  `ProcessSurface` derives `publishResult?.version ?? loadedBaseVersion`. The
+  Changes view then refetches after a publish with no reload.
 
-  `FieldMatrixGrid.tsx` lost its `compact` prop and its `matrixScrollCompact`
-  style with the dock. Its `matrixScroll` style still caps at 32rem and
-  scrolls itself, and `FieldMatrixPanel` is its one mount.
+  The grid `FieldMatrixGrid.tsx` lost its `compact` prop and its
+  `matrixScrollCompact` style with the dock. Its `matrixScroll` style still
+  caps at 32rem and scrolls itself, and `FieldMatrixPanel` is its one mount.
+
+  The catalog namespace `dock.` went with the strip it named. Eleven of its
+  keys read `pathsView.` and `changesView.` now, one namespace per component
+  that reads them. Six named a control nothing renders any more, and the
+  change deleted those six.
 
 ## Instance audit log (`instance-audit-log-chain`)
 
@@ -4669,7 +4715,7 @@ The studio reads that field rather than a role. Neither authoring role implies
 the publish permission. A scoped grant reaches it without either role. So a
 role check answers wrong in both directions.
 
-The component `EditScreen` passes the loaded value into `EditorArea` as a prop.
+The component `EditScreen` passes the loaded value into `ProcessSurface` as a prop.
 That component folds whatever `reload()` re-read over it, the way
 `changesBaseVersion` folds a publish result's version. The field deliberately
 does not join `DraftSaveState`.

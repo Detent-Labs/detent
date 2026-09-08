@@ -71,8 +71,6 @@ function renderHeader(findings: PublishFinding[]): string {
         actions={{ saving: false, publishing: false, error: null, pendingDialog: null, resolveDialog: () => {}, save: () => {}, discard: () => {}, publish: () => {}, reload: () => {} }}
         structureActive={true}
         processId="proc_a"
-        canPublish={true}
-        baseVersion={null}
         go={() => {}}
       />
     </DraftContext.Provider>,
