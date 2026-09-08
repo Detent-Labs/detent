@@ -368,6 +368,7 @@ function CelStamp({ label, src }: { label: string; src: string }) {
  * which takes all three states, and writes through `applyBulkToggle` inside
  * one `mutate()` call. */
 function BulkBadges({
+  active,
   targets,
   allSteps,
   written,
@@ -380,6 +381,9 @@ function BulkBadges({
    * The accessible name carries both, so thirty badges stop sharing three
    * names between them. */
   scope: { kind: "column" | "row"; name: string };
+  /** True while this header holds the grid's focus and the author has
+   * activated it. Only then do its badges take the keyboard. */
+  active: boolean;
   allSteps: Parameters<typeof bulkBadgeOn>[0];
   written: WrittenAccessor;
   technicalFieldIds: Set<string>;
@@ -419,6 +423,7 @@ function BulkBadges({
             type="button"
             {...stylex.props(styles.matrixFlagBadge, badgeStateStyle(state, key))}
             aria-pressed={badgeAriaPressed(state)}
+            tabIndex={active ? undefined : -1}
             aria-label={name}
             title={name}
             onClick={() => onToggle(key)}
@@ -472,16 +477,30 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
 
   const rowCount = rows.length;
   const colCount = drawnSteps.length;
-  const clamp = (n: number, count: number) => Math.max(0, Math.min(n, count - 1));
+  // Headers join the roving model when they carry bulk badges, so a badge
+  // takes no tab stop of its own (`spa-accessibility`: "A control inside a
+  // grid cell joins the grid's roving model"). Row -1 is the header row and
+  // col -1 the header column; together they reach the corner.
+  const headerFloor = showBulkBadges ? -1 : 0;
+  const clamp = (n: number, count: number, min: number) => Math.max(min, Math.min(n, count - 1));
 
   const moveFocus = (next: Focus) => {
     if (rowCount === 0 || colCount === 0) return;
-    const clamped = { row: clamp(next.row, rowCount), col: clamp(next.col, colCount) };
+    const clamped = {
+      row: clamp(next.row, rowCount, headerFloor),
+      col: clamp(next.col, colCount, headerFloor),
+    };
     setFocus(clamped);
     cellRefs.current.get(cellKey(clamped.row, clamped.col))?.focus();
   };
 
   const activate = () => {
+    // A header carrying badges activates the way a live cell does: the
+    // gesture is one Enter, and the controls inside become reachable.
+    if (focus.row === -1 || focus.col === -1) {
+      if (showBulkBadges) setActivated(true);
+      return;
+    }
     const row = rows[focus.row];
     const col = drawnSteps[focus.col];
     if (row && col && cellState(col.step, row.id) === "live") setActivated(true);
@@ -575,12 +594,34 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
       <table {...stylex.props(styles.matrixTable)} role="grid" aria-label={t("fieldMatrix.heading")} onKeyDown={onGridKeyDown}>
         <thead>
           <tr>
-            <th scope="col" {...stylex.props(styles.matrixCorner)} />
+            <th
+              scope="col"
+              {...stylex.props(styles.matrixCorner)}
+              ref={(el) => {
+                if (!showBulkBadges) return;
+                if (el) cellRefs.current.set(cellKey(-1, -1), el);
+                else cellRefs.current.delete(cellKey(-1, -1));
+              }}
+              tabIndex={showBulkBadges && focus.row === -1 && focus.col === -1 && !activated ? 0 : -1}
+              onFocus={() => showBulkBadges && setFocus({ row: -1, col: -1 })}
+            />
             {drawnSteps.map(({ step, index: stepIndex }, colIndex) => {
               const inert = step.view === undefined;
               const colTargets = showBulkBadges ? columnLiveTargets(rows, step, stepIndex) : [];
               return (
-                <th key={step.id ?? colIndex} scope="col" {...stylex.props(styles.matrixColHeader)} data-inert={inert || undefined}>
+                <th
+                  key={step.id ?? colIndex}
+                  scope="col"
+                  {...stylex.props(styles.matrixColHeader)}
+                  data-inert={inert || undefined}
+                  ref={(el) => {
+                    if (!showBulkBadges) return;
+                    if (el) cellRefs.current.set(cellKey(-1, colIndex), el);
+                    else cellRefs.current.delete(cellKey(-1, colIndex));
+                  }}
+                  tabIndex={showBulkBadges && focus.row === -1 && focus.col === colIndex && !activated ? 0 : -1}
+                  onFocus={() => showBulkBadges && setFocus({ row: -1, col: colIndex })}
+                >
                   <span {...stylex.props(styles.matrixColLabel)}>
                     {resolveDraftLocalizedText(step.label, contentLocale, baseLocale) || step.key || t("steps.unnamedStep")}
                   </span>
@@ -589,6 +630,7 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
                   {showBulkBadges && colTargets.length > 0 && (
                     <BulkBadges
                       targets={colTargets}
+                      active={activated && focus.row === -1 && focus.col === colIndex}
                       scope={{
                         kind: "column",
                         name:
@@ -621,6 +663,13 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
                   )}
                   data-depth={row.depth}
                   data-technical={technicalIds.has(row.id) || undefined}
+                  ref={(el) => {
+                    if (!showBulkBadges) return;
+                    if (el) cellRefs.current.set(cellKey(rowIndex, -1), el);
+                    else cellRefs.current.delete(cellKey(rowIndex, -1));
+                  }}
+                  tabIndex={showBulkBadges && focus.col === -1 && focus.row === rowIndex && !activated ? 0 : -1}
+                  onFocus={() => showBulkBadges && setFocus({ row: rowIndex, col: -1 })}
                 >
                   <span {...stylex.props(styles.matrixFieldKey)}>{row.key === "" ? t("panelsScreen.unnamedField") : row.key}</span>
                   <span {...stylex.props(styles.matrixFieldType)} aria-label={`${t("fieldMatrix.rowTypeLabel")}: ${row.type}`}>
@@ -634,6 +683,7 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
                   {showBulkBadges && rowTargets.length > 0 && (
                     <BulkBadges
                       targets={rowTargets}
+                      active={activated && focus.col === -1 && focus.row === rowIndex}
                       scope={{ kind: "row", name: row.key === "" ? t("panelsScreen.unnamedField") : row.key }}
                       allSteps={allSteps}
                       written={written}

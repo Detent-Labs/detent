@@ -21,12 +21,12 @@
 
 ## 3. The keyboard
 
-- [ ] 3.1 Give every bulk badge `tabIndex={-1}`
-- [ ] 3.2 Extend the arrow handler from the first data row into the header row
-- [ ] 3.3 Move focus along the header row with the left and right arrows
-- [ ] 3.4 Return focus to the data rows with the down arrow
-- [ ] 3.5 Test that the grid is one tab stop with badges present
-- [ ] 3.6 Test that an arrow key reaches a header badge
+- [x] 3.1 Give every bulk badge `tabIndex={-1}`
+- [x] 3.2 Extend the arrow handler from the first data row into the header row
+- [x] 3.3 Move focus along the header row with the left and right arrows
+- [x] 3.4 Return focus to the data rows with the down arrow
+- [x] 3.5 Test that the grid is one tab stop with badges present
+- [x] 3.6 Test that an arrow key reaches a header badge
 
 ## 4. The rest
 
