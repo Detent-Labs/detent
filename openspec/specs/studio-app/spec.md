@@ -699,10 +699,16 @@ deeper indent. This is a rail-rendering rule only: the draft's own field tree
 SHALL keep whatever depth it declares.
 
 The Fields rail entry SHALL name a field by its resolved label alone, on one
-line. The field's kind name and the issue mark SHALL sit beside it. The row SHALL
-NOT print the field's key. The key stays in the definition half's "What this
-field asks" zone, once an author selects that field. The engine's own exact-match
-value already lives there.
+line. A label too long for the rail's width SHALL truncate there rather than
+wrap onto a second line. The field's kind name and the issue mark SHALL sit
+beside it, on that same line. A kind name too long for its own share of the
+line SHALL truncate the same way.
+
+The row SHALL NOT print the field's key. The key stays in the definition
+half's "What this field asks" zone, once an author selects that field. The
+engine's own exact-match value already lives there. The Data sources rail
+entry names its data source through the same rail-row name element. An
+over-long data source key SHALL truncate on its one line the identical way.
 
 The kind name SHALL come from the same table the kind picker reads. A row naming
 the base type while the picker beside it names the kind would give one field two
@@ -858,6 +864,27 @@ empty-key field did before.
 - **WHEN** the author selects a `{type: "string", format: "date"}` field
 - **THEN** the rail row and the kind picker both name that field's kind, with
   the same word
+
+#### Scenario: A long field name truncates instead of wrapping
+
+- **WHEN** a field's resolved label is longer than the rail entry's own
+  width, especially once indented under a group
+- **THEN** the rail entry shows the label truncated on its one line. It
+  prints no character of it on a line of its own
+
+#### Scenario: A long kind name truncates instead of wrapping
+
+- **WHEN** a field's kind name is longer than its own share of the rail
+  entry's line
+- **THEN** the rail entry truncates the kind name on that same line. It
+  prints no character of it on a line of its own
+
+#### Scenario: A long data source key truncates instead of wrapping
+
+- **WHEN** a data source's `key` is longer than the Data sources rail
+  entry's own width
+- **THEN** the rail entry shows the key truncated on its one line. It
+  prints no character of it on a line of its own
 
 <!-- The heading repeats the live spec's wording verbatim, so a delta can match it. -->
 <!-- antislop: allow synonym-rotation -->
