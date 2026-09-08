@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { t, type CatalogKey } from "../catalog.js";
@@ -70,8 +71,13 @@ const styles = stylex.create({
   // blocker: the one tab whose count also reads as a publish-readiness
   // signal. `colors.refusal` is the same token the checks rail's own
   // held-back and blocker states already read (`studio-process-tabs`).
+  // Weight 800 is the written face's own second weight, the one
+  // `tabSelected` above already reads, so the row keeps one weight
+  // vocabulary. It carries the state at a glance, where color alone reads
+  // slowly.
   tabCountBlocker: {
     color: colors.refusal,
+    fontWeight: 800,
   },
   // Off screen, never `display: none`: a hidden node is announced by no
   // engine. Carries the blocker state's text equivalent, since the color
@@ -110,15 +116,59 @@ interface Props {
  * The process surface's tab row (`studio-process-tabs`). Ten tabs in
  * authoring order, and nothing else — the trailing edge is the last tab.
  *
- * The keyboard model is the area's own, per `spa-accessibility`'s tab pattern:
- * every tab is its own stop in the tab order, the way a button is, and Enter or
- * Space opens the focused one. It carries no roving tab stop and binds no
- * arrow key, so the row introduces no second model beside the one the rest of
- * the area follows.
+ * The keyboard model is roving-tabindex, per `spa-accessibility`'s own named
+ * exception for a tab set carrying many tabs in one line that scrolls
+ * sideways. This row is the one tab set of that shape in the browser
+ * packages. The whole row is one stop in the page's tab order: the focused
+ * tab carries `tabindex="0"` and the other nine `tabindex="-1"`. The left and
+ * right arrow keys move focus, wrapping at the row's ends, and Enter or Space
+ * opens the focused tab. Ten plain stops would cost a keyboard user ten Tab
+ * presses to cross the row. Every other tab set keeps the plain-button model.
  */
 export function ProcessTabRow({ open, counts, checksBlocked, onOpen, jsonOpen }: Props) {
+  const [focusedTab, setFocusedTab] = useState<ProcessTab>(open);
+  const [announcement, setAnnouncement] = useState("");
+  const tabRefs = useRef(new Map<ProcessTab, HTMLButtonElement>());
+  const wasBlocked = useRef(checksBlocked);
+
+  // Opening a tab brings focus and selection back together, whatever opened
+  // it (`studio-process-tabs`). A click on the already-open tab moves no
+  // selection, so the `onFocus` below is what re-seats the stop in that case.
+  useEffect(() => {
+    setFocusedTab(open);
+  }, [open]);
+
+  // Only the clear-to-blocker edge announces. A fix resolving is a different
+  // concern, and the reverse transition stays silent (design.md Non-Goals).
+  // The region itself stays mounted below: no engine reliably announces a
+  // live region that arrives with its text already inside it.
+  useEffect(() => {
+    if (checksBlocked && !wasBlocked.current) setAnnouncement(t("tabs.checksBlockingAnnounced"));
+    wasBlocked.current = checksBlocked;
+  }, [checksBlocked]);
+
+  // Arrow keys move focus alone; they open no tab. That is the WAI-ARIA tabs
+  // pattern's manual-activation variant, and `FieldMatrixGrid.tsx`'s own grid
+  // reads the same way. Opening a studio tab mounts a canvas, a grid or a form
+  // editor, so a stray arrow press must not swap the body by accident.
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+    if (step === 0) return;
+    // A key event from anything but one of the ten tab buttons is not ours.
+    const from = PROCESS_TABS.findIndex((tab) => tabRefs.current.get(tab) === e.target);
+    if (from === -1) return;
+    // `preventDefault` on the two arrow keys alone, so the row's own sideways
+    // scroll does not fire beside the focus move.
+    e.preventDefault();
+    const next = PROCESS_TABS[(from + step + PROCESS_TABS.length) % PROCESS_TABS.length];
+    if (next === undefined) return;
+    setFocusedTab(next);
+    tabRefs.current.get(next)?.focus();
+  };
+
   return (
-    <div {...stylex.props(styles.row)} role="tablist" aria-label={t("tabs.rowLabel")}>
+    <>
+    <div {...stylex.props(styles.row)} role="tablist" aria-label={t("tabs.rowLabel")} onKeyDown={onKeyDown}>
       {PROCESS_TABS.map((tab) => {
         const count = counts[tab];
         // The JSON surface stands no tab, so none reports itself selected
@@ -130,12 +180,18 @@ export function ProcessTabRow({ open, counts, checksBlocked, onOpen, jsonOpen }:
           <button
             key={tab}
             id={tabDomId(tab)}
+            ref={(node) => {
+              if (node) tabRefs.current.set(tab, node);
+              else tabRefs.current.delete(tab);
+            }}
             type="button"
             role="tab"
             aria-selected={selected}
             aria-controls={tabPanelDomId(tab)}
+            tabIndex={tab === focusedTab ? 0 : -1}
             {...stylex.props(styles.tab, selected && styles.tabSelected)}
             onClick={() => onOpen(tab)}
+            onFocus={() => setFocusedTab(tab)}
           >
             <span>{t(TAB_LABEL[tab])}</span>
             {count !== undefined && (
@@ -146,5 +202,13 @@ export function ProcessTabRow({ open, counts, checksBlocked, onOpen, jsonOpen }:
         );
       })}
     </div>
+    {/* Outside the `tablist`, whose ARIA content model owns `tab` children
+      * alone. Mounted at all times and empty until the edge above fills it,
+      * so the engine announces a change rather than an arrival. Polite: a
+      * blocker appearing is not worth interrupting what is already speaking. */}
+    <p {...stylex.props(styles.visuallyHidden)} role="status" aria-live="polite">
+      {announcement}
+    </p>
+    </>
   );
 }

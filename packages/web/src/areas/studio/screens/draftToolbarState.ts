@@ -12,11 +12,14 @@ export function isDirty(current: unknown, savedSnapshot: unknown): boolean {
 }
 
 /** What the Publish control renders, resolved from the loaded draft's own
- * `canPublish` report. */
+ * `canPublish` report and the draft's own worst open issue. */
 export interface PublishAvailability {
   available: boolean;
-  /** The catalog key of the reason, when the control is unavailable. */
-  reasonKey?: "draftToolbar.publishUnavailable";
+  /** The catalog key of the reason, when the control carries one. An
+   * unavailable control always carries one. An available control carries the
+   * blocked reason too, so a blocking issue reads before the click rather
+   * than only inside the dialog the click opens. */
+  reasonKey?: "draftToolbar.publishUnavailable" | "draftToolbar.publishBlockedReason";
 }
 
 /**
@@ -29,9 +32,17 @@ export interface PublishAvailability {
  * `undefined` reads as unavailable. A response that carries no field is a
  * response the engine never blessed, and the safe reading of an absent
  * permission is that it is absent.
+ *
+ * `blocked` is whether the draft's worst open issue is a blocker. A blocked
+ * draft stays publishable, so this reports `available: true` beside the
+ * reason. The two reasons never compete for the one span: the early return
+ * below answers the permission first, and reaches `blocked` only once the
+ * permission holds.
  */
-export function publishAvailability(canPublish: boolean | undefined): PublishAvailability {
-  return canPublish === true ? { available: true } : { available: false, reasonKey: "draftToolbar.publishUnavailable" };
+export function publishAvailability(canPublish: boolean | undefined, blocked: boolean): PublishAvailability {
+  if (canPublish !== true) return { available: false, reasonKey: "draftToolbar.publishUnavailable" };
+  if (blocked) return { available: true, reasonKey: "draftToolbar.publishBlockedReason" };
+  return { available: true };
 }
 
 /**

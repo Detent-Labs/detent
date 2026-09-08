@@ -4388,9 +4388,11 @@ meets `scope=started` should infer no new permission tier from it.
   `tabForIssue`, maps an issue's entity type onto the tab that owns it. The
   third, `formEditorReturnTab`, yields the tab the form editor returns to.
 
-  The row component `ProcessTabRow.tsx` renders a `tablist` of buttons. Each
-  tab is its own tab stop. The row scrolls sideways and never wraps, with no
-  trailing control of its own. It still takes a `jsonOpen` prop, read-only,
+  The row component `ProcessTabRow.tsx` renders a `tablist` of buttons. The
+  whole row is one tab stop, on `spa-accessibility`'s roving-tabindex
+  pattern: the focused tab carries `tabindex="0"` and the other nine
+  `tabindex="-1"`, and the arrow keys move focus without opening a tab. The
+  row scrolls sideways and never wraps, with no trailing control of its own. It still takes a `jsonOpen` prop, read-only,
   to suppress every tab's `aria-selected` while the JSON surface stands
   open. `ProcessHeaderBar.tsx`'s `⋮` menu carries the JSON surface, Versions
   and Player instead, under its "Views" group. The JSON entry names its own

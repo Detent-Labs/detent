@@ -176,18 +176,36 @@ describe("isDirty", () => {
  * naive increment renders as `vNaN`.
  */
 describe("publishAvailability (studio-publish: the client gate reads the engine's report)", () => {
-  it("a true report offers the control, with no reason", () => {
-    expect(publishAvailability(true)).toEqual({ available: true });
+  it("a true report on an unblocked draft offers the control, with no reason", () => {
+    expect(publishAvailability(true, false)).toEqual({ available: true });
   });
 
   it("a false report withholds the control and names a reason key", () => {
-    const resolved = publishAvailability(false);
+    const resolved = publishAvailability(false, false);
     expect(resolved.available).toBe(false);
     expect(resolved.reasonKey).toBe("draftToolbar.publishUnavailable");
   });
 
   it("an absent report reads as unavailable, not as permitted", () => {
-    expect(publishAvailability(undefined).available).toBe(false);
+    expect(publishAvailability(undefined, false).available).toBe(false);
+  });
+
+  // The blocked-but-permitted pair, the combination the old one-argument
+  // signature could not express: a reason beside `available: true`.
+  it("a blocked draft keeps the control available and names the blocking reason", () => {
+    const resolved = publishAvailability(true, true);
+    expect(resolved.available).toBe(true);
+    expect(resolved.reasonKey).toBe("draftToolbar.publishBlockedReason");
+  });
+
+  // The permission answers first, so the two reasons never compete for the
+  // one span. An unpermitted actor never reads the blocked reason.
+  it("an absent permission outranks the blocked state, whatever blocked holds", () => {
+    for (const blocked of [true, false]) {
+      const resolved = publishAvailability(false, blocked);
+      expect(resolved.available).toBe(false);
+      expect(resolved.reasonKey).toBe("draftToolbar.publishUnavailable");
+    }
   });
 });
 

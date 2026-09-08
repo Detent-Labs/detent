@@ -1,6 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
-import { colors, fonts, space } from "form-ui/tokens.stylex";
+import { colors, space } from "form-ui/tokens.stylex";
 import { t } from "../catalog.js";
+import { issueSourceLabel } from "./shared/IssueList";
 import { allChecksClear, groupChecksBySource } from "../draft/checksRail";
 import type { EditorIssue } from "../draft/issues";
 import type { ValidationResult } from "../draft/validation";
@@ -35,15 +36,12 @@ const styles = stylex.create({
     borderTopStyle: "solid",
     borderTopColor: colors.border,
   },
+  // The heading's layout alone. Its face, size, transform, tracking and color
+  // come from `issueSourceLabel`, which this composes over.
   checksGroupHeading: {
     marginBlockEnd: space.s1,
     marginBlockStart: 0,
     marginInline: 0,
-    fontFamily: fonts.mono,
-    fontSize: "0.8rem",
-    textTransform: "uppercase",
-    letterSpacing: "0.06em",
-    color: colors.textMuted,
   },
   checksGroupHeldBack: {
     margin: 0,
@@ -178,9 +176,10 @@ export function ChecksRail({ validation, canPublish, onOpenIssue, narrowedTo, on
         {groups.map((group) => (
           <section key={group.source} {...stylex.props(styles.checksGroup)}>
             {/* The source name is the same untranslated machine value
-                IssueList already prints (`[{issue.source}]`) — a category
-                this validation pipeline itself defines, not authored prose. */}
-            <h3 {...stylex.props(styles.checksGroupHeading)}>{group.source}</h3>
+                IssueList already prints in its own label — a category this
+                validation pipeline itself defines, not authored prose. Both
+                sites read one identity style, `issueSourceLabel`. */}
+            <h3 {...stylex.props(issueSourceLabel, styles.checksGroupHeading)}>{group.source}</h3>
             {group.heldBack ? (
               <p {...stylex.props(styles.checksGroupHeldBack)}>{t("checksRail.heldBack")}</p>
             ) : (

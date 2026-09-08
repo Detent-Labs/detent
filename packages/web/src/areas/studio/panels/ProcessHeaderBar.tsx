@@ -115,6 +115,14 @@ const styles = stylex.create({
     letterSpacing: "0.1em",
     color: colors.textMuted,
   },
+  // The blocked reason names an issue the draft itself carries, the same fact
+  // the Checks count and the structurally-invalid banner already color. It
+  // composes over `publishReason` above, the way `tabCountBlocker` composes
+  // over `tabCount` in `ProcessTabRow.tsx`. The permission-denied reason keeps
+  // the muted tone: it names an administrative fact about the actor instead.
+  publishBlockedReason: {
+    color: colors.refusal,
+  },
   // `::backdrop` stays a literal fallback in `app.css`, which the
   // `studio-dialog` class beside this compiled style keeps matching.
   dialog: {
@@ -264,14 +272,21 @@ const styles = stylex.create({
   },
 });
 
-/** The Publish control points `aria-describedby` here when the permission is
- * absent. One header bar renders per screen, so one constant id suffices. */
-const PUBLISH_REASON_ID = "studio-publish-unavailable-reason";
+/** The Publish control points `aria-describedby` here whenever it carries a
+ * reason. Two reach it: the permission is absent, or a blocking issue stands
+ * in the draft. One header bar renders per screen, so one constant id
+ * suffices. */
+const PUBLISH_REASON_ID = "studio-publish-reason";
 
 /**
- * The header bar's Publish control, with the reason line that renders beneath it
- * when the permission is absent (studio-publish: "The studio offers Publish
- * only where the engine would admit it, and names the reason otherwise").
+ * The header bar's Publish control, with the reason line that renders beneath
+ * it (studio-publish: "The studio offers Publish only where the engine would
+ * admit it, and names the reason otherwise").
+ *
+ * Two reasons render there. An absent permission makes the control
+ * unavailable. A blocking issue in the draft leaves it available and
+ * operable: the click still opens the confirmation dialog, which states the
+ * same warning. The reason says so before the click rather than only after.
  *
  * A component of its own because the gate and its reason are one concept: the
  * `role="group"` wrapper, the `aria-disabled` control, the reason line and the
@@ -287,16 +302,20 @@ const PUBLISH_REASON_ID = "studio-publish-unavailable-reason";
  */
 export function PublishNavControl({
   canPublish,
+  blocked,
   publishing,
   onPublish,
   triggerRef,
 }: {
   canPublish: boolean;
+  /** True when the draft's worst open issue is a blocker. Adds a reason; it
+   * leaves the control available and operable. */
+  blocked: boolean;
   publishing: boolean;
   onPublish: () => void;
   triggerRef?: RefObject<HTMLButtonElement | null>;
 }) {
-  const gate = publishAvailability(canPublish);
+  const gate = publishAvailability(canPublish, blocked);
   return (
     <div role="group">
       <button
@@ -304,8 +323,12 @@ export function PublishNavControl({
         type="button"
         className="btn btn-primary"
         disabled={publishing}
+        // `aria-disabled` and the click guard read availability, so the
+        // blocked-but-permitted control stays operable. `aria-describedby`
+        // reads the reason instead, so the new case's text reaches the button
+        // the same way the permission case's already does.
         aria-disabled={gate.available ? undefined : true}
-        aria-describedby={gate.available ? undefined : PUBLISH_REASON_ID}
+        aria-describedby={gate.reasonKey ? PUBLISH_REASON_ID : undefined}
         onClick={() => {
           if (!gate.available) return;
           onPublish();
@@ -314,7 +337,13 @@ export function PublishNavControl({
         {publishing ? t("draftToolbar.publishing") : t("draftToolbar.publish")}
       </button>
       {gate.reasonKey && (
-        <span id={PUBLISH_REASON_ID} {...stylex.props(styles.publishReason)}>
+        <span
+          id={PUBLISH_REASON_ID}
+          {...stylex.props(
+            styles.publishReason,
+            gate.reasonKey === "draftToolbar.publishBlockedReason" && styles.publishBlockedReason,
+          )}
+        >
           {t(gate.reasonKey)}
         </span>
       )}
@@ -785,6 +814,7 @@ export function ProcessHeaderBar({
           </button>
           <PublishNavControl
             canPublish={canPublish}
+            blocked={blocked}
             publishing={actions.publishing}
             onPublish={actions.publish}
             triggerRef={publishTriggerRef}
