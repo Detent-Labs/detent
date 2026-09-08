@@ -4213,7 +4213,7 @@ meets `scope=started` should infer no new permission tier from it.
   and `panelEntityCounts` stays for the callers that still read it.
 
   No view carries a Save, the rule the overlay already had. Every view writes
-  into the in-browser draft, and the area nav's Save persists it.
+  into the in-browser draft, and the header bar's Save persists it.
 
 - Process Studio, the field matrix (`packages/web/src/areas/studio/panels/
   FieldMatrixPanel.tsx`, `fieldMatrixLogic.ts`, `studio-app`,
@@ -4397,11 +4397,14 @@ meets `scope=started` should infer no new permission tier from it.
   state, so an author reads what pressing it does
   (`studio-header-menu-merge`).
 
-  The component `DraftNavControls.tsx` renders Checks, Save, Discard draft and
-  Publish into the studio's area nav. That nav renders outside
-  `DraftProvider`, so the surface reaches it through a portal. The element
-  `root.tsx` reserves is the portal's target. The function `checksDotState` in
-  `draft/checksRail.ts` decides the Checks dot: blocker, advisory or clear.
+  The component `DraftNavControls.tsx` renders Checks into the studio's area
+  nav. That nav renders outside `DraftProvider`, so the surface reaches it
+  through a portal. The element `root.tsx` reserves is the portal's target.
+  The function `checksDotState` in `draft/checksRail.ts` decides the Checks
+  dot: blocker, advisory or clear. Save, Discard draft and Publish render
+  directly in `ProcessHeaderBar.tsx` instead, right-aligned ahead of its `⋮`
+  menu trigger. That component already sits inside `EditScreen.tsx`'s own
+  tree, so it renders them without a portal.
 
   The rail component `StepsRail.tsx` lists one numbered row per step. The
   module `draft/registerOrder.ts` orders them by reachability from

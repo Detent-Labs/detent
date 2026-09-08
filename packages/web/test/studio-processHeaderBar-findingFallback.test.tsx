@@ -69,6 +69,10 @@ function renderHeader(findings: PublishFinding[]): string {
         publishResult={publishResult}
         conflict={false}
         actions={{ saving: false, publishing: false, error: null, pendingDialog: null, resolveDialog: () => {}, save: () => {}, discard: () => {}, publish: () => {}, reload: () => {} }}
+        canPublish={true}
+        baseVersion={null}
+        validation={validation}
+        processLabel="Expense approval"
         structureActive={true}
         processId="proc_a"
         go={() => {}}

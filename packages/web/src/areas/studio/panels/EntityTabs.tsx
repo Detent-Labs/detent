@@ -114,10 +114,28 @@ const styles = stylex.create({
     borderBottomWidth: 0,
     cursor: "grab",
   },
+  // `studio-app` requires the rail entry to name its field on one line.
+  // `minWidth: 0` lets the flex item shrink below its content's width; the
+  // three properties below then truncate instead of wrapping into it.
+  //
+  // A real `4.5rem` basis, not the zero basis `flex: 1` carries, and not
+  // `railType`'s own auto (content-tracking) basis either. A first pass
+  // gave the name `flex: "1 1 7rem"` and left `railType` on its default
+  // `0 1 auto` — measured (`getBoundingClientRect` against `scrollWidth`
+  // on the live rail) to starve `railType` even for a four-character kind
+  // like "Date", because 7rem alone already exceeds this button's ~86px
+  // typical combined budget for the two spans, and an auto-basis kind
+  // shrinks proportionally right along with it. `railType` below now
+  // carries a matching fixed `3rem` basis instead of auto, so a short kind
+  // word's claim on the row no longer depends on how little it needs —
+  // both spans get a floor sized off the measured typical budget, name
+  // larger since it is the row's primary text.
   railName: {
-    flex: 1,
+    flex: "1 1 4.5rem",
     minWidth: 0,
-    overflowWrap: "anywhere",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
   },
   // The written face carries two weights and no third, so the selected
   // row's name takes 800 rather than a tint the hover wash would collide
@@ -126,13 +144,17 @@ const styles = stylex.create({
     fontWeight: 800,
   },
   // The field's kind — a word an author reads, so the written face, not
-  // mono. `minWidth: 0` and the wrap keep a long German kind name
-  // ("Mehrfachauswahl") inside the rail's 16rem column.
+  // mono. A fixed `3rem` basis, not auto: see `railName`'s comment above.
+  // `minWidth: 0` and the truncation keep a long German kind name
+  // ("Mehrfachauswahl") on the rail's one line, inside its 16rem column.
   railType: {
+    flex: "0 1 3rem",
     minWidth: 0,
     fontSize: "0.8rem",
     color: colors.textMuted,
-    overflowWrap: "anywhere",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
   },
   // The move target picker. A select rather than a direction button, because
   // a drop reaches every group and the keyboard has to reach the same set.
@@ -277,8 +299,14 @@ export function PanelsRailFieldRow({
         aria-current={selected ? "true" : undefined}
         onClick={onClick}
       >
-        <span {...stylex.props(styles.railName, selected && styles.railNameSelected)}>{label}</span>
-        {typeLabel && <span {...stylex.props(styles.railType)}>{typeLabel}</span>}
+        <span title={label} {...stylex.props(styles.railName, selected && styles.railNameSelected)}>
+          {label}
+        </span>
+        {typeLabel && (
+          <span title={typeLabel} {...stylex.props(styles.railType)}>
+            {typeLabel}
+          </span>
+        )}
         {issues > 0 && (
           <span {...stylex.props(styles.railIssues)} aria-label={`${issues} ${t("panelsScreen.issueMark")}`}>
             {issues}
@@ -557,7 +585,10 @@ export function DataSourcesTab({ token }: { token: string }) {
                   aria-current={selectedDataSourceId === ds.id ? "true" : undefined}
                   onClick={() => setSelectedDataSourceId(ds.id)}
                 >
-                  <span {...stylex.props(styles.railName)}>
+                  <span
+                    title={ds.key === "" || ds.key === undefined ? t("panelsScreen.unnamedDataSource") : ds.key}
+                    {...stylex.props(styles.railName)}
+                  >
                     {ds.key === "" || ds.key === undefined ? t("panelsScreen.unnamedDataSource") : ds.key}
                   </span>
                   {dsIssues > 0 && (
