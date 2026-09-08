@@ -4,8 +4,8 @@
 
 The process surface (`/processes/:id/edit`) SHALL offer a JSON surface. An
 author opens it from the header bar's `⋮` menu. No Structure control and no
-JSON control SHALL stand beside the header bar any more — the JSON entry
-lives inside that menu, not as a separate toggle next to it.
+JSON control SHALL stand beside the header bar any more. The JSON entry
+lives inside that menu, instead of as a separate toggle beside it.
 
 The tab body covers every component that changes the draft body. That includes
 the process header, the field catalog, the data sources and the contract. It
@@ -38,6 +38,7 @@ open.
   currently holds
 - **AND** that state carries any JSON edit already applied
 
+<!-- antislop: allow negation-habit - the scenario title must stay byte-identical to the base spec's -->
 #### Scenario: The header bar carries no surface pair
 
 - **WHEN** the developer reads the header bar's row without opening its `⋮`
