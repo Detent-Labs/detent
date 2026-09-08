@@ -12,7 +12,7 @@ function unwrapDefinitionVersion(value: unknown): unknown {
 
 /**
  * A locally loaded child process JSON for cross-process checks
- * (`checkSubprocessChildRefs`), used by `StepsPanel`'s subprocess step
+ * (`checkSubprocessChildRefs`), used by the step page's subprocess
  * editor. A real, complete file, so it's parsed straight through the actual
  * `processBody` schema. Tolerates the same two on-disk shapes the round-trip
  * test found in `examples/`: a published `ProcessVersion` wrapper (body under

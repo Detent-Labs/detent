@@ -1,8 +1,8 @@
-import { useState } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { t } from "../catalog.js";
-import { allChecksClear, groupChecksBySource, totalOpenIssueCount } from "../draft/checksRail";
+import { allChecksClear, checksDotState, groupChecksBySource, totalOpenIssueCount } from "../draft/checksRail";
+import type { EditorIssue } from "../draft/issues";
 import type { ValidationResult } from "../draft/validation";
 
 const styles = stylex.create({
@@ -14,51 +14,13 @@ const styles = stylex.create({
     borderColor: colors.border,
     padding: space.s3,
   },
-  // The docked, collapsed presentation (`.studio-checks-rail-docked`):
-  // `.canvas-inspector` already draws the bordered box around the whole
-  // inspector, so this variant draws none of its own.
-  checksRailDocked: {
+  // The collapsed form, in the studio's area nav. It stands beside three
+  // buttons in a header row, so it draws no box and takes no padding: the
+  // summary control inside it is the whole of it.
+  checksRailBare: {
+    overflowY: "visible",
     borderWidth: 0,
-    paddingTop: space.s3,
-    paddingRight: 0,
-    paddingBottom: 0,
-    paddingLeft: 0,
-    marginTop: space.s3,
-    borderTopWidth: 2,
-    borderTopStyle: "solid",
-    borderTopColor: colors.divider,
-  },
-  // The panels screen's own docked instance, the sibling directly below
-  // that screen's two columns. The docked variant above drops all four
-  // edges because `.canvas-inspector` boxes the inspector's instance. That
-  // screen boxes nothing, so this one draws the other three edges itself,
-  // at the 1px weight the rail takes when it stands on its own. The 2px top
-  // edge stays: it is the boundary against the columns, the structural
-  // weight.
-  checksRailFramed: {
-    borderRightWidth: 1,
-    borderBottomWidth: 1,
-    borderLeftWidth: 1,
-    borderRightStyle: "solid",
-    borderBottomStyle: "solid",
-    borderLeftStyle: "solid",
-    borderRightColor: colors.border,
-    borderBottomColor: colors.border,
-    borderLeftColor: colors.border,
-    paddingTop: space.s3,
-    paddingRight: space.s3,
-    paddingBottom: space.s3,
-    paddingLeft: space.s3,
-  },
-  // The canvas ribbon's bar, where the summary stands beside the ribbon's own
-  // control rather than at a region's bottom edge. The docked variant's top
-  // divider separates the rail from what sits above it; in the bar nothing
-  // does, so both it and the margin that carried it drop.
-  checksRailInBar: {
-    flex: "1 1 auto",
-    minWidth: 0,
-    marginTop: 0,
-    borderTopWidth: 0,
+    padding: 0,
   },
   // `.studio-checks-rail h2`: a descendant selector on a bare `<h2>`.
   checksRailHeading: {
@@ -127,45 +89,69 @@ const styles = stylex.create({
     color: colors.textMuted,
     fontSize: "0.8rem",
   },
+  // The collapsed summary, a control in the area nav's own button row. It
+  // borrows `.btn-ghost`'s chrome through the class, so it declares only the
+  // line the dot, the name and the count share.
   checksRailSummary: {
     display: "flex",
-    alignItems: "baseline",
-    justifyContent: "space-between",
+    alignItems: "center",
     gap: space.s2,
-    width: "100%",
-    backgroundColor: { default: "transparent", ":hover": colors.surfaceMuted },
-    color: "inherit",
-    borderWidth: 0,
-    borderTopWidth: 2,
-    borderTopStyle: "solid",
-    borderTopColor: colors.divider,
-    paddingTop: space.s2,
-    paddingRight: 0,
-    paddingBottom: 0,
-    paddingLeft: 0,
-    font: "inherit",
-    textAlign: "left",
-    cursor: "pointer",
   },
-  // `.studio-checks-rail-docked .studio-checks-rail-summary`: this file
-  // knows `collapsed` at both render sites, so the descendant override
-  // becomes a second style applied alongside the base one.
-  checksRailSummaryDocked: {
-    borderTopWidth: 0,
-    paddingTop: 0,
+  // The state dot. It carries `aria-hidden`: the control's own accessible name
+  // already states the count and what the dot reads, in one sentence.
+  checksRailDot: {
+    flex: "none",
+    width: 8,
+    height: 8,
+    borderWidth: 2,
+    borderStyle: "solid",
+    borderColor: "currentcolor",
   },
-  checksRailSummaryHeading: {
-    flex: 1,
-    minWidth: 0,
+  checksRailDotBlocker: {
+    color: colors.refusal,
+    backgroundColor: colors.refusal,
+  },
+  checksRailDotAdvisory: {
+    color: colors.accent400,
+    backgroundColor: colors.accent400,
+  },
+  checksRailDotClear: {
+    color: colors.textMuted,
+    backgroundColor: "transparent",
+  },
+  // The narrowing line: what the rail is showing, and the control widening it
+  // again. It stands above the groups, so an author never reads a filtered
+  // list as the whole one.
+  checksRailNarrowed: {
+    display: "flex",
+    alignItems: "baseline",
+    flexWrap: "wrap",
+    gap: space.s2,
+    marginBlock: 0,
+    marginBottom: space.s2,
+    paddingBottom: space.s2,
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.border,
+    color: colors.textMuted,
   },
   checksRailSummaryCount: {
     fontFamily: fonts.mono,
     fontVariantNumeric: "tabular-nums",
     color: colors.textMuted,
   },
-  checksRailSummaryHeldBack: {
-    color: colors.refusal,
-    fontSize: "0.85rem",
+  // A row in the grouped list. It opens the tab owning the issue's subject, so
+  // it is a real control, flush left and carrying the row's own text alone.
+  checksGroupIssueButton: {
+    display: "block",
+    width: "100%",
+    backgroundColor: { default: "transparent", ":hover": colors.surfaceMuted },
+    color: "inherit",
+    borderWidth: 0,
+    padding: 0,
+    font: "inherit",
+    textAlign: "left",
+    cursor: "pointer",
   },
 });
 
@@ -177,21 +163,27 @@ interface Props {
    * cannot verify: an actor without `system:publish` read "ready to publish"
    * here while the menu 900px away refused the act (studio-publish). */
   canPublish: boolean;
-  /** True when this rail docks at a bottom edge and opens as a one-line
-   * summary, expanding in place when chosen. Two sites take it: the step
-   * inspector's bottom edge, and the panels screen's, below that screen's two
-   * columns (task 7.4). False beside the canvas, where nothing is selected and
-   * the full grouped list always shows. See `studio-checks-rail`'s
-   * collapsed-summary requirement. */
+  /** True in the studio's area nav, the rail's one collapsed site. It renders
+   * the one-line summary there — the count, the state dot, and an accessible
+   * name carrying both. Pressing it opens the Checks tab; it expands no list
+   * in place, under the area nav or on any tab
+   * (`studio-checks-rail`'s collapsed-summary requirement). */
   collapsed?: boolean;
-  /** True at the panels screen's bottom edge alone, where nothing boxes the
-   * rail: it then draws its own right, bottom and left edges. The inspector's
-   * docked instance leaves it false and takes `.canvas-inspector`'s box. */
-  framed?: boolean;
-  /** True in the canvas ribbon's bar alone, where the summary stands beside
-   * the ribbon's control instead of at a region's bottom edge. It drops the
-   * docked variant's top divider and takes the bar's remaining width. */
-  inBar?: boolean;
+  /** What the collapsed summary opens: the Checks tab. */
+  onOpen?: () => void;
+  /** What a row in the grouped list opens: the tab owning that issue's
+   * subject (`studio-process-tabs`). A rail rendered without it prints its
+   * rows as plain text, the way the per-entity placements do. */
+  onOpenIssue?: (issue: EditorIssue) => void;
+  /** The one step this rail is narrowed to: the entity ids its issues may
+   * name, and the step's own label for the line saying so. Absent means the
+   * whole draft, which is what every mount but the Forms tab's badge passes
+   * (`studio-forms-overview`: "Pressing the badge SHALL open the Checks tab,
+   * narrowed to that step"). */
+  narrowedTo?: { label: string; entityIds: readonly string[] };
+  /** Widens a narrowed rail back to the whole draft. Required beside
+   * `narrowedTo`: an author must never be stuck in a filtered list. */
+  onShowEvery?: () => void;
 }
 
 /**
@@ -199,53 +191,75 @@ interface Props {
  * (`studio-checks-rail`). Reads the same array every per-entity `IssueList`
  * placement already filters; this is one more view over it, not a second
  * validation pass.
+ *
+ * Two forms, one component. The Checks tab stands the full grouped list. The
+ * area nav stands the collapsed summary, which is the same rail reporting one
+ * line instead of its groups.
  */
-export function ChecksRail({ validation, canPublish, collapsed = false, framed = false, inBar = false }: Props) {
-  const [expanded, setExpanded] = useState(false);
-  const groups = groupChecksBySource(validation);
+export function ChecksRail({ validation, canPublish, collapsed = false, onOpen, onOpenIssue, narrowedTo, onShowEvery }: Props) {
+  // Narrowing filters the issues and nothing else: every dimension keeps its
+  // own held-back state, so a narrowed rail still says which checks have not
+  // run rather than reporting a step clear that nothing has checked yet.
+  const shown: ValidationResult = narrowedTo
+    ? { ...validation, issues: validation.issues.filter((i) => narrowedTo.entityIds.includes(i.entityId)) }
+    : validation;
+  const groups = groupChecksBySource(shown);
   const clear = allChecksClear(groups);
   const summary = totalOpenIssueCount(groups);
-  const showSummary = collapsed && !expanded;
+  const dot = checksDotState(groups);
+  // One whole sentence per state, never a name assembled from fragments
+  // (design-language.md). It carries the count and what the dot reads, which
+  // is what the collapsed summary's accessible name has to say.
+  const summaryName =
+    summary.kind === "held-back"
+      ? t("checksRail.summaryHeldBack")
+      : summary.kind === "clear"
+        ? t("checksRail.summaryClear")
+        : summary.count === 1
+          ? t(dot === "blocker" ? "checksRail.summaryBlockerOne" : "checksRail.summaryAdvisoryOne")
+          : t(dot === "blocker" ? "checksRail.summaryBlocker" : "checksRail.summaryAdvisory").replace(
+              "{count}",
+              String(summary.count),
+            );
 
   return (
     <aside
-      // `collapsed` also marks a docked instance (true whether the summary
-      // or, once chosen, the expanded list shows). The two docked sites draw
-      // their own box differently: at the step inspector's bottom edge the
-      // rail draws none, since `.canvas-inspector` already provides one, and
-      // at the panels screen's bottom edge it draws three of its four edges
-      // itself (`framed`), since that screen boxes nothing.
-      {...stylex.props(
-        styles.checksRail,
-        collapsed && styles.checksRailDocked,
-        framed && styles.checksRailFramed,
-        inBar && styles.checksRailInBar,
-      )}
+      {...stylex.props(styles.checksRail, collapsed && styles.checksRailBare)}
       aria-label={t("checksRail.heading")}
     >
-      {showSummary ? (
-        <button
-          type="button"
-          {...stylex.props(styles.checksRailSummary, collapsed && styles.checksRailSummaryDocked)}
-          aria-expanded={false}
-          aria-controls="studio-checks-rail-groups"
-          onClick={() => setExpanded(true)}
-        >
-          <span {...stylex.props(styles.checksRailSummaryHeading)}>{t("checksRail.heading")}</span>
-          {summary.kind === "count" && <span {...stylex.props(styles.checksRailSummaryCount)}>{summary.count}</span>}
-          {summary.kind === "held-back" && (
-            <span {...stylex.props(styles.checksRailSummaryHeldBack)}>{t("checksRail.heldBack")}</span>
-          )}
+      {collapsed ? (
+        <button type="button" className="btn btn-ghost" aria-label={summaryName} onClick={onOpen}>
+          <span {...stylex.props(styles.checksRailSummary)}>
+            <span
+              aria-hidden="true"
+              {...stylex.props(
+                styles.checksRailDot,
+                dot === "blocker" && styles.checksRailDotBlocker,
+                dot === "advisory" && styles.checksRailDotAdvisory,
+                dot === "clear" && styles.checksRailDotClear,
+              )}
+            />
+            {t("checksRail.heading")}
+            {summary.kind === "count" && <span {...stylex.props(styles.checksRailSummaryCount)}>{summary.count}</span>}
+          </span>
         </button>
       ) : (
         <>
           <h2 {...stylex.props(styles.checksRailHeading)}>{t("checksRail.heading")}</h2>
           <div id="studio-checks-rail-groups">
+            {narrowedTo && (
+              <p {...stylex.props(styles.checksRailNarrowed)}>
+                {t("checksRail.narrowedTo").replace("{step}", narrowedTo.label)}
+                <button type="button" className="btn btn-ghost" onClick={onShowEvery}>
+                  {t("checksRail.showEvery")}
+                </button>
+              </p>
+            )}
             {/* Two sentences, two keys, one box. The first is what this rail
                 measured. The second is what the engine reported about this
                 actor. Conflating them into one sentence is the defect: the
                 rail cannot verify a permission, so it must not assert one. */}
-            {clear && (
+            {clear && narrowedTo === undefined && (
               <p {...stylex.props(styles.checksRailClear)}>
                 {t("checksRail.allClear")}{" "}
                 {t(canPublish ? "checksRail.clearReadyToPublish" : "checksRail.clearNeedsPublishPermission")}
@@ -267,7 +281,17 @@ export function ChecksRail({ validation, canPublish, collapsed = false, framed =
                       <ul {...stylex.props(styles.checksGroupList)}>
                         {group.issues.map((issue, i) => (
                           <li key={i} {...stylex.props(styles.checksGroupIssue)}>
-                            {issue.message}
+                            {onOpenIssue ? (
+                              <button
+                                type="button"
+                                {...stylex.props(styles.checksGroupIssueButton)}
+                                onClick={() => onOpenIssue(issue)}
+                              >
+                                {issue.message}
+                              </button>
+                            ) : (
+                              issue.message
+                            )}
                           </li>
                         ))}
                       </ul>

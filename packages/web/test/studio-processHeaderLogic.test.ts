@@ -35,7 +35,7 @@ describe("the base-locale control's wiring (processHeaderLogic.ts)", () => {
     const state = typeBaseLocale({}, "en", "de");
 
     expect(state.draft.baseLocale).toBe("de");
-    // StepsPanel seeds a new entity's label with seedLocalizedText(contentLocale).
+    // The rail's add controls seed a new step's label with seedLocalizedText(contentLocale).
     const stepLabel = seedLocalizedText(state.contentLocale);
     expect(Object.keys(stepLabel!)).toEqual(["de"]);
 

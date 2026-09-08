@@ -3,10 +3,17 @@
  * badges, explanatory hints. Deliberately NOT translated: raw contract
  * vocabulary shown as a bare field label ("key", "label", "type", "guard",
  * "versionBinding", "visible"/"required"/"readonly"/"group", ...) and
- * literal schema enum values ("manual", "automatic", "task", "subprocess",
- * "pinned", "latest-at-spawn") — translating those would decouple the
- * on-screen word from the JSON property/value it names, which defeats the
- * point for a structural JSON editor.
+ * literal schema enum values ("manual", "automatic", "task", "subprocess") —
+ * translating those would decouple the on-screen word from the JSON
+ * property/value it names, which defeats the point for a structural JSON
+ * editor.
+ *
+ * The guided-vocabulary layer (`studio-guided-vocabulary`) carves out the
+ * authoring controls an author with no JSON meets: a step's kind, its
+ * assignment strategy, its time limit and a subprocess step's version
+ * binding. Those read as plain phrases here, and "pinned"/"latest-at-spawn"
+ * are worded with them. The contract's own word stays one disclosure away, in
+ * the step's raw JSON.
  */
 export const en = {
   "app.title": "Process Studio",
@@ -30,6 +37,8 @@ export const en = {
   "draftToolbar.publishDialogHeading": "Publish this draft",
   "draftToolbar.publishDialogNextVersion": "Next version",
   "draftToolbar.publishDialogUnsaved": "This draft has unsaved changes. Publishing saves them first.",
+  "draftToolbar.publishDialogOpenIssues": "Open issues",
+  "draftToolbar.publishDialogBlocked": "The engine refuses this publish until somebody fixes a blocking issue.",
   "draftToolbar.publishDialogImmutable": "A published version can never change. To correct it, publish a new one.",
   "draftToolbar.discardDialogHeading": "Discard this draft",
   "draftToolbar.discardDialogLastSaved": "Last saved",
@@ -181,16 +190,14 @@ export const en = {
   "instanceQuery.addAttribute": "+ Add attribute",
   "instanceQuery.removeAttribute": "Remove",
 
-  "steps.removeStep": "Remove step",
   "steps.unnamedStep": "(unnamed step)",
-  "steps.terminalBadge": "terminal",
   "steps.crossProcessLegend": "cross-process check (checkSubprocessChildRefs)",
   "steps.crossProcessChecked": "checked against loaded child —",
   "steps.unload": "unload",
   "steps.loadChildError": "failed to load child process JSON",
   "steps.pathsHeading": "Paths",
   "steps.timersHeading": "Timers",
-  "steps.assignmentStrategyLabel": "assignment strategy",
+  "steps.assignmentLabel": "Who can act on this step",
 
   "paths.empty": "No paths.",
   "paths.addPath": "+ Add path",
@@ -204,10 +211,20 @@ export const en = {
   "timers.empty": "No timers.",
   "timers.addTimer": "+ Add timer",
   "timers.removeTimer": "Remove timer",
-  "timers.durationOption": "duration (ISO-8601)",
-  "timers.deadlineOption": "deadline (CEL)",
+  "timers.durationOption": "A time limit",
+  "timers.deadlineOption": "A deadline a condition computes (CEL)",
   "timers.reminderOption": "(reminder — no transition)",
-  "timers.durationPlaceholder": "e.g. PT1H30M",
+
+  // The time-limit control: a number and a unit over `Timer.duration`
+  // (`studio-guided-vocabulary`). It writes the ISO-8601 duration the
+  // definition contract requires, so nothing here names a contract key.
+  "timeLimit.numberLabel": "After",
+  "timeLimit.unitLabel": "Unit",
+  "timeLimit.unitHours": "hours",
+  "timeLimit.unitDays": "days",
+  "timeLimit.unitWeeks": "weeks",
+  "timeLimit.written": "This time limit is written out, so a number and a unit cannot state it.",
+  "timeLimit.tooFar": "That reaches further ahead than a time limit can go.",
 
   "actions.empty": "No actions.",
   "actions.addAction": "+ Add action",
@@ -234,7 +251,7 @@ export const en = {
   // keys went with it. "visible"/"required"/"readonly"/"span"/"group" stay
   // untranslated, per this file's header: they name the JSON being edited.
   "formEditor.heading": "Form",
-  "formEditor.backToCanvas": "← Back to canvas",
+  "formEditor.back": "← Back to the process",
   "formEditor.stepNotFound": "This step no longer exists in the draft.",
   "formEditor.navigateAwayKeepsChanges": "Every change is already in the draft. Save, Discard and Publish stay on the toolbar.",
   "formEditor.paletteLabel": "Catalog fields not on this form",
@@ -314,7 +331,18 @@ export const en = {
   "ruleBuilder.valueKindField": "another field",
   "ruleBuilder.selectValueField": "(select a field)",
 
-  "subprocess.processIdPlaceholder": "proc_...",
+  // The subprocess step's own two guided controls: the process picker and the
+  // version binding (`studio-guided-vocabulary`). The picker prints a process
+  // label, never a `proc_` id, and the binding pair reads as two plain
+  // choices over "pinned"/"latest-at-spawn".
+  "subprocess.processLabel": "Which process it calls",
+  "subprocess.selectProcess": "(choose a process)",
+  "subprocess.unknownProcess": "(a process you cannot open)",
+  "subprocess.bindingLegend": "Which version it calls",
+  "subprocess.bindingPinned": "Always this exact version",
+  "subprocess.bindingLatest": "The newest version whose contract still matches",
+  "subprocess.bindingNote": "A contract change starts a new signature, so this step keeps the last matching version.",
+  "subprocess.pinnedVersionLabel": "Version",
   "subprocess.removeMappingEntry": "remove",
   "subprocess.addInputMapping": "+ Add input mapping",
   "subprocess.addOutputMapping": "+ Add output mapping",
@@ -324,8 +352,41 @@ export const en = {
   "contentLocale.addPlaceholder": "add locale (e.g. de)",
   "contentLocale.add": "+ add locale",
 
-  "edit.structureTab": "Structure",
-  "edit.jsonTab": "JSON",
+  "tabs.rowLabel": "Process surface",
+  "tabs.canvas": "Canvas",
+  "tabs.steps": "Steps",
+  "tabs.fields": "Fields",
+  "tabs.dataSources": "Data sources",
+  "tabs.paths": "Paths",
+  "tabs.forms": "Forms",
+  "tabs.matrix": "Field matrix",
+  "tabs.contract": "Contract",
+  "tabs.changes": "Changes",
+  "tabs.checks": "Checks",
+  "tabs.overflowTrigger": "More",
+  "tabs.overflowJsonOpen": "Open the JSON surface",
+  "tabs.overflowJsonLeave": "Leave the JSON surface",
+  "tabs.overflowVersions": "Versions",
+  "tabs.overflowPlayer": "Player",
+
+  // The Forms tab: one plate per step that declares a view
+  // (`studio-forms-overview`).
+  "formsTab.gridLabel": "Forms in this process",
+  "formsTab.empty": "No step in this process declares a form yet.",
+  "formsTab.fieldCount": "{count} fields",
+  "formsTab.fieldCountOne": "1 field",
+  "formsTab.emptyForm": "Empty form",
+  "formsTab.openForm": "Open the form",
+  "formsTab.startForm": "Start the form",
+  "formsTab.issueMark": "open issues on this form",
+  "formsTab.issueMarkOne": "open issue on this form",
+  "formsTab.requiredMark": "required",
+  "formsTab.noteEntry": "Note",
+
+  // The form editor's trailing pane: what a participant meets
+  // (`studio-form-editor`).
+  "formPreview.heading": "What a participant meets",
+  "formPreview.submit": "Submit",
 
   "columnMapping.heading": "Column mapping",
   "columnMapping.noColumns": "This list declares no column, so there is nothing to map.",
@@ -335,17 +396,10 @@ export const en = {
   "columnMapping.removeRow": "Remove",
   "columnMapping.staleColumn": "The list no longer declares this column. The mapping writes nothing until an operator declares it again, or you remove the row.",
 
-  "panelsScreen.linkFields": "Fields",
-  "panelsScreen.linkDataSources": "Data sources",
-  "panelsScreen.linkContract": "Contract",
-  "panelsScreen.linkFieldMatrix": "Field matrix",
-  "panelsScreen.linkChanges": "Changes",
-  "panelsScreen.linkPaths": "Paths",
   "panelsScreen.railLabel": "Editors",
   "panelsScreen.unnamedField": "(unnamed field)",
   "panelsScreen.unnamedDataSource": "(unnamed data source)",
   "panelsScreen.issueMark": "issues",
-  "panelsScreen.backToCanvas": "← Canvas",
   "panelsScreen.moveTargetLabel": "Move this field to",
   "panelsScreen.moveTargetTopLevel": "Top level",
   "panelsScreen.movedIntoGroup": "{field} moved into {group}.",
@@ -370,26 +424,24 @@ export const en = {
   "fieldMatrix.flaggedCellMark": "Flagged in Checks",
   "fieldMatrix.technicalRowMark": "Technical",
 
-  "stepSections.entry": "Entry",
+  // The step page's eight section headings (`studio-step-page`). "Time
+  // limit" is the word for a timer everywhere an author reads one; the
+  // contract's own `deadline` key stays in the step's raw JSON.
+  "stepSections.entry": "On entry",
   "stepSections.assignment": "Assignment",
-  "stepSections.form": "Form",
-  "stepSections.paths": "Paths",
-  "stepSections.timers": "Timers",
-  "stepSections.exit": "Exit",
-  "stepSections.terminalNoPathsOrTimers": "A terminal step has no outgoing path and no timer.",
+  "stepSections.form": "Step form fields",
+  "stepSections.paths": "Path to",
+  "stepSections.timers": "Time limit",
+  "stepSections.exit": "On exit",
+  "stepSections.howItEnds": "How the case ends",
+  "stepSections.terminalNoPathsOrTimers": "A step that ends the process has no outgoing path and no time limit.",
   "stepSections.noAssignmentWarning":
     "This step has no assignment. Only the starter or an admin can act on it, and it stays out of everyone's My-tasks inbox. Publishing still works.",
   "stepSections.actions": "Actions",
-  "stepSections.subprocess": "Subprocess spec",
-  "stepSections.developerView": "View raw JSON",
+  "stepSections.subprocess": "Which process it calls",
   "stepSections.behaviorZoneLabel": "Behavior",
-  "stepSections.pathsEmptyTerminal": "Terminal steps have no outgoing paths.",
-  "stepSections.issueCount": "Issues",
+  "stepSections.pathsEmptyTerminal": "A step that ends the process has no outgoing path.",
   "stepSections.noIssues": "No issues on this step.",
-  "stepSections.performedByLabel": "performed by",
-  "stepSections.performedByParticipant": "a participant",
-  "stepSections.performedBySubprocess": "a subprocess",
-  "stepSections.performedByTerminal": "nothing — this ends the process",
   "stepSections.setInitialStep": "Set as the process's first step",
   "stepSections.outcomePlaceholder": "choose an outcome…",
   "stepSections.isInitialStep": "This is the process's first step.",
@@ -403,9 +455,37 @@ export const en = {
   "stepSections.descriptionField": "description",
   "stepSections.outcomeField": "outcome",
   "stepSections.outcomeHint": "An outcome binds only on a contracted process.",
-  "stepSections.moreActions": "More step actions",
-  "stepSections.registerLabel": "Step configuration",
-  "stepSections.emptyValue": "—",
+
+  // The steps rail: one numbered row per step, in reachability order
+  // (`studio-step-page`).
+  "stepsRail.label": "Steps",
+  "stepsRail.fieldCount": "{count} form fields",
+  "stepsRail.calls": "Calls {process}",
+  "stepsRail.callsNothing": "Calls no process yet",
+  "stepsRail.ends": "Ends as {outcome}",
+  "stepsRail.endsNoOutcome": "Ends with no outcome",
+  "stepsRail.issueMark": "open issues",
+  "stepsRail.issueMarkOne": "open issue",
+  "stepsRail.moveEarlier": "Move earlier",
+  "stepsRail.moveLater": "Move later",
+  "stepsRail.addLegend": "Add",
+  "stepsRail.addStep": "Add a step",
+  "stepsRail.addSubprocess": "Add a call to another process",
+  "stepsRail.addEnd": "Add an end",
+  "stepsRail.empty": "This process carries no step yet.",
+
+  // The step page: one wide page holding everything one step declares.
+  "stepPage.stepNumber": "Step {number}",
+  "stepPage.sectionsLabel": "Step settings",
+  "stepPage.removeStep": "Remove this step",
+  "stepPage.walkLabel": "Walk the steps",
+  "stepPage.previous": "Previous: {step}",
+  "stepPage.previousNone": "Previous step",
+  "stepPage.next": "Next: {step}",
+  "stepPage.nextNone": "Next step",
+  "stepPage.developerView": "Developer view",
+  "stepPage.developerViewNote":
+    "Read-only here. The JSON surface stays the one place for hand-authoring a definition.",
 
   // The role a step's stamp reads, in the steps register and in the
   // configuration pane's masthead. `draft/roleStamp.ts` picks which one.
@@ -414,10 +494,36 @@ export const en = {
   "stepRole.subprocess": "Subprocess",
   "stepRole.end": "End",
 
+  // The phrase a control choosing a step's kind prints
+  // (`studio-guided-vocabulary`). Keyed by `draft/performedBy.ts`'s own three
+  // values, so the closed key union stays exhaustive against the model the
+  // sections read. A stamp naming an existing step's kind keeps the short
+  // `stepRole.*` word instead: a phrase does not fit a stamp.
+  "stepKind.legend": "What this step is",
+  "stepKind.participant": "A step someone works",
+  "stepKind.subprocess": "A call to another process",
+  "stepKind.terminal": "An end",
+
+  // The four assignment strategies the engine registers: `static` in
+  // `src/engine/registry.ts`'s createDefaultAssignmentRegistry, and the three
+  // `org.` types in `src/engine/assignment-strategies.ts`. A registered
+  // strategy this table misses falls back to its registry type, in mono.
+  "assignmentStrategy.static.name": "A fixed list of people",
+  "assignmentStrategy.static.note": "Everyone the list names can act on the step.",
+  "assignmentStrategy.org.manager-of-starter.name": "The starter's manager",
+  "assignmentStrategy.org.manager-of-starter.note":
+    "The directory resolves that person when an instance enters the step.",
+  "assignmentStrategy.org.group-members.name": "Everyone in a group",
+  "assignmentStrategy.org.group-members.note":
+    "Whoever is in the group when an instance enters the step can act on it.",
+  "assignmentStrategy.org.actor-from-field.name": "The person a field names",
+  "assignmentStrategy.org.actor-from-field.note":
+    "Whoever that field holds when an instance enters the step can act on it.",
+  // An absent assignment names no strategy at all, so it never resolves
+  // through the registry.
+  "assignment.none": "Nobody in particular",
+
   "palette.heading": "Add to canvas",
-  "palette.step": "Step",
-  "palette.subprocess": "Subprocess",
-  "palette.end": "End",
 
   "headerBar.unnamedProcess": "(untitled process)",
   "headerBar.revision": "rev.",
@@ -445,6 +551,18 @@ export const en = {
   "checksRail.clearNeedsPublishPermission": "Publishing needs the publish permission for this process.",
   "checksRail.configHeldBack": "Plugin config check held back — verified at publish.",
   "checksRail.unknownKeysHeldBack": "Unknown-key check held back — verified at publish.",
+  // The area nav's collapsed summary. One whole sentence per state, so the
+  // count and the dot's own reading reach a screen reader together.
+  "checksRail.summaryBlocker": "Checks: {count} open issues, one of which refuses a publish.",
+  "checksRail.summaryBlockerOne": "Checks: one open issue, and it refuses a publish.",
+  "checksRail.summaryAdvisory": "Checks: {count} open issues, none of which refuses a publish.",
+  "checksRail.summaryAdvisoryOne": "Checks: one open issue, and it refuses no publish.",
+  "checksRail.summaryClear": "Checks: no open issue.",
+  "checksRail.summaryHeldBack": "Checks: held back until earlier checks pass.",
+  // A rail narrowed to one step, and the control that widens it again
+  // (`studio-forms-overview`: a card's badge opens Checks on its own step).
+  "checksRail.narrowedTo": "Showing the checks on {step}.",
+  "checksRail.showEvery": "Show every check",
 
   "jsonView.label": "Draft body (JSON)",
   "jsonView.apply": "Apply",
@@ -473,9 +591,10 @@ export const en = {
   // base templates carry only the segments every element has; a segment that
   // is sometimes absent takes a key of its own, because filling an unused
   // slot with an empty string prints "Capture, capture, Step, , 2 outgoing
-  // paths". The kind word comes from `palette.step`, `palette.subprocess` or
-  // `palette.end`, and the guard slot takes the readable guard the edge label
-  // draws or, for a guardless path, `canvas.pathLabelNoGuard`.
+  // paths". The kind word comes from `stepRole.task`, `stepRole.subprocess` or
+  // `stepRole.end`, the same three the stamp reads, and the guard slot takes
+  // the readable guard the edge label draws or, for a guardless path,
+  // `canvas.pathLabelNoGuard`.
   //
   // The fan count picks between two node templates, because a fixed plural
   // announces "1 outgoing paths" on every single-path step.
@@ -492,26 +611,19 @@ export const en = {
 
   "ribbon.expand": "Expand the canvas",
   "ribbon.collapse": "Collapse the canvas",
-  "stepsRegister.label": "Steps",
-  "stepsRegister.addFirstStep": "Add the first step",
 
-  "dock.region": "Editor dock",
-  "dock.expand": "Open the dock",
-  "dock.collapse": "Close the dock",
-  "dock.tabChanges": "Changes",
-  "dock.tabMatrix": "Field matrix",
-  "dock.tabPaths": "Paths",
-  "dock.changesFirstPublish": "Nothing to compare yet. Publishing this draft would be the first version.",
-  "dock.changesNone": "This draft matches the version it sits on.",
-  "dock.changesLoading": "Reading the published version…",
-  "dock.pathsSource": "Source step",
-  "dock.pathsTrigger": "Trigger",
-  "dock.pathsPriority": "Priority",
-  "dock.pathsGuard": "Guard",
-  "dock.pathsTarget": "Target",
-  "dock.pathsNoPriority": "No priority",
-  "dock.pathsNoGuard": "No guard",
-  "dock.pathsEmpty": "This process has no path yet. Drag from a step on the canvas to make one.",
+  "changesView.firstPublish": "Nothing to compare yet. Publishing this draft would be the first version.",
+  "changesView.none": "This draft matches the version it sits on.",
+  "changesView.loading": "Reading the published version…",
+
+  "pathsView.source": "Source step",
+  "pathsView.trigger": "Trigger",
+  "pathsView.priority": "Priority",
+  "pathsView.guard": "Guard",
+  "pathsView.target": "Target",
+  "pathsView.noPriority": "No priority",
+  "pathsView.noGuard": "No guard",
+  "pathsView.empty": "This process has no path yet. Drag from a step on the canvas to make one.",
 
   "expression.placeholder": "CEL expression",
   "plugin.typePlaceholder": "plugin type identifier",

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { PanelsRailFieldRow } from "../src/areas/studio/screens/PanelsScreen.js";
+import { PanelsRailFieldRow } from "../src/areas/studio/panels/EntityTabs.js";
 
 const NOOP = () => {};
 
@@ -36,15 +36,15 @@ describe("PanelsRailFieldRow", () => {
     const html = renderToStaticMarkup(<PanelsRailFieldRow {...BASE} />);
     expect(html).toContain(">Amount<");
     expect(html).toContain(">Number<");
-    expect(html).not.toContain("panelsRailKey");
+    expect(html).not.toContain("railKey");
   });
 
   it("shows the issue mark only when the row carries one", () => {
     const withIssue = renderToStaticMarkup(<PanelsRailFieldRow {...BASE} issues={2} />);
-    expect(withIssue).toContain("panelsRailIssues");
+    expect(withIssue).toContain("railIssues");
     expect(withIssue).toContain(">2<");
 
-    expect(renderToStaticMarkup(<PanelsRailFieldRow {...BASE} />)).not.toContain("panelsRailIssues");
+    expect(renderToStaticMarkup(<PanelsRailFieldRow {...BASE} />)).not.toContain("railIssues");
   });
 
   // The keyboard half of the move gesture (spa-accessibility): a real control
@@ -90,7 +90,7 @@ describe("PanelsRailFieldRow", () => {
     const html = renderToStaticMarkup(
       <PanelsRailFieldRow {...BASE} moveTargets={[{ id: undefined, label: "Top level" }]} />,
     );
-    expect(html).toContain("panelsRailMove");
+    expect(html).toContain("railMove");
     expect(html).toContain("disabled");
     // A disabled control still carries a name.
     expect(html).toContain('aria-label="Move this field to"');

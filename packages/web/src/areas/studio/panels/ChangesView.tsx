@@ -159,8 +159,8 @@ export function ChangesView({ processId, token, draft, baseVersion, onCount }: P
     onCount(diff?.length);
   }, [diff, onCount]);
 
-  if (baseVersion === null) return <p {...stylex.props(styles.empty)}>{t("dock.changesFirstPublish")}</p>;
-  if (state.kind === "loading") return <p {...stylex.props(styles.empty)}>{t("dock.changesLoading")}</p>;
+  if (baseVersion === null) return <p {...stylex.props(styles.empty)}>{t("changesView.firstPublish")}</p>;
+  if (state.kind === "loading") return <p {...stylex.props(styles.empty)}>{t("changesView.loading")}</p>;
   if (state.kind === "error")
     return (
       <div {...stylex.props(styles.errorBanner)} role="alert">
@@ -169,7 +169,7 @@ export function ChangesView({ processId, token, draft, baseVersion, onCount }: P
       </div>
     );
   if (!diff) return null;
-  if (diff.length === 0) return <p {...stylex.props(styles.empty)}>{t("dock.changesNone")}</p>;
+  if (diff.length === 0) return <p {...stylex.props(styles.empty)}>{t("changesView.none")}</p>;
 
   return (
     <ul {...stylex.props(styles.diff)}>

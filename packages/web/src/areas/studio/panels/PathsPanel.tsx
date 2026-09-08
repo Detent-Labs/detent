@@ -30,10 +30,15 @@ const styles = stylex.create({
     boxShadow: `inset 3px 0 0 ${colors.accent}`,
     borderColor: colors.accent,
   },
+  // The same shorthand StyleX drops on the step page's own picker: a
+  // `<fieldset>` keeps the UA's `2px groove` when it goes, so the longhand
+  // says it instead. `global.css` now clears the groove for every fieldset,
+  // and this stays because a picker with no frame is this component's own
+  // intent, not something to read out of a global sheet.
   studioSegmented: {
     display: "flex",
     gap: 0,
-    border: "none",
+    borderStyle: "none",
     padding: 0,
     marginBlock: space.s2,
     marginInline: 0,
@@ -51,7 +56,11 @@ const styles = stylex.create({
   },
   segmentedOption: {
     flex: "1 1 auto",
-    background: "none",
+    // `background: none` leaves the UA's own `buttonface` color standing, so
+    // this picker kept a grey plate: rgb(240, 240, 240) light, rgb(107, 107,
+    // 107) dark. On the step page, where the section now stands open, that
+    // dropped the pressed option's accent text to 1.69:1.
+    backgroundColor: "transparent",
     color: colors.text,
     border: `1px solid ${colors.border}`,
     paddingBlock: space.s1,
@@ -59,7 +68,7 @@ const styles = stylex.create({
     font: "inherit",
     cursor: "pointer",
     ":hover": {
-      background: colors.surfaceMuted,
+      backgroundColor: colors.surfaceMuted,
     },
   },
   // `.studio-segmented-option + .studio-segmented-option`: this file always
@@ -73,8 +82,14 @@ const styles = stylex.create({
     color: colors.accent,
     boxShadow: `inset 0 -2px 0 ${colors.accent}`,
   },
+  // A fieldset that means to carry the ledger hairline. StyleX emits no
+  // `border` shorthand at all, so this asked for 1px and drew the UA's 2px
+  // groove instead; the longhands are what actually reach the element, and
+  // they have to stand here or `global.css`'s fieldset reset takes the frame.
   studioOnlyWhen: {
-    border: `1px solid ${colors.border}`,
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: colors.border,
     paddingBlock: space.s2,
     paddingInline: space.s3,
     marginBlock: space.s2,

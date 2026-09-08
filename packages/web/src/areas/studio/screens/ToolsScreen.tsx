@@ -19,6 +19,15 @@ const styles = stylex.create({
     paddingInline: space.s3,
     paddingBottom: space.s6,
   },
+  // Both fieldsets on this screen frame their own block, and did so with the
+  // UA's `2px groove` until `global.css` cleared it for every fieldset. The
+  // frame is this screen's own intent, so it states it: the 1px hairline in
+  // the border role.
+  panel: {
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: colors.border,
+  },
   studioBack: {
     display: "block",
     paddingLeft: 0,
@@ -188,7 +197,7 @@ export function ToolsScreen({ token, navigate, onUnauthorized }: ToolsScreenProp
         <p {...stylex.props(styles.studioEmpty)}>Loading…</p>
       ) : (
         <>
-          <fieldset>
+          <fieldset {...stylex.props(styles.panel)}>
             <legend>Registered plugin types</legend>
             <h2>Action handlers</h2>
             {registry && registry.actionTypes.length > 0 ? (
@@ -228,7 +237,7 @@ export function ToolsScreen({ token, navigate, onUnauthorized }: ToolsScreenProp
             )}
           </fieldset>
 
-          <fieldset>
+          <fieldset {...stylex.props(styles.panel)}>
             <legend>CEL scratchpad</legend>
             <label>
               Process

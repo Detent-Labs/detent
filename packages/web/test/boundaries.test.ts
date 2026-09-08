@@ -78,7 +78,7 @@ describe("area boundaries", () => {
     // label, step label, step description, field label, field description,
     // field option label, and a note's text. Nine textual sites carried the
     // first six: process label and step label/description sit in
-    // ProcessHeaderBar.tsx/StepsPanel.tsx, one each. field-catalog-redesign
+    // ProcessHeaderBar.tsx/StepPage.tsx, one each. field-catalog-redesign
     // split the field catalog's single recursive FieldRow into two
     // source-level components — FieldEditor for the selected top-level
     // field's tab set, SubFieldRow for a group's children — so field label,

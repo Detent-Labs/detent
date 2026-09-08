@@ -22,8 +22,14 @@ const styles = stylex.create({
     gap: space.s3,
     marginBottom: space.s3,
   },
+  // A fieldset that means to carry the ledger hairline. StyleX emits no
+  // `border` shorthand at all, so this asked for 1px and drew the UA's 2px
+  // groove instead; the longhands are what actually reach the element, and
+  // they have to stand here or `global.css`'s fieldset reset takes the frame.
   studioMapSection: {
-    border: `1px solid ${colors.border}`,
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: colors.border,
     padding: space.s3,
   },
   studioMapSectionLegend: {

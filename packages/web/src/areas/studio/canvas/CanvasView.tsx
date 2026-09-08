@@ -358,6 +358,12 @@ interface Props {
   onSelectStep: (stepId: string | undefined, pathId?: string) => void;
   /** The whole set at once: a shift-click's toggle and a marquee's release. */
   onSelectSteps: (stepIds: string[]) => void;
+  /** Opens the Steps tab on one step, after the selection is written. Enter
+   * calls it; a pointer press never does. A click has to leave the author on
+   * the canvas: shift-click builds a set and the delete control acts on one,
+   * and neither survives a press that switches tabs (`studio-canvas`'s "Every
+   * canvas gesture ... SHALL stay live"). */
+  onOpenStepPage?: (stepId: string) => void;
   /** Canvas-wide, never per path (design.md). `EditScreen` resolves an absent
    * or unknown stored value to the default before it reaches here. */
   edgeStyle: EdgeStyle;
@@ -379,6 +385,12 @@ interface Props {
    * over an `end` step. Drawn as the drop-target state on the matching edge
    * group and its guard label; adds no permanent control. */
   insertTargetPathId?: string;
+  /** False while the Canvas tab hides. Every tab body stays mounted and nine
+   * hide, so this canvas can mount inside a `hidden` subtree, where the SVG
+   * measures zero and the auto-fit below would frame nothing and then latch.
+   * The fit waits for the tab to open instead. Defaults to true, so a caller
+   * that stands the canvas alone needs no flag. */
+  visible?: boolean;
 }
 
 function isPoint(value: unknown): value is Point {
@@ -410,6 +422,7 @@ export function CanvasView({
   selectedStepIds,
   onSelectStep,
   onSelectSteps,
+  onOpenStepPage,
   selectedPathId,
   edgeStyle,
   onEdgeStyleChange,
@@ -418,6 +431,7 @@ export function CanvasView({
   groups,
   onGroupsChange,
   insertTargetPathId,
+  visible = true,
 }: Props) {
   const { draft, mutate, contentLocale, loadedChildren } = useDraft();
   const steps = draft.workflow?.steps ?? [];
@@ -729,11 +743,11 @@ export function CanvasView({
   // and running before paint means the very first frame is already framed,
   // instead of flashing the raw top-left layout first.
   useLayoutEffect(() => {
-    if (hasFitOnLoad.current || nodePositions.length === 0) return;
+    if (hasFitOnLoad.current || nodePositions.length === 0 || !visible) return;
     hasFitOnLoad.current = true;
     fitToView();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nodePositions]);
+  }, [nodePositions, visible]);
 
   // Pointer capture keeps a fast drag tracking even if the pointer leaves
   // the element; failure to acquire it (e.g. an already-released pointer)
@@ -1027,10 +1041,12 @@ export function CanvasView({
   const stepLabel = (s: (typeof steps)[number] | undefined) =>
     resolveDraftLocalizedText(s?.label, contentLocale, baseLocale) || s?.key || t("steps.unnamedStep");
 
-  /** The palette's own three words. `end` is a `terminal` flag on an ordinary
+  /** The stamp's own three words, so the node's accessible name and the role
+   * stamp beside it cannot name one step's kind differently
+   * (`studio-guided-vocabulary`). `end` is a `terminal` flag on an ordinary
    * task step, never a `type` of its own. */
   const stepKind = (s: (typeof steps)[number]) =>
-    s.type === "subprocess" ? t("palette.subprocess") : s.terminal === true ? t("palette.end") : t("palette.step");
+    s.type === "subprocess" ? t("stepRole.subprocess") : s.terminal === true ? t("stepRole.end") : t("stepRole.task");
 
   /** A step's accessible name. The base template carries the segments every
    * step has; a stamp appends only where it applies, because an unfilled slot
@@ -1097,10 +1113,15 @@ export function CanvasView({
     }
     if (e.key === "Enter") {
       // A group's disclosure is a real button and answers Enter itself.
-      if (focus.kind === "step") onSelectStep(focus.stepId);
-      else if (focus.kind === "path") {
+      if (focus.kind === "step") {
+        onSelectStep(focus.stepId);
+        onOpenStepPage?.(focus.stepId);
+      } else if (focus.kind === "path") {
         const owner = steps.find((s) => s.paths?.some((p) => p.id === focus.pathId));
-        if (owner?.id) onSelectStep(owner.id, focus.pathId);
+        if (owner?.id) {
+          onSelectStep(owner.id, focus.pathId);
+          onOpenStepPage?.(owner.id);
+        }
       }
       return;
     }

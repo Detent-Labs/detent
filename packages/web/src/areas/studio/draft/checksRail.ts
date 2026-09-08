@@ -113,3 +113,22 @@ export function totalOpenIssueCount(groups: readonly CheckGroup[]): OpenIssueSum
   const count = groups.reduce((sum, g) => sum + g.issues.length, 0);
   return count === 0 ? { kind: "clear" } : { kind: "count", count };
 }
+
+/** What the area nav's Checks dot reads (`studio-checks-rail`): the worst open
+ * issue, over three states and no fourth. */
+export type ChecksDotState = "blocker" | "advisory" | "clear";
+
+/**
+ * The dot's own read of `groups`. The `view` group holds the studio's own
+ * findings over a draft the engine would publish, so its entries are advisory:
+ * they never refuse a publish. Every other group is an engine validator, so one
+ * open entry there blocks.
+ *
+ * A held-back group takes the blocker color, never the clear one. Its checks
+ * have not run, so nothing yet says the draft would publish, and the
+ * collapsed-summary requirement already forbids reading that state as clear.
+ */
+export function checksDotState(groups: readonly CheckGroup[]): ChecksDotState {
+  if (groups.some((g) => g.heldBack || (g.source !== "view" && g.issues.length > 0))) return "blocker";
+  return groups.some((g) => g.issues.length > 0) ? "advisory" : "clear";
+}

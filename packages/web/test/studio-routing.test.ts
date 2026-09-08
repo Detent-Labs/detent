@@ -1,5 +1,13 @@
 import { describe, it, expect } from "bun:test";
-import { matchRoute, routePath, ROUTE_ROLE, PANEL_VIEWS, type Route } from "../src/areas/studio/routing.js";
+import {
+  matchRoute,
+  routePath,
+  ROUTE_ROLE,
+  PANEL_VIEWS,
+  PANEL_VIEW_TAB,
+  PROCESS_TABS,
+  type Route,
+} from "../src/areas/studio/routing.js";
 import { mayEnter } from "../src/shell/areas.js";
 
 const DEVELOPER_ROLE = "system:developer";
@@ -17,7 +25,7 @@ const EVERY_ROUTE: Route[] = [
   { name: "processes" },
   { name: "edit", processId: "proc_1" },
   { name: "edit", processId: "proc_1", formStepId: "step_1" },
-  { name: "edit", processId: "proc_1", panel: "fields" },
+  { name: "edit", processId: "proc_1", tab: "fields" },
   { name: "edit", processId: "proc_1", stepId: "step_1" },
   { name: "versions", processId: "proc_1" },
   { name: "migrate", processId: "proc_1", from: "1", to: "2" },
@@ -62,34 +70,77 @@ describe("the form editor's formStepId sub-state of the edit route", () => {
   });
 });
 
-describe("the panels screen's panel sub-state of the edit route", () => {
-  it("round-trips /processes/:id/edit/panels/:view, per view", () => {
-    for (const panel of PANEL_VIEWS) {
-      const route: Route = { name: "edit", processId: "proc_1", panel };
-      expect(routePath(route)).toBe(`/processes/proc_1/edit/panels/${panel}`);
+describe("the open tab's sub-state of the edit route", () => {
+  it("round-trips /processes/:id/edit/:tab, per tab", () => {
+    for (const tab of PROCESS_TABS) {
+      const route: Route = { name: "edit", processId: "proc_1", tab };
+      expect(routePath(route)).toBe(`/processes/proc_1/edit/${tab}`);
       expect(matchRoute(routePath(route))).toEqual(route);
     }
   });
 
-  it("falls back to the plain edit route on an unrecognized view", () => {
+  it("holds ten tabs, in authoring order", () => {
+    expect(PROCESS_TABS).toEqual([
+      "canvas",
+      "steps",
+      "fields",
+      "dataSources",
+      "paths",
+      "forms",
+      "matrix",
+      "contract",
+      "changes",
+      "checks",
+    ]);
+  });
+
+  it("falls back to the plain edit route on an unrecognized tab name", () => {
     // A typo lands on the canvas, not on a dead end. The top-level table
     // answers an unrecognized path with the process list; this is that rule
     // one level down.
-    expect(matchRoute("/processes/proc_1/edit/panels/nonsense")).toEqual({ name: "edit", processId: "proc_1" });
+    expect(matchRoute("/processes/proc_1/edit/nonsense")).toEqual({ name: "edit", processId: "proc_1" });
+  });
+
+  it("opens the canvas for an address naming no tab", () => {
+    expect(matchRoute("/processes/proc_1/edit")).toEqual({ name: "edit", processId: "proc_1" });
   });
 
   it("stays distinct from the plain edit path and from a form path", () => {
     const plain = matchRoute("/processes/proc_1/edit");
-    const withPanel = matchRoute("/processes/proc_1/edit/panels/fields");
+    const withTab = matchRoute("/processes/proc_1/edit/fields");
     const withForm = matchRoute("/processes/proc_1/edit/form/step_1");
-    expect(withPanel).toEqual({ name: "edit", processId: "proc_1", panel: "fields" });
-    expect(withPanel).not.toEqual(plain);
-    expect(withPanel).not.toEqual(withForm);
+    expect(withTab).toEqual({ name: "edit", processId: "proc_1", tab: "fields" });
+    expect(withTab).not.toEqual(plain);
+    expect(withTab).not.toEqual(withForm);
   });
 
   it("prefers the form path when both fields are set, so one path is emitted", () => {
-    const route: Route = { name: "edit", processId: "proc_1", formStepId: "step_1", panel: "fields" };
+    const route: Route = { name: "edit", processId: "proc_1", formStepId: "step_1", tab: "fields" };
     expect(routePath(route)).toBe("/processes/proc_1/edit/form/step_1");
+  });
+});
+
+describe("the retired panels address", () => {
+  it("maps each old view name onto the tab that holds it now", () => {
+    for (const view of PANEL_VIEWS) {
+      expect(matchRoute(`/processes/proc_1/edit/panels/${view}`)).toEqual({
+        name: "edit",
+        processId: "proc_1",
+        tab: PANEL_VIEW_TAB[view],
+      });
+    }
+  });
+
+  it("names a tab the row actually holds, for every one of the six", () => {
+    for (const view of PANEL_VIEWS) expect(PROCESS_TABS).toContain(PANEL_VIEW_TAB[view]);
+  });
+
+  it("falls back to the plain edit route on an unrecognized view", () => {
+    expect(matchRoute("/processes/proc_1/edit/panels/nonsense")).toEqual({ name: "edit", processId: "proc_1" });
+  });
+
+  it("emits no panels path any more, so nothing writes the retired address", () => {
+    expect(routePath({ name: "edit", processId: "proc_1", tab: "fields" })).not.toContain("/panels/");
   });
 });
 
@@ -108,15 +159,15 @@ describe("the step target's sub-state of the edit route", () => {
     expect(matchRoute("/processes/proc_1/edit/step/a/b")).toEqual({ name: "edit", processId: "proc_1" });
   });
 
-  it("stays distinct from the form-editor and panels sub-states, with no collision between the three", () => {
+  it("stays distinct from the form-editor and tab sub-states, with no collision between the three", () => {
     const plain = matchRoute("/processes/proc_1/edit");
     const withForm = matchRoute("/processes/proc_1/edit/form/step_1");
-    const withPanel = matchRoute("/processes/proc_1/edit/panels/fields");
+    const withTab = matchRoute("/processes/proc_1/edit/fields");
     const withStep = matchRoute("/processes/proc_1/edit/step/step_1");
     expect(withStep).toEqual({ name: "edit", processId: "proc_1", stepId: "step_1" });
     expect(withStep).not.toEqual(plain);
     expect(withStep).not.toEqual(withForm);
-    expect(withStep).not.toEqual(withPanel);
+    expect(withStep).not.toEqual(withTab);
   });
 });
 

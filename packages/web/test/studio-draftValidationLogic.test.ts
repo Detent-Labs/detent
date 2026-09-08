@@ -129,7 +129,7 @@ describe("runValidation: dimensions.duration / dimensions.structural", () => {
 });
 
 // add-step-assignment-warning: the studio's assignment-less-step warning
-// (inlined in StepsPanel.tsx) stays outside this pipeline entirely, the
+// (inlined in StepPage.tsx) stays outside this pipeline entirely, the
 // same way the "db.list" missing-key warning does. This pins that as a
 // regression test rather than relying only on the absence of an import.
 describe("runValidation: an assignment-less step", () => {

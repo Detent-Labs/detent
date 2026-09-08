@@ -35,6 +35,16 @@ const styles = stylex.create({
     containerType: "inline-size",
     containerName: "studio-player",
   },
+  // Instance access frames its own controls, and did so with the UA's `2px
+  // groove` until `global.css` cleared it for every fieldset. The frame is
+  // this screen's own intent, so it states it: the 1px hairline in the
+  // border role, the same rule `canvasInspector` and the migration editor's
+  // map section carry.
+  panel: {
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: colors.border,
+  },
   studioBack: {
     display: "block",
     paddingLeft: 0,
@@ -262,7 +272,7 @@ export function PlayerScreen({ processId, token, navigate, onUnauthorized }: Pla
       </button>
       <h1>Player</h1>
 
-      <fieldset>
+      <fieldset {...stylex.props(styles.panel)}>
         <legend>Instance access</legend>
         <div {...stylex.props(styles.studioControls)}>
           <button type="button" className="btn btn-primary" disabled={loading} onClick={() => void doCreate()}>
