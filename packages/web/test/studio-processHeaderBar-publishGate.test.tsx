@@ -132,7 +132,9 @@ describe("ProcessHeaderBar's failure region", () => {
 /**
  * Task 2.9 and task 2.15 of `studio-guided-surface`. The header bar stands no
  * Structure/JSON pair, and its `⋮` menu carries none of the area nav's four
- * controls. The JSON surface opens from the tab row's overflow menu instead.
+ * controls. `studio-header-menu-merge` later gave the JSON toggle a home in
+ * this same `⋮` menu's own "Views" group, so this still holds: it names the
+ * area nav's four controls, not the JSON toggle itself.
  */
 describe("What the header bar no longer carries", () => {
   it("stands no Structure control and no JSON control", () => {
@@ -161,7 +163,7 @@ describe("The header bar's ⋮ menu", () => {
   it("stays closed until something opens it", () => {
     const html = renderHeader({});
 
-    expect(html).toContain('aria-haspopup="menu"');
+    expect(html).toContain('aria-haspopup="true"');
     expect(html).toContain('aria-expanded="false"');
     expect(html).not.toContain('role="menu"');
   });
