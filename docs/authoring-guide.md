@@ -785,10 +785,10 @@ A draft opens on one screen. A tab row over the body holds ten tabs, and the
 chapters below follow their order. Those are Canvas, Steps, Fields, Data
 sources, Paths, Forms, Field matrix, Contract, Changes and Checks.
 
-The tab row's overflow menu holds three more entries. The **JSON** entry
-prints the same draft as raw text. That helps when you want to read the whole
-body at once. The **Versions** and **Player** entries open their own
-screens.
+The header bar's `⋮` menu holds three more entries, under Views. The
+**JSON** entry prints the same draft as raw text. That helps when you want to
+read the whole body at once. The **Versions** and **Player** entries open
+their own screens.
 
 ### 2. Define the field catalog
 
@@ -975,7 +975,7 @@ Skip this step when nothing calls your process.
 
 ### 9. Run it in the Player
 
-The Player runs your draft. Open it from the tab row's overflow menu. Fill in
+The Player runs your draft. Open it from the header bar's `⋮` menu. Fill in
 the forms as a participant would, and walk the process to an end step. Walk it
 again down a different path.
 

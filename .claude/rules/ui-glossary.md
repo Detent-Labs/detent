@@ -51,10 +51,9 @@ nav, the header bar, the tab row, then one tab body.
 |---|---|---|
 | process surface | the one screen a draft opens on: the tab row and the body under it | `screens/EditScreen.tsx` |
 | screen nav | the row above the header bar. It holds Back to processes and nothing else | `screens/EditScreen.tsx` |
-| header bar | the process-identity row: name, key, revision, dirty/saved state, the `⋮` menu | `panels/ProcessHeaderBar.tsx` |
-| tab row | the row of ten tabs over the body, with the overflow menu at its end | `panels/ProcessTabRow.tsx` |
+| header bar | the process-identity row: name, key, revision, dirty/saved state, the `⋮` menu (its Views group holds the JSON surface, Versions and Player) | `panels/ProcessHeaderBar.tsx` |
+| tab row | the row of ten tabs over the body | `panels/ProcessTabRow.tsx` |
 | tab | one of the ten. The authoring order runs Canvas, Steps, Fields, Data sources, Paths, Forms, Field matrix, Contract, Changes and Checks | `routing.ts` |
-| overflow menu | the tab row's own menu: the JSON surface, Versions and Player | `panels/ProcessTabRow.tsx` |
 | structure surface | the ten tab bodies together, the JSON surface's one alternative | `EditScreen.tsx`, its `structureActive` prop |
 | JSON surface | the raw definition view, the structure surface's one alternative | `panels/JsonView.tsx` |
 

@@ -784,6 +784,9 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, go, navSlot
         structureActive={!jsonOpen}
         processId={processId}
         go={go}
+        onToggleJson={() => setJsonOpen((open) => !open)}
+        onVersions={() => navigate({ name: "versions", processId })}
+        onPlayer={() => navigate({ name: "play", processId })}
       />
       {/* Checks, Save, Discard draft and Publish stand in the studio's area
           nav (`studio-process-tabs`). That nav renders outside
@@ -827,9 +830,6 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, go, navSlot
             counts={counts}
             onOpen={goToTab}
             jsonOpen={jsonOpen}
-            onToggleJson={() => setJsonOpen((open) => !open)}
-            onVersions={() => navigate({ name: "versions", processId })}
-            onPlayer={() => navigate({ name: "play", processId })}
           />
           {/* The JSON surface stands in place of every tab body, never beside
               one: no draft-body-writing control may stay reachable while it is
