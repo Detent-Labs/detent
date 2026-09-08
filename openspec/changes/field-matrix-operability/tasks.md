@@ -10,14 +10,14 @@
 
 ## 2. The names and the counts
 
-- [ ] 2.1 Add the catalog key carrying both counts in one sentence
-- [ ] 2.2 Add the catalog key naming a column target
-- [ ] 2.3 Add the catalog key naming a row target
-- [ ] 2.4 Compute both counts from the eligible set the badge already builds
-- [ ] 2.5 Put the sentence in the badge's `title`
-- [ ] 2.6 Put the same sentence in the badge's `aria-label`
-- [ ] 2.7 Test that two badges for one flag carry different names
-- [ ] 2.8 Test that the name and the title carry the same two numbers
+- [x] 2.1 Add the catalog key carrying both counts in one sentence
+- [x] 2.2 Add the catalog key naming a column target
+- [x] 2.3 Add the catalog key naming a row target
+- [x] 2.4 Compute both counts from the eligible set the badge already builds
+- [x] 2.5 Put the sentence in the badge's `title`
+- [x] 2.6 Put the same sentence in the badge's `aria-label`
+- [x] 2.7 Test that two badges for one flag carry different names
+- [x] 2.8 Test that the name and the title carry the same two numbers
 
 ## 3. The keyboard
 

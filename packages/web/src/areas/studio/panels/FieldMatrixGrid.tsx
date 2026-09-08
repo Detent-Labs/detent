@@ -18,6 +18,7 @@ import {
   rowLiveTargets,
   bulkBadgeOn,
   bulkBadgeState,
+  bulkBadgeCounts,
   type BulkBadgeState,
   applyBulkToggle,
   eligibleTargetEntries,
@@ -371,9 +372,14 @@ function BulkBadges({
   allSteps,
   written,
   technicalFieldIds,
+  scope,
   onToggle,
 }: {
   targets: BulkTarget[];
+  /** Which axis this badge group acts on, and what that target is called.
+   * The accessible name carries both, so thirty badges stop sharing three
+   * names between them. */
+  scope: { kind: "column" | "row"; name: string };
   allSteps: Parameters<typeof bulkBadgeOn>[0];
   written: WrittenAccessor;
   technicalFieldIds: Set<string>;
@@ -393,14 +399,28 @@ function BulkBadges({
       {FLAG_KEYS.map((key) => {
         if (!eligible.includes(key)) return <span key={key} aria-hidden="true" {...stylex.props(styles.matrixFlagEmpty)} />;
         const state = bulkBadgeState(allSteps, targets, key, written, technicalFieldIds);
+        const counts = bulkBadgeCounts(allSteps, targets, key, written, technicalFieldIds);
+        // The flag's own word is a complete label. The blast radius is a
+        // complete sentence. Joining two whole labels is not the same as
+        // building one sentence out of fragments.
+        const radius =
+          state === "full"
+            ? t(scope.kind === "column" ? "fieldMatrix.bulkClearColumn" : "fieldMatrix.bulkClearRow")
+                .replace("{total}", String(counts.total))
+                .replace("{name}", scope.name)
+            : t(scope.kind === "column" ? "fieldMatrix.bulkSetColumn" : "fieldMatrix.bulkSetRow")
+                .replace("{total}", String(counts.total))
+                .replace("{set}", String(counts.alreadySet))
+                .replace("{name}", scope.name);
+        const name = `${t(FLAG_LABEL_KEY[key])}. ${radius}`;
         return (
           <button
             key={key}
             type="button"
             {...stylex.props(styles.matrixFlagBadge, badgeStateStyle(state, key))}
             aria-pressed={badgeAriaPressed(state)}
-            aria-label={t(FLAG_LABEL_KEY[key])}
-            title={t(FLAG_LABEL_KEY[key])}
+            aria-label={name}
+            title={name}
             onClick={() => onToggle(key)}
           >
             {FLAG_LETTER[key]}
@@ -569,6 +589,13 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
                   {showBulkBadges && colTargets.length > 0 && (
                     <BulkBadges
                       targets={colTargets}
+                      scope={{
+                        kind: "column",
+                        name:
+                          resolveDraftLocalizedText(step.label, contentLocale, baseLocale) ||
+                          step.key ||
+                          t("steps.unnamedStep"),
+                      }}
                       allSteps={allSteps}
                       written={written}
                       technicalFieldIds={technicalIds}
@@ -607,6 +634,7 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
                   {showBulkBadges && rowTargets.length > 0 && (
                     <BulkBadges
                       targets={rowTargets}
+                      scope={{ kind: "row", name: row.key === "" ? t("panelsScreen.unnamedField") : row.key }}
                       allSteps={allSteps}
                       written={written}
                       technicalFieldIds={technicalIds}
