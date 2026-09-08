@@ -8,6 +8,8 @@ import {
   columnLiveTargets,
   rowLiveTargets,
   bulkBadgeOn,
+  bulkBadgeState,
+  bulkBadgeCounts,
   applyBulkToggle,
   eligibleTargetEntries,
   isCellFlagged,
@@ -401,5 +403,79 @@ describe("isCellFlagged", () => {
   it("does not flag a cell at its defaults", () => {
     const entry = vf({ ref: "field_vendor" });
     expect(isCellFlagged(entry, "field_vendor", false, none, 0)).toBe(false);
+  });
+});
+
+/**
+ * The three-state reading, and why the boolean beside it is not enough.
+ *
+ * `bulkBadgeOn` answers the write path's question: does a press turn the flag
+ * on or off. It collapses "none set" and "some set" into one `false`, so the
+ * badge drew a column with two of four cells set exactly like a column with
+ * none. One press then wrote all four, a second press cleared all four, and
+ * the mix was gone. The studio has no undo.
+ */
+describe("bulkBadgeState / bulkBadgeCounts", () => {
+  const none: WrittenAccessor = () => 0;
+  const noTechnical = new Set<string>();
+  const targets = [
+    { stepIndex: 0, fieldId: "field_vendor" },
+    { stepIndex: 1, fieldId: "field_vendor" },
+  ];
+  const build = (a: Record<string, unknown>, b: Record<string, unknown>): DraftStep[] => [
+    ds({ id: "step_a", view: { fields: [vf({ ref: "field_vendor", ...a })] } }),
+    ds({ id: "step_b", view: { fields: [vf({ ref: "field_vendor", ...b })] } }),
+  ];
+
+  it("reads empty when no eligible cell carries the flag", () => {
+    const steps = build({}, {});
+    expect(bulkBadgeState(steps, targets, "required", none, noTechnical)).toBe("empty");
+  });
+
+  it("reads full when every eligible cell carries the flag", () => {
+    const steps = build({ required: true }, { required: true });
+    expect(bulkBadgeState(steps, targets, "required", none, noTechnical)).toBe("full");
+  });
+
+  it("reads mixed when some do and some do not", () => {
+    const steps = build({ required: true }, {});
+    expect(bulkBadgeState(steps, targets, "required", none, noTechnical)).toBe("mixed");
+  });
+
+  it("reads empty for an empty eligible set", () => {
+    expect(bulkBadgeState([], [], "required", none, noTechnical)).toBe("empty");
+  });
+
+  it("separates mixed from empty, which the boolean cannot", () => {
+    // The defect, pinned. Both of these answer `false` to `bulkBadgeOn`, and
+    // that is correct for the write path: a press turns the flag on in both.
+    // It is the reader that needed the third state.
+    const mixed = build({ required: true }, {});
+    const empty = build({}, {});
+    expect(bulkBadgeOn(mixed, targets, "required", none, noTechnical)).toBe(false);
+    expect(bulkBadgeOn(empty, targets, "required", none, noTechnical)).toBe(false);
+    expect(bulkBadgeState(mixed, targets, "required", none, noTechnical)).not.toBe(
+      bulkBadgeState(empty, targets, "required", none, noTechnical),
+    );
+  });
+
+  it("counts what a press writes and what already holds the value", () => {
+    const steps = build({ required: true }, {});
+    expect(bulkBadgeCounts(steps, targets, "required", none, noTechnical)).toEqual({
+      total: 2,
+      alreadySet: 1,
+    });
+  });
+
+  it("counts a full column as every cell already set", () => {
+    const steps = build({ required: true }, { required: true });
+    expect(bulkBadgeCounts(steps, targets, "required", none, noTechnical)).toEqual({
+      total: 2,
+      alreadySet: 2,
+    });
+  });
+
+  it("counts nothing for an empty eligible set", () => {
+    expect(bulkBadgeCounts([], [], "required", none, noTechnical)).toEqual({ total: 0, alreadySet: 0 });
   });
 });
