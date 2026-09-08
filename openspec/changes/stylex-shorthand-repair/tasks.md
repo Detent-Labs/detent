@@ -43,6 +43,15 @@
 - [x] 5.3 Add the browser-check entry to `docs/browser-checks.md`
 - [x] 5.4 Name the four surfaces the entry covers: canvas, field matrix, JSON view, error banner
 
+## 5b. The pressed bulk badge
+
+- [x] 5b.1 Replace the accent pressed style with one style per flag
+- [x] 5b.2 Pick the style from the flag key the button already holds
+- [x] 5b.3 Add `packages/web/test/studio-fieldMatrixBadge.test.ts`
+- [x] 5b.4 Assert each flag fill clears 4.5:1 in both color schemes
+- [x] 5b.5 Assert the flag fills beat the accent's own margin
+- [x] 5b.6 Write the `studio-app` delta for the pressed fill
+
 ## 6. Verification
 
 - [x] 6.1 Run `bun run typecheck` in the devcontainer

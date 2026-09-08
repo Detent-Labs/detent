@@ -51,11 +51,19 @@ None.
   drops and puts a test behind the ban. One modified requirement restates the
   global stylesheet's line bound and its survivor list.
 
-The area capabilities take no delta. Each of `admin-app`, `end-user-app`,
-`reporting-app`, `unified-shell`, `form-ui` and the studio capabilities
-already states what its screens render. The specs were right and the compiled
-output was wrong. This change moves the output to the spec, not the spec to
-the output.
+- `studio-app`: one added requirement fixes what the repair made visible. The
+  field matrix's pressed bulk badge fills with its own flag color, never with
+  the accent.
+
+The other area capabilities take no delta. Each of `admin-app`,
+`end-user-app`, `reporting-app`, `unified-shell` and `form-ui` already states
+what its screens render. The specs were right and the compiled output was
+wrong. This change moves the output to the spec, not the spec to the output.
+
+The studio is the exception, and the reason is worth stating. The badge asked
+for an accent fill that never painted. Restoring it put six accent fills on
+one screen. The language allows one, and the screen's own legend contradicts
+the rest. A faithful conversion is not always a correct screen.
 
 ## Impact
 

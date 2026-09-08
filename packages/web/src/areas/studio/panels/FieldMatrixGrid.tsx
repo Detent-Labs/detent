@@ -233,10 +233,28 @@ const styles = stylex.create({
   },
   // `[aria-pressed="true"]`: a JS-computed choice reading the same
   // `aria-pressed` the button already carries.
-  matrixFlagBadgePressed: {
+  //
+  // The fill is the flag's own color, never the accent. Three reasons, in
+  // order. The legend twelve pixels away names these three colors, so a REQ
+  // badge that filled with the accent would contradict the key beside it.
+  // The accent marks state and the one primary action per screen
+  // (`design-language.md`), and Publish already holds it. And the accent
+  // fill clears AA by 0.025 under this badge's own 11px text, at 4.525:1;
+  // each flag color measures 6.4:1 or better, in both schemes.
+  matrixFlagBadgePressedVisible: {
     color: colors.accentContrast,
-    backgroundColor: colors.accent,
-    borderColor: colors.accent,
+    backgroundColor: colors.flagVisible,
+    borderColor: colors.flagVisible,
+  },
+  matrixFlagBadgePressedRequired: {
+    color: colors.accentContrast,
+    backgroundColor: colors.flagRequired,
+    borderColor: colors.flagRequired,
+  },
+  matrixFlagBadgePressedReadonly: {
+    color: colors.accentContrast,
+    backgroundColor: colors.flagReadonly,
+    borderColor: colors.flagReadonly,
   },
   matrixFlagEmpty: {
     height: "1.125rem",
@@ -262,6 +280,14 @@ const MATRIX_FLAG_ACCENT_STYLE: Record<FlagKey, stylex.StyleXStyles> = {
 
 export const FLAG_KEYS: FlagKey[] = ["visible", "required", "readonly"];
 const FLAG_LETTER: Record<FlagKey, string> = { visible: "VIS", required: "REQ", readonly: "RO" };
+
+/** The pressed fill, per flag. Mirrors `FLAG_SWATCH_STYLE` in the panel's
+ * legend, so the badge and the key it explains read one color each. */
+const FLAG_BADGE_PRESSED: Record<FlagKey, stylex.StyleXStyles> = {
+  visible: styles.matrixFlagBadgePressedVisible,
+  required: styles.matrixFlagBadgePressedRequired,
+  readonly: styles.matrixFlagBadgePressedReadonly,
+};
 export const FLAG_LABEL_KEY = {
   visible: "formEditor.visible",
   required: "formEditor.required",
@@ -324,7 +350,7 @@ function BulkBadges({
           <button
             key={key}
             type="button"
-            {...stylex.props(styles.matrixFlagBadge, pressed && styles.matrixFlagBadgePressed)}
+            {...stylex.props(styles.matrixFlagBadge, pressed && FLAG_BADGE_PRESSED[key])}
             aria-pressed={pressed}
             aria-label={t(FLAG_LABEL_KEY[key])}
             title={t(FLAG_LABEL_KEY[key])}

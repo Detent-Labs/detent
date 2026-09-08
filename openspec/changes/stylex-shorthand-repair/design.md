@@ -95,6 +95,26 @@ The sheet stands at 133 lines against a stated bound of about 120. The bound
 moves to about 150 rather than the comment shrinking. That comment records the
 measurement that found the bevel, and it is the only record of it.
 
+### 6. One revealed declaration gets corrected, not shipped
+
+The conversion is faithful everywhere. In one place the declaration it
+revealed is wrong, and this change fixes that place rather than leaving it.
+
+`matrixFlagBadgePressed` asked for an accent fill. It painted none for as
+long as it existed. Converting it put six accent fills on the field matrix at
+once. Three things say the accent is wrong there. The legend twelve pixels
+away names one color per flag. The language gives the accent to state and to
+the one primary action per screen, and Publish holds it. The accent measures
+4.525:1 under the badge's 11px label, clearing AA by 0.025, where each flag
+color measures 6.4:1 or better.
+
+The badge now takes its own flag's color. The three flag tokens are the
+scoped exception `design-language.md` already names, and the legend on the
+same screen already draws them.
+
+Every other revealed declaration ships as authored. This one earned an
+exception because it broke a rule the same screen states in words.
+
 ## Risks / Trade-offs
 
 **A border that paints changes a box's size.** The global reset sets
