@@ -571,6 +571,14 @@ data: an amount from an earlier step, a status the engine set.
 A **group** also names a catalog field, one that holds child fields. Use it
 to organize related inputs under one heading, not to display static text.
 
+Two rules bind a group, and publish enforces both. A member entry's `group`
+holds the group field's `key`, never its label. The same view also carries a
+`ref` entry for the group field itself. Miss either one and the renderer draws
+neither the container nor its members, so the step comes up blank.
+
+The catalog may leave a group field childless. The view says which entries sit
+inside it, so one group field can head different entries on different steps.
+
 A **note** names no field at all. It carries `text` (a `LocalizedText`, the
 same shape a field's `label` uses) and nothing to submit. Use it for
 instructional or explanatory copy that exists only on this step's form. A

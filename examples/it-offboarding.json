@@ -1,7 +1,7 @@
 {
   "processId": "proc_it_offboarding",
   "version": 1,
-  "definitionHash": "e7a26ef3b2fe4986f6aeb90bbda9db210cde69536363e594a0d98f891e108c1d",
+  "definitionHash": "a3cbe29dd35998803670fc24114112698b83abe3a0c773bf2fc68e02414226c0",
   "status": "published",
   "publishedAt": "2026-09-08T09:00:00Z",
   "definition": {
@@ -769,115 +769,133 @@
           "view": {
             "fields": [
               {
+                "ref": "field_0fb5a2c4-0001-4a1c-8e2f-0fb500000001"
+              },
+              {
                 "ref": "field_0fb5a2c4-0002-4a1c-8e2f-0fb500000002",
                 "required": true,
-                "group": "Personal details"
+                "group": "personal_details"
               },
               {
                 "ref": "field_0fb5a2c4-0003-4a1c-8e2f-0fb500000003",
                 "required": true,
-                "group": "Personal details"
+                "group": "personal_details"
               },
               {
                 "ref": "field_0fb5a2c4-0004-4a1c-8e2f-0fb500000004",
                 "required": true,
-                "group": "Personal details"
+                "group": "personal_details"
               },
               {
                 "ref": "field_0fb5a2c4-0005-4a1c-8e2f-0fb500000005",
                 "required": true,
-                "group": "Personal details"
+                "group": "personal_details"
+              },
+              {
+                "ref": "field_0fb5a2c4-0006-4a1c-8e2f-0fb500000006"
               },
               {
                 "ref": "field_0fb5a2c4-0007-4a1c-8e2f-0fb500000007",
-                "group": "Data backup and email"
+                "group": "data_backup_and_email"
               },
               {
                 "ref": "field_0fb5a2c4-0008-4a1c-8e2f-0fb500000008",
-                "group": "Data backup and email"
+                "group": "data_backup_and_email"
               },
               {
                 "ref": "field_0fb5a2c4-0009-4a1c-8e2f-0fb500000009",
-                "group": "Data backup and email"
+                "group": "data_backup_and_email"
               },
               {
                 "ref": "field_0fb5a2c4-0010-4a1c-8e2f-0fb500000010",
-                "group": "Data backup and email"
+                "group": "data_backup_and_email"
               },
               {
                 "ref": "field_0fb5a2c4-0011-4a1c-8e2f-0fb500000011",
-                "group": "Data backup and email"
+                "group": "data_backup_and_email"
               },
               {
                 "ref": "field_0fb5a2c4-0012-4a1c-8e2f-0fb500000012",
-                "group": "Data backup and email"
+                "group": "data_backup_and_email"
               },
               {
                 "ref": "field_0fb5a2c4-0013-4a1c-8e2f-0fb500000013",
-                "group": "Data backup and email"
+                "group": "data_backup_and_email"
               },
               {
                 "ref": "field_0fb5a2c4-0014-4a1c-8e2f-0fb500000014",
-                "group": "Data backup and email"
+                "group": "data_backup_and_email"
               },
               {
                 "ref": "field_0fb5a2c4-0015-4a1c-8e2f-0fb500000015",
-                "group": "Data backup and email"
+                "group": "data_backup_and_email"
+              },
+              {
+                "ref": "field_0fb5a2c4-0016-4a1c-8e2f-0fb500000016"
               },
               {
                 "ref": "field_0fb5a2c4-0017-4a1c-8e2f-0fb500000017",
-                "group": "Hardware"
+                "group": "hardware"
               },
               {
                 "ref": "field_0fb5a2c4-0018-4a1c-8e2f-0fb500000018",
-                "group": "Hardware"
+                "group": "hardware"
               },
               {
                 "ref": "field_0fb5a2c4-0019-4a1c-8e2f-0fb500000019",
-                "group": "Hardware"
+                "group": "hardware"
               },
               {
                 "ref": "field_0fb5a2c4-0020-4a1c-8e2f-0fb500000020",
-                "group": "Hardware"
+                "group": "hardware"
+              },
+              {
+                "ref": "field_0fb5a2c4-0021-4a1c-8e2f-0fb500000021"
               },
               {
                 "ref": "field_0fb5a2c4-0022-4a1c-8e2f-0fb500000022",
                 "required": true,
-                "group": "Permissions"
+                "group": "permissions"
+              },
+              {
+                "ref": "field_0fb5a2c4-0023-4a1c-8e2f-0fb500000023"
               },
               {
                 "ref": "field_0fb5a2c4-0024-4a1c-8e2f-0fb500000024",
-                "group": "Retention"
+                "group": "retention"
               },
               {
                 "ref": "field_0fb5a2c4-0025-4a1c-8e2f-0fb500000025",
-                "group": "Retention"
+                "group": "retention"
               },
               {
                 "ref": "field_0fb5a2c4-0026-4a1c-8e2f-0fb500000026",
-                "group": "Retention"
+                "group": "retention"
               },
               {
                 "ref": "field_0fb5a2c4-0027-4a1c-8e2f-0fb500000027",
-                "group": "Retention"
+                "group": "retention"
+              },
+              {
+                "ref": "field_0fb5a2c4-0028-4a1c-8e2f-0fb500000028"
               },
               {
                 "ref": "field_0fb5a2c4-0029-4a1c-8e2f-0fb500000029",
-                "group": "Notification"
+                "group": "notification"
               },
               {
                 "ref": "field_0fb5a2c4-0030-4a1c-8e2f-0fb500000030",
-                "group": "Notification"
+                "group": "notification"
               },
               {
                 "ref": "field_0fb5a2c4-0031-4a1c-8e2f-0fb500000031",
                 "required": true,
-                "group": "Notification"
+                "group": "notification"
               },
               {
                 "ref": "field_0fb5a2c4-0032-4a1c-8e2f-0fb500000032",
                 "required": true,
-                "group": "Notification"
+                "group": "notification"
               }
             ]
           },
@@ -921,38 +939,47 @@
           "view": {
             "fields": [
               {
+                "ref": "field_0fb5a2c4-0001-4a1c-8e2f-0fb500000001"
+              },
+              {
                 "ref": "field_0fb5a2c4-0002-4a1c-8e2f-0fb500000002",
                 "readonly": true,
-                "group": "Personal details"
+                "group": "personal_details"
               },
               {
                 "ref": "field_0fb5a2c4-0003-4a1c-8e2f-0fb500000003",
                 "readonly": true,
-                "group": "Personal details"
+                "group": "personal_details"
+              },
+              {
+                "ref": "field_0fb5a2c4-0028-4a1c-8e2f-0fb500000028"
               },
               {
                 "ref": "field_0fb5a2c4-0030-4a1c-8e2f-0fb500000030",
                 "readonly": true,
-                "group": "Notification"
+                "group": "notification"
+              },
+              {
+                "ref": "field_0fb5a2c4-0033-4a1c-8e2f-0fb500000033"
               },
               {
                 "ref": "field_0fb5a2c4-0034-4a1c-8e2f-0fb500000034",
                 "required": true,
-                "group": "Processing (XAN)"
+                "group": "processing_xan"
               },
               {
                 "ref": "field_0fb5a2c4-0035-4a1c-8e2f-0fb500000035",
                 "required": true,
-                "group": "Processing (XAN)"
+                "group": "processing_xan"
               },
               {
                 "ref": "field_0fb5a2c4-0039-4a1c-8e2f-0fb500000039",
                 "required": true,
-                "group": "Processing (XAN)"
+                "group": "processing_xan"
               },
               {
                 "ref": "field_0fb5a2c4-0044-4a1c-8e2f-0fb500000044",
-                "group": "Processing (XAN)"
+                "group": "processing_xan"
               }
             ]
           },
@@ -989,113 +1016,134 @@
           "view": {
             "fields": [
               {
+                "ref": "field_0fb5a2c4-0001-4a1c-8e2f-0fb500000001"
+              },
+              {
                 "ref": "field_0fb5a2c4-0002-4a1c-8e2f-0fb500000002",
                 "readonly": true,
-                "group": "Personal details"
+                "group": "personal_details"
               },
               {
                 "ref": "field_0fb5a2c4-0003-4a1c-8e2f-0fb500000003",
                 "readonly": true,
-                "group": "Personal details"
+                "group": "personal_details"
               },
               {
                 "ref": "field_0fb5a2c4-0004-4a1c-8e2f-0fb500000004",
                 "readonly": true,
-                "group": "Personal details"
+                "group": "personal_details"
               },
               {
                 "ref": "field_0fb5a2c4-0005-4a1c-8e2f-0fb500000005",
                 "readonly": true,
-                "group": "Personal details"
+                "group": "personal_details"
+              },
+              {
+                "ref": "field_0fb5a2c4-0006-4a1c-8e2f-0fb500000006"
               },
               {
                 "ref": "field_0fb5a2c4-0007-4a1c-8e2f-0fb500000007",
                 "readonly": true,
-                "group": "Data backup and email"
+                "group": "data_backup_and_email"
               },
               {
                 "ref": "field_0fb5a2c4-0008-4a1c-8e2f-0fb500000008",
                 "readonly": true,
-                "group": "Data backup and email"
+                "group": "data_backup_and_email"
               },
               {
                 "ref": "field_0fb5a2c4-0009-4a1c-8e2f-0fb500000009",
                 "readonly": true,
-                "group": "Data backup and email"
+                "group": "data_backup_and_email"
               },
               {
                 "ref": "field_0fb5a2c4-0010-4a1c-8e2f-0fb500000010",
                 "readonly": true,
-                "group": "Data backup and email"
+                "group": "data_backup_and_email"
               },
               {
                 "ref": "field_0fb5a2c4-0011-4a1c-8e2f-0fb500000011",
                 "readonly": true,
-                "group": "Data backup and email"
+                "group": "data_backup_and_email"
               },
               {
                 "ref": "field_0fb5a2c4-0014-4a1c-8e2f-0fb500000014",
                 "readonly": true,
-                "group": "Data backup and email"
+                "group": "data_backup_and_email"
+              },
+              {
+                "ref": "field_0fb5a2c4-0016-4a1c-8e2f-0fb500000016"
               },
               {
                 "ref": "field_0fb5a2c4-0017-4a1c-8e2f-0fb500000017",
                 "readonly": true,
-                "group": "Hardware"
+                "group": "hardware"
               },
               {
                 "ref": "field_0fb5a2c4-0019-4a1c-8e2f-0fb500000019",
                 "readonly": true,
-                "group": "Hardware"
+                "group": "hardware"
               },
               {
                 "ref": "field_0fb5a2c4-0020-4a1c-8e2f-0fb500000020",
                 "readonly": true,
-                "group": "Hardware"
+                "group": "hardware"
+              },
+              {
+                "ref": "field_0fb5a2c4-0021-4a1c-8e2f-0fb500000021"
               },
               {
                 "ref": "field_0fb5a2c4-0022-4a1c-8e2f-0fb500000022",
                 "readonly": true,
-                "group": "Permissions"
+                "group": "permissions"
+              },
+              {
+                "ref": "field_0fb5a2c4-0023-4a1c-8e2f-0fb500000023"
               },
               {
                 "ref": "field_0fb5a2c4-0024-4a1c-8e2f-0fb500000024",
                 "readonly": true,
-                "group": "Retention"
+                "group": "retention"
               },
               {
                 "ref": "field_0fb5a2c4-0026-4a1c-8e2f-0fb500000026",
                 "readonly": true,
-                "group": "Retention"
+                "group": "retention"
               },
               {
                 "ref": "field_0fb5a2c4-0027-4a1c-8e2f-0fb500000027",
                 "readonly": true,
-                "group": "Retention"
+                "group": "retention"
+              },
+              {
+                "ref": "field_0fb5a2c4-0028-4a1c-8e2f-0fb500000028"
               },
               {
                 "ref": "field_0fb5a2c4-0029-4a1c-8e2f-0fb500000029",
                 "readonly": true,
-                "group": "Notification"
+                "group": "notification"
               },
               {
                 "ref": "field_0fb5a2c4-0030-4a1c-8e2f-0fb500000030",
                 "readonly": true,
-                "group": "Notification"
+                "group": "notification"
+              },
+              {
+                "ref": "field_0fb5a2c4-0033-4a1c-8e2f-0fb500000033"
               },
               {
                 "ref": "field_0fb5a2c4-0034-4a1c-8e2f-0fb500000034",
                 "required": true,
-                "group": "Processing (XAN)"
+                "group": "processing_xan"
               },
               {
                 "ref": "field_0fb5a2c4-0035-4a1c-8e2f-0fb500000035",
                 "required": true,
-                "group": "Processing (XAN)"
+                "group": "processing_xan"
               },
               {
                 "ref": "field_0fb5a2c4-0036-4a1c-8e2f-0fb500000036",
-                "group": "Processing (XAN)"
+                "group": "processing_xan"
               }
             ]
           },
@@ -1139,78 +1187,99 @@
           "view": {
             "fields": [
               {
+                "ref": "field_0fb5a2c4-0033-4a1c-8e2f-0fb500000033"
+              },
+              {
                 "ref": "field_0fb5a2c4-0036-4a1c-8e2f-0fb500000036",
                 "readonly": true,
-                "group": "Processing (XAN)"
+                "group": "processing_xan"
               },
               {
                 "ref": "field_0fb5a2c4-0037-4a1c-8e2f-0fb500000037",
                 "required": true,
-                "group": "Processing (XAN)"
+                "group": "processing_xan"
+              },
+              {
+                "ref": "field_0fb5a2c4-0001-4a1c-8e2f-0fb500000001"
               },
               {
                 "ref": "field_0fb5a2c4-0005-4a1c-8e2f-0fb500000005",
-                "group": "Personal details"
+                "group": "personal_details"
+              },
+              {
+                "ref": "field_0fb5a2c4-0006-4a1c-8e2f-0fb500000006"
               },
               {
                 "ref": "field_0fb5a2c4-0009-4a1c-8e2f-0fb500000009",
-                "group": "Data backup and email"
+                "group": "data_backup_and_email"
               },
               {
                 "ref": "field_0fb5a2c4-0010-4a1c-8e2f-0fb500000010",
-                "group": "Data backup and email"
+                "group": "data_backup_and_email"
               },
               {
                 "ref": "field_0fb5a2c4-0011-4a1c-8e2f-0fb500000011",
-                "group": "Data backup and email"
+                "group": "data_backup_and_email"
               },
               {
                 "ref": "field_0fb5a2c4-0014-4a1c-8e2f-0fb500000014",
-                "group": "Data backup and email"
+                "group": "data_backup_and_email"
               },
               {
                 "ref": "field_0fb5a2c4-0015-4a1c-8e2f-0fb500000015",
-                "group": "Data backup and email"
+                "group": "data_backup_and_email"
+              },
+              {
+                "ref": "field_0fb5a2c4-0016-4a1c-8e2f-0fb500000016"
               },
               {
                 "ref": "field_0fb5a2c4-0017-4a1c-8e2f-0fb500000017",
-                "group": "Hardware"
+                "group": "hardware"
               },
               {
                 "ref": "field_0fb5a2c4-0018-4a1c-8e2f-0fb500000018",
-                "group": "Hardware"
+                "group": "hardware"
               },
               {
                 "ref": "field_0fb5a2c4-0019-4a1c-8e2f-0fb500000019",
-                "group": "Hardware"
+                "group": "hardware"
               },
               {
                 "ref": "field_0fb5a2c4-0020-4a1c-8e2f-0fb500000020",
-                "group": "Hardware"
+                "group": "hardware"
+              },
+              {
+                "ref": "field_0fb5a2c4-0021-4a1c-8e2f-0fb500000021"
               },
               {
                 "ref": "field_0fb5a2c4-0022-4a1c-8e2f-0fb500000022",
-                "group": "Permissions"
+                "group": "permissions"
+              },
+              {
+                "ref": "field_0fb5a2c4-0023-4a1c-8e2f-0fb500000023"
               },
               {
                 "ref": "field_0fb5a2c4-0024-4a1c-8e2f-0fb500000024",
-                "group": "Retention"
+                "group": "retention"
               },
               {
                 "ref": "field_0fb5a2c4-0025-4a1c-8e2f-0fb500000025",
-                "group": "Retention"
+                "group": "retention"
               },
               {
                 "ref": "field_0fb5a2c4-0026-4a1c-8e2f-0fb500000026",
-                "group": "Retention"
+                "group": "retention"
               },
               {
                 "ref": "field_0fb5a2c4-0027-4a1c-8e2f-0fb500000027",
-                "group": "Retention"
+                "group": "retention"
+              },
+              {
+                "ref": "field_0fb5a2c4-0028-4a1c-8e2f-0fb500000028"
               },
               {
                 "ref": "field_0fb5a2c4-0030-4a1c-8e2f-0fb500000030",
-                "group": "Notification"
+                "group": "notification"
               }
             ]
           },
@@ -1247,33 +1316,42 @@
           "view": {
             "fields": [
               {
+                "ref": "field_0fb5a2c4-0001-4a1c-8e2f-0fb500000001"
+              },
+              {
                 "ref": "field_0fb5a2c4-0002-4a1c-8e2f-0fb500000002",
                 "readonly": true,
-                "group": "Personal details"
+                "group": "personal_details"
               },
               {
                 "ref": "field_0fb5a2c4-0004-4a1c-8e2f-0fb500000004",
                 "readonly": true,
-                "group": "Personal details"
+                "group": "personal_details"
               },
               {
                 "ref": "field_0fb5a2c4-0005-4a1c-8e2f-0fb500000005",
                 "readonly": true,
-                "group": "Personal details"
+                "group": "personal_details"
+              },
+              {
+                "ref": "field_0fb5a2c4-0033-4a1c-8e2f-0fb500000033"
               },
               {
                 "ref": "field_0fb5a2c4-0034-4a1c-8e2f-0fb500000034",
                 "readonly": true,
-                "group": "Processing (XAN)"
+                "group": "processing_xan"
               },
               {
                 "ref": "field_0fb5a2c4-0038-4a1c-8e2f-0fb500000038",
                 "required": true,
-                "group": "Processing (XAN)"
+                "group": "processing_xan"
+              },
+              {
+                "ref": "field_0fb5a2c4-0028-4a1c-8e2f-0fb500000028"
               },
               {
                 "ref": "field_0fb5a2c4-0030-4a1c-8e2f-0fb500000030",
-                "group": "Notification"
+                "group": "notification"
               }
             ]
           },
@@ -1310,81 +1388,93 @@
           "view": {
             "fields": [
               {
+                "ref": "field_0fb5a2c4-0001-4a1c-8e2f-0fb500000001"
+              },
+              {
                 "ref": "field_0fb5a2c4-0002-4a1c-8e2f-0fb500000002",
                 "readonly": true,
-                "group": "Personal details"
+                "group": "personal_details"
               },
               {
                 "ref": "field_0fb5a2c4-0005-4a1c-8e2f-0fb500000005",
                 "readonly": true,
-                "group": "Personal details"
+                "group": "personal_details"
+              },
+              {
+                "ref": "field_0fb5a2c4-0006-4a1c-8e2f-0fb500000006"
               },
               {
                 "ref": "field_0fb5a2c4-0007-4a1c-8e2f-0fb500000007",
                 "readonly": true,
-                "group": "Data backup and email"
+                "group": "data_backup_and_email"
               },
               {
                 "ref": "field_0fb5a2c4-0008-4a1c-8e2f-0fb500000008",
                 "readonly": true,
-                "group": "Data backup and email"
+                "group": "data_backup_and_email"
               },
               {
                 "ref": "field_0fb5a2c4-0009-4a1c-8e2f-0fb500000009",
                 "readonly": true,
-                "group": "Data backup and email"
+                "group": "data_backup_and_email"
               },
               {
                 "ref": "field_0fb5a2c4-0010-4a1c-8e2f-0fb500000010",
                 "readonly": true,
-                "group": "Data backup and email"
+                "group": "data_backup_and_email"
               },
               {
                 "ref": "field_0fb5a2c4-0011-4a1c-8e2f-0fb500000011",
                 "readonly": true,
-                "group": "Data backup and email"
+                "group": "data_backup_and_email"
               },
               {
                 "ref": "field_0fb5a2c4-0012-4a1c-8e2f-0fb500000012",
                 "readonly": true,
-                "group": "Data backup and email"
+                "group": "data_backup_and_email"
               },
               {
                 "ref": "field_0fb5a2c4-0013-4a1c-8e2f-0fb500000013",
                 "readonly": true,
-                "group": "Data backup and email"
+                "group": "data_backup_and_email"
               },
               {
                 "ref": "field_0fb5a2c4-0014-4a1c-8e2f-0fb500000014",
                 "readonly": true,
-                "group": "Data backup and email"
+                "group": "data_backup_and_email"
               },
               {
                 "ref": "field_0fb5a2c4-0015-4a1c-8e2f-0fb500000015",
                 "readonly": true,
-                "group": "Data backup and email"
+                "group": "data_backup_and_email"
+              },
+              {
+                "ref": "field_0fb5a2c4-0016-4a1c-8e2f-0fb500000016"
               },
               {
                 "ref": "field_0fb5a2c4-0017-4a1c-8e2f-0fb500000017",
                 "readonly": true,
-                "group": "Hardware"
+                "group": "hardware"
               },
               {
                 "ref": "field_0fb5a2c4-0018-4a1c-8e2f-0fb500000018",
                 "readonly": true,
-                "group": "Hardware"
+                "group": "hardware"
               },
               {
                 "ref": "field_0fb5a2c4-0019-4a1c-8e2f-0fb500000019",
-                "group": "Hardware"
+                "group": "hardware"
               },
               {
                 "ref": "field_0fb5a2c4-0020-4a1c-8e2f-0fb500000020",
-                "group": "Hardware"
+                "group": "hardware"
+              },
+              {
+                "ref": "field_0fb5a2c4-0028-4a1c-8e2f-0fb500000028"
               },
               {
                 "ref": "field_0fb5a2c4-0030-4a1c-8e2f-0fb500000030",
-                "group": "Notification"
+                "group": "notification"
               }
             ]
           },
@@ -1421,77 +1511,92 @@
           "view": {
             "fields": [
               {
+                "ref": "field_0fb5a2c4-0001-4a1c-8e2f-0fb500000001"
+              },
+              {
                 "ref": "field_0fb5a2c4-0002-4a1c-8e2f-0fb500000002",
                 "readonly": true,
-                "group": "Personal details"
+                "group": "personal_details"
               },
               {
                 "ref": "field_0fb5a2c4-0005-4a1c-8e2f-0fb500000005",
                 "readonly": true,
-                "group": "Personal details"
+                "group": "personal_details"
+              },
+              {
+                "ref": "field_0fb5a2c4-0006-4a1c-8e2f-0fb500000006"
               },
               {
                 "ref": "field_0fb5a2c4-0009-4a1c-8e2f-0fb500000009",
                 "readonly": true,
-                "group": "Data backup and email"
+                "group": "data_backup_and_email"
               },
               {
                 "ref": "field_0fb5a2c4-0010-4a1c-8e2f-0fb500000010",
                 "readonly": true,
-                "group": "Data backup and email"
+                "group": "data_backup_and_email"
               },
               {
                 "ref": "field_0fb5a2c4-0011-4a1c-8e2f-0fb500000011",
                 "readonly": true,
-                "group": "Data backup and email"
+                "group": "data_backup_and_email"
               },
               {
                 "ref": "field_0fb5a2c4-0014-4a1c-8e2f-0fb500000014",
                 "readonly": true,
-                "group": "Data backup and email"
+                "group": "data_backup_and_email"
               },
               {
                 "ref": "field_0fb5a2c4-0015-4a1c-8e2f-0fb500000015",
                 "readonly": true,
-                "group": "Data backup and email"
+                "group": "data_backup_and_email"
+              },
+              {
+                "ref": "field_0fb5a2c4-0016-4a1c-8e2f-0fb500000016"
               },
               {
                 "ref": "field_0fb5a2c4-0017-4a1c-8e2f-0fb500000017",
                 "readonly": true,
-                "group": "Hardware"
+                "group": "hardware"
+              },
+              {
+                "ref": "field_0fb5a2c4-0021-4a1c-8e2f-0fb500000021"
               },
               {
                 "ref": "field_0fb5a2c4-0022-4a1c-8e2f-0fb500000022",
                 "readonly": true,
-                "group": "Permissions"
+                "group": "permissions"
+              },
+              {
+                "ref": "field_0fb5a2c4-0033-4a1c-8e2f-0fb500000033"
               },
               {
                 "ref": "field_0fb5a2c4-0041-4a1c-8e2f-0fb500000041",
                 "required": true,
-                "group": "Processing (XAN)"
+                "group": "processing_xan"
               },
               {
                 "ref": "field_0fb5a2c4-0042-4a1c-8e2f-0fb500000042",
                 "required": true,
-                "group": "Processing (XAN)"
+                "group": "processing_xan"
               },
               {
                 "ref": "field_0fb5a2c4-0043-4a1c-8e2f-0fb500000043",
                 "required": true,
-                "group": "Processing (XAN)"
+                "group": "processing_xan"
               },
               {
                 "ref": "field_0fb5a2c4-0040-4a1c-8e2f-0fb500000040",
-                "group": "Processing (XAN)"
+                "group": "processing_xan"
               },
               {
                 "ref": "field_0fb5a2c4-0044-4a1c-8e2f-0fb500000044",
-                "group": "Processing (XAN)"
+                "group": "processing_xan"
               },
               {
                 "ref": "field_0fb5a2c4-0045-4a1c-8e2f-0fb500000045",
                 "required": true,
-                "group": "Processing (XAN)"
+                "group": "processing_xan"
               }
             ]
           },
@@ -1535,43 +1640,52 @@
           "view": {
             "fields": [
               {
+                "ref": "field_0fb5a2c4-0001-4a1c-8e2f-0fb500000001"
+              },
+              {
                 "ref": "field_0fb5a2c4-0002-4a1c-8e2f-0fb500000002",
                 "readonly": true,
-                "group": "Personal details"
+                "group": "personal_details"
+              },
+              {
+                "ref": "field_0fb5a2c4-0016-4a1c-8e2f-0fb500000016"
               },
               {
                 "ref": "field_0fb5a2c4-0017-4a1c-8e2f-0fb500000017",
                 "readonly": true,
-                "group": "Hardware"
+                "group": "hardware"
               },
               {
                 "ref": "field_0fb5a2c4-0018-4a1c-8e2f-0fb500000018",
                 "readonly": true,
-                "group": "Hardware"
+                "group": "hardware"
               },
               {
                 "ref": "field_0fb5a2c4-0019-4a1c-8e2f-0fb500000019",
                 "readonly": true,
-                "group": "Hardware"
+                "group": "hardware"
               },
               {
                 "ref": "field_0fb5a2c4-0020-4a1c-8e2f-0fb500000020",
                 "readonly": true,
-                "group": "Hardware"
+                "group": "hardware"
+              },
+              {
+                "ref": "field_0fb5a2c4-0033-4a1c-8e2f-0fb500000033"
               },
               {
                 "ref": "field_0fb5a2c4-0046-4a1c-8e2f-0fb500000046",
-                "group": "Processing (XAN)"
+                "group": "processing_xan"
               },
               {
                 "ref": "field_0fb5a2c4-0047-4a1c-8e2f-0fb500000047",
                 "required": true,
-                "group": "Processing (XAN)"
+                "group": "processing_xan"
               },
               {
                 "ref": "field_0fb5a2c4-0048-4a1c-8e2f-0fb500000048",
                 "required": true,
-                "group": "Processing (XAN)"
+                "group": "processing_xan"
               }
             ]
           },
@@ -1615,57 +1729,63 @@
           "view": {
             "fields": [
               {
+                "ref": "field_0fb5a2c4-0001-4a1c-8e2f-0fb500000001"
+              },
+              {
                 "ref": "field_0fb5a2c4-0002-4a1c-8e2f-0fb500000002",
                 "readonly": true,
-                "group": "Personal details"
+                "group": "personal_details"
               },
               {
                 "ref": "field_0fb5a2c4-0003-4a1c-8e2f-0fb500000003",
                 "readonly": true,
-                "group": "Personal details"
+                "group": "personal_details"
+              },
+              {
+                "ref": "field_0fb5a2c4-0033-4a1c-8e2f-0fb500000033"
               },
               {
                 "ref": "field_0fb5a2c4-0041-4a1c-8e2f-0fb500000041",
                 "readonly": true,
-                "group": "Processing (XAN)"
+                "group": "processing_xan"
               },
               {
                 "ref": "field_0fb5a2c4-0042-4a1c-8e2f-0fb500000042",
                 "readonly": true,
-                "group": "Processing (XAN)"
+                "group": "processing_xan"
               },
               {
                 "ref": "field_0fb5a2c4-0043-4a1c-8e2f-0fb500000043",
                 "readonly": true,
-                "group": "Processing (XAN)"
+                "group": "processing_xan"
               },
               {
                 "ref": "field_0fb5a2c4-0040-4a1c-8e2f-0fb500000040",
                 "readonly": true,
-                "group": "Processing (XAN)"
+                "group": "processing_xan"
               },
               {
                 "ref": "field_0fb5a2c4-0047-4a1c-8e2f-0fb500000047",
                 "readonly": true,
-                "group": "Processing (XAN)"
+                "group": "processing_xan"
               },
               {
                 "ref": "field_0fb5a2c4-0034-4a1c-8e2f-0fb500000034",
                 "readonly": true,
-                "group": "Processing (XAN)"
+                "group": "processing_xan"
               },
               {
                 "ref": "field_0fb5a2c4-0048-4a1c-8e2f-0fb500000048",
-                "group": "Processing (XAN)"
+                "group": "processing_xan"
               },
               {
                 "ref": "field_0fb5a2c4-0035-4a1c-8e2f-0fb500000035",
-                "group": "Processing (XAN)"
+                "group": "processing_xan"
               },
               {
                 "ref": "field_0fb5a2c4-0049-4a1c-8e2f-0fb500000049",
                 "required": true,
-                "group": "Processing (XAN)"
+                "group": "processing_xan"
               }
             ]
           },
@@ -1702,29 +1822,38 @@
           "view": {
             "fields": [
               {
+                "ref": "field_0fb5a2c4-0001-4a1c-8e2f-0fb500000001"
+              },
+              {
                 "ref": "field_0fb5a2c4-0002-4a1c-8e2f-0fb500000002",
                 "readonly": true,
-                "group": "Personal details"
+                "group": "personal_details"
               },
               {
                 "ref": "field_0fb5a2c4-0005-4a1c-8e2f-0fb500000005",
                 "readonly": true,
-                "group": "Personal details"
+                "group": "personal_details"
+              },
+              {
+                "ref": "field_0fb5a2c4-0023-4a1c-8e2f-0fb500000023"
               },
               {
                 "ref": "field_0fb5a2c4-0024-4a1c-8e2f-0fb500000024",
                 "readonly": true,
-                "group": "Retention"
+                "group": "retention"
               },
               {
                 "ref": "field_0fb5a2c4-0025-4a1c-8e2f-0fb500000025",
                 "readonly": true,
-                "group": "Retention"
+                "group": "retention"
+              },
+              {
+                "ref": "field_0fb5a2c4-0033-4a1c-8e2f-0fb500000033"
               },
               {
                 "ref": "field_0fb5a2c4-0050-4a1c-8e2f-0fb500000050",
                 "required": true,
-                "group": "Processing (XAN)"
+                "group": "processing_xan"
               }
             ]
           },
@@ -1761,29 +1890,38 @@
           "view": {
             "fields": [
               {
+                "ref": "field_0fb5a2c4-0001-4a1c-8e2f-0fb500000001"
+              },
+              {
                 "ref": "field_0fb5a2c4-0002-4a1c-8e2f-0fb500000002",
                 "readonly": true,
-                "group": "Personal details"
+                "group": "personal_details"
               },
               {
                 "ref": "field_0fb5a2c4-0005-4a1c-8e2f-0fb500000005",
                 "readonly": true,
-                "group": "Personal details"
+                "group": "personal_details"
+              },
+              {
+                "ref": "field_0fb5a2c4-0023-4a1c-8e2f-0fb500000023"
               },
               {
                 "ref": "field_0fb5a2c4-0026-4a1c-8e2f-0fb500000026",
                 "readonly": true,
-                "group": "Retention"
+                "group": "retention"
               },
               {
                 "ref": "field_0fb5a2c4-0027-4a1c-8e2f-0fb500000027",
                 "readonly": true,
-                "group": "Retention"
+                "group": "retention"
+              },
+              {
+                "ref": "field_0fb5a2c4-0033-4a1c-8e2f-0fb500000033"
               },
               {
                 "ref": "field_0fb5a2c4-0051-4a1c-8e2f-0fb500000051",
                 "required": true,
-                "group": "Processing (XAN)"
+                "group": "processing_xan"
               }
             ]
           },
@@ -1811,54 +1949,60 @@
           "view": {
             "fields": [
               {
+                "ref": "field_0fb5a2c4-0001-4a1c-8e2f-0fb500000001"
+              },
+              {
                 "ref": "field_0fb5a2c4-0002-4a1c-8e2f-0fb500000002",
                 "readonly": true,
-                "group": "Personal details"
+                "group": "personal_details"
               },
               {
                 "ref": "field_0fb5a2c4-0003-4a1c-8e2f-0fb500000003",
                 "readonly": true,
-                "group": "Personal details"
+                "group": "personal_details"
               },
               {
                 "ref": "field_0fb5a2c4-0004-4a1c-8e2f-0fb500000004",
                 "readonly": true,
-                "group": "Personal details"
+                "group": "personal_details"
               },
               {
                 "ref": "field_0fb5a2c4-0005-4a1c-8e2f-0fb500000005",
                 "readonly": true,
-                "group": "Personal details"
+                "group": "personal_details"
+              },
+              {
+                "ref": "field_0fb5a2c4-0033-4a1c-8e2f-0fb500000033"
               },
               {
                 "ref": "field_0fb5a2c4-0047-4a1c-8e2f-0fb500000047",
                 "readonly": true,
-                "group": "Processing (XAN)"
+                "group": "processing_xan"
               },
               {
                 "ref": "field_0fb5a2c4-0049-4a1c-8e2f-0fb500000049",
                 "readonly": true,
-                "group": "Processing (XAN)"
+                "group": "processing_xan"
               },
               {
                 "ref": "field_0fb5a2c4-0050-4a1c-8e2f-0fb500000050",
                 "readonly": true,
-                "group": "Processing (XAN)"
+                "group": "processing_xan"
               },
               {
                 "ref": "field_0fb5a2c4-0051-4a1c-8e2f-0fb500000051",
                 "readonly": true,
-                "group": "Processing (XAN)"
+                "group": "processing_xan"
               },
               {
                 "ref": "field_0fb5a2c4-0034-4a1c-8e2f-0fb500000034",
                 "readonly": true,
-                "group": "Processing (XAN)"
+                "group": "processing_xan"
               },
               {
                 "ref": "field_0fb5a2c4-0035-4a1c-8e2f-0fb500000035",
                 "readonly": true,
-                "group": "Processing (XAN)"
+                "group": "processing_xan"
               }
             ]
           }
