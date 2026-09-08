@@ -605,10 +605,13 @@ element's handler sees it.
 Arrow keys SHALL move focus. Right SHALL follow an outgoing path. Left SHALL
 follow an incoming path. Up and Down SHALL move through the draft's step
 order, the order `workflow.steps` holds. Enter SHALL select the focused step
-and open its inspector, exactly as a click does. Escape SHALL move focus to
-the `<svg>`, which carries the `tabindex` that call needs.
+and open the Steps tab on it.
 
-Escape SHALL also move the roving stop itself. The `<svg>` takes
+A pointer press SHALL select alone and leave the author on the canvas. A
+shift-click builds a set there, and the delete control acts on one.
+
+Escape SHALL move focus to the `<svg>`, which carries the `tabindex` that call
+needs. Escape SHALL also move the roving stop itself. The `<svg>` takes
 `tabindex="0"`, and every node, path and box drops to `-1`. Tab then leaves
 the canvas rather than re-entering it. Re-entering the canvas SHALL land on
 that root. An arrow key from a root focus SHALL move to the entry point.
@@ -623,7 +626,7 @@ therefore leaves no stop a following Enter also answers.
 
 A key press originating inside the inline rename field SHALL NOT reach the
 canvas handler. The exclusion SHALL read the event's target. A target inside a
-text-entry field stops the handler. A disclosure button the surface draws is
+text-entry field stops the handler. A disclosure button the canvas draws is
 not such a field. An arrow key and Escape SHALL reach the handler from one.
 
 Focus SHALL alternate between a step and a path. Right from a step SHALL move
@@ -633,16 +636,16 @@ to that path's source step. Right from a path SHALL move to its target step,
 whichever end the author arrived through. Left from a path SHALL move to its
 source step, on the same rule.
 
-Focus SHALL NOT wrap at a boundary. Right on a terminal step SHALL move
-nothing, and Left on the initial step SHALL move nothing. Down on the last
-step in the draft order and Up on the first SHALL move nothing. The same holds
-at either end of a fan.
+Focus SHALL NOT wrap at a boundary. Right on an end step SHALL move nothing,
+and Left on the initial step SHALL move nothing. Down on the last step in the
+draft order and Up on the first SHALL move nothing. The same holds at either
+end of a fan.
 
 The step's `aria-label` SHALL name, in order, its resolved label, its key, its
 kind, its stamps and its outgoing-path count. That count SHALL cover the
-reachable paths alone. The kind SHALL read step, subprocess or end, the three
-words the palette uses. The phrase carrying that count SHALL agree with it in
-number. A step carrying one path SHALL NOT announce a plural.
+reachable paths alone. The kind SHALL read the three plain phrases the palette
+uses. The phrase carrying that count SHALL agree with it in number. A step
+carrying one path SHALL NOT announce a plural.
 
 #### Scenario: Tab reaches the canvas and lands on the initial step
 
@@ -677,14 +680,15 @@ number. A step carrying one path SHALL NOT announce a plural.
 
 #### Scenario: The boundary moves nothing
 
-- **WHEN** focus sits on a terminal step and the author presses Right
+- **WHEN** focus sits on an end step and the author presses Right
 - **THEN** focus stays where it is, and no wrap to another step happens
 
 #### Scenario: Enter selects the focused step
 
 - **WHEN** focus sits on a step and the author presses Enter
-- **THEN** that step becomes the selection, and the inspector opens on it,
-  exactly as a click on the node does
+- **THEN** that step becomes the selection, and the Steps tab opens on it
+- **AND** a click on the node takes the selection alone, keeping the author on
+  the canvas
 
 #### Scenario: An arrow key leaves a focused group box
 
@@ -710,18 +714,17 @@ number. A step carrying one path SHALL NOT announce a plural.
 
 #### Scenario: A screen reader names a terminal step in full
 
-- **WHEN** focus reaches a terminal step labelled "Approved", keyed
-  `approved`, carrying outcome `approved` and no outgoing path
-- **THEN** its accessible name carries the label, the key, the kind word,
+- **WHEN** focus reaches an end step labelled "Approved", keyed `approved`,
+  carrying outcome `approved` and no outgoing path
+- **THEN** its accessible name carries the label, the key, the kind phrase,
   the outcome and a zero path count
 
 #### Scenario: A step carrying one path announces the singular
 
 - **WHEN** focus reaches a step carrying exactly one outgoing path
 - **THEN** its accessible name reads one outgoing path, never the plural
-
+<!-- "function" here is the mathematical sense; "method" elsewhere names a TypeScript method. -->
 <!-- antislop: allow synonym-rotation -->
-<!-- A total function is mathematics; the path-creation method is code. -->
 ### Requirement: The traversal is a total function over a deep-partial draft
 
 The traversal reads a `Draft`. `DraftOf` makes that type optional at every
@@ -834,12 +837,13 @@ element inside the canvas SHALL always carry the tab stop.
 ### Requirement: A path is a focusable control carrying its own name
 
 Each path SHALL be a focusable control with `role="button"`, a roving
-`tabindex` and an `aria-label`. Activating it SHALL select that path and open
-its inspector, exactly as a click on its edge group does.
+`tabindex` and an `aria-label`. Activating a path SHALL resolve to that path's
+source step. The step page then holds that source step, with its Path to
+section in view.
 
 The guard label's own `<div>` SHALL leave the accessibility tree. A pointer
 already reaches the path anywhere along its route. The edge group's own
-handler and its full-route hit area do that today. What the surface lacks is a
+handler and its full-route hit area do that today. What the canvas lacks is a
 tab stop, a role and a name. The path itself now carries all three.
 
 The path's `aria-label` SHALL name its label, its source step, its target
@@ -847,7 +851,7 @@ step, its trigger and its guard. An automatic path SHALL add its `priority`. A
 path carrying no guard SHALL say so.
 
 The guard slot SHALL take the readable condition the canvas draws on the edge,
-never the CEL source. That readable form already exists on the surface, under
+never the CEL source. That readable form already exists on the canvas, under
 `aria-hidden`. Where nothing resolves it, the slot SHALL take the source
 itself.
 
@@ -858,8 +862,8 @@ set. A path entered from its target SHALL walk that target's incoming set.
 #### Scenario: A keyboard author reaches a path's guard
 
 - **WHEN** a keyboard author moves focus to a path and presses Enter
-- **THEN** the inspector opens on that path, and the guard it carries is
-  reachable for editing
+- **THEN** the step page opens on that path's source step, and the author can
+  change the guard it carries
 
 #### Scenario: An automatic path announces its priority
 
@@ -885,6 +889,8 @@ set. A path entered from its target SHALL walk that target's incoming set.
 - **WHEN** the canvas renders a path carrying a guard
 - **THEN** the path itself is focusable and named, and the guard label's
   `<div>` carries `aria-hidden`
+
+<!-- The heading repeats the live spec's wording verbatim, so a delta can match it. -->
 
 ### Requirement: A focused canvas element draws a 2px accent ring
 
@@ -1065,522 +1071,400 @@ a profile rather than added speculatively.
 - **WHEN** a step is added, removed, or repositioned in the stored layout
 - **THEN** the computations re-run and the canvas reflects the change
 
+<!-- antislop: allow synonym-rotation -->
 ### Requirement: The structure surface lays out a canvas ribbon, a steps register and the configuration pane
 
-The structure surface SHALL show three regions. The canvas ribbon spans the
-full width above. Beneath it, the steps register stands on the left and the
-configuration pane on the right.
+The Canvas tab SHALL carry the canvas alone. The canvas SHALL fill the tab's
+whole body. No ribbon bar and no band SHALL stand over it. No expand control
+and no band height SHALL stand either.
 
-The ribbon SHALL start collapsed on every load. A collapsed ribbon shows a
-bar and a band. The bar holds the ribbon's control and the checks summary.
-The band draws the graph at fit scale. An expanded ribbon shows the full
-canvas with the palette.
+The steps register and the configuration pane SHALL NOT stand. The steps rail
+and the step page hold that work, per `studio-step-page`.
 
-Every canvas interaction the other requirements of this capability state
-SHALL stay live in both states. The two differ in height, and in whether the
-palette lists. The band draws a shorter canvas, not a lesser one.
+Every canvas gesture the other requirements of this capability state SHALL
+stay live. Those gestures cover the drag, the connect and the drop on a path.
+They cover the pan, the zoom, the keyboard traversal and the focus ring. They
+also cover auto layout, Arrange, the grid snap, groups, waypoints and the
+inline rename.
 
-The ribbon's control SHALL be a `<button type="button">`. It carries
-`aria-expanded` for its state and `aria-controls` naming the ribbon's body.
+The canvas and the step page SHALL share one selected step. Pressing a node
+SHALL make that step the one the step page holds. Pressing a rail row SHALL
+mark that step's node on the canvas. Pressing a path edge SHALL resolve to
+that path's source step. The step page then holds that source step, with its
+Path to section in view.
 
-Nothing SHALL persist the ribbon's open state. It lives in the screen's own
-component state. A reload returns the ribbon to collapsed. The draft's
-`layout` blob SHALL carry no key for it.
+The canvas SHALL keep the selection count and the delete control for a
+selection of more than one step. This capability's own selection requirement
+states that rule.
 
-Selection SHALL cross both ways. Selecting a node on the canvas opens that
-step in the configuration pane and marks its row in the register. Choosing a
-row in the register opens that step and marks its node.
+The canvas SHALL fill the height the tab body leaves, above a floor of 36rem.
+Past that floor the page scrolls.
 
-The configuration pane SHALL show the register's first step when the
-developer has selected none. It SHALL show the selection's own count and
-delete control when the selection holds more than one step.
-
-The screen's header rows and the collapsed ribbon take their height first.
-The register and the pane SHALL fill what remains, above a floor of 36rem.
-Expanding the ribbon takes height from both down to that floor. Past it, the
-page scrolls.
-
-Below 64rem of width the steps register SHALL collapse to a disclosure. The
-panels screen's index rail already follows that rule, at that same
-breakpoint.
-
+<!-- The scenario names below repeat the live spec's wording verbatim, so a delta can match them. -->
+<!-- antislop: allow synonym-rotation -->
 #### Scenario: The three regions appear
 
-- **WHEN** the structure surface loads
-- **THEN** the ribbon, the steps register and the configuration pane each
-  appear as their own region
+- **WHEN** an author opens the Canvas tab
+- **THEN** the canvas fills the tab's body
+- **AND** no ribbon, no steps register and no configuration pane stand beside
+  it
 
 #### Scenario: The ribbon starts collapsed
 
-- **WHEN** the developer opens the structure surface
-- **THEN** the ribbon shows its bar and the fit-scale band, and no palette
+- **WHEN** an author opens the Canvas tab
+- **THEN** the canvas stands at its full height, carrying no bar and no band
 
 #### Scenario: The control expands and collapses the ribbon
 
-- **WHEN** the developer activates the ribbon's control
-- **THEN** the full canvas shows, with the palette
-- **AND** activating the control again returns the ribbon to its band
+- **WHEN** an author looks for a control that changes the canvas height
+- **THEN** the Canvas tab carries none
 
 #### Scenario: A canvas selection opens the pane
 
-- **WHEN** the developer clicks a step node in the ribbon
-- **THEN** the configuration pane shows that step, and its register row
-  reads as current
+- **WHEN** an author presses a step node on the Canvas tab
+- **THEN** the step page holds that step
+- **AND** the node reads as selected
 
 #### Scenario: A register selection marks the node
 
-- **WHEN** the developer chooses a step's row in the register
-- **THEN** the configuration pane shows that step, and its node reads as
-  selected in the ribbon
+- **WHEN** an author presses a row of the steps rail
+- **THEN** that step's node reads as selected on the Canvas tab
 
+<!-- The scenario name repeats the live spec's wording verbatim, so a delta can match it. -->
+<!-- antislop: allow synonym-rotation -->
 #### Scenario: Several steps show the count
 
-- **WHEN** the developer selects more than one step
-- **THEN** the configuration pane shows the selection count and its delete
-  control, not a step
+- **WHEN** an author selects more than one step on the canvas
+- **THEN** the canvas carries the selection count and its delete control
 
 #### Scenario: A reload returns the ribbon to collapsed
 
-- **WHEN** the developer expands the ribbon and reloads the screen
-- **THEN** the ribbon shows its band
+- **WHEN** an author reloads the Canvas tab
+- **THEN** the canvas fills the body, as it did before the reload
 
 #### Scenario: Saving a draft writes no ribbon state
 
-- **WHEN** the developer expands the ribbon and saves the draft
-- **THEN** the saved `layout` blob carries no key naming the ribbon
+- **WHEN** an author saves the draft
+- **THEN** the saved `layout` blob carries no key naming a ribbon
 
 #### Scenario: A short window holds the floor
 
-- **WHEN** the structure surface loads in a window shorter than the floor
-- **THEN** the register and the pane keep 36rem and the page scrolls
+- **WHEN** an author opens the Canvas tab in a window shorter than the floor
+- **THEN** the canvas keeps 36rem and the page scrolls
 
 ### Requirement: The steps register lists every step in reachability order
 
-The steps register SHALL show one ruled row per step in the draft. Each row
-carries the step's role stamp, its label resolved for the content locale,
-and its issue count. The count prints only above zero, as a refusal-tone
-stamp.
+The steps register SHALL NOT stand. The Canvas tab carries the canvas alone,
+and no register of rows beside it.
 
-The role stamp SHALL read `Initial` for the draft's `initialStep`, `End`
-for a step carrying `terminal: true`, `Subprocess` for a step of that type,
-and `Task` otherwise. Those four use the existing stamp tones.
+The steps rail carries every step of the draft, in reachability order. That
+rail and its rows belong to `studio-step-page`.
 
-Rows SHALL follow reachability from the initial step. Terminal steps come
-last, in the draft's own order. A step no path reaches comes after the
-reachable ones and before the terminal ones.
-
-A row's identifying content SHALL be a real `<button type="button">`. The
-row itself carries no click handler. The current step's row carries
-`aria-current="true"`.
-
-Below the steps, the register SHALL carry the process links. Those are
-Fields, Data sources, Contract, Field matrix, Changes and Paths. Each opens
-the panels screen at its own view, per `studio-app`. Each shows its count
-where one exists.
+The process links SHALL NOT stand either. Those were Fields, Data sources,
+Contract, Field matrix, Changes and Paths. The tab row carries each one now,
+per `studio-process-tabs`.
 
 #### Scenario: Every step takes a row
 
-- **WHEN** a draft holds seven steps
-- **THEN** the register shows seven rows
+- **WHEN** a draft holds seven steps and an author opens the Canvas tab
+- **THEN** the canvas draws seven nodes
+- **AND** no register of rows stands beside them
 
 #### Scenario: Rows follow reachability
 
-- **WHEN** a draft's initial step reaches step B, and B reaches terminal
-  step C
-- **THEN** the register lists the initial step, then B, then C
+- **WHEN** an author reads the draft's steps in reachability order
+- **THEN** the steps rail carries that order, per `studio-step-page`
+- **AND** the Canvas tab carries no such list
 
 #### Scenario: An issue count prints on its row
 
 - **WHEN** one step carries two open issues and another carries none
-- **THEN** the first row shows a count of two, and the second shows no
-  count
+- **THEN** the first step's rail row carries a count of two
+- **AND** the Canvas tab carries no row and no row count
 
 #### Scenario: A row is a real control
 
-- **WHEN** a keyboard user tabs into the register
-- **THEN** each row's identifying content takes focus as a button, and the
-  current row carries `aria-current`
+- **WHEN** a keyboard author tabs through the Canvas tab
+- **THEN** no register row takes focus, because no register stands
+- **AND** the canvas keeps the one tab stop its keyboard requirement states
 
+<!-- The heading repeats the live spec's wording verbatim, so a delta can match it. -->
+
+<!-- antislop: allow synonym-rotation -->
 ### Requirement: The configuration pane's masthead names the step
 
-The configuration pane SHALL open with a masthead above the section
-register. The masthead does not scroll with the register.
+<!-- Why: a remove control acts on one step; the canvas's delete control acts on a whole selection. -->
+<!-- antislop: allow synonym-rotation -->
+The masthead SHALL NOT stand. The step page carries the step's name line, its
+first-step mark and its remove control. Those belong to `studio-step-page`.
 
-The masthead SHALL carry the step's role stamp, its label, its key and its
-id. It SHALL also carry the description, the performed-by control, the
-initial-step control, the issue count, and an overflow control. The label
-edits inline. The key and
-the id print in the mono face. The description edits as localized text.
+The step's key field SHALL stand on the step page, beside the name line. The
+key-derivation requirement below governs it.
 
-The masthead SHALL keep the missing-translation warning beside the label and
-beside the description. Those are two of the six `LocalizedTextInput` sites
+The step's `id` SHALL stand in the step page's Developer view. That disclosure
+carries the step's JSON as well, read-only.
+
+The missing-translation warning SHALL stand beside the name line and beside
+the description line. Those stay two of the six `LocalizedTextInput` sites
 `studio-app` requires a warning at. Each warning is a sibling of its field,
 never nested inside a label.
 
-The initial-step control SHALL show only when the step is not the draft's
-`initialStep`. When it is, the role stamp reads `Initial` and no control
-appears.
+The step's open issue count SHALL stand on its rail row. That count totals the
+step's own issues and those of its paths, timers and actions.
 
-The outcome field does not sit here. A terminal step's outcome is what it
-produces on departure, so the Exit section holds it. The register requirement
-below states that. The field's own hint states that an outcome binds only on
-a contracted process, and no label carries a parenthetical.
+The outcome field SHALL stand in the step page's "How the case ends" section.
+An end step declares its outcome on departure.
 
-<!-- Why: "Remove step" below is a literal UI label, not a synonym choice -->
-<!-- against "delete" elsewhere in this file. -->
+<!-- The scenario names below repeat the live spec's wording verbatim, so a delta can match them. -->
 <!-- antislop: allow synonym-rotation -->
-The overflow control SHALL open two entries: "View raw JSON" and "Remove
-step". The first shows the step's raw JSON, read-only, in place below the
-masthead. It carries `aria-expanded` and `aria-controls`. The second removes
-the step, as the diagnostics drawer's control did.
-
-The issue count SHALL total the step's own issues and those of its paths,
-timers and actions. It prints as a refusal-tone stamp above zero.
-
 #### Scenario: The masthead shows the step's identity
 
-- **WHEN** the developer selects a step
-- **THEN** the masthead shows its role stamp, label, key, id, description
-  and performed-by control
+- **WHEN** an author opens a step on the step page
+- **THEN** the page carries the step's kind, its label, its key and its
+  description
+- **AND** the Canvas tab carries no masthead
 
 #### Scenario: The label edits inline
 
-- **WHEN** the developer edits the label in the masthead
-- **THEN** the draft's step label updates, and the key derives per the
-  masthead's key-derivation requirement
+- **WHEN** an author types a new label into the step page's name line
+- **THEN** the draft's step label changes
+- **AND** the key derives per the key-derivation requirement below
 
 #### Scenario: The masthead keeps its translation warnings
 
 - **WHEN** the content locale is `de` and the step's label carries no `de`
   value
-- **THEN** the missing-translation warning renders beside the label
+- **THEN** the missing-translation warning stands beside the name line
 
 #### Scenario: The masthead sets the initial step
 
-- **WHEN** the developer activates "Set as initial step" in the masthead
-- **THEN** the draft's `workflow.initialStep` names that step, the stamp
-  reads `Initial`, and the control disappears
+- **WHEN** an author marks a step as the draft's first step
+- **THEN** the draft's `workflow.initialStep` names that step
+- **AND** the step page carries the first-step mark
 
 #### Scenario: The overflow shows raw JSON
 
-- **WHEN** the developer chooses "View raw JSON" from the overflow
-- **THEN** the step's raw JSON renders read-only below the masthead
+- **WHEN** an author opens the step page's Developer view
+- **THEN** that disclosure carries the step's JSON, read-only
 
 #### Scenario: The overflow offers step removal
 
-- **WHEN** the developer chooses "Remove step" from the overflow
-- **THEN** the step leaves the draft, and the pane shows the register's
-  first remaining step
+- **WHEN** an author presses the step page's remove control
+- **THEN** the step leaves the draft
+- **AND** the step page holds the first remaining step in the rail's order
 
 #### Scenario: The issue count covers a path's issue
 
-- **WHEN** a step carries no issue of its own and one of its paths carries
-  a failing guard
-- **THEN** the masthead's count reads one
+- **WHEN** a step carries no issue of its own, and one of its paths carries a
+  failing guard
+- **THEN** that step's rail row counts one
 
-### Requirement: The configuration pane shows the step as a register of sections in runtime order
+<!-- The heading repeats the live spec's wording verbatim, so a delta can match it. -->
 
-Below the masthead, the configuration pane SHALL show a register of
-sections in a fixed order. That order is Entry, Assignment, Form, Paths,
-Timers, Exit. A Subprocess section joins after Exit when performed-by reads
-Subprocess.
-
-Every section head SHALL show at all times. A head carries the section's
-name and its resolved value or count, right-aligned in the mono face. An
-empty section prints `—` as its value. A head carrying issues also shows
-their count as a refusal-tone stamp.
-
-Each head SHALL be a `<button type="button">` carrying `aria-expanded` and
-`aria-controls`. Choosing it expands or collapses the section in place.
-Several sections stay open at once. The pane keeps each step's open set
-for as long as the draft stays loaded.
-
-A section carrying content or an issue SHALL open by default. An empty one
-stays closed.
-
-The sections SHALL hold what follows. No section's own fields, validation or
-mutation logic differs from the panel it hosts.
-
-- Entry holds the `onEntry` actions.
-- Assignment holds the assignment strategy and the no-assignment warning.
-<!-- Why: "Build the form" below is a literal UI label, not a synonym -->
-<!-- choice against "create" elsewhere in this file. -->
 <!-- antislop: allow synonym-rotation -->
-- Form holds the configured-field count, a "Build the form" control, and no
-  editor. That control navigates to the form editor's routed page.
-- Paths holds the paths editor.
-- Timers holds the timers editor.
-- Exit holds the `onExit` and `onCancel` actions, and the outcome field on a
-  terminal step.
-- Subprocess holds the spec editor and the cross-process check fieldset.
-  That fieldset's file input loads a child body, and
-  `checkSubprocessChildRefs` runs against nothing without it.
-
-Selecting a path edge on the canvas SHALL resolve to its source step. The
-pane opens that step with its Paths section expanded and the path's own row
-highlighted.
-
-#### Scenario: Every section head shows
-
-- **WHEN** the developer selects a step with three paths, two timers and no
-  entry actions
-- **THEN** the pane shows all six heads, with Paths reading 3, Timers 2, and
-  Entry reading `—`
-
-#### Scenario: Sections with content open by default
-
-- **WHEN** the developer selects that same step
-- **THEN** Paths and Timers show their bodies, and Entry shows none
-
-#### Scenario: A head expands its section in place
-
-- **WHEN** the developer chooses a collapsed section's head
-- **THEN** that section's body shows below its head, and no other section
-  changes state
-
-#### Scenario: Several sections stay open together
-
-- **WHEN** the developer expands Paths and then expands Timers
-- **THEN** both bodies show
-
-#### Scenario: The open set survives a selection change
-
-- **WHEN** the developer collapses Paths on step A, selects step B, and
-  returns to step A
-- **THEN** Paths on step A is still collapsed
-
-#### Scenario: A section head carries its issue count
-
-- **WHEN** one of the step's paths carries a failing guard
-- **THEN** the Paths head shows an issue count of one
-
-#### Scenario: Entry and Exit split the three action lists
-
-- **WHEN** the developer selects a step with one `onEntry` and one `onExit`
-  action
-- **THEN** Entry reads 1 action, Exit reads 1 action, and each body holds
-  the matching editor
-
-#### Scenario: The Form section navigates to the form editor
-
-- **WHEN** the developer chooses "Build the form" in the Form section
-- **THEN** the form editor's routed page opens for that step
-
-#### Scenario: The Subprocess section keeps the cross-process check
-
-- **WHEN** the developer selects a step of type `subprocess`
-- **THEN** the Subprocess section holds the spec editor and the
-  cross-process fieldset, whose file input still loads a child body
-
-#### Scenario: A path edge opens its source step's Paths section
-
-- **WHEN** the developer clicks a path edge on the canvas
-- **THEN** the pane shows the edge's source step, Paths shows its body, and
-  the clicked path's row carries the highlight
-
-#### Scenario: A head activates with the keyboard
-
-- **WHEN** a keyboard user focuses a section head and presses Enter or
-  Space
-- **THEN** the section toggles, and `aria-expanded` reflects the new state
-
 ### Requirement: The configuration pane's sections follow the performed-by control
 
-The section register SHALL change shape with the masthead's performed-by
-control.
+The step page's sections SHALL follow the performed-by control. A section
+stands only where the step's kind declares it. `studio-step-page` states which
+section each kind carries.
 
-When performed-by reads Terminal, the pane SHALL omit the Paths and Timers
-sections. In their place one line states that a terminal step has no
-outgoing path and no timer. The Assignment section SHALL show no
-no-assignment warning on a terminal step. That mirrors the existing rule:
-`terminal === true || assignment !== undefined`.
+The performed-by control SHALL stand on the step page. Changing it SHALL
+re-shape the page's sections at once. No section collapses there, so no open
+section survives the change.
 
-When performed-by reads Subprocess, the pane SHALL omit the Assignment and
-Form sections and add the Subprocess section. A subprocess step is a
-wait-state with no participant form.
-
-When performed-by changes, the register SHALL re-render to the new shape at
-once. A section that no longer lists cannot stay open.
+The no-assignment warning SHALL NOT stand on an end step. That mirrors the
+existing rule: `terminal === true || assignment !== undefined`.
 
 #### Scenario: A terminal step omits Paths and Timers
 
-- **WHEN** the developer selects a step carrying `terminal: true`
-- **THEN** the pane shows no Paths head and no Timers head, and one line
-  states why
+- **WHEN** an author opens an end step on the step page
+- **THEN** the page carries no section for an outgoing path and none for a
+  time limit
+- **AND** one line states that an end step carries neither
 
 #### Scenario: A terminal step suppresses the no-assignment warning
 
-- **WHEN** the developer selects a step carrying `terminal: true` and no
-  `assignment`
-- **THEN** the Assignment section shows no no-assignment warning
+- **WHEN** an author opens an end step carrying no `assignment`
+- **THEN** no no-assignment warning stands for that step
 
 #### Scenario: A subprocess step swaps Assignment and Form for Subprocess
 
-- **WHEN** the developer selects a step of type `subprocess`
-- **THEN** the pane shows no Assignment head and no Form head, and shows a
-  Subprocess head
+- **WHEN** an author opens a step of type `subprocess` on the step page
+- **THEN** the page carries the section naming which process the step calls
+- **AND** the page carries no Assignment section and no form section
 
 #### Scenario: Leaving Subprocess drops its section
 
-- **WHEN** the developer changes performed-by from Subprocess to
-  Participant
-- **THEN** the Subprocess head disappears, and Assignment and Form appear
+- **WHEN** an author changes performed-by from a call to another process, to
+  a step someone works
+- **THEN** the page drops the section naming which process the step calls
+- **AND** the Assignment section and the form section stand at once
 
 ### Requirement: A palette offers Step, Subprocess, and End as an always-available way to add a step
 
-The expanded canvas ribbon SHALL show a palette listing Step, Subprocess,
-and End. Each entry SHALL be a drag source. Dragging one onto the canvas
-SHALL add a step of that kind at the drop point. That SHALL use the same
-draft-mutation method the steps register's own add control calls.
+The Canvas tab SHALL carry a palette at all times. The palette lists three
+entries. They read as a step someone works, a call to another process, and an
+end, per `studio-guided-vocabulary`. No entry prints "terminal".
 
-The palette SHALL stay usable regardless of canvas selection.
+Each entry SHALL be a drag source. Dragging one onto the canvas SHALL add a
+step of that kind at the drop point. That SHALL use the same draft-mutation
+method the steps rail's own add controls call.
 
-A draft holding no step SHALL offer an add control in the steps register.
-That control SHALL add a step of type `task`. The collapsed ribbon shows no
-palette, so the register carries the one always-reachable way to add the
-first step.
+The palette SHALL stay usable whatever the canvas selection holds. No expand
+control gates it, because the canvas fills the tab's body.
+
+A draft holding no step SHALL still reach the palette. The steps rail's foot
+carries the same three controls, per `studio-step-page`.
 
 #### Scenario: Dragging a palette entry adds a step
 
-- **WHEN** the developer expands the ribbon and drags the Step entry onto
-  the canvas
-- **THEN** a new step of type `task` exists at the drop point
+- **WHEN** an author drags the palette's step entry onto the canvas
+- **THEN** a new step of type `task` stands at the drop point
 
 #### Scenario: The palette works with nothing selected
 
-- **WHEN** the developer selects nothing on the canvas
+- **WHEN** an author selects nothing on the canvas
 - **THEN** every palette entry stays usable
 
 #### Scenario: An empty draft adds its first step from the register
 
-- **WHEN** a draft holds no step and the ribbon stays collapsed
-- **THEN** the steps register shows an add control, and activating it adds a
-  step of type `task`
+- **WHEN** a draft holds no step and an author opens the Canvas tab
+- **THEN** the palette stands, and dragging its step entry adds a step of type
+  `task`
+- **AND** the steps rail's foot carries the same three add controls
+
+#### Scenario: The palette names its entries in plain words
+
+- **WHEN** an author reads the palette
+- **THEN** the three entries name a step someone works, a call to another
+  process, and an end
 
 ### Requirement: A process-identity header bar shows draft and publish status
 
-The canvas edit screen SHALL show a header bar above the three-column
-layout. It SHALL show the process name and the key in the mono face.
-It SHALL also show the draft's revision badge and dirty state. It SHALL
-show the version and hash after a publish. `EditorArea` computes all of
-these as controlled props. It already lifts `saveState` the same way.
+The process surface SHALL carry a header bar above the tab row. The bar SHALL
+print the process name and the key in the mono face. It SHALL carry the
+draft's revision badge and dirty state. It SHALL carry the version and hash
+after a publish. `EditorArea` computes all of these as controlled props. It
+already lifts `saveState` the same way.
 
-The header bar SHALL also show a last-saved time. That time is
-client-only state. `EditorArea` sets it on every successful save.
+The header bar SHALL carry a last-saved time. That time is client-only state.
+`EditorArea` sets it on every successful save.
 
-The header bar SHALL show the content-locale badge the `studio-app`
-capability's content-locale-switcher requirement governs. It SHALL also
-show the Structure/JSON toggle.
+The header bar SHALL carry the content-locale badge the `studio-app`
+capability's content-locale-switcher requirement governs. It SHALL carry no
+Structure control and no JSON control. That pair no longer stands. The JSON
+surface opens from the tab row's overflow menu, per `studio-process-tabs`.
 
+<!-- Why: "Discard draft" below is the literal button label `DraftToolbar` renders, not a synonym choice against "remove" elsewhere in this file. -->
 <!-- antislop: allow synonym-rotation -->
-<!-- "Discard" below is the literal button label `DraftToolbar` renders, not a synonym choice against "remove" elsewhere in this file. -->
-The header bar SHALL show a `⋮` overflow menu. The menu SHALL hold
-`DraftToolbar`'s Save, Discard draft, and Publish actions.
-`DraftToolbar` SHALL keep computing when each action is available and
-what each one does. The menu calls that logic. The menu holds no save,
-discard, or publish logic of its own.
+The header bar SHALL carry a `⋮` overflow menu. The menu SHALL hold no Save,
+no Discard draft and no Publish action. The studio's area nav carries those
+three. `DraftToolbar` SHALL keep computing when each action is available and
+what each one does. The area nav calls that logic and holds none of its own.
 
-The menu SHALL show its remaining controls under one heading: "Process,
-saved with the draft". That heading SHALL hold the editable process key
-and the base-locale control the `studio-app` capability's base-locale
-requirement governs. The menu SHALL NOT offer an action-registry
-selector or any other session-only control. Nothing in the studio ever
-loads a live `Registry` a registry-resolution check could run against.
-The menu therefore holds nothing session-only.
+The menu SHALL hold its remaining controls under one heading: "Process, saved
+with the draft". That heading SHALL hold the editable process key, the
+base-locale control and the add-locale control. The `studio-app` capability's
+base-locale requirement governs the second of those three. The add-locale
+control keeps the behavior it carries today, and no capability declares it
+yet. The
+menu SHALL NOT offer an action-registry selector or any other session-only
+control. Nothing in the studio ever loads a live `Registry` a
+registry-resolution check could run against.
 
-That heading SHALL also hold a "Manage assignment groups for this
-process" link. The link SHALL open the admin area's Groups screen: the
-`admin-app` capability's `/groups` route.
+That heading SHALL also hold a "Manage assignment groups for this process"
+link. The link SHALL open the admin area's Groups screen: the `admin-app`
+capability's `/groups` route.
 
+<!-- Why: "parameter" below names a URL query parameter, not a synonym choice against the performed-by control's own entries. -->
 <!-- antislop: allow synonym-rotation -->
-<!-- "parameter" below names a URL query parameter; "option" elsewhere in this file (the "performed by" segmented control) names an unrelated UI choice, not the same concept. -->
-It SHALL carry the open process's id as a query parameter. That
-parameter pre-filters the Groups screen to global groups plus groups
-already scoped to this process.
+It SHALL carry the open process's id as a query parameter. That parameter
+pre-filters the Groups screen to global groups plus groups already scoped to
+this process.
 
-<!-- antislop: allow synonym-rotation -->
-<!-- "surface" below names the UI glossary term (structure surface / JSON surface), not a synonym for "show". -->
-The link SHALL appear once a process is open, for any signed-in actor.
-It SHALL appear whether or not that actor holds `system:admin`. It SHALL
-appear whether the structure surface or the JSON surface is active.
+The link SHALL appear once a process is open, for any signed-in actor. It
+SHALL appear whether or not that actor holds `system:admin`. It SHALL appear
+whatever tab the row holds open.
 
-Following it without `system:admin` SHALL lead to one of two outcomes.
-The same admin-area-entry gate every other admin route already crosses
-decides which (`shell/areas.ts::mayEnter`). An actor may hold
-`system:datalists`, or another role `mayEnter` accepts for the admin
-area, without holding `system:admin`. That actor SHALL see the admin
-area's own `MissingRole` empty state. That is the same state any
-`system:admin`-gated route shows a caller without the role.
+Following it without `system:admin` SHALL lead to one of two outcomes. The
+same admin-area-entry gate every other admin route already crosses decides
+which (`shell/areas.ts::mayEnter`). An actor can hold `system:datalists`, or
+another role `mayEnter` accepts for the admin area, without holding
+`system:admin`. That actor SHALL reach the admin area's own `MissingRole`
+empty state. That is the state any `system:admin`-gated route gives a caller
+without the role.
 
-An actor who holds no admin-area-entry role at all SHALL never reach the
-admin area's own code. The shell blocks entry before `AdminArea` mounts,
-and shows its generic `area.forbidden` message instead.
+An actor who holds no admin-area-entry role at all SHALL never reach the admin
+area's own code. The shell blocks entry before `AdminArea` mounts, and gives
+its generic `area.forbidden` message instead.
 
-The link SHALL carry no group data of its own. It SHALL trigger no
-request to a `/admin/groups*` route: it is navigation only, so Studio
-duplicates no group CRUD.
+The link SHALL carry no group data of its own. It SHALL trigger no request to
+a `/admin/groups*` route: it is navigation only, so Studio duplicates no group
+CRUD.
 
-The header bar's summary fields SHALL stay a read-only pass-through of
-state `EditorArea` owns. Those fields are the process name, the revision
-badge, the dirty state, and the published version and hash. None of
-them carries logic of its own.
+The header bar's summary fields SHALL stay a read-only pass-through of state
+`EditorArea` owns. Those fields are the process name, the revision badge, the
+dirty state, and the published version and hash. None of them carries logic of
+its own.
 
 #### Scenario: The header bar shows an unsaved draft's state
 
-- **WHEN** the draft has unsaved changes
-- **THEN** the header bar shows the process name, the draft's revision
-  badge, and a dirty indicator
+- **WHEN** the draft carries unsaved changes
+- **THEN** the header bar prints the process name, the draft's revision badge,
+  and a dirty indicator
 
 #### Scenario: The header bar shows a just-published version
 
 - **WHEN** a publish succeeds
-- **THEN** the header bar shows the published version and its hash
-  prefix
+- **THEN** the header bar prints the published version and its hash prefix
 
 #### Scenario: The overflow menu invokes DraftToolbar's own save
 
-- **WHEN** the developer chooses Save from the `⋮` menu
-- **THEN** the draft saves through `DraftToolbar`'s existing save call
+- **WHEN** an author looks for Save in the `⋮` menu
+- **THEN** the menu holds none
+- **AND** the studio's area nav carries the Save control, which calls
+  `DraftToolbar`'s existing save
 
 #### Scenario: The overflow menu separates persisted settings from session-only settings
 
-- **WHEN** the developer opens the `⋮` menu
-- **THEN** the key and base-locale control appear under "Process, saved
-  with the draft"
-- **AND** no action-registry selector and no other session-only control
-  appears anywhere in the menu
+- **WHEN** an author opens the `⋮` menu
+- **THEN** the process key, the base-locale control and the add-locale control
+  stand under "Process, saved with the draft"
+- **AND** no action-registry selector and no other session-only control stands
+  anywhere in the menu
 
 #### Scenario: The menu links to Groups filtered to the open process
 
-- **WHEN** the developer opens the `⋮` menu and selects "Manage
-  assignment groups for this process"
-- **THEN** the admin area's Groups screen opens, showing global groups plus
+- **WHEN** an author opens the `⋮` menu and picks "Manage assignment groups
+  for this process"
+- **THEN** the admin area's Groups screen opens, holding global groups plus
   groups already scoped to the open process
 
 #### Scenario: Following the link with admin-area entry but not the admin role
 
 - **WHEN** an actor who holds `system:datalists` but lacks `system:admin`
   follows the link
-- **THEN** the admin area shows its own `MissingRole` empty state instead
-  of the Groups screen
+- **THEN** the admin area gives its own `MissingRole` empty state instead of
+  the Groups screen
 
 #### Scenario: Following the link with no admin-area-entry role at all
 
 - **WHEN** an actor who holds neither `system:admin` nor `system:datalists`
   follows the link
 - **THEN** the shell blocks entry to the admin area before it mounts
-- **AND** it shows the generic `area.forbidden` message instead of the
-  Groups screen
+- **AND** it gives the generic `area.forbidden` message instead of the Groups
+  screen
 
 #### Scenario: The link renders regardless of the open surface
 
-- **WHEN** the developer has the JSON surface active, not the structure
-  surface
-- **THEN** the "Manage assignment groups for this process" link still
-  appears in the `⋮` menu
+- **WHEN** an author holds the Paths tab open, not the Canvas tab
+- **THEN** the "Manage assignment groups for this process" link still stands
+  in the `⋮` menu
 
 ### Requirement: The header bar's process key auto-derives from the process label
 
+<!-- "produce" names key derivation's output; "create" elsewhere names a gesture adding a step or path. -->
+<!-- antislop: allow synonym-rotation -->
 The header bar's `⋮` menu holds a "Process, saved with the draft" group.
 That group's key field SHALL auto-fill from the process label as the
 developer types. This holds while the draft's key is empty. It also holds
@@ -1655,79 +1539,78 @@ carrying a translation in the chosen locale.
 
 ### Requirement: A step node on the canvas offers an inline rename
 
-The canvas SHALL let the developer rename a step's label directly on
-its node. Renaming SHALL NOT need editing the step through the
-configuration pane's masthead. Committing the rename SHALL write
-`step.label` through the same Draft mutation the masthead's label
-input already calls.
+The canvas SHALL let an author rename a step's label directly on its node.
+Renaming SHALL NOT need the step page's name line. Committing the rename SHALL
+write `step.label` through the same Draft mutation that name line calls.
 
 The field SHALL open seeded with the step's label resolved for the content
 locale, and with nothing else. It SHALL NOT seed from the step's `key`, and it
 SHALL NOT seed from the unnamed-step string. A step carrying no entry for the
-chosen locale therefore opens an empty field. The developer then writes a
+chosen locale therefore opens an empty field. The author then writes a
 translation, rather than committing a copy of the key as a label.
 
 #### Scenario: Double-clicking a node's label opens an inline text field
 
-- **WHEN** the developer double-clicks a step node's label on the canvas
+- **WHEN** an author double-clicks a step node's label on the canvas
 - **THEN** a text field opens on the node, seeded with the step's current
   label
 
 #### Scenario: Committing the inline rename updates the step's label
 
-- **WHEN** the developer edits a node's inline text field and commits it
-- **THEN** the step's `label` updates through the same Draft mutation the
-  masthead's label input calls
+- **WHEN** an author writes a node's inline text field and commits it
+- **THEN** the step's `label` changes through the same Draft mutation the step
+  page's name line calls
 
 #### Scenario: A step with no translation opens an empty field
 
 - **WHEN** the content locale is `de`, a step's `label` carries only its
-  base-locale entry, and the developer opens the inline rename
+  base-locale entry, and the author opens the inline rename
 - **THEN** the field opens empty, carrying neither the base-locale text nor
   the step's key
 
 #### Scenario: Enter inside the rename field opens no inspector
 
-- **WHEN** the inline rename is open and the developer presses Enter
+- **WHEN** the inline rename stands open and the author presses Enter
 - **THEN** the rename commits, and the canvas handler neither selects the step
-  nor opens the inspector
+  nor opens the step page on it
 
+<!-- The heading repeats the live spec's wording verbatim, so a delta can match it. -->
+
+<!-- antislop: allow synonym-rotation -->
 ### Requirement: The masthead's step key auto-derives from the step label
 
-The masthead's key field SHALL auto-fill from the selected step's
-label as the developer types. This holds for a step whose key is empty. It
-also holds for a step whose key still matches what derivation would
-produce from the label's prior value. Derivation SHALL follow the same
-rule the header bar's process key uses.
+The step page's key field SHALL auto-fill from the step's label as an author
+types. This holds for a step whose key is empty. It also holds for a step
+whose key still matches the derivation from the label's prior value.
+Derivation SHALL follow the same rule the header bar's process key uses.
 
-This auto-fill and lock behavior SHALL apply through both label-editing
-routes. Those routes are the masthead's own label input, and the
-canvas node's inline rename. The two routes are one label-editing surface
-for this purpose. A rename through either route SHALL keep the step's key
-in agreement with the other. A key locked by a hand-edit made through
-either route SHALL stay locked through the other.
+This auto-fill and lock behavior SHALL apply through both label-writing
+routes. Those routes are the step page's own name line, and the canvas node's
+inline rename. The two routes count as one for this purpose. A rename through
+either route SHALL keep the step's key in agreement with the other. A key
+locked by a hand-written value through either route SHALL stay locked through
+the other.
 
-The masthead SHALL append `_2` when the derived key collides with
-another step's key in the draft's workflow. If that also collides, the
-masthead SHALL append `_3`. It SHALL keep incrementing the suffix
-until the candidate is unique among the draft's steps.
+The step page SHALL append `_2` when the derived key collides with another
+step's key in the draft's workflow. If that also collides, the page SHALL
+append `_3`. It SHALL keep incrementing the suffix until the candidate is
+unique among the draft's steps.
 
-The first edit typed directly into the masthead's key field SHALL
-disable this auto-fill for that step. That holds for the rest of the
-draft's lifetime in the browser.
+The first value typed directly into the key field SHALL disable this auto-fill
+for that step. That holds for the rest of the draft's lifetime in the browser.
 
 #### Scenario: A new step's key follows its label as the developer types
 
 - **WHEN** the developer, while the studio's content locale is the draft's
   base locale, creates a step from the palette
-- **AND** the developer types "Manager review" into its label, having
-  never touched its key field
+- **AND** the developer types "Manager review" into its label, having never
+  touched its key field
 - **THEN** the step's key reads `manager_review`
 
 #### Scenario: A new step's key stays empty while the developer types in a non-base content locale
 
-- **WHEN** the developer has switched the studio's content locale away
-  from the draft's base locale
+- **WHEN** the developer has switched the studio's content locale away from
+  the draft's base locale
 - **AND** the developer creates a step from the palette and types a label
   into it
 - **AND** the developer never touches its key field
@@ -1744,43 +1627,57 @@ draft's lifetime in the browser.
 
 #### Scenario: A hand-edited step key no longer follows its label
 
-- **WHEN** the developer changes a step's auto-derived key and then edits
-  that step's label further
+- **WHEN** the developer changes a step's auto-derived key, then changes that
+  step's label further
 - **THEN** that step's key stays what the developer typed
 
 #### Scenario: A step renamed via the canvas node's inline rename derives its key the same way
 
 - **WHEN** the developer double-clicks a new step's canvas node
-- **AND** the developer types "Manager review" via the inline rename,
-  having never touched its key field
-- **THEN** the step's key reads `manager_review`. Typing the same label
-  into the masthead would produce the same result
+- **AND** the developer types "Manager review" via the inline rename, having
+  never touched its key field
+- **THEN** the step's key reads `manager_review`. Typing the same label into
+  the step page's name line reads the same
 
 #### Scenario: Editing a non-base-locale translation leaves an already-derived step key untouched
 
-- **WHEN** the developer types a base-locale step label, deriving a key,
-  then switches the studio's content locale
+- **WHEN** the developer types a base-locale step label, deriving a key, then
+  switches the studio's content locale
 - **AND** the developer types a translation into the step label's
   non-base-locale entry
-- **AND** the developer does this via either the masthead or the
+- **AND** the developer does this via either the step page's name line or the
   canvas node's inline rename
 - **THEN** the step's key stays unchanged
 
+<!-- The heading repeats the live spec's wording verbatim, so a delta can match it. -->
+
+<!-- antislop: allow synonym-rotation -->
 ### Requirement: The masthead's type and terminal controls render as a "performed by" segmented control
 
-The masthead SHALL render the step's existing `type` and
-`terminal` fields as a three-option segmented control, labeled
-"performed by". The options are participant (type `task`), subprocess
-(type `subprocess`), and nothing/terminal. This SHALL set the same
-fields the masthead's type control sets today; it adds no new
-field.
+The step page SHALL render the step's existing `type` and `terminal` fields as
+a segmented control of three entries, labeled "performed by". The three
+entries take the plain phrases `studio-guided-vocabulary` states. They read as a step
+someone works, a call to another process, and an end.
 
+The control SHALL set the same two fields it sets today. It adds no new field.
+The word `terminal` SHALL NOT stand on it.
+
+<!-- The scenario name repeats the live spec's wording verbatim, so a delta can match it. -->
+<!-- antislop: allow synonym-rotation -->
 #### Scenario: Choosing a "performed by" option sets the step's type
 
-- **WHEN** the developer selects the subprocess option in a step's
+- **WHEN** an author picks the call-to-another-process entry in a step's
   "performed by" control
-- **THEN** the step's `type` becomes `subprocess`, the same field the
-  masthead's type control already sets
+- **THEN** the step's `type` becomes `subprocess`, the same field the control
+  already sets
+
+#### Scenario: The control names an end in plain words
+
+- **WHEN** an author reads a step's "performed by" control
+- **THEN** its third entry reads as an end
+- **AND** no entry prints "terminal"
+
+<!-- The heading repeats the live spec's wording verbatim, so a delta can match it. -->
 
 ### Requirement: The initial step shows a distinct stamp
 
@@ -1868,25 +1765,27 @@ rather than omit it.
 - **THEN** its rect carries `rx="0"`, matching the subprocess rect inside the
   same node
 
+<!-- antislop: allow synonym-rotation -->
 ### Requirement: The masthead constrains a terminal step's outcome to the process's declared outcomes
 
-When the draft's contract declares one or more `outcomes`, the
-masthead's `outcome` field SHALL offer only those values, not free text.
+The outcome field stands in the step page's "How the case ends" section. When
+the draft's contract declares one or more `outcomes`, that field SHALL offer
+only those values, not free text.
+
 Without a contract, or with a contract that declares no outcomes, the field
 carries no validated meaning. It SHALL stay a free-text field.
 
 #### Scenario: The developer picks an outcome from the declared list
 
-- **WHEN** the developer selects a terminal step on a draft whose contract
-  declares one or more outcomes
-- **THEN** the masthead's outcome field offers only those declared
-  outcomes as choices
+- **WHEN** the developer opens an end step on a draft whose contract declares
+  one or more outcomes
+- **THEN** the outcome field offers only those declared outcomes as choices
 
 #### Scenario: An outcome field stays free text without a declared outcome list
 
-- **WHEN** the developer selects a terminal step on a draft with no
-  contract, or a contract that declares no outcomes
-- **THEN** the masthead's outcome field accepts any text
+- **WHEN** the developer opens an end step on a draft with no contract, or a
+  contract that declares no outcomes
+- **THEN** the outcome field accepts any text
 
 ### Requirement: A step lands on the canvas lattice
 
@@ -2203,58 +2102,56 @@ write no position for any step in the set.
 
 ### Requirement: A set of several steps offers a count and a delete control
 
-The third column SHALL show the set's count while the set holds more than one
-step. It SHALL show a control that deletes every step in the set.
+The canvas SHALL carry the set's count while the set holds more than one step.
+It SHALL carry a control that deletes every step in the set.
 
-It SHALL NOT show the inspector in that state. The inspector edits one step,
-and a set of several names no one step for it.
+The step page holds one step, and a set of several names no one step for it.
+The canvas summary therefore carries the set's own controls.
 
+<!-- Why: a remove control acts on one step; the delete control here acts on a whole selection. -->
+<!-- antislop: allow synonym-rotation -->
 The delete control SHALL take each step in the set out of the draft's
-`workflow.steps`. It SHALL leave a path that points at a deleted step as it is.
-The inspector's own delete leaves such a path today, and the checks rail
-reports it.
+`workflow.steps`. It SHALL leave a path that points at a deleted step as it
+is. The step page's own remove control leaves such a path today, and the
+checks rail reports it.
 
 The draft SHALL take the first remaining step as its `workflow.initialStep`
-when the deleted set held it. That is the rule a single delete applies today.
+when the deleted set held it. That is the rule one step's own removal applies
+today.
 
-The summary SHALL also offer a control that groups the set. Grouping SHALL
+The summary SHALL also carry a control that groups the set. Grouping SHALL
 create a group holding exactly the selected steps, with a name the author can
 change. It SHALL leave the selection as it is.
 
 The control SHALL refuse a set that any group already holds. A step SHALL
 belong to at most one group, so nothing has to decide which box draws it.
 
-When the selection exactly matches one group's members, the summary SHALL show
-that group's own controls instead. Those are its name, a collapse
+When the selection exactly matches one group's members, the summary SHALL
+carry that group's own controls instead. Those are its name, a collapse
 control and an ungroup control.
 
-The third column SHALL dock the collapsed checks rail at the summary's bottom
-edge. It docks one at the inspector's bottom edge already. The
-`studio-checks-rail` capability carries that summary's own rules.
+The `studio-checks-rail` capability carries the checks rail's own home. The
+canvas summary docks none of it.
 
-The set SHALL be empty after the delete. The third column then shows the full
-checks rail again.
+The set SHALL be empty after the delete.
 
 #### Scenario: Two selected steps show a count
 
-- **WHEN** the developer selects two steps
-- **THEN** the third column reports a count of two, and shows no step sections
-- **AND** the collapsed checks rail docks at that summary's bottom edge
+- **WHEN** an author selects two steps
+- **THEN** the canvas summary reports a count of two
+- **AND** the step page holds no section for the set
 
 #### Scenario: The delete control deletes every step in the set
 
-- **WHEN** the developer has selected three of five steps
+- **WHEN** an author has selected three of five steps
 - **AND** activates the delete control
 - **THEN** the draft holds the other two steps alone
-- **AND** the third column shows the checks rail
+- **AND** the canvas summary leaves
 
 #### Scenario: Deleting the initial step moves the marker
 
-- **WHEN** the set holds the draft's initial step and the developer deletes it
+- **WHEN** the set holds the draft's initial step and an author deletes it
 - **THEN** the draft's `workflow.initialStep` names the first remaining step
-
-<!-- Why: the header must match the base spec character for character. -->
-<!-- antislop: allow passive-voice -->
 
 ### Requirement: A path renders as an orthogonal route, under one canvas-wide style
 
@@ -2864,65 +2761,65 @@ requirement's scope.
 
 ### Requirement: The inspector's Paths and Timers tabs render from compiled styles
 
-`panels/PathsPanel.tsx`, the body of the configuration pane's Paths
-section, SHALL render from compiled component styles. The rendered result
-SHALL match the previous stylesheet declaration for declaration.
+`panels/PathsPanel.tsx`, the body of the step page's Path to section, SHALL
+render from compiled component styles. The rendered result SHALL match the
+previous stylesheet declaration for declaration.
 
-`panels/TimersPanel.tsx`, the body of the Timers section, renders no class
+`panels/TimersPanel.tsx`, the body of the Time limit section, renders no class
 this migration covers. It already satisfies this requirement, unchanged.
 
 #### Scenario: The Paths tab keeps its look
 
-- **WHEN** a browser opens the configuration pane's Paths section
+- **WHEN** a browser opens the step page's Path to section
 - **THEN** its computed layout, spacing, color and border equal the values
   the deleted stylesheet declared
 
 ### Requirement: The bench renders from compiled styles
 
-The steps register, the masthead, the section register and the ribbon's
-own chrome SHALL render from compiled component styles, reading
-`form-ui/tokens.stylex`. No literal class name appears in any of the four
-beyond the `.btn` family and the three exceptions `web-styling` pins.
+The steps rail, the step page and the Canvas tab's own chrome SHALL render
+from compiled component styles, reading `form-ui/tokens.stylex`. No literal
+class name stands in any of the three beyond the `.btn` family and the three
+exceptions `web-styling` pins.
 
-Every string a person reads in the four SHALL come from the studio catalog.
-That includes the no-assignment warning, the section names, and the
-terminal step's one-line explanation.
+Every string a person reads in the three SHALL come from the studio catalog.
+That includes the no-assignment warning, the section names, and the end
+step's one-line explanation.
 
 #### Scenario: The bench carries no stray literal class
 
-- **WHEN** a browser renders the bench
-- **THEN** no element inside the four regions carries a literal class
-  beyond the `.btn` family, `canvas-node`, `panzoom-exclude` and
-  `studio-dialog`
+- **WHEN** a browser renders the steps rail, the step page and the Canvas tab
+- **THEN** no element inside the three carries a literal class beyond the
+  `.btn` family, `canvas-node`, `panzoom-exclude` and `studio-dialog`
 
 #### Scenario: The no-assignment warning reads from the catalog
 
-- **WHEN** the developer selects a non-terminal step with no assignment
+- **WHEN** an author opens a step someone works that carries no assignment
 - **THEN** the warning's text resolves through the studio catalog's `t`
 
+<!-- The heading repeats the live spec's wording verbatim, so a delta can match it. -->
+
+<!-- antislop: allow synonym-rotation -->
 ### Requirement: The edit screen's own layout renders from compiled styles
 
-`screens/EditScreen.tsx`, the layout the structure view sits in, SHALL
-compile from typed StyleX style objects. The rendered result SHALL
-match the previous stylesheet declaration for declaration.
+`screens/` collapses its edit screen and its panels screen into one process
+surface component. That component's own layout SHALL compile from typed
+StyleX style objects. The layout covers the header bar, the tab row and the
+tab body. The rendered result SHALL match the previous stylesheet declaration
+for declaration.
 
 #### Scenario: The edit screen keeps its look
 
-- **WHEN** a browser opens the edit screen's structure view
+- **WHEN** a browser opens the process surface
 - **THEN** its computed layout equals the value the deleted stylesheet
   declared
 
 #### Scenario: The group-rename label still renders correctly, unmigrated
 
-<!-- This scenario's title predates this requirement's last change and
-     now describes a state that change ended. The body below states
-     the corrected, current fact; the title stays so a future delta
-     against it recognizes this as the same scenario evolving, not one
-     dropped and a new one added. -->
-- **WHEN** the inspector shows a group's rename label
+<!-- This scenario's title predates the change that ended the state it names; the title stays so a later delta reads this as one scenario evolving. -->
+- **WHEN** the canvas draws a group's rename label
 - **THEN** it carries no literal `canvas-group-name` class
-- **AND** its computed style, including its `cursor: grab` affordance,
-  equals the value the deleted stylesheet declared
+- **AND** its computed style, including its `cursor: grab` affordance, equals
+  the value the deleted stylesheet declared
 
 ### Requirement: The canvas renders from compiled styles
 
