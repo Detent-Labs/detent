@@ -8,12 +8,11 @@ context: |
   operator, the developer and the process owner. The engine itself stays
   headless and API-first behind that UI: it carries no UI dependency, and
   `packages/web` reaches it only over the HTTP wrapper and the exports map.
-  Keep that boundary. Direction: no-code and low-code process authoring
-  (ROADMAP stage 27). No-code is the target for what the builders cover, and
-  low-code is what stays underneath permanently — the JSON view, the CEL
-  input and hand-authored bodies stay first-class. Every authoring surface
-  produces the same JSON definition as today, so none of them relaxes a
-  contract rule.
+  Keep that boundary. Direction: no-code and low-code process authoring.
+  No-code is the target for what the builders cover, and low-code is what
+  stays underneath permanently — the JSON view, the CEL input and
+  hand-authored bodies stay first-class. Every authoring surface produces the
+  same JSON definition as today, so none of them relaxes a contract rule.
 
   Paradigm: state-based
   finite-state machine — Steps (states) joined by explicit Paths (transitions),
@@ -54,27 +53,31 @@ context: |
   imports from another area — only upward into `shell/`, `api/`, `i18n/`.
   The studio area is Process Studio, the developer's product: server-persisted
   drafts (the `drafts` table, optimistic concurrency on a `revision` column),
-  a canvas-primary edit screen (drag-to-move, drag-to-connect) with a
-  selection-driven inspector beside a routed panels screen holding the four
-  process-wide views (field catalog, data sources, contract, field matrix),
-  a routed form editor, a replacing JSON surface, publish,
-  published versions with a JSON diff, migration-plan authoring, a
-  registry/CEL-scratchpad Tools screen, a Player beside the merged
-  instance record, and a Templates screen holding the reusable bodies a new
-  process seeds from; gated by `system:author` or `system:developer`, with
-  migration-plan authoring and the Tools screen behind `system:developer`
-  alone and the Templates screen behind `system:templates`. The admin area is the
-  operator's product — all-instances list, merged transition/event record
-  with cancel, outbox with dead-letter retry/discard, pending timers, user
-  administration, data list maintenance, the UI-strings override screen;
-  gated by `system:admin` or, for the
-  data list screens alone, `system:datalists`. The app area is participant-facing
-  (My-tasks inbox / Task / Start-a-process over `scope=mine`-derived inbox
-  filtering and JWT auth). The reporting area is the process owner's — cycle
-  time, bottlenecks, SLA; gated by `system:reports`. `packages/form-ui` is a
-  source-only, no-build field-form renderer shared by the studio area's Player
-  and the app area, so what an author previews is what a participant gets; it
-  stays its own package. Both reach the engine only through the HTTP wrapper
+  one tabbed process surface holding ten tabs (canvas, steps, fields, data
+  sources, paths, forms, field matrix, contract, changes, checks), a routed
+  form editor, a replacing JSON surface, publish, published versions with a
+  JSON diff, migration-plan authoring, a registry/CEL-scratchpad Tools
+  screen, a Player beside the merged instance record, and a Templates screen
+  holding the reusable bodies a new process seeds from. The canvas tab keeps
+  drag-to-move and drag-to-connect; the steps tab pairs a numbered rail with
+  one step page. Studio routes admit `system:author` or `system:developer`.
+  Tools stays behind `system:developer` alone, migration-plan authoring
+  behind `system:developer` or a scoped `migrate` grant, and Templates
+  behind `system:templates`. The admin area is the operator's
+  product — all-instances list, merged transition/event record with cancel
+  and its verified field-level audit trail, outbox with dead-letter
+  retry/discard, pending timers, user administration, assignment groups,
+  migration runs, data list maintenance, the UI-strings override screen;
+  gated by `system:admin` or, for the data list screens alone,
+  `system:datalists`. The app area is participant-facing: the My-tasks
+  inbox, one task, Start a process, Cases I started and Cases I took part
+  in, over the `mine`, `started` and `visible` list scopes and JWT auth.
+  The reporting area is the process owner's — cycle time, bottlenecks, SLA,
+  and a saved report builder with column choice, live preview, a CSV export
+  and per-report viewer/editor sharing; gated by `system:reports`.
+  `packages/form-ui` is a source-only, no-build field-form renderer shared by
+  the studio area's Player and the app area, so what an author previews is
+  what a participant gets; it stays its own package. Both reach the engine only through the HTTP wrapper
   or the engine package's `exports` map — neither authors-or-runs definitions
   in-process except via those boundaries. `packages/editor`, the original
   structural-editor proof of concept, is deleted.
@@ -88,9 +91,9 @@ context: |
   their `data` payload, in-process only, for a caller resolving an option
   list or a report cell — no label resolution, no HTTP route.
   `listInstances` and `queryInstances` share one predicate builder,
-  `buildInstanceWhere`. `src/http/` wraps
-  it as `http-wrapper`, with one route module per surface beside
-  `routes.ts` — admin, studio, reporting, account and UI strings;
+  `buildInstanceWhere`. `src/http/` wraps it as `http-wrapper`, with one
+  route module per surface beside `routes.ts` — admin, studio, reporting and
+  account; the `GET /ui-strings` handler sits in `admin-routes.ts`.
   JWT/local-account auth (`jwt-authentication`,
   `local-user-accounts`) and role-gated operations (`authorization`:
   `system:publish`, `system:cancel-any`, `system:admin`, `system:developer`,
