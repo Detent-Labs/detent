@@ -2,11 +2,12 @@ import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { DraftProvider } from "../src/areas/studio/draft/store.js";
 import { CanvasView } from "../src/areas/studio/canvas/CanvasView.js";
+import { NODE_HEIGHT } from "../src/areas/studio/canvas/geometry.js";
 import type { Draft } from "../src/areas/studio/draft/types.js";
 
 /**
- * The two text lines a canvas node draws: the resolved label, and the step's
- * key underneath it. Read off the markup `CanvasView` renders, the way
+ * The one text line a canvas node draws: the resolved label. Read off the
+ * markup `CanvasView` renders, the way
  * `studio-fieldMatrixGrid-bulkBadges.test.tsx` reads its grid.
  *
  * `DraftProvider` seeds the content locale from the draft's own `baseLocale`,
@@ -62,31 +63,42 @@ function renderCanvas(baseLocale: string): string {
 interface NodeLines {
   stepId: string;
   label: string | undefined;
-  key: string | undefined;
+  /** The label line's own baseline, as the markup carries it. */
+  labelY: string | undefined;
+  /** Every `<text>` the node body draws, so a second line shows up as a
+   * second entry rather than going unread. */
+  texts: string[];
 }
 
-/** The two lines each node draws, in node order. A node group is the only
+/** The one line each node draws, in node order. A node group is the only
  * element opening with `data-step-id`, and the split runs each chunk from one
- * node's open tag to the next one's, so the first match of either class inside
- * a chunk belongs to that node. */
+ * node's open tag to the next one's, so a match inside a chunk belongs to that
+ * node. */
 function nodeLines(html: string): NodeLines[] {
   return html
     .split(/(?=<g data-step-id=")/)
     .slice(1)
-    .map((chunk) => ({
-      stepId: /<g data-step-id="([^"]*)"/.exec(chunk)?.[1] ?? "",
-      label: /class="nodeLabel">([^<]*)</.exec(chunk)?.[1],
-      key: /class="nodeKey">([^<]*)</.exec(chunk)?.[1],
-    }));
+    .map((chunk) => {
+      // `class` renders last, so one match carries the label's attributes and
+      // its content together and the two cannot come from different elements.
+      const labelText = /<text([^>]*)class="nodeLabel">([^<]*)</.exec(chunk);
+      return {
+        stepId: /<g data-step-id="([^"]*)"/.exec(chunk)?.[1] ?? "",
+        label: labelText?.[2],
+        labelY: labelText ? /\by="([^"]*)"/.exec(labelText[1])?.[1] : undefined,
+        texts: [...chunk.matchAll(/<text[^>]*>([^<]*)</g)].map((m) => m[1]),
+      };
+    });
 }
 
 const ENGLISH = nodeLines(renderCanvas("en"));
 const GERMAN = nodeLines(renderCanvas("de"));
 
-describe("the canvas node's two text lines", () => {
-  it("prints a step's label and its key, each on its own line", () => {
+describe("the canvas node's one text line", () => {
+  it("prints a step's label", () => {
     expect(ENGLISH.length).toBe(2);
-    expect(ENGLISH[0]).toEqual({ stepId: "step_capture", label: "Capture the request", key: "capture" });
+    expect(ENGLISH[0].stepId).toBe("step_capture");
+    expect(ENGLISH[0].label).toBe("Capture the request");
   });
 
   // The defect: the operand order that read the key first, so every node on
@@ -96,13 +108,22 @@ describe("the canvas node's two text lines", () => {
     expect(ENGLISH[0].label).not.toBe("capture");
   });
 
-  // The defect: an unconditional key line, which printed the fallback value
-  // twice the moment a label resolved to the key.
-  it("never prints one string on both lines", () => {
+  // Baseline 24 is where the label sat while a key line followed it. Nothing
+  // follows it now, so the one line centres: half the node's height, plus the
+  // ~4 units a 13px face carries below its own centre.
+  it("centres the label line in the node", () => {
     for (const node of [...ENGLISH, ...GERMAN]) {
-      if (node.key === undefined) continue;
-      expect(node.label).not.toBe(node.key);
+      expect(node.labelY).toBe(String(NODE_HEIGHT / 2 + 4));
     }
+  });
+
+  // The key is a slug that references nothing, so the canvas does not spend a
+  // line on it. It stays in the node's accessible name and in the inspector.
+  it("draws no key line, on any node, in any locale", () => {
+    for (const node of [...ENGLISH, ...GERMAN]) {
+      expect(node.texts).toEqual([node.label ?? ""]);
+    }
+    expect(ENGLISH[0].texts).not.toContain("capture");
   });
 
   // The same operand-order defect, seen from the other side: a key-first node
@@ -111,15 +132,13 @@ describe("the canvas node's two text lines", () => {
     expect(GERMAN.length).toBe(2);
     expect(GERMAN[0].label).toBe("Anfrage erfassen");
     expect(GERMAN[0].label).not.toBe("Capture the request");
-    // The key is a slug, not display text, so it stays put under the locale.
-    expect(GERMAN[0].key).toBe("capture");
   });
 
-  // The defect: the key line drawn whatever the label line held, so a step
-  // with no label yet printed its key on both lines.
-  it("prints the key on the label line when the label resolves empty, and draws no key line", () => {
+  // The fallback chain the key line's removal leaves untouched: a step whose
+  // label resolves to nothing still reads as its key.
+  it("prints the key on its one line when the label resolves empty", () => {
     expect(ENGLISH[1].stepId).toBe("step_archive");
     expect(ENGLISH[1].label).toBe("archive");
-    expect(ENGLISH[1].key).toBeUndefined();
+    expect(ENGLISH[1].texts).toEqual(["archive"]);
   });
 });
