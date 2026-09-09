@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { ProcessTabRow, tabDomId, tabPanelDomId } from "../src/areas/studio/panels/ProcessTabRow.js";
+import { announcementAfter, ProcessTabRow, tabDomId, tabPanelDomId } from "../src/areas/studio/panels/ProcessTabRow.js";
 import { PROCESS_TABS, type ProcessTab } from "../src/areas/studio/routing.js";
 import { tabStops } from "./studio-fieldMatrixTabStops.test.js";
 
@@ -216,5 +216,34 @@ describe("Tab selection while the JSON surface is open", () => {
     const html = render({ open: "paths", jsonOpen: true });
 
     expect(html).not.toContain('aria-selected="true"');
+  });
+});
+
+describe("The live region's text across a blocked-state transition", () => {
+  const SENTENCE = "A blocking issue appeared in Checks.";
+
+  it("carries the sentence on the clear-to-blocker edge", () => {
+    expect(announcementAfter(false, true, SENTENCE)).toBe(SENTENCE);
+  });
+
+  it("writes nothing while the draft stays blocked", () => {
+    expect(announcementAfter(true, true, SENTENCE)).toBeNull();
+  });
+
+  it("empties the region on the blocker-to-clear edge", () => {
+    // Not cosmetic. Both edges write one constant, so leaving the sentence
+    // standing makes a second rise re-set identical text, which mutates no
+    // text node and reaches no screen reader.
+    expect(announcementAfter(true, false, SENTENCE)).toBe("");
+  });
+
+  it("announces a blocker that returns after a fix", () => {
+    let region = "";
+    for (const [was, now] of [[false, true], [true, false], [false, true]] as const) {
+      const next = announcementAfter(was, now, SENTENCE);
+      if (next !== null) region = next;
+    }
+
+    expect(region).toBe(SENTENCE);
   });
 });

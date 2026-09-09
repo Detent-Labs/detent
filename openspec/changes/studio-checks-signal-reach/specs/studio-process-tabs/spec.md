@@ -33,6 +33,9 @@ region SHALL stay silent otherwise. That covers three cases. A draft that
 loads already blocked, a further edit that stays blocked, and the reverse
 transition out of blocker.
 
+Every such transition SHALL announce. A blocker that returns after a fix
+SHALL announce again.
+
 #### Scenario: Adding a step raises the Steps count
 
 - **WHEN** an author adds a step on the Canvas tab
@@ -77,6 +80,12 @@ transition out of blocker.
 - **WHEN** an edit turns the loaded draft's worst open issue into a blocker,
   where it was not one before
 - **THEN** a live region announces that transition once
+
+#### Scenario: A blocker returning after a fix announces again
+
+- **WHEN** an edit turns the worst open issue into a blocker a second time
+- **AND** an earlier blocker already announced, and the author fixed it
+- **THEN** the live region announces that transition too
 
 #### Scenario: An already-blocked draft announces nothing on load
 

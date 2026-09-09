@@ -113,6 +113,28 @@ interface Props {
 }
 
 /**
+ * What the live region below carries after a blocked-state transition.
+ * `null` leaves it as it stands.
+ *
+ * Only the clear-to-blocker edge announces. A fix resolving is a different
+ * concern, and the reverse transition stays silent (design.md Non-Goals).
+ * That edge still empties the region rather than leaving the sentence
+ * standing: both edges write the same constant, so a second rise into
+ * blocker would otherwise re-set identical text, mutate no text node and
+ * reach no screen reader. Measured in a real browser before this branch
+ * existed — the count recolored while a `MutationObserver` on the region
+ * counted zero mutations. Emptying a polite region announces nothing itself.
+ *
+ * Extracted because this repo ships no DOM test library, so no test here can
+ * fire the effect that calls it (`studio-draftProvider-chainingFetch.test.ts`
+ * states the same convention).
+ */
+export function announcementAfter(was: boolean, now: boolean, sentence: string): string | null {
+  if (now) return was ? null : sentence;
+  return "";
+}
+
+/**
  * The process surface's tab row (`studio-process-tabs`). Ten tabs in
  * authoring order, and nothing else — the trailing edge is the last tab.
  *
@@ -138,12 +160,9 @@ export function ProcessTabRow({ open, counts, checksBlocked, onOpen, jsonOpen }:
     setFocusedTab(open);
   }, [open]);
 
-  // Only the clear-to-blocker edge announces. A fix resolving is a different
-  // concern, and the reverse transition stays silent (design.md Non-Goals).
-  // The region itself stays mounted below: no engine reliably announces a
-  // live region that arrives with its text already inside it.
   useEffect(() => {
-    if (checksBlocked && !wasBlocked.current) setAnnouncement(t("tabs.checksBlockingAnnounced"));
+    const next = announcementAfter(wasBlocked.current, checksBlocked, t("tabs.checksBlockingAnnounced"));
+    if (next !== null) setAnnouncement(next);
     wasBlocked.current = checksBlocked;
   }, [checksBlocked]);
 

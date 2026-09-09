@@ -16,6 +16,12 @@ const styles = stylex.create({
   issueSourceLabel: {
     fontFamily: fonts.mono,
     fontSize: "0.8rem",
+    // Stated, not inherited. The rail composes this onto an `<h3>`, whose
+    // user-agent default is bold: the same label measured 700 there and 400
+    // in the per-entity list, so one definition rendered two ways. 400 is
+    // what `design-language.md` gives a label, and it is what the list
+    // already read.
+    fontWeight: 400,
     textTransform: "uppercase",
     letterSpacing: "0.06em",
     color: colors.textMuted,
