@@ -108,22 +108,22 @@ const styles = stylex.create({
     alignItems: "center",
     gap: space.s2,
   },
-  // Out of flow, beneath the button and aligned to its right edge. The
-  // trailing cluster is right-aligned behind `marginLeft: auto`, so anything
-  // in flow beside Publish pushes the whole cluster left. Measured at 1280px
-  // before this: Publish moved 167px the instant a blocker appeared, and the
-  // reason met the button's right edge with no gap. An author reaching for
-  // Publish had it slide out from under the pointer, on an edit made in
-  // another tab. The permission reason rendered in the same place, but only
-  // for an actor who could not click Publish anyway.
-  publishGate: {
-    position: "relative",
-  },
+  // In flow, as the cluster's own leading item. The cluster is right-aligned
+  // behind `marginLeft: auto`, so its right edge is pinned and it grows to
+  // the LEFT: Publish holds its position with the line present and absent.
+  // The 167px shift a line in flow once measured came from placing it beside
+  // the cluster instead, where it ate the free space the auto-margin was
+  // spending.
+  //
+  // Inside the cluster it also wraps with the cluster. A line ahead of the
+  // cluster takes the auto-margin with it, and the cluster then strands at
+  // the row's LEFT edge on every width where the row wraps — measured at
+  // 1200, 1150, 1100, 1024, 960, 600, 500, 430 and 375.
+  //
+  // The out-of-flow placement that stood here read as a caption of the tab
+  // row: pinned beneath the button, it crossed the header's own 2px bottom
+  // border at mid-cap height and struck the sentence through.
   publishReason: {
-    position: "absolute",
-    insetBlockStart: "100%",
-    insetInlineEnd: 0,
-    marginBlockStart: space.s1,
     whiteSpace: "nowrap",
     fontFamily: fonts.body,
     fontSize: 11,
@@ -132,10 +132,8 @@ const styles = stylex.create({
     color: colors.textMuted,
   },
   // The blocked reason names an issue the draft itself carries, the same fact
-  // the Checks count and the structurally-invalid banner already color. It
-  // composes over `publishReason` above, the way `tabCountBlocker` composes
-  // over `tabCount` in `ProcessTabRow.tsx`. The permission-denied reason keeps
-  // the muted tone: it names an administrative fact about the actor instead.
+  // the Checks count already colors. The permission-denied reason keeps the
+  // muted tone: it names an administrative fact about the actor instead.
   publishBlockedReason: {
     color: colors.refusal,
   },
@@ -295,19 +293,19 @@ const styles = stylex.create({
 const PUBLISH_REASON_ID = "studio-publish-reason";
 
 /**
- * The header bar's Publish control, with the reason line that renders beneath
- * it (studio-publish: "The studio offers Publish only where the engine would
- * admit it, and names the reason otherwise").
+ * The header bar's Publish control (studio-publish: "The studio offers
+ * Publish only where the engine would admit it, and names the reason
+ * otherwise"). `PublishReasonLine` below renders the reason itself, from its
+ * own place on the header row.
  *
- * Two reasons render there. An absent permission makes the control
- * unavailable. A blocking issue in the draft leaves it available and
- * operable: the click still opens the confirmation dialog, which states the
- * same warning. The reason says so before the click rather than only after.
+ * Two reasons exist. An absent permission makes the control unavailable. A
+ * blocking issue in the draft leaves it available and operable: the click
+ * still opens the confirmation dialog, which states the same warning. The
+ * reason says so before the click rather than only after.
  *
- * A component of its own because the gate and its reason are one concept: the
- * `role="group"` wrapper, the `aria-disabled` control, the reason line and the
- * `aria-describedby` that binds them have to stay together or the reason
- * reaches nobody.
+ * The control and its reason stand in two places in the row, so
+ * `aria-describedby` carries the binding alone. An id reference needs no DOM
+ * adjacency, and `PUBLISH_REASON_ID` is the one constant both sides read.
  *
  * `aria-disabled`, not the native `disabled` attribute, for the permission
  * state: a natively disabled button takes no focus, so nothing ever reads its
@@ -324,8 +322,8 @@ export function PublishNavControl({
   triggerRef,
 }: {
   canPublish: boolean;
-  /** True when the draft's worst open issue is a blocker. Adds a reason; it
-   * leaves the control available and operable. */
+  /** True when the draft's worst open issue is a blocker. Adds a hidden
+   * reason; it leaves the control available and operable. */
   blocked: boolean;
   publishing: boolean;
   onPublish: () => void;
@@ -333,37 +331,54 @@ export function PublishNavControl({
 }) {
   const gate = publishAvailability(canPublish, blocked);
   return (
-    <div role="group" {...stylex.props(styles.publishGate)}>
-      <button
-        ref={triggerRef}
-        type="button"
-        className="btn btn-primary"
-        disabled={publishing}
-        // `aria-disabled` and the click guard read availability, so the
-        // blocked-but-permitted control stays operable. `aria-describedby`
-        // reads the reason instead, so the new case's text reaches the button
-        // the same way the permission case's already does.
-        aria-disabled={gate.available ? undefined : true}
-        aria-describedby={gate.reasonKey ? PUBLISH_REASON_ID : undefined}
-        onClick={() => {
-          if (!gate.available) return;
-          onPublish();
-        }}
-      >
-        {publishing ? t("draftToolbar.publishing") : t("draftToolbar.publish")}
-      </button>
-      {gate.reasonKey && (
-        <span
-          id={PUBLISH_REASON_ID}
-          {...stylex.props(
-            styles.publishReason,
-            gate.reasonKey === "draftToolbar.publishBlockedReason" && styles.publishBlockedReason,
-          )}
-        >
-          {t(gate.reasonKey)}
-        </span>
+    <button
+      ref={triggerRef}
+      type="button"
+      className="btn btn-primary"
+      disabled={publishing}
+      // `aria-disabled` and the click guard read availability, so the
+      // blocked-but-permitted control stays operable. `aria-describedby`
+      // reads the reason instead, so the blocked case's text reaches the
+      // button the same way the permission case's does.
+      aria-disabled={gate.available ? undefined : true}
+      aria-describedby={gate.reasonKey ? PUBLISH_REASON_ID : undefined}
+      onClick={() => {
+        if (!gate.available) return;
+        onPublish();
+      }}
+    >
+      {publishing ? t("draftToolbar.publishing") : t("draftToolbar.publish")}
+    </button>
+  );
+}
+
+/**
+ * The reason the Publish control carries, or nothing. It renders as the
+ * action cluster's leading item, on the header row itself. The cluster's own
+ * `marginLeft: auto` pins its trailing edge, so the cluster grows leftward
+ * and no control moves (see `publishReason` above).
+ *
+ * The blocked reason takes the refusal tone. It names an issue the draft
+ * carries, the same fact the Checks count colors. The permission-denied
+ * reason keeps the muted tone: it names a fact about the actor instead.
+ *
+ * `publishAvailability` runs here a second time rather than taking a prop.
+ * The function is pure over two booleans the header bar already holds, and a
+ * threaded prop would let the button's reason and this line's reason drift.
+ */
+export function PublishReasonLine({ canPublish, blocked }: { canPublish: boolean; blocked: boolean }) {
+  const gate = publishAvailability(canPublish, blocked);
+  if (!gate.reasonKey) return null;
+  return (
+    <span
+      id={PUBLISH_REASON_ID}
+      {...stylex.props(
+        styles.publishReason,
+        gate.reasonKey === "draftToolbar.publishBlockedReason" && styles.publishBlockedReason,
       )}
-    </div>
+    >
+      {t(gate.reasonKey)}
+    </span>
   );
 }
 
@@ -821,6 +836,11 @@ export function ProcessHeaderBar({
           as a unit instead of stranding the menu alone at the row's left
           edge (design.md). */}
       <div {...stylex.props(styles.trailingCluster)}>
+        {/* The cluster's leading item, so the reason reads on the row's own
+            baseline beside the state it explains, wraps with the controls it
+            belongs to, and leaves the row's 2px bottom border whole. */}
+        <PublishReasonLine canPublish={canPublish} blocked={blocked} />
+
         <div {...stylex.props(styles.draftActions)}>
           <button type="button" className="btn btn-secondary" disabled={actions.saving} onClick={actions.save}>
             {actions.saving ? t("draftToolbar.saving") : t("draftToolbar.save")}
