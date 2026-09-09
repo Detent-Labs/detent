@@ -157,11 +157,6 @@ const styles = stylex.create({
     fontSize: 13,
     fill: colors.text,
   },
-  nodeKey: {
-    fontFamily: fonts.mono,
-    fontSize: 11,
-    fill: colors.textMuted,
-  },
   // Merges app.css's two declarations for this selector (the shared
   // display/fill/stroke/pointer-events block plus its own stroke-width/
   // stroke-dasharray block) into one entry, per design.md D3 case 1. The
@@ -1220,12 +1215,12 @@ export function CanvasView({
         <rect width={NODE_WIDTH} height={NODE_HEIGHT} rx={0} {...stylex.props(styles.nodeRect, isSelected && styles.nodeRectSelected)} />
         {step.type === "subprocess" && (
           // The doubled rule BPMN draws on a call activity. It sits before
-          // the label, the key, the stamps and the connect handle, so the
-          // handle's own circle covers the 3px it overlaps on the right.
+          // the label, the stamps and the connect handle, so the handle's
+          // own circle covers the 3px it overlaps on the right.
           <rect x={4} y={4} width={NODE_WIDTH - 8} height={NODE_HEIGHT - 8} rx={0} {...stylex.props(styles.nodeSubprocess)} />
         )}
         {isRenaming ? (
-          <foreignObject x={6} y={14} width={NODE_WIDTH - 12} height={22} className="panzoom-exclude">
+          <foreignObject x={6} y={19} width={NODE_WIDTH - 12} height={22} className="panzoom-exclude">
             <input
               // eslint-disable-next-line jsx-a11y/no-autofocus
               autoFocus
@@ -1242,16 +1237,11 @@ export function CanvasView({
             />
           </foreignObject>
         ) : (
-          <text x={10} y={24} {...stylex.props(styles.nodeLabel)}>
+          // The node's one body line. Baseline 34 puts a 13px face's optical
+          // middle on the node's own middle; the rename field above centres
+          // its 22-unit box on the same 30.
+          <text x={10} y={34} {...stylex.props(styles.nodeLabel)}>
             {label}
-          </text>
-        )}
-        {/* The key draws only where the label line does not already print it.
-            A step whose label resolves to nothing falls back to that key, and
-            one value must not appear on both lines. */}
-        {step.key && step.key !== label && (
-          <text x={10} y={44} {...stylex.props(styles.nodeKey)}>
-            {step.key}
           </text>
         )}
         {isTerminal && (
