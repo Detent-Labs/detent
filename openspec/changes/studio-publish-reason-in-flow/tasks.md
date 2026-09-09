@@ -42,10 +42,10 @@
   printed.
 - [x] 5.2 Run the full `bun test` with `DATABASE_URL` set. Report the pass
   count and the skip count.
-- [ ] 5.3 Run the prose gate over the pushed range, per `CLAUDE.md`. A gate
-  reads a commit range, so this waits for the commit.
-- [ ] 5.4 Run the whitespace gate over the same range, piped in the same
-  way. It waits for the commit too.
+- [x] 5.3 Run the prose gate over the pushed range, per `CLAUDE.md`. It
+  exits 0, on the range and again in the push hook.
+- [x] 5.4 Run the whitespace gate over the same range, piped in the same
+  way. It exits 0 in both places too.
 - [x] 5.5 Open a blocked draft in a real browser. Confirm the line reads on
   the row and Publish holds its position.
 - [x] 5.6 Repeat as an actor without the publish permission. Confirm that
