@@ -31,7 +31,7 @@ list them.
 
 | Image | Software | License |
 |---|---|---|
-| `postgres:16` | PostgreSQL | PostgreSQL License |
+| `postgres:latest` | PostgreSQL | PostgreSQL License |
 
 ### Development-only, never shipped
 

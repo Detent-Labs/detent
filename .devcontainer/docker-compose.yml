@@ -1,8 +1,8 @@
 # Devcontainer services: the `app` container (Node 22 base + Bun, and running
 # scripts/dev-webhook-sink.ts as its own background process — see the
-# command: entry below), a PostgreSQL 16 datastore, and a Mailpit SMTP
-# catcher. The engine reaches Postgres via DATABASE_URL (see openspec/specs
-# persistence), Mailpit via SMTP_HOST/PORT
+# command: entry below), a PostgreSQL datastore on the latest release, and a
+# Mailpit SMTP catcher. The engine reaches Postgres via DATABASE_URL (see
+# openspec/specs persistence), Mailpit via SMTP_HOST/PORT
 # (notification-email-action-handler), and the in-container sink via
 # HTTP_ACTION_ALLOWED_HOSTS (dedup-runtime-pagination-webhook-sink). pgdata
 # persists the database across rebuilds; caught mail is deliberately not
@@ -79,7 +79,11 @@ services:
       retries: 5
 
   db:
-    image: postgres:16
+    # Floating tag on purpose: pre-1.0, we track the latest release and freeze
+    # on a version later. The mount below is the parent of PGDATA, not PGDATA
+    # itself, so a major bump lands its own `<major>/docker` subdirectory
+    # inside this volume instead of writing where nothing is mounted.
+    image: postgres:latest
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
@@ -92,7 +96,7 @@ services:
     # and untyped-timestamp casts display, never what's stored.
     command: ["postgres", "-c", "log_timezone=Europe/Zurich", "-c", "timezone=Europe/Zurich"]
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
