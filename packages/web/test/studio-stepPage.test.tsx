@@ -169,8 +169,11 @@ describe("The step page's section set", () => {
   });
 
   it("stands every section open, so none carries a disclosure of its own", () => {
-    // A collapsible register would carry `aria-expanded` on each heading. The
-    // page's one disclosure is the Developer view, and it is a `<details>`.
+    // A collapsible register would carry `aria-expanded` on each heading. Two
+    // disclosures sit elsewhere on the page, both labelled "Developer view":
+    // the native `<details>` pair over the step's read-only JSON, and the
+    // guard editor's own button, which `ConditionInput.tsx` builds for each
+    // automatic path.
     const headings = render().match(/<h3[^>]*>/g) ?? [];
 
     expect(headings.length).toBeGreaterThan(0);

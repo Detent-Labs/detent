@@ -27,6 +27,7 @@
     "check": "bun run typecheck && bun run build && bun test && bun run test:tz",
     "serve": "bun run src/http/server.ts",
     "seed": "bun run scripts/seed.ts",
+    "thirdparty": "bun run scripts/thirdparty.ts",
     "openspec:review-check": "bun run scripts/openspec-review-check.ts",
     "openspec:spec-diff": "bun run scripts/openspec-spec-diff.ts",
     "openspec:task-status": "bun run scripts/openspec-task-status.ts"

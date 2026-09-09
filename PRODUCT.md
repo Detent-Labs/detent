@@ -97,8 +97,9 @@ or color. No corner has a radius. The accent is a stamp, not a paint.
 A value the engine matches exactly uses the mono face. A component reads a
 semantic role, never a hex.
 
-The written face is Archivo. `tokens.css` sets the mono stack. Icons are
-Lucide at 18px with a 1.75 stroke.
+The written face is the system stack, `system-ui, sans-serif`. Archivo is
+the intended face and does not ship yet. Both faces come from `tokens.css`.
+Icons are Lucide at 18px with a 1.75 stroke.
 
 The UI ships in English and German. Each area keeps its own catalog.
 
@@ -106,10 +107,11 @@ The UI ships in English and German. Each area keeps its own catalog.
 
 Real material exists. Use it instead of invented content.
 
-- Seven example definitions in `examples/`. They cover `expense-approval`,
-  `employee-onboarding`, `access-request`, `laptop-inventory`,
-  `purchase-requisition`, and a parent/child subprocess pair.
-- 99 capability specifications under `openspec/specs/`.
+- Nine example definitions in `examples/`. They cover `expense-approval`,
+  `employee-onboarding`, `it-onboarding`, `it-offboarding`, `access-request`,
+  `laptop-inventory`, `purchase-requisition`, and a parent/child subprocess
+  pair.
+- Capability specifications under `openspec/specs/`, one directory each.
 - `ROADMAP.md` and `docs/roadmap-history.md` record every finished stage.
 - `docs/authoring-guide.md` teaches the definition contract to authors.
 

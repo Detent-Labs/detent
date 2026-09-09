@@ -33,8 +33,20 @@ boundary.
 The compile-pass placement also makes a check unbypassable. A hand-written
 body cannot skip it by merely satisfying `publishedProcessBody`, which checks
 only the cancel-sink count.
+
+Five per-field checks share one walk. `checkFieldTree` runs `checkPatterns`,
+`checkColumnMapping`, `checkFieldKeyFormat`, `checkFieldFormatControl`,
+`checkFieldExpressionLength` and the field-key length bound at each field, in
+that sequence, over one `walkFieldsIndexed` pass
+(`field-tree-check-consolidation`). `structuralIssues` lists twelve checks;
+`checkFieldTree` is one entry there, and those five carry no entry of their own.
 - All `id` references resolve within the process; `initialStep` exists.
 - Ids unique per kind; slugs/keys are not used as references anywhere.
+- Field `key`s are unique across the whole field tree, groups included: CEL
+  addresses a field by `key` in the flat `data` namespace. Data source `key`s
+  are unique among themselves, and equal none of the reserved CEL namespaces
+  (`data`, `instance`, `actor`, `child`, `result`). Both are Zod refinements in
+  `processBody`'s superRefine.
 - Every non-terminal step has at least one exit (a path, or a timer with a
   targetPath); terminal steps have no outgoing paths.
 - A step's paths are all-manual or all-automatic. Among 2+ automatic paths,
@@ -53,8 +65,17 @@ only the cancel-sink count.
   only on terminal steps; every declared outcome is reachable by a terminal step.
 - `inputMapping` keys are in the child contract's `inputFields`; a
   subprocess-callable child requires no fields outside its `inputFields`.
+- A step declares a `subprocess` spec iff its `type` is `"subprocess"`, and a
+  subprocess step's paths are all-automatic. The step is a wait-state: a manual
+  path would let an actor advance the parent while the child still runs. All
+  three are Zod refinements in `definition.ts`'s `step` superRefine, beside the
+  path-trigger checks.
 - `unmappableStep` present iff `onUnmappable === "route-to-step"`; migration
   maps reference valid ids.
+- `migrationSpec.fieldMap` is injective. Two sources targeting one field
+  collapse under the snapshot remap, last write in an unspecified order, so
+  registration fails rather than the migration producing a data-dependent
+  result. A Zod refinement on `migrationSpec` in `definition.ts`.
 - Every `LocalizedText` value anywhere in the body (process, steps, fields
   incl. nested `group` fields, field options, `ViewNote.text`) has a
   non-empty entry for `ProcessBody.baseLocale`; other locales are optional
@@ -96,10 +117,22 @@ only the cancel-sink count.
   CEL. The compile pass checks both (`compile.ts::checkTechnicalFields`), not
   a Zod refinement on `fieldDef` or `viewField` — see `definition-contract`'s
   placement rule.
+- A `redactable` field is never `type: "group"`: a group holds fields, not a
+  value to erase. The compile pass checks this
+  (`compile.ts::checkRedactableFields`), not a Zod refinement on `fieldDef` —
+  see `definition-contract`'s placement rule. `redactable` places no
+  restriction on `technical`; a field may declare both.
 - `FieldDef.key` matches `/^[a-z_][a-z0-9_]*$/` — the CEL identifier grammar
   `data.<key>` requires. The compile pass checks this
   (`compile.ts::checkFieldKeyFormat`). `Step.key`/`Path.key` stay
   format-free: nothing reads them as identifiers.
+- A field's `format` and `control` are pairs its own `type` admits, per the one
+  table `definition.ts::ALLOWED_BY_TYPE`, and a literal `default` matches the
+  declared `format`. A plugin-typed field has no row there, so it may declare
+  neither key. The compile pass checks this
+  (`compile.ts::checkFieldFormatControl`, inside `checkFieldTree`), not a Zod
+  refinement — see `definition-contract`'s placement rule, which that
+  function's own comment cites.
 - `Path.key` is a non-empty string after trimming, and `Path.label` is
   required and a non-empty string after trimming, for a path of either
   trigger kind. Both are plain per-field Zod constraints on the shared
@@ -107,10 +140,20 @@ only the cancel-sink count.
   see `definition-contract`'s placement rule), so `.trim()` is applied at
   parse time and a padded authored value normalizes before it reaches
   `definitionHash`.
+- A `FieldDef.columnMapping` field declares a `dataSource` and
+  `type: "string"`. Each key matches `/^[a-z_][a-z0-9_]*$/` and the key-length
+  bound. Each target resolves in the recursive field set, and is neither a
+  group field nor the mapping field itself. No two keys name one target. The
+  compile pass checks all of it (`compile.ts::checkColumnMapping`, inside
+  `checkFieldTree`) — see `definition-contract`'s placement rule. It reads no
+  data list, so a key naming no declared column publishes.
 - `key`, `Plugin.type`, every `duration`, `pattern` and `Expression.src` stay
   under a declared length bound — every authored string that reaches an
-  interpreter or a registry lookup. Checked in `compile.ts::checkLengthBounds`,
-  plus the pattern bound in `checkPatterns`.
+  interpreter or a registry lookup. `compile.ts::checkLengthBounds` checks the
+  `Plugin.type`, `duration` and non-field-tree `Expression.src` sites.
+  `checkPatterns` owns the `pattern` bound. The field-key length bound, and a
+  field's own `validation.rule`/`default` expression length, sit in
+  `checkFieldTree` instead.
 - A `view.fields[]` entry declaring literal `required: true` and literal
   `readonly: true` names a field some source in the body writes, guaranteed
   before the entry's own step is submitted (an action `output` or a

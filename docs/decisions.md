@@ -2,8 +2,10 @@
 # Decisions: open questions and deferrals
 
 Forward-looking counterpart to `docs/current-state.md`, which describes what
-exists. This file records what was decided and not yet built, and what still
-needs a decision. `ROADMAP.md` carries stage-by-stage status.
+exists. This file records what was decided and not yet built, what still
+needs a decision, the reasoning behind decisions that have since shipped,
+and the open findings of the 2026-08-18 code review. `ROADMAP.md` carries
+stage-by-stage status.
 
 ## Open questions (still need a decision before building the relevant part)
 - The formal expression context is pinned (`src/cel/check.ts`): `instance`
@@ -144,23 +146,7 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   `spa-accessibility`, not `web-styling`: a CSS migration cannot cause or
   fix either gap.
 
-## Decided, not yet built (each needs its own OpenSpec change)
-- **Archivo as the written face.** The Type section of
-  `.claude/rules/design-language.md` names Archivo. `tokens.css` sets both
-  `--font-heading` and `--font-body` to `system-ui, sans-serif`, and neither an
-  `@font-face` rule nor a font link exists anywhere in `packages/web`, so the
-  reader's OS supplies the face today and it differs per platform. The
-  two-weight rule holds either way: 800 for a heading and a button label, 400
-  for everything else, nothing between. Deferred 2026-09-02 — we do not need
-  Archivo yet. When it lands, self-host the woff2: the build-time CSP is
-  `default-src 'self'` with no `font-src`
-  (`packages/web/vite.config.ts:26`), so a self-hosted file needs no CSP change
-  and no `frontend-security-headers` delta, while a Google Fonts link would
-  need `style-src` and `font-src` additions plus that delta. It changes the
-  type of every screen in all four areas, so it needs its own OpenSpec change,
-  a browser check, and a `DESIGN.md` refresh. The studio area's `app.css`
-  reasons from the two weights in a comment; that comment now names the
-  written face rather than Archivo.
+## Decided and built (kept for the reasoning, not for the work)
 - **Instance audit log: a tamper-evident change record for field data.**
   Shipped in full. A design pass on 2026-08-25 settled the shape; the owner
   approved each piece in turn. All three changes landed and archived, in
@@ -379,7 +365,7 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
     composes nothing.
   - The read this handler needs exists already in most respects, built for a
     different consumer since this entry was written. `instance-data-query`'s
-    `queryInstances` (`src/runtime/api.ts:1560`, shipped 2026-08-27 as
+    `queryInstances` (`src/runtime/api.ts:1868`, shipped 2026-08-27 as
     `instance-query-core`, now archived) filters instances by `processId`,
     `status`, `currentStepId`, `startedBy`, `claimedBy`, `excludeInstanceId`,
     `createdAfter`/`createdBefore` and a `dataWhere` list of field/operator/
@@ -625,7 +611,7 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
     `Permission` (`src/auth/authorize.ts:78`) was `"publish" | "cancel" |
     "migrate"`, with no entry covering reading. A pass on 2026-08-25 priced
     a fourth one and found it additive rather than restrictive, because
-    the bulk read was already closed: `src/http/routes.ts:449` ran
+    the bulk read was already closed: `src/http/routes.ts:481` ran
     `requireRole(actor, ADMIN_ROLE)` for `scope=all`, while `scope=mine`
     and `scope=started` justify themselves through the caller's own
     assignment or authorship and need no grant at all. So a `read`
@@ -702,8 +688,8 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   six scalars share) shipped in three commits, pushed and never merged. The
   annotated tag `change2-rejected` holds them. A benchmark on 2026-09-01 then
   rejected it. Change 3, the rebuild of the three expression indexes no
-  Change 2 column replaces, measured out as worth building.
-  `tmp/offene-items.md` item 25 carries Change 3 alone from here on.
+  Change 2 column replaces, shipped 2026-09-01 as
+  `rebuild-instance-expression-indexes`.
 
   **Change 2: built, measured, rejected.** The five columns bought no
   runtime. Numbers from the 2026-09-01 benchmark, 200,000 rows, median of
@@ -855,163 +841,6 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   depending on which range a caller uses, and a later promotion of
   `startedAt` into a column inherits that question rather than closing it.
   The full column inventory is under Open questions, above.
-- **Process-scoped permissions: the filter, the draft scope, and the
-  `permissions` booleans.** A design pass on 2026-08-15 settled the shape;
-  `ROADMAP.md` stage 40 carries it in full. The seam shipped 2026-08-15 as
-  `process-scoped-permission-seam`, and the storage half shipped 2026-08-16
-  as `process-scoped-permission-grants`. `can(actor, permission, processId,
-  db)` and `requirePermission` sit in `src/auth/authorize.ts` over three
-  permissions; `src/auth/grants.ts` holds the `permission_grants` table's SQL
-  behind them, and three `system:admin`-gated routes administer a grant.
-  Nobody was blocked by the seam alone, and no account gained or lost access
-  the day storage landed: an installation that writes no grant row keeps
-  every answer it had.
-
-  Three pieces stayed open, each its own later OpenSpec change. Two still
-  are.
-
-  The `scope=all` filter and the reporting aggregates turn a gate into a
-  query predicate. That reaches `instance-query`, not `authorization`.
-
-  Shape decided 2026-08-25, pulled forward by the instance-data-tables
-  entry above, which depends on it. `Permission` gains a fourth member,
-  `read`, with `ADMIN_ROLE` as its reserved short-circuit in the
-  module-private `PERMISSION_ROLE`. `REPORTS_ROLE` stays what it is,
-  "may use the reporting area", and does not become the short-circuit:
-  area access and data scope are two questions, and one role answering
-  both makes every later narrowing impossible. The three reporting
-  aggregates (`handleReportingCycleTime`, `handleReportingBottleneck` and
-  `handleReportingSla`, `src/http/reporting-routes.ts:141`, `:145` and
-  `:149`) each already take a `processId`, so `requireRole(actor,
-  REPORTS_ROLE)` there becomes the role plus `read` on that process.
-
-  That file has grown since this was written. `instance-data-tables` put
-  the saved-report routes beside the aggregates, so twelve handlers now
-  gate on `REPORTS_ROLE`, not three. The report routes carry their own
-  per-report `viewers`/`editors` check plus the process `read` grant, so
-  they need no part of this migration. It stays scoped to the three
-  aggregates above.
-
-  Landed 2026-08-30 as `reporting-aggregate-read-permission`. The three
-  aggregate routes now share `requireReportingAccess`
-  (`src/http/reporting-routes.ts`), which runs `requireRole(actor,
-  REPORTS_ROLE)` then `requirePermission(actor, "read", processId, db)`.
-
-  The work is not the default. It is that a process-scoped grant cannot
-  gate a query naming no process: `requireRole(actor, ADMIN_ROLE)` at
-  `src/http/routes.ts:449` answers yes or no without one, and
-  `requirePermission` needs one. Two answers exist.
-
-  Keep it a gate, and
-  `scope=all` without `ADMIN_ROLE` requires an explicit `processId`;
-  that is cheap, and a report reads exactly one process, so it covers
-  the case that pulled this forward. Or make it the predicate this
-  paragraph originally named, restricting the result set to the granted
-  processes. Build the first. The second waits for somebody asking for a
-  list that spans processes, which nobody has.
-
-  A draft-scoped `"author"` permission would let an installation limit who
-  sees and edits which draft. `drafts.process_id` is scopeable — it is the
-  table's own key, named from `PUT /drafts/:processId`'s first save — but
-  every author reaches every draft today.
-
-  The third piece closed 2026-08-19 as `scope-migration-plan-visibility`.
-  The web areas reading `actor.roles` directly was framed as a gap across
-  "the resource views," plural. An audit of every client-side role check in
-  `packages/web` found it real in one place: the Studio Versions screen's
-  "Plan migration" control. Publish and Cancel already rendered
-  unconditionally and let the server's 403 carry the gate. `GET
-  /drafts/:processId` now carries a `canPlanMigration` field, computed from
-  the seam's own `can()`; the Versions screen reads it instead of a role.
-  No general `permissions`-booleans framework landed — the audit found no
-  second case that needed one.
-
-  A directory group name is a principal, not a permission, and that decision
-  is built, not pending: the identity provider is the authority on who
-  someone is and which groups they hold, and the installation is the
-  authority on what a group may do inside it. `claimToRoles`
-  (`src/auth/jwt.ts:81`) passes an issuer's claim through verbatim, so
-  `Actor.roles` needed no new shape. A grant maps a role string to a
-  permission and a scope, `{ type: "process", config: { processId } }` the
-  only type shipped. Encoding the scope into the grant's own name
-  (`system:publish@proc_...`) was considered and dropped 2026-08-16: it would
-  have inverted the split, making the directory admin the authority on this
-  engine's own opaque ids, for an installation that never asked for it.
-  `Actor.roles` stays a `string[]` of free text from either source;
-  `auth_users.roles` stays a `TEXT[]`.
-
-  `openspec/changes/archive/2026-08-27-process-read-permission/` has
-  applied the `read` permission piece above: `src/auth/authorize.ts:78`'s
-  `Permission` type now admits `read`, mapped to `ADMIN_ROLE`.
-- **CEL-readable data-source results.** Runtime option-list resolution for
-  `field.dataSource` is DONE (see `docs/current-state.md`) — but `src/cel/check.ts`
-  still registers a data source at no site (guards/output/transforms), so a CEL
-  reference to one remains a publish error (`unknown variable`). Widening that is
-  a separate, more consequential decision (an unresolvable reference there could
-  only park a wait-state forever or throw mid-delivery); it stays deliberately
-  out of scope until a concrete need for CEL-visible data-source values exists.
-
-  Stage 29 tested that deferral and left it standing. `FieldDef.columnMapping`
-  now writes a picked option's column attributes into ordinary catalog fields,
-  before the transition commits, so a guard reads `data.<key>` as it always
-  has. That is not a data source in the CEL context. The engine resolves the
-  value, checks it against the target field's declared type, and writes it; CEL
-  then reads a field, exactly as it does for a participant's own input. The
-  unresolvable-reference hazard this row names never arises, because nothing
-  CEL evaluates names a data source.
-- **A data-source type whose resolution leaves the database.** Two types now
-  ship: `"static"` and `"db.list"` (the latter reads two engine-owned tables,
-  see `docs/current-state.md`). Neither leaves the engine's own Postgres, so
-  neither exercises a resolution deadline of its own — `"db.list"` inherits the
-  `Bun.sql` connection timeout, and `DataSourceHandlerDef.resolve` carries no
-  deadline seam. The first type that reaches an outside service (e.g. an
-  HTTP-backed data source) owns the timeout, cache and error semantics, which
-  stay open questions not worth deciding speculatively. A deadline would widen
-  `DataSourceContext`, the same additive move `heldValues` already made, so
-  this is a deferral rather than a door that closes.
-- **An assignment strategy whose resolution leaves the database.** Four
-  strategies now ship: `"static"`, `"org.manager-of-starter"`, reading
-  `auth_users.manager_user_id`, `"org.group-members"`, reading the
-  `groups` store, and `"org.actor-from-field"`, reading the instance's own
-  `data` and, for a `group_` value, that same store (see
-  `docs/current-state.md`). None leaves the engine's own
-  Postgres, so none exercises a network failure mode.
-  The resolution deadline (`ASSIGNMENT_RESOLUTION_TIMEOUT_MS`, default 5000),
-  the failure classification and the `assignment.unresolved` event all exist
-  and already bound EVERY strategy. The first one reaching an outside
-  directory inherits them rather than owning them. What it owns is its own
-  retry and cache semantics, and whether a per-strategy deadline earns the
-  granularity. A deferral, not a door that closes.
-
-  This change closes the subprocess-return row-lock question: bounded by the
-  deadline, not hoisted above the lock. A hoist needs an optimistic pre-read
-  plus a sequence re-check. That re-check must still fall back to resolving
-  under the lock when it fails. Hoisting makes the unbounded hold rarer
-  without making it impossible. It also costs a second read of the parent
-  row on every return delivery. Do not re-propose the hoist without a
-  measurement showing the bounded hold is itself the problem.
-- **The editor dock: three decisions that outlived it.** The dock shipped
-  under `studio-editor-dock` (archived), and `studio-step-bench` deleted it.
-  The canvas became a ribbon, so no strip stands below the columns to hold a
-  dock. Three decisions from that design pass outlive both the build log and
-  the dock itself.
-  - The Player stays rejected. Its reason was height, and a step form still
-    needs more than a band gives. `screens/PlayerScreen.tsx` keeps its own
-    route. Do not re-propose it as a panels-screen view without a design
-    that answers the height.
-  - Two candidates stay deferred, not rejected. Each one is a panels-screen
-    view now, not a dock tab. A translation-coverage grid would map every
-    `LocalizedText` against every locale and mark the gaps that the
-    `baseLocale` invariant permits. A CEL scratchpad would evaluate an
-    expression against the draft's field catalog through `cel/check`. The
-    panels screen's index rail is that list now, so neither one grew cheaper
-    or dearer.
-  - The ribbon persists nothing, deliberately. Its open state lives in
-    `EditorArea` component state, so it survives a selection change and
-    resets on a reload. The ribbon claims no key in `saveState.layout`, and
-    that blob is per-draft. One author's expanded ribbon would open for every
-    author of the draft. A later "remember my ribbon" requirement needs a
-    per-author preference store, which no area has today.
 - **"Long text" was rejected as a type and shipped as a control.**
   `field-catalog-redesign` listed the ten `baseFieldType` values under
   friendly names and stopped there, because the contract carried no multiline
@@ -1035,44 +864,6 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   never applies or re-checks a default; it seeds a fresh instance's data
   once, at creation, same as any other explicitly submitted value from that
   point on.
-- **The studio's seven remaining `confirm()` prompts.**
-  `studio-publish-gate-and-report` converted the two on the publish path to
-  the application's own modal dialog. The others stay:
-  `root.tsx:66`, `EditScreen.tsx`'s arrange gate,
-  `ProcessesScreen.tsx`'s draft discard, `TemplatesScreen.tsx`'s template
-  discard, and three in `FieldCatalogPanel.tsx`. Two hardcode English rather
-  than reading the catalog, in `ProcessesScreen.tsx` and
-  `TemplatesScreen.tsx`. The navigation prompt at `root.tsx:66` is the odd one
-  out: `studio-app` states the `confirm()`/`t()` pattern for it as a
-  requirement, so converting it rewrites that requirement and every scenario
-  under it. The other six belong to `studio-form-editor` and `studio-app`, and
-  each carries its own facts, its own dialog copy and its own catalog keys.
-  Deferred 2026-09-02, on capability ownership and effort, not on
-  reversibility: two of the six discard server state and the studio carries no
-  undo.
-- **The 22 failure renders outside the studio edit screen.**
-  `packages/web/src` rendered 27 failure states with no alert role.
-  `studio-publish-gate-and-report` fixed five, all in the edit screen's own
-  chrome, and narrowed the `spa-error-reporting` requirement to that screen to
-  match. The remaining 22 sit in the app, admin and reporting areas, on the
-  studio's other screens, and in the panels the edit screen itself mounts. A
-  later change sweeps them into the same `studio-error-banner` shape and widens
-  that requirement back out. Deferred 2026-09-02: the sweep touches four areas
-  and every one of their capability specs, and the measured defect sat on the
-  publish path.
-- **The header reads "Unsaved changes" after a `PUT` that answered 200.**
-  Observed on the studio edit screen. The path looks correct on the page: a
-  defined save result makes `doSave` call `onSavedBodyChange(draft)`,
-  `EditScreen.tsx` clones that body into `savedBody`, and `dirtyNow` compares
-  the two by serializing both. So either something re-dirties the draft after
-  the save, or the save returned nothing, and both readings need a
-  reproduction. It is a dirty-state failure in `EditorArea`, not a publish
-  failure: it shares no cause with the three defects
-  `studio-publish-gate-and-report` fixed, and no file with them but
-  `EditScreen.tsx`. Deferred 2026-09-02, at a cost of one wasted `PUT`: a
-  permanently dirty draft makes the publish dialog always state its
-  unsaved-changes sentence and always save first, which gives no wrong
-  result.
 - **StyleX adopted as `packages/web`'s and `packages/form-ui`'s styling
   model.** `stylex-phase-0-tooling` installed the compiler, settled the
   token home in `packages/form-ui/src/tokens.stylex.ts`, gave `bun test` a
@@ -1175,3 +966,340 @@ needs a decision. `ROADMAP.md` carries stage-by-stage status.
   its own class-collision test: a compiled StyleX class cannot collide
   across areas the way a hand-written one could, so the risk the test
   guarded is gone, not merely unchecked.
+
+## Decided, not yet built (each needs its own OpenSpec change)
+- **Archivo as the written face.** The Type section of
+  `.claude/rules/design-language.md` names Archivo. `tokens.css` sets both
+  `--font-heading` and `--font-body` to `system-ui, sans-serif`, and neither an
+  `@font-face` rule nor a font link exists anywhere in `packages/web`, so the
+  reader's OS supplies the face today and it differs per platform. The
+  two-weight rule holds either way: 800 for a heading and a button label, 400
+  for everything else, nothing between. Deferred 2026-09-02 — we do not need
+  Archivo yet. When it lands, self-host the woff2: the build-time CSP is
+  `default-src 'self'` with no `font-src`
+  (`packages/web/vite.config.ts:26`), so a self-hosted file needs no CSP change
+  and no `frontend-security-headers` delta, while a Google Fonts link would
+  need `style-src` and `font-src` additions plus that delta. It changes the
+  type of every screen in all four areas, so it needs its own OpenSpec change,
+  a browser check, and a `DESIGN.md` refresh. The studio area's `app.css`
+  reasons from the two weights in a comment; that comment now names the
+  written face rather than Archivo.
+- **Process-scoped permissions: the filter, the draft scope, and the
+  `permissions` booleans.** A design pass on 2026-08-15 settled the shape;
+  `ROADMAP.md` stage 40 carries it in full. The seam shipped 2026-08-15 as
+  `process-scoped-permission-seam`, and the storage half shipped 2026-08-16
+  as `process-scoped-permission-grants`. `can(actor, permission, processId,
+  db)` and `requirePermission` sit in `src/auth/authorize.ts` over three
+  permissions; `src/auth/grants.ts` holds the `permission_grants` table's SQL
+  behind them, and three `system:admin`-gated routes administer a grant.
+  Nobody was blocked by the seam alone, and no account gained or lost access
+  the day storage landed: an installation that writes no grant row keeps
+  every answer it had.
+
+  Three pieces stayed open, each its own later OpenSpec change. Two still
+  are.
+
+  The `scope=all` filter and the reporting aggregates turn a gate into a
+  query predicate. That reaches `instance-query`, not `authorization`.
+
+  Shape decided 2026-08-25, pulled forward by the instance-data-tables
+  entry above, which depends on it. `Permission` gains a fourth member,
+  `read`, with `ADMIN_ROLE` as its reserved short-circuit in the
+  module-private `PERMISSION_ROLE`. `REPORTS_ROLE` stays what it is,
+  "may use the reporting area", and does not become the short-circuit:
+  area access and data scope are two questions, and one role answering
+  both makes every later narrowing impossible. The three reporting
+  aggregates (`handleReportingCycleTime`, `handleReportingBottleneck` and
+  `handleReportingSla`, `src/http/reporting-routes.ts:141`, `:145` and
+  `:149`) each already take a `processId`, so `requireRole(actor,
+  REPORTS_ROLE)` there becomes the role plus `read` on that process.
+
+  That file has grown since this was written. `instance-data-tables` put
+  the saved-report routes beside the aggregates, so twelve handlers now
+  gate on `REPORTS_ROLE`, not three. The report routes carry their own
+  per-report `viewers`/`editors` check plus the process `read` grant, so
+  they need no part of this migration. It stays scoped to the three
+  aggregates above.
+
+  Landed 2026-08-30 as `reporting-aggregate-read-permission`. The three
+  aggregate routes now share `requireReportingAccess`
+  (`src/http/reporting-routes.ts`), which runs `requireRole(actor,
+  REPORTS_ROLE)` then `requirePermission(actor, "read", processId, db)`.
+
+  The work is not the default. It is that a process-scoped grant cannot
+  gate a query naming no process: `requireRole(actor, ADMIN_ROLE)` at
+  `src/http/routes.ts:481` answers yes or no without one, and
+  `requirePermission` needs one. Two answers exist.
+
+  Keep it a gate, and
+  `scope=all` without `ADMIN_ROLE` requires an explicit `processId`;
+  that is cheap, and a report reads exactly one process, so it covers
+  the case that pulled this forward. Or make it the predicate this
+  paragraph originally named, restricting the result set to the granted
+  processes. Build the first. The second waits for somebody asking for a
+  list that spans processes, which nobody has.
+
+  A draft-scoped `"author"` permission would let an installation limit who
+  sees and edits which draft. `drafts.process_id` is scopeable — it is the
+  table's own key, named from `PUT /drafts/:processId`'s first save — but
+  every author reaches every draft today.
+
+  The third piece closed 2026-08-19 as `scope-migration-plan-visibility`.
+  The web areas reading `actor.roles` directly was framed as a gap across
+  "the resource views," plural. An audit of every client-side role check in
+  `packages/web` found it real in one place: the Studio Versions screen's
+  "Plan migration" control. Publish and Cancel already rendered
+  unconditionally and let the server's 403 carry the gate. `GET
+  /drafts/:processId` now carries a `canPlanMigration` field, computed from
+  the seam's own `can()`; the Versions screen reads it instead of a role.
+  No general `permissions`-booleans framework landed — the audit found no
+  second case that needed one.
+
+  A directory group name is a principal, not a permission, and that decision
+  is built, not pending: the identity provider is the authority on who
+  someone is and which groups they hold, and the installation is the
+  authority on what a group may do inside it. `claimToRoles`
+  (`src/auth/jwt.ts:81`) passes an issuer's claim through verbatim, so
+  `Actor.roles` needed no new shape. A grant maps a role string to a
+  permission and a scope, `{ type: "process", config: { processId } }` the
+  only type shipped. Encoding the scope into the grant's own name
+  (`system:publish@proc_...`) was considered and dropped 2026-08-16: it would
+  have inverted the split, making the directory admin the authority on this
+  engine's own opaque ids, for an installation that never asked for it.
+  `Actor.roles` stays a `string[]` of free text from either source;
+  `auth_users.roles` stays a `TEXT[]`.
+
+  `openspec/changes/archive/2026-08-27-process-read-permission/` has
+  applied the `read` permission piece above: `src/auth/authorize.ts:78`'s
+  `Permission` type now admits `read`, mapped to `ADMIN_ROLE`.
+- **CEL-readable data-source results.** Runtime option-list resolution for
+  `field.dataSource` is DONE (see `docs/current-state.md`) — but `src/cel/check.ts`
+  still registers a data source at no site (guards/output/transforms), so a CEL
+  reference to one remains a publish error (`unknown variable`). Widening that is
+  a separate, more consequential decision (an unresolvable reference there could
+  only park a wait-state forever or throw mid-delivery); it stays deliberately
+  out of scope until a concrete need for CEL-visible data-source values exists.
+
+  Stage 29 tested that deferral and left it standing. `FieldDef.columnMapping`
+  now writes a picked option's column attributes into ordinary catalog fields,
+  before the transition commits, so a guard reads `data.<key>` as it always
+  has. That is not a data source in the CEL context. The engine resolves the
+  value, checks it against the target field's declared type, and writes it; CEL
+  then reads a field, exactly as it does for a participant's own input. The
+  unresolvable-reference hazard this row names never arises, because nothing
+  CEL evaluates names a data source.
+- **A data-source type whose resolution leaves the database.** Three types now
+  ship: `"static"`, `"db.list"` and `"instance.query"` (see
+  `docs/current-state.md`). `"db.list"` reads two engine-owned tables;
+  `"instance.query"` reads another process's instances through
+  `queryInstances`. None leaves the engine's own Postgres, so none exercises
+  a resolution deadline of its own — both reading types inherit the `Bun.sql`
+  connection timeout, and `DataSourceHandlerDef.resolve` carries no deadline
+  seam. The first type that reaches an outside service (e.g. an
+  HTTP-backed data source) owns the timeout, cache and error semantics, which
+  stay open questions not worth deciding speculatively. A deadline would widen
+  `DataSourceContext`, the same additive move `heldValues` already made, so
+  this is a deferral rather than a door that closes.
+- **An assignment strategy whose resolution leaves the database.** Four
+  strategies now ship: `"static"`, `"org.manager-of-starter"`, reading
+  `auth_users.manager_user_id`, `"org.group-members"`, reading the
+  `groups` store, and `"org.actor-from-field"`, reading the instance's own
+  `data` and, for a `group_` value, that same store (see
+  `docs/current-state.md`). None leaves the engine's own
+  Postgres, so none exercises a network failure mode.
+  The resolution deadline (`ASSIGNMENT_RESOLUTION_TIMEOUT_MS`, default 5000),
+  the failure classification and the `assignment.unresolved` event all exist
+  and already bound EVERY strategy. The first one reaching an outside
+  directory inherits them rather than owning them. What it owns is its own
+  retry and cache semantics, and whether a per-strategy deadline earns the
+  granularity. A deferral, not a door that closes.
+
+  This change closes the subprocess-return row-lock question: bounded by the
+  deadline, not hoisted above the lock. A hoist needs an optimistic pre-read
+  plus a sequence re-check. That re-check must still fall back to resolving
+  under the lock when it fails. Hoisting makes the unbounded hold rarer
+  without making it impossible. It also costs a second read of the parent
+  row on every return delivery. Do not re-propose the hoist without a
+  measurement showing the bounded hold is itself the problem.
+- **The editor dock: three decisions that outlived it.** The dock shipped
+  under `studio-editor-dock` (archived), and `studio-step-bench` deleted it.
+  The process surface then replaced the edit screen under
+  `studio-guided-surface`, so no strip stands below the tab body to hold a
+  dock. Three decisions from that design pass outlive both the build log and
+  the dock itself.
+  - The Player stays rejected. Its reason was height, and a step form still
+    needs more than a band gives. `screens/PlayerScreen.tsx` keeps its own
+    route. Do not re-propose it as a tab without a design that answers the
+    height.
+  - Two candidates stay deferred, not rejected. Each one would be a tab on
+    the process surface now, not a dock tab. A translation-coverage grid
+    would map every `LocalizedText` against every locale and mark the gaps
+    that the `baseLocale` invariant permits. A CEL scratchpad would evaluate
+    an expression against the draft's field catalog through `cel/check`. The
+    tab row is that list now, so neither one grew cheaper or dearer.
+  - The process surface persists no per-author view state, deliberately. The
+    open tab stands in the address; everything else lives in
+    `ProcessSurface` component state, so it survives a selection change and
+    resets on a reload. No view state claims a key in `saveState.layout`,
+    and that blob is per-draft. One author's stored state would open for
+    every author of the draft. A later "remember my view" requirement needs
+    a per-author preference store, which no area has today.
+- **The studio's seven remaining `confirm()` prompts.**
+  `studio-publish-gate-and-report` converted the two on the publish path to
+  the application's own modal dialog. The others stay:
+  `root.tsx:86`, `EditScreen.tsx`'s arrange gate,
+  `ProcessesScreen.tsx`'s draft discard, `TemplatesScreen.tsx`'s template
+  discard, and three in `FieldCatalogPanel.tsx`. Two hardcode English rather
+  than reading the catalog, in `ProcessesScreen.tsx` and
+  `TemplatesScreen.tsx`. The navigation prompt at `root.tsx:86` is the odd one
+  out: `studio-app` states the `confirm()`/`t()` pattern for it as a
+  requirement, so converting it rewrites that requirement and every scenario
+  under it. The other six belong to `studio-form-editor` and `studio-app`, and
+  each carries its own facts, its own dialog copy and its own catalog keys.
+  Deferred 2026-09-02, on capability ownership and effort, not on
+  reversibility: two of the six discard server state and the studio carries no
+  undo.
+- **The 22 failure renders outside the studio edit screen.**
+  `packages/web/src` rendered 27 failure states with no alert role.
+  `studio-publish-gate-and-report` fixed five, all in the edit screen's own
+  chrome, and narrowed the `spa-error-reporting` requirement to that screen to
+  match. The remaining 22 sit in the app, admin and reporting areas, on the
+  studio's other screens, and in the panels the edit screen itself mounts. A
+  later change sweeps them into the same `studio-error-banner` shape and widens
+  that requirement back out. Deferred 2026-09-02: the sweep touches four areas
+  and every one of their capability specs, and the measured defect sat on the
+  publish path.
+- **The header reads "Unsaved changes" after a `PUT` that answered 200.**
+  Observed on the studio edit screen. The path looks correct on the page: a
+  defined save result makes `doSave` call `onSavedBodyChange(draft)`,
+  `EditScreen.tsx` clones that body into `savedBody`, and `dirtyNow` compares
+  the two by serializing both. So either something re-dirties the draft after
+  the save, or the save returned nothing, and both readings need a
+  reproduction. It is a dirty-state failure in `ProcessSurface`, not a publish
+  failure: it shares no cause with the three defects
+  `studio-publish-gate-and-report` fixed, and no file with them but
+  `EditScreen.tsx`. Deferred 2026-09-02, at a cost of one wasted `PUT`: a
+  permanently dirty draft makes the publish dialog always state its
+  unsaved-changes sentence and always save first, which gives no wrong
+  result.
+- **A Name column on the admin area's Users screen.** A brainstorming session
+  settled the shape on 2026-08-23: a dedicated Name column before Email,
+  display only, with no editor on the screen. The API side is already done.
+  `GET /admin/users` returns the resolved `displayName`
+  (`src/auth/users.ts:151-152`), and
+  `openspec/specs/admin-user-management/spec.md:18` pins it in the list body.
+  The web client drops the field: the `UserSummary` mirror omits it
+  (`packages/web/src/areas/admin/api/types.ts:110`) and `UsersScreen.tsx`
+  renders five columns (`:394`).
+
+  Three files change. The mirror gains `displayName: string`, the screen gains
+  a `<th>`, a per-row `<td>` and an em-dash placeholder on the create row, and
+  the password editor row's `colSpan` grows from 5 to 6
+  (`packages/web/src/areas/admin/screens/UsersScreen.tsx:606`). One catalog
+  key, `users.colName`, lands in the en and de maps of
+  `packages/web/src/i18n/catalogs/admin.ts:119` and `:384`, both reading
+  "Name". The delta belongs to `admin-app`, and `admin-operations-api` stays
+  unchanged, since the API already ships the field. Editing a name stays on
+  the profile page and `PATCH /admin/users/:userId/name`.
+
+  Out of scope: in-place editing on this screen, names in the manager cells,
+  and a name input on the create row. The browser check is `/admin/users` with
+  two accounts, one with a stored name and one whose row falls back to its
+  email. Building it waits on the owner's go-ahead.
+
+## Open from the 2026-08-18 code review (each needs its own OpenSpec change)
+
+All ten items on the Prioritized Action List of
+[`docs/CODE_REVIEW.md`](CODE_REVIEW.md) are open. Each was re-checked against
+the tree on 2026-09-09. That review holds the reasoning and the recommended
+fix. This section records that nothing else tracks them.
+
+- **SEC-1: the subprocess and chaining graph has no cycle check.** Publish-time
+  validation resolves each child and checks every `inputMapping` target
+  (`src/engine/definitions.ts:468`). No walk over the reference graph runs.
+  `validateProcessChaining` (`src/engine/definitions.ts:531`) repeats the
+  shape, and the spawn handler (`src/engine/subprocess.ts:53`) counts no hops.
+  Risk: a published reference cycle spawns instances until storage fills. The
+  oldest of the ten, and the only one the review rates High.
+- **SEC-2: no password floor on any write path.** `requireNonBlank` is the
+  whole check on `POST /admin/users/:userId/password`
+  (`src/http/admin-routes.ts:253`), and the route comment states the position
+  at `:242`. `createUser` (`src/auth/users.ts:65`), `setPassword` (`:139`) and
+  `setPasswordById` (`:235`) apply nothing either. Risk: a one-character
+  password reaches storage for an account that may hold `system:admin`. The
+  review recommends a length-only floor in `src/auth/users.ts`, shared by both
+  routes and the CLI.
+- **SEC-3: an account cannot rotate its own password.** `PATCH /account/me`
+  accepts `displayName` and `locale` alone
+  (`src/http/account-routes.ts:31`), and the file exposes two handlers,
+  `handleGetAccount` (`:62`) and `handlePatchAccount` (`:113`). Every password
+  write runs through `system:admin` or the recovery CLI. Risk: a holder who
+  suspects their password is exposed must ask an operator, who then knows the
+  new value. It shares SEC-2's validator, so one change covers both.
+- **SEC-4: the session token lives in `localStorage`.** `browserStorage` reads
+  the global at `packages/web/src/shell/session.ts:39`, `loadSession` reads
+  the key at `:44`, and `persistSession` writes it at `:65`. Risk: any script
+  running on the origin can read the bearer token. The review treats this as a
+  decision rather than a defect: keep `localStorage` and record why, or move
+  to a `Secure; HttpOnly; SameSite=Strict` cookie and pay a CSRF token on
+  every mutating route. Either outcome belongs in an OpenSpec change.
+- **SEC-5: login rate limiting is per-process and in-memory.** Both windows
+  are `Map`s in process memory (`src/auth/login.ts:54` and `:61`), marked
+  `ponytail:` at `:49`. A second record exists: `PONYTAIL-DEBT.md:84-87` holds
+  that marker, its ceiling and its upgrade path, behind the
+  `ponytail-ledger-fresh` push gate. That ledger is gitignored, so a fresh
+  clone starts without it and `scripts/gates/ponytail-ledger.sh:22` then exits
+  0. Risk: two replicas double every threshold, and a restart clears both
+  windows. The review names the constraint a Postgres replacement must keep:
+  one statement doing the check and the increment together. It also asks for
+  the single-process assumption in `docs/runbooks/deployment.md` until the fix
+  lands (`docs/CODE_REVIEW.md:281`). That runbook stays silent on it, and the
+  `deployment-runbook` capability governs the file, so that sentence needs a
+  delta of its own.
+- **SEC-6: no ceiling on an instance's total attachment bytes.**
+  `MAX_ATTACHMENT_BYTES` bounds one upload, 5 MiB by default
+  (`src/http/routes.ts:99`, enforced at `:359`). `uploadAttachment`
+  (`src/runtime/api.ts:2583`) inserts the row without an aggregate. Risk: one
+  credentialed actor can grow an instance's stored bytes without bound. The
+  review puts this storage bound ahead of a general rate limit: one aggregate
+  query at the existing enforcement point.
+- **TEST-1: nothing asserts that every route refuses an uncredentialed
+  request.** Each handler carries its own `requireRole` or `requirePermission`
+  call, and the route table holds 86 entries (`src/http/server.ts:554`). No
+  test iterates that table. Risk: a route added without a check ships
+  silently, which is the first entry of the OWASP Top 10. The review's fix is
+  a table-driven test plus a named exemption set.
+- **DEP-1: CI runs no SAST and no secret scanning.**
+  `.github/workflows/check.yml` is the only workflow, and it holds no CodeQL
+  or `gitleaks` job. Dependabot covers version drift alone
+  (`.github/dependabot.yml`). Risk: a committed credential or a code-level
+  pattern reaches `main` unflagged. CodeQL is free for a public repository and
+  adds one job.
+- **CQ-1: 81 dead `eslint-disable` directives, and no linter.** The repository
+  tracks no ESLint, Prettier or Biome configuration, so every directive
+  suppresses nothing. `src/schema/compile.ts` holds 53 of the 81 and fourteen
+  other files hold the rest; the review counted ten, all of them in that same
+  file. Sixty-six name `@typescript-eslint/no-explicit-any`, thirteen name
+  `react-hooks/exhaustive-deps`, and two name one rule each. Risk: the
+  comments imply a tool that never runs. Delete them, or adopt a linter and
+  give `bun run check` the style gate it lacks.
+- **ARCH-1: `src/runtime/api.ts` has grown to 2,673 lines.** The review
+  measured 1,384 on 2026-08-18, itself up from 1,269 the pass before. It is
+  still the largest source file in the repository. Next come
+  `packages/web/src/areas/studio/canvas/CanvasView.tsx` (1,791),
+  `src/schema/definition.ts` (1,428) and
+  `packages/web/src/areas/studio/panels/FieldCatalogPanel.tsx` (1,356). Two
+  test files run longer: `test/runtime-api.test.ts` holds 3,128 lines and
+  `test/http.test.ts` holds 2,562. Risk: a reviewer reading one operation
+  carries the whole file, and two agents editing it contend. The review's fix
+  is a split into sibling modules re-exported from `api.ts`, so no import site
+  changes.
+- **Not from that review: `src/schema/compile.ts:1218` miscounts its own
+  list.** The doc comment on `structuralIssues` names five checks that read
+  the body duck-typed, then calls the remainder four. The list returns twelve
+  checks, so seven remain: `checkFieldTree`, `checkViewFieldPatterns`,
+  `checkIdResolution`, `checkLengthBounds`, `checkRedactableFields`,
+  `checkGroupReference` and `checkActorFromFieldReference`. The comment at
+  `:1247`, inside `compileProcessBody`, already says twelve. Risk: a reader
+  trusts the smaller number and misses three checks. The 2026-09-09 documentation
+  audit found it; the next change inside that file carries the fix.

@@ -110,11 +110,12 @@ an identity, and a right-aligned quantity in the mono face, like a
 ledger's amount column. The row's identifying content is a real control. The
 row itself carries no click handler.
 
-Studio's index rail (`PanelsScreen.tsx`'s `panelsRailRow`/`panelsRailName`/
-`panelsRailType` styles) follows a plainer version of the same rule. A
-hairline sits between entries, content stays flush left, and the
-mono-faced count or type name sits right-aligned. It carries no stamp,
-so the rule holds without the first column.
+Studio's entity rail (`EntityTabs.tsx`'s `railRow`/`railName`/`railType`
+styles) follows a plainer version of the same rule. A hairline sits between
+entries, content stays flush left, and the kind word takes the written
+face. It carries no stamp, so the rule holds without the first column. The
+steps rail in `StepsRail.tsx` adds one: a mono number leads and a mono
+count closes.
 
 **The measuring rule**, `reporting/components.tsx`'s `DurationRule`.
 Reports' one chart form is a hairline with an accent fill whose length
@@ -165,8 +166,10 @@ variant becomes a suffix class.
 Three other literal exceptions exist: `canvas-node`, `panzoom-exclude`
 and `.studio-dialog`. `web-styling` pins each to its own non-styling
 reason. Those reasons are a keyboard-focus selector, a pan-library
-contract, and a `::backdrop` the compiler cannot reach. No other
-literal class exists anywhere in `packages/web` or `packages/form-ui`.
+contract, and a `::backdrop` the compiler cannot reach. Neither of the
+first two has a rule in any stylesheet; only `.studio-dialog::backdrop`
+does, in `shell/global.css`. No other literal class exists anywhere in
+`packages/web` or `packages/form-ui`.
 
 **Labels and locales.** Every string a person reads comes from a catalog.
 EN and DE ship in the shell, app, admin and reporting catalogs, each reached

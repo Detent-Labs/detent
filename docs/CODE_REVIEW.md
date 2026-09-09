@@ -58,10 +58,10 @@ password story that has no floor.
 3. **SEC-3 · Medium · No self-service password change.** `PATCH /account/me` writes
    the account's own name and its locale. An account holder who believes their password is
    compromised must reach an operator.
-4. **SEC-4 · Medium · Login rate limiting is per-process and in-memory.** Two
+4. **SEC-5 · Medium · Login rate limiting is per-process and in-memory.** Two
    replicas double every threshold; a restart clears both windows. Marked
    `ponytail:` in the source with the upgrade path named. Carried from SEC-D.
-5. **SEC-5 · Medium · No rate limit or quota on any route but login.** One valid
+5. **SEC-6 · Medium · No rate limit or quota on any route but login.** One valid
    token can drive unbounded instance creation, comment writes and 5 MiB
    attachment uploads.
 6. **TEST-1 · Medium · Nothing asserts that every route requires a credential.**
@@ -85,7 +85,7 @@ of access-control regressions the rest of this section is about.
 | DEP-1 · No dependency monitoring | **Closed** | `.github/dependabot.yml` exists |
 | SEC-B · SPA ships no content CSP | **Closed** | `packages/web/vite.config.ts:23` injects a full policy at build; `src/http/static.ts:39` and `docker/nginx.conf:23` carry the three header-only directives |
 | SEC-C · Session token in `localStorage` | **Open** — carried as SEC-4 | `packages/web/src/shell/session.ts:39` |
-| SEC-D · In-memory login rate limiting | **Open** — carried as SEC-6 | `src/auth/login.ts:54`, still marked `ponytail:` |
+| SEC-D · In-memory login rate limiting | **Open** — carried as SEC-5 | `src/auth/login.ts:54`, still marked `ponytail:` |
 | ARCH-A · `src/runtime/api.ts` size | **Open, worse** — carried as ARCH-1 | 1,384 lines, up from 1,269 |
 
 ## Detailed Findings
