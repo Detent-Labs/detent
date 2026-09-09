@@ -12,7 +12,7 @@ later, once there is something to freeze for.
   brings up the same file, so one edit moves both.
 - The `db` volume mount moves to `pgdata:/var/lib/postgresql`. That parent is
   the image's declared `VOLUME` on 18, and the old path stops being the data
-  directory there. Without this the server writes where nothing mounts.
+  directory there. Without this the 18 entrypoint exits 1 at startup.
 - **BREAKING** for every existing checkout. The jump crosses two majors, and a
   `pgdata` volume written by 16 will not start under 18. Each worktree drops its
   volume once and reseeds. CI keeps no volume and needs nothing.
@@ -54,8 +54,8 @@ Devcontainer and CI:
 - `.devcontainer/devcontainer.json`: the comment describing the `db` service.
 - `.github/workflows/check.yml`: no edit. It already reads the compose file.
 - `test/worktree-env.test.ts`: two asserts guarding the mount and the tag. The
-  bring-up is manual and the failure is silent, so nothing else catches a
-  revert.
+  bring-up is manual, so nothing else catches a revert before it reaches a
+  machine.
 
 Source comments that record measured 16.15 behavior:
 

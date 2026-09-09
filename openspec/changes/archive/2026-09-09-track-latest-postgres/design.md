@@ -20,14 +20,19 @@ metadata on Docker Hub:
 | `postgres:17` | `/var/lib/postgresql/data` | `/var/lib/postgresql/data` |
 | `postgres:18` | `/var/lib/postgresql/18/docker` | `/var/lib/postgresql` |
 
-So the tag on its own does not raise the incompatible-files error a major jump
-usually raises. It does something quieter. The server never reads the mounted
-volume. It runs initdb into `/var/lib/postgresql/18/docker`, and Docker backs
-that path with an anonymous volume from the image's own declaration.
+So the tag on its own stops the container. The 18 entrypoint checks whether
+`/var/lib/postgresql/data` is a mount, and exits 1 when it is. The message
+names this exact fix: "place a single mount at `/var/lib/postgresql`".
 
-The named `pgdata` volume then holds PostgreSQL 16 files nothing reads, and the
-live data sits somewhere nobody named. The tag alone is therefore not the whole
-change. The mount path is the other half.
+The data survives. It sits in the named volume, unread, while the stack refuses
+to start. The tag alone is therefore not the whole change. The mount path is
+the other half.
+
+Corrected after archiving. This section first claimed the tag alone loses the
+database in silence. That reading came from the image's `PGDATA` and `VOLUME`
+metadata rather than a run. Running it gives exit 1 in all three cases tried.
+Those are an empty volume, one written by 16, and 16 opening a volume written
+by 18.
 
 ## Goals / Non-Goals
 
@@ -65,7 +70,7 @@ Alternatives:
 
 - Mount `/var/lib/postgresql/18/docker` directly. This encodes the major in a
   path, under a tag chosen precisely so the major can move. The next release
-  breaks it silently, the way the current mount breaks now.
+  breaks it the way the current mount breaks now.
 - Set `PGDATA=/var/lib/postgresql/data` in the service environment and keep the
   mount. This works, and it fights the image rather than following it. It also
   leaves the repository carrying a workaround whose reason lives two majors back.
