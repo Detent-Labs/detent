@@ -5,7 +5,7 @@
 A step node SHALL print the step's `label`, resolved against the studio's
 content locale with fallback to the draft's `baseLocale`. It SHALL fall back
 to the step's `key` only when that resolution yields nothing. It SHALL fall
-back to the unnamed-step string only when the step also carries no key.
+back to the unnamed-step string only when the step has no key either.
 
 That resolved line is the only text the node body draws. The node SHALL NOT
 draw the step's key on a line of its own. The line SHALL sit centred between
@@ -18,6 +18,8 @@ inspector and the JSON view both carry it.
 Changing the content locale SHALL change what every node prints, for a step
 carrying a translation in the chosen locale.
 
+<!-- antislop: allow trailing-negation -->
+<!-- The base spec's scenario name; openspec validate rejects a renamed one. -->
 #### Scenario: A node prints the label, not the key
 
 - **WHEN** the canvas renders a step keyed `capture` and labelled
