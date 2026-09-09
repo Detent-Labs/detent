@@ -53,7 +53,7 @@
 
 ## 4. Scope
 
-- [ ] 4.1 Confirm the change touched three files, all documentation. This
+- [x] 4.1 Confirm the change touched three files, all documentation. This
       change edits nothing under `src/`, `packages/`, `test/` or
       `openspec/specs/`. The wrong source comment at
       `src/schema/compile.ts:1218-1220` stays for Change E, per `design.md`.
@@ -67,15 +67,15 @@
 
 ## 5. Verification
 
-- [ ] 5.1 Run `bun run typecheck` in the devcontainer and confirm it exits 0.
+- [x] 5.1 Run `bun run typecheck` in the devcontainer and confirm it exits 0.
       It proves no accidental code touch, and nothing more: no test asserts
       anything about the two rule files.
-- [ ] 5.2 Run `bun run build` in the devcontainer and confirm it exits 0.
-- [ ] 5.3 Run the full `bun test` in the devcontainer with `DATABASE_URL` set,
+- [x] 5.2 Run `bun run build` in the devcontainer and confirm it exits 0.
+- [x] 5.3 Run the full `bun test` in the devcontainer with `DATABASE_URL` set,
       and confirm 0 failures. Read the skip count, not the pass count alone. A
       single-file rerun is not the signal. Pipe the run through
       `sh scripts/gates/silent-green.sh` and confirm it exits 0.
-- [ ] 5.4 Check the coverage first, then run the prose gate over the committed
+- [x] 5.4 Check the coverage first, then run the prose gate over the committed
       range. `sh scripts/gates/range.sh < /dev/null` prints `origin/main..HEAD`,
       and `git diff --name-only origin/main..HEAD -- '*.md'` lists
       `.claude/rules/process-contract.md`,
@@ -88,12 +88,12 @@
       exits 0. All three target files exit 0 at the linter today, so each one's
       base count is 0. Judge the result by the process exit code, never by the
       printed line count.
-- [ ] 5.5 Check the same coverage first: `sh scripts/gates/range.sh < /dev/null`
+- [x] 5.5 Check the same coverage first: `sh scripts/gates/range.sh < /dev/null`
       prints `origin/main..HEAD`, and `git diff --name-only origin/main..HEAD`
       lists the three target files. Then run the whitespace gate over the
       committed range:
       `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh`.
       Confirm it exits 0. Both gates read committed content. A run over a tree
       with uncommitted edits checks nothing and reports green.
-- [ ] 5.6 Skip the browser check. No wave in this effort touches
+- [x] 5.6 Skip the browser check. No wave in this effort touches
       `packages/web`, and a rule file is not a screen.

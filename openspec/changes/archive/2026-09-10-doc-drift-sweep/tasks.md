@@ -122,7 +122,7 @@
 
 ## 11. Verification
 
-- [ ] 11.1 Run `bun run typecheck` in the devcontainer and confirm it exits 0.
+- [x] 11.1 Run `bun run typecheck` in the devcontainer and confirm it exits 0.
       It proves no code file was touched by accident. Then run
       `git status --porcelain -- THIRDPARTY.md package.json docs/current-state.md docs/decisions.md ROADMAP.md docs/roadmap-history.md README.md PRODUCT.md .claude/rules/design-language.md openspec/specs/authored-content-localization/spec.md openspec/specs/studio-canvas/spec.md scripts/thirdparty.ts`
       and confirm twelve entries. Naming the paths is what makes the new
@@ -130,15 +130,15 @@
       it, and reports the shared tree's own `VERSION` edit instead. Then run
       `git status --porcelain -- src packages test` and confirm it prints
       nothing.
-- [ ] 11.2 Run `bun run build` in the devcontainer and confirm it exits 0.
-- [ ] 11.3 Run the full `bun test` in the devcontainer, with `DATABASE_URL`
+- [x] 11.2 Run `bun run build` in the devcontainer and confirm it exits 0.
+- [x] 11.3 Run the full `bun test` in the devcontainer, with `DATABASE_URL`
       set, and confirm 0 failures. Read the verdict off a named failure,
       never off a pass count. Capture the run, then hand the capture to the
       gate:
       `bun test 2>&1 | tee /tmp/t.log; sh scripts/gates/silent-green.sh /tmp/t.log`.
       The script reads its path from `$1`, so a bare pipe into it exits 1 with
       "No captured run at". Confirm the gate exits 0.
-- [ ] 11.4 Lint the six unarmed Markdown files on the host, and read the exit
+- [x] 11.4 Lint the six unarmed Markdown files on the host, and read the exit
       code rather than the printed line count. Run
       `python3 "${ANTISLOP:-$HOME/AI/AntiSlop/antislop.py}" check <file>` over
       each of `THIRDPARTY.md`, `docs/decisions.md`, `ROADMAP.md`,
@@ -147,7 +147,7 @@
       does today. At exit 0 the gate scores the file 0 at both ends, so an
       advisory line changes nothing. At exit 1 every printed line counts, and
       a file that exits 0 at the base and 1 at the tip is a rise.
-- [ ] 11.5 Check the worktree bytes of the twelve changed paths. The push
+- [x] 11.5 Check the worktree bytes of the twelve changed paths. The push
       gate reads committed content and this change stays uncommitted here, so
       the gate would see none of it. Run `git ls-files --eol` over the eleven
       tracked paths of task 11.1 and confirm every row reads `w/lf`. Run
@@ -157,7 +157,7 @@
       `tail -c 2 <file>` on each and confirm no file ends in a blank line.
       `scripts/thirdparty.ts` is untracked, so `git ls-files --eol` skips it:
       confirm its line endings with `file scripts/thirdparty.ts`.
-- [ ] 11.6 Measure the four armed files on the host. The devcontainer does not
+- [x] 11.6 Measure the four armed files on the host. The devcontainer does not
       carry the linter, which is why `scripts/gates/prose.sh` resolves it from
       `$ANTISLOP` with a `$HOME`-relative fallback. Run
       `python3 "${ANTISLOP:-$HOME/AI/AntiSlop/antislop.py}" check <file>` on

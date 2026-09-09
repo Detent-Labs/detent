@@ -43,18 +43,18 @@ commits this change's files. The whitespace gate then reads worktree bytes for
 its CR probe (`scripts/gates/whitespace.sh:64`). A gate that finds no file in
 its range prints "nothing to check" and exits 0, which is no pass.
 
-- [ ] 5.1 Run `bun run typecheck` and confirm it exits 0.
-- [ ] 5.2 Run `bun run build` and confirm it exits 0.
-- [ ] 5.3 Run the full `bun test` with `DATABASE_URL` set. Two test files gain
+- [x] 5.1 Run `bun run typecheck` and confirm it exits 0.
+- [x] 5.2 Run `bun run build` and confirm it exits 0.
+- [x] 5.3 Run the full `bun test` with `DATABASE_URL` set. Two test files gain
       an assertion here, so this is a real gate. Confirm 0 fail, and check the
       skip count against the baseline.
       Verify: `bun test 2>&1 | tee /tmp/t.log; sh scripts/gates/silent-green.sh /tmp/t.log` exits 0.
-- [ ] 5.4 Run the prose gate over the pushed range and confirm it exits 0.
+- [x] 5.4 Run the prose gate over the pushed range and confirm it exits 0.
       Verify: `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` exits 0.
-- [ ] 5.5 Run the whitespace gate over the same range and confirm it exits 0.
+- [x] 5.5 Run the whitespace gate over the same range and confirm it exits 0.
       Verify: `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh` exits 0.
-- [ ] 5.6 Confirm the change's own artifacts still validate.
+- [x] 5.6 Confirm the change's own artifacts still validate.
       Verify: `openspec validate spec-drift-corrections --type change --strict` reports valid.
-- [ ] 5.7 Confirm no file under `src/` or `packages/web/src/` changed. No
+- [x] 5.7 Confirm no file under `src/` or `packages/web/src/` changed. No
       browser check applies, because no screen changes.
       Verify: `git diff --stat origin/main..HEAD -- src packages/web/src` prints nothing.
