@@ -1,7 +1,8 @@
 {
   "name": "workflow-engine",
 
-  // Compose-based: the `app` service is the dev container, `db` is PostgreSQL 16.
+  // Compose-based: the `app` service is the dev container, `db` is PostgreSQL
+  // on the latest released major (postgres:latest).
   "dockerComposeFile": "docker-compose.yml",
   "service": "app",
   "workspaceFolder": "/workspace",

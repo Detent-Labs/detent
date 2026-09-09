@@ -175,3 +175,25 @@ test("the established PORT_VITE matches docker-compose.yml's PORT_VITE default, 
   expect(compose).toContain(`http://localhost:\${PORT_VITE`);
   expect(compose).toContain(`http://127.0.0.1:\${PORT_VITE`);
 });
+
+/**
+ * `track-latest-postgres`: PGDATA left `/var/lib/postgresql/data` at
+ * postgres:18, and the image declares the parent `/var/lib/postgresql` as its
+ * volume instead. A mount on the old path raises nothing. The server
+ * initializes a fresh cluster at the new path, Docker backs it with an
+ * anonymous volume from the image's own declaration, and the named volume
+ * keeps files nothing reads. The database is simply gone, with no message.
+ *
+ * Bring-up is manual and the failure is silent, so these two asserts are the
+ * only thing standing between a one-line edit and that loss.
+ */
+test("the db service mounts the parent of PGDATA, so a major bump keeps its data", () => {
+  const compose = readFileSync(COMPOSE_FILE, "utf8");
+  expect(compose).toContain("- pgdata:/var/lib/postgresql\n");
+  expect(compose).not.toContain("/var/lib/postgresql/data");
+});
+
+test("the db service tracks the latest PostgreSQL release", () => {
+  const compose = readFileSync(COMPOSE_FILE, "utf8");
+  expect(compose).toContain("image: postgres:latest");
+});

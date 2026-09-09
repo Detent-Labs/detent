@@ -2460,10 +2460,10 @@ test.skipIf(!DB)("listInstances' version filter excludes another version of the 
 // classes of value cannot name a stored row, and they fail differently.
 //
 // A value past int4 raises. `buildInstanceWhere` emits a leading `::int` cast
-// on the filter's own null test, and that cast is where Postgres 16.15 raises
-// "integer out of range" for 2147483648 and -2147483649. An unmapped
-// PostgresError maps to a 500 with no message (src/http/errors.ts), so this
-// is the class that regressed a 200 into a 500.
+// on the filter's own null test, and that cast is where Postgres 16.15 and
+// 18.6 raise "integer out of range" for 2147483648 and -2147483649. An
+// unmapped PostgresError maps to a 500 with no message (src/http/errors.ts),
+// so this is the class that regressed a 200 into a 500.
 //
 // A fractional value raises nothing at all: `1.5::int` rounds to 2, and
 // `version = 1.5` promotes to numeric and matches nothing. Rejecting it buys
