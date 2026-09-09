@@ -122,6 +122,32 @@ keeps finding real errors: a missed second consumer of `GET /instances`, a
 design resting on a false `InstanceView.assignment` premise, a migration
 ordering derived from files nobody read.
 
+### Apply runs on subagent-driven-development
+The apply phase does not run as an inline loop inside the session's own
+context. `openspec-apply-change` step 6 is replaced by
+`superpowers:subagent-driven-development`, with the change's `tasks.md` as its
+plan file: one fresh implementer subagent per task, a task reviewer after each,
+a fix loop capped at five rounds, a ledger under `.superpowers/sdd/`, and one
+whole-branch review at the end. Every other phase stays OpenSpec's — propose,
+review, verify, archive. The skill's final review is not one of the four checks
+below and replaces none of them.
+
+Four project facts the dispatch must carry, because the skill cannot know them:
+- **The brief is thin.** A `tasks.md` checkbox line is not a task brief. Hand
+  each implementer the task text plus the change's `design.md` and its delta
+  spec under `openspec/changes/<name>/specs/`. Exact values live in those
+  files, never in the dispatch prose.
+- **No single-file test rerun.** The DB suites share one database and truncate
+  in `beforeEach`, so back-to-back runs of one file fail spuriously. An
+  implementer runs the full `bun test` with `DATABASE_URL` set, in the
+  devcontainer, and reads its verdict off a named failure.
+- **A ruling stops at the definition contract.** The skill decides ambiguities
+  itself and ledgers them. That authority ends at `src/schema/definition.ts`
+  and at any rule a delta spec states: those need their own OpenSpec change,
+  never a ruling.
+- **The controller owns the branch.** Create the worktree or branch before
+  Task 1. No subagent calls `EnterWorktree` — one call re-pins every sibling.
+
 ## Verification (the gate before "done")
 Call a change done only after all four checks pass. Report what each one
 printed, not that you ran it.
