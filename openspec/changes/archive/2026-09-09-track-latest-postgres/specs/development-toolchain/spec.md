@@ -50,3 +50,4 @@ therefore never depends on a host binding.
 - **WHEN** the test suite runs outside the devcontainer with `SMTP_HOST`
   unset
 - **THEN** the end-to-end send test skips, and the config-validation and
+  failure-classification tests still run

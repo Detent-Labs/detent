@@ -655,15 +655,15 @@ upgrade a deliberate commit, which re-runs the hash test over `examples/`.
 ### Requirement: The devcontainer provides an SMTP catcher
 
 The devcontainer SHALL run an SMTP catcher service alongside the existing
-Postgres service. It SHALL come from a pinned off-the-shelf image with no
-custom build. The engine service SHALL depend on it and SHALL receive
+Postgres service. The catcher SHALL come from a pinned off-the-shelf image
+with no custom build. The engine service SHALL depend on it and SHALL receive
 `SMTP_HOST`, `SMTP_PORT`, and `SMTP_FROM` pointing at it.
 
 The shared compose file SHALL declare no `ports` entry for it. The Postgres
 service already follows that rule. The bring-up publishes the catcher's web
 interface instead, at the port `worktree-isolation` derives, into
 `.devcontainer/docker-compose.ports.yml`. The bring-up generates that file and
-git ignores it, so the shared file still carries no team-wide host
+git ignores it, so the shared file still has no team-wide host
 binding. A contributor who
 wants an extra binding of their own adds it to the gitignored
 `docker-compose.override.yml`, on the loopback address.
