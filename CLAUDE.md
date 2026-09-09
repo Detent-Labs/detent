@@ -220,7 +220,7 @@ carries the reasoning.
 
 ## Repository layout
 ```
-.devcontainer/             Dockerfile + docker-compose.yml + devcontainer.json (Node 22 + Bun, Postgres 16)
+.devcontainer/             Dockerfile + docker-compose.yml + devcontainer.json (Node 22 + Bun, Postgres latest)
 package.json               Bun workspace root (workspaces: packages/*); engine package's exports map
                             (./schema, ./schema/canonical-json, ./schema/strip-compiled, ./cel/check,
                              ./schema/compile, ./engine/registry, ./engine/registry-check)
@@ -376,8 +376,9 @@ after a substantial change lands.
 - **Run `bun test` with `DATABASE_URL` set, always.** The DB-backed suites are
   `test.skipIf(!DB)` and make up most of the suite. Without the variable
   they skip *silently* and report a green that proves almost nothing. Check the
-  skip count, not just the pass count. Outside the devcontainer, point it at a
-  Postgres 16 with the compose credentials. Don't just remember to check by
+  skip count, not just the pass count. Outside the devcontainer, point it at
+  the major the compose file's `postgres:latest` currently resolves to, with
+  the compose credentials. Don't just remember to check by
   eye: `scripts/gates/silent-green.sh` already reads exactly this, from any
   captured test output, not only a pushed `bun run check` log. Pipe a run
   through it to get the same DATABASE_URL-unset and skip-floor checks the push

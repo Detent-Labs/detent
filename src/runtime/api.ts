@@ -1629,12 +1629,12 @@ export const VERSION_MAX = 2147483647;
  *
  * The range check is not cosmetic. `buildInstanceWhere` emits a leading
  * `::int` cast on the filter's own null test, and that cast is where a value
- * past int4 raises "integer out of range". Measured against Postgres 16.15:
- * 2147483648 and -2147483649 raise there, both edges bind, and the comparison
- * half alone would not raise at all, since it promotes to numeric and matches
- * nothing. An unmapped PostgresError maps to a 500 with no message
- * (src/http/errors.ts). So without this bound `GET /instances` answers 500
- * where the text comparison it replaced answered an empty 200.
+ * past int4 raises "integer out of range". Measured against Postgres 16.15
+ * and 18.6: 2147483648 and -2147483649 raise there, both edges bind, and the
+ * comparison half alone would not raise at all, since it promotes to numeric
+ * and matches nothing. An unmapped PostgresError maps to a 500 with no
+ * message (src/http/errors.ts). So without this bound `GET /instances`
+ * answers 500 where the text comparison it replaced answered an empty 200.
  *
  * The integer check is a different rule with a different reason. A fractional
  * value never raises: `1.5::int` rounds to 2, and `version = 1.5` promotes to
