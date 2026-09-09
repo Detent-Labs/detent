@@ -7,9 +7,9 @@
   nothing
 - [ ] 1.3 Move the label `<text>` baseline from `y={24}` to `y={34}`, and the
   rename `<foreignObject>` from `y={14}` to `y={19}`, per design.md
-- [ ] 1.4 Drop "the key" from the subprocess rule's comment, which lists what
-  the doubled rect sits before; confirm the comment names only the elements
-  still drawn
+- [ ] 1.4 Drop "the key" from the subprocess rule's comment. It lists what the
+  doubled rect sits before. Confirm the comment names only what the node still
+  draws
 
 ## 2. The test
 
@@ -23,9 +23,9 @@
 
 - [ ] 3.1 Run `bun run typecheck`, `bun run build` and the full `bun test` with
   `DATABASE_URL` set, and report what each printed
-- [ ] 3.2 Open a draft's canvas in a real browser against the production build,
-  confirm a step node draws one centred line, and confirm a double-click opens
-  the rename field over that line without the text jumping
+- [ ] 3.2 Open a draft's canvas in a real browser, against the production
+  build. Confirm a step node draws one centred line. Confirm a double-click
+  opens the rename field over that line, with no jump
 - [ ] 3.3 Run `/impeccable critique /studio/drafts/<id>/canvas` and
   `/impeccable audit` on the same route, per the Conventions rule
 - [ ] 3.4 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`
