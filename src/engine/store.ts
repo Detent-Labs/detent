@@ -291,10 +291,10 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   // a query MAY use instead of a jsonb ->> lookup. GENERATED ALWAYS ... STORED
   // rather than a dual write: it cannot drift from body, which a second
   // write path could. startedAt is `text`, not `timestamptz` — verified
-  // against Postgres 16.15 that `(body->>'startedAt')::timestamptz` raises
-  // "generation expression is not immutable" (the timestamptz input path
-  // reads session DateStyle/TimeZone). Every writer produces startedAt as
-  // `new Date().toISOString()`, a fixed-width ISO-8601 string in UTC, so a
+  // against Postgres 16.15 and 18.6 that `(body->>'startedAt')::timestamptz`
+  // raises "generation expression is not immutable" (the timestamptz input
+  // path reads session DateStyle/TimeZone). Every writer produces startedAt
+  // as `new Date().toISOString()`, a fixed-width ISO-8601 string in UTC, so a
   // text column ranges and sorts the same way a timestamptz column would.
   await db`ALTER TABLE instances ADD COLUMN IF NOT EXISTS process_id text GENERATED ALWAYS AS ((body->>'processId')) STORED`;
   await db`ALTER TABLE instances ADD COLUMN IF NOT EXISTS version integer GENERATED ALWAYS AS (((body->>'version')::integer)) STORED`;
@@ -651,11 +651,12 @@ async function initInstanceAudit(db: SQL): Promise<void> {
   `;
 
   // Membership is what lets this role SET ROLE detent_audit_owner below —
-  // membership alone does not carry SET on Postgres 16. No ADMIN OPTION:
-  // Postgres 16 already gives the creator admin option, and re-requesting it
-  // raises invalid_grant_operation (0LP01), which this trap does not catch —
-  // harmless, since a role that just created detent_audit_owner already holds
-  // admin option and never takes this branch for that reason.
+  // membership alone does not carry SET on Postgres 16.15 or 18.6. No ADMIN
+  // OPTION: Postgres already gives the creator admin option, and re-requesting
+  // it raises invalid_grant_operation (0LP01) when the grantor is not a
+  // superuser, which this trap does not catch — harmless, since a role that
+  // just created detent_audit_owner already holds admin option and never
+  // takes this branch for that reason.
   await db`
     DO $$ BEGIN
       GRANT detent_audit_owner TO current_user WITH INHERIT FALSE;
