@@ -108,7 +108,23 @@ const styles = stylex.create({
     alignItems: "center",
     gap: space.s2,
   },
+  // Out of flow, beneath the button and aligned to its right edge. The
+  // trailing cluster is right-aligned behind `marginLeft: auto`, so anything
+  // in flow beside Publish pushes the whole cluster left. Measured at 1280px
+  // before this: Publish moved 167px the instant a blocker appeared, and the
+  // reason met the button's right edge with no gap. An author reaching for
+  // Publish had it slide out from under the pointer, on an edit made in
+  // another tab. The permission reason rendered in the same place, but only
+  // for an actor who could not click Publish anyway.
+  publishGate: {
+    position: "relative",
+  },
   publishReason: {
+    position: "absolute",
+    insetBlockStart: "100%",
+    insetInlineEnd: 0,
+    marginBlockStart: space.s1,
+    whiteSpace: "nowrap",
     fontFamily: fonts.body,
     fontSize: 11,
     textTransform: "uppercase",
@@ -317,7 +333,7 @@ export function PublishNavControl({
 }) {
   const gate = publishAvailability(canPublish, blocked);
   return (
-    <div role="group">
+    <div role="group" {...stylex.props(styles.publishGate)}>
       <button
         ref={triggerRef}
         type="button"

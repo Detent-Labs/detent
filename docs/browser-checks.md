@@ -2675,15 +2675,23 @@ away from the tab row hears the transition through a live region. A compiled
 class hashes, so no markup assertion can name a weight. An announcement needs
 a real assistive technology to judge.
 
-Open a draft with no open issue, on the Paths tab. Introduce a blocking issue
-there, such as a step that leads nowhere. Pass: the Checks count turns bold
-as well as red. Every other tab's count keeps its ordinary weight. Switch to
-the dark scheme and repeat.
+Open a draft with no open issue, on the Canvas tab. The Paths tab has no
+control that introduces one, since it is a read-only overview. Add a step
+from the palette. Leave it unconnected, so it leads nowhere.
+
+Pass: the Checks count turns bold as well as red, while the Canvas tab stays
+open. Every other tab's count keeps its ordinary weight. Switch to the dark
+scheme and repeat.
 
 Run a screen reader and repeat the same edit. NVDA, VoiceOver or Orca each
 work. Pass: the reader speaks the blocking-issue sentence once, without
 moving focus. Fix the issue. Pass: the reader stays silent, since only the
 clear-to-blocker edge announces.
+
+Introduce a second blocker after that fix. Pass: the reader speaks the
+sentence again. The falling edge empties the region first. Both edges write
+one constant, so a second rise would otherwise re-set identical text and
+announce nothing.
 
 ### The tab row's roving-tabindex keyboard model (`studio-checks-signal-reach`)
 
@@ -2708,14 +2716,21 @@ its body stands. Repeat with Space. Pass: Space opens it the same way.
 ### Publish's pre-click blocked reason (`studio-checks-signal-reach`)
 
 Publish stays available while a blocking issue stands in the draft. Text
-beside it now says so before the click. Whether the two reasons read apart
+beneath it now says so before the click. Whether the two reasons read apart
 from each other is a visual judgment.
 
 Open a draft holding a blocker, as an actor with the publish permission.
-Pass: a red line beside Publish names the open issue as the blocker. Publish
-itself stays enabled, and a click still opens the confirmation dialog. Open
-the same draft as an actor lacking the permission. Pass: the reason reads in
-the muted tone instead, and Publish reports itself disabled.
+Pass: a red line beneath Publish names the open issue as the blocker.
+Publish itself stays enabled, and a click still opens the confirmation
+dialog.
+
+Watch the buttons while the blocker appears. Pass: Publish and every button
+beside it hold the position they held. The line sits out of flow, aligned to
+the button's trailing edge, so it moves nothing. It measured a 167-pixel
+shift before that.
+
+Open the same draft as an actor lacking the permission. Pass: the reason
+reads in the muted tone instead, and Publish reports itself disabled.
 
 ### The structurally-invalid banner's color (`studio-checks-signal-reach`)
 
@@ -2738,3 +2753,7 @@ Open the Checks tab on a draft holding issues from two sources. Pass: each
 row prints its source as a small uppercase mono label, with no brackets. The
 group headings above them read in that same treatment. Open a step page
 carrying its own issues. Pass: the per-entity list reads the same way.
+
+Compare the two weights. Pass: the rail's headings and the list's sources
+both read at weight 400. The rail composes the label onto an `<h3>`, whose
+user-agent default is bold, so the shared style states the weight itself.
