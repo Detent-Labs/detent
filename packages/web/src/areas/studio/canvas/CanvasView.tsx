@@ -152,10 +152,41 @@ const styles = stylex.create({
     stroke: colors.border,
     strokeWidth: 1,
   },
+  // The label's outer box. It positions the one or two lines it holds, which
+  // `nodeLabel` cannot do for itself: the clamp below needs
+  // `display: -webkit-box`, and `align-items` reaches neither that nor any
+  // other non-flex container.
+  //
+  // `flex-start` over `center`, because centring gives a one-line label and a
+  // two-line one different first baselines, and a row of nodes is the
+  // strongest alignment this surface has. The 20 puts that shared baseline
+  // back on 34, where the old `<text y={34}>` drew it, so a one-line label
+  // renders exactly where it always did. Two clamped lines measure 39, so
+  // they close at 59 inside the 60-unit box.
+  nodeLabelBox: {
+    boxSizing: "border-box",
+    height: "100%",
+    paddingTop: 20,
+    display: "flex",
+    alignItems: "flex-start",
+  },
+  // Two lines, then an ellipsis. `-webkit-line-clamp` needs all four
+  // declarations together, and it draws the ellipsis itself, so no
+  // `text-overflow` belongs here.
+  //
+  // `overflow-wrap: anywhere` is what makes the clamp reach German. A
+  // compound is one token, and a token wider than the box does not break on
+  // its own, so the block stayed one line, never exceeded two, and got cut
+  // mid-glyph with no ellipsis at all.
   nodeLabel: {
     fontFamily: fonts.body,
     fontSize: 13,
-    fill: colors.text,
+    color: colors.text,
+    display: "-webkit-box",
+    WebkitBoxOrient: "vertical",
+    WebkitLineClamp: 2,
+    overflow: "hidden",
+    overflowWrap: "anywhere",
   },
   // Merges app.css's two declarations for this selector (the shared
   // display/fill/stroke/pointer-events block plus its own stroke-width/
@@ -410,6 +441,51 @@ function isPoint(value: unknown): value is Point {
 function trackPointer<T extends object>(drag: T | null, setDrag: (next: T) => void, patch: Partial<T>): void {
   if (!drag) return;
   setDrag({ ...drag, ...patch });
+}
+
+/**
+ * A step node's label, over one or two lines, with the full text on hover
+ * where the clamp cut it.
+ *
+ * The `title` is the only reveal a sighted pointer user has, so it carries a
+ * meaning worth keeping: a tooltip on every node, cut or not, stops saying
+ * "there is more text here". It therefore rides the measurement rather than
+ * the label.
+ *
+ * The state opens `true` so the server-rendered markup and the first paint
+ * both carry it, and the effect clears it on a label that fits. The reverse
+ * default would flash a node with no tooltip and render SSR markup that
+ * contradicts the client.
+ */
+function NodeLabel({ label }: { label: string }): React.JSX.Element {
+  const line = useRef<HTMLDivElement | null>(null);
+  const [clipped, setClipped] = useState(true);
+  useLayoutEffect(() => {
+    const el = line.current;
+    if (!el) return;
+    // A `ResizeObserver` and not a one-shot measurement, because the box
+    // changes without the label changing. Every tab body stays mounted and
+    // `EditScreen`'s `tabBodyHidden` is `display: none`, so a label edited on
+    // the Steps tab re-renders while the canvas lays out at zero. Measured on
+    // a one-shot: the node came back to a visible canvas clamped and with no
+    // title. The zero guard leaves the state alone until the observer is
+    // called again with a real box.
+    const measure = (): void => {
+      if (el.clientHeight === 0) return;
+      setClipped(el.scrollHeight > el.clientHeight || el.scrollWidth > el.clientWidth);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [label]);
+  return (
+    <div {...stylex.props(styles.nodeLabelBox)} aria-hidden="true" title={clipped ? label : undefined}>
+      <div ref={line} {...stylex.props(styles.nodeLabel)}>
+        {label}
+      </div>
+    </div>
+  );
 }
 
 /**
@@ -1237,12 +1313,20 @@ export function CanvasView({
             />
           </foreignObject>
         ) : (
-          // The node's one body line. Baseline 34 puts a 13px face's optical
-          // middle on the node's own middle; the rename field above centres
-          // its 22-unit box on the same 30.
-          <text x={10} y={34} {...stylex.props(styles.nodeLabel)}>
-            {label}
-          </text>
+          // The node's body, over one or two lines. All four attributes are
+          // load-bearing: a `<foreignObject>` with no `height` draws nothing,
+          // and the outer `<div>` resolves its own `height: 100%` against this
+          // rect. The 26 units on the right clear the connect handle, whose
+          // circle reaches 7 units inward from `NODE_WIDTH`.
+          <foreignObject
+            x={10}
+            y={0}
+            width={NODE_WIDTH - 36}
+            height={NODE_HEIGHT}
+            className="panzoom-exclude"
+          >
+            <NodeLabel label={label} />
+          </foreignObject>
         )}
         {isTerminal && (
           <g transform={`translate(${NODE_WIDTH - 22}, -12) rotate(-8)`}>
