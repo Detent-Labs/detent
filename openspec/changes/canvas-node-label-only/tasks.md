@@ -26,7 +26,7 @@
 - [x] 3.2 Open a draft's canvas in a real browser, against the production
   build. Confirm a step node draws one centred line. Confirm a double-click
   opens the rename field over that line, with no jump
-- [ ] 3.3 Run `/impeccable critique /studio/drafts/<id>/canvas` and
+- [x] 3.3 Run `/impeccable critique /studio/drafts/<id>/canvas` and
   `/impeccable audit` on the same route, per the Conventions rule
 - [x] 3.4 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`
   and `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh`,
