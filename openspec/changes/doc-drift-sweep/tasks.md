@@ -1,6 +1,6 @@
 ## 1. The dependency generator
 
-- [ ] 1.1 Add `scripts/thirdparty.ts` from report 02's C7, verbatim at 59
+- [x] 1.1 Add `scripts/thirdparty.ts` from report 02's C7, verbatim at 59
       lines. Register it in the root `package.json` scripts block, beside
       `seed`, as `"thirdparty": "bun run scripts/thirdparty.ts"`. Run it in
       the devcontainer, after `bun install`: it reads licenses off disk and
@@ -10,7 +10,7 @@
 
 ## 2. THIRDPARTY.md
 
-- [ ] 2.1 Apply report 02's C1 through C6, from that report's byte-exact
+- [x] 2.1 Apply report 02's C1 through C6, from that report's byte-exact
       anchors. Produce the table with `bun run thirdparty --write`, never by
       hand. Then run the script with no `--write` and compare its stdout
       against the committed table. The two must match byte for byte. Verify:
@@ -24,7 +24,7 @@
 
 ## 3. docs/current-state.md
 
-- [ ] 3.1 Apply report 04's C1 through C16, from that report's byte-exact
+- [x] 3.1 Apply report 04's C1 through C16, from that report's byte-exact
       anchors. Apply C1 through C13 and C16 first, then insert C14 and C15,
       which shift every line below them. C3 needs its two-line anchor, which
       is what separates `:1816` from `:1857`. Do not expand
@@ -41,7 +41,7 @@
 
 ## 4. docs/decisions.md
 
-- [ ] 4.1 Apply report 05's C1 through C8b, from that report's byte-exact
+- [x] 4.1 Apply report 05's C1 through C8b, from that report's byte-exact
       anchors. Run C5's structural move first, on the current-tree line
       numbers. The other eight replacements are position-independent, so
       apply them afterwards. Keep the seven moved entries in their original
@@ -57,7 +57,7 @@
 
 ## 5. ROADMAP.md
 
-- [ ] 5.1 Apply report 06's C1, C2 and C3, from that report's byte-exact
+- [x] 5.1 Apply report 06's C1, C2 and C3, from that report's byte-exact
       anchors. Run C2 before C3, or stage 44's text is gone before its row
       exists. Task 6.1 lands in the same commit, since `ROADMAP.md:10-12`
       binds a finished stage to a row plus a history entry. Verify:
@@ -67,7 +67,7 @@
 
 ## 6. docs/roadmap-history.md
 
-- [ ] 6.1 Apply report 06's C4, C5 and C6, from that report's byte-exact
+- [x] 6.1 Apply report 06's C4, C5 and C6, from that report's byte-exact
       anchors. Entry 44 goes between 42 and 45. Entries 61 and 62 append, in
       that order. Write the stage 62 entry from the shipped rule, never from
       its proposal's plan. Verify: `grep -q "^44\." docs/roadmap-history.md`
@@ -76,7 +76,7 @@
 
 ## 7. README.md
 
-- [ ] 7.1 Apply report 07's C1, C2 and C3, from that report's byte-exact
+- [x] 7.1 Apply report 07's C1, C2 and C3, from that report's byte-exact
       anchors. C2 inserts a whole grid row, so apply it after C1. Verify:
       `grep -q tenancy README.md` exits 0. Verify:
       `grep -q livez README.md` exits 0. Verify:
@@ -85,7 +85,7 @@
 
 ## 8. PRODUCT.md
 
-- [ ] 8.1 Apply report 07's C4, C5 and C6, from that report's byte-exact
+- [x] 8.1 Apply report 07's C4, C5 and C6, from that report's byte-exact
       anchors. Anchor on text: the audit's three line numbers are four lines
       early. Verify: `grep -q "Nine example" PRODUCT.md` exits 0. Verify:
       `grep -q it-onboarding PRODUCT.md` exits 0. Verify:
@@ -94,7 +94,7 @@
 
 ## 9. .claude/rules/design-language.md
 
-- [ ] 9.1 Apply report 07's C7 and C8, from that report's byte-exact anchors.
+- [x] 9.1 Apply report 07's C7 and C8, from that report's byte-exact anchors.
       Leave the pre-existing clause `It carries no stamp` byte-identical:
       rewriting it is what holds this file's prose delta at zero. Keep the
       word `issue` out of the file, since `error` already names that concept
@@ -106,14 +106,14 @@
 
 ## 10. The two live specs
 
-- [ ] 10.1 Apply report 07's C9 to
+- [x] 10.1 Apply report 07's C9 to
       `openspec/specs/authored-content-localization/spec.md`. One word
       changes, on line 127. Verify:
       `grep -q StepsRail openspec/specs/authored-content-localization/spec.md`
       exits 0. Verify:
       `grep -q StepsPanel openspec/specs/authored-content-localization/spec.md`
       exits 1.
-- [ ] 10.2 Apply report 07's C10 to `openspec/specs/studio-canvas/spec.md`.
+- [x] 10.2 Apply report 07's C10 to `openspec/specs/studio-canvas/spec.md`.
       One word changes, on line 102. Leave `PathsPanel` alone in the same
       sentence, since that component still exists. Verify:
       `grep -q StepsRail openspec/specs/studio-canvas/spec.md` exits 0.

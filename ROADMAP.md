@@ -267,50 +267,7 @@ Specs: `development-toolchain`, `devcontainer-preflight`, `worktree-isolation`,
 
     Specs: `definition-contract`, `runtime-api`, `cel-expressions`.
 
-44. **Technical (system-only) field marker: DONE.** Raised 2026-08-19 in
-    conversation, while verifying the `gate-required-readonly-conflict`
-    change (landed 2026-08-18, commit `f4c2db1`) live on `detent.org`. That
-    change gates `required` and `readonly` against each other one-way, but
-    only while nothing else in the draft writes the field (`writtenByOther`,
-    `draft/view-flags.ts`). Live testing on `loan_application` found the
-    gate correctly stays off for `result`: the `check` step's
-    `subprocess.outputMapping` writes it
-    (`field_l_result: { src: "child.outcome", lang: "cel" }`), so
-    `writtenFieldCounts` counts it as written and the gate does not fire.
-    That was the earlier change's own designed behavior, not a defect — but
-    `result` is written only by the engine and never by a participant, on
-    any step, so offering it as an editable, `required` field on any form is
-    arguably the wrong shape regardless of step order. This change (`technical-
-    field-marker`) closes that gap with a declared marker.
-
-    `FieldDef` gained `technical?: boolean`. A `technical` field must not be
-    `type: "group"`, and a view entry naming one must declare neither
-    `required` nor `readonly`, literal or CEL — both checked at publish
-    (`compile.ts::checkTechnicalFields`), never as a Zod refinement, since
-    `definition.ts` also deserializes stored immutable bodies. The engine
-    forces `required: false, readonly: true` for a technical field on every
-    step, in `resolveFields`, mirroring the `type: "group"` precedent
-    already there. A submission naming a technical field is rejected with
-    the existing `readonly-field` issue.
-
-    The studio ships the marker without inference: a Technical checkbox on
-    the field catalog's Field tab, reaching a group's child too. Checking it
-    clears every stale `required`/`readonly` view key the field carries,
-    behind a confirmation naming the count. The form editor's strip omits
-    the `required`/`readonly` controls for a technical field; the field
-    matrix disables the equivalent cell controls and marks the row header.
-    A new checks-rail finding reports the inverse case — a technical field
-    no structural source writes — non-blocking, and anchored on the field
-    rather than a step.
-
-    Inferring "technical" from usage, and step-order/reachability-aware
-    validation, are both explicitly deferred; see this stage's own history
-    entry for the reasoning.
-
-    Specs: `definition-contract`, `runtime-api`, `studio-app`,
-    `studio-form-editor`, `studio-checks-rail`.
-
-45. **StyleX styling model for `packages/web`/`packages/form-ui`: PHASES 0-5
+63. **StyleX styling model for `packages/web`/`packages/form-ui`: PHASES 0-5
     DONE.** `stylex-phase-0-tooling` installed the
     compiler, split `tokens.css`'s element rules into `global.css`, moved
     the design-token module to `packages/form-ui`, gave `bun test` a
@@ -394,6 +351,7 @@ Stage detail: `docs/roadmap-history.md`. Same numbers, same order.
 | 39 | Process chaining | `process-chaining` | `process-chaining`, `cross-process-validation` |
 | 41 | Field matrix | `studio-view-flags-module`, `studio-field-matrix` | `studio-app`, `studio-canvas`, `spa-accessibility`, `studio-form-editor`, `studio-checks-rail` |
 | 42 | Field catalog and data sources as list and detail | `panels-list-and-detail` | `studio-app` |
+| 44 | Technical (system-only) field marker | `technical-field-marker` | `definition-contract`, `runtime-api`, `studio-app`, `studio-checks-rail`, `studio-form-editor` |
 | 45 | Auto-derive `key` from `label` in the studio | `auto-derive-key-from-label` | `studio-canvas`, `studio-app` |
 | 46 | Instance audit log: append-only, hash-chained field history | `instance-audit-log-chain` | `admin-operations-api`, `data-retention`, `instance-audit-log`, `persistence` |
 | 47 | Cross-process instance query core (`queryInstances`) | `instance-query-core` | `admin-app`, `http-wrapper`, `instance-data-query`, `instance-query`, `persistence` |

@@ -141,6 +141,25 @@ describe("The steps rail's order and numbering", () => {
   });
 });
 
+/**
+ * `spa-accessibility`: "A disclosure is a button that carries its expanded
+ * state". A rail row is not a disclosure. It opens the step page, so it takes
+ * `aria-current` and never `aria-expanded`.
+ */
+describe("A steps rail row selects rather than discloses", () => {
+  it("gives each row a button that carries `aria-current` and no `aria-expanded`", () => {
+    // The row's own button is the one carrying neither a move control's
+    // `aria-label` nor an add control's shared `btn` class.
+    const rows = buttonTags(render({ current: "step_b" })).filter(
+      (b) => !b.includes("aria-label=") && !b.includes("btn-secondary"),
+    );
+
+    expect(rows).toHaveLength(3);
+    expect(rows.filter((b) => b.includes('aria-current="true"'))).toHaveLength(1);
+    for (const row of rows) expect(row).not.toContain("aria-expanded");
+  });
+});
+
 describe("A steps-rail row's summary line", () => {
   it("names who works a task step and how many fields its form carries", () => {
     const html = render();

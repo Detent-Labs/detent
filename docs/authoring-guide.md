@@ -479,7 +479,7 @@ The example has seven steps. `capture` is the initial step. `booked` and
 
 What a step shows. A view entry either names a catalog field or stands alone
 as a note. A field entry overrides how this step presents that field:
-visible, required, readonly, its span, its order, its group.
+visible, required, readonly, its span, its group.
 
 Requiredness lives in the view, never in the catalog. One step can demand a
 field that the next step only displays.

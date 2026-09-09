@@ -229,6 +229,21 @@ Stage-by-stage status is in `ROADMAP.md`.
   anchors on the field itself (`entityType: "field"`), not a step, since
   `technical` is a catalog-level declaration. `runValidation` calls it
   beside `checkViewFlags`.
+
+  `draft/view-flags.ts` reaches the engine for one thing. Its
+  `writtenFieldCounts` imports `computeDominatorSets` and `dominates` from
+  `workflow-engine/schema/step-graph`. That entry in the exports map is
+  backed by `src/schema/step-graph.ts`. The module answers one question: does
+  step D lie on every path from `initialStep` to step S. The compile pass's
+  `checkUnsatisfiableRequiredReadonly` reads the same two functions, so the
+  two can never disagree.
+
+  It is an iterative dataflow fixpoint rather than a dominator-tree library.
+  The authored graph is small and may hold a cycle, such as a rejection path.
+  Every step but `initialStep` starts at the full id set, and a step with no
+  predecessor keeps it. That is the vacuous reading of dominance rather than a
+  gap. Both functions are duck-typed, so one runs on a parsed `ProcessBody`
+  and on a partial `Draft`.
 - Publish validation consolidation (`validation-sequence-module`): a new
   top-level module, `src/validate.ts`, exported as `./validate`. It owns the
   publish-time stage order. `publishBody` (`src/engine/definitions.ts`) and
@@ -462,7 +477,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   `AutomaticCascadeLoop` always agree on why the instance is parked.
 - Runtime API Layer (`src/runtime/api.ts`, `test/runtime-api.test.ts`): the
   first library boundary a UI can call without touching engine internals.
-  It has three operations, and no HTTP transport. It has no auth/actor
+  It has no HTTP transport of its own. It has no auth/actor
   resolution either, since every function takes an explicit `actor: Actor`,
   trusted as given. It has no assignment/claim enforcement, since
   `AssignmentState` is declared in the schema but unenforced everywhere,
@@ -1082,8 +1097,9 @@ Stage-by-stage status is in `ROADMAP.md`.
   resolved options like a static-`options` field. Only `"static"` shipped in
   v1; the registry mechanism held more without a built-in for each. Three
   types ship as of `instance-query-data-source`: `"static"` (this entry),
-  `"db.list"` (below), and `"instance.query"`. The third type's option list is
-  another process's own running instances. See `docs/decisions.md`'s
+  `"db.list"` (below), and `"instance.query"`. The third type's handler is
+  `src/engine/instance-query-source.ts`, and its option list is another
+  process's own running instances. See `docs/decisions.md`'s
   "Aggregated data source" entry and `examples/employee-onboarding.json`.
   CEL-readable data-source results remain untouched and out of scope — a CEL
   reference to a data source is still a publish error (see "Decided, not yet
@@ -1786,7 +1802,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   field edit remain panel-only.
 - Canvas grid snapping (`packages/web/src/areas/studio/canvas/geometry.ts`,
   `canvas/layout.ts`, `canvas/CanvasView.tsx`, `screens/EditScreen.tsx`,
-  `areas/studio/app.css`): a step lands on the lattice the author can see.
+  `form-ui/tokens.stylex`): a step lands on the lattice the author can see.
 
   `GRID_STEP` is 20 and `snapToGrid` rounds to the nearest point. Three sites
   call it: a drag's release, the drag preview, and the palette drop. All three,
@@ -1800,8 +1816,8 @@ Stage-by-stage status is in `ROADMAP.md`.
   The grid tracks the transform. `CanvasView` subscribes to `panzoomchange`
   and writes `--canvas-grid-size`, `--canvas-grid-offset-x` and
   `--canvas-grid-offset-y` onto `.canvas-wrap`, reading the scale and pan from
-  the event's own `detail`. The stylesheet reads all three, so the gradient and
-  its colour role stay in CSS.
+  the event's own `detail`. `CanvasView.tsx`'s `wrap` style reads all three,
+  and draws the dot gradient from the `border` token.
 
   The grid still sits on the wrap rather than the SVG, for the reason it always
   did: Panzoom transforms the SVG, so a grid drawn there shrinks with the zoom.
@@ -1813,7 +1829,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   its first drag. No step size both matched the drawn dots and divided the old
   four.
 - Canvas multi-select (`packages/web/src/areas/studio/canvas/selection.ts`,
-  `canvas/CanvasView.tsx`, `screens/EditScreen.tsx`, `areas/studio/app.css`):
+  `canvas/CanvasView.tsx`, `screens/EditScreen.tsx`, `form-ui/tokens.stylex`):
   the canvas selects a set of steps, not one.
 
   `ProcessSurface` holds `selectedStepIds: string[]`. A set of one drives the
@@ -1854,7 +1870,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   which is stage 37's rule applied unchanged. Every selection write stays at
   pointer-up; pointer-down only decides which steps the gesture moves.
 - Canvas edge routing (`packages/web/src/areas/studio/canvas/geometry.ts`,
-  `canvas/CanvasView.tsx`, `screens/EditScreen.tsx`, `areas/studio/app.css`): a
+  `canvas/CanvasView.tsx`, `screens/EditScreen.tsx`, `form-ui/tokens.stylex`): a
   path draws as an orthogonal route, under one canvas-wide style.
 
   `routeEdge` returns the route's corner points, and the count reads off both
@@ -2003,7 +2019,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   both directions of that ordering impossible to satisfy at once.
 - Canvas keyboard traversal (`packages/web/src/areas/studio/canvas/traversal.ts`,
   `canvas/CanvasView.tsx`, `screens/EditScreen.tsx`, `i18n/catalogs/studio.ts`,
-  `areas/studio/app.css`, `studio-canvas`, `spa-accessibility`): the canvas
+  `form-ui/tokens.stylex`, `studio-canvas`, `spa-accessibility`): the canvas
   answers the keyboard, not the pointer alone. The `<svg>` root carries
   `role="application"`, an `aria-label` and a `tabindex` of its own. That role
   is load-bearing: browse mode otherwise consumes an arrow key before the
@@ -2061,7 +2077,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   what keeps focus distinct from selection. A coincident 2px stroke would
   recolor the line, which is what selection already draws.
 
-  The node and the path suppress the bare `:focus-visible` outline `tokens.css`
+  The node and the path suppress the bare `:focus-visible` outline `global.css`
   gives every element. Chrome and Firefox both paint it on an SVG element, so a
   focused node would otherwise draw two rings. The `<svg>` root and each
   disclosure button keep it, since neither draws a ring of its own. The node
@@ -3011,9 +3027,10 @@ Stage-by-stage status is in `ROADMAP.md`.
 
   `packages/web/test/boundaries.test.ts` enforces the one structural rule by
   scanning source: no file under `src/areas/<a>/` imports from
-  `src/areas/<b>/`, and no class name is defined in two areas' stylesheets
-  (measured before the merge: 153 classes, zero collisions, since each area
-  already prefixes its own). Each area is a dynamic import, so the build emits
+  `src/areas/<b>/`. Its class-collision companion went with the area
+  stylesheets in `stylex-phase-5-cleanup`. A compiled class carries its own
+  call site in its name, so two areas cannot collide.
+  Each area is a dynamic import, so the build emits
   one chunk per area and a participant loading `/app` never downloads the
   Studio canvas.
 
@@ -3764,9 +3781,10 @@ disabled button states no reason. It leaves the pointer nothing to click, and
 the screen reader nothing to announce.
 
 The browser now names the empty field and moves focus to it. Chrome confirmed
-that. No CSS changed, since `shell.css` styles no `:invalid` state, so an
-untouched field carries no error styling. The `spa-accessibility` spec now
-carries the rule.
+that. No CSS changed, since `global.css` styles no `:invalid` state, so an
+untouched field carries no error styling. That sheet is where
+`stylex-phase-5-cleanup` consolidated `shell.css`. The `spa-accessibility`
+spec now carries the rule.
 
 Five one-line removals followed. The `?? catalog.en[key] ?? key` tail went
 from `t()` in both catalogs. The catalog type gives every locale every key.
@@ -4133,13 +4151,13 @@ Each row is a stamp, an identity that is itself the control, and a
 right-aligned date. A row opens `/app/tasks/:instanceId`, the screen that
 already renders an instance for a non-claimant.
 
-`app.css` gained three stamp tones beside the accent one it had. Together
-they are four roles: open, settled, dormant, refusal. The admin area's badges
-carry the same four. `design-language.md` fixes that set, and this adds no
+`StartedScreen.tsx` carries four stamp tones as compiled styles: `stampOpen`,
+`stampSettled`, `stampDormant` and `stampRefusal`. They are four roles: open,
+settled, dormant, refusal. The admin area's badges carry the same four. `design-language.md` fixes that set, and this adds no
 fifth.
 
-An area never styles another area's prefix. These rules therefore duplicate
-the admin ones on purpose, rather than sharing them.
+An area never reads another area's style object. These styles therefore
+duplicate the admin ones on purpose, rather than sharing them.
 
 Nothing about who may read, comment on, cancel or write changed. A reader who
 meets `scope=started` should infer no new permission tier from it.
@@ -4484,6 +4502,32 @@ meets `scope=started` should infer no new permission tier from it.
   that reads them. Six named a control nothing renders any more, and the
   change deleted those six.
 
+## Instance form drafts (`instance-form-drafts`)
+
+A participant's unfinished form input on a running instance lives in its own
+table, `instance_drafts`, one row per instance. The module
+`src/engine/instance-drafts.ts` owns it. The row never touches
+`instances.body.data`. Saving is lenient: `checkEnvelope` requires a JSON
+object under `MAX_DRAFT_ENVELOPE_BYTES`, 8 MiB, and nothing else. The field
+rules `submitAndTransition` enforces do not run here.
+
+The table has no `revision` column. One writer holds a draft at a time:
+the claimant, the starter or an admin. A plain upsert is therefore enough. The
+module exports `getInstanceDraft`, `saveInstanceDraft` and
+`deleteInstanceDraft`.
+
+The runtime wrapper `saveInstanceDraft` (`src/runtime/api.ts`) backs
+`PUT /instances/:instanceId/draft`. It reads the instance unlocked, with no
+`FOR UPDATE`, since the draft carries no OCC token. It shares
+`requireSubmitAuthority` with `submitAndTransition`, so the two predicates
+cannot drift. The `step_id` comes from the instance's current step, never from
+the caller.
+
+The read path returns the stored draft as `InstanceView.draft`. It does so
+only when the draft's `stepId` still matches the instance's current step. A
+transition therefore strands no draft on the wire. The module
+`engine/retention.ts` deletes the row with an instance's other satellite data.
+
 ## Instance audit log (`instance-audit-log-chain`)
 
 The relation `instance_audit` (`src/engine/store.ts`) holds one
@@ -4712,6 +4756,54 @@ would let specific real actors see test-instance tasks in their normal
 app-area task list. The one-predicate visibility design leaves room to
 add that exception in one place later.
 
+## The styling model (`web-styling`, `stylex-phase-0-tooling` to `-5-cleanup`)
+
+Every component style in `packages/web` and `packages/form-ui` compiles from
+source. A component declares its styles in a `stylex.create` call beside its
+own markup. The build compiles them into the stylesheet `index.html` links,
+and the runtime injects nothing. A style naming an unknown token fails
+`bun run typecheck`.
+
+The tokens live once, in `packages/form-ui/src/tokens.stylex.ts`. Its values
+alias the custom properties `shell/tokens.css` declares, so dark mode carries
+over unchanged. Both packages import from that module. `packages/form-ui`
+reaches no token through `packages/web`.
+
+Phase 0 installed the tooling and wrote the migration plan. Phase 1 took
+`packages/form-ui`. Phase 2 took the shell's account menu and the app, admin
+and reporting areas. Phase 3 took every studio screen but the canvas.
+
+Phase 4 took `canvas/CanvasView.tsx` and `canvas/EditRail.tsx`. Phase 5 folded
+the remaining rules into `shell/global.css` and deleted the last five
+stylesheets. Two hand-written sheets remain, `shell/tokens.css` and
+`shell/global.css`. The second holds the reset, the `:focus-visible` ring and
+the element defaults. It also holds the `.shell` frame, one
+`prefers-reduced-motion` block and `.studio-dialog::backdrop`.
+
+A few class names stay literal, each for a reason that is not styling. The
+class `canvas-node` backs `elementFor()`'s focus `querySelector`, and
+`panzoom-exclude` is Panzoom's own runtime contract. A `<dialog>` composes
+`studio-dialog` for a `::backdrop` no compiled style can reach. The `.btn`
+family and `.app-back` stay in `shell/tokens.css` permanently.
+
+Phase 2 deferred that family to whichever phase converted its last call site.
+No phase did, and phase 5 recorded the deferral as permanent. A compiled class
+hashes per call site. Converting a family shared across every area would give
+each site its own class. The family stays shared and generic instead.
+
+The build wraps no compiled rule in a cascade layer. A layered rule loses to
+an unlayered one, and nothing layers `global.css`. The canvas's own focus
+indicators must beat that sheet's `:focus-visible` outline.
+
+Under `bun test` a style object resolves to readable class names from its own
+keys, and the compiler never runs. No test asserts on a compiled class name.
+One suite reads every module under both source trees. It fails on a `border`
+or `background` shorthand in a style object, and names the file and line. The
+compiler emits no rule for either, and reports no error.
+
+Each phase closed with a browser probe reading computed styles from the live
+DOM. One dated section per phase sits in `docs/browser-checks.md`.
+
 ## The studio publish gate and its failure report (`studio-publish-gate-and-report`)
 
 The route `GET /drafts/:processId` carries one further computed field,
@@ -4729,12 +4821,18 @@ That component folds whatever `reload()` re-read over it, the way
 `changesBaseVersion` folds a publish result's version. The field deliberately
 does not join `DraftSaveState`.
 
-The component `PublishMenuItem` in `ProcessHeaderBar.tsx` renders the `⋮`
-menu's Publish item. It renders the reason line beneath that item when the
-permission is absent. It marks the item `aria-disabled` rather than natively
-disabled, so the item keeps focus and a screen reader reads its
-`aria-describedby` reason. The header bar is its only production caller. The
-export serves that component's own test alone.
+The component `PublishNavControl` in `ProcessHeaderBar.tsx` renders the header
+row's Publish button. The sibling `PublishReasonLine` renders the reason
+itself, as the leading item of that row's trailing cluster. An
+`aria-describedby` reference to the constant `PUBLISH_REASON_ID` binds the
+two, so the pair does not need DOM adjacency. Neither Publish nor its reason
+stands in the `⋮` menu any more.
+
+The control marks the button `aria-disabled`, never natively disabled. It
+therefore keeps focus, and a screen reader reads the bound reason. The native
+`disabled` attribute stays for a publish in flight, a state that carries no
+reason. The header bar is the only production caller of either component. Both
+exports serve `studio-processHeaderBar-publishGate.test.tsx`.
 
 The hook `useDraftToolbarActions` raises no native prompt. Its `publish()` and
 `discard()` set `pendingDialog`, and `resolveDialog(true)` runs the act the
