@@ -22,17 +22,34 @@ The repository SHALL contain `docs/openapi.yaml`, a valid OpenAPI 3.0
 document. It SHALL describe every route a customer integration can call:
 `POST /auth/login`, `POST /processes/:processId/instances`,
 `GET /instances/:id`, `GET /instances`, `POST /instances/:id/submit`,
-`POST /instances/:id/claim`, `POST /instances/:id/release`,
-`POST /instances/:id/delegate`, `POST /instances/:id/comments`,
-`GET /instances/:id/comments`, `POST /instances/:id/cancel`,
-`GET /instances/:id/record`, `POST /processes`, `GET /processes`,
-`GET /processes/:id/versions`, `GET /account/me`, `PATCH /account/me`,
-`GET /livez`, `GET /readyz`, `GET /ui-strings`. It SHALL NOT document
-`admin/*`, `drafts/*`, `migration-plans/*`, `reporting/*`, or `registry`.
+`PUT /instances/:id/draft`, `POST /instances/:id/claim`,
+`POST /instances/:id/release`, `POST /instances/:id/delegate`,
+`POST /instances/:id/comments`, `GET /instances/:id/comments`,
+`POST /instances/:id/attachments`, `GET /instances/:id/attachments`,
+`GET /instances/:id/attachments/:attachmentId`,
+`POST /instances/:id/cancel`, `GET /instances/:id/record`,
+`POST /instances/:id/visibility/grant`,
+`POST /instances/:id/visibility/revoke`,
+`POST /instances/:id/visibility/restore`, `POST /processes`,
+`GET /processes`, `GET /processes/:id/versions`, `GET /account/me`,
+`PATCH /account/me`, `GET /livez`, `GET /readyz`, `GET /ui-strings`,
+`GET /metrics`. It SHALL NOT document `admin/*`, `drafts/*`,
+`migration-plans/*`, `reporting/*`, `templates/*`, `registry`, or the two
+`processes/:id/versions/:version` studio reads.
 
 `reporting/*` falls under the same ground as `admin/*`. It is a role-gated
 surface backing a frontend this repository ships. It is not an integration
 point a customer's own system calls.
+
+`templates/*` sits on that ground too. Its four routes back the studio's
+template library. An author reads and writes them from the developer area.
+
+The two `processes/:id/versions/:version` reads are studio reads as well.
+One returns a published version's body, which the developer area reads on
+several screens. The other scans that body for orphan keys, for the
+migration-plan screen. The list route stays documented.
+`GET /processes/:id/versions` lists published versions, which an
+integration needs.
 
 `GET /ui-strings` falls under the opposite ground. It backs a frontend
 this repository ships, as `registry` does. No token and no role gate it.
@@ -46,6 +63,12 @@ document, under the `admin/*` exclusion.
 and no role gates them, so any integration holding a session can call them.
 They scope to the caller's own account, which is what keeps them outside the
 `admin/*` exclusion: they administer nobody.
+
+`PUT /instances/:id/draft` and the three `visibility` writes join the
+document as well. The draft save carries a participant's own unfinished
+form input on a running instance. No screen in `packages/web` calls the
+three visibility writes at all. All four sit inside the instance lifecycle
+this document already advertises.
 
 This requirement names the exclusion rather than leaving it implicit. A
 reader can then tell the absence is a decision, not an omission. Should a
@@ -62,8 +85,16 @@ extends this requirement. It does not redesign the routes.
 #### Scenario: An internal-only route is absent
 
 - **WHEN** a reader searches `docs/openapi.yaml` for an `admin/*`,
-  `drafts/*`, `migration-plans/*`, `reporting/*`, or `registry` path
+  `drafts/*`, `migration-plans/*`, `reporting/*`, `templates/*`, or
+  `registry` path
 - **THEN** no such path appears in the document
+
+#### Scenario: The studio version reads are absent and named
+
+- **WHEN** a reader searches `docs/openapi.yaml` for a
+  `processes/{processId}/versions/{version}` path
+- **THEN** no such path appears, and the exclusion note names both that read
+  and its `orphan-keys` sibling
 
 #### Scenario: The public override read declares that it needs no auth
 
@@ -75,6 +106,14 @@ extends this requirement. It does not redesign the routes.
 - **WHEN** a reader searches `docs/openapi.yaml` for `/account/me`
 - **THEN** both `GET` and `PATCH` appear, each stating that it needs a token
   and no role
+
+#### Scenario: The draft save and the three visibility writes appear
+
+- **WHEN** a reader searches `docs/openapi.yaml` for
+  `/instances/{instanceId}/draft` and for
+  `/instances/{instanceId}/visibility/`
+- **THEN** all four entries appear, each stating its auth requirement, its
+  request schema and its error statuses
 
 ### Requirement: Each route documents auth, schema, and errors
 
