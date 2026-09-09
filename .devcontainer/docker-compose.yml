@@ -82,7 +82,9 @@ services:
     # Floating tag on purpose: pre-1.0, we track the latest release and freeze
     # on a version later. The mount below is the parent of PGDATA, not PGDATA
     # itself, so a major bump lands its own `<major>/docker` subdirectory
-    # inside this volume instead of writing where nothing is mounted.
+    # inside this volume. A mount on `.../data` instead makes postgres:18 exit
+    # 1 at startup, naming this exact fix; the data is not lost, but the stack
+    # will not come up.
     image: postgres:latest
     restart: unless-stopped
     environment:
