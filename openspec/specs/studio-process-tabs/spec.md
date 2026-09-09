@@ -49,8 +49,22 @@ its ordinary, uncolored state in every other case. That covers a clear
 draft, and a draft whose open issues are all advisory. No other tab's count
 carries a state color.
 
+The blocker color SHALL also carry bold weight. Weight reads faster than
+color alone at a glance.
+
 The blocker color SHALL carry a text equivalent, visually hidden, so the
 state reaches a screen reader too. Color alone reaches none.
+
+A screen reader user away from the tab row SHALL also hear the count's
+transition into the blocker state. The studio SHALL announce that
+transition once, through a live region. That announcement fires the moment
+the count's state moves from clear or advisory-only to blocker. The live
+region SHALL stay silent otherwise. That covers three cases. A draft that
+loads already blocked, a further edit that stays blocked, and the reverse
+transition out of blocker.
+
+Every such transition SHALL announce. A blocker that returns after a fix
+SHALL announce again.
 
 #### Scenario: Adding a step raises the Steps count
 
@@ -71,24 +85,48 @@ state reaches a screen reader too. Color alone reaches none.
 #### Scenario: A blocking issue colors the Checks count
 
 - **WHEN** a draft holds one step that leads nowhere
-- **THEN** the Checks tab's count carries the blocker color
+- **THEN** the Checks tab's count carries the blocker color and bold weight
 - **AND** the count itself reads the number of open issues
 
 #### Scenario: A clear draft's Checks count has no state color
 
 - **WHEN** the loaded draft has no open issue
 - **THEN** the Checks tab's count reads 0, in the tab row's ordinary color
+  and weight
 
 #### Scenario: An advisory-only draft's Checks count has no state color
 
 - **WHEN** the loaded draft's open issues are all advisory, none a blocker
 - **THEN** the Checks tab's count reads the issue count, in the tab row's
-  ordinary color
+  ordinary color and weight
 
 #### Scenario: The blocker state carries a text equivalent
 
 - **WHEN** the loaded draft's worst open issue is a blocker
 - **THEN** the Checks tab's accessible name states that fact in words
+
+#### Scenario: A new blocker announces itself
+
+- **WHEN** an edit turns the loaded draft's worst open issue into a blocker,
+  where it was not one before
+- **THEN** a live region announces that transition once
+
+#### Scenario: A blocker returning after a fix announces again
+
+- **WHEN** an edit turns the worst open issue into a blocker a second time
+- **AND** an earlier blocker already announced, and the author fixed it
+- **THEN** the live region announces that transition too
+
+#### Scenario: An already-blocked draft announces nothing on load
+
+- **WHEN** a draft loads with its worst open issue already a blocker
+- **THEN** the live region stays silent
+
+#### Scenario: A fixed blocker announces nothing
+
+- **WHEN** an edit turns the loaded draft's worst open issue from a blocker
+  into a clear or advisory-only state
+- **THEN** the live region stays silent
 
 ### Requirement: The open tab stands in the address
 
@@ -178,30 +216,85 @@ open the Paths tab with that path selected.
 - **THEN** the Steps tab is the open one
 - **AND** the step page stands on that step
 
-### Requirement: The tab row follows the area's own tab pattern
+### Requirement: The tab row follows the area's roving-tabindex pattern
 
 The tab row SHALL be a tab set as `spa-accessibility` already states it. It
 SHALL group its tabs in a `tablist`. Each tab SHALL be a button carrying the
 tab role. The open tab SHALL carry `aria-selected`.
 
-Each tab SHALL be its own stop in the tab order, the way a button is. Enter or
-Space SHALL open the focused tab. The open tab's body SHALL stand open, and
-the other nine SHALL hide. This row introduces no roving tab stop and no arrow-key
-model of its own.
+The row carries ten tabs in one line that scrolls sideways rather than
+wrapping. It SHALL follow `spa-accessibility`'s roving-tabindex pattern for
+a tab set of that shape. An ordinary tab set instead follows the
+plain-button pattern.
 
-#### Scenario: A tab opens with Enter
+The row SHALL be one stop in the page's tab order. Its trailing edge is the
+last tab, so no control beside the tabs takes a stop of its own. Exactly one
+tab SHALL carry `tabindex="0"`, and the other nine `tabindex="-1"`. That one
+is the open tab until an arrow key moves focus, and the focused tab
+afterwards. Opening a tab SHALL bring focus and selection back together.
+
+The left and right arrow keys SHALL move focus one tab at a time within the
+row. Moving past the last tab SHALL wrap focus to the first tab. Moving
+past the first SHALL wrap focus to the last. An arrow key SHALL move focus
+alone. It SHALL NOT open the newly focused tab.
+
+Enter or Space SHALL open the focused tab. The open tab's body SHALL stand
+open, and the other nine SHALL hide.
+
+#### Scenario: The row is one tab stop
+
+- **WHEN** an author presses Tab from the header bar
+- **THEN** focus lands on the open tab
+- **AND** a further Tab press leaves the row
+
+#### Scenario: An arrow key moves focus without opening the tab
+
+- **WHEN** an author focuses the Canvas tab and presses the right arrow key
+- **THEN** focus moves to the Steps tab
+- **AND** the Canvas tab's body stays open
+
+#### Scenario: Enter opens the focused tab
 
 - **WHEN** an author focuses the Paths tab and presses Enter
 - **THEN** the Paths tab is the open one, and its body stands open
 
-#### Scenario: Every tab is its own stop
+#### Scenario: Arrow-key focus wraps at the row's ends
 
-- **WHEN** an author presses Tab from the header bar
-- **THEN** the focus lands on the first tab
-- **AND** a further Tab press moves to the second tab
+- **WHEN** an author focuses the Checks tab, the row's last, and presses the
+  right arrow key
+- **THEN** focus moves to the Canvas tab, the row's first
 
-#### Scenario: The open tab states its state
+#### Scenario: The open tab states its state under the new model
 
 - **WHEN** a screen reader reaches the tab row
 - **THEN** the open tab reports `aria-selected`
 - **AND** the nine hidden bodies leave the accessibility tree
+
+### Requirement: A structurally invalid draft's banner carries the refusal color
+
+Where the loaded draft fails structural validation, its warning banner
+SHALL take `colors.refusal`. That is the color the Checks tab's blocked
+count already carries. Plain, uncolored text left that state reading no
+differently from routine copy.
+
+This banner SHALL NOT take the bordered, rotated stamp treatment. This
+screen already reserves that treatment for a load or a request that comes
+back wrong. That treatment marks a fixed, five-tone case vocabulary a
+design decision alone extends. A structurally invalid draft joins the
+plain-text signal family instead.
+
+`spa-error-reporting` binds this screen's failure states to one banner
+shape. That capability's own Purpose scopes it to a request that fails.
+This banner reports a validation state of the draft body rather than a
+failed request. So that one-shape rule does not reach it.
+
+#### Scenario: A structurally invalid draft's banner carries the refusal color
+
+- **WHEN** the loaded draft fails structural validation
+- **THEN** its banner takes `colors.refusal`
+- **AND** it does not take the bordered stamp treatment
+
+#### Scenario: A structurally valid draft shows no such banner
+
+- **WHEN** the loaded draft passes structural validation
+- **THEN** no such banner stands
