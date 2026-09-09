@@ -2771,3 +2771,55 @@ carrying its own issues. Pass: the per-entity list reads the same way.
 Compare the two weights. Pass: the rail's headings and the list's sources
 both read at weight 400. The rail composes the label onto an `<h3>`, whose
 user-agent default is bold, so the shared style states the weight itself.
+
+### Canvas node label (`canvas-node-label-clamp`)
+
+The node label was one SVG `<text>` at a fixed baseline, which neither wraps
+nor truncates. It is two nested `<div>`s in a `<foreignObject>` now, wrapped
+over at most two lines and clamped with an ellipsis. Whether the result reads
+as a label rather than as a cut glyph is a visual judgment.
+
+Open Studio and a draft. Rename a step to "Confirm Completion to Opteon".
+Pass: the label sits inside its node, over two lines, both centred against the
+node's top and bottom edges. Watch for the defect: text crossing the right
+border, or a line sitting flush against the node's top.
+
+Rename the same step to something past two lines, "Confirm Completion to
+Opteon and Notify the Requesting Department" say. Pass: the second line ends
+in an ellipsis. Point at the node. Pass: a tooltip prints the whole label.
+
+Point at a node short enough to skip the clamp. Pass: no tooltip appears at
+all. The tooltip rides the measurement, so one on every node would stop
+meaning that more text is hiding.
+
+Switch the content locale to German and rename a step to a single long
+compound, `Arbeitsunfähigkeitsbescheinigungsprüfung`. Pass: the word breaks
+across two lines. Watch for the defect: one line cut mid-glyph with no
+ellipsis. That reads as a name rather than as a truncation. It was the state
+before `overflow-wrap: anywhere` landed.
+
+Edit a step's label on the Steps tab, then switch back to Canvas. Pass: a
+label the clamp cut carries its tooltip. Watch for the defect: no tooltip on
+a visibly cut label. Every tab body stays mounted and the hidden one is
+`display: none`. The canvas therefore lays out at zero while the Steps tab
+is open, and a one-shot measurement reads that zero as "it fits".
+
+Put a one-line label beside a two-line one. Pass: both labels' first lines
+start at the same height inside their nodes. Watch for the defect: the
+one-line label sitting lower than its neighbour's first line.
+
+Read the node's right edge on a two-line label. Pass: neither line runs under
+the connect handle, and the handle draws whole. Drag from the handle. Pass:
+the connect gesture still starts.
+
+Drag the node by its label. Pass: the node moves and the canvas does not pan.
+Double-click the label. Pass: the rename field opens over the node. Click the
+label once. Pass: the node selects.
+
+Switch the content locale to German on a draft carrying translations. Pass:
+each node prints its German label under the same clamp. German runs up to 40%
+longer, so a label fitting one line in English may take two here.
+
+Zoom away from 1 in both directions. Pass: the label scales with the node and
+stays inside it. Switch to the dark scheme. Pass: the label reads against the
+node's ground.
