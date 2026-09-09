@@ -2641,3 +2641,119 @@ state it announces.
 
 Point at a checkbox the studio gates, on a technical field's row. Pass: it
 says the definition contract rejects that flag there.
+
+### The Checks tab's colored count (`checks-status-consolidation`)
+
+The area nav's own Checks control is gone. Its severity signal moved onto
+the Checks tab's own count in the tab row instead. Whether `colors.refusal`
+reads well there, in both color schemes, is a visual judgment no `bun:test`
+assertion can make. `development-toolchain`'s split rule keeps it here,
+since no defect record exists for it yet.
+
+Open a draft with no open issue. Pass: the header bar carries Save, Discard
+draft and Publish, and the area nav stands empty. The tab row's Checks count
+reads in the tab row's ordinary color, the same as every other tab's count.
+
+Introduce a blocking issue (an unreachable step works) without leaving the
+Paths tab. Pass: the Checks tab's count turns to the refusal color. It
+stays visible without switching tabs, while every other tab's count stays
+as it was. Switch to the dark scheme and repeat. Pass: the color still
+reads well against the tab row's ground, and no light-mode value leaks
+through.
+
+Fix the issue. Pass: the count returns to the ordinary color, with no
+reload. Introduce an advisory-only issue (a view-flag finding) instead.
+Pass: the count stays in the ordinary color. Only a blocker recolors it.
+
+Click the Checks tab. Pass: the full grouped list opens exactly as it did
+before this change.
+
+### The Checks count's weight and its announcement (`studio-checks-signal-reach`)
+
+The blocked count now reads in bold beside its color. A screen reader user
+away from the tab row hears the transition through a live region. A compiled
+class hashes, so no markup assertion can name a weight. An announcement needs
+a real assistive technology to judge.
+
+Open a draft with no open issue, on the Canvas tab. The Paths tab has no
+control that introduces one, since it is a read-only overview. Add a step
+from the palette. Leave it unconnected, so it leads nowhere.
+
+Pass: the Checks count turns bold as well as red, while the Canvas tab stays
+open. Every other tab's count keeps its ordinary weight. Switch to the dark
+scheme and repeat.
+
+Run a screen reader and repeat the same edit. NVDA, VoiceOver or Orca each
+work. Pass: the reader speaks the blocking-issue sentence once, without
+moving focus. Fix the issue. Pass: the reader stays silent, since only the
+clear-to-blocker edge announces.
+
+Introduce a second blocker after that fix. Pass: the reader speaks the
+sentence again. The falling edge empties the region first. Both edges write
+one constant, so a second rise would otherwise re-set identical text and
+announce nothing.
+
+### The tab row's roving-tabindex keyboard model (`studio-checks-signal-reach`)
+
+The row is one stop in the page's tab order now. The arrow keys move focus
+between tabs, and Enter or Space opens the focused one. The harness mounts no
+DOM, so it can dispatch no key and move no focus. Every case below needs a
+real browser.
+
+Open a draft. Press Tab from the header bar's Publish control. Pass: focus
+steps to the `⋮` menu trigger, then to the open tab. No other tab takes a
+stop. Press Tab again. Pass: focus leaves the row entirely, reaching whatever
+follows it.
+
+Focus the Canvas tab. Press the right arrow key nine times, then once more.
+Pass: focus walks to Checks and then wraps back to Canvas. The left arrow key
+wraps the other way. Pass: no tab opens along the way, and the Canvas body
+stays.
+
+Focus a tab the row does not have open. Press Enter. Pass: that tab opens and
+its body stands. Repeat with Space. Pass: Space opens it the same way.
+
+### Publish's pre-click blocked reason (`studio-checks-signal-reach`)
+
+Publish stays available while a blocking issue stands in the draft. Text
+beneath it now says so before the click. Whether the two reasons read apart
+from each other is a visual judgment.
+
+Open a draft holding a blocker, as an actor with the publish permission.
+Pass: a red line beneath Publish names the open issue as the blocker.
+Publish itself stays enabled, and a click still opens the confirmation
+dialog.
+
+Watch the buttons while the blocker appears. Pass: Publish and every button
+beside it hold the position they held. The line sits out of flow, aligned to
+the button's trailing edge, so it moves nothing. It measured a 167-pixel
+shift before that.
+
+Open the same draft as an actor lacking the permission. Pass: the reason
+reads in the muted tone instead, and Publish reports itself disabled.
+
+### The structurally-invalid banner's color (`studio-checks-signal-reach`)
+
+The banner for a draft that fails structural validation now reads in the
+refusal color. It read as plain text before. Whether it reads as a warning
+without a border or a stamp is a visual judgment.
+
+Open a draft whose body fails Zod validation. Pass: the banner text reads in
+the refusal color, with no border and no rotated stamp around it. Switch to
+the dark scheme. Pass: the color still reads against the screen's ground.
+
+### An issue's source as a label (`studio-checks-signal-reach`)
+
+An issue's source renders as a mono label now, in place of a bracket prefix
+inline in the message. The checks rail's group heading reads the same style.
+Whether the label separates from the message at a glance is a visual
+judgment.
+
+Open the Checks tab on a draft holding issues from two sources. Pass: each
+row prints its source as a small uppercase mono label, with no brackets. The
+group headings above them read in that same treatment. Open a step page
+carrying its own issues. Pass: the per-entity list reads the same way.
+
+Compare the two weights. Pass: the rail's headings and the list's sources
+both read at weight 400. The rail composes the label onto an `<h3>`, whose
+user-agent default is bold, so the shared style states the weight itself.

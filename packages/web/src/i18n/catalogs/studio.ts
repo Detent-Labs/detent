@@ -30,6 +30,10 @@ export const en = {
   "draftToolbar.publish": "Publish",
   "draftToolbar.publishing": "Publishing…",
   "draftToolbar.publishUnavailable": "Needs the publish permission for this process",
+  // Beside Publish while the draft's worst open issue is a blocker. The
+  // control stays available: the click still opens the confirmation dialog,
+  // which states the same warning (`studio-publish`).
+  "draftToolbar.publishBlockedReason": "Blocked by an open issue",
   "draftToolbar.dialogCancel": "Cancel",
   "draftToolbar.dialogProcess": "Process",
   "draftToolbar.dialogProcessId": "Process id",
@@ -363,6 +367,14 @@ export const en = {
   "tabs.contract": "Contract",
   "tabs.changes": "Changes",
   "tabs.checks": "Checks",
+  // Visually-hidden text appended to the Checks tab's count when it carries
+  // the blocker color, so the state reaches a screen reader too — color
+  // alone conveys nothing there (`studio-process-tabs`).
+  "tabs.checksBlocking": "blocking a publish",
+  // What the tab row's live region reads when the Checks count crosses from
+  // clear to blocker. A full sentence, unlike the fragment above: a live
+  // region reads on its own rather than joining an accessible name.
+  "tabs.checksBlockingAnnounced": "A blocking issue appeared in Checks.",
 
   // The Forms tab: one plate per step that declares a view
   // (`studio-forms-overview`).
@@ -575,14 +587,6 @@ export const en = {
   "checksRail.clearNeedsPublishPermission": "Publishing needs the publish permission for this process.",
   "checksRail.configHeldBack": "Plugin config check held back — verified at publish.",
   "checksRail.unknownKeysHeldBack": "Unknown-key check held back — verified at publish.",
-  // The area nav's collapsed summary. One whole sentence per state, so the
-  // count and the dot's own reading reach a screen reader together.
-  "checksRail.summaryBlocker": "Checks: {count} open issues, one of which refuses a publish.",
-  "checksRail.summaryBlockerOne": "Checks: one open issue, and it refuses a publish.",
-  "checksRail.summaryAdvisory": "Checks: {count} open issues, none of which refuses a publish.",
-  "checksRail.summaryAdvisoryOne": "Checks: one open issue, and it refuses no publish.",
-  "checksRail.summaryClear": "Checks: no open issue.",
-  "checksRail.summaryHeldBack": "Checks: held back until earlier checks pass.",
   // A rail narrowed to one step, and the control that widens it again
   // (`studio-forms-overview`: a card's badge opens Checks on its own step).
   "checksRail.narrowedTo": "Showing the checks on {step}.",

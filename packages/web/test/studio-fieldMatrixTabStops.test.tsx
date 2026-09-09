@@ -52,8 +52,12 @@ const render = (showBulkBadges: boolean) =>
   );
 
 /** Elements the browser would put in the tab order: an explicit `tabindex="0"`,
- * or an interactive element carrying no `tabindex` at all. */
-function tabStops(html: string): number {
+ * or an interactive element carrying no `tabindex` at all.
+ *
+ * Exported for `studio-processTabRow.test.tsx`, whose row follows the same
+ * roving-tabindex model and asks the same question of its markup. One
+ * definition, so both suites agree on what the browser would focus. */
+export function tabStops(html: string): number {
   const explicit = (html.match(/tabindex="0"/g) ?? []).length;
   const buttons = [...html.matchAll(/<button\b[^>]*>/g)].map((m) => m[0]);
   const inputs = [...html.matchAll(/<input\b[^>]*>/g)].map((m) => m[0]);

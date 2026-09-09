@@ -776,14 +776,15 @@ Your installation may list no template. Somebody holding `system:templates`
 creates them on Studio's **Templates** screen, from a published version of a
 process.
 
-Studio's own area nav carries **Checks**, **Save**, **Discard draft** and
-**Publish**. Those four stand there whatever you have open. Checks reads as a
-dot and a count. The dot says whether anything blocks a publish, and pressing
-it lists what Studio found.
+Studio's own area nav carries **Save**, **Discard draft** and **Publish**.
+Those three stand there whatever you have open.
 
 A draft opens on one screen. A tab row over the body holds ten tabs, and the
 chapters below follow their order. Those are Canvas, Steps, Fields, Data
-sources, Paths, Forms, Field matrix, Contract, Changes and Checks.
+sources, Paths, Forms, Field matrix, Contract, Changes and Checks. Checks
+reads as a plain count, like any other tab, until something blocks a
+publish. Then the count itself turns red. Open the tab to see what Studio
+found.
 
 The header bar's `⋮` menu holds three more entries, under Views. The
 **JSON** entry prints the same draft as raw text. That helps when you want to

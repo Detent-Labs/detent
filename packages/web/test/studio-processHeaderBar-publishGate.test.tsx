@@ -291,7 +291,7 @@ describe("Neither dialog primes the button it cannot undo", () => {
 
 describe("The Publish control's permission gate", () => {
   it("marks the control unavailable and names the reason when the report reads false", () => {
-    const html = renderToStaticMarkup(<PublishNavControl canPublish={false} publishing={false} onPublish={() => {}} />);
+    const html = renderToStaticMarkup(<PublishNavControl canPublish={false} blocked={false} publishing={false} onPublish={() => {}} />);
 
     expect(html).toContain('aria-disabled="true"');
     expect(html).toContain("Needs the publish permission for this process");
@@ -301,7 +301,7 @@ describe("The Publish control's permission gate", () => {
   });
 
   it("points aria-describedby at the reason it renders, by that element's own id", () => {
-    const html = renderToStaticMarkup(<PublishNavControl canPublish={false} publishing={false} onPublish={() => {}} />);
+    const html = renderToStaticMarkup(<PublishNavControl canPublish={false} blocked={false} publishing={false} onPublish={() => {}} />);
 
     const described = /aria-describedby="([^"]+)"/.exec(html);
     expect(described).not.toBeNull();
@@ -309,7 +309,7 @@ describe("The Publish control's permission gate", () => {
   });
 
   it("keeps the control rendered and focusable, so a screen reader reaches that reference", () => {
-    const html = renderToStaticMarkup(<PublishNavControl canPublish={false} publishing={false} onPublish={() => {}} />);
+    const html = renderToStaticMarkup(<PublishNavControl canPublish={false} blocked={false} publishing={false} onPublish={() => {}} />);
 
     expect(html).toContain("Publish");
     // The violating input: the native `disabled` attribute, which takes the
@@ -320,7 +320,7 @@ describe("The Publish control's permission gate", () => {
 
   it("sends no publish request when activated while unavailable", () => {
     let published = 0;
-    const item = PublishNavControl({ canPublish: false, publishing: false, onPublish: () => published++ });
+    const item = PublishNavControl({ canPublish: false, blocked: false, publishing: false, onPublish: () => published++ });
     // The rendered click handler, called the way an activation calls it.
     const button = (item.props as { children: { props: { onClick: () => void } }[] }).children[0]!;
     button.props.onClick();
@@ -329,11 +329,39 @@ describe("The Publish control's permission gate", () => {
   });
 
   it("offers the control unchanged when the report reads true", () => {
-    const html = renderToStaticMarkup(<PublishNavControl canPublish={true} publishing={false} onPublish={() => {}} />);
+    const html = renderToStaticMarkup(<PublishNavControl canPublish={true} blocked={false} publishing={false} onPublish={() => {}} />);
 
     expect(html).not.toContain("aria-disabled");
     expect(html).not.toContain("aria-describedby");
     expect(html).not.toContain("Needs the publish permission");
+  });
+
+  // A blocking issue names itself before the click, rather than only inside
+  // the dialog the click opens (`studio-publish`). The control stays
+  // operable: a blocked draft is still publishable.
+  it("names the blocking reason beside a permitted control, and leaves it operable", () => {
+    const html = renderToStaticMarkup(<PublishNavControl canPublish={true} blocked={true} publishing={false} onPublish={() => {}} />);
+
+    expect(html).toContain("Blocked by an open issue");
+    expect(html).not.toContain("aria-disabled");
+    expect(html).not.toContain('disabled=""');
+  });
+
+  it("points aria-describedby at the blocking reason too, by that element's own id", () => {
+    const html = renderToStaticMarkup(<PublishNavControl canPublish={true} blocked={true} publishing={false} onPublish={() => {}} />);
+
+    const described = /aria-describedby="([^"]+)"/.exec(html);
+    expect(described).not.toBeNull();
+    expect(html).toContain(`id="${described![1]}"`);
+  });
+
+  it("still publishes when activated while blocked but permitted", () => {
+    let published = 0;
+    const item = PublishNavControl({ canPublish: true, blocked: true, publishing: false, onPublish: () => published++ });
+    const button = (item.props as { children: { props: { onClick: () => void } }[] }).children[0]!;
+    button.props.onClick();
+
+    expect(published).toBe(1);
   });
 });
 
