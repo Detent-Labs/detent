@@ -179,13 +179,15 @@ test("the established PORT_VITE matches docker-compose.yml's PORT_VITE default, 
 /**
  * `track-latest-postgres`: PGDATA left `/var/lib/postgresql/data` at
  * postgres:18, and the image declares the parent `/var/lib/postgresql` as its
- * volume instead. A mount on the old path raises nothing. The server
- * initializes a fresh cluster at the new path, Docker backs it with an
- * anonymous volume from the image's own declaration, and the named volume
- * keeps files nothing reads. The database is simply gone, with no message.
+ * volume instead. A mount on the old path stops the container: the entrypoint
+ * detects it and exits 1 with "in 18+, these Docker images are configured to
+ * store database data in a ... (unused mount/volume)". Measured on 18.6
+ * against an empty volume and against one written by 16; the 16 data survives
+ * intact in the volume, unread, while the stack refuses to come up.
  *
- * Bring-up is manual and the failure is silent, so these two asserts are the
- * only thing standing between a one-line edit and that loss.
+ * So a revert here takes the devcontainer down rather than losing data. These
+ * asserts catch it before that, since bring-up is manual and nothing else
+ * reads this file.
  */
 test("the db service mounts the parent of PGDATA, so a major bump keeps its data", () => {
   const compose = readFileSync(COMPOSE_FILE, "utf8");
