@@ -2713,24 +2713,38 @@ stays.
 Focus a tab the row does not have open. Press Enter. Pass: that tab opens and
 its body stands. Repeat with Space. Pass: Space opens it the same way.
 
-### Publish's pre-click blocked reason (`studio-checks-signal-reach`)
+### Publish's pre-click reason (`studio-publish-reason-in-flow`)
 
-Publish stays available while a blocking issue stands in the draft. Text
-beneath it now says so before the click. Whether the two reasons read apart
-from each other is a visual judgment.
+Both reasons the Publish control carries now read on the header bar's own
+row, as the action cluster's leading item. The line sat beneath the button
+before, out of flow. The bar's 2px bottom border struck it at mid-cap height
+there.
+Whether the row still reads as one line with a ninth item on it is a visual
+judgment.
 
 Open a draft holding a blocker, as an actor with the publish permission.
-Pass: a red line beneath Publish names the open issue as the blocker.
-Publish itself stays enabled, and a click still opens the confirmation
-dialog.
+Pass: the reason reads on the row itself, in the refusal color, on Save's own
+baseline. Nothing renders beneath the buttons. The bar's bottom border runs
+unbroken. The Checks tab's count reads in the refusal color,
+bold. Publish stays enabled, and a click still opens the confirmation dialog.
 
 Watch the buttons while the blocker appears. Pass: Publish and every button
-beside it hold the position they held. The line sits out of flow, aligned to
-the button's trailing edge, so it moves nothing. It measured a 167-pixel
-shift before that.
+beside it hold the position they held, and the bar keeps its height. An
+in-cluster placement measured a 167-pixel shift. That is why the line carries
+the row's auto-margin instead.
 
-Open the same draft as an actor lacking the permission. Pass: the reason
-reads in the muted tone instead, and Publish reports itself disabled.
+Open the same draft as an actor lacking the permission. Pass: that reason
+reads in the same place, in the muted tone, and Publish reports itself
+disabled.
+
+Narrow the window until the header wraps, and keep narrowing to 375. Pass: at
+every width the action cluster stays right-aligned and the reason wraps with
+it. The reason collides with neither the tab row below nor the status items
+beside it.
+
+A line placed beside the cluster rather than inside it fails exactly here.
+The cluster loses its auto-margin to that line, and strands at the row's left
+edge. That measured Publish at x 191 instead of x 1129.
 
 ### The structurally-invalid banner's color (`studio-checks-signal-reach`)
 
