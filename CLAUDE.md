@@ -214,10 +214,11 @@ count at the pushed range's base against the count at its tip. It blocks only a
 rise. A file already carrying findings passes, as long as the push adds none.
 
 Measurement sets that rule. Measured on 2026-08-04, the live specs under
-`openspec/specs/` held about 3166 findings across 52 of the 80 files that
-existed then; the directory carries 89 today. `instance-migration` alone held
-287, `timers` 220, `transition-execution` 167. A whole-file gate makes each of
-those unpushable until somebody clears its debt in full.
+`openspec/specs/` held about 3166 findings across 52 of 80 files. The
+directory has grown since; count it rather than trust a number here.
+`instance-migration` alone held 287, `timers` 220, `transition-execution` 167.
+A whole-file gate makes each of those unpushable until somebody clears its
+debt in full.
 
 That happened on 2026-08-04. A change synced one requirement into
 `development-toolchain/spec.md` and paid a 28-finding prose rewrite. Every one
@@ -247,18 +248,25 @@ carries the reasoning.
 ## Repository layout
 ```
 .devcontainer/             Dockerfile + docker-compose.yml + devcontainer.json (Node 22 + Bun, Postgres latest)
-package.json               Bun workspace root (workspaces: packages/*); engine package's exports map
-                            (./schema, ./schema/canonical-json, ./schema/strip-compiled, ./cel/check,
-                             ./schema/compile, ./engine/registry, ./engine/registry-check)
+package.json               Bun workspace root (workspaces: packages/*);
+                            engine package's exports map (./schema,
+                             ./schema/canonical-json, ./schema/strip-compiled,
+                             ./cel/check, ./schema/compile,
+                             ./schema/step-graph, ./engine/registry,
+                             ./engine/registry-check, ./validate)
 tsconfig.json              strict; NodeNext ESM; covers src + test
 src/schema/definition.ts   Zod schemas = the definition contract; TS types via z.infer; invariants included
 src/engine/                executor: instance store, outbox, transitions, timers, subprocess, drafts,
                             definitions, migration, admin queries
 src/runtime/api.ts         Runtime API Layer: createProcessInstance / getInstanceView / submitAndTransition
                             / claimStep / releaseClaim / cancelInstance / listInstances / getInstanceRecord
-src/http/                  REST/JSON wrapper over Bun.serve; one route file per surface (routes.ts,
-                            admin-routes.ts, studio-routes.ts, reporting-routes.ts, account-routes.ts,
-                            ui-strings-routes.ts) beside server.ts, static.ts, health.ts, metrics.ts, errors.ts
+src/http/                  REST/JSON wrapper over Bun.serve; one route file
+                            per surface (routes.ts, admin-routes.ts,
+                            studio-routes.ts, reporting-routes.ts,
+                            account-routes.ts) beside server.ts, static.ts,
+                            metrics.ts, errors.ts. The ui-strings routes sit
+                            in admin-routes.ts, /livez and /readyz in
+                            server.ts
 src/auth/                  ActorResolver seam (dev-header + JWT), local accounts, login, roles, CLI
 src/handlers/              action handlers; http.request, notification.email and process.start ship
 examples/                  serialized example definitions
@@ -266,17 +274,24 @@ test/                      bun:test suites; tests run inside the container
 packages/web/              the ONE browser package (React + Vite). One build, one login, one session,
                             one address; the engine serves it from WEB_ROOT. Talks to the engine only
                             over the HTTP wrapper and the exports map.
-  src/shell/                prefix routing, session, LoginScreen, ErrorBoundary, Chrome, tokens.css
+  src/shell/                prefix routing, session, LoginScreen,
+                            ErrorBoundary, Chrome, tokens.css, global.css
   src/api/                  API_BASE, AppClientError, parseErrorBody, request, login, errorText
   src/i18n/                 locale selection and persistence; chrome/area catalogs stay per area
-  src/areas/app/            participant: My-tasks / Task / Start-a-process (Login is the shell's)
-  src/areas/admin/          operator: instances, merged record, outbox, timers, users, migrations,
-                            data lists, UI strings
-  src/areas/studio/         developer: drafts, canvas, inspector panels, the routed panels screen
-                            (field catalog, data sources, contract, field matrix), form editor,
-                            JSON surface, publish, versions+diff, migration-plan authoring,
-                            Templates, Tools, Player
-  src/areas/reporting/      process owner: cycle time, bottlenecks, SLA
+  src/areas/app/            participant: My tasks, one task, Start a
+                            process, Cases I started, Cases I took part in
+                            (Login is the shell's)
+  src/areas/admin/          operator: instances, merged record, outbox,
+                            timers, users, migrations, groups, data lists,
+                            UI strings
+  src/areas/studio/         developer: drafts, the process surface's ten tabs
+                            (canvas, with its selection-driven inspector;
+                            steps, fields, data sources, paths, forms,
+                            field matrix, contract, changes, checks),
+                            form editor, JSON surface, publish, versions+diff,
+                            migration-plan authoring, Templates, Tools, Player
+  src/areas/reporting/      process owner: cycle time, bottlenecks, SLA,
+                            saved reports (builder, preview, CSV, sharing)
 packages/form-ui/          shared step-form renderer (source-only, no build step); consumed by both
                             the studio area's Player and the app area, so what an author previews is
                             what a participant gets. Stays its own package.
@@ -303,6 +318,22 @@ packages/form-ui/          shared step-form renderer (source-only, no build step
   full; one table row per finished stage.
 - `docs/roadmap-history.md` — what each finished stage was, under the same
   number. Read it only for a stage the table sends you to.
+- `README.md` — the entry point: install, develop, deploy, and a status grid.
+- `PRODUCT.md` — who the four audiences are, and what the product commits to.
+- `THIRDPARTY.md` — the dependency and license notice. Regenerate it with
+  `bun run scripts/thirdparty.ts --write` after any dependency change.
+- `docs/openapi.yaml` — the customer-facing HTTP surface, route by route. It
+  names every excluded route too.
+- `docs/runbooks/deployment.md` — what a deployment configures before it runs
+  either image.
+- `docs/runbooks/backup-restore.md` — the dump and restore steps. One database
+  per tenant, so dump each one.
+- `docs/field-model-redesign.md` — a design record, not a spec. What the
+  2026-08-30 session settled about the field model.
+- `docs/CODE_REVIEW.md` — the current review and its open action list. The
+  three dated files beside it are superseded, and still cited.
+- `DESIGN.md` — the design tokens the detector reads, and what each one means.
+- `docs/browser-checks.md` — the browser checks that stay manual, per screen.
 
 For "what does X do" prefer the knowledge graph below over any of them — the
 code is the source of truth, those files are the map.
