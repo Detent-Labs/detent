@@ -18,6 +18,9 @@
   `nodeKey` element renders for a step carrying both a label and a key
 - [x] 2.2 Keep the locale-switch case and the empty-label fallback case, and
   confirm `bun test packages/web/test/studio-canvas-node-label.test.tsx` passes
+- [x] 2.3 Assert the label's baseline, so the centring `SHALL` has a test that
+  a revert to `y={24}` fails. Read the `y` off the same `<text>` match the
+  label comes from, and compare against `NODE_HEIGHT`
 
 ## 3. Verification
 
