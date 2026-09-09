@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { DraftProvider } from "../src/areas/studio/draft/store.js";
 import { CanvasView } from "../src/areas/studio/canvas/CanvasView.js";
+import { NODE_HEIGHT } from "../src/areas/studio/canvas/geometry.js";
 import type { Draft } from "../src/areas/studio/draft/types.js";
 
 /**
@@ -62,6 +63,8 @@ function renderCanvas(baseLocale: string): string {
 interface NodeLines {
   stepId: string;
   label: string | undefined;
+  /** The label line's own baseline, as the markup carries it. */
+  labelY: string | undefined;
   /** Every `<text>` the node body draws, so a second line shows up as a
    * second entry rather than going unread. */
   texts: string[];
@@ -75,11 +78,17 @@ function nodeLines(html: string): NodeLines[] {
   return html
     .split(/(?=<g data-step-id=")/)
     .slice(1)
-    .map((chunk) => ({
-      stepId: /<g data-step-id="([^"]*)"/.exec(chunk)?.[1] ?? "",
-      label: /class="nodeLabel">([^<]*)</.exec(chunk)?.[1],
-      texts: [...chunk.matchAll(/<text[^>]*>([^<]*)</g)].map((m) => m[1]),
-    }));
+    .map((chunk) => {
+      // `class` renders last, so one match carries the label's attributes and
+      // its content together and the two cannot come from different elements.
+      const labelText = /<text([^>]*)class="nodeLabel">([^<]*)</.exec(chunk);
+      return {
+        stepId: /<g data-step-id="([^"]*)"/.exec(chunk)?.[1] ?? "",
+        label: labelText?.[2],
+        labelY: labelText ? /\by="([^"]*)"/.exec(labelText[1])?.[1] : undefined,
+        texts: [...chunk.matchAll(/<text[^>]*>([^<]*)</g)].map((m) => m[1]),
+      };
+    });
 }
 
 const ENGLISH = nodeLines(renderCanvas("en"));
@@ -97,6 +106,15 @@ describe("the canvas node's one text line", () => {
   it("reads the label line from the label, never from the key", () => {
     expect(ENGLISH[0].label).toBe("Capture the request");
     expect(ENGLISH[0].label).not.toBe("capture");
+  });
+
+  // Baseline 24 is where the label sat while a key line followed it. Nothing
+  // follows it now, so the one line centres: half the node's height, plus the
+  // ~4 units a 13px face carries below its own centre.
+  it("centres the label line in the node", () => {
+    for (const node of [...ENGLISH, ...GERMAN]) {
+      expect(node.labelY).toBe(String(NODE_HEIGHT / 2 + 4));
+    }
   });
 
   // The key is a slug that references nothing, so the canvas does not spend a
