@@ -4,7 +4,7 @@ import { DraftContext, type DraftContextValue } from "../src/areas/studio/draft/
 import type { EditorIssue } from "../src/areas/studio/draft/issues.js";
 import type { ValidationResult } from "../src/areas/studio/draft/validation.js";
 import type { DraftToolbarActions } from "../src/areas/studio/panels/DraftToolbar.js";
-import { ProcessHeaderBar, PublishNavControl } from "../src/areas/studio/panels/ProcessHeaderBar.js";
+import { ProcessHeaderBar, PublishNavControl, PublishReasonLine } from "../src/areas/studio/panels/ProcessHeaderBar.js";
 
 /**
  * studio-publish-gate-and-report: the header bar announces a failed mutation.
@@ -290,22 +290,30 @@ describe("Neither dialog primes the button it cannot undo", () => {
 });
 
 describe("The Publish control's permission gate", () => {
-  it("marks the control unavailable and names the reason when the report reads false", () => {
+  it("marks the control unavailable when the report reads false", () => {
     const html = renderToStaticMarkup(<PublishNavControl canPublish={false} blocked={false} publishing={false} onPublish={() => {}} />);
 
     expect(html).toContain('aria-disabled="true"');
-    expect(html).toContain("Needs the publish permission for this process");
     // The reason is text the control points at, not a tooltip: a `title`
     // reaches neither the keyboard nor a screen reader.
     expect(html).not.toContain("title=");
   });
 
-  it("points aria-describedby at the reason it renders, by that element's own id", () => {
-    const html = renderToStaticMarkup(<PublishNavControl canPublish={false} blocked={false} publishing={false} onPublish={() => {}} />);
+  it("names the permission reason on the line, in the muted register", () => {
+    const html = renderToStaticMarkup(<PublishReasonLine canPublish={false} blocked={false} />);
 
-    const described = /aria-describedby="([^"]+)"/.exec(html);
+    expect(html).toContain("Needs the publish permission for this process");
+  });
+
+  // The control and its reason render in two places in the row now, so the
+  // id reference is the whole binding. It has to survive that separation.
+  it("points aria-describedby at the id the reason line renders", () => {
+    const control = renderToStaticMarkup(<PublishNavControl canPublish={false} blocked={false} publishing={false} onPublish={() => {}} />);
+    const reason = renderToStaticMarkup(<PublishReasonLine canPublish={false} blocked={false} />);
+
+    const described = /aria-describedby="([^"]+)"/.exec(control);
     expect(described).not.toBeNull();
-    expect(html).toContain(`id="${described![1]}"`);
+    expect(reason).toContain(`id="${described![1]}"`);
   });
 
   it("keeps the control rendered and focusable, so a screen reader reaches that reference", () => {
@@ -315,15 +323,14 @@ describe("The Publish control's permission gate", () => {
     // The violating input: the native `disabled` attribute, which takes the
     // control out of the tab order and so silences its own description.
     expect(html).not.toContain('disabled=""');
-    expect(html).toContain('role="group"');
+    expect(html).toContain("aria-describedby");
   });
 
   it("sends no publish request when activated while unavailable", () => {
     let published = 0;
-    const item = PublishNavControl({ canPublish: false, blocked: false, publishing: false, onPublish: () => published++ });
     // The rendered click handler, called the way an activation calls it.
-    const button = (item.props as { children: { props: { onClick: () => void } }[] }).children[0]!;
-    button.props.onClick();
+    const button = PublishNavControl({ canPublish: false, blocked: false, publishing: false, onPublish: () => published++ });
+    (button.props as { onClick: () => void }).onClick();
 
     expect(published).toBe(0);
   });
@@ -333,33 +340,80 @@ describe("The Publish control's permission gate", () => {
 
     expect(html).not.toContain("aria-disabled");
     expect(html).not.toContain("aria-describedby");
-    expect(html).not.toContain("Needs the publish permission");
+  });
+
+  it("renders no reason line at all for a clear, permitted draft", () => {
+    expect(renderToStaticMarkup(<PublishReasonLine canPublish={true} blocked={false} />)).toBe("");
+  });
+
+  // The reason is the action cluster's own leading item, which is what holds
+  // every control still: the cluster's `marginLeft: auto` pins its trailing
+  // edge, so it grows leftward instead of moving Publish. A line placed
+  // BESIDE the cluster takes that margin with it, and the whole cluster then
+  // strands at the row's leading edge wherever the row wraps.
+  //
+  // What a static render sees is the nesting depth between the reason and
+  // Save. One `<div>` opens between them, the `draftActions` wrapper that
+  // holds the three buttons. A reason placed ahead of the cluster would put
+  // the cluster's own wrapper there too, and the count would read two.
+  it("renders the reason as the action cluster's leading item, ahead of Save", () => {
+    const html = renderHeader({ canPublish: false });
+    const reasonAt = html.indexOf('id="studio-publish-reason"');
+    const saveAt = html.indexOf(">Save<");
+
+    expect(reasonAt).toBeGreaterThan(-1);
+    expect(saveAt).toBeGreaterThan(reasonAt);
+    expect(html.slice(reasonAt, saveAt).match(/<div/g) ?? []).toHaveLength(1);
+  });
+
+  it("keeps the blocked reason in that same place", () => {
+    const html = renderHeader({ issues: [issue("cel")] });
+    const reasonAt = html.indexOf('id="studio-publish-reason"');
+    const saveAt = html.indexOf(">Save<");
+
+    expect(html).toContain("Blocked by an open issue");
+    expect(saveAt).toBeGreaterThan(reasonAt);
+    expect(html.slice(reasonAt, saveAt).match(/<div/g) ?? []).toHaveLength(1);
   });
 
   // A blocking issue names itself before the click, rather than only inside
-  // the dialog the click opens (`studio-publish`). The control stays
-  // operable: a blocked draft is still publishable.
-  it("names the blocking reason beside a permitted control, and leaves it operable", () => {
-    const html = renderToStaticMarkup(<PublishNavControl canPublish={true} blocked={true} publishing={false} onPublish={() => {}} />);
+  // the dialog the click opens (`studio-publish`). The control stays operable
+  // either way: a blocked draft is still publishable.
+  it("names the blocking reason on the line, and leaves the control operable", () => {
+    const control = renderToStaticMarkup(<PublishNavControl canPublish={true} blocked={true} publishing={false} onPublish={() => {}} />);
+    const reason = renderToStaticMarkup(<PublishReasonLine canPublish={true} blocked={true} />);
 
-    expect(html).toContain("Blocked by an open issue");
-    expect(html).not.toContain("aria-disabled");
-    expect(html).not.toContain('disabled=""');
+    expect(reason).toContain("Blocked by an open issue");
+    expect(control).not.toContain("aria-disabled");
+    expect(control).not.toContain('disabled=""');
   });
 
   it("points aria-describedby at the blocking reason too, by that element's own id", () => {
-    const html = renderToStaticMarkup(<PublishNavControl canPublish={true} blocked={true} publishing={false} onPublish={() => {}} />);
+    const control = renderToStaticMarkup(<PublishNavControl canPublish={true} blocked={true} publishing={false} onPublish={() => {}} />);
+    const reason = renderToStaticMarkup(<PublishReasonLine canPublish={true} blocked={true} />);
 
-    const described = /aria-describedby="([^"]+)"/.exec(html);
+    const described = /aria-describedby="([^"]+)"/.exec(control);
     expect(described).not.toBeNull();
-    expect(html).toContain(`id="${described![1]}"`);
+    expect(reason).toContain(`id="${described![1]}"`);
+  });
+
+  // The two reasons share one slot and one register, and part on tone alone:
+  // the blocked one names an issue the draft carries, so it takes the refusal
+  // color. What a static render sees is the class list, which must differ.
+  it("parts the blocked reason from the permission reason by class", () => {
+    const cls = (html: string) => /class="([^"]*)"/.exec(html)?.[1];
+    const blocked = cls(renderToStaticMarkup(<PublishReasonLine canPublish={true} blocked={true} />));
+    const denied = cls(renderToStaticMarkup(<PublishReasonLine canPublish={false} blocked={false} />));
+
+    expect(blocked).toBeDefined();
+    expect(denied).toBeDefined();
+    expect(blocked).not.toBe(denied);
   });
 
   it("still publishes when activated while blocked but permitted", () => {
     let published = 0;
-    const item = PublishNavControl({ canPublish: true, blocked: true, publishing: false, onPublish: () => published++ });
-    const button = (item.props as { children: { props: { onClick: () => void } }[] }).children[0]!;
-    button.props.onClick();
+    const button = PublishNavControl({ canPublish: true, blocked: true, publishing: false, onPublish: () => published++ });
+    (button.props as { onClick: () => void }).onClick();
 
     expect(published).toBe(1);
   });
