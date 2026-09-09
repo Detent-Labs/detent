@@ -2692,9 +2692,10 @@ between tabs, and Enter or Space opens the focused one. The harness mounts no
 DOM, so it can dispatch no key and move no focus. Every case below needs a
 real browser.
 
-Open a draft. Press Tab from the header bar. Pass: focus lands once, on the
-open tab. Press Tab again. Pass: focus leaves the row entirely, reaching
-whatever follows it.
+Open a draft. Press Tab from the header bar's Publish control. Pass: focus
+steps to the `⋮` menu trigger, then to the open tab. No other tab takes a
+stop. Press Tab again. Pass: focus leaves the row entirely, reaching whatever
+follows it.
 
 Focus the Canvas tab. Press the right arrow key nine times, then once more.
 Pass: focus walks to Checks and then wraps back to Canvas. The left arrow key
