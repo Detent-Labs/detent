@@ -31,7 +31,7 @@ list them.
 
 | Image | Software | License |
 |---|---|---|
-| `postgres:latest` | PostgreSQL | PostgreSQL License |
+| `postgres:16` | PostgreSQL | PostgreSQL License |
 
 ### Development-only, never shipped
 
@@ -39,6 +39,7 @@ list them.
 |---|---|---|
 | `axllent/mailpit:v1.27` | Mailpit (SMTP test catcher, devcontainer only) | MIT |
 | `mcr.microsoft.com/devcontainers/typescript-node:22` | Node.js devcontainer base | MIT |
+| `postgres:latest` | PostgreSQL (devcontainer and CI; the deployment pins 16) | PostgreSQL License |
 
 These images each carry their own OS-level packages (Debian or Alpine system
 libraries). This list does not enumerate those individually; see each
