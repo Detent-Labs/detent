@@ -29,7 +29,6 @@ const FILES = [
   // Both confirmation dialogs live here, with the controls that open them
   // (`studio-process-tabs`).
   "src/areas/studio/panels/ProcessHeaderBar.tsx",
-  "src/areas/studio/panels/DraftNavControls.tsx",
 ];
 
 /** Block comments first, then line comments — the order matters for a `//`

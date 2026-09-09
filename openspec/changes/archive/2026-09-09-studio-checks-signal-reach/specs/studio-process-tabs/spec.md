@@ -1,34 +1,4 @@
-# studio-process-tabs Specification
-
-## Purpose
-
-One tabbed surface holds every part of a process draft an author edits. The
-tab row takes the place of the split between the edit screen and the panels
-screen. No authoring job crosses a screen boundary any more.
-
-## Requirements
-
-### Requirement: The process surface carries one tab row
-
-A draft SHALL open on one surface. That surface SHALL carry a tab row above
-its body. The row SHALL hold ten tabs in authoring order. Those are Canvas,
-Steps, Fields, Data sources, Paths, Forms, Field matrix, Contract, Changes and
-Checks.
-
-The body SHALL carry exactly one tab at a time. No index rail SHALL stand
-beside the body.
-
-#### Scenario: A draft opens on the Canvas tab
-
-- **WHEN** an author opens a draft from the process list
-- **THEN** the tab row holds ten tabs
-- **AND** the Canvas tab is the open one
-
-#### Scenario: The surface carries no index rail
-
-- **WHEN** an author opens the Fields tab
-- **THEN** the Fields editor fills the body
-- **AND** no rail of tab names stands beside it
+## MODIFIED Requirements
 
 ### Requirement: A tab carries the count of what it holds
 
@@ -128,93 +98,7 @@ SHALL announce again.
   into a clear or advisory-only state
 - **THEN** the live region stays silent
 
-### Requirement: The open tab stands in the address
-
-The open tab SHALL be a sub-state of the edit route, at
-`/studio/processes/:id/edit/:tab`. A reload SHALL restore the same tab. An
-address naming no tab SHALL open Canvas. An address naming a tab the row does
-not hold SHALL open Canvas.
-
-The form editor and the step target SHALL stay their own sub-states. The form
-editor SHALL keep winning where both arrive.
-
-#### Scenario: A reload keeps the open tab
-
-- **WHEN** an author opens the Paths tab and reloads the browser
-- **THEN** the Paths tab is the open one
-
-#### Scenario: An unknown tab name falls back
-
-- **WHEN** an author opens `/studio/processes/p1/edit/nonsense`
-- **THEN** the Canvas tab is the open one
-
-### Requirement: The header bar's menu holds what is not a tab
-
-The header bar's `⋮` menu SHALL carry a second group, "Views", below the
-process's own "Process, saved with the draft" group. The Views group SHALL
-hold the JSON surface, Versions and Player. The tab row SHALL have no
-trailing control of its own. Its trailing edge is the last tab.
-
-The JSON entry SHALL name its own state. An author reads from it whether
-the entry opens the JSON surface or leaves it.
-
-#### Scenario: The JSON surface opens from the header bar's menu
-
-- **WHEN** an author opens the header bar's `⋮` menu and picks the JSON
-  entry
-- **THEN** the JSON surface replaces the tab body
-- **AND** the entry now names leaving that surface
-
-#### Scenario: The tab row has no trailing control
-
-- **WHEN** an author reads the tab row
-- **THEN** its trailing edge is the last tab, with no overflow control
-  after it
-
-### Requirement: The area nav stands empty of draft controls
-
-The studio's area nav SHALL stand empty of draft controls while a draft
-stands open. Save, Discard draft and Publish stand in the header bar, as this
-capability's own requirement below states. The Checks tab's own count
-reports the checks state, as the count requirement above states. No control
-outside the tab row SHALL duplicate that state.
-
-#### Scenario: The area nav stands empty of draft controls
-
-- **WHEN** an author opens a draft
-- **THEN** the studio's area nav is empty of draft controls
-- **AND** Save, Discard draft and Publish stand in the header bar instead
-
-### Requirement: Save, Discard draft and Publish stand in the header bar
-
-The process header bar SHALL carry three controls, right-aligned in its row:
-Save, Discard draft and Publish. None of the three SHALL stand inside the
-header bar's own `⋮` menu. All three SHALL stay visible and usable on every
-tab and while the JSON surface is active.
-
-#### Scenario: The three controls stand in the header bar, not the menu
-
-- **WHEN** an author reads the header bar
-- **THEN** Save, Discard draft and Publish stand in the header bar row, right-aligned
-- **AND** the `⋮` menu carries none of the three
-
-#### Scenario: The three controls stay reachable while the JSON surface is active
-
-- **WHEN** an author opens the JSON surface from the overflow menu
-- **THEN** Save, Discard draft and Publish still stand in the header bar row
-
-### Requirement: A check opens the tab that owns its subject
-
-A row in the Checks tab SHALL open the place its subject lives. An issue about
-a step SHALL open the Steps tab with that step selected. An issue about a field
-SHALL open the Fields tab with that field selected. An issue about a path SHALL
-open the Paths tab with that path selected.
-
-#### Scenario: A step issue opens the step
-
-- **WHEN** an author presses a check that names a step
-- **THEN** the Steps tab is the open one
-- **AND** the step page stands on that step
+## ADDED Requirements
 
 ### Requirement: The tab row follows the area's roving-tabindex pattern
 
@@ -298,3 +182,18 @@ failed request. So that one-shape rule does not reach it.
 
 - **WHEN** the loaded draft passes structural validation
 - **THEN** no such banner stands
+
+## REMOVED Requirements
+
+### Requirement: The tab row follows the area's own tab pattern
+
+**Reason**: This row moves to the roving-tabindex model. That model
+contradicts this requirement's own "Every tab is its own stop" scenario. A
+MODIFIED block cannot drop a scenario. The replacement lands as its own
+requirement above, "The tab row follows the area's roving-tabindex
+pattern."
+
+**Migration**: The `tablist` grouping, the tab role, `aria-selected` and
+the Enter-or-Space activation all carry over unchanged into that new
+requirement. Only the tab-order model changes. Every tab took its own stop
+before; the row takes one stop now.

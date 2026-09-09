@@ -4359,7 +4359,7 @@ meets `scope=started` should infer no new permission tier from it.
 
 - The process surface (`screens/EditScreen.tsx`, `panels/ProcessTabRow.tsx`,
   `panels/StepsRail.tsx`, `panels/StepPage.tsx`, `panels/FormsTab.tsx`,
-  `panels/FormPreview.tsx`, `panels/DraftNavControls.tsx`,
+  `panels/FormPreview.tsx`,
   `studio-process-tabs`, `studio-step-page`, `studio-forms-overview`,
   `studio-guided-vocabulary`): stage 62. A draft opened on two screens before
   this. The edit screen carried a canvas ribbon over a bench. A separate
@@ -4388,23 +4388,25 @@ meets `scope=started` should infer no new permission tier from it.
   `tabForIssue`, maps an issue's entity type onto the tab that owns it. The
   third, `formEditorReturnTab`, yields the tab the form editor returns to.
 
-  The row component `ProcessTabRow.tsx` renders a `tablist` of buttons. Each
-  tab is its own tab stop. The row scrolls sideways and never wraps, with no
-  trailing control of its own. It still takes a `jsonOpen` prop, read-only,
+  The row component `ProcessTabRow.tsx` renders a `tablist` of buttons. The
+  whole row is one tab stop, on `spa-accessibility`'s roving-tabindex
+  pattern: the focused tab carries `tabindex="0"` and the other nine
+  `tabindex="-1"`, and the arrow keys move focus without opening a tab. The
+  row scrolls sideways and never wraps, with no trailing control of its own. It still takes a `jsonOpen` prop, read-only,
   to suppress every tab's `aria-selected` while the JSON surface stands
   open. `ProcessHeaderBar.tsx`'s `⋮` menu carries the JSON surface, Versions
   and Player instead, under its "Views" group. The JSON entry names its own
   state, so an author reads what pressing it does
   (`studio-header-menu-merge`).
 
-  The component `DraftNavControls.tsx` renders Checks into the studio's area
-  nav. That nav renders outside `DraftProvider`, so the surface reaches it
-  through a portal. The element `root.tsx` reserves is the portal's target.
-  The function `checksDotState` in `draft/checksRail.ts` decides the Checks
-  dot: blocker, advisory or clear. Save, Discard draft and Publish render
-  directly in `ProcessHeaderBar.tsx` instead, right-aligned ahead of its `⋮`
-  menu trigger. That component already sits inside `EditScreen.tsx`'s own
-  tree, so it renders them without a portal.
+  Save, Discard draft and Publish render directly in `ProcessHeaderBar.tsx`,
+  right-aligned ahead of its `⋮` menu trigger. That component already sits
+  inside `EditScreen.tsx`'s own tree, so it renders them without a portal.
+  The studio's area nav has no draft control, and `root.tsx` reserves no
+  element for one. The Checks tab's own count, in `ProcessTabRow.tsx`,
+  carries the severity color instead: the function `checksDotState` in
+  `draft/checksRail.ts` decides blocker, advisory or clear, and only the
+  blocker state colors the count.
 
   The rail component `StepsRail.tsx` lists one numbered row per step. The
   module `draft/registerOrder.ts` orders them by reachability from

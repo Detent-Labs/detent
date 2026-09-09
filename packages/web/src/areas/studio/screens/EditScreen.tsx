@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
 import * as stylex from "@stylexjs/stylex";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { DraftProvider, useDraft } from "../draft/store.js";
@@ -10,7 +9,6 @@ import { StepsRail } from "../panels/StepsRail.js";
 import { StepPage, type WalkNeighbour } from "../panels/StepPage.js";
 import { useDraftToolbarActions } from "../panels/DraftToolbar.js";
 import { ProcessHeaderBar } from "../panels/ProcessHeaderBar.js";
-import { DraftNavControls } from "../panels/DraftNavControls.js";
 import { ProcessTabRow, tabDomId, tabPanelDomId } from "../panels/ProcessTabRow.js";
 import { ChecksRail } from "../panels/ChecksRail.js";
 import { FieldsTab, DataSourcesTab } from "../panels/EntityTabs.js";
@@ -26,6 +24,7 @@ import { useFetchOnce } from "../panels/shared/useFetchOnce.js";
 import type { DraftRecord, PublishResult } from "../api/types.js";
 import { DEFAULT_TAB, type ProcessTab, type Route } from "../routing.js";
 import { formEditorReturnTab, processTabCounts, tabForIssue } from "../draft/process-tabs.js";
+import { checksDotState, groupChecksBySource } from "../draft/checksRail.js";
 import { initialSaveState, type DraftSaveState } from "./draftSaveLogic.js";
 import { isDirty } from "./draftToolbarState.js";
 import { CanvasView, groupMembersDomId } from "../canvas/CanvasView.js";
@@ -102,10 +101,16 @@ const styles = stylex.create({
   },
   // `.draft-incomplete` already zeroes its own top margin, so it needs no
   // extra help from `.studio-edit-screen > *` (below).
+  //
+  // `colors.refusal` joins the plain-color family the Checks count and the
+  // Publish reason already read for the same kind of fact. It stays out of
+  // the `errorBanner`/`errorBannerStamp` family below, which this file
+  // reserves for a load or a request that comes back wrong.
   draftIncomplete: {
     marginBlockStart: 0,
     marginBlockEnd: space.s3,
     marginInline: 0,
+    color: colors.refusal,
   },
   // Every OTHER `.studio-error-banner` in this file renders as a direct
   // child of `.studio-edit-screen`'s own flex column, which used to zero a
@@ -260,11 +265,6 @@ interface EditScreenProps {
   go: (href: string, opts?: NavigateOptions) => void;
   navigate: (route: Route, opts?: NavigateOptions) => void;
   onUnauthorized: () => void;
-  /** The element `root.tsx` reserves inside the studio's area nav. The
-   * surface renders its four draft controls into it through a portal: they
-   * belong to the open draft, whose state lives inside `DraftProvider`, and
-   * the nav sits outside it. `null` until the nav's own callback ref fires. */
-  navSlot: HTMLElement | null;
   /** Reports the open draft's dirty state upward, so `root.tsx` can guard
    * navigation away from it (design.md: "Report dirtiness upward through one
    * callback prop into a ref"). */
@@ -278,7 +278,6 @@ interface ProcessSurfaceProps {
   stepId?: string;
   token: string;
   go: (href: string, opts?: NavigateOptions) => void;
-  navSlot: HTMLElement | null;
   initialRevision: number;
   initialLayout: Record<string, unknown>;
   /** The published version this draft sits on, for the Changes tab.
@@ -314,7 +313,7 @@ interface ProcessSurfaceProps {
  * component state, the data sources panel fetched its list keys on mount, and
  * the field matrix holds its selected cell.
  */
-function ProcessSurface({ processId, formStepId, tab, stepId, token, go, navSlot, initialRevision, initialLayout, loadedBaseVersion, loadedCanPublish, navigate, onUnauthorized, onDirtyChange }: ProcessSurfaceProps) {
+function ProcessSurface({ processId, formStepId, tab, stepId, token, go, initialRevision, initialLayout, loadedBaseVersion, loadedCanPublish, navigate, onUnauthorized, onDirtyChange }: ProcessSurfaceProps) {
   const { draft, mutate, validation, replace, contentLocale } = useDraft();
   const baseLocale = draft.baseLocale ?? "en";
   const [saveState, setSaveState] = useState<DraftSaveState>(() => initialSaveState(initialRevision, initialLayout));
@@ -713,6 +712,9 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, go, navSlot
   });
 
   const counts = processTabCounts(draft, validation.issues, changesCount);
+  // The Checks tab's own count reads this color when the draft's worst open
+  // issue is a blocker (`studio-process-tabs`); no other tab's count does.
+  const checksBlocked = checksDotState(groupChecksBySource(validation)) === "blocker";
   const goToTab = (target: ProcessTab) => {
     // The narrowing belongs to one visit to the Checks tab. Leaving it drops
     // the filter, so a later press on the Checks control opens the whole list.
@@ -794,17 +796,6 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, go, navSlot
         onVersions={() => navigate({ name: "versions", processId })}
         onPlayer={() => navigate({ name: "play", processId })}
       />
-      {/* Checks stands in the studio's area nav (`studio-process-tabs`).
-          That nav renders outside `DraftProvider`, so the surface reaches it
-          through the element `root.tsx` reserves there rather than by
-          lifting the draft's own state out of the provider. Save, Discard
-          draft and Publish render directly in `ProcessHeaderBar` above,
-          inside this component's own tree — no portal needed for them. */}
-      {navSlot !== null &&
-        createPortal(
-          <DraftNavControls validation={validation} canPublish={canPublish} onOpenChecks={() => goToTab("checks")} />,
-          navSlot,
-        )}
       {formStepId !== undefined ? (
         formStep ? (
           <FormEditorScreen
@@ -824,6 +815,7 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, go, navSlot
           <ProcessTabRow
             open={openTab}
             counts={counts}
+            checksBlocked={checksBlocked}
             onOpen={goToTab}
             jsonOpen={jsonOpen}
           />
@@ -1032,7 +1024,7 @@ type EditLoadState =
   | { kind: "error"; message: string }
   | { kind: "loaded"; record: DraftRecord };
 
-export function EditScreen({ processId, formStepId, tab, stepId, token, go, navSlot, navigate, onUnauthorized, onDirtyChange }: EditScreenProps) {
+export function EditScreen({ processId, formStepId, tab, stepId, token, go, navigate, onUnauthorized, onDirtyChange }: EditScreenProps) {
   const [state, setState] = useState<EditLoadState>({ kind: "loading" });
   const fail = useFail(onUnauthorized, (e) => setState({ kind: "error", message: describeCaughtError(e) }));
 
@@ -1097,7 +1089,6 @@ export function EditScreen({ processId, formStepId, tab, stepId, token, go, navS
         stepId={stepId}
         token={token}
         go={go}
-        navSlot={navSlot}
         initialRevision={state.record.revision}
         initialLayout={state.record.layout}
         loadedBaseVersion={state.record.baseVersion}

@@ -148,9 +148,9 @@ describe("the canvas opens the Steps tab, and keeps its own selection behavior",
 
 describe("every new component's styles compile", () => {
   // `DraftNavControls.tsx` left this list when `studio-draft-actions-to-
-  // header-bar` narrowed it to a pass-through around `ChecksRail`: it
-  // declares no markup of its own left to style, so it carries no
-  // `stylex.create(` any more, by design rather than by omission.
+  // header-bar` narrowed it to a pass-through around `ChecksRail`.
+  // `checks-status-consolidation` then deleted the file outright: removing
+  // the area nav's Checks control emptied its whole body.
   const NEW_FILES = [
     "src/areas/studio/panels/ProcessTabRow.tsx",
     "src/areas/studio/panels/EntityTabs.tsx",
