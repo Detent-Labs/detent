@@ -5,8 +5,9 @@ info:
   description: >-
     The customer-facing HTTP surface of the workflow/BPM engine: login,
     process publish/list/versions, and the full instance lifecycle
-    (create, view, submit, claim/release/delegate, comment, attach a
-    file, cancel, and the audit record), plus the caller's own account.
+    (create, view, submit, save a form draft, claim/release/delegate,
+    comment, attach a file, cancel, change who may see it, and the audit
+    record), plus the caller's own account.
     Excludes `admin/*`, `drafts/*`,
     `migration-plans/*`, `reporting/*`, `templates/*`,
     the two `processes/{processId}/versions/{version}` studio reads (the
@@ -429,6 +430,62 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/IssuesErrorEnvelope"
+
+  /instances/{instanceId}/draft:
+    put:
+      tags: [instances]
+      operationId: saveInstanceDraft
+      summary: Save the participant's unfinished form input
+      description: >-
+        No reserved-role requirement. On a step with an assignment the
+        current claimant alone may save. On a step without one, the
+        instance's starter or a `system:admin` holder may. The draft is
+        stored leniently: no field rule runs until submit.
+      parameters:
+        - $ref: "#/components/parameters/instanceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InstanceDraftRequest"
+      responses:
+        "200":
+          description: The saved draft's author and save time. One draft per instance; a second save replaces the first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstanceDraftSaved"
+        "400":
+          description: Request body is not valid JSON, `data` is not a JSON object, or the serialized draft exceeds the 8 MiB envelope bound.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: No actor could be resolved from the request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: The actor is not the claimant, or on an unassigned step is neither the starter nor a `system:admin` holder.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "409":
+          description: The instance is not running.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "500":
+          description: The instance does not exist. Also covers any unrecognized server-side failure.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
 
   /instances/{instanceId}/claim:
     post:
@@ -874,6 +931,141 @@ paths:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "403":
           description: The actor holds neither `system:admin` nor `system:developer` or `system:author` plus starter status on this instance.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /instances/{instanceId}/visibility/grant:
+    post:
+      tags: [instances]
+      operationId: grantInstanceVisibility
+      summary: Give one actor sight of an instance
+      description: >-
+        Requires the `system:admin` role, or a `visibility` grant over this
+        instance's process. The named actor joins the instance's principal
+        set, and any standing revocation of that actor is lifted.
+      parameters:
+        - $ref: "#/components/parameters/instanceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VisibilityRequest"
+      responses:
+        "204":
+          description: No content. The change is recorded as a `visibility.changed` event on the instance. A repeat call writes no further state, and appends another event.
+        "400":
+          description: Request body is not valid JSON, or `actorId` is missing, not a string, or blank.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: No actor could be resolved from the request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: The actor holds neither `system:admin` nor a `visibility` grant over this instance's process.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "500":
+          description: The instance does not exist, or its pinned version has no published body. Also covers any unrecognized server-side failure.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /instances/{instanceId}/visibility/revoke:
+    post:
+      tags: [instances]
+      operationId: revokeInstanceVisibility
+      summary: Remove one actor's sight of an instance
+      description: >-
+        Requires the `system:admin` role, or a `visibility` grant over this
+        instance's process. The named actor is denied, whichever principal
+        matched them. The denial outlives a later assignment.
+      parameters:
+        - $ref: "#/components/parameters/instanceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VisibilityRequest"
+      responses:
+        "204":
+          description: No content. The change is recorded as a `visibility.changed` event on the instance. A repeat call writes no further state, and appends another event.
+        "400":
+          description: Request body is not valid JSON, or `actorId` is missing, not a string, or blank.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: No actor could be resolved from the request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: The actor holds neither `system:admin` nor a `visibility` grant over this instance's process.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "500":
+          description: The instance does not exist, or its pinned version has no published body. Also covers any unrecognized server-side failure.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /instances/{instanceId}/visibility/restore:
+    post:
+      tags: [instances]
+      operationId: restoreInstanceVisibility
+      summary: Undo a revocation on one actor
+      description: >-
+        Requires the `system:admin` role, or a `visibility` grant over this
+        instance's process. The named actor returns to the sight they had
+        before the revocation. It grants nothing on its own.
+      parameters:
+        - $ref: "#/components/parameters/instanceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VisibilityRequest"
+      responses:
+        "204":
+          description: No content. The change is recorded as a `visibility.changed` event on the instance. A repeat call writes no further state, and appends another event.
+        "400":
+          description: Request body is not valid JSON, or `actorId` is missing, not a string, or blank.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: No actor could be resolved from the request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: The actor holds neither `system:admin` nor a `visibility` grant over this instance's process.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "500":
+          description: The instance does not exist, or its pinned version has no published body. Also covers any unrecognized server-side failure.
           content:
             application/json:
               schema:
@@ -1743,6 +1935,34 @@ components:
           minLength: 1
           maxLength: 10000
       required: [text]
+
+    InstanceDraftRequest:
+      type: object
+      properties:
+        data:
+          type: object
+          additionalProperties: true
+          default: {}
+          description: The whole draft, replacing whatever was stored. Serialized, it is bounded at 8 MiB.
+
+    InstanceDraftSaved:
+      type: object
+      properties:
+        updatedBy:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+      required: [updatedBy, updatedAt]
+
+    VisibilityRequest:
+      type: object
+      properties:
+        actorId:
+          type: string
+          minLength: 1
+          description: The actor whose sight of this instance changes, named directly rather than by the principal they matched.
+      required: [actorId]
 
     HealthStatus:
       type: object

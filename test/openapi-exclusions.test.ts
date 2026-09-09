@@ -12,7 +12,7 @@ import { test, expect } from "bun:test";
 
 const DOC = await Bun.file(new URL("../docs/openapi.yaml", import.meta.url)).text();
 
-const EXCLUDED = ["admin", "drafts", "migration-plans", "reporting"] as const;
+const EXCLUDED = ["admin", "drafts", "migration-plans", "reporting", "templates"] as const;
 
 /** Path keys are the two-space-indented `  /foo/...:` entries under `paths:`. */
 const documentedPaths = [...DOC.matchAll(/^ {2}(\/[^\s:]*):/gm)].map((m) => m[1]!);
@@ -56,6 +56,24 @@ test("neither account route claims a 404", () => {
   // federated, not as missing, so the read answers 200 and the write 403.
   const entry = DOC.slice(DOC.indexOf("  /account/me:"), DOC.indexOf("  /livez:"));
   expect(entry).not.toContain('"404"');
+});
+
+test("the draft save and the three visibility writes are documented", () => {
+  // All four sit inside the instance lifecycle the document advertises. No
+  // screen in `packages/web` calls the three visibility writes, which is how
+  // they stayed out of the document while every screen-backed route went in.
+  expect(documentedPaths).toContain("/instances/{instanceId}/draft");
+  expect(documentedPaths).toContain("/instances/{instanceId}/visibility/grant");
+  expect(documentedPaths).toContain("/instances/{instanceId}/visibility/revoke");
+  expect(documentedPaths).toContain("/instances/{instanceId}/visibility/restore");
+});
+
+test("neither studio version read is documented, while the list route stays", () => {
+  // Whole-path comparisons, not a prefix: `/processes/{processId}/versions` is
+  // documented and an integration needs it, so a prefix check would flag it.
+  expect(documentedPaths).not.toContain("/processes/{processId}/versions/{version}");
+  expect(documentedPaths).not.toContain("/processes/{processId}/versions/{version}/orphan-keys");
+  expect(documentedPaths).toContain("/processes/{processId}/versions");
 });
 
 test("no internal-only prefix appears as a documented path", () => {

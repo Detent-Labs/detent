@@ -7,7 +7,7 @@ This change lands after the audit's Change A. Confirm that first:
 
 ## 1. docs/decisions.md
 
-- [ ] 1.1 Apply report 10's C1, C2 and C3, with the overrides from
+- [x] 1.1 Apply report 10's C1, C2 and C3, with the overrides from
       `design.md`. C1 appends the display-name entry at the file's end, and
       its citation reads `src/auth/users.ts:151-152`. C2 then appends the new
       `##` section after C1's last line. Take the SEC-4, SEC-5, CQ-1 and
@@ -30,7 +30,7 @@ This change lands after the audit's Change A. Confirm that first:
 
 ## 2. docs/CODE_REVIEW.md
 
-- [ ] 2.1 Apply report 10's C4, C5 and C6. Three ids move, and nothing else
+- [x] 2.1 Apply report 10's C4, C5 and C6. Three ids move, and nothing else
       in the file moves. Do not re-derive the ids from the top-findings list.
       The detailed findings and the action list are the source.
       Verify: `grep -c "^4\. \*\*SEC-5" docs/CODE_REVIEW.md` reports 1.
@@ -42,24 +42,24 @@ This change lands after the audit's Change A. Confirm that first:
 
 ## 3. Verification
 
-- [ ] 3.1 Run the prose gate over the pushed range:
+- [x] 3.1 Run the prose gate over the pushed range:
       `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`.
       Both files exit 0 under the linter today, so the gate counts 0 at the
       base. The tip must exit 0 too. Read the exit code, never the printed
       line count.
       Verify: the gate exits 0, and it names both files as checked.
-- [ ] 3.2 Run the whitespace gate over the same range:
+- [x] 3.2 Run the whitespace gate over the same range:
       `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh`.
       Verify: the gate exits 0.
-- [ ] 3.3 Run `bun run typecheck`, then `bun run build`, then the full
+- [x] 3.3 Run `bun run typecheck`, then `bun run build`, then the full
       `bun test` with `DATABASE_URL` set, inside the devcontainer. These
       prove that no code file moved. Read the verdict off a named failure.
       Verify: all three exit 0, and `git diff --stat` names two files.
-- [ ] 3.4 Confirm that no browser check applies. This change touches no file
+- [x] 3.4 Confirm that no browser check applies. This change touches no file
       under `packages/`, so no screen changes.
       Verify: `git diff --name-only` lists `docs/decisions.md` and
       `docs/CODE_REVIEW.md` alone.
-- [ ] 3.5 Confirm the scope boundary. This change fixes none of the ten
+- [x] 3.5 Confirm the scope boundary. This change fixes none of the ten
       findings, and it deletes no gitignored file.
       Verify: `git status --short` shows no other tracked file, and
       `ls docs/superpowers/specs/` still lists the display-name design.

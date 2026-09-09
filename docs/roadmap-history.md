@@ -1582,6 +1582,42 @@ as it stands.
     Archived as `openspec/changes/archive/2026-08-17-panels-list-and-detail`.
     The delta landed in `studio-app`.
 
+44. **Technical (system-only) field marker: DONE.** Change:
+    `technical-field-marker`.
+
+    Live testing on `detent.org` placed `result` on `loan_application` as a
+    required form field. Only the `check` step's `subprocess.outputMapping`
+    writes it, so the earlier `required`/`readonly` gate stayed off by its own
+    design. No participant can ever supply that value. The form entry meant
+    nothing.
+
+    `FieldDef` gained `technical?: boolean`. Publish rejects two shapes. One is
+    `technical: true` on a `type: "group"` field. The other is a view entry
+    naming a technical field that declares `required` or `readonly`, literal or
+    CEL. Both checks sit in `compile.ts::checkTechnicalFields`, never as a Zod
+    refinement, since `definition.ts` also parses stored immutable bodies.
+
+    The engine forces `required: false, readonly: true` for a technical field
+    on every step. That line sits in `resolveFields`, beside the `type:
+    "group"` case already there. A submission naming a technical field returns
+    the existing `readonly-field` issue.
+
+    The studio ships the marker without inference. A Technical checkbox on the
+    field catalog's Field tab reaches a top-level field and a group's child.
+    Checking it clears every stale `required`/`readonly` view key, behind a
+    confirmation naming the count. The form editor's strip omits both controls
+    for a technical field, and the field matrix disables the matching cells and
+    marks the row header. A new checks-rail finding reports the inverse case, a
+    technical field no structural source writes.
+
+    Two things stayed out. Inferring "technical" from usage needs a dismissal
+    mechanism `EditorIssue` does not have, and it would put a second authority
+    beside the declared key. Step-order-aware validation is a separate, costlier
+    analysis. Neither blocks the marker.
+
+    Specs: `definition-contract`, `runtime-api`, `studio-app`,
+    `studio-checks-rail`, `studio-form-editor`.
+
 45. **Auto-derive `key` from `label` in the studio: DONE.** Raised 2026-08-23
     in conversation. Change: `auto-derive-key-from-label`. A shared
     `deriveKey`/`dedupeKey`/`shouldAutoDeriveKey` triple
@@ -2067,3 +2103,73 @@ as it stands.
     `nav.involvedCases` in both locales.
 
     Specs: `end-user-app`.
+
+61. **The studio's publish gate, its confirmation dialogs and its failure
+    report: DONE.** Change: `studio-publish-gate-and-report`.
+
+    A browser check found three failures on one path. The edit screen admits
+    `system:developer` and `system:author`, and neither role implies
+    `system:publish`. The menu offered Publish to both. Publishing as the
+    seeded `demo-developer` account answered 403, the screen looked unchanged,
+    and one console line was the whole report.
+
+    `GET /drafts/:processId` now carries `canPublish`, computed from
+    `can(actor, "publish", processId, db)`. That copies the `canPlanMigration`
+    field the same handler already returned. The studio marks Publish
+    unavailable when it reads false and states the reason as text, beside the
+    control on the header row.
+
+    A native `confirm()` guarded the least reversible act in the product.
+    Publish and discard now confirm in a modal `dialog` element. The publish
+    dialog names the process, the draft revision and the version the publish
+    mints, and states that a published version never changes. One dialog covers
+    the unsaved-changes case as well. It does not open with its confirming
+    control focused, and focus returns to the control that opened it.
+
+    A failed save, discard or publish renders in an announced alert region.
+    Four other bare paragraphs took the same banner shape: the save conflict,
+    the missing form step, the absent draft and the dock's failed diff load.
+    Seven further `confirm()` sites in the studio stayed as they were. Each
+    belongs to another capability and carries its own copy and catalog keys.
+
+    Specs: `process-drafts`, `spa-error-reporting`, `studio-app`,
+    `studio-publish`.
+
+62. **One tabbed process surface for a draft, and the plain-language authoring
+    vocabulary over it: DONE.** Change: `studio-guided-surface`.
+
+    The studio split one authoring job across two screens. The edit screen
+    carried a canvas ribbon over a bench. The panels screen carried the six
+    process-wide views behind an index rail. Adding a field, putting it on a
+    form and routing on it crossed that boundary three times. The controls also
+    spoke the definition contract at the author.
+
+    One process surface replaces both screens. A tab row holds ten tabs in
+    authoring order: Canvas, Steps, Fields, Data sources, Paths, Forms, Field
+    matrix, Contract, Changes and Checks. Eight of them print a count; Canvas
+    and Contract print none. `PROCESS_TABS` in `areas/studio/routing.ts` owns
+    the list, and the open tab stands in the address at
+    `/studio/processes/:id/edit/:tab`. No index rail stands beside the body.
+
+    The Steps tab holds the guided walk. A numbered steps rail stands left of
+    one wide step page, in reachability order. The page replaces the
+    collapsible section register with a flat two-column one, and prints each
+    section's open issues beside its heading. A Developer view disclosure holds
+    that step's raw JSON, closed on open. The Forms tab lists one card per step
+    that declares a view, each carrying a miniature of that form.
+
+    A label layer words every authoring control plainly. "Performed by" became
+    Assignment, a terminal step became "An end", a guard became "Taken only
+    when". The definition contract did not move, and its own words stay
+    reachable in the Developer view.
+
+    The JSON surface, Versions and Player sit in a Views group in the header
+    bar's menu. Save, Discard draft and Publish stand right-aligned on the
+    header row, ahead of that menu. The area nav stands empty of draft
+    controls. Four new capabilities carry the rules: `studio-guided-vocabulary`,
+    `studio-process-tabs`, `studio-step-page` and `studio-forms-overview`.
+
+    Specs: `studio-app`, `studio-canvas`, `studio-checks-rail`,
+    `studio-form-editor`, `studio-forms-overview`, `studio-guided-vocabulary`,
+    `studio-json-view`, `studio-process-tabs`, `studio-publish`,
+    `studio-step-page`.

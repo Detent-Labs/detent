@@ -1,6 +1,6 @@
 ## 1. `.claude/rules/process-contract.md`
 
-- [ ] 1.1 Apply C1 through C7 from `tmp/doc-audit/08-rules-contract.md`. Use
+- [x] 1.1 Apply C1 through C7 from `tmp/doc-audit/08-rules-contract.md`. Use
       that report's byte-exact anchors, and apply C2 before C3, because C3's
       anchor is the last sentence C2 introduces. Read the file immediately
       before editing it. Narrow the `allow-file` directive on line 14 to
@@ -23,7 +23,7 @@
 
 ## 2. `.claude/rules/authoring-invariants.md`
 
-- [ ] 2.1 Apply C9 through C16 from `tmp/doc-audit/08-rules-contract.md`. Read
+- [x] 2.1 Apply C9 through C16 from `tmp/doc-audit/08-rules-contract.md`. Read
       the file immediately before editing it. Keep every added bullet at six
       sentences or fewer: this file's `allow-file` on line 12 does not silence
       `paragraph-length`. The facts behind each correction sit in `design.md`,
@@ -43,7 +43,7 @@
 
 ## 3. `docs/authoring-guide.md`
 
-- [ ] 3.1 Apply C8 from `tmp/doc-audit/08-rules-contract.md`: drop `order` from
+- [x] 3.1 Apply C8 from `tmp/doc-audit/08-rules-contract.md`: drop `order` from
       the view-key list on line 482. Read the file immediately before editing
       it. Line 833 already states the list correctly, so leave it alone. This
       file carries no `allow-file` directive. C8 deletes two words and adds

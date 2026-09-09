@@ -1,6 +1,6 @@
 ## 1. `docs/openapi.yaml`
 
-- [ ] 1.1 Apply C1 through C4 of `tmp/doc-audit/09-openapi.md`. Those four
+- [x] 1.1 Apply C1 through C4 of `tmp/doc-audit/09-openapi.md`. Those four
       corrections cover the draft-save entry, the three visibility entries, the
       three component schemas and the summary sentence. Take the replacement
       text from the report, which is byte-exact and anchor-checked.
@@ -12,7 +12,7 @@
 
 ## 2. `test/openapi-exclusions.test.ts`
 
-- [ ] 2.1 Add `templates` to `EXCLUDED` at line 15. Add one assertion per new
+- [x] 2.1 Add `templates` to `EXCLUDED` at line 15. Add one assertion per new
       documented path, and one that no studio version read appears. Match the
       full version-read path: a prefix also matches
       `/processes/{processId}/versions`, which stays documented.
@@ -22,13 +22,13 @@
 
 ## 3. `packages/web/test/studio-stepsRail.test.tsx`
 
-- [ ] 3.1 Add one assertion: no rail row carries `aria-expanded`. That
+- [x] 3.1 Add one assertion: no rail row carries `aria-expanded`. That
       assertion is what makes the rewritten first scenario testable.
       Verify: `grep -c 'aria-expanded' packages/web/test/studio-stepsRail.test.tsx` reports 1 or more.
 
 ## 4. `packages/web/test/studio-stepPage.test.tsx`
 
-- [ ] 4.1 Correct the comment at `:172-173`. It reads "The page's one
+- [x] 4.1 Correct the comment at `:172-173`. It reads "The page's one
       disclosure is the Developer view, and it is a `<details>`", and the page
       carries a second one, the guard editor's toggle
       (`ConditionInput.tsx:154-164`). The assertion below it scans `<h3>` tags
