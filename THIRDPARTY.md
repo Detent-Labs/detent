@@ -5,10 +5,12 @@ Public License v3.0-or-later (see `LICENSE`). It uses the open-source
 packages listed below. `bun install` installs each one unmodified, under its
 own license, per `bun.lock` / `package.json`.
 
-This list reads name and version from `bun.lock`, then reads the `license`
-field from each resolved package's own `package.json`. It also cross-checks
-every workspace's `package.json` (`packages/*` + root). Regenerate it after
-any dependency change.
+`scripts/thirdparty.ts` builds the Direct dependencies table below. It
+reads name and version from `bun.lock`, then reads the `license` field from
+each resolved package's own `package.json`. The lockfile's `workspaces`
+block names every direct dependency; the `frozen-lockfile` gate keeps that
+block true to the manifests. Run `bun run scripts/thirdparty.ts --write`
+after any dependency change.
 
 Full license text for the SPDX identifiers below is the standard text
 published at <https://spdx.org/licenses/> (e.g. `.../MIT.html`,
@@ -54,30 +56,33 @@ Declared directly in a `package.json` (root or a `packages/*` workspace).
 | `@dagrejs/dagre` | 3.1.1 | MIT |
 | `@marcbachmann/cel-js` | 8.0.0 | MIT |
 | `@panzoom/panzoom` | 4.6.2 | MIT |
+| `@stylexjs/stylex` | 0.19.0 | MIT |
+| `@stylexjs/unplugin` | 0.19.0 | MIT |
 | `@types/bun` | 1.3.14 | MIT |
-| `@types/react` | 19.2.18, 18.3.31 | MIT |
-| `@types/react-dom` | 19.2.4, 18.3.7 | MIT |
+| `@types/react` | 19.2.18 | MIT |
+| `@types/react-dom` | 19.2.4 | MIT |
 | `@vitejs/plugin-react` | 6.0.5 | MIT |
-| `immer` | 11.1.15 | MIT |
 | `jose` | 6.2.4 | MIT |
-| `lucide-react` | 1.29.0 | ISC |
+| `lucide-react` | 1.40.0 | ISC |
 | `react` | 19.2.8, 18.3.1 | MIT |
 | `react-dom` | 19.2.8, 18.3.1 | MIT |
-| `typescript` | 5.6.2 | Apache-2.0 |
+| `typescript` | 7.0.2 | Apache-2.0 |
 | `vite` | 8.2.1 | MIT |
-| `zod` | 4.4.3 | MIT |
+| `zod` | 4.5.4 | MIT |
 
-`react`, `react-dom` and their type packages resolve twice. `packages/web`
-declares `^19` and gets 19.2.8. `packages/form-ui` declares `^18` as a peer
-range and keeps 18.3.1 under it.
+`react` and `react-dom` resolve twice. `packages/web` declares `^19` and
+gets 19.2.8. `packages/form-ui` declares `^18` as a peer range and keeps
+18.3.1 under it. The two type packages resolve once. Both workspaces declare
+`@types/react` and `@types/react-dom` at `^19`.
 
 ## Transitive dependencies
 
 <!-- antislop: allow sentence-length -->
 
 Pulled in by the packages above, mostly Rolldown and Lightning CSS under
-Vite plus small runtime helpers for React. `bun.lock` names every one, with
-its resolved version.
+Vite plus small runtime helpers for React. Babel arrives with
+`@stylexjs/unplugin`, which compiles the StyleX styles at build time.
+`bun.lock` names every one, with its resolved version.
 
 ## Notes
 
@@ -90,10 +95,11 @@ its resolved version.
   copyleft, and it binds whoever modifies a covered file. This project uses
   the published package unmodified, and only at build time. The obligation is
   attribution.
-- `typescript`, `vite`, `@vitejs/plugin-react`, and everything under
-  "Transitive dependencies" are build-time tooling. Bun installs them, but
-  the build does not bundle them into the shipped application code.
+- `typescript`, `vite`, `@vitejs/plugin-react`, `@stylexjs/unplugin`, and
+  everything under "Transitive dependencies" are build-time tooling. Bun
+  installs them, but the build does not bundle them into the shipped
+  application code.
 - Runtime/bundled libraries are `@marcbachmann/cel-js`, `jose`, `zod`,
-  `react`, `react-dom`, `immer`, `@panzoom/panzoom`, `lucide-react`,
-  `@dagrejs/dagre` (plus their small runtime helpers `@dagrejs/graphlib`,
-  `scheduler`, `loose-envify`, `js-tokens`).
+  `react`, `react-dom`, `@stylexjs/stylex`, `@panzoom/panzoom`,
+  `lucide-react`, `@dagrejs/dagre` (plus their small runtime helpers
+  `@dagrejs/graphlib`, `scheduler`, `loose-envify`, `js-tokens`).

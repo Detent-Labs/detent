@@ -11,7 +11,7 @@ paths:
   - "docs/authoring-guide.md"
 ---
 
-<!-- antislop: allow-file synonym-rotation em-dash passive-voice sentence-length run-ons paragraph-length -->
+<!-- antislop: allow-file em-dash passive-voice sentence-length run-ons -->
 # The definition contract: load-bearing rules
 
 JSON is the one artifact; the Zod schemas (with TS types derived via z.infer)
@@ -71,14 +71,63 @@ an unset optional field.
 **Data vs presentation.** Fields are defined once in a process-wide catalog.
 Each step carries a flat `view` whose entries either reference a catalog
 field, overriding its per-step presentation (visible / required / readonly /
-order / group), or stand alone as a note (`text`, plus visible / order /
-group — no field underneath, so no required or readonly). The instance
+span / group / validation / validationMode), or stand alone as a note (`text`,
+plus visible / span / group — no field underneath, so no required, readonly or
+validation). There is no `order` key; the array position is the order, and
+`FieldForm.tsx` renders in declaration order. The instance
 payload is a flat object keyed by `fieldId`, stable across the whole
 lifecycle. Requiredness lives only in the view, never in the catalog.
 `FieldDef.technical` refines that rule rather than breaching it: it is a
 catalog-level fact that forces `required: false, readonly: true` on every
 step, and a view entry naming a technical field may declare neither key at
 all. Ordinary, per-step requiredness stays exactly where it was.
+
+**Redaction marker.** `FieldDef.redactable` marks a field's historical values
+eligible for erasure. The instance audit log's redaction path clears a
+redactable field across its whole history and leaves every other field
+untouched. Nothing else reads the flag: not a CEL type-check, not view
+resolution, not another publish-time rule. A `redactable` field must not be
+`type: "group"`, a write-path check (`compile.ts::checkRedactableFields`).
+`redactable` and `technical` are independent. A declared `redactable: false`
+is a key in the canonical JSON, distinct from an absent key.
+
+**Field semantics.** A `FieldDef` declares `type`, the value form. It may add
+`format` (the semantics over that form) and `control` (the input widget).
+`definition.ts::ALLOWED_BY_TYPE` is the one table of allowed pairs per type.
+The publish-time check reads it (`compile.ts::checkFieldFormatControl`), the
+one reader in `src/`. A plugin envelope has no row there, so a plugin-typed
+field may declare neither key. `format` is read at runtime too, by
+`typeMatches` and by `celType`; `control` is read by the form renderer and by
+three studio files, which size a canvas card row, label a field kind and
+detect a kind change.
+
+The studio has no format picker and no control picker. Its kind picker
+(`FieldCatalogPanel.tsx::KindPicker`) writes whole `{type, format, control}`
+triples from `definition.ts::FIELD_KINDS`, a curated sixteen of the
+twenty-five combinations `ALLOWED_BY_TYPE` admits.
+
+`FieldDef.columnMapping` maps a data source column key onto another catalog
+field. The engine resolves the picked option, checks the attribute against the
+target's declared type, and writes a match. Its bounds live in
+`compile.ts::checkColumnMapping`. The field needs a `dataSource` and
+`type: "string"`, and each key matches the field-key grammar and length bound.
+Each target resolves, and is neither a group nor the mapping field itself; no
+two keys name one target. Publishing reads no data list, so a key naming no
+declared column publishes and writes nothing at runtime.
+
+**View layout.** `View.columns` and `ViewField.span` are layout only, each `1`
+or `2`, absent meaning 1. Neither reaches a guard, a CEL context or a
+submission check. The renderer clamps a span to `min(span, columns)`. A span
+wider than the grid draws narrow, never a publish error. Both keys are optional
+unions in `definition.ts`, which also deserializes stored bodies, so a body
+written before them keeps its `definitionHash`.
+
+**View validation override.** A `ViewField` may override the catalog field's
+`validation`, the same shape `FieldDef.validation` carries. `validationMode`
+says how the two combine. `"merge"`, the default when `validation` is present,
+overlays the step's keys on the catalog's. `"replace"` drops the catalog value
+whole. A `validationMode` without `validation`, and a `validation` with no key
+set, both fail to parse — two Zod refinements on `viewField` itself.
 
 **Actions and triggers.** Actions are declarative handler references
 (`{ type, config }`), never inline code. Triggers are ordered: onExit(source),
@@ -130,8 +179,9 @@ core validates only the envelope; each plugin ships its own JSON Schema.
 `Step.assignment.strategy.type` resolves through its own `AssignmentRegistry`
 (`registry.ts`), a third sibling beside the action `Registry` and the
 `DataSourceRegistry`; `"static"` is a registered entry there — the type an
-author gets by default; `org.manager-of-starter` and `org.group-members` also
-ship — not a literal any engine code compares against. An entry declares a candidate resolver
+author gets by default; `org.manager-of-starter`, `org.group-members` and
+`org.actor-from-field` also ship — not a literal any engine code compares
+against. An entry declares a candidate resolver
 (`(ctx) => Promise<string[]>`, async even for `static`, over the narrow context
 `{ config, stepId, instance: { id, startedBy, data }, db }`) and may declare a
 config schema. `db` is the instance's OWN database, and it is required: under
@@ -173,8 +223,8 @@ placement, throwing `AssignmentRegistryValidationError` /
 `DataSourceRegistryValidationError`. Data sources are never
 inlined; fields bind to them by id and options resolve at runtime.
 
-`org.group-members`, one of the two org-aware assignment strategies, adds a
-fourth, DB-resolving publish-time check beside `validateCrossProcess` and
+`org.group-members`, one of the three org-aware assignment strategies, adds a
+third, DB-resolving publish-time check beside `validateCrossProcess` and
 `validateProcessChaining`: for every entry in the body's own `allowedGroups`,
 `publishBody` confirms a group with that id exists in the `groups` store
 (`src/auth/groups.ts`) and that its scope permits the publishing process,
@@ -182,6 +232,13 @@ throwing `GroupScopeValidationError` on any violation. It runs at the same
 placement as the other two — after the hash-hit no-op return, so an
 already-published body's re-publish stays a no-op even after a referenced
 group's scope narrows underneath it (`group-scope-validation`).
+
+`publishBody` awaits six DB-resolving checks in all, in this order:
+`validateCrossProcess`, `validateProcessChaining`, `validateGroupScope`,
+`validateInstanceQueryReferences`, `validateInstanceTransitionReferences`,
+`validateCrossProcessReadGrant`. The two `instance*References` checks also
+return the `PublishFinding`s the publish result carries.
+`validateCrossProcessReadGrant` is skipped when the caller passes no actor.
 
 **Runtime record (the audit backbone).** The instance carries assignment/claim
 state and persisted timer firings. Each HistoryEntry is append-only and records

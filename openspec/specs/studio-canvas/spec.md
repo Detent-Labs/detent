@@ -99,7 +99,7 @@ the drag-to-a-step gesture already shows for a rejected candidate.
 
 When that check accepts the candidate, the release SHALL create a new
 step at the drop point. It SHALL then create a path from the source
-step to that new step. Both SHALL use the same methods `StepsPanel`'s
+step to that new step. Both SHALL use the same methods `StepsRail`'s
 "add step" button and `PathsPanel`'s "add path" action already call.
 Creating the step before the path means a rejected candidate never
 leaves a step behind with no path to it.

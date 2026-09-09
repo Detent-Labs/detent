@@ -124,7 +124,7 @@ reaches the label at all.
 
 The canvas is the surface that carried that defect. Its node printed the
 step's key, and printed it twice. The content-locale switcher changed nothing
-there. Two step headings carried the same defect, in `StepsPanel` and in the
+there. Two step headings carried the same defect, in `StepsRail` and in the
 form editor. Each printed a key and reached no label.
 
 #### Scenario: The content locale reaches every surface that prints a label
