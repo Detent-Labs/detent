@@ -19,7 +19,16 @@ import {
   type DraftViewField,
   type DropSide,
 } from "../draft/view-layout";
-import { insertGroupedField, nudgeViewField, removeViewEntry, viewTree, type ViewTreeNode } from "../draft/view-tree";
+import {
+  dragScopeByIndex,
+  insertGroupedField,
+  isLawfulCardDrop,
+  landedIndex,
+  nudgeViewField,
+  removeViewEntry,
+  viewTree,
+  type ViewTreeNode,
+} from "../draft/view-tree";
 import { PALETTE_FIELD_KINDS, mintCatalogField, type PaletteFieldKind } from "../draft/mintField";
 import { seedLocalizedText, missingTranslationWarning, resolveDraftLocalizedText, type DraftLocalizedText } from "../draft/localized-text";
 import { BooleanOrExpressionInput } from "../panels/shared/BooleanOrExpressionInput";
@@ -797,19 +806,14 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
   };
 
   const move = (rowIndex: number, delta: -1 | 1) => {
-    const movedEntry = rows[rowIndex];
     const next = nudgeViewField(rows, rowIndex, delta, fields);
     if (next === rows) return;
     setRows(next);
-    // The landed index, read off the array the move returned rather than
-    // assumed as `rowIndex + delta`: a root entry's move can step over a
-    // whole group's footprint, landing more than one position away.
-    // `nudgeViewField`'s splice keeps the moved entry's own object
-    // reference, so `indexOf` finds it — the same way `EntityTabs.tsx`'s
-    // `moveField` reads its own landed row off the moved tree rather than
-    // trusting the target it was handed.
-    const landed = next.indexOf(movedEntry!);
-    setSelected(landed === -1 ? undefined : landed);
+    // The landed index, read off the array the move returned (`view-tree.ts`'s
+    // `landedIndex`) rather than assumed as `rowIndex + delta`: a root
+    // entry's move can step over a whole group's footprint, landing more
+    // than one position away.
+    setSelected(landedIndex(rows, next, rowIndex));
   };
 
   const fieldFor = (ref_: FieldId | undefined) => fields.find((f) => f.id === ref_);
@@ -838,24 +842,11 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
 
   // Every row's own drag scope: `undefined` at the form's root, or the
   // group's own key for a member — whichever nested `<ol>` a card's edges
-  // and tail slot belong to. Built once per tree so a dragover handler can
-  // compare the dragged entry's own scope against the target's, the
-  // mechanism task 6.5 needs (design.md: "A refused drop uses the browser's
-  // own no-drop cursor").
-  const scopeByIndex = useMemo(() => {
-    const map = new Map<number, string | undefined>();
-    const walk = (nodes: ViewTreeNode[], scope: string | undefined) => {
-      for (const node of nodes) {
-        map.set(node.index, scope);
-        if (node.members) {
-          const groupKey = isDraftViewField(node.entry) ? fieldFor(node.entry.ref)?.key : undefined;
-          walk(node.members, groupKey);
-        }
-      }
-    };
-    walk(tree, undefined);
-    return map;
-  }, [tree, fields]);
+  // and tail slot belong to (`view-tree.ts`'s `dragScopeByIndex`). Built once
+  // per render so a dragover handler can compare the dragged entry's own
+  // scope against the target's, the mechanism task 6.5 needs (design.md: "A
+  // refused drop uses the browser's own no-drop cursor").
+  const scopeByIndex = useMemo(() => dragScopeByIndex(rows, fields), [rows, fields]);
 
   /** Whether a dragover at `scope` should call `preventDefault` — the whole
    * refusal mechanism task 6.5 needs: the browser draws its own no-drop
@@ -863,11 +854,11 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
    * ever painted. A palette or mint payload is always welcome, wherever it
    * lands (`insertGroupedField` and the group-less mint rule each resolve
    * their own placement); a card payload is welcome only at the scope it
-   * already occupies. */
+   * already occupies, `view-tree.ts`'s `isLawfulCardDrop`. */
   const lawfulDrop = (scope: string | undefined) => {
     if (!dragging) return false;
     if (dragging.kind !== "card") return true;
-    return scopeByIndex.get(dragging.index) === scope;
+    return isLawfulCardDrop(scopeByIndex, dragging.index, scope);
   };
 
   /** One placed card, leaf or group, at its own nesting level. `scope` is the

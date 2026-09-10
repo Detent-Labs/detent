@@ -377,3 +377,63 @@ export function insertGroupedField(
   next.splice(memberSlot, 0, { ref, group: parentKey });
   return next;
 }
+
+/**
+ * Every row's own drag scope: `undefined` at the form's root, or the
+ * group's own key for a member -- whichever nested list a card's own edges
+ * and tail slot belong to. What a dragover handler compares a dragged
+ * card's origin against, so a card can only relocate within its own scope
+ * (the "A drag that would land a member outside its group SHALL change
+ * nothing" requirement). Reuses `viewTree` rather than re-walking `rows`,
+ * so this can never disagree with what the canvas actually draws.
+ */
+export function dragScopeByIndex(rows: DraftViewEntry[], catalogFields: DraftField[]): Map<number, string | undefined> {
+  const fieldsById = draftFieldsById(catalogFields);
+  const tree = viewTree(rows, catalogFields);
+  const map = new Map<number, string | undefined>();
+  const walk = (nodes: ViewTreeNode[], scope: string | undefined) => {
+    for (const node of nodes) {
+      map.set(node.index, scope);
+      if (node.members) {
+        const entry = node.entry;
+        const groupKey = isDraftViewField(entry) && entry.ref !== undefined ? fieldsById.get(entry.ref)?.key : undefined;
+        walk(node.members, groupKey);
+      }
+    }
+  };
+  walk(tree, undefined);
+  return map;
+}
+
+/**
+ * Whether a card whose own drag origin sits at `draggedIndex` may legally
+ * land at `targetScope` -- the whole task-6.5 refusal rule, as one equality
+ * check once `dragScopeByIndex` has already answered "whose scope is
+ * this". A dragover handler calls `preventDefault` only where this reads
+ * true; where it reads false, the browser draws its own no-drop cursor and
+ * fires no `drop` -- no new visual state, no CSS (design.md: "A refused
+ * drop uses the browser's own no-drop cursor").
+ */
+export function isLawfulCardDrop(scopeByIndex: Map<number, string | undefined>, draggedIndex: number, targetScope: string | undefined): boolean {
+  return scopeByIndex.get(draggedIndex) === targetScope;
+}
+
+/**
+ * Where the entry originally at `index` in `rows` ends up in `next` -- the
+ * array a splice-based move (`nudgeViewField`, or a plain `moveViewField`)
+ * returned. Reads the move's own OUTPUT rather than assuming a fixed
+ * `index + delta`: a root entry's move can step over a whole group's
+ * footprint, landing more than one position away
+ * (`EntityTabs.tsx`'s `moveField` reads its own landed row the same way,
+ * off the moved tree rather than trusting the target it was handed).
+ * Relies on the move keeping the same object reference for the moved
+ * entry -- every mover in this module does, via `moveViewField`'s splice --
+ * so `indexOf` finds it. `undefined` for an out-of-range `index`, or when
+ * the entry cannot be found in `next` at all (should not happen for a
+ * `next` this module's own movers returned).
+ */
+export function landedIndex(rows: DraftViewEntry[], next: DraftViewEntry[], index: number): number | undefined {
+  if (index < 0 || index >= rows.length) return undefined;
+  const found = next.indexOf(rows[index]!);
+  return found === -1 ? undefined : found;
+}
