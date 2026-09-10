@@ -32,10 +32,10 @@
 
 ## 4. The two participant-facing consumers
 
-- [ ] 4.1 Hold the open tab in `TaskScreen.tsx`; switch it via `firstTabWithIssue`
-- [ ] 4.2 Hold the open tab in `PlayerScreen.tsx`, the same way
-- [ ] 4.3 Call `resolveTabsLocale` at both, beside `resolveFieldsLocale`
-- [ ] 4.4 Verify group 4 with `bun run typecheck` and `bun run build`
+- [x] 4.1 Hold the open tab in `TaskScreen.tsx`; switch it via `firstTabWithIssue`
+- [x] 4.2 Hold the open tab in `PlayerScreen.tsx`, the same way
+- [x] 4.3 Call `resolveTabsLocale` at both, beside `resolveFieldsLocale`
+- [x] 4.4 Verify group 4 with `bun run typecheck` and `bun run build`
 
 ## 5. The studio form editor
 
