@@ -196,6 +196,22 @@ stage-by-stage status.
   supplies the options, and not to the field that binds to that source. A
   change that builds one starts at the data source, never at `FieldDef`. S4
   of the record archived beside `field-model-type-format-control` states it.
+- `docs/current-state.md:482` says the Runtime API Layer "has no
+  assignment/claim enforcement". `requireSubmitAuthority` in
+  `src/runtime/api.ts:1294` enforces both today, called from
+  `submitAndTransition` and its sibling at `:1354` and `:1389`. The line is
+  wrong as a statement of the present. Fixing it settles a question the
+  document has never answered: whether it describes the tree as it stands,
+  or collects dated stage records that stay true of their stage. Several
+  other passages read as stage records. The 2026-09-09 audit deferred the
+  fix on that ground, and no change owns it yet.
+- `THIRDPARTY.md:36` lists `postgres:16` as the deployment's database image,
+  and `:44` repeats "the deployment pins 16". No tracked file states that
+  pin: the devcontainer compose runs `postgres:latest`, the deployment
+  runbook names no image, and the compose stack that does pin it lives
+  untracked under `tmp/`. `scripts/thirdparty.ts` does not generate the
+  container tables. Either the pin gets a tracked source or the row says
+  where it comes from.
 
 ## Decided and built (kept for the reasoning, not for the work)
 - **Instance audit log: a tamper-evident change record for field data.**
@@ -1010,6 +1026,9 @@ stage-by-stage status.
   `.btn`/`.app-back` stay literal in `tokens.css` permanently: phase 2's
   D1 deferred their conversion to whichever phase converted the last
   file still writing that literal string, and no such phase followed.
+  `openspec/specs/web-styling/spec.md` does not say so yet: it names
+  `.app-back` nowhere, and the phase-5 paragraph with its scenario is a
+  capability delta still owed by a change of its own.
   A dispatched sweep also corrected every literal-class citation this
   migration left stale in `.claude/rules/design-language.md`,
   `.claude/rules/ui-glossary.md` and six passages of
