@@ -75,7 +75,7 @@ Every other term below belongs to one tab.
 | Term | Names | Lives in |
 |---|---|---|
 | canvas | the graph surface an author draws a process on | `canvas/CanvasView.tsx` |
-| palette | the "Add to canvas" list: drag a Step, Subprocess or End onto the canvas | `canvas/CanvasPalette.tsx` |
+| canvas bar | the row between the tab row and canvas: add controls, a reachability report, and selection controls | `canvas/CanvasBar.tsx` |
 | steps rail | the Steps tab's left column: one numbered row per step, in reachability order | `panels/StepsRail.tsx` |
 | step page | the Steps tab's wide right column, editing the one selected step | `panels/StepPage.tsx` |
 | masthead | the step page's top zone. It holds the step number, the kind phrase, the name, the key, the description, and the issues no section claims | `panels/StepPage.tsx` |
@@ -107,6 +107,11 @@ for the row list the Fields and Data sources tabs keep.
 
 *Inspector* retired ahead of both, with the inspector column. The step page is
 what succeeds it. Say *step page*.
+
+*Palette* left this table with the canvas bar row above. The word survives on
+the form editor's own field list (`screens/FormEditorScreen.tsx`), whose
+`draft/mintField.ts` export is still named `PALETTE_FIELD_KINDS`. Say
+*palette* only for that list.
 
 **field tabs** names one thing only: the Field / Values / Rules set inside the
 field catalog's own editor. It stands apart from the register tab, the shell's
