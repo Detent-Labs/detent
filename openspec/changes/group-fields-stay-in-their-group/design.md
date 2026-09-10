@@ -134,6 +134,21 @@ and the target by one position each. It changes no pair's relative order
 except the moved entry's. Root order therefore survives a member's splice,
 and member order survives a root's. Only the entry the author dragged moves.
 
+### The parentage half binds in both directions
+
+A field entry whose catalog parent is a group must declare that group's key.
+An absent or an empty `group` on such an entry fails to publish, exactly as a
+wrong one does.
+
+The one-directional reading was a hole. It let a hand-authored body lift a
+grouped field onto the form's root. The catalog still held it in a group. The
+editor would never write that shape, and the JSON view reaches it in one
+keystroke.
+
+A group whose own `key` is empty is the exception. Its children can name
+nothing, so they have no `group` either. Such a body already fails the
+field-key grammar, so the exception never reaches a publish.
+
 ### The strip drops its group select rather than showing it read-only
 
 A read-only field would restate what the card's own nesting shows. The
