@@ -39,10 +39,10 @@
 
 ## 5. The studio form editor
 
-- [ ] 5.1 Add `tabs` and `tab` to the draft view types and `view-layout.ts`
-- [ ] 5.2 Carry `tab` and the draft's tabs through `previewViewEntries`
-- [ ] 5.3 Add pure helpers for adding, removing and reordering a tab
-- [ ] 5.4 Cover those helpers with `bun:test`: the sweep, the merge, and key stability
+- [x] 5.1 Add `tabs` and `tab` to the draft view types and `view-layout.ts`
+- [x] 5.2 Carry `tab` and the draft's tabs through `previewViewEntries`
+- [x] 5.3 Add pure helpers for adding, removing and reordering a tab
+- [x] 5.4 Cover those helpers with `bun:test`: the sweep, the merge, and key stability
 - [ ] 5.5 Add the tab strip above the canvas: add, rename, reorder, remove
 - [ ] 5.6 Never rewrite a tab's key after minting; renaming writes the label alone
 - [ ] 5.7 Filter the canvas to the selected tab, keeping every existing behavior
