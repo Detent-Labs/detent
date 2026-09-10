@@ -43,6 +43,10 @@ const styles = stylex.create({
     borderBottomWidth: 1,
     borderBottomStyle: "solid",
     borderBottomColor: colors.border,
+    // Below ~760px the row's controls outrun the viewport (Ungroup is the
+    // last to go). A scrollbar keeps every control reachable by pointer
+    // instead of clipping the tail with no hint.
+    overflowX: "auto",
   },
   // Nothing in the row shrinks: a shrunk button wraps its own label, which
   // would grow the bar. Narrow-window behaviour is design.md's own open
@@ -78,13 +82,28 @@ const styles = stylex.create({
     fontFamily: fonts.mono,
     fontVariantNumeric: "tabular-nums",
   },
-  // Label above control, 4px apart, both flush left (design-language.md's
-  // field rule). No `cursor: grab`: nothing in the bar drags a group.
+  // The field's own box is the input's box: the bar centres every control on
+  // one line (D6), and a label inside the flow would grow the field taller
+  // than its siblings and drop the input off that line. The label sits
+  // absolutely above it instead, anchored by `position: relative` here. No
+  // `cursor: grab`: nothing in the bar drags a group.
   groupNameField: {
-    display: "flex",
-    flexDirection: "column",
+    position: "relative",
     flexShrink: 0,
-    gap: space.s1,
+  },
+  // The design language's field label: 11px, uppercase, tracked 0.1em, in
+  // slate (mirrors `StepPage.tsx`'s `fieldLabelText`, flush left, 4px above
+  // the control).
+  groupNameLabelText: {
+    position: "absolute",
+    bottom: "100%",
+    left: 0,
+    marginBottom: space.s1,
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: "0.1em",
+    color: colors.textMuted,
+    whiteSpace: "nowrap",
   },
   groupNameInput: {
     width: "9rem",
@@ -360,7 +379,7 @@ export function CanvasBar({
           </span>
           <button
             type="button"
-            className={`btn btn-secondary ${stylex.props(styles.control).className ?? ""}`.trim()}
+            className={`btn btn-destructive ${stylex.props(styles.control).className ?? ""}`.trim()}
             onClick={onDeleteSelection}
           >
             {t("canvas.selectionRemove")}
@@ -372,7 +391,7 @@ export function CanvasBar({
           {matched ? (
             <>
               <label {...stylex.props(styles.groupNameField)}>
-                {t("canvas.groupName")}
+                <span {...stylex.props(styles.groupNameLabelText)}>{t("canvas.groupName")}</span>
                 <input
                   {...stylex.props(styles.groupNameInput)}
                   value={matched.name}
