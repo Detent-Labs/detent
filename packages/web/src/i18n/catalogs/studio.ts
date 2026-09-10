@@ -561,8 +561,6 @@ export const en = {
   // through the registry.
   "assignment.none": "Nobody in particular",
 
-  "palette.heading": "Add to canvas",
-
   "headerBar.unnamedProcess": "(untitled process)",
   "headerBar.revision": "rev.",
   "headerBar.unsaved": "Unsaved changes",
