@@ -1,6 +1,6 @@
 ## Context
 
-See `proposal.md` for motivation. See `docs/field-model-redesign.md` (S2) for
+See `proposal.md` for motivation. See `openspec/changes/archive/2026-08-30-field-model-type-format-control/field-model-redesign.md` (S2) for
 the record this change comes from.
 
 Four properties of the current code shape everything below.

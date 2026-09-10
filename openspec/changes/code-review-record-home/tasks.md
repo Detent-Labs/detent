@@ -15,7 +15,7 @@ before any file moves.
 
 ## 1. Carry the live findings into docs/decisions.md
 
-- [ ] 1.0 Measure `docs/decisions.md` as the ponytail change left it, before
+- [x] 1.0 Measure `docs/decisions.md` as the ponytail change left it, before
       any write. Its base for the prose gate is whatever the ponytail change
       committed, so every later task keeps the count where this task finds it.
       Verify: `grep -c "^## " docs/decisions.md` prints 5.
@@ -26,7 +26,7 @@ before any file moves.
       change's task 3.4 verifies. If it prints 1 instead, the directive
       survived. Record that and go on, since the rule holds either way.
 
-- [ ] 1.1 Re-verify the `NotFoundError` finding at the source before writing
+- [x] 1.1 Re-verify the `NotFoundError` finding at the source before writing
       it. It is ARCH-1 of the 2026-08-01 review. Read
       `docs/CODE_REVIEW-2026-08-01.md:426-437`, `src/http/errors.ts:95`, and
       `openspec/changes/archive/2026-07-29-correct-api-error-responses/design.md:65-69`.
@@ -36,7 +36,7 @@ before any file moves.
       prints 1.
       `grep -c NotFoundError docs/decisions.md` prints 0.
 
-- [ ] 1.2 Append the `NotFoundError` entry to the tail of `## Open questions`
+- [x] 1.2 Append the `NotFoundError` entry to the tail of `## Open questions`
       in `docs/decisions.md`, above `## Decided and built`. It states the
       question. It decides nothing. It carries no id of its own, because the
       file already holds a 2026-08-18 ARCH-1. It names its source as ARCH-1 of
@@ -50,7 +50,7 @@ before any file moves.
       `python3 "${ANTISLOP:-$HOME/AI/AntiSlop/antislop.py}" check docs/decisions.md | wc -l`
       still prints N.
 
-- [ ] 1.3 Re-verify the nine carried findings against the tree. Use the
+- [x] 1.3 Re-verify the nine carried findings against the tree. Use the
       anchor table in `design.md`. A finding the tree already closed gets
       recorded as closed, never copied as open.
       Verify: `grep -n "ctor: NotFoundError" src/http/errors.ts` still
@@ -58,7 +58,7 @@ before any file moves.
       `grep -rl rolesVersion src | wc -l` prints 0, and
       `grep -rl "bun audit" .github | wc -l` prints 0.
 
-- [ ] 1.4 Append the nine entries to the tail of the existing
+- [x] 1.4 Append the nine entries to the tail of the existing
       `## Open from the 2026-08-18 code review` section, after its last
       bullet and above `## Refused simplifications`. One entry per finding,
       each with its severity, its live anchor and one risk sentence. ARCH-2
@@ -78,7 +78,7 @@ before any file moves.
 
 ## 2. Move the record into the archive
 
-- [ ] 2.1 Create `openspec/changes/archive/2026-08-18-code-review-record/`
+- [x] 2.1 Create `openspec/changes/archive/2026-08-18-code-review-record/`
       and write its `README.md`. It names the four-file chain, the rename
       convention, commit `9fe8fb38` that set it, and commit `0b520cc8` that
       drew the tracked line. It points at `docs/decisions.md` for the live
@@ -91,14 +91,14 @@ before any file moves.
       `python3 "${ANTISLOP:-$HOME/AI/AntiSlop/antislop.py}" check openspec/changes/archive/2026-08-18-code-review-record/README.md`
       exits 0.
 
-- [ ] 2.2 Move all four files with `git mv`, one per file, into that
+- [x] 2.2 Move all four files with `git mv`, one per file, into that
       directory. Change no byte inside any of them.
       Verify: `ls docs/CODE_REVIEW*.md` exits 2 and lists nothing.
       `ls openspec/changes/archive/2026-08-18-code-review-record/` lists five
       files. `git diff --cached -M --stat -- docs openspec/changes/archive`
       shows four renames with no content change.
 
-- [ ] 2.3 Confirm the OpenSpec tooling still reads the tree. `openspec list`
+- [x] 2.3 Confirm the OpenSpec tooling still reads the tree. `openspec list`
       enumerates active changes only and never reads `archive/`, so the
       `--all` validation is the check that reaches the live specs the entry
       sits beside.
@@ -108,7 +108,7 @@ before any file moves.
 
 ## 3. Retarget the two live pointers
 
-- [ ] 3.1 Replace the two-line `docs/CODE_REVIEW.md` bullet at
+- [x] 3.1 Replace the two-line `docs/CODE_REVIEW.md` bullet at
       `CLAUDE.md:333-334`. The replacement names both homes: the open
       findings in `docs/decisions.md`, and the record in the archived entry.
       Touch no other line.
@@ -117,7 +117,7 @@ before any file moves.
       `git diff HEAD --stat -- CLAUDE.md` shows two insertions and two
       deletions.
 
-- [ ] 3.2 Retarget the link in the intro paragraph of
+- [x] 3.2 Retarget the link in the intro paragraph of
       `## Open from the 2026-08-18 code review` in `docs/decisions.md`. Today
       it reads `[`docs/CODE_REVIEW.md`](CODE_REVIEW.md)`, and the sentence
       after it delegates the reasoning and the recommended fix to that file.
@@ -151,7 +151,7 @@ before any file moves.
 
 ## 5. Leave the citations alone
 
-- [ ] 5.1 Confirm this change rewrote no archived byte. Eighteen archived
+- [x] 5.1 Confirm this change rewrote no archived byte. Eighteen archived
       files name a `CODE_REVIEW` path, and all eighteen stay as they are. The
       `git mv` of task 2.2 stages both halves of each rename, so the moves sit
       in the index and never in the worktree diff. Read them with `--cached`
@@ -166,7 +166,7 @@ before any file moves.
 
 ## 6. Verification
 
-- [ ] 6.1 Run the prose gate over the pushed range:
+- [x] 6.1 Run the prose gate over the pushed range:
       `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`.
       Read the exit code, never the printed line count. The four moves cost
       zero, because the gate reads a renamed file's base count at the old
@@ -174,7 +174,7 @@ before any file moves.
       `README.md` are the real exposure.
       Verify: the gate exits 0 and names each changed file as checked.
 
-- [ ] 6.2 Run the whitespace gate over the same range:
+- [x] 6.2 Run the whitespace gate over the same range:
       `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh`.
       The `< /dev/null` belongs on `range.sh` alone.
       Verify: the gate exits 0.
@@ -184,11 +184,11 @@ before any file moves.
       that no code file moved. Read the verdict off a named failure.
       Verify: all three exit 0, and the skip count sits at the floor.
 
-- [ ] 6.4 Confirm no browser check applies. This change touches no file under
+- [x] 6.4 Confirm no browser check applies. This change touches no file under
       `packages/`, so no screen changes. Read the index with a pathspec, as in
       task 5.1, so another agent's worktree edits stay out of the count.
       Verify: `git diff --cached --name-only -M -- packages | wc -l` prints 0.
 
-- [ ] 6.5 Confirm the scope boundary. This change fixes no finding and
+- [x] 6.5 Confirm the scope boundary. This change fixes no finding and
       decides no open question.
       Verify: `git diff --cached --name-only -M -- src test | wc -l` prints 0.

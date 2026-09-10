@@ -1891,7 +1891,7 @@ as it stands.
     submission and outbox writeback already share, and an optional `control`
     (`multiline`, `radio`, `checkboxes`) at catalog level.
 
-    Decisions D1 to D25 in `docs/field-model-redesign.md` settle every
+    Decisions D1 to D25 in `openspec/changes/archive/2026-08-30-field-model-type-format-control/field-model-redesign.md` settle every
     question this change implements.
 
     Specs: `authored-content-localization`, `cel-expressions`,
@@ -1920,7 +1920,7 @@ as it stands.
     prefixes the users and groups stores already mint.
 
     Decisions D10 through D15, D20, D22 and D23 in
-    `docs/field-model-redesign.md` settle the rest.
+    `openspec/changes/archive/2026-08-30-field-model-type-format-control/field-model-redesign.md` settle the rest.
 
     Specs: `actor-from-field-assignment`, `database-seed-script`,
     `data-source-resolution`, `definition-contract`, `runtime-api`,
@@ -1933,7 +1933,7 @@ as it stands.
     carrying a default. The faked field then landed in `data` and travelled
     through every report having never held a value.
 
-    Two of the three shapes `docs/field-model-redesign.md` groups under S2
+    Two of the three shapes `openspec/changes/archive/2026-08-30-field-model-type-format-control/field-model-redesign.md` groups under S2
     already worked: a summary of what the applicant entered is a view field
     with `readonly: true`, which `filterToEditable` drops before submission,
     and a section heading is a `group` field, which `leafFields` keeps out of

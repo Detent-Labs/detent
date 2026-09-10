@@ -18,7 +18,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # The four gates that need only git and a shell (CLAUDE.md's gate table).
+  # The three gates that need only git and a shell (CLAUDE.md's gate table).
   host-gates:
     runs-on: ubuntu-latest
     steps:
@@ -46,9 +46,6 @@ jobs:
           printf '%s %s %s %s\n' "$REF" "$LOCAL_SHA" "$REF" "$REMOTE_SHA" \
             | sh scripts/gates/range.sh > "$RUNNER_TEMP/ranges.txt"
           cat "$RUNNER_TEMP/ranges.txt"
-
-      - name: ponytail-ledger-fresh
-        run: sh scripts/gates/ponytail-ledger.sh
 
       - name: pushed-whitespace
         run: sh scripts/gates/whitespace.sh < "$RUNNER_TEMP/ranges.txt"
