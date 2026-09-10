@@ -44,6 +44,12 @@ Arrow keys, `Home` and `End` SHALL move focus between tabs without opening
 one. They are a convenience over the plain-button pattern, not the
 roving-tabindex variant: every tab stays tabbable.
 
+`form-ui` SHALL export the pure function that answers which tab index a key
+moves focus to. The studio's own authoring strip answers the same four keys,
+and one implementation SHALL serve both. A copy in the other package needs a
+test comparing two function bodies. Such a test reds one package's suite for
+a reformat in the other.
+
 The strip SHALL compile from StyleX and read `form-ui/tokens.stylex`, the way
 every other part of this package's rendering does.
 
