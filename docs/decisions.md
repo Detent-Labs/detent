@@ -1287,6 +1287,17 @@ stage-by-stage status.
   value directly. The per-request tenant resolve runs inside the dispatch
   path, at `:809-811`. The rewrite needs an OpenSpec change of its own; this
   entry records the finding and leaves its shape open.
+- **Three requirements in `studio-canvas` still say "palette".** Lines 648,
+  1772 and 1781, in "The traversal is a total function over a deep-partial
+  draft" and "A step node prints the step's label, centred and resolved for
+  the content locale". The `studio-canvas-bar` change of 2026-09-10 deleted
+  that control and its component. Its delta declares "edit rail" the older
+  word for the bar's add controls, and says nothing about "palette", so those
+  three lines name something the spec no longer defines. The sync left them
+  on purpose: the delta stated no rule change for either requirement, and
+  rewording untouched prose would exceed the delta and put new text under the
+  prose ratchet. A sweep of the stale word wants its own change, together
+  with the six requirements that still say "edit rail".
 
 ## Open from the 2026-08-18 code review (each needs its own OpenSpec change)
 

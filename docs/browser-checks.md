@@ -180,10 +180,11 @@ set to dark (`prefers-color-scheme: dark`). Work through every component
 `studio-canvas-first-structure-editor` and `studio-canvas-first-form-builder`
 added:
 
-- **Palette** (`CanvasPalette`, `studio-step-bench`): the expanded ribbon's
-  "Add to canvas" group, in its default state. Check its drag-hover state
-  too (the ghost that follows the pointer during a drag), for each of
-  Step/Subprocess/End.
+- **Canvas bar** (`CanvasBar`, `studio-canvas-bar`): the bar's default state,
+  with Add step and its caret. Open the caret's menu. Pass: it opens. Check
+  every add control's drag-hover state too, the ghost that follows the
+  pointer during a drag. Confirm it for each of the three kinds: task,
+  subprocess, end.
 - **Steps register** (`studio-step-bench`): the ruled rows, each with its
   role stamp and its issue count. The current row too. The foot's six
   process rows (Fields, Data sources, Contract, Field matrix, Changes,
@@ -278,17 +279,17 @@ outside its own viewport. Only a browser reports that. The second activation
 matters on its own. It starts from the zoom level the first one set. The old
 code read that state back through a transformed rect.
 
-Then drag a Step from the palette onto empty canvas, twice. Do it once at the
-opening zoom level, and once after a fit has zoomed out. Pass: each drop adds
-a step.
+Then drag a Step from the canvas bar onto empty canvas, twice. Do it once at
+the opening zoom level, and once after a fit has zoomed out. Pass: each drop
+adds a step.
 
 The second drop is the one that earns its place. Panzoom scales the SVG
 element itself, so a zoomed-out canvas leaves most of the wrap outside the
 SVG's own box. The wrap paints the grid and shows the graph there, so an
-author reads that area as canvas. For that reason `onPaletteDrop` resolves the
-canvas through `.canvas-wrap`.
+author reads that area as canvas. For that reason `onCanvasBarDrop` resolves
+the canvas through the body around it, `#studio-canvas-body`.
 
-A synthetic mouse drag does not exercise this. The palette listens for pointer
+A synthetic mouse drag does not exercise this. The bar listens for pointer
 events, and raw `mousedown`/`mousemove` leaves it inert. Use a real drag, or a
 tool that dispatches pointer events.
 
@@ -303,13 +304,13 @@ Scroll the wheel while pointing at "Fit to view" itself. Pass: neither pan
 nor zoom happens.
 
 Panzoom's own pan-drag, and this app's wheel listener, used to bind directly
-to the SVG element. That is the same element the palette-drop defect above
+to the SVG element. That is the same element the bar-drop defect above
 already names. A zoomed-out canvas left most of the wrap outside that
 element's own box. A drag or scroll started in the margin did nothing. That
 is the same defect, for a different gesture.
 
 `packages/web/test/studio-canvas-fit.test.ts` cannot see this either, for
-the same reason it cannot see the palette-drop defect. It asserts numbers,
+the same reason it cannot see the bar-drop defect. It asserts numbers,
 not which DOM element a pointer event reaches.
 
 ### Studio canvas: the graph centers on open, with no author action
@@ -335,6 +336,79 @@ call then lands on the same values already showing.
 This check needs a real Panzoom instance racing its own internal timer
 against real `getBBox()`/`clientWidth`. `packages/web/test/` assumes no
 DOM at all. Nothing there can observe either side of the race.
+
+### Studio canvas bar
+
+Source: `studio-canvas-bar` tasks 7.1, 7.2, 8.3, 9.3, 9.4.
+
+Seed the database and open a draft on the Canvas tab.
+
+Select nothing, then one step, then several steps, then a selection
+matching one group. Pass, measured: the bar holds at 88px in every state,
+and the canvas never reflows. Two selected steps print their count, Remove
+steps, and Group these steps in the bar. A selection matching one group
+prints Group name with its input, Collapse and Ungroup.
+
+Select one step that no path reaches. Pass: the bar prints "unconnected".
+Select a reached step instead. Pass: the bar prints nothing there.
+
+Open the caret's menu. Pass, measured: it opens under the caret with three
+entries, each a phrase over a muted note. Press Escape. Pass: the menu
+closes, and focus returns to the caret button. Reopen the menu, then press
+outside the panel. Pass: the menu closes there too.
+
+Start a drag from inside the open menu, and keep the pointer over the
+canvas for the whole gesture. Pass, measured: the menu stays open for the
+whole drag and closes on release, dropping the step. Repeat the drag,
+releasing over a rendered path instead. Pass, measured: the targeted path
+draws at 3px in the accent. The release inserts the step into that path,
+raising both the step count and the path count by one.
+
+The drop-target class is no longer literal: `.canvas-edge-insert-target`
+now compiles through StyleX. A check written against that class name reads
+as a missing highlight when the highlight is working. Read the computed
+stroke instead: the targeted path draws at 3px in the accent.
+
+Drag a step from an add control and release it outside the canvas body.
+Pass: the drop adds nothing.
+
+Press Add step once. Pass, measured: the step lands at the visible canvas
+centre. Press it again, with no drag between the two presses. Pass,
+measured: the second step lands 200px right of the first, `NODE_WIDTH +
+GRID_STEP`.
+
+Start a drag from an add control. Release the pointer off every drop
+target, so the click never lands. Press that control's keyboard activation
+once. Pass: the shared flag swallows that press, and adds nothing. Press it
+again. Pass:
+the second press adds a step.
+
+Two reviewers accepted that swallow as a narrow, acceptable cost of one
+shared flag. Confirm it reaches only that single press, never a second one.
+
+Open the caret's menu, then start a drag from a menu entry without
+releasing. Pass: the ghost stays hidden while the pointer sits over the
+still-open menu panel. A popover promotes to the browser's own top layer,
+above every z-index, including the ghost's. Drag the pointer past the
+panel's edge. Pass: the ghost appears once the pointer clears it.
+
+Reach the group state: select two steps, then Group these steps. Narrow
+the window's width to 800px. Pass: the bar still fits, and Ungroup sits
+inside it. Narrow it to 700px. Pass: the bar scrolls sideways, and the
+page behind it keeps its own width.
+
+Wheel the pointer right over the bar. Pass: Ungroup scrolls into view and
+takes a click there. Measured at 700px: a 676px bar over 749px of content,
+so 73px of it scrolls. The bar stands 88px tall at both widths.
+
+None of the pointer, focus, or height checks above has coverage in
+`packages/web/test/`. Every suite there renders through
+`renderToStaticMarkup`, which mounts no DOM. No test can take a pointer
+event, read focus, or measure a rendered height.
+
+`studio-canvasBar.test.tsx` does cover the reachability text, against a
+rendered string rather than a live pointer or focus event. This walk
+confirms the real DOM wires that text to the bar as that test expects.
 
 ### Users screen: the manager control past one page
 
@@ -739,8 +813,8 @@ Pan the canvas, then drag a step. Pass: the dots travelled with the graph, and
 the step lands on one of them. The dots and the steps move together, never
 against each other.
 
-Drop a step from the creation palette. Pass: it lands on a dot, at whatever
-zoom you are at.
+Drop a step from the canvas bar. Pass: it lands on a dot, at whatever zoom
+you are at.
 
 Open a draft nobody has dragged yet. Pass: every step already sits on a dot.
 Drag one by a whole number of dots. Pass: it moves by exactly that, with no
@@ -836,9 +910,9 @@ around an obstacle, by decision, and stage 33's control points are the answer.
 
 ### Canvas subprocess marker (`canvas-subprocess-step-shape`)
 
-Open Studio and a draft. Drag the palette's Subprocess entry onto the canvas,
-beside an ordinary step. This entry is a visual judgment. No test in this
-repository reads a rendered node.
+Open Studio and a draft. Drag the canvas bar's Subprocess entry onto the
+canvas, beside an ordinary step. This entry is a visual judgment. No test in
+this repository reads a rendered node.
 
 Read the two nodes. Pass: the subprocess step carries a second rule inside its
 rectangle, and the task step carries one rule alone. Watch for the defect: a
@@ -2679,7 +2753,7 @@ a real assistive technology to judge.
 
 Open a draft with no open issue, on the Canvas tab. The Paths tab has no
 control that introduces one, since it is a read-only overview. Add a step
-from the palette. Leave it unconnected, so it leads nowhere.
+from the canvas bar. Leave it unconnected, so it leads nowhere.
 
 Pass: the Checks count turns bold as well as red, while the Canvas tab stays
 open. Every other tab's count keeps its ordinary weight. Switch to the dark

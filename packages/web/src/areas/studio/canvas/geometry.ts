@@ -45,6 +45,45 @@ export function hitTestNode(point: Point, nodes: NodePosition[]): string | undef
   return undefined;
 }
 
+/**
+ * How many steps rightward `freeLatticePoint` walks before it gives up and
+ * answers its last candidate.
+ *
+ * ponytail: a row this long has no realistic process behind it; past this
+ * cap the canvas bar's Add step button would need to wrap to a new row or
+ * pick an empty region instead of walking further right. Nothing in this
+ * codebase approaches the cap today.
+ */
+const FREE_LATTICE_POINT_STEP_LIMIT = 500;
+
+/**
+ * The nearest point at or right of `wanted`, on the lattice, whose
+ * `NODE_WIDTH`x`NODE_HEIGHT` rect clears every rect in `placed`. Walks right
+ * by `NODE_WIDTH + GRID_STEP` — a whole lattice multiple that a one-cell step
+ * could not clear against an inclusive bound — until it finds one.
+ *
+ * Performs its own rect test rather than importing `nodesInRect` from
+ * `selection.ts`, which already imports this module; the reverse import
+ * would make a cycle. The test itself is the same inclusive bound
+ * `hitTestNode` and `nodesInRect` use, so a step placed edge-to-edge with
+ * another still counts as clear.
+ */
+export function freeLatticePoint(wanted: Point, placed: NodePosition[]): Point {
+  let candidate = wanted;
+  for (let i = 0; i < FREE_LATTICE_POINT_STEP_LIMIT; i++) {
+    const overlapped = placed.some(
+      (n) =>
+        candidate.x <= n.x + NODE_WIDTH &&
+        candidate.x + NODE_WIDTH >= n.x &&
+        candidate.y <= n.y + NODE_HEIGHT &&
+        candidate.y + NODE_HEIGHT >= n.y,
+    );
+    if (!overlapped) return candidate;
+    candidate = { x: candidate.x + NODE_WIDTH + GRID_STEP, y: candidate.y };
+  }
+  return candidate;
+}
+
 /** Delta between a drag's start and current pointer position. */
 export function dragDelta(start: Point, current: Point): Point {
   return { x: current.x - start.x, y: current.y - start.y };
