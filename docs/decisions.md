@@ -57,7 +57,7 @@ stage-by-stage status.
   flatness. Under a sub-table CEL sees `dyn` and the generated columns find
   nothing. An author who needs it today declares `pos1_betrag`, `pos2_betrag`
   and further keys by hand, so the ceiling is whatever number they pick in
-  advance. `docs/field-model-redesign.md` records this as S1 and assigns it
+  advance. `openspec/changes/archive/2026-08-30-field-model-type-format-control/field-model-redesign.md` records this as S1 and assigns it
   change 4, which depends on `field-model-type-format-control`. Nothing is
   designed yet, and the open question is what shape holds the rows without
   breaking CEL, the generated columns and instance migration at once.
@@ -109,7 +109,7 @@ stage-by-stage status.
   back into an `Instance`. Shrinking `body` is a separate and much larger
   question, and nothing today asks for it.
 - Four more display-element shapes for the `view`: a chart, a read-only table,
-  a markup block and a tab panel. `docs/field-model-redesign.md` records this
+  a markup block and a tab panel. `openspec/changes/archive/2026-08-30-field-model-type-format-control/field-model-redesign.md` records this
   as S2 and assigns it change 3, which shipped the first of the five, the
   note (`field-model-view-note`, `ViewNote`/`ViewEntry` in
   `src/schema/definition.ts`). The remaining four wait on their own design:
@@ -145,6 +145,57 @@ stage-by-stage status.
   No follow-up change tracks this yet. It belongs to `studio-publish` or
   `spa-accessibility`, not `web-styling`: a CSS migration cannot cause or
   fix either gap.
+- `NotFoundError` is served as HTTP 500 where most APIs answer 404. The
+  mapping sits at `src/http/errors.ts:95`, and the header comment at `:10-16`
+  calls it the one exception carved out of the message-free fallback. The
+  2026-08-01 code review rated it Medium as its ARCH-1: a request for a
+  nonexistent instance raises the 5xx rate, so an alert built on that rate
+  fires on a client typo. The archived design
+  `openspec/changes/archive/2026-07-29-correct-api-error-responses/design.md`
+  kept the mapping on purpose and closed with "Recorded as an open question".
+  This entry is that record.
+
+  The live spec pins the mapping at three sites.
+  `openspec/specs/http-wrapper/spec.md:215` holds the status-table row,
+  `http-wrapper/spec.md:242` the scenario that maps a typed not-found error
+  to 500, and `http-wrapper/spec.md:1665` the attachment requirement. Moving
+  to 404 is a contract change for every consumer plus a spec change at all
+  three sites, so it needs its own OpenSpec change. Nothing here decides it.
+- The `richtext` format. A multiline string is still a string, and nothing
+  validates it differently, so `multiline` is a control. A `richtext` value is
+  markup instead. That is what puts it on the `format` axis: a
+  `notification.email` handler must know before it escapes the value.
+
+  The member waits for a change of its own, because markup raises storage,
+  sanitizing and editor questions. Markdown storage is the cheaper answer to
+  the first of those. D7 and D20 of the record archived beside
+  `field-model-type-format-control` state this.
+- The `image` and `signature` formats. Both refine a `file`, and a `file` is
+  opaque today: `JS_TYPE` maps it to `"any"` at `src/schema/definition.ts:407`.
+  A format over an unbuilt type buys nothing. Both wait until a file field
+  carries a value the engine can read. D20 of the record archived beside
+  `field-model-type-format-control` states this.
+- The `slider` and `stars` controls. Neither is a native HTML control, so each
+  needs its own keyboard and screen-reader work. Nobody has asked for either.
+  D21 of the record archived beside `field-model-type-format-control` states
+  this.
+- An `items` key for a typed list. A `list` holds strings today, and a list of
+  numbers would add an `items` key that types the members. This differs from
+  S1 above: S1 is a repeating sub-table of rows and columns, while `items`
+  types the members of one flat list. Do not add the key until a process needs
+  a list of something other than strings. D3 of the record archived beside
+  `field-model-type-format-control` states this.
+- S3, catalog scope. Reuse of one field across several processes raises a
+  scoping question, and the catalog is per-process today. The record left it
+  out of scope, and nothing is designed.
+  `openspec/changes/archive/2026-08-31-field-model-person-format/proposal.md:85`
+  cites the label and states no content. S3 of the record archived beside
+  `field-model-type-format-control` states it.
+- S4, hierarchical option sets. The record settled this one as a placement,
+  and it opens no shape. A choice tree belongs to the data source that
+  supplies the options, and not to the field that binds to that source. A
+  change that builds one starts at the data source, never at `FieldDef`. S4
+  of the record archived beside `field-model-type-format-control` states it.
 
 ## Decided and built (kept for the reasoning, not for the work)
 - **Instance audit log: a tamper-evident change record for field data.**
@@ -1206,13 +1257,25 @@ stage-by-stage status.
   and a name input on the create row. The browser check is `/admin/users` with
   two accounts, one with a stored name and one whose row falls back to its
   email. Building it waits on the owner's go-ahead.
+- **The hand-rolled router in `src/http/server.ts` reimplements
+  `Bun.serve({ routes })`.** Finding 11 of the ponytail audit, verified at the
+  code on 2026-09-10. The `Route` type sits at `src/http/server.ts:229`, `seg`
+  at `:302` and `match` at `:335`. The OPTIONS branch at `:799` collects the
+  allowed methods by filtering the same table. `Bun.serve` takes
+  `{ fetch, port, maxRequestBodySize }` at `src/http/server.ts:884`, with no
+  `routes` key. Two facts make the cut risky. `createServer` at `:522`
+  returns the `fetch` function itself, and the test suite drives that return
+  value directly. The per-request tenant resolve runs inside the dispatch
+  path, at `:809-811`. The rewrite needs an OpenSpec change of its own; this
+  entry records the finding and leaves its shape open.
 
 ## Open from the 2026-08-18 code review (each needs its own OpenSpec change)
 
 All ten items on the Prioritized Action List of
-[`docs/CODE_REVIEW.md`](CODE_REVIEW.md) are open. Each was re-checked against
-the tree on 2026-09-09. That review holds the reasoning and the recommended
-fix. This section records that nothing else tracks them.
+[`openspec/changes/archive/2026-08-18-code-review-record/CODE_REVIEW.md`](../openspec/changes/archive/2026-08-18-code-review-record/CODE_REVIEW.md)
+are open. Each was re-checked against the tree on 2026-09-09. That review
+holds the reasoning and the recommended fix. This section records that
+nothing else tracks them.
 
 - **SEC-1: the subprocess and chaining graph has no cycle check.** Publish-time
   validation resolves each child and checks every `inputMapping` target
@@ -1245,17 +1308,15 @@ fix. This section records that nothing else tracks them.
   every mutating route. Either outcome belongs in an OpenSpec change.
 - **SEC-5: login rate limiting is per-process and in-memory.** Both windows
   are `Map`s in process memory (`src/auth/login.ts:54` and `:61`), marked
-  `ponytail:` at `:49`. A second record exists: `PONYTAIL-DEBT.md:84-87` holds
-  that marker, its ceiling and its upgrade path, behind the
-  `ponytail-ledger-fresh` push gate. That ledger is gitignored, so a fresh
-  clone starts without it and `scripts/gates/ponytail-ledger.sh:22` then exits
-  0. Risk: two replicas double every threshold, and a restart clears both
-  windows. The review names the constraint a Postgres replacement must keep:
-  one statement doing the check and the increment together. It also asks for
-  the single-process assumption in `docs/runbooks/deployment.md` until the fix
-  lands (`docs/CODE_REVIEW.md:281`). That runbook stays silent on it, and the
-  `deployment-runbook` capability governs the file, so that sentence needs a
-  delta of its own.
+  `ponytail:` at `src/auth/login.ts:49`. That marker is the whole record: it
+  states the shortcut, its ceiling and its upgrade path, and no ledger file
+  and no push gate stand behind it. Risk: two replicas double every
+  threshold, and a restart clears both windows. The review names the constraint a Postgres
+  replacement must keep: one statement doing the check and the increment
+  together. The 2026-08-18 code review asks for the single-process assumption
+  in `docs/runbooks/deployment.md` until the fix lands. That runbook stays
+  silent on it, and the `deployment-runbook` capability governs the file, so
+  that sentence needs a delta of its own.
 - **SEC-6: no ceiling on an instance's total attachment bytes.**
   `MAX_ATTACHMENT_BYTES` bounds one upload, 5 MiB by default
   (`src/http/routes.ts:99`, enforced at `:359`). `uploadAttachment`
@@ -1303,3 +1364,334 @@ fix. This section records that nothing else tracks them.
   `:1247`, inside `compileProcessBody`, already says twelve. Risk: a reader
   trusts the smaller number and misses three checks. The 2026-09-09 documentation
   audit found it; the next change inside that file carries the fix.
+
+The nine findings below never reached the list above. Seven are Low and two
+are Informational. Each was re-checked against the tree on 2026-09-10, and
+each entry carries the anchor that holds today. All nine stay open.
+
+- **SEC-7: CEL evaluation has no wall-clock bound.** `evaluate`
+  runs inside `try`/`catch` at `src/cel/eval.ts:129` and `:166`, so a raise
+  reads as no match while time stays unbounded. `MAX_EXPRESSION_LENGTH` at
+  `src/schema/compile.ts:156` caps source at 4,000 characters, a bound on
+  length rather than on cost. Risk (Low): a deeply nested comprehension holds its
+  transaction's locks for the whole evaluation. Authoring needs
+  `system:developer` or `system:author`, so this is defense in depth. The
+  review prefers a publish-time complexity bound over a runtime timer.
+- **SEC-8: attachment `contentType` is caller-supplied and echoed on
+  download.** The upload schema at `src/http/routes.ts:111` constrains it to
+  `MIME_TOKEN_PAIR` (`:108`), and the download handler at `:394` returns it
+  as `Content-Type` through `toBinaryResponse` (`src/http/server.ts:196`).
+  Every binary response carries `X-Content-Type-Options: nosniff`,
+  `BINARY_ROUTES` gives this route `Content-Disposition: attachment`, and
+  the CSP sets `object-src 'none'`, so a stored `text/html` downloads rather
+  than renders. Risk (Low): a later change that drops one of those layers turns a
+  stored file into rendered content. The review's optional fix is an
+  allowlist of upload types in place of the shape regex.
+- **SEC-9: a role reduction waits for the issued token to expire.**
+  `src/auth/jwt.ts:115-124` checks `isActiveAccount` on every locally issued
+  token and reads roles from the token's own claim, and the comment there
+  points at the `admin-user-management` spec. Disabling an account ends its
+  session at the next request, while removing one role leaves the old set
+  effective until expiry, up to eight hours. Risk (Low): an operator who revokes
+  `system:admin` from an account that stays active waits for that expiry.
+  The zero-code method is to disable the account and re-enable it: the next
+  request rejects the old token, and the next login issues the reduced set.
+  That method sits in no operator document today. The alternative is a
+  `rolesVersion` claim compared by `isActiveAccount`, a schema change that
+  needs its own OpenSpec change; `grep -rl rolesVersion src openspec/specs`
+  prints nothing.
+- **SEC-10: development defaults.**
+  `.devcontainer/docker-compose.yml` sets `ALLOW_INSECURE_DEV_AUTH: "1"` at
+  `:47` and `POSTGRES_PASSWORD: postgres` at `:92`. Both serve a disposable
+  local stack, the server prints `AUTH DISABLED` at startup
+  (`src/http/server.ts:403`) whenever the first applies, and the production
+  image in `docker/engine.Dockerfile` inherits neither. Risk (Informational): a stack
+  started from the compose file outside the devcontainer runs with auth
+  disabled. The review recorded it for completeness and recommends nothing.
+- **ARCH-2: `BINARY_ROUTES` is a hand-kept ledger.** The
+  list sits at `src/http/server.ts:268`, and `test/http-disposition.test.ts`
+  drives every declared entry. TEST-1 above covers the review's second
+  ledger, the per-handler role checks. Risk (Low, narrowed): a binary route added and never
+  declared ships without `Content-Disposition`, and no test notices. That
+  one case is all that remains of the finding.
+- **CQ-2: doc comments duplicate facts held elsewhere.** The header of
+  `src/auth/authorize.ts` states which role admits which route at `:28-44`,
+  while the route table in `src/http/server.ts` and each handler's own check
+  are where that is true. `docs/current-state.md` repeats the shape by
+  listing exported symbols by hand. Risk (Low): a rename in one place leaves the
+  other wrong, and no gate covers either. The review's fix is to name where
+  a list lives instead of restating it.
+- **DEP-2: the CI workflow runs no `bun audit` step.**
+  `grep -rn "bun audit" .github/` returns nothing. Dependabot already covers
+  version drift, and the review judges the pair unlikely to earn its
+  maintenance. Risk (Informational): an advisory Dependabot misses waits for the next manual
+  look. Recorded so the next audit skips re-deriving it.
+- **PERF-1: fixed 500 ms polling per tenant.** `src/engine/host.ts:326`
+  runs `pollForever` for the outbox drain on a 500 ms loop wrapped in
+  `eachTenant`, with the resolution and timer sweeps beside it at `:327` and
+  `:328`. Risk (Low): at many tenants each cycle issues work proportional to tenant
+  count whether or not any tenant holds a pending row. The review names a
+  Postgres `LISTEN`/`NOTIFY` wake-up or one cross-tenant claim query as the
+  replacement, once tenancy grows past a handful.
+- **PERF-2: one query per refused permission check.** `can()` at
+  `src/auth/authorize.ts:118` short-circuits on the global role before any
+  query, so the common paths cost nothing. Risk (Low): a burst of refused requests
+  from one actor issues one grant query each. The review calls it documented
+  and correctly bounded, and recommends nothing.
+
+## Refused simplifications (kept so the next sweep does not re-propose them)
+
+Each entry below names a cut somebody proposed, the reason a reviewer refused
+it, and the measurement or citation that refused it. The record exists so the
+next over-engineering sweep does not price the same cut twice. It came out of
+the ponytail audits of 2026-07-26 through 2026-08-18. Every path was re-checked
+against the tree on 2026-09-10. A line number appears only where no symbol
+identifies the site: gate script lines, test assertions and spec lines. A dated
+count is history and stays as measured.
+
+Entries 1 to 9 come from the 2026-08-16 survey. Entries 10 to 46 are the
+deliberate refusals, all of them.
+
+1. Five dependencies each earn their place. `@dagrejs/dagre` drives a layered
+   layout with group-collapse. `@panzoom/panzoom` backs the canvas transform.
+   The `lucide-react` imports named 17 icons on 2026-08-16, and the package
+   tree-shakes. `jose` covers remote JWKS. Both `zod` and
+   `@marcbachmann/cel-js` are load-bearing. `immer` already left the tree.
+2. Extracting `packages/form-ui` further stayed refused. Its `react-dom` and
+   `zod` peers are both real. The call `renderToStaticMarkup` runs in its
+   tests, and `resolveLocalizedText` pulls zod transitively through
+   `packages/form-ui/src/locale.ts`. The package measured 535 lines over eight
+   files on 2026-08-16, with two consumers. That is still no shared-package
+   proposal.
+3. Hand-rolls that a platform feature would replace were checked and found
+   absent. `crypto.randomUUID`, `Intl.NumberFormat` and `<dialog>` with
+   `showModal()` already sit where a hand-roll would.
+4. Collapsing `src/tenancy/` was refused. It is 360 lines over four files, and
+   each of `connections.ts`'s four injected dependencies has a test passing
+   something else. Its pool map carries the `ponytail:` marker naming the
+   missing eviction.
+5. Shortening the gate scripts was refused. Their length is comments recording
+   measured traps.
+6. Deleting an unused example was refused. On 2026-08-16 the directory held
+   four `examples/*.json` files, referenced 176, 44, 25 and 23 times across
+   docs, seed, specs and compose. It holds nine today.
+7. Deleting unreferenced CSS classes was refused. On 2026-08-16 template
+   literals built the `admin-badge-*`, `app-stamp-*` and `studio-diff-*`
+   names, so a selector grep missed them on purpose. Those literals have since
+   left the tree, and the reasoning stays: a class a grep cannot find is a
+   class to check by hand.
+8. Replacing `packages/web/src/areas/studio/canvas/` with a graph library was
+   refused. The directory stays hand-rolled SVG.
+9. The route table in `src/http/server.ts` holds four `req.method ===`
+   comparisons today. Finding 11, recorded under
+   "Decided, not yet built" above, is the one open question over it, and it
+   asks about a platform feature rather than duplication.
+10. **Finding 2, an all-or-nothing recipient rule over `nodemailer`.** Declined
+    2026-08-18. Its only public send entry bundles the RCPT check with the
+    message transfer. The library proceeds to `DATA` once it accepts any
+    recipient. No configuration restores the rule the spec requires.
+    [`src/handlers/notification-email.ts`; the requirement "Every recipient
+    is accepted before the message is sent" in
+    `openspec/specs/notification-email-action-handler/spec.md`]
+11. **Finding 5, merge `RuleInput` into `ConditionInput`.** Rejected
+    2026-08-16. A `git diff --no-index` run that day reported 51 insertions
+    and 84 deletions over the two files, then 267 combined lines. The default
+    operand and the field-against-field comparison have no counterpart on a
+    path guard. [`packages/web/src/areas/studio/panels/shared/RuleInput.tsx`
+    and `ConditionInput.tsx` beside it]
+12. **Finding 28, drop `ConditionInput`'s `toggleVariant` prop.** Rejected
+    2026-08-16. Each variant has a live caller. `panels/PathsPanel.tsx` passes
+    `"disclosure"`, `panels/FieldCatalogPanel.tsx` passes `"link"`, and
+    `panels/shared/BooleanOrExpressionInput.tsx` takes the `"link"` default.
+    Dropping the prop changes what one of those sites renders.
+    [`packages/web/src/areas/studio/panels/shared/ConditionInput.tsx`, the
+    `toggleVariant` prop]
+13. **Finding 22, `Intl.NumberFormat` for `formatDuration`.** Rejected
+    2026-08-16. The test file
+    `packages/web/test/reporting-reportingLogic.test.ts:90-110` pins 13
+    strings across `en` and `de`, among them `"4.5 s"` and `"5,5 Std"`. The
+    formatter renders `"4.5 sec"` and `"5,5 Std."` instead.
+    [`packages/web/src/areas/reporting/screens/reportingLogic.ts`,
+    `formatDuration`]
+14. **`Intl.RelativeTimeFormat` for `waitingLabel`.** Rejected 2026-08-05, after
+    surviving five scans as a finding. Four tests in
+    `packages/web/test/inboxLogic.test.ts` pin `"5m"`, `"3h"`, `"2d"` and
+    `"just now"`. Narrow style renders `"5 min. ago"`, and no style renders
+    `"5m"`. Re-file it as a design change, never as a standard-library swap.
+    [`packages/web/src/areas/app/screens/inboxLogic.ts`, `waitingLabel`]
+15. **A shared changed-file collector for `prose.sh` and `whitespace.sh`.**
+    Rejected 2026-08-05. Only `prose.sh` runs `git diff --name-status -M`, and
+    it does so to read a renamed file's baseline at its old path.
+    [`scripts/gates/prose.sh:74`, `scripts/gates/whitespace.sh:44`]
+16. **Delete the unused registry seams.** Rejected. That set is
+    `devHeaderResolver`, the action `Registry`, the `DataSourceRegistry`, the
+    `AssignmentRegistry`'s multi-strategy handlers, `exampleRegistry.ts` with
+    `RegistryPanel.tsx`, and `Action.execution`'s reserved enum. `CLAUDE.md`
+    records the reserved enum and the dev-header seam as v1 boundaries, and
+    the registries as the plugin seam. The two studio files have
+    since left the tree on their own change, on 2026-08-18; the rest stand.
+17. **Delete `Action.execution` specifically.** Rejected on a second ground. It
+    sits inside `ProcessBody`, so removing it moves the `definitionHash` of
+    every stored body carrying it. The field `definitionStatus` sits outside the
+    body, so it does not.
+18. **Replace the `migrateInstances` and `findOrphanKeys` keyset loop.**
+    Declined 2026-07-26. [`src/engine/migration.ts`]
+19. **Collapse `requireRole` and the role constants.** Rejected. The call sites
+    ask about genuinely different roles. [`src/auth/authorize.ts`,
+    `requireRole`]
+20. **Reduce `checkAndRecordAttempt`'s parameters.** Rejected. Tests exercise
+    each with different values. The signature read `(map, email, now)` when
+    the cut was proposed; it has since grown a `maxAttempts` and a `capacity`
+    parameter. [`src/auth/login.ts`, `checkAndRecordAttempt`]
+21. **Collapse the two `ActorResolver` implementations.** Rejected. Both
+    `src/auth/jwt.ts` and `src/auth/resolve.ts` are real implementations.
+22. **Collapse the i18n catalogs into one.** Rejected. The JSON contract is
+    multi-locale by construction, and the app area ships a real `de` in
+    `packages/web/src/i18n/catalogs/app.ts`. Finding 20 cuts unused keys
+    instead.
+23. **Drop `optionText`'s `if (!attributes) return label` guard.** Rejected
+    2026-08-16. The `attributes` parameter types as `Record<...> | undefined`,
+    and `Object.values(undefined)` throws a `TypeError`. Only the guard's
+    sibling was dead, the `parts.length === 0` branch, and that branch is cut.
+    [`packages/form-ui/src/FieldForm.tsx`, `optionText`]
+24. **Finding 39, merge `isGroup` and `isGroupField`.** Rejected 2026-08-16.
+    Both bodies read `field.field.type === "group"`. The only module both call
+    sites import at runtime is `types.ts`, which emits no JavaScript and
+    reaches them through `import type`. Hosting the predicate there turns a
+    type-only module into a runtime one, for three duplicated lines.
+    [`packages/form-ui/src/FieldForm.tsx`, `isGroup`;
+    `packages/form-ui/src/submit.ts`, `isGroupField`]
+25. **Finding 9, delete `parseJsonb` as dead.** Rejected. A separate
+    `parseJsonb` exports from `src/engine/host.ts`. `src/http/admin-routes.ts`
+    names it on six lines, and `test/data-list-columns.test.ts` imports it. It
+    returns `undefined` on a parse error, where the `src/engine/drafts.ts`
+    export the `templates.ts` mapper shares lets that error throw.
+26. **Finding 9, merge `toTemplate` and `toDraft`.** Rejected. The two map
+    different columns. One question stays filed and unresolved: does `Bun.sql`
+    ever hand back raw text on the `drafts` and `templates` columns? A negative
+    answer kills the string guard and ten further inline sites.
+    [`src/engine/templates.ts`, `toTemplate`; `src/engine/drafts.ts`,
+    `toDraft`]
+27. **Finding 26, a shared `requireAnyRole(actor, ...roles)`.** Rejected
+    2026-08-16. The comment above `requireAuthoring` in
+    `src/http/studio-routes.ts` rejects it and names one specific pair on
+    purpose. `requireStudioRead`, in the same file, binds to the same rule by
+    reference. The three helpers also raise three different messages, each
+    naming its own role set. [`src/http/admin-routes.ts`,
+    `requireDataListRead`]
+28. **Finding 39, merge `requireNonBlank` and `requireString`.** Rejected
+    2026-08-16. They differ three ways. `requireNonBlank` rejects
+    `!value.trim()` and returns the untrimmed value, because trimming a password
+    would store a secret the operator never typed. `requireString` rejects
+    `raw.length === 0` and bounds the result at `MAX_KEY_LENGTH`. The messages
+    differ too, `must not be empty` against `is required`. The input `"   "`
+    passes `requireString` today and would fail a merged rule.
+    [`src/http/admin-routes.ts`, `requireNonBlank` and `requireString`]
+29. **Finding 54, inline `resolveBaseLocaleChange`.** Declined 2026-08-18. It
+    exports on purpose: `studio-processHeaderLogic.test.ts` drives it as a pure
+    function, and `ProcessHeaderBar` has no DOM test harness. The extraction is
+    the only way to reach the base-locale sync regression it guards.
+    [`packages/web/src/areas/studio/screens/processHeaderLogic.ts`]
+30. **Finding 39, inline `resolveActor(req, resolver, db)`.** Rejected
+    2026-08-16. Its body is one line, `resolver(req.headers, db)`. The command
+    `git grep -o 'resolveActor(' -- src | wc -l` prints 22, the declaration
+    among them. The archived change `2026-08-05-dedup-server-helpers` created
+    the helper by collapsing four copies, and the doc comment above it says
+    so. Inlining would reverse that change to save three lines.
+    [`src/http/routes.ts`, `resolveActor`]
+31. **Finding 39, inline `accountName.ts` into `Chrome.tsx`.** Rejected
+    2026-08-16. The file is 15 lines with one call site, and it carries its own
+    three-case test. Inlining moves the logic into a React component, so those
+    three cases need a render to reach. The test then dies or grows a renderer.
+    The change `2026-08-16-ponytail-cleanup-fetch-hooks-and-imports` declined
+    finding 37 on this same ground. [`packages/web/src/shell/accountName.ts`]
+32. **Finding 39, derive `onGoToArea` and `onGoToProfile` from the `go` prop.**
+    Rejected 2026-08-16. Two derivations exist, not one. Each of the four area
+    roots builds its own href as `/${a}`. The file `shell/App.tsx` passes
+    `areaHref(a, "/")` at both of its `onGoToArea` sites, and `Chrome` serves
+    both callers. [`packages/web/src/shell/App.tsx`]
+33. **Finding 39, merge `listComments` and `listAttachments`.** Rejected
+    2026-08-16. The two differ in path segment and in return type, a comment
+    page against an attachment page. A merged function needs a type parameter
+    and a segment argument, and would run longer than the pair it replaces.
+    [`packages/web/src/areas/app/screens/TaskScreen.tsx`, the two `await`
+    call sites]
+34. **Finding 8, cut the 45-line comment above `armStepTimers`.** Rejected
+    2026-08-16. The block states facts: totality, the CEL evaluation contract,
+    and a magnitude bound from a real overflow analysis. None of it is process
+    history, which is what the comment rule targets.
+    [`src/engine/duration.ts`, the doc comment above `armStepTimers`]
+35. **Finding 24, a generic `NamedError` base class.** Rejected 2026-08-16.
+    Only `RequestShapeError` and `NotFoundError` are name-only.
+    `InstanceNotRunningError` and `InstanceRunningError` each carry
+    `instanceId` and `status` as readable state, and a caller distinguishes
+    outcomes on it. A shared base would drop that state.
+    [`src/errors.ts`, the four classes named]
+36. **Finding 27, delete `BINARY_ROUTES`.** Rejected 2026-08-16. The
+    requirement "`BINARY_ROUTES` declares every route that returns stored
+    bytes" in `openspec/specs/http-wrapper/spec.md` names it. Its own comment
+    says a person keeps the list in sync by hand, since no static walk of
+    `routes` can derive it. Deleting it deletes a spec requirement written
+    after a measured `/admin/*` route collision.
+    [`src/http/server.ts`, `BINARY_ROUTES`]
+37. **Finding 29, cut four thin delegates in `src/cel/eval.ts`.** Rejected
+    2026-08-16 for two of the four. The function `buildTransformContext`
+    re-keys the context against the source catalog rather than delegating. The
+    comment on `buildOutputContext` explains why its namespace stays separate
+    from the guard context. The other two, `evalTransforms` and `evalFieldMap`,
+    are genuine delegates and stay a finding.
+    [`src/cel/eval.ts`, the four functions named]
+38. **Finding 34, dedupe the two pagination helper sets.** Rejected 2026-08-16
+    as a whole. The comments above `MAX_LIST_LIMIT` in `src/runtime/api.ts`
+    and in `src/engine/admin-queries.ts` both call the duplication deliberate.
+    The first reads "the numbers agree today by coincidence, not by contract."
+    Only `Page<T>` is an unexplained duplicate, and it stays a possible future
+    finding.
+39. **Finding 35, `Map.groupBy` for `groupMs`.** Rejected 2026-08-16. It would
+    replace nine lines, and it needs `tsconfig.json`'s `lib` raised from
+    `ES2022` to `ES2024` repo-wide. That blast radius is disproportionate.
+    [`src/engine/reporting.ts`, `groupMs`]
+40. **Finding 40, drop `JwtResolverConfig.localRolesClaim`.** Rejected
+    2026-08-16. A call at `test/auth-jwt.test.ts:109` passes
+    `localRolesClaim: "groups"`. The `?? "roles"` fallback inside
+    `jwtResolver` is a default rather than dead code. [`src/auth/jwt.ts`,
+    `JwtResolverConfig.localRolesClaim`]
+41. **Finding 41, drop ten `src/` exports whose only importer is a test.**
+    Rejected 2026-08-16. A test importer is an importer, and `export` is how the
+    test reaches the symbol. The ten are `singleTenantSource`,
+    `parseExpression`, `projectInstance`, `managerOfStarterStrategyDef`, the
+    pair `InvalidTenantKey` and `TenantKeyTaken`, `checkDbReady`,
+    `clientAddressOf`, `parseAuthIssuers`, `MAX_OVERRIDE_VALUE_LENGTH` and
+    `countUiStringOverrides`. Two symbols with no importer at all,
+    `checkTemplateKey` and `SUPPORTED_LOCALES`, lost their `export` instead.
+42. **Finding 14, a copy-pasted `tFill`.** Rejected 2026-08-16. Only
+    `areas/admin/catalog.ts` declares `tFill`, and only
+    `areas/reporting/catalog.ts` declares `tCount`. The bodies differ: `tFill`
+    walks `Object.entries(values)` with `replaceAll`, and `tCount` runs one
+    `replace` on `{n}`. Each has one declaration, so neither is duplication.
+43. **Finding 17, four area clients declare `listProcesses`.** Rejected
+    2026-08-16 as a dedup. Three of the four agree exactly. The reporting
+    area's version reads a different route, `/reporting/processes`, and
+    unwraps `{processes}` from the body. It stayed its own function.
+    [`packages/web/src/areas/reporting/api/client.ts`]
+44. **Finding 17, `getInstanceRecord` is byte-identical.** Not a refusal: a
+    correction, kept because the claim recurs. The two bodies differed by one
+    local name, `query` against `params`, so "byte-identical" did not hold.
+    The merge still landed, in the archived change
+    `2026-08-17-ponytail-web-client-catalog-dedup`.
+45. **Finding 17, route three types through the engine's exports map.**
+    Rejected 2026-08-16. `HistoryEntry` reaches `packages/web` through the
+    `./schema` entry. Of the three types named, `VersionSummary` lives in
+    `src/engine/definitions.ts` and `InstanceRecordElement` in
+    `src/runtime/api.ts`, files that map does not publish, and
+    `InstanceRecordPage` has no engine declaration at all. Widening the engine
+    package's public surface is an engine decision, and a `packages/web`
+    refactor does not get to make it. The three moved to
+    `packages/web/src/api/types.ts` instead.
+46. **Finding 13, the `useFail(onUnauthorized, setError, describe)` signature.**
+    Rejected 2026-08-16. That shape misses `shell/ProfilePage.tsx`, whose two
+    sites answer with `setLoadFailed(true)` and `setSaveFailed(true)`. The
+    shipped shape is `useFail(onUnauthorized, onError)`, taking the failure
+    handler itself. Further sites, `TaskScreen.tsx` and `PlayerScreen.tsx`
+    among them, kept their own ladder and share only the `is401` predicate.
+    [`packages/web/src/shell/useFail.ts`]

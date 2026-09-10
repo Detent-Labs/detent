@@ -13,8 +13,8 @@ is unaffected — this is a pure, behavior-preserving extraction that
 touches none of [[transactional-outbox]]'s or [[timers]]'s delivery/firing
 semantics. This capability exists purely to keep the "don't re-duplicate
 this" constraint from silently regressing as more poll-loop-driven engine
-workers are added. Added for `PONYTAIL-AUDIT.md`'s 2026-07-26 scan,
-finding 2.
+workers are added. Added by the archived change
+`2026-07-27-dedupe-engine-poll-loops`.
 
 ## Requirements
 

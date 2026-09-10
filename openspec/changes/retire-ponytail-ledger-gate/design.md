@@ -216,15 +216,17 @@ the tree moves between review and apply.
    missing eviction.
 5. Shortening the gate scripts was refused. Their length is comments recording
    measured traps.
-6. Deleting an unused example was refused. The four `examples/*.json` files are
-   referenced 176, 44, 25 and 23 times across docs, seed, specs and compose.
-7. Deleting unreferenced CSS classes was refused. Template literals build the
-   `admin-badge-*`, `app-stamp-*` and `studio-diff-*` names, so a selector grep
-   misses them on purpose.
+6. Deleting an unused example was refused. On 2026-08-16 the directory held
+   four `examples/*.json` files, referenced 176, 44, 25 and 23 times across
+   docs, seed, specs and compose. It holds nine today.
+7. Deleting unreferenced CSS classes was refused. On 2026-08-16 template
+   literals built the `admin-badge-*`, `app-stamp-*` and `studio-diff-*`
+   names. A selector grep therefore missed them on purpose. Those literals
+   have since left the tree. The reasoning stays.
 8. Replacing `packages/web/src/areas/studio/canvas/` with a graph library was
    refused. The directory stays hand-rolled SVG.
 9. The route table in `src/http/server.ts` holds four `req.method ===`
-   comparisons, as the 2026-08-04 change left it. Finding 11 is the one open
+   comparisons today. Finding 11 is the one open
    question over it, and it asks about a platform feature rather than
    duplication.
 
@@ -271,7 +273,9 @@ the tree moves between review and apply.
     `devHeaderResolver`, the action `Registry`, the `DataSourceRegistry`, the
     `AssignmentRegistry`'s multi-strategy handlers, `exampleRegistry.ts` with
     `RegistryPanel.tsx`, and `Action.execution`'s reserved enum. `CLAUDE.md`
-    documents each as a deliberate v1 boundary.
+    records the reserved enum and the dev-header seam as v1 boundaries, and
+    the registries as the plugin seam. The two studio files have
+    since left the tree, on 2026-08-18; the rest stand.
 17. **Delete `Action.execution` specifically.** Rejected on a second ground. It
     sits inside `ProcessBody`, so removing it moves the `definitionHash` of
     every stored body carrying it. The field `definitionStatus` sits outside the
@@ -280,8 +284,10 @@ the tree moves between review and apply.
     Declined 2026-07-26. [`src/engine/migration.ts`]
 19. **Collapse `requireRole` and the role constants.** Rejected. The call sites
     ask about genuinely different roles.
-20. **Reduce `checkAndRecordAttempt(map, email, now)`'s parameters.** Rejected.
-    Tests exercise all three with different values.
+20. **Reduce `checkAndRecordAttempt`'s parameters.** Rejected. Tests exercise
+    each with different values. The signature read `(map, email, now)` when
+    the cut was proposed; it has since grown a `maxAttempts` and a `capacity`
+    parameter. [`src/auth/login.ts`, `checkAndRecordAttempt`]
 21. **Collapse the two `ActorResolver` implementations.** Rejected. Both
     `jwt.ts` and `resolve.ts` are real implementations.
 22. **Collapse the i18n catalogs into one.** Rejected. The JSON contract is
@@ -301,7 +307,7 @@ the tree moves between review and apply.
     `packages/form-ui/src/submit.ts`, `isGroupField`]
 25. **Finding 9, delete `parseJsonb` as dead.** Rejected. A separate
     `parseJsonb` exports from `src/engine/host.ts`. `src/http/admin-routes.ts`
-    names it six times, and `test/data-list-columns.test.ts` imports it. It
+    names it on six lines, and `test/data-list-columns.test.ts` imports it. It
     returns `undefined` on a parse error, where the `drafts.ts` and
     `templates.ts` pair lets that error throw.
 26. **Finding 9, merge `toTemplate` and `toDraft`.** Rejected. The two map
@@ -331,16 +337,16 @@ the tree moves between review and apply.
 30. **Finding 39, inline `resolveActor(req, resolver, db)`.** Rejected
     2026-08-16. Its body is one line, `resolver(req.headers, db)`. The command
     `git grep -o 'resolveActor(' -- src | wc -l` prints 22, the declaration
-    among them. The 2026-08-04 `dedup-server-helpers` change created the
-    helper by collapsing four copies, and the doc comment above it says so.
+    among them. The archived change `2026-08-05-dedup-server-helpers` created
+    the helper by collapsing four copies, and the doc comment above it says so.
     Inlining would reverse that change to save three lines.
     [`src/http/routes.ts`, `resolveActor`]
 31. **Finding 39, inline `accountName.ts` into `Chrome.tsx`.** Rejected
     2026-08-16. The file is 15 lines with one call site, and it carries its own
     three-case test. Inlining moves the logic into a React component, so those
     three cases need a render to reach. The test then dies or grows a renderer.
-    The change `ponytail-cleanup-fetch-hooks-and-imports` declined finding 37 on
-    this same ground. [`packages/web/src/shell/accountName.ts`]
+    The change `2026-08-16-ponytail-cleanup-fetch-hooks-and-imports` declined
+    finding 37 on this same ground. [`packages/web/src/shell/accountName.ts`]
 32. **Finding 39, derive `onGoToArea` and `onGoToProfile` from the `go` prop.**
     Rejected 2026-08-16. Two derivations exist, not one. Each of the four area
     roots builds its own href as `/${a}`. The file `shell/App.tsx` passes
@@ -397,22 +403,22 @@ the tree moves between review and apply.
     pair `InvalidTenantKey` and `TenantKeyTaken`, `checkDbReady`, `clientAddressOf`,
     `parseAuthIssuers`, `MAX_OVERRIDE_VALUE_LENGTH` and
     `countUiStringOverrides`. Two symbols with no importer at all,
-    `checkTemplateKey` and `SUPPORTED_LOCALES`, resolved instead.
+    `checkTemplateKey` and `SUPPORTED_LOCALES`, lost their `export` instead.
 42. **Finding 14, a copy-pasted `tFill`.** Rejected 2026-08-16. Only
     `areas/admin/catalog.ts` declares `tFill`, and only
     `areas/reporting/catalog.ts` declares `tCount`. The bodies differ: `tFill`
     walks `Object.entries(values)` with `replaceAll`, and `tCount` runs one
     `replace` on `{n}`. Each has one declaration, so neither is duplication.
 43. **Finding 17, four area clients declare `listProcesses`.** Rejected
-    2026-08-16 on the count. Three do, and they agree exactly. The reporting
+    2026-08-16 as a dedup. Three of the four agree exactly. The reporting
     area's version reads a different route, `/reporting/processes`, and unwraps
     `{processes}` from the body. It stayed its own function.
     [`packages/web/src/areas/reporting/api/client.ts`]
 44. **Finding 17, `getInstanceRecord` is byte-identical.** Not a refusal: a
     correction, kept because the claim recurs. The two bodies differed by one
     local name, `query` against `params`, so "byte-identical" did not hold.
-    The merge still landed, in `ponytail-web-client-catalog-dedup` on
-    2026-08-16.
+    The merge still landed, in the archived change
+    `2026-08-17-ponytail-web-client-catalog-dedup`.
 45. **Finding 17, route three types through the engine's exports map.**
     Rejected 2026-08-16. `HistoryEntry` reaches `packages/web` through the
     `./schema` entry. Of the three types named, `VersionSummary` lives in

@@ -47,7 +47,6 @@ cat > "$REFS"
 sh "$GATES/range.sh" < "$REFS" > "$RANGES"
 
 # Stage 1: the host gates.
-sh "$GATES/ponytail-ledger.sh"
 sh "$GATES/whitespace.sh" < "$RANGES"
 sh "$GATES/prose.sh" < "$RANGES"
 sh "$GATES/machine-paths.sh"

@@ -12,8 +12,8 @@ scope than this audit pass's other `*-consolidation` capabilities (two
 constants in one file, not a pattern reused across call sites), recorded
 because the spec-driven schema requires every change to carry at least
 one delta and there was no capability-bearing sibling finding to fold
-this plain simplification into. Added for `PONYTAIL-AUDIT.md`'s
-2026-07-26 scan, finding 7.
+this plain simplification into. Added by the archived change
+`2026-07-27-dedupe-auth-token-lifetime`.
 
 ## Requirements
 

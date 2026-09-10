@@ -13,8 +13,8 @@ mapping row's field used to duplicate the entry instead of replacing it (see
 the field-move scenarios below). This capability exists purely to keep the
 "don't re-duplicate this" constraint from silently regressing as more
 field-expression-map call sites are added. Companion to
-[[registry-error-consolidation]], added for the same `PONYTAIL-AUDIT.md`
-report's finding 1.
+[[registry-error-consolidation]], added by the archived change
+`2026-07-26-shared-field-expression-map-editor`.
 
 ## Requirements
 

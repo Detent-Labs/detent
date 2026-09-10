@@ -1,12 +1,12 @@
 /**
  * Keyset-pagination cursor encode/decode, shared by `runtime/api.ts` (instance
  * listing, instance record) and `engine/admin-queries.ts` (outbox listing,
- * pending timers) — previously duplicated verbatim in both
- * (`PONYTAIL-AUDIT.md` finding 9). A cursor is base64url of a JSON array of
- * strings; `arity` is the tuple length the caller's query destructures (2 for
- * `(createdAt, id)`-shaped cursors, 3 for `getInstanceRecord`'s
- * `(transitionSeq, at, id)`), since different callers encode different
- * tuples.
+ * pending timers) — previously duplicated verbatim in both, until the
+ * archived change `2026-07-29-correct-api-error-responses` extracted it. A
+ * cursor is base64url of a JSON array of strings; `arity` is the tuple length
+ * the caller's query destructures (2 for `(createdAt, id)`-shaped cursors, 3
+ * for `getInstanceRecord`'s `(transitionSeq, at, id)`), since different
+ * callers encode different tuples.
  *
  * `decodeCursor` validates shallowly on purpose: "a JSON array of `arity`
  * strings" is exactly what `encodeCursor` produces, so this only rejects a

@@ -7,8 +7,8 @@ field-tree write-path checks and the leaf-field collection shared by
 `src/cel/check.ts` and `src/cel/eval.ts`. It keeps the field-tree walk from
 repeating once per check, or once per caller. Companion to the existing
 `field-expression-map-consolidation`, `registry-config-check-consolidation`,
-and `runtime-field-type-check-consolidation` capabilities, for the same
-`PONYTAIL-AUDIT.md` report's findings 65 and 66.
+and `runtime-field-type-check-consolidation` capabilities, added by the
+archived change `2026-08-18-field-tree-check-consolidation`.
 
 ## Requirements
 
