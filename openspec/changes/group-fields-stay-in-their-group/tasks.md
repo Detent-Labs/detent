@@ -66,9 +66,11 @@ tree.
 
 ## 7. Docs and rules
 
-- [ ] 7.1 Rewrite the group passage in `docs/authoring-guide.md` to state the parentage rule
-- [ ] 7.2 Correct the view-group bullet in `.claude/rules/authoring-invariants.md`
-- [ ] 7.3 Check `.claude/rules/process-contract.md` for the same claim and correct it
+- [x] 7.1 Rewrite the group passage in `docs/authoring-guide.md` to state the
+      parentage rule
+- [x] 7.2 Correct the view-group bullet in `.claude/rules/authoring-invariants.md`
+- [x] 7.3 Check `.claude/rules/process-contract.md` for the same claim and
+      correct it
 
 ## 8. Verification
 
