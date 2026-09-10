@@ -277,6 +277,7 @@ export const en = {
   "formEditor.moveUp": "Move up",
   "formEditor.moveDown": "Move down",
   "formEditor.remove": "Remove",
+  "formEditor.removeGroup": "Remove ({count})",
   "formEditor.markRequired": "required",
   "formEditor.markReadonly": "readonly",
   "formEditor.markCel": "CEL",

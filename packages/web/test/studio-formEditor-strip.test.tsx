@@ -5,14 +5,20 @@ import type { DraftViewField } from "../src/areas/studio/draft/view-layout.js";
 
 /**
  * technical-field-marker task 4.2: the per-step strip omits `required` and
- * `readonly` for a field declaring `technical: true`, while `visible`,
- * `group` and `span` stay offered. `FormEditorStrip` is the strip's
- * presentational component, pulled out of `FormEditorScreen` so it can be
- * exercised with an arbitrary row directly — selecting a row in the full
- * screen runs through client-side `useState`, invisible to a server render.
+ * `readonly` for a field declaring `technical: true`, while `visible` and
+ * `span` stay offered. `FormEditorStrip` is the strip's presentational
+ * component, pulled out of `FormEditorScreen` so it can be exercised with an
+ * arbitrary row directly — selecting a row in the full screen runs through
+ * client-side `useState`, invisible to a server render.
  * `renderToStaticMarkup` needs no DOM: mirrors
  * `studio-editorDock-fieldMatrixTab.test.tsx`'s own synchronous server
  * render, no DOM, no listening socket.
+ *
+ * The strip offers no `group` control at all (group-fields-stay-in-their-
+ * group's "A field's strip offers no group control" scenario, task 6.7): the
+ * field catalog's own move control is where an author re-parents a field
+ * now, so a select here would offer one lawful value and several the
+ * publish rejects.
  */
 const row = (): DraftViewField => ({ ref: "field_amount" as never });
 
@@ -26,30 +32,28 @@ const render = (technicalFieldIds: Set<string>) =>
       written={() => 0}
       technicalFieldIds={technicalFieldIds}
       isGroup={false}
-      groupKeys={[]}
       onChangeFlag={() => {}}
       onChangeSpan={() => {}}
-      onChangeGroup={() => {}}
     />,
   );
 
 describe("FormEditorStrip", () => {
-  it("emits no required or readonly control for a technical field, and keeps visible/group/span", () => {
+  it("emits no required or readonly control for a technical field, and keeps visible/span, and no group control", () => {
     const html = render(new Set(["field_amount"]));
     expect(html).toContain(">visible<");
     expect(html).not.toContain(">required<");
     expect(html).not.toContain(">readonly<");
     expect(html).toContain(">span<");
-    expect(html).toContain(">group<");
+    expect(html).not.toContain(">group<");
   });
 
-  it("emits every control for a non-technical field", () => {
+  it("emits every override control for a non-technical field, and no group control", () => {
     const html = render(new Set());
     expect(html).toContain(">visible<");
     expect(html).toContain(">required<");
     expect(html).toContain(">readonly<");
     expect(html).toContain(">span<");
-    expect(html).toContain(">group<");
+    expect(html).not.toContain(">group<");
   });
 });
 
@@ -69,10 +73,8 @@ describe("FormEditorStrip: dominance-scoped gating", () => {
         written={written}
         technicalFieldIds={new Set()}
         isGroup={false}
-        groupKeys={[]}
         onChangeFlag={() => {}}
         onChangeSpan={() => {}}
-        onChangeGroup={() => {}}
       />,
     );
 
