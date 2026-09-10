@@ -33,6 +33,7 @@ import {
   publishedProcessBody,
   processBody,
   collectFieldsDeep,
+  parentGroupKeyById,
   parseIsoDuration,
   MAX_TIMER_DURATION_MS,
   CANCEL_SINK_STEP_ID,
@@ -46,6 +47,7 @@ import {
   type BaseFieldType,
   type FieldControl,
   type FieldFormat,
+  type FieldId,
   type Literal,
   type ProcessBody,
   type Step,
@@ -963,12 +965,16 @@ function checkRedactableFields(body: ProcessBody): CompileIssue[] {
 // drew 37 empty forms between them.
 //
 // An empty `group` reads as no group, matching what the renderer already does
-// with it, so this check passes over one.
+// with it, so this check passes over one entirely — including the third half
+// below.
 //
-// The rule does NOT ask the view group to follow the catalog's own nesting.
-// The view carries presentation: `purchase-requisition.json` places `quantity`
-// under five different headings across five steps, and one catalog tree cannot
-// hold a field in five places.
+// A third half binds a field entry (one carrying a `ref`) to the catalog: its
+// `group` must name the key of the group field that holds that field in the
+// catalog's own `fields` (`parentGroupKeyById`), or stay empty when the
+// catalog holds the field at the top level. This reaches a group field's own
+// entry too — a group nested inside another group carries the outer group's
+// key, and no other. A note entry is exempt from this half alone: it names no
+// catalog field, so nothing parents it.
 //
 // Operates on duck-typed input, like checkReservedActionPrefix,
 // checkUnknownKeys and checkTechnicalFields: it runs before any Zod parse of
@@ -985,6 +991,9 @@ function checkViewGroupReferences(body: ProcessBody): CompileIssue[] {
     if (typeof f?.key !== "string" || typeof f?.id !== "string") return;
     groupIdByKey.set(f.key, f.id);
   });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const parentKeyById = parentGroupKeyById((body.fields ?? []) as any);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (body.workflow?.steps ?? []).forEach((s: any, si: number) => {
@@ -1005,6 +1014,25 @@ function checkViewGroupReferences(body: ProcessBody): CompileIssue[] {
           loc,
           value: group,
           message: "a view entry's group names a group field this view does not carry",
+        });
+        return;
+      }
+      if (typeof vf?.ref !== "string") return; // a note has no catalog parent to agree with
+      const fieldId = vf.ref as FieldId;
+      if (!parentKeyById.has(fieldId)) {
+        issues.push({
+          loc,
+          value: group,
+          message: "a view entry's group must be empty; the catalog holds this field at the top level",
+        });
+        return;
+      }
+      const catalogParent = parentKeyById.get(fieldId) as string;
+      if (catalogParent !== group) {
+        issues.push({
+          loc,
+          value: group,
+          message: `a view entry's group must name this field's catalog parent, "${catalogParent}"`,
         });
       }
     });
