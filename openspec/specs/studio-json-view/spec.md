@@ -3,14 +3,14 @@
 ## Purpose
 
 A third editing surface on the studio area of `packages/web`'s `/processes/:id/edit` screen
-(see `studio-app`), alongside Canvas and Panels (`studio-canvas`): a raw,
+(see `studio-app`), alongside the structure surface: a raw,
 pretty-printed JSON view over the draft body, replacing rather than
 two-way-bound. Editing and clicking Apply parses the text, runs it through
-the same load-time shape guard (`checkDraftShape`, ported verbatim from
-`packages/editor/src/draft/load-guard.ts`) the editor's file-based Load
+the same load-time shape guard (`checkDraftShape`, in
+`packages/web/src/areas/studio/draft/load-guard.ts`) the editor's file-based Load
 already used, and — only on success — replaces the whole draft body through
 the Draft model's existing `replace()` path (the same one Load/Import used).
-The JSON surface and every draft-body-mutating component (`ProcessHeader`,
+The JSON surface and every draft-body-mutating component (`ProcessHeaderBar`,
 `FieldCatalogPanel`, `DataSourcesPanel`, `ContractPanel`, Canvas, and the
 steps/paths/timers/actions panels nested under it) are mutually exclusive —
 only one is shown, and interactable, at a time — so a stale JSON textarea can
