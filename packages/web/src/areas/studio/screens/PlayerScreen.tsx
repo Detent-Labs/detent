@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
-import { FieldForm, PathButtons, filterToEditable, resolveFieldsLocale, resolveTabsLocale, firstTabWithIssue, isResolvedViewField } from "form-ui";
+import { FieldForm, PathButtons, filterToEditable, resolveFieldsLocale, resolveTabsLocale, isResolvedViewField } from "form-ui";
 import type { SubmissionIssue } from "form-ui";
 import { createInstance, createTestInstance, getInstanceView, submitPath, claimStep, releaseClaim, getInstanceRecord, StudioClientError } from "../api/client.js";
 import type { InstanceView, InstanceRecordElement } from "../api/types.js";
-import { seedFormValues, createAndOpenInstance, isTestInstance } from "./playerLogic.js";
+import { seedFormValues, createAndOpenInstance, isTestInstance, tabToOpenOnFailure } from "./playerLogic.js";
 import { describeRecordElement } from "../../../api/record.js";
 import type { Route } from "../routing.js";
 import { describeError, describeCaughtError } from "../errors.js";
@@ -196,23 +196,37 @@ export function PlayerScreen({ processId, token, navigate, onUnauthorized }: Pla
     [onUnauthorized],
   );
 
+  // Built once per render and read from both the tab-switch effect below and
+  // the JSX return: `fieldIds`/`unmatchedIssues` split raw server issues into
+  // the ones a rendered field owns and the ones nothing on this view claims.
+  const fieldIds = new Set(view?.fields.filter(isResolvedViewField).map((f) => f.field.id) ?? []);
+  const issuesByField = new Map<string, SubmissionIssue[]>();
+  const unmatchedIssues: SubmissionIssue[] = [];
+  for (const issue of validationIssues) {
+    if (fieldIds.has(issue.fieldId)) {
+      const arr = issuesByField.get(issue.fieldId) ?? [];
+      arr.push(issue);
+      issuesByField.set(issue.fieldId, arr);
+    } else {
+      unmatchedIssues.push(issue);
+    }
+  }
+
   // A required field on an unopened tab otherwise blocks the submission with
   // nothing on screen to explain it (form-view-tabs design.md, "The issue
-  // switch belongs to the consumer"). Reacts to `validationIssues` alone, not
-  // to the derived `issuesByField` map below: that map is a fresh object every
-  // render, and depending on it here would force the operator back onto the
-  // offending tab on every unrelated re-render, undoing a deliberate switch
-  // away from it.
+  // switch belongs to the consumer"). Keyed on `validationIssues` alone, NOT
+  // on `issuesByField` above: that Map is a fresh object every render, and
+  // keying this effect on it would re-run it, and so re-call
+  // `tabToOpenOnFailure`, on every unrelated re-render (record paging, a
+  // refresh) — forcing the operator back onto the offending tab even after
+  // they had deliberately switched away from it while the same stale issues
+  // sat in state. `form-tab-switch-effect.test.ts` pins this dependency
+  // list; `studio-playerLogic.test.ts` covers the decision itself.
   useEffect(() => {
-    if (!view || validationIssues.length === 0) return;
-    const byField = new Map<string, SubmissionIssue[]>();
-    for (const issue of validationIssues) {
-      const arr = byField.get(issue.fieldId) ?? [];
-      arr.push(issue);
-      byField.set(issue.fieldId, arr);
-    }
-    const nextTab = firstTabWithIssue(view.fields, view.tabs ?? [], byField);
+    if (!view) return;
+    const nextTab = tabToOpenOnFailure(view.fields, view.tabs ?? [], issuesByField);
     if (nextTab !== undefined) setActiveTab(nextTab);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [validationIssues, view]);
 
   const doCreate = () =>
@@ -277,19 +291,6 @@ export function PlayerScreen({ processId, token, navigate, onUnauthorized }: Pla
       })
       .catch(failRecord);
   }, [instanceId, recordCursor, token, failRecord]);
-
-  const fieldIds = new Set(view?.fields.filter(isResolvedViewField).map((f) => f.field.id) ?? []);
-  const issuesByField = new Map<string, SubmissionIssue[]>();
-  const unmatchedIssues: SubmissionIssue[] = [];
-  for (const issue of validationIssues) {
-    if (fieldIds.has(issue.fieldId)) {
-      const arr = issuesByField.get(issue.fieldId) ?? [];
-      arr.push(issue);
-      issuesByField.set(issue.fieldId, arr);
-    } else {
-      unmatchedIssues.push(issue);
-    }
-  }
 
   return (
     <main {...stylex.props(styles.studioScreen, styles.studioPlayerScreen)}>
