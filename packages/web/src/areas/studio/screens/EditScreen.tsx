@@ -41,7 +41,7 @@ import {
 } from "../canvas/geometry.js";
 import { type StepGroup } from "../canvas/groups.js";
 import { arrangeSteps, hasHandPlacedStep } from "../canvas/arrange.js";
-import type { LayoutStep } from "../canvas/layout.js";
+import { autoPlaceSteps, type LayoutStep } from "../canvas/layout.js";
 import { newStep, type StepKind } from "../draft/createStep.js";
 import { addToDraftArray } from "../draft/draft-array-crud.js";
 import { insertOnPath } from "../draft/insertOnPath.js";
@@ -285,9 +285,9 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, go, initial
   const { draft, mutate, validation, replace, contentLocale } = useDraft();
   const baseLocale = draft.baseLocale ?? "en";
   const [saveState, setSaveState] = useState<DraftSaveState>(() => initialSaveState(initialRevision, initialLayout));
-  // The canvas selection is a set (design.md). A set of one drives the
-  // configuration pane exactly as the single id did; a set of several drives
-  // the group summary instead, since the pane edits one step.
+  // The canvas selection is a set (design.md). A set of one drives the step
+  // page exactly as the single id did; a set of several names no one step for
+  // it, so the canvas bar carries that set's own count and controls.
   const [selectedStepIds, setSelectedStepIds] = useState<string[]>([]);
   const [selectedPathId, setSelectedPathId] = useState<string | undefined>(undefined);
   // The path an edit-rail drag currently sits over, resolved the same way the
@@ -472,9 +472,10 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, go, initial
     setSelectedPathId(undefined);
   };
 
-  // The inspector takes one step. A set of several names none for it, and the
-  // group summary stands in (studio-canvas: "It SHALL NOT show the inspector
-  // in that state").
+  // The step page takes one step. A set of several names none for it, so the
+  // canvas bar carries the set's count and its delete and group controls
+  // instead (studio-canvas: "The step page holds one step, and a set of
+  // several names no one step for it").
   const inspectedStepId = selectedStepIds.length === 1 ? selectedStepIds[0] : undefined;
 
   // The rail's own order, read three times: for the row list's current mark,
@@ -677,13 +678,20 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, go, initial
     const svg = body?.querySelector<SVGSVGElement>("svg");
     if (!rect || !svg) return; // the canvas is not on screen — no placement
     const centre = snapToGrid(svgPointFromClient(svg, rect.left + rect.width / 2, rect.top + rect.height / 2));
-    // Every step's stored position. Reading through the draft's own steps
-    // leaves the blob's reserved keys — `waypoints`, `groups` and
-    // `canvasEdgeStyle` — out: none of the three is a step id.
+    // Every step's RESOLVED position, not the stored blob alone (design D2). A
+    // step the steps rail's foot created and nobody dragged carries no stored
+    // entry, and `CanvasView` still draws it, through `autoPlaceSteps`. The
+    // two sources resolve in the order `CanvasView.positionOf` resolves them,
+    // so the press tests against the nodes an author can see. Walking the
+    // draft's own steps also leaves the blob's reserved keys — `waypoints`,
+    // `groups` and `canvasEdgeStyle` — out: none of the three is a step id.
+    const autoPlaced = autoPlaceSteps(steps as LayoutStep[], draft.workflow?.initialStep, saveState.layout);
     const placed: NodePosition[] = [];
     for (const s of steps) {
-      const at = s.id === undefined ? undefined : saveState.layout[s.id];
-      if (s.id !== undefined && isLayoutPoint(at)) placed.push({ id: s.id, x: at.x, y: at.y });
+      if (s.id === undefined) continue;
+      const stored = saveState.layout[s.id];
+      const at = isLayoutPoint(stored) ? stored : (autoPlaced[s.id] ?? { x: 0, y: 0 });
+      placed.push({ id: s.id, x: at.x, y: at.y });
     }
     const point = freeLatticePoint(centre, placed);
     const created = newStep(kind, seedLocalizedText(contentLocale));
