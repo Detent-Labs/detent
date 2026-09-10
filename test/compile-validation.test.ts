@@ -545,6 +545,18 @@ describe("compile: a body violating a new check still reads (no new Zod refineme
     b.workflow.steps[0].view = { fields: [{ ref: "field_amount", group: "Personal details" }] };
     expect(processBody.safeParse(b).success).toBe(true);
   });
+
+  it("a field entry naming the wrong catalog parent parses on read", () => {
+    // More bodies violate the parentage half than the first two, per the
+    // delta spec. A body pinning `field_amount` (a top-level catalog field)
+    // under a group the view carries must still parse.
+    const b: any = baseBody();
+    b.fields.push({ id: "field_person", key: "person", label: { en: "Person" }, type: "group" });
+    b.workflow.steps[0].view = {
+      fields: [{ ref: "field_person" }, { ref: "field_amount", group: "person" }],
+    };
+    expect(processBody.safeParse(b).success).toBe(true);
+  });
 });
 
 // table-shaped-data-sources: a structural check. `columnMapping`
@@ -1213,11 +1225,30 @@ describe("compile: org.actor-from-field fieldId names a person-formatted field",
 // entry whose `group` names nothing, or names a group field the view leaves
 // out, therefore vanishes from the form with no message. Three published
 // examples carried the shape and drew 37 empty forms between them.
+//
+// group-fields-stay-in-their-group adds a third half: a field entry's
+// `group` must name the key of the group field that holds it in the
+// catalog's own `fields` (or stay empty when the catalog holds it at the
+// top level), reached via `parentGroupKeyById`. A note entry, which names no
+// catalog field, is exempt from this half alone.
 describe("compile: a view entry's group names a group field the view carries", () => {
-  /** `baseBody` plus one group field, and a view on step_a the caller fills. */
+  /**
+   * `baseBody` plus one group field holding `field_amount` as its one
+   * catalog member, and a view on step_a the caller fills. `field_amount`
+   * therefore has one true catalog parent, "person", throughout this
+   * describe block.
+   */
   const grouped = (entries: any[]): any => {
     const b: any = baseBody();
-    b.fields.push({ id: "field_person", key: "person", label: { en: "Person" }, type: "group" });
+    b.fields = [
+      {
+        id: "field_person",
+        key: "person",
+        label: { en: "Person" },
+        type: "group",
+        fields: [{ id: "field_amount", key: "amount", label: { en: "Amount" }, type: "number" }],
+      },
+    ];
     b.workflow.steps[0].view = { fields: entries };
     return b;
   };
@@ -1248,6 +1279,8 @@ describe("compile: a view entry's group names a group field the view carries", (
   });
 
   it("accepts a view carrying the group field beside its members", () => {
+    // field_amount's view entry names "person", its actual catalog parent,
+    // so this clears the parentage half too.
     const b = grouped([
       { ref: "field_person" },
       { ref: "field_amount", group: "person" },
@@ -1258,21 +1291,10 @@ describe("compile: a view entry's group names a group field the view carries", (
 
   it("reads an empty group as no group, the way the renderer does", () => {
     // `!entry.group` is true for "", so form-ui already draws such an entry at
-    // the form's root. Rejecting it would refuse a body that renders.
+    // the form's root. Rejecting it would refuse a body that renders. The
+    // empty-group carve-out reaches the parentage half too: field_amount's
+    // true catalog parent is "person", yet an empty group still publishes.
     const b = grouped([{ ref: "field_amount", group: "" }]);
-    expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
-  });
-
-  it("groups a top-level field under a childless group field", () => {
-    // The purchase-requisition shape. The view carries presentation, so a
-    // `group` need not follow the catalog's nesting: that file places
-    // `quantity` under five headings across five steps, and no single catalog
-    // tree holds a field in five places. The renderer never reads a group
-    // field's own `fields`, so a childless container draws its members all
-    // the same.
-    const b = grouped([{ ref: "field_person" }, { ref: "field_amount", group: "person" }]);
-    expect(b.fields.find((f: any) => f.id === "field_person").fields).toBeUndefined();
-    expect(b.fields.find((f: any) => f.id === "field_amount").type).toBe("number");
     expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
   });
 
@@ -1289,5 +1311,98 @@ describe("compile: a view entry's group names a group field the view carries", (
     compiled.workflow.steps[0].view.fields.push({ ref: "field_amount", group: "nope" });
     expect(publishedProcessBody.safeParse(compiled).success).toBe(true);
     expect(() => compileProcessBody(compiled)).toThrow(CompileValidationError);
+  });
+
+  it("rejects a group on a top-level field", () => {
+    // The catalog holds `field_amount` at the top level here (baseBody's own
+    // shape, a childless "person" group sitting beside it, not around it),
+    // so no group name is valid for its view entry, not even one the view
+    // legitimately carries.
+    const b: any = baseBody();
+    b.fields.push({ id: "field_person", key: "person", label: { en: "Person" }, type: "group" });
+    b.workflow.steps[0].view = {
+      fields: [{ ref: "field_person" }, { ref: "field_amount", group: "person" }],
+    };
+    const err = rejects(b);
+    expect(err.issues.some((i) => i.loc === "steps[0].view.fields[1].group")).toBe(true);
+    expect(err.message).toContain("top level");
+  });
+
+  it("rejects a field entry naming a group that does not hold it, naming the catalog's own parent", () => {
+    const b: any = baseBody();
+    b.fields = [
+      {
+        id: "field_person",
+        key: "person",
+        label: { en: "Person" },
+        type: "group",
+        fields: [{ id: "field_amount", key: "amount", label: { en: "Amount" }, type: "number" }],
+      },
+      { id: "field_other", key: "other", label: { en: "Other" }, type: "group" },
+    ];
+    b.workflow.steps[0].view = {
+      fields: [{ ref: "field_person" }, { ref: "field_other" }, { ref: "field_amount", group: "other" }],
+    };
+    const err = rejects(b);
+    expect(err.issues.some((i) => i.loc === "steps[0].view.fields[2].group")).toBe(true);
+    expect(err.message).toContain('"person"');
+  });
+
+  it("carries one group across every step; the third entry alone fails", () => {
+    const b: any = baseBody();
+    b.fields = [
+      {
+        id: "field_person",
+        key: "person",
+        label: { en: "Person" },
+        type: "group",
+        fields: [{ id: "field_amount", key: "amount", label: { en: "Amount" }, type: "number" }],
+      },
+      { id: "field_other", key: "other", label: { en: "Other" }, type: "group" },
+    ];
+    b.workflow.initialStep = "step_a";
+    b.workflow.steps = [
+      {
+        id: "step_a",
+        key: "a",
+        label: { en: "A" },
+        type: "task",
+        paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }],
+        view: { fields: [{ ref: "field_person" }, { ref: "field_amount", group: "person" }] },
+      },
+      {
+        id: "step_b",
+        key: "b",
+        label: { en: "B" },
+        type: "task",
+        paths: [{ id: "path_bc", key: "bc", label: "Bc", to: "step_c", trigger: "manual" }],
+        view: { fields: [{ ref: "field_person" }, { ref: "field_amount", group: "person" }] },
+      },
+      {
+        id: "step_c",
+        key: "c",
+        label: { en: "C" },
+        type: "task",
+        terminal: true,
+        view: { fields: [{ ref: "field_other" }, { ref: "field_amount", group: "other" }] },
+      },
+    ];
+    const err = rejects(b);
+    expect(err.issues.some((i) => i.loc === "steps[0].view.fields[1].group")).toBe(false);
+    expect(err.issues.some((i) => i.loc === "steps[1].view.fields[1].group")).toBe(false);
+    expect(err.issues.some((i) => i.loc === "steps[2].view.fields[1].group")).toBe(true);
+  });
+
+  it("publishes a note naming a group no catalog tie binds", () => {
+    // A note names no catalog field, so it has no catalog parent to agree
+    // with. field_person is a top-level group here — a field entry naming
+    // it would need an empty group — but a note is exempt from the
+    // parentage half entirely, so naming "person" still publishes as long
+    // as the view carries a ref to it (the first two halves still bind it).
+    const b = grouped([
+      { ref: "field_person" },
+      { kind: "note", text: { en: "Hello." }, group: "person" },
+    ]);
+    expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
   });
 });
