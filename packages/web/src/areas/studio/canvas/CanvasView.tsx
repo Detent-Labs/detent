@@ -157,18 +157,15 @@ const styles = stylex.create({
   // `display: -webkit-box`, and `align-items` reaches neither that nor any
   // other non-flex container.
   //
-  // `flex-start` over `center`, because centring gives a one-line label and a
-  // two-line one different first baselines, and a row of nodes is the
-  // strongest alignment this surface has. The 20 puts that shared baseline
-  // back on 34, where the old `<text y={34}>` drew it, so a one-line label
-  // renders exactly where it always did. Two clamped lines measure 39, so
-  // they close at 59 inside the 60-unit box.
+  // `center` over `flex-start`, so one line and two read from the node's own
+  // middle. A fixed 20 of top padding put both first lines on 34, which cost
+  // a two-line label its centring: 39 of clamped text closed on 59 inside the
+  // 60-unit box. Centred, two lines run 10.5 to 49.5, and one line lands on
+  // 20.25 — a quarter unit from where the padding drew it.
   nodeLabelBox: {
-    boxSizing: "border-box",
     height: "100%",
-    paddingTop: 20,
     display: "flex",
-    alignItems: "flex-start",
+    alignItems: "center",
   },
   // Two lines, then an ellipsis. `-webkit-line-clamp` needs all four
   // declarations together, and it draws the ellipsis itself, so no
