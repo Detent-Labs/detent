@@ -185,9 +185,9 @@ const styles = stylex.create({
     boxShadow: `inset 0 -2px 0 ${colors.accent}`,
   },
   // A filled `stamp-refusal`, per `DESIGN.md`: mono at 11px, refusal ground,
-  // paper text. One stamp per tab, which is the Stamp Rule's own limit, and
-  // its `aria-label` is the screen-reader text the `form-ui` spec requires —
-  // no second element carries the count.
+  // paper text. One stamp per tab, which is the Stamp Rule's own limit. The
+  // sibling below carries the same count as text, since the stamp's color
+  // reaches no screen reader.
   tabIssueStamp: {
     fontFamily: fonts.mono,
     fontVariantNumeric: "tabular-nums",
@@ -196,6 +196,17 @@ const styles = stylex.create({
     color: colors.paper50,
     paddingBlock: 2,
     paddingInline: 7,
+  },
+  visuallyHidden: {
+    position: "absolute",
+    width: 1,
+    height: 1,
+    margin: -1,
+    padding: 0,
+    overflow: "hidden",
+    clipPath: "inset(50%)",
+    whiteSpace: "nowrap",
+    borderWidth: 0,
   },
   note: {
     margin: 0,
@@ -401,15 +412,28 @@ export function FieldForm({ fields, values, onChange, locale, issuesByField, col
                 type="button"
                 role="tab"
                 aria-selected={selected}
-                aria-controls={tabPanelDomId(tab.key)}
+                // The open tab alone. One panel is in the DOM, so
+                // `aria-controls` on a closed tab would name an element that
+                // is not there.
+                aria-controls={selected ? tabPanelDomId(tab.key) : undefined}
                 {...stylex.props(styles.tab, selected && styles.tabSelected)}
                 onClick={() => onTabChange?.(tab.key)}
               >
                 <span>{resolveText(tab.label, locale, locale) || tab.key}</span>
                 {count > 0 && (
-                  <span {...stylex.props(styles.tabIssueStamp)} aria-label={issueCountText(count, locale)}>
-                    {count}
-                  </span>
+                  <>
+                    {/* The count twice: once as the stamp a participant
+                      * reads, hidden from the accessibility tree, and once
+                      * as the text naming what it counts. A name on the
+                      * stamp itself would be an accessible name on a
+                      * generic element, which ARIA 1.2 prohibits. Off
+                      * screen, never `display: none`: a hidden node is
+                      * announced by no engine. */}
+                    <span {...stylex.props(styles.tabIssueStamp)} aria-hidden="true">
+                      {count}
+                    </span>
+                    <span {...stylex.props(styles.visuallyHidden)}>{issueCountText(count, locale)}</span>
+                  </>
                 )}
               </button>
             );

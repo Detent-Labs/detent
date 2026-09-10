@@ -63,6 +63,19 @@ function selectedTab(html: string): string | undefined {
   return /id="form-ui-tab-([^"]+)"[^>]*aria-selected="true"/.exec(html)?.[1];
 }
 
+/** A tab button's accessible name, computed the way name-from-content
+ * computes it: the text its subtree carries, minus every subtree
+ * `aria-hidden` takes out of the tree. That is what a screen reader
+ * announces, and no attribute stands in for it. */
+function accessibleName(html: string, tabKey: string): string {
+  const button = new RegExp(`<button[^>]*id="form-ui-tab-${tabKey}"[\\s\\S]*?</button>`).exec(html)?.[0] ?? "";
+  return button
+    .replace(/<span[^>]*aria-hidden="true"[\s\S]*?<\/span>/g, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 /** Every drawn tab's key, in the order the strip drew them. */
 function drawnTabKeys(html: string): string[] {
   return [...html.matchAll(/id="form-ui-tab-([^"]+)"/g)].map((m) => m[1]!);
@@ -113,18 +126,21 @@ describe("FieldForm: a view declaring tabs renders as a tab strip over one panel
     expect(selectedTab(html)).toBe("one");
     expect(html).toContain("Label f1");
     expect(html).not.toContain("Label f2");
-    // One panel, naming the tab that labels it. The closed tab still carries
-    // its own `aria-controls`, per the spec; the panel it names is what the
-    // form does not draw.
+    // One panel, and it names the tab that labels it.
     expect(html).toContain('role="tabpanel" id="form-ui-tabpanel-one" aria-labelledby="form-ui-tab-one"');
-    expect(html).not.toContain('id="form-ui-tabpanel-two"');
     expect([...html.matchAll(/role="tabpanel"/g)]).toHaveLength(1);
+    expect(html).not.toContain("form-ui-tabpanel-two");
   });
 
-  it("each tab carries aria-selected and aria-controls naming its panel", () => {
-    const html = render([field("f1", "one"), field("f2", "two")], TABS, "one");
-    expect(html).toContain('aria-selected="true" aria-controls="form-ui-tabpanel-one"');
-    expect(html).toContain('aria-selected="false" aria-controls="form-ui-tabpanel-two"');
+  it("a closed tab names no panel", () => {
+    const three: ResolvedViewTab[] = [...TABS, { key: "three", label: { en: "History" } }];
+    const html = render([field("f1", "one"), field("f2", "two"), field("f3", "three")], three, "two");
+    // The open tab alone: the panel a closed tab would name is not in the
+    // DOM, so naming it would leave a dangling reference.
+    expect(html).toContain('aria-selected="true" aria-controls="form-ui-tabpanel-two"');
+    expect([...html.matchAll(/aria-controls=/g)]).toHaveLength(1);
+    expect(html).toContain('id="form-ui-tab-one" type="button" role="tab" aria-selected="false" class=');
+    expect(html).toContain('id="form-ui-tab-three" type="button" role="tab" aria-selected="false" class=');
   });
 
   it("opening a tab calls back rather than switching", () => {
@@ -216,11 +232,13 @@ describe("nextTabIndex: arrow keys move focus without opening a tab", () => {
     expect(nextTabIndex("ArrowRight", 0, 0)).toBeUndefined();
   });
 
-  it("the strip keeps the plain-button tab order: no tab is taken out of it", () => {
+  it("every tab is its own tab stop", () => {
     // `spa-accessibility` gives an ordinary tab set the plain-button pattern.
     // Roving tabindex is its named exception for the studio's ten-tab
     // scrolling row, and it would need focus state this package cannot hold.
-    expect(render([field("f1", "one"), field("f2", "two")], TABS, "one")).not.toContain("tabindex");
+    const html = render([field("f1", "one"), field("f2", "two")], TABS, "one");
+    expect(html).not.toContain('tabindex="-1"');
+    expect(html).not.toContain("tabindex");
   });
 });
 
@@ -284,7 +302,8 @@ describe("firstTabWithIssue: a helper names the first tab holding an issue", () 
     ]);
     expect(firstTabWithIssue(fields, three, issues)).toBe("two");
     const html = render(fields, three, "one", {}, issues);
-    expect(html).toContain('aria-label="1 issue"');
+    expect(accessibleName(html, "two")).toBe("Approval 1 issue");
+    expect(accessibleName(html, "three")).toBe("History 1 issue");
     expect(tabIssueCount(fields, "two", issues)).toBe(1);
     expect(tabIssueCount(fields, "three", issues)).toBe(1);
     expect(tabIssueCount(fields, "one", issues)).toBe(0);
@@ -319,7 +338,11 @@ describe("The tab stamp: each drawn tab marks its own issues", () => {
     ]);
     const html = render(fields, TABS, "one", {}, issues);
     expect(tabIssueCount(fields, "two", issues)).toBe(2);
-    expect(html).toContain('aria-label="2 issues"');
+    // The name a screen reader announces, not an attribute that happens to
+    // sit in the markup. The stamp itself is out of the tree, so the count
+    // reads once.
+    expect(accessibleName(html, "two")).toBe("Approval 2 issues");
+    expect(accessibleName(html, "one")).toBe("Details");
     expect(html).toContain("tabIssueStamp");
   });
 
@@ -329,7 +352,7 @@ describe("The tab stamp: each drawn tab marks its own issues", () => {
     expect(render(fields, TABS, "one", {}, issues)).toBe(first);
     // activeTab alone decides which panel draws; the counts do not move.
     const second = render(fields, TABS, "two", {}, issues);
-    expect(second).toContain('aria-label="1 issue"');
+    expect(accessibleName(second, "two")).toBe("Approval 1 issue");
     expect(selectedTab(second)).toBe("two");
   });
 
