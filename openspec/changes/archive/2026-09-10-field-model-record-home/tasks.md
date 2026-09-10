@@ -195,9 +195,9 @@ This change edits Markdown and moves one file, so the three commands below
 prove that no code file moved. The controller runs them once, alone, after the
 three record-home changes land. No implementer runs them per task.
 
-- [ ] 6.1 Run `bun run typecheck` in the devcontainer. Verify: it exits 0.
-- [ ] 6.2 Run `bun run build` in the devcontainer. Verify: it exits 0.
-- [ ] 6.3 Run the full `bun test` in the devcontainer with `DATABASE_URL` set.
+- [x] 6.1 Run `bun run typecheck` in the devcontainer. Verify: it exits 0.
+- [x] 6.2 Run `bun run build` in the devcontainer. Verify: it exits 0.
+- [x] 6.3 Run the full `bun test` in the devcontainer with `DATABASE_URL` set.
       Read the verdict off a named failure, never off a pass count. Capture the
       run and hand the capture to the gate:
       `bun test 2>&1 | tee /tmp/t.log; sh scripts/gates/silent-green.sh /tmp/t.log`.

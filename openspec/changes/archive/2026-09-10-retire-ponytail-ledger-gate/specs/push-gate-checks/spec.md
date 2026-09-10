@@ -6,7 +6,7 @@ A deliberate shortcut in `src/` or `packages/` SHALL carry a `ponytail:` comment
 at the code it defers. That comment SHALL state three things: the shortcut, the
 ceiling it holds to, and the entry point for the upgrade.
 
-The roll-up SHALL be derived on demand. The command is
+A reader SHALL derive the roll-up on demand. The command is
 `git grep -n 'ponytail:' -- src packages`. No tracked ledger file and no push
 gate SHALL back this convention. A contributor who adds or removes a marker
 SHALL owe no bookkeeping beyond the comment itself.
@@ -56,7 +56,7 @@ roll-up command scopes to those two trees, so a wider grep finds the rest.
   another file
 - **THEN** the record moves with it, and no second site needs a matching change
 
-#### Scenario: A reintroduced ledger is rejected in review
+#### Scenario: Review rejects a reintroduced ledger
 
 - **WHEN** a change proposes a tracked file listing the `ponytail:` markers, or a
   gate comparing such a file against the tree

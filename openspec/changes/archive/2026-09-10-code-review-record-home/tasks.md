@@ -135,7 +135,7 @@ before any file moves.
 
 ## 4. Add the spec requirement
 
-- [ ] 4.1 Sync the delta at
+- [x] 4.1 Sync the delta at
       `openspec/changes/code-review-record-home/specs/development-toolchain/spec.md`
       into `openspec/specs/development-toolchain/spec.md`. Place it beside the
       browser-check requirement at `:830`. Match the shape of its siblings.
@@ -179,7 +179,7 @@ before any file moves.
       The `< /dev/null` belongs on `range.sh` alone.
       Verify: the gate exits 0.
 
-- [ ] 6.3 Run `bun run typecheck`, then `bun run build`, then the full
+- [x] 6.3 Run `bun run typecheck`, then `bun run build`, then the full
       `bun test` with `DATABASE_URL` set, inside the devcontainer. These prove
       that no code file moved. Read the verdict off a named failure.
       Verify: all three exit 0, and the skip count sits at the floor.
