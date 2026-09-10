@@ -59,8 +59,8 @@ Docs and rules:
   list. The word therefore cannot name a horizontal bar.
 - `docs/browser-checks.md` names the palette at lines 183 and 281, and gains
   the bar's own manual checks.
-- `docs/current-state.md` names the palette at lines 1184, 1808, 1946, 1947
-  and 1959.
+- `docs/current-state.md` names the canvas palette at lines 1808, 1946, 1947
+  and 1959. Line 1184 names the form editor's own palette and stays.
 
 Nothing touches the engine, the HTTP surface or the schema. The definition
 contract stays as it is.
