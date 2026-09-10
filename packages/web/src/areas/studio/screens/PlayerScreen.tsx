@@ -1,7 +1,7 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
-import { FieldForm, PathButtons, filterToEditable, resolveFieldsLocale, isResolvedViewField } from "form-ui";
+import { FieldForm, PathButtons, filterToEditable, resolveFieldsLocale, resolveTabsLocale, firstTabWithIssue, isResolvedViewField } from "form-ui";
 import type { SubmissionIssue } from "form-ui";
 import { createInstance, createTestInstance, getInstanceView, submitPath, claimStep, releaseClaim, getInstanceRecord, StudioClientError } from "../api/client.js";
 import type { InstanceView, InstanceRecordElement } from "../api/types.js";
@@ -134,6 +134,7 @@ export function PlayerScreen({ processId, token, navigate, onUnauthorized }: Pla
   const [loading, setLoading] = useState(false);
   const [outcome, setOutcome] = useState<string | undefined>(undefined);
   const [validationIssues, setValidationIssues] = useState<SubmissionIssue[]>([]);
+  const [activeTab, setActiveTab] = useState<string | undefined>(undefined);
   const failRecord = useFail(onUnauthorized, (e) => setRecordError(describeCaughtError(e)));
 
   const loadRecord = useCallback(
@@ -194,6 +195,25 @@ export function PlayerScreen({ processId, token, navigate, onUnauthorized }: Pla
     },
     [onUnauthorized],
   );
+
+  // A required field on an unopened tab otherwise blocks the submission with
+  // nothing on screen to explain it (form-view-tabs design.md, "The issue
+  // switch belongs to the consumer"). Reacts to `validationIssues` alone, not
+  // to the derived `issuesByField` map below: that map is a fresh object every
+  // render, and depending on it here would force the operator back onto the
+  // offending tab on every unrelated re-render, undoing a deliberate switch
+  // away from it.
+  useEffect(() => {
+    if (!view || validationIssues.length === 0) return;
+    const byField = new Map<string, SubmissionIssue[]>();
+    for (const issue of validationIssues) {
+      const arr = byField.get(issue.fieldId) ?? [];
+      arr.push(issue);
+      byField.set(issue.fieldId, arr);
+    }
+    const nextTab = firstTabWithIssue(view.fields, view.tabs ?? [], byField);
+    if (nextTab !== undefined) setActiveTab(nextTab);
+  }, [validationIssues, view]);
 
   const doCreate = () =>
     withErrorHandling(async () => {
@@ -330,6 +350,9 @@ export function PlayerScreen({ processId, token, navigate, onUnauthorized }: Pla
               locale="en"
               issuesByField={issuesByField}
               columns={view.columns ?? 1}
+              tabs={resolveTabsLocale(view.tabs ?? [], "en", view.baseLocale)}
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
             />
 
             <div {...stylex.props(styles.studioControls)}>

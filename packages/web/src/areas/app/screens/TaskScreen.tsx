@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Stamp } from "lucide-react";
 import * as stylex from "@stylexjs/stylex";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
-import { FieldForm, PathButtons, filterToEditable, resolveFieldsLocale, isResolvedViewField } from "form-ui";
+import { FieldForm, PathButtons, filterToEditable, resolveFieldsLocale, resolveTabsLocale, firstTabWithIssue, isResolvedViewField } from "form-ui";
 import type { SubmissionIssue } from "form-ui";
 import {
   cancelInstance,
@@ -161,6 +161,7 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
   const [loading, setLoading] = useState(false);
   const [outcome, setOutcome] = useState<ErrorOutcome | undefined>(undefined);
   const [validationIssues, setValidationIssues] = useState<SubmissionIssue[]>([]);
+  const [activeTab, setActiveTab] = useState<string | undefined>(undefined);
   const [comments, setComments] = useState<InstanceComment[]>([]);
   const [commentText, setCommentText] = useState("");
   const [attachments, setAttachments] = useState<InstanceAttachment[]>([]);
@@ -251,6 +252,25 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [instanceId]);
+
+  // A required field on an unopened tab otherwise blocks the submission with
+  // nothing on screen to explain it (form-view-tabs design.md, "The issue
+  // switch belongs to the consumer"). Reacts to `validationIssues` alone, not
+  // to the derived `issuesByField` map below: that map is a fresh object every
+  // render, and depending on it here would force the participant back onto
+  // the offending tab on every unrelated re-render, undoing a deliberate
+  // switch away from it.
+  useEffect(() => {
+    if (!view || validationIssues.length === 0) return;
+    const byField = new Map<string, SubmissionIssue[]>();
+    for (const issue of validationIssues) {
+      const arr = byField.get(issue.fieldId) ?? [];
+      arr.push(issue);
+      byField.set(issue.fieldId, arr);
+    }
+    const nextTab = firstTabWithIssue(view.fields, view.tabs ?? [], byField);
+    if (nextTab !== undefined) setActiveTab(nextTab);
+  }, [validationIssues, view]);
 
   // Claim, release and delegate all change `assignment`, which is what the
   // controls are derived from. Reload rather than patch the loaded view: the
@@ -391,6 +411,9 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
             locale={locale}
             issuesByField={issuesByField}
             columns={view.columns ?? 1}
+            tabs={resolveTabsLocale(view.tabs ?? [], locale, view.baseLocale)}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
           />
 
           <div {...stylex.props(styles.taskActions)}>
