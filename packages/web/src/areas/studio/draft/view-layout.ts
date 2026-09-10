@@ -1,4 +1,4 @@
-import type { FieldId, LocalizedText, ViewEntry, ViewField } from "workflow-engine/schema";
+import type { FieldId, LocalizedText, View, ViewEntry, ViewField, ViewTab } from "workflow-engine/schema";
 import type { DraftOf } from "./types";
 
 export type DraftViewField = DraftOf<ViewField>;
@@ -7,6 +7,14 @@ export type DraftViewField = DraftOf<ViewField>;
  * validation. `DraftOf` makes every key optional, so a mid-edit note (no
  * `text` yet) and a mid-edit field (no `ref` yet) both parse as this type. */
 export type DraftViewEntry = DraftOf<ViewEntry>;
+
+/** A drafted tab-strip member: a minted `key` and an authored `label`,
+ * before publish-time validation. */
+export type DraftViewTab = DraftOf<ViewTab>;
+
+/** A drafted step view: entries, the column count, and the optional tab
+ * strip above them. */
+export type DraftView = DraftOf<View>;
 
 /** True for a drafted field entry, the studio's counterpart to
  * `definition.ts`'s `isViewField`: a drafted note always carries `kind`, and
@@ -43,15 +51,22 @@ export function reorderIndex(from: number, slot: number): number {
   return slot;
 }
 
+/** Splices `rows[from]` out and back in at `to`. The one array-move
+ * primitive `moveViewField` and `moveViewTab` both reduce to, so a card drag
+ * and a tab-strip reorder can never drift apart on the mechanics. */
+function spliceMove<T>(rows: T[], from: number, to: number): T[] {
+  const next = [...rows];
+  const [item] = next.splice(from, 1);
+  next.splice(to, 0, item!);
+  return next;
+}
+
 /** Move a placed card to a drop slot. This is the one array change a drag and
  * a keyboard move both produce, so neither can drift from the other. */
 export function moveViewField(rows: DraftViewEntry[], from: number, slot: number): DraftViewEntry[] {
   const to = reorderIndex(from, slot);
   if (from === to || from < 0 || from >= rows.length) return rows;
-  const next = [...rows];
-  const [item] = next.splice(from, 1);
-  next.splice(to, 0, item!);
-  return next;
+  return spliceMove(rows, from, to);
 }
 
 /** Move a placed card one position up or down, the keyboard equivalent of
@@ -102,4 +117,103 @@ export function unplacedRefs(catalogIds: FieldId[], rows: DraftViewEntry[]): Fie
  * one column and widening it again returns every card to its declared width. */
 export function clampSpan(span: number | undefined, columns: 1 | 2): 1 | 2 {
   return Math.min(span ?? 1, columns) as 1 | 2;
+}
+
+// ============================================================
+// Tab strip.
+// ============================================================
+
+/** Mints a tab's `key`: a fresh UUID, unique within the view by
+ * construction. A `ViewTab.key` carries no identifier grammar the way a
+ * field's `key` does — `definition.ts` requires only a non-empty trimmed
+ * string — and the editor never shows it (design.md: "The studio mints the
+ * `key` and never shows it"), so there is no derive-from-label step to run
+ * and no collision to dedupe against. */
+function mintTabKey(): string {
+  return crypto.randomUUID();
+}
+
+/** True for a root entry: one that declares no `group`. Only a root entry
+ * carries its own `tab` — a group's members carry none of their own (rule 4
+ * of the definition contract's tab/field/group hierarchy), so they are never
+ * a target of the sweep below or of the merge in `removeViewTab`. */
+function isRootEntry(entry: DraftViewEntry): boolean {
+  return !entry.group;
+}
+
+/** Adds a tab to `view`, minting its `key` and carrying `label` as authored
+ * (design.md: "The editor mints the `key` and never shows it"; the caller —
+ * `seedLocalizedText` today — is what guarantees a non-empty base-locale
+ * entry).
+ *
+ * Adding the FIRST tab to a form sweeps every existing root entry onto it
+ * (`studio-form-editor`: "Creating and removing a tab leaves no entry
+ * stranded" — rule 3 of the definition contract requires a non-empty `tab`
+ * on every root entry once a view declares one, so the author's very next
+ * keystroke would otherwise produce an unpublishable draft). A grouped entry
+ * is skipped: its group holds it, and the group's own entry is what carries
+ * the tab. Adding a second or later tab sweeps nothing — every existing root
+ * entry already names a tab, and the author assigns new ones deliberately. */
+export function addViewTab(view: DraftView, label: DraftViewTab["label"]): DraftView {
+  const tabs = view.tabs ?? [];
+  const key = mintTabKey();
+  const nextTabs = [...tabs, { key, label }];
+
+  if (tabs.length > 0) return { ...view, tabs: nextTabs };
+
+  const fields = (view.fields ?? []).map((entry) => (isRootEntry(entry) ? { ...entry, tab: key } : entry));
+  return { ...view, tabs: nextTabs, fields };
+}
+
+/** Renames a tab: writes `label` alone, on a copy. The `key` a copy carries
+ * is untouched by construction — this function has no parameter through
+ * which one could reach it — which is what the definition contract's rule
+ * requires: an authoring surface SHALL NOT rewrite a tab's `key` once an
+ * entry in the view names it, since a rewrite would orphan every entry
+ * naming the old value. A `key` naming no tab is a no-op: the map matches
+ * nothing and hands back an equivalent, unmutated array. */
+export function renameViewTab(view: DraftView, key: string, label: DraftViewTab["label"]): DraftView {
+  return { ...view, tabs: (view.tabs ?? []).map((t) => (t.key === key ? { ...t, label } : t)) };
+}
+
+/** Removes a tab, handing its entries to a neighbour rather than deleting
+ * them (`studio-form-editor`: "The editor deletes no entry. It opens no
+ * dialog either").
+ *
+ * Removing the tab before the removed one's own strip position takes its
+ * entries — the tab after it when the removed tab was first. Removing the
+ * LAST remaining tab is the teardown case instead: `tab` is cleared from
+ * every entry and `tabs` drops from the view, returning the form to the
+ * shape it had before any tab existed. A `key` naming no tab is a no-op. */
+export function removeViewTab(view: DraftView, key: string): DraftView {
+  const tabs = view.tabs ?? [];
+  const index = tabs.findIndex((t) => t.key === key);
+  if (index === -1) return view;
+
+  if (tabs.length === 1) {
+    const fields = (view.fields ?? []).map((entry) => {
+      if (entry.tab === undefined) return entry;
+      const out = { ...entry };
+      delete out.tab;
+      return out;
+    });
+    const next = { ...view, fields };
+    delete next.tabs;
+    return next;
+  }
+
+  const target = tabs[index === 0 ? 1 : index - 1]!.key;
+  const fields = (view.fields ?? []).map((entry) => (entry.tab === key ? { ...entry, tab: target } : entry));
+  const nextTabs = tabs.filter((t) => t.key !== key);
+  return { ...view, tabs: nextTabs, fields };
+}
+
+/** Move a tab to a drop slot, the tab-strip's own `moveViewField`. It
+ * touches `tabs` alone — reordering changes the tab order alone and moves no
+ * entry between tabs (`studio-form-editor`), and this function's signature
+ * carries no `fields` to move one through even by mistake. */
+export function moveViewTab(tabs: DraftViewTab[], from: number, slot: number): DraftViewTab[] {
+  const to = reorderIndex(from, slot);
+  if (from === to || from < 0 || from >= tabs.length) return tabs;
+  return spliceMove(tabs, from, to);
 }

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import { baseFieldType } from "workflow-engine/schema";
-import { previewViewFields } from "../src/areas/studio/draft/field-preview.js";
+import { previewViewEntries, previewViewFields } from "../src/areas/studio/draft/field-preview.js";
 import type { DraftField } from "../src/areas/studio/draft/fields.js";
+import type { DraftView, DraftViewEntry } from "../src/areas/studio/draft/view-layout.js";
 
 /** Runtime-shaped test data, cast once at the boundary — `DraftField`'s
  * branded ids (`field_a` etc.) are plain strings in a literal, the same
@@ -9,6 +10,10 @@ import type { DraftField } from "../src/areas/studio/draft/fields.js";
  * reason. */
 const field = (patch: Record<string, unknown>): DraftField =>
   ({ id: "field_a", key: "a", label: { en: "A" }, type: "string", ...patch }) as unknown as DraftField;
+
+/** Same escape hatch, for a view entry: `ref` is a branded `FieldId` in the
+ * real type, a plain string here. */
+const entry = (patch: Record<string, unknown>): DraftViewEntry => patch as unknown as DraftViewEntry;
 
 describe("previewViewFields", () => {
   it("returns undefined for a field carrying no id", () => {
@@ -152,5 +157,52 @@ describe("previewViewFields", () => {
     const f = field({ label: { en: "Base only" } });
     const result = previewViewFields(f, "de", "en")!;
     expect(result.fields[0]!.field.label).toEqual({ de: "Base only" });
+  });
+});
+
+describe("previewViewEntries carries tab and the draft's tabs", () => {
+  const catalog: DraftField[] = [field({})];
+
+  it("carries tab onto a resolved field entry", () => {
+    const view: DraftView = { fields: [entry({ ref: "field_a", tab: "t1" })] };
+    const result = previewViewEntries(view, catalog, "en", "en");
+    expect(result.entries[0]!.tab).toBe("t1");
+  });
+
+  it("carries tab onto a resolved note entry", () => {
+    const view: DraftView = { fields: [entry({ kind: "note", text: { en: "hi" }, tab: "t1" })] };
+    const result = previewViewEntries(view, [], "en", "en");
+    expect(result.entries[0]!.tab).toBe("t1");
+  });
+
+  it("leaves tab undefined for an entry naming none", () => {
+    const view: DraftView = { fields: [entry({ ref: "field_a" })] };
+    const result = previewViewEntries(view, catalog, "en", "en");
+    expect(result.entries[0]!.tab).toBeUndefined();
+  });
+
+  it("resolves the draft's tabs for the content locale, falling back to the base locale", () => {
+    const view: DraftView = {
+      tabs: [
+        { key: "t1", label: { en: "Details" } },
+        { key: "t2", label: { de: "Andere" } },
+      ],
+    };
+    const result = previewViewEntries(view, [], "de", "en");
+    expect(result.tabs).toEqual([
+      { key: "t1", label: { de: "Details" } },
+      { key: "t2", label: { de: "Andere" } },
+    ]);
+  });
+
+  it("drops a tab with no key yet: nothing can name it", () => {
+    const view: DraftView = { tabs: [{ label: { en: "Mid-mint" } }] };
+    const result = previewViewEntries(view, [], "en", "en");
+    expect(result.tabs).toEqual([]);
+  });
+
+  it("returns an empty tabs array for an untabbed view", () => {
+    const result = previewViewEntries(undefined, [], "en", "en");
+    expect(result.tabs).toEqual([]);
   });
 });
