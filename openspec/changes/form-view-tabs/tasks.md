@@ -4,9 +4,8 @@
 - [ ] 1.2 Add the `view` superRefine holding rules 1 to 5; see design.md
 - [ ] 1.3 Call the base-locale check on each tab `label` in `processBody`
 - [ ] 1.4 Add one test per rule, each rejecting a violating body
-- [ ] 1.5 Add a test that a tab keeps its key when its label changes
-- [ ] 1.6 Add a test that an untabbed body parses with an unchanged `definitionHash`
-- [ ] 1.7 Verify group 1: `bun run typecheck` and the full `bun test`, both green
+- [ ] 1.5 Add a test that an untabbed body parses with an unchanged `definitionHash`
+- [ ] 1.6 Verify group 1: `bun run typecheck` and the full `bun test`, both green
 
 ## 2. Runtime resolution
 
@@ -31,28 +30,28 @@
 - [ ] 3.10 Add tests for every scenario the `form-ui` delta spec states
 - [ ] 3.11 Verify group 3 with the full `bun test` and `bun run typecheck`
 
-## 4. The three consumers
+## 4. The two participant-facing consumers
 
 - [ ] 4.1 Hold the open tab in `TaskScreen.tsx`; switch it via `firstTabWithIssue`
 - [ ] 4.2 Hold the open tab in `PlayerScreen.tsx`, the same way
-- [ ] 4.3 Hold the open tab in `FormPreview.tsx`, driven by the editor's selection
-- [ ] 4.4 Call `resolveTabsLocale` at each of the three, beside `resolveFieldsLocale`
-- [ ] 4.5 Verify group 4 with `bun run typecheck` and `bun run build`
+- [ ] 4.3 Call `resolveTabsLocale` at both, beside `resolveFieldsLocale`
+- [ ] 4.4 Verify group 4 with `bun run typecheck` and `bun run build`
 
 ## 5. The studio form editor
 
 - [ ] 5.1 Add `tabs` and `tab` to the draft view types and `view-layout.ts`
 - [ ] 5.2 Carry `tab` and the draft's tabs through `previewViewEntries`
 - [ ] 5.3 Add pure helpers for adding, removing and reordering a tab
-- [ ] 5.4 Cover those helpers with `bun:test`, including the sweep and merge rules
+- [ ] 5.4 Cover those helpers with `bun:test`: the sweep, the merge, and key stability
 - [ ] 5.5 Add the tab strip above the canvas: add, rename, reorder, remove
 - [ ] 5.6 Never rewrite a tab's key after minting; renaming writes the label alone
 - [ ] 5.7 Filter the canvas to the selected tab, keeping every existing behavior
 - [ ] 5.8 Add the tab picker to the field strip and the note strip
 - [ ] 5.9 Keep group and tab consistent when an entry moves in or out of a group
-- [ ] 5.10 Drive the preview's open tab from the canvas selection, both ways
-- [ ] 5.11 Add the new studio catalog strings for every locale the catalog carries
-- [ ] 5.12 Verify group 5 with the full `bun test` and `bun run build`
+- [ ] 5.10 Hold the preview's open tab in `FormPreview.tsx`; drive it both ways
+- [ ] 5.11 Call `resolveTabsLocale` in `FormPreview.tsx` too
+- [ ] 5.12 Add the new studio catalog strings for every locale the catalog carries
+- [ ] 5.13 Verify group 5 with the full `bun test` and `bun run build`
 
 ## 6. Documentation and examples
 
