@@ -145,9 +145,9 @@ export function viewTree(rows: DraftViewEntry[], catalogFields: DraftField[]): V
 
 /** Every row index reachable from `rootIndex` through `.group` membership,
  * `rootIndex` included: the card plus its members, plus a nested group's
- * own members, however far apart they sit in `rows`. Used to find where a
- * whole group's footprint ends, for the root-level step-over move below --
- * a plain leaf's footprint is just itself. */
+ * own members, however far apart they sit in `rows`. Used by the cascading
+ * remove below, to find every entry a group's own card takes with it --
+ * a plain leaf's closure is just itself. */
 function subtreeIndices(rows: DraftViewEntry[], cardIndexByKey: Map<string, number>, rootIndex: number): number[] {
   const set = new Set<number>([rootIndex]);
   let grew = true;
@@ -172,15 +172,23 @@ function subtreeIndices(rows: DraftViewEntry[], cardIndexByKey: Map<string, numb
  * entries naming the same group. For a root entry, siblings are the other
  * root entries, group cards included.
  *
- * Implemented as a splice to the target sibling's own slot, through
- * `moveViewField` (the same primitive the drag path uses), never as a
- * two-position swap: the delta spec's "A keyboard move reorders the same
- * way a drag does" scenario would go false on an array where a group's
- * members are not adjacent, since a swap and a splice shift a different set
- * of entries in between. Stepping past a root sibling that is a group card
- * moves past that whole card, every one of its members included, wherever
- * they sit in `rows` -- the entry lands below (or above) the group's full
- * footprint, not merely past the card's own row.
+ * Implemented as a splice to a sibling boundary, through `moveViewField`
+ * (the same primitive the drag path uses), never as a two-position swap:
+ * the delta spec's "A keyboard move reorders the same way a drag does"
+ * scenario would go false on an array where a group's members are not
+ * adjacent, since a swap and a splice shift a different set of entries in
+ * between.
+ *
+ * The slot is the NEXT sibling's own raw index when moving down (or the
+ * array's end, past the last sibling), and the TARGET sibling's own raw
+ * index when moving up -- a boundary between siblings, not the target's
+ * `.group` footprint. That distinction matters once a group's members
+ * scatter: an entry unrelated to the group (a different root, say) can sit
+ * physically between two of its members without being one of them, and
+ * bounding by the target's raw-index footprint would sweep that unrelated
+ * entry along for the ride, turning a one-sibling step into two. Bounding
+ * by sibling position instead keeps the move to exactly one step among
+ * `siblings`, regardless of what else is interleaved in `rows`.
  *
  * Out-of-range is a no-op, returning `rows` unchanged: a command on the
  * first or last sibling needs no separate guard at the call site.
@@ -206,8 +214,7 @@ export function nudgeViewField(
   if (targetPos < 0 || targetPos >= siblings.length) return rows;
   const targetIndex = siblings[targetPos]!;
 
-  const footprint = subtreeIndices(rows, cardIndexByKey, targetIndex);
-  const slot = delta === 1 ? Math.max(...footprint) + 1 : Math.min(...footprint);
+  const slot = delta === 1 ? (siblings[targetPos + 1] ?? rows.length) : targetIndex;
   return moveViewField(rows, index, slot);
 }
 
@@ -219,20 +226,27 @@ export function nudgeViewField(
  * accepts (the "Removing a group card removes the members placed inside
  * it" requirement).
  *
+ * The cascade reuses `subtreeIndices`, the same transitive closure
+ * `nudgeViewField` walks: removing an OUTER group must take a nested
+ * group's own card AND that nested group's own members, not just the
+ * entries naming the outer key directly. A single-level filter on `.group`
+ * would strand the inner group's members, naming a group (the inner one)
+ * that stayed on the view but whose own card just left it -- itself an
+ * unpublishable state.
+ *
  * Removing anything else, a plain field, a note, or a member of a group,
  * removes only that one entry; the group it belonged to, if any, stays with
  * its other members.
  */
 export function removeViewEntry(rows: DraftViewEntry[], index: number, catalogFields: DraftField[]): DraftViewEntry[] {
   if (index < 0 || index >= rows.length) return rows;
-  const entry = rows[index]!;
   const fieldsById = draftFieldsById(catalogFields);
-  const field = isDraftViewField(entry) && entry.ref !== undefined ? fieldsById.get(entry.ref) : undefined;
-  if (field?.type !== "group" || !field.key) {
+  if (!isGroupCard(rows[index]!, fieldsById)) {
     return rows.filter((_, i) => i !== index);
   }
-  const key = field.key;
-  return rows.filter((r, i) => i !== index && r.group !== key);
+  const cardIndexByKey = groupCardIndexByKey(rows, fieldsById);
+  const doomed = new Set(subtreeIndices(rows, cardIndexByKey, index));
+  return rows.filter((_, i) => !doomed.has(i));
 }
 
 /** Every catalog key naming a placeable group, to the group field's own id:
@@ -248,18 +262,46 @@ function groupFieldIdByKey(fieldsById: Map<FieldId, DraftField>): Map<string, Fi
 }
 
 /**
+ * Where a new member lands among a group's existing members (the MODIFIED
+ * "A left palette lists..." requirement's position rule): a drop on another
+ * member's own edge -- `at` equal to that member's own index, or to one past
+ * it -- lands exactly there; every other drop lands after the group's last
+ * member. `cardIndex` is the group's own row index, the fallback anchor when
+ * the group has no members yet to test an edge against, so a group's first
+ * member always lands right after its card.
+ *
+ * Deciding this needs only `rows`, the group's key and the named slot -- no
+ * drop geometry -- so it belongs here, where a unit test can drive it,
+ * rather than in the renderer, which keeps the one thing it alone can know:
+ * which card edge the pointer hit.
+ */
+function memberInsertionSlot(rows: DraftViewEntry[], groupKey: string, cardIndex: number, at: number): number {
+  const memberIndices: number[] = [];
+  rows.forEach((r, i) => {
+    if (r.group === groupKey) memberIndices.push(i);
+  });
+  const onMemberEdge = memberIndices.some((mi) => at === mi || at === mi + 1);
+  if (onMemberEdge) return at;
+  const anchor = memberIndices.length > 0 ? Math.max(...memberIndices) : cardIndex;
+  return anchor + 1;
+}
+
+/**
  * Place a catalog field on the canvas at a drop slot, honoring the field's
  * catalog parent (checkbox 4.9, the MODIFIED "A left palette lists..."
  * requirement). A field the catalog nests inside a group lands carrying
- * that group's key as its own `group`, regardless of the slot named: the
- * caller picks the slot (among the group's members, or after the last one
- * by default -- a rendering decision, not this function's), and this
- * function honors it while still attaching the right `group`.
+ * that group's key as its own `group`, wherever the drop named: among the
+ * group's existing members, at the drop's own slot when that slot sits on
+ * another member's edge, and after the group's last member otherwise
+ * (`memberInsertionSlot`).
  *
- * When that group's own card is not yet on the view, one change places
- * both: the card at the drop slot, the member entry right after it, so no
- * intermediate draft ever names a group the view does not carry (the
- * "A group's first field brings the group card with it" scenario).
+ * A field nested two or more groups deep gets its WHOLE missing ancestor
+ * chain placed, outermost first, each card carrying its own parent's key --
+ * not just its immediate parent -- stopping as soon as an ancestor already
+ * on the view is reached. One change places every missing card plus the
+ * field itself, so no intermediate draft ever names a group the view does
+ * not carry (the "A group's first field brings the group card with it"
+ * scenario, generalized to a deeper chain).
  *
  * A top-level field -- no catalog parent, or a parent whose own key is
  * still empty (checkbox 4.4) -- places exactly like `insertViewField`: at
@@ -273,31 +315,65 @@ export function insertGroupedField(
   catalogFields: DraftField[],
 ): DraftViewEntry[] {
   if (rows.filter(isDraftViewField).some((r) => r.ref === ref)) return rows;
+
+  const fieldsById = draftFieldsById(catalogFields);
+  const parentKeyById = draftParentGroupKeyById(catalogFields);
+  const groupIdByKey = groupFieldIdByKey(fieldsById);
+  const isPresent = (fieldId: FieldId) => rows.some((r) => isDraftViewField(r) && r.ref === fieldId);
+
+  // Walk from `ref` up through its ancestors, collecting every one whose own
+  // card is still missing from the view, innermost first, stopping the
+  // instant an already-placed ancestor (or the top of the chain) is
+  // reached: everything further out is either already on the view or has
+  // no group at all.
+  const missingAncestors: { id: FieldId; ownGroup: string | undefined }[] = [];
+  {
+    let current: FieldId | undefined = ref;
+    const seen = new Set<FieldId>();
+    for (;;) {
+      const key = parentKeyById.get(current);
+      if (key === undefined) break;
+      const groupId = groupIdByKey.get(key);
+      if (groupId === undefined || seen.has(groupId)) break; // catalog inconsistency, or a cycle: stop rather than loop
+      seen.add(groupId);
+      if (isPresent(groupId)) break;
+      missingAncestors.push({ id: groupId, ownGroup: parentKeyById.get(groupId) });
+      current = groupId;
+    }
+  }
+  missingAncestors.reverse(); // outermost first
+
   const at = Math.max(0, Math.min(slot, rows.length));
   const next = [...rows];
+  const parentKey = parentKeyById.get(ref);
 
-  const parentKey = draftParentGroupKeyById(catalogFields).get(ref);
+  if (missingAncestors.length > 0) {
+    const cards: DraftViewEntry[] = missingAncestors.map((a) =>
+      a.ownGroup === undefined ? { ref: a.id } : { ref: a.id, group: a.ownGroup },
+    );
+    const fieldEntry: DraftViewEntry = parentKey === undefined ? { ref } : { ref, group: parentKey };
+    next.splice(at, 0, ...cards, fieldEntry);
+    return next;
+  }
+
   if (parentKey === undefined) {
     next.splice(at, 0, { ref });
     return next;
   }
 
-  const fieldsById = draftFieldsById(catalogFields);
-  const groupId = groupFieldIdByKey(fieldsById).get(parentKey);
+  // The immediate parent's own card is already on the view: place the field
+  // among its members instead of at the raw drop slot.
+  const groupId = groupIdByKey.get(parentKey);
   if (groupId === undefined) {
-    // Defensive: `draftParentGroupKeyById` and `fieldsById` walk the same
-    // catalog, so a parent key with no matching group field should not
-    // happen. Fall back to a top-level placement rather than write a
-    // `group` nothing in the view can ever resolve.
+    // Defensive: `parentKeyById` and `groupIdByKey` walk the same catalog,
+    // so a parent key with no matching group field should not happen. Fall
+    // back to a top-level placement rather than write a `group` nothing in
+    // the view can ever resolve.
     next.splice(at, 0, { ref });
     return next;
   }
-
-  const cardPresent = rows.some((r) => isDraftViewField(r) && r.ref === groupId);
-  if (cardPresent) {
-    next.splice(at, 0, { ref, group: parentKey });
-    return next;
-  }
-  next.splice(at, 0, { ref: groupId }, { ref, group: parentKey });
+  const cardIndex = rows.findIndex((r) => isDraftViewField(r) && r.ref === groupId);
+  const memberSlot = memberInsertionSlot(rows, parentKey, cardIndex, at);
+  next.splice(memberSlot, 0, { ref, group: parentKey });
   return next;
 }
