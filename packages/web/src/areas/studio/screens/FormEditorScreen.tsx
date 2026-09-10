@@ -556,8 +556,9 @@ export function FormEditorStrip({
   // definition contract rejects both) — the strip removes the `required`/
   // `readonly` controls entirely rather than disabling them, since a
   // settable-but-doomed control would only invite the rejected publish this
-  // change exists to prevent (design.md). `visible`, `span` and `group` stay
-  // offered unchanged.
+  // change exists to prevent (design.md). `visible` and `span` stay offered
+  // unchanged; this strip no longer offers `group` at all, since the catalog
+  // now owns a field's parentage (task 6.7).
   const isTechnical = row.ref !== undefined && technicalFieldIds.has(row.ref);
   return (
     <section {...stylex.props(styles.formStrip)} aria-label={t("formEditor.stripLabel")}>
