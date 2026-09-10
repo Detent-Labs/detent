@@ -9,7 +9,7 @@
  * check at a time — mirrors test/validate.test.ts's "definition-contract"
  * blocks in style.
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { describe, it, expect } from "bun:test";
 import { processVersion, processBody, publishedProcessBody, type ProcessBody } from "../src/schema/definition.js";
 import {
@@ -1038,13 +1038,9 @@ describe("compile: unsatisfiable required+readonly pair", () => {
     expect(err.issues.some((i) => i.value === "field_amount")).toBe(true);
   });
 
-  const EXAMPLE_FILES = [
-    "expense-approval.json",
-    "subprocess-credit-check-child.json",
-    "subprocess-loan-parent.json",
-    "purchase-requisition.json",
-    "access-request.json",
-  ];
+  const EXAMPLE_FILES = readdirSync(new URL("../examples/", import.meta.url))
+    .filter((name) => name.endsWith(".json"))
+    .sort();
 
   it("publishes each example definition unchanged", () => {
     for (const name of EXAMPLE_FILES) {

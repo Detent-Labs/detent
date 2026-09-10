@@ -1,20 +1,20 @@
 ## 1. The parentage helper
 
-- [ ] 1.1 Add `parentGroupKeyById(fields)` to `src/schema/definition.ts`, returning a `Map`
-- [ ] 1.2 Unit-test it over a flat catalog, a one-deep group and a two-deep nesting
-- [ ] 1.3 Confirm `./schema` already exports it, so the exports map stays untouched
+- [x] 1.1 Add `parentGroupKeyById(fields)` to `src/schema/definition.ts`, returning a `Map`
+- [x] 1.2 Unit-test it over a flat catalog, a one-deep group and a two-deep nesting
+- [x] 1.3 Confirm `./schema` already exports it, so the exports map stays untouched
 
 ## 2. The example bodies
 
 The examples move first, so the publish check in group 3 never lands on a red
 tree.
 
-- [ ] 2.1 Count the violations in `examples/` again; do not trust the proposal's numbers
-- [ ] 2.2 Nest each grouped field of `purchase-requisition.json` under its group in the catalog
-- [ ] 2.3 Pick each multi-group field's group by the rule in `design.md`: its earliest step's
-- [ ] 2.4 Align its view entries with the chosen catalog parents
-- [ ] 2.5 Regenerate its wrapper `definitionHash` with the JCS hash of the body
-- [ ] 2.6 Extend the example loops in `compile-validation.test.ts` and `validate.test.ts` to nine
+- [x] 2.1 Count the violations in `examples/` again; do not trust the proposal's numbers
+- [x] 2.2 Nest each grouped field of `purchase-requisition.json` under its group in the catalog
+- [x] 2.3 Pick each multi-group field's group by the rule in `design.md`: its earliest step's
+- [x] 2.4 Align its view entries with the chosen catalog parents
+- [x] 2.5 Regenerate its wrapper `definitionHash` with the JCS hash of the body
+- [x] 2.6 Extend the example loops in `compile-validation.test.ts` and `validate.test.ts` to nine
 
 ## 3. The publish check
 
