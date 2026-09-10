@@ -107,12 +107,15 @@ A mounted-but-hidden panel would put focusable controls in the accessibility
 tree that the participant cannot see. The `spa-accessibility` capability
 already guards against that elsewhere.
 
-### The issue switch reads `issuesByField`
+### The issue switch belongs to the consumer
 
-`FieldForm` keeps the previously seen `issuesByField` in a ref. A map going
-from empty to non-empty opens a tab. The tab it opens is the first drawn one
-holding an entry with an issue. While the map stays empty, the
+`form-ui` exports `firstTabWithIssue` as a pure function. A consumer calls it
+after a submission fails and sets its own `activeTab` to the answer. While
+`issuesByField` stays empty the helper answers `undefined`, so the
 participant's own choice stands.
+
+`FieldForm` starts no switch of its own. It has no state to switch from, and
+adding one would put the first React hook into a package that has none.
 
 Validation is server-side here. `submitAndTransition` returns
 `SubmissionValidationError`, and `TaskScreen.tsx` turns it into

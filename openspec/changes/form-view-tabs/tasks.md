@@ -18,17 +18,17 @@
 
 ## 3. The form-ui renderer
 
-- [ ] 3.1 Add `tab` and a `ResolvedViewTab` shape to `packages/form-ui/src/types.ts`
-- [ ] 3.2 Add `drawnTabs` and `firstTabWithIssue` as pure functions, exported
-- [ ] 3.3 Add `resolveTabsLocale`, the sibling of `resolveFieldsLocale`, exported
-- [ ] 3.4 Add the `tabs`, `activeTab` and `onTabChange` props to `FieldForm`
-- [ ] 3.5 Draw the tablist with the process row's own grammar; see design.md
-- [ ] 3.6 Draw one panel, holding the open tab's root entries at the form's `columns`
-- [ ] 3.7 Derive the open tab from `activeTab` and `drawnTabs`, storing nothing
-- [ ] 3.8 Wire the keyboard pattern: arrows, `Home`, `End`, `Enter`, `Space`
-- [ ] 3.9 Mark each tab holding an issue with a `stamp-refusal` count
-- [ ] 3.10 Add tests for every scenario the `form-ui` delta spec states
-- [ ] 3.11 Verify group 3 with the full `bun test` and `bun run typecheck`
+- [x] 3.1 Add `tab` and a `ResolvedViewTab` shape to `packages/form-ui/src/types.ts`
+- [x] 3.2 Add `drawnTabs` and `firstTabWithIssue` as pure functions, exported
+- [x] 3.3 Add `resolveTabsLocale`, the sibling of `resolveFieldsLocale`, exported
+- [x] 3.4 Add the `tabs`, `activeTab` and `onTabChange` props to `FieldForm`
+- [x] 3.5 Draw the tablist with the process row's own grammar; see design.md
+- [x] 3.6 Draw one panel, holding the open tab's root entries at the form's `columns`
+- [x] 3.7 Derive the open tab from `activeTab` and `drawnTabs`, storing nothing
+- [x] 3.8 Wire the keyboard pattern: arrows, `Home`, `End`, `Enter`, `Space`
+- [x] 3.9 Mark each tab holding an issue with a `stamp-refusal` count
+- [x] 3.10 Add tests for every scenario the `form-ui` delta spec states
+- [x] 3.11 Verify group 3 with the full `bun test` and `bun run typecheck`
 
 ## 4. The two participant-facing consumers
 

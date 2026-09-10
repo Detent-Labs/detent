@@ -29,12 +29,20 @@ An entry carrying a `group` SHALL keep rendering inside its group. The
 group's own entry is what places it under a tab. A group therefore draws
 whole, on one tab, never split.
 
-Each `role="tab"` SHALL carry `aria-selected` and `aria-controls` naming its
-panel, and the panel SHALL carry `aria-labelledby` naming its tab. Arrow
-keys SHALL move focus between tabs without opening one, and `Enter` or
-`Space` SHALL open the focused tab. `Home` and `End` SHALL move focus to the
-first and last tab. That is the WAI-ARIA tabs pattern with manual activation,
-the same pattern the studio's own process tab row already follows.
+Each `role="tab"` SHALL carry `aria-selected`, and the drawn panel SHALL
+carry `aria-labelledby` naming its own tab. The OPEN tab alone SHALL carry
+`aria-controls`. Only one panel is in the DOM, so `aria-controls` on a closed
+tab would name an element that is not there.
+
+The strip SHALL follow the plain-button pattern. Each tab is its own stop in
+the tab order, and `Enter` or `Space` activates the focused one. The
+`spa-accessibility` capability reserves the roving-tabindex variant for a
+many-tab row that scrolls sideways. Every other tab set keeps the
+plain-button pattern, and a form's strip is one of those.
+
+Arrow keys, `Home` and `End` SHALL move focus between tabs without opening
+one. They are a convenience over the plain-button pattern, not the
+roving-tabindex variant: every tab stays tabbable.
 
 The strip SHALL compile from StyleX and read `form-ui/tokens.stylex`, the way
 every other part of this package's rendering does.
@@ -71,6 +79,18 @@ then applies the same base-locale fallback.
 
 - **WHEN** `activeTab` names a tab the strip does not draw
 - **THEN** the first drawn tab renders open, and `FieldForm` stores nothing
+
+#### Scenario: Every tab is its own tab stop
+
+- **WHEN** a keyboard user tabs through the strip
+- **THEN** focus lands on each tab in turn, and no tab carries
+  `tabindex="-1"`
+
+#### Scenario: A closed tab names no panel
+
+- **WHEN** the strip draws three tabs and one is open
+- **THEN** the open tab carries `aria-controls` naming the drawn panel, and
+  the two closed tabs carry none
 
 #### Scenario: Arrow keys move focus without opening a tab
 
