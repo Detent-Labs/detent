@@ -82,9 +82,9 @@
   `bun test` with `DATABASE_URL` set. Report what each printed.
 - [x] 9.2 Run the prose gate and the whitespace gate over the pushed range.
   Pipe the range into each script.
-- [ ] 9.3 Check the Canvas tab in a real browser. Add a step by press, add one
+- [x] 9.3 Check the Canvas tab in a real browser. Add a step by press, add one
   by drag, and drop one on a path.
-- [ ] 9.4 Check the bar at narrow width, per the design's first open question.
+- [x] 9.4 Check the bar at narrow width, per the design's first open question.
   Record the answer in `docs/browser-checks.md`.
-- [ ] 9.5 Run `/impeccable critique` and `/impeccable audit` against the Canvas
+- [x] 9.5 Run `/impeccable critique` and `/impeccable audit` against the Canvas
   tab. Fix what either reports.
