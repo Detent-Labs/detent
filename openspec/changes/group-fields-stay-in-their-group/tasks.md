@@ -41,15 +41,15 @@ tree.
 
 ## 5. The catalog stays level with the views
 
-- [ ] 5.1 Add a `draft/` helper that rewrites view entries after a catalog change
-- [ ] 5.2 On a move, set each entry naming the field to the new parent's key
-- [ ] 5.3 On a move to the top level, remove that entry's `group` key instead
-- [ ] 5.4 On a group key rename, rewrite every entry naming the old key, notes included
-- [ ] 5.5 Call it from `EntityTabs.tsx:423`'s `moveField`, inside its existing `mutate`
-- [ ] 5.6 Call it from both key inputs in `FieldCatalogPanel.tsx`, in one `mutate` each
-- [ ] 5.7 Leave a note's own `group` alone on a move; a move has no note to carry
-- [ ] 5.8 Unit-test both rewrites across three steps, plus the top-level and note cases
-- [ ] 5.9 Correct `moveFieldToGroup`'s doc comment; it states the old no-view-change rule
+- [x] 5.1 Add a `draft/` helper that rewrites view entries after a catalog change
+- [x] 5.2 On a move, set each entry naming the field to the new parent's key
+- [x] 5.3 On a move to the top level, remove that entry's `group` key instead
+- [x] 5.4 On a group key rename, rewrite every entry naming the old key, notes included
+- [x] 5.5 Call it from `EntityTabs.tsx:423`'s `moveField`, inside its existing `mutate`
+- [x] 5.6 Call it from both key inputs in `FieldCatalogPanel.tsx`, in one `mutate` each
+- [x] 5.7 Leave a note's own `group` alone on a move; a move has no note to carry
+- [x] 5.8 Unit-test both rewrites across three steps, plus the top-level and note cases
+- [x] 5.9 Correct `moveFieldToGroup`'s doc comment; it states the old no-view-change rule
 
 ## 6. The editor screen
 
