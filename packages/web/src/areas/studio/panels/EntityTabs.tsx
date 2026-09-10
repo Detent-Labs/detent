@@ -13,6 +13,7 @@ import { flattenDraftFields } from "../draft/fields";
 import { fieldKindWord } from "../draft/field-type-labels";
 import { groupTargetsFor, moveFieldToGroup } from "./fieldCatalogLogic";
 import { flattenRailFields, issueCountForEntityId } from "../draft/panel-rail";
+import { syncViewGroupsOnFieldMove } from "../draft/view-group-sync";
 import { FieldCatalogPanel } from "./FieldCatalogPanel";
 import { DataSourcesPanel } from "./DataSourcesPanel";
 
@@ -426,8 +427,18 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
     if (next === fields) return;
 
     const fromGroupId = parentGroupId(fieldId);
+    // The destination group's own key, read off the moved tree rather than
+    // re-derived from `targetGroupId`: `moveFieldToGroup` grafts the field
+    // directly under that group, so its key is the field's whole new parent
+    // key (view-group-sync.ts's `newGroupKey`). `undefined` at the top level.
+    const newGroupKey = targetGroupId === undefined ? undefined : flattenDraftFields(next).find((f) => f.id === targetGroupId)?.key;
     mutate((d) => {
       d.fields = next;
+      // Same mutate as the field-array write above: a reader between the two
+      // must never see the catalog and the views disagree (studio-app: "A
+      // move rewrites no reference" / "A move to the top level clears the
+      // group on every entry").
+      syncViewGroupsOnFieldMove(d, fieldId, newGroupKey);
     });
 
     // Read the new place off the moved tree, not off the target argument: a

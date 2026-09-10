@@ -64,10 +64,19 @@ export function droppedByKindChange(
  *
  * The move writes the field's place and nothing else. The field keeps its
  * `id`, its `key` and every other key it carries, and the group keeps its
- * own. Nothing else in the body needs rewriting: a group carries no entry in
- * the flat `data` namespace, `FieldDef.key` is unique across every depth, and
- * views and column mappings reference the `id` (design.md, decision: group
- * change). So no CEL expression, no view entry and no column mapping changes.
+ * own. No CEL expression and no column mapping changes: a group carries no
+ * entry in the flat `data` namespace, `FieldDef.key` is unique across every
+ * depth, and column mappings reference the `id` (design.md, decision: group
+ * change).
+ *
+ * A view entry's `group` is the one reference this move strands: the
+ * definition contract binds it to the field's catalog parent, so this
+ * function's caller owns rewriting it, in the same draft change as this
+ * function's own result. `EntityTabs.tsx`'s `moveField` calls
+ * `view-group-sync.ts::syncViewGroupsOnFieldMove`. Widening this function to
+ * take the whole draft and do that rewrite itself would give the rail's pure
+ * tree function a second job (design.md: "One helper keeps the view entries
+ * level with the catalog").
  *
  * Answers the array it was given, unchanged, where the move is not one to
  * make: no field carries `fieldId`, `targetGroupId` names no `group` field,

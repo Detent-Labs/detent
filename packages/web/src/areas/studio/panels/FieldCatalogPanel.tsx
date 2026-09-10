@@ -19,6 +19,7 @@ import { FieldValidationEditor } from "./shared/FieldValidationEditor";
 import { DefaultValueEditor } from "./shared/DefaultValueEditor";
 import { fieldLocaleGaps, missingTranslationWarning, resolveDraftLocalizedText, seedLocalizedText } from "../draft/localized-text";
 import { draftFields } from "../draft/fields";
+import { syncViewGroupsOnGroupRename } from "../draft/view-group-sync.js";
 import { droppedByKindChange, nextFieldKey } from "./fieldCatalogLogic.js";
 import { fieldCheckZone, type FieldCheckZone } from "./fieldCheckZone.js";
 import { fieldKindLabel } from "../draft/field-type-labels";
@@ -371,6 +372,35 @@ function isCustomType(type: DraftField["type"]): type is DraftOf<FieldDef>["type
 }
 
 /**
+ * The key input's own write, at both sites that carry one: the top-level
+ * `FieldEditor` and the recursive `SubFieldRow` (a group's own child, at any
+ * depth, including a group nested inside another group). An ordinary
+ * key edit stays on the existing `onChange` patch path. A `type: "group"`
+ * field's key edit goes through `mutate` directly instead, because it must
+ * also rewrite every view entry naming the old key — a write `onChange`'s
+ * patch (bubbled up to `updateInDraftArray`) cannot reach, since it only
+ * ever touches the field catalog (`studio-app`: "Renaming a group field's
+ * key rewrites the view entries naming it"). Both writes land in that one
+ * `mutate`, so no reader ever sees the catalog and the views disagree.
+ *
+ * `field.id`, not an array index, finds the target inside the mutate's own
+ * draft clone: `SubFieldRow` never learns its own path through the catalog
+ * tree, and the id resolves at any depth.
+ */
+function writeFieldKey(mutate: Mutate, field: DraftField, onChange: (patch: Partial<DraftField>) => void, newKey: string): void {
+  const oldKey = field.key ?? "";
+  if (field.type !== "group" || oldKey === "" || oldKey === newKey) {
+    onChange({ key: newKey });
+    return;
+  }
+  mutate((d) => {
+    const target = draftFields(d).find((f) => f.id === field.id);
+    if (target) target.key = newKey;
+    syncViewGroupsOnGroupRename(d, oldKey, newKey);
+  });
+}
+
+/**
  * Applies a kind switch, dropping the `format` or `control` the new kind does
  * not name and saying so before it happens.
  *
@@ -550,7 +580,7 @@ function SubFieldRow({ field, dataSources, lists, mutate, onChange, onRemove }: 
           type="text"
           {...stylex.props(styles.studioMono)}
           value={field.key ?? ""}
-          onChange={(e) => onChange({ key: e.target.value })}
+          onChange={(e) => writeFieldKey(mutate, field, onChange, e.target.value)}
         />
       </label>
       <label {...stylex.props(styles.fieldRowLabel)}>
@@ -983,7 +1013,7 @@ function FieldEditor({
                 type="text"
                 {...stylex.props(styles.studioMono)}
                 value={field.key ?? ""}
-                onChange={(e) => onChange({ key: e.target.value })}
+                onChange={(e) => writeFieldKey(mutate, field, onChange, e.target.value)}
               />
             </label>
           </Zone>
