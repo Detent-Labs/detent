@@ -407,6 +407,34 @@ describe("dragScopeByIndex maps every row to the scope its own edges answer to",
     expect(nested.get(1)).toBe("outer");
     expect(nested.get(2)).toBe("inner");
   });
+
+  it("confines a nested group's member to its own group rather than the form root -- a top-level-only field lookup would give it the root's own scope and wrongly let it drag out", () => {
+    // Regression for the shallow `fields.find(f => f.id === ref)` lookup this
+    // extraction replaced (`FormEditorScreen.tsx` before this module existed):
+    // that search never recurses into a group's own `fields`, so a group
+    // nested inside another group (B, inside A) resolved to `undefined` --
+    // the SAME value a form-root card carries. A member of B then compared
+    // equal to a root card under `isLawfulCardDrop`, wrongly permitting a
+    // drag of that member out to the form root (and a root card into B). The
+    // delta spec's own "A drag that would land a member outside its group
+    // SHALL change nothing" is what this protects.
+    //
+    // Asserted by VALUE, not by the boolean alone: a boolean-only assertion
+    // would pass against the shallow lookup too, for the wrong reason --
+    // exactly how the old bug went unnoticed. If a future change deletes
+    // `draftFieldsById`'s recursion as "redundant", this is what breaks.
+    const catalog = [group("group_a", "A", [group("group_b", "B", [leaf("field_leaf", "leaf")])])];
+    const rows = [ref("group_a"), ref("group_b", "A"), ref("field_leaf", "B")];
+    const scopeByIndex = dragScopeByIndex(rows, catalog);
+
+    expect(scopeByIndex.get(0)).toBeUndefined(); // A's own card sits at the form root
+    expect(scopeByIndex.get(1)).toBe("A"); // B's own card is a member of A
+    expect(scopeByIndex.get(2)).toBe("B"); // the leaf is a member of B -- not of A, and not of the root
+
+    // The leaf's scope ("B") differs from the root's (`undefined`), so a
+    // drag of the leaf to a root-level slot is refused.
+    expect(isLawfulCardDrop(scopeByIndex, 2, undefined)).toBe(false);
+  });
 });
 
 describe("isLawfulCardDrop reads the task-6.5 refusal rule off a scope map", () => {
