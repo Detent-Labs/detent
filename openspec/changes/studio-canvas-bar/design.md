@@ -78,9 +78,16 @@ group setters, which `EditScreen` owns. It also measures its own toolbar for
 
 `CanvasBar` reports a kind. `EditScreen` computes the centre of
 `#studio-canvas-body`'s client rect. It converts with `svgPointFromClient`,
-snaps with `snapToGrid`, then walks right one grid cell at a time until the
-point is free in `saveState.layout`. It then calls `appendStep`, `onMoveStep`
-and `onSelectStep`, exactly as the drop branch does.
+snaps with `snapToGrid`, then walks right until the point is clear of every
+step. It then calls `appendStep`, `onMoveStep` and `onSelectStep`, exactly as
+the drop branch does.
+
+The collision test reads resolved positions. Reading the stored
+`saveState.layout` blob alone would miss steps. A step the steps rail's foot
+created and nobody dragged has no stored entry. `CanvasView` still draws it,
+through `autoPlaceSteps`. The press therefore resolves positions the way
+`CanvasView.positionOf` does. A new step then lands clear of every step an
+author can see.
 
 The alternative was calling `onPaletteDrop` with the centre point. Rejected:
 that runs `elementFromPoint` at the centre. A press over an existing node would
