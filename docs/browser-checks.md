@@ -1398,37 +1398,39 @@ session. `studio-draftToolbarState.test.ts` pins that exact bug at the unit
 level. Here the real save/conflict/reload sequence drives it in a browser
 instead.
 
-### Selecting a path opens the source step's Paths section with the row highlighted
+### Selecting a path shows the source step's Paths section with the row highlighted
 
 Source: `redesign-step-inspector`, `studio-step-bench`.
 
 On the canvas, select a step. Then click one of its outgoing path edges. A
 guard label works as a click target.
 
-Pass: the configuration pane switches to the path's source step. The Paths
-section shows its body. The selected path's own row shows a highlight
+Pass: the step page switches to the path's source step. The Paths section
+stands open with its body. The selected path's own row shows a highlight
 border, distinct from the section's other rows.
 
-This exercises `defaultOpenSections`, seeded from `sectionSummary.ts` and
-read by `StepsPanel.tsx`.
+This exercises `selectedPathId`. The state lives in `EditScreen.tsx`, and
+the edge click sets it through `CanvasView.tsx`'s `onSelectStep`. In
+`PathsPanel.tsx`, a row whose id matches takes the `pathRowSelected` style.
 
 ### The no-assignment warning renders on a non-terminal step and not on a terminal one
 
 Source: `ponytail-studio-small-cuts` task 5.4.
 
 On the canvas, select a non-terminal step with no `assignment` set. Use
-`approval_routing` on the `purchase_requisition` draft. Open its Assignment
-tab. Then select a terminal step with no `assignment`, `closed`, and open
-its Assignment tab too.
+`approval_routing` on the `purchase_requisition` draft. Its Assignment
+section stands open on the step page. Then select a terminal step with no
+`assignment`, `closed`, whose Assignment section stands open too.
 
 Pass: the non-terminal step shows "This step has no assignment. Only the
 starter or an admin can act on it, and it stays out of everyone's My-tasks
 inbox. Publishing still works." beside the assignment editor. The terminal
 step shows no such warning.
 
-This exercises task 2.2's inlined `assignmentWarning` guard. It now reads
-as one local `assignmentWarningText`, computed once in `StepsPanel.tsx` and
-read at both the conditional and the paragraph body.
+This exercises task 2.2's inlined `assignmentWarning` guard. Today it is
+`showAssignmentWarning` in `StepPage.tsx`, true for a non-terminal step with
+no `assignment`. The section renders `stepSections.noAssignmentWarning` when
+it holds.
 
 ### The Tools screen's CEL scratchpad populates its field catalog
 
