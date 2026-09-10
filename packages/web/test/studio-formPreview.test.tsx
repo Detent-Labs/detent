@@ -167,4 +167,20 @@ describe("The preview's tab strip", () => {
   it("draws no strip for an untabbed form", () => {
     expect(render()).not.toContain('role="tablist"');
   });
+
+  it("draws that strip inside the inert container, so a tab there takes no click", () => {
+    // `studio-form-editor`: "The strip the preview draws SHALL NOT be
+    // interactive … `onTabChange` stays wired and stays silent while `inert`
+    // holds". The canvas carries the strip that answers a click.
+    //
+    // The click itself is a browser fact. What a static render proves is the
+    // mechanism behind it: the pane declares one `inert`, and the strip comes
+    // after it, so the strip sits in that subtree rather than beside it.
+    const html = render(TABBED);
+    const inert = html.indexOf('inert=""');
+
+    expect(inert).toBeGreaterThan(-1);
+    expect((html.match(/inert=""/g) ?? []).length).toBe(1);
+    expect(html.indexOf('role="tablist"')).toBeGreaterThan(inert);
+  });
 });
