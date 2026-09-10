@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { FieldForm, nextTabIndex } from "../src/FieldForm.js";
-import { drawnTabs, firstTabWithIssue, tabIssueCount } from "../src/tabs.js";
+import { FieldForm } from "../src/FieldForm.js";
+import { drawnTabs, firstTabWithIssue, nextTabIndex, tabIssueCount } from "../src/tabs.js";
 import { resolveTabsLocale } from "../src/locale.js";
 import { issueCountText } from "../src/issue-messages.js";
 import type { ResolvedViewEntry, ResolvedViewField, ResolvedViewTab, SubmissionIssue } from "../src/types.js";
@@ -224,6 +224,9 @@ describe("nextTabIndex: arrow keys move focus without opening a tab", () => {
     expect(nextTabIndex("Enter", 0, 3)).toBeUndefined();
     expect(nextTabIndex(" ", 0, 3)).toBeUndefined();
     expect(nextTabIndex("Tab", 0, 3)).toBeUndefined();
+    // The near misses: a key one row over on the keyboard, and a letter.
+    expect(nextTabIndex("ArrowDown", 0, 3)).toBeUndefined();
+    expect(nextTabIndex("a", 0, 3)).toBeUndefined();
   });
 
   it("a press from outside the strip, and an empty strip, move nothing", () => {

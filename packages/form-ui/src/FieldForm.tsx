@@ -11,7 +11,7 @@ import {
 } from "./types.js";
 import { booleanLabels, resolveText } from "./locale.js";
 import { issueCountText, issueMessage } from "./issue-messages.js";
-import { drawnTabs, tabIssueCount } from "./tabs.js";
+import { drawnTabs, nextTabIndex, tabIssueCount } from "./tabs.js";
 import { colors, fonts, space } from "./tokens.stylex.js";
 
 /** Every `form-ui.css` rule, as StyleX. A layout choice with a fixed set of
@@ -245,26 +245,6 @@ interface FieldFormProps {
  * in one place. */
 const tabDomId = (tabKey: string) => `form-ui-tab-${tabKey}`;
 const tabPanelDomId = (tabKey: string) => `form-ui-tabpanel-${tabKey}`;
-
-/**
- * The tab a focus-moving key press moves focus to, as an index into the drawn
- * strip; `undefined` for a key the strip leaves alone. Arrow keys wrap at the
- * row's ends, `Home` and `End` jump to it — the WAI-ARIA tabs pattern's
- * manual-activation variant, the one `ProcessTabRow.tsx` already follows.
- * Focus moves alone: `Enter` and `Space` are what open a tab, and a `<button>`
- * turns both into the click this strip listens for.
- *
- * Extracted because this repo ships no DOM test library, so no test here can
- * fire the event that calls it.
- */
-export function nextTabIndex(key: string, from: number, count: number): number | undefined {
-  if (count === 0 || from < 0 || from >= count) return undefined;
-  if (key === "ArrowRight") return (from + 1) % count;
-  if (key === "ArrowLeft") return (from - 1 + count) % count;
-  if (key === "Home") return 0;
-  if (key === "End") return count - 1;
-  return undefined;
-}
 
 /** How many grid columns a field draws across. A field never exceeds the grid
  * it sits in: the two properties are set independently, so a form narrowed to
