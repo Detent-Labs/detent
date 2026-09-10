@@ -15,6 +15,7 @@ tree.
 - [x] 2.4 Align its view entries with the chosen catalog parents
 - [x] 2.5 Regenerate its wrapper `definitionHash` with the JCS hash of the body
 - [x] 2.6 Extend the example loops in `compile-validation.test.ts` and `validate.test.ts` to nine
+- [ ] 2.7 Give nine detached entries in `purchase-requisition.json` their group and its card
 
 ## 3. The publish check
 
