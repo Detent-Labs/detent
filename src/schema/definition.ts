@@ -392,6 +392,30 @@ export function leafFields(fields: FieldDef[]): FieldDef[] {
 }
 
 /**
+ * Maps every field id in the catalog to the `key` of the `type: "group"`
+ * field that holds it in that group's own `fields`, at any depth. A field
+ * the catalog holds at the top level gets no entry at all (not an
+ * `undefined` value) — `has` is the top-level test. A group nested inside
+ * another group maps to the OUTER group's key, not its own: the map answers
+ * "who holds this field", and a group field is held the same way a leaf is.
+ *
+ * The one parentage lookup `compile.ts::checkViewGroupReferences` and the
+ * studio's view-tree/view-sync code both read, so neither reimplements the
+ * walk and the two sides cannot disagree about a field's group.
+ */
+export function parentGroupKeyById(fields: FieldDef[]): Map<FieldId, string> {
+  const out = new Map<FieldId, string>();
+  const walk = (fs: FieldDef[], parentKey: string | undefined) => {
+    for (const f of fs) {
+      if (parentKey !== undefined) out.set(f.id, parentKey);
+      if (f.fields) walk(f.fields, f.key);
+    }
+  };
+  walk(fields, undefined);
+  return out;
+}
+
+/**
  * Expected JS shape per BaseFieldType. Shared by the submission validator
  * (`src/runtime/api.ts`, a participant's value) and the outbox writeback check
  * (`src/engine/outbox.ts`, a handler's `Action.output` value) — one type rule
