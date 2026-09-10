@@ -2806,9 +2806,9 @@ a visibly cut label. Every tab body stays mounted and the hidden one is
 `display: none`. The canvas therefore lays out at zero while the Steps tab
 is open, and a one-shot measurement reads that zero as "it fits".
 
-Put a one-line label beside a two-line one. Pass: both labels' first lines
-start at the same height inside their nodes. Watch for the defect: the
-one-line label sitting lower than its neighbour's first line.
+Put a one-line label beside a two-line one. Pass: each label sits centred
+between its own node's top and bottom edges. Watch for the defect: the
+two-line label sitting low in its node and closing on the bottom border.
 
 Read the node's right edge on a two-line label. Pass: neither line runs under
 the connect handle, and the handle draws whole. Drag from the handle. Pass:
