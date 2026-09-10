@@ -598,7 +598,7 @@ instructional or explanatory copy that exists only on this step's form. A
 warning above a decision. A reminder of what a value means. A line no field
 in the catalog should carry as its label.
 
-A note takes the same `visible`, `group` and `span` a field entry takes. It
+A note takes the same `visible` and `span` a field entry takes. It
 can sit inside a group. Unlike a field entry, its `group` names no catalog
 parent: a note may sit in any group the same view carries.
 
