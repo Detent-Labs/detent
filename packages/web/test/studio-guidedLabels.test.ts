@@ -111,11 +111,10 @@ describe("the step-kind phrases", () => {
 });
 
 describe("newStepNote", () => {
-  it("answers a non-empty note for each of the palette's three kinds", () => {
-    const kinds: StepKind[] = ["task", "subprocess", "end"];
-    for (const kind of kinds) {
-      expect(newStepNote(kind).length, kind).toBeGreaterThan(0);
-    }
+  it("answers each palette kind's own catalog note", () => {
+    expect(newStepNote("task")).toBe(studioCatalog.en["stepKindNote.participant"]);
+    expect(newStepNote("subprocess")).toBe(studioCatalog.en["stepKindNote.subprocess"]);
+    expect(newStepNote("end")).toBe(studioCatalog.en["stepKindNote.terminal"]);
   });
 
   it("gives the three kinds three different notes", () => {
