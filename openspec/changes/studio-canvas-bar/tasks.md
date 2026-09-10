@@ -12,9 +12,9 @@
 
 ## 3. Placement on a press
 
-- [ ] 3.1 Add a pure function that finds a free lattice point. Give it the
+- [x] 3.1 Add a pure function that finds a free lattice point. Give it the
   wanted point and the placed positions.
-- [ ] 3.2 Cover that function in `packages/web/test`. Verify a point already
+- [x] 3.2 Cover that function in `packages/web/test`. Verify a point already
   taken walks right to the next free one.
 
 ## 4. The bar component
