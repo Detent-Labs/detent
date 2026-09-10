@@ -19,7 +19,7 @@ import {
   type DraftViewField,
   type DropSide,
 } from "../draft/view-layout";
-import { nudgeViewField } from "../draft/view-tree";
+import { insertGroupedField, nudgeViewField, removeViewEntry, viewTree, type ViewTreeNode } from "../draft/view-tree";
 import { PALETTE_FIELD_KINDS, mintCatalogField, type PaletteFieldKind } from "../draft/mintField";
 import { seedLocalizedText, missingTranslationWarning, resolveDraftLocalizedText, type DraftLocalizedText } from "../draft/localized-text";
 import { BooleanOrExpressionInput } from "../panels/shared/BooleanOrExpressionInput";
@@ -361,6 +361,64 @@ const styles = stylex.create({
     gap: space.s1,
     paddingRight: space.s2,
   },
+  // The group card (`studio-form-editor`'s fieldset/legend/nested-`<ol>`
+  // shape, task 6.1): the `<li>` spans the canvas grid's full width, the
+  // same way the empty-state and tail rows already do, and lays its own edge
+  // beside the fieldset the way a leaf card lays its edge beside its body
+  // button.
+  formGroupLi: {
+    gridColumn: "1 / -1",
+    display: "flex",
+    alignItems: "stretch",
+    minWidth: 0,
+  },
+  // `DESIGN.md`: "A canvas group is a 1px stroke with no fill, so the grid
+  // stays visible through it" (task 6.2). No radius, matching every other
+  // surface; the 4-point padding keeps the legend and the members off the
+  // stroke.
+  formGroupFieldset: {
+    flex: 1,
+    minWidth: 0,
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: colors.border,
+    backgroundColor: "transparent",
+    margin: 0,
+    paddingBlock: space.s3,
+    paddingInline: space.s3,
+  },
+  formGroupLegend: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: space.s2,
+    width: "100%",
+    padding: 0,
+  },
+  // The Title role (`design-language.md`: 800 weight, 0.85rem, uppercase,
+  // 0.08em tracking, slate) — the same rule `global.css`'s bare `h2` already
+  // draws, read here from tokens instead of a hand-written selector.
+  formGroupLegendName: {
+    display: "flex",
+    alignItems: "baseline",
+    flex: 1,
+    minWidth: 0,
+    backgroundColor: "transparent",
+    borderStyle: "none",
+    color: colors.textMuted,
+    fontFamily: fonts.heading,
+    fontWeight: fonts.headingWeight,
+    fontSize: "0.85rem",
+    textTransform: "uppercase",
+    letterSpacing: "0.08em",
+    textAlign: "left",
+    cursor: "grab",
+    paddingBlock: space.s1,
+    paddingInline: 0,
+  },
+  formGroupMembersSpacing: {
+    marginTop: space.s3,
+  },
   formStripEmpty: {
     marginTop: space.s4,
     paddingTop: space.s3,
@@ -463,10 +521,8 @@ export interface FormEditorStripProps {
   written: WrittenAccessor;
   technicalFieldIds: Set<string>;
   isGroup: boolean;
-  groupKeys: string[];
   onChangeFlag: (key: FlagKey, next: BoolOrExpr) => void;
   onChangeSpan: (span: 1 | 2) => void;
-  onChangeGroup: (group: string | undefined) => void;
 }
 
 /**
@@ -484,10 +540,8 @@ export function FormEditorStrip({
   written,
   technicalFieldIds,
   isGroup,
-  groupKeys,
   onChangeFlag,
   onChangeSpan,
-  onChangeGroup,
 }: FormEditorStripProps) {
   // A technical field's view entry may declare neither key at all (the
   // definition contract rejects both) — the strip removes the `required`/
@@ -538,19 +592,6 @@ export function FormEditorStrip({
           </select>
         </label>
       )}
-      {/* Move-to-group, the third keyboard move command. A group is named by
-          its key, which is what `ViewField.group` carries. */}
-      <label {...stylex.props(styles.formStripField)}>
-        {t("formEditor.group")}
-        <select value={row.group ?? ""} onChange={(e) => onChangeGroup(e.target.value === "" ? undefined : e.target.value)}>
-          <option value="">{t("formEditor.noGroup")}</option>
-          {groupKeys.map((k) => (
-            <option key={k} value={k}>
-              {k}
-            </option>
-          ))}
-        </select>
-      </label>
     </section>
   );
 }
@@ -691,8 +732,14 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
     setRows(rows.map((r, i) => (i === rowIndex ? setFlag(r as DraftViewField, key, next) : r)));
   };
 
+  /** Cascades through `removeViewEntry` (`draft/view-tree.ts`): removing a
+   * group card takes every entry naming its key with it, field and note
+   * members alike, in the one change (checkbox 6.6's own control, and the
+   * "Removing a group card removes the members placed inside it"
+   * requirement). Removing anything else stays the plain single-entry
+   * filter it always was. */
   const removeRow = (rowIndex: number) => {
-    setRows(rows.filter((_, i) => i !== rowIndex));
+    setRows(removeViewEntry(rows, rowIndex, fields));
     setSelected(undefined);
   };
 
@@ -731,7 +778,11 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
   const dropAt = (slot: number) => {
     if (!dragging) return;
     if (dragging.kind === "palette") {
-      setRows(insertViewField(rows, dragging.ref, slot));
+      // A field the catalog nests inside a group lands among that group's
+      // members (and brings the group's own card too, when it is missing)
+      // wherever the drop named — `insertGroupedField` owns that slot
+      // decision (the MODIFIED "A left palette lists..." requirement).
+      setRows(insertGroupedField(rows, dragging.ref, slot, fields));
       setSelected(undefined);
     } else if (dragging.kind === "mint") {
       mintAndPlace(dragging.fieldKind, slot);
@@ -746,10 +797,19 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
   };
 
   const move = (rowIndex: number, delta: -1 | 1) => {
+    const movedEntry = rows[rowIndex];
     const next = nudgeViewField(rows, rowIndex, delta, fields);
     if (next === rows) return;
     setRows(next);
-    setSelected(rowIndex + delta);
+    // The landed index, read off the array the move returned rather than
+    // assumed as `rowIndex + delta`: a root entry's move can step over a
+    // whole group's footprint, landing more than one position away.
+    // `nudgeViewField`'s splice keeps the moved entry's own object
+    // reference, so `indexOf` finds it — the same way `EntityTabs.tsx`'s
+    // `moveField` reads its own landed row off the moved tree rather than
+    // trusting the target it was handed.
+    const landed = next.indexOf(movedEntry!);
+    setSelected(landed === -1 ? undefined : landed);
   };
 
   const fieldFor = (ref_: FieldId | undefined) => fields.find((f) => f.id === ref_);
@@ -769,6 +829,215 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
     .filter((f) => f?.type === "group")
     .map((f) => f!.key)
     .filter((k): k is string => k !== undefined && k !== "");
+
+  // The canvas's nested read of `rows` (`draft/view-tree.ts`, task 6.1): the
+  // roots, and per group entry its members, each node carrying that entry's
+  // own index into `rows`. The renderer below walks this; every handler
+  // still addresses `rows[i]`.
+  const tree = useMemo(() => viewTree(rows, fields), [rows, fields]);
+
+  // Every row's own drag scope: `undefined` at the form's root, or the
+  // group's own key for a member — whichever nested `<ol>` a card's edges
+  // and tail slot belong to. Built once per tree so a dragover handler can
+  // compare the dragged entry's own scope against the target's, the
+  // mechanism task 6.5 needs (design.md: "A refused drop uses the browser's
+  // own no-drop cursor").
+  const scopeByIndex = useMemo(() => {
+    const map = new Map<number, string | undefined>();
+    const walk = (nodes: ViewTreeNode[], scope: string | undefined) => {
+      for (const node of nodes) {
+        map.set(node.index, scope);
+        if (node.members) {
+          const groupKey = isDraftViewField(node.entry) ? fieldFor(node.entry.ref)?.key : undefined;
+          walk(node.members, groupKey);
+        }
+      }
+    };
+    walk(tree, undefined);
+    return map;
+  }, [tree, fields]);
+
+  /** Whether a dragover at `scope` should call `preventDefault` — the whole
+   * refusal mechanism task 6.5 needs: the browser draws its own no-drop
+   * cursor and fires no `drop` where this says no, so no new visual state is
+   * ever painted. A palette or mint payload is always welcome, wherever it
+   * lands (`insertGroupedField` and the group-less mint rule each resolve
+   * their own placement); a card payload is welcome only at the scope it
+   * already occupies. */
+  const lawfulDrop = (scope: string | undefined) => {
+    if (!dragging) return false;
+    if (dragging.kind !== "card") return true;
+    return scopeByIndex.get(dragging.index) === scope;
+  };
+
+  /** One placed card, leaf or group, at its own nesting level. `scope` is the
+   * key of the group whose `<ol>` this level renders inside, or `undefined`
+   * at the form's root — every drop target here compares a dragged card's
+   * own scope against it (task 6.5). `isFirst`/`isLast` are this node's
+   * position among the array it was mapped over (the tree's own roots, or a
+   * group node's own `members`) — not `rowIndex === 0`, wrong once a group
+   * can sit among the roots (task 6.4). */
+  const renderEntry = (node: ViewTreeNode, isFirst: boolean, isLast: boolean, scope: string | undefined) => {
+    const row = node.entry;
+    const rowIndex = node.index;
+    const isField = isDraftViewField(row);
+    // `row` stays the union type outside a narrowed branch, so `.ref` is
+    // read once here (where `isField` still narrows it) rather than at each
+    // site below, including the group branch, which never re-checks
+    // `isField` itself (a group's card is always a field entry, never a
+    // note, but TS has no way to know that from `node.members` alone).
+    const fieldRef = isField ? row.ref : undefined;
+    const field = fieldFor(fieldRef);
+    const hiddenByExpression = isExpression(row.visible);
+
+    // `stopPropagation` on every dragover handler, lawful or not: nesting
+    // means a member's edge sits inside its group's own `<li>`, and without
+    // it an outer, looser-scoped handler would get a second, wrong-scoped
+    // opinion once the event bubbles.
+    const allowDrop = (dropScope: string | undefined) => (e: DragEvent) => {
+      e.stopPropagation();
+      if (lawfulDrop(dropScope)) e.preventDefault();
+    };
+    const dropOn = (side: DropSide) => (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dropAt(dropSlot(rowIndex, side));
+    };
+
+    const members = node.members;
+    if (members) {
+      // A group's card is always a field entry (never a note), so `field` is
+      // defined here.
+      const groupKey = field?.key;
+      const memberCount = members.length;
+      const lastMemberIndex = memberCount > 0 ? members[memberCount - 1]!.index : rowIndex;
+      // Every drop that does not land on a member's own edge lands after the
+      // group's last member (or right after the card, when it has none) —
+      // `insertGroupedField`'s own `memberInsertionSlot` rule. A plain card
+      // move (reordering a member within its own group) uses this same slot
+      // to reach the group's own tail.
+      const tailSlot = lastMemberIndex + 1;
+      const fieldsetProps = stylex.props(
+        styles.formGroupFieldset,
+        selected === rowIndex && styles.formCardSelected,
+        hiddenByExpression && styles.formCardConditional,
+      );
+      return (
+        <li key={`field:${fieldRef}`} {...stylex.props(styles.formGroupLi)} onDragOver={allowDrop(scope)} onDrop={dropOn("after")}>
+          <span {...stylex.props(styles.formCardEdge)} onDragOver={allowDrop(scope)} onDrop={dropOn("before")} aria-hidden="true" />
+          <fieldset className={fieldsetProps.className} style={fieldsetProps.style} data-selected={selected === rowIndex || undefined}>
+            <legend {...stylex.props(styles.formGroupLegend)}>
+              <button
+                type="button"
+                {...stylex.props(styles.formGroupLegendName)}
+                draggable
+                onDragStart={() => setDragging({ kind: "card", index: rowIndex })}
+                onDragEnd={() => setDragging(undefined)}
+                aria-pressed={selected === rowIndex}
+                onClick={() => setSelected(selected === rowIndex ? undefined : rowIndex)}
+              >
+                {labelFor(fieldRef)}
+              </button>
+              <span {...stylex.props(styles.formCardMoves)}>
+                <button type="button" className="btn btn-secondary" disabled={isFirst} onClick={() => move(rowIndex, -1)}>
+                  {t("formEditor.moveUp")}
+                </button>
+                <button type="button" className="btn btn-secondary" disabled={isLast} onClick={() => move(rowIndex, 1)}>
+                  {t("formEditor.moveDown")}
+                </button>
+                <button type="button" className="btn btn-secondary btn-destructive" onClick={() => removeRow(rowIndex)}>
+                  {t("formEditor.removeGroup").replace("{count}", String(memberCount))}
+                </button>
+              </span>
+            </legend>
+            <ol
+              {...stylex.props(columns === 2 ? styles.formCanvasTwoCol : styles.formCanvasOneCol, styles.formGroupMembersSpacing)}
+              data-columns={columns}
+            >
+              {members.map((member, i) => renderEntry(member, i === 0, i === memberCount - 1, groupKey))}
+              {/* The group's own tail slot (task 6.3): a group with no
+                  members yet still has to offer a target, and a member's own
+                  reorder-to-the-end has nowhere else to land either. */}
+              <li
+                {...stylex.props(styles.formCanvasTail)}
+                onDragOver={allowDrop(groupKey)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  dropAt(tailSlot);
+                }}
+              >
+                {t("formEditor.dropHere")}
+              </li>
+            </ol>
+          </fieldset>
+        </li>
+      );
+    }
+
+    const span = clampSpan(row.span, columns);
+    const celMarked = isField && (isExpression(row.visible) || isExpression(row.required) || isExpression(row.readonly));
+    const cardKey = isField ? `field:${row.ref}` : `note:${rowIndex}`;
+    const cardLabel = isField ? labelFor(row.ref) : resolveDraftLocalizedText(row.text, contentLocale, draft.baseLocale ?? "en") || t("formEditor.emptyNote");
+    const cardType = isField ? typeLabel(field?.type) : t("formEditor.noteType");
+    const cardProps = stylex.props(
+      styles.formCard,
+      selected === rowIndex && styles.formCardSelected,
+      hiddenByExpression && styles.formCardConditional,
+      columns === 2 && span === 2 && styles.formCardSpanTwo,
+    );
+    return (
+      <li
+        key={cardKey}
+        className={isField ? cardProps.className : `studio-form-card-note ${cardProps.className}`}
+        style={cardProps.style}
+        data-span={span}
+        data-selected={selected === rowIndex || undefined}
+        data-conditional={hiddenByExpression || undefined}
+        onDragOver={allowDrop(scope)}
+        onDrop={dropOn("after")}
+      >
+        {/* Two thin edges rather than one whole-card target: a drop names a
+            side, and the side is what decides the slot. A span-2 card owns
+            its row, so both of its halves are the same card and only these
+            edges split it. */}
+        <span {...stylex.props(styles.formCardEdge)} onDragOver={allowDrop(scope)} onDrop={dropOn("before")} aria-hidden="true" />
+        <button
+          type="button"
+          {...stylex.props(styles.formCardBody)}
+          draggable
+          onDragStart={() => setDragging({ kind: "card", index: rowIndex })}
+          onDragEnd={() => setDragging(undefined)}
+          aria-pressed={selected === rowIndex}
+          onClick={() => setSelected(selected === rowIndex ? undefined : rowIndex)}
+        >
+          <span {...stylex.props(isField ? styles.formCardKey : styles.formCardNotePreview)}>{cardLabel}</span>
+          <span {...stylex.props(styles.formCardMarks)}>
+            {isField && row.required === true && <span {...stylex.props(styles.formMachineMark)}>{t("formEditor.markRequired")}</span>}
+            {isField && row.readonly === true && <span {...stylex.props(styles.formMachineMark)}>{t("formEditor.markReadonly")}</span>}
+            {celMarked && <span {...stylex.props(styles.formCel)}>{t("formEditor.markCel")}</span>}
+            <span {...stylex.props(styles.formMachineMark, styles.formCardSpan)}>
+              {span}/{columns}
+            </span>
+          </span>
+          <span {...stylex.props(styles.formMachineMark)}>{cardType}</span>
+        </button>
+        {/* The keyboard route to the same array change a drag makes. A drag
+            handle alone leaves reordering unreachable without a pointer. */}
+        <span {...stylex.props(styles.formCardMoves)}>
+          <button type="button" className="btn btn-secondary" disabled={isFirst} onClick={() => move(rowIndex, -1)}>
+            {t("formEditor.moveUp")}
+          </button>
+          <button type="button" className="btn btn-secondary" disabled={isLast} onClick={() => move(rowIndex, 1)}>
+            {t("formEditor.moveDown")}
+          </button>
+          <button type="button" className="btn btn-secondary" onClick={() => removeRow(rowIndex)}>
+            {t("formEditor.remove")}
+          </button>
+        </span>
+      </li>
+    );
+  };
 
   const selectedRow = selected !== undefined ? rows[selected] : undefined;
 
@@ -801,7 +1070,7 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
                     draggable
                     onDragStart={() => setDragging({ kind: "palette", ref: id })}
                     onDragEnd={() => setDragging(undefined)}
-                    onClick={() => setRows(insertViewField(rows, id, rows.length))}
+                    onClick={() => setRows(insertGroupedField(rows, id, rows.length, fields))}
                   >
                     <span {...stylex.props(styles.formPaletteKey)}>{labelFor(id)}</span>
                     <span {...stylex.props(styles.formPaletteType)}>{typeLabel(fieldFor(id)?.type)}</span>
@@ -871,91 +1140,17 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
             aria-label={t("formEditor.canvasLabel")}
           >
             {rows.length === 0 && <li {...stylex.props(styles.formCanvasEmpty)}>{t("formEditor.canvasEmpty")}</li>}
-            {rows.map((row, rowIndex) => {
-              const isField = isDraftViewField(row);
-              const field = isField ? fieldFor(row.ref) : undefined;
-              const span = isGroupRow(row) ? columns : clampSpan(row.span, columns);
-              const hiddenByExpression = isExpression(row.visible);
-              const celMarked = isField && (isExpression(row.visible) || isExpression(row.required) || isExpression(row.readonly));
-              const cardKey = isField ? `field:${row.ref}` : `note:${rowIndex}`;
-              const cardLabel = isField ? labelFor(row.ref) : resolveDraftLocalizedText(row.text, contentLocale, draft.baseLocale ?? "en") || t("formEditor.emptyNote");
-              const cardType = isField ? typeLabel(field?.type) : t("formEditor.noteType");
-              const dropOn = (side: DropSide) => (e: DragEvent) => {
-                e.preventDefault();
-                e.stopPropagation();
-                dropAt(dropSlot(rowIndex, side));
-              };
-              const allowDrop = (e: DragEvent) => e.preventDefault();
-              const cardProps = stylex.props(
-                styles.formCard,
-                selected === rowIndex && styles.formCardSelected,
-                hiddenByExpression && styles.formCardConditional,
-                columns === 2 && span === 2 && styles.formCardSpanTwo,
-              );
-              return (
-                <li
-                  key={cardKey}
-                  className={isField ? cardProps.className : `studio-form-card-note ${cardProps.className}`}
-                  style={cardProps.style}
-                  data-span={span}
-                  data-selected={selected === rowIndex || undefined}
-                  data-conditional={hiddenByExpression || undefined}
-                  onDragOver={allowDrop}
-                  onDrop={dropOn("after")}
-                >
-                  {/* Two thin edges rather than one whole-card target: a drop
-                      names a side, and the side is what decides the slot. A
-                      span-2 card owns its row, so both of its halves are the
-                      same card and only these edges split it. */}
-                  <span {...stylex.props(styles.formCardEdge)} onDragOver={allowDrop} onDrop={dropOn("before")} aria-hidden="true" />
-                  <button
-                    type="button"
-                    {...stylex.props(styles.formCardBody)}
-                    draggable
-                    onDragStart={() => setDragging({ kind: "card", index: rowIndex })}
-                    onDragEnd={() => setDragging(undefined)}
-                    aria-pressed={selected === rowIndex}
-                    onClick={() => setSelected(selected === rowIndex ? undefined : rowIndex)}
-                  >
-                    <span {...stylex.props(isField ? styles.formCardKey : styles.formCardNotePreview)}>{cardLabel}</span>
-                    <span {...stylex.props(styles.formCardMarks)}>
-                      {isField && row.required === true && <span {...stylex.props(styles.formMachineMark)}>{t("formEditor.markRequired")}</span>}
-                      {isField && row.readonly === true && <span {...stylex.props(styles.formMachineMark)}>{t("formEditor.markReadonly")}</span>}
-                      {celMarked && <span {...stylex.props(styles.formCel)}>{t("formEditor.markCel")}</span>}
-                      <span {...stylex.props(styles.formMachineMark, styles.formCardSpan)}>
-                        {span}/{columns}
-                      </span>
-                    </span>
-                    <span {...stylex.props(styles.formMachineMark)}>{cardType}</span>
-                  </button>
-                  {/* The keyboard route to the same array change a drag makes.
-                      A drag handle alone leaves reordering unreachable without
-                      a pointer. */}
-                  <span {...stylex.props(styles.formCardMoves)}>
-                    <button type="button" className="btn btn-secondary" disabled={rowIndex === 0} onClick={() => move(rowIndex, -1)}>
-                      {t("formEditor.moveUp")}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      disabled={rowIndex === rows.length - 1}
-                      onClick={() => move(rowIndex, 1)}
-                    >
-                      {t("formEditor.moveDown")}
-                    </button>
-                    <button type="button" className="btn btn-secondary" onClick={() => removeRow(rowIndex)}>
-                      {t("formEditor.remove")}
-                    </button>
-                  </span>
-                </li>
-              );
-            })}
+            {tree.map((node, i) => renderEntry(node, i === 0, i === tree.length - 1, undefined))}
             {/* The tail slot, so a card can be dropped past the last one. */}
             <li
               {...stylex.props(styles.formCanvasTail)}
-              onDragOver={(e) => e.preventDefault()}
+              onDragOver={(e) => {
+                e.stopPropagation();
+                if (lawfulDrop(undefined)) e.preventDefault();
+              }}
               onDrop={(e) => {
                 e.preventDefault();
+                e.stopPropagation();
                 dropAt(rows.length);
               }}
             >
@@ -972,10 +1167,8 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
               written={written}
               technicalFieldIds={technicalIds}
               isGroup={isGroupRow(selectedRow)}
-              groupKeys={groupKeys}
               onChangeFlag={(key, next) => setViewFlag(selected!, key, next)}
               onChangeSpan={(span) => updateRow(selected!, { span })}
-              onChangeGroup={(group) => updateRow(selected!, { group })}
             />
           ) : selectedRow ? (
             <NoteEditorStrip
