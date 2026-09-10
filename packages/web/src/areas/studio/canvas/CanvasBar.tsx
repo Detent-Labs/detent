@@ -100,6 +100,10 @@ const styles = stylex.create({
     left: 0,
     marginBottom: space.s1,
     fontSize: 11,
+    // The bar leaves about 17px above the input for this label. At `normal`
+    // the host's own system-ui metrics decide the label's height, so a fixed
+    // 1 pins it to 11px plus the 4px margin on every platform.
+    lineHeight: 1,
     textTransform: "uppercase",
     letterSpacing: "0.1em",
     color: colors.textMuted,
@@ -302,7 +306,15 @@ export function CanvasBar({
     onDrop(drag.kind, e.clientX, e.clientY);
   };
 
-  const onPointerCancel = () => setDrag(null);
+  const onPointerCancel = () => {
+    if (!drag) return;
+    setDrag(null);
+    // A cancel fires no release, so the caller's own drop-target highlight
+    // would stand until the next drag started. The callback it already reads
+    // carries the retraction: a point outside the viewport hits no element,
+    // so the caller's hit test resolves it to no path.
+    if (drag.moved) onDragMove(drag.kind, -1, -1);
+  };
 
   /** The press path, which the keyboard reaches too: a focused control's
    * Enter or Space fires a click and no pointer event at all. */

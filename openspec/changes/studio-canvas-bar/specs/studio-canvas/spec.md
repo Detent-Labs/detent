@@ -8,8 +8,9 @@ SHALL stay fixed whatever the canvas selection holds.
 
 The bar SHALL carry three add controls. They read as a step someone works, a
 call to another process, and an end, per `studio-guided-vocabulary`. No
-control prints "terminal". A step someone works SHALL stand as the bar's own
-button. The other two SHALL stand in a menu that button opens.
+control prints "terminal". A step someone works SHALL also stand as the bar's
+own button, under an action phrase. The menu its caret opens SHALL list all
+three kinds.
 
 Each add control SHALL be a drag source. Dragging one onto the canvas SHALL
 add a step of that kind at the drop point. That SHALL use the same

@@ -287,7 +287,7 @@ The second drop is the one that earns its place. Panzoom scales the SVG
 element itself, so a zoomed-out canvas leaves most of the wrap outside the
 SVG's own box. The wrap paints the grid and shows the graph there, so an
 author reads that area as canvas. For that reason `onCanvasBarDrop` resolves
-the canvas through `.canvas-wrap`.
+the canvas through the body around it, `#studio-canvas-body`.
 
 A synthetic mouse drag does not exercise this. The bar listens for pointer
 events, and raw `mousedown`/`mousemove` leaves it inert. Use a real drag, or a
@@ -393,9 +393,13 @@ above every z-index, including the ghost's. Drag the pointer past the
 panel's edge. Pass: the ghost appears once the pointer clears it.
 
 Reach the group state: select two steps, then Group these steps. Narrow
-the window's width to 800px. Pass: the bar still fits. Narrow it to 700px.
-Measured: the bar overflows sideways there, answering the design's first
-open question.
+the window's width to 800px. Pass: the bar still fits, and Ungroup sits
+inside it. Narrow it to 700px. Pass: the bar scrolls sideways, and the
+page behind it keeps its own width.
+
+Wheel the pointer right over the bar. Pass: Ungroup scrolls into view and
+takes a click there. Measured at 700px: a 676px bar over 749px of content,
+so 73px of it scrolls. The bar stands 88px tall at both widths.
 
 None of the pointer, focus, or height checks above has coverage in
 `packages/web/test/`. Every suite there renders through
