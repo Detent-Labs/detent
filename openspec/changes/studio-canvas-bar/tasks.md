@@ -19,19 +19,19 @@
 
 ## 4. The bar component
 
-- [ ] 4.1 Add the file `canvas/CanvasBar.tsx`. Style it with StyleX from the
+- [x] 4.1 Add the file `canvas/CanvasBar.tsx`. Style it with StyleX from the
   tokens alone. Verify the design detector reports nothing.
-- [ ] 4.2 Give the bar one flex row at a fixed height. Verify the height holds
+- [x] 4.2 Give the bar one flex row at a fixed height. Verify the height holds
   with a group-name input inside it.
-- [ ] 4.3 Add the Add step button and its caret trigger. Render both as
+- [x] 4.3 Add the Add step button and its caret trigger. Render both as
   `btn btn-secondary`, per design D5.
-- [ ] 4.4 Add the popover menu holding the other two kinds. Follow
+- [x] 4.4 Add the popover menu holding the other two kinds. Follow
   `Chrome.tsx`'s pattern, per design D4.
-- [ ] 4.5 Move `CanvasPalette`'s pointer-capture drag onto all three controls.
+- [x] 4.5 Move `CanvasPalette`'s pointer-capture drag onto all three controls.
   Hide the popover on release, per design D3.
-- [ ] 4.6 Render the selection count, the delete control and the group
+- [x] 4.6 Render the selection count, the delete control and the group
   controls. Copy them from `EditScreen`'s `canvasSelection` aside.
-- [ ] 4.7 Render the reachability report for one selected step. Read it from
+- [x] 4.7 Render the reachability report for one selected step. Read it from
   `reachableStepIds`.
 
 ## 5. Wiring the screen
