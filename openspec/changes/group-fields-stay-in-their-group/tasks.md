@@ -54,15 +54,15 @@ tree.
 
 ## 6. The editor screen
 
-- [ ] 6.1 Render the tree: a group `<li>` holds a `<fieldset>`, a `<legend>` and a nested `<ol>`
-- [ ] 6.2 Draw the group box as a 1px stroke with no fill, spanning the form's full width
-- [ ] 6.3 Give every group a tail drop slot inside it, so an empty group accepts a drop
-- [ ] 6.4 Disable move-up on a group's first member and move-down on its last
-- [ ] 6.5 Call `preventDefault` on `dragover` only for a lawful slot, so a refusal reads native
-- [ ] 6.6 Make a group card's remove control destructive, labelled with its member count
-- [ ] 6.7 Remove the `group` select from `FormEditorStrip`; leave `NoteEditorStrip` alone
-- [ ] 6.8 Keep `formEditor.group` and `formEditor.noGroup`; the note strip still reads both
-- [ ] 6.9 Add the new studio catalog keys; that catalog ships `en` alone by an earlier decision
+- [x] 6.1 Render the tree: a group `<li>` holds a `<fieldset>`, a `<legend>` and a nested `<ol>`
+- [x] 6.2 Draw the group box as a 1px stroke with no fill, spanning the form's full width
+- [x] 6.3 Give every group a tail drop slot inside it, so an empty group accepts a drop
+- [x] 6.4 Disable move-up on a group's first member and move-down on its last
+- [x] 6.5 Call `preventDefault` on `dragover` only for a lawful slot, so a refusal reads native
+- [x] 6.6 Make a group card's remove control destructive, labelled with its member count
+- [x] 6.7 Remove the `group` select from `FormEditorStrip`; leave `NoteEditorStrip` alone
+- [x] 6.8 Keep `formEditor.group` and `formEditor.noGroup`; the note strip still reads both
+- [x] 6.9 Add the new studio catalog keys; that catalog ships `en` alone by an earlier decision
 
 ## 7. Docs and rules
 
