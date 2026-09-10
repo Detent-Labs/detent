@@ -1,11 +1,11 @@
 ## 1. The definition contract
 
-- [ ] 1.1 Add `viewTab`, `view.tabs`, and `tab` on `viewField` and `viewNote`
-- [ ] 1.2 Add the `view` superRefine holding rules 1 to 5; see design.md
-- [ ] 1.3 Call the base-locale check on each tab `label` in `processBody`
-- [ ] 1.4 Add one test per rule, each rejecting a violating body
-- [ ] 1.5 Add a test that an untabbed body parses with an unchanged `definitionHash`
-- [ ] 1.6 Verify group 1: `bun run typecheck` and the full `bun test`, both green
+- [x] 1.1 Add `viewTab`, `view.tabs`, and `tab` on `viewField` and `viewNote`
+- [x] 1.2 Add the `view` superRefine holding rules 1 to 5; see design.md
+- [x] 1.3 Call the base-locale check on each tab `label` in `processBody`
+- [x] 1.4 Add one test per rule, each rejecting a violating body
+- [x] 1.5 Add a test that an untabbed body parses with an unchanged `definitionHash`
+- [x] 1.6 Verify group 1: `bun run typecheck` and the full `bun test`, both green
 
 ## 2. Runtime resolution
 
