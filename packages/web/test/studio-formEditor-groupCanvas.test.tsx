@@ -102,12 +102,29 @@ function render(): string {
   );
 }
 
-/** The group's own fieldset, start to end. Exactly one exists in this
- * fixture, so a plain first-open/first-close slice bounds it correctly. */
+/** The canvas region alone, bounded by its own `aria-label` and the trailing
+ * preview pane's -- `form-ui`'s `FieldForm` (`FieldForm.tsx:318-338`) draws
+ * its OWN `<fieldset>` for the same group inside the mounted `FormPreview`,
+ * so a search unscoped to the canvas would find whichever one happens to
+ * come first in DOM order rather than the one this suite means to assert
+ * on. */
+function canvasHtml(html: string): string {
+  const start = html.indexOf('aria-label="Form layout"');
+  const end = html.indexOf('aria-label="What a participant meets"');
+  expect(start, "expected to find the canvas region").toBeGreaterThan(-1);
+  expect(end, "expected to find the preview pane, to bound the canvas region").toBeGreaterThan(-1);
+  return html.slice(start, end);
+}
+
+/** The group's own fieldset, start to end, scoped to the canvas region so
+ * `form-ui`'s own second fieldset inside the preview pane is never a
+ * candidate. Exactly one exists within the canvas in this fixture, so a
+ * plain first-open/first-close slice bounds it correctly there. */
 function fieldsetBlock(html: string): string {
-  const start = html.indexOf("<fieldset");
-  const end = html.indexOf("</fieldset>");
-  return html.slice(start, end + "</fieldset>".length);
+  const canvas = canvasHtml(html);
+  const start = canvas.indexOf("<fieldset");
+  const end = canvas.indexOf("</fieldset>");
+  return canvas.slice(start, end + "</fieldset>".length);
 }
 
 /** One leaf card's own `<li>...</li>`, found by its visible label. A leaf
