@@ -54,15 +54,6 @@ export function moveViewField(rows: DraftViewEntry[], from: number, slot: number
   return next;
 }
 
-/** Move a placed card one position up or down, the keyboard equivalent of
- * dragging it across one neighbour. Out-of-range is a no-op, so a command on
- * the first or last card needs no separate guard at the call site. */
-export function nudgeViewField(rows: DraftViewEntry[], index: number, delta: -1 | 1): DraftViewEntry[] {
-  const target = index + delta;
-  if (target < 0 || target >= rows.length) return rows;
-  return moveViewField(rows, index, delta === 1 ? target + 1 : target);
-}
-
 /** Place a catalog field on the canvas at a drop slot. A field already on the
  * view is not re-added: the palette lists only unplaced fields, and a stale
  * drag must not duplicate a row. A note names no catalog field, so it never

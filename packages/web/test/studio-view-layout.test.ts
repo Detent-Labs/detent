@@ -7,7 +7,6 @@ import {
   insertViewNote,
   isDraftViewField,
   moveViewField,
-  nudgeViewField,
   reorderIndex,
   unplacedRefs,
   type DraftViewEntry,
@@ -92,26 +91,6 @@ describe("moveViewField splices the view array to the drop position", () => {
     expect(refs(moveViewField(start, 0, dropSlot(1, "after")))).toEqual(["wide", "a", "c"]);
     // Dropping "c" before the wide card: slot 1, and "c" sits after it, so no shift.
     expect(refs(moveViewField(start, 2, dropSlot(1, "before")))).toEqual(["a", "c", "wide"]);
-  });
-});
-
-describe("nudgeViewField is the keyboard move, producing the same array a drag does", () => {
-  it("moves up exactly as dragging one position up would", () => {
-    const start = rows("a", "b", "c");
-    expect(refs(nudgeViewField(start, 2, -1))).toEqual(["a", "c", "b"]);
-    expect(refs(nudgeViewField(start, 2, -1))).toEqual(refs(moveViewField(start, 2, dropSlot(1, "before"))));
-  });
-
-  it("moves down exactly as dragging one position down would", () => {
-    const start = rows("a", "b", "c");
-    expect(refs(nudgeViewField(start, 0, 1))).toEqual(["b", "a", "c"]);
-    expect(refs(nudgeViewField(start, 0, 1))).toEqual(refs(moveViewField(start, 0, dropSlot(1, "after"))));
-  });
-
-  it("is a no-op at either end", () => {
-    const start = rows("a", "b");
-    expect(nudgeViewField(start, 0, -1)).toBe(start);
-    expect(nudgeViewField(start, 1, 1)).toBe(start);
   });
 });
 
