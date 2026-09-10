@@ -69,11 +69,11 @@
 
 ## 8. Docs and rules
 
-- [ ] 8.1 Replace the palette row in `.claude/rules/ui-glossary.md` with a
+- [x] 8.1 Replace the palette row in `.claude/rules/ui-glossary.md` with a
   canvas bar row. Say that palette still names the form editor's field list.
-- [ ] 8.2 Update `docs/current-state.md` at lines 1184, 1808, 1946, 1947 and
+- [x] 8.2 Update `docs/current-state.md` at lines 1184, 1808, 1946, 1947 and
   1959. Confirm each symbol first, per that file's own rule.
-- [ ] 8.3 Update `docs/browser-checks.md` at lines 183 and 281. Add the bar's
+- [x] 8.3 Update `docs/browser-checks.md` at lines 183 and 281. Add the bar's
   own checks, including the drag out of an open menu.
 
 ## 9. Verification

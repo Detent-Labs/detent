@@ -180,10 +180,11 @@ set to dark (`prefers-color-scheme: dark`). Work through every component
 `studio-canvas-first-structure-editor` and `studio-canvas-first-form-builder`
 added:
 
-- **Palette** (`CanvasPalette`, `studio-step-bench`): the expanded ribbon's
-  "Add to canvas" group, in its default state. Check its drag-hover state
-  too (the ghost that follows the pointer during a drag), for each of
-  Step/Subprocess/End.
+- **Canvas bar** (`CanvasBar`, `studio-canvas-bar`): the bar's default state,
+  with Add step and its caret. Open the caret's menu. Pass: it opens. Check
+  every add control's drag-hover state too, the ghost that follows the
+  pointer during a drag. Confirm it for each of the three kinds: task,
+  subprocess, end.
 - **Steps register** (`studio-step-bench`): the ruled rows, each with its
   role stamp and its issue count. The current row too. The foot's six
   process rows (Fields, Data sources, Contract, Field matrix, Changes,
@@ -278,17 +279,17 @@ outside its own viewport. Only a browser reports that. The second activation
 matters on its own. It starts from the zoom level the first one set. The old
 code read that state back through a transformed rect.
 
-Then drag a Step from the palette onto empty canvas, twice. Do it once at the
-opening zoom level, and once after a fit has zoomed out. Pass: each drop adds
-a step.
+Then drag a Step from the canvas bar onto empty canvas, twice. Do it once at
+the opening zoom level, and once after a fit has zoomed out. Pass: each drop
+adds a step.
 
 The second drop is the one that earns its place. Panzoom scales the SVG
 element itself, so a zoomed-out canvas leaves most of the wrap outside the
 SVG's own box. The wrap paints the grid and shows the graph there, so an
-author reads that area as canvas. For that reason `onPaletteDrop` resolves the
-canvas through `.canvas-wrap`.
+author reads that area as canvas. For that reason `onCanvasBarDrop` resolves
+the canvas through `.canvas-wrap`.
 
-A synthetic mouse drag does not exercise this. The palette listens for pointer
+A synthetic mouse drag does not exercise this. The bar listens for pointer
 events, and raw `mousedown`/`mousemove` leaves it inert. Use a real drag, or a
 tool that dispatches pointer events.
 
@@ -335,6 +336,47 @@ call then lands on the same values already showing.
 This check needs a real Panzoom instance racing its own internal timer
 against real `getBBox()`/`clientWidth`. `packages/web/test/` assumes no
 DOM at all. Nothing there can observe either side of the race.
+
+### Studio canvas bar
+
+Source: `studio-canvas-bar` tasks 7.1, 7.2, 8.3.
+
+Seed the database and open a draft on the Canvas tab.
+
+Select nothing, then one step, then several steps, then a selection matching
+one group. Pass: the bar's height holds the same across all four states.
+
+Open the caret's menu, then press Escape. Pass: the menu closes, and focus
+returns to the caret button. Reopen the menu, then press outside the panel.
+Pass: the menu closes there too.
+
+Start a drag from inside the open menu, and keep the pointer over the canvas
+for the whole gesture. Pass: the menu stays open until release, then closes
+and drops the step. Repeat the drag, releasing over a rendered path instead.
+Pass: the dropped step splits into that path, the same insert a control's
+own drag already makes.
+
+Press Add step twice in a row, with no drag between the two presses. Pass:
+the second step lands beside the first, at a separate lattice point.
+
+Start a drag from an add control. Release the pointer off every drop
+target, so the click never lands. Press that control's keyboard activation
+once. Pass: the shared flag swallows that press, and adds nothing. Press it
+again. Pass:
+the second press adds a step.
+
+Two reviewers accepted that swallow as a narrow, acceptable cost of one
+shared flag. Confirm it reaches only that single press, never a second one.
+
+Open the caret's menu, then start a drag from a menu entry without
+releasing. Pass: the ghost stays hidden while the pointer sits over the
+still-open menu panel. A popover promotes to the browser's own top layer,
+above every z-index, including the ghost's. Drag the pointer past the
+panel's edge. Pass: the ghost appears once the pointer clears it.
+
+None of the six checks above has coverage in `packages/web/test/`. Every
+suite there renders through `renderToStaticMarkup`, which mounts no DOM. No
+test can take a pointer event, read focus, or measure a rendered height.
 
 ### Users screen: the manager control past one page
 

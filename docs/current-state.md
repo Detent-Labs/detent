@@ -1805,7 +1805,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   `form-ui/tokens.stylex`): a step lands on the lattice the author can see.
 
   `GRID_STEP` is 20 and `snapToGrid` rounds to the nearest point. Three sites
-  call it: a drag's release, the drag preview, and the palette drop. All three,
+  call it: a drag's release, the drag preview, and the bar's drop. All three,
   because the preview never calls `onMoveStep`. Rounding at the write path
   alone would leave the preview unrounded, and the node would jump on release.
 
@@ -1852,7 +1852,7 @@ Stage-by-stage status is in `ROADMAP.md`.
 
   Panzoom scales the SVG element, so at any zoom under 1 most of the visible
   canvas sits outside the SVG's own box. The gesture binds to `.canvas-wrap`
-  for that reason, as `onPaletteDrop` already does, and the band draws as an
+  for that reason, as `onCanvasBarDrop` already does, and the band draws as an
   HTML overlay there rather than as an SVG rect that would clip at the
   shrunken viewport.
 
@@ -1943,10 +1943,10 @@ Stage-by-stage status is in `ROADMAP.md`.
   the drag preview stays a straight line from it: a control that moved under
   the pointer is harder to press, and a drag in flight has no target to face.
 - Canvas edge insert (`packages/web/src/areas/studio/draft/insertOnPath.ts`,
-  `canvas/CanvasView.tsx`, `screens/EditScreen.tsx`, `canvas/CanvasPalette.tsx`,
-  `canvas-edge-affordances`, roadmap #31): a palette drag released over a
+  `canvas/CanvasView.tsx`, `screens/EditScreen.tsx`, `canvas/CanvasBar.tsx`,
+  `canvas-edge-affordances`, roadmap #31): a bar drag released over a
   rendered path inserts the dragged step into it instead of placing it
-  free-standing. `EditScreen.onPaletteDrop` resolves the path under the
+  free-standing. `EditScreen.onCanvasBarDrop` resolves the path under the
   release point through `elementFromPoint`'s `closest("[data-path-id]")`, the
   edge group and its guard label's `foreignObject` both carrying
   `data-path-id`/`data-step-id`. `insertOnPath` (`draft/`) is the pure
@@ -1956,7 +1956,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   The insert clears the split path's stored waypoints in the same
   `saveState.layout` write that places the new step, the same reason
   `Arrange` already clears every waypoint. While the drag is live,
-  `CanvasPalette.onDragMove` reports the pointer's moving position, and the path
+  `CanvasBar.onDragMove` reports the pointer's moving position, and the path
   it currently sits over renders in a drop-target stroke
   (`.canvas-edge-insert-target`) — heavier, in the accent, no other control.
   An `end` step never takes this branch: a terminal step has no outgoing
@@ -2094,6 +2094,25 @@ Stage-by-stage status is in `ROADMAP.md`.
   takes a key of its own, so no template prints an empty slot. Those chrome
   words ship in English alone, while the label an author wrote resolves against
   the studio's content locale.
+- Canvas bar (`packages/web/src/areas/studio/canvas/CanvasBar.tsx`,
+  `screens/EditScreen.tsx`, `canvas/layout.ts`, `studio-canvas-bar`): a
+  fixed-height row between the tab row and the canvas, replacing
+  `canvas/CanvasPalette.tsx` and the floating `canvasSelection` aside. It
+  carries the three add controls behind Add step and its caret menu. It also
+  carries one selected step's reachability report and the selection's own
+  controls. `EditScreen` renders it as `<CanvasBar>`, directly above
+  `#studio-canvas-body`, and keeps every drag and selection callback itself.
+
+  A press on an add control adds a step at the visible canvas centre. It
+  resolves no drop point through `elementFromPoint`, so it never lands on an
+  existing node. One function, `canvas/layout.ts::drawnPositions`, serves both
+  that walk and `CanvasView.positionOf`. It layers a step's stored `layout`
+  position over `autoPlaceSteps`'s fallback and the origin last resort. A new
+  step then collides against every step an author can see, including ones the
+  layout blob never recorded.
+  The move also renamed `onPaletteDrop`/`onPaletteDragMove` to
+  `onCanvasBarDrop`/`onCanvasBarDragMove`; the drop-on-path insert
+  (`insertOnPath`) stayed unchanged underneath.
 - Process Studio — lifecycle (`src/http/studio-routes.ts`, `src/engine/drafts.ts`,
   `src/http/errors.ts`, `packages/web/src/areas/studio/panels/DraftToolbar.tsx`,
   `packages/web/src/areas/studio/screens/{VersionsScreen,MigrationPlanScreen}.tsx`,
