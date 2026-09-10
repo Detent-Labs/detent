@@ -28,12 +28,5 @@
         "reason": "design.json records it as .ds-stamp-dormant; the detector reads the token palette only. Copied verbatim from app-area InvolvedScreen.tsx's stampDormant."
       }
     ]
-  },
-  "hook": {
-    "enabled": true,
-    "limits": {
-      "maxFindings": 5,
-      "maxChars": 8000
-    }
   }
 }

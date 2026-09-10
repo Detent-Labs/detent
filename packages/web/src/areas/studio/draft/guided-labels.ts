@@ -95,7 +95,7 @@ export function newStepPhrase(kind: StepKind): string {
   return stepKindPhrase(kind === "end" ? "terminal" : kind === "subprocess" ? "subprocess" : "participant");
 }
 
-/** The short note under the palette's phrase, on `newStepPhrase`'s own kind
+/** The short note under the canvas bar's phrase, on `newStepPhrase`'s own kind
  * mapping: `end` reads the `terminal` note, since it is a flag on a task
  * step and never a kind of its own. */
 export function newStepNote(kind: StepKind): string {
