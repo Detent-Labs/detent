@@ -1,5 +1,5 @@
 import * as stylex from "@stylexjs/stylex";
-import { FieldForm, PathButtons } from "form-ui";
+import { FieldForm, PathButtons, resolveTabsLocale } from "form-ui";
 import type { AvailablePath } from "form-ui";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
 import type { Step } from "workflow-engine/schema";
@@ -81,6 +81,16 @@ interface Props {
   processLabel: string;
   contentLocale: string;
   baseLocale: string;
+  /** The tab the canvas is showing. One selected-tab value drives both
+   * halves of the editor (`studio-form-editor`), so this pane holds none of
+   * its own and the two can never disagree about which tab is open. */
+  activeTab: string | undefined;
+  /** `FieldForm`'s own controlled shape, wired and silent: the strip this
+   * pane draws sits inside the `inert` container below, so a click there
+   * reaches no tab and this never fires. The canvas carries the strip an
+   * author operates (`studio-form-editor`: "The strip the preview draws
+   * SHALL NOT be interactive"). */
+  onTabChange: (tabKey: string) => void;
   /** Composed after the pane's own style, so the editor can place the pane in
    * its grid without this component knowing the grid. The pattern
    * `PathButtons` already sets in `form-ui`. */
@@ -98,8 +108,8 @@ interface Props {
  * It reads the step straight off the draft, so every change in the canvas
  * beside it reaches the preview on the same render, with no reload.
  */
-export function FormPreview({ step, fields, processLabel, contentLocale, baseLocale, style }: Props) {
-  const { entries, values } = previewViewEntries(step.view, fields, contentLocale, baseLocale);
+export function FormPreview({ step, fields, processLabel, contentLocale, baseLocale, activeTab, onTabChange, style }: Props) {
+  const { entries, values, tabs } = previewViewEntries(step.view, fields, contentLocale, baseLocale);
   const columns: 1 | 2 = step.view?.columns === 2 ? 2 : 1;
   const stepLabel = resolveDraftLocalizedText(step.label, contentLocale, baseLocale) || step.key || t("steps.unnamedStep");
 
@@ -111,7 +121,19 @@ export function FormPreview({ step, fields, processLabel, contentLocale, baseLoc
           <span {...stylex.props(styles.process)}>{processLabel}</span>
           <p {...stylex.props(styles.step)}>{stepLabel}</p>
         </div>
-        <FieldForm fields={entries} values={values} onChange={() => {}} locale={contentLocale} columns={columns} />
+        {/* `resolveTabsLocale` beside the entries `previewViewEntries`
+            already resolved, so this pane applies the same base-locale
+            fallback the Player and the Task screen apply to a tab label. */}
+        <FieldForm
+          fields={entries}
+          values={values}
+          onChange={() => {}}
+          locale={contentLocale}
+          columns={columns}
+          tabs={resolveTabsLocale(tabs, contentLocale, baseLocale)}
+          activeTab={activeTab}
+          onTabChange={onTabChange}
+        />
         <PathButtons paths={previewPaths(step)} onSubmit={() => {}} />
       </div>
     </aside>
