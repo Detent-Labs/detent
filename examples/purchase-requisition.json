@@ -1,7 +1,7 @@
 {
   "processId": "proc_7d41e0b6-5c2a-4f19-9e83-6b0d4a71c58f",
   "version": 1,
-  "definitionHash": "0287388f260f666928d247cf3fccacb8b07b4c1011cbec50a3eaa5ce8be452ec",
+  "definitionHash": "0cbdd60039cbac3a7ce05d9c059d5502513f9d8c58fb923c80d79d9f688d360a",
   "status": "published",
   "publishedAt": "2026-08-15T09:00:00Z",
   "definition": {
@@ -36,68 +36,6 @@
       ]
     },
     "fields": [
-      {
-        "id": "field_9c7e5b31-0001-4a1c-8e2f-000000000001",
-        "key": "cost_center",
-        "label": {
-          "en": "Cost Center"
-        },
-        "type": "string",
-        "options": [
-          {
-            "value": "cc_1000",
-            "label": {
-              "en": "CC-1000 Engineering"
-            }
-          },
-          {
-            "value": "cc_2000",
-            "label": {
-              "en": "CC-2000 Marketing"
-            }
-          },
-          {
-            "value": "cc_3000",
-            "label": {
-              "en": "CC-3000 Operations"
-            }
-          }
-        ]
-      },
-      {
-        "id": "field_9c7e5b31-0002-4a1c-8e2f-000000000002",
-        "key": "category",
-        "label": {
-          "en": "Category"
-        },
-        "type": "string",
-        "options": [
-          {
-            "value": "it_hardware",
-            "label": {
-              "en": "IT Hardware"
-            }
-          },
-          {
-            "value": "software_license",
-            "label": {
-              "en": "Software License"
-            }
-          },
-          {
-            "value": "professional_services",
-            "label": {
-              "en": "Professional Services"
-            }
-          },
-          {
-            "value": "facilities",
-            "label": {
-              "en": "Facilities"
-            }
-          }
-        ]
-      },
       {
         "id": "field_9c7e5b31-0003-4a1c-8e2f-000000000003",
         "key": "line_item",
@@ -176,131 +114,6 @@
         ]
       },
       {
-        "id": "field_9c7e5b31-0008-4a1c-8e2f-000000000008",
-        "key": "vendor",
-        "label": {
-          "en": "Vendor"
-        },
-        "description": {
-          "en": "Options come from the approved-vendor data source. Picking a row copies its payment_terms column into the field below."
-        },
-        "type": "string",
-        "dataSource": "ds_6f2a8d47-0001-4a1c-8e2f-000000000001",
-        "columnMapping": {
-          "payment_terms": "field_9c7e5b31-0009-4a1c-8e2f-000000000009"
-        }
-      },
-      {
-        "id": "field_9c7e5b31-0009-4a1c-8e2f-000000000009",
-        "key": "payment_terms",
-        "label": {
-          "en": "Payment Terms"
-        },
-        "description": {
-          "en": "Written by the vendor field's columnMapping. Read-only everywhere a participant sees it."
-        },
-        "type": "string"
-      },
-      {
-        "id": "field_9c7e5b31-0010-4a1c-8e2f-000000000010",
-        "key": "needed_by",
-        "label": {
-          "en": "Needed By"
-        },
-        "type": "string",
-        "format": "date"
-      },
-      {
-        "id": "field_9c7e5b31-0011-4a1c-8e2f-000000000011",
-        "key": "justification",
-        "label": {
-          "en": "Business Justification"
-        },
-        "type": "string",
-        "validation": {
-          "minLength": 20,
-          "maxLength": 1000
-        }
-      },
-      {
-        "id": "field_9c7e5b31-0012-4a1c-8e2f-000000000012",
-        "key": "budget_ok",
-        "label": {
-          "en": "Covered by the cost center's remaining budget"
-        },
-        "type": "boolean"
-      },
-      {
-        "id": "field_9c7e5b31-0013-4a1c-8e2f-000000000013",
-        "key": "manager_note",
-        "label": {
-          "en": "Manager Note"
-        },
-        "type": "string",
-        "validation": {
-          "maxLength": 500
-        }
-      },
-      {
-        "id": "field_9c7e5b31-0014-4a1c-8e2f-000000000014",
-        "key": "finance_note",
-        "label": {
-          "en": "Finance Note"
-        },
-        "type": "string",
-        "validation": {
-          "maxLength": 500
-        }
-      },
-      {
-        "id": "field_9c7e5b31-0015-4a1c-8e2f-000000000015",
-        "key": "rejection_reason",
-        "label": {
-          "en": "Rejection Reason"
-        },
-        "description": {
-          "en": "Fill this in when you reject. A path carries no data of its own, so a reviewer records the reason in the form before taking the reject path."
-        },
-        "type": "string",
-        "options": [
-          {
-            "value": "over_budget",
-            "label": {
-              "en": "Over budget"
-            }
-          },
-          {
-            "value": "no_business_case",
-            "label": {
-              "en": "No business case"
-            }
-          },
-          {
-            "value": "vendor_not_approved",
-            "label": {
-              "en": "Vendor not approved"
-            }
-          },
-          {
-            "value": "duplicate_request",
-            "label": {
-              "en": "Duplicate request"
-            }
-          }
-        ]
-      },
-      {
-        "id": "field_9c7e5b31-0016-4a1c-8e2f-000000000016",
-        "key": "po_number",
-        "label": {
-          "en": "PO Number"
-        },
-        "description": {
-          "en": "Written back by the ERP action, never typed by a participant."
-        },
-        "type": "string"
-      },
-      {
         "id": "field_9c7e5b31-0017-4a1c-8e2f-000000000017",
         "key": "po_status",
         "label": {
@@ -333,61 +146,6 @@
         "default": "pending"
       },
       {
-        "id": "field_9c7e5b31-0018-4a1c-8e2f-000000000018",
-        "key": "received_quantity",
-        "label": {
-          "en": "Quantity Received"
-        },
-        "type": "number",
-        "validation": {
-          "min": 0
-        }
-      },
-      {
-        "id": "field_9c7e5b31-0019-4a1c-8e2f-000000000019",
-        "key": "receipt_note",
-        "label": {
-          "en": "Receipt Note"
-        },
-        "type": "string",
-        "validation": {
-          "maxLength": 500
-        }
-      },
-      {
-        "id": "field_9c7e5b31-0020-4a1c-8e2f-000000000020",
-        "key": "discrepancy_note",
-        "label": {
-          "en": "Discrepancy Note"
-        },
-        "type": "string",
-        "validation": {
-          "maxLength": 500
-        }
-      },
-      {
-        "id": "field_9c7e5b31-0021-4a1c-8e2f-000000000021",
-        "key": "invoice_number",
-        "label": {
-          "en": "Invoice Number"
-        },
-        "type": "string",
-        "validation": {
-          "maxLength": 60
-        }
-      },
-      {
-        "id": "field_9c7e5b31-0022-4a1c-8e2f-000000000022",
-        "key": "invoice_amount",
-        "label": {
-          "en": "Invoice Amount"
-        },
-        "type": "number",
-        "validation": {
-          "min": 0
-        }
-      },
-      {
         "id": "field_9c7e5b31-0023-4a1c-8e2f-000000000023",
         "key": "request",
         "label": {
@@ -396,7 +154,92 @@
         "description": {
           "en": "Catalog grouping only. Each step's view places fields under this heading."
         },
-        "type": "group"
+        "type": "group",
+        "fields": [
+          {
+            "id": "field_9c7e5b31-0001-4a1c-8e2f-000000000001",
+            "key": "cost_center",
+            "label": {
+              "en": "Cost Center"
+            },
+            "type": "string",
+            "options": [
+              {
+                "value": "cc_1000",
+                "label": {
+                  "en": "CC-1000 Engineering"
+                }
+              },
+              {
+                "value": "cc_2000",
+                "label": {
+                  "en": "CC-2000 Marketing"
+                }
+              },
+              {
+                "value": "cc_3000",
+                "label": {
+                  "en": "CC-3000 Operations"
+                }
+              }
+            ]
+          },
+          {
+            "id": "field_9c7e5b31-0002-4a1c-8e2f-000000000002",
+            "key": "category",
+            "label": {
+              "en": "Category"
+            },
+            "type": "string",
+            "options": [
+              {
+                "value": "it_hardware",
+                "label": {
+                  "en": "IT Hardware"
+                }
+              },
+              {
+                "value": "software_license",
+                "label": {
+                  "en": "Software License"
+                }
+              },
+              {
+                "value": "professional_services",
+                "label": {
+                  "en": "Professional Services"
+                }
+              },
+              {
+                "value": "facilities",
+                "label": {
+                  "en": "Facilities"
+                }
+              }
+            ]
+          },
+          {
+            "id": "field_9c7e5b31-0010-4a1c-8e2f-000000000010",
+            "key": "needed_by",
+            "label": {
+              "en": "Needed By"
+            },
+            "type": "string",
+            "format": "date"
+          },
+          {
+            "id": "field_9c7e5b31-0011-4a1c-8e2f-000000000011",
+            "key": "justification",
+            "label": {
+              "en": "Business Justification"
+            },
+            "type": "string",
+            "validation": {
+              "minLength": 20,
+              "maxLength": 1000
+            }
+          }
+        ]
       },
       {
         "id": "field_9c7e5b31-0024-4a1c-8e2f-000000000024",
@@ -407,7 +250,35 @@
         "description": {
           "en": "Catalog grouping only. Each step's view places fields under this heading."
         },
-        "type": "group"
+        "type": "group",
+        "fields": [
+          {
+            "id": "field_9c7e5b31-0008-4a1c-8e2f-000000000008",
+            "key": "vendor",
+            "label": {
+              "en": "Vendor"
+            },
+            "description": {
+              "en": "Options come from the approved-vendor data source. Picking a row copies its payment_terms column into the field below."
+            },
+            "type": "string",
+            "dataSource": "ds_6f2a8d47-0001-4a1c-8e2f-000000000001",
+            "columnMapping": {
+              "payment_terms": "field_9c7e5b31-0009-4a1c-8e2f-000000000009"
+            }
+          },
+          {
+            "id": "field_9c7e5b31-0009-4a1c-8e2f-000000000009",
+            "key": "payment_terms",
+            "label": {
+              "en": "Payment Terms"
+            },
+            "description": {
+              "en": "Written by the vendor field's columnMapping. Read-only everywhere a participant sees it."
+            },
+            "type": "string"
+          }
+        ]
       },
       {
         "id": "field_9c7e5b31-0025-4a1c-8e2f-000000000025",
@@ -418,7 +289,76 @@
         "description": {
           "en": "Catalog grouping only. Each step's view places fields under this heading."
         },
-        "type": "group"
+        "type": "group",
+        "fields": [
+          {
+            "id": "field_9c7e5b31-0012-4a1c-8e2f-000000000012",
+            "key": "budget_ok",
+            "label": {
+              "en": "Covered by the cost center's remaining budget"
+            },
+            "type": "boolean"
+          },
+          {
+            "id": "field_9c7e5b31-0013-4a1c-8e2f-000000000013",
+            "key": "manager_note",
+            "label": {
+              "en": "Manager Note"
+            },
+            "type": "string",
+            "validation": {
+              "maxLength": 500
+            }
+          },
+          {
+            "id": "field_9c7e5b31-0014-4a1c-8e2f-000000000014",
+            "key": "finance_note",
+            "label": {
+              "en": "Finance Note"
+            },
+            "type": "string",
+            "validation": {
+              "maxLength": 500
+            }
+          },
+          {
+            "id": "field_9c7e5b31-0015-4a1c-8e2f-000000000015",
+            "key": "rejection_reason",
+            "label": {
+              "en": "Rejection Reason"
+            },
+            "description": {
+              "en": "Fill this in when you reject. A path carries no data of its own, so a reviewer records the reason in the form before taking the reject path."
+            },
+            "type": "string",
+            "options": [
+              {
+                "value": "over_budget",
+                "label": {
+                  "en": "Over budget"
+                }
+              },
+              {
+                "value": "no_business_case",
+                "label": {
+                  "en": "No business case"
+                }
+              },
+              {
+                "value": "vendor_not_approved",
+                "label": {
+                  "en": "Vendor not approved"
+                }
+              },
+              {
+                "value": "duplicate_request",
+                "label": {
+                  "en": "Duplicate request"
+                }
+              }
+            ]
+          }
+        ]
       },
       {
         "id": "field_9c7e5b31-0026-4a1c-8e2f-000000000026",
@@ -440,7 +380,31 @@
         "description": {
           "en": "Catalog grouping only. Each step's view places fields under this heading."
         },
-        "type": "group"
+        "type": "group",
+        "fields": [
+          {
+            "id": "field_9c7e5b31-0018-4a1c-8e2f-000000000018",
+            "key": "received_quantity",
+            "label": {
+              "en": "Quantity Received"
+            },
+            "type": "number",
+            "validation": {
+              "min": 0
+            }
+          },
+          {
+            "id": "field_9c7e5b31-0019-4a1c-8e2f-000000000019",
+            "key": "receipt_note",
+            "label": {
+              "en": "Receipt Note"
+            },
+            "type": "string",
+            "validation": {
+              "maxLength": 500
+            }
+          }
+        ]
       },
       {
         "id": "field_9c7e5b31-0028-4a1c-8e2f-000000000028",
@@ -462,7 +426,20 @@
         "description": {
           "en": "Catalog grouping only. Each step's view places fields under this heading."
         },
-        "type": "group"
+        "type": "group",
+        "fields": [
+          {
+            "id": "field_9c7e5b31-0020-4a1c-8e2f-000000000020",
+            "key": "discrepancy_note",
+            "label": {
+              "en": "Discrepancy Note"
+            },
+            "type": "string",
+            "validation": {
+              "maxLength": 500
+            }
+          }
+        ]
       },
       {
         "id": "field_9c7e5b31-0030-4a1c-8e2f-000000000030",
@@ -473,7 +450,20 @@
         "description": {
           "en": "Catalog grouping only. Each step's view places fields under this heading."
         },
-        "type": "group"
+        "type": "group",
+        "fields": [
+          {
+            "id": "field_9c7e5b31-0016-4a1c-8e2f-000000000016",
+            "key": "po_number",
+            "label": {
+              "en": "PO Number"
+            },
+            "description": {
+              "en": "Written back by the ERP action, never typed by a participant."
+            },
+            "type": "string"
+          }
+        ]
       },
       {
         "id": "field_9c7e5b31-0031-4a1c-8e2f-000000000031",
@@ -484,7 +474,31 @@
         "description": {
           "en": "Catalog grouping only. Each step's view places fields under this heading."
         },
-        "type": "group"
+        "type": "group",
+        "fields": [
+          {
+            "id": "field_9c7e5b31-0021-4a1c-8e2f-000000000021",
+            "key": "invoice_number",
+            "label": {
+              "en": "Invoice Number"
+            },
+            "type": "string",
+            "validation": {
+              "maxLength": 60
+            }
+          },
+          {
+            "id": "field_9c7e5b31-0022-4a1c-8e2f-000000000022",
+            "key": "invoice_amount",
+            "label": {
+              "en": "Invoice Amount"
+            },
+            "type": "number",
+            "validation": {
+              "min": 0
+            }
+          }
+        ]
       }
     ],
     "dataSources": [
@@ -651,24 +665,27 @@
                 "ref": "field_9c7e5b31-0023-4a1c-8e2f-000000000023"
               },
               {
+                "ref": "field_9c7e5b31-0003-4a1c-8e2f-000000000003"
+              },
+              {
                 "ref": "field_9c7e5b31-0004-4a1c-8e2f-000000000004",
-                "group": "request",
+                "group": "line_item",
                 "readonly": true,
                 "span": 2
               },
               {
                 "ref": "field_9c7e5b31-0005-4a1c-8e2f-000000000005",
-                "group": "request",
+                "group": "line_item",
                 "readonly": true
               },
               {
                 "ref": "field_9c7e5b31-0006-4a1c-8e2f-000000000006",
-                "group": "request",
+                "group": "line_item",
                 "readonly": true
               },
               {
                 "ref": "field_9c7e5b31-0007-4a1c-8e2f-000000000007",
-                "group": "request",
+                "group": "line_item",
                 "readonly": true
               },
               {
@@ -825,24 +842,27 @@
                 "ref": "field_9c7e5b31-0023-4a1c-8e2f-000000000023"
               },
               {
+                "ref": "field_9c7e5b31-0003-4a1c-8e2f-000000000003"
+              },
+              {
                 "ref": "field_9c7e5b31-0004-4a1c-8e2f-000000000004",
-                "group": "request",
+                "group": "line_item",
                 "readonly": true,
                 "span": 2
               },
               {
                 "ref": "field_9c7e5b31-0005-4a1c-8e2f-000000000005",
-                "group": "request",
+                "group": "line_item",
                 "readonly": true
               },
               {
                 "ref": "field_9c7e5b31-0006-4a1c-8e2f-000000000006",
-                "group": "request",
+                "group": "line_item",
                 "readonly": true
               },
               {
                 "ref": "field_9c7e5b31-0007-4a1c-8e2f-000000000007",
-                "group": "request",
+                "group": "line_item",
                 "readonly": true
               },
               {
@@ -1107,22 +1127,25 @@
             "columns": 2,
             "fields": [
               {
-                "ref": "field_9c7e5b31-0026-4a1c-8e2f-000000000026"
+                "ref": "field_9c7e5b31-0003-4a1c-8e2f-000000000003"
               },
               {
                 "ref": "field_9c7e5b31-0004-4a1c-8e2f-000000000004",
-                "group": "ordered",
+                "group": "line_item",
                 "readonly": true,
                 "span": 2
               },
               {
                 "ref": "field_9c7e5b31-0005-4a1c-8e2f-000000000005",
-                "group": "ordered",
+                "group": "line_item",
                 "readonly": true
               },
               {
+                "ref": "field_9c7e5b31-0030-4a1c-8e2f-000000000030"
+              },
+              {
                 "ref": "field_9c7e5b31-0016-4a1c-8e2f-000000000016",
-                "group": "ordered",
+                "group": "order",
                 "readonly": true
               },
               {
@@ -1232,21 +1255,24 @@
             "columns": 2,
             "fields": [
               {
-                "ref": "field_9c7e5b31-0028-4a1c-8e2f-000000000028"
+                "ref": "field_9c7e5b31-0003-4a1c-8e2f-000000000003"
               },
               {
                 "ref": "field_9c7e5b31-0005-4a1c-8e2f-000000000005",
-                "group": "ordered_vs_received",
+                "group": "line_item",
                 "readonly": true
               },
               {
+                "ref": "field_9c7e5b31-0027-4a1c-8e2f-000000000027"
+              },
+              {
                 "ref": "field_9c7e5b31-0018-4a1c-8e2f-000000000018",
-                "group": "ordered_vs_received",
+                "group": "receipt",
                 "readonly": true
               },
               {
                 "ref": "field_9c7e5b31-0019-4a1c-8e2f-000000000019",
-                "group": "ordered_vs_received",
+                "group": "receipt",
                 "readonly": true,
                 "span": 2
               },
@@ -1314,18 +1340,24 @@
                 "readonly": true
               },
               {
+                "ref": "field_9c7e5b31-0024-4a1c-8e2f-000000000024"
+              },
+              {
                 "ref": "field_9c7e5b31-0009-4a1c-8e2f-000000000009",
-                "group": "order",
+                "group": "vendor_section",
                 "readonly": true
               },
               {
+                "ref": "field_9c7e5b31-0003-4a1c-8e2f-000000000003"
+              },
+              {
                 "ref": "field_9c7e5b31-0005-4a1c-8e2f-000000000005",
-                "group": "order",
+                "group": "line_item",
                 "readonly": true
               },
               {
                 "ref": "field_9c7e5b31-0006-4a1c-8e2f-000000000006",
-                "group": "order",
+                "group": "line_item",
                 "readonly": true
               },
               {
