@@ -134,8 +134,8 @@ override-row list's `↑`/`↓` buttons already express.
 The canvas SHALL draw a group's placed members inside that group's own
 card. An entry with no `group` sits at the form's root. A group card
 draws the entries naming its key, in the view array's order. That is
-the nesting `form-ui` already renders, so the canvas and the preview
-beside it agree on sight.
+the nesting `form-ui` already renders. The canvas and the preview beside it
+then agree on sight, for every draft a publish accepts.
 
 A group field's own member fields SHALL show at the same column count
 as the form around them. That matches how `form-ui` lays a group out
@@ -187,6 +187,12 @@ the form's root. Three drafts hold one:
 
 The checks rail reports each of those, so the canvas SHALL show the entry
 rather than hide it.
+
+The preview beside the canvas drops such an entry instead. `form-ui` reads a
+`group` for truth rather than resolving it against the cards the view carries.
+The entry then matches no root filter, and no group's own filter either. That
+divergence reaches no publishable draft. It is the one case where the canvas
+deliberately shows more than the preview.
 
 #### Scenario: An entry naming an unknown group draws at the root
 
