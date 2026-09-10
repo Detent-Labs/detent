@@ -1291,11 +1291,51 @@ describe("compile: a view entry's group names a group field the view carries", (
 
   it("reads an empty group as no group, the way the renderer does", () => {
     // `!entry.group` is true for "", so form-ui already draws such an entry at
-    // the form's root. Rejecting it would refuse a body that renders. The
-    // empty-group carve-out reaches the parentage half too: field_amount's
-    // true catalog parent is "person", yet an empty group still publishes.
-    const b = grouped([{ ref: "field_amount", group: "" }]);
+    // the form's root. That is lawful only when the catalog agrees:
+    // baseBody's `field_amount` sits at the top level (unlike this describe
+    // block's own `grouped()` catalog, where it is nested), so an empty
+    // group here matches its real catalog parent, "no group at all".
+    const b: any = baseBody();
+    b.workflow.steps[0].view = { fields: [{ ref: "field_amount", group: "" }] };
     expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
+  });
+
+  it("rejects a grouped field whose entry names no group", () => {
+    // The half binds in both directions: field_amount's catalog parent is
+    // "person", so its entry must declare it. Omitting `group` entirely
+    // would otherwise let a hand-authored body lift the field onto the
+    // form's root while the catalog still holds it in a group.
+    const err = rejects(grouped([{ ref: "field_person" }, { ref: "field_amount" }]));
+    expect(err.issues.some((i) => i.loc === "steps[0].view.fields[1].group")).toBe(true);
+    expect(err.message).toContain('"person"');
+  });
+
+  it("rejects a grouped field whose entry carries an empty group", () => {
+    // Same violation as the absent-group case above, authored the other way.
+    const err = rejects(grouped([{ ref: "field_person" }, { ref: "field_amount", group: "" }]));
+    expect(err.issues.some((i) => i.loc === "steps[0].view.fields[1].group")).toBe(true);
+    expect(err.message).toContain('"person"');
+  });
+
+  it("exempts a child of a key-less group; the field-key grammar fails the body anyway", () => {
+    // A group whose own `key` is empty gives its children nothing to name,
+    // so `parentGroupKeyById` maps them to "" too, and an absent `group` on
+    // their own entry agrees with that. This check must report nothing for
+    // field_child — the body still fails to publish, but on
+    // checkFieldKeyFormat's own empty-key rejection, not this check.
+    const b: any = baseBody();
+    b.fields = [
+      {
+        id: "field_group",
+        key: "",
+        label: { en: "Group" },
+        type: "group",
+        fields: [{ id: "field_child", key: "child", label: { en: "Child" }, type: "string" }],
+      },
+    ];
+    b.workflow.steps[0].view = { fields: [{ ref: "field_group" }, { ref: "field_child" }] };
+    const err = rejects(b);
+    expect(err.issues.some((i) => i.loc === "steps[0].view.fields[1].group")).toBe(false);
   });
 
   it("still rejects a second step that leaves the container out", () => {
