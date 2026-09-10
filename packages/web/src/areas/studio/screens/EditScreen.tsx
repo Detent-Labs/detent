@@ -41,7 +41,7 @@ import {
 } from "../canvas/geometry.js";
 import { type StepGroup } from "../canvas/groups.js";
 import { arrangeSteps, hasHandPlacedStep } from "../canvas/arrange.js";
-import { autoPlaceSteps, type LayoutStep } from "../canvas/layout.js";
+import { drawnPositions, isPoint, type LayoutStep } from "../canvas/layout.js";
 import { newStep, type StepKind } from "../draft/createStep.js";
 import { addToDraftArray } from "../draft/draft-array-crud.js";
 import { insertOnPath } from "../draft/insertOnPath.js";
@@ -373,13 +373,12 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, go, initial
   // The second reserved key in that same blob. A malformed entry reads as no
   // waypoints rather than failing the render, the rule `canvasEdgeStyle`
   // already follows: a draft saved by a later version must still draw.
-  const isLayoutPoint = (v: unknown): v is Point =>
-    !!v && typeof (v as Point).x === "number" && typeof (v as Point).y === "number";
+  // `isPoint` is that same guard, and `canvas/layout.ts` is its one home.
   const waypoints: Record<string, Point[]> = {};
   const storedWaypoints = saveState.layout.waypoints;
   if (storedWaypoints && typeof storedWaypoints === "object") {
     for (const [pathId, list] of Object.entries(storedWaypoints as Record<string, unknown>)) {
-      if (Array.isArray(list) && list.every(isLayoutPoint)) waypoints[pathId] = list;
+      if (Array.isArray(list) && list.every(isPoint)) waypoints[pathId] = list;
     }
   }
 
@@ -678,21 +677,14 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, go, initial
     const svg = body?.querySelector<SVGSVGElement>("svg");
     if (!rect || !svg) return; // the canvas is not on screen — no placement
     const centre = snapToGrid(svgPointFromClient(svg, rect.left + rect.width / 2, rect.top + rect.height / 2));
-    // Every step's RESOLVED position, not the stored blob alone (design D2). A
-    // step the steps rail's foot created and nobody dragged carries no stored
-    // entry, and `CanvasView` still draws it, through `autoPlaceSteps`. The
-    // two sources resolve in the order `CanvasView.positionOf` resolves them,
-    // so the press tests against the nodes an author can see. Walking the
-    // draft's own steps also leaves the blob's reserved keys — `waypoints`,
-    // `groups` and `canvasEdgeStyle` — out: none of the three is a step id.
-    const autoPlaced = autoPlaceSteps(steps as LayoutStep[], draft.workflow?.initialStep, saveState.layout);
-    const placed: NodePosition[] = [];
-    for (const s of steps) {
-      if (s.id === undefined) continue;
-      const stored = saveState.layout[s.id];
-      const at = isLayoutPoint(stored) ? stored : (autoPlaced[s.id] ?? { x: 0, y: 0 });
-      placed.push({ id: s.id, x: at.x, y: at.y });
-    }
+    // The drawn positions, not the stored blob alone (design D2). A step the
+    // steps rail's foot created and nobody dragged has no stored entry, and
+    // `CanvasView` draws it anyway. `drawnPositions` is the one home of that
+    // resolution, and `CanvasView.positionOf` reads the same function, so the
+    // press tests against exactly the nodes an author can see. Its record is
+    // keyed by step id alone, so the blob's reserved keys stay out of it.
+    const drawn = drawnPositions(steps as LayoutStep[], draft.workflow?.initialStep, saveState.layout);
+    const placed: NodePosition[] = Object.entries(drawn).map(([id, at]) => ({ id, x: at.x, y: at.y }));
     const point = freeLatticePoint(centre, placed);
     const created = newStep(kind, seedLocalizedText(contentLocale));
     appendStep(created);
