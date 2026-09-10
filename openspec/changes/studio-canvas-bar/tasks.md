@@ -1,13 +1,13 @@
 ## 1. Worktree setup
 
-- [ ] 1.1 Run `/impeccable hooks on` in this worktree. The detector hook lives
+- [x] 1.1 Run `/impeccable hooks on` in this worktree. The detector hook lives
   in an ignored settings file, so a fresh checkout has none.
 
 ## 2. Reachability
 
-- [ ] 2.1 Export `reachableStepIds(steps, initialStep)` from
+- [x] 2.1 Export `reachableStepIds(steps, initialStep)` from
   `draft/registerOrder.ts`. Have `registerOrder` call it, per design D7.
-- [ ] 2.2 Extend `studio-registerOrder.test.ts`. Assert an unreached terminal
+- [x] 2.2 Extend `studio-registerOrder.test.ts`. Assert an unreached terminal
   step stays out of the returned set.
 
 ## 3. Placement on a press
@@ -51,8 +51,8 @@
   `newStepPhrase`. Follow `assignmentStrategyLabel`'s name and note pair.
 - [ ] 6.2 Add the bar's keys to the English studio catalog. Cover the button,
   the caret, the two menu entries and their notes.
-- [ ] 6.3 Add the key naming an unconnected step. Add the German entries for
-  every new key.
+- [ ] 6.3 Add the key naming an unconnected step, and the caret button's own
+  accessible name. The studio catalog ships English alone.
 - [ ] 6.4 Drop the palette's own heading key. Verify
   `i18n-catalog-parity.test.ts` passes.
 
