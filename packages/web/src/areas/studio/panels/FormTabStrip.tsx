@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type KeyboardEvent } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { t } from "../catalog.js";
@@ -13,6 +13,33 @@ import type { DraftViewTab } from "../draft/view-layout";
  * already emits for the same tab keys. */
 export const formTabDomId = (key: string) => `studio-form-tab-${key}`;
 export const formTabPanelDomId = (key: string) => `studio-form-tabpanel-${key}`;
+
+/**
+ * The tab a focus-moving key press moves focus to, as an index into the drawn
+ * strip; `undefined` for a key the strip leaves alone. Arrow keys wrap at the
+ * row's ends, and `Home` and `End` jump to it.
+ *
+ * Focus moves alone: `Enter` and `Space` are what open a tab, and a
+ * `<button>` turns both into the click this strip listens for. These four
+ * keys are a convenience OVER the plain-button pattern, not the
+ * roving-tabindex variant (`form-ui`'s own strip spec) — every tab here stays
+ * tabbable, and no tab carries a `tabIndex`.
+ *
+ * A copy of `packages/form-ui/src/FieldForm.tsx`'s own `nextTabIndex`, which
+ * the package does not export. The two strips share the tokens and no code:
+ * the dependency direction forbids `form-ui` importing from `packages/web`,
+ * and design.md accepts that cost for one tab language. Extracted here for
+ * the same reason it is extracted there — this repo ships no DOM test
+ * library, so no test can fire the event that calls it.
+ */
+export function nextTabIndex(key: string, from: number, count: number): number | undefined {
+  if (count === 0 || from < 0 || from >= count) return undefined;
+  if (key === "ArrowRight") return (from + 1) % count;
+  if (key === "ArrowLeft") return (from - 1 + count) % count;
+  if (key === "Home") return 0;
+  if (key === "End") return count - 1;
+  return undefined;
+}
 
 const styles = stylex.create({
   // The row wraps rather than scrolling sideways: a form's own tabs are few,
@@ -120,10 +147,24 @@ export function FormTabStrip({ tabs, open, contentLocale, baseLocale, onOpen, on
   const openTab = openIndex === -1 ? undefined : drawn[openIndex];
   const renamingOpen = openTab !== undefined && renaming === openTab.key;
 
+  // Arrow keys, `Home` and `End` move focus alone; a `<button>`'s own `Enter`
+  // and `Space` handling is what opens the focused tab. The participant's
+  // strip answers the same four keys, so one area holds one behavior.
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    const buttons = Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+    const from = buttons.findIndex((b) => b === e.target || b.contains(e.target as Node));
+    const next = nextTabIndex(e.key, from, buttons.length);
+    if (next === undefined) return;
+    // `preventDefault` on the four handled keys alone, so a wrapped row's own
+    // scroll does not fire beside the focus move.
+    e.preventDefault();
+    buttons[next]?.focus();
+  };
+
   return (
     <div {...stylex.props(styles.row)}>
       {drawn.length > 0 && (
-        <div {...stylex.props(styles.tabs)} role="tablist" aria-label={t("formEditor.tabRowLabel")}>
+        <div {...stylex.props(styles.tabs)} role="tablist" aria-label={t("formEditor.tabRowLabel")} onKeyDown={onKeyDown}>
           {drawn.map((tab) => {
             const selected = tab.key === open;
             return (

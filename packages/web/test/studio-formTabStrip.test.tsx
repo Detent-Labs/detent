@@ -1,6 +1,7 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { FormTabStrip } from "../src/areas/studio/panels/FormTabStrip.js";
+import { FormTabStrip, nextTabIndex } from "../src/areas/studio/panels/FormTabStrip.js";
 import type { DraftViewTab } from "../src/areas/studio/draft/view-layout.js";
 
 /**
@@ -99,5 +100,92 @@ describe("the form's tab strip", () => {
     // open tab. A member-less strip is the case with no tab to rename.
     expect(render(TABS, "t1")).toContain("Rename");
     expect(render([])).not.toContain("Rename");
+  });
+});
+
+/**
+ * form-view-tabs fix round 1: the strip answers the same four focus-moving
+ * keys the participant's strip answers (`form-ui`'s own spec: "Arrow keys,
+ * `Home` and `End` SHALL move focus between tabs without opening one. They
+ * are a convenience over the plain-button pattern, not the roving-tabindex
+ * variant: every tab stays tabbable"). Without them one area would hold two
+ * tab strips answering one key differently.
+ *
+ * `nextTabIndex` carries the whole decision, so a test reaches it without a
+ * DOM. What it cannot reach is whether the `tablist` calls it, which is the
+ * defect a pure test alone would miss — the last describe reads the source
+ * for that, the way `form-tab-switch-effect.test.ts` checks its own call site.
+ */
+describe("nextTabIndex moves focus without opening a tab", () => {
+  it("steps right and left", () => {
+    expect(nextTabIndex("ArrowRight", 0, 3)).toBe(1);
+    expect(nextTabIndex("ArrowLeft", 2, 3)).toBe(1);
+  });
+
+  it("wraps at both ends of the row", () => {
+    expect(nextTabIndex("ArrowRight", 2, 3)).toBe(0);
+    expect(nextTabIndex("ArrowLeft", 0, 3)).toBe(2);
+  });
+
+  it("jumps to either end on Home and End", () => {
+    expect(nextTabIndex("Home", 2, 3)).toBe(0);
+    expect(nextTabIndex("End", 0, 3)).toBe(2);
+  });
+
+  it("leaves every other key alone, so typing reaches whatever else listens", () => {
+    expect(nextTabIndex("Enter", 0, 3)).toBeUndefined();
+    expect(nextTabIndex(" ", 0, 3)).toBeUndefined();
+    expect(nextTabIndex("ArrowDown", 0, 3)).toBeUndefined();
+    expect(nextTabIndex("a", 0, 3)).toBeUndefined();
+  });
+
+  it("answers nothing for an event from outside the row, or from an empty one", () => {
+    // `from` is -1 when the key came from anything but one of the tabs.
+    expect(nextTabIndex("ArrowRight", -1, 3)).toBeUndefined();
+    expect(nextTabIndex("ArrowRight", 3, 3)).toBeUndefined();
+    expect(nextTabIndex("Home", 0, 0)).toBeUndefined();
+  });
+
+  it("agrees with form-ui's own copy, key for key", () => {
+    // The two strips answer one key one way. This repo forbids `form-ui`
+    // importing from `packages/web`, and the package exports no helper, so
+    // the behavior is duplicated on purpose and compared here instead.
+    const theirs = readFileSync(new URL("../../form-ui/src/FieldForm.tsx", import.meta.url).pathname, "utf8");
+    const body = theirs.slice(theirs.indexOf("export function nextTabIndex"));
+
+    expect(body).toContain('if (key === "ArrowRight") return (from + 1) % count;');
+    expect(body).toContain('if (key === "ArrowLeft") return (from - 1 + count) % count;');
+    expect(body).toContain('if (key === "Home") return 0;');
+    expect(body).toContain('if (key === "End") return count - 1;');
+  });
+});
+
+/**
+ * The opening tag carrying `role="tablist"` in `source`, as raw text. Throws
+ * when there is none: a strip that stops declaring a tablist should fail
+ * loudly here, not read as a pass.
+ */
+function tablistTag(source: string): string {
+  const at = source.indexOf('role="tablist"');
+  if (at === -1) throw new Error("FormTabStrip: no tablist found");
+  const open = source.lastIndexOf("<", at);
+  const close = source.indexOf(">", at);
+  if (open === -1 || close === -1) throw new Error("FormTabStrip: no element around the tablist");
+  return source.slice(open, close + 1);
+}
+
+describe("the tablist's own key handler", () => {
+  const source = readFileSync(new URL("../src/areas/studio/panels/FormTabStrip.tsx", import.meta.url).pathname, "utf8");
+
+  it("sits on the tablist, so the four keys reach the tabs inside it", () => {
+    // A pure `nextTabIndex` that nothing calls would pass every test above.
+    expect(tablistTag(source)).toContain("onKeyDown={onKeyDown}");
+  });
+
+  it("reports a tablist that carries no handler, rather than reading one as a pass", () => {
+    const bare = '<div {...stylex.props(styles.tabs)} role="tablist" aria-label={t("formEditor.tabRowLabel")}>';
+
+    expect(tablistTag(bare)).not.toContain("onKeyDown");
+    expect(() => tablistTag("export function X() { return null; }")).toThrow();
   });
 });
