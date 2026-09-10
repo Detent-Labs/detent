@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import type { FieldId } from "workflow-engine/schema";
 import type { Draft } from "../src/areas/studio/draft/types";
 import type { DraftViewEntry } from "../src/areas/studio/draft/view-layout";
-import { syncViewGroupsOnFieldMove, syncViewGroupsOnGroupRename } from "../src/areas/studio/draft/view-group-sync";
+import { syncViewGroupsOnFieldMove, syncViewGroupsOnGroupKeyGained, syncViewGroupsOnGroupRename } from "../src/areas/studio/draft/view-group-sync";
 
 /** The catalog stays level with the views: the two rewrites a field-catalog
  * move and a group-key rename each owe every view entry naming the field or
@@ -69,6 +69,21 @@ describe("syncViewGroupsOnFieldMove", () => {
     const [fields] = rowsOf(draft);
     expect(fields).toEqual([ref("x", "new"), ref("other", "g")]);
   });
+
+  it("treats a destination group's still-empty key the same as no destination: removes the group key rather than writing it empty", () => {
+    // A key-less group draws no card at all (`view-tree.ts::isGroupCard`'s
+    // `!!field.key` test), so it can never be a field's named destination
+    // even where the caller's own lookup answers `""` rather than
+    // `undefined` for it (`EntityTabs.tsx`'s `moveField`, reading a
+    // `DraftField.key` still mid-edit).
+    const draft = draftOf([ref("x", "g")]);
+
+    syncViewGroupsOnFieldMove(draft, "x", "");
+
+    const [fields] = rowsOf(draft);
+    expect(fields).toEqual([ref("x")]);
+    expect("group" in fields[0]!).toBe(false);
+  });
 });
 
 describe("syncViewGroupsOnGroupRename", () => {
@@ -112,5 +127,42 @@ describe("syncViewGroupsOnGroupRename", () => {
 
     const [fields] = rowsOf(draft);
     expect(fields).toEqual([ref("a", "order_request"), ref("b", "shipping")]);
+  });
+});
+
+describe("syncViewGroupsOnGroupKeyGained", () => {
+  // The reverse direction from a rename: a group field's key going from ""
+  // to a real value. No entry could ever have named "" as this group, so
+  // its direct children's already-placed entries carry no `group` at all
+  // until now -- this is the function that gives them one, rather than
+  // stranding them the instant the parent's key becomes real
+  // (`compile.ts::checkViewGroupReferences`'s third half).
+  it("sets group on every entry naming one of the group's direct children, across three steps", () => {
+    const draft = draftOf([ref("child_a")], [ref("child_b")], [ref("child_a"), ref("child_b")]);
+
+    syncViewGroupsOnGroupKeyGained(draft, ["child_a", "child_b"], "newly_named");
+
+    const rows = rowsOf(draft);
+    expect(rows[0]).toEqual([ref("child_a", "newly_named")]);
+    expect(rows[1]).toEqual([ref("child_b", "newly_named")]);
+    expect(rows[2]).toEqual([ref("child_a", "newly_named"), ref("child_b", "newly_named")]);
+  });
+
+  it("leaves an entry naming a field outside the group's own children alone", () => {
+    const draft = draftOf([ref("child_a"), ref("unrelated")]);
+
+    syncViewGroupsOnGroupKeyGained(draft, ["child_a"], "newly_named");
+
+    const [fields] = rowsOf(draft);
+    expect(fields).toEqual([ref("child_a", "newly_named"), ref("unrelated")]);
+  });
+
+  it("touches no note: a group's own `fields` array holds catalog fields only", () => {
+    const draft = draftOf([ref("child_a"), note("About this section")]);
+
+    syncViewGroupsOnGroupKeyGained(draft, ["child_a"], "newly_named");
+
+    const [fields] = rowsOf(draft);
+    expect(fields).toEqual([ref("child_a", "newly_named"), note("About this section")]);
   });
 });
