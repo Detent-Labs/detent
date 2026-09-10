@@ -13,10 +13,12 @@ import {
   assignmentStrategyLabel,
   assignmentWord,
   isCuratedAssignmentStrategy,
+  newStepNote,
   newStepPhrase,
   stepKindPhrase,
   type AssignmentStrategyName,
 } from "../src/areas/studio/draft/guided-labels.js";
+import type { StepKind } from "../src/areas/studio/draft/createStep.js";
 
 afterEach(() => setUiStringOverrides({}));
 
@@ -105,6 +107,19 @@ describe("the step-kind phrases", () => {
     setUiStringOverrides({ studio: { en: { "stepKind.terminal": "The last step" } } });
     expect(stepKindPhrase("terminal")).toBe("The last step");
     expect(newStepPhrase("end")).toBe("The last step");
+  });
+});
+
+describe("newStepNote", () => {
+  it("answers each palette kind's own catalog note", () => {
+    expect(newStepNote("task")).toBe(studioCatalog.en["stepKindNote.participant"]);
+    expect(newStepNote("subprocess")).toBe(studioCatalog.en["stepKindNote.subprocess"]);
+    expect(newStepNote("end")).toBe(studioCatalog.en["stepKindNote.terminal"]);
+  });
+
+  it("gives the three kinds three different notes", () => {
+    const notes = new Set((["task", "subprocess", "end"] as StepKind[]).map(newStepNote));
+    expect(notes.size).toBe(3);
   });
 });
 

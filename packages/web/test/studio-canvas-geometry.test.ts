@@ -11,6 +11,7 @@ import {
   legOfSegment,
   midpointOfRoute,
   routePath,
+  freeLatticePoint,
   CLICK_THRESHOLD,
   GRID_STEP,
   NODE_WIDTH,
@@ -444,5 +445,64 @@ describe("canvas geometry: the route path", () => {
 
   it("returns an empty string for fewer than two points", () => {
     expect(routePath([{ x: 0, y: 0 }], "step")).toBe("");
+  });
+});
+
+describe("canvas geometry: a free lattice point", () => {
+  const wanted = { x: 400, y: 200 };
+
+  it("answers wanted unchanged when nothing is placed", () => {
+    expect(freeLatticePoint(wanted, [])).toEqual(wanted);
+  });
+
+  it("walks one step right of a node exactly at wanted", () => {
+    const placed = [{ id: "a", x: 400, y: 200 }];
+    expect(freeLatticePoint(wanted, placed)).toEqual({ x: 600, y: 200 });
+  });
+
+  it("walks past two nodes placed one step apart", () => {
+    const placed = [
+      { id: "a", x: 400, y: 200 },
+      { id: "b", x: 600, y: 200 },
+    ];
+    expect(freeLatticePoint(wanted, placed)).toEqual({ x: 800, y: 200 });
+  });
+
+  it("counts a shared-edge touch as an overlap", () => {
+    // Right edge of this node is exactly wanted.x, the same inclusive bound
+    // hitTestNode and nodesInRect use.
+    const placed = [{ id: "a", x: 400 - NODE_WIDTH, y: 200 }];
+    expect(freeLatticePoint(wanted, placed)).toEqual({ x: 600, y: 200 });
+  });
+
+  it("leaves wanted unchanged for a node far away on the same row", () => {
+    const placed = [{ id: "a", x: 2000, y: 200 }];
+    expect(freeLatticePoint(wanted, placed)).toEqual(wanted);
+  });
+
+  it("leaves wanted unchanged for a node at the same x, clear of it vertically", () => {
+    // Gap of 100 sits strictly between NODE_HEIGHT (60) and NODE_WIDTH (180):
+    // the real check (against NODE_HEIGHT) finds no overlap here, but a
+    // vertical comparison written against NODE_WIDTH by mistake would find
+    // one and move wanted, so this gap catches that swap where 2000 would not.
+    const placed = [{ id: "a", x: 400, y: 300 }];
+    expect(freeLatticePoint(wanted, placed)).toEqual(wanted);
+  });
+
+  it("keeps every answer on the lattice", () => {
+    const configs = [
+      [],
+      [{ id: "a", x: 400, y: 200 }],
+      [
+        { id: "a", x: 400, y: 200 },
+        { id: "b", x: 600, y: 200 },
+        { id: "c", x: 800, y: 200 },
+      ],
+    ];
+    for (const placed of configs) {
+      const answer = freeLatticePoint(wanted, placed);
+      expect(answer.x % GRID_STEP).toBe(0);
+      expect(answer.y % GRID_STEP).toBe(0);
+    }
   });
 });

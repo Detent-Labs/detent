@@ -38,8 +38,8 @@ const styles = stylex.create({
   // Instance access frames its own controls, and did so with the UA's `2px
   // groove` until `global.css` cleared it for every fieldset. The frame is
   // this screen's own intent, so it states it: the 1px hairline in the
-  // border role, the same rule `canvasInspector` and the migration editor's
-  // map section carry.
+  // border role, the same rule `EditScreen`'s `canvasRegion` and the migration
+  // editor's map section carry.
   panel: {
     borderWidth: 1,
     borderStyle: "solid",
