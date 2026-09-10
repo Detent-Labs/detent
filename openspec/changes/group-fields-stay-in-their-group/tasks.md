@@ -50,6 +50,7 @@ tree.
 - [x] 5.7 Leave a note's own `group` alone on a move; a move has no note to carry
 - [x] 5.8 Unit-test both rewrites across three steps, plus the top-level and note cases
 - [x] 5.9 Correct `moveFieldToGroup`'s doc comment; it states the old no-view-change rule
+- [ ] 5.10 Move the pair, not the tree, in `studio-fieldCatalogLogic.test.ts`'s example block
 
 ## 6. The editor screen
 
@@ -61,7 +62,7 @@ tree.
 - [ ] 6.6 Make a group card's remove control destructive, labelled with its member count
 - [ ] 6.7 Remove the `group` select from `FormEditorStrip`; leave `NoteEditorStrip` alone
 - [ ] 6.8 Keep `formEditor.group` and `formEditor.noGroup`; the note strip still reads both
-- [ ] 6.9 Add the new studio catalog keys to both `en` and `de`
+- [ ] 6.9 Add the new studio catalog keys; that catalog ships `en` alone by an earlier decision
 
 ## 7. Docs and rules
 
