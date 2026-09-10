@@ -1,7 +1,7 @@
 import type { BaseFieldType, FieldFormat, FieldOption, LocalizedText } from "workflow-engine/schema";
-import type { ResolvedViewEntry, ResolvedViewField } from "form-ui";
+import type { ResolvedViewEntry, ResolvedViewField, ResolvedViewTab } from "form-ui";
 import { flattenDraftFields, type DraftField } from "./fields";
-import { isDraftViewField, type DraftViewEntry } from "./view-layout";
+import { isDraftViewField, type DraftView, type DraftViewTab } from "./view-layout";
 import { resolveDraftLocalizedText, type DraftLocalizedText } from "./localized-text";
 
 /** `text` resolved to a single entry keyed by `locale`, falling back to
@@ -13,6 +13,16 @@ import { resolveDraftLocalizedText, type DraftLocalizedText } from "./localized-
  * a multi-language draft under the studio's own `contentLocale`. */
 function resolvedLabel(text: DraftLocalizedText, locale: string, baseLocale: string): LocalizedText {
   return { [locale]: resolveDraftLocalizedText(text, locale, baseLocale) ?? "" };
+}
+
+/** The draft's tab strip, resolved for the content locale the same way a
+ * note's `text` is above. A tab mid-mint with no `key` yet resolves to
+ * nothing: `form-ui`'s `ResolvedViewTab.key` is required, and no entry can
+ * name an unminted tab anyway. */
+function resolvedTabs(tabs: DraftViewTab[] | undefined, locale: string, baseLocale: string): ResolvedViewTab[] {
+  return (tabs ?? [])
+    .filter((tab) => !!tab.key)
+    .map((tab) => ({ key: tab.key!, label: resolvedLabel(tab.label, locale, baseLocale) }));
 }
 
 /** One sample value per format, for the "How it will look" preview. A format
@@ -163,13 +173,18 @@ export function previewViewFields(
  * engine's own overrides on a group (neither) and a technical field
  * (readonly, never required). An expression reads as the engine's default,
  * so a preview never asserts a value only the runtime can resolve.
+ *
+ * Also returns the draft's own tab strip, resolved for `contentLocale`
+ * beside `entries` and `values` — `form-ui`'s `drawnTabs`/`firstTabWithIssue`
+ * and the `FieldForm` tab props all read entries and tabs together, so the
+ * caller needs both from one call.
  */
 export function previewViewEntries(
-  view: { fields?: DraftViewEntry[] } | undefined,
+  view: DraftView | undefined,
   fields: DraftField[],
   contentLocale: string,
   baseLocale: string,
-): { entries: ResolvedViewEntry[]; values: Record<string, unknown> } {
+): { entries: ResolvedViewEntry[]; values: Record<string, unknown>; tabs: ResolvedViewTab[] } {
   const byId = new Map(flattenDraftFields(fields).filter((f) => f.id !== undefined).map((f) => [f.id!, f]));
   const entries: ResolvedViewEntry[] = [];
   const values: Record<string, unknown> = {};
@@ -177,7 +192,13 @@ export function previewViewEntries(
   for (const raw of view?.fields ?? []) {
     if (raw.visible === false) continue;
     if (!isDraftViewField(raw)) {
-      entries.push({ kind: "note", text: resolvedLabel(raw.text, contentLocale, baseLocale), group: raw.group, span: raw.span });
+      entries.push({
+        kind: "note",
+        text: resolvedLabel(raw.text, contentLocale, baseLocale),
+        group: raw.group,
+        tab: raw.tab,
+        span: raw.span,
+      });
       continue;
     }
     const field = raw.ref === undefined ? undefined : byId.get(raw.ref);
@@ -189,10 +210,11 @@ export function previewViewEntries(
       ...synthesized,
       required: group || technical ? false : raw.required === true,
       readonly: group ? false : technical ? true : raw.readonly === true,
+      tab: raw.tab,
       span: raw.span,
     });
     values[field.id] = synthesized.value;
   }
 
-  return { entries, values };
+  return { entries, values, tabs: resolvedTabs(view?.tabs, contentLocale, baseLocale) };
 }
