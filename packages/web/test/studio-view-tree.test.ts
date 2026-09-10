@@ -4,7 +4,10 @@ import type { DraftField } from "../src/areas/studio/draft/fields";
 import { isDraftViewField, type DraftViewEntry } from "../src/areas/studio/draft/view-layout";
 import {
   draftParentGroupKeyById,
+  dragScopeByIndex,
   insertGroupedField,
+  isLawfulCardDrop,
+  landedIndex,
   nudgeViewField,
   removeViewEntry,
   viewTree,
@@ -361,5 +364,103 @@ describe("draftParentGroupKeyById maps a field id to its parent group's key, dra
       fields: [leaf("field_x", "x")],
     };
     expect(draftParentGroupKeyById([changedKind]).has(id("field_x"))).toBe(false);
+  });
+});
+
+/**
+ * `dragScopeByIndex` and `isLawfulCardDrop` are the whole task-6.5 refusal
+ * mechanism, extracted out of `FormEditorScreen.tsx` (fix round 1): a pure
+ * function of the tree, an index and a scope belongs where a unit test
+ * reaches it, the same reasoning the brief already applied to
+ * `insertGroupedField`'s own slot decision.
+ */
+describe("dragScopeByIndex maps every row to the scope its own edges answer to", () => {
+  const catalog = [group("group_g", "g", [leaf("field_x", "x"), leaf("field_y", "y")])];
+  const rows = [
+    ref("root1"), // 0: root
+    ref("group_g"), // 1: the group's own card -- sits at the ROOT's scope, not its inner key
+    ref("field_x", "g"), // 2: member, scope "g"
+    ref("root2"), // 3: root
+    ref("field_y", "g"), // 4: member, scope "g"
+  ];
+  const scopeByIndex = dragScopeByIndex(rows, catalog);
+
+  it("gives a root entry no scope", () => {
+    expect(scopeByIndex.get(0)).toBeUndefined();
+    expect(scopeByIndex.get(3)).toBeUndefined();
+  });
+
+  it("gives a group's own card the scope of the level it sits at, not its own key", () => {
+    expect(scopeByIndex.get(1)).toBeUndefined();
+  });
+
+  it("gives each member its group's own key", () => {
+    expect(scopeByIndex.get(2)).toBe("g");
+    expect(scopeByIndex.get(4)).toBe("g");
+  });
+
+  it("gives a nested group's own card the OUTER group's key, and its members the INNER key", () => {
+    const nestedCatalog = [group("group_outer", "outer", [group("group_inner", "inner", [leaf("field_z", "z")])])];
+    const nestedRows = [ref("group_outer"), ref("group_inner", "outer"), ref("field_z", "inner")];
+    const nested = dragScopeByIndex(nestedRows, nestedCatalog);
+    expect(nested.get(0)).toBeUndefined();
+    expect(nested.get(1)).toBe("outer");
+    expect(nested.get(2)).toBe("inner");
+  });
+});
+
+describe("isLawfulCardDrop reads the task-6.5 refusal rule off a scope map", () => {
+  const catalog = [group("group_g", "g", [leaf("field_x", "x"), leaf("field_y", "y")])];
+  const rows = [ref("root1"), ref("group_g"), ref("field_x", "g"), ref("root2"), ref("field_y", "g")];
+  const scopeByIndex = dragScopeByIndex(rows, catalog);
+
+  it("refuses a member dragged to a root slot", () => {
+    expect(isLawfulCardDrop(scopeByIndex, 2, undefined)).toBe(false);
+  });
+
+  it("allows a member dragged to a sibling's edge inside its own group", () => {
+    expect(isLawfulCardDrop(scopeByIndex, 2, "g")).toBe(true);
+  });
+
+  it("refuses a root dragged to a slot inside a group", () => {
+    expect(isLawfulCardDrop(scopeByIndex, 0, "g")).toBe(false);
+  });
+
+  it("allows a group card dragged among the roots", () => {
+    expect(isLawfulCardDrop(scopeByIndex, 1, undefined)).toBe(true);
+  });
+});
+
+/**
+ * `landedIndex` is the fix for the stale `setSelected(rowIndex + delta)`
+ * line group 4 flagged and group 6 left for a later fix round to extract:
+ * where a moved entry ends up, read off the array the move returned rather
+ * than assumed as a fixed offset.
+ */
+describe("landedIndex reads a moved entry's new position off the array a move returned", () => {
+  it("finds an entry that moved forward", () => {
+    const rows: DraftViewEntry[] = [ref("a"), ref("b"), ref("c")];
+    const next = [rows[1]!, rows[0]!, rows[2]!];
+    expect(landedIndex(rows, next, 0)).toBe(1);
+  });
+
+  it("finds a root entry that stepped over a whole group's footprint, landing more than one position away", () => {
+    const catalog = [group("group_g", "g")];
+    const rows = [ref("root1"), ref("group_g"), ref("x", "g"), ref("y", "g"), ref("z", "g"), ref("root2")];
+    const next = nudgeViewField(rows, 0, 1, catalog);
+    expect(landedIndex(rows, next, 0)).toBe(4);
+  });
+
+  it("is undefined for an out-of-range index", () => {
+    const rows: DraftViewEntry[] = [ref("a")];
+    expect(landedIndex(rows, rows, -1)).toBeUndefined();
+    expect(landedIndex(rows, rows, 1)).toBeUndefined();
+  });
+
+  it("is undefined when the entry is no longer present in the returned array", () => {
+    const catalog: DraftField[] = [];
+    const rows = [ref("a"), ref("b")];
+    const next = removeViewEntry(rows, 0, catalog);
+    expect(landedIndex(rows, next, 0)).toBeUndefined();
   });
 });
