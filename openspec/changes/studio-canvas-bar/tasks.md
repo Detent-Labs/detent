@@ -58,11 +58,11 @@
 
 ## 7. Tests
 
-- [ ] 7.1 Add a render test for the bar. Assert the four selection states each
+- [x] 7.1 Add a render test for the bar. Assert the four selection states each
   render at one height.
-- [ ] 7.2 Assert the menu opens, and that Escape closes it and returns focus
+- [x] 7.2 Assert the menu opens, and that Escape closes it and returns focus
   to the button.
-- [ ] 7.3 Assert the reachability report stands for one selected step alone.
+- [x] 7.3 Assert the reachability report stands for one selected step alone.
   Cover the unreached case and the reached one.
 - [x] 7.4 Extend `studio-guidedLabels.test.ts`. Assert a note comes back for
   each of the three kinds.

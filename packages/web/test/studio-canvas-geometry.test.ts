@@ -480,8 +480,12 @@ describe("canvas geometry: a free lattice point", () => {
     expect(freeLatticePoint(wanted, placed)).toEqual(wanted);
   });
 
-  it("leaves wanted unchanged for a node at the same x but well below", () => {
-    const placed = [{ id: "a", x: 400, y: 2000 }];
+  it("leaves wanted unchanged for a node at the same x, clear of it vertically", () => {
+    // Gap of 100 sits strictly between NODE_HEIGHT (60) and NODE_WIDTH (180):
+    // the real check (against NODE_HEIGHT) finds no overlap here, but a
+    // vertical comparison written against NODE_WIDTH by mistake would find
+    // one and move wanted, so this gap catches that swap where 2000 would not.
+    const placed = [{ id: "a", x: 400, y: 300 }];
     expect(freeLatticePoint(wanted, placed)).toEqual(wanted);
   });
 
