@@ -28,7 +28,7 @@
 
 ## 2. The spec delta
 
-- [ ] 2.1 Apply this change's delta to
+- [x] 2.1 Apply this change's delta to
       `openspec/specs/push-gate-checks/spec.md`. Append the requirement
       "The `ponytail:` marker is the deferral record" after the last
       requirement, at the end of the file. Verify:
@@ -142,12 +142,12 @@
 
 ## 5. Verification
 
-- [ ] 5.1 Run `bun run typecheck` in the devcontainer and confirm it exits 0. It
+- [x] 5.1 Run `bun run typecheck` in the devcontainer and confirm it exits 0. It
       proves the `src/pagination.ts` comment change broke no code. Then run
       `git status --porcelain -- src packages test` and confirm one entry,
       `src/pagination.ts`.
-- [ ] 5.2 Run `bun run build` in the devcontainer and confirm it exits 0.
-- [ ] 5.3 Run the full `bun test` in the devcontainer with `DATABASE_URL` set,
+- [x] 5.2 Run `bun run build` in the devcontainer and confirm it exits 0.
+- [x] 5.3 Run the full `bun test` in the devcontainer with `DATABASE_URL` set,
       and confirm 0 failures. Read the verdict off a named failure, never off a
       pass count. Capture the run and hand the capture to the gate:
       `bun test 2>&1 | tee /tmp/t.log; sh scripts/gates/silent-green.sh /tmp/t.log`.
