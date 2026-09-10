@@ -26,7 +26,7 @@ the keyboard move reach it. Until now nothing tied that write to
 - One answer to "which group holds this field", readable from the catalog
   alone.
 - A canvas whose nesting matches the preview beside it, without reading the
-  preview.
+  preview, for every draft a publish accepts.
 - A move gesture that cannot express something the publish rejects.
 
 **Non-Goals:**

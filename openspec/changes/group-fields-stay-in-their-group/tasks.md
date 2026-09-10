@@ -26,15 +26,15 @@ tree.
 
 ## 4. The canvas tree
 
-- [ ] 4.1 Add a pure tree builder beside `view-layout.ts`, keyed on each entry's array index
-- [ ] 4.2 Roots are entries with no `group`; a group node holds the entries naming its key
-- [ ] 4.3 An entry whose `group` resolves to no group card draws as a root, never hidden
-- [ ] 4.4 A field under a key-less group draws as a root; draw no card for that group
-- [ ] 4.5 Unit-test an interleaved array, a nested group and a group with no members
-- [ ] 4.6 Replace `nudgeViewField` with a sibling swap, scoped by the entry's own group
-- [ ] 4.7 Unit-test the swap at both bounds, and a root swap stepping past a whole group
-- [ ] 4.8 Add a cascading remove: a group entry takes every entry naming its key
-- [ ] 4.9 Add a group-aware insert: it sets `group` and places the group entry when absent
+- [x] 4.1 Add a pure tree builder beside `view-layout.ts`, keyed on each entry's array index
+- [x] 4.2 Roots are entries with no `group`; a group node holds the entries naming its key
+- [x] 4.3 An entry whose `group` resolves to no group card draws as a root, never hidden
+- [x] 4.4 A field under a key-less group draws as a root; draw no card for that group
+- [x] 4.5 Unit-test an interleaved array, a nested group and a group with no members
+- [x] 4.6 Replace `nudgeViewField` with a sibling swap, scoped by the entry's own group
+- [x] 4.7 Unit-test the swap at both bounds, and a root swap stepping past a whole group
+- [x] 4.8 Add a cascading remove: a group entry takes every entry naming its key
+- [x] 4.9 Add a group-aware insert: it sets `group` and places the group entry when absent
 
 ## 5. The catalog stays level with the views
 
