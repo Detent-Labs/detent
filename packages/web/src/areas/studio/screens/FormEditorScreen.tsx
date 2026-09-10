@@ -14,12 +14,12 @@ import {
   insertViewNote,
   isDraftViewField,
   moveViewField,
-  nudgeViewField,
   unplacedRefs,
   type DraftViewEntry,
   type DraftViewField,
   type DropSide,
 } from "../draft/view-layout";
+import { nudgeViewField } from "../draft/view-tree";
 import { PALETTE_FIELD_KINDS, mintCatalogField, type PaletteFieldKind } from "../draft/mintField";
 import { seedLocalizedText, missingTranslationWarning, resolveDraftLocalizedText, type DraftLocalizedText } from "../draft/localized-text";
 import { BooleanOrExpressionInput } from "../panels/shared/BooleanOrExpressionInput";
@@ -746,7 +746,7 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
   };
 
   const move = (rowIndex: number, delta: -1 | 1) => {
-    const next = nudgeViewField(rows, rowIndex, delta);
+    const next = nudgeViewField(rows, rowIndex, delta, fields);
     if (next === rows) return;
     setRows(next);
     setSelected(rowIndex + delta);
