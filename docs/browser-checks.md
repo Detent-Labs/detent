@@ -339,25 +339,43 @@ DOM at all. Nothing there can observe either side of the race.
 
 ### Studio canvas bar
 
-Source: `studio-canvas-bar` tasks 7.1, 7.2, 8.3.
+Source: `studio-canvas-bar` tasks 7.1, 7.2, 8.3, 9.3, 9.4.
 
 Seed the database and open a draft on the Canvas tab.
 
-Select nothing, then one step, then several steps, then a selection matching
-one group. Pass: the bar's height holds the same across all four states.
+Select nothing, then one step, then several steps, then a selection
+matching one group. Pass, measured: the bar holds at 88px in every state,
+and the canvas never reflows. Two selected steps print their count, Remove
+steps, and Group these steps in the bar. A selection matching one group
+prints Group name with its input, Collapse and Ungroup.
 
-Open the caret's menu, then press Escape. Pass: the menu closes, and focus
-returns to the caret button. Reopen the menu, then press outside the panel.
-Pass: the menu closes there too.
+Select one step that no path reaches. Pass: the bar prints "unconnected".
+Select a reached step instead. Pass: the bar prints nothing there.
 
-Start a drag from inside the open menu, and keep the pointer over the canvas
-for the whole gesture. Pass: the menu stays open until release, then closes
-and drops the step. Repeat the drag, releasing over a rendered path instead.
-Pass: the dropped step splits into that path, the same insert a control's
-own drag already makes.
+Open the caret's menu. Pass, measured: it opens under the caret with three
+entries, each a phrase over a muted note. Press Escape. Pass: the menu
+closes, and focus returns to the caret button. Reopen the menu, then press
+outside the panel. Pass: the menu closes there too.
 
-Press Add step twice in a row, with no drag between the two presses. Pass:
-the second step lands beside the first, at a separate lattice point.
+Start a drag from inside the open menu, and keep the pointer over the
+canvas for the whole gesture. Pass, measured: the menu stays open for the
+whole drag and closes on release, dropping the step. Repeat the drag,
+releasing over a rendered path instead. Pass, measured: the targeted path
+draws at 3px in the accent. The release inserts the step into that path,
+raising both the step count and the path count by one.
+
+The drop-target class is no longer literal: `.canvas-edge-insert-target`
+now compiles through StyleX. A check written against that class name reads
+as a missing highlight when the highlight is working. Read the computed
+stroke instead: the targeted path draws at 3px in the accent.
+
+Drag a step from an add control and release it outside the canvas body.
+Pass: the drop adds nothing.
+
+Press Add step once. Pass, measured: the step lands at the visible canvas
+centre. Press it again, with no drag between the two presses. Pass,
+measured: the second step lands 200px right of the first, `NODE_WIDTH +
+GRID_STEP`.
 
 Start a drag from an add control. Release the pointer off every drop
 target, so the click never lands. Press that control's keyboard activation
@@ -374,9 +392,19 @@ still-open menu panel. A popover promotes to the browser's own top layer,
 above every z-index, including the ghost's. Drag the pointer past the
 panel's edge. Pass: the ghost appears once the pointer clears it.
 
-None of the six checks above has coverage in `packages/web/test/`. Every
-suite there renders through `renderToStaticMarkup`, which mounts no DOM. No
-test can take a pointer event, read focus, or measure a rendered height.
+Reach the group state: select two steps, then Group these steps. Narrow
+the window's width to 800px. Pass: the bar still fits. Narrow it to 700px.
+Measured: the bar overflows sideways there, answering the design's first
+open question.
+
+None of the pointer, focus, or height checks above has coverage in
+`packages/web/test/`. Every suite there renders through
+`renderToStaticMarkup`, which mounts no DOM. No test can take a pointer
+event, read focus, or measure a rendered height.
+
+`studio-canvasBar.test.tsx` does cover the reachability text, against a
+rendered string rather than a live pointer or focus event. This walk
+confirms the real DOM wires that text to the bar as that test expects.
 
 ### Users screen: the manager control past one page
 
