@@ -2097,8 +2097,9 @@ Stage-by-stage status is in `ROADMAP.md`.
 - Canvas bar (`packages/web/src/areas/studio/canvas/CanvasBar.tsx`,
   `screens/EditScreen.tsx`, `canvas/layout.ts`, `studio-canvas-bar`): a
   fixed-height row between the tab row and the canvas, replacing
-  `canvas/CanvasPalette.tsx` and the floating `canvasSelection` aside. It
-  carries the three add controls behind Add step and its caret menu. It also
+  `canvas/CanvasPalette.tsx` and the `canvasSelection` aside. That aside
+  stacked below the canvas and shortened it. It carries the three add
+  controls behind Add step and its caret menu. It also
   carries one selected step's reachability report and the selection's own
   controls. `EditScreen` renders it as `<CanvasBar>`, directly above
   `#studio-canvas-body`, and keeps every drag and selection callback itself.

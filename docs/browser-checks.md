@@ -304,13 +304,13 @@ Scroll the wheel while pointing at "Fit to view" itself. Pass: neither pan
 nor zoom happens.
 
 Panzoom's own pan-drag, and this app's wheel listener, used to bind directly
-to the SVG element. That is the same element the palette-drop defect above
+to the SVG element. That is the same element the bar-drop defect above
 already names. A zoomed-out canvas left most of the wrap outside that
 element's own box. A drag or scroll started in the margin did nothing. That
 is the same defect, for a different gesture.
 
 `packages/web/test/studio-canvas-fit.test.ts` cannot see this either, for
-the same reason it cannot see the palette-drop defect. It asserts numbers,
+the same reason it cannot see the bar-drop defect. It asserts numbers,
 not which DOM element a pointer event reaches.
 
 ### Studio canvas: the graph centers on open, with no author action
@@ -781,8 +781,8 @@ Pan the canvas, then drag a step. Pass: the dots travelled with the graph, and
 the step lands on one of them. The dots and the steps move together, never
 against each other.
 
-Drop a step from the creation palette. Pass: it lands on a dot, at whatever
-zoom you are at.
+Drop a step from the canvas bar. Pass: it lands on a dot, at whatever zoom
+you are at.
 
 Open a draft nobody has dragged yet. Pass: every step already sits on a dot.
 Drag one by a whole number of dots. Pass: it moves by exactly that, with no
@@ -878,9 +878,9 @@ around an obstacle, by decision, and stage 33's control points are the answer.
 
 ### Canvas subprocess marker (`canvas-subprocess-step-shape`)
 
-Open Studio and a draft. Drag the palette's Subprocess entry onto the canvas,
-beside an ordinary step. This entry is a visual judgment. No test in this
-repository reads a rendered node.
+Open Studio and a draft. Drag the canvas bar's Subprocess entry onto the
+canvas, beside an ordinary step. This entry is a visual judgment. No test in
+this repository reads a rendered node.
 
 Read the two nodes. Pass: the subprocess step carries a second rule inside its
 rectangle, and the task step carries one rule alone. Watch for the defect: a
@@ -2721,7 +2721,7 @@ a real assistive technology to judge.
 
 Open a draft with no open issue, on the Canvas tab. The Paths tab has no
 control that introduces one, since it is a read-only overview. Add a step
-from the palette. Leave it unconnected, so it leads nowhere.
+from the canvas bar. Leave it unconnected, so it leads nowhere.
 
 Pass: the Checks count turns bold as well as red, while the Canvas tab stays
 open. Every other tab's count keeps its ordinary weight. Switch to the dark
