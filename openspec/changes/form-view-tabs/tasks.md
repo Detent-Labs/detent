@@ -9,12 +9,12 @@
 
 ## 2. Runtime resolution
 
-- [ ] 2.1 Add `tab` to `ResolvedViewField` and `ResolvedViewNote` in `src/runtime/api.ts`
-- [ ] 2.2 Add `tabs` to `InstanceView`, empty for an untabbed view
-- [ ] 2.3 Fill both from `resolveFields` and its caller, leaving each label unresolved
-- [ ] 2.4 Leave `validateSubmissionData` alone; a tab reaches no submission check
-- [ ] 2.5 Add tests for the six scenarios the `runtime-api` delta spec states
-- [ ] 2.6 Verify group 2 with the full `bun test`, naming those six tests green
+- [x] 2.1 Add `tab` to `ResolvedViewField` and `ResolvedViewNote` in `src/runtime/api.ts`
+- [x] 2.2 Add `tabs` to `InstanceView`, empty for an untabbed view
+- [x] 2.3 Fill both from `resolveFields` and its caller, leaving each label unresolved
+- [x] 2.4 Leave `validateSubmissionData` alone; a tab reaches no submission check
+- [x] 2.5 Add tests for the six scenarios the `runtime-api` delta spec states
+- [x] 2.6 Verify group 2 with the full `bun test`, naming those six tests green
 
 ## 3. The form-ui renderer
 
