@@ -39,11 +39,33 @@ function step(over: Record<string, unknown> = {}): DraftOf<Step> {
   } as unknown as DraftOf<Step>;
 }
 
-function render(s: DraftOf<Step> = step()): string {
+function render(s: DraftOf<Step> = step(), activeTab?: string): string {
   return renderToStaticMarkup(
-    <FormPreview step={s} fields={FIELDS} processLabel="Expense approval" contentLocale="en" baseLocale="en" />,
+    <FormPreview
+      step={s}
+      fields={FIELDS}
+      processLabel="Expense approval"
+      contentLocale="en"
+      baseLocale="en"
+      activeTab={activeTab}
+      onTabChange={() => {}}
+    />,
   );
 }
+
+/** The same step with a two-tab view, its two fields one per tab. */
+const TABBED = step({
+  view: {
+    tabs: [
+      { key: "tab_1", label: { en: "Details" } },
+      { key: "tab_2", label: { en: "Approval" } },
+    ],
+    fields: [
+      { ref: AMOUNT, required: true, tab: "tab_1" },
+      { ref: PURPOSE, tab: "tab_2" },
+    ],
+  },
+});
 
 describe("The participant preview", () => {
   it("names the process and the step above the fields", () => {
@@ -115,5 +137,34 @@ describe("The preview's own controls", () => {
 
   it("carries one submit control where the step declares no path at all", () => {
     expect(render(step({ paths: [] }))).toContain("Submit");
+  });
+});
+
+describe("The preview's tab strip", () => {
+  it("draws the draft's tabs, with their authored labels", () => {
+    const html = render(TABBED);
+
+    expect(html).toContain('role="tablist"');
+    expect(html).toContain("Details");
+    expect(html).toContain("Approval");
+  });
+
+  it("opens the tab the canvas is showing, and draws that tab's entries alone", () => {
+    const second = render(TABBED, "tab_2");
+
+    expect(second).toContain("Purpose");
+    // The closed tab's entries are absent from the DOM, not hidden.
+    expect(second).not.toContain("Amount");
+  });
+
+  it("opens the first tab where the canvas shows none yet", () => {
+    const first = render(TABBED);
+
+    expect(first).toContain("Amount");
+    expect(first).not.toContain("Purpose");
+  });
+
+  it("draws no strip for an untabbed form", () => {
+    expect(render()).not.toContain('role="tablist"');
   });
 });

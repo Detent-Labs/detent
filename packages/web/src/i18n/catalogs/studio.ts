@@ -297,6 +297,21 @@ export const en = {
   "formEditor.noteType": "note",
   "formEditor.emptyNote": "(empty note)",
 
+  // The form's own tab strip, above the canvas. "tab" is the picker's label
+  // beside "group" and "span", and stays lowercase with them: all three name
+  // the JSON key they write.
+  "formEditor.tabRowLabel": "Form tabs",
+  "formEditor.addTab": "Add a tab",
+  "formEditor.renameTab": "Rename",
+  "formEditor.moveTabLeft": "Move left",
+  "formEditor.moveTabRight": "Move right",
+  "formEditor.removeTab": "Remove tab",
+  "formEditor.tabName": "Tab name",
+  "formEditor.newTabName": "New tab",
+  "formEditor.unnamedTab": "(unnamed tab)",
+  "formEditor.tab": "tab",
+  "formEditor.tabFromGroup": "The group decides the tab.",
+
   // The condition builder. "guard", "visible"/"required"/"readonly" and the CEL
   // operators stay untranslated, per this file's header: they name the JSON the
   // author is editing.

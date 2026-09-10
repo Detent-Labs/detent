@@ -27,9 +27,12 @@ const render = (technicalFieldIds: Set<string>) =>
       technicalFieldIds={technicalFieldIds}
       isGroup={false}
       groupKeys={[]}
+      tabOptions={[]}
+      tabValue={undefined}
       onChangeFlag={() => {}}
       onChangeSpan={() => {}}
       onChangeGroup={() => {}}
+      onChangeTab={() => {}}
     />,
   );
 
@@ -70,9 +73,12 @@ describe("FormEditorStrip: dominance-scoped gating", () => {
         technicalFieldIds={new Set()}
         isGroup={false}
         groupKeys={[]}
+        tabOptions={[]}
+        tabValue={undefined}
         onChangeFlag={() => {}}
         onChangeSpan={() => {}}
         onChangeGroup={() => {}}
+        onChangeTab={() => {}}
       />,
     );
 
@@ -89,5 +95,74 @@ describe("FormEditorStrip: dominance-scoped gating", () => {
   it("keeps gating engaged when the only writer is on a non-dominating step (a step index this accessor never credits)", () => {
     const html = renderGated(() => 0, 2);
     expect((html.match(/disabled=""/g) ?? []).length).toBe(1);
+  });
+});
+
+/**
+ * form-view-tabs task 5.8: both strips carry a tab picker beside the group
+ * picker (`studio-form-editor`: "A selected entry's strip assigns it to a
+ * tab"). `NoteEditorStrip` reads the content locale from the draft context,
+ * so the field strip is the one a static render reaches; the two mount the
+ * same `TabPicker`, with the same four props.
+ */
+const TABS = [
+  { key: "tab_1", label: "Details" },
+  { key: "tab_2", label: "Approval" },
+];
+
+const renderTabbed = (over: { tabOptions?: typeof TABS; tabValue?: string; group?: string } = {}) =>
+  renderToStaticMarkup(
+    <FormEditorStrip
+      row={{ ref: "field_amount" as never, group: over.group }}
+      label="Amount"
+      stepId={"step_a" as never}
+      ownStepIndex={0}
+      written={() => 1}
+      technicalFieldIds={new Set()}
+      isGroup={false}
+      groupKeys={["approval"]}
+      tabOptions={over.tabOptions ?? TABS}
+      tabValue={over.tabValue}
+      onChangeFlag={() => {}}
+      onChangeSpan={() => {}}
+      onChangeGroup={() => {}}
+      onChangeTab={() => {}}
+    />,
+  );
+
+describe("the strip's tab picker", () => {
+  it("lists the form's tabs, and selects the one the entry names", () => {
+    const html = renderTabbed({ tabValue: "tab_2" });
+
+    expect(html).toContain(">tab<");
+    expect(html).toContain("Details");
+    expect(html).toContain("Approval");
+    expect(html).toContain('value="tab_2"');
+  });
+
+  it("offers no empty choice: a root entry on a tabbed form always names a tab", () => {
+    // The group picker's own "(none)" is the only empty option in the strip.
+    expect((renderTabbed({ tabValue: "tab_1" }).match(/<option value=""/g) ?? []).length).toBe(1);
+  });
+
+  it("draws no picker at all on an untabbed form", () => {
+    const html = renderTabbed({ tabOptions: [] });
+
+    expect(html).not.toContain(">tab<");
+  });
+
+  it("stays inert for an entry naming a group, and says why", () => {
+    const html = renderTabbed({ group: "approval", tabValue: "tab_1" });
+
+    expect(html).toContain("The group decides the tab.");
+    // The reason reaches a screen reader as the control's own description,
+    // not as loose text beside it.
+    expect(html).toContain('aria-describedby="form-editor-tab-from-group"');
+    expect(html).toContain('id="form-editor-tab-from-group"');
+    expect(html).toContain("disabled");
+  });
+
+  it("stays operable for a root entry", () => {
+    expect(renderTabbed({ tabValue: "tab_1" })).not.toContain("form-editor-tab-from-group");
   });
 });
