@@ -173,7 +173,7 @@ that sequence, over one `walkFieldsIndexed` pass
   group field then draws the entries naming its key, so an entry failing
   either half leaves the form with no message. An empty `group` reads as no
   group, matching the renderer. The rule reaches a note entry too.
-  A third half binds a field entry (one carrying a `ref`): its `group` names
+  A third clause binds a field entry (one carrying a `ref`): its `group` names
   the group field that holds it in the catalog's own `fields`, the catalog's
   one answer to where a field belongs for the whole process. A field the
   catalog holds at the top level has no `group` at all. This half binds both
