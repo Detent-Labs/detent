@@ -965,16 +965,24 @@ function checkRedactableFields(body: ProcessBody): CompileIssue[] {
 // drew 37 empty forms between them.
 //
 // An empty `group` reads as no group, matching what the renderer already does
-// with it, so this check passes over one entirely — including the third half
-// below.
+// with it — but only the first two halves take that at face value. The
+// third half below still holds an absent/empty `group` to the catalog.
 //
 // A third half binds a field entry (one carrying a `ref`) to the catalog: its
 // `group` must name the key of the group field that holds that field in the
 // catalog's own `fields` (`parentGroupKeyById`), or stay empty when the
-// catalog holds the field at the top level. This reaches a group field's own
+// catalog holds the field at the top level. The half binds in both
+// directions: a field the catalog holds inside a group must declare that
+// group's key, so an absent or empty `group` on such an entry fails too — a
+// hand-authored body cannot lift a grouped field onto the form's root while
+// the catalog still holds it in a group. This reaches a group field's own
 // entry too — a group nested inside another group carries the outer group's
-// key, and no other. A note entry is exempt from this half alone: it names no
-// catalog field, so nothing parents it.
+// key, and no other. One exception: a group whose own `key` is empty maps
+// its children to `""` too (`parentGroupKeyById` has no other key to give
+// them), so they carry no `group` either and this half reports nothing for
+// them — moot in practice, since `checkFieldKeyFormat` already rejects the
+// empty key on its own. A note entry is exempt from this half entirely: it
+// names no catalog field, so nothing parents it.
 //
 // Operates on duck-typed input, like checkReservedActionPrefix,
 // checkUnknownKeys and checkTechnicalFields: it runs before any Zod parse of
@@ -1001,38 +1009,50 @@ function checkViewGroupReferences(body: ProcessBody): CompileIssue[] {
     const entries: any[] = s?.view?.fields ?? [];
     const refs = new Set(entries.filter((e) => typeof e?.ref === "string").map((e) => e.ref as string));
     entries.forEach((vf, vi) => {
-      const group = vf?.group;
-      if (typeof group !== "string" || group === "") return;
+      const rawGroup = vf?.group;
+      const group = typeof rawGroup === "string" ? rawGroup : "";
       const loc = `steps[${si}].view.fields[${vi}].group`;
-      const groupId = groupIdByKey.get(group);
-      if (groupId === undefined) {
-        issues.push({ loc, value: group, message: "a view entry's group must name a group field's key" });
-        return;
+
+      // First two halves: reached only by a non-empty declared group. An
+      // absent or empty one always sits at the form's root as far as they're
+      // concerned; the third half below is where that placement is tested
+      // against the catalog.
+      if (group !== "") {
+        const groupId = groupIdByKey.get(group);
+        if (groupId === undefined) {
+          issues.push({ loc, value: group, message: "a view entry's group must name a group field's key" });
+          return;
+        }
+        if (!refs.has(groupId)) {
+          issues.push({
+            loc,
+            value: group,
+            message: "a view entry's group names a group field this view does not carry",
+          });
+          return;
+        }
       }
-      if (!refs.has(groupId)) {
-        issues.push({
-          loc,
-          value: group,
-          message: "a view entry's group names a group field this view does not carry",
-        });
-        return;
-      }
+
       if (typeof vf?.ref !== "string") return; // a note has no catalog parent to agree with
+
+      // Third half: reaches every field entry, whatever `group` says,
+      // including an absent or empty one. `?? ""` folds two catalog shapes
+      // onto the same "no group" value the declared side already normalizes
+      // to: a field the catalog holds at the top level (no map entry) and a
+      // field held by a group whose own `key` is empty (mapped to "" by
+      // `parentGroupKeyById`, since that group's children can name nothing).
+      // Both compare equal to a matching absent/empty declared `group`, which
+      // is exactly the one exception the rule carves out.
       const fieldId = vf.ref as FieldId;
-      if (!parentKeyById.has(fieldId)) {
-        issues.push({
-          loc,
-          value: group,
-          message: "a view entry's group must be empty; the catalog holds this field at the top level",
-        });
-        return;
-      }
-      const catalogParent = parentKeyById.get(fieldId) as string;
+      const catalogParent = parentKeyById.get(fieldId) ?? "";
       if (catalogParent !== group) {
         issues.push({
           loc,
           value: group,
-          message: `a view entry's group must name this field's catalog parent, "${catalogParent}"`,
+          message:
+            catalogParent === ""
+              ? "a view entry's group must be empty; the catalog holds this field at the top level"
+              : `a view entry's group must name this field's catalog parent, "${catalogParent}"`,
         });
       }
     });
