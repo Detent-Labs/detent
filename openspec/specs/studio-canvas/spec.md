@@ -14,7 +14,9 @@ creation writes through the Draft model's `mutate()`, the same surface
 re-implementing the all-manual-or-all-automatic rule. The canvas adds no
 authoring operation the panels can't already do — it is a faster way to
 position and connect, not a new capability surface.
+
 ## Requirements
+
 ### Requirement: Step nodes are repositioned by dragging, and position persists as draft layout
 
 <!-- antislop: allow synonym-rotation -->
@@ -725,6 +727,7 @@ carrying one path SHALL NOT announce a plural.
 - **THEN** its accessible name reads one outgoing path, never the plural
 <!-- "function" here is the mathematical sense; "method" elsewhere names a TypeScript method. -->
 <!-- antislop: allow synonym-rotation -->
+
 ### Requirement: The traversal is a total function over a deep-partial draft
 
 The traversal reads a `Draft`. `DraftOf` makes that type optional at every
@@ -956,6 +959,7 @@ button is HTML, so the outline follows its shape already.
 
 <!-- antislop: allow passive-voice -->
 <!-- The MODIFIED header must match the live spec byte for byte. -->
+
 ### Requirement: Canvas interaction logic is tested as pure functions, independent of rendering
 
 Twelve computations SHALL live in pure modules with `bun:test` coverage. Five
@@ -1072,6 +1076,7 @@ a profile rather than added speculatively.
 - **THEN** the computations re-run and the canvas reflects the change
 
 <!-- antislop: allow synonym-rotation -->
+
 ### Requirement: The structure surface lays out a canvas ribbon, a steps register and the configuration pane
 
 The Canvas tab SHALL carry the canvas alone. The canvas SHALL fill the tab's
@@ -1191,6 +1196,7 @@ per `studio-process-tabs`.
 <!-- The heading repeats the live spec's wording verbatim, so a delta can match it. -->
 
 <!-- antislop: allow synonym-rotation -->
+
 ### Requirement: The configuration pane's masthead names the step
 
 <!-- Why: a remove control acts on one step; the canvas's delete control acts on a whole selection. -->
@@ -1262,6 +1268,7 @@ An end step declares its outcome on departure.
 <!-- The heading repeats the live spec's wording verbatim, so a delta can match it. -->
 
 <!-- antislop: allow synonym-rotation -->
+
 ### Requirement: The configuration pane's sections follow the performed-by control
 
 The step page's sections SHALL follow the performed-by control. A section
@@ -1507,7 +1514,7 @@ throughout. Nothing about it SHALL become read-only or disabled otherwise.
   non-base-locale entry
 - **THEN** the process key stays unchanged
 
-### Requirement: A step node prints the step's label, resolved for the content locale
+### Requirement: A step node prints the step's label, centred and resolved for the content locale
 
 A step node SHALL print the step's `label`, resolved against the studio's
 content locale with fallback to the draft's `baseLocale`. It SHALL fall back
@@ -1530,9 +1537,9 @@ Text too long for two lines SHALL end in an ellipsis. The node SHALL carry the
 untruncated text as its hover title, and only where the text is cut. A title on
 every node, cut or not, stops saying that more text is hiding.
 
-The node's own size SHALL NOT change with the label's length. Every node's
-first line SHALL start at one offset from its own top edge. That holds at one
-line and at two, so a row of nodes reads along a shared line.
+The node's own size SHALL NOT change with the label's length. The label block
+SHALL sit centred between the node's top and bottom edges. That holds at one
+line and at two, so every node reads from its own middle.
 
 The key stays legible elsewhere. The step's accessible name names it, and the
 inspector and the JSON view both carry it.
@@ -1575,11 +1582,12 @@ carrying a translation in the chosen locale.
 - **THEN** the cut node carries its full label as a hover title
 - **AND** the node reading "Done" carries none
 
-#### Scenario: One line and two lines share a first line
+#### Scenario: One line and two lines share a centre
 
 - **WHEN** one node's label takes one line and its neighbour's takes two
-- **THEN** both first lines start at the same offset below their node's top
-  edge
+- **THEN** each label block sits centred between its own node's top and
+  bottom edges
+- **AND** the two blocks read from one shared centre line
 
 #### Scenario: A long label leaves the node's size alone
 
@@ -1638,6 +1646,7 @@ translation, rather than committing a copy of the key as a label.
 <!-- The heading repeats the live spec's wording verbatim, so a delta can match it. -->
 
 <!-- antislop: allow synonym-rotation -->
+
 ### Requirement: The masthead's step key auto-derives from the step label
 
 The step page's key field SHALL auto-fill from the step's label as an author
@@ -1713,6 +1722,7 @@ for that step. That holds for the rest of the draft's lifetime in the browser.
 <!-- The heading repeats the live spec's wording verbatim, so a delta can match it. -->
 
 <!-- antislop: allow synonym-rotation -->
+
 ### Requirement: The masthead's type and terminal controls render as a "performed by" segmented control
 
 The step page SHALL render the step's existing `type` and `terminal` fields as
@@ -1827,6 +1837,7 @@ rather than omit it.
   same node
 
 <!-- antislop: allow synonym-rotation -->
+
 ### Requirement: The masthead constrains a terminal step's outcome to the process's declared outcomes
 
 The outcome field stands in the step page's "How the case ends" section. When
@@ -2860,6 +2871,7 @@ step's one-line explanation.
 <!-- The heading repeats the live spec's wording verbatim, so a delta can match it. -->
 
 <!-- antislop: allow synonym-rotation -->
+
 ### Requirement: The edit screen's own layout renders from compiled styles
 
 `screens/` collapses its edit screen and its panels screen into one process

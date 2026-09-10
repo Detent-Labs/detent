@@ -226,16 +226,17 @@ describe("the declarations the clamp rests on", () => {
     expect(styleBlock("nodeLabel")).toContain('overflowWrap: "anywhere"');
   });
 
-  // The defect: centring gives one line and two lines different first
-  // baselines, about 9.75 apart, so a row of nodes loses its shared baseline.
-  it("tops the label box rather than centring it", () => {
-    expect(styleBlock("nodeLabelBox")).toContain('alignItems: "flex-start"');
-    expect(styleBlock("nodeLabelBox")).toContain("paddingTop: 20");
+  // The defect: a fixed top padding tops the label, so two clamped lines
+  // close on 59 in the 60-unit box and the label reads as pushed out of the
+  // node. The padding assertion is the negative half of the same rule.
+  it("centres the label box rather than topping it", () => {
+    expect(styleBlock("nodeLabelBox")).toContain('alignItems: "center"');
+    expect(styleBlock("nodeLabelBox")).not.toContain("paddingTop");
   });
 
-  // 20 of padding plus the clamp's own two lines must close inside the node.
-  // A 13px face on this stack lays out at 19.5 per line.
+  // The clamp's own two lines must close inside the node. A 13px face on this
+  // stack lays out at 19.5 per line.
   it("closes two clamped lines inside the node's height", () => {
-    expect(20 + 2 * 19.5).toBeLessThanOrEqual(NODE_HEIGHT);
+    expect(2 * 19.5).toBeLessThanOrEqual(NODE_HEIGHT);
   });
 });
