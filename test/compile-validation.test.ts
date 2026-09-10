@@ -546,7 +546,7 @@ describe("compile: a body violating a new check still reads (no new Zod refineme
     expect(processBody.safeParse(b).success).toBe(true);
   });
 
-  it("a field entry naming the wrong catalog parent parses on read", () => {
+  it("a field entry carrying a group while its catalog parent is the top level parses on read", () => {
     // More bodies violate the parentage half than the first two, per the
     // delta spec. A body pinning `field_amount` (a top-level catalog field)
     // under a group the view carries must still parse.
@@ -1404,5 +1404,52 @@ describe("compile: a view entry's group names a group field the view carries", (
       { kind: "note", text: { en: "Hello." }, group: "person" },
     ]);
     expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
+  });
+
+  it("resolves a group nested inside another group", () => {
+    // The parentage half binds a group field's own view entry too: a group
+    // nested inside another group carries the OUTER group's key, not its
+    // own — `field_inner` sits inside `field_outer`'s own `fields`.
+    const b: any = baseBody();
+    b.fields = [
+      {
+        id: "field_outer",
+        key: "outer",
+        label: { en: "Outer" },
+        type: "group",
+        fields: [{ id: "field_inner", key: "inner", label: { en: "Inner" }, type: "group" }],
+      },
+    ];
+    b.workflow.steps[0].view = {
+      fields: [{ ref: "field_outer" }, { ref: "field_inner", group: "outer" }],
+    };
+    expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
+  });
+
+  it("rejects a nested group naming a group other than its own catalog parent", () => {
+    // Same catalog as above, plus an unrelated top-level group the view also
+    // carries. `field_inner`'s real catalog parent is "outer", so naming the
+    // otherwise-legitimate "sibling" still fails.
+    const b: any = baseBody();
+    b.fields = [
+      {
+        id: "field_outer",
+        key: "outer",
+        label: { en: "Outer" },
+        type: "group",
+        fields: [{ id: "field_inner", key: "inner", label: { en: "Inner" }, type: "group" }],
+      },
+      { id: "field_sibling", key: "sibling", label: { en: "Sibling" }, type: "group" },
+    ];
+    b.workflow.steps[0].view = {
+      fields: [
+        { ref: "field_outer" },
+        { ref: "field_sibling" },
+        { ref: "field_inner", group: "sibling" },
+      ],
+    };
+    const err = rejects(b);
+    expect(err.issues.some((i) => i.loc === "steps[0].view.fields[2].group")).toBe(true);
+    expect(err.message).toContain('"outer"');
   });
 });
