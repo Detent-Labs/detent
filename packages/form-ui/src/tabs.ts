@@ -83,3 +83,29 @@ export function firstTabWithIssue(
 ): string | undefined {
   return drawnTabs(entries, tabs).find((tab) => tabIssueCount(entries, tab.key, issuesByField) > 0)?.key;
 }
+
+/**
+ * The tab a focus-moving key press moves focus to, as an index into the drawn
+ * strip; `undefined` for a key the strip leaves alone. Arrow keys wrap at the
+ * row's ends, `Home` and `End` jump to it — the WAI-ARIA tabs pattern's
+ * manual-activation variant, the one `ProcessTabRow.tsx` already follows.
+ * Focus moves alone: `Enter` and `Space` are what open a tab, and a `<button>`
+ * turns both into the click a strip listens for.
+ *
+ * These four keys are a convenience OVER the plain-button pattern, not the
+ * roving-tabindex variant: every tab stays tabbable, and no tab carries a
+ * `tabIndex`. Both strips in this product read this one function — the
+ * participant's `FieldForm`, and the studio form editor's own
+ * `FormTabStrip.tsx` — so one key cannot come to mean two things.
+ *
+ * Extracted because this repo ships no DOM test library, so no test here can
+ * fire the event that calls it.
+ */
+export function nextTabIndex(key: string, from: number, count: number): number | undefined {
+  if (count === 0 || from < 0 || from >= count) return undefined;
+  if (key === "ArrowRight") return (from + 1) % count;
+  if (key === "ArrowLeft") return (from - 1 + count) % count;
+  if (key === "Home") return 0;
+  if (key === "End") return count - 1;
+  return undefined;
+}
