@@ -9,8 +9,9 @@ import {
 } from "../src/areas/studio/panels/fieldCatalogLogic.js";
 import { mergeLocalizedTextEntry } from "../src/areas/studio/draft/localized-text.js";
 import { mintCatalogField } from "../src/areas/studio/draft/mintField.js";
-import { draftFields, type DraftField } from "../src/areas/studio/draft/fields.js";
+import { draftFields, flattenDraftFields, type DraftField } from "../src/areas/studio/draft/fields.js";
 import { runValidation } from "../src/areas/studio/draft/validation.js";
+import { syncViewGroupsOnFieldMove } from "../src/areas/studio/draft/view-group-sync.js";
 import type { Draft } from "../src/areas/studio/draft/types.js";
 
 describe("nextFieldKey", () => {
@@ -239,13 +240,30 @@ describe("moveFieldToGroup over examples/purchase-requisition.json", () => {
 
   const groupIdOf = (body: Draft) => draftFields(body).find((f) => f.key === "line_item")!.id!;
 
+  /**
+   * Mirrors `EntityTabs.tsx`'s `moveField`: the catalog write via
+   * `moveFieldToGroup`, then the view sync via `syncViewGroupsOnFieldMove`,
+   * both landing on one draft the way `moveField`'s one `mutate` lands them
+   * on one clone. The destination's key is read off the moved tree, the
+   * same way the component reads it, never re-derived from `targetGroupId`
+   * alone — and this is the one caller-side lookup `moveField` itself does
+   * inline, not a second copy of the sync function it then calls.
+   */
+  const moveFieldAndSyncViews = (body: Draft, fieldId: string, targetGroupId: string | undefined): Draft => {
+    const next = moveFieldToGroup(body.fields as DraftField[], fieldId, targetGroupId);
+    const newGroupKey = targetGroupId === undefined ? undefined : flattenDraftFields(next).find((f) => f.id === targetGroupId)?.key;
+    const moved: Draft = structuredClone({ ...body, fields: next });
+    syncViewGroupsOnFieldMove(moved, fieldId, newGroupKey);
+    return moved;
+  };
+
   it("keeps the body publishable when a top-level field moves into the group", () => {
     const body = exampleDraft();
     const vendor = draftFields(body).find((f) => f.key === "vendor")!;
     const before = runValidation(body, undefined, {}, {});
     expect(before.zodValid).toBe(true);
 
-    const moved: Draft = { ...body, fields: moveFieldToGroup(body.fields as DraftField[], vendor.id!, groupIdOf(body)) };
+    const moved = moveFieldAndSyncViews(body, vendor.id!, groupIdOf(body));
 
     const after = runValidation(moved, undefined, {}, {});
     expect(after.zodValid).toBe(true);
@@ -257,12 +275,32 @@ describe("moveFieldToGroup over examples/purchase-requisition.json", () => {
     const quantity = draftFields(body).find((f) => f.key === "quantity")!;
     const before = runValidation(body, undefined, {}, {});
 
-    const moved: Draft = { ...body, fields: moveFieldToGroup(body.fields as DraftField[], quantity.id!, undefined) };
+    const moved = moveFieldAndSyncViews(body, quantity.id!, undefined);
 
     expect(draftFields(moved).find((f) => f.key === "quantity")!.id).toBe(quantity.id);
     const after = runValidation(moved, undefined, {}, {});
     expect(after.zodValid).toBe(true);
     expect(after.issues).toEqual(before.issues);
+  });
+
+  it("without the view sync, a bare catalog move strands every view entry naming the moved field", () => {
+    // The other half of the same fact the two tests above prove:
+    // `syncViewGroupsOnFieldMove` is not incidental, it is what keeps a
+    // move publishable. Calling `moveFieldToGroup` alone -- the pre-task-5
+    // shape both tests above used to take -- reproduces the measured
+    // regression this fix responds to: the moved field's view entries still
+    // name their old (absent) group, which now disagrees with the field's
+    // real catalog parent.
+    const body = exampleDraft();
+    const vendor = draftFields(body).find((f) => f.key === "vendor")!;
+
+    const moved: Draft = { ...body, fields: moveFieldToGroup(body.fields as DraftField[], vendor.id!, groupIdOf(body)) };
+
+    const after = runValidation(moved, undefined, {}, {});
+    const stranded = after.issues.filter(
+      (i) => i.message === 'a view entry\'s group must name this field\'s catalog parent, "line_item"',
+    );
+    expect(stranded).toHaveLength(3);
   });
 });
 
