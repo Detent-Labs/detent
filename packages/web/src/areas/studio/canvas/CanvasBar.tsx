@@ -160,8 +160,9 @@ interface Props {
   /** A press with no drag: add a step of this kind at the visible canvas
    * centre. */
   onAddStep: (kind: StepKind) => void;
-  /** A drag's release, in screen (client) coordinates. Same contract
-   * `CanvasPalette.onDrop` carries today. */
+  /** A drag's release, in screen (client) coordinates: the bar holds no canvas
+   * geometry, so resolving a client point to a canvas point is the caller's
+   * job. */
   onDrop: (kind: StepKind, clientX: number, clientY: number) => void;
   /** Every pointer move a drag makes, same coordinates. */
   onDragMove: (kind: StepKind, clientX: number, clientY: number) => void;
@@ -196,8 +197,8 @@ interface BarDrag {
  *
  * Every add control is both a button and a drag source. A press adds a step
  * at the visible canvas centre, which the caller computes; a drag adds one at
- * the drop point, over the same screen-coordinate contract the palette
- * carried.
+ * the drop point, reported in screen (client) coordinates for the caller to
+ * resolve against the live canvas.
  */
 export function CanvasBar({
   onAddStep,
@@ -244,6 +245,11 @@ export function CanvasBar({
   };
 
   const onPointerDown = (e: React.PointerEvent, kind: StepKind) => {
+    // The flag's own reset. A drop sets it for a click that two paths can
+    // swallow: a failed capture retargets the release off the button, and a
+    // menu entry sits in a `display: none` subtree once the release hides the
+    // panel. Left standing, it would eat the next press instead.
+    suppressClick.current = false;
     try {
       e.currentTarget.setPointerCapture(e.pointerId);
     } catch {
@@ -305,7 +311,7 @@ export function CanvasBar({
       <div {...stylex.props(styles.addGroup)}>
         <button
           type="button"
-          className={`btn btn-secondary ${stylex.props(styles.control).className ?? ""}`}
+          className={`btn btn-secondary ${stylex.props(styles.control).className ?? ""}`.trim()}
           {...dragProps("task")}
         >
           {t("canvas.addStep")}
@@ -313,7 +319,7 @@ export function CanvasBar({
         <button
           ref={triggerRef}
           type="button"
-          className={`btn btn-secondary ${stylex.props(styles.control, styles.caret).className ?? ""}`}
+          className={`btn btn-secondary ${stylex.props(styles.control, styles.caret).className ?? ""}`.trim()}
           aria-label={t("canvas.addStepMore")}
           aria-expanded={expanded}
           aria-haspopup="menu"
@@ -354,7 +360,7 @@ export function CanvasBar({
           </span>
           <button
             type="button"
-            className={`btn btn-secondary ${stylex.props(styles.control).className ?? ""}`}
+            className={`btn btn-secondary ${stylex.props(styles.control).className ?? ""}`.trim()}
             onClick={onDeleteSelection}
           >
             {t("canvas.selectionRemove")}
@@ -375,7 +381,7 @@ export function CanvasBar({
               </label>
               <button
                 type="button"
-                className={`btn btn-secondary ${stylex.props(styles.control).className ?? ""}`}
+                className={`btn btn-secondary ${stylex.props(styles.control).className ?? ""}`.trim()}
                 // The same attribute the canvas box's own disclosure carries.
                 // Both write this one `collapsed` flag, so neither may report
                 // it as a pressed state instead. `aria-controls` names the
@@ -390,7 +396,7 @@ export function CanvasBar({
               </button>
               <button
                 type="button"
-                className={`btn btn-secondary ${stylex.props(styles.control).className ?? ""}`}
+                className={`btn btn-secondary ${stylex.props(styles.control).className ?? ""}`.trim()}
                 onClick={() => onGroupsChange(groups.filter((g) => g.id !== matched.id))}
               >
                 {t("canvas.groupUngroup")}
@@ -400,7 +406,7 @@ export function CanvasBar({
             canGroup(selectedStepIds, groups) && (
               <button
                 type="button"
-                className={`btn btn-secondary ${stylex.props(styles.control).className ?? ""}`}
+                className={`btn btn-secondary ${stylex.props(styles.control).className ?? ""}`.trim()}
                 onClick={() =>
                   onGroupsChange([
                     ...groups,
