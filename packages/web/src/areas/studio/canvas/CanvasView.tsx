@@ -9,7 +9,7 @@ import { newStep } from "../draft/createStep";
 import { newPath } from "../draft/createPath";
 import { seedLocalizedText, resolveDraftLocalizedText } from "../draft/localized-text";
 import { t } from "../catalog.js";
-import { autoPlaceSteps, type LayoutStep } from "./layout";
+import { drawnPositions, type LayoutStep } from "./layout";
 import {
   dragDelta,
   exceedsClickThreshold,
@@ -424,10 +424,6 @@ interface Props {
   visible?: boolean;
 }
 
-function isPoint(value: unknown): value is Point {
-  return !!value && typeof (value as Point).x === "number" && typeof (value as Point).y === "number";
-}
-
 /** The guard-then-merge shape every `on*PointerMove` handler below repeats:
  * bail when no drag of that kind is active, otherwise merge the
  * caller-computed patch into it. Node, group, waypoint and connect-drag
@@ -659,12 +655,11 @@ export function CanvasView({
   // both re-run on every pointer-move event during a drag for nothing.
   // Keyed on their actual inputs only.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const autoPlaced = useMemo(() => autoPlaceSteps(steps as LayoutStep[], initialStepId, layout), [steps, initialStepId, layout]);
-  const positionOf = (stepId: string): Point => {
-    const recorded = layout[stepId];
-    if (isPoint(recorded)) return recorded;
-    return autoPlaced[stepId] ?? { x: 0, y: 0 };
-  };
+  const drawn = useMemo(() => drawnPositions(steps as LayoutStep[], initialStepId, layout), [steps, initialStepId, layout]);
+  // The origin here answers a lookup miss, not the resolution's own last
+  // resort, which `drawnPositions` already applies. A selection or a group can
+  // name a step the draft no longer holds, and that id is in no record.
+  const positionOf = (stepId: string): Point => drawn[stepId] ?? { x: 0, y: 0 };
 
   const nodePositions: NodePosition[] = useMemo(
     () => steps.filter((s) => s.id).map((s) => ({ id: s.id as string, ...positionOf(s.id as string) })),

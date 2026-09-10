@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { DraftProvider, useDraft } from "../draft/store.js";
@@ -27,13 +27,21 @@ import { formEditorReturnTab, processTabCounts, tabForIssue } from "../draft/pro
 import { checksDotState, groupChecksBySource } from "../draft/checksRail.js";
 import { initialSaveState, type DraftSaveState } from "./draftSaveLogic.js";
 import { isDirty } from "./draftToolbarState.js";
-import { CanvasView, groupMembersDomId } from "../canvas/CanvasView.js";
-import { CanvasPalette } from "../canvas/CanvasPalette.js";
-import { registerOrder } from "../draft/registerOrder.js";
-import { snapToGrid, svgPointFromClient, DEFAULT_EDGE_STYLE, type Point, type EdgeStyle } from "../canvas/geometry.js";
-import { canGroup, groupMatching, type StepGroup } from "../canvas/groups.js";
+import { CanvasView } from "../canvas/CanvasView.js";
+import { CanvasBar } from "../canvas/CanvasBar.js";
+import { reachableStepIds, registerOrder } from "../draft/registerOrder.js";
+import {
+  freeLatticePoint,
+  snapToGrid,
+  svgPointFromClient,
+  DEFAULT_EDGE_STYLE,
+  type NodePosition,
+  type Point,
+  type EdgeStyle,
+} from "../canvas/geometry.js";
+import { type StepGroup } from "../canvas/groups.js";
 import { arrangeSteps, hasHandPlacedStep } from "../canvas/arrange.js";
-import type { LayoutStep } from "../canvas/layout.js";
+import { drawnPositions, isPoint, type LayoutStep } from "../canvas/layout.js";
 import { newStep, type StepKind } from "../draft/createStep.js";
 import { addToDraftArray } from "../draft/draft-array-crud.js";
 import { insertOnPath } from "../draft/insertOnPath.js";
@@ -48,8 +56,8 @@ import type { NavigateOptions } from "../../../shell/routing.js";
  * turns its own rail at this same width, for the same reason. */
 const NARROW = "@media (max-width: 64rem)";
 
-/** The Canvas tab's body: what a palette drop resolves the live canvas
- * through. */
+/** The Canvas tab's body: what a canvas bar drop resolves the live canvas
+ * through, and what a press measures its centre against. */
 const CANVAS_BODY_ID = "studio-canvas-body";
 
 const styles = stylex.create({
@@ -180,8 +188,9 @@ const styles = stylex.create({
   tabBodyHidden: {
     display: "none",
   },
-  // The Canvas tab: the palette beside the canvas, filling the body above a
-  // 36rem floor. No bar and no band stand over it (`studio-canvas`).
+  // The Canvas tab: the canvas alone, filling the width and the height the
+  // canvas bar leaves, above a 36rem floor. No band stands over it and no
+  // control changes its height (`studio-canvas`).
   canvasRegion: {
     display: "flex",
     flex: "1 1 auto",
@@ -202,47 +211,6 @@ const styles = stylex.create({
     gap: space.s3,
     alignItems: "stretch",
     minHeight: "36rem",
-  },
-  canvasInspector: {
-    minWidth: 0,
-    overflowY: "auto",
-    borderWidth: 1,
-    borderStyle: "solid",
-    borderColor: colors.border,
-    padding: space.s3,
-  },
-  canvasSelection: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "flex-start",
-    gap: space.s3,
-  },
-  canvasSelectionHeading: {
-    display: "flex",
-    alignItems: "baseline",
-    justifyContent: "space-between",
-    gap: space.s2,
-    width: "100%",
-    paddingBottom: space.s2,
-    borderBottomWidth: 2,
-    borderBottomStyle: "solid",
-    borderBottomColor: colors.divider,
-  },
-  canvasSelectionCount: {
-    fontFamily: fonts.mono,
-    fontVariantNumeric: "tabular-nums",
-  },
-  // `.canvas-group-name` (stylex-phase-3-studio's D2) is now fully compiled
-  // (stylex-phase-4-canvas's D5): `canvas/CanvasView.tsx`'s own SVG `<text>`
-  // reads its own independent style for `font-family`/`font-size`/`fill`,
-  // and this label's only borrowed property, `cursor: grab`, moved here.
-  // The label-above-control shape design-language.md's own field rule
-  // states is this file's addition.
-  canvasGroupNameField: {
-    display: "flex",
-    flexDirection: "column",
-    gap: space.s1,
-    cursor: "grab",
   },
 });
 
@@ -317,9 +285,9 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, go, initial
   const { draft, mutate, validation, replace, contentLocale } = useDraft();
   const baseLocale = draft.baseLocale ?? "en";
   const [saveState, setSaveState] = useState<DraftSaveState>(() => initialSaveState(initialRevision, initialLayout));
-  // The canvas selection is a set (design.md). A set of one drives the
-  // configuration pane exactly as the single id did; a set of several drives
-  // the group summary instead, since the pane edits one step.
+  // The canvas selection is a set (design.md). A set of one drives the step
+  // page exactly as the single id did; a set of several names no one step for
+  // it, so the canvas bar carries that set's own count and controls.
   const [selectedStepIds, setSelectedStepIds] = useState<string[]>([]);
   const [selectedPathId, setSelectedPathId] = useState<string | undefined>(undefined);
   // The path an edit-rail drag currently sits over, resolved the same way the
@@ -405,13 +373,12 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, go, initial
   // The second reserved key in that same blob. A malformed entry reads as no
   // waypoints rather than failing the render, the rule `canvasEdgeStyle`
   // already follows: a draft saved by a later version must still draw.
-  const isLayoutPoint = (v: unknown): v is Point =>
-    !!v && typeof (v as Point).x === "number" && typeof (v as Point).y === "number";
+  // `isPoint` is that same guard, and `canvas/layout.ts` is its one home.
   const waypoints: Record<string, Point[]> = {};
   const storedWaypoints = saveState.layout.waypoints;
   if (storedWaypoints && typeof storedWaypoints === "object") {
     for (const [pathId, list] of Object.entries(storedWaypoints as Record<string, unknown>)) {
-      if (Array.isArray(list) && list.every(isLayoutPoint)) waypoints[pathId] = list;
+      if (Array.isArray(list) && list.every(isPoint)) waypoints[pathId] = list;
     }
   }
 
@@ -504,14 +471,21 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, go, initial
     setSelectedPathId(undefined);
   };
 
-  // The inspector takes one step. A set of several names none for it, and the
-  // group summary stands in (studio-canvas: "It SHALL NOT show the inspector
-  // in that state").
+  // The step page takes one step. A set of several names none for it, so the
+  // canvas bar carries the set's count and its delete and group controls
+  // instead (studio-canvas: "The step page holds one step, and a set of
+  // several names no one step for it").
   const inspectedStepId = selectedStepIds.length === 1 ? selectedStepIds[0] : undefined;
 
   // The rail's own order, read three times: for the row list's current mark,
   // for the walk's two ends, and for the step the page falls back to.
   const railOrder = registerOrder(steps, draft.workflow?.initialStep);
+  // The same walk the rail's order rests on, over the same two inputs
+  // (design D7). The canvas bar reads it for one selected step: a step the
+  // initial step reaches over paths reads as nothing, and one no chain
+  // reaches reads as unconnected. A set of several carries its count instead.
+  const reachable = useMemo(() => reachableStepIds(steps, draft.workflow?.initialStep), [steps, draft.workflow?.initialStep]);
+  const unconnected = selectedStepIds.length === 1 && !reachable.has(selectedStepIds[0]);
   // The step the step page holds, and the row the rail reads as current.
   // Selecting none holds the rail's own first step, so the page never stands
   // empty on a draft carrying one. One piece of state drives both regions:
@@ -589,10 +563,10 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, go, initial
     return pathId && sourceStepId ? { pathId, sourceStepId } : undefined;
   };
 
-  /** `CanvasPalette.onDragMove`: fired on every pointer move a palette drag
-   * makes. An `end` drag resolves to no target — a terminal step never lands
-   * inside a path, so nothing may suggest that it does. */
-  const onPaletteDragMove = (kind: StepKind, clientX: number, clientY: number) => {
+  /** `CanvasBar.onDragMove`: fired on every pointer move a bar drag makes. An
+   * `end` drag resolves to no target — a terminal step never lands inside a
+   * path, so nothing may suggest that it does. */
+  const onCanvasBarDragMove = (kind: StepKind, clientX: number, clientY: number) => {
     setInsertTargetPathId(kind === "end" ? undefined : resolveDropPath(clientX, clientY)?.pathId);
   };
 
@@ -609,8 +583,8 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, go, initial
   };
 
   /** The one draft-mutation method every step-creating control on this screen
-   * shares: the palette's drop, and the steps register's own add control on a
-   * draft holding no step (`studio-canvas`'s palette requirement). */
+   * shares: the canvas bar's drop, its press, and the steps rail's own foot on
+   * a draft holding no step (`studio-canvas`'s canvas bar requirement). */
   const appendStep = (created: ReturnType<typeof newStep>) => {
     addToDraftArray(
       mutate,
@@ -625,16 +599,17 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, go, initial
   };
 
   /** The rail foot's three add controls, through the same creation path the
-   * palette's own drop uses. The new step opens on the page at once
-   * (`studio-step-page`). */
+   * canvas bar's own drop uses. The new step opens on the page at once
+   * (`studio-step-page`). It gets no position of its own: the Steps tab shows
+   * no canvas, so `autoPlaceSteps` places it when the Canvas tab next draws. */
   const onAddStep = (kind: StepKind) => {
     const created = newStep(kind, seedLocalizedText(contentLocale));
     appendStep(created);
     if (created.id) onSelectStep(created.id);
   };
 
-  /** The palette's own drag-to-place, through that same creation path. Screen
-   * coordinates in, since the palette holds no canvas geometry of its own:
+  /** The canvas bar's own drag-to-place, through that same creation path.
+   * Screen coordinates in, since the bar holds no canvas geometry of its own:
    * `elementFromPoint` finds the live canvas (or none, when the drop misses
    * it), and `svgPointFromClient` converts through its current pan/zoom
    * transform — the same conversion `CanvasView`'s own node and handle drags
@@ -646,10 +621,10 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, go, initial
    * the same rule `elementFromPoint` already gives every other drop. An `end`
    * step never takes this branch: a terminal step has no outgoing path, so it
    * cannot stand between two steps. */
-  const onPaletteDrop = (kind: StepKind, clientX: number, clientY: number) => {
+  const onCanvasBarDrop = (kind: StepKind, clientX: number, clientY: number) => {
     setInsertTargetPathId(undefined);
     const target = document.elementFromPoint(clientX, clientY);
-    // Resolve through the ribbon's body, not through the SVG under the
+    // Resolve through the canvas body, not through the SVG under the
     // pointer. Panzoom scales the SVG element itself, so a zoomed-out canvas
     // leaves most of the body outside the SVG's own box, while the body still
     // shows the graph. Every point the author reads as canvas therefore places
@@ -681,6 +656,37 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, go, initial
       return;
     }
 
+    appendStep(created);
+    if (created.id) {
+      onMoveStep(created.id, point);
+      onSelectStep(created.id);
+    }
+  };
+
+  /** The canvas bar's press: an add control activated with no drag. The step
+   * lands at the centre of the visible canvas, on the lattice, clear of every
+   * step already placed (design D2).
+   *
+   * It measures that centre off the canvas body's own rect rather than calling
+   * `onCanvasBarDrop` with it. That handler runs `elementFromPoint`, so a
+   * press whose centre falls over an existing node would place the new step on
+   * top of it. */
+  const onCanvasBarAddStep = (kind: StepKind) => {
+    const body = document.getElementById(CANVAS_BODY_ID);
+    const rect = body?.getBoundingClientRect();
+    const svg = body?.querySelector<SVGSVGElement>("svg");
+    if (!rect || !svg) return; // the canvas is not on screen — no placement
+    const centre = snapToGrid(svgPointFromClient(svg, rect.left + rect.width / 2, rect.top + rect.height / 2));
+    // The drawn positions, not the stored blob alone (design D2). A step the
+    // steps rail's foot created and nobody dragged has no stored entry, and
+    // `CanvasView` draws it anyway. `drawnPositions` is the one home of that
+    // resolution, and `CanvasView.positionOf` reads the same function, so the
+    // press tests against exactly the nodes an author can see. Its record is
+    // keyed by step id alone, so the blob's reserved keys stay out of it.
+    const drawn = drawnPositions(steps as LayoutStep[], draft.workflow?.initialStep, saveState.layout);
+    const placed: NodePosition[] = Object.entries(drawn).map(([id, at]) => ({ id, x: at.x, y: at.y }));
+    const point = freeLatticePoint(centre, placed);
+    const created = newStep(kind, seedLocalizedText(contentLocale));
     appendStep(created);
     if (created.id) {
       onMoveStep(created.id, point);
@@ -829,11 +835,22 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, go, initial
           {tabPanel(
             "canvas",
             <>
-              {/* The canvas alone, filling the tab body. No bar and no band
-                  stand over it, and no control changes its height
-                  (`studio-canvas`). */}
+              {/* The canvas bar, then the canvas filling the body it leaves.
+                  `styles.tabBody` is a column flex, so the bar stacks above
+                  the canvas and holds its own height whatever the selection
+                  carries. No band stands over the canvas, and no control
+                  changes its height (`studio-canvas`). */}
+              <CanvasBar
+                onAddStep={onCanvasBarAddStep}
+                onDrop={onCanvasBarDrop}
+                onDragMove={onCanvasBarDragMove}
+                selectedStepIds={selectedStepIds}
+                unconnected={unconnected}
+                onDeleteSelection={deleteSelection}
+                groups={groups}
+                onGroupsChange={onGroupsChange}
+              />
               <div id={CANVAS_BODY_ID} {...stylex.props(styles.canvasRegion)}>
-                <CanvasPalette onDrop={onPaletteDrop} onDragMove={onPaletteDragMove} />
                 <CanvasView
                   layout={saveState.layout}
                   onMoveStep={onMoveStep}
@@ -853,86 +870,6 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, go, initial
                   visible={!jsonOpen && openTab === "canvas"}
                 />
               </div>
-              {/* A set of several steps names no one step, so the canvas keeps
-                  the selection count, the delete control and the group
-                  controls for it (`studio-canvas`). */}
-              {selectedStepIds.length > 1 && (
-                <aside {...stylex.props(styles.canvasInspector, styles.canvasSelection)}>
-                  <div {...stylex.props(styles.canvasSelectionHeading)}>
-                    <span className="canvas-selection-label">{t("canvas.selectionHeading")}</span>
-                    <span {...stylex.props(styles.canvasSelectionCount)}>{selectedStepIds.length}</span>
-                  </div>
-                  <button type="button" className="btn btn-secondary" onClick={deleteSelection}>
-                    {t("canvas.selectionRemove")}
-                  </button>
-                  {/* One selection, three states: a set no group holds offers
-                      grouping, a set that IS a group offers that group's own
-                      controls, and a set spanning a group's members and
-                      others offers neither. The canvas keeps no group
-                      selection of its own (design.md). */}
-                  {(() => {
-                    const matched = groupMatching(selectedStepIds, groups);
-                    if (matched) {
-                      return (
-                        <>
-                          <label {...stylex.props(styles.canvasGroupNameField)}>
-                            {t("canvas.groupName")}
-                            <input
-                              value={matched.name}
-                              onChange={(e) =>
-                                onGroupsChange(groups.map((g) => (g.id === matched.id ? { ...g, name: e.target.value } : g)))
-                              }
-                            />
-                          </label>
-                          <button
-                            type="button"
-                            className="btn btn-secondary"
-                            // The same attribute the canvas box's own
-                            // disclosure carries. Both write this one
-                            // `collapsed` flag, so neither may report it as a
-                            // pressed state instead. `aria-controls` names the
-                            // members `<g>`, and only where the box draws:
-                            // below two members `drawnBox` returns nothing and
-                            // no wrapper exists to name. A step delete can
-                            // leave a group at one member.
-                            aria-expanded={matched.collapsed !== true}
-                            aria-controls={matched.stepIds.length > 1 ? groupMembersDomId(matched.id) : undefined}
-                            onClick={() =>
-                              onGroupsChange(
-                                groups.map((g) => (g.id === matched.id ? { ...g, collapsed: !g.collapsed } : g)),
-                              )
-                            }
-                          >
-                            {matched.collapsed ? t("canvas.groupExpand") : t("canvas.groupCollapse")}
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-secondary"
-                            onClick={() => onGroupsChange(groups.filter((g) => g.id !== matched.id))}
-                          >
-                            {t("canvas.groupUngroup")}
-                          </button>
-                        </>
-                      );
-                    }
-                    if (!canGroup(selectedStepIds, groups)) return null;
-                    return (
-                      <button
-                        type="button"
-                        className="btn btn-secondary"
-                        onClick={() =>
-                          onGroupsChange([
-                            ...groups,
-                            { id: `grp_${crypto.randomUUID()}`, stepIds: [...selectedStepIds], name: t("canvas.groupDefaultName") },
-                          ])
-                        }
-                      >
-                        {t("canvas.groupCreate")}
-                      </button>
-                    );
-                  })()}
-                </aside>
-              )}
             </>,
           )}
 
