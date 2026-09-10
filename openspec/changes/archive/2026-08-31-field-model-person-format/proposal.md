@@ -10,7 +10,7 @@ assignment strategy reads one.
 Change 1 built the `format` axis this needs, and it sits archived at
 `openspec/changes/archive/2026-08-30-field-model-type-format-control/`. That
 axis is a validated semantic layered on a `type`, with its own publish-time
-check and its own studio picker. D20 in `docs/field-model-redesign.md`
+check and its own studio picker. D20 in `openspec/changes/archive/2026-08-30-field-model-type-format-control/field-model-redesign.md`
 (`:155`) named `person` as the format that change deliberately deferred. It
 waited on the strategy and the people list it needs. This change ships both.
 Decisions D10 through D15, D20, D22 and D23 in that same record settle every

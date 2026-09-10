@@ -12,7 +12,7 @@ price is why `docs/decisions.md` turned down a "Long text" type.
 
 This change splits the key along the three jobs. A widget then costs a
 `control` member, and a validated semantic costs a `format` member. Decisions
-D1 to D25 in `docs/field-model-redesign.md` settle every question this
+D1 to D25 in `field-model-redesign.md` settle every question this
 proposal implements.
 
 ## What Changes

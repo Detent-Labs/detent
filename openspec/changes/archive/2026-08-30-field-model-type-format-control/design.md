@@ -1,6 +1,6 @@
 ## Context
 
-See `proposal.md` for motivation, and `docs/field-model-redesign.md` for the
+See `proposal.md` for motivation, and `field-model-redesign.md` for the
 brainstorming record whose decisions D1 to D25 this change implements. This
 document records the technical choices that record left to the implementation.
 
@@ -297,5 +297,5 @@ holds state that the revert would leave behind.
 
 ## Open Questions
 
-None. `docs/field-model-redesign.md` closed the six questions its own record
+None. `field-model-redesign.md` closed the six questions its own record
 held, and Decisions 1 to 9 above settle what it left to implementation.

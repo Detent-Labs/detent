@@ -6,7 +6,7 @@ therefore fakes that note with a read-only string field carrying a default. The
 faked field then lands in `data` and travels through every report, having never
 held a value.
 
-Two of the three shapes `docs/field-model-redesign.md` groups under S2 already
+Two of the three shapes `openspec/changes/archive/2026-08-30-field-model-type-format-control/field-model-redesign.md` groups under S2 already
 work today. A summary of what the applicant entered is a view field with
 `readonly: true`, which `filterToEditable` drops before submission. A section
 heading is a `group` field, which `leafFields` keeps out of the CEL `data`
@@ -214,7 +214,7 @@ Docs:
   rejected
 - `.claude/rules/process-contract.md`: the view sentence at `:72` names both
   entry kinds
-- `docs/current-state.md` and `docs/field-model-redesign.md`
+- `docs/current-state.md` and `openspec/changes/archive/2026-08-30-field-model-type-format-control/field-model-redesign.md`
 - `docs/decisions.md`: the four kinds this change leaves out become an open
   question there. That is the register S1's item list already uses
 

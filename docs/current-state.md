@@ -14,7 +14,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   so those two types are hand-written and their schemas use z.lazy (the only place
   a type is not inferred).
 - The field model is three keys (`field-model-type-format-control`,
-  `docs/field-model-redesign.md`). `type` is the value form, `format` the
+  `openspec/changes/archive/2026-08-30-field-model-type-format-control/field-model-redesign.md`). `type` is the value form, `format` the
   meaning of the value, `control` the input form. One test sorts a candidate
   member: anything a reader outside the renderer touches belongs in `format`.
   - `baseFieldType` holds six value forms: `string`, `number`, `boolean`,
@@ -2654,10 +2654,10 @@ Stage-by-stage status is in `ROADMAP.md`.
   validation is `validateSubmissionData`'s job, not the transport edge's.
 
   `api.ts` and `admin-queries.ts` used to duplicate `decodeCursor`/
-  `encodeCursor` verbatim (`PONYTAIL-AUDIT.md` finding 9). Both now import
-  them from the new `src/pagination.ts`. Now `decodeCursor` takes an
-  `arity` parameter. Listing cursors are 2-tuples; `getInstanceRecord`'s is a
-  3-tuple. It wraps the base64url-decode-then-`JSON.parse` step in a `try`.
+  `encodeCursor` verbatim, until `2026-07-29-correct-api-error-responses`.
+  Both now import them from the new `src/pagination.ts`. Now `decodeCursor`
+  takes an `arity` parameter. Listing cursors are 2-tuples;
+  `getInstanceRecord`'s is a 3-tuple. It wraps the base64url-decode-then-`JSON.parse` step in a `try`.
   It then checks the result is an array of exactly `arity` strings, raising
   `RequestShapeError` otherwise.
 
