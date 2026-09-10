@@ -78,9 +78,9 @@
 
 ## 9. Verification
 
-- [ ] 9.1 Run `bun run typecheck`, then `bun run build`, then the full
+- [x] 9.1 Run `bun run typecheck`, then `bun run build`, then the full
   `bun test` with `DATABASE_URL` set. Report what each printed.
-- [ ] 9.2 Run the prose gate and the whitespace gate over the pushed range.
+- [x] 9.2 Run the prose gate and the whitespace gate over the pushed range.
   Pipe the range into each script.
 - [ ] 9.3 Check the Canvas tab in a real browser. Add a step by press, add one
   by drag, and drop one on a path.
