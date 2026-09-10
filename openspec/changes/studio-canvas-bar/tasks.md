@@ -47,11 +47,11 @@
 
 ## 6. Strings
 
-- [ ] 6.1 Add `newStepNote(kind)` to `draft/guided-labels.ts`, beside
+- [x] 6.1 Add `newStepNote(kind)` to `draft/guided-labels.ts`, beside
   `newStepPhrase`. Follow `assignmentStrategyLabel`'s name and note pair.
-- [ ] 6.2 Add the bar's keys to the English studio catalog. Cover the button,
+- [x] 6.2 Add the bar's keys to the English studio catalog. Cover the button,
   the caret, the two menu entries and their notes.
-- [ ] 6.3 Add the key naming an unconnected step, and the caret button's own
+- [x] 6.3 Add the key naming an unconnected step, and the caret button's own
   accessible name. The studio catalog ships English alone.
 - [ ] 6.4 Drop the palette's own heading key. Verify
   `i18n-catalog-parity.test.ts` passes.
@@ -64,7 +64,7 @@
   to the button.
 - [ ] 7.3 Assert the reachability report stands for one selected step alone.
   Cover the unreached case and the reached one.
-- [ ] 7.4 Extend `studio-guidedLabels.test.ts`. Assert a note comes back for
+- [x] 7.4 Extend `studio-guidedLabels.test.ts`. Assert a note comes back for
   each of the three kinds.
 
 ## 8. Docs and rules
