@@ -647,6 +647,18 @@ export type Path = z.infer<typeof path>;
 // View (flat) + Assignment.
 // ============================================================
 
+/** One entry in a view's tab strip. `key` is this view's own reference
+ * anchor for `ViewField.tab`/`ViewNote.tab`, the same way `group` already
+ * names a `type: "group"` field's `key`. A tab carries no `id`: nothing
+ * outside its own view addresses one, the same as a note. The `view`
+ * superRefine below enforces the five rules that hold the tab/field/group
+ * hierarchy together. */
+export const viewTab = z.object({
+  key: z.string().trim().min(1),
+  label: localizedText,
+});
+export type ViewTab = z.infer<typeof viewTab>;
+
 export const viewField = z
   .object({
     ref: fieldId,
@@ -654,6 +666,12 @@ export const viewField = z
     required: z.union([z.boolean(), expression]).optional(),
     readonly: z.union([z.boolean(), expression]).optional(),
     group: z.string().optional(),
+    /** Names a key in the same view's `tabs`. Layout only, exactly as `group`
+     * is: it reaches no guard, no CEL context and no submission check. An
+     * absent value and an empty string both read as no tab, matching
+     * `group`. The `view` superRefine enforces where a tab may and must
+     * appear. */
+    tab: z.string().optional(),
     /** How many of the view's columns this field occupies. Layout only: it
      * reaches no guard, no CEL context and no submission check. Absent means 1,
      * and the renderer clamps to `min(span, columns)`, so a span wider than the
@@ -690,6 +708,9 @@ export const viewNote = z.object({
   text: localizedText,
   visible: z.union([z.boolean(), expression]).optional(),
   group: z.string().optional(),
+  /** Names a key in the same view's `tabs`. See `ViewField.tab`; the same
+   * rules and the same empty-string-reads-as-absent convention apply. */
+  tab: z.string().optional(),
   span: z.union([z.literal(1), z.literal(2)]).optional(),
 });
 export type ViewNote = z.infer<typeof viewNote>;
@@ -708,18 +729,64 @@ export function isViewField(entry: ViewEntry): entry is ViewField {
   return !("kind" in entry);
 }
 
-export const view = z.object({
-  fields: z.array(viewEntry),
-  /** How many columns the step's form lays its root fields out in. Layout
-   * only, like `ViewField.span`. Absent means 1, which is the single stacked
-   * column every body written before this key parsed to, so no stored body
-   * changes shape and no `definitionHash` moves.
-   *
-   * Optional, and widening the union later stays safe: this schema is also the
-   * deserializer for stored immutable bodies, so narrowing it or making the key
-   * required would make an already-published body throw on READ. */
-  columns: z.union([z.literal(1), z.literal(2)]).optional(),
-});
+export const view = z
+  .object({
+    fields: z.array(viewEntry),
+    /** How many columns the step's form lays its root fields out in. Layout
+     * only, like `ViewField.span`. Absent means 1, which is the single stacked
+     * column every body written before this key parsed to, so no stored body
+     * changes shape and no `definitionHash` moves.
+     *
+     * Optional, and widening the union later stays safe: this schema is also the
+     * deserializer for stored immutable bodies, so narrowing it or making the key
+     * required would make an already-published body throw on READ. */
+    columns: z.union([z.literal(1), z.literal(2)]).optional(),
+    /** An ordered tab strip for this view's root entries. Array position is
+     * tab order, the way `fields`'s own position already is the field order.
+     * Optional and additive: no body published before this key carried
+     * `tabs` or `tab`, so an untabbed body parses exactly as it does today
+     * and its `definitionHash` does not move. */
+    tabs: z.array(viewTab).optional(),
+  })
+  /** The five rules that hold a view's tab/field/group hierarchy together.
+   * All view-scoped, so one superRefine here covers all five rather than
+   * splitting across `viewField`/`viewNote`. No published body carries
+   * `tabs` or `tab`, so none of the five can strand a pinned instance -
+   * the same schema-placement criterion `validationMode`-requires-`validation`
+   * already follows. */
+  .superRefine((v, ctx) => {
+    const add = (message: string, path: (string | number)[]) =>
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message, path });
+
+    const tabs = v.tabs ?? [];
+
+    // Rule 1: two members of one view's `tabs` must not share a `key`.
+    const declaredKeys = new Set<string>();
+    tabs.forEach((t, i) => {
+      if (declaredKeys.has(t.key)) add(`duplicate tab key: ${t.key}`, ["tabs", i, "key"]);
+      declaredKeys.add(t.key);
+    });
+
+    v.fields.forEach((entry, i) => {
+      const tab = entry.tab;
+      const hasTab = !!tab;
+      const hasGroup = !!entry.group;
+
+      // Rule 5: a view declaring no tab carries no `tab` on any entry.
+      if (tabs.length === 0) {
+        if (hasTab) add("tab is set, but this view declares no tabs", ["fields", i, "tab"]);
+        return;
+      }
+      // Rule 2: a non-empty `tab` must name a `key` the view's `tabs` declares.
+      if (hasTab && !declaredKeys.has(tab!)) add(`tab does not name a declared tab: ${tab}`, ["fields", i, "tab"]);
+      // Rule 4: an entry declaring a non-empty `group` declares no `tab` - its
+      // group holds it, and the group's own entry is what names the tab.
+      if (hasGroup && hasTab) add("an entry inside a group must not declare tab", ["fields", i, "tab"]);
+      // Rule 3: a view declaring at least one tab carries a non-empty `tab`
+      // on every entry that declares no `group`.
+      if (!hasGroup && !hasTab) add("entry outside a group must declare tab once the view declares tabs", ["fields", i, "tab"]);
+    });
+  });
 export type View = z.infer<typeof view>;
 
 export const assignment = z.object({ strategy: plugin });
@@ -970,6 +1037,9 @@ export const processBody = z
       // Cancel transition: [source.onCancel, cancel-sink.onEntry]. The injected
       // sink has no onEntry, so this reduces to disjointness among onCancel.
       disjointOutputs([...(s.onCancel ?? []), ...(sink?.onEntry ?? [])], ["workflow", "steps", i, "onCancel"]);
+      (s.view?.tabs ?? []).forEach((t, j) => {
+        requireBaseLocale(t.label, ["workflow", "steps", i, "view", "tabs", j, "label"]);
+      });
       (s.view?.fields ?? []).forEach((vf, j) => {
         if (isViewField(vf)) {
           if (!fieldIds.has(vf.ref)) add(`view ref does not resolve: ${vf.ref}`, ["workflow", "steps", i, "view", "fields", j, "ref"]);

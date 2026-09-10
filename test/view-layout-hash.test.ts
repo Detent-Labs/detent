@@ -42,6 +42,11 @@ import { canonicalize } from "../src/schema/canonical-json.js";
  * fresh measurement. The two subprocess bodies declare no removed type
  * member, so their literals are unmoved — which is the evidence that the
  * type rename, and not something wider, is what moved the third.
+ *
+ * `form-view-tabs` adds `view.tabs` and `tab` on a view entry, both optional.
+ * None of these three example bodies declares either key, so all three
+ * literals stay exactly as `field-model-type-format-control` left them —
+ * unlike the earlier changes above, this one moves nothing.
  */
 const PRE_CHANGE_HASHES: Record<string, string> = {
   "expense-approval.json": "4d340d360fc4c1c92b13d8cf69f72ba2e28a09c0affcac0d0c8358f01162e5b1",
@@ -62,19 +67,23 @@ describe("view layout keys do not move definitionHash", () => {
       expect(definitionHash(processBody.parse(bodyOf(file)))).toBe(expected);
     });
 
-    it(`${file} parses back carrying neither columns nor span`, () => {
+    it(`${file} parses back carrying neither columns nor span nor tabs`, () => {
       // The hash is taken over the canonicalized parse output, so an absent
       // optional that started materializing as a default would show up here
       // before it showed up as a moved hash.
       const canonical = canonicalize(processBody.parse(bodyOf(file)));
       expect(canonical).not.toContain('"columns"');
       expect(canonical).not.toContain('"span"');
+      expect(canonical).not.toContain('"tabs"');
+      expect(canonical).not.toContain('"tab"');
     });
   }
 
   it("leaves an absent optional absent rather than defaulting it", () => {
     expect(view.parse({ fields: [] })).not.toHaveProperty("columns");
+    expect(view.parse({ fields: [] })).not.toHaveProperty("tabs");
     expect(viewField.parse({ ref: "field_x" })).not.toHaveProperty("span");
+    expect(viewField.parse({ ref: "field_x" })).not.toHaveProperty("tab");
   });
 
   it("keeps a body that declares the keys distinct from one that does not", () => {
@@ -91,6 +100,35 @@ describe("view layout keys do not move definitionHash", () => {
         steps: raw.workflow.steps.map((s: any) => (s.view ? { ...s, view: { ...s.view, columns: 2 } } : s)),
       },
     });
+    expect(definitionHash(laid)).not.toBe(definitionHash(bare));
+  });
+
+  it("an untabbed body's definitionHash stays put; declaring tabs is a different body", () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const raw = bodyOf("expense-approval.json") as any;
+    const bare = processBody.parse(raw);
+    expect(definitionHash(bare)).toBe(PRE_CHANGE_HASHES["expense-approval.json"]);
+
+    // Tab every root (ungrouped) entry of the first step that declares a
+    // view, satisfying rule 3 of the "view's tabs and its entries form one
+    // hierarchy" requirement, and leave every other step untouched.
+    let tabbed = false;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const steps = raw.workflow.steps.map((s: any) => {
+      if (tabbed || !s.view) return s;
+      tabbed = true;
+      return {
+        ...s,
+        view: {
+          ...s.view,
+          tabs: [{ key: "all", label: { [raw.baseLocale]: "All" } }],
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          fields: s.view.fields.map((f: any) => (f.group ? f : { ...f, tab: "all" })),
+        },
+      };
+    });
+    expect(tabbed).toBe(true);
+    const laid = processBody.parse({ ...raw, workflow: { ...raw.workflow, steps } });
     expect(definitionHash(laid)).not.toBe(definitionHash(bare));
   });
 });
