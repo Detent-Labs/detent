@@ -1,6 +1,15 @@
 import { Fragment, useEffect, useState, type ReactNode } from "react";
 import * as stylex from "@stylexjs/stylex";
-import { FIELD_KINDS, fieldKindOf, type DataSourceDef, type Expression, type FieldDef, type FieldKindName, type FieldOption } from "workflow-engine/schema";
+import {
+  FIELD_KINDS,
+  fieldKindOf,
+  type DataSourceDef,
+  type Expression,
+  type FieldDef,
+  type FieldId,
+  type FieldKindName,
+  type FieldOption,
+} from "workflow-engine/schema";
 import { FieldForm } from "form-ui";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
 import type { DraftOf } from "../draft/types";
@@ -19,7 +28,7 @@ import { FieldValidationEditor } from "./shared/FieldValidationEditor";
 import { DefaultValueEditor } from "./shared/DefaultValueEditor";
 import { fieldLocaleGaps, missingTranslationWarning, resolveDraftLocalizedText, seedLocalizedText } from "../draft/localized-text";
 import { draftFields } from "../draft/fields";
-import { syncViewGroupsOnGroupRename } from "../draft/view-group-sync.js";
+import { syncViewGroupsOnGroupKeyGained, syncViewGroupsOnGroupRename } from "../draft/view-group-sync.js";
 import { droppedByKindChange, nextFieldKey } from "./fieldCatalogLogic.js";
 import { fieldCheckZone, type FieldCheckZone } from "./fieldCheckZone.js";
 import { fieldKindLabel } from "../draft/field-type-labels";
@@ -374,29 +383,58 @@ function isCustomType(type: DraftField["type"]): type is DraftOf<FieldDef>["type
 /**
  * The key input's own write, at both sites that carry one: the top-level
  * `FieldEditor` and the recursive `SubFieldRow` (a group's own child, at any
- * depth, including a group nested inside another group). An ordinary
- * key edit stays on the existing `onChange` patch path. A `type: "group"`
- * field's key edit goes through `mutate` directly instead, because it must
- * also rewrite every view entry naming the old key — a write `onChange`'s
- * patch (bubbled up to `updateInDraftArray`) cannot reach, since it only
- * ever touches the field catalog (`studio-app`: "Renaming a group field's
- * key rewrites the view entries naming it"). Both writes land in that one
- * `mutate`, so no reader ever sees the catalog and the views disagree.
+ * depth, including a group nested inside another group). An ordinary key
+ * edit -- not a group, or a group whose key hasn't actually changed -- stays
+ * on the existing `onChange` patch path.
+ *
+ * A `type: "group"` field's real key change goes through `mutate` directly
+ * instead, because it must also rewrite view entries the catalog write
+ * (`onChange`, bubbled to `updateInDraftArray`) never reaches. Two shapes:
+ *
+ * - The group already carried a key (`oldKey !== ""`): every entry naming
+ *   `oldKey` gets `newKey` (`syncViewGroupsOnGroupRename`).
+ * - The group is GAINING its first key (`oldKey === ""`): no entry could
+ *   ever have named `""`, so that rewrite would match nothing -- but the
+ *   group's own direct children just became nameable for the first time,
+ *   and any of them already placed on a view needs `group: newKey`
+ *   (`syncViewGroupsOnGroupKeyGained`). Leaving them unset strands them the
+ *   same way an unsynced rename would (`studio-app`, and
+ *   `compile.ts::checkViewGroupReferences`'s third half).
  *
  * `field.id`, not an array index, finds the target inside the mutate's own
  * draft clone: `SubFieldRow` never learns its own path through the catalog
  * tree, and the id resolves at any depth.
+ *
+ * `onWrite`, when given, fires on every write this function makes,
+ * including the direct-`mutate` branch -- which bypasses `onChange` and so
+ * cannot trigger `FieldEditor`'s own `setDefinitionWrites` bump the way the
+ * ordinary branch does for free (`studio-app`: a definition-half write
+ * tints the effect half's usage rows). The bump is independent local UI
+ * state, not a second Draft write; the catalog and view halves still land
+ * in the one `mutate` either way.
  */
-function writeFieldKey(mutate: Mutate, field: DraftField, onChange: (patch: Partial<DraftField>) => void, newKey: string): void {
+function writeFieldKey(
+  mutate: Mutate,
+  field: DraftField,
+  onChange: (patch: Partial<DraftField>) => void,
+  newKey: string,
+  onWrite?: () => void,
+): void {
   const oldKey = field.key ?? "";
-  if (field.type !== "group" || oldKey === "" || oldKey === newKey) {
+  if (field.type !== "group" || oldKey === newKey) {
     onChange({ key: newKey });
     return;
   }
+  onWrite?.();
   mutate((d) => {
     const target = draftFields(d).find((f) => f.id === field.id);
     if (target) target.key = newKey;
-    syncViewGroupsOnGroupRename(d, oldKey, newKey);
+    if (oldKey === "") {
+      const childIds = (field.fields ?? []).map((f) => f.id).filter((fid): fid is FieldId => fid !== undefined);
+      syncViewGroupsOnGroupKeyGained(d, childIds, newKey);
+    } else {
+      syncViewGroupsOnGroupRename(d, oldKey, newKey);
+    }
   });
 }
 
@@ -1013,7 +1051,7 @@ function FieldEditor({
                 type="text"
                 {...stylex.props(styles.studioMono)}
                 value={field.key ?? ""}
-                onChange={(e) => writeFieldKey(mutate, field, onChange, e.target.value)}
+                onChange={(e) => writeFieldKey(mutate, field, onChange, e.target.value, () => setDefinitionWrites((n) => n + 1))}
               />
             </label>
           </Zone>

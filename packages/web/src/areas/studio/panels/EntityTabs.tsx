@@ -431,6 +431,9 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
     // re-derived from `targetGroupId`: `moveFieldToGroup` grafts the field
     // directly under that group, so its key is the field's whole new parent
     // key (view-group-sync.ts's `newGroupKey`). `undefined` at the top level.
+    // A still-empty key passes through unchanged here on purpose:
+    // `syncViewGroupsOnFieldMove` itself normalizes "" to "no group", the
+    // same way `view-tree.ts::isGroupCard`'s `!!field.key` test does.
     const newGroupKey = targetGroupId === undefined ? undefined : flattenDraftFields(next).find((f) => f.id === targetGroupId)?.key;
     mutate((d) => {
       d.fields = next;
