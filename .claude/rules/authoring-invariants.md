@@ -172,10 +172,24 @@ that sequence, over one `walkFieldsIndexed` pass
   that group field. `form-ui` draws only the entries with no `group`, and a
   group field then draws the entries naming its key, so an entry failing
   either half leaves the form with no message. An empty `group` reads as no
-  group, matching the renderer. The rule reaches a note entry too, and it does
-  not ask the view group to follow the catalog's own nesting: the view carries
-  presentation, and `purchase-requisition.json` heads one field under five
-  groups across five steps. The compile pass checks this
+  group, matching the renderer. The rule reaches a note entry too.
+  A third half binds a field entry (one carrying a `ref`): its `group` names
+  the group field that holds it in the catalog's own `fields`, the catalog's
+  one answer to where a field belongs for the whole process. A field the
+  catalog holds at the top level has no `group` at all. This half binds both
+  ways — a field entry whose catalog parent is a group must declare that
+  group's key, and an absent or empty `group` on such an entry fails to
+  publish exactly as a wrong one does, closing the hole where a
+  hand-authored body lifts a grouped field onto the form's root while the
+  catalog still holds it in a group, and it reaches a nested group's own
+  entry the same way, against the outer group's key.
+  `purchase-requisition.json` now nests each such field under one catalog
+  parent instead of naming a different group per step. A note is exempt from
+  the third half alone; the first two halves still bind it, so its `group`
+  may name any group field the same view carries. A group whose own `key` is
+  empty is the one exception on the catalog side — its children can name
+  nothing, so they have no `group` either, and such a body already fails the
+  field-key grammar before this rule runs. The compile pass checks all of it
   (`compile.ts::checkViewGroupReferences`). A Zod refinement on `viewField`
   would strand the pinned instances of three bodies published before the
   check — see `definition-contract`'s placement rule.
