@@ -95,6 +95,13 @@ export function newStepPhrase(kind: StepKind): string {
   return stepKindPhrase(kind === "end" ? "terminal" : kind === "subprocess" ? "subprocess" : "participant");
 }
 
+/** The short note under the palette's phrase, on `newStepPhrase`'s own kind
+ * mapping: `end` reads the `terminal` note, since it is a flag on a task
+ * step and never a kind of its own. */
+export function newStepNote(kind: StepKind): string {
+  return t(`stepKindNote.${kind === "end" ? "terminal" : kind === "subprocess" ? "subprocess" : "participant"}`);
+}
+
 /** A process's own label, never its `proc_` id. Two surfaces read it: the
  * subprocess picker and the steps rail's summary line for a subprocess step.
  * A published body carries a base-locale entry by invariant, so the `key`
