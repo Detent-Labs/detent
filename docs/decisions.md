@@ -1450,7 +1450,8 @@ identifies the site: gate script lines, test assertions and spec lines. A dated
 count is history and stays as measured.
 
 Entries 1 to 9 come from the 2026-08-16 survey. Entries 10 to 46 are the
-deliberate refusals, all of them.
+deliberate refusals, all of them. Entries 47 to 51 come from the library
+audit of 2026-09-10.
 
 1. Five dependencies each earn their place. `@dagrejs/dagre` drives a layered
    layout with group-collapse. `@panzoom/panzoom` backs the canvas transform.
@@ -1695,3 +1696,35 @@ deliberate refusals, all of them.
     handler itself. Further sites, `TaskScreen.tsx` and `PlayerScreen.tsx`
     among them, kept their own ladder and share only the `is401` predicate.
     [`packages/web/src/shell/useFail.ts`]
+47. **Replace the SMTP client with nodemailer.** Rejected 2026-09-10.
+    `nodemailer` 10.0.3 runs under Bun 1.3.11 and delivers to Mailpit. It
+    still cannot serve here. Its connection sends `DATA` once any recipient
+    is accepted, and reports the rest as rejected. No option turns that off.
+    The spec forbids a partial delivery, because a transient retry would then
+    send a second copy to every accepted address. That rule stays. The wire
+    code stays with it. [`src/handlers/notification-email.ts`,
+    `openspec/specs/notification-email-action-handler/spec.md`, "Every
+    recipient is accepted before the message is sent"]
+48. **Route through `Bun.serve({ routes })`.** Rejected 2026-09-10. The
+    hand router is `seg`, `match` and one loop, about 25 lines. The rest of
+    the dispatch stays under either router: the navigation check before the
+    match, the tenant handle per request, the preflight derived from the
+    table, and the binary exit. Bun's router derives no preflight. It also
+    answers only through a listening server, so the 16 suites that call
+    `createServer` with a bare `Request` would each need a port.
+    [`src/http/server.ts`]
+49. **Parse CLI arguments with `node:util.parseArgs`.** Rejected 2026-09-10.
+    Both CLIs take positionals only, and `parseArgs` hands the same array
+    back under `positionals`. The four scripts read one `process.argv` entry
+    each. Nothing shrinks. [`src/auth/cli.ts`, `src/tenancy/cli.ts`]
+50. **Format durations with `Intl.DurationFormat`.** Rejected 2026-09-10.
+    The formatter renders every non-zero field. It cannot print `5.5 h`, and
+    German comes out as `Std.`, against the catalog's `Std`. The largest-unit
+    selection stays hand-written either way. [`formatDuration`,
+    `packages/web/src/areas/reporting/screens/reportingLogic.ts`]
+51. **Move the web area's fetching onto TanStack Query.** Deferred
+    2026-09-10, undecided. The tree holds 88 `useEffect` fetches and 49
+    loading flags across the four areas. A query cache would earn its place
+    only through invalidation after a mutation. That is the stale-UI defect
+    class the browser check exists for. Revisit when that class recurs.
+    Until then the hand-written clients stay.
