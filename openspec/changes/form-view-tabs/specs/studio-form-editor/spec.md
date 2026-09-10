@@ -148,19 +148,28 @@ The participant preview SHALL show the draft's tabs, through the same
 `FieldForm` a participant gets. It SHALL open the tab the canvas is showing.
 The two halves of the editor then never disagree about which tab is open.
 
-Selecting a tab in the preview SHALL select the same tab on the canvas. The
-author edits and previews one tab at a time.
+The strip the preview draws SHALL NOT be interactive. This capability's own
+live requirement gives the preview the `inert` attribute, so it takes no
+pointer interaction and no keyboard focus. A tab there is part of what an
+author reads.
+
+The canvas carries the strip an author operates. At the editor's default
+width the preview stands beside that canvas, in its own column. It drops
+below only under the narrow breakpoint. Either way the two strips show one
+selection, and only one of them takes a click. The author gives up nothing.
 
 One selected-tab value SHALL drive both halves. The editor owns it and passes
 it to `FieldForm` as `activeTab`, taking `onTabChange` back. That is the
 `form-ui` capability's own controlled shape, so the two halves cannot drift.
+`onTabChange` stays wired and stays silent while `inert` holds.
 
 #### Scenario: The preview opens the tab the canvas shows
 
 - **WHEN** the developer selects the second tab on the canvas
 - **THEN** the preview draws the tab strip with the second tab open
 
-#### Scenario: Selecting a tab in the preview moves the canvas
+#### Scenario: The preview's own strip takes no click
 
-- **WHEN** the developer selects the third tab inside the preview
-- **THEN** the canvas shows the third tab's entries
+- **WHEN** the developer clicks a tab inside the preview
+- **THEN** nothing moves, because the preview carries `inert`
+- **AND** the canvas keeps showing the tab it showed

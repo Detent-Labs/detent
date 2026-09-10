@@ -168,10 +168,14 @@ Both strips read one token module, `form-ui/tokens.stylex`. `ProcessTabRow.tsx`
 already imports it. The two strips share the tokens and no component: the
 dependency direction forbids `form-ui` importing from `packages/web`.
 
-Two strips then stack in the form editor, the process row above and the
-form's own below. That is the accepted cost of one tab language, chosen over
-a quieter second treatment. The step title sits between them and separates
-the levels.
+The two strips never appear together. `EditScreen.tsx` renders the form
+editor INSTEAD of the process tab row, on one branch of `formStepId`. One
+strip is on screen at a time.
+
+An earlier draft of this section assumed they stacked. It weighed a quieter
+second treatment against that cost. Reading `EditScreen.tsx` settles it. No
+stacking leaves no level to disambiguate, so the identical grammar is right
+outright rather than a cost accepted.
 
 A tab holding issues carries a filled `stamp-refusal` count beside its label:
 mono, 11px, refusal ground, paper text. One stamp per tab, which is the Stamp
