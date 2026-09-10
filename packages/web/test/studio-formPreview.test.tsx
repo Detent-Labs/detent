@@ -173,14 +173,39 @@ describe("The preview's tab strip", () => {
     // interactive … `onTabChange` stays wired and stays silent while `inert`
     // holds". The canvas carries the strip that answers a click.
     //
-    // The click itself is a browser fact. What a static render proves is the
-    // mechanism behind it: the pane declares one `inert`, and the strip comes
-    // after it, so the strip sits in that subtree rather than beside it.
+    // The click itself is a browser fact, and `inert` suppressing interaction
+    // on its subtree is a platform guarantee. What this repo owns is the one
+    // precondition under both: the strip is a DESCENDANT of an `inert`
+    // element. It is load-bearing — `onTabChange={setActiveTab}` means a
+    // strip that escaped that subtree really would move the canvas.
     const html = render(TABBED);
-    const inert = html.indexOf('inert=""');
 
-    expect(inert).toBeGreaterThan(-1);
-    expect((html.match(/inert=""/g) ?? []).length).toBe(1);
-    expect(html.indexOf('role="tablist"')).toBeGreaterThan(inert);
+    // React emitted the attribute at all.
+    expect(html.indexOf('inert=""')).toBeGreaterThan(-1);
+    expect(tablistsInsideInert(html)).toBe(1);
+  });
+
+  it("counts no strip for one sitting BESIDE the inert container", () => {
+    // The arrangement the guard above exists to reject, and the reason it
+    // reads the tree rather than the string: in serialized markup a later
+    // string is a descendant OR a following sibling, and both of these put
+    // `role="tablist"` after `inert=""`.
+    expect(tablistsInsideInert('<div inert=""><div>m</div><div role="tablist"></div></div>')).toBe(1);
+    expect(tablistsInsideInert('<div inert=""><div>m</div></div><div role="tablist"></div>')).toBe(0);
   });
 });
+
+/** How many tab strips sit inside an `inert` element. A descendant selector,
+ * which is the relation the scenario turns on; `HTMLRewriter` ships with Bun,
+ * so proving it costs no dependency and no DOM library. */
+function tablistsInsideInert(html: string): number {
+  let count = 0;
+  new HTMLRewriter()
+    .on("[inert] [role=tablist]", {
+      element() {
+        count++;
+      },
+    })
+    .transform(html);
+  return count;
+}
