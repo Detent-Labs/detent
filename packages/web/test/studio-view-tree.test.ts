@@ -172,6 +172,32 @@ describe("nudgeViewField moves an entry among its own siblings, scoped by its gr
     const next = nudgeViewField(rows, 4, -1, catalog);
     expect(refs(next)).toEqual(["root1", "root2", "group_g", "x", "y"]);
   });
+
+  it("a member's swap keeps the pair adjacent even when an unrelated entry sits between them in the array", () => {
+    const catalog = [group("group_g", "g")];
+    // "between" is not a member of group_g: it just happens to sit
+    // physically between x and y in `rows`.
+    const rows = [ref("group_g"), ref("x", "g"), ref("between"), ref("y", "g")];
+    const next = nudgeViewField(rows, 3, -1, catalog);
+    expect(refs(next)).toEqual(["group_g", "y", "x", "between"]);
+  });
+
+  it("a root's step-over skips exactly one sibling, not an unrelated entry physically interleaved inside that sibling's members", () => {
+    const catalog = [group("group_g", "g")];
+    // rootB is its own root sibling of rootA, not part of group_g, but it
+    // physically sits between group_g's two members (x and y). A raw
+    // footprint-max-index slot would sweep rootB along too, turning a
+    // one-sibling step into two; the sibling-boundary slot must not.
+    const rows = [ref("rootA"), ref("group_g"), ref("x", "g"), ref("rootB"), ref("y", "g"), ref("rootC")];
+    const next = nudgeViewField(rows, 0, 1, catalog);
+    // Root order after the move: group_g, rootA, rootB, rootC -- rootA
+    // stepped past group_g alone. x and y stay group_g's members either way,
+    // wherever they physically land.
+    expect(refs(next)).toEqual(["group_g", "x", "rootA", "rootB", "y", "rootC"]);
+    const roots = viewTree(next, catalog);
+    expect(refs(roots.map((n) => n.entry))).toEqual(["group_g", "rootA", "rootB", "rootC"]);
+    expect(refs(roots[0]!.members!.map((n) => n.entry))).toEqual(["x", "y"]);
+  });
 });
 
 describe("removeViewEntry cascades from a group's own card to its members", () => {
@@ -190,6 +216,22 @@ describe("removeViewEntry cascades from a group's own card to its members", () =
   it("removes only itself for a plain field", () => {
     const rows = [ref("a"), ref("b")];
     expect(refs(removeViewEntry(rows, 0, []))).toEqual(["b"]);
+  });
+
+  it("removing an OUTER group cascades through a nested group's own card and its own members", () => {
+    const catalog = [group("group_outer", "outer", [group("group_inner", "inner", [leaf("field_z", "z")])])];
+    const rows = [
+      ref("root1"),
+      ref("group_outer"),
+      ref("group_inner", "outer"),
+      ref("field_z", "inner"),
+      ref("root2"),
+    ];
+    // A single-level filter on `.group !== "outer"` would leave field_z
+    // behind (its own `.group` is "inner", not "outer") -- exactly the
+    // "names a group the view no longer carries" state this cascade exists
+    // to prevent.
+    expect(refs(removeViewEntry(rows, 1, catalog))).toEqual(["root1", "root2"]);
   });
 
   it("cascades nothing for a key-less group's own entry: it draws no card, so it is a plain leaf", () => {
@@ -233,6 +275,49 @@ describe("insertGroupedField places a catalog field honoring its catalog parent"
     const catalog = [leaf("field_a", "a")];
     const rows = [ref("field_a")];
     expect(insertGroupedField(rows, id("field_a"), 0, catalog)).toBe(rows);
+  });
+
+  it("a drop on a member's own edge lands at that slot among the members", () => {
+    const catalog = [group("group_g", "g", [leaf("field_x", "x"), leaf("field_y", "y")])];
+    // Drop landing on member x's trailing edge (slot 2): field_y must land
+    // right there, between x and whatever follows, not after the group's
+    // last member.
+    const rows = [ref("group_g"), ref("x", "g"), ref("tail")];
+    const next = insertGroupedField(rows, id("field_y"), 2, catalog);
+    expect(refs(next)).toEqual(["group_g", "x", "field_y", "tail"]);
+  });
+
+  it("every other drop lands after the group's last member, ignoring the raw slot named", () => {
+    const catalog = [group("group_g", "g", [leaf("field_x", "x"), leaf("field_y", "y")])];
+    // Slot 0 names the very front of the array -- nowhere near any member's
+    // own edge -- so field_y must still land after x, the group's only
+    // (and therefore last) member.
+    const rows = [ref("group_g"), ref("x", "g")];
+    const next = insertGroupedField(rows, id("field_y"), 0, catalog);
+    expect(refs(next)).toEqual(["group_g", "x", "field_y"]);
+  });
+
+  it("places a field two levels deep, inserting its whole missing ancestor chain outermost first", () => {
+    const catalog = [group("group_outer", "outer", [group("group_inner", "inner", [leaf("field_z", "z")])])];
+    const rows = [ref("root1")];
+    const next = insertGroupedField(rows, id("field_z"), 1, catalog);
+    expect(next).toEqual([
+      { ref: id("root1") },
+      { ref: id("group_outer") },
+      { ref: id("group_inner"), group: "outer" },
+      { ref: id("field_z"), group: "inner" },
+    ]);
+  });
+
+  it("places only the missing part of a deeper chain when an outer ancestor is already on the view", () => {
+    const catalog = [group("group_outer", "outer", [group("group_inner", "inner", [leaf("field_z", "z")])])];
+    const rows = [ref("group_outer")];
+    const next = insertGroupedField(rows, id("field_z"), 1, catalog);
+    expect(next).toEqual([
+      { ref: id("group_outer") },
+      { ref: id("group_inner"), group: "outer" },
+      { ref: id("field_z"), group: "inner" },
+    ]);
   });
 });
 
