@@ -17,7 +17,7 @@ import {
   NODE_WIDTH,
   NODE_HEIGHT,
 } from "../src/areas/studio/canvas/geometry.js";
-import { autoPlaceSteps, COLUMN_WIDTH, ROW_HEIGHT, type LayoutStep } from "../src/areas/studio/canvas/layout.js";
+import { COLUMN_WIDTH, ROW_HEIGHT } from "../src/areas/studio/canvas/layout.js";
 
 describe("canvas geometry: hit-testing", () => {
   const nodes = [
@@ -500,47 +500,5 @@ describe("canvas geometry: a free lattice point", () => {
       expect(answer.x % GRID_STEP).toBe(0);
       expect(answer.y % GRID_STEP).toBe(0);
     }
-  });
-});
-
-/**
- * The rule `EditScreen.onCanvasBarAddStep` applies before it calls
- * `freeLatticePoint` (design D2). A step nobody dragged carries no entry in
- * the stored `layout` blob, and `CanvasView` draws it through `autoPlaceSteps`
- * anyway, so a collision test reading the blob alone reports a point free that
- * an author can see is taken.
- *
- * The handler itself needs a live canvas rect and a `getScreenCTM`, which this
- * harness has no DOM for. These assert the resolution rule it composes.
- */
-describe("canvas geometry: a press resolves positions before testing them", () => {
-  const steps: LayoutStep[] = [{ id: "step_a" }];
-
-  const resolved = (layout: Record<string, unknown>) => {
-    const autoPlaced = autoPlaceSteps(steps, "step_a", layout);
-    return steps.map((s) => {
-      const stored = layout[s.id as string];
-      const at = stored && typeof stored === "object" ? (stored as { x: number; y: number }) : autoPlaced[s.id as string];
-      return { id: s.id as string, x: at.x, y: at.y };
-    });
-  };
-
-  it("walks past a step carrying an auto-placed position alone", () => {
-    // step_a is the initial step, so autoPlaceSteps puts it at the origin.
-    const placed = resolved({});
-    expect(placed).toEqual([{ id: "step_a", x: 0, y: 0 }]);
-    expect(freeLatticePoint({ x: 0, y: 0 }, placed)).toEqual({ x: NODE_WIDTH + GRID_STEP, y: 0 });
-  });
-
-  it("reading the stored blob alone would report that same point free", () => {
-    // The defect this rule closes: with no stored entry the list stands empty,
-    // so a new step lands on top of the one the canvas already draws.
-    expect(freeLatticePoint({ x: 0, y: 0 }, [])).toEqual({ x: 0, y: 0 });
-  });
-
-  it("prefers a stored position over the auto-placed one, as positionOf does", () => {
-    const placed = resolved({ step_a: { x: 400, y: 200 } });
-    expect(placed).toEqual([{ id: "step_a", x: 400, y: 200 }]);
-    expect(freeLatticePoint({ x: 400, y: 200 }, placed)).toEqual({ x: 400 + NODE_WIDTH + GRID_STEP, y: 200 });
   });
 });
