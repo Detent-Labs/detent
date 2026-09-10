@@ -43,15 +43,15 @@
 - [x] 5.2 Carry `tab` and the draft's tabs through `previewViewEntries`
 - [x] 5.3 Add pure helpers for adding, removing and reordering a tab
 - [x] 5.4 Cover those helpers with `bun:test`: the sweep, the merge, and key stability
-- [ ] 5.5 Add the tab strip above the canvas: add, rename, reorder, remove
-- [ ] 5.6 Never rewrite a tab's key after minting; renaming writes the label alone
-- [ ] 5.7 Filter the canvas to the selected tab, keeping every existing behavior
-- [ ] 5.8 Add the tab picker to the field strip and the note strip
-- [ ] 5.9 Keep group and tab consistent when an entry moves in or out of a group
-- [ ] 5.10 Hold the preview's open tab in `FormPreview.tsx`; drive it both ways
-- [ ] 5.11 Call `resolveTabsLocale` in `FormPreview.tsx` too
-- [ ] 5.12 Add the new studio catalog strings for every locale the catalog carries
-- [ ] 5.13 Verify group 5 with the full `bun test` and `bun run build`
+- [x] 5.5 Add the tab strip above the canvas: add, rename, reorder, remove
+- [x] 5.6 Never rewrite a tab's key after minting; renaming writes the label alone
+- [x] 5.7 Filter the canvas to the selected tab, keeping every existing behavior
+- [x] 5.8 Add the tab picker to the field strip and the note strip
+- [x] 5.9 Keep group and tab consistent when an entry moves in or out of a group
+- [x] 5.10 Hold the preview's open tab in `FormPreview.tsx`; drive it both ways
+- [x] 5.11 Call `resolveTabsLocale` in `FormPreview.tsx` too
+- [x] 5.12 Add the new studio catalog strings for every locale the catalog carries
+- [x] 5.13 Verify group 5 with the full `bun test` and `bun run build`
 
 ## 6. Documentation and examples
 
