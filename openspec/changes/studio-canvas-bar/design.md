@@ -173,8 +173,11 @@ Rollback is a revert of the branch.
 
 ## Open Questions
 
-- Does the bar keep a home on a narrow window? The Steps tab drops its rail
-  below a breakpoint. The bar has no such rule yet, and a browser check at
-  narrow width answers it.
+- Does the bar keep a home on a narrow window? Measured in a browser, in the
+  group state, which is the widest one. The bar fits down to an 800px
+  viewport. At 700px it overflows sideways, because every child carries
+  `flexShrink: 0`. Its height stays 88px at every width. Whether the bar earns
+  a breakpoint rule of its own, the way the Steps tab's rail has one, is still
+  open.
 - Should the form editor's own field list keep the word palette? This change
   leaves it alone. A later glossary pass can name it.
