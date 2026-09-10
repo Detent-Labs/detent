@@ -14,13 +14,24 @@ leaves out hides it the same way. Neither shape produces a message today, and
 the author meets a blank form.
 
 An absent `group` and an empty one both mean the entry sits at the form's
-root. The rule reaches a non-empty `group` alone.
+root. The first two halves reach a non-empty `group` alone. The third half
+below reaches every field entry, whatever its `group` says.
 
 A third half applies to a field entry, one carrying a `ref`. Its `group` SHALL
 name the `key` of the group field that holds that field in the catalog's own
 `fields`. The catalog answers where a field belongs, once, for the whole
 process. An entry naming any other group field SHALL fail to publish. A field
 the catalog holds at the top level SHALL have no `group` at all.
+
+The half binds in both directions. A field entry whose catalog parent is a
+group SHALL declare that group's key. An absent or an empty `group` on such
+an entry SHALL fail to publish. Otherwise a hand-authored body could lift a
+grouped field onto the form's root. The catalog would still hold it in a
+group, which is the disagreement this rule exists to end.
+
+A group whose own `key` is empty is the one exception. Its children can name
+nothing, so they SHALL have no `group` either. Such a body fails the field-key
+grammar on its own, so the exception never reaches a publish.
 
 That half reaches a group field's own entry the same way. A group nested
 inside another group carries the outer group's key, and no other.
@@ -62,6 +73,26 @@ pinned to one of them. That is the placement criterion
 - **AND** the catalog holds that field under a different group
 - **THEN** the body fails to publish, and the error names the step, the entry
   and the group the catalog declares
+
+#### Scenario: Publish rejects a grouped field whose entry names no group
+
+- **WHEN** the catalog holds a field inside a group field
+- **AND** a step's `view.fields` holds that field's entry with no `group`
+- **THEN** the body fails to publish, and the error names the group the
+  catalog declares
+
+#### Scenario: Publish rejects a grouped field whose entry carries an empty group
+
+- **WHEN** the catalog holds a field inside a group field
+- **AND** a step's `view.fields` holds that field's entry carrying `group: ""`
+- **THEN** the body fails to publish
+
+#### Scenario: A field under a key-less group has no group
+
+- **WHEN** the catalog holds a field inside a group field whose `key` is empty
+- **AND** a step's `view.fields` holds that field's entry with no `group`
+- **THEN** this rule reports nothing, and the field-key grammar fails the body
+  on its own
 
 #### Scenario: Publish rejects a group on a top-level field
 
