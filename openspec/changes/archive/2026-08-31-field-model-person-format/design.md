@@ -1,6 +1,6 @@
 ## Context
 
-See `proposal.md` for motivation. See `docs/field-model-redesign.md` for the
+See `proposal.md` for motivation. See `openspec/changes/archive/2026-08-30-field-model-type-format-control/field-model-redesign.md` for the
 brainstorming record whose decisions D10-D15, D20, D22 and D23 this change
 implements. This document records the technical choices that record left to
 implementation. It also states where investigation during this proposal

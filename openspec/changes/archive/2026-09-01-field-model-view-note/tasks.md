@@ -124,9 +124,9 @@ engine and `packages/form-ui` alone. Task 5.8 is the first full green.
 - [x] 6.2 Write the note-versus-readonly-versus-group rule into `docs/authoring-guide.md`
 - [x] 6.2a Correct the guide's "The view names catalog fields" line to name both entry kinds
 - [x] 6.3 Update `docs/current-state.md`
-- [x] 6.3a Record under S2 in `docs/field-model-redesign.md` that the note kind shipped
+- [x] 6.3a Record under S2 in `openspec/changes/archive/2026-08-30-field-model-type-format-control/field-model-redesign.md` that the note kind shipped
 - [x] 6.3b Record beside it that the table, chart, markup and tab-panel kinds stay open, each one more union member
-- [x] 6.3d Correct the S2 sentence in `docs/field-model-redesign.md` reading `Change 3 carries them`, which names all five shapes. Name the note as what shipped, and correct the ordering table's row 3 on the same grounds
+- [x] 6.3d Correct the S2 sentence in `openspec/changes/archive/2026-08-30-field-model-type-format-control/field-model-redesign.md` reading `Change 3 carries them`, which names all five shapes. Name the note as what shipped, and correct the ordering table's row 3 on the same grounds
 - [x] 6.3c Record those four kinds under "Open questions" in `docs/decisions.md`, the register S1 already uses
 - [x] 6.4 Add a `ResolvedViewNote` schema to `docs/openapi.yaml`, with `kind`, `text`, `group` and `span`
 - [x] 6.4b Give it `required: [kind, text]`. Neither schema sets `additionalProperties: false`, so those two keys are what keep the `oneOf` from matching a field entry against both branches

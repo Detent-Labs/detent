@@ -192,14 +192,13 @@ directives already work.
 
 | Rule | Script | Rejects |
 |---|---|---|
-| `ponytail-ledger-fresh` | `gates/ponytail-ledger.sh` | a `ponytail:` marker the ledgers do not list |
 | `pushed-whitespace` | `gates/whitespace.sh` | a CR byte, a trailing space, a blank line at EOF, in the pushed range |
 | `changed-markdown-prose` | `gates/prose.sh` | a rising antislop finding count in the Markdown the push changes |
 | `no-machine-paths` | `gates/machine-paths.sh` | an absolute home-directory path in a tracked file |
 | `frozen-lockfile` | `gates/lockfile.sh` | a manifest the committed `bun.lock` cannot satisfy |
 | `no-silent-green` | `gates/silent-green.sh` | a suite run with no database, or one skipping past the floor |
 
-The first four need only git and a shell, so they run on the host and report
+The first three need only git and a shell, so they run on the host and report
 even when the container is down. The last two run in the devcontainer.
 
 Two properties are worth knowing before a push. `--no-verify` bypasses the hook,
@@ -328,10 +327,10 @@ packages/form-ui/          shared step-form renderer (source-only, no build step
   either image.
 - `docs/runbooks/backup-restore.md` — the dump and restore steps. One database
   per tenant, so dump each one.
-- `docs/field-model-redesign.md` — a design record, not a spec. What the
+- `openspec/changes/archive/2026-08-30-field-model-type-format-control/field-model-redesign.md` — a design record, not a spec. What the
   2026-08-30 session settled about the field model.
-- `docs/CODE_REVIEW.md` — the current review and its open action list. The
-  three dated files beside it are superseded, and still cited.
+- `docs/decisions.md` — every open code-review finding, under its own heading.
+  `openspec/changes/archive/2026-08-18-code-review-record/` — the four dated reviews.
 - `DESIGN.md` — the design tokens the detector reads, and what each one means.
 - `docs/browser-checks.md` — the browser checks that stay manual, per screen.
 
@@ -361,6 +360,10 @@ after a substantial change lands.
 
 ## Conventions
 - TypeScript strict, ESM.
+- A deliberate shortcut in `src/` or `packages/` carries a `ponytail:` comment
+  naming the shortcut, its ceiling and the upgrade entry point. The roll-up is
+  `git grep -n 'ponytail:' -- src packages`; no ledger file and no gate back
+  it. `openspec/specs/push-gate-checks/spec.md` states the rule.
 - **UI work in `packages/web` or `packages/form-ui` goes through the design skills
   first.** The `impeccable` skill owns visual direction, and it enters the
   OpenSpec cycle at three points. In the proposal, `/impeccable shape <screen>`
