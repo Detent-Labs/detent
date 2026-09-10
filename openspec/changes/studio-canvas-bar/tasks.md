@@ -36,13 +36,13 @@
 
 ## 5. Wiring the screen
 
-- [ ] 5.1 Mount `CanvasBar` above the canvas body in `EditScreen`. Verify the
+- [x] 5.1 Mount `CanvasBar` above the canvas body in `EditScreen`. Verify the
   bar stands under the tab row.
-- [ ] 5.2 Wire the press. Read the canvas body's centre, then convert, snap
+- [x] 5.2 Wire the press. Read the canvas body's centre, then convert, snap
   and place, per design D2.
-- [ ] 5.3 Delete the `canvasSelection` aside, the `canvasInspector` style and
+- [x] 5.3 Delete the `canvasSelection` aside, the `canvasInspector` style and
   the `canvasSelection` style. Verify nothing stands below the canvas.
-- [ ] 5.4 Delete `canvas/CanvasPalette.tsx` and its import. Verify the canvas
+- [x] 5.4 Delete `canvas/CanvasPalette.tsx` and its import. Verify the canvas
   now fills the body's full width.
 
 ## 6. Strings
@@ -53,7 +53,7 @@
   the caret, the two menu entries and their notes.
 - [x] 6.3 Add the key naming an unconnected step, and the caret button's own
   accessible name. The studio catalog ships English alone.
-- [ ] 6.4 Drop the palette's own heading key. Verify
+- [x] 6.4 Drop the palette's own heading key. Verify
   `i18n-catalog-parity.test.ts` passes.
 
 ## 7. Tests
