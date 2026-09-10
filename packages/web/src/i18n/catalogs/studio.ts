@@ -550,6 +550,13 @@ export const en = {
   "stepKind.subprocess": "A call to another process",
   "stepKind.terminal": "An end",
 
+  // The note under the canvas bar's step-kind menu entries
+  // (`studio-guided-vocabulary`), read through `newStepNote`. Same three
+  // `performedBy.ts` values as `stepKind.*` above.
+  "stepKindNote.participant": "Someone fills its form and picks a path.",
+  "stepKindNote.subprocess": "Waits for it and routes on its outcome.",
+  "stepKindNote.terminal": "Closes the case with a named outcome.",
+
   // The four assignment strategies the engine registers: `static` in
   // `src/engine/registry.ts`'s createDefaultAssignmentRegistry, and the three
   // `org.` types in `src/engine/assignment-strategies.ts`. A registered
@@ -568,8 +575,6 @@ export const en = {
   // An absent assignment names no strategy at all, so it never resolves
   // through the registry.
   "assignment.none": "Nobody in particular",
-
-  "palette.heading": "Add to canvas",
 
   "headerBar.unnamedProcess": "(untitled process)",
   "headerBar.revision": "rev.",
@@ -628,6 +633,13 @@ export const en = {
   "canvas.groupExpand": "Expand",
   "canvas.groupUngroup": "Ungroup",
   "canvas.groupStepCount": "steps",
+
+  // The canvas bar (`studio-guided-vocabulary`): its Add step button, the
+  // caret that opens the step-kind menu, and what the bar prints for a
+  // selected step no chain of paths reaches.
+  "canvas.addStep": "Add step",
+  "canvas.addStepMore": "More step kinds",
+  "canvas.unconnected": "unconnected",
 
   // The accessible names the canvas composes for its nodes, its paths and
   // its `<svg>` root. Each `{slot}` is filled with `.replace()`. The two
