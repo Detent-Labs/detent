@@ -23,6 +23,8 @@ tree.
 - [x] 3.3 Leave a note entry exempt; its `group` still answers the first two halves
 - [x] 3.4 Add rejection tests: wrong group, group on a top-level field, one field across steps
 - [x] 3.5 Add an acceptance test for a note naming a group no catalog tie binds
+- [ ] 3.6 Reject a grouped field's entry that declares no group, or an empty one
+- [ ] 3.7 Exempt a child of a key-less group; the field-key grammar fails that body anyway
 
 ## 4. The canvas tree
 
