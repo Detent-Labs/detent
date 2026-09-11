@@ -388,6 +388,28 @@ describe("The tab stamp: each drawn tab marks its own issues", () => {
   });
 });
 
+describe("tabsLabel: the strip's accessible name comes from the consumer", () => {
+  // This package ships no screen catalog, and the form editor draws this strip
+  // beside the studio's authoring strip over the same tab labels, so each of
+  // the three consumers names its own.
+  it("stamps the prop on the tablist", () => {
+    const html = renderToStaticMarkup(
+      <FieldForm fields={[field("f1", "one")]} values={{}} onChange={noop} locale="en" tabs={TABS} activeTab="one" tabsLabel="Form tabs" />,
+    );
+    expect(html).toContain('role="tablist" aria-label="Form tabs"');
+  });
+
+  it("leaves the tablist unnamed when the consumer passes none", () => {
+    const html = renderToStaticMarkup(
+      <FieldForm fields={[field("f1", "one")]} values={{}} onChange={noop} locale="en" tabs={TABS} activeTab="one" />,
+    );
+    // The panel's own `aria-labelledby` stays, so this looks for the
+    // attribute the prop writes rather than for the prefix it shares.
+    expect(html).toContain('role="tablist"><button');
+    expect(html).not.toContain('aria-label="');
+  });
+});
+
 describe("resolveTabsLocale: the sibling of resolveFieldsLocale", () => {
   const tabs: ResolvedViewTab[] = [
     { key: "one", label: { en: "Details", de: "Details DE" } },
