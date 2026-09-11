@@ -2,8 +2,8 @@ import type { FieldId } from "workflow-engine/schema";
 import { moveFieldToGroup, nextFieldKey } from "../panels/fieldCatalogLogic";
 import { draftFields, flattenDraftFields, type DraftField } from "./fields";
 import type { Draft } from "./types";
-import { isDraftViewField } from "./view-layout";
-import { missingAncestorCards } from "./view-tree";
+import { fillMissingTabs, homeTab, isDraftViewField } from "./view-layout";
+import { cardGroupKey, missingAncestorCards } from "./view-tree";
 
 /**
  * Keeps `workflow.steps[].view` entries level with the field-catalog edits
@@ -35,6 +35,14 @@ import { missingAncestorCards } from "./view-tree";
  * the rewritten entry would name a group its view does not carry, which the
  * publish refuses as well.
  *
+ * On a tabbed form the move keeps the tab rules. Each entry's former tab is
+ * the tab the canvas drew it on: its own for a root, its outermost card's for
+ * a member (`view-layout.ts::homeTab`). An entry the move puts inside a group
+ * loses its `tab`, since the card holding it names the tab. An entry the move
+ * lifts to the top level takes its former tab. A placed card standing at the
+ * form's root takes that same former tab, and an inner card of a placed chain
+ * carries none. An untabbed form gets no `tab` anywhere.
+ *
  * A move the catalog refuses (`moveFieldToGroup` answers its input
  * unchanged) writes nothing.
  */
@@ -42,20 +50,32 @@ export function moveFieldAndSyncViews(draft: Draft, fieldId: string, targetGroup
   const fields = draft.fields ?? [];
   const next = moveFieldToGroup(fields, fieldId, targetGroupId);
   if (next === fields) return;
+  const steps = draft.workflow?.steps ?? [];
+  // Read before the rewrite, while each entry still names its old group.
+  const groupKeyOf = cardGroupKey(fields);
+  const formerTabs = steps.map((step) => {
+    const rows = step.view?.fields ?? [];
+    const entry = rows.find((e) => isDraftViewField(e) && e.ref === fieldId);
+    return entry === undefined ? undefined : homeTab(entry, rows, step.view?.tabs, groupKeyOf);
+  });
   draft.fields = next;
   // The destination's key, read off the moved tree: the field now hangs
   // directly under that group, so its key is the field's whole parent key.
   const newGroupKey = targetGroupId === undefined ? undefined : flattenDraftFields(next).find((f) => f.id === targetGroupId)?.key;
   syncViewGroupsOnFieldMove(draft, fieldId, newGroupKey);
 
-  for (const step of draft.workflow?.steps ?? []) {
+  steps.forEach((step, s) => {
     const rows = step.view?.fields;
-    if (!rows) continue;
+    if (!rows) return;
     const at = rows.findIndex((entry) => isDraftViewField(entry) && entry.ref === fieldId);
-    if (at === -1) continue;
+    if (at === -1) return;
+    const entry = rows[at]!;
+    const formerTab = formerTabs[s];
+    if (entry.group) delete entry.tab;
+    else if (formerTab !== undefined) entry.tab = formerTab;
     const cards = missingAncestorCards(rows, fieldId as FieldId, next);
-    if (cards.length > 0) rows.splice(at, 0, ...cards);
-  }
+    if (cards.length > 0) rows.splice(at, 0, ...fillMissingTabs(cards, formerTab));
+  });
 }
 
 /**

@@ -1,7 +1,7 @@
 {
   "processId": "proc_7d41e0b6-5c2a-4f19-9e83-6b0d4a71c58f",
   "version": 1,
-  "definitionHash": "83a99e89d77544e5125849939844c5d6b990f0f5b4f84dbec7372e334a928959",
+  "definitionHash": "dceaa74876a37d90db4ede012e16fa7772955cad597c1c1b371abb60aeab24a1",
   "status": "published",
   "publishedAt": "2026-08-15T09:00:00Z",
   "definition": {
@@ -815,12 +815,28 @@
           },
           "view": {
             "columns": 2,
-            "fields": [
+            "tabs": [
               {
-                "ref": "field_9c7e5b31-0023-4a1c-8e2f-000000000023"
+                "key": "review",
+                "label": {
+                  "en": "Review"
+                }
               },
               {
-                "ref": "field_9c7e5b31-0003-4a1c-8e2f-000000000003"
+                "key": "decision",
+                "label": {
+                  "en": "Decision"
+                }
+              }
+            ],
+            "fields": [
+              {
+                "ref": "field_9c7e5b31-0023-4a1c-8e2f-000000000023",
+                "tab": "review"
+              },
+              {
+                "ref": "field_9c7e5b31-0003-4a1c-8e2f-000000000003",
+                "tab": "review"
               },
               {
                 "ref": "field_9c7e5b31-0004-4a1c-8e2f-000000000004",
@@ -849,7 +865,8 @@
                 "readonly": true
               },
               {
-                "ref": "field_9c7e5b31-0024-4a1c-8e2f-000000000024"
+                "ref": "field_9c7e5b31-0024-4a1c-8e2f-000000000024",
+                "tab": "review"
               },
               {
                 "ref": "field_9c7e5b31-0008-4a1c-8e2f-000000000008",
@@ -866,10 +883,12 @@
                 "text": {
                   "en": "Approving here commits budget. Confirm the vendor and amount above match the attached quote before deciding."
                 },
-                "span": 2
+                "span": 2,
+                "tab": "review"
               },
               {
-                "ref": "field_9c7e5b31-0025-4a1c-8e2f-000000000025"
+                "ref": "field_9c7e5b31-0025-4a1c-8e2f-000000000025",
+                "tab": "decision"
               },
               {
                 "ref": "field_9c7e5b31-0013-4a1c-8e2f-000000000013",

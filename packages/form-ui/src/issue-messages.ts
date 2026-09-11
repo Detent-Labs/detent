@@ -64,3 +64,20 @@ export function issueMessage(issue: SubmissionIssue, locale: LocaleCode, baseLoc
   if (issue.kind === "type-mismatch") return typeMismatchMessage(issue, loc);
   return MESSAGES[loc][issue.kind] ?? MESSAGES.en[issue.kind] ?? issue.kind;
 }
+
+const ISSUE_COUNT: Record<string, { one: string; many: string }> = {
+  en: { one: "issue", many: "issues" },
+  de: { one: "Problem", many: "Probleme" },
+};
+
+/**
+ * A tab's own issue count, as text — "2 issues". The tab strip's stamp names
+ * the count where a screen reader reaches it, so the color the stamp draws in
+ * carries no state on its own. Falls back through `locale` -> `baseLocale` ->
+ * English, the way `issueMessage` does.
+ */
+export function issueCountText(count: number, locale: LocaleCode, baseLocale: LocaleCode = locale): string {
+  const loc = locale in ISSUE_COUNT ? locale : baseLocale in ISSUE_COUNT ? baseLocale : "en";
+  const words = ISSUE_COUNT[loc] ?? ISSUE_COUNT.en!;
+  return `${count} ${count === 1 ? words.one : words.many}`;
+}

@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import type { FieldId } from "workflow-engine/schema";
 import type { DraftField } from "../src/areas/studio/draft/fields";
 import type { Draft } from "../src/areas/studio/draft/types";
-import type { DraftViewEntry } from "../src/areas/studio/draft/view-layout";
+import type { DraftView, DraftViewEntry, DraftViewTab } from "../src/areas/studio/draft/view-layout";
 import {
   moveFieldAndSyncViews,
   syncViewGroupsOnFieldMove,
@@ -194,6 +194,97 @@ describe("moveFieldAndSyncViews brings a missing group card along", () => {
     moveFieldAndSyncViews(draft, "x", "g");
 
     expect(rowsOf(draft)[0]).toEqual([ref("other")]);
+  });
+});
+
+/** A tabbed-form fixture: whole step views, `tabs` included. */
+const tab = (key: string): DraftViewTab => ({ key, label: { en: key } });
+
+const onTab = (entry: DraftViewEntry, tabKey: string): DraftViewEntry => ({ ...entry, tab: tabKey });
+
+const draftWithViews = (fields: DraftField[], ...views: DraftView[]): Draft =>
+  ({
+    fields,
+    workflow: { steps: views.map((view) => ({ view })) },
+  }) as unknown as Draft;
+
+describe("moveFieldAndSyncViews keeps a tabbed form's tab rules", () => {
+  const tabs = [tab("t1"), tab("t2")];
+
+  it("takes the tab off an entry moving into a group, and gives the card it places that entry's former tab, right before it", () => {
+    const draft = draftWithViews([leaf("a", "a"), leaf("x", "x"), group("g", "g")], { tabs, fields: [onTab(ref("a"), "t1"), onTab(ref("x"), "t2")] });
+
+    moveFieldAndSyncViews(draft, "x", "g");
+
+    expect(rowsOf(draft)[0]).toEqual([onTab(ref("a"), "t1"), onTab(ref("g"), "t2"), ref("x", "g")]);
+  });
+
+  it("gives only the outermost card of a placed chain the tab", () => {
+    const draft = draftWithViews([leaf("x", "x"), group("outer", "outer", [group("inner", "inner", [leaf("z", "z")])])], {
+      tabs,
+      fields: [onTab(ref("x"), "t2")],
+    });
+
+    moveFieldAndSyncViews(draft, "x", "inner");
+
+    expect(rowsOf(draft)[0]).toEqual([onTab(ref("outer"), "t2"), ref("inner", "outer"), ref("x", "inner")]);
+  });
+
+  it("takes the tab off an entry joining a card the form already carries, and leaves that card's own tab alone", () => {
+    const draft = draftWithViews([leaf("x", "x"), group("g", "g")], { tabs, fields: [onTab(ref("g"), "t1"), onTab(ref("x"), "t2")] });
+
+    moveFieldAndSyncViews(draft, "x", "g");
+
+    expect(rowsOf(draft)[0]).toEqual([onTab(ref("g"), "t1"), ref("x", "g")]);
+  });
+
+  it("gives an entry leaving a nested group for the top level the tab its outermost card carries", () => {
+    const draft = draftWithViews([group("outer", "outer", [group("inner", "inner", [leaf("z", "z")])])], {
+      tabs,
+      fields: [onTab(ref("outer"), "t2"), ref("inner", "outer"), ref("z", "inner")],
+    });
+
+    moveFieldAndSyncViews(draft, "z", undefined);
+
+    expect(rowsOf(draft)[0]).toEqual([onTab(ref("outer"), "t2"), ref("inner", "outer"), onTab(ref("z"), "t2")]);
+  });
+
+  it("gives an entry leaving its group on an untabbed form no tab", () => {
+    const draft = draftWith([group("g", "g", [leaf("x", "x")])], [ref("g"), ref("x", "g")]);
+
+    moveFieldAndSyncViews(draft, "x", undefined);
+
+    expect(rowsOf(draft)[0]!.some((entry) => "tab" in entry)).toBe(false);
+  });
+
+  it("takes the tab off a group moved into another group, and gives the destination card it places the moved card's former tab", () => {
+    const draft = draftWithViews([group("h", "h", [leaf("k", "k")]), group("g", "g", [leaf("y", "y")])], {
+      tabs,
+      fields: [onTab(ref("g"), "t2"), ref("y", "g")],
+    });
+
+    moveFieldAndSyncViews(draft, "g", "h");
+
+    expect(rowsOf(draft)[0]).toEqual([onTab(ref("h"), "t2"), ref("g", "h"), ref("y", "g")]);
+  });
+
+  it("takes the tab off a group moved into a group the form already carries, whose card keeps its own tab", () => {
+    const draft = draftWithViews([group("h", "h", [leaf("k", "k")]), group("g", "g", [leaf("y", "y")])], {
+      tabs,
+      fields: [onTab(ref("h"), "t1"), onTab(ref("g"), "t2"), ref("y", "g")],
+    });
+
+    moveFieldAndSyncViews(draft, "g", "h");
+
+    expect(rowsOf(draft)[0]).toEqual([onTab(ref("h"), "t1"), ref("g", "h"), ref("y", "g")]);
+  });
+
+  it("gives the card a member's move places the tab that member drew on", () => {
+    const draft = draftWithViews([group("a", "a", [leaf("x", "x")]), group("b", "b")], { tabs, fields: [onTab(ref("a"), "t2"), ref("x", "a")] });
+
+    moveFieldAndSyncViews(draft, "x", "b");
+
+    expect(rowsOf(draft)[0]).toEqual([onTab(ref("a"), "t2"), onTab(ref("b"), "t2"), ref("x", "b")]);
   });
 });
 

@@ -607,6 +607,46 @@ A note can hide behind a guard exactly as a field does. It never takes
 underneath for any of those to describe. Its `text` needs a non-empty entry
 for the process's `baseLocale`, the rule every `LocalizedText` follows.
 
+#### Tabs
+
+A view with a long form can split its root entries across a strip of tabs.
+The view declares `tabs`, an ordered list of `{ key, label }`. Each root
+entry then names one tab by its `key`, in a `tab` field it carries the same
+way it already carries `group`.
+
+A tab has no fields of its own. It is a label an entry points at, the way
+a group's `key` is a label an entry points at. Nothing outside the view
+addresses a tab: it has no `id`, and no CEL, guard or submission check
+ever reaches it. A tab is layout, exactly like `columns` and `span`.
+
+Once a view declares at least one tab, five rules bind every entry in it.
+
+1. No two tabs in one view share a `key`.
+2. An entry's `tab` must name a `key` that view's `tabs` declares.
+3. Every root entry, one declaring no `group`, must declare a `tab`.
+4. An entry declaring `group` must not also declare `tab`. Its group already
+   sits under a tab, so the group's own entry is what places it there. A
+   group never draws part of itself under one tab and the rest under
+   another.
+5. On a view declaring no tabs, no entry declares one either.
+
+An entry inside a group therefore never names a tab directly. A view naming
+no tabs at all still parses exactly as it always did. A tab holding no entry
+still publishes. The form draws it empty, and hides it once every entry it
+holds resolves invisible.
+
+A tab's `label` follows the same base-locale rule a field's `label` and a
+note's `text` follow: a non-empty entry for the process's `baseLocale`.
+
+<!-- antislop: allow synonym-rotation -->
+<!-- Why: "Remove" here is a tab's own action, distinct from the "Discard
+     draft" area-nav control this guide names elsewhere. The rule reads them
+     as one concept. -->
+Add the first tab and every existing root entry needs a `tab` added beside
+it. Remove the last tab and every `tab` on that view comes out with it,
+`tabs` included. The studio's form editor does both sweeps for the author,
+so a tabbed draft is never left half-migrated.
+
 ### Path
 
 One transition from one step to another. A path is `manual` or `automatic`. A

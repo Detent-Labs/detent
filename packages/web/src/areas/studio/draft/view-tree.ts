@@ -1,6 +1,6 @@
 import type { FieldId } from "workflow-engine/schema";
 import { flattenDraftFields, type DraftField } from "./fields";
-import { isDraftViewField, moveViewField, type DraftViewEntry } from "./view-layout";
+import { fillMissingTabs, homeTab, isDraftViewField, moveViewField, type DraftViewEntry, type DraftViewTab } from "./view-layout";
 
 /** The form editor's canvas interaction, the nested half: which entries draw
  * inside a group's own card, and the array operations that keep that nesting
@@ -61,6 +61,18 @@ function isGroupCard(entry: DraftViewEntry, fieldsById: Map<FieldId, DraftField>
   if (!isDraftViewField(entry) || entry.ref === undefined) return false;
   const field = fieldsById.get(entry.ref);
   return field?.type === "group" && !!field.key;
+}
+
+/** The group key an entry declares, read through the catalog: a group card's
+ * own `key`, and `undefined` for every other entry. It is the `groupKeyOf`
+ * that `view-layout.ts`'s `owningTab`, `homeTab` and `drawnRows` take, built
+ * on the same test `viewTree` draws a card by. */
+export function cardGroupKey(catalogFields: DraftField[]): (entry: DraftViewEntry) => string | undefined {
+  const fieldsById = draftFieldsById(catalogFields);
+  return (entry) => {
+    if (!isGroupCard(entry, fieldsById) || !isDraftViewField(entry) || entry.ref === undefined) return undefined;
+    return fieldsById.get(entry.ref)?.key;
+  };
 }
 
 /** Every group card's own row index, by the key that names it. Built from
@@ -195,9 +207,12 @@ function subtreeIndices(rows: DraftViewEntry[], cardIndexByKey: Map<string, numb
 /**
  * Move a placed entry one position up or down among its own siblings, the
  * keyboard equivalent of dragging it across one neighbour -- scoped by the
- * entry's own group. For a member, siblings are the other
- * entries naming the same group. For a root entry, siblings are the other
- * root entries, group cards included.
+ * entry's own group. For a member, siblings are the other entries naming the
+ * same group, whatever tab the canvas shows. For a root entry, siblings are
+ * the other root entries, group cards included, that `drawn` holds. On a
+ * tabbed form `drawn` is `drawnRows`'s answer for the shown tab, so a root
+ * steps past the neighbour the author can see, never past an entry another
+ * tab draws. Omitting `drawn` counts every root, which is the untabbed form.
  *
  * Implemented as a splice to a sibling boundary, through `moveViewField`
  * (the same primitive the drag path uses), never as a two-position swap:
@@ -225,18 +240,21 @@ export function nudgeViewField(
   index: number,
   delta: -1 | 1,
   catalogFields: DraftField[],
+  drawn?: number[],
 ): DraftViewEntry[] {
   if (index < 0 || index >= rows.length) return rows;
   const fieldsById = draftFieldsById(catalogFields);
   const cardIndexByKey = groupCardIndexByKey(rows, fieldsById);
   const parentIndex = groupOf(rows[index]!, cardIndexByKey);
+  const onCanvas = parentIndex === undefined && drawn !== undefined ? new Set(drawn) : undefined;
 
   const siblings: number[] = [];
   rows.forEach((entry, i) => {
-    if (groupOf(entry, cardIndexByKey) === parentIndex) siblings.push(i);
+    if (groupOf(entry, cardIndexByKey) === parentIndex && (onCanvas === undefined || onCanvas.has(i))) siblings.push(i);
   });
 
   const pos = siblings.indexOf(index);
+  if (pos === -1) return rows;
   const targetPos = pos + delta;
   if (targetPos < 0 || targetPos >= siblings.length) return rows;
   const targetIndex = siblings[targetPos]!;
@@ -367,12 +385,20 @@ function memberInsertionSlot(rows: DraftViewEntry[], groupKey: string, cardIndex
  * still empty -- places exactly like `insertViewField`: at
  * the slot, carrying no `group`. A field already on the view is not
  * re-added, the same dedup `insertViewField` applies.
+ *
+ * On a tabbed form `tab` is the tab the canvas shows. The one root entry the
+ * placement adds takes it: the outermost card of a placed chain, or a
+ * top-level field. A member and an inner card carry none, since the card
+ * holding them names the tab (rule 4 of the definition contract's tab
+ * hierarchy). A member joining a card the form already carries therefore
+ * lands on that card's tab.
  */
 export function insertGroupedField(
   rows: DraftViewEntry[],
   ref: FieldId,
   slot: number,
   catalogFields: DraftField[],
+  tab?: string,
 ): DraftViewEntry[] {
   if (rows.filter(isDraftViewField).some((r) => r.ref === ref)) return rows;
 
@@ -387,12 +413,12 @@ export function insertGroupedField(
   const cards = missingAncestorCards(rows, ref, catalogFields);
   if (cards.length > 0) {
     const fieldEntry: DraftViewEntry = parentKey === undefined ? { ref } : { ref, group: parentKey };
-    next.splice(at, 0, ...cards, fieldEntry);
+    next.splice(at, 0, ...fillMissingTabs([...cards, fieldEntry], tab));
     return next;
   }
 
   if (parentKey === undefined) {
-    next.splice(at, 0, { ref });
+    next.splice(at, 0, ...fillMissingTabs([{ ref }], tab));
     return next;
   }
 
@@ -404,7 +430,7 @@ export function insertGroupedField(
     // so a parent key with no matching group field should not happen. Fall
     // back to a top-level placement rather than write a `group` nothing in
     // the view can ever resolve.
-    next.splice(at, 0, { ref });
+    next.splice(at, 0, ...fillMissingTabs([{ ref }], tab));
     return next;
   }
   const cardIndex = rows.findIndex((r) => isDraftViewField(r) && r.ref === groupId);
@@ -413,30 +439,32 @@ export function insertGroupedField(
   return next;
 }
 
+/** Which sibling list a card's edges and tail slot belong to: one group's
+ * members, named by the group's key, or the roots one tab draws, named by
+ * that tab's key (`undefined` on an untabbed form). */
+export type DragScope = { group: string } | { tab: string | undefined };
+
 /**
- * Every row's own drag scope: `undefined` at the form's root, or the
- * group's own key for a member -- whichever nested list a card's own edges
- * and tail slot belong to. What a dragover handler compares a dragged
- * card's origin against, so a card can only relocate within its own scope
- * (the "A drag that would land a member outside its group SHALL change
- * nothing" requirement). Reuses `viewTree` rather than re-walking `rows`,
- * so this can never disagree with what the canvas actually draws.
+ * Every row's own drag scope: its group for a member, and for a root the tab
+ * the canvas draws it on (`view-layout.ts::homeTab`) -- whichever sibling
+ * list a card's own edges and tail slot belong to. What a dragover handler
+ * compares a dragged card's origin against, so a card can only relocate
+ * within its own scope (the "A drag that would land a member outside its
+ * group SHALL change nothing" requirement): a member within its group, a
+ * root among the roots its own tab draws. Reuses `viewTree` rather than
+ * re-walking `rows`, so this can never disagree with what the canvas
+ * actually draws.
  */
-export function dragScopeByIndex(rows: DraftViewEntry[], catalogFields: DraftField[]): Map<number, string | undefined> {
-  const fieldsById = draftFieldsById(catalogFields);
-  const tree = viewTree(rows, catalogFields);
-  const map = new Map<number, string | undefined>();
-  const walk = (nodes: ViewTreeNode[], scope: string | undefined) => {
+export function dragScopeByIndex(rows: DraftViewEntry[], catalogFields: DraftField[], tabs?: DraftViewTab[]): Map<number, DragScope> {
+  const groupKeyOf = cardGroupKey(catalogFields);
+  const map = new Map<number, DragScope>();
+  const walk = (nodes: ViewTreeNode[], scope: DragScope | undefined) => {
     for (const node of nodes) {
-      map.set(node.index, scope);
-      if (node.members) {
-        const entry = node.entry;
-        const groupKey = isDraftViewField(entry) && entry.ref !== undefined ? fieldsById.get(entry.ref)?.key : undefined;
-        walk(node.members, groupKey);
-      }
+      map.set(node.index, scope ?? { tab: homeTab(node.entry, rows, tabs, groupKeyOf) });
+      if (node.members) walk(node.members, { group: groupKeyOf(node.entry) ?? "" });
     }
   };
-  walk(tree, undefined);
+  walk(viewTree(rows, catalogFields), undefined);
   return map;
 }
 
@@ -444,13 +472,16 @@ export function dragScopeByIndex(rows: DraftViewEntry[], catalogFields: DraftFie
  * Whether a card whose own drag origin sits at `draggedIndex` may legally
  * land at `targetScope` -- the whole drag refusal rule, as one equality
  * check once `dragScopeByIndex` has already answered "whose scope is
- * this". A dragover handler calls `preventDefault` only where this reads
+ * this". An index the map does not hold lands nowhere. A dragover handler calls `preventDefault` only where this reads
  * true; where it reads false, the browser draws its own no-drop cursor and
  * fires no `drop` -- no new visual state, no CSS (design.md: "A refused
  * drop uses the browser's own no-drop cursor").
  */
-export function isLawfulCardDrop(scopeByIndex: Map<number, string | undefined>, draggedIndex: number, targetScope: string | undefined): boolean {
-  return scopeByIndex.get(draggedIndex) === targetScope;
+export function isLawfulCardDrop(scopeByIndex: Map<number, DragScope>, draggedIndex: number, targetScope: DragScope): boolean {
+  const origin = scopeByIndex.get(draggedIndex);
+  if (origin === undefined) return false;
+  if ("group" in origin) return "group" in targetScope && origin.group === targetScope.group;
+  return "tab" in targetScope && origin.tab === targetScope.tab;
 }
 
 /**

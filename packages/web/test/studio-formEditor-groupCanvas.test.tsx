@@ -124,10 +124,21 @@ const DRAFT = {
   },
 } as unknown as Draft;
 
+/** The same catalog and entries on a tabbed form: `alpha` and the `billing`
+ * group on `review`, `gamma` on `decision`, and every member with no tab of
+ * its own. `order` sets which tab the strip lists first, which is the one a
+ * fresh render shows. */
+function tabbedDraft(order: ["review", "decision"] | ["decision", "review"]): Draft {
+  const draft = structuredClone(DRAFT) as unknown as { workflow: { steps: { view: { tabs?: unknown; fields: Record<string, unknown>[] } }[] } };
+  const view = draft.workflow.steps[0]!.view;
+  view.tabs = order.map((key) => ({ key, label: { en: key === "review" ? "Review" : "Decision" } }));
+  view.fields = view.fields.map((entry) => (entry.group ? entry : { ...entry, tab: entry.ref === GAMMA ? "decision" : "review" }));
+  return draft as unknown as Draft;
+}
+
 /** Renders the screen with the field list `EditScreen.tsx` hands it: the
  * whole catalog, flattened through `draftFields`. */
-function render(): string {
-  const draft = DRAFT;
+function render(draft: Draft = DRAFT): string {
   return renderToStaticMarkup(
     <DraftContext.Provider value={contextValue(draft)}>
       <FormEditorScreen step={draft.workflow!.steps![0]!} index={0} fields={draftFields(draft)} onBack={() => {}} />
@@ -259,5 +270,34 @@ describe("The group's own remove control", () => {
     const canvas = canvasHtml(render());
     expect(legendBlock(fieldsetBlock(canvas, "billing"))).toContain("Remove (5)");
     expect(legendBlock(fieldsetBlock(canvas, "address"))).toContain("Remove (2)");
+  });
+});
+
+describe("On a tabbed form, the canvas draws the shown tab's roots, each group card nesting its members", () => {
+  it("draws the group card with every member on the group's own tab, and no root from another tab", () => {
+    const canvas = canvasHtml(render(tabbedDraft(["review", "decision"])));
+    const billing = fieldsetBlock(canvas, "billing");
+    for (const member of [">beta<", ">address<", ">street<", ">city<", ">delta<"]) expect(billing).toContain(member);
+    expect(fieldsetBlock(canvas, "address")).toContain(">street<");
+    expect(canvas).toContain(">alpha<");
+    expect(canvas).not.toContain(">gamma<");
+  });
+
+  it("draws neither the group card nor any member on a tab the group is not on", () => {
+    const canvas = canvasHtml(render(tabbedDraft(["decision", "review"])));
+    expect(canvas).toContain(">gamma<");
+    for (const hidden of [">alpha<", ">billing<", ">beta<", ">address<", ">street<", ">city<", ">delta<"]) expect(canvas).not.toContain(hidden);
+  });
+
+  it("bounds a root's move commands by the roots its own tab draws", () => {
+    const review = canvasHtml(render(tabbedDraft(["review", "decision"])));
+    expect(isButtonDisabled(cardBlock(review, "alpha"), "Move up")).toBe(true);
+    const billing = legendBlock(fieldsetBlock(review, "billing"));
+    expect(isButtonDisabled(billing, "Move up")).toBe(false);
+    expect(isButtonDisabled(billing, "Move down")).toBe(true);
+
+    const gamma = cardBlock(canvasHtml(render(tabbedDraft(["decision", "review"]))), "gamma");
+    expect(isButtonDisabled(gamma, "Move up")).toBe(true);
+    expect(isButtonDisabled(gamma, "Move down")).toBe(true);
   });
 });

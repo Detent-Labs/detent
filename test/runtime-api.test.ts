@@ -541,6 +541,125 @@ test.skipIf(!DB)("getInstanceView reports a declared view.columns, and a field's
   expect(field.span).toBe(2);
 });
 
+/**
+ * step_a's view declares three tabs: `details` (field_amount, required;
+ * field_name), `handover` (field_reason, required), `archive` (field_archived,
+ * always hidden — the view's only entry naming that tab). Every root entry
+ * names a tab, per rule 3.
+ */
+const tabViewBody = (): ProcessBody =>
+  ({
+    key: "tab_view_body",
+    label: { en: "Tab View Body" },
+    baseLocale: "en",
+    fields: [
+      { id: "field_amount", key: "amount", label: { en: "Amount" }, type: "number" },
+      { id: "field_name", key: "name", label: { en: "Name" }, type: "string" },
+      { id: "field_reason", key: "reason", label: { en: "Reason" }, type: "string" },
+      { id: "field_archived", key: "archived", label: { en: "Archived" }, type: "string" },
+    ],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        {
+          id: "step_a",
+          key: "a",
+          label: { en: "A" },
+          type: "task",
+          view: {
+            tabs: [
+              { key: "details", label: { en: "Details" } },
+              { key: "handover", label: { en: "Handover" } },
+              { key: "archive", label: { en: "Archive" } },
+            ],
+            fields: [
+              { ref: "field_amount", tab: "details", required: true },
+              { ref: "field_name", tab: "details" },
+              { ref: "field_reason", tab: "handover", required: true },
+              { ref: "field_archived", tab: "archive", visible: false },
+            ],
+          },
+          paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }],
+        },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+test.skipIf(!DB)("a view declaring no tabs resolves an empty list, every entry's tab undefined", async () => {
+  const PID = pid("proc_tabs_none");
+  await publishBody(PID, viewBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+
+  const view = await getInstanceView(created.instanceId, actor, dataSourceReg);
+  expect(view.tabs).toEqual([]);
+  for (const entry of view.fields) expect(entry.tab).toBeUndefined();
+});
+
+test.skipIf(!DB)("a tabbed view resolves its tabs in declaration order, labels unresolved", async () => {
+  const PID = pid("proc_tabs_order");
+  await publishBody(PID, tabViewBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+
+  const view = await getInstanceView(created.instanceId, actor, dataSourceReg);
+  expect(view.tabs).toEqual([
+    { key: "details", label: { en: "Details" } },
+    { key: "handover", label: { en: "Handover" } },
+    { key: "archive", label: { en: "Archive" } },
+  ]);
+});
+
+test.skipIf(!DB)("a resolved entry reports its own tab", async () => {
+  const PID = pid("proc_tabs_entry");
+  await publishBody(PID, tabViewBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+
+  const view = await getInstanceView(created.instanceId, actor, dataSourceReg);
+  const reason = view.fields.filter(isResolvedViewField).find((f) => f.field.key === "reason")!;
+  expect(reason.tab).toBe("handover");
+});
+
+test.skipIf(!DB)("a hidden field on a tab drops out as it does today", async () => {
+  const PID = pid("proc_tabs_hidden_field");
+  await publishBody(PID, tabViewBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+
+  const view = await getInstanceView(created.instanceId, actor, dataSourceReg);
+  expect(view.fields.filter(isResolvedViewField).find((f) => f.field.key === "archived")).toBeUndefined();
+});
+
+test.skipIf(!DB)("a tab whose entries all resolve invisible still reports", async () => {
+  const PID = pid("proc_tabs_invisible_tab");
+  await publishBody(PID, tabViewBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+
+  const view = await getInstanceView(created.instanceId, actor, dataSourceReg);
+  expect(view.tabs.map((t) => t.key)).toContain("archive");
+  expect(view.fields.some((f) => f.tab === "archive")).toBe(false);
+});
+
+test.skipIf(!DB)("a required field on an unopened tab stays required", async () => {
+  const PID = pid("proc_tabs_required");
+  await publishBody(PID, tabViewBody(), reg, dataSourceReg);
+  // Created empty — the required check only bites when actually trying to
+  // leave the step, the same as an untabbed view.
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+
+  let raised: unknown;
+  try {
+    await submitAndTransition(
+      created.instanceId,
+      "path_ab" as PathId,
+      { field_amount: 100, field_name: "Bob" } as unknown as Instance["data"],
+      actor, dataSourceReg,
+    );
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(SubmissionValidationError);
+  expect((raised as SubmissionValidationError).issues).toContainEqual({ kind: "required-missing", fieldId: "field_reason" as FieldId });
+});
+
 test.skipIf(!DB)("createProcessInstance pins to an explicit older version, not the newest", async () => {
   const PID = pid("proc_version_pin");
   const v1 = await publishBody(PID, cascadeBody(), reg, dataSourceReg);

@@ -71,11 +71,12 @@ an unset optional field.
 **Data vs presentation.** Fields are defined once in a process-wide catalog.
 Each step carries a flat `view` whose entries either reference a catalog
 field, overriding its per-step presentation (visible / required / readonly /
-span / validation / validationMode), or stand alone as a note (`text`,
-plus visible / span / group — no field underneath, so no required, readonly or
-validation). A field entry's `group` is not a per-step override: it must
-repeat the catalog's own parent group, or stay empty for a field the catalog
-holds at the top level. There is no `order` key; the array position is the order, and
+span / tab / validation / validationMode), or stand alone as a note (`text`,
+plus visible / span / group / tab — no field underneath, so no required,
+readonly or validation). A field entry's `group` is not a per-step override:
+it must repeat the catalog's own parent group, or stay empty for a field the
+catalog holds at the top level. There is no `order` key; the array position
+is the order, and
 `FieldForm.tsx` renders in declaration order. The instance
 payload is a flat object keyed by `fieldId`, stable across the whole
 lifecycle. Requiredness lives only in the view, never in the catalog.
@@ -123,6 +124,14 @@ submission check. The renderer clamps a span to `min(span, columns)`. A span
 wider than the grid draws narrow, never a publish error. Both keys are optional
 unions in `definition.ts`, which also deserializes stored bodies, so a body
 written before them keeps its `definitionHash`.
+
+`View.tabs` and an entry's own `tab` are layout the same way. `tabs` is an
+ordered array of `{ key, label }`; an entry's `tab` names one member's `key`,
+exactly as `group` already names a group field's `key`. Neither reaches a
+guard, a CEL context or a submission check, and a required field on any tab
+stays required. Both are optional, so a body written before them keeps its
+`definitionHash`. Five rules in `definition.ts`'s `view` superRefine hold the
+tab/field/group hierarchy together — see `authoring-invariants.md`.
 
 **View validation override.** A `ViewField` may override the catalog field's
 `validation`, the same shape `FieldDef.validation` carries. `validationMode`

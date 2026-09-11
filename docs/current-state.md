@@ -4867,3 +4867,52 @@ takes the same shape. Both sit as siblings of the header, rather than as items
 inside its wrapping flex row. The missing form step, the absent draft and the
 Changes view's failed diff load now carry that shape too. An open dialog hides the
 banner, because the dialog reports the same failure.
+
+## Tabbed step forms (`form-view-tabs`)
+
+A step's `view` may declare `tabs`, an ordered array of `{ key, label }`. An
+entry names one through its own `tab`. Both are layout, the way `columns` and
+`span` already are. The five rules holding the tab, field and group hierarchy
+together sit in `definition.ts`'s `view` superRefine. The file
+`.claude/rules/authoring-invariants.md` lists them.
+
+The route `getInstanceView` (`src/runtime/api.ts`) reports `tabs` beside
+`columns`, in declaration order. A view declaring none reports an empty array.
+Each label stays unresolved, as `LocalizedText`, and the browser applies the
+locale. The type is `ResolvedViewTab`, exported there beside
+`ResolvedViewEntry`. An entry's own `tab` rides along on the entry itself.
+
+The module `packages/form-ui/src/tabs.ts` is new. It exports eight pure
+functions over a resolved view, plus the `TabSwitch` type. Three answer what
+the strip draws and which tab is open: `drawnTabs`, `openTabKey` and
+`nextTabIndex`. Three count issues: `tabIssueCount`, `firstTabWithIssue` and
+`tabIssueFieldCount`. Two shape the switch announcement: `tabSwitchState` and
+`tabSwitchAnnouncement`. The package's `index.ts` publishes six of them and
+the type, while `openTabKey` and `tabIssueCount` stay inside the package.
+
+Two more exports landed beside it: `resolveTabsLocale` in `locale.ts`, and the
+`ResolvedViewTab` type in `types.ts`.
+
+The renderer `FieldForm` draws the strip above its grid. The open tab's
+entries make the one panel under it. A closed tab's entries are absent from
+the DOM. The open tab derives from the `activeTab` prop on every render, so
+the package still has no state. Its new `tabsLabel` prop is the strip's
+accessible name, and each consumer passes its own catalog's string.
+
+Three consumers own the tab switch: `areas/app/screens/TaskScreen.tsx`,
+`areas/studio/screens/PlayerScreen.tsx` and
+`areas/studio/panels/FormPreview.tsx`. The first two call `firstTabWithIssue`
+from a `useEffect` after a failed submission, keyed on `validationIssues`
+alone. The suite `packages/web/test/form-tab-switch-effect.test.ts` pins that
+dependency list by reading the source.
+
+Each of the first two also carries a visually hidden `role="status"` region.
+It names the tab a failed submission opened and how many fields there still
+need an entry. A tab that was already open announces nothing. An `attempt`
+counter keys the announced node, so a repeat failure speaks again.
+
+The component `areas/studio/panels/FormTabStrip.tsx` is the authoring strip,
+above the form editor's canvas. It reads `nextTabIndex` from `form-ui`, so
+both strips answer an arrow key one way. Every write leaves through a callback
+onto `draft/view-layout.ts`, which gained `addViewTab`, `renameViewTab`,
+`moveViewTab`, `removeViewTab` and `shownTab`.

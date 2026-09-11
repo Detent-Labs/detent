@@ -97,6 +97,11 @@ export type ResolvedViewField = {
   required: boolean;
   readonly: boolean;
   group?: string;
+  // The matching `ViewField.tab`, or `undefined` when it declares none —
+  // mirrors how `group` already resolves. Layout only: it reaches no guard
+  // and no submission check, so the editable and required field sets below
+  // ignore it entirely.
+  tab?: string;
   options?: FieldOption[];
   // How many of the view's columns this field occupies, resolved from the
   // matching `ViewField.span` and 1 when the view declares none. Presentation
@@ -113,6 +118,8 @@ export type ResolvedViewNote = {
   kind: "note";
   text: LocalizedText;
   group?: string;
+  // See `ResolvedViewField.tab`.
+  tab?: string;
   span: 1 | 2;
 };
 
@@ -127,6 +134,11 @@ export type ResolvedViewEntry = ResolvedViewField | ResolvedViewNote;
 export function isResolvedViewField(entry: ResolvedViewEntry): entry is ResolvedViewField {
   return !("kind" in entry);
 }
+
+/** One member of a resolved view's tab strip: the authored `key` and its
+ * UNRESOLVED `LocalizedText` label — the caller resolves it for its own
+ * locale, the same way a note's `text` travels today. */
+export type ResolvedViewTab = { key: string; label: LocalizedText };
 
 export type AvailablePath = { id: PathId; key: string; label?: string };
 
@@ -149,6 +161,11 @@ export type InstanceView = {
   // Reported for every status, the same way `step` is: it describes the step's
   // declared layout rather than instance state.
   columns: 1 | 2;
+  // The current step's `view.tabs`, in declaration order, or an empty array
+  // when the view declares none. Reported for every status, the same way
+  // `columns` is: it describes the step's declared layout rather than
+  // instance state.
+  tabs: ResolvedViewTab[];
   availablePaths: AvailablePath[];
   // The instance's persisted claim state, in the shape InstanceSummary
   // carries. Absent when the current step declares no assignment: there is
@@ -690,7 +707,7 @@ async function resolveFields(
   for (const vf of step.view?.fields ?? []) {
     if (!isViewField(vf)) {
       if (!resolveFlag(vf.visible, ctx, true)) continue;
-      out.push({ kind: "note", text: vf.text, group: vf.group, span: vf.span ?? 1 });
+      out.push({ kind: "note", text: vf.text, group: vf.group, tab: vf.tab, span: vf.span ?? 1 });
       continue;
     }
     const field = fieldsById.get(vf.ref as string);
@@ -716,7 +733,7 @@ async function resolveFields(
       // neither options nor dataSource".
       options = await resolvePersonOptions(body.allowedGroups ?? [], held, body.baseLocale, db);
     }
-    out.push({ field, value, required, readonly, group: vf.group, options, span: vf.span ?? 1 });
+    out.push({ field, value, required, readonly, group: vf.group, tab: vf.tab, options, span: vf.span ?? 1 });
   }
   return out;
 }
@@ -1275,6 +1292,7 @@ export async function getInstanceView(instanceId: InstanceId, actor: Actor, regi
     step: { id: step.id, key: step.key, label: step.label, type: step.type },
     fields: await resolveFields(body, step, instance, actor, registry, db),
     columns: step.view?.columns ?? 1,
+    tabs: (step.view?.tabs ?? []).map((t) => ({ key: t.key, label: t.label })),
     availablePaths: instance.status === "running" ? resolveAvailablePaths(body, step, instance, actor) : [],
     assignment: instance.assignment,
     redactedAt: instance.redactedAt,
