@@ -24,14 +24,19 @@ const MENU_KINDS: readonly StepKind[] = ["subprocess", "end"];
 const styles = stylex.create({
   // The ledger rule under the tab row: one flex row, content flush left, a
   // hairline against the canvas below it. Zero radius, no shadow. No
-  // minHeight: Add step is the tallest control in every selection state, so
-  // its own height is the row's floor (`studio-canvas`'s "The bar stands one
-  // control row tall").
+  // minHeight: the row's height is its tallest control, Add step, in every
+  // selection state (`studio-canvas`'s "The bar stands one control row
+  // tall"). That height holds inside `EditScreen.tsx`'s `tabBody` column
+  // only because `flexShrink: 0` sits below: `overflowX: auto` alone gives
+  // the bar an automatic minimum size of 0, so the column would shrink it
+  // in a short window instead of scrolling the tab body past the canvas's
+  // own 36rem floor.
   bar: {
     display: "flex",
     alignItems: "center",
     flexWrap: "nowrap",
     gap: space.s3,
+    flexShrink: 0,
     paddingBlock: space.s2,
     paddingInline: 0,
     borderBottomWidth: 1,
