@@ -3,7 +3,6 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { t } from "../catalog.js";
 import { useDraft } from "../draft/store.js";
-import { registerOrder } from "../draft/registerOrder.js";
 import { resolveDraftLocalizedText } from "../draft/localized-text.js";
 import type { StepKind } from "../draft/createStep.js";
 import { railRowIssues } from "./stepRailRow.js";
@@ -165,18 +164,18 @@ interface Props {
 
 /**
  * The Steps tab's leading column (`studio-step-page`: "The steps rail lists
- * each step by number and label"). One ruled row per step, numbered, each
- * carrying its label and its open issue count.
+ * each step in the draft's own order"). One ruled row per step, numbered,
+ * each carrying its label and its open issue count.
  *
- * The steps rail's order is `registerOrder`'s reachability order. Reordering
- * writes the draft's own `workflow.steps` order, which is what the canvas's
- * Up/Down traversal and the serialized definition both read; the rail's own
- * order stays derived from the graph.
+ * The rail lists the draft's own `workflow.steps` order. No walk over the
+ * paths decides where a row stands, and a move control writes that same
+ * `workflow.steps` order back, which is what the canvas's Up/Down traversal
+ * and the serialized definition both read.
  */
 export function StepsRail({ currentStepId, onSelectStep, onReorder, onAddStep }: Props) {
   const { draft, validation, contentLocale } = useDraft();
   const baseLocale = draft.baseLocale ?? "en";
-  const ordered = registerOrder(draft.workflow?.steps, draft.workflow?.initialStep);
+  const ordered = draft.workflow?.steps ?? [];
   const footHeadingId = "studio-steps-rail-add";
 
   return (
