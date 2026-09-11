@@ -1,9 +1,17 @@
-import type { ReactNode } from "react";
+import type { KeyboardEvent, ReactNode } from "react";
 import type { LocaleCode } from "workflow-engine/schema";
 import * as stylex from "@stylexjs/stylex";
-import { isResolvedViewField, type ResolvedViewEntry, type ResolvedViewField, type ResolvedViewNote, type SubmissionIssue } from "./types.js";
+import {
+  isResolvedViewField,
+  type ResolvedViewEntry,
+  type ResolvedViewField,
+  type ResolvedViewNote,
+  type ResolvedViewTab,
+  type SubmissionIssue,
+} from "./types.js";
 import { booleanLabels, resolveText } from "./locale.js";
-import { issueMessage } from "./issue-messages.js";
+import { issueCountText, issueMessage } from "./issue-messages.js";
+import { drawnTabs, nextTabIndex, openTabKey, tabIssueCount } from "./tabs.js";
 import { colors, fonts, space } from "./tokens.stylex.js";
 
 /** Every `form-ui.css` rule, as StyleX. A layout choice with a fixed set of
@@ -135,6 +143,76 @@ const styles = stylex.create({
     fontSize: 12,
     color: colors.refusal,
   },
+  // The strip repeats the studio's own process tab row, grammar for grammar
+  // (`ProcessTabRow.tsx`): 14px labels over a 2px divider, 4px gaps, 8px by
+  // 12px padding, and an accent rule under the open tab. The two strips share
+  // this token module and no component — `form-ui` importing from
+  // `packages/web` would invert the dependency direction.
+  tabRow: {
+    display: "flex",
+    alignItems: "stretch",
+    gap: space.s1,
+    flex: "none",
+    flexWrap: "nowrap",
+    overflowX: "auto",
+    overscrollBehavior: "contain",
+    borderBottomWidth: 2,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.divider,
+    marginBottom: space.s4,
+  },
+  tab: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: space.s2,
+    flex: "none",
+    whiteSpace: "nowrap",
+    backgroundColor: { default: "transparent", ":hover": colors.surfaceMuted },
+    color: "inherit",
+    borderWidth: 0,
+    paddingBlock: space.s2,
+    paddingInline: space.s3,
+    fontFamily: "inherit",
+    fontSize: 14,
+    // Explicit, not the UA's `normal`. Unset, this tab measured 35.0px
+    // against the authoring strip's 38.5px on the form editor, where the two
+    // draw side by side over the same labels. 1.5 is the body line height
+    // `DESIGN.md` gives, and the authoring strip pins the same pair.
+    lineHeight: 1.5,
+    textAlign: "left",
+    cursor: "pointer",
+  },
+  // The open tab. The written face holds two weights and no third, so the
+  // mark is the accent rule under the tab plus weight 800 — the same pair the
+  // process tab row spends.
+  tabSelected: {
+    fontWeight: 800,
+    boxShadow: `inset 0 -2px 0 ${colors.accent}`,
+  },
+  // A filled `stamp-refusal`, per `DESIGN.md`: mono at 11px, refusal ground,
+  // paper text. One stamp per tab, which is the Stamp Rule's own limit. The
+  // sibling below carries the same count as text, since the stamp's color
+  // reaches no screen reader.
+  tabIssueStamp: {
+    fontFamily: fonts.mono,
+    fontVariantNumeric: "tabular-nums",
+    fontSize: 11,
+    backgroundColor: colors.refusal700,
+    color: colors.paper50,
+    paddingBlock: 2,
+    paddingInline: 7,
+  },
+  visuallyHidden: {
+    position: "absolute",
+    width: 1,
+    height: 1,
+    margin: -1,
+    padding: 0,
+    overflow: "hidden",
+    clipPath: "inset(50%)",
+    whiteSpace: "nowrap",
+    borderWidth: 0,
+  },
   note: {
     margin: 0,
     padding: `0 0 0 ${space.s3}`,
@@ -155,7 +233,29 @@ interface FieldFormProps {
   /** The step view's declared column count. 1 is the width every form had
    * before `view.columns` existed, so an omitted prop renders unchanged. */
   columns?: 1 | 2;
+  /** The step view's declared tabs, in declaration order. Absent or empty
+   * renders the form exactly as it rendered before tabs existed: no strip,
+   * no panel. */
+  tabs?: ResolvedViewTab[];
+  /** The tab key the consumer wants open. It is a request, not state: the
+   * open tab derives from it and from the drawn strip on every render. */
+  activeTab?: string;
+  /** Called with a tab's key when the participant opens it. The consumer
+   * owns the switch — this component holds no tab state of its own. */
+  onTabChange?: (tabKey: string) => void;
+  /** The accessible name for the tab strip, taken from the consumer's own
+   * string catalog. This package ships no screen catalog of its own, and the
+   * form editor draws this strip beside the studio's authoring strip over the
+   * same tab labels, so each consumer names its own. Absent leaves the
+   * `tablist` unnamed, which is what a form with no tab renders anyway. */
+  tabsLabel?: string;
 }
+
+/** The tab button's own element id, and the id of the panel it controls.
+ * `aria-controls` and `aria-labelledby` both read them, so the format lives
+ * in one place. */
+const tabDomId = (tabKey: string) => `form-ui-tab-${tabKey}`;
+const tabPanelDomId = (tabKey: string) => `form-ui-tabpanel-${tabKey}`;
 
 /** How many grid columns a field draws across. A field never exceeds the grid
  * it sits in: the two properties are set independently, so a form narrowed to
@@ -251,15 +351,91 @@ function ViewEntryInput({ entry, allFields, values, onChange, locale, issuesByFi
  *
  * Declaration order stays the render order. The grid fills left to right then
  * wraps down, so a view array built before this grid existed lays out in the
- * order its `↑`/`↓` buttons already gave it. */
-export function FieldForm({ fields, values, onChange, locale, issuesByField, columns = 1 }: FieldFormProps) {
-  const roots = fields.map((entry, index) => ({ entry, index })).filter(({ entry }) => !entry.group);
+ * order its `↑`/`↓` buttons already gave it.
+ *
+ * A view declaring `tabs` draws a strip above that grid, and the grid becomes
+ * the open tab's one panel: the closed tabs' entries are absent from the DOM
+ * rather than hidden, so no control a participant cannot see sits in the
+ * accessibility tree. The open tab is derived on every render and stored
+ * nowhere — this component holds no tab state, the same way it holds no value
+ * and no locale state. */
+export function FieldForm({ fields, values, onChange, locale, issuesByField, columns = 1, tabs, activeTab, onTabChange, tabsLabel }: FieldFormProps) {
+  const strip = drawnTabs(fields, tabs ?? []);
+  // `activeTab` when the strip draws that tab, the first drawn tab otherwise,
+  // with no effect and no state. `undefined` means no strip draws, which is
+  // every untabbed form and a form whose every tab came back empty. The rule
+  // sits in `tabs.ts` because a consumer deciding whether a failed submission
+  // moved the participant has to read the open tab the same way this does.
+  const open = openTabKey(strip, activeTab);
+  const roots = fields
+    .map((entry, index) => ({ entry, index }))
+    .filter(({ entry }) => !entry.group && (open === undefined || entry.tab === open));
+  // Arrow keys, `Home` and `End` move focus alone; a `<button>`'s own `Enter`
+  // and `Space` handling is what opens the focused tab. The strip keeps the
+  // plain-button tab order `spa-accessibility` gives an ordinary tab set —
+  // roving tabindex is that spec's named exception for the studio's ten-tab
+  // row, and it would need the focus state this component may not
+  // hold.
+  const onTabKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    const buttons = Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+    const from = buttons.findIndex((b) => b === e.target || b.contains(e.target as Node));
+    const next = nextTabIndex(e.key, from, buttons.length);
+    if (next === undefined) return;
+    // `preventDefault` on the four handled keys alone, so the row's own
+    // sideways scroll does not fire beside the focus move.
+    e.preventDefault();
+    buttons[next]?.focus();
+  };
   return (
     // The wrapper carries the size container the collapse rule measures. A
     // container query matches descendants of the container, never the element
     // declaring it, so the grid cannot be its own container.
     <div {...stylex.props(styles.form)}>
-      <div {...stylex.props(columns === 2 ? styles.gridTwoCol : styles.gridOneCol)} data-columns={columns}>
+      {open !== undefined && (
+        <div {...stylex.props(styles.tabRow)} role="tablist" aria-label={tabsLabel} onKeyDown={onTabKeyDown}>
+          {strip.map((tab) => {
+            const count = tabIssueCount(fields, tab.key, issuesByField);
+            const selected = tab.key === open;
+            return (
+              <button
+                key={tab.key}
+                id={tabDomId(tab.key)}
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                // The open tab alone. One panel is in the DOM, so
+                // `aria-controls` on a closed tab would name an element that
+                // is not there.
+                aria-controls={selected ? tabPanelDomId(tab.key) : undefined}
+                {...stylex.props(styles.tab, selected && styles.tabSelected)}
+                onClick={() => onTabChange?.(tab.key)}
+              >
+                <span>{resolveText(tab.label, locale, locale) || tab.key}</span>
+                {count > 0 && (
+                  <>
+                    {/* The count twice: once as the stamp a participant
+                      * reads, hidden from the accessibility tree, and once
+                      * as the text naming what it counts. A name on the
+                      * stamp itself would be an accessible name on a
+                      * generic element, which ARIA 1.2 prohibits. Off
+                      * screen, never `display: none`: a hidden node is
+                      * announced by no engine. */}
+                    <span {...stylex.props(styles.tabIssueStamp)} aria-hidden="true">
+                      {count}
+                    </span>
+                    <span {...stylex.props(styles.visuallyHidden)}>{issueCountText(count, locale)}</span>
+                  </>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      <div
+        {...stylex.props(columns === 2 ? styles.gridTwoCol : styles.gridOneCol)}
+        data-columns={columns}
+        {...(open === undefined ? {} : { role: "tabpanel", id: tabPanelDomId(open), "aria-labelledby": tabDomId(open) })}
+      >
         {roots.map(({ entry, index }) => (
           <ViewEntryInput
             key={entryKey(entry, index)}

@@ -1,7 +1,7 @@
 import type { LocalizedText, LocaleCode } from "workflow-engine/schema";
-import type { ResolvedViewField, ResolvedViewEntry, AvailablePath, SubmissionIssue } from "form-ui";
+import type { ResolvedViewField, ResolvedViewEntry, ResolvedViewTab, AvailablePath, SubmissionIssue } from "form-ui";
 
-export type { ResolvedViewField, ResolvedViewEntry, AvailablePath, SubmissionIssue };
+export type { ResolvedViewField, ResolvedViewEntry, ResolvedViewTab, AvailablePath, SubmissionIssue };
 
 export type { Actor, LoginResponse, ClientError } from "../../../api/types.js";
 
@@ -37,6 +37,10 @@ export interface InstanceView {
   /** The step's declared form width. Optional here, unlike on the engine's own
    * type: a response predating the key omits it, and the form reads that as 1. */
   columns?: 1 | 2;
+  /** The step's declared tabs, in declaration order. Optional here, unlike
+   * on the engine's own type: a response predating the key omits it, and the
+   * form reads that as no tabs. */
+  tabs?: ResolvedViewTab[];
   availablePaths: AvailablePath[];
   assignment?: { candidates: string[]; claimedBy?: string; claimedAt?: string } | null;
   // The participant's saved form draft, present only when it matches the

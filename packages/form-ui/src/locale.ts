@@ -1,5 +1,5 @@
 import { resolveLocalizedText, type LocalizedText, type LocaleCode } from "workflow-engine/schema";
-import { isResolvedViewField, type ResolvedViewEntry } from "./types.js";
+import { isResolvedViewField, type ResolvedViewEntry, type ResolvedViewTab } from "./types.js";
 
 /** `LocalizedText` resolution with fallback to `baseLocale` — a consumer with
  * a single locale (the editor's Player) passes the same value for both. */
@@ -46,4 +46,14 @@ export function resolveFieldsLocale(fields: ResolvedViewEntry[], locale: LocaleC
       options: f.options?.map((o) => ({ ...o, label: { [locale]: resolveText(o.label, locale, baseLocale) } })),
     };
   });
+}
+
+/**
+ * The sibling of `resolveFieldsLocale`, for a view's tab strip. A tab's label
+ * sits outside `fields`, so it reaches no existing resolver, and one call
+ * then applies the same base-locale fallback. Returns a new array; never
+ * mutates its input.
+ */
+export function resolveTabsLocale(tabs: ResolvedViewTab[], locale: LocaleCode, baseLocale: LocaleCode): ResolvedViewTab[] {
+  return tabs.map((tab) => ({ ...tab, label: { [locale]: resolveText(tab.label, locale, baseLocale) } }));
 }

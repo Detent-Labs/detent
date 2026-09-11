@@ -820,9 +820,24 @@
           },
           "view": {
             "columns": 2,
+            "tabs": [
+              {
+                "key": "review",
+                "label": {
+                  "en": "Review"
+                }
+              },
+              {
+                "key": "decision",
+                "label": {
+                  "en": "Decision"
+                }
+              }
+            ],
             "fields": [
               {
-                "ref": "field_9c7e5b31-0023-4a1c-8e2f-000000000023"
+                "ref": "field_9c7e5b31-0023-4a1c-8e2f-000000000023",
+                "tab": "review"
               },
               {
                 "ref": "field_9c7e5b31-0004-4a1c-8e2f-000000000004",
@@ -851,7 +866,8 @@
                 "readonly": true
               },
               {
-                "ref": "field_9c7e5b31-0024-4a1c-8e2f-000000000024"
+                "ref": "field_9c7e5b31-0024-4a1c-8e2f-000000000024",
+                "tab": "review"
               },
               {
                 "ref": "field_9c7e5b31-0008-4a1c-8e2f-000000000008",
@@ -868,10 +884,12 @@
                 "text": {
                   "en": "Approving here commits budget. Confirm the vendor and amount above match the attached quote before deciding."
                 },
-                "span": 2
+                "span": 2,
+                "tab": "review"
               },
               {
-                "ref": "field_9c7e5b31-0025-4a1c-8e2f-000000000025"
+                "ref": "field_9c7e5b31-0025-4a1c-8e2f-000000000025",
+                "tab": "decision"
               },
               {
                 "ref": "field_9c7e5b31-0013-4a1c-8e2f-000000000013",

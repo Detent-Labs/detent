@@ -2899,3 +2899,107 @@ longer, so a label fitting one line in English may take two here.
 Zoom away from 1 in both directions. Pass: the label scales with the node and
 stays inside it. Switch to the dark scheme. Pass: the label reads against the
 node's ground.
+
+### Tabbed step form: the editor's strip, the preview pane and the participant (`form-view-tabs`)
+
+`packages/form-ui/test/tabs.test.tsx` covers `nextTabIndex`, `drawnTabs` and
+`firstTabWithIssue` as pure functions. `studio-formTabStrip.test.tsx` and
+`tabs.test.tsx` render both strips through `renderToStaticMarkup`,
+which fires no real key event. Neither suite reaches a real `keydown` on a
+mounted strip, so that is what this walk exercises. It also covers the
+strip's plain-button tab order, `spa-accessibility`'s named exception from
+the process tab row's own roving one.
+
+Build the production bundle and open it on the engine's own port. Do not use
+`bun run dev`: Studio's dev-mode crash is pre-existing, per this file's
+`instance-transition-action` entry above. Seed the database first, per
+`docs/decisions.md`'s seed script.
+
+**The author's strip.** Open Studio, `purchase-requisition`, step
+`finance_review`, the form editor. This step now carries two tabs, "Review"
+and "Decision". Pass: the canvas draws a strip above the field list, under
+the columns control. Both tabs draw as plain buttons, and the open one
+carries the accent rule underneath.
+
+Press Tab from the columns control. Pass: focus lands on the first tab, one
+stop in the page's own tab order. Press Tab again. Pass: focus lands on the
+second tab, still ahead of "Add a tab" in that same order. Every tab is its
+own stop, so `Tab` walks the strip one tab at a time.
+
+With a tab focused, press the right arrow, then the left arrow. Pass: focus
+moves to the neighboring tab each time, and wraps at either end. The open
+tab stays put throughout. Press `Home`, then `End`. Pass: focus jumps to the
+first tab, then the last.
+
+Press `Enter` on a focused, unopened tab. Pass: that tab opens, and the
+canvas below swaps to its entries. Focus the other tab and press `Space`.
+Pass: it opens the same way.
+
+Choose "Add a tab". Pass: a third tab appears, named "New tab", open. Choose
+"Remove tab". Pass: it disappears and a neighboring tab opens in its place.
+Restore the step to its original two tabs before leaving, or discard the
+draft.
+
+**The preview pane matches the canvas.** Beside the canvas, the trailing
+pane draws the identical strip. It already sits open on the tab the canvas
+shows. Click the canvas's own "Decision" tab. Pass: the preview's own strip
+switches to "Decision" too, with no click of its own. One open-tab state
+drives both.
+
+Click a tab inside the preview pane itself. Pass: nothing moves. The pane
+carries `inert`, confirmed in the browser's own inspector, so a click there
+reaches no tab at all.
+
+**The two process-level strips never stack.** With the form editor open,
+look for the process tab row.
+
+Pass: it stays off screen entirely, the whole time the form editor's own
+strip is up. The form editor renders in its place instead, per
+`EditScreen.tsx`'s own branch, never beside the process tab row. Choose
+Back. Pass: the process tab row returns, and no form tab strip remains.
+
+<!-- antislop: allow long-words -->
+<!-- Why: "Purchase Requisition" is examples/purchase-requisition.json's own
+     proper name, not a verb to simplify. -->
+**The participant's strip, and the issue switch.** Start a Purchase
+Requisition instance and drive it to Finance Review. Open the task. Pass:
+the same strip draws above the form, opened on "Review". It has no add,
+rename or remove control anywhere in it. Repeat the keyboard walk above. The
+arrows, `Home`, `End`, `Enter` and `Space` all move and open a tab the same
+way.
+
+Stay on "Review" and submit with Finance Note, on "Decision", left empty.
+Pass: the submission fails, and the strip switches itself to "Decision", the
+tab holding the first reported issue. The studio Player plays the same
+draft through the identical `FieldForm`, with its own open-tab state. This
+walk does not repeat it there.
+
+Read the page's `[role="status"]` element in the inspector. Pass: it carries
+this sentence, and sits off screen rather than hidden.
+
+```
+Opened the Decision tab. 1 field still needs an entry.
+```
+
+Click "Review" yourself. Pass: that text clears, so a tab you chose announces
+nothing. Submit again. Pass: the sentence returns, which is what a screen
+reader needs to hear it twice.
+
+Switch the language to German. Submit once more. Pass: the live region reads
+this instead.
+
+```
+Registerkarte Decision geöffnet. 1 Feld benötigt noch eine Eingabe.
+```
+
+**The author's strip holds one line.** Narrow the window to 640px, then to
+400px. Pass: the strip stays one line tall at both widths. The 2px divider
+stays directly under the tabs. The page itself never scrolls sideways.
+
+The strip's own row scrolls sideways instead. Its trailing commands run off
+the right edge rather than wrapping below. Pass: no command ever stands alone
+on a line. The five commands read in the muted ink. The two tabs stay the
+loudest thing in the row.
+
+Ledger reference: Task 3: minor (deferred): `onTabKeyDown` wiring uncovered.
+This walk is where that finding gets exercised.

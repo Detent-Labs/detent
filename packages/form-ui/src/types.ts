@@ -29,6 +29,12 @@ export interface ResolvedViewField {
   required: boolean;
   readonly: boolean;
   group?: string;
+  /** The tab this entry draws on, or `undefined` when the view declares no
+   * tabs — mirrors how `group` already resolves. Layout only: it reaches no
+   * guard and no submission check, so `editableFieldIds` and
+   * `filterToEditable` ignore it entirely. An entry declaring a `group`
+   * carries none: its group's entry is what places it under a tab. */
+  tab?: string;
   options?: FieldOption[];
   /** How many of the form's columns this field occupies, as the engine
    * resolved it. Optional here because a hand-built fixture and an older
@@ -45,11 +51,23 @@ export interface ResolvedViewNote {
   kind: "note";
   text: LocalizedText;
   group?: string;
+  /** See `ResolvedViewField.tab`. */
+  tab?: string;
   span?: 1 | 2;
 }
 
 /** A resolved view entry: a field entry or a note. */
 export type ResolvedViewEntry = ResolvedViewField | ResolvedViewNote;
+
+/** One member of a resolved view's tab strip: the authored `key` and its
+ * UNRESOLVED `LocalizedText` label, which `resolveTabsLocale` resolves the
+ * way `resolveFieldsLocale` resolves a field's. Hand-mirrors
+ * `src/runtime/api.ts`'s own `ResolvedViewTab`, the way every wire shape in
+ * this file mirrors its engine counterpart rather than importing it. */
+export interface ResolvedViewTab {
+  key: string;
+  label: LocalizedText;
+}
 
 /** True for a resolved field entry, the discriminant every reader narrows
  * on. */
