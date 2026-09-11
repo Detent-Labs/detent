@@ -547,7 +547,7 @@ describe("compile: a body violating a new check still reads (no new Zod refineme
   });
 
   it("a field entry carrying a group while its catalog parent is the top level parses on read", () => {
-    // More bodies violate the parentage half than the first two, per the
+    // More bodies violate the parentage clause than the first two, per the
     // delta spec. A body pinning `field_amount` (a top-level catalog field)
     // under a group the view carries must still parse.
     const b: any = baseBody();
@@ -1280,7 +1280,7 @@ describe("compile: a view entry's group names a group field the view carries", (
 
   it("accepts a view carrying the group field beside its members", () => {
     // field_amount's view entry names "person", its actual catalog parent,
-    // so this clears the parentage half too.
+    // so this clears the parentage clause too.
     const b = grouped([
       { ref: "field_person" },
       { ref: "field_amount", group: "person" },
@@ -1301,7 +1301,7 @@ describe("compile: a view entry's group names a group field the view carries", (
   });
 
   it("rejects a grouped field whose entry names no group", () => {
-    // The half binds in both directions: field_amount's catalog parent is
+    // The clause binds in both directions: field_amount's catalog parent is
     // "person", so its entry must declare it. Omitting `group` entirely
     // would otherwise let a hand-authored body lift the field onto the
     // form's root while the catalog still holds it in a group.
@@ -1447,7 +1447,7 @@ describe("compile: a view entry's group names a group field the view carries", (
   });
 
   it("resolves a group nested inside another group", () => {
-    // The parentage half binds a group field's own view entry too: a group
+    // The parentage clause binds a group field's own view entry too: a group
     // nested inside another group carries the OUTER group's key, not its
     // own — `field_inner` sits inside `field_outer`'s own `fields`.
     const b: any = baseBody();
