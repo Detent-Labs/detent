@@ -31,4 +31,4 @@
 - [x] 5.2 Run the FULL `bun test` with `DATABASE_URL` set, through `silent-green.sh`
 - [x] 5.3 Run the prose and whitespace push gates over the branch range
 - [x] 5.4 Run `openspec validate destructive-buttons-show-the-accent --strict`
-- [ ] 5.5 Rerun 5.1 to 5.4 after the hover and press rule lands
+- [x] 5.5 Rerun 5.1 to 5.4 after the hover and press rule lands
