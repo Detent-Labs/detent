@@ -2096,14 +2096,16 @@ Stage-by-stage status is in `ROADMAP.md`.
   the studio's content locale.
 - Canvas bar (`packages/web/src/areas/studio/canvas/CanvasBar.tsx`,
   `screens/EditScreen.tsx`, `canvas/layout.ts`, `studio-canvas-bar`,
-  `tighter-canvas-bar`): a row one control tall between the tab row and the
-  canvas, replacing `canvas/CanvasPalette.tsx` and the `canvasSelection`
-  aside. That aside stacked below the canvas and shortened it. The bar sets
-  no minimum height, so its tallest control sets it in every selection state.
-  Add step adds a step someone works. Its caret menu holds the other two
-  kinds: a call to another process, and an end.
+  `tighter-canvas-bar`): a row between the tab row and the canvas, replacing
+  `canvas/CanvasPalette.tsx` and the `canvasSelection` aside. That aside
+  stacked below the canvas and shortened it. The bar sets no minimum height.
+  From an 872px-tall window up, Add step sets it at 54px in every selection
+  state. A shorter window lets the tab body squeeze the bar below its
+  controls: 17px at 720px tall.
 
-  One selected step shows its reachability report, then Remove step. Several
+  Add step adds a step someone works. Its caret menu holds the other two
+  kinds: a call to another process, and an end. One selected step shows its
+  reachability report, then Remove step. Several
   show their count, Remove steps, then the group controls. A set matching one
   group shows the group's name field, its label beside the input.
   `EditScreen` renders the bar as `<CanvasBar>`, directly above
