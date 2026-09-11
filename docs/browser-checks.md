@@ -2667,9 +2667,11 @@ it to the place it came from. That is what the helper writes, and the rail
 shows it.
 
 Drag `po_status`'s row onto `Line Item`'s row with the pointer. Pass: the
-same indent and the same announcement. Drag it onto a row outside any
-group. Pass: the same move out. Both gestures reach one helper, and both
-reach the same set of destinations. A difference between them is a defect.
+same indent and the same announcement. Now drag `finance_note`'s row onto
+`po_status`'s row, a top-level row that is no group. Pass: the same move
+out. Both gestures reach one helper, and both reach the same destinations.
+
+The "+ Add field" row takes no drop. Measured 2026-09-12.
 
 Now select `discrepancy_note`, the one child of `resolution`. A group
 child's row has no label or description ahead of the key. Its move control
@@ -2734,7 +2736,7 @@ at either width. That count covered every element inside both halves and the
 rail.
 
 Read the editor's move control last. Its "Dieses Feld verschieben nach"
-label wraps instead of clipping, the same rule the screen's other controls
+label fits on one line or wraps, the same rule the screen's other controls
 follow. The closed select stays inside its own half, with no horizontal
 scroll. The rail has no visible kind word any more. The icon that leads a
 label takes no width of its own. Its name reaches only a tooltip and a
