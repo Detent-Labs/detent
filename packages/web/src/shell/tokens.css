@@ -139,13 +139,6 @@
   cursor: not-allowed;
 }
 
-/* A destructive commit: outlined in the accent, never filled, per the
-   document's own "Destructive" example. Applies alongside .btn-secondary. */
-.btn-destructive {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
-}
-
 .btn-primary {
   background: var(--color-accent);
   color: var(--color-accent-contrast);
@@ -171,6 +164,16 @@
 
 .btn-secondary:active {
   background: color-mix(in srgb, var(--color-text) 14%, transparent);
+}
+
+/* A destructive commit: outlined in the accent, never filled, per the
+   document's own "Destructive" example. Applies alongside .btn-secondary,
+   and must stay ordered after every .btn-secondary rule above: both weigh
+   one class, so source order settles the tie.
+   packages/web/test/btn-destructive-accent.test.ts pins the order. */
+.btn-destructive {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
 }
 
 .btn-ghost {
