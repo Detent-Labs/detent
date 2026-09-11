@@ -4,17 +4,19 @@ See proposal.md for the motivation. Three facts shape the approach.
 
 The order helper derives the rail's order from the path graph. Three call sites
 read it. They are the rail's row list, the process surface's `railOrder`, and
-the Forms tab's card rows. That same list feeds the rail's current mark, the walk's
-two ends and the step page's fallback step. All four surfaces therefore move
-together.
+the Forms tab's card rows. That same list feeds the rail's current mark, the
+walk's two ends and the step page's fallback step. All four surfaces therefore
+move together.
 
 The draft's own `workflow.steps` order is already visible elsewhere. The
-reporting area orders its per-step rows by it, in `orderOf`. The canvas's entry
-focus falls back to the first reachable step in it. The serialized definition
-prints it. An author who presses a move control writes that order today.
+engine's reporting queries order their per-step rows by it, in
+`src/engine/reporting.ts`'s `orderOf`. The canvas's entry focus falls back to
+the first reachable step in it. The serialized definition prints it. An author
+who presses a move control writes that order today.
 
-The repo's `tsconfig.json` sets `noUnusedLocals` over `test` as well. A dropped
-call site therefore leaves no import behind.
+`packages/web/tsconfig.json` sets `noUnusedLocals` and includes its own `test`
+directory. `bun run typecheck` reaches it through the workspace filter script.
+A dropped call site therefore leaves no import behind.
 
 ## Goals / Non-Goals
 
@@ -32,6 +34,8 @@ call site therefore leaves no import behind.
 - The five other rail findings in `docs/decisions.md`. RAIL-1 alone closes
   here.
 - The reachability set. The canvas bar's report reads it, and it stays.
+- `docs/roadmap-history.md` records what stage 62 shipped, so its reachability
+  sentence stays as written.
 
 ## Decisions
 
@@ -40,9 +44,9 @@ alternative was a wrapper returning that same array. A wrapper states no rule
 of its own. A later reader would ask what it decides.
 
 **One list serves the rail and the walk.** The process surface builds it once
-and hands it on. The current mark, the walk's two ends and the fallback step follow
-the rail. Letting the walk keep the graph order would put Next on a different
-step than the row below.
+and hands it on. The current mark, the walk's two ends and the fallback step
+follow the rail. Letting the walk keep the graph order would put Next on a
+different step than the row below.
 
 **The Forms cards keep following the rail.** Their row builder orders by the
 same list. The spec already pins the cards to the rail's order. The card order
@@ -50,18 +54,23 @@ therefore moves with the rail rather than against it.
 
 **The order helper goes and the reachability set stays.** The first loses every
 consumer. The second keeps one, the canvas bar's reachability report. Its test
-file keeps the `reachableStepIds` block. The cases covering the terminal group
-and the breadth-first walk go with the function.
+file keeps the `reachableStepIds` block, with that block's first case narrowed.
+The comparison against the order helper's terminal group goes with the helper.
+
+**The order requirement owns the move control's effect.** The reorder
+requirement keeps the controls' presence and their two disabled ends. Where a
+press lands is an ordering fact, so it stands with the order.
 
 **Two deltas remove and add instead.** The old walk gives one scenario its
 name. The validator matches scenario names character for character, in strict
-mode. The other requirement names the walk in its own header. A REMOVED
-plus ADDED pair states both changes cleanly.
+mode. The other requirement names the walk in its own header. A REMOVED plus
+ADDED pair states both changes cleanly.
 
 **The mockup replaces the shape step.** No layout changes, so that step has
 nothing to decide. The owner picked the behaviour from four rendered variants.
 That page is the decision record. The detector still runs after every write
-under `packages/web`. The critique and the audit still run at the browser check.
+under `packages/web`. The critique and the audit still run at the browser
+check.
 
 ## Risks / Trade-offs
 

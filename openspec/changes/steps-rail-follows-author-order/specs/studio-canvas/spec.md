@@ -47,3 +47,34 @@ per `studio-process-tabs`.
 - **WHEN** a keyboard author tabs through the Canvas tab
 - **THEN** no register row takes focus, because no register stands
 - **AND** the canvas keeps the one tab stop its keyboard requirement states
+
+## MODIFIED Requirements
+
+### Requirement: The canvas bar reports one selected step's reachability
+
+The canvas bar SHALL report the reachability of a single selected step. A step
+the draft's initial step reaches through paths reads as nothing. A step no
+chain of paths reaches reads as unconnected.
+
+A step counts as reached when the draft's initial step reaches it over paths.
+That rule stands on its own. The steps rail's order no longer applies it. A
+draft naming no initial step leaves every step unconnected. The rule reaches a
+terminal step the same way it reaches any other.
+
+The report SHALL stand only for a selection of exactly one step. A selection
+of none has no report. A selection of several carries the count instead.
+
+#### Scenario: An unreached step reads as unconnected
+
+- **WHEN** an author selects a step no path reaches
+- **THEN** the bar reads as unconnected
+
+#### Scenario: A reached step has no report
+
+- **WHEN** an author selects the draft's initial step
+- **THEN** the bar has no reachability report
+
+#### Scenario: Several selected steps carry the count instead
+
+- **WHEN** an author selects two steps, one of them unreached
+- **THEN** the bar reports a count of two and no reachability
