@@ -95,6 +95,17 @@ describe("the form's tab strip", () => {
     expect((middle.match(/disabled=""/g) ?? []).length).toBe(0);
   });
 
+  it("reads the end guard off the whole array, so a keyless tab ahead of the open one keeps Move left live", () => {
+    // `FormEditorScreen.moveTab` splices the whole `tabs` array, so the guard
+    // has to index that array too. Over the drawn tabs alone, the open tab
+    // here reads as position 0 and Move left would be disabled while the
+    // splice still had somewhere to move it.
+    const html = render([{ label: { en: "half-typed" } }, ...TABS], "t1");
+
+    expect(html).toMatch(/Move left/);
+    expect((html.match(/disabled=""/g) ?? []).length).toBe(0);
+  });
+
   it("carries the authoring controls only while a tab is open", () => {
     // A strip drawing tabs always has one open, since the screen derives the
     // open tab. A member-less strip is the case with no tab to rename.

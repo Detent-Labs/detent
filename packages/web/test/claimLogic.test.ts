@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { resolveClaimControls, isEligibleCandidate, maySubmit, tabToOpenOnFailure } from "../src/areas/app/screens/claimLogic.js";
-import type { InstanceView, ResolvedViewEntry, ResolvedViewTab, SubmissionIssue } from "../src/areas/app/api/types.js";
+import { resolveClaimControls, isEligibleCandidate, maySubmit } from "../src/areas/app/screens/claimLogic.js";
+import type { InstanceView } from "../src/areas/app/api/types.js";
 
 type Assignment = InstanceView["assignment"];
 
@@ -83,38 +83,5 @@ describe("maySubmit", () => {
   it("withholds submission from a blocked actor", () => {
     expect(maySubmit({ state: "blocked-not-candidate" })).toBe(false);
     expect(maySubmit({ state: "blocked-claimed-by-other" })).toBe(false);
-  });
-});
-
-/** form-view-tabs, group 4 fix round 1: the tab-switch decision `TaskScreen`
- * calls from its post-submission `useEffect`. */
-describe("tabToOpenOnFailure", () => {
-  const field = (id: string, tab: string): ResolvedViewEntry =>
-    ({ field: { id, key: id, label: { en: id }, type: "string" }, value: undefined, required: false, readonly: false, tab }) as ResolvedViewEntry;
-  const tabs: ResolvedViewTab[] = [
-    { key: "one", label: { en: "One" } },
-    { key: "two", label: { en: "Two" } },
-  ];
-  const fields: ResolvedViewEntry[] = [field("field_a", "one"), field("field_b", "two")];
-  const issuesFor = (fieldId: string): Map<string, SubmissionIssue[]> => new Map([[fieldId, [{ kind: "required", fieldId }]]]);
-
-  it("moves to the tab holding an issue that isn't the open tab", () => {
-    expect(tabToOpenOnFailure(fields, tabs, issuesFor("field_b"))).toBe("two");
-  });
-
-  it("answers undefined for an empty issue map, leaving the participant's own choice alone", () => {
-    expect(tabToOpenOnFailure(fields, tabs, new Map())).toBeUndefined();
-  });
-
-  it("answers the same tab for the same issues built twice, so a re-render with unchanged issues never picks a different tab", () => {
-    // Two separately-built Maps carrying the same content, standing in for
-    // what two renders of the same `validationIssues` state each produce:
-    // the decision is a pure function of content, never of the Map's own
-    // identity, which is what lets the screen's effect skip re-running on an
-    // unrelated re-render without ever risking a different answer if it did.
-    const first = tabToOpenOnFailure(fields, tabs, issuesFor("field_b"));
-    const second = tabToOpenOnFailure(fields, tabs, issuesFor("field_b"));
-    expect(first).toBe("two");
-    expect(second).toBe("two");
   });
 });

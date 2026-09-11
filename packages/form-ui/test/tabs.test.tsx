@@ -330,6 +330,19 @@ describe("firstTabWithIssue: a helper names the first tab holding an issue", () 
     expect(firstTabWithIssue(grouped, TABS, issues)).toBe("two");
     expect(tabIssueCount(grouped, "two", issues)).toBe(1);
   });
+
+  it("answers the same tab for the same issues built twice, so a re-render with unchanged issues never picks a different tab", () => {
+    // Two separately-built Maps carrying the same content, standing in for
+    // what two renders of the same `validationIssues` state each produce: the
+    // answer is a pure function of content, never of the Map's own identity.
+    // That is what lets `TaskScreen` and `PlayerScreen` key their tab-switch
+    // effect on `validationIssues` rather than on the derived Map, without
+    // risking a different answer if the effect did re-run
+    // (`packages/web/test/form-tab-switch-effect.test.ts`).
+    const issues = () => new Map([["f2", [required("f2")]]]);
+    expect(firstTabWithIssue(fields, three, issues())).toBe("two");
+    expect(firstTabWithIssue(fields, three, issues())).toBe("two");
+  });
 });
 
 describe("The tab stamp: each drawn tab marks its own issues", () => {

@@ -929,9 +929,10 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
     writeView(renameViewTab(step.view ?? { fields: [] }, key, label));
   };
 
-  const moveTab = (key: string, delta: -1 | 1) => {
-    const from = tabs.findIndex((tab) => tab.key === key);
-    if (from === -1) return;
+  // `from` is the strip's own index into this same `tabs` array, so the
+  // strip's Move-left/right end guards and this splice act on one set of
+  // positions. `moveViewTab` holds the range guard.
+  const moveTab = (from: number, delta: -1 | 1) => {
     const target = from + delta;
     writeView({ ...(step.view ?? { fields: [] }), tabs: moveViewTab(tabs, from, delta === 1 ? target + 1 : target) });
   };

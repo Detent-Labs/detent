@@ -409,6 +409,9 @@ export const en = {
   // (`studio-form-editor`).
   "formPreview.heading": "What a participant meets",
   "formPreview.submit": "Submit",
+  // The strip inside the preview, named apart from the authoring strip above
+  // it: one form-editor screen draws both over the same tab labels.
+  "formPreview.formTabsLabel": "Form tabs in the preview",
 
   "columnMapping.heading": "Column mapping",
   "columnMapping.noColumns": "This list declares no column, so there is nothing to map.",
@@ -594,6 +597,10 @@ export const en = {
   "headerBar.jsonLeave": "Leave the JSON surface",
   "headerBar.versions": "Versions",
   "headerBar.player": "Player",
+
+  // The Player screen. Its own strings are still mostly inline English; this
+  // one is a catalog key because it is an accessible name.
+  "player.formTabsLabel": "Form tabs",
 
   "checksRail.heading": "Checks",
   "checksRail.heldBack": "Held back until earlier checks pass.",
