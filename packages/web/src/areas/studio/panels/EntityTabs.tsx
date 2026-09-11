@@ -11,7 +11,7 @@ import { addToDraftArray } from "../draft/draft-array-crud";
 import { resolveDraftLocalizedText, seedLocalizedText } from "../draft/localized-text";
 import { flattenDraftFields } from "../draft/fields";
 import { fieldKindWord } from "../draft/field-type-labels";
-import { groupTargetsFor, moveFieldToGroup } from "./fieldCatalogLogic";
+import { groupTargetsFor, moveControlId, moveFieldToGroup } from "./fieldCatalogLogic";
 import { flattenRailFields, issueCountForEntityId } from "../draft/panel-rail";
 import { moveFieldAndSyncViews } from "../draft/view-group-sync";
 import { FieldCatalogPanel } from "./FieldCatalogPanel";
@@ -339,8 +339,6 @@ export function PanelsRailFieldRow({
     </div>
   );
 }
-
-const moveControlId = (fieldId: string) => `studio-panels-rail-move-${fieldId}`;
 
 /**
  * The Fields tab: the catalog's own entity rail beside the open field's
