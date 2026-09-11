@@ -21,13 +21,12 @@ const BAR_MIN_HEIGHT = "5.5rem";
 const MENU_GAP_PX = 4;
 
 /**
- * The three kinds the menu names, in the guided layer's own order
- * (`studio-guided-vocabulary`): a step someone works, a call to another
- * process, and an end. The bar's own button is the shortcut for the first,
- * and the menu still names all three, so no kind reaches the author through
- * the shortcut alone.
+ * The two kinds the menu names (`studio-guided-vocabulary`): a call to
+ * another process, and an end. Add step is the press and drag source for the
+ * third kind, a step someone works, so the menu lists only the two kinds Add
+ * step does not add.
  */
-const MENU_KINDS: readonly StepKind[] = ["task", "subprocess", "end"];
+const MENU_KINDS: readonly StepKind[] = ["subprocess", "end"];
 
 const styles = stylex.create({
   // The ledger rule under the tab row: one flex row, content flush left, a
