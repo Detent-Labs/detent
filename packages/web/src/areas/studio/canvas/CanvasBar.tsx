@@ -48,8 +48,8 @@ const styles = stylex.create({
     overflowX: "auto",
   },
   // Nothing in the row shrinks: a shrunk button wraps its own label, which
-  // would grow the bar. Narrow-window behaviour is design.md's own open
-  // question, and a browser check answers it.
+  // would grow the bar. The walk in `docs/browser-checks.md` records the
+  // narrow-window behaviour.
   control: {
     flexShrink: 0,
   },
@@ -92,8 +92,8 @@ const styles = stylex.create({
     flexShrink: 0,
   },
   // The design language's field label: 11px, uppercase, tracked 0.1em, in
-  // slate (mirrors `StepPage.tsx`'s `fieldLabelText`), now flush against the
-  // input beside it instead of floated above it.
+  // slate (mirrors `StepPage.tsx`'s `fieldLabelText`), flush against the
+  // input beside it.
   groupNameLabelText: {
     fontSize: 11,
     lineHeight: 1,
@@ -198,7 +198,7 @@ interface Props {
   onGroupsChange: (groups: StepGroup[]) => void;
 }
 
-/** A live drag out of one of the four add controls. */
+/** A live drag out of one of the three add controls. */
 interface BarDrag {
   kind: StepKind;
   /** Where the press landed, in client coordinates. Decides press against
