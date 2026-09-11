@@ -1798,8 +1798,9 @@ Stage-by-stage status is in `ROADMAP.md`.
   `canvas/connection.ts` are pure and unit-tested alongside `layout.ts`; the
   SVG/React rendering and pointer wiring itself is not, per this repo's
   existing convention (`packages/web/src/areas/app/screens/inboxLogic.ts`). The canvas
-  introduces no operation the panels can't already do — deletion and every
-  field edit remain panel-only.
+  introduces no operation the panels can't already do. Deletion keeps its
+  panel route through the step page's own Remove control, and every field
+  edit stays panel-only.
 - Canvas grid snapping (`packages/web/src/areas/studio/canvas/geometry.ts`,
   `canvas/layout.ts`, `canvas/CanvasView.tsx`, `screens/EditScreen.tsx`,
   `form-ui/tokens.stylex`): a step lands on the lattice the author can see.
