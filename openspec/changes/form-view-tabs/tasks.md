@@ -55,13 +55,13 @@
 
 ## 6. Documentation and examples
 
-- [ ] 6.1 Add `tabs` and `tab` to `docs/openapi.yaml`, `tabs` in `required`
-- [ ] 6.2 Teach the tab rules in `docs/authoring-guide.md`
-- [ ] 6.3 Record the rule delta in the two files under `.claude/rules/`
-- [ ] 6.4 Strike the tab panel from the parked display elements in `docs/decisions.md`
-- [ ] 6.5 Record the tabbed-form browser check in `docs/browser-checks.md`
-- [ ] 6.6 Add one tabbed form to an existing definition under `examples/`
-- [ ] 6.7 Verify group 6: the prose gate reports no rise on the changed Markdown
+- [x] 6.1 Add `tabs` and `tab` to `docs/openapi.yaml`, `tabs` in `required`
+- [x] 6.2 Teach the tab rules in `docs/authoring-guide.md`
+- [x] 6.3 Record the rule delta in the two files under `.claude/rules/`
+- [x] 6.4 Strike the tab panel from the parked display elements in `docs/decisions.md`
+- [x] 6.5 Record the tabbed-form browser check in `docs/browser-checks.md`
+- [x] 6.6 Add one tabbed form to an existing definition under `examples/`
+- [x] 6.7 Verify group 6: the prose gate reports no rise on the changed Markdown
 
 ## 7. Verification
 
