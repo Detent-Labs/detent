@@ -41,6 +41,7 @@
 - [x] 5.8 Run `/impeccable critique` and `/impeccable audit` against the Canvas tab, and route every finding.
 - [x] 5.9 Name in the audit where focus lands after Remove step takes its own step away.
 - [x] 5.10 Record for the finish message that `tmp/Detent Design Language.dc.html` needs the same Fields exception.
+- [x] 5.11 Re-measure with scrollbars visible: 69px with a group selected, 54px with nothing selected, at 800px and 700px.
 
 ## 6. Verification
 

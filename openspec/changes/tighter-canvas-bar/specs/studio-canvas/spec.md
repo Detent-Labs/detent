@@ -54,7 +54,8 @@ floor of 36rem. Past that floor the page scrolls.
 
 #### Scenario: The bar holds its height across a selection
 
-- **WHEN** an author selects three steps, then clears the selection
+- **WHEN** an author selects three steps, then clears the selection, in a
+  window wide enough for the row
 - **THEN** the bar's height never changes
 - **AND** the canvas never reflows
 
@@ -95,10 +96,13 @@ floor of 36rem. Past that floor the page scrolls.
 ### Requirement: A canvas bar offers Step, Subprocess, and End as an always-available way to add a step
 
 The Canvas tab SHALL carry a canvas bar at all times. The bar stands between
-the tab row and the canvas. It runs the tab body's full width. Its height
-SHALL stay fixed whatever the canvas selection holds. That height SHALL be one
-row of its controls. A field in the bar SHALL carry its label beside the
-field, so no selection state grows the row.
+the tab row and the canvas. It runs the tab body's full width.
+
+While the bar's controls fit the window, its height SHALL stay fixed whatever
+the canvas selection holds. That height SHALL be one row of its controls. A
+field in the bar SHALL carry its label beside the field. A row wider than the
+window SHALL scroll sideways inside the bar. The scrollbar MAY add its own
+height to the bar.
 
 The bar SHALL carry three add controls. They add a step someone works, a call
 to another process, and an end, per `studio-guided-vocabulary`. No control
@@ -151,9 +155,17 @@ foot carries the same three controls, per `studio-step-page`.
 
 #### Scenario: The bar stands one control row tall
 
-- **WHEN** an author selects a set that matches one group
+- **WHEN** an author selects a set that matches one group, in a window wide
+  enough for the row
 - **THEN** the group name's label stands beside its field
 - **AND** the bar keeps the height it has with nothing selected
+
+#### Scenario: A narrow window scrolls the row
+
+- **WHEN** an author selects a set matching one group in a window too narrow
+  for the row
+- **THEN** the bar scrolls the row sideways
+- **AND** every control in it stays reachable by pointer
 
 #### Scenario: The add controls work with nothing selected
 

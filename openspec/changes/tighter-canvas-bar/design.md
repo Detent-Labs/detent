@@ -50,7 +50,7 @@ owner's screenshots and a mockup of three heights, both on 2026-09-11.
   input.
 - **States.** Nothing selected, one step reached or unconnected, several
   steps, and a set matching one group. Each measures 54px, the height with
-  nothing selected.
+  nothing selected, in a window wide enough for the row.
 - **Boundaries.** No new control and no new color. The steps rail's foot, the
   step page and the menu's disclosure behaviour stay as they are.
 
@@ -58,7 +58,8 @@ owner's screenshots and a mockup of three heights, both on 2026-09-11.
 
 **Goals:**
 
-- The bar stands one control row tall in every selection state.
+- The bar stands one control row tall in every selection state, in a window
+  wide enough for the row.
 - The caret menu lists only the two kinds Add step does not add.
 - One selected step shows the Remove control.
 
@@ -151,8 +152,12 @@ as a checklist entry".
 - [The heading face changes alone, as when Archivo ships] → Add step's
   `normal` line box changes while the input's stays. The walk re-measures the
   group state.
-- [The group state's row grows about 90px wider] → The bar already scrolls
-  sideways in a narrow window. A task measures the fit at 800px and 700px.
+- [The group state's row grows about 90px wider] → The row reaches 838px.
+  Under about 877px wide at 720px tall, the bar scrolls it sideways. Its
+  scrollbar grows the bar from 54px to 69px in Chrome on Windows, moving the
+  canvas too. The owner chose that growth (A) on 2026-09-11 over B and C. B hides the scrollbar, which leaves a pointer user no cue that
+  controls sit past the edge. C reserves its band in every state, which takes
+  15px from the canvas in every window.
 - [A single step leaves the draft on one press] → The step page's own control
   acts the same way today. So does the multi-step control. The checks rail
   reports any path left pointing at the step.
