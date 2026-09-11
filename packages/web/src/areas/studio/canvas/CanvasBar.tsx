@@ -391,7 +391,7 @@ export function CanvasBar({
           </span>
           <button
             type="button"
-            className={`btn btn-destructive ${stylex.props(styles.control).className ?? ""}`.trim()}
+            className={`btn btn-secondary btn-destructive ${stylex.props(styles.control).className ?? ""}`.trim()}
             onClick={onDeleteSelection}
           >
             {t("canvas.selectionRemove")}

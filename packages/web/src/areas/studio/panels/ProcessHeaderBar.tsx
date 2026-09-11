@@ -568,7 +568,7 @@ function DiscardConfirmDialog({
         </p>
       )}
       <div {...stylex.props(styles.controls)}>
-        <button type="button" className="btn btn-destructive" onClick={onConfirm} disabled={busy}>
+        <button type="button" className="btn btn-secondary btn-destructive" onClick={onConfirm} disabled={busy}>
           {t("draftToolbar.discard")}
         </button>
         {/* Cancel holds the initial focus. Discard draft is the first
