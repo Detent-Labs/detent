@@ -1,18 +1,18 @@
 ## 1. Stylesheet
 
-- [ ] 1.1 Move the `.btn-destructive` block in `tokens.css` below `.btn-secondary:active`
-- [ ] 1.2 Extend that block's comment with the order it needs and the test pinning it
+- [x] 1.1 Move the `.btn-destructive` block in `tokens.css` below `.btn-secondary:active`
+- [x] 1.2 Extend that block's comment with the order it needs and the test pinning it
 
 ## 2. Call sites
 
-- [ ] 2.1 Add `btn-secondary` to the confirming control in `ProcessHeaderBar.tsx:571`
-- [ ] 2.2 Add `btn-secondary` to the selection control in `CanvasBar.tsx:394`
+- [x] 2.1 Add `btn-secondary` to the confirming control in `ProcessHeaderBar.tsx:571`
+- [x] 2.2 Add `btn-secondary` to the selection control in `CanvasBar.tsx:394`
 
 ## 3. Test
 
-- [ ] 3.1 Add a `packages/web/test/` file asserting the destructive rule follows every secondary rule
-- [ ] 3.2 In that file, assert each `className` naming `btn-destructive` also names `btn-secondary`
-- [ ] 3.3 Cite this change's proposal in the file's header comment as the defect it guards
+- [x] 3.1 Add a `packages/web/test/` file asserting the destructive rule follows every secondary rule
+- [x] 3.2 In that file, assert each `className` naming `btn-destructive` also names `btn-secondary`
+- [x] 3.3 Cite this change's proposal in the file's header comment as the defect it guards
 
 ## 4. Browser check
 
