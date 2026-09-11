@@ -357,6 +357,9 @@ mono face and the stamp, never from the control itself.
 ### Inputs / Fields
 
 - Label above control, both flush left, 4px apart.
+- The one exception: a field inside a toolbar row, such as the canvas bar's
+  group name. Its label sits beside the control, 8px apart, so the row keeps
+  one control's height.
 - The label takes 11px uppercase at 0.1em, in slate.
 - The control takes a 1px hairline border, the paper ground, 8px padding and
   14px text. The border is the field; no fill stands behind it.
