@@ -131,8 +131,9 @@ It cannot see the cascade.
   The test pins the hover rule after every `.btn-secondary` rule.
 - [Accent text on the dark scheme's surface] → `.btn-ghost` already sets the
   same accent text on the same grounds. The walk runs once per scheme.
-- [Discard draft loses its fill] → The stylesheet leaves it the browser's own
-  button background today. Losing that fill is the fix. The walk confirms it.
+- [Discard draft loses its fill] → Before this change, the stylesheet left it
+  the browser's own button background. Losing that fill is the fix. The walk
+  confirms it.
 - [Both controls in the draft confirmation dialog read in the accent] → Its
   Cancel carries `btn-ghost`, whose text is the accent too. Only the border
   sets Discard draft apart. The walk judges whether the two read apart.

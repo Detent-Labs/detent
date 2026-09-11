@@ -45,8 +45,8 @@ disabled opacity. Keyboard focus SHALL draw the shared accent focus ring.
 #### Scenario: A disabled destructive control keeps the accent
 
 - **WHEN** a destructive control carries the `disabled` attribute
-- **THEN** it renders at the shared disabled opacity, with its text and its
-  border still in the accent
+- **THEN** it renders at the shared disabled opacity
+- **AND** its text and its border stay in the accent, under the pointer as well
 
 #### Scenario: Every destructive control carries the secondary class
 
