@@ -979,9 +979,9 @@ function checkRedactableFields(body: ProcessBody): CompileIssue[] {
 // entry too — a group nested inside another group carries the outer group's
 // key, and no other. One exception: a group whose own `key` is empty maps
 // its children to `""` too (`parentGroupKeyById` has no other key to give
-// them), so they carry no `group` either and this half reports nothing for
+// them), so they carry no `group` either and this clause reports nothing for
 // them — moot in practice, since `checkFieldKeyFormat` already rejects the
-// empty key on its own. A note entry is exempt from this half entirely: it
+// empty key on its own. A note entry is exempt from this clause entirely: it
 // names no catalog field, so nothing parents it.
 //
 // Operates on duck-typed input, like checkReservedActionPrefix,
@@ -1035,7 +1035,7 @@ function checkViewGroupReferences(body: ProcessBody): CompileIssue[] {
 
       if (typeof vf?.ref !== "string") return; // a note has no catalog parent to agree with
 
-      // Third half: reaches every field entry, whatever `group` says,
+      // Third clause: reaches every field entry, whatever `group` says,
       // including an absent or empty one. `?? ""` folds two catalog shapes
       // onto the same "no group" value the declared side already normalizes
       // to: a field the catalog holds at the top level (no map entry) and a
