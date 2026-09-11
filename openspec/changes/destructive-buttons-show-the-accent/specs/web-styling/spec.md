@@ -12,9 +12,10 @@ red. That treatment is the one `DESIGN.md` states. No later rule in the shared
 stylesheet SHALL override it.
 
 On hover and while pressed, the control SHALL take the secondary control's
-wash. Its text and its border SHALL stay in the accent. A disabled control
-SHALL keep the accent at the shared disabled opacity. Keyboard focus SHALL
-draw the shared accent focus ring.
+wash. Its text and its border SHALL then read `--color-accent-on-muted`, the
+accent step that clears a tinted ground. The plain accent measures under
+4.5:1 on that wash. A disabled control SHALL keep the accent at the shared
+disabled opacity. Keyboard focus SHALL draw the shared accent focus ring.
 
 #### Scenario: Cancel instance shows the accent outline
 
@@ -23,11 +24,18 @@ draw the shared accent focus ring.
   equal the accent
 - **AND** its computed background is transparent
 
-#### Scenario: Hover keeps the accent
+#### Scenario: Hover reads the accent step for a tinted ground
 
 - **WHEN** the pointer rests on a destructive control
-- **THEN** its text and its border stay in the accent
+- **THEN** its text and its border read `--color-accent-on-muted`
 - **AND** its background shows the secondary control's hover wash
+- **AND** its text contrast against that wash is at least 4.5:1
+
+#### Scenario: Pressing keeps the text readable
+
+- **WHEN** the pointer holds a destructive control down
+- **THEN** its text and its border read `--color-accent-on-muted`
+- **AND** its text contrast against the pressed wash is at least 4.5:1
 
 #### Scenario: A destructive control differs from the secondary one beside it
 

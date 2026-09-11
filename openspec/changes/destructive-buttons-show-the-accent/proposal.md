@@ -18,14 +18,16 @@ a plain secondary button beside it.
 
 - The `.btn-destructive` block moves below the `.btn-secondary` rules in
   `tokens.css`. Its accent `color` and `border-color` then win the cascade.
-  Hover and active keep the secondary's ink wash, since neither rule sets a
-  color or a border.
+  On hover and while pressed, the secondary's ink wash stays. Text and border
+  switch to `--color-accent-on-muted` there, because the plain accent measures
+  under 4.5:1 on that wash.
 - Two call sites carry `btn-destructive` without `btn-secondary`: the draft
   confirmation dialog (`ProcessHeaderBar.tsx:571`) and the canvas bar's remove
   control (`CanvasBar.tsx:394`). Each gains `btn-secondary`. Today, by reading,
   each keeps the browser's own button background and gets no hover wash.
-- A `bun:test` assertion holds both facts: the rule order in `tokens.css`, and
-  the pairing at every call site in `packages/web/src`.
+- A `bun:test` assertion holds three facts. Two sit in `tokens.css`: the rule
+  order, and the hover and press rule's order and token. The third is the
+  pairing at every call site in `packages/web/src`.
 - `docs/browser-checks.md` gains one walk across the ten destructive controls.
   It checks the accent outline at rest, on hover, while disabled and under the
   focus ring.
@@ -43,7 +45,8 @@ None.
 
 ## Impact
 
-- `packages/web/src/shell/tokens.css`: one block moves.
+- `packages/web/src/shell/tokens.css`: one block moves, and a hover and press
+  rule lands beside it.
 - `packages/web/src/areas/studio/panels/ProcessHeaderBar.tsx` and
   `packages/web/src/areas/studio/canvas/CanvasBar.tsx`: one class each.
 - One new test file under `packages/web/test/`.
