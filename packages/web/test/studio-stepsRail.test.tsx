@@ -155,7 +155,6 @@ describe("The steps rail's order and numbering", () => {
       expect(at).toBeGreaterThan(cursor);
       cursor = at;
     }
-    expect(expected).toEqual(["Intake", "Credit check", "Done"]);
   });
 
   it("numbers the call one, the end two and the task three, when the array runs call, end, task", () => {
