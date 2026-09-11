@@ -1481,14 +1481,6 @@ They are `steps-rail-rows-drop-summary-line` on the Studio Steps tab,
 rest. Every item below sits outside the change that found it, and each was
 recorded rather than fixed. The RAIL tags are local to this section.
 
-- **RAIL-1: a move control leaves a reachable row in place.** The rail orders
-  reachable non-end steps by a breadth-first walk. That order comes from
-  `registerOrder`, which reads the graph rather than the array. The move
-  control swaps two entries in the draft's own steps array, which the canvas
-  traversal and the serialized definition both read. An end step and an
-  unreachable step follow the swap; a reachable step keeps its place.
-  Risk (Medium): the control stands enabled on every row, and most clicks
-  show no change.
 - **RAIL-2: a move control is 26px wide.** The button pads an 18px icon by
   4px on each side, in the `move` style of `StepsRail.tsx`. Its height
   follows the row. Risk (Low): that width clears the 24px minimum target and
