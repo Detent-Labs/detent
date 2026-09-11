@@ -3200,7 +3200,7 @@ Open `it-offboarding` and go to its Steps tab, at
 Pass: each row shows its number, label, "Move earlier" and "Move later",
 with no summary line under it.
 
-Open the rail's "Add" foot and choose "Add a call to another process".
+In the rail's foot, under "Add", choose "Add a call to another process".
 Pass: the new row's issue badge sits at its trailing edge, reading "1 open
 issue".
 
