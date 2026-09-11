@@ -409,10 +409,10 @@ keeps its own width.
 Wheel the pointer right over the bar. Pass: Ungroup scrolls into view and
 takes a click there.
 
-Measured on 2026-09-11 in a 1000px-tall window, the group state holds 838px
-of content. At 800px a 776px bar leaves 62px to scroll. At 700px a 676px bar
-leaves 162px. The bar fits from an 862px window up, and stands 54px tall at
-both widths.
+Measured on 2026-09-11, the group state holds 838px of content, at 720px
+and at 1000px tall. At 800px a 776px bar leaves 62px to scroll. At 700px a
+676px bar leaves 162px. The bar fits from an 862px window up, and stands
+54px tall at both widths.
 
 None of the pointer, focus, or height checks above has coverage in
 `packages/web/test/`. Every suite there renders through
@@ -433,15 +433,17 @@ bar's height and the region's top edge from those two elements. Read Add
 step's own height beside them, as the positive control.
 
 Select nothing, then one step, then three steps, then a set matching one
-group. Pass: every state reads the nothing-selected height, with Add step
-whole inside the bar. The region's top edge stays put.
+group. Do it in a 1280 by 1000 window, then in a 1280 by 720 one. Pass:
+every state reads the nothing-selected height, with Add step whole inside
+the bar. The region's top edge stays put.
 
-Measured on 2026-09-11, Chromium on Windows, 1280 by 1000: the bar stands
-54px in all four states. Add step stands 37px. The region's top edge holds
-at 271.5px.
+Measured on 2026-09-11, Chromium on Windows: the bar stands 54px in all four
+states, in both windows. Add step stands 37px inside it. The region's top
+edge holds at 271.5px.
 
-Repeat the four states in a 1280 by 720 window. Pass: the bar keeps that
-same height, with Add step whole.
+In the 720px window the tab body scrolls past the canvas floor. Pass,
+measured: it holds 630px of content in 479px, and the canvas region keeps
+576px.
 
 In the group state, read the Group name field. Pass, measured: its label
 stands left of the input, 8px apart, on the input's centre line. The input
