@@ -174,7 +174,9 @@
    one class, so source order settles the tie.
    packages/web/test/btn-destructive-accent.test.ts pins the order.
    Hover and press read --color-accent-on-muted, because the plain accent
-   measures under 4.5:1 on the secondary control's washes. */
+   measures under 4.5:1 on the secondary control's washes. A disabled control
+   keeps the accent under the pointer; its rule ties the hover rule at two
+   classes, so it stays after it. */
 .btn-destructive {
   border-color: var(--color-accent);
   color: var(--color-accent);
@@ -184,6 +186,12 @@
 .btn-destructive:active {
   border-color: var(--color-accent-on-muted);
   color: var(--color-accent-on-muted);
+}
+
+.btn-destructive:disabled,
+.btn-destructive[aria-disabled="true"] {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
 }
 
 .btn-ghost {

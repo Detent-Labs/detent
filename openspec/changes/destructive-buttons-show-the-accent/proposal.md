@@ -25,9 +25,9 @@ a plain secondary button beside it.
   confirmation dialog (`ProcessHeaderBar.tsx:571`) and the canvas bar's remove
   control (`CanvasBar.tsx:394`). Each gains `btn-secondary`. Today, by reading,
   each keeps the browser's own button background and gets no hover wash.
-- A `bun:test` assertion holds three facts. Two sit in `tokens.css`: the rule
-  order, and the hover and press rule's order and token. The third is the
-  pairing at every call site in `packages/web/src`.
+- A `bun:test` assertion holds four facts. Three sit in `tokens.css`: the rule
+  order, the hover and press rule's order and token, and the disabled rule's.
+  The fourth is the pairing at every call site in `packages/web/src`.
 - `docs/browser-checks.md` gains one walk across the ten destructive controls.
   It checks the accent outline at rest, on hover, while disabled and under the
   focus ring.
@@ -45,10 +45,11 @@ None.
 
 ## Impact
 
-- `packages/web/src/shell/tokens.css`: one block moves, and a hover and press
-  rule lands beside it.
+- `packages/web/src/shell/tokens.css`: one block moves. A hover and press rule
+  and a disabled rule land beside it.
 - `packages/web/src/areas/studio/panels/ProcessHeaderBar.tsx` and
   `packages/web/src/areas/studio/canvas/CanvasBar.tsx`: one class each.
+- `packages/web/src/areas/studio/panels/FormsTab.tsx`: a comment-only change.
 - One new test file under `packages/web/test/`.
 - `docs/browser-checks.md`: one new walk.
 - No engine, definition contract or catalog change. `DESIGN.md` and

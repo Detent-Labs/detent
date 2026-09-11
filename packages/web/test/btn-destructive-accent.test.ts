@@ -7,14 +7,17 @@
  * control — see this change's proposal,
  * `openspec/changes/destructive-buttons-show-the-accent/proposal.md`.
  *
- * Three facts pin the fix. The `.btn-destructive` rule must stay ordered after
+ * Four facts pin the fix. The `.btn-destructive` rule must stay ordered after
  * every `.btn-secondary` rule, so its accent wins the cascade. Every
  * `className` naming `btn-destructive` must also name `btn-secondary`, since
  * the accent treatment rides alongside the secondary control's background
- * and hover wash rather than replacing them. And the `.btn-destructive:hover`
+ * and hover wash rather than replacing them. The `.btn-destructive:hover`
  * and `:active` rule, also after every `.btn-secondary` rule, sets text and
  * border to `--color-accent-on-muted`: the plain accent measures under 4.5:1
- * on the secondary control's hover and pressed washes.
+ * on the secondary control's hover and pressed washes. And the
+ * `.btn-destructive:disabled` rule follows that one and sets both back to
+ * `--color-accent`: a disabled control keeps the accent under the pointer,
+ * and the two rules tie at two classes.
  *
  * What it cannot see: whether the accent actually renders. `docs/browser-checks.md`
  * carries that half, per `development-toolchain`'s split rule.
@@ -30,6 +33,8 @@ const SRC = new URL("../src/", import.meta.url).pathname;
 const SECONDARY_OPENER = /^\.btn-secondary(:hover|:active)?\s*\{/;
 
 const HOVER_AND_PRESS = /^\.btn-destructive:hover,\s*\.btn-destructive:active\s*\{([^}]*)\}/m;
+
+const DISABLED = /^\.btn-destructive:disabled,\s*\.btn-destructive\[aria-disabled="true"\]\s*\{([^}]*)\}/m;
 
 function walk(dir: string): string[] {
   return readdirSync(dir).flatMap((entry) => {
@@ -97,6 +102,19 @@ describe("the destructive button's accent outline", () => {
     expect(declarations(rule?.[1] ?? "")).toMatchObject({
       color: "var(--color-accent-on-muted)",
       "border-color": "var(--color-accent-on-muted)",
+    });
+  });
+
+  it("keeps --color-accent on a disabled control, in a rule after the hover and press rule", () => {
+    const css = readFileSync(TOKENS_CSS, "utf8");
+    const hoverAndPress = HOVER_AND_PRESS.exec(css);
+    const disabled = DISABLED.exec(css);
+    expect(hoverAndPress).not.toBeNull();
+    expect(disabled).not.toBeNull();
+    expect(disabled?.index ?? -1).toBeGreaterThan(hoverAndPress?.index ?? Number.POSITIVE_INFINITY);
+    expect(declarations(disabled?.[1] ?? "")).toMatchObject({
+      color: "var(--color-accent)",
+      "border-color": "var(--color-accent)",
     });
   });
 
