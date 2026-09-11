@@ -168,8 +168,8 @@ interface Props {
 
 /**
  * The Forms tab (`studio-forms-overview`): every form the process asks a
- * participant to fill in, one plate each, in the reachability order the steps
- * rail uses.
+ * participant to fill in, one plate each, in the draft's own order, the same
+ * order the steps rail lists.
  *
  * Reads the draft off `useDraft()`, the way every other tab body does, so
  * a form edit anywhere reaches these plates with no reload.
