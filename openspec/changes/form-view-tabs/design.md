@@ -168,14 +168,19 @@ Both strips read one token module, `form-ui/tokens.stylex`. `ProcessTabRow.tsx`
 already imports it. The two strips share the tokens and no component: the
 dependency direction forbids `form-ui` importing from `packages/web`.
 
-The two strips never appear together. `EditScreen.tsx` renders the form
-editor INSTEAD of the process tab row, on one branch of `formStepId`. One
-strip is on screen at a time.
+The authoring strip never stacks with the process tab row. In
+`EditScreen.tsx` the form editor renders INSTEAD of that row, on one branch
+of `formStepId`. An earlier draft of this section assumed the two stacked,
+and weighed a quieter second treatment against that cost. Reading the screen
+settles it: one of them is on screen at a time.
 
-An earlier draft of this section assumed they stacked. It weighed a quieter
-second treatment against that cost. Reading `EditScreen.tsx` settles it. No
-stacking leaves no level to disambiguate, so the identical grammar is right
-outright rather than a cost accepted.
+Two tablists do share the form editor, and they are the authoring strip and
+the preview's own. In `FormEditorScreen.tsx` the strip sits above the canvas
+and the preview beside it, over the same tab labels. That pairing is an
+argument FOR the identical grammar. A preview earns its name by showing what
+the participant gets. The two read apart by their trailing ends. The
+authoring strip carries the ghost commands, and the preview's strip is inert
+and shows labels alone.
 
 A tab holding issues carries a filled `stamp-refusal` count beside its label:
 mono, 11px, refusal ground, paper text. One stamp per tab, which is the Stamp
