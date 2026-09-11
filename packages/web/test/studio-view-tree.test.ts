@@ -5,6 +5,7 @@ import { isDraftViewField, type DraftViewEntry } from "../src/areas/studio/draft
 import {
   draftParentGroupKeyById,
   dragScopeByIndex,
+  groupTailSlot,
   insertGroupedField,
   isLawfulCardDrop,
   landedIndex,
@@ -12,6 +13,7 @@ import {
   removeViewEntry,
   viewTree,
 } from "../src/areas/studio/draft/view-tree";
+import { moveViewField } from "../src/areas/studio/draft/view-layout";
 
 /** The form editor's canvas interaction, the nested half: which entries the
  * canvas draws inside a group's own card, and the array operations scoped by
@@ -22,8 +24,8 @@ const id = (s: string) => s as FieldId;
 
 /** A minimal `type: "group"` catalog field: the type-and-key pair
  * `view-tree.ts`'s own `isGroupCard` reads, plus whatever the fixture nests
- * under it. An empty `key` is a deliberate fixture, not an omission --
- * checkbox 4.4's case. */
+ * under it. An empty `key` is a deliberate fixture, not an omission: a
+ * key-less group draws no card. */
 const group = (fieldId: string, key: string, fields: DraftField[] = []): DraftField => ({
   id: id(fieldId),
   key,
@@ -124,6 +126,54 @@ describe("viewTree derives the canvas's nested read of a step's view", () => {
     expect(roots.map((n) => n.index)).toEqual([0]);
     expect(roots[0]!.members?.map((n) => n.index)).toEqual([1]);
   });
+
+  it("draws both cards of a two-group cycle at the root, rather than hiding both", () => {
+    // A hand-edited body: group a's entry names b, and group b's entry names
+    // a. Each card resolves, so without a guard each becomes the other's
+    // member and neither reaches the roots.
+    const catalog = [group("group_a", "a"), group("group_b", "b")];
+    const rows = [ref("group_a", "b"), ref("group_b", "a"), ref("field_x", "a")];
+    const roots = viewTree(rows, catalog);
+    expect(roots.map((n) => n.index)).toEqual([0, 1]);
+    expect(roots[0]!.members?.map((n) => n.index)).toEqual([2]);
+    expect(roots[1]!.members).toEqual([]);
+    expect([...dragScopeByIndex(rows, catalog).keys()].sort()).toEqual([0, 1, 2]);
+  });
+});
+
+describe("groupTailSlot names the slot a drop on a group's own box lands at", () => {
+  const catalog = [
+    group("line_item", "line_item", [leaf("item_description", "item_description"), leaf("quantity", "quantity"), leaf("unit_price", "unit_price")]),
+    group("order", "order", [leaf("po_number", "po_number")]),
+  ];
+
+  it("lands a palette field dropped on the group box after the group's last member", () => {
+    const rows = [ref("line_item"), ref("item_description", "line_item"), ref("quantity", "line_item"), ref("order")];
+    const slot = groupTailSlot(viewTree(rows, catalog)[0]!);
+    const next = insertGroupedField(rows, id("unit_price"), slot, catalog);
+    expect(refs(next)).toEqual(["line_item", "item_description", "quantity", "unit_price", "order"]);
+  });
+
+  it("lands a root card dropped on the group box after the group in root order", () => {
+    const rows = [ref("root1"), ref("line_item"), ref("item_description", "line_item"), ref("quantity", "line_item"), ref("root2")];
+    const slot = groupTailSlot(viewTree(rows, catalog)[1]!);
+    const next = moveViewField(rows, 0, slot);
+    expect(refs(viewTree(next, catalog).map((n) => n.entry))).toEqual(["line_item", "root1", "root2"]);
+  });
+
+  it("still sends a root card past the group card when the members sit before that card in the array", () => {
+    const rows = [ref("root1"), ref("item_description", "line_item"), ref("line_item")];
+    const slot = groupTailSlot(viewTree(rows, catalog)[1]!);
+    const next = moveViewField(rows, 0, slot);
+    expect(refs(viewTree(next, catalog).map((n) => n.entry))).toEqual(["line_item", "root1"]);
+  });
+
+  it("names the slot right after the card for a group with no member yet", () => {
+    const rows = [ref("line_item"), ref("order")];
+    const slot = groupTailSlot(viewTree(rows, catalog)[0]!);
+    expect(slot).toBe(1);
+    expect(refs(insertGroupedField(rows, id("quantity"), slot, catalog))).toEqual(["line_item", "quantity", "order"]);
+  });
 });
 
 describe("nudgeViewField moves an entry among its own siblings, scoped by its group", () => {
@@ -176,13 +226,18 @@ describe("nudgeViewField moves an entry among its own siblings, scoped by its gr
     expect(refs(next)).toEqual(["root1", "root2", "group_g", "x", "y"]);
   });
 
-  it("a member's swap keeps the pair adjacent even when an unrelated entry sits between them in the array", () => {
+  it("a member's move keeps an interleaved outside entry's place on the canvas, while that entry's array index shifts", () => {
     const catalog = [group("group_g", "g")];
     // "between" is not a member of group_g: it just happens to sit
     // physically between x and y in `rows`.
     const rows = [ref("group_g"), ref("x", "g"), ref("between"), ref("y", "g")];
     const next = nudgeViewField(rows, 3, -1, catalog);
+    // The splice moves "between" from index 2 to index 3. Nothing renders
+    // from array position, so the assertions below pin the canvas place.
     expect(refs(next)).toEqual(["group_g", "y", "x", "between"]);
+    const roots = viewTree(next, catalog);
+    expect(refs(roots.map((n) => n.entry))).toEqual(["group_g", "between"]);
+    expect(refs(roots[0]!.members!.map((n) => n.entry))).toEqual(["y", "x"]);
   });
 
   it("a root's step-over skips exactly one sibling, not an unrelated entry physically interleaved inside that sibling's members", () => {
@@ -368,11 +423,10 @@ describe("draftParentGroupKeyById maps a field id to its parent group's key, dra
 });
 
 /**
- * `dragScopeByIndex` and `isLawfulCardDrop` are the whole task-6.5 refusal
- * mechanism, extracted out of `FormEditorScreen.tsx` (fix round 1): a pure
- * function of the tree, an index and a scope belongs where a unit test
- * reaches it, the same reasoning the brief already applied to
- * `insertGroupedField`'s own slot decision.
+ * `dragScopeByIndex` and `isLawfulCardDrop` are the whole drag refusal
+ * mechanism behind "A drag that would land a member outside its group SHALL
+ * change nothing": a pure function of the tree, an index and a scope, where
+ * a unit test reaches it.
  */
 describe("dragScopeByIndex maps every row to the scope its own edges answer to", () => {
   const catalog = [group("group_g", "g", [leaf("field_x", "x"), leaf("field_y", "y")])];
@@ -437,7 +491,7 @@ describe("dragScopeByIndex maps every row to the scope its own edges answer to",
   });
 });
 
-describe("isLawfulCardDrop reads the task-6.5 refusal rule off a scope map", () => {
+describe("isLawfulCardDrop reads the drag refusal rule off a scope map", () => {
   const catalog = [group("group_g", "g", [leaf("field_x", "x"), leaf("field_y", "y")])];
   const rows = [ref("root1"), ref("group_g"), ref("field_x", "g"), ref("root2"), ref("field_y", "g")];
   const scopeByIndex = dragScopeByIndex(rows, catalog);
@@ -460,10 +514,8 @@ describe("isLawfulCardDrop reads the task-6.5 refusal rule off a scope map", () 
 });
 
 /**
- * `landedIndex` is the fix for the stale `setSelected(rowIndex + delta)`
- * line group 4 flagged and group 6 left for a later fix round to extract:
- * where a moved entry ends up, read off the array the move returned rather
- * than assumed as a fixed offset.
+ * `landedIndex`: where a moved entry ends up, read off the array the move
+ * returned rather than assumed as a fixed `rowIndex + delta` offset.
  */
 describe("landedIndex reads a moved entry's new position off the array a move returned", () => {
   it("finds an entry that moved forward", () => {
