@@ -93,7 +93,11 @@ interface Props {
   onOpen: (key: string) => void;
   onAdd: () => void;
   onRename: (key: string, label: DraftLocalizedText) => void;
-  onMove: (key: string, delta: -1 | 1) => void;
+  /** Takes the open tab's index in `tabs`, not its key: the screen's own
+   * `moveViewTab` splices that same array, so the end guards below and the
+   * move act on one set of positions. A keyless tab (only the JSON view mints
+   * one) would otherwise shift the two apart. */
+  onMove: (index: number, delta: -1 | 1) => void;
   onRemove: (key: string) => void;
 }
 
@@ -117,8 +121,11 @@ export function FormTabStrip({ tabs, open, contentLocale, baseLocale, onOpen, on
   // A tab mid-mint with no `key` draws nothing: no entry can name it, and the
   // strip's own DOM ids are built from the key.
   const drawn = tabs.filter((tab): tab is DraftViewTab & { key: string } => !!tab.key);
-  const openIndex = drawn.findIndex((tab) => tab.key === open);
-  const openTab = openIndex === -1 ? undefined : drawn[openIndex];
+  const openTab = open === undefined ? undefined : drawn.find((tab) => tab.key === open);
+  // Over `tabs`, the array `onMove`'s consumer splices, rather than over
+  // `drawn`. The two agree for every draft the editor itself writes, and
+  // disagree for one carrying a keyless tab from the JSON view.
+  const openIndex = openTab === undefined ? -1 : tabs.indexOf(openTab);
   const renamingOpen = openTab !== undefined && renaming === openTab.key;
 
   // Arrow keys, `Home` and `End` move focus alone; a `<button>`'s own `Enter`
@@ -194,14 +201,14 @@ export function FormTabStrip({ tabs, open, contentLocale, baseLocale, onOpen, on
             <button type="button" {...ghost(styles.control)} onClick={() => setRenaming(openTab.key)}>
               {t("formEditor.renameTab")}
             </button>
-            <button type="button" {...ghost(styles.control)} disabled={openIndex === 0} onClick={() => onMove(openTab.key, -1)}>
+            <button type="button" {...ghost(styles.control)} disabled={openIndex === 0} onClick={() => onMove(openIndex, -1)}>
               {t("formEditor.moveTabLeft")}
             </button>
             <button
               type="button"
               {...ghost(styles.control)}
-              disabled={openIndex === drawn.length - 1}
-              onClick={() => onMove(openTab.key, 1)}
+              disabled={openIndex === tabs.length - 1}
+              onClick={() => onMove(openIndex, 1)}
             >
               {t("formEditor.moveTabRight")}
             </button>

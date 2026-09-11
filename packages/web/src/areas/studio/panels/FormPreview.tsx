@@ -133,6 +133,7 @@ export function FormPreview({ step, fields, processLabel, contentLocale, baseLoc
           tabs={resolveTabsLocale(tabs, contentLocale, baseLocale)}
           activeTab={activeTab}
           onTabChange={onTabChange}
+          tabsLabel={t("formPreview.formTabsLabel")}
         />
         <PathButtons paths={previewPaths(step)} onSubmit={() => {}} />
       </div>

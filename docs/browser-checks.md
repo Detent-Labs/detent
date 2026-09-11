@@ -2904,7 +2904,7 @@ node's ground.
 
 `packages/form-ui/test/tabs.test.tsx` covers `nextTabIndex`, `drawnTabs` and
 `firstTabWithIssue` as pure functions. `studio-formTabStrip.test.tsx` and
-`field-form.test.tsx` render both strips through `renderToStaticMarkup`,
+`tabs.test.tsx` render both strips through `renderToStaticMarkup`,
 which fires no real key event. Neither suite reaches a real `keydown` on a
 mounted strip, so that is what this walk exercises. It also covers the
 strip's plain-button tab order, `spa-accessibility`'s named exception from

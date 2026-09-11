@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
-import { FieldForm, PathButtons, filterToEditable, resolveFieldsLocale, resolveTabsLocale, isResolvedViewField } from "form-ui";
+import { FieldForm, PathButtons, filterToEditable, firstTabWithIssue, resolveFieldsLocale, resolveTabsLocale, isResolvedViewField } from "form-ui";
 import type { SubmissionIssue } from "form-ui";
 import { createInstance, createTestInstance, getInstanceView, submitPath, claimStep, releaseClaim, getInstanceRecord, StudioClientError } from "../api/client.js";
 import type { InstanceView, InstanceRecordElement } from "../api/types.js";
-import { seedFormValues, createAndOpenInstance, isTestInstance, tabToOpenOnFailure } from "./playerLogic.js";
+import { seedFormValues, createAndOpenInstance, isTestInstance } from "./playerLogic.js";
 import { describeRecordElement } from "../../../api/record.js";
 import type { Route } from "../routing.js";
 import { describeError, describeCaughtError } from "../errors.js";
@@ -217,14 +217,14 @@ export function PlayerScreen({ processId, token, navigate, onUnauthorized }: Pla
   // switch belongs to the consumer"). Keyed on `validationIssues` alone, NOT
   // on `issuesByField` above: that Map is a fresh object every render, and
   // keying this effect on it would re-run it, and so re-call
-  // `tabToOpenOnFailure`, on every unrelated re-render (record paging, a
+  // `firstTabWithIssue`, on every unrelated re-render (record paging, a
   // refresh) — forcing the operator back onto the offending tab even after
   // they had deliberately switched away from it while the same stale issues
   // sat in state. `form-tab-switch-effect.test.ts` pins this dependency
-  // list; `studio-playerLogic.test.ts` covers the decision itself.
+  // list; `form-ui`'s own `tabs.test.tsx` covers the decision itself.
   useEffect(() => {
     if (!view) return;
-    const nextTab = tabToOpenOnFailure(view.fields, view.tabs ?? [], issuesByField);
+    const nextTab = firstTabWithIssue(view.fields, view.tabs ?? [], issuesByField);
     if (nextTab !== undefined) setActiveTab(nextTab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [validationIssues, view]);
@@ -354,6 +354,7 @@ export function PlayerScreen({ processId, token, navigate, onUnauthorized }: Pla
               tabs={resolveTabsLocale(view.tabs ?? [], "en", view.baseLocale)}
               activeTab={activeTab}
               onTabChange={setActiveTab}
+              tabsLabel={t("player.formTabsLabel")}
             />
 
             <div {...stylex.props(styles.studioControls)}>

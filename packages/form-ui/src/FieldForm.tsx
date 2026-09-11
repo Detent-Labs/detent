@@ -238,6 +238,12 @@ interface FieldFormProps {
   /** Called with a tab's key when the participant opens it. The consumer
    * owns the switch — this component holds no tab state of its own. */
   onTabChange?: (tabKey: string) => void;
+  /** The accessible name for the tab strip, taken from the consumer's own
+   * string catalog. This package ships no screen catalog of its own, and the
+   * form editor draws this strip beside the studio's authoring strip over the
+   * same tab labels, so each consumer names its own. Absent leaves the
+   * `tablist` unnamed, which is what a form with no tab renders anyway. */
+  tabsLabel?: string;
 }
 
 /** The tab button's own element id, and the id of the panel it controls.
@@ -348,7 +354,7 @@ function ViewEntryInput({ entry, allFields, values, onChange, locale, issuesByFi
  * accessibility tree. The open tab is derived on every render and stored
  * nowhere — this component holds no tab state, the same way it holds no value
  * and no locale state. */
-export function FieldForm({ fields, values, onChange, locale, issuesByField, columns = 1, tabs, activeTab, onTabChange }: FieldFormProps) {
+export function FieldForm({ fields, values, onChange, locale, issuesByField, columns = 1, tabs, activeTab, onTabChange, tabsLabel }: FieldFormProps) {
   const strip = drawnTabs(fields, tabs ?? []);
   // `activeTab` when the strip draws that tab, the first drawn tab otherwise.
   // That one expression covers an `activeTab` naming a tab whose entries all
@@ -381,7 +387,7 @@ export function FieldForm({ fields, values, onChange, locale, issuesByField, col
     // declaring it, so the grid cannot be its own container.
     <div {...stylex.props(styles.form)}>
       {open !== undefined && (
-        <div {...stylex.props(styles.tabRow)} role="tablist" onKeyDown={onTabKeyDown}>
+        <div {...stylex.props(styles.tabRow)} role="tablist" aria-label={tabsLabel} onKeyDown={onTabKeyDown}>
           {strip.map((tab) => {
             const count = tabIssueCount(fields, tab.key, issuesByField);
             const selected = tab.key === open;

@@ -4,18 +4,18 @@
  * failed submission from `validationIssues` alone, in a `useEffect`, never
  * from `issuesByField` — the `Map` the render body separately builds from
  * that same state. `issuesByField` is a fresh object on every render, so
- * keying the effect on it would re-run `tabToOpenOnFailure` on every
+ * keying the effect on it would re-run `firstTabWithIssue` on every
  * unrelated re-render (posting a comment, loading a record page) and force
  * the participant back onto the tab it names, even after they had
  * deliberately switched away from it while the same stale issues sat in
  * state.
  *
- * `claimLogic.test.ts` and `studio-playerLogic.test.ts` cover
- * `tabToOpenOnFailure` itself — that it is deterministic, and that it leaves
- * an empty issue map alone. Neither can see which array a `useEffect`
- * dependency list names: that is a fact about the call site, not the pure
- * function. This file is the check on the call site, the way
- * `stylex-shorthand.test.ts` checks a call site no type system reaches.
+ * `packages/form-ui/test/tabs.test.tsx` covers `firstTabWithIssue` itself —
+ * that it is deterministic, and that it leaves an empty issue map alone. That
+ * suite cannot see which array a `useEffect` dependency list names: that is a
+ * fact about the call site, not the pure function. This file is the check on
+ * the call site, the way `stylex-shorthand.test.ts` checks a call site no type
+ * system reaches.
  */
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "bun:test";
@@ -27,17 +27,20 @@ const SCREENS = [
 
 /**
  * The dependency array literal closing the first `useEffect` that follows a
- * `tabToOpenOnFailure(` call in `source`, as raw text (e.g.
+ * `firstTabWithIssue(` call in `source`, as raw text (e.g.
  * `"[validationIssues, view]"`). Throws when no such call, or no closing
  * `}, [...]);` after it, is found — a screen that stops calling
- * `tabToOpenOnFailure` at all should fail loudly here, not read as a pass.
+ * `firstTabWithIssue` at all should fail loudly here, not read as a pass.
+ *
+ * The literal is the `form-ui` export both screens call directly. The import
+ * line naming it has no `(` after the name, so this finds the call site.
  */
 function tabSwitchEffectDeps(source: string, screenName: string): string {
-  const callIndex = source.indexOf("tabToOpenOnFailure(");
-  if (callIndex === -1) throw new Error(`${screenName}: no tabToOpenOnFailure call found`);
+  const callIndex = source.indexOf("firstTabWithIssue(");
+  if (callIndex === -1) throw new Error(`${screenName}: no firstTabWithIssue call found`);
   const after = source.slice(callIndex);
   const depsMatch = after.match(/\},\s*(\[[^\]]*\])\s*\);/);
-  if (!depsMatch || depsMatch[1] === undefined) throw new Error(`${screenName}: no dependency array found after tabToOpenOnFailure`);
+  if (!depsMatch || depsMatch[1] === undefined) throw new Error(`${screenName}: no dependency array found after firstTabWithIssue`);
   return depsMatch[1];
 }
 
@@ -61,7 +64,7 @@ describe("the tab-switch effect's dependency list", () => {
     // threw and got swallowed) would still pass the two assertions above.
     const bad = `
       useEffect(() => {
-        const nextTab = tabToOpenOnFailure(view.fields, view.tabs, issuesByField);
+        const nextTab = firstTabWithIssue(view.fields, view.tabs, issuesByField);
         if (nextTab !== undefined) setActiveTab(nextTab);
       }, [issuesByField, view]);
     `;
@@ -69,7 +72,7 @@ describe("the tab-switch effect's dependency list", () => {
     expect(deps).toContain("issuesByField");
   });
 
-  it("throws when no tabToOpenOnFailure call is present, rather than reading a removed call as a pass", () => {
+  it("throws when no firstTabWithIssue call is present, rather than reading a removed call as a pass", () => {
     expect(() => tabSwitchEffectDeps("export function X() { return null; }", "fixture")).toThrow();
   });
 });

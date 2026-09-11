@@ -62,12 +62,13 @@
 - [x] 6.5 Record the tabbed-form browser check in `docs/browser-checks.md`
 - [x] 6.6 Add one tabbed form to an existing definition under `examples/`
 - [x] 6.7 Verify group 6: the prose gate reports no rise on the changed Markdown
+- [x] 6.8 Record the new module, component and exports in `docs/current-state.md`
 
 ## 7. Verification
 
-- [ ] 7.1 Run `bun run typecheck`, then `bun run build`, and report both
-- [ ] 7.2 Run the full `bun test` with `DATABASE_URL` set; report passes and skips
-- [ ] 7.3 Run the prose and whitespace gates over the pushed range
-- [ ] 7.4 Run the Impeccable detector over every changed file under `packages/`
-- [ ] 7.5 Check the tabbed form in a real browser: participant, Player, editor
+- [x] 7.1 Run `bun run typecheck`, then `bun run build`, and report both
+- [x] 7.2 Run the full `bun test` with `DATABASE_URL` set; report passes and skips
+- [x] 7.3 Run the prose and whitespace gates over the pushed range
+- [x] 7.4 Run the Impeccable detector over every changed file under `packages/`
+- [x] 7.5 Check the tabbed form in a real browser: participant, Player, editor
 - [ ] 7.6 Run `/impeccable critique` and `/impeccable audit` on the form editor route
