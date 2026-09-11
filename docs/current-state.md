@@ -1833,9 +1833,9 @@ Stage-by-stage status is in `ROADMAP.md`.
   the canvas selects a set of steps, not one.
 
   `ProcessSurface` holds `selectedStepIds: string[]`. A set of one drives the
-  configuration pane exactly as the single id did. A set of several drives a
-  summary instead — a count and a Remove steps control — because the pane
-  edits one step.
+  step page exactly as the single id did. The canvas bar also offers Remove
+  step for it. A set of several drives the bar's count and Remove steps
+  instead, because the step page edits one step.
 
   `canvas/selection.ts` exports `toggleSelection`, `normalizeRect` and
   `nodesInRect`, all pure and covered by
@@ -2095,13 +2095,18 @@ Stage-by-stage status is in `ROADMAP.md`.
   words ship in English alone, while the label an author wrote resolves against
   the studio's content locale.
 - Canvas bar (`packages/web/src/areas/studio/canvas/CanvasBar.tsx`,
-  `screens/EditScreen.tsx`, `canvas/layout.ts`, `studio-canvas-bar`): a
-  fixed-height row between the tab row and the canvas, replacing
-  `canvas/CanvasPalette.tsx` and the `canvasSelection` aside. That aside
-  stacked below the canvas and shortened it. It carries the three add
-  controls behind Add step and its caret menu. It also
-  carries one selected step's reachability report and the selection's own
-  controls. `EditScreen` renders it as `<CanvasBar>`, directly above
+  `screens/EditScreen.tsx`, `canvas/layout.ts`, `studio-canvas-bar`,
+  `tighter-canvas-bar`): a row one control tall between the tab row and the
+  canvas, replacing `canvas/CanvasPalette.tsx` and the `canvasSelection`
+  aside. That aside stacked below the canvas and shortened it. The bar sets
+  no minimum height, so its tallest control sets it in every selection state.
+  Add step adds a step someone works. Its caret menu holds the other two
+  kinds: a call to another process, and an end.
+
+  One selected step shows its reachability report, then Remove step. Several
+  show their count, Remove steps, then the group controls. A set matching one
+  group shows the group's name field, its label beside the input.
+  `EditScreen` renders the bar as `<CanvasBar>`, directly above
   `#studio-canvas-body`, and keeps every drag and selection callback itself.
 
   A press on an add control adds a step at the visible canvas centre. It
