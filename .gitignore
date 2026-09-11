@@ -43,6 +43,7 @@ Thumbs.db
 
 # temp files
 tmp/
+scratch/
 
 # Cache
 .ruff_cache/
