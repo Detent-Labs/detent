@@ -201,11 +201,18 @@ The authoring controls sit at the strip's trailing end, in the editor alone.
 They are ghost buttons in mono at 11px, in the muted ink. A participant never
 gets them, so the participant's strip is labels and nothing else.
 
-The muted ink is the point. Per `DESIGN.md`, the accent marks state and one
-primary action, and every other action stays outlined or plain. Five accent
-commands beside two ink tabs made the servant louder than the thing it
-serves. It also put two readings on one colour in one row. The accent under
-the open tab now means one thing, and the focus ring stays accent.
+The muted ink is the point. The Stamp Rule in `DESIGN.md` spends the accent on
+state and on one primary action per screen. Five accent commands beside two
+ink tabs made the servant louder than the thing it serves. It also put two
+readings on one colour in one row. The accent under the open tab now means one
+thing, and the focus ring stays accent.
+
+That treatment is new, and `DESIGN.md`'s button catalogue has yet to list it.
+The catalogue defines Ghost as accent text. Its quiet option is Secondary: ink
+text with a divider border. Transparent, muted ink and no border is a sixth.
+The press takes Secondary's own pressed wash, ink at 14%, since the command
+reads as ink now. Record the treatment in `DESIGN.md` before a second
+component reaches for it.
 
 ## Risks / Trade-offs
 

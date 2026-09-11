@@ -13,8 +13,9 @@ import {
   isResolvedViewField,
   tabIssueFieldCount,
   tabSwitchAnnouncement,
+  tabSwitchState,
 } from "form-ui";
-import type { SubmissionIssue } from "form-ui";
+import type { SubmissionIssue, TabSwitch } from "form-ui";
 import {
   cancelInstance,
   claim,
@@ -190,8 +191,8 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
   // tab the participant did not choose. Data, not a sentence: the sentence
   // needs the locale-resolved tab label the render body already builds.
   // `undefined` is silence, which is what a participant's own tab click
-  // leaves behind.
-  const [tabSwitch, setTabSwitch] = useState<{ tabKey: string; fieldCount: number } | undefined>(undefined);
+  // leaves behind, and what a submission that opened nothing leaves behind.
+  const [tabSwitch, setTabSwitch] = useState<TabSwitch | undefined>(undefined);
   const [comments, setComments] = useState<InstanceComment[]>([]);
   const [commentText, setCommentText] = useState("");
   const [attachments, setAttachments] = useState<InstanceAttachment[]>([]);
@@ -314,7 +315,14 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
     if (!view) return;
     const nextTab = firstTabWithIssue(view.fields, view.tabs ?? [], issuesByField);
     if (nextTab !== undefined) setActiveTab(nextTab);
-    setTabSwitch(nextTab === undefined ? undefined : { tabKey: nextTab, fieldCount: tabIssueFieldCount(view.fields, nextTab, issuesByField) });
+    // `activeTab` read from this render's own closure, not from the
+    // dependency list: the effect re-runs on a new `validationIssues`, and
+    // the render that hands it that array carries the tab the participant is
+    // standing on. `tabSwitchState` answers `undefined` when that tab is
+    // already the one the issues name, so the region below never reports an
+    // opening nobody saw.
+    const fieldCount = nextTab === undefined ? 0 : tabIssueFieldCount(view.fields, nextTab, issuesByField);
+    setTabSwitch((prev) => tabSwitchState(prev, view.fields, view.tabs ?? [], activeTab, nextTab, fieldCount));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [validationIssues, view]);
 
@@ -448,11 +456,9 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
             activeTab={activeTab}
             onTabChange={(tabKey) => {
               setActiveTab(tabKey);
-              // A tab the participant chose announces nothing, and clearing
-              // here is also what lets the NEXT failed submission speak: a
-              // live region whose text is unchanged is announced by no
-              // engine, so returning to the same tab with the same count
-              // would otherwise pass in silence.
+              // A tab the participant chose announces nothing: they watched
+              // it open. The repeat case is the `attempt` key below, not this
+              // clear.
               setTabSwitch(undefined);
             }}
             tabsLabel={t(locale, "task.formTabsLabel")}
@@ -463,13 +469,21 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
               participant has just pressed Submit and is not mid-sentence
               with anything else. */}
           <p {...stylex.props(styles.visuallyHidden)} role="status" aria-live="polite">
-            {tabSwitch === undefined
-              ? ""
-              : tabSwitchAnnouncement(
+            {tabSwitch === undefined ? (
+              ""
+            ) : (
+              // Keyed on the attempt: a second failed submission naming the
+              // same tab and the same count builds the same sentence, and
+              // React writes no DOM for an unchanged string. The key replaces
+              // the node instead, which is the mutation the engine speaks.
+              <span key={tabSwitch.attempt}>
+                {tabSwitchAnnouncement(
                   { one: t(locale, "task.formTabOpenedOne"), many: t(locale, "task.formTabOpenedMany") },
                   resolveText(view.tabs?.find((tab) => tab.key === tabSwitch.tabKey)?.label, locale, view.baseLocale),
                   tabSwitch.fieldCount,
                 )}
+              </span>
+            )}
           </p>
 
           <div {...stylex.props(styles.taskActions)}>

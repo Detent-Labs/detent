@@ -11,7 +11,7 @@ import {
 } from "./types.js";
 import { booleanLabels, resolveText } from "./locale.js";
 import { issueCountText, issueMessage } from "./issue-messages.js";
-import { drawnTabs, nextTabIndex, tabIssueCount } from "./tabs.js";
+import { drawnTabs, nextTabIndex, openTabKey, tabIssueCount } from "./tabs.js";
 import { colors, fonts, space } from "./tokens.stylex.js";
 
 /** Every `form-ui.css` rule, as StyleX. A layout choice with a fixed set of
@@ -361,12 +361,12 @@ function ViewEntryInput({ entry, allFields, values, onChange, locale, issuesByFi
  * and no locale state. */
 export function FieldForm({ fields, values, onChange, locale, issuesByField, columns = 1, tabs, activeTab, onTabChange, tabsLabel }: FieldFormProps) {
   const strip = drawnTabs(fields, tabs ?? []);
-  // `activeTab` when the strip draws that tab, the first drawn tab otherwise.
-  // That one expression covers an `activeTab` naming a tab whose entries all
-  // resolved invisible, and an open tab that disappears on a value change,
+  // `activeTab` when the strip draws that tab, the first drawn tab otherwise,
   // with no effect and no state. `undefined` means no strip draws, which is
-  // every untabbed form and a form whose every tab came back empty.
-  const open = strip.some((tab) => tab.key === activeTab) ? activeTab : strip[0]?.key;
+  // every untabbed form and a form whose every tab came back empty. The rule
+  // sits in `tabs.ts` because a consumer deciding whether a failed submission
+  // moved the participant has to read the open tab the same way this does.
+  const open = openTabKey(strip, activeTab);
   const roots = fields
     .map((entry, index) => ({ entry, index }))
     .filter(({ entry }) => !entry.group && (open === undefined || entry.tab === open));

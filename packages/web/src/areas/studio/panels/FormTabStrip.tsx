@@ -87,18 +87,31 @@ const styles = stylex.create({
     flex: "none",
     marginLeft: "auto",
   },
-  // Plain, not accent. `DESIGN.md` spends the accent on state and the one
-  // primary action per screen, and leaves every other action outlined or
-  // plain. Five accent commands beside two ink tabs made the servant louder
-  // than the thing it serves, and put two meanings on one colour inside one
-  // row: the rule under the open tab means THIS TAB IS OPEN, and a command
-  // 340px to its right meant CLICK ME. The accent keeps the first meaning
-  // alone now; focus is still the accent ring, from `tokens.css`.
+  // Plain, not accent. The Stamp Rule in `DESIGN.md` spends the accent on
+  // state and on one primary action per screen. Five accent commands beside
+  // two ink tabs made the servant louder than the thing it serves, and put
+  // two meanings on one colour inside one row: the rule under the open tab
+  // means THIS TAB IS OPEN, and a command 340px to its right meant CLICK ME.
+  // The accent keeps the first meaning alone now; focus is still the accent
+  // ring, from `tokens.css`.
+  //
+  // Transparent, muted ink and no border is a treatment `DESIGN.md`'s button
+  // catalogue does not list yet — Ghost is defined there as accent text, and
+  // the quiet documented option is Secondary, ink text with a divider border.
+  // The press therefore takes Secondary's own pressed wash, ink at 14%.
+  // Without it there is no pressed state at all: a StyleX atom is `:not(#\#)`
+  // at specificity 1,1,0, so the `transparent` default above outranks
+  // `.btn-ghost:active` in `tokens.css` and nothing replaces the wash it
+  // takes away.
   control: {
     fontFamily: fonts.mono,
     fontSize: 11,
     color: colors.textMuted,
-    backgroundColor: { default: "transparent", ":hover": colors.surfaceMuted },
+    backgroundColor: {
+      default: "transparent",
+      ":hover": colors.surfaceMuted,
+      ":active": `color-mix(in srgb, ${colors.text} 14%, transparent)`,
+    },
   },
   // The authored name itself, not a command, so it takes the ordinary ink.
   rename: {
@@ -138,9 +151,9 @@ interface Props {
  * The keyboard model is the plain-button pattern `spa-accessibility` gives an
  * ordinary tab set: each tab is its own stop in the tab order, and a
  * `<button>`'s own Enter and Space handling is what opens the focused one.
- * The roving-tabindex variant that spec names is reserved for a many-tab row
- * that scrolls sideways, which is `ProcessTabRow.tsx` above this one and
- * nothing else.
+ * The roving-tabindex variant that spec names is reserved for a many-tab row,
+ * which is `ProcessTabRow.tsx` above this one and nothing else. Both form
+ * strips scroll sideways as well, so the tab count is what separates them.
  *
  * Every write leaves through a callback: the screen owns the draft, and this
  * component holds one piece of state, which tab the author is renaming.

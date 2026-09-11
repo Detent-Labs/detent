@@ -1,7 +1,17 @@
 import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { FieldForm } from "../src/FieldForm.js";
-import { drawnTabs, firstTabWithIssue, nextTabIndex, tabIssueCount, tabIssueFieldCount, tabSwitchAnnouncement } from "../src/tabs.js";
+import {
+  drawnTabs,
+  firstTabWithIssue,
+  nextTabIndex,
+  openTabKey,
+  tabIssueCount,
+  tabIssueFieldCount,
+  tabSwitchAnnouncement,
+  tabSwitchState,
+  type TabSwitch,
+} from "../src/tabs.js";
 import { resolveTabsLocale } from "../src/locale.js";
 import { issueCountText } from "../src/issue-messages.js";
 import type { ResolvedViewEntry, ResolvedViewField, ResolvedViewTab, SubmissionIssue } from "../src/types.js";
@@ -389,6 +399,11 @@ describe("The tab stamp: each drawn tab marks its own issues", () => {
 });
 
 describe("tabsLabel: the strip's accessible name comes from the consumer", () => {
+  /** The tablist element's own opening tag. An assertion about the strip's
+   * name reads this rather than the whole form, so an attribute on a field
+   * control elsewhere can neither answer it nor break it. */
+  const tablistTag = (html: string) => /<[^>]*role="tablist"[^>]*>/.exec(html)?.[0] ?? "";
+
   // This package ships no screen catalog, and the form editor draws this strip
   // beside the studio's authoring strip over the same tab labels, so each of
   // the three consumers names its own.
@@ -396,17 +411,18 @@ describe("tabsLabel: the strip's accessible name comes from the consumer", () =>
     const html = renderToStaticMarkup(
       <FieldForm fields={[field("f1", "one")]} values={{}} onChange={noop} locale="en" tabs={TABS} activeTab="one" tabsLabel="Form tabs" />,
     );
-    expect(html).toContain('role="tablist" aria-label="Form tabs"');
+    expect(tablistTag(html)).toContain('aria-label="Form tabs"');
   });
 
   it("leaves the tablist unnamed when the consumer passes none", () => {
     const html = renderToStaticMarkup(
       <FieldForm fields={[field("f1", "one")]} values={{}} onChange={noop} locale="en" tabs={TABS} activeTab="one" />,
     );
-    // The panel's own `aria-labelledby` stays, so this looks for the
-    // attribute the prop writes rather than for the prefix it shares.
-    expect(html).toContain('role="tablist"><button');
-    expect(html).not.toContain('aria-label="');
+    // Scoped to the tablist's own tag: a field control somewhere else in the
+    // form gaining an `aria-label` for its own reasons says nothing about the
+    // strip's name, and neither does the order React writes the attributes in.
+    expect(tablistTag(html)).toContain('role="tablist"');
+    expect(tablistTag(html)).not.toContain("aria-label");
   });
 });
 
@@ -485,5 +501,71 @@ describe("tabSwitchAnnouncement: the sentence a consumer reads out after an unch
 
   it("carries an authored tab label through as it stands", () => {
     expect(tabSwitchAnnouncement(sentences, "Prüfung & Freigabe", 2)).toContain("Prüfung & Freigabe");
+  });
+});
+
+describe("openTabKey: the tab a drawn strip is showing", () => {
+  const fields = [field("f1", "one"), field("f2", "two")];
+
+  it("answers the named tab when the strip draws it", () => {
+    expect(openTabKey(drawnTabs(fields, TABS), "two")).toBe("two");
+  });
+
+  it("answers the first drawn tab for a consumer that stored none", () => {
+    // A participant who has clicked no tab is still looking at one.
+    expect(openTabKey(drawnTabs(fields, TABS), undefined)).toBe("one");
+  });
+
+  it("answers the first drawn tab when the named one stopped drawing", () => {
+    expect(openTabKey(drawnTabs([field("f2", "two")], TABS), "one")).toBe("two");
+  });
+
+  it("answers nothing when no strip draws", () => {
+    expect(openTabKey(drawnTabs([], TABS), "one")).toBeUndefined();
+  });
+});
+
+describe("tabSwitchState: the live region reports a switch that happened, and repeats itself", () => {
+  const fields = [field("f1", "one"), field("f2", "two")];
+  const state = (previous: TabSwitch | undefined, activeTab: string | undefined, nextTab: string | undefined) =>
+    tabSwitchState(previous, fields, TABS, activeTab, nextTab, 2);
+
+  it("reports the tab a failed submission opened", () => {
+    expect(state(undefined, "one", "two")).toEqual({ tabKey: "two", fieldCount: 2, attempt: 1 });
+  });
+
+  it("says nothing when the participant was already standing on that tab", () => {
+    // The defect this pins: a participant who fills one of two required
+    // fields on the open tab and resubmits heard "Opened the Approval tab"
+    // while nothing opened.
+    expect(state(undefined, "two", "two")).toBeUndefined();
+  });
+
+  it("says nothing when the tab was open by default and the consumer stored none", () => {
+    // `activeTab` is `undefined` until a participant clicks a tab, and the
+    // strip shows its first drawn tab meanwhile. Comparing against
+    // `activeTab` itself would read that as an opening.
+    expect(state(undefined, undefined, "one")).toBeUndefined();
+  });
+
+  it("says nothing when no tab holds an issue", () => {
+    expect(state(undefined, "one", undefined)).toBeUndefined();
+  });
+
+  it("gives a repeat of the same switch a new attempt, so a screen reader hears it twice", () => {
+    // Same tab, same count, same sentence. The attempt is what the consumer
+    // spends as the announced node's `key`: React writes no DOM for an
+    // unchanged string, and an unchanged live region is announced by no
+    // engine.
+    const first = state(undefined, "one", "two");
+    const second = state(first, "one", "two");
+    expect(second?.tabKey).toBe(first?.tabKey);
+    expect(second?.fieldCount).toBe(first?.fieldCount);
+    expect(second?.attempt).toBe(2);
+    expect(state(second, "one", "two")?.attempt).toBe(3);
+  });
+
+  it("starts the count again after silence, which is its own change of text", () => {
+    expect(state(undefined, "one", "two")?.attempt).toBe(1);
   });
 });
