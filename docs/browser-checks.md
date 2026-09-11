@@ -3073,3 +3073,113 @@ loudest thing in the row.
 
 Ledger reference: Task 3: minor (deferred): `onTabKeyDown` wiring uncovered.
 This walk is where that finding gets exercised.
+
+### Destructive controls outlined in the accent (`destructive-buttons-show-the-accent`)
+
+The destructive rule in `tokens.css` lost to a later rule on every screen. A
+`.btn-secondary` rule of equal weight came after it and won the tie. A test
+now pins the rule order and the class pairing:
+`packages/web/test/btn-destructive-accent.test.ts`. Whether the accent
+renders stays a visual judgment, so it lands here.
+
+Build the production bundle and open it on the engine's own port. Seed the
+database first. The studio controls need the author role, and the admin
+controls need the admin role. The seeded `demo-superuser@example.test` account
+holds both.
+
+Ten controls carry `btn btn-secondary btn-destructive`. Read each at rest,
+under a real pointer hover, while the pointer holds it down, and under keyboard
+focus. Read the computed `color`, `border-color` and `background-color` in the
+inspector each time. Compare them with a plain `btn btn-secondary` control on
+the same screen. Walk all ten in the light scheme, then again in the dark.
+
+Most of these controls commit on a click. To read the pressed state, hold the
+pointer down on the control. Slide the pointer off the control before you
+release it, so no click reaches it.
+
+Pass, at rest: text and border read in the accent over a transparent
+background. Pass, on hover: text and border read `--color-accent-on-muted` over
+the secondary control's hover wash. That token reads `#ae1800` in light and
+`#ff9783` in dark. Pass, pressed: text and border read the same token over the
+secondary control's pressed wash. Pass, under focus: the 2px accent ring draws
+at a 2px offset.
+
+Measured on 2026-09-11, the hover and pressed text reads 5.60:1 and 4.86:1 in
+light, and 6.54:1 and 5.25:1 in dark. Pass: that text stays at 4.5:1 or above
+on both washes.
+
+Pass, beside the plain control: the two differ in text color and in border
+color. The plain control reads in ink over the divider. Watch for the defect:
+ink text over a grey border, the plain control's own look.
+
+In the dark scheme the accent lightens with the ground. Pass: the accent text
+still reads on the dark surface.
+
+Redact data and Delete list also reach a disabled state. Pass: each drops to
+45% opacity. Its text and border still read in the accent, at rest and under
+the pointer.
+
+**Processes list.** Create a draft of any process. Its row shows Discard
+beside Open. Open is the plain control.
+
+**Draft confirmation dialog.** Open that draft and read Save in the header bar.
+Save is the plain control here, read before the dialog opens. Then choose
+Discard draft in the header bar. The dialog shows its own Discard draft beside
+Cancel. Cancel is a ghost control, and its text reads in the accent too.
+
+Pass: the dialog's Discard draft reads a transparent background. The browser's
+own grey button fill showed there before this change. Pass: the border alone
+sets it apart from Cancel, and the two still read as two controls.
+
+**Canvas bar.** On the Canvas tab, click one step, then shift-click a second.
+Remove steps appears once you select two or more steps. Fit to view is the
+plain control.
+
+**Form editor.** Open a form holding a group, such as the `await_goods` step
+of `purchase_requisition`. Each group card's legend holds Move up, Move down
+and Remove. On the first card, Move down is the plain control, and Move up
+stays disabled.
+
+**Task screen.** Choose Start a process in the app area and start any process.
+The task screen opens on the new case and shows Discard case. Upload is the
+plain control.
+
+**Outbox.** Discard shows on a row whose status is `dead-letter`, and the seed
+creates none. Produce one through a draft instead.
+
+Create a draft of `expense_approval` and open the JSON surface. Add an
+`http.request` action to the `submit` path of the `capture` step. Point its
+`url` at a host `HTTP_ACTION_ALLOWED_HOSTS` leaves out, such as
+`https://refused.example.test/hook`. Remove that step's assignment and its
+`required` flags, so the Player can submit it. Apply and save, then open the
+Player and choose Create test instance. Submit the path.
+
+The handler refuses that host before it opens a socket. The outbox row turns
+`dead-letter` after one attempt. Open Outbox in the admin area. The row shows
+Discard beside Retry. Retry is the plain control.
+
+**Instance screen, running.** Open the case the task screen started, from
+Instances. Use that published case for this state and the next. Cancel
+instance shows beside Refresh. Refresh is the plain control. Pass: the two
+differ in text color and in border color.
+
+Measured on 2026-09-11, cancelling the Player's test instance failed with a
+server error. That defect sits outside this change.
+
+**Instance screen, ended.** Choose Cancel instance on that case. Redact data
+now shows beside Refresh. Read it enabled. Choose Redact data and confirm.
+Pass: Redact data turns disabled.
+
+**Groups.** Open Groups in the admin area. The seeded IT Ops row shows Delete
+beside Edit name. Edit name is the plain control.
+
+**Data list detail.** Create a list under Data lists and open it. The list
+starts unused, so Delete list shows enabled. Add column is the plain control.
+
+For the disabled state, publish a version whose data source reads that list.
+In a draft's JSON surface, add a data source of type `db.list` with the list's
+`listKey`. Publish, then reopen the list. Pass: Used by names that version,
+and Delete list turns disabled. That version stays, so walk this control last,
+on a database you can reseed.
+
+Discard every draft the walk created before you finish.

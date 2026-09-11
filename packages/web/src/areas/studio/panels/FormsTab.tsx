@@ -129,7 +129,7 @@ const styles = stylex.create({
   // The asterisk sits at 11px on the miniature's muted ground, where the
   // plain accent role reads 4.17:1 light and 4.46:1 dark — both under the
   // 4.5:1 AA text minimum. `--color-accent-on-muted` is the accent step far
-  // enough from that ground to clear it, and this is its one consumer.
+  // enough from that ground to clear it.
   miniatureRequired: {
     color: colors.accentOnMuted,
   },

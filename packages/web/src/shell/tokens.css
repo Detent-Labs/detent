@@ -58,14 +58,16 @@
   --color-accent-contrast: var(--paper-50);
   /* The accent as it must read on --color-surface-muted, where the plain role
      falls short. --color-accent measures 4.17:1 there in light and 4.46:1 in
-     dark, both under the 4.5:1 AA text minimum at the 11px size its one
-     consumer uses — the required asterisk in a Forms card miniature
-     (FormsTab.tsx, .miniatureRequired). Same reasoning as --stamp-600 above,
-     and the same fix: a step of the existing accent ramp far enough from the
-     muted ground to clear it. This one picks a different step per scheme, as
-     the ramp comment above says the semantic layer does, because the ramp
-     itself carries no dark override: --color-accent-700 reads 5.91:1 on
-     light's #eae9e9, and --color-accent-400 reads 6.71:1 on dark's #2d2b2b. */
+     dark, both under the 4.5:1 AA text minimum at the 11px size of the
+     required asterisk in a Forms card miniature (FormsTab.tsx,
+     .miniatureRequired). .btn-destructive's hover and press rule below reads
+     it too, on the secondary control's washes. Same reasoning as --stamp-600
+     above, and the same fix: a step of the existing accent ramp far enough
+     from the muted ground to clear it. This one picks a different step per
+     scheme, as the ramp comment above says the semantic layer does, because
+     the ramp itself carries no dark override: --color-accent-700 reads
+     5.91:1 on light's #eae9e9, and --color-accent-400 reads 6.71:1 on dark's
+     #2d2b2b. */
   --color-accent-on-muted: var(--color-accent-700);
   --color-refusal: var(--refusal-700);
 
@@ -139,13 +141,6 @@
   cursor: not-allowed;
 }
 
-/* A destructive commit: outlined in the accent, never filled, per the
-   document's own "Destructive" example. Applies alongside .btn-secondary. */
-.btn-destructive {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
-}
-
 .btn-primary {
   background: var(--color-accent);
   color: var(--color-accent-contrast);
@@ -171,6 +166,32 @@
 
 .btn-secondary:active {
   background: color-mix(in srgb, var(--color-text) 14%, transparent);
+}
+
+/* A destructive commit: outlined in the accent, never filled, per the
+   document's own "Destructive" example. Applies alongside .btn-secondary,
+   and must stay ordered after every .btn-secondary rule above: both weigh
+   one class, so source order settles the tie.
+   packages/web/test/btn-destructive-accent.test.ts pins the order.
+   Hover and press read --color-accent-on-muted, because the plain accent
+   measures under 4.5:1 on the secondary control's washes. A disabled control
+   keeps the accent under the pointer; its rule ties the hover rule at two
+   classes, so it stays after it. */
+.btn-destructive {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.btn-destructive:hover,
+.btn-destructive:active {
+  border-color: var(--color-accent-on-muted);
+  color: var(--color-accent-on-muted);
+}
+
+.btn-destructive:disabled,
+.btn-destructive[aria-disabled="true"] {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
 }
 
 .btn-ghost {
