@@ -62,27 +62,13 @@ function spliceMove<T>(rows: T[], from: number, to: number): T[] {
 }
 
 /** Move a placed card to a drop slot. This is the one array change a drag and
- * a keyboard move both produce, so neither can drift from the other. */
+ * a keyboard move both produce, so neither can drift from the other. The
+ * keyboard move itself is `view-tree.ts::nudgeViewField`, which needs the
+ * catalog to know a card's group. */
 export function moveViewField(rows: DraftViewEntry[], from: number, slot: number): DraftViewEntry[] {
   const to = reorderIndex(from, slot);
   if (from === to || from < 0 || from >= rows.length) return rows;
   return spliceMove(rows, from, to);
-}
-
-/** Move a placed card one position up or down, the keyboard equivalent of
- * dragging it across one neighbour. Out-of-range is a no-op, so a command on
- * the first or last card needs no separate guard at the call site.
- *
- * `drawn` names the entry indices the canvas is currently drawing, in draw
- * order — `drawnRows` below, on a form filtered to one tab. The move then
- * swaps the card with the neighbour the author can SEE, not with the array
- * neighbour, which on a tabbed form may sit on another tab and make the
- * command read as a no-op. Omitting it draws every entry, which is the
- * untabbed form and the behavior this had before tabs existed. */
-export function nudgeViewField(rows: DraftViewEntry[], index: number, delta: -1 | 1, drawn?: number[]): DraftViewEntry[] {
-  const neighbour = drawnNeighbour(drawn ?? rows.map((_, i) => i), index, delta);
-  if (neighbour === undefined) return rows;
-  return moveViewField(rows, index, delta === 1 ? neighbour + 1 : neighbour);
 }
 
 /** Place a catalog field on the canvas at a drop slot. A field already on the
@@ -269,14 +255,28 @@ export function owningTab(
   return undefined;
 }
 
-/** The entry indices the canvas draws for `tab`, in the view's own order.
- * `undefined` draws every entry: an untabbed view lays out exactly the way
- * it did before tabs existed.
+/** The tab the canvas draws an entry on: its owning tab while that names a
+ * tab in the strip, the strip's first tab otherwise, and `undefined` for a
+ * view declaring none.
  *
  * An entry whose owning tab names no tab in the strip draws on the FIRST tab
  * rather than on none. The JSON view can author one — design.md accepts that
  * a hand-authored draft breaks the rule and fails at publish — and a card no
  * canvas draws is a card no author can repair. */
+export function homeTab(
+  entry: DraftViewEntry,
+  entries: DraftViewEntry[],
+  tabs: DraftViewTab[] | undefined,
+  groupKeyOf: (entry: DraftViewEntry) => string | undefined,
+): string | undefined {
+  const keys = (tabs ?? []).map((t) => t.key).filter((k): k is string => !!k);
+  const owning = owningTab(entry, entries, groupKeyOf);
+  return owning !== undefined && keys.includes(owning) ? owning : keys[0];
+}
+
+/** The entry indices the canvas draws for `tab`, in the view's own order:
+ * every entry whose `homeTab` is `tab`. `undefined` draws every entry: an
+ * untabbed view lays out exactly the way it did before tabs existed. */
 export function drawnRows(
   entries: DraftViewEntry[],
   tabs: DraftViewTab[] | undefined,
@@ -284,26 +284,28 @@ export function drawnRows(
   groupKeyOf: (entry: DraftViewEntry) => string | undefined,
 ): number[] {
   if (tab === undefined) return entries.map((_, i) => i);
-  const keys = (tabs ?? []).map((t) => t.key).filter((k): k is string => !!k);
   const rows: number[] = [];
   entries.forEach((entry, index) => {
-    const owning = owningTab(entry, entries, groupKeyOf);
-    const home = owning !== undefined && keys.includes(owning) ? owning : keys[0];
-    if (home === tab) rows.push(index);
+    if (homeTab(entry, entries, tabs, groupKeyOf) === tab) rows.push(index);
   });
   return rows;
 }
 
-/** The entry a keyboard move swaps `index` with: its neighbour in the DRAWN
- * order, never in the array. `undefined` at either end of the drawn list,
- * and for an index the canvas is not drawing.
- *
- * It is also where the moved card lands, so the screen re-selects the card
- * it just moved by reading this one value. */
-export function drawnNeighbour(drawn: number[], index: number, delta: -1 | 1): number | undefined {
-  const at = drawn.indexOf(index);
-  if (at === -1) return undefined;
-  return drawn[at + delta];
+/** The tab the canvas shows once a placement has put `ref` on the form: the
+ * tab its entry now draws on (`homeTab`, which reads `owningTab`). A member
+ * joining a group card on another tab draws on that card's tab, and a drop
+ * that changed nothing on the shown canvas reads as a failure. `shown`
+ * stands when the view carries no entry for `ref`. */
+export function tabAfterPlacement(
+  entries: DraftViewEntry[],
+  ref: FieldId,
+  tabs: DraftViewTab[] | undefined,
+  shown: string | undefined,
+  groupKeyOf: (entry: DraftViewEntry) => string | undefined,
+): string | undefined {
+  const entry = entries.find((e) => isDraftViewField(e) && e.ref === ref);
+  if (entry === undefined) return shown;
+  return homeTab(entry, entries, tabs, groupKeyOf) ?? shown;
 }
 
 /** Every root entry carrying no `tab` takes `tab`. On a tabbed view a

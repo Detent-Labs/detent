@@ -13,6 +13,7 @@ import { flattenDraftFields } from "../draft/fields";
 import { fieldKindWord } from "../draft/field-type-labels";
 import { groupTargetsFor, moveFieldToGroup } from "./fieldCatalogLogic";
 import { flattenRailFields, issueCountForEntityId } from "../draft/panel-rail";
+import { moveFieldAndSyncViews } from "../draft/view-group-sync";
 import { FieldCatalogPanel } from "./FieldCatalogPanel";
 import { DataSourcesPanel } from "./DataSourcesPanel";
 
@@ -426,9 +427,11 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
     if (next === fields) return;
 
     const fromGroupId = parentGroupId(fieldId);
-    mutate((d) => {
-      d.fields = next;
-    });
+    // One mutate carries the field-array write, the `group` rewrite on every
+    // view entry naming the field, and any group card a form now lacks, so a
+    // reader never sees the catalog and the views disagree
+    // (`view-group-sync.ts::moveFieldAndSyncViews`).
+    mutate((d) => moveFieldAndSyncViews(d, fieldId, targetGroupId));
 
     // Read the new place off the moved tree, not off the target argument: a
     // move into a nested group makes some ancestor the top-level row, and that

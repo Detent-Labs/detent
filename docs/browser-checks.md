@@ -1102,8 +1102,8 @@ Open Studio, `purchase-requisition`, step `finance_review`, the form
 editor. Pass: the palette carries a "Notes" heading and an "Add a note"
 button, below the catalog field list. Select the existing note card. Pass:
 its own strip opens, reading "Note", with a `text` box, a Visible
-checkbox, a span control and a group control — the same group control a
-field card's strip offers.
+checkbox, a span control and a group control. Only a note's strip carries
+that group control: a field's group follows its catalog parent.
 
 Edit the `text` box. Pass: the canvas card's own preview text updates as
 you type. Click Move up. Pass: the card moves one slot toward the front of
@@ -1120,6 +1120,76 @@ the text or remove the card before leaving.
 
 Open the palette again. Pass: every catalog field still listed there sits
 above the Notes section, unaffected by anything just done to a note.
+
+### Groups on the form editor canvas (`group-fields-stay-in-their-group`)
+
+Three suites cover the pure half: `studio-view-tree.test.ts`,
+`studio-view-group-sync.test.ts` and `studio-formEditor-groupCanvas.test.tsx`.
+None of them fires an HTML5 drag or blurs a typed key, so this walk stays
+manual. Start from a freshly seeded `purchase-requisition` draft, and discard
+it afterwards.
+
+Open the form editor for step `await_goods`. Pass: the `line_item` card draws
+as a box, its members inside it. Select its first member. Pass: its Move up
+reads disabled, and so does Move down on the box's last member.
+
+Drag a member card onto the edge of a card at the form's root. Pass: the
+pointer shows the browser's own no-drop cursor. Let go there. Pass: every
+card keeps its place.
+
+Drag `unit_price` from the palette onto the `line_item` legend itself. Pass:
+it lands inside the box, after `quantity`, the box's last member.
+
+Open the Fields tab and move `order` into `line_item` with the rail's move
+control. Return to the `await_goods` form. Pass: the `order` box draws inside
+the `line_item` box, with `po_number` inside `order`.
+
+Read the count on the `line_item` box's remove control. Pass: it matches every
+card inside the box, the nested `order` box and its member included. Press
+it. Pass: the box leaves with all of them, and each field returns to the
+palette.
+
+Move `po_status` into `request` the same way. Open the form for step
+`po_error`, whose view carried no `request` card. Pass: a `request` box now
+holds `po_status`, and the checks rail shows no new entry.
+
+Change the `line_item` group's label to "Line Items". Pass: its key reads
+`line_items`. Every form still draws its members inside the box, and the
+checks rail shows no new entry.
+
+Select the `resolution` group's key and type `receipt_resolution`. Pass:
+every form keeps its layout while you type. Press Enter. Pass: the `receipt`
+box keeps its own members, and `discrepancy_note` sits in the renamed box.
+
+On a form holding a note, place the note inside a group with its strip's
+group control. Clear that group's key and press Enter. Pass: the checks rail
+reports the note's group, which still names the old key. Type the key back
+and press Enter. Pass: the note draws inside the box again.
+
+The last walk needs a tabbed form and the seeded layout. Discard the draft,
+and start this walk from a freshly seeded one. Open the form editor for step
+`finance_review`. Its form declares two tabs, "Review" and "Decision". The
+`request` and `line_item` boxes draw on "Review", and the `decision` box
+draws on "Decision".
+
+Open "Decision" and select `finance_note` inside the `decision` box. Pass:
+the strip's tab control reads disabled, set to "Decision". Under it, a line
+reads "The group decides the tab."
+
+With "Decision" still open, drag `category` from the palette onto the canvas.
+Its catalog group is `request`, whose box draws on "Review". Pass: the canvas
+switches to "Review" by itself, with `category` inside the `request` box after
+`cost_center`.
+
+Open the Fields tab and select the `decision` group. Clear its key and press
+Enter. Return to the `finance_review` form and open "Decision". Pass:
+`manager_note`, `finance_note` and `rejection_reason` draw there at the form's
+root, outside any box. Open "Review". Pass: none of the three draws there.
+
+Open the Fields tab again. Type `decision` back into the `decision` group's
+key and press Enter. Return to the form and open "Decision". Pass: the three
+draw inside the `decision` box again. Select each one. Pass: its tab control
+reads "Decision", disabled.
 
 <!-- antislop: allow-file synonym-rotation -->
 <!-- Why: this file already carries the rule's two collisions elsewhere.
@@ -1221,7 +1291,7 @@ checked, and the JSON surface shows no `required` key left on `submit`'s
 view entry for `result`.
 
 Open the form editor's per-step strip for `submit`, `result` selected.
-Pass: the strip offers Visible, Group and Span. It offers no Required or
+Pass: the strip offers Visible and Span. It offers no Required or
 Read-only control. Note how the strip's layout reads with the two
 controls gone — this is the browser-check judgment design.md's Open
 Questions leaves to implementation time.

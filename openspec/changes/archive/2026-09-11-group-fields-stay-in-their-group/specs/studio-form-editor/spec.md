@@ -1,60 +1,135 @@
-# studio-form-editor Specification
+## ADDED Requirements
 
-## Purpose
-A visual, drag-and-drop editor for a step's form layout, in the studio
-area of `packages/web`. It replaces `ViewEditor`'s override-row list.
-An author sees the form's actual shape while arranging it, instead of
-reading an ordered list of field names.
-## Requirements
-<!-- antislop: allow synonym-rotation -->
-### Requirement: The form editor opens as a full-screen routed page over the step's view
+### Requirement: Removing a group card removes the members placed inside it
 
-Two places open the form editor. The step page's Step form fields section
-opens it for the step it holds. The Forms tab's card opens it for that card's
-step. Both reach the same routed page at `edit/form/:stepId`.
+Removing a group card from the canvas SHALL remove every entry placed
+inside that group. One draft change carries all of it. That covers
+field members and note members alike.
 
-The editor SHALL open as a full-screen routed page. It replaces the native
-`<dialog>` this capability used before.
+The catalog keeps every field. Each removed member SHALL return to the
+palette, and the group's own entry SHALL return with them.
 
-Leaving the editor SHALL return to the place the author came from. An author
-who came from the Forms tab returns to the Forms tab. An author who came from
-the step page returns to that step.
+A member cannot outlive its group card on a form. The definition
+contract already refuses a body whose entry names a group the view
+leaves out. Leaving the members behind would hand the author a draft
+that no publish accepts. Nothing on the canvas would explain it.
 
-<!-- The screen's Discard control drops every unsaved change; removing a card takes one entry off the form. -->
-<!-- antislop: allow synonym-rotation -->
-The editor SHALL write directly to the in-browser draft as the author works.
-It offers no Save button of its own. The screen's existing Save, Discard and
-Publish controls stay the only ones that persist.
+#### Scenario: Removing a group takes its members off the form
 
-Navigating away from the editor and back SHALL carry the same draft state a
-re-opened modal would have carried. The editor's writes already land in the
-draft on every change, so it needs no separate state-preservation step.
+- **WHEN** the developer removes a group card holding two placed member
+  fields
+- **THEN** the view carries neither the group entry nor either member
+- **AND** all three appear in the palette again
 
-#### Scenario: Opening the editor shows the current form
+#### Scenario: Removing a group takes a note placed inside it
 
-- **WHEN** the developer opens the form editor for a step that already has
-  view fields
-- **THEN** the page renders those fields in their current order and layout
+- **WHEN** the developer removes a group card holding a note
+- **THEN** the view carries neither the group entry nor the note
 
-#### Scenario: Navigating away keeps every change
+#### Scenario: Removing a group leaves the catalog alone
 
-- **WHEN** the developer navigates away from the form editor after moving or
-  adding a field
-- **THEN** the draft keeps that change
-- **AND** the screen's own Save, Discard and Publish controls still govern
+- **WHEN** the developer removes a group card holding two placed member
+  fields
+- **THEN** the field catalog still declares the group and both fields,
+  nested as before
 
-#### Scenario: Returning to the editor shows the same state
+#### Scenario: Removing one member leaves the group standing
 
-- **WHEN** the developer navigates away from the form editor and back to it,
-  without an intervening save
-- **THEN** the page carries the same fields, in the same order, the developer
-  left it in
+- **WHEN** the developer removes a single member card from inside a
+  group
+- **THEN** the group card stays on the canvas, with its other members
 
-#### Scenario: Leaving returns to the Forms tab
+### Requirement: On a tabbed form, a group card holds its members on its own tab
 
-- **WHEN** the developer opens the form editor from a Forms tab card and then
-  leaves it
-- **THEN** the Forms tab is the open one
+On a tabbed form the canvas SHALL draw the shown tab's root entries. A group
+card among them SHALL nest its members, and a member SHALL draw nowhere else.
+A member has no `tab` of its own, so its card's tab is its tab. The canvas
+and the preview then agree on which entries each tab draws.
+
+A root entry's move commands SHALL step among the roots the shown tab draws.
+A move past a group card SHALL clear the card and every member at once. An
+entry another tab draws SHALL neither stop the move nor count as a step. A
+member's move commands SHALL step among its own group's members, whatever tab
+the canvas draws.
+
+A root card's drag SHALL land only among the roots its own tab draws. A
+member's drag SHALL land only among its own group's members. No canvas drop
+SHALL place a member outside its group.
+
+A palette drop on a tabbed form SHALL give the shown tab to the one root entry
+it places. That entry is the outermost group card it places, or a top-level
+field. A member and an inner card SHALL have no `tab`. A member joining a
+card the form already carries SHALL land on that card's tab.
+
+Removing a group card on a tabbed form SHALL remove its members as it does on
+an untabbed form. Every other entry SHALL keep its `tab`.
+
+Adding the first tab SHALL give its key to the root entries alone. Removing a
+tab SHALL move a group card on it like any root entry. The card's members
+SHALL move with it.
+
+#### Scenario: A tab draws a group card with its members
+
+- **WHEN** a tabbed form's first tab holds a group card with two members
+- **AND** its second tab holds a root field
+- **THEN** the canvas on the first tab draws both members inside the group card
+- **AND** it draws no card for the root field
+
+#### Scenario: A group card draws on no other tab
+
+- **WHEN** the developer selects the second tab of that form
+- **THEN** the canvas draws the root field alone, and neither the group card
+  nor a member
+
+#### Scenario: A root's move steps over a group and past another tab's entry
+
+- **WHEN** the developer uses the move-down command on a root field directly
+  above a group card on the shown tab
+- **AND** an entry the second tab draws sits between the two in the view array
+- **THEN** the root field lands below the group card and all its members on
+  the canvas
+- **AND** the second tab draws that entry where it drew it before
+
+#### Scenario: A member's move reads its group alone
+
+- **WHEN** the developer uses the move-down command on a group's first member
+  on a tabbed form
+- **THEN** that member and the group's second member trade places
+
+#### Scenario: A root's drag stays on its tab
+
+- **WHEN** the developer drags a root card on a tabbed form
+- **THEN** only drop slots among the roots of that card's own tab accept it
+
+#### Scenario: A palette drop gives the tab to the outermost card
+
+- **WHEN** the catalog nests a field inside a group inside another group
+- **AND** the developer drags that field onto a tabbed form carrying neither card
+- **THEN** the outer group card carries the shown tab
+- **AND** neither the inner group card nor the member carries a `tab`
+
+#### Scenario: Removing a group card on a tabbed form
+
+- **WHEN** the developer removes a group card holding two members on a tabbed
+  form
+- **THEN** the view carries neither the card nor either member
+- **AND** every other entry keeps the `tab` it carried
+
+#### Scenario: The first tab gives no member a tab
+
+- **WHEN** the developer adds the first tab to a form holding a group card and
+  its members
+- **THEN** the group card carries the new tab, and no member carries a `tab`
+
+#### Scenario: Removing a tab carries a group card's members along
+
+- **WHEN** a form holds two tabs, with a group card and its members on the
+  second
+- **AND** the developer removes the second tab
+- **THEN** the group card names the first tab
+- **AND** its members still sit inside it, carrying no `tab`
+
+## MODIFIED Requirements
 
 ### Requirement: A left palette lists catalog fields not yet on the form, and offers minting a new one
 
@@ -241,51 +316,6 @@ deliberately shows more than the preview.
   a note and a second field entry
 - **THEN** the canvas draws three cards in that order, left to right then
   down
-
-### Requirement: The editor sets the form's own column count
-
-A toggle above the canvas SHALL read and write the step view's
-`columns`. It offers one column or two. Outside the JSON view, this is
-the only control that writes `columns`. An author never has to leave
-the editor to lay a form out in two columns.
-
-Changing the toggle SHALL reflow the canvas at once. A card whose
-`span` exceeds the new count SHALL show clamped, per the `form-ui`
-capability's `min(span, columns)` rule. The editor SHALL NOT rewrite
-that field's stored `span`. An author who returns the form to two
-columns gets the spanning field back.
-
-#### Scenario: The toggle writes the view's column count
-
-- **WHEN** the developer sets the toggle to two columns
-- **THEN** the draft's `view.columns` is `2`, and the canvas lays its
-  cards out in two columns
-
-#### Scenario: Narrowing the form clamps a spanning card without losing it
-
-- **WHEN** a `span: 2` field sits on a two-column form and the
-  developer sets the toggle to one column
-- **THEN** that card renders full width at the new count, and the
-  draft still records its `span` as `2`
-
-### Requirement: Each placed field shows its overrides as marks on its card
-
-A placed field's card SHALL mark required and readonly. It SHALL show
-a CEL badge when `visible`, `required`, or `readonly` is an expression
-rather than a literal. It SHALL show a dashed border when `visible`
-resolves to a conditionally-hidden expression.
-
-#### Scenario: A literal override shows as a plain mark
-
-- **WHEN** a placed field's `required` is the literal `true`
-- **THEN** its card shows a required mark with no CEL badge
-
-#### Scenario: An expression override shows the CEL badge
-
-- **WHEN** a placed field's `visible` is a CEL expression rather than
-  a literal
-- **THEN** its card shows the CEL badge, and a dashed border marking
-  it conditionally hidden
 
 ### Requirement: A selected field's strip sets its overrides and span
 
@@ -556,61 +586,6 @@ form's root answers the root rule.
   sitting directly above a group card holding three members
 - **THEN** that entry lands below the group card and all three members
 
-### Requirement: A "Developer view" disclosure holds two existing CEL and JSON escape hatches
-
-A selected field's override strip already lets `visible`, `required`,
-and `readonly` fall back to a CEL expression. That escape hatch SHALL
-move behind a "Developer view" disclosure on the strip. It stays
-reachable; it starts collapsed.
-
-The process-field catalog panel already lets a custom field type carry
-a raw JSON textarea for its plugin envelope. The
-`studio-plugin-config-form` capability does not cover this position,
-per its own carve-out. That escape hatch SHALL move behind its own
-"Developer view" disclosure, on the same collapsed-by-default pattern.
-
-Neither disclosure changes what its escape hatch writes. Both match the
-structure editor's own "Developer view" placement convention (see
-`studio-canvas`).
-
-#### Scenario: The override strip's CEL input starts collapsed
-
-- **WHEN** a developer selects a placed field whose `required` override
-  is already set to a CEL expression
-- **THEN** the strip shows no CEL input until the developer opens its
-  "Developer view" disclosure
-
-#### Scenario: The field catalog's JSON textarea starts collapsed
-
-- **WHEN** a developer selects a custom field type in the field catalog
-  panel
-- **THEN** the panel shows no JSON textarea until the developer opens
-  its "Developer view" disclosure
-
-### Requirement: An author places a note on the form canvas
-
-The form editor SHALL offer adding a note to the step's view. A note SHALL
-appear on the canvas as a card among the field cards. It sits at its own
-position in the view array. The card shows the text an author gave it.
-
-The palette lists catalog fields not yet on the form. A note belongs to no
-catalog, so the editor SHALL offer it beside the palette rather than inside it.
-
-A placed note SHALL answer the same gestures a field card answers. That
-includes the keyboard route reaching a field's position without a drag.
-
-#### Scenario: An author adds a note and positions it
-
-- **WHEN** an author adds a note and moves it above the first field card
-- **THEN** the note occupies the view array's first position, and the step's
-  draft records it there
-
-#### Scenario: A note is reachable without a drag
-
-- **WHEN** an author moves a note using the keyboard route that moves a field
-  card
-- **THEN** the note changes position the same way a field card does
-
 ### Requirement: A note's strip sets its text, its span, its group and its visibility
 
 Selecting a note SHALL open a strip that sets the note's text. It covers the
@@ -651,186 +626,6 @@ value the note never holds.
   `baseLocale`
 - **THEN** the editor reports it before publish, rather than letting publish be
   the first place an author learns of it
-
-### Requirement: A note marks no catalog field as used
-
-A note SHALL appear in no field usage list. A note SHALL mark no catalog field
-as used, so the palette keeps offering every field the notes sit beside.
-
-The count of a step's configured fields lives outside the form editor, on the
-Form section. The `studio-app` capability states its rule.
-
-#### Scenario: A note leaves the usage list alone
-
-- **WHEN** a step's view holds one field entry and three notes
-- **THEN** that step appears in the usage list of the one field alone
-
-#### Scenario: A note marks no catalog field as used
-
-- **WHEN** a step's view holds notes alone
-- **THEN** the palette still offers every catalog field, and the editor reports
-  that step as using none
-
-### Requirement: The form editor renders from compiled styles
-
-`screens/FormEditorScreen.tsx` SHALL render from compiled component
-styles, reading `form-ui/tokens.stylex`. The rendered result SHALL
-match the previous stylesheet declaration for declaration.
-
-The "How it will look" preview has a two-column layout. It SHALL pick
-its style from a parameterized style function, keyed on the column
-count. That is the same pattern `form-ui`'s own field renderer uses
-for its own columns/span choice. The preview MAY still render a
-`data-columns` fact on its container, for a test or another consumer
-to read. No stylesheet SHALL select on it after migration.
-
-#### Scenario: The form editor keeps its look
-
-- **WHEN** a browser renders the form editor
-- **THEN** its computed layout, spacing, color and border equal the
-  values the deleted stylesheet declared
-
-#### Scenario: The two-column preview switches correctly
-
-- **WHEN** an author toggles a field group between one and two columns
-- **THEN** the preview's computed grid layout matches the deleted
-  stylesheet's own two-column and one-column rules
-- **AND** no compiled or hand-written stylesheet rule selects on a
-  `data-columns` or `data-span` attribute after the migration
-
-### Requirement: A live participant preview stands beside the form canvas
-
-The form editor SHALL carry a preview of what a participant meets. The preview
-SHALL stand beside the form canvas, in the editor's trailing pane.
-
-The preview SHALL mount the same `packages/form-ui` renderer the Player mounts.
-No second renderer SHALL exist for it. What an author reads in the preview is
-therefore what a participant gets.
-
-The preview SHALL follow the view's own column count and its label position.
-It SHALL name the process and the step above the fields. Below the fields it
-SHALL carry one control per manual path the step declares, taking each path's
-own label. A step declaring only automatic paths SHALL carry one submit
-control.
-
-The preview SHALL take no keyboard focus and no pointer interaction. It carries
-the `inert` attribute, so a screen reader passes over it. Every change in the
-form canvas SHALL reach the preview at once, without a reload.
-
-#### Scenario: The preview follows the view order
-
-- **WHEN** an author moves a field above another in the form canvas
-- **THEN** the preview prints the two fields in the new order
-
-#### Scenario: The preview follows the column count
-
-- **WHEN** an author sets the form to two columns
-- **THEN** the preview lays its fields in two columns
-
-#### Scenario: The preview names the manual paths
-
-- **WHEN** the step declares two manual paths labelled "Approve" and "Reject"
-- **THEN** the preview carries one control reading "Approve"
-- **AND** the preview carries one control reading "Reject"
-
-#### Scenario: The preview takes no focus
-
-- **WHEN** an author walks the form editor with the Tab key
-- **THEN** the focus never lands inside the preview
-
-#### Scenario: A required entry marks itself in the preview
-
-- **WHEN** a view entry declares `required: true`
-- **THEN** the preview marks that entry's label as required
-
-### Requirement: A tab strip above the canvas authors the form's tabs
-
-A strip above the canvas SHALL read and write the step view's `tabs`. It
-SHALL offer adding a tab, renaming one, reordering the list and removing a
-tab. Outside the JSON view, this is the only control that writes `tabs`.
-
-A form with no tab SHALL show the strip's add control alone. The canvas then
-lays every entry out the way it does today.
-
-The strip SHALL change a tab's name as authored text. It writes the content
-locale the studio already resolves authored text for. Adding a tab SHALL seed its
-`label` with a non-empty base-locale entry. The draft then never carries a
-tab that fails the base-locale rule.
-
-The editor SHALL mint a tab's `key`, unique within the view. The author
-names the label; nothing asks them for a key.
-
-The editor SHALL NOT rewrite a tab's `key` afterwards. Renaming a tab changes
-its `label` alone. The definition contract makes that key the anchor every
-entry's `tab` names. A rewrite would orphan them.
-
-Selecting a tab in the strip SHALL show that tab's own entries on the canvas
-and hide the others. Every existing canvas behavior SHALL keep working
-within the selected tab. That covers placement, the column count, spans,
-groups and the keyboard move commands.
-
-#### Scenario: Adding the first tab
-
-- **WHEN** the developer adds a tab to a form that had none
-- **THEN** the draft's `view.tabs` holds one member with a minted key and a
-  seeded base-locale label
-
-#### Scenario: Renaming a tab writes its label
-
-- **WHEN** the developer renames a tab
-- **THEN** the draft records the new text under the content locale
-- **AND** the tab keeps its key, so every entry naming it still resolves
-
-#### Scenario: Selecting a tab filters the canvas
-
-- **WHEN** the developer selects the second tab
-- **THEN** the canvas shows the entries naming that tab alone, at the form's
-  own column count
-
-### Requirement: Creating and removing a tab leaves no entry stranded
-
-Adding the FIRST tab to a form SHALL move every existing root entry into it.
-The draft then satisfies the definition contract's rule for a tabbed view.
-The author has no step to remember.
-
-Removing the LAST remaining tab SHALL clear `tab` from every entry and leave
-the view with no `tabs` key. The form returns to the shape it had before any
-tab existed.
-
-Removing a tab while others remain SHALL move its entries to the tab before
-it in the strip. They move to the tab after it when the removed tab was the
-first. The editor deletes no entry. It opens no dialog either.
-
-Reordering the strip SHALL change the tab order alone. It SHALL move no entry
-between tabs.
-
-#### Scenario: The first tab sweeps up the existing form
-
-- **WHEN** a form holds four root entries and the developer adds a tab
-- **THEN** all four entries name that tab, and the canvas shows all four
-
-#### Scenario: Removing the last tab returns the form to one page
-
-- **WHEN** a form holds one tab and the developer removes it
-- **THEN** `view.tabs` is gone, no entry carries a `tab`, and every entry
-  renders on one canvas
-
-#### Scenario: Removing a middle tab hands its entries to its left neighbour
-
-- **WHEN** a form holds three tabs and the developer removes the second
-- **THEN** the second tab's entries name the first tab, in their existing
-  order
-
-#### Scenario: Removing the first tab hands its entries to its right neighbour
-
-- **WHEN** a form holds two tabs and the developer removes the first
-- **THEN** its entries name the remaining tab
-
-#### Scenario: Reordering moves no entry
-
-- **WHEN** the developer moves the third tab to the front
-- **THEN** `view.tabs` records the new order, and every entry keeps the tab
-  it named
 
 ### Requirement: A selected entry's strip assigns it to a tab
 
@@ -903,164 +698,3 @@ no `tab` of their own, so nothing else has to change.
 
 - **WHEN** the developer selects a note and picks the third tab
 - **THEN** the draft records `tab` on the note entry
-
-### Requirement: The live preview beside the canvas shows the form's tabs
-
-The participant preview SHALL show the draft's tabs, through the same
-`FieldForm` a participant gets. It SHALL open the tab the canvas is showing.
-The two halves of the editor then never disagree about which tab is open.
-
-The strip the preview draws SHALL NOT be interactive. This capability's own
-live requirement gives the preview the `inert` attribute, so it takes no
-pointer interaction and no keyboard focus. A tab there is part of what an
-author reads.
-
-The canvas carries the strip an author operates. At the editor's default
-width the preview stands beside that canvas, in its own column. It drops
-below only under the narrow breakpoint. Either way the two strips show one
-selection, and only one of them takes a click. The author gives up nothing.
-
-One selected-tab value SHALL drive both halves. The editor owns it and passes
-it to `FieldForm` as `activeTab`, taking `onTabChange` back. That is the
-`form-ui` capability's own controlled shape, so the two halves cannot drift.
-`onTabChange` stays wired and stays silent while `inert` holds.
-
-#### Scenario: The preview opens the tab the canvas shows
-
-- **WHEN** the developer selects the second tab on the canvas
-- **THEN** the preview draws the tab strip with the second tab open
-
-#### Scenario: The preview's own strip takes no click
-
-- **WHEN** the developer clicks a tab inside the preview
-- **THEN** nothing moves, because the preview carries `inert`
-- **AND** the canvas keeps showing the tab it showed
-
-### Requirement: Removing a group card removes the members placed inside it
-
-Removing a group card from the canvas SHALL remove every entry placed
-inside that group. One draft change carries all of it. That covers
-field members and note members alike.
-
-The catalog keeps every field. Each removed member SHALL return to the
-palette, and the group's own entry SHALL return with them.
-
-A member cannot outlive its group card on a form. The definition
-contract already refuses a body whose entry names a group the view
-leaves out. Leaving the members behind would hand the author a draft
-that no publish accepts. Nothing on the canvas would explain it.
-
-#### Scenario: Removing a group takes its members off the form
-
-- **WHEN** the developer removes a group card holding two placed member
-  fields
-- **THEN** the view carries neither the group entry nor either member
-- **AND** all three appear in the palette again
-
-#### Scenario: Removing a group takes a note placed inside it
-
-- **WHEN** the developer removes a group card holding a note
-- **THEN** the view carries neither the group entry nor the note
-
-#### Scenario: Removing a group leaves the catalog alone
-
-- **WHEN** the developer removes a group card holding two placed member
-  fields
-- **THEN** the field catalog still declares the group and both fields,
-  nested as before
-
-#### Scenario: Removing one member leaves the group standing
-
-- **WHEN** the developer removes a single member card from inside a
-  group
-- **THEN** the group card stays on the canvas, with its other members
-
-### Requirement: On a tabbed form, a group card holds its members on its own tab
-
-On a tabbed form the canvas SHALL draw the shown tab's root entries. A group
-card among them SHALL nest its members, and a member SHALL draw nowhere else.
-A member has no `tab` of its own, so its card's tab is its tab. The canvas
-and the preview then agree on which entries each tab draws.
-
-A root entry's move commands SHALL step among the roots the shown tab draws.
-A move past a group card SHALL clear the card and every member at once. An
-entry another tab draws SHALL neither stop the move nor count as a step. A
-member's move commands SHALL step among its own group's members, whatever tab
-the canvas draws.
-
-A root card's drag SHALL land only among the roots its own tab draws. A
-member's drag SHALL land only among its own group's members. No canvas drop
-SHALL place a member outside its group.
-
-A palette drop on a tabbed form SHALL give the shown tab to the one root entry
-it places. That entry is the outermost group card it places, or a top-level
-field. A member and an inner card SHALL have no `tab`. A member joining a
-card the form already carries SHALL land on that card's tab.
-
-Removing a group card on a tabbed form SHALL remove its members as it does on
-an untabbed form. Every other entry SHALL keep its `tab`.
-
-Adding the first tab SHALL give its key to the root entries alone. Removing a
-tab SHALL move a group card on it like any root entry. The card's members
-SHALL move with it.
-
-#### Scenario: A tab draws a group card with its members
-
-- **WHEN** a tabbed form's first tab holds a group card with two members
-- **AND** its second tab holds a root field
-- **THEN** the canvas on the first tab draws both members inside the group card
-- **AND** it draws no card for the root field
-
-#### Scenario: A group card draws on no other tab
-
-- **WHEN** the developer selects the second tab of that form
-- **THEN** the canvas draws the root field alone, and neither the group card
-  nor a member
-
-#### Scenario: A root's move steps over a group and past another tab's entry
-
-- **WHEN** the developer uses the move-down command on a root field directly
-  above a group card on the shown tab
-- **AND** an entry the second tab draws sits between the two in the view array
-- **THEN** the root field lands below the group card and all its members on
-  the canvas
-- **AND** the second tab draws that entry where it drew it before
-
-#### Scenario: A member's move reads its group alone
-
-- **WHEN** the developer uses the move-down command on a group's first member
-  on a tabbed form
-- **THEN** that member and the group's second member trade places
-
-#### Scenario: A root's drag stays on its tab
-
-- **WHEN** the developer drags a root card on a tabbed form
-- **THEN** only drop slots among the roots of that card's own tab accept it
-
-#### Scenario: A palette drop gives the tab to the outermost card
-
-- **WHEN** the catalog nests a field inside a group inside another group
-- **AND** the developer drags that field onto a tabbed form carrying neither card
-- **THEN** the outer group card carries the shown tab
-- **AND** neither the inner group card nor the member carries a `tab`
-
-#### Scenario: Removing a group card on a tabbed form
-
-- **WHEN** the developer removes a group card holding two members on a tabbed
-  form
-- **THEN** the view carries neither the card nor either member
-- **AND** every other entry keeps the `tab` it carried
-
-#### Scenario: The first tab gives no member a tab
-
-- **WHEN** the developer adds the first tab to a form holding a group card and
-  its members
-- **THEN** the group card carries the new tab, and no member carries a `tab`
-
-#### Scenario: Removing a tab carries a group card's members along
-
-- **WHEN** a form holds two tabs, with a group card and its members on the
-  second
-- **AND** the developer removes the second tab
-- **THEN** the group card names the first tab
-- **AND** its members still sit inside it, carrying no `tab`

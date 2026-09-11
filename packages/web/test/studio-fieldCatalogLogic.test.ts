@@ -11,6 +11,7 @@ import { mergeLocalizedTextEntry } from "../src/areas/studio/draft/localized-tex
 import { mintCatalogField } from "../src/areas/studio/draft/mintField.js";
 import { draftFields, type DraftField } from "../src/areas/studio/draft/fields.js";
 import { runValidation } from "../src/areas/studio/draft/validation.js";
+import { moveFieldAndSyncViews, writeGroupLabel } from "../src/areas/studio/draft/view-group-sync.js";
 import type { Draft } from "../src/areas/studio/draft/types.js";
 
 describe("nextFieldKey", () => {
@@ -237,7 +238,15 @@ describe("moveFieldToGroup over examples/purchase-requisition.json", () => {
     return (raw.definition ?? raw) as Draft;
   };
 
-  const groupIdOf = (body: Draft) => draftFields(body).find((f) => f.key === "line_item")!.id!;
+  const groupIdOf = (body: Draft, key = "line_item") => draftFields(body).find((f) => f.key === key)!.id!;
+
+  /** `EntityTabs.tsx`'s `moveField` calls `moveFieldAndSyncViews` inside one
+   * `mutate`, which hands it a `structuredClone` of the draft. */
+  const moveOnClone = (body: Draft, fieldId: string, targetGroupId: string | undefined): Draft => {
+    const moved = structuredClone(body);
+    moveFieldAndSyncViews(moved, fieldId, targetGroupId);
+    return moved;
+  };
 
   it("keeps the body publishable when a top-level field moves into the group", () => {
     const body = exampleDraft();
@@ -245,7 +254,7 @@ describe("moveFieldToGroup over examples/purchase-requisition.json", () => {
     const before = runValidation(body, undefined, {}, {});
     expect(before.zodValid).toBe(true);
 
-    const moved: Draft = { ...body, fields: moveFieldToGroup(body.fields as DraftField[], vendor.id!, groupIdOf(body)) };
+    const moved = moveOnClone(body, vendor.id!, groupIdOf(body));
 
     const after = runValidation(moved, undefined, {}, {});
     expect(after.zodValid).toBe(true);
@@ -257,12 +266,80 @@ describe("moveFieldToGroup over examples/purchase-requisition.json", () => {
     const quantity = draftFields(body).find((f) => f.key === "quantity")!;
     const before = runValidation(body, undefined, {}, {});
 
-    const moved: Draft = { ...body, fields: moveFieldToGroup(body.fields as DraftField[], quantity.id!, undefined) };
+    const moved = moveOnClone(body, quantity.id!, undefined);
 
     expect(draftFields(moved).find((f) => f.key === "quantity")!.id).toBe(quantity.id);
     const after = runValidation(moved, undefined, {}, {});
     expect(after.zodValid).toBe(true);
     expect(after.issues).toEqual(before.issues);
+  });
+
+  it("keeps step po_error publishable when po_status moves into request, a group whose card that form lacks", () => {
+    const body = exampleDraft();
+    const poStatus = draftFields(body).find((f) => f.key === "po_status")!;
+    const requestId = groupIdOf(body, "request");
+    const poErrorBefore = body.workflow!.steps!.find((s) => s.key === "po_error")!.view!.fields!;
+    expect(poErrorBefore.some((e) => "ref" in e && e.ref === requestId)).toBe(false);
+    const before = runValidation(body, undefined, {}, {});
+
+    const moved = moveOnClone(body, poStatus.id!, requestId);
+
+    const after = runValidation(moved, undefined, {}, {});
+    expect(after.zodValid).toBe(true);
+    expect(after.issues).toEqual(before.issues);
+    const poError = moved.workflow!.steps!.find((s) => s.key === "po_error")!.view!.fields!;
+    const statusAt = poError.findIndex((e) => "ref" in e && e.ref === poStatus.id);
+    expect(poError[statusAt - 1]).toEqual({ ref: requestId });
+    expect(poError[statusAt]).toMatchObject({ ref: poStatus.id, group: "request" });
+  });
+
+  it("keeps the tabbed finance_review step publishable when line_item moves into request, then cost_center leaves for the top level", () => {
+    const body = exampleDraft();
+    const lineItemId = groupIdOf(body);
+    const before = runValidation(body, undefined, {}, {});
+    expect(before.zodValid).toBe(true);
+
+    const nested = moveOnClone(body, lineItemId, groupIdOf(body, "request"));
+    const costCenter = draftFields(nested).find((f) => f.key === "cost_center")!;
+    const moved = moveOnClone(nested, costCenter.id!, undefined);
+
+    const after = runValidation(moved, undefined, {}, {});
+    expect(after.zodValid).toBe(true);
+    expect(after.issues).toEqual(before.issues);
+    const review = moved.workflow!.steps!.find((s) => s.key === "finance_review")!.view!.fields!;
+    expect(review.find((e) => "ref" in e && e.ref === lineItemId)).toEqual({ ref: lineItemId, group: "request" });
+    expect(review.find((e) => "ref" in e && e.ref === costCenter.id)).toMatchObject({ ref: costCenter.id, tab: "review" });
+  });
+
+  it("keeps the body publishable when line_item is renamed through its label", () => {
+    const body = exampleDraft();
+    const lineItemId = groupIdOf(body);
+    const before = runValidation(body, undefined, {}, {});
+
+    const renamed = structuredClone(body);
+    writeGroupLabel(renamed, lineItemId, { en: "Line Items" }, "en");
+
+    expect(draftFields(renamed).find((f) => f.id === lineItemId)!.key).toBe("line_items");
+    const after = runValidation(renamed, undefined, {}, {});
+    expect(after.zodValid).toBe(true);
+    expect(after.issues).toEqual(before.issues);
+  });
+
+  it("without the view sync, a bare catalog move strands every view entry naming the moved field", () => {
+    // The other half of the same fact the tests above prove: the view sync
+    // is what keeps a move publishable. `moveFieldToGroup` alone leaves the
+    // moved field's view entries naming their old group, which disagrees
+    // with the field's real catalog parent.
+    const body = exampleDraft();
+    const vendor = draftFields(body).find((f) => f.key === "vendor")!;
+
+    const moved: Draft = { ...body, fields: moveFieldToGroup(body.fields as DraftField[], vendor.id!, groupIdOf(body)) };
+
+    const after = runValidation(moved, undefined, {}, {});
+    const stranded = after.issues.filter(
+      (i) => i.message === 'a view entry\'s group must name this field\'s catalog parent, "line_item"',
+    );
+    expect(stranded).toHaveLength(3);
   });
 });
 
