@@ -9,48 +9,49 @@ import { groupMembersDomId } from "./CanvasView.js";
 import { canGroup, groupMatching, type StepGroup } from "./groups.js";
 import { dragDelta, exceedsClickThreshold, type Point } from "./geometry.js";
 
-/**
- * The bar's height, set by its tallest child: the group-name field, a label
- * over a control. Every other state renders shorter inside the same row, so
- * the bar's height never changes and the canvas never reflows (design D6).
- */
-const BAR_MIN_HEIGHT = "5.5rem";
-
 /** Mirrors `--space-1`: the gap `Chrome.tsx`'s account menu sits below its own
  * trigger by. */
 const MENU_GAP_PX = 4;
 
 /**
- * The three kinds the menu names, in the guided layer's own order
- * (`studio-guided-vocabulary`): a step someone works, a call to another
- * process, and an end. The bar's own button is the shortcut for the first,
- * and the menu still names all three, so no kind reaches the author through
- * the shortcut alone.
+ * The two kinds the menu names (`studio-guided-vocabulary`): a call to
+ * another process, and an end. Add step is the press and drag source for the
+ * third kind, a step someone works, so the menu lists only the two kinds Add
+ * step does not add.
  */
-const MENU_KINDS: readonly StepKind[] = ["task", "subprocess", "end"];
+const MENU_KINDS: readonly StepKind[] = ["subprocess", "end"];
 
 const styles = stylex.create({
   // The ledger rule under the tab row: one flex row, content flush left, a
-  // hairline against the canvas below it. Zero radius, no shadow.
+  // hairline against the canvas below it. Zero radius, no shadow. No
+  // minHeight: while the controls fit the window, the row's height is its
+  // tallest control, Add step, in every selection state (`studio-canvas`'s
+  // "The bar stands one control row tall"). That height holds inside
+  // `EditScreen.tsx`'s `tabBody` column only because `flexShrink: 0` sits
+  // below: `overflowX: auto` alone gives the bar an automatic minimum size
+  // of 0, so the column would shrink it in a short window instead of
+  // scrolling the tab body past the canvas's own 36rem floor.
   bar: {
     display: "flex",
     alignItems: "center",
     flexWrap: "nowrap",
     gap: space.s3,
-    minHeight: BAR_MIN_HEIGHT,
+    flexShrink: 0,
     paddingBlock: space.s2,
     paddingInline: 0,
     borderBottomWidth: 1,
     borderBottomStyle: "solid",
     borderBottomColor: colors.border,
-    // Below ~760px the row's controls outrun the viewport (Ungroup is the
-    // last to go). A scrollbar keeps every control reachable by pointer
-    // instead of clipping the tail with no hint.
+    // Below a ~877px window the group state's controls outrun the viewport
+    // (Ungroup is the last to go); ~862px when the tab body shows no
+    // vertical scrollbar. A scrollbar keeps every control reachable by
+    // pointer instead of clipping the tail with no hint, and adds its own
+    // height to the bar there (15px in Chrome on Windows).
     overflowX: "auto",
   },
   // Nothing in the row shrinks: a shrunk button wraps its own label, which
-  // would grow the bar. Narrow-window behaviour is design.md's own open
-  // question, and a browser check answers it.
+  // would grow the bar. The walk in `docs/browser-checks.md` records the
+  // narrow-window behaviour.
   control: {
     flexShrink: 0,
   },
@@ -82,35 +83,34 @@ const styles = stylex.create({
     fontFamily: fonts.mono,
     fontVariantNumeric: "tabular-nums",
   },
-  // The field's own box is the input's box: the bar centres every control on
-  // one line (D6), and a label inside the flow would grow the field taller
-  // than its siblings and drop the input off that line. The label sits
-  // absolutely above it instead, anchored by `position: relative` here. No
-  // `cursor: grab`: nothing in the bar drags a group.
+  // The one exception `DESIGN.md`'s Fields list carries: a toolbar field's
+  // label sits beside the field, not above it, so the row never grows past
+  // the height Add step already sets. No `cursor: grab`: nothing in the bar
+  // drags a group.
   groupNameField: {
-    position: "relative",
+    display: "flex",
+    alignItems: "center",
+    gap: space.s2,
     flexShrink: 0,
   },
   // The design language's field label: 11px, uppercase, tracked 0.1em, in
-  // slate (mirrors `StepPage.tsx`'s `fieldLabelText`, flush left, 4px above
-  // the control).
+  // slate (mirrors `StepPage.tsx`'s `fieldLabelText`), flush against the
+  // input beside it.
   groupNameLabelText: {
-    position: "absolute",
-    bottom: "100%",
-    left: 0,
-    marginBottom: space.s1,
     fontSize: 11,
-    // The bar leaves about 17px above the input for this label. At `normal`
-    // the host's own system-ui metrics decide the label's height, so a fixed
-    // 1 pins it to 11px plus the 4px margin on every platform.
     lineHeight: 1,
     textTransform: "uppercase",
     letterSpacing: "0.1em",
     color: colors.textMuted,
     whiteSpace: "nowrap",
   },
+  // The button's own type, 14px at `line-height: normal`: inheriting the
+  // body's 15px at that same `normal` drew the input one pixel taller than
+  // Add step, which would grow the bar past its floor.
   groupNameInput: {
     width: "9rem",
+    fontSize: 14,
+    lineHeight: "normal",
   },
   // The popover's own top-layer promotion strips any CSS anchoring to the
   // trigger, so the panel's position is set inline off the trigger's live
@@ -200,7 +200,7 @@ interface Props {
   onGroupsChange: (groups: StepGroup[]) => void;
 }
 
-/** A live drag out of one of the four add controls. */
+/** A live drag out of one of the three add controls. */
 interface BarDrag {
   kind: StepKind;
   /** Where the press landed, in client coordinates. Decides press against
@@ -376,11 +376,21 @@ export function CanvasBar({
         </div>
       </div>
 
-      {/* One step selected reports its reachability; several report their
-          count instead, and nothing selected reports neither
-          (`studio-canvas`). */}
+      {/* One step selected reports its reachability, then offers Remove;
+          several report their count instead, then Remove steps; nothing
+          selected reports neither (`studio-canvas`). */}
       {selectedStepIds.length === 1 && unconnected && (
         <span {...stylex.props(styles.unconnectedReport)}>{t("canvas.unconnected")}</span>
+      )}
+
+      {selectedStepIds.length === 1 && (
+        <button
+          type="button"
+          className={`btn btn-secondary btn-destructive ${stylex.props(styles.control).className ?? ""}`.trim()}
+          onClick={onDeleteSelection}
+        >
+          {t("canvas.selectionRemoveOne")}
+        </button>
       )}
 
       {selectedStepIds.length > 1 && (

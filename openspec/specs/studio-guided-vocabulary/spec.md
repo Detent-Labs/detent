@@ -69,9 +69,9 @@ control SHALL take the same three phrases.
 
 #### Scenario: The add control names what it adds
 
-- **WHEN** an author opens the control that adds a step
-- **THEN** the three entries name a step someone works, a call to another
-  process, and an end
+- **WHEN** an author opens the canvas bar's menu
+- **THEN** its two entries name a call to another process, and an end
+- **AND** the bar's own button, beside it, adds a step someone works
 
 ### Requirement: A time limit reads as a number and a unit
 

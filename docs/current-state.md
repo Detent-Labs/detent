@@ -1798,8 +1798,9 @@ Stage-by-stage status is in `ROADMAP.md`.
   `canvas/connection.ts` are pure and unit-tested alongside `layout.ts`; the
   SVG/React rendering and pointer wiring itself is not, per this repo's
   existing convention (`packages/web/src/areas/app/screens/inboxLogic.ts`). The canvas
-  introduces no operation the panels can't already do — deletion and every
-  field edit remain panel-only.
+  introduces no operation the panels can't already do. Deletion keeps its
+  panel route through the step page's own Remove control, and every field
+  edit stays panel-only.
 - Canvas grid snapping (`packages/web/src/areas/studio/canvas/geometry.ts`,
   `canvas/layout.ts`, `canvas/CanvasView.tsx`, `screens/EditScreen.tsx`,
   `form-ui/tokens.stylex`): a step lands on the lattice the author can see.
@@ -1833,9 +1834,9 @@ Stage-by-stage status is in `ROADMAP.md`.
   the canvas selects a set of steps, not one.
 
   `ProcessSurface` holds `selectedStepIds: string[]`. A set of one drives the
-  configuration pane exactly as the single id did. A set of several drives a
-  summary instead — a count and a Remove steps control — because the pane
-  edits one step.
+  step page exactly as the single id did. The canvas bar also offers Remove
+  step for it. A set of several drives the bar's count and Remove steps
+  instead, because the step page edits one step.
 
   `canvas/selection.ts` exports `toggleSelection`, `normalizeRect` and
   `nodesInRect`, all pure and covered by
@@ -2095,13 +2096,23 @@ Stage-by-stage status is in `ROADMAP.md`.
   words ship in English alone, while the label an author wrote resolves against
   the studio's content locale.
 - Canvas bar (`packages/web/src/areas/studio/canvas/CanvasBar.tsx`,
-  `screens/EditScreen.tsx`, `canvas/layout.ts`, `studio-canvas-bar`): a
-  fixed-height row between the tab row and the canvas, replacing
+  `screens/EditScreen.tsx`, `canvas/layout.ts`, `studio-canvas-bar`,
+  `tighter-canvas-bar`): a row between the tab row and the canvas, replacing
   `canvas/CanvasPalette.tsx` and the `canvasSelection` aside. That aside
-  stacked below the canvas and shortened it. It carries the three add
-  controls behind Add step and its caret menu. It also
-  carries one selected step's reachability report and the selection's own
-  controls. `EditScreen` renders it as `<CanvasBar>`, directly above
+  stacked below the canvas and shortened it.
+
+  The bar sets no minimum height, and `flexShrink: 0` keeps the tab body from
+  squeezing it. In a window wide enough for its row, Add step sets it at 54px
+  in every selection state. In a narrower window the bar scrolls the row
+  sideways, and its scrollbar adds 15px in Chrome on Windows. A window too
+  short for the canvas's 36rem floor scrolls the tab body instead.
+
+  Add step adds a step someone works. Its caret menu holds the other two
+  kinds: a call to another process, and an end. One selected step shows its
+  reachability report, then Remove step. Several
+  show their count, Remove steps, then the group controls. A set matching one
+  group shows the group's name field, its label beside the input.
+  `EditScreen` renders the bar as `<CanvasBar>`, directly above
   `#studio-canvas-body`, and keeps every drag and selection callback itself.
 
   A press on an add control adds a step at the visible canvas centre. It
