@@ -110,7 +110,7 @@ stage-by-stage status.
   question, and nothing today asks for it.
 - Three more display-element shapes for the `view`: a chart, a read-only
   table and a markup block. `openspec/changes/archive/2026-08-30-field-model-type-format-control/field-model-redesign.md` records this
-  as S2 and assigns it change 3, which shipped the first of four, the
+  as S2 and assigns it change 3, which shipped the first of five, the
   note (`field-model-view-note`, `ViewNote`/`ViewEntry` in
   `src/schema/definition.ts`). The remaining three wait on their own design:
   each is one more `ViewEntry` union member, and each needs its own decision
