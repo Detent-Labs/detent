@@ -20,11 +20,11 @@
 - [x] 4.2 Give each control in the walk its screen and the state that shows it
 - [x] 4.3 Reach the outbox row's control through a draft `http.request` action to a refused host
 - [x] 4.4 Run the walk on the production build in both schemes, reading computed color and border
-- [ ] 4.5 Copy `.claude/skills/impeccable/` from the main checkout, then run critique and audit fresh
+- [x] 4.5 Copy `.claude/skills/impeccable/` from the main checkout, then run critique and audit fresh
 
 ## 5. Verification
 
-- [ ] 5.1 Run `bun run typecheck` and `bun run build` in the devcontainer
-- [ ] 5.2 Run the FULL `bun test` with `DATABASE_URL` set, through `silent-green.sh`
+- [x] 5.1 Run `bun run typecheck` and `bun run build` in the devcontainer
+- [x] 5.2 Run the FULL `bun test` with `DATABASE_URL` set, through `silent-green.sh`
 - [ ] 5.3 Run the prose and whitespace push gates over the branch range
-- [ ] 5.4 Run `openspec validate destructive-buttons-show-the-accent --strict`
+- [x] 5.4 Run `openspec validate destructive-buttons-show-the-accent --strict`
