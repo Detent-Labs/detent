@@ -183,7 +183,13 @@ drag scope names a tab for a root and a group for a member.
 A write that changes an entry's group keeps the tab rules. The entry's former
 tab is the tab the canvas drew it on, `view-layout.ts::homeTab`. Joining a
 group clears the entry's `tab`, and a card placed at the root takes the
-former tab. Leaving for the top level gives the entry its former tab.
+former tab. Leaving for the top level gives the entry its former tab. A
+group-key write counts too: a cleared key lifts the group's children, and a
+first key puts them inside it.
+
+A palette drop can put a member inside a card another tab draws. The canvas
+then shows that tab. Otherwise the drop leaves the shown canvas as it was, and
+the author cannot see where the member went.
 
 ### The parentage clause binds in both directions
 

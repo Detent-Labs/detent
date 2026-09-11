@@ -219,6 +219,15 @@ and refuses the publish.
 The rule reaches the key control wherever the catalog offers it. A top-level
 group and a group nested inside another group SHALL behave the same way.
 
+On a tabbed form the rewrite keeps the definition contract's tab rules.
+Clearing a group's key turns the entries of its direct children into roots.
+Each such entry SHALL take the tab of the outermost card holding the group's
+own entry. A group's first key turns those entries into members, and each
+SHALL lose its `tab`.
+
+On a form declaring no tabs, the rewrite SHALL write no `tab`. Every note
+SHALL keep its `tab` as it stood.
+
 The definition contract already refuses a body whose entry names a group key
 no field declares. Before this requirement, renaming a group produced exactly
 that body. The author then met the error at publish, with nothing naming the
@@ -246,3 +255,30 @@ rename.
 
 - **WHEN** the developer renames one of a draft's two group fields
 - **THEN** the entries naming the other group keep their old key
+
+#### Scenario: A cleared key gives a root group's members its card's tab
+
+- **WHEN** a tabbed step view carries a group's card and two members on its
+  second tab
+- **AND** the developer clears that group's key
+- **THEN** both members' entries name the second tab and have no `group`
+
+#### Scenario: A cleared key on a nested group gives its members the outer card's tab
+
+- **WHEN** a tabbed step view carries an outer group's card on its second tab
+- **AND** an inner group's card and its member sit inside that card
+- **AND** the developer clears the inner group's key
+- **THEN** the member's entry names the second tab
+
+#### Scenario: A group's first key takes the tab off its children's entries
+
+- **WHEN** a tabbed step view carries a key-less group's card and its child
+  field, each naming a tab
+- **AND** the developer gives the group its first key
+- **THEN** the child's entry names that key and has no `tab`
+
+#### Scenario: A form without tabs gains no tab from a cleared key
+
+- **WHEN** a step view declaring no tabs carries a group's card and a member
+- **AND** the developer clears that group's key
+- **THEN** the member's entry has no `tab`

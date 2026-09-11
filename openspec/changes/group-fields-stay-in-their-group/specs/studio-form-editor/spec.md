@@ -148,6 +148,10 @@ place the group card too. One draft change carries both. The group card
 goes at the slot the drop named. A member reaching a form without its
 group would leave a draft no publish accepts.
 
+On a tabbed form, a drop can place a member inside a group card another tab
+draws. The canvas SHALL then show the card's tab, where the member landed. A
+drop that changed nothing on the shown canvas would read as a failure.
+
 The palette SHALL also offer an "add a field to the process" section, by
 type. Dragging one of those entries onto the canvas SHALL mint a new
 catalog field of that type. It SHALL add that field to the view, at the
@@ -191,6 +195,14 @@ return it to that list, if the field stays in the catalog.
   that group onto the canvas
 - **THEN** the view carries the group's own entry and the member entry
 - **AND** the canvas draws the member inside the group card
+
+#### Scenario: A drop into a group card on another tab shows that tab
+
+- **WHEN** a tabbed form carries a group's card on its second tab
+- **AND** the developer drops that group's field from the palette onto the
+  first tab
+- **THEN** the member lands inside the group card
+- **AND** the canvas shows the second tab
 
 #### Scenario: Dropping an "add a field" entry mints and places a field
 
