@@ -2974,5 +2974,32 @@ tab holding the first reported issue. The studio Player plays the same
 draft through the identical `FieldForm`, with its own open-tab state. This
 walk does not repeat it there.
 
+Read the page's `[role="status"]` element in the inspector. Pass: it carries
+this sentence, and sits off screen rather than hidden.
+
+```
+Opened the Decision tab. 1 field still needs an entry.
+```
+
+Click "Review" yourself. Pass: that text clears, so a tab you chose announces
+nothing. Submit again. Pass: the sentence returns, which is what a screen
+reader needs to hear it twice.
+
+Switch the language to German. Submit once more. Pass: the live region reads
+this instead.
+
+```
+Registerkarte Decision geöffnet. 1 Feld benötigt noch eine Eingabe.
+```
+
+**The author's strip holds one line.** Narrow the window to 640px, then to
+400px. Pass: the strip stays one line tall at both widths. The 2px divider
+stays directly under the tabs. The page itself never scrolls sideways.
+
+The strip's own row scrolls sideways instead. Its trailing commands run off
+the right edge rather than wrapping below. Pass: no command ever stands alone
+on a line. The five commands read in the muted ink. The two tabs stay the
+loudest thing in the row.
+
 Ledger reference: Task 3: minor (deferred): `onTabKeyDown` wiring uncovered.
 This walk is where that finding gets exercised.

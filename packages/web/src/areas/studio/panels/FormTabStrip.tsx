@@ -16,14 +16,23 @@ export const formTabDomId = (key: string) => `studio-form-tab-${key}`;
 export const formTabPanelDomId = (key: string) => `studio-form-tabpanel-${key}`;
 
 const styles = stylex.create({
-  // The row wraps rather than scrolling sideways: a form's own tabs are few,
-  // where the process surface's ten are not, and the canvas under this row
-  // must not move down a line on every resize.
+  // One line at every width, scrolling sideways in its own container rather
+  // than wrapping — the participant strip's own overflow model, so a form's
+  // tab strip behaves one way and not two. Wrapping put the 2px divider
+  // below the controls at 640px, 70px under the tabs, so the accent rule no
+  // longer met the canvas it marks, which is the whole reason the strip sits
+  // where it sits. Nothing wraps now, so no command can strand alone on a
+  // line either. The 4px block padding is the room the 2px focus ring at 2px
+  // offset needs: `overflowX` resolves `overflow-y` to `auto` as well, and a
+  // ring drawn outside the padding box would clip.
   row: {
     display: "flex",
     alignItems: "stretch",
-    flexWrap: "wrap",
+    flexWrap: "nowrap",
     gap: space.s1,
+    paddingBlock: space.s1,
+    overflowX: "auto",
+    overscrollBehavior: "contain",
     borderBottomWidth: 2,
     borderBottomStyle: "solid",
     borderBottomColor: colors.divider,
@@ -32,12 +41,13 @@ const styles = stylex.create({
   tabs: {
     display: "flex",
     alignItems: "stretch",
-    flexWrap: "wrap",
+    flexWrap: "nowrap",
     gap: space.s1,
-    minWidth: 0,
+    flex: "none",
   },
-  // `ProcessTabRow.tsx`'s own tab, character for character (design.md
-  // "Visual direction": one tab language, two strips).
+  // `FieldForm.tsx`'s own tab, character for character (design.md "Visual
+  // direction": one tab language, two strips). That pair is the one a viewer
+  // compares, since both draw on this screen over the same labels.
   tab: {
     display: "flex",
     alignItems: "baseline",
@@ -49,7 +59,14 @@ const styles = stylex.create({
     borderWidth: 0,
     paddingBlock: space.s2,
     paddingInline: space.s3,
-    font: "inherit",
+    // Pinned, not inherited. `font: "inherit"` resolved against a 15px
+    // ambient and drew this strip 3.5px taller than the participant strip
+    // beside it on this same screen, over the same labels. 14px with an
+    // explicit 1.5 is `DESIGN.md`'s own action-label size and the size
+    // `FieldForm.tsx` pins, so neither strip depends on an ambient.
+    fontFamily: "inherit",
+    fontSize: 14,
+    lineHeight: 1.5,
     textAlign: "left",
     cursor: "pointer",
   },
@@ -65,18 +82,30 @@ const styles = stylex.create({
   controls: {
     display: "flex",
     alignItems: "center",
-    flexWrap: "wrap",
+    flexWrap: "nowrap",
     gap: space.s1,
+    flex: "none",
     marginLeft: "auto",
   },
+  // Plain, not accent. `DESIGN.md` spends the accent on state and the one
+  // primary action per screen, and leaves every other action outlined or
+  // plain. Five accent commands beside two ink tabs made the servant louder
+  // than the thing it serves, and put two meanings on one colour inside one
+  // row: the rule under the open tab means THIS TAB IS OPEN, and a command
+  // 340px to its right meant CLICK ME. The accent keeps the first meaning
+  // alone now; focus is still the accent ring, from `tokens.css`.
   control: {
     fontFamily: fonts.mono,
     fontSize: 11,
+    color: colors.textMuted,
+    backgroundColor: { default: "transparent", ":hover": colors.surfaceMuted },
   },
+  // The authored name itself, not a command, so it takes the ordinary ink.
   rename: {
     fontFamily: fonts.mono,
     fontSize: 11,
     minWidth: "8rem",
+    color: colors.text,
   },
 });
 

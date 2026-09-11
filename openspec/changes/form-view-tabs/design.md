@@ -160,9 +160,19 @@ Shaped against `DESIGN.md` before any code, per the repo's UI convention. The
 world is the Rubber Stamp Ledger. Zero radius, the border as the form
 language, one accent spent as a stamp.
 
-The strip repeats the process tab row's grammar, character for character. It
-is a row of 14px weight-800 labels over a 2px divider. Gaps are 4px, padding
-is 8px by 12px, and an accent rule under the open tab marks it.
+The strip repeats the process tab row's grammar. It is a row of 14px
+weight-800 labels over a 2px divider. Gaps are 4px, padding is 8px by 12px,
+and an accent rule under the open tab marks it.
+
+Both strips pin that 14px and a 1.5 line height outright. The token for an
+action label in `DESIGN.md` is 14px. A pinned pair also keeps a strip off
+whatever ambient size its surroundings carry. The process tab row sits at the
+ambient 15px, and this change leaves it there. It shares a screen with
+neither strip.
+
+Each strip holds one line at every width. It scrolls sideways in its own
+container rather than wrapping. Wrapping would drop the 2px divider below the
+controls. The accent rule would then stop meeting the canvas it marks.
 
 Both strips read one token module, `form-ui/tokens.stylex`. `ProcessTabRow.tsx`
 already imports it. The two strips share the tokens and no component: the
@@ -188,8 +198,14 @@ Rule's own limit. That count is also the screen-reader text the `form-ui`
 spec requires. No second element carries it.
 
 The authoring controls sit at the strip's trailing end, in the editor alone.
-They are ghost buttons in mono at 11px, in the accent. A participant never
+They are ghost buttons in mono at 11px, in the muted ink. A participant never
 gets them, so the participant's strip is labels and nothing else.
+
+The muted ink is the point. Per `DESIGN.md`, the accent marks state and one
+primary action, and every other action stays outlined or plain. Five accent
+commands beside two ink tabs made the servant louder than the thing it
+serves. It also put two readings on one colour in one row. The accent under
+the open tab now means one thing, and the focus ring stays accent.
 
 ## Risks / Trade-offs
 

@@ -85,6 +85,49 @@ export function firstTabWithIssue(
 }
 
 /**
+ * How many of `tabKey`'s FIELDS still carry an issue, counting a group's
+ * members under the group's own tab. The sibling above counts issues; this
+ * counts the fields holding them, which is what the switch announcement says
+ * a participant still has to deal with. Two issues on one field are one field
+ * to go back to.
+ */
+export function tabIssueFieldCount(
+  entries: ResolvedViewEntry[],
+  tabKey: string,
+  issuesByField: Map<string, SubmissionIssue[]> | undefined,
+): number {
+  if (!issuesByField || issuesByField.size === 0) return 0;
+  let count = 0;
+  for (const entry of entries) {
+    if (!isResolvedViewField(entry)) continue;
+    if (owningTab(entry, entries) !== tabKey) continue;
+    if ((issuesByField.get(entry.field.id)?.length ?? 0) > 0) count++;
+  }
+  return count;
+}
+
+/**
+ * The live-region sentence a consumer announces when a failed submission
+ * opened a tab the participant did not choose themselves. A count under one
+ * announces nothing: an empty issue set is not worth speaking over whatever a
+ * screen reader is already reading.
+ *
+ * The caller hands in both whole sentences from its own catalog, `{tab}` and
+ * `{count}` still in place. A translator therefore sees each sentence entire,
+ * per `design-language.md`'s "Never assemble a sentence from fragments", and
+ * this package keeps the screen catalog it does not ship. `EntityTabs.tsx`'s
+ * move announcer already spends the same two placeholders the same way.
+ */
+export function tabSwitchAnnouncement(
+  sentences: { one: string; many: string },
+  tabLabel: string,
+  fieldCount: number,
+): string {
+  if (fieldCount < 1) return "";
+  return (fieldCount === 1 ? sentences.one : sentences.many).replace("{tab}", tabLabel).replace("{count}", String(fieldCount));
+}
+
+/**
  * The tab a focus-moving key press moves focus to, as an index into the drawn
  * strip; `undefined` for a key the strip leaves alone. Arrow keys wrap at the
  * row's ends, `Home` and `End` jump to it — the WAI-ARIA tabs pattern's

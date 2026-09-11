@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { FieldForm } from "../src/FieldForm.js";
-import { drawnTabs, firstTabWithIssue, nextTabIndex, tabIssueCount } from "../src/tabs.js";
+import { drawnTabs, firstTabWithIssue, nextTabIndex, tabIssueCount, tabIssueFieldCount, tabSwitchAnnouncement } from "../src/tabs.js";
 import { resolveTabsLocale } from "../src/locale.js";
 import { issueCountText } from "../src/issue-messages.js";
 import type { ResolvedViewEntry, ResolvedViewField, ResolvedViewTab, SubmissionIssue } from "../src/types.js";
@@ -435,5 +435,55 @@ describe("resolveTabsLocale: the sibling of resolveFieldsLocale", () => {
       <FieldForm fields={[field("f1", "one")]} values={{}} onChange={noop} locale="de" tabs={resolved} activeTab="one" />,
     );
     expect(html).toContain("Details DE");
+  });
+});
+
+describe("tabIssueFieldCount: the switch announcement counts fields, not issues", () => {
+  const fields = [field("f1", "one"), field("f2", "one"), field("f3", "two")];
+
+  it("counts one field carrying two issues once", () => {
+    const issues = new Map([["f1", [required("f1"), required("f1")]]]);
+    expect(tabIssueCount(fields, "one", issues)).toBe(2);
+    expect(tabIssueFieldCount(fields, "one", issues)).toBe(1);
+  });
+
+  it("counts each offending field on the tab", () => {
+    const issues = new Map([
+      ["f1", [required("f1")]],
+      ["f2", [required("f2")]],
+    ]);
+    expect(tabIssueFieldCount(fields, "one", issues)).toBe(2);
+  });
+
+  it("leaves a clean tab, and a clean map, at zero", () => {
+    const issues = new Map([["f3", [required("f3")]]]);
+    expect(tabIssueFieldCount(fields, "one", issues)).toBe(0);
+    expect(tabIssueFieldCount(fields, "one", undefined)).toBe(0);
+    expect(tabIssueFieldCount(fields, "one", new Map())).toBe(0);
+  });
+
+  it("counts a group's member under the group's own tab", () => {
+    const withGroup = [group("g", "two"), field("f4", undefined, { group: "g" })];
+    const issues = new Map([["f4", [required("f4")]]]);
+    expect(tabIssueFieldCount(withGroup, "two", issues)).toBe(1);
+    expect(tabIssueFieldCount(withGroup, "one", issues)).toBe(0);
+  });
+});
+
+describe("tabSwitchAnnouncement: the sentence a consumer reads out after an unchosen switch", () => {
+  const sentences = { one: "Opened {tab}. 1 field left.", many: "Opened {tab}. {count} fields left." };
+
+  it("takes the singular sentence for one field and the plural for more", () => {
+    expect(tabSwitchAnnouncement(sentences, "Decision", 1)).toBe("Opened Decision. 1 field left.");
+    expect(tabSwitchAnnouncement(sentences, "Decision", 3)).toBe("Opened Decision. 3 fields left.");
+  });
+
+  it("says nothing for a count of zero or less", () => {
+    expect(tabSwitchAnnouncement(sentences, "Decision", 0)).toBe("");
+    expect(tabSwitchAnnouncement(sentences, "Decision", -1)).toBe("");
+  });
+
+  it("carries an authored tab label through as it stands", () => {
+    expect(tabSwitchAnnouncement(sentences, "Prüfung & Freigabe", 2)).toContain("Prüfung & Freigabe");
   });
 });
