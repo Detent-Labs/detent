@@ -71,4 +71,4 @@
 - [x] 7.3 Run the prose and whitespace gates over the pushed range
 - [x] 7.4 Run the Impeccable detector over every changed file under `packages/`
 - [x] 7.5 Check the tabbed form in a real browser: participant, Player, editor
-- [ ] 7.6 Run `/impeccable critique` and `/impeccable audit` on the form editor route
+- [x] 7.6 Run `/impeccable critique` and `/impeccable audit` on the form editor route

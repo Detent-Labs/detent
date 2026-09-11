@@ -374,7 +374,7 @@ export function FieldForm({ fields, values, onChange, locale, issuesByField, col
   // and `Space` handling is what opens the focused tab. The strip keeps the
   // plain-button tab order `spa-accessibility` gives an ordinary tab set —
   // roving tabindex is that spec's named exception for the studio's ten-tab
-  // scrolling row, and it would need the focus state this component may not
+  // row, and it would need the focus state this component may not
   // hold.
   const onTabKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     const buttons = Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
