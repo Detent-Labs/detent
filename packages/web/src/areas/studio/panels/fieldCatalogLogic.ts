@@ -138,3 +138,35 @@ export function groupTargetsFor(fields: DraftField[], fieldId: string): string[]
     .filter((f) => f.type === "group" && f.id !== undefined && f.id !== fieldId && !inside.has(f.id))
     .map((f) => f.id as string);
 }
+
+/**
+ * The id a field's move control takes, so the tab can put focus back on it
+ * after a move re-orders the list (`spa-accessibility`). Moved here from
+ * `EntityTabs.tsx` alongside `moveTargetsFor` below, which avoids an import
+ * cycle once the editor gains its own move control (design.md, decision:
+ * "One write, one announcement, and focus back on the control").
+ */
+export const moveControlId = (fieldId: string) => `studio-field-move-${fieldId}`;
+
+/**
+ * Every destination a field's move control offers, plus the group (or
+ * non-group parent) holding it today. `undefined` names the top level.
+ *
+ * `targetIds` orders the top level first, then the current parent when it is
+ * no group — a field can sit inside a parent `changeKind` rewrote from a
+ * group into something else, and the control's value has to name an option
+ * it holds — then every group `groupTargetsFor` returns. Lifted out of
+ * `EntityTabs.tsx`'s `FieldsTab` render loop, where the same three pieces
+ * built one row's `moveTargets` at a time; the editor's own move control
+ * reads this the same way (design.md, decision: "One write, one
+ * announcement, and focus back on the control").
+ */
+export function moveTargetsFor(
+  fields: DraftField[],
+  fieldId: string,
+): { currentId: string | undefined; targetIds: (string | undefined)[] } {
+  const currentId = flattenDraftFields(fields).find((f) => (f.fields ?? []).some((c) => c.id === fieldId))?.id;
+  const groupTargets = groupTargetsFor(fields, fieldId);
+  const orphanedParent = currentId !== undefined && !groupTargets.includes(currentId) ? [currentId] : [];
+  return { currentId, targetIds: [undefined, ...orphanedParent, ...groupTargets] };
+}

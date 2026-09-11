@@ -5,6 +5,7 @@ import {
   droppedByKindChange,
   groupTargetsFor,
   moveFieldToGroup,
+  moveTargetsFor,
   nextFieldKey,
 } from "../src/areas/studio/panels/fieldCatalogLogic.js";
 import { mergeLocalizedTextEntry } from "../src/areas/studio/draft/localized-text.js";
@@ -391,5 +392,39 @@ describe("groupTargetsFor", () => {
 
     expect(groupTargetsFor(fields, "field_a")).toEqual([]);
     expect(ids(moveFieldToGroup(fields, "field_a", undefined))).toEqual(["field_g", "field_a"]);
+  });
+});
+
+/**
+ * The move control's own set, built from the same three pieces the rail's
+ * per-row target build once assembled (design.md, decision: "One write, one
+ * announcement, and focus back on the control").
+ */
+describe("moveTargetsFor", () => {
+  it("names the top level first, then every group", () => {
+    const fields = [fld("field_a", "a"), grp("field_g", "g", []), grp("field_h", "h", [])];
+
+    const { currentId, targetIds } = moveTargetsFor(fields, "field_a");
+
+    expect(currentId).toBeUndefined();
+    expect(targetIds).toEqual([undefined, "field_g", "field_h"]);
+  });
+
+  it("never names the field itself or any group inside it", () => {
+    const fields = [grp("field_g", "g", [grp("field_inner", "inner", [])]), grp("field_h", "h", [])];
+
+    const { targetIds } = moveTargetsFor(fields, "field_g");
+
+    expect(targetIds).toEqual([undefined, "field_h"]);
+  });
+
+  it("keeps a parent that is no longer a group, and names it as the current id", () => {
+    const orphaning = { ...grp("field_g", "g", [fld("field_a", "a")]), type: "string" as const };
+    const fields = [orphaning];
+
+    const { currentId, targetIds } = moveTargetsFor(fields, "field_a");
+
+    expect(currentId).toBe("field_g");
+    expect(targetIds).toEqual([undefined, "field_g"]);
   });
 });

@@ -1,9 +1,9 @@
 ## 1. Lookups
 
-- [ ] 1.1 Add `fieldKindIcon(field)` to `draft/field-type-labels.ts`. It shares one branch helper with `fieldKindWord`. It follows design.md's table. Verify with `bun run typecheck`.
-- [ ] 1.2 Extend `studio-fieldTypeLabels.test.ts`. Assert sixteen distinct icons for the sixteen kinds. Assert `Puzzle` for a plugin envelope. Assert `Braces` for a triple no kind names. Verify in the full suite.
-- [ ] 1.3 Move `moveControlId` into `fieldCatalogLogic.ts`, and give its id the prefix `studio-field-move-`. Add `moveTargetsFor(fields, fieldId)` there, as design.md describes. Verify with `bun run typecheck`.
-- [ ] 1.4 Extend `studio-fieldCatalogLogic.test.ts` for `moveTargetsFor`. Assert the top level first. Assert the field and its descendants absent. Assert a parent that is no group kept. Verify in the full suite.
+- [x] 1.1 Add `fieldKindIcon(field)` to `draft/field-type-labels.ts`. It shares one branch helper with `fieldKindWord`. It follows design.md's table. Verify with `bun run typecheck`.
+- [x] 1.2 Extend `studio-fieldTypeLabels.test.ts`. Assert sixteen distinct icons for the sixteen kinds. Assert `Puzzle` for a plugin envelope. Assert `Braces` for a triple no kind names. Verify in the full suite.
+- [x] 1.3 Move `moveControlId` into `fieldCatalogLogic.ts`, and give its id the prefix `studio-field-move-`. Add `moveTargetsFor(fields, fieldId)` there, as design.md describes. Verify with `bun run typecheck`.
+- [x] 1.4 Extend `studio-fieldCatalogLogic.test.ts` for `moveTargetsFor`. Assert the top level first. Assert the field and its descendants absent. Assert a parent that is no group kept. Verify in the full suite.
 
 ## 2. Rail row
 
