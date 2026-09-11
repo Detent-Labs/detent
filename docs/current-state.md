@@ -2099,9 +2099,12 @@ Stage-by-stage status is in `ROADMAP.md`.
   `screens/EditScreen.tsx`, `canvas/layout.ts`, `studio-canvas-bar`,
   `tighter-canvas-bar`): a row between the tab row and the canvas, replacing
   `canvas/CanvasPalette.tsx` and the `canvasSelection` aside. That aside
-  stacked below the canvas and shortened it. The bar sets no minimum height,
-  and `flexShrink: 0` keeps the tab body from squeezing it. Add step sets it
-  at 54px in every selection state, at 720px tall and at 1000px. A window too
+  stacked below the canvas and shortened it.
+
+  The bar sets no minimum height, and `flexShrink: 0` keeps the tab body from
+  squeezing it. In a window wide enough for its row, Add step sets it at 54px
+  in every selection state. In a narrower window the bar scrolls the row
+  sideways, and its scrollbar adds 15px in Chrome on Windows. A window too
   short for the canvas's 36rem floor scrolls the tab body instead.
 
   Add step adds a step someone works. Its caret menu holds the other two

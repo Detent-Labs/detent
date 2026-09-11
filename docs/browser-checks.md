@@ -344,9 +344,9 @@ Source: `studio-canvas-bar` tasks 7.1, 7.2, 8.3, 9.3, 9.4.
 Seed the database and open a draft on the Canvas tab.
 
 Select nothing, then one step, then several steps, then a selection
-matching one group. Pass: the bar stands one control row tall in every
-state, and the canvas never reflows. The one-control-row walk below holds
-the figures.
+matching one group. Do it in a window wide enough for the row. Pass: the bar
+stands one control row tall in every state, and the canvas never reflows.
+The one-control-row walk below holds the figures.
 
 One selected step prints Remove step. Two selected steps print their count,
 Remove steps, and Group these steps in the bar. A selection matching one
@@ -403,16 +403,24 @@ panel's edge. Pass: the ghost appears once the pointer clears it.
 
 Reach the group state: select two steps, then Group these steps. Narrow
 the window's width to 800px, then to 700px. Pass: at both widths the bar
-scrolls sideways, with Ungroup past its right edge. The page behind it
-keeps its own width.
+scrolls sideways, with Ungroup past its right edge. The bar grows by its
+scrollbar's height alone. The page behind it keeps its own width.
 
 Wheel the pointer right over the bar. Pass: Ungroup scrolls into view and
 takes a click there.
 
-Measured on 2026-09-11, the group state holds 838px of content, at 720px
-and at 1000px tall. At 800px a 776px bar leaves 62px to scroll. At 700px a
-676px bar leaves 162px. The bar fits from an 862px window up, and stands
-54px tall at both widths.
+This check needs visible scrollbars. Run it headed, or headless without
+`--hide-scrollbars`. Playwright's headless launch passes that flag, and a
+hidden scrollbar takes no height, so the bar's growth never shows.
+
+Measured on 2026-09-11 in headed Chrome on Windows, 720px tall, the group
+state holds 838px of content. At 800px a 761px bar leaves 77px to scroll. At
+700px a 661px bar leaves 177px. The bar stands 69px there with a group
+selected, and 54px with nothing selected.
+
+At 720px tall the tab body's own scrollbar takes 15px of width. The row fits
+from about an 877px window up there, and from 862px at 1000px tall. In a
+1280px window the bar stands 54px in every state.
 
 None of the pointer, focus, or height checks above has coverage in
 `packages/web/test/`. Every suite there renders through
