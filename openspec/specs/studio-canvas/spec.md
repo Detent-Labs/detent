@@ -548,15 +548,15 @@ comes first.
 
 ### Requirement: The canvas introduces no authoring operation unavailable through the panels
 
-<!-- Why: this block repeats the base spec's wording, which the delta must -->
-<!-- match for the archive to apply it. Both findings predate this change. -->
-<!-- antislop: allow sentence-length passive-voice -->
+<!-- Why: the copied paragraphs repeat the base spec's wording; remove and delete name two controls. -->
+<!-- antislop: allow sentence-length passive-voice synonym-rotation -->
 
-Every mutation the canvas can trigger (positioning a step, connecting a
-path, inserting a step into a path) SHALL have an existing panel-based
-equivalent; the canvas SHALL NOT be
-the only way to perform any authoring operation, including deletion, which
-SHALL remain panel-only.
+Every mutation the canvas can trigger SHALL have an existing panel-based
+equivalent. Those mutations are positioning a step, connecting a path,
+inserting a step into a path, and deleting a selection. The canvas SHALL NOT
+be the only way to perform any authoring operation. Deletion keeps its panel
+route. The step page's own remove control removes each step the canvas bar's
+delete control removes.
 
 The insert gesture holds to this rule by composition. It performs no mutation
 the panels lack. The rail's own existing step-creation drag creates the step.
@@ -572,8 +572,7 @@ pointer-driven, and the panel route is its keyboard equivalent.
 
 #### Scenario: A step and its paths remain deletable without the canvas
 
-<!-- Why: the scenario repeats the base spec's own wording, character for -->
-<!-- character. Both findings predate this change. -->
+<!-- Why: the scenario repeats the base spec's own wording, character for character. -->
 <!-- antislop: allow passive-voice synonym-rotation -->
 - **WHEN** a step or path is deleted through its panel
 - **THEN** the deletion succeeds identically to before this change, with no
@@ -581,8 +580,7 @@ pointer-driven, and the panel route is its keyboard equivalent.
 
 #### Scenario: The panels reach an inserted step's end state
 
-<!-- Why: this scenario repeats the base spec's own wording, character for -->
-<!-- character. The rail carries that name on the screen. -->
+<!-- Why: this scenario repeats the base spec's own wording; the rail carries that name on the screen. -->
 <!-- antislop: allow synonym-rotation -->
 - **WHEN** the developer drags a Step from the edit rail onto empty canvas
 - **AND** retargets the source step's path to it in `PathsPanel`
@@ -1077,6 +1075,8 @@ a profile rather than added speculatively.
 
 <!-- antislop: allow synonym-rotation -->
 
+<!-- The heading repeats the live spec's wording verbatim, so a delta can match it. -->
+<!-- antislop: allow synonym-rotation -->
 ### Requirement: The structure surface lays out a canvas ribbon, a steps register and the configuration pane
 
 The Canvas tab SHALL carry the canvas bar and the canvas, in that order. The
@@ -1099,9 +1099,9 @@ mark that step's node on the canvas. Pressing a path edge SHALL resolve to
 that path's source step. The step page then holds that source step, with its
 Path to section in view.
 
-The canvas bar SHALL keep the selection count and the delete control for a
-selection of more than one step. This capability's own selection requirement
-states that rule.
+The canvas bar SHALL keep the delete control for a selection of one step or
+more. It SHALL keep the selection count for a selection of more than one step.
+This capability's own selection requirement states both rules.
 
 The canvas SHALL fill the height the tab body leaves under the bar, above a
 floor of 36rem. Past that floor the page scrolls.
@@ -1129,7 +1129,8 @@ floor of 36rem. Past that floor the page scrolls.
 
 #### Scenario: The bar holds its height across a selection
 
-- **WHEN** an author selects three steps, then clears the selection
+- **WHEN** an author selects three steps, then clears the selection, in a
+  window wide enough for the row
 - **THEN** the bar's height never changes
 - **AND** the canvas never reflows
 
@@ -1320,14 +1321,19 @@ existing rule: `terminal === true || assignment !== undefined`.
 ### Requirement: A canvas bar offers Step, Subprocess, and End as an always-available way to add a step
 
 The Canvas tab SHALL carry a canvas bar at all times. The bar stands between
-the tab row and the canvas. It runs the tab body's full width. Its height
-SHALL stay fixed whatever the canvas selection holds.
+the tab row and the canvas. It runs the tab body's full width.
 
-The bar SHALL carry three add controls. They read as a step someone works, a
-call to another process, and an end, per `studio-guided-vocabulary`. No
-control prints "terminal". A step someone works SHALL also stand as the bar's
-own button, under an action phrase. The menu its caret opens SHALL list all
-three kinds.
+While the bar's controls fit the window, its height SHALL stay fixed whatever
+the canvas selection holds. That height SHALL be one row of its controls. A
+field in the bar SHALL carry its label beside the field. A row wider than the
+window SHALL scroll sideways inside the bar. The scrollbar MAY add its own
+height to the bar.
+
+The bar SHALL carry three add controls. They add a step someone works, a call
+to another process, and an end, per `studio-guided-vocabulary`. No control
+prints "terminal". A step someone works SHALL stand as the bar's own button,
+under an action phrase. The menu its caret opens SHALL list the other two
+kinds alone: a call to another process, and an end.
 
 Each add control SHALL be a drag source. Dragging one onto the canvas SHALL
 add a step of that kind at the drop point. That SHALL use the same
@@ -1370,6 +1376,21 @@ foot carries the same three controls, per `studio-step-page`.
 - **WHEN** an author opens the bar's menu
 - **THEN** the menu offers a call to another process, and an end
 - **AND** each entry adds a step of that kind
+- **AND** the menu offers no step someone works
+
+#### Scenario: The bar stands one control row tall
+
+- **WHEN** an author selects a set that matches one group, in a window wide
+  enough for the row
+- **THEN** the group name's label stands beside its field
+- **AND** the bar keeps the height it has with nothing selected
+
+#### Scenario: A narrow window scrolls the row
+
+- **WHEN** an author selects a set matching one group in a window too narrow
+  for the row
+- **THEN** the bar scrolls the row sideways
+- **AND** every control in it stays reachable by pointer
 
 #### Scenario: The add controls work with nothing selected
 
@@ -1386,8 +1407,8 @@ foot carries the same three controls, per `studio-step-page`.
 #### Scenario: The add controls name themselves in plain words
 
 - **WHEN** an author reads the bar
-- **THEN** the three controls name a step someone works, a call to another
-  process, and an end
+- **THEN** the bar's button names adding a step
+- **AND** the menu names a call to another process, and an end
 
 ### Requirement: The canvas bar reports one selected step's reachability
 
@@ -2272,13 +2293,15 @@ write no position for any step in the set.
 ### Requirement: A set of several steps offers a count and a delete control
 
 The canvas bar SHALL carry the set's count while the set holds more than one
-step. It SHALL carry a control that deletes every step in the set. No panel
-SHALL stand below the canvas for either.
+step. It SHALL carry a control that deletes every step in the set while the
+set holds one step or more. No panel SHALL stand below the canvas for either.
 
 The step page holds one step, and a set of several names no one step for it.
-The canvas bar therefore carries the set's own controls.
+The canvas bar therefore carries the set's own controls. A single selected
+step reaches the same delete control from the canvas, whose label then names
+one step.
 
-<!-- Why: a remove control acts on one step; the delete control here acts on a whole selection. -->
+<!-- Why: the step page's control is named Remove; the delete control here acts on the canvas selection. -->
 <!-- antislop: allow synonym-rotation -->
 The delete control SHALL take each step in the set out of the draft's
 `workflow.steps`. It SHALL leave a path that points at a deleted step as it is.
@@ -2292,9 +2315,9 @@ The draft SHALL take the first remaining step as its `workflow.initialStep`
 when the deleted set held it. That is the rule one step's own removal applies
 today.
 
-The bar SHALL also carry a control that groups the set. Grouping SHALL create
-a group holding exactly the selected steps, with a name the author can change.
-It SHALL leave the selection as it is.
+The bar SHALL also carry a control that groups a set of more than one step.
+Grouping SHALL create a group holding exactly the selected steps, with a name
+the author can change. It SHALL leave the selection as it is.
 
 The control SHALL refuse a set that any group already holds. A step SHALL
 belong to at most one group, so nothing has to decide which box draws it.
@@ -2314,12 +2337,25 @@ The set SHALL be empty after the delete.
 - **THEN** the canvas bar reports a count of two
 - **AND** the step page has no section for the set
 
+#### Scenario: One selected step shows the delete control, and no count
+
+- **WHEN** an author selects one step
+- **THEN** the canvas bar carries the delete control, labelled for one step
+- **AND** the bar has no count and no grouping control
+
 #### Scenario: The delete control deletes every step in the set
 
 - **WHEN** an author has selected three of five steps
 - **AND** activates the delete control
 - **THEN** the draft holds the other two steps alone
 - **AND** the bar's count and delete control leave
+
+#### Scenario: The delete control deletes one selected step
+
+- **WHEN** an author has selected one of five steps
+- **AND** activates the delete control
+- **THEN** the draft holds the other four steps alone
+- **AND** the delete control leaves
 
 #### Scenario: Deleting the initial step moves the marker
 
