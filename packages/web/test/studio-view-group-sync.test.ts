@@ -417,9 +417,9 @@ describe("writeGroupKey", () => {
     writeGroupKey(draft, "g", "newly_named");
 
     const rows = rowsOf(draft);
-    expect(rows[0]).toEqual([ref("child_a", "newly_named")]);
-    expect(rows[1]).toEqual([ref("child_b", "newly_named")]);
-    expect(rows[2]).toEqual([ref("child_a", "newly_named"), ref("child_b", "newly_named")]);
+    expect(rows[0]).toEqual([ref("g"), ref("child_a", "newly_named")]);
+    expect(rows[1]).toEqual([ref("g"), ref("child_b", "newly_named")]);
+    expect(rows[2]).toEqual([ref("g"), ref("child_a", "newly_named"), ref("child_b", "newly_named")]);
   });
 
   it("leaves an entry naming a field outside the group's own children alone, on a first key", () => {
@@ -427,7 +427,7 @@ describe("writeGroupKey", () => {
 
     writeGroupKey(draft, "g", "newly_named");
 
-    expect(rowsOf(draft)[0]).toEqual([ref("child_a", "newly_named"), ref("unrelated")]);
+    expect(rowsOf(draft)[0]).toEqual([ref("g"), ref("child_a", "newly_named"), ref("unrelated")]);
   });
 
   it("moves no root note into a group gaining its first key", () => {
@@ -435,7 +435,7 @@ describe("writeGroupKey", () => {
 
     writeGroupKey(draft, "g", "newly_named");
 
-    expect(rowsOf(draft)[0]).toEqual([ref("child_a", "newly_named"), note("About this section")]);
+    expect(rowsOf(draft)[0]).toEqual([ref("g"), ref("child_a", "newly_named"), note("About this section")]);
   });
 });
 
@@ -524,5 +524,49 @@ describe("writeGroupKey keeps a tabbed form's tab rules", () => {
 
     expect(rowsOf(draft)[0]).toEqual([ref("g"), ref("a")]);
     expect(rowsOf(draft)[0]!.some((entry) => "tab" in entry)).toBe(false);
+  });
+});
+
+describe("writeGroupKey places the card a group's first key needs", () => {
+  const tabs = [tab("t1"), tab("t2")];
+
+  it("places the group's card before its first child entry, on an untabbed view lacking it", () => {
+    const draft = draftWith([leaf("x", "x"), group("g", "", [leaf("a", "a"), leaf("b", "b")])], [ref("x"), ref("a"), ref("b")]);
+
+    writeGroupKey(draft, "g", "named");
+
+    expect(rowsOf(draft)[0]).toEqual([ref("x"), ref("g"), ref("a", "named"), ref("b", "named")]);
+  });
+
+  it("gives the placed card the first child's former tab, and a child from another tab follows it", () => {
+    const draft = draftWithViews([leaf("x", "x"), group("g", "", [leaf("a", "a"), leaf("b", "b")])], {
+      tabs,
+      fields: [onTab(ref("x"), "t1"), onTab(ref("a"), "t2"), onTab(ref("b"), "t1")],
+    });
+
+    writeGroupKey(draft, "g", "named");
+
+    expect(rowsOf(draft)[0]).toEqual([onTab(ref("x"), "t1"), onTab(ref("g"), "t2"), ref("a", "named"), ref("b", "named")]);
+  });
+
+  it("places the whole missing chain when a key-less group nested in a keyed group gains its first key", () => {
+    const draft = draftWithViews([group("outer", "outer", [group("inner", "", [leaf("z", "z")])])], {
+      tabs,
+      fields: [onTab(ref("z"), "t2")],
+    });
+
+    writeGroupKey(draft, "inner", "inner");
+
+    expect(rowsOf(draft)[0]).toEqual([onTab(ref("outer"), "t2"), ref("inner", "outer"), ref("z", "inner")]);
+  });
+
+  it("places no second card on a view already carrying the group's entry, while a view lacking it gains one", () => {
+    const draft = draftWith([group("g", "", [leaf("a", "a")])], [ref("g"), ref("a")], [ref("a")]);
+
+    writeGroupKey(draft, "g", "named");
+
+    const rows = rowsOf(draft);
+    expect(rows[0]).toEqual([ref("g"), ref("a", "named")]);
+    expect(rows[1]).toEqual([ref("g"), ref("a", "named")]);
   });
 });

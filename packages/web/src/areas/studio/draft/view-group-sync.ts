@@ -129,6 +129,11 @@ export function syncViewGroupsOnFieldMove(draft: Draft, fieldId: string, newGrou
  *   (`view-layout.ts::homeTab`, read before the key changes). A non-empty
  *   key makes each child's entry a member, which carries no `tab`. A note's
  *   `tab` stays as it was.
+ * - A first key can reach a view that carries a child's entry and lacks the
+ *   group's own card. That view gains the card, and any missing ancestor
+ *   card, before its first child entry. The outermost placed card takes that
+ *   child's former tab, so every child sits on one tab. A view already
+ *   carrying the card gains no second one.
  *
  * Writes no `group: ""` anywhere. A field that is not `type: "group"` gets
  * its key written and nothing else: a non-group parent hands its leftover
@@ -143,14 +148,14 @@ export function writeGroupKey(draft: Draft, groupFieldId: string, newKey: string
   const steps = draft.workflow?.steps ?? [];
   const childIds = new Set((group.fields ?? []).map((f) => f.id).filter((fid): fid is FieldId => fid !== undefined));
   // The tab each child's entry draws on, read while its `group` still names
-  // this group's card. Indexed by step and entry, since the rewrite below
-  // walks the same arrays in the same order.
-  const clearing = group.type === "group" && newKey === "";
+  // this group's card, or no card before a first key. Indexed by step and
+  // entry, since the writes below walk the same arrays in the same order
+  // before any card is placed.
   const groupKeyOf = cardGroupKey(draft.fields ?? []);
   const formerTabs = steps.map((step) => {
     const rows = step.view?.fields ?? [];
     return rows.map((entry) =>
-      clearing && isDraftViewField(entry) && entry.ref !== undefined && childIds.has(entry.ref)
+      group.type === "group" && isDraftViewField(entry) && entry.ref !== undefined && childIds.has(entry.ref)
         ? homeTab(entry, rows, step.view?.tabs, groupKeyOf)
         : undefined,
     );
@@ -177,6 +182,21 @@ export function writeGroupKey(draft: Draft, groupFieldId: string, newKey: string
         entry.group = newKey;
       }
     });
+  });
+
+  if (oldKey !== "") return;
+  // A first key gives the children a group their views may not carry. The
+  // card, with any missing ancestor card, goes before the first child entry
+  // (`view-tree.ts::missingAncestorCards`, the walk a catalog move uses), and
+  // the outermost placed card takes that child's former tab.
+  steps.forEach((step, s) => {
+    const rows = step.view?.fields;
+    if (!rows) return;
+    const at = rows.findIndex((entry) => isDraftViewField(entry) && entry.ref !== undefined && childIds.has(entry.ref));
+    const first = rows[at];
+    if (first === undefined || !isDraftViewField(first) || first.ref === undefined) return;
+    const cards = missingAncestorCards(rows, first.ref, draft.fields ?? []);
+    if (cards.length > 0) rows.splice(at, 0, ...fillMissingTabs(cards, formerTabs[s]![at]));
   });
 }
 
