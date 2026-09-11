@@ -1,18 +1,27 @@
 import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { FormEditorStrip } from "../src/areas/studio/screens/FormEditorScreen.js";
+import { FormEditorStrip, NoteEditorStrip } from "../src/areas/studio/screens/FormEditorScreen.js";
 import type { DraftViewField } from "../src/areas/studio/draft/view-layout.js";
+import type { Draft } from "../src/areas/studio/draft/types.js";
+import type { ValidationResult } from "../src/areas/studio/draft/validation.js";
+import { DraftContext, type DraftContextValue } from "../src/areas/studio/draft/store.js";
 
 /**
  * technical-field-marker task 4.2: the per-step strip omits `required` and
- * `readonly` for a field declaring `technical: true`, while `visible`,
- * `group` and `span` stay offered. `FormEditorStrip` is the strip's
- * presentational component, pulled out of `FormEditorScreen` so it can be
- * exercised with an arbitrary row directly — selecting a row in the full
- * screen runs through client-side `useState`, invisible to a server render.
+ * `readonly` for a field declaring `technical: true`, while `visible` and
+ * `span` stay offered. `FormEditorStrip` is the strip's presentational
+ * component, pulled out of `FormEditorScreen` so it can be exercised with an
+ * arbitrary row directly — selecting a row in the full screen runs through
+ * client-side `useState`, invisible to a server render.
  * `renderToStaticMarkup` needs no DOM: mirrors
  * `studio-editorDock-fieldMatrixTab.test.tsx`'s own synchronous server
  * render, no DOM, no listening socket.
+ *
+ * The strip offers no `group` control at all (group-fields-stay-in-their-
+ * group's "A field's strip offers no group control" scenario): the
+ * field catalog's own move control is where an author re-parents a field
+ * now, so a select here would offer one lawful value and several the
+ * publish rejects.
  */
 const row = (): DraftViewField => ({ ref: "field_amount" as never });
 
@@ -26,33 +35,31 @@ const render = (technicalFieldIds: Set<string>) =>
       written={() => 0}
       technicalFieldIds={technicalFieldIds}
       isGroup={false}
-      groupKeys={[]}
       tabOptions={[]}
       tabValue={undefined}
       onChangeFlag={() => {}}
       onChangeSpan={() => {}}
-      onChangeGroup={() => {}}
       onChangeTab={() => {}}
     />,
   );
 
 describe("FormEditorStrip", () => {
-  it("emits no required or readonly control for a technical field, and keeps visible/group/span", () => {
+  it("emits no required or readonly control for a technical field, and keeps visible/span, and no group control", () => {
     const html = render(new Set(["field_amount"]));
     expect(html).toContain(">visible<");
     expect(html).not.toContain(">required<");
     expect(html).not.toContain(">readonly<");
     expect(html).toContain(">span<");
-    expect(html).toContain(">group<");
+    expect(html).not.toContain(">group<");
   });
 
-  it("emits every control for a non-technical field", () => {
+  it("emits every override control for a non-technical field, and no group control", () => {
     const html = render(new Set());
     expect(html).toContain(">visible<");
     expect(html).toContain(">required<");
     expect(html).toContain(">readonly<");
     expect(html).toContain(">span<");
-    expect(html).toContain(">group<");
+    expect(html).not.toContain(">group<");
   });
 });
 
@@ -72,12 +79,10 @@ describe("FormEditorStrip: dominance-scoped gating", () => {
         written={written}
         technicalFieldIds={new Set()}
         isGroup={false}
-        groupKeys={[]}
         tabOptions={[]}
         tabValue={undefined}
         onChangeFlag={() => {}}
         onChangeSpan={() => {}}
-        onChangeGroup={() => {}}
         onChangeTab={() => {}}
       />,
     );
@@ -99,11 +104,11 @@ describe("FormEditorStrip: dominance-scoped gating", () => {
 });
 
 /**
- * form-view-tabs task 5.8: both strips carry a tab picker beside the group
- * picker (`studio-form-editor`: "A selected entry's strip assigns it to a
- * tab"). `NoteEditorStrip` reads the content locale from the draft context,
- * so the field strip is the one a static render reaches; the two mount the
- * same `TabPicker`, with the same four props.
+ * form-view-tabs task 5.8: both strips carry a tab picker
+ * (`studio-form-editor`: "A selected entry's strip assigns it to a tab"). The
+ * field strip carries no group picker beside it. Both mount the same
+ * `TabPicker`, with the same four props, so the field strip's renders below
+ * need no draft context; the note strip's own render at the end supplies one.
  */
 const TABS = [
   { key: "tab_1", label: "Details" },
@@ -120,12 +125,10 @@ const renderTabbed = (over: { tabOptions?: typeof TABS; tabValue?: string; group
       written={() => 1}
       technicalFieldIds={new Set()}
       isGroup={false}
-      groupKeys={["approval"]}
       tabOptions={over.tabOptions ?? TABS}
       tabValue={over.tabValue}
       onChangeFlag={() => {}}
       onChangeSpan={() => {}}
-      onChangeGroup={() => {}}
       onChangeTab={() => {}}
     />,
   );
@@ -141,8 +144,23 @@ describe("the strip's tab picker", () => {
   });
 
   it("offers no empty choice: a root entry on a tabbed form always names a tab", () => {
-    // The group picker's own "(none)" is the only empty option in the strip.
-    expect((renderTabbed({ tabValue: "tab_1" }).match(/<option value=""/g) ?? []).length).toBe(1);
+    // The field strip carries no group picker, so no "(none)" option remains.
+    expect((renderTabbed({ tabValue: "tab_1" }).match(/<option value=""/g) ?? []).length).toBe(0);
+  });
+
+  it("carries the tab picker and no group control: the field catalog owns a field's group", () => {
+    const html = renderTabbed({ tabValue: "tab_1" });
+
+    expect(html).toContain(">tab<");
+    expect(html).not.toContain(">group<");
+  });
+
+  it("shows a member its group's tab, inert, with the reason beside it", () => {
+    const html = renderTabbed({ group: "approval", tabValue: "tab_2" });
+
+    expect(html).toMatch(/<option value="tab_2" selected="">Approval<\/option>/);
+    expect(html).toContain("The group decides the tab.");
+    expect(html).not.toContain(">group<");
   });
 
   it("draws no picker at all on an untabbed form", () => {
@@ -164,5 +182,69 @@ describe("the strip's tab picker", () => {
 
   it("stays operable for a root entry", () => {
     expect(renderTabbed({ tabValue: "tab_1" })).not.toContain("form-editor-tab-from-group");
+  });
+});
+
+/**
+ * A note has no catalog parent, so its own strip keeps the group picker
+ * beside the tab picker. `NoteEditorStrip` reads the content locale off the
+ * draft context, so this render supplies `DraftContext.Provider` the way
+ * `studio-formEditor-groupCanvas.test.tsx` does.
+ */
+function contextValue(draft: Draft): DraftContextValue {
+  const validation: ValidationResult = {
+    zodValid: true,
+    issues: [],
+    dimensions: {
+      zod: "ran",
+      duration: "ran",
+      structural: "ran",
+      actionType: "ran",
+      assignmentType: "ran",
+      dataSourceType: "ran",
+      registryConfig: "not-run",
+      cel: "ran",
+    },
+    subprocessStepStatus: {},
+    chainingSiteStatus: {},
+  };
+  return {
+    draft,
+    mutate: () => {},
+    replace: () => {},
+    validation,
+    loadedChildren: {},
+    setChildForStep: () => {},
+    registry: undefined,
+    loadedChainingTargets: {},
+    contentLocale: "en",
+    setContentLocale: () => {},
+    usedLocales: ["en"],
+    loadGeneration: 0,
+  };
+}
+
+describe("the note strip on a tabbed form", () => {
+  it("keeps both the group picker and the tab picker", () => {
+    const html = renderToStaticMarkup(
+      <DraftContext.Provider value={contextValue({ baseLocale: "en" } as unknown as Draft)}>
+        <NoteEditorStrip
+          row={{ kind: "note", text: { en: "Heads up" } }}
+          stepId={"step_a" as never}
+          baseLocale="en"
+          groupKeys={["approval"]}
+          tabOptions={TABS}
+          tabValue="tab_1"
+          onChangeText={() => {}}
+          onChangeVisible={() => {}}
+          onChangeSpan={() => {}}
+          onChangeGroup={() => {}}
+          onChangeTab={() => {}}
+        />
+      </DraftContext.Provider>,
+    );
+
+    expect(html).toContain(">group<");
+    expect(html).toContain(">tab<");
   });
 });

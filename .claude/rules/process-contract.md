@@ -71,9 +71,11 @@ an unset optional field.
 **Data vs presentation.** Fields are defined once in a process-wide catalog.
 Each step carries a flat `view` whose entries either reference a catalog
 field, overriding its per-step presentation (visible / required / readonly /
-span / group / tab / validation / validationMode), or stand alone as a note
-(`text`, plus visible / span / group / tab — no field underneath, so no
-required, readonly or validation). There is no `order` key; the array position
+span / tab / validation / validationMode), or stand alone as a note (`text`,
+plus visible / span / group / tab — no field underneath, so no required,
+readonly or validation). A field entry's `group` is not a per-step override:
+it must repeat the catalog's own parent group, or stay empty for a field the
+catalog holds at the top level. There is no `order` key; the array position
 is the order, and
 `FieldForm.tsx` renders in declaration order. The instance
 payload is a flat object keyed by `fieldId`, stable across the whole

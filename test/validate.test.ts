@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { describe, it, expect } from "bun:test";
 import {
   processVersion,
@@ -265,14 +265,9 @@ describe("definition-contract: A path carries a non-empty key and a non-empty la
 });
 
 describe("definition-contract: every example carries a non-empty path key and label", () => {
-  const files = [
-    "purchase-requisition.json",
-    "expense-approval.json",
-    "subprocess-loan-parent.json",
-    "subprocess-credit-check-child.json",
-    "laptop-inventory.json",
-    "employee-onboarding.json",
-  ];
+  const files = readdirSync(new URL("../examples/", import.meta.url))
+    .filter((name) => name.endsWith(".json"))
+    .sort();
 
   for (const file of files) {
     it(`${file}: every path has a non-empty key and label`, () => {

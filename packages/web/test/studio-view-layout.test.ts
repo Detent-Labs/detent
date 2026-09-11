@@ -3,22 +3,22 @@ import { authoredProcessBody, type FieldId } from "workflow-engine/schema";
 import {
   addViewTab,
   clampSpan,
-  drawnNeighbour,
   drawnRows,
   dropSlot,
   fillMissingTabs,
+  homeTab,
   insertViewField,
   insertViewNote,
   isDraftViewField,
   moveViewField,
   moveViewTab,
-  nudgeViewField,
   owningTab,
   removeViewTab,
   renameViewTab,
   reorderIndex,
   setEntryGroup,
   shownTab,
+  tabAfterPlacement,
   unplacedRefs,
   type DraftView,
   type DraftViewEntry,
@@ -105,26 +105,6 @@ describe("moveViewField splices the view array to the drop position", () => {
     expect(refs(moveViewField(start, 0, dropSlot(1, "after")))).toEqual(["wide", "a", "c"]);
     // Dropping "c" before the wide card: slot 1, and "c" sits after it, so no shift.
     expect(refs(moveViewField(start, 2, dropSlot(1, "before")))).toEqual(["a", "c", "wide"]);
-  });
-});
-
-describe("nudgeViewField is the keyboard move, producing the same array a drag does", () => {
-  it("moves up exactly as dragging one position up would", () => {
-    const start = rows("a", "b", "c");
-    expect(refs(nudgeViewField(start, 2, -1))).toEqual(["a", "c", "b"]);
-    expect(refs(nudgeViewField(start, 2, -1))).toEqual(refs(moveViewField(start, 2, dropSlot(1, "before"))));
-  });
-
-  it("moves down exactly as dragging one position down would", () => {
-    const start = rows("a", "b", "c");
-    expect(refs(nudgeViewField(start, 0, 1))).toEqual(["b", "a", "c"]);
-    expect(refs(nudgeViewField(start, 0, 1))).toEqual(refs(moveViewField(start, 0, dropSlot(1, "after"))));
-  });
-
-  it("is a no-op at either end", () => {
-    const start = rows("a", "b");
-    expect(nudgeViewField(start, 0, -1)).toBe(start);
-    expect(nudgeViewField(start, 1, 1)).toBe(start);
   });
 });
 
@@ -482,43 +462,24 @@ describe("drawnRows filters the canvas to one tab", () => {
   });
 });
 
-describe("drawnNeighbour is the keyboard move's target within the drawn list", () => {
-  it("answers the neighbour in draw order, not in array order", () => {
-    expect(drawnNeighbour([0, 3, 4], 3, -1)).toBe(0);
-    expect(drawnNeighbour([0, 3, 4], 3, 1)).toBe(4);
+describe("homeTab names the one tab the canvas draws an entry on", () => {
+  const strip = [tab("t1"), tab("t2")];
+
+  it("answers a root entry's own tab, and a member's group's tab", () => {
+    const entries: DraftViewEntry[] = [{ ref: id("g1"), tab: "t2" }, { ref: id("a"), group: "g1" }];
+    expect(homeTab(entries[0]!, entries, strip, groupKeyOf)).toBe("t2");
+    expect(homeTab(entries[1]!, entries, strip, groupKeyOf)).toBe("t2");
   });
 
-  it("answers undefined at either end, and for a row the canvas is not drawing", () => {
-    expect(drawnNeighbour([0, 3, 4], 0, -1)).toBeUndefined();
-    expect(drawnNeighbour([0, 3, 4], 4, 1)).toBeUndefined();
-    expect(drawnNeighbour([0, 3, 4], 2, -1)).toBeUndefined();
-  });
-});
-
-describe("nudgeViewField moves a card past the neighbour the author can SEE", () => {
-  it("swaps two cards the array does not place side by side", () => {
-    // b and d are on the shown tab; a and c are not. Moving d up must land it
-    // above b, not between a and c where it would look like a no-op.
-    const start = rows("a", "b", "c", "d");
-    expect(refs(nudgeViewField(start, 3, -1, [1, 3]) as DraftViewField[])).toEqual(["a", "d", "b", "c"]);
+  it("answers the first tab for an entry whose owning tab the strip does not declare", () => {
+    const entries: DraftViewEntry[] = [{ ref: id("a") }, { ref: id("b"), tab: "gone" }];
+    expect(homeTab(entries[0]!, entries, strip, groupKeyOf)).toBe("t1");
+    expect(homeTab(entries[1]!, entries, strip, groupKeyOf)).toBe("t1");
   });
 
-  it("moves down past the next drawn card", () => {
-    const start = rows("a", "b", "c", "d");
-    expect(refs(nudgeViewField(start, 1, 1, [1, 3]) as DraftViewField[])).toEqual(["a", "c", "d", "b"]);
-  });
-
-  it("is a no-op at either end of the drawn list", () => {
-    const start = rows("a", "b", "c", "d");
-    expect(nudgeViewField(start, 1, -1, [1, 3])).toBe(start);
-    expect(nudgeViewField(start, 3, 1, [1, 3])).toBe(start);
-  });
-
-  it("keeps its old behavior when no drawn list is passed", () => {
-    const start = rows("a", "b", "c");
-    expect(refs(nudgeViewField(start, 2, -1) as DraftViewField[])).toEqual(
-      refs(nudgeViewField(start, 2, -1, [0, 1, 2]) as DraftViewField[]),
-    );
+  it("answers undefined on an untabbed view", () => {
+    const entries: DraftViewEntry[] = [{ ref: id("a") }];
+    expect(homeTab(entries[0]!, entries, undefined, groupKeyOf)).toBeUndefined();
   });
 });
 
@@ -568,5 +529,31 @@ describe("setEntryGroup keeps a group and a tab from meeting on one entry", () =
       span: 2,
       group: "g1",
     });
+  });
+});
+
+describe("tabAfterPlacement shows the tab a palette placement landed on", () => {
+  const strip = [tab("t1"), tab("t2")];
+
+  it("shows the card's tab when a placed member joins a group card on another tab", () => {
+    const entries: DraftViewEntry[] = [{ ref: id("a"), tab: "t1" }, { ref: id("g1"), tab: "t2" }, { ref: id("x"), group: "g1" }];
+    expect(tabAfterPlacement(entries, id("x"), strip, "t1", groupKeyOf)).toBe("t2");
+  });
+
+  it("shows the outermost card's tab when the member sits in a nested group", () => {
+    const entries: DraftViewEntry[] = [{ ref: id("g1"), tab: "t2" }, { ref: id("g2"), group: "g1" }, { ref: id("x"), group: "g2" }];
+    expect(tabAfterPlacement(entries, id("x"), strip, "t1", groupKeyOf)).toBe("t2");
+  });
+
+  it("keeps the shown tab for an entry the placement put on it", () => {
+    const entries: DraftViewEntry[] = [{ ref: id("g1"), tab: "t1" }, { ref: id("x"), group: "g1" }, { ref: id("y"), tab: "t1" }];
+    expect(tabAfterPlacement(entries, id("x"), strip, "t1", groupKeyOf)).toBe("t1");
+    expect(tabAfterPlacement(entries, id("y"), strip, "t1", groupKeyOf)).toBe("t1");
+  });
+
+  it("keeps the shown tab on an untabbed view, and when the view carries no entry for the field", () => {
+    const entries: DraftViewEntry[] = [{ ref: id("x") }];
+    expect(tabAfterPlacement(entries, id("x"), undefined, undefined, groupKeyOf)).toBeUndefined();
+    expect(tabAfterPlacement(entries, id("missing"), strip, "t2", groupKeyOf)).toBe("t2");
   });
 });

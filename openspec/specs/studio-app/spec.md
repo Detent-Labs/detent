@@ -2977,17 +2977,55 @@ The catalog rail SHALL move a field into a group field and out of it,
 in place. The move SHALL neither remove the group nor rebuild it. It
 SHALL neither remove the moved field nor rebuild it.
 
-The move SHALL write one thing: the field's place in the draft's field
-array. The field SHALL keep its `id`, its `key` and every other key it
-carries. No CEL expression, no view entry and no column mapping SHALL
-change.
+The move SHALL write the field's place in the draft's field array. The
+field SHALL keep its `id`, its `key` and every other key it carries. No
+CEL expression and no column mapping SHALL change.
 
-That holds because a group carries no entry in the flat data payload,
+That holds because a group has no entry in the flat data payload,
 and `FieldDef.key` is unique across every depth. A leaf field takes a
 flat address through its own key, whatever group it sits in. Views and
 column mappings reference the `id`. The `definition-contract` capability
 states both rules, and this requirement rests on them rather than
 restating them.
+
+A view entry is the one reference the move SHALL rewrite. The definition
+contract binds a field entry's `group` to the field's catalog parent. A
+move that leaves the entries alone therefore strands every one of them.
+The move SHALL set the `group` of every view entry whose `ref` names the
+moved field, to the destination group's `key`. A move to the top level
+SHALL remove that key instead of writing it.
+
+The same contract refuses an entry whose `group` names a card its view
+does not carry. A step's view may carry the moved field without the
+destination group's card. The move SHALL then place that card on the view,
+immediately before the moved field's entry.
+
+A destination nested inside other groups SHALL bring every missing ancestor
+card too, outermost first. Each placed card SHALL name its own parent's key
+as its `group`. A view already carrying a card SHALL gain no second one. A
+move to the top level SHALL place nothing.
+
+The rewrite and every placed card SHALL reach every step in the draft. Both
+SHALL land in the same draft change as the field-array write. A reader
+between the writes would see a catalog and a set of views that disagree.
+
+A tabbed form keeps the definition contract's tab rules through the move.
+Each entry's former tab is the tab the form editor's canvas drew it on. A
+root's former tab is its own, and a member's is its outermost group card's.
+
+An entry the move puts inside a group SHALL lose its `tab`, since its card
+names the tab. A card the move places at the form's root SHALL take that
+entry's former tab. An inner card of a placed chain SHALL have no `tab`. An
+entry the move lifts to the top level SHALL take its former tab. On a form
+declaring no tabs, the move SHALL write no `tab` anywhere.
+
+A group moved into another group follows the same rule. Its own card loses
+its `tab`, and the destination card holds the tab instead. A card the move
+places takes the moved card's former tab. A card the form already carries
+keeps its own.
+
+A note entry SHALL stay untouched. A note names no catalog field, so no
+move can carry it.
 
 A pointer SHALL move the field by dragging its rail entry. The keyboard
 SHALL move the same field from the same entry, per
@@ -3035,6 +3073,93 @@ that field's own two halves.
   and one column mapping targets
 - **THEN** both view entries and the column mapping still resolve, and
   neither carries a changed `id`
+- **AND** each view entry's `group` now names the destination group
+
+#### Scenario: A move to the top level clears the group on every entry
+
+- **WHEN** the developer moves a group child out to the top level
+- **AND** three step views carry an entry naming that field
+- **THEN** none of the three entries carries a `group` key any more
+
+#### Scenario: A move brings the destination group's card to a form lacking it
+
+- **WHEN** the developer moves a top-level field into a group
+- **AND** a step view carries that field but not the group's card
+- **THEN** that view carries the group's card immediately before the
+  field's entry
+- **AND** the field's entry names the group's key
+
+#### Scenario: A move into a nested group brings the whole missing chain
+
+- **WHEN** the developer moves a field into a group that sits inside
+  another group
+- **AND** a step view carrying the field carries neither group's card
+- **THEN** that view carries the outer card, then the inner card naming
+  the outer key, then the field's entry
+
+#### Scenario: A form already carrying the group's card gains no second one
+
+- **WHEN** the developer moves a field into a group whose card a step view
+  already carries
+- **THEN** that view still carries exactly one card for that group
+
+#### Scenario: A group moved into another group brings the destination card
+
+- **WHEN** the developer moves a group field into a second group
+- **AND** a step view carries the first group's card and its members, but
+  not the second group's card
+- **THEN** that view carries the second group's card immediately before
+  the first group's card
+- **AND** the first group's members keep their places after its card
+
+#### Scenario: A move to the top level places nothing
+
+- **WHEN** the developer moves a group child out to the top level
+- **THEN** every step view keeps the cards it carried, and gains none
+
+#### Scenario: A move into a group takes the entry's tab off
+
+- **WHEN** the developer moves a top-level field into a group
+- **AND** a tabbed step view carries that field on its second tab, but not the
+  group's card
+- **THEN** that view carries the group's card on the second tab, immediately
+  before the field's entry
+- **AND** the field's entry names the group's key and has no `tab`
+
+#### Scenario: Only the outermost placed card takes the tab
+
+- **WHEN** the developer moves a field on a tabbed form into a group nested
+  inside another group
+- **AND** that view carries neither group's card
+- **THEN** the outer card carries the field's former tab
+- **AND** neither the inner card nor the field's entry carries a `tab`
+
+#### Scenario: A move to the top level gives the entry its card's tab
+
+- **WHEN** the developer moves a group child out to the top level
+- **AND** a tabbed step view carries the child inside a group card on the
+  second tab
+- **THEN** the child's entry names the second tab
+
+#### Scenario: A form without tabs gains no tab from a move
+
+- **WHEN** the developer moves a group child out to the top level
+- **AND** a step view carrying it declares no tabs
+- **THEN** the child's entry has no `tab`
+
+#### Scenario: A group moved into a group hands its tab to the destination card
+
+- **WHEN** the developer moves a group field into a second group
+- **AND** a tabbed step view carries the first group's card on its second tab,
+  but not the second group's card
+- **THEN** that view carries the second group's card on the second tab
+- **AND** the first group's card has no `tab`
+
+#### Scenario: A move leaves a note inside the group alone
+
+- **WHEN** the developer moves a field out of a group whose view also
+  holds a note naming that group's key
+- **THEN** the note still names that group's key
 
 #### Scenario: A move keeps the key
 
@@ -3320,3 +3445,173 @@ different reasons, and the wording SHALL say which one applies.
 - **WHEN** the author points at a `required` checkbox on a technical field's
   cell
 - **THEN** the cell states that the definition contract rejects the flag there
+
+### Requirement: Renaming a group field's key rewrites the view entries naming it
+
+A `view.fields[].group` holds a group field's `key` rather than its `id`.
+Editing that key in the field catalog SHALL rewrite the view entries that
+belong to the group. The rewrite SHALL reach every step in the draft. The
+catalog write and the view rewrite SHALL land in one draft change.
+
+A field entry belongs to the group through the catalog. The rewrite SHALL
+reach each entry whose `ref` names one of the group's direct children. It
+SHALL set that entry's `group` to the new key. An empty new key SHALL remove
+the entry's `group` instead. The rewrite SHALL leave every other group's
+entries alone, even an entry naming the same key string.
+
+A note has no catalog parent, so its old key is its only tie to the group. A
+note naming the old key SHALL follow to the new key only when both hold:
+
+- the old key and the new key are both non-empty
+- no other group field, at any catalog depth, holds either key
+
+Otherwise the note SHALL keep the key it names. The checks rail reports it
+while no group field its view carries holds that key. Retyping the old key
+returns the note to its group, since the note never left that key. A group's
+first key therefore leaves every note in place, since the old key is empty.
+
+No key write SHALL write an empty `group`.
+
+A group's key input SHALL commit the typed key on blur or on Enter. Ordinary
+typing SHALL write nothing before the commit. A half-typed key could equal
+another group's key, and the rewrite never sees one.
+
+A label change that derives a new key for a group reaches the same rewrite. A
+label whose derivation is empty SHALL keep the group's key.
+
+The rule reaches the key control wherever the catalog offers it. A top-level
+group and a group nested inside another group SHALL behave the same way.
+
+On a tabbed form the rewrite keeps the definition contract's tab rules.
+Clearing a group's key turns the entries of its direct children into roots.
+Each such entry SHALL take the tab of the outermost card holding the group's
+own entry. A group's first key turns those entries into members, and each
+SHALL lose its `tab`.
+
+On a form declaring no tabs, the rewrite SHALL write no `tab`. Every note
+SHALL keep its `tab` as it stood.
+
+A group's first key can reach a view that carries a child's entry and lacks
+the group's own card. That view SHALL gain the card, placed immediately
+before its first child entry. Every missing ancestor card SHALL come with it,
+outermost first. A view already carrying the card SHALL gain no second one.
+
+On a tabbed view the outermost placed card SHALL take the tab the first child
+carried. Every child then sits inside that card, whatever tab it named before
+the key changed.
+
+The definition contract already refuses a body whose entry names a group key
+no field declares. Before this requirement, renaming a group produced exactly
+that body. The author then met the error at publish, with nothing naming the
+rename.
+
+#### Scenario: A rename follows through to every step
+
+- **WHEN** the developer changes a group field's key from `request` to
+  `order_request`
+- **AND** three step views carry entries for that group's children
+- **THEN** all three entries name `order_request`
+
+#### Scenario: A rename carries a note along
+
+- **WHEN** the developer changes a group field's key from `request` to
+  `order_request`, and no other group field holds either key
+- **AND** a step view holds a note naming `request`
+- **THEN** the note names `order_request`
+
+#### Scenario: A nested group renames the same way
+
+- **WHEN** the developer renames a group field that sits inside another group
+- **THEN** its direct children's entries name the new key
+- **AND** its own entry still names the outer group's key
+
+#### Scenario: A rename leaves another group's entries alone
+
+- **WHEN** the developer renames one of a draft's two group fields
+- **THEN** the entries naming the other group keep their old key
+
+#### Scenario: A cleared key keeps the note until the key returns
+
+- **WHEN** a step view carries the card of a group keyed `g`, a member and a
+  note naming `g`
+- **AND** the developer clears that key and commits it
+- **THEN** the member's entry has no `group`, and the note still names `g`
+- **AND** no entry in the view carries an empty `group`
+- **AND** once the developer types `g` again and commits it, the member's
+  entry and the note name `g`
+
+#### Scenario: A key another group holds leaves every note where it stands
+
+- **WHEN** a step view holds a note naming group `g`'s key and a note naming
+  group `h`'s key
+- **AND** the developer changes `g`'s key to `h` and commits it
+- **THEN** the first note still names `g`, and the second still names `h`
+
+#### Scenario: An old key two groups share keeps its note
+
+- **WHEN** two group fields both hold the key `dup`
+- **AND** a step view carries a member of the first group and a note naming
+  `dup`
+- **AND** the developer changes the first group's key to `unique` and commits
+  it
+- **THEN** the member's entry names `unique`
+- **AND** the note still names `dup`
+
+#### Scenario: A cleared key gives a root group's members its card's tab
+
+- **WHEN** a tabbed step view carries a group's card and two members on its
+  second tab
+- **AND** the developer clears that group's key
+- **THEN** both members' entries name the second tab and have no `group`
+
+#### Scenario: A cleared key on a nested group gives its members the outer card's tab
+
+- **WHEN** a tabbed step view carries an outer group's card on its second tab
+- **AND** an inner group's card and its member sit inside that card
+- **AND** the developer clears the inner group's key
+- **THEN** the member's entry names the second tab
+
+#### Scenario: A group's first key takes the tab off its children's entries
+
+- **WHEN** a tabbed step view carries a key-less group's card and its child
+  field, each naming a tab
+- **AND** the developer gives the group its first key
+- **THEN** the child's entry names that key and has no `tab`
+
+#### Scenario: A form without tabs gains no tab from a cleared key
+
+- **WHEN** a step view declaring no tabs carries a group's card and a member
+- **AND** the developer clears that group's key
+- **THEN** the member's entry has no `tab`
+
+#### Scenario: A group's first key brings its card to a form lacking it
+
+- **WHEN** a step view carries a key-less group's child field and lacks the
+  group's card
+- **AND** the developer gives the group its first key
+- **THEN** that view carries the group's card immediately before the child's
+  entry
+
+#### Scenario: A first key's card takes the first child's tab
+
+- **WHEN** a tabbed step view carries two children of a key-less group, on
+  different tabs
+- **AND** that view lacks the group's card
+- **AND** the developer gives the group its first key
+- **THEN** the placed card names the tab of the child that comes first in the
+  view
+- **AND** both children sit inside it, with no `tab` of their own
+
+#### Scenario: A first key on a nested group brings the whole chain
+
+- **WHEN** a key-less group sits inside a keyed group in the catalog
+- **AND** a step view carries the inner group's child field and neither card
+- **AND** the developer gives the inner group its first key
+- **THEN** that view carries the outer card, then the inner card naming the
+  outer key, then the child's entry
+
+#### Scenario: A first key places no second card
+
+- **WHEN** a step view already carries a key-less group's card and its child
+- **AND** the developer gives the group its first key
+- **THEN** that view still carries exactly one card for that group

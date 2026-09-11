@@ -1,6 +1,14 @@
 import { Fragment, useEffect, useState, type ReactNode } from "react";
 import * as stylex from "@stylexjs/stylex";
-import { FIELD_KINDS, fieldKindOf, type DataSourceDef, type Expression, type FieldDef, type FieldKindName, type FieldOption } from "workflow-engine/schema";
+import {
+  FIELD_KINDS,
+  fieldKindOf,
+  type DataSourceDef,
+  type Expression,
+  type FieldDef,
+  type FieldKindName,
+  type FieldOption,
+} from "workflow-engine/schema";
 import { FieldForm } from "form-ui";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
 import type { DraftOf } from "../draft/types";
@@ -19,6 +27,7 @@ import { FieldValidationEditor } from "./shared/FieldValidationEditor";
 import { DefaultValueEditor } from "./shared/DefaultValueEditor";
 import { fieldLocaleGaps, missingTranslationWarning, resolveDraftLocalizedText, seedLocalizedText } from "../draft/localized-text";
 import { draftFields } from "../draft/fields";
+import { writeGroupKey, writeGroupLabel } from "../draft/view-group-sync.js";
 import { droppedByKindChange, nextFieldKey } from "./fieldCatalogLogic.js";
 import { fieldCheckZone, type FieldCheckZone } from "./fieldCheckZone.js";
 import { fieldKindLabel } from "../draft/field-type-labels";
@@ -370,6 +379,53 @@ function isCustomType(type: DraftField["type"]): type is DraftOf<FieldDef>["type
   return typeof type === "object" && type !== null;
 }
 
+interface FieldKeyInputProps {
+  field: DraftField;
+  mutate: Mutate;
+  onChange: (patch: Partial<DraftField>) => void;
+  /** Fires on a group key's commit, which bypasses `onChange`. `FieldEditor`
+   * counts a definition-half write there, so its usage rows still tint. */
+  onWrite?: () => void;
+}
+
+/**
+ * The key input, at both sites that carry one: the top-level `FieldEditor`
+ * and the recursive `SubFieldRow`, a group's child at any depth. A non-group
+ * field writes its key through `onChange` on every keystroke.
+ *
+ * A group's key is what view entries store, so changing it rewrites them
+ * (`view-group-sync.ts::writeGroupKey`). The input holds the typed text
+ * locally and commits it on blur or Enter, in one `mutate`, so ordinary
+ * typing never hands the rewrite a half-typed key. `field.id` finds the
+ * group inside the mutate's draft clone, at any depth.
+ */
+function FieldKeyInput({ field, mutate, onChange, onWrite }: FieldKeyInputProps) {
+  const [typed, setTyped] = useState<string | undefined>(undefined);
+  const groupId = field.type === "group" ? field.id : undefined;
+  if (groupId === undefined) {
+    return <input type="text" {...stylex.props(styles.studioMono)} value={field.key ?? ""} onChange={(e) => onChange({ key: e.target.value })} />;
+  }
+  const commit = () => {
+    if (typed === undefined) return;
+    setTyped(undefined);
+    if (typed === (field.key ?? "")) return;
+    onWrite?.();
+    mutate((d) => writeGroupKey(d, groupId, typed));
+  };
+  return (
+    <input
+      type="text"
+      {...stylex.props(styles.studioMono)}
+      value={typed ?? field.key ?? ""}
+      onChange={(e) => setTyped(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") commit();
+      }}
+    />
+  );
+}
+
 /**
  * Applies a kind switch, dropping the `format` or `control` the new kind does
  * not name and saying so before it happens.
@@ -474,8 +530,14 @@ function SubFieldRow({ field, dataSources, lists, mutate, onChange, onRemove }: 
   const baseLocale = draft.baseLocale ?? "en";
   /** Deduped against the whole catalog, not just this group's own children
    * (design.md: `FieldDef.key` is one flat CEL namespace regardless of
-   * nesting depth). */
+   * nesting depth). A group's label goes through `writeGroupLabel`, so the
+   * key it derives rewrites the view entries naming the old one. */
   const updateLabel = (label: DraftField["label"]) => {
+    const groupId = field.type === "group" ? field.id : undefined;
+    if (groupId !== undefined) {
+      mutate((d) => writeGroupLabel(d, groupId, label, baseLocale));
+      return;
+    }
     const taken = new Set(draftFields(draft).filter((f) => f.id !== field.id).map((f) => f.key ?? ""));
     const derivedKey = nextFieldKey(field.key ?? "", field.label, label, baseLocale, taken);
     onChange(derivedKey === undefined ? { label } : { label, key: derivedKey });
@@ -546,12 +608,7 @@ function SubFieldRow({ field, dataSources, lists, mutate, onChange, onRemove }: 
     <div {...stylex.props(styles.fieldRow)} id={field.id === undefined ? undefined : `field-row-${field.id}`}>
       <label {...stylex.props(styles.fieldRowLabel)}>
         {t("fieldCatalog.keyLabel")}
-        <input
-          type="text"
-          {...stylex.props(styles.studioMono)}
-          value={field.key ?? ""}
-          onChange={(e) => onChange({ key: e.target.value })}
-        />
+        <FieldKeyInput field={field} mutate={mutate} onChange={onChange} />
       </label>
       <label {...stylex.props(styles.fieldRowLabel)}>
         {t("fieldCatalog.labelLabel")}
@@ -894,8 +951,15 @@ function FieldEditor({
   const baseLocale = draft.baseLocale ?? "en";
   const fieldId = field.id;
   /** Deduped against the whole catalog, including every group's nested
-   * children (design.md: `FieldDef.key` is one flat CEL namespace). */
+   * children (design.md: `FieldDef.key` is one flat CEL namespace). A
+   * group's label goes through `writeGroupLabel`, so the key it derives
+   * rewrites the view entries naming the old one. */
   const updateLabel = (label: DraftField["label"]) => {
+    if (field.type === "group" && fieldId !== undefined) {
+      setDefinitionWrites((n) => n + 1);
+      mutate((d) => writeGroupLabel(d, fieldId, label, baseLocale));
+      return;
+    }
     const taken = new Set(draftFields(draft).filter((f) => f.id !== field.id).map((f) => f.key ?? ""));
     const derivedKey = nextFieldKey(field.key ?? "", field.label, label, baseLocale, taken);
     onChange(derivedKey === undefined ? { label } : { label, key: derivedKey });
@@ -979,12 +1043,7 @@ function FieldEditor({
             )}
             <label {...stylex.props(styles.fieldRowLabel)}>
               {t("fieldCatalog.keyLabel")}
-              <input
-                type="text"
-                {...stylex.props(styles.studioMono)}
-                value={field.key ?? ""}
-                onChange={(e) => onChange({ key: e.target.value })}
-              />
+              <FieldKeyInput field={field} mutate={mutate} onChange={onChange} onWrite={() => setDefinitionWrites((n) => n + 1)} />
             </label>
           </Zone>
 

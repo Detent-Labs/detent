@@ -479,7 +479,9 @@ The example has seven steps. `capture` is the initial step. `booked` and
 
 What a step shows. A view entry either names a catalog field or stands alone
 as a note. A field entry overrides how this step presents that field:
-visible, required, readonly, its span, its group.
+visible, required, readonly, its span. Its `group` works differently. A note
+picks any group freely. A field entry must name its own catalog parent
+instead.
 
 Requiredness lives in the view, never in the catalog. One step can demand a
 field that the next step only displays.
@@ -571,13 +573,24 @@ data: an amount from an earlier step, a status the engine set.
 A **group** also names a catalog field, one that holds child fields. Use it
 to organize related inputs under one heading, not to display static text.
 
-Two rules bind a group, and publish enforces both. A member entry's `group`
-holds the group field's `key`, never its label. The same view also carries a
-`ref` entry for the group field itself. Miss either one and the renderer draws
-neither the container nor its members, so the step comes up blank.
+The catalog decides which group a field belongs to. The example nests
+`quantity` inside the `line_item` group in `purchase-requisition.json`.
+Every step's view entry for `quantity` must set its `group` to `line_item`.
+Naming a different group, or naming none, fails to publish.
 
-The catalog may leave a group field childless. The view says which entries sit
-inside it, so one group field can head different entries on different steps.
+A field the catalog holds at the top level takes the opposite rule. Its
+view entry must have no `group`, or an empty one.
+
+These two rules still bind every group entry, and publish enforces both. A
+member entry's `group` holds the group field's `key`, never its label. The
+same view also carries a `ref` entry for the group field itself. Miss either
+one and the renderer draws neither the container nor its members, so the
+step comes up blank.
+
+The catalog may leave a group field childless, and a step need not place
+every child it has. The `line_item` group holds four fields. One step can
+place two of them. A later step can place the other two. What no step can
+do is place a child under a group the catalog does not give it.
 
 A **note** names no field at all. It carries `text` (a `LocalizedText`, the
 same shape a field's `label` uses) and nothing to submit. Use it for
@@ -585,12 +598,14 @@ instructional or explanatory copy that exists only on this step's form. A
 warning above a decision. A reminder of what a value means. A line no field
 in the catalog should carry as its label.
 
-A note takes the same `visible`, `group` and `span` a field entry takes. It
-can sit inside a group. It can hide behind a guard exactly as a field does.
-It never takes `required`, `readonly`, `validation` or `validationMode`:
-there is no field underneath for any of those to describe. Its `text` needs
-a non-empty entry for the process's `baseLocale`, the rule every
-`LocalizedText` follows.
+A note takes the same `visible` and `span` a field entry takes. It
+can sit inside a group. Unlike a field entry, its `group` names no catalog
+parent: a note may sit in any group the same view carries.
+
+A note can hide behind a guard exactly as a field does. It never takes
+`required`, `readonly`, `validation` or `validationMode`: there is no field
+underneath for any of those to describe. Its `text` needs a non-empty entry
+for the process's `baseLocale`, the rule every `LocalizedText` follows.
 
 #### Tabs
 
@@ -869,13 +884,27 @@ another position to reorder the view. Each card also carries move-up and
 move-down buttons, which make the same change without a pointer. Take a card
 off the canvas and its field returns to the palette.
 
+A group draws as a box, with its placed members inside. A group nested in
+another group draws inside that box too. A member's drag and its move buttons
+stay inside its own group. Drop a group's field from the palette, and it lands
+inside that group. A form lacking the group's box gains that box as well.
+Take a group's box off the canvas and every field inside it returns to the
+palette.
+
 A toggle above the canvas sets the form to one column or two. Select a card
-and the strip sets that field's visible, required, readonly, span and group.
-Each of the first three takes `true`, `false`, or a CEL expression. For a
-field marked `technical` in the field catalog, the strip omits the required
-and readonly controls. The definition contract forbids declaring either on
-that field's view entry. The strip therefore offers no path to a rejected
-publish.
+and the strip sets that field's visible, required, readonly and span. Each
+of the first three takes `true`, `false`, or a CEL expression.
+
+A field's `group` no longer sits in the strip. It follows the field's
+catalog parent, and moving a field between groups happens in the field
+catalog. A move there updates every form carrying the field, and adds the
+group's box where a form lacks it. A note is the exception. Its own strip
+keeps a `group` select, since a note has no catalog parent to follow.
+
+For a field marked `technical` in the field catalog, the strip omits the
+required and readonly controls. The definition contract forbids declaring
+either on that field's view entry. The strip therefore offers no path to a
+rejected publish.
 
 On the right stands **What a participant meets**. That pane mounts the same
 renderer the Player mounts and the Tasks area mounts. It follows the view's
