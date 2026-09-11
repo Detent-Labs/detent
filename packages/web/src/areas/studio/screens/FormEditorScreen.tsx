@@ -21,6 +21,7 @@ import {
 } from "../draft/view-layout";
 import {
   dragScopeByIndex,
+  groupTailSlot,
   insertGroupedField,
   isLawfulCardDrop,
   landedIndex,
@@ -371,7 +372,7 @@ const styles = stylex.create({
     paddingRight: space.s2,
   },
   // The group card (`studio-form-editor`'s fieldset/legend/nested-`<ol>`
-  // shape, task 6.1): the `<li>` spans the canvas grid's full width, the
+  // shape): the `<li>` spans the canvas grid's full width, the
   // same way the empty-state and tail rows already do, and lays its own edge
   // beside the fieldset the way a leaf card lays its edge beside its body
   // button.
@@ -382,7 +383,7 @@ const styles = stylex.create({
     minWidth: 0,
   },
   // `DESIGN.md`: "A canvas group is a 1px stroke with no fill, so the grid
-  // stays visible through it" (task 6.2). No radius, matching every other
+  // stays visible through it". No radius, matching every other
   // surface; the 4-point padding keeps the legend and the members off the
   // stroke.
   formGroupFieldset: {
@@ -557,8 +558,8 @@ export function FormEditorStrip({
   // `readonly` controls entirely rather than disabling them, since a
   // settable-but-doomed control would only invite the rejected publish this
   // change exists to prevent (design.md). `visible` and `span` stay offered
-  // unchanged; this strip no longer offers `group` at all, since the catalog
-  // now owns a field's parentage (task 6.7).
+  // unchanged. The strip offers no `group` control: the field catalog owns a
+  // field's parentage.
   const isTechnical = row.ref !== undefined && technicalFieldIds.has(row.ref);
   return (
     <section {...stylex.props(styles.formStrip)} aria-label={t("formEditor.stripLabel")}>
@@ -606,10 +607,9 @@ export function FormEditorStrip({
   );
 }
 
-/** A note carries no `ref` for the group select's key attribute, unlike a
- * field row (`row.ref ?? rowIndex`); it keys by index alone, which costs
- * nothing here since `LocalizedTextInput` holds no state of its own
- * (task 5.4d). */
+/** A selected note's strip props. `groupKeys` lists the keys of the group
+ * cards this step's view carries: a note has no catalog parent, so its group
+ * is a per-step choice among those cards. */
 export interface NoteEditorStripProps {
   row: DraftOf<ViewNote>;
   stepId: DraftStep["id"];
@@ -690,8 +690,8 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
   const processLabel =
     resolveDraftLocalizedText(draft.label, contentLocale, draft.baseLocale ?? "en") || t("headerBar.unnamedProcess");
   const written = useMemo(() => writtenFieldCounts(draft), [draft]);
-  // Threaded into both gatedKeys calls below (task 5.2) and this screen's own
-  // control-omission logic (task 4.1) — computed once, from the already-flat
+  // Threaded into both gatedKeys calls below and this screen's own
+  // control-omission logic — computed once, from the already-flat
   // catalog this screen receives, rather than twice.
   const technicalIds = useMemo(
     () => new Set(fields.filter((f) => f.technical === true && f.id !== undefined).map((f) => f.id!)),
@@ -743,18 +743,17 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
   };
 
   /** Cascades through `removeViewEntry` (`draft/view-tree.ts`): removing a
-   * group card takes every entry naming its key with it, field and note
-   * members alike, in the one change (checkbox 6.6's own control, and the
+   * group card takes every entry placed inside it along, field and note
+   * members alike and a nested group's members too, in the one change (the
    * "Removing a group card removes the members placed inside it"
-   * requirement). Removing anything else stays the plain single-entry
-   * filter it always was. */
+   * requirement). Removing anything else removes that one entry. */
   const removeRow = (rowIndex: number) => {
     setRows(removeViewEntry(rows, rowIndex, fields));
     setSelected(undefined);
   };
 
   /** Mints a catalog field and places it on this step's view, in one Draft
-   * mutation (task 3.2): both the new `fields` entry and the new `view`
+   * mutation: both the new `fields` entry and the new `view`
    * row commit together, so a mid-mutation reader never sees one without
    * the other. */
   const mintAndPlace = (kind: PaletteFieldKind, slot: number) => {
@@ -771,7 +770,7 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
   };
 
   /** Places a note at the end of the view, seeded with a non-empty entry for
-   * the body's `baseLocale` (task 5.4a). A note inserted with no text at all
+   * the body's `baseLocale`. A note inserted with no text at all
    * would parse against neither union member, failing the draft's whole
    * `authoredProcessBody.safeParse` and blanking every checks-rail dimension
    * after `zod` (design.md Risks: "A half-typed note card blanks the whole
@@ -835,7 +834,7 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
     .map((f) => f!.key)
     .filter((k): k is string => k !== undefined && k !== "");
 
-  // The canvas's nested read of `rows` (`draft/view-tree.ts`, task 6.1): the
+  // The canvas's nested read of `rows` (`draft/view-tree.ts`): the
   // roots, and per group entry its members, each node carrying that entry's
   // own index into `rows`. The renderer below walks this; every handler
   // still addresses `rows[i]`.
@@ -845,12 +844,12 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
   // group's own key for a member — whichever nested `<ol>` a card's edges
   // and tail slot belong to (`view-tree.ts`'s `dragScopeByIndex`). Built once
   // per render so a dragover handler can compare the dragged entry's own
-  // scope against the target's, the mechanism task 6.5 needs (design.md: "A
-  // refused drop uses the browser's own no-drop cursor").
+  // scope against the target's (design.md: "A refused drop uses the
+  // browser's own no-drop cursor").
   const scopeByIndex = useMemo(() => dragScopeByIndex(rows, fields), [rows, fields]);
 
   /** Whether a dragover at `scope` should call `preventDefault` — the whole
-   * refusal mechanism task 6.5 needs: the browser draws its own no-drop
+   * refusal mechanism: the browser draws its own no-drop
    * cursor and fires no `drop` where this says no, so no new visual state is
    * ever painted. A palette or mint payload is always welcome, wherever it
    * lands (`insertGroupedField` and the group-less mint rule each resolve
@@ -865,10 +864,10 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
   /** One placed card, leaf or group, at its own nesting level. `scope` is the
    * key of the group whose `<ol>` this level renders inside, or `undefined`
    * at the form's root — every drop target here compares a dragged card's
-   * own scope against it (task 6.5). `isFirst`/`isLast` are this node's
+   * own scope against it. `isFirst`/`isLast` are this node's
    * position among the array it was mapped over (the tree's own roots, or a
    * group node's own `members`) — not `rowIndex === 0`, wrong once a group
-   * can sit among the roots (task 6.4). */
+   * can sit among the roots. */
   const renderEntry = (node: ViewTreeNode, isFirst: boolean, isLast: boolean, scope: string | undefined) => {
     const row = node.entry;
     const rowIndex = node.index;
@@ -902,20 +901,26 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
       // defined here.
       const groupKey = field?.key;
       const memberCount = members.length;
-      const lastMemberIndex = memberCount > 0 ? members[memberCount - 1]!.index : rowIndex;
-      // Every drop that does not land on a member's own edge lands after the
-      // group's last member (or right after the card, when it has none) —
-      // `insertGroupedField`'s own `memberInsertionSlot` rule. A plain card
-      // move (reordering a member within its own group) uses this same slot
-      // to reach the group's own tail.
-      const tailSlot = lastMemberIndex + 1;
+      // A drop on the group's own box and a drop on its tail row both name
+      // this slot (`view-tree.ts::groupTailSlot`). A palette field lands after
+      // the last member, a root card dropped on the box lands after the
+      // group, and a member dropped on the tail row becomes the last member.
+      const tailSlot = groupTailSlot(node);
+      const dropOnTail = (e: DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropAt(tailSlot);
+      };
+      // The entries the remove click takes besides the card itself: the whole
+      // cascade `removeViewEntry` performs, a nested group's members included.
+      const removalCount = rows.length - removeViewEntry(rows, rowIndex, fields).length - 1;
       const fieldsetProps = stylex.props(
         styles.formGroupFieldset,
         selected === rowIndex && styles.formCardSelected,
         hiddenByExpression && styles.formCardConditional,
       );
       return (
-        <li key={`field:${fieldRef}`} {...stylex.props(styles.formGroupLi)} onDragOver={allowDrop(scope)} onDrop={dropOn("after")}>
+        <li key={`field:${fieldRef}`} {...stylex.props(styles.formGroupLi)} onDragOver={allowDrop(scope)} onDrop={dropOnTail}>
           <span {...stylex.props(styles.formCardEdge)} onDragOver={allowDrop(scope)} onDrop={dropOn("before")} aria-hidden="true" />
           <fieldset className={fieldsetProps.className} style={fieldsetProps.style} data-selected={selected === rowIndex || undefined}>
             <legend {...stylex.props(styles.formGroupLegend)}>
@@ -938,7 +943,7 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
                   {t("formEditor.moveDown")}
                 </button>
                 <button type="button" className="btn btn-secondary btn-destructive" onClick={() => removeRow(rowIndex)}>
-                  {t("formEditor.removeGroup").replace("{count}", String(memberCount))}
+                  {t("formEditor.removeGroup").replace("{count}", String(removalCount))}
                 </button>
               </span>
             </legend>
@@ -947,18 +952,10 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
               data-columns={columns}
             >
               {members.map((member, i) => renderEntry(member, i === 0, i === memberCount - 1, groupKey))}
-              {/* The group's own tail slot (task 6.3): a group with no
-                  members yet still has to offer a target, and a member's own
+              {/* The group's own tail slot: a group with no members yet
+                  still has to offer a target, and a member's own
                   reorder-to-the-end has nowhere else to land either. */}
-              <li
-                {...stylex.props(styles.formCanvasTail)}
-                onDragOver={allowDrop(groupKey)}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  dropAt(tailSlot);
-                }}
-              >
+              <li {...stylex.props(styles.formCanvasTail)} onDragOver={allowDrop(groupKey)} onDrop={dropOnTail}>
                 {t("formEditor.dropHere")}
               </li>
             </ol>

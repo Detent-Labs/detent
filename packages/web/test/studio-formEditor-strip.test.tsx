@@ -15,7 +15,7 @@ import type { DraftViewField } from "../src/areas/studio/draft/view-layout.js";
  * render, no DOM, no listening socket.
  *
  * The strip offers no `group` control at all (group-fields-stay-in-their-
- * group's "A field's strip offers no group control" scenario, task 6.7): the
+ * group's "A field's strip offers no group control" scenario): the
  * field catalog's own move control is where an author re-parents a field
  * now, so a select here would offer one lawful value and several the
  * publish rejects.

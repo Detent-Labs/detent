@@ -2,20 +2,20 @@ import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ValidationResult } from "../src/areas/studio/draft/validation.js";
 import type { Draft } from "../src/areas/studio/draft/types.js";
+import { draftFields } from "../src/areas/studio/draft/fields.js";
 import { DraftContext, type DraftContextValue } from "../src/areas/studio/draft/store.js";
 import { FormEditorScreen } from "../src/areas/studio/screens/FormEditorScreen.js";
 
 /**
- * The canvas's group rendering (`studio-form-editor`, task group 6): the
+ * The canvas's group rendering (`studio-form-editor`): the
  * fieldset/legend/nested-`<ol>` shape, member order under array
- * interleaving, and the move-boundary/remove-count controls the legend
- * carries. Fix round 1 flagged that this group added no test of its own —
- * the array-outcome half already lives in `studio-view-tree.test.ts`
- * (group 4), and these four are exactly the delta-spec outcomes a plain
- * initial render can observe with no drag and no DOM interaction, the same
- * `renderToStaticMarkup` technique `studio-formEditor-strip.test.tsx` and
- * `studio-formsTab.test.tsx` already use. `FormEditorScreen` reads `draft`,
- * `mutate` and `contentLocale` off `useDraft()`, so this supplies
+ * interleaving, a group nested inside another group, and the
+ * move-boundary/remove-count controls the legend carries. The array
+ * outcomes live in `studio-view-tree.test.ts`; these tests cover what a
+ * plain initial render can observe with no drag and no DOM interaction, the
+ * same `renderToStaticMarkup` technique `studio-formEditor-strip.test.tsx`
+ * and `studio-formsTab.test.tsx` already use. `FormEditorScreen` reads
+ * `draft`, `mutate` and `contentLocale` off `useDraft()`, so this supplies
  * `DraftContext.Provider` directly, the way `studio-formsTab.test.tsx`
  * already does.
  */
@@ -25,6 +25,9 @@ const BILLING = "field_00000000-0000-4000-8000-0000000000b2";
 const BETA = "field_00000000-0000-4000-8000-0000000000b3";
 const GAMMA = "field_00000000-0000-4000-8000-0000000000b4";
 const DELTA = "field_00000000-0000-4000-8000-0000000000b5";
+const ADDRESS = "field_00000000-0000-4000-8000-0000000000b6";
+const STREET = "field_00000000-0000-4000-8000-0000000000b7";
+const CITY = "field_00000000-0000-4000-8000-0000000000b8";
 
 function validation(): ValidationResult {
   return {
@@ -62,18 +65,37 @@ function contextValue(draft: Draft): DraftContextValue {
   };
 }
 
-// Two roots (`alpha`, `gamma`) interleave the group's own card and its two
-// members in the raw array, so `gamma` sits physically between `beta` and
-// `delta` -- proving the fieldset draws the two members adjacent, in their
-// own order, regardless of the array gap between them.
+// The catalog nests `beta`, the `address` group and `delta` under `billing`,
+// and `street` and `city` under `address`, so every view entry below names
+// its own catalog parent. Two roots (`alpha`, `gamma`) interleave the array:
+// `gamma` sits between `address`'s subtree and `delta`, proving the fieldset
+// draws billing's members adjacent, in their own order, regardless of the
+// array gap between them.
 const DRAFT = {
   baseLocale: "en",
   fields: [
     { id: ALPHA, key: "alpha", type: "string", label: { en: "Alpha" } },
-    { id: BILLING, key: "billing", type: "group", label: { en: "Billing" } },
-    { id: BETA, key: "beta", type: "string", label: { en: "Beta" } },
+    {
+      id: BILLING,
+      key: "billing",
+      type: "group",
+      label: { en: "Billing" },
+      fields: [
+        { id: BETA, key: "beta", type: "string", label: { en: "Beta" } },
+        {
+          id: ADDRESS,
+          key: "address",
+          type: "group",
+          label: { en: "Address" },
+          fields: [
+            { id: STREET, key: "street", type: "string", label: { en: "Street" } },
+            { id: CITY, key: "city", type: "string", label: { en: "City" } },
+          ],
+        },
+        { id: DELTA, key: "delta", type: "string", label: { en: "Delta" } },
+      ],
+    },
     { id: GAMMA, key: "gamma", type: "string", label: { en: "Gamma" } },
-    { id: DELTA, key: "delta", type: "string", label: { en: "Delta" } },
   ],
   workflow: {
     initialStep: "step_a",
@@ -84,7 +106,16 @@ const DRAFT = {
         label: { en: "Intake" },
         type: "task",
         view: {
-          fields: [{ ref: ALPHA }, { ref: BILLING }, { ref: BETA, group: "billing" }, { ref: GAMMA }, { ref: DELTA, group: "billing" }],
+          fields: [
+            { ref: ALPHA },
+            { ref: BILLING },
+            { ref: BETA, group: "billing" },
+            { ref: ADDRESS, group: "billing" },
+            { ref: STREET, group: "address" },
+            { ref: CITY, group: "address" },
+            { ref: GAMMA },
+            { ref: DELTA, group: "billing" },
+          ],
         },
         paths: [{ id: "path_1", to: "step_b", trigger: "automatic", priority: 1 }],
       },
@@ -93,21 +124,21 @@ const DRAFT = {
   },
 } as unknown as Draft;
 
+/** Renders the screen with the field list `EditScreen.tsx` hands it: the
+ * whole catalog, flattened through `draftFields`. */
 function render(): string {
   const draft = DRAFT;
   return renderToStaticMarkup(
     <DraftContext.Provider value={contextValue(draft)}>
-      <FormEditorScreen step={draft.workflow!.steps![0]!} index={0} fields={draft.fields!} onBack={() => {}} />
+      <FormEditorScreen step={draft.workflow!.steps![0]!} index={0} fields={draftFields(draft)} onBack={() => {}} />
     </DraftContext.Provider>,
   );
 }
 
 /** The canvas region alone, bounded by its own `aria-label` and the trailing
- * preview pane's -- `form-ui`'s `FieldForm` (`FieldForm.tsx:318-338`) draws
- * its OWN `<fieldset>` for the same group inside the mounted `FormPreview`,
- * so a search unscoped to the canvas would find whichever one happens to
- * come first in DOM order rather than the one this suite means to assert
- * on. */
+ * preview pane's. `form-ui`'s `FieldForm` (`FieldForm.tsx:318-338`) draws
+ * its OWN `<fieldset>` for each group inside the mounted `FormPreview`, so a
+ * search unscoped to the canvas could find the preview's copy. */
 function canvasHtml(html: string): string {
   const start = html.indexOf('aria-label="Form layout"');
   const end = html.indexOf('aria-label="What a participant meets"');
@@ -116,15 +147,42 @@ function canvasHtml(html: string): string {
   return html.slice(start, end);
 }
 
-/** The group's own fieldset, start to end, scoped to the canvas region so
- * `form-ui`'s own second fieldset inside the preview pane is never a
- * candidate. Exactly one exists within the canvas in this fixture, so a
- * plain first-open/first-close slice bounds it correctly there. */
-function fieldsetBlock(html: string): string {
-  const canvas = canvasHtml(html);
-  const start = canvas.indexOf("<fieldset");
-  const end = canvas.indexOf("</fieldset>");
-  return canvas.slice(start, end + "</fieldset>".length);
+/** The preview pane alone, from its own `aria-label` to the end. */
+function previewHtml(html: string): string {
+  const start = html.indexOf('aria-label="What a participant meets"');
+  expect(start, "expected to find the preview pane").toBeGreaterThan(-1);
+  return html.slice(start);
+}
+
+/** The whole `<fieldset>` whose legend shows `legendText`, start to its own
+ * matching close. Fieldsets nest here, so the close is found by depth rather
+ * than by the first `</fieldset>` after the start. */
+function fieldsetBlock(region: string, legendText: string): string {
+  const labelIndex = region.indexOf(`>${legendText}<`);
+  expect(labelIndex, `expected to find a fieldset legend reading "${legendText}"`).toBeGreaterThan(-1);
+  const start = region.lastIndexOf("<fieldset", labelIndex);
+  let depth = 0;
+  let cursor = start;
+  for (;;) {
+    const open = region.indexOf("<fieldset", cursor + 1);
+    const close = region.indexOf("</fieldset>", cursor + 1);
+    expect(close, "expected a closing </fieldset>").toBeGreaterThan(-1);
+    if (open !== -1 && open < close) {
+      depth++;
+      cursor = open;
+      continue;
+    }
+    if (depth === 0) return region.slice(start, close + "</fieldset>".length);
+    depth--;
+    cursor = close;
+  }
+}
+
+/** A fieldset's own `<legend>...</legend>`: the first legend in its block. */
+function legendBlock(fieldset: string): string {
+  const start = fieldset.indexOf("<legend");
+  const end = fieldset.indexOf("</legend>");
+  return fieldset.slice(start, end + "</legend>".length);
 }
 
 /** One leaf card's own `<li>...</li>`, found by its visible label. A leaf
@@ -150,17 +208,33 @@ function isButtonDisabled(block: string, label: string): boolean {
 }
 
 describe("The canvas draws a group's members inside its own card", () => {
-  it("draws both members inside the fieldset, and draws neither root inside it", () => {
-    const fieldset = fieldsetBlock(render());
-    expect(fieldset).toContain(">beta<");
-    expect(fieldset).toContain(">delta<");
-    expect(fieldset).not.toContain(">alpha<");
-    expect(fieldset).not.toContain(">gamma<");
+  it("draws every member inside the fieldset, and draws neither root inside it", () => {
+    const billing = fieldsetBlock(canvasHtml(render()), "billing");
+    for (const member of [">beta<", ">address<", ">street<", ">city<", ">delta<"]) expect(billing).toContain(member);
+    expect(billing).not.toContain(">alpha<");
+    expect(billing).not.toContain(">gamma<");
+  });
+
+  it("draws a nested group's own members inside its own fieldset, within the outer one", () => {
+    const address = fieldsetBlock(canvasHtml(render()), "address");
+    expect(address).toContain(">street<");
+    expect(address).toContain(">city<");
+    expect(address).not.toContain(">beta<");
+    expect(address).not.toContain(">delta<");
   });
 
   it("draws the members in the order the preview renders them, despite an unrelated root sitting between them in the array", () => {
-    const fieldset = fieldsetBlock(render());
-    expect(fieldset.indexOf(">beta<")).toBeLessThan(fieldset.indexOf(">delta<"));
+    const html = render();
+    const canvas = fieldsetBlock(canvasHtml(html), "billing");
+    const canvasOrder = [">beta<", ">address<", ">street<", ">city<", ">delta<"].map((s) => canvas.indexOf(s));
+    expect(canvasOrder).toEqual([...canvasOrder].sort((a, b) => a - b));
+
+    const preview = fieldsetBlock(previewHtml(html), "Billing");
+    const previewOrder = ["Beta", "Address", "Street", "City", "Delta"].map((s) => preview.indexOf(s));
+    expect(previewOrder.every((i) => i > -1)).toBe(true);
+    expect(previewOrder).toEqual([...previewOrder].sort((a, b) => a - b));
+    expect(preview).not.toContain("Alpha");
+    expect(preview).not.toContain("Gamma");
   });
 });
 
@@ -181,8 +255,9 @@ describe("A member's move command stops at its own group's boundary", () => {
 });
 
 describe("The group's own remove control", () => {
-  it("names its member count in its label", () => {
-    const fieldset = fieldsetBlock(render());
-    expect(fieldset).toContain("Remove (2)");
+  it("names how many entries the click takes, a nested group's own members included", () => {
+    const canvas = canvasHtml(render());
+    expect(legendBlock(fieldsetBlock(canvas, "billing"))).toContain("Remove (5)");
+    expect(legendBlock(fieldsetBlock(canvas, "address"))).toContain("Remove (2)");
   });
 });
