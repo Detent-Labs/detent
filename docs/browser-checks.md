@@ -3088,23 +3088,35 @@ controls need the admin role. The seeded `demo-superuser@example.test` account
 holds both.
 
 Ten controls carry `btn btn-secondary btn-destructive`. Read each at rest,
-under a real pointer hover, and under keyboard focus. Read the computed
-`color`, `border-color` and `background-color` in the inspector each time.
-Compare them with a plain `btn btn-secondary` control on the same screen. Walk
-all ten in the light scheme, then again in the dark.
+under a real pointer hover, while the pointer holds it down, and under keyboard
+focus. Read the computed `color`, `border-color` and `background-color` in the
+inspector each time. Compare them with a plain `btn btn-secondary` control on
+the same screen. Walk all ten in the light scheme, then again in the dark.
+
+Most of these controls commit on a click. To read the pressed state, hold the
+pointer down on the control. Slide the pointer off the control before you
+release it, so no click reaches it.
 
 Pass, at rest: text and border read in the accent over a transparent
-background. Pass, on hover: text and border stay in the accent over the
-secondary control's wash. Pass, under focus: the 2px accent ring draws at a
-2px offset. Pass, beside the plain control: the two differ in text color and
-in border color. The plain control reads in ink over the divider. Watch for
-the defect: ink text over a grey border, the plain control's own look.
+background. Pass, on hover: text and border read `--color-accent-on-muted` over
+the secondary control's hover wash. That token reads `#ae1800` in light and
+`#ff9783` in dark. Pass, pressed: text and border read the same token over the
+secondary control's pressed wash. Pass, under focus: the 2px accent ring draws
+at a 2px offset.
+
+Measured on 2026-09-11, the hover and pressed text reads 5.60:1 and 4.86:1 in
+light, and 6.54:1 and 5.25:1 in dark. Pass: that text stays at 4.5:1 or above
+on both washes.
+
+Pass, beside the plain control: the two differ in text color and in border
+color. The plain control reads in ink over the divider. Watch for the defect:
+ink text over a grey border, the plain control's own look.
 
 In the dark scheme the accent lightens with the ground. Pass: the accent text
 still reads on the dark surface.
 
 Redact data and Delete list also reach a disabled state. Pass: each drops to
-45% opacity, with its text and border still in the accent.
+45% opacity. At rest, its text and border still read in the accent.
 
 **Processes list.** Create a draft of any process. Its row shows Discard
 beside Open. Open is the plain control.
@@ -3146,9 +3158,12 @@ The handler refuses that host before it opens a socket. The outbox row turns
 Discard beside Retry. Retry is the plain control.
 
 **Instance screen, running.** Open the case the task screen started, from
-Instances. Cancel instance shows beside Refresh. Refresh is the plain control.
-Use that published case. Measured on 2026-09-11, cancelling the Player's test
-instance failed with a server error.
+Instances. Use that published case for this state and the next. Cancel
+instance shows beside Refresh. Refresh is the plain control. Pass: the two
+differ in text color and in border color.
+
+Measured on 2026-09-11, cancelling the Player's test instance failed with a
+server error. That defect sits outside this change.
 
 **Instance screen, ended.** Choose Cancel instance on that case. Redact data
 now shows beside Refresh. Read it enabled. Choose Redact data and confirm.
