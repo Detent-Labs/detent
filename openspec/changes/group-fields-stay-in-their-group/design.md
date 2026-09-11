@@ -46,7 +46,7 @@ the keyboard move reach it. Until now nothing tied that write to
 
 ### One function derives the canvas tree; the array keeps its shape
 
-A pure function reads `(rows, parentGroupKeyByFieldId)` and returns the roots
+A pure function reads `(rows, catalogFields)` and returns the roots
 plus, per group entry, its members. Each node carries the entry's own array
 index. The renderer walks that tree; every handler still addresses `rows[i]`.
 
