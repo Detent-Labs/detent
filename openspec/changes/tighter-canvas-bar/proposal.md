@@ -23,7 +23,9 @@ The owner named all three on 2026-09-11, with screenshots of the Canvas tab.
   step stays the one control for a step someone works.
 - The bar drops its fixed 5.5rem and stands one control row tall, 54px. The
   group name's label moves beside its input. The owner chose this on
-  2026-09-11 over a 72px bar that keeps the label above.
+  2026-09-11 over a 72px bar that keeps the label above. In a window too
+  narrow for its row, the bar scrolls sideways and grows by its scrollbar's
+  height.
 - Two design files gain one exception for a field inside a toolbar row: its
   label stands beside the control. Those files are `DESIGN.md` and
   `.claude/rules/design-language.md`.
