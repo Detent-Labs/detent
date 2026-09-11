@@ -7,16 +7,16 @@
 
 ## 2. Rail row
 
-- [ ] 2.1 Remove the move `select`, its four props and the `railMove` style from `PanelsRailFieldRow`. Drop the per-row target build in `FieldsTab`. Keep the drag. Verify with `bun run typecheck`.
-- [ ] 2.2 Lead the label with the kind icon. Its wrapper carries `aria-hidden` and the kind name as `title`. The kind name stays in the button as hidden text. Verify with task 2.5.
-- [ ] 2.3 Remove the `railType` style and its mention in the `railName` comment. Set `alignItems` on `railFieldInRow` to `center`. Verify with `bun run typecheck`.
-- [ ] 2.4 Set the rail column in the `layout` style to `20rem`, up from `16rem`. Verify both tabs in task 4.2.
-- [ ] 2.5 Update `studio-panelsRailFieldRow.test.tsx`. Assert no `select` renders. Assert the kind name as text inside the button. Assert the wrapper's `aria-hidden` and `title`. Verify in the full suite.
+- [x] 2.1 Remove the move `select`, its four props and the `railMove` style from `PanelsRailFieldRow`. Drop the per-row target build in `FieldsTab`. Keep the drag. Verify with `bun run typecheck`.
+- [x] 2.2 Lead the label with the kind icon. Its wrapper carries `aria-hidden` and the kind name as `title`. The kind name stays in the button as hidden text. Verify with task 2.5.
+- [x] 2.3 Remove the `railType` style and its mention in the `railName` comment. Set `alignItems` on `railFieldInRow` to `center`. Verify with `bun run typecheck`.
+- [x] 2.4 Set the rail column in the `layout` style to `20rem`, up from `16rem`. Verify both tabs in task 4.2.
+- [x] 2.5 Update `studio-panelsRailFieldRow.test.tsx`. Assert no `select` renders. Assert the kind name as text inside the button. Assert the wrapper's `aria-hidden` and `title`. Verify in the full suite.
 
 ## 3. Editor move control
 
-- [ ] 3.1 Add the move control under the key in `FieldEditor` and in `SubFieldRow`. Render it like the key, as a `fieldRowLabel` label around the select. Read its options from `moveTargetsFor` and its id from `moveControlId`. Verify with `bun run typecheck`.
-- [ ] 3.2 Pass `moveField` from `FieldsTab` through `FieldCatalogPanel` as `onMoveField`. Both editors and nested child rows receive it. Verify with task 4.3.
+- [x] 3.1 Add the move control under the key in `FieldEditor` and in `SubFieldRow`. Render it like the key, as a `fieldRowLabel` label around the select. Read its options from `moveTargetsFor` and its id from `moveControlId`. Verify with `bun run typecheck`.
+- [x] 3.2 Pass `moveField` from `FieldsTab` through `FieldCatalogPanel` as `onMoveField`. Both editors and nested child rows receive it. Verify with task 4.3.
 
 ## 4. Rules and docs
 
