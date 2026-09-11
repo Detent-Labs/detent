@@ -44,7 +44,7 @@ tree.
 - [x] 5.1 Add a `draft/` helper that rewrites view entries after a catalog change
 - [x] 5.2 On a move, set each entry naming the field to the new parent's key
 - [x] 5.3 On a move to the top level, remove that entry's `group` key instead
-- [x] 5.4 On a group key rename, rewrite every entry naming the old key, notes included
+- [x] 5.4 On a group key change, rewrite its direct children's entries; notes follow the rename requirement
 - [x] 5.5 Call it from `EntityTabs.tsx:423`'s `moveField`, inside its existing `mutate`
 - [x] 5.6 Call it from both key inputs in `FieldCatalogPanel.tsx`, in one `mutate` each
 - [x] 5.7 Leave a note's own `group` alone on a move; a move has no note to carry
