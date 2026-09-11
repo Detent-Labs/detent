@@ -16,9 +16,11 @@
 
 ## 4. Browser check
 
-- [ ] 4.1 Add a `docs/browser-checks.md` walk over the ten destructive controls, in both schemes
-- [ ] 4.2 Run the walk on the production build, reading each control's computed color and border
-- [ ] 4.3 Run `/impeccable critique` and `/impeccable audit` on one changed route, or record why not
+- [ ] 4.1 Add a `docs/browser-checks.md` section named for this change, walking the ten controls
+- [ ] 4.2 Give each control in the walk its screen and the state that shows it
+- [ ] 4.3 Reach the outbox row's control through a draft `http.request` action to a refused host
+- [ ] 4.4 Run the walk on the production build in both schemes, reading computed color and border
+- [ ] 4.5 Copy `.claude/skills/impeccable/` from the main checkout, then run critique and audit fresh
 
 ## 5. Verification
 

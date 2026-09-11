@@ -18,6 +18,9 @@ The cascade today, in source order:
 Each of the first three selectors weighs one class, so source order settles
 every tie. See proposal.md's Why for what that does at the call sites.
 
+The requirement lands in `web-styling`, the capability that owns the rules for
+literal shared classes.
+
 No `/impeccable shape` ran. Only the main checkout carries that skill, and
 this worktree lacks it. It would have had nothing to decide either. The
 Destructive entry in `DESIGN.md` fixes the look, and
@@ -37,7 +40,8 @@ specified treatment and invents none.
 
 - A hover treatment of its own for destructive controls. They keep the
   secondary control's ink wash.
-- Moving the `.btn` family to compiled styles.
+- Moving the `.btn` family to compiled styles. The family stays literal
+  permanently, as `docs/decisions.md` records.
 - Deciding again which actions count as destructive. The ten call sites keep
   their role.
 
@@ -74,9 +78,9 @@ text. It asserts two facts:
 - Every `className` value naming `btn-destructive` also names `btn-secondary`.
 
 That split follows `development-toolchain`'s "A browser check lands as an
-assertion or as a checklist entry". This repository produced the defect, the
-proposal names both lines of `tokens.css`, and both facts read without a
-browser.
+assertion or as a checklist entry". This repository produced the defect, and
+proposal.md's Why records it with the 2026-09-11 measurement. Both facts read
+without a browser.
 
 Whether the accent renders stays a visual judgment. It lands in
 `docs/browser-checks.md` as one walk over the ten controls.
@@ -94,6 +98,9 @@ It cannot see the cascade.
   same accent text on the same grounds. The walk runs once per scheme.
 - [Discard draft loses its fill] → The stylesheet leaves it the browser's own
   button background today. Losing that fill is the fix. The walk confirms it.
+- [Both controls in the draft confirmation dialog read in the accent] → Its
+  Cancel carries `btn-ghost`, whose text is the accent too. Only the border
+  sets Discard draft apart. The walk judges whether the two read apart.
 
 ## Migration Plan
 
