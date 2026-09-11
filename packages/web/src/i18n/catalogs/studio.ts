@@ -637,6 +637,7 @@ export const en = {
   "canvas.initialStamp": "start",
   "canvas.edgeStyleToggle": "Rounded corners",
   "canvas.selectionHeading": "Steps selected",
+  "canvas.selectionRemoveOne": "Remove step",
   "canvas.selectionRemove": "Remove steps",
   "canvas.groupCreate": "Group these steps",
   "canvas.groupDefaultName": "Group",
