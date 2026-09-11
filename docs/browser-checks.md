@@ -3194,8 +3194,8 @@ Build the production bundle and open it on the engine's own port. Seed the
 database, then sign in as `demo-superuser@example.test`, password
 `seed-demo-password`. The account holds every role the studio needs.
 
-Open "IT Offboarding" (key `it_offboarding`) from the Processes list and
-choose "Create draft". Studio opens the draft at
+In the Processes list, find the row `it_offboarding` and choose "Create
+draft". Studio opens the draft at
 `/studio/processes/<id>/edit`. Choose the Steps tab, at
 `/studio/processes/<id>/edit/steps`. Resize the window to 1440px wide.
 
