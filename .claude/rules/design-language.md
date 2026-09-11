@@ -72,7 +72,8 @@ with no exception.
 
 Lucide icons appear at 18px with a 1.75 stroke and inherit `currentColor`.
 An icon never appears alone in place of a label. It sits beside a label, or
-it works as decoration you can delete without losing meaning.
+it works as decoration you can delete without losing meaning. An icon may
+stand in for a secondary word beside a label.
 
 ## Components
 
@@ -110,12 +111,11 @@ an identity, and a right-aligned quantity in the mono face, like a
 ledger's amount column. The row's identifying content is a real control. The
 row itself carries no click handler.
 
-Studio's entity rail (`EntityTabs.tsx`'s `railRow`/`railName`/`railType`
-styles) follows a plainer version of the same rule. A hairline sits between
-entries, content stays flush left, and the kind word takes the written
-face. It carries no stamp, so the rule holds without the first column. The
-steps rail in `StepsRail.tsx` adds one: a mono number leads and a mono
-count closes.
+Studio's entity rail (`EntityTabs.tsx`'s `railRow`/`railName` styles)
+follows a plainer version of the same rule. A hairline sits between
+entries, and content stays flush left. It carries no stamp, so the rule
+holds without the first column. The steps rail in `StepsRail.tsx` adds one:
+a mono number leads and a mono count closes.
 
 **The measuring rule**, `reporting/components.tsx`'s `DurationRule`.
 Reports' one chart form is a hairline with an accent fill whose length
