@@ -6,7 +6,7 @@ literal until its last consumer migrates" keeps them there. The reset in
 `global.css` gives `button` no border and an inherited color. It sets no
 background.
 
-The cascade today, in source order:
+The cascade before this change, in source order:
 
 - `.btn` (line 123): layout, type, a transparent 1px border, no background.
 - `.btn-destructive` (line 144): the accent `border-color` and `color`.
@@ -21,8 +21,9 @@ every tie. See proposal.md's Why for what that does at the call sites.
 The requirement lands in `web-styling`, the capability that owns the rules for
 literal shared classes.
 
-No `/impeccable shape` ran. Only the main checkout carries that skill, and
-this worktree lacks it. It would have had nothing to decide either. The
+No `/impeccable shape` ran. Only the main checkout carried that skill; this
+worktree lacked it at proposal time. Task 4.5 copied it in for the critique
+and audit. It would have had nothing to decide either. The
 Destructive entry in `DESIGN.md` fixes the look, and
 `.claude/rules/design-language.md` repeats it. This change restores a
 specified treatment and invents none.

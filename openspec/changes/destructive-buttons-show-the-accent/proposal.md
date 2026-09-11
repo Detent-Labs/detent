@@ -29,8 +29,8 @@ a plain secondary button beside it.
   order, the hover and press rule's order and token, and the disabled rule's.
   The fourth is the pairing at every call site in `packages/web/src`.
 - `docs/browser-checks.md` gains one walk across the ten destructive controls.
-  It checks the accent outline at rest, on hover, while disabled and under the
-  focus ring.
+  It checks the accent outline at rest, on hover, while pressed, while
+  disabled and under the focus ring.
 
 ## Capabilities
 
