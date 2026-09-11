@@ -102,10 +102,10 @@ export function newStepNote(kind: StepKind): string {
   return t(`stepKindNote.${kind === "end" ? "terminal" : kind === "subprocess" ? "subprocess" : "participant"}`);
 }
 
-/** A process's own label, never its `proc_` id. Two surfaces read it: the
- * subprocess picker and the steps rail's summary line for a subprocess step.
- * A published body carries a base-locale entry by invariant, so the `key`
- * fallback is for the moment a summary arrives with neither. */
+/** A process's own label, never its `proc_` id. One surface reads it: the
+ * subprocess picker. A published body carries a base-locale entry by
+ * invariant, so the `key` fallback is for the moment a summary arrives with
+ * neither. */
 export function processLabel(process: ProcessSummary, contentLocale: string): string {
   return process.label?.[contentLocale] ?? process.label?.[process.baseLocale] ?? process.key;
 }
