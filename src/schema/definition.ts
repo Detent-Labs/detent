@@ -399,9 +399,11 @@ export function leafFields(fields: FieldDef[]): FieldDef[] {
  * another group maps to the OUTER group's key, not its own: the map answers
  * "who holds this field", and a group field is held the same way a leaf is.
  *
- * The one parentage lookup `compile.ts::checkViewGroupReferences` and the
- * studio's view-tree/view-sync code both read, so neither reimplements the
- * walk and the two sides cannot disagree about a field's group.
+ * `compile.ts::checkViewGroupReferences` reads it. The studio keeps its own
+ * draft-shaped walk, `view-tree.ts::draftParentGroupKeyById`, because this
+ * one is typed against the fully-required `FieldDef[]`. The two differ on
+ * one shape: a non-group field still carrying `fields` hands its key to
+ * those children here, and hands them nothing in the studio's walk.
  */
 export function parentGroupKeyById(fields: FieldDef[]): Map<FieldId, string> {
   const out = new Map<FieldId, string>();
