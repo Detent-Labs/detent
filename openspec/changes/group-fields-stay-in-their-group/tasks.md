@@ -78,6 +78,6 @@ tree.
 - [x] 8.2 Run the full `bun test` with `DATABASE_URL` set; report the skip count too
 - [x] 8.3 Run both push gates over the pushed range, per the root `CLAUDE.md`
 - [x] 8.4 Run `impeccable detect` over the changed files under `packages/web`
-- [ ] 8.5 Browser check the form editor: nest, move, refuse a drag, remove a group
-- [ ] 8.6 Browser check a catalog move and a group rename; both forms must follow
-- [ ] 8.7 Run `/impeccable critique` and `/impeccable audit` against the form editor route
+- [x] 8.5 Browser check the form editor: nest, move, refuse a drag, remove a group
+- [x] 8.6 Browser check a catalog move and a group rename; both forms must follow
+- [x] 8.7 Run `/impeccable critique` and `/impeccable audit` against the form editor route
