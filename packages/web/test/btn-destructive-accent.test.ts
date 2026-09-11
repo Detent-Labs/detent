@@ -7,11 +7,14 @@
  * control — see this change's proposal,
  * `openspec/changes/destructive-buttons-show-the-accent/proposal.md`.
  *
- * Two facts pin the fix. The `.btn-destructive` rule must stay ordered after
- * every `.btn-secondary` rule, so its accent wins the cascade. And every
+ * Three facts pin the fix. The `.btn-destructive` rule must stay ordered after
+ * every `.btn-secondary` rule, so its accent wins the cascade. Every
  * `className` naming `btn-destructive` must also name `btn-secondary`, since
  * the accent treatment rides alongside the secondary control's background
- * and hover wash rather than replacing them.
+ * and hover wash rather than replacing them. And the `.btn-destructive:hover`
+ * and `:active` rule, also after every `.btn-secondary` rule, sets text and
+ * border to `--color-accent-on-muted`: the plain accent measures under 4.5:1
+ * on the secondary control's hover and pressed washes.
  *
  * What it cannot see: whether the accent actually renders. `docs/browser-checks.md`
  * carries that half, per `development-toolchain`'s split rule.
@@ -24,6 +27,10 @@ const TOKENS_CSS = new URL("../src/shell/tokens.css", import.meta.url).pathname;
 
 const SRC = new URL("../src/", import.meta.url).pathname;
 
+const SECONDARY_OPENER = /^\.btn-secondary(:hover|:active)?\s*\{/;
+
+const HOVER_AND_PRESS = /^\.btn-destructive:hover,\s*\.btn-destructive:active\s*\{([^}]*)\}/m;
+
 function walk(dir: string): string[] {
   return readdirSync(dir).flatMap((entry) => {
     const full = join(dir, entry);
@@ -33,10 +40,19 @@ function walk(dir: string): string[] {
 
 const modules = walk(SRC).filter((f) => /\.tsx?$/.test(f));
 
-/** Line indices opening a `.btn-destructive` or `.btn-secondary` rule, in source order. */
-function ruleLines(css: string, escapedSelector: string): number[] {
-  const re = new RegExp(`^${escapedSelector}(:hover|:active)?\\s*\\{`);
-  return css.split("\n").flatMap((line, i) => (re.test(line) ? [i] : []));
+/** Line indices opening a rule `opener` matches, in source order. */
+function ruleLines(css: string, opener: RegExp): number[] {
+  return css.split("\n").flatMap((line, i) => (opener.test(line) ? [i] : []));
+}
+
+/** A rule body's declarations, property to value. */
+function declarations(body: string): Record<string, string> {
+  return Object.fromEntries(
+    body.split(";").flatMap((declaration) => {
+      const colon = declaration.indexOf(":");
+      return colon < 0 ? [] : [[declaration.slice(0, colon).trim(), declaration.slice(colon + 1).trim()]];
+    }),
+  );
 }
 
 /** Every `className` site naming `btn-destructive`, and whether it also names `btn-secondary`. */
@@ -59,16 +75,29 @@ describe("the destructive button's accent outline", () => {
   it("finds modules to check, so an empty walk cannot pass", () => {
     // A broken path would return no files and report no hit, which reads as
     // a pass. The count is the guard on the guard.
+    // 150 exceeds any one area (studio: 126) and either extension (.ts: 128), so a partial walk fails.
     expect(modules.length).toBeGreaterThan(150);
   });
 
   it("orders .btn-destructive after every .btn-secondary rule in tokens.css", () => {
     const css = readFileSync(TOKENS_CSS, "utf8");
-    const destructiveLines = ruleLines(css, "\\.btn-destructive");
-    const secondaryLines = ruleLines(css, "\\.btn-secondary");
+    const destructiveLines = ruleLines(css, /^\.btn-destructive\s*\{/);
+    const secondaryLines = ruleLines(css, SECONDARY_OPENER);
     expect(destructiveLines.length).toBe(1);
     expect(secondaryLines.length).toBeGreaterThan(0);
     expect(destructiveLines[0]).toBeGreaterThan(Math.max(...secondaryLines));
+  });
+
+  it("reads --color-accent-on-muted on hover and press, in a rule after every .btn-secondary rule", () => {
+    const css = readFileSync(TOKENS_CSS, "utf8");
+    const rule = HOVER_AND_PRESS.exec(css);
+    expect(rule).not.toBeNull();
+    const line = css.slice(0, rule?.index ?? 0).split("\n").length - 1;
+    expect(line).toBeGreaterThan(Math.max(...ruleLines(css, SECONDARY_OPENER)));
+    expect(declarations(rule?.[1] ?? "")).toMatchObject({
+      color: "var(--color-accent-on-muted)",
+      "border-color": "var(--color-accent-on-muted)",
+    });
   });
 
   it("pairs every btn-destructive className with btn-secondary", () => {

@@ -2,7 +2,7 @@
 
 - [x] 1.1 Move the `.btn-destructive` block in `tokens.css` below `.btn-secondary:active`
 - [x] 1.2 Extend that block's comment with the order it needs and the test pinning it
-- [ ] 1.3 Add a `.btn-destructive:hover` and `:active` rule reading `--color-accent-on-muted`, after the block
+- [x] 1.3 Add a `.btn-destructive:hover` and `:active` rule reading `--color-accent-on-muted`, after the block
 
 ## 2. Call sites
 
@@ -14,7 +14,7 @@
 - [x] 3.1 Add a `packages/web/test/` file asserting the destructive rule follows every secondary rule
 - [x] 3.2 In that file, assert each `className` naming `btn-destructive` also names `btn-secondary`
 - [x] 3.3 Cite this change's proposal in the file's header comment as the defect it guards
-- [ ] 3.4 Assert that rule follows every secondary rule and reads `--color-accent-on-muted` for text and border
+- [x] 3.4 Assert that rule follows every secondary rule and reads `--color-accent-on-muted` for text and border
 
 ## 4. Browser check
 
