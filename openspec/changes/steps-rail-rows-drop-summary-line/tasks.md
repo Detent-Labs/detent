@@ -40,7 +40,7 @@
   Record what each one printed.
 - [x] 3.2 Run the full `bun test` with `DATABASE_URL` set, piped through
   `scripts/gates/silent-green.sh`. Record the pass, fail and skip counts.
-- [ ] 3.3 Run the prose gate and the whitespace gate, each fed by
+- [x] 3.3 Run the prose gate and the whitespace gate, each fed by
   `sh scripts/gates/range.sh < /dev/null`. Record both outputs.
 - [x] 3.4 Run the `docs/browser-checks.md` entry from 2.2 in a real browser.
   Record what each width showed.
