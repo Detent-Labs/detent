@@ -208,13 +208,35 @@ that field's own two halves.
 ### Requirement: Renaming a group field's key rewrites the view entries naming it
 
 A `view.fields[].group` holds a group field's `key` rather than its `id`.
-Editing that key in the field catalog SHALL rewrite every view entry naming
-the old one. The rewrite SHALL reach every step in the draft, and both
-halves SHALL land in one draft change.
+Editing that key in the field catalog SHALL rewrite the view entries that
+belong to the group. The rewrite SHALL reach every step in the draft. The
+catalog write and the view rewrite SHALL land in one draft change.
 
-This reaches a field entry and a note entry alike. Neither one has another
-route back to its container. Leaving either behind hides it from the form
-and refuses the publish.
+A field entry belongs to the group through the catalog. The rewrite SHALL
+reach each entry whose `ref` names one of the group's direct children. It
+SHALL set that entry's `group` to the new key. An empty new key SHALL remove
+the entry's `group` instead. The rewrite SHALL leave every other group's
+entries alone, even an entry naming the same key string.
+
+A note has no catalog parent, so its old key is its only tie to the group. A
+note naming the old key SHALL follow to the new key only when both hold:
+
+- the old key and the new key are both non-empty
+- no other group field, at any catalog depth, holds either key
+
+Otherwise the note SHALL keep the key it names. The checks rail reports it
+until the author repairs the key. Retyping the old key returns the note to its
+group, since the note never left that key. A group's first key therefore
+leaves every note in place, since the old key is empty.
+
+No key write SHALL leave an entry with an empty `group`.
+
+A group's key input SHALL commit the typed key on blur or on Enter. Ordinary
+typing SHALL write nothing before the commit. A half-typed key could equal
+another group's key, and the rewrite never sees one.
+
+A label change that derives a new key for a group reaches the same rewrite. A
+label whose derivation is empty SHALL keep the group's key.
 
 The rule reaches the key control wherever the catalog offers it. A top-level
 group and a group nested inside another group SHALL behave the same way.
@@ -251,19 +273,48 @@ rename.
 
 #### Scenario: A rename carries a note along
 
-- **WHEN** the developer renames a group whose view holds a note naming its
-  old key
-- **THEN** the note names the new key
+- **WHEN** the developer changes a group field's key from `request` to
+  `order_request`, and no other group field holds either key
+- **AND** a step view holds a note naming `request`
+- **THEN** the note names `order_request`
 
 #### Scenario: A nested group renames the same way
 
 - **WHEN** the developer renames a group field that sits inside another group
-- **THEN** every view entry naming its old key names the new one
+- **THEN** its direct children's entries name the new key
+- **AND** its own entry still names the outer group's key
 
 #### Scenario: A rename leaves another group's entries alone
 
 - **WHEN** the developer renames one of a draft's two group fields
 - **THEN** the entries naming the other group keep their old key
+
+#### Scenario: A cleared key keeps the note until the key returns
+
+- **WHEN** a step view carries the card of a group keyed `g`, a member and a
+  note naming `g`
+- **AND** the developer clears that key and commits it
+- **THEN** the member's entry has no `group`, and the note still names `g`
+- **AND** no entry in the view carries an empty `group`
+- **AND** once the developer types `g` again and commits it, the member's
+  entry and the note name `g`
+
+#### Scenario: A key another group holds leaves every note where it stands
+
+- **WHEN** a step view holds a note naming group `g`'s key and a note naming
+  group `h`'s key
+- **AND** the developer changes `g`'s key to `h` and commits it
+- **THEN** the first note still names `g`, and the second still names `h`
+
+#### Scenario: An old key two groups share keeps its note
+
+- **WHEN** two group fields both hold the key `dup`
+- **AND** a step view carries a member of the first group and a note naming
+  `dup`
+- **AND** the developer changes the first group's key to `unique` and commits
+  it
+- **THEN** the member's entry names `unique`
+- **AND** the note still names `dup`
 
 #### Scenario: A cleared key gives a root group's members its card's tab
 
