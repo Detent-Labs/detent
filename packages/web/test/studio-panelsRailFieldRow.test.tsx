@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
+import { Hash } from "lucide-react";
 import { PanelsRailFieldRow } from "../src/areas/studio/panels/EntityTabs.js";
 
 const NOOP = () => {};
@@ -7,18 +8,11 @@ const NOOP = () => {};
 const BASE = {
   label: "Amount",
   typeLabel: "Number",
+  kindIcon: Hash,
   depth: 0 as const,
   issues: 0,
   selected: false,
   onClick: NOOP,
-  moveTargets: [
-    { id: undefined, label: "Top level" },
-    { id: "field_group_1", label: "Billing" },
-    { id: "field_group_2", label: "Delivery" },
-  ],
-  currentTargetId: undefined,
-  moveControlId: "studio-panels-rail-move-field_1",
-  onMoveTo: NOOP,
   onDragStart: NOOP,
   onDragEnd: NOOP,
   onDrop: NOOP,
@@ -26,16 +20,18 @@ const BASE = {
 };
 
 /**
- * field-catalog-editor-rework task 4.1: the Fields rail row drops to one
- * line — the resolved label, the field's kind, the issue mark. It no
- * longer prints the field's key. This change adds the move control beside
- * it (studio-field-authoring-surface tasks 7.1 to 7.3).
+ * fields-rail-kind-icons tasks 2.1-2.5: the Fields rail row drops its move
+ * `select` and its visible kind word. It leads the label with the field's
+ * kind icon instead — `aria-hidden` on the icon's own wrapper, the kind
+ * name as that wrapper's `title`, and the kind name stays in the button as
+ * hidden text (design.md, decision: "The kind name stays inside the button,
+ * visually hidden"). The keyboard route for the move is now the field's own
+ * editor, not this row.
  */
 describe("PanelsRailFieldRow", () => {
-  it("renders the resolved label and the kind word, and no key text", () => {
+  it("renders the resolved label, and no key text", () => {
     const html = renderToStaticMarkup(<PanelsRailFieldRow {...BASE} />);
     expect(html).toContain(">Amount<");
-    expect(html).toContain(">Number<");
     expect(html).not.toContain("railKey");
   });
 
@@ -47,53 +43,35 @@ describe("PanelsRailFieldRow", () => {
     expect(renderToStaticMarkup(<PanelsRailFieldRow {...BASE} />)).not.toContain("railIssues");
   });
 
-  // The keyboard half of the move gesture (spa-accessibility): a real control
-  // in the tab order, beside the row rather than nested inside it, carrying
-  // the id the screen re-focuses after the move.
-  it("draws the move control outside the row button", () => {
+  // The move's keyboard route left the rail for the field's own editor
+  // (spa-accessibility, design.md decision: "The move control leaves the
+  // rail for the editor"). The row keeps one button and no second control.
+  it("renders no move control", () => {
     const html = renderToStaticMarkup(<PanelsRailFieldRow {...BASE} />);
-    expect(html).toContain('id="studio-panels-rail-move-field_1"');
-    // One button, and it closes before the picker opens: a control nested
-    // inside a button is invalid markup a browser silently unnests.
+    expect(html).not.toContain("<select");
     expect(html.split("<button").length - 1).toBe(1);
-    expect(html.indexOf("</button>")).toBeLessThan(html.indexOf('id="studio-panels-rail-move-field_1"'));
   });
 
-  // The defect this replaced: one arrow reached the nearest group above and
-  // nothing else, so a keyboard user could not name a second group at all.
-  // A drop reaches every group, so the picker offers every group.
-  it("offers every destination a drop reaches", () => {
+  // The icon's own wrapper carries `aria-hidden` and the kind name as its
+  // `title`: a `title` on an element holding no text still counts toward
+  // the button's accessible name, so the attribute has to sit on the
+  // wrapper rather than the icon alone, or a screen reader hears the kind
+  // twice.
+  it("wraps the kind icon in an aria-hidden span carrying the kind name as its title", () => {
     const html = renderToStaticMarkup(<PanelsRailFieldRow {...BASE} />);
-    expect(html).toContain('aria-label="Move this field to"');
-    expect(html).toContain(">Top level<");
-    expect(html).toContain(">Billing<");
-    expect(html).toContain(">Delivery<");
+    expect(html).toContain('aria-hidden="true"');
+    expect(html).toContain('title="Number"');
   });
 
-  // The picker states the membership it writes, so a row inside a group opens
-  // on that group rather than on the top level. React renders the selection
-  // as `selected` on the option, never as a `value` attribute on the select,
-  // so the option's own `value=` proves nothing on its own.
-  it("selects the group the field sits in today", () => {
-    const html = renderToStaticMarkup(<PanelsRailFieldRow {...BASE} currentTargetId="field_group_2" />);
-    expect(html).toContain('value="field_group_2" selected=""');
-    expect(html).not.toContain('value="" selected=""');
+  it("keeps the kind name inside the button, as hidden text", () => {
+    const html = renderToStaticMarkup(<PanelsRailFieldRow {...BASE} />);
+    expect(html.indexOf(">Number<")).toBeGreaterThan(html.indexOf("<button"));
+    expect(html.indexOf(">Number<")).toBeLessThan(html.indexOf("</button>"));
   });
 
-  it("selects the top level for a field that sits in no group", () => {
-    const html = renderToStaticMarkup(<PanelsRailFieldRow {...BASE} currentTargetId={undefined} />);
-    expect(html).toContain('value="" selected=""');
-    expect(html).not.toContain('value="field_group_2" selected=""');
-  });
-
-  it("disables the move control when the row has nowhere to move", () => {
-    const html = renderToStaticMarkup(
-      <PanelsRailFieldRow {...BASE} moveTargets={[{ id: undefined, label: "Top level" }]} />,
-    );
-    expect(html).toContain("railMove");
-    expect(html).toContain("disabled");
-    // A disabled control still carries a name.
-    expect(html).toContain('aria-label="Move this field to"');
+  it("renders no icon for a row naming no field", () => {
+    const html = renderToStaticMarkup(<PanelsRailFieldRow {...BASE} kindIcon={undefined} typeLabel={undefined} />);
+    expect(html).not.toContain("aria-hidden");
   });
 
   it("marks the row a pointer has picked up", () => {

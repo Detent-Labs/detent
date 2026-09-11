@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
 import type { DataSourceDef } from "workflow-engine/schema";
+import type { LucideIcon } from "lucide-react";
 import type { DraftOf } from "../draft/types";
 import type { DraftField } from "../draft/fields";
 import { useDraft } from "../draft/store";
@@ -10,8 +11,8 @@ import { mintId } from "../draft/ids";
 import { addToDraftArray } from "../draft/draft-array-crud";
 import { resolveDraftLocalizedText, seedLocalizedText } from "../draft/localized-text";
 import { flattenDraftFields } from "../draft/fields";
-import { fieldKindWord } from "../draft/field-type-labels";
-import { groupTargetsFor, moveControlId, moveFieldToGroup } from "./fieldCatalogLogic";
+import { fieldKindIcon, fieldKindWord } from "../draft/field-type-labels";
+import { moveControlId, moveFieldToGroup } from "./fieldCatalogLogic";
 import { flattenRailFields, issueCountForEntityId } from "../draft/panel-rail";
 import { moveFieldAndSyncViews } from "../draft/view-group-sync";
 import { FieldCatalogPanel } from "./FieldCatalogPanel";
@@ -30,7 +31,7 @@ const styles = stylex.create({
   layout: {
     display: "grid",
     flex: "1 1 0",
-    gridTemplateColumns: { default: "16rem minmax(0, 1fr)", [NARROW]: "minmax(0, 1fr)" },
+    gridTemplateColumns: { default: "20rem minmax(0, 1fr)", [NARROW]: "minmax(0, 1fr)" },
     gridTemplateRows: { default: "none", [NARROW]: "auto minmax(0, 1fr)" },
     gap: space.s3,
     alignItems: "stretch",
@@ -87,11 +88,9 @@ const styles = stylex.create({
   railRowIndented: {
     paddingLeft: space.s6,
   },
-  // A Fields row holds two controls: the row itself and its move control.
-  // The wrapper carries the hairline and the indentation the single button
-  // carried before, so the pair still reads as one register row. One line,
-  // no wrap: the move control is a fixed cell, so nothing on this row is
-  // measured off an English label.
+  // The row's own wrapper: it carries the hairline, the indentation and the
+  // drop target for the field's drag (`studio-app`). The move itself now
+  // lives in the field's own editor, not on this row.
   railFieldRow: {
     display: "flex",
     alignItems: "baseline",
@@ -105,32 +104,25 @@ const styles = stylex.create({
   railFieldRowDragging: {
     opacity: 0.5,
   },
-  // Inside a row the button shares the line, so it takes the remainder
-  // rather than the `width: 100%` its standalone form uses for "+ Add field"
-  // and the data-source entries. The wrapper draws the hairline.
+  // The wrapper still draws the hairline and the indentation, so the button
+  // takes the remainder of the row rather than the `width: 100%` its
+  // standalone form uses for "+ Add field" and the data-source entries. An
+  // SVG has no text baseline, so the row centers instead of the shared
+  // `railRow`'s `baseline`.
   railFieldInRow: {
     flex: "1 1 9rem",
     minWidth: 0,
     width: "auto",
     borderBottomWidth: 0,
+    alignItems: "center",
     cursor: "grab",
   },
   // `studio-app` requires the rail entry to name its field on one line.
   // `minWidth: 0` lets the flex item shrink below its content's width; the
-  // three properties below then truncate instead of wrapping into it.
-  //
-  // A real `4.5rem` basis, not the zero basis `flex: 1` carries, and not
-  // `railType`'s own auto (content-tracking) basis either. A first pass
-  // gave the name `flex: "1 1 7rem"` and left `railType` on its default
-  // `0 1 auto` — measured (`getBoundingClientRect` against `scrollWidth`
-  // on the live rail) to starve `railType` even for a four-character kind
-  // like "Date", because 7rem alone already exceeds this button's ~86px
-  // typical combined budget for the two spans, and an auto-basis kind
-  // shrinks proportionally right along with it. `railType` below now
-  // carries a matching fixed `3rem` basis instead of auto, so a short kind
-  // word's claim on the row no longer depends on how little it needs —
-  // both spans get a floor sized off the measured typical budget, name
-  // larger since it is the row's primary text.
+  // three properties below then truncate instead of wrapping into it. A
+  // real `4.5rem` basis, not the zero basis `flex: 1` carries: the name is
+  // the row's primary text, so it claims the row ahead of the icon and the
+  // issue mark rather than sharing evenly with them.
   railName: {
     flex: "1 1 4.5rem",
     minWidth: 0,
@@ -144,44 +136,14 @@ const styles = stylex.create({
   railNameSelected: {
     fontWeight: 800,
   },
-  // The field's kind — a word an author reads, so the written face, not
-  // mono. A fixed `3rem` basis, not auto: see `railName`'s comment above.
-  // `minWidth: 0` and the truncation keep a long German kind name
-  // ("Mehrfachauswahl") on the rail's one line, inside its 16rem column.
-  railType: {
-    flex: "0 1 3rem",
-    minWidth: 0,
-    fontSize: "0.8rem",
+  // The field's kind icon, leading the label (design.md, decision: "One
+  // icon per kind"). `aria-hidden` on this wrapper: the kind name reaches
+  // the button's accessible name as hidden text beside the label instead,
+  // so a screen reader never hears the kind twice.
+  railKindIcon: {
+    flex: "none",
+    display: "inline-flex",
     color: colors.textMuted,
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-  },
-  // The move target picker. A select rather than a direction button, because
-  // a drop reaches every group and the keyboard has to reach the same set.
-  // Its options carry group labels, which are prose, so it truncates instead
-  // of wrapping: the closed control shares a 16rem column with the row's own
-  // name and kind, and the option list opens over the rail at full width.
-  // Disabled, it keeps its place — every field entry carries one, as
-  // `studio-app` requires — and states that it has nothing to do rather than
-  // vanishing between renders.
-  railMove: {
-    flex: "0 1 auto",
-    minWidth: 0,
-    maxWidth: "7rem",
-    backgroundColor: colors.surface,
-    color: { default: colors.textMuted, ":hover": colors.text, ":disabled": colors.textMuted },
-    borderWidth: 1,
-    borderStyle: "solid",
-    borderColor: colors.border,
-    paddingBlock: space.s1,
-    paddingInline: space.s2,
-    font: "inherit",
-    fontSize: "0.8rem",
-    lineHeight: 1.4,
-    textOverflow: "ellipsis",
-    opacity: { default: 1, ":disabled": 0.5 },
-    cursor: { default: "pointer", ":disabled": "not-allowed" },
   },
   // The live region the move announces through. Off screen, never
   // `display: none`: a hidden region is announced by no engine.
@@ -216,30 +178,15 @@ interface PanelsRailFieldRowProps {
   issues: number;
   selected: boolean;
   onClick: () => void;
-  /** Every place this row's field may sit, the top level first and then each
-   * group it may join. One entry alone renders the control disabled rather
-   * than dropping it: `studio-app` requires every field entry to carry one.
-   *
-   * The set matches what a drop can reach, which is the point of the picker.
-   * A single direction control reached the nearest group above and no other,
-   * so a keyboard user could not name a second group at all.
-   *
-   * Each label is already resolved. The picker never prints a label at full
-   * width: the option list opens over the rail, and the closed control shows
-   * one truncated line. Measured before the truncation: a wrapped move
-   * sentence on all 22 rows of `purchase_requisition` put the rail at 1867px
-   * inside a 576px pane. */
-  moveTargets: { id: string | undefined; label: string }[];
-  /** The group this field sits in today, `undefined` at the top level. The
-   * picker's own value, so the control states the membership it writes. */
-  currentTargetId: string | undefined;
-  /** The id the move control's own element takes, so the tab can put focus
-   * back on it after the move re-orders the list (`spa-accessibility`). */
-  moveControlId: string;
-  onMoveTo: (targetId: string | undefined) => void;
-  /** The pointer half of the same move. The row is the drag source and every
-   * row is a drop target: dropping on a group moves the dragged field in,
-   * dropping on a row outside any group moves it out. */
+  /** The field's kind icon, leading the label (design.md, decision: "One
+   * icon per kind"). `undefined` only where the row names no field at all —
+   * every other case pairs it with `typeLabel`. */
+  kindIcon: LucideIcon | undefined;
+  /** The pointer half of the move (`studio-app`). The row is the drag source
+   * and every row is a drop target: dropping on a group moves the dragged
+   * field in, dropping on a row outside any group moves it out. The
+   * keyboard route is the move control in the field's own editor
+   * (`spa-accessibility`). */
   onDragStart: () => void;
   onDragEnd: () => void;
   onDrop: () => void;
@@ -247,35 +194,33 @@ interface PanelsRailFieldRowProps {
 }
 
 /**
- * A Fields rail row: the resolved label, the field's kind, the issue mark,
- * and the move control beside them. The row prints no `key`; the key stays
- * visible in the definition half once an author selects that field, where
- * the engine's exact-match value already lives. Pulled out of the render
- * loop so it can be exercised directly, the same reason `FormEditorStrip`
- * sits beside `FormEditorScreen`.
+ * A Fields rail row: the kind icon, the resolved label, and the issue mark,
+ * in one button. The row prints no `key` and no visible kind word; the key
+ * stays in the definition half once an author selects that field. The kind
+ * name is the icon's tooltip, and it stays in the button's accessible name
+ * as hidden text (design.md, decision: "The kind name stays inside the
+ * button, visually hidden"). Pulled out of the render loop so it can be
+ * exercised directly, the same reason `FormEditorStrip` sits beside
+ * `FormEditorScreen`.
  *
- * Two controls, two sibling buttons rather than one nested in the other: a
- * button inside a button is invalid markup, and the move has to be a real
- * control in the tab order (`spa-accessibility`). The wrapper carries the
- * row's hairline and its indentation, so the two read as one row.
+ * The row moves a field by drag alone; the keyboard route is the move
+ * control in the field's own editor (`spa-accessibility`). The wrapper still
+ * carries the row's hairline, its indentation and the drop target, so the
+ * one button still reads as one row.
  */
 export function PanelsRailFieldRow({
   label,
   typeLabel,
+  kindIcon: KindIcon,
   depth,
   issues,
   selected,
   onClick,
-  moveTargets,
-  currentTargetId,
-  moveControlId,
-  onMoveTo,
   onDragStart,
   onDragEnd,
   onDrop,
   dragging,
 }: PanelsRailFieldRowProps) {
-  const moveSentence = t("panelsScreen.moveTargetLabel");
   return (
     <div
       {...stylex.props(
@@ -300,42 +245,26 @@ export function PanelsRailFieldRow({
         aria-current={selected ? "true" : undefined}
         onClick={onClick}
       >
+        {/* `aria-hidden` here, not on the icon alone: a `title` on an
+            element holding no text still counts toward the button's name,
+            and the kind name already reaches that name as hidden text
+            below. With the attribute on the icon alone a screen reader
+            would hear the kind twice. */}
+        {KindIcon && (
+          <span aria-hidden="true" title={typeLabel} {...stylex.props(styles.railKindIcon)}>
+            <KindIcon size={18} strokeWidth={1.75} />
+          </span>
+        )}
         <span title={label} {...stylex.props(styles.railName, selected && styles.railNameSelected)}>
           {label}
         </span>
-        {typeLabel && (
-          <span title={typeLabel} {...stylex.props(styles.railType)}>
-            {typeLabel}
-          </span>
-        )}
+        {typeLabel && <span {...stylex.props(styles.visuallyHidden)}>{typeLabel}</span>}
         {issues > 0 && (
           <span {...stylex.props(styles.railIssues)} aria-label={`${issues} ${t("panelsScreen.issueMark")}`}>
             {issues}
           </span>
         )}
       </button>
-      {/* A target picker, not a direction button. The drop can reach any
-          group by falling on its row, so the keyboard names every group too
-          (`spa-accessibility`: the keyboard reaches what the drag reaches).
-          One arrow reached the nearest group above and nothing else, which
-          left a keyboard user unable to name a second group at all. The
-          picker's own value states where the field sits today, so the
-          control reads the membership it also writes. */}
-      <select
-        id={moveControlId}
-        {...stylex.props(styles.railMove)}
-        disabled={moveTargets.length < 2}
-        aria-label={moveSentence}
-        title={moveSentence}
-        value={currentTargetId ?? ""}
-        onChange={(e) => onMoveTo(e.target.value === "" ? undefined : e.target.value)}
-      >
-        {moveTargets.map((target) => (
-          <option key={target.id ?? ""} value={target.id ?? ""}>
-            {target.label}
-          </option>
-        ))}
-      </select>
     </div>
   );
 }
@@ -467,29 +396,13 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
             // The kind, not the base type: the same word the definition half's
             // kind picker shows for this field.
             const typeLabel = field ? fieldKindWord(field) : undefined;
-            // Every place this field may sit: the top level, then each group a
-            // drop could also reach. Built per row because the excluded set is
-            // the row's own subtree.
-            //
-            // The current parent rides along when it is not one of those
-            // groups. A field can sit inside a parent that is no group:
-            // `changeKind` rewrites a field's type and leaves its `fields` in
-            // place, so a group turned into a Text field keeps its children,
-            // and `flattenRailFields` keeps drawing them. The picker's value
-            // has to name an option the picker holds, or React drops the
-            // selection and the row reads as top-level while it is nested.
-            const parentId = parentGroupId(row.id);
-            const groupTargets = groupTargetsFor(draft.fields ?? [], row.id);
-            const orphanedParent = parentId !== undefined && !groupTargets.includes(parentId) ? [parentId] : [];
-            const moveTargets = [undefined, ...orphanedParent, ...groupTargets].map((id) => ({
-              id,
-              label: id === undefined ? t("panelsScreen.moveTargetTopLevel") : fieldWord(id),
-            }));
+            const kindIcon = field ? fieldKindIcon(field) : undefined;
             return (
               <li key={row.id}>
                 <PanelsRailFieldRow
                   label={label || t("panelsScreen.unnamedField")}
                   typeLabel={typeLabel}
+                  kindIcon={kindIcon}
                   depth={row.depth}
                   issues={rowIssues}
                   selected={selectedFieldId === row.rootId}
@@ -497,10 +410,6 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
                     setSelectedFieldId(row.rootId);
                     setFocusFieldId(row.id);
                   }}
-                  moveTargets={moveTargets}
-                  currentTargetId={parentId}
-                  moveControlId={moveControlId(row.id)}
-                  onMoveTo={(targetId) => moveField(row.id, targetId)}
                   onDragStart={() => setDragFieldId(row.id)}
                   onDragEnd={() => setDragFieldId(undefined)}
                   onDrop={() => dropOnRow(row.id)}
@@ -532,6 +441,7 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
           onAdd={addField}
           onRemove={removeField}
           onShowStep={onShowStep}
+          onMoveField={moveField}
         />
       </div>
     </div>
