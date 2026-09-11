@@ -24,9 +24,19 @@ The move SHALL set the `group` of every view entry whose `ref` names the
 moved field, to the destination group's `key`. A move to the top level
 SHALL remove that key instead of writing it.
 
-The rewrite SHALL reach every step in the draft. It SHALL land in the same
-draft change as the field-array write. A reader between the two writes
-would see a catalog and a set of views that disagree.
+The same contract refuses an entry whose `group` names a card its view
+does not carry. A step's view may carry the moved field without the
+destination group's card. The move SHALL then place that card on the view,
+immediately before the moved field's entry.
+
+A destination nested inside other groups SHALL bring every missing ancestor
+card too, outermost first. Each placed card SHALL name its own parent's key
+as its `group`. A view already carrying a card SHALL gain no second one. A
+move to the top level SHALL place nothing.
+
+The rewrite and every placed card SHALL reach every step in the draft. Both
+SHALL land in the same draft change as the field-array write. A reader
+between the writes would see a catalog and a set of views that disagree.
 
 A note entry SHALL stay untouched. A note names no catalog field, so no
 move can carry it.
@@ -84,6 +94,42 @@ that field's own two halves.
 - **WHEN** the developer moves a group child out to the top level
 - **AND** three step views carry an entry naming that field
 - **THEN** none of the three entries carries a `group` key any more
+
+#### Scenario: A move brings the destination group's card to a form lacking it
+
+- **WHEN** the developer moves a top-level field into a group
+- **AND** a step view carries that field but not the group's card
+- **THEN** that view carries the group's card immediately before the
+  field's entry
+- **AND** the field's entry names the group's key
+
+#### Scenario: A move into a nested group brings the whole missing chain
+
+- **WHEN** the developer moves a field into a group that sits inside
+  another group
+- **AND** a step view carrying the field carries neither group's card
+- **THEN** that view carries the outer card, then the inner card naming
+  the outer key, then the field's entry
+
+#### Scenario: A form already carrying the group's card gains no second one
+
+- **WHEN** the developer moves a field into a group whose card a step view
+  already carries
+- **THEN** that view still carries exactly one card for that group
+
+#### Scenario: A group moved into another group brings the destination card
+
+- **WHEN** the developer moves a group field into a second group
+- **AND** a step view carries the first group's card and its members, but
+  not the second group's card
+- **THEN** that view carries the second group's card immediately before
+  the first group's card
+- **AND** the first group's members keep their places after its card
+
+#### Scenario: A move to the top level places nothing
+
+- **WHEN** the developer moves a group child out to the top level
+- **THEN** every step view keeps the cards it carried, and gains none
 
 #### Scenario: A move leaves a note inside the group alone
 

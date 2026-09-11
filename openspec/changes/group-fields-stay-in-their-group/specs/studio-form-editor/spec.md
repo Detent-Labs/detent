@@ -470,7 +470,7 @@ form's root answers the root rule.
 - **WHEN** the developer uses the move-up command on a group's second
   member
 - **THEN** that member and the group's first member trade places
-- **AND** no entry outside the group moves
+- **AND** no entry outside the group changes its place on the canvas
 
 #### Scenario: A drag out of a group changes nothing
 
@@ -484,3 +484,44 @@ form's root answers the root rule.
 - **WHEN** the developer uses the move-down command on a root entry
   sitting directly above a group card holding three members
 - **THEN** that entry lands below the group card and all three members
+
+### Requirement: A note's strip sets its text, its span, its group and its visibility
+
+Selecting a note SHALL open a strip that sets the note's text. It covers the
+body's base locale and any other locale the body declares. The strip SHALL set
+the note's `span` and its `group`. For `visible` it SHALL offer the same
+condition input a field card's strip offers.
+
+A note has no catalog parent, so its group is a per-step choice. In the form
+editor, the note strip is the one place an author makes that choice. The
+renderer honors a note's `group`, per the `form-ui` capability. A strip
+omitting the control would leave that choice out of an author's reach.
+
+The strip SHALL offer no requiredness, no readonly state and no validation. A
+note carries none of those. Offering them would invite an author to expect a
+value the note never holds.
+
+#### Scenario: An author writes a note's text in the base locale
+
+- **WHEN** an author selects a note and types its text
+- **THEN** the draft records that text under the body's `baseLocale`
+
+#### Scenario: A note's strip offers visibility and group but no requiredness
+
+- **WHEN** an author selects a note
+- **THEN** the strip shows a condition input for `visible`, a span control and
+  a group control
+- **AND** it shows no required, readonly or validation control
+
+#### Scenario: An author places a note inside a group from its strip
+
+- **WHEN** an author selects a note and picks a group field's key in its strip
+- **THEN** the draft records that key as the note's `group`, and the note
+  renders inside that group's container
+
+#### Scenario: The editor reports a note missing its base-locale text
+
+- **WHEN** a step's view holds a note whose text is empty for the body's
+  `baseLocale`
+- **THEN** the editor reports it before publish, rather than letting publish be
+  the first place an author learns of it

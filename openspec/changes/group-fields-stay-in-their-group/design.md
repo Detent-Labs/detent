@@ -28,6 +28,8 @@ the keyboard move reach it. Until now nothing tied that write to
 - A canvas whose nesting matches the preview beside it, without reading the
   preview, for every draft a publish accepts.
 - A move gesture that cannot express something the publish rejects.
+- A catalog move or group key change that keeps every form it touches
+  publishable.
 
 **Non-Goals:**
 
@@ -52,33 +54,40 @@ Alternative considered: normalize the array so members follow their group
 entry. Rejected on two counts. It changes `definitionHash` for a body that
 renders the same. It would also have to run on every load of an older draft.
 
-### Both move commands are sibling swaps
+### Both move commands splice among siblings
 
-Move-up and move-down swap an entry with its previous or next sibling. For a
+Move-up and move-down splice an entry to its previous or next sibling's
+boundary, through `moveViewField`, the operation a drag performs. For a
 member, siblings are the entries naming the same group. For a root entry,
-siblings are the entries naming no group, group cards included.
+siblings are the root entries, group cards included.
 
-That gives the root case its stepping-over behaviour for free. Swapping a root
-entry past a group card moves it past every member the card draws. The members
-never left their own positions.
+That gives the root case its stepping-over behaviour. Moving a root entry past
+a group card moves it past every member the card draws.
 
-Alternative considered: keep the splice-based `moveViewField` and compute a
-target slot per case. Rejected. Two scopes would need two slot computations,
-and a splice renumbers entries that neither gesture named.
+On an interleaved array, the splice shifts an entry outside the group by one
+array index. Its place on the canvas stays put, since nothing renders from
+array position. `studio-view-tree.test.ts` pins that canvas place.
 
-`moveViewField` stays as it is for the drag path, which still names a slot.
+Alternative considered: a two-position swap. Rejected. On an interleaved array
+a swap and a drag shift different entries. The keyboard move would then stop
+matching the drag it stands in for.
 
-### One parentage helper, exported from the engine package
+### A parentage helper in the engine, a draft-shaped walk in the studio
 
-`src/schema/definition.ts` gains a function mapping each field id to its
-parent group's key, or to nothing for a top-level field. `compile.ts`'s
-`checkViewGroupReferences` reads it, and so does the studio through the
-`./schema` export.
+`src/schema/definition.ts` gains `parentGroupKeyById`. It maps each field id
+to its parent group's key, or to nothing for a top-level field. `compile.ts`'s
+`checkViewGroupReferences` reads it.
 
-The engine has no UI dependency, and `packages/web` reaches it only over
-that exports map. A second implementation in the studio would drift from the
-publish check, which is exactly the disagreement
-`field-tree-check-consolidation` exists to prevent.
+The studio keeps its own walk, `view-tree.ts::draftParentGroupKeyById`. The
+engine's helper takes the fully-required `FieldDef[]`. A mid-edit draft's
+catalog is partial: it may lack an `id`, or hold an empty key.
+`fields.ts::flattenDraftFields` stands beside `collectFieldsDeep` for the same
+reason.
+
+The two walks differ on one shape. `changeKind` leaves a former group's
+children in place. The engine hands those children the non-group parent's
+key, and the studio hands them nothing. Aligning the engine's walk to
+`type === "group"` changes a publish verdict, so it needs its own change.
 
 ### A refused drop uses the browser's own no-drop cursor
 
@@ -101,17 +110,39 @@ That keeps list semantics for the members, which carry an order and a count.
 It also matches the element `form-ui` already draws for a group. The 1px
 stroke with no fill is the canvas-group treatment `DESIGN.md` already names.
 
-### One helper keeps the view entries level with the catalog
+### One module keeps the view entries level with the catalog
 
-Two catalog edits can now strand a view entry. Moving a field between groups
-changes its parent, and renaming a group changes the key the entries store.
+Two catalog changes can now strand a view entry. Moving a field between groups
+changes its parent, and changing a group's key changes what the entries store.
 Both leave every entry naming the field or the group pointing at the old
 answer, which the publish then refuses.
 
-One exported helper in `draft/` rewrites the entries for both. Three call
-sites reach it: `EntityTabs.tsx:423`'s `moveField`, and the two key inputs in
-`FieldCatalogPanel.tsx`. Each writes the catalog and the views in one
-`mutate`, so no reader sees the two disagree.
+`draft/view-group-sync.ts` holds one pure write per catalog change. Each
+write changes the catalog and the views together. Its caller runs it inside
+one `mutate`, so no reader sees the two disagree. Three writes cover every
+call site:
+
+- `moveFieldAndSyncViews`, which `EntityTabs.tsx`'s `moveField` calls for both
+  the drag and the keyboard move.
+- `writeGroupKey`, which a group's key input calls on blur and on Enter.
+- `writeGroupLabel`, which a group's label input calls on every keystroke.
+  It keeps the key when the new label derives to nothing.
+
+A move rewrites the moved field's entries and places any card a form lacks.
+Where a view carries the field without its destination group's card, the card
+goes immediately before the field's entry. A nested destination brings its
+whole missing ancestor chain, through `view-tree.ts::missingAncestorCards`.
+A palette drop uses that same walk. A move to the top level places nothing.
+
+A key change matches field entries by catalog parentage. An entry whose `ref`
+names one of the group's direct children takes the new key. A note has no
+parent, so it follows by its old key. It follows only when both keys are
+non-empty and no other group holds either. Otherwise the note keeps the old
+key, and the checks rail reports it.
+
+A group's key input holds the typed text and commits it on blur or Enter.
+Ordinary typing therefore never hands the rewrite a half-typed key, which
+could equal another group's key. Nothing writes `group: ""`.
 
 `moveFieldToGroup` itself keeps its signature. It takes `DraftField[]` and
 answers `DraftField[]`, and it cannot reach `workflow.steps[].view` at all.
@@ -123,16 +154,20 @@ on each draft load. Rejected on two counts. It would silently rewrite a body
 somebody hand-edited in the JSON view. It would also hide the error the
 checks rail exists to report.
 
-### The drag path keeps its splice
+Alternative considered: match a key change's entries by the old key string,
+on every keystroke. Rejected. A key typed through another group's key would
+merge the two groups. A cleared key would send the group's notes to the root.
 
-`moveViewField` splices an entry out and back in at an absolute slot. The
-keyboard path becomes a sibling swap, so the two look like different
-operations on an interleaved array.
+### The drag and the keyboard share one splice
 
-They agree where it counts. A splice shifts the entries between the source
-and the target by one position each. It changes no pair's relative order
-except the moved entry's. Root order therefore survives a member's splice,
-and member order survives a root's. Only the entry the author dragged moves.
+`moveViewField` splices an entry out and back in at an absolute slot. A drag
+names that slot directly. A keyboard move computes it from the sibling
+boundary, so both reach the same operation.
+
+A splice shifts the entries between the source and the target by one
+position each. It changes no pair's relative order except the moved entry's.
+Root order therefore survives a member's splice, and member order survives a
+root's. Only the entry the author moved changes its place on the canvas.
 
 ### The parentage half binds in both directions
 
@@ -210,16 +245,19 @@ catalog does not hold. The check sits on the write path, so
 the body still loads and the editor still opens. The canvas draws such an
 entry at the form's root, and the checks rail reports it.
 
-**The two checks can disagree.** Both read the same exported helper. A
-divergence needs someone to bypass it. The test suite covers the
-publish side; the studio side gets its own unit test over the derived tree.
+**Two walks answer the parentage question.** The engine reads
+`parentGroupKeyById`, and the studio reads `draftParentGroupKeyById`. They
+differ on a non-group field still carrying `fields`, as the decision above
+states. The test suite covers the publish side; the studio side gets its own
+unit test over the derived tree.
 
 **A group with one member shows two dead buttons.** The owner accepted it. The
 alternative moved the remove control between cards, which costs more.
 
-**An interleaved array reorders on sight.** A member swap writes two array
-positions. A reader of the JSON view sees both entries move, while the
-rendered form stays as it was.
+**An interleaved array reorders on sight.** A member's move splices the array.
+On an interleaved array, an entry outside the group shifts its array index by
+one. A reader of the JSON view sees that entry move. Its place on the canvas
+and in the rendered form stays as it was.
 
 ## Migration Plan
 

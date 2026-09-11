@@ -38,8 +38,10 @@ through that select, and nothing on the canvas shows the result.
   move control becomes the one place that answers where a field belongs.
 - That move control gains a second write. Moving a field between groups now
   rewrites the `group` of every view entry naming it, across every step.
-  Renaming a group's key does the same. Without those, the one control the
-  rule points at produces a draft no publish accepts.
+  Where a form carries the field but not its new group's card, the move
+  places that card too. Renaming a group's key rewrites the entries the same
+  way. Without those, the one control the rule points at produces a draft no
+  publish accepts.
 - `examples/purchase-requisition.json` gets its catalog restructured. It places
   40 top-level fields into groups through `group` alone, which the new rule
   rejects. Eight of its fields also sit in a different group per step. `quantity`
@@ -75,8 +77,9 @@ None.
   Removing a group card takes its members with it. A field's strip no longer
   offers a group select.
 - `studio-app`: the catalog rail's field move rewrites the view entries naming
-  the moved field, instead of rewriting no reference at all. A new requirement
-  gives a group's key rename the same treatment.
+  the moved field, instead of rewriting no reference at all. It also places
+  the destination group's card on a form lacking it. A new requirement gives a
+  group's key rename the same treatment.
 
 `form-ui` is untouched. It already reads membership from `group` and draws the
 container. The rule above only narrows which values reach it.
