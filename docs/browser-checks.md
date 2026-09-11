@@ -3116,7 +3116,8 @@ In the dark scheme the accent lightens with the ground. Pass: the accent text
 still reads on the dark surface.
 
 Redact data and Delete list also reach a disabled state. Pass: each drops to
-45% opacity. At rest, its text and border still read in the accent.
+45% opacity. Its text and border still read in the accent, at rest and under
+the pointer.
 
 **Processes list.** Create a draft of any process. Its row shows Discard
 beside Open. Open is the plain control.
