@@ -89,10 +89,6 @@ const DRAFT = {
   },
 } as unknown as Draft;
 
-const PROCESSES = [
-  { processId: "proc_credit", version: 1, definitionHash: "h", key: "credit", label: { en: "Credit check" }, baseLocale: "en" },
-] as never[];
-
 function render(over: { current?: string; issues?: EditorIssue[]; draft?: Draft } = {}): string {
   return renderToStaticMarkup(
     <DraftContext.Provider value={contextValue(over.draft ?? DRAFT, over.issues ?? [])}>
@@ -101,7 +97,6 @@ function render(over: { current?: string; issues?: EditorIssue[]; draft?: Draft 
         onSelectStep={() => {}}
         onReorder={() => {}}
         onAddStep={() => {}}
-        processes={PROCESSES}
       />
     </DraftContext.Provider>,
   );
