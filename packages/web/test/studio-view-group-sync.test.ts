@@ -10,11 +10,13 @@ import {
   writeGroupLabel,
 } from "../src/areas/studio/draft/view-group-sync";
 
-/** The catalog stays level with the views: the writes a field-catalog move,
- * a group-key edit and a group-label edit each owe every view entry naming
- * the field or the group. Follows `studio-view-tree.test.ts`'s fixture shape,
- * but these functions read the whole `Draft` -- the catalog plus every
- * step's `workflow.steps[].view` -- rather than one step's `rows` array. */
+/** The catalog stays level with the views. A field-catalog move owes every
+ * view entry naming the moved field. A group-key edit and a group-label edit
+ * each owe the entries of the group's direct children, and a note on the old
+ * key only when both keys are non-empty and no other group field holds
+ * either. Follows `studio-view-tree.test.ts`'s fixture shape, but these
+ * functions read the whole `Draft` -- the catalog plus every step's
+ * `workflow.steps[].view` -- rather than one step's `rows` array. */
 
 const id = (s: string) => s as FieldId;
 
@@ -406,6 +408,20 @@ describe("writeGroupKey", () => {
     expect(rowsOf(draft)[0]).toEqual([ref("a", "unique"), note("Which one?", "dup")]);
   });
 
+  it("carries no note into a key a nested group already holds", () => {
+    // Protects `heldElsewhere`'s reach into nested groups: `inner` sits inside
+    // `outer`, so a lookup over the top-level catalog alone would miss it and
+    // let the note follow into `inner`.
+    const draft = draftWith(
+      [group("g", "g", [leaf("a", "a")]), group("outer", "outer", [group("inner", "inner", [leaf("z", "z")])])],
+      [ref("g"), ref("a", "g"), note("In g", "g")],
+    );
+
+    writeGroupKey(draft, "g", "inner");
+
+    expect(rowsOf(draft)[0]).toEqual([ref("g"), ref("a", "inner"), note("In g", "g")]);
+  });
+
   it("gives a group's first key to every entry naming one of its direct children, across three steps", () => {
     const draft = draftWith(
       [group("g", "", [leaf("child_a", "child_a"), leaf("child_b", "child_b")])],
@@ -448,7 +464,7 @@ describe("writeGroupLabel", () => {
       [ref("a", key)],
     );
 
-  it("renames a label-locked group's key and rewrites every view entry naming it, across steps", () => {
+  it("renames a label-locked group's key and rewrites its children's entries and its note, across steps", () => {
     const draft = lineItemDraft("line_item");
 
     writeGroupLabel(draft, "li", { en: "Line Items" }, "en");
@@ -468,6 +484,21 @@ describe("writeGroupLabel", () => {
 
     expect(catalogField(draft, "li")!.key).toBe("line_item");
     expect(catalogField(draft, "li")!.label).toEqual({ en: "!!!" });
+    expect(rowsOf(draft)[0]).toEqual([ref("li"), ref("a", "line_item"), note("Per line", "line_item")]);
+  });
+
+  it("keeps the group's key and its entries when the new label derives to nothing beside a key-less group", () => {
+    // Protects the empty derivation from deduping against a key-less
+    // field's `""`: `dedupeKey("", taken)` answers `_2` while `taken` holds
+    // `""`, and the group, its member and its note would all move to `_2`.
+    const draft = draftWith(
+      [group("li", "line_item", [leaf("a", "a")], "Line Item"), group("blank", "")],
+      [ref("li"), ref("a", "line_item"), note("Per line", "line_item")],
+    );
+
+    writeGroupLabel(draft, "li", { en: "!!!" }, "en");
+
+    expect(catalogField(draft, "li")!.key).toBe("line_item");
     expect(rowsOf(draft)[0]).toEqual([ref("li"), ref("a", "line_item"), note("Per line", "line_item")]);
   });
 

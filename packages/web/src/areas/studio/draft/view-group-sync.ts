@@ -121,8 +121,9 @@ export function syncViewGroupsOnFieldMove(draft: Draft, fieldId: string, newGrou
  *   non-empty and no other group field holds either one. A note has no
  *   catalog parent, so the old key is its only tie to this group, and a key
  *   another group holds ties it to that group as well. Otherwise the note
- *   keeps `oldKey`, and the checks rail reports it rather than the form
- *   losing it.
+ *   keeps `oldKey`. While no group field its view carries holds `oldKey`,
+ *   the checks rail reports it rather than the form losing it; while one
+ *   does, the note draws in that group's box.
  * - On a tabbed view the rewrite keeps the tab rules. A cleared key lifts
  *   each child's entry to the root, where it takes the tab it drew on: the
  *   tab of the outermost card holding this group's own entry
@@ -206,13 +207,15 @@ export function writeGroupKey(draft: Draft, groupFieldId: string, newKey: string
  * as the prior label's derivation) through `writeGroupKey`, so the views
  * follow. A label deriving to an empty key keeps the current key, so clearing
  * a label never clears a key the views name. `nextFieldKey` dedupes against
- * every other catalog key, so the derived key never lands on another group's.
+ * every other non-empty catalog key, so the derived key never lands on another
+ * group's. A key-less field stays out of that set: a `""` in it dedupes an
+ * empty derivation to `_2`, which would rename the group.
  */
 export function writeGroupLabel(draft: Draft, groupFieldId: string, label: DraftField["label"], baseLocale: string): void {
   const fields = draftFields(draft);
   const group = fields.find((f) => f.id === groupFieldId);
   if (!group) return;
-  const taken = new Set(fields.filter((f) => f.id !== groupFieldId).map((f) => f.key ?? ""));
+  const taken = new Set(fields.filter((f) => f.id !== groupFieldId).map((f) => f.key ?? "").filter((key) => key !== ""));
   const derivedKey = nextFieldKey(group.key ?? "", group.label, label, baseLocale, taken);
   group.label = label;
   if (derivedKey) writeGroupKey(draft, groupFieldId, derivedKey);
