@@ -66,6 +66,16 @@ name. The validator matches scenario names character for character, in strict
 mode. The other requirement names the walk in its own header. A REMOVED plus
 ADDED pair states both changes cleanly.
 
+**The canvas bar's requirement takes a MODIFIED block.** Its header names no
+order. The delta keeps that header and rewrites one sentence. Its sibling in
+the same capability names the walk in its header, which a MODIFIED block cannot
+reword.
+
+**The move control's press is a browser check.** This package ships no DOM test
+library, and `renderToStaticMarkup` fires no event. The unit cases assert what
+the rail renders: both controls per row, and the two disabled ends. The press
+and its effect run in the browser check `docs/browser-checks.md` holds.
+
 **The mockup replaces the shape step.** No layout changes, so that step has
 nothing to decide. The owner picked the behaviour from four rendered variants.
 That page is the decision record. The detector still runs after every write
