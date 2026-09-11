@@ -38,6 +38,21 @@ The rewrite and every placed card SHALL reach every step in the draft. Both
 SHALL land in the same draft change as the field-array write. A reader
 between the writes would see a catalog and a set of views that disagree.
 
+A tabbed form keeps the definition contract's tab rules through the move.
+Each entry's former tab is the tab the form editor's canvas drew it on. A
+root's former tab is its own, and a member's is its outermost group card's.
+
+An entry the move puts inside a group SHALL lose its `tab`, since its card
+names the tab. A card the move places at the form's root SHALL take that
+entry's former tab. An inner card of a placed chain SHALL have no `tab`. An
+entry the move lifts to the top level SHALL take its former tab. On a form
+declaring no tabs, the move SHALL write no `tab` anywhere.
+
+A group moved into another group follows the same rule. Its own card loses
+its `tab`, and the destination card holds the tab instead. A card the move
+places takes the moved card's former tab. A card the form already carries
+keeps its own.
+
 A note entry SHALL stay untouched. A note names no catalog field, so no
 move can carry it.
 
@@ -130,6 +145,44 @@ that field's own two halves.
 
 - **WHEN** the developer moves a group child out to the top level
 - **THEN** every step view keeps the cards it carried, and gains none
+
+#### Scenario: A move into a group takes the entry's tab off
+
+- **WHEN** the developer moves a top-level field into a group
+- **AND** a tabbed step view carries that field on its second tab, but not the
+  group's card
+- **THEN** that view carries the group's card on the second tab, immediately
+  before the field's entry
+- **AND** the field's entry names the group's key and has no `tab`
+
+#### Scenario: Only the outermost placed card takes the tab
+
+- **WHEN** the developer moves a field on a tabbed form into a group nested
+  inside another group
+- **AND** that view carries neither group's card
+- **THEN** the outer card carries the field's former tab
+- **AND** neither the inner card nor the field's entry carries a `tab`
+
+#### Scenario: A move to the top level gives the entry its card's tab
+
+- **WHEN** the developer moves a group child out to the top level
+- **AND** a tabbed step view carries the child inside a group card on the
+  second tab
+- **THEN** the child's entry names the second tab
+
+#### Scenario: A form without tabs gains no tab from a move
+
+- **WHEN** the developer moves a group child out to the top level
+- **AND** a step view carrying it declares no tabs
+- **THEN** the child's entry has no `tab`
+
+#### Scenario: A group moved into a group hands its tab to the destination card
+
+- **WHEN** the developer moves a group field into a second group
+- **AND** a tabbed step view carries the first group's card on its second tab,
+  but not the second group's card
+- **THEN** that view carries the second group's card on the second tab
+- **AND** the first group's card has no `tab`
 
 #### Scenario: A move leaves a note inside the group alone
 

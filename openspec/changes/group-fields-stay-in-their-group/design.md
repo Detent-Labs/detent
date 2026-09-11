@@ -169,7 +169,23 @@ position each. It changes no pair's relative order except the moved entry's.
 Root order therefore survives a member's splice, and member order survives a
 root's. Only the entry the author moved changes its place on the canvas.
 
-### The parentage half binds in both directions
+### On a tabbed form, the tab bounds a root and the group bounds a member
+
+A tabbed form draws one tab at a time (`form-view-tabs`). The canvas draws
+the tree's roots that `drawnRows` places on the shown tab. A card draws its
+members wherever it draws, since a member has no `tab`. The tree and the tab
+filter therefore agree on every entry a tab draws.
+
+The keyboard move and the drag read the same two bounds. A root's siblings
+are the roots the shown tab draws, and a member's are its group's members. A
+drag scope names a tab for a root and a group for a member.
+
+A write that changes an entry's group keeps the tab rules. The entry's former
+tab is the tab the canvas drew it on, `view-layout.ts::homeTab`. Joining a
+group clears the entry's `tab`, and a card placed at the root takes the
+former tab. Leaving for the top level gives the entry its former tab.
+
+### The parentage clause binds in both directions
 
 A field entry whose catalog parent is a group must declare that group's key.
 An absent or an empty `group` on such an entry fails to publish, exactly as a

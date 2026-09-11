@@ -67,10 +67,10 @@ None.
 
 ### Modified Capabilities
 
-- `definition-contract`: one requirement gains a parentage half for field
+- `definition-contract`: one requirement gains a parentage clause for field
   entries. It is the one titled "A view entry's group names a group field the
   same view carries". It loses the paragraph permitting an entry to name any
-  group the view carries. The note half stays as written.
+  group the view carries. The note clause stays as written.
 - `studio-form-editor`: the canvas nests a group's members inside its card. The
   palette drop places a group's field into its group, and places the group's
   own card where that is missing. The group bounds every move command.
@@ -89,7 +89,7 @@ container. The rule above only narrows which values reach it.
 - `src/schema/compile.ts`. `checkViewGroupReferences` gains the parentage
   check, on the write path. That follows the placement criterion the
   requirement already states. Three published bodies violated the earlier
-  half, and a schema refinement would strand every instance pinned to one of
+  clause, and a schema refinement would strand every instance pinned to one of
   them.
 - `packages/web/src/areas/studio/draft/view-layout.ts`. The group-aware move,
   the group-aware insert, and the cascading remove.

@@ -19,9 +19,9 @@ tree.
 
 ## 3. The publish check
 
-- [x] 3.1 Extend `checkViewGroupReferences` with the parentage half, reading the helper
+- [x] 3.1 Extend `checkViewGroupReferences` with the parentage clause, reading the helper
 - [x] 3.2 Message names the step, the entry index and the group the catalog declares
-- [x] 3.3 Leave a note entry exempt; its `group` still answers the first two halves
+- [x] 3.3 Leave a note entry exempt; its `group` still answers the first two clauses
 - [x] 3.4 Add rejection tests: wrong group, group on a top-level field, one field across steps
 - [x] 3.5 Add an acceptance test for a note naming a group no catalog tie binds
 - [x] 3.6 Reject a grouped field's entry that declares no group, or an empty one
