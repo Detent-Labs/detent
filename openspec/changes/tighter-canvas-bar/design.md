@@ -79,6 +79,11 @@ state, so the row never falls under one control's height. The group name
 field becomes a flex row: the label, 8px of gap, then the input. The label
 keeps its 11px uppercase slate style and loses its absolute position.
 
+The bar also sets `flexShrink: 0`. Its `overflowX: auto` gives it an
+automatic minimum height of 0. Without the rule, the `tabBody` column in
+`EditScreen.tsx` shrinks the bar to 17px in windows under about 872px tall.
+With it, the tab body scrolls past the canvas's 36rem floor instead.
+
 The input takes the button's type: 14px at `line-height: normal`. Today it
 inherits the body's 15px at that same `normal`, which draws it 38px. That is
 one pixel taller than Add step. A 1.5 line height would draw it 39px. With the
