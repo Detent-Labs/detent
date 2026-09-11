@@ -2,9 +2,9 @@
 
 ### Requirement: A destructive control renders outlined in the accent
 
-A control that commits a destructive action SHALL carry the literal class
-`.btn-destructive` beside `.btn-secondary`. That covers every area of
-`packages/web`.
+Every control carrying the literal class `.btn-destructive` SHALL also carry
+`.btn-secondary`. That covers every area of `packages/web`. Which controls
+carry the class stays as it stands.
 
 Such a control SHALL render its text and its border in the accent. Its
 background SHALL stay transparent at rest. It SHALL render neither filled nor
@@ -18,7 +18,7 @@ draw the shared accent focus ring.
 
 #### Scenario: Cancel instance shows the accent outline
 
-- **WHEN** an operator opens an instance the operator may cancel
+- **WHEN** an operator opens a running instance
 - **THEN** the Cancel instance control's computed text color and border color
   equal the accent
 - **AND** its computed background is transparent
@@ -31,8 +31,7 @@ draw the shared accent focus ring.
 
 #### Scenario: A destructive control differs from the secondary one beside it
 
-- **WHEN** the draft confirmation dialog shows its destructive control beside
-  Cancel
+- **WHEN** the instance screen shows Cancel instance beside Refresh
 - **THEN** the two controls differ in text color and in border color
 
 #### Scenario: A disabled destructive control keeps the accent
