@@ -3,6 +3,7 @@
 - [x] 1.1 Move the `.btn-destructive` block in `tokens.css` below `.btn-secondary:active`
 - [x] 1.2 Extend that block's comment with the order it needs and the test pinning it
 - [x] 1.3 Add a `.btn-destructive:hover` and `:active` rule reading `--color-accent-on-muted`, after the block
+- [x] 1.4 Add a `.btn-destructive:disabled` rule restoring `--color-accent`, after the hover and press rule
 
 ## 2. Call sites
 

@@ -72,6 +72,9 @@ to it. The wash stays, and the rest state keeps the plain accent. The token
 picks a step per scheme. In light, `#ae1800` reads 5.60:1 on hover and 4.86:1
 pressed. In dark, `#ff9783` reads 6.54:1 and 5.25:1.
 
+A `.btn-destructive:disabled` rule follows the hover and press rule, so a
+disabled control keeps the accent under the pointer.
+
 The primary control already changes its accent step under the pointer. Its
 background reads `--color-accent-600` on hover and `--color-accent-700`
 pressed.
@@ -99,16 +102,18 @@ call sites and `DESIGN.md`, for the same rendered result.
 ### A source-reading test, and a browser walk for the look
 
 One `bun:test` file reads `tokens.css` and the `packages/web/src` sources as
-text. It asserts three facts:
+text. It asserts four facts:
 
 - The `.btn-destructive` rule starts after the last `.btn-secondary` rule.
 - The `.btn-destructive:hover` and `:active` rule starts after it too, and
   sets text and border to `--color-accent-on-muted`.
+- The `.btn-destructive:disabled` rule starts after the hover and press rule,
+  and sets text and border back to `--color-accent`.
 - Every `className` value naming `btn-destructive` also names `btn-secondary`.
 
 That split follows `development-toolchain`'s "A browser check lands as an
 assertion or as a checklist entry". This repository produced the defect, and
-proposal.md's Why records it with the 2026-09-11 measurement. All three facts
+proposal.md's Why records it with the 2026-09-11 measurement. All four facts
 read without a browser.
 
 Whether the accent renders stays a visual judgment. It lands in
