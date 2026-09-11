@@ -73,7 +73,8 @@ with no exception.
 Lucide icons appear at 18px with a 1.75 stroke and inherit `currentColor`.
 An icon never appears alone in place of a label. It sits beside a label, or
 it works as decoration you can delete without losing meaning. An icon may
-stand in for a secondary word beside a label.
+stand in for a secondary word beside a label. That word stays its tooltip,
+and it stays part of the accessible name.
 
 ## Components
 
