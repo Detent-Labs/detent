@@ -6,9 +6,11 @@
   array runs call, end, task. Let the call reach the task, and the task reach
   the end. Assert the rail numbers the call one, the end two and the task
   three. Confirm that case fails against today's code.
-- [ ] 1.2 Add a case to `studio-stepsRail.test.tsx` for a move control moving
-  its own row. Drop the file's `registerOrder` import. Point its header comment
-  at the added requirement. Confirm the new case fails against today's code.
+- [ ] 1.2 Add a case to `studio-stepsRail.test.tsx` asserting each row carries
+  both move controls. Assert the first row's Move earlier and the last row's
+  Move later stand disabled. The press itself belongs to the browser check in
+  2.2, because this package ships no DOM test library. Drop the file's
+  `registerOrder` import. Point its header comment at the added requirement.
 - [ ] 1.3 Make `StepsRail.tsx` list `draft.workflow.steps` and drop its
   `registerOrder` import. Correct the docblock that states the old order.
   Verify: the new rail cases pass and `bun run typecheck` passes.
@@ -22,9 +24,7 @@
   Give `studio-formCardRows.test.ts` a fixture whose array order differs from
   the graph order. Assert the card order follows the array. Correct the
   docblocks at `formCardRows.ts:89` and `FormsTab.tsx:171`, and the catalog
-  comment at `i18n/catalogs/studio.ts:509`. Verify: its cases pass, and
-  `git grep -n 'reachability order' -- packages/web` returns nothing once 1.6
-  lands.
+  comment at `i18n/catalogs/studio.ts:509`. Verify: its cases pass.
 - [ ] 1.6 Remove `registerOrder` from `draft/registerOrder.ts`, keeping
   `reachableStepIds`. Correct that file's surviving docblock, which names the
   removed function twice. In `studio-registerOrder.test.ts`, drop the cases for
@@ -32,7 +32,8 @@
   `reachableStepIds` block, with its first case narrowed. Drop its
   `registerOrder` assertion, and name that case "holds a reached terminal
   step". Verify: a grep for `registerOrder(` over `packages/web` finds no call
-  site, and `bun run typecheck` passes.
+  site, `git grep -n 'reachability order' -- packages/web` returns nothing, and
+  `bun run typecheck` passes.
 
 ## 2. Prose
 
