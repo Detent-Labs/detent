@@ -4,26 +4,26 @@
 
 A `view.fields[].group` SHALL name the `key` of a `type: "group"` field the
 body declares, at any depth in the catalog. The same view SHALL carry a field
-entry whose `ref` names that group field. A body failing either half SHALL
+entry whose `ref` names that group field. A body failing either clause SHALL
 fail to publish.
 
-Both halves earn their place. The renderer draws only the entries carrying no
+Both clauses earn their place. The renderer draws only the entries carrying no
 `group`, and a group field draws the entries naming its own key. A `group`
 naming nothing therefore hides its entry. A `group` naming a field the view
 leaves out hides it the same way. Neither shape produces a message today, and
 the author meets a blank form.
 
 An absent `group` and an empty one both mean the entry sits at the form's
-root. The first two halves reach a non-empty `group` alone. The third half
+root. The first two clauses reach a non-empty `group` alone. The third clause
 below reaches every field entry, whatever its `group` says.
 
-A third half applies to a field entry, one carrying a `ref`. Its `group` SHALL
-name the `key` of the group field that holds that field in the catalog's own
-`fields`. The catalog answers where a field belongs, once, for the whole
+A third clause applies to a field entry, one carrying a `ref`. Its `group`
+SHALL name the `key` of the group field that holds that field in the catalog's
+own `fields`. The catalog answers where a field belongs, once, for the whole
 process. An entry naming any other group field SHALL fail to publish. A field
 the catalog holds at the top level SHALL have no `group` at all.
 
-The half binds in both directions. A field entry whose catalog parent is a
+The clause binds in both directions. A field entry whose catalog parent is a
 group SHALL declare that group's key. An absent or an empty `group` on such
 an entry SHALL fail to publish. Otherwise a hand-authored body could lift a
 grouped field onto the form's root. The catalog would still hold it in a
@@ -33,15 +33,15 @@ A group whose own `key` is empty is the one exception. Its children can name
 nothing, so they SHALL have no `group` either. Such a body fails the field-key
 grammar on its own, so the exception never reaches a publish.
 
-That half reaches a group field's own entry the same way. A group nested
+That clause reaches a group field's own entry the same way. A group nested
 inside another group carries the outer group's key, and no other.
 
-A note entry is exempt from the parentage half. A note names no catalog field,
-so no group holds it. Its `group` may name any group field the same view
-carries. The first two halves still bind it.
+A note entry is exempt from the parentage clause. A note names no catalog
+field, so no group holds it. Its `group` may name any group field the same
+view carries. The first two clauses still bind it.
 
 The compile pass carries this check, on the write path. Three published bodies
-violate the first two halves today, and more violate the parentage half. A
+violate the first two clauses today, and more violate the parentage clause. A
 schema refinement sits on the read path, so it would strand every instance
 pinned to one of them. That is the placement criterion
 `An authoring invariant argues its own placement` already states.

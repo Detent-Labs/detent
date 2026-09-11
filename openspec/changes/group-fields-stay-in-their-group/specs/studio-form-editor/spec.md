@@ -39,6 +39,96 @@ that no publish accepts. Nothing on the canvas would explain it.
   group
 - **THEN** the group card stays on the canvas, with its other members
 
+### Requirement: On a tabbed form, a group card holds its members on its own tab
+
+On a tabbed form the canvas SHALL draw the shown tab's root entries. A group
+card among them SHALL nest its members, and a member SHALL draw nowhere else.
+A member has no `tab` of its own, so its card's tab is its tab. The canvas
+and the preview then agree on which entries each tab draws.
+
+A root entry's move commands SHALL step among the roots the shown tab draws.
+A move past a group card SHALL clear the card and every member at once. An
+entry another tab draws SHALL neither stop the move nor count as a step. A
+member's move commands SHALL step among its own group's members, whatever tab
+the canvas draws.
+
+A root card's drag SHALL land only among the roots its own tab draws. A
+member's drag SHALL land only among its own group's members. No canvas drop
+SHALL place a member outside its group.
+
+A palette drop on a tabbed form SHALL give the shown tab to the one root entry
+it places. That entry is the outermost group card it places, or a top-level
+field. A member and an inner card SHALL have no `tab`. A member joining a
+card the form already carries SHALL land on that card's tab.
+
+Removing a group card on a tabbed form SHALL remove its members as it does on
+an untabbed form. Every other entry SHALL keep its `tab`.
+
+Adding the first tab SHALL give its key to the root entries alone. Removing a
+tab SHALL move a group card on it like any root entry. The card's members
+SHALL move with it.
+
+#### Scenario: A tab draws a group card with its members
+
+- **WHEN** a tabbed form's first tab holds a group card with two members
+- **AND** its second tab holds a root field
+- **THEN** the canvas on the first tab draws both members inside the group card
+- **AND** it draws no card for the root field
+
+#### Scenario: A group card draws on no other tab
+
+- **WHEN** the developer selects the second tab of that form
+- **THEN** the canvas draws the root field alone, and neither the group card
+  nor a member
+
+#### Scenario: A root's move steps over a group and past another tab's entry
+
+- **WHEN** the developer uses the move-down command on a root field directly
+  above a group card on the shown tab
+- **AND** an entry the second tab draws sits between the two in the view array
+- **THEN** the root field lands below the group card and all its members on
+  the canvas
+- **AND** the second tab draws that entry where it drew it before
+
+#### Scenario: A member's move reads its group alone
+
+- **WHEN** the developer uses the move-down command on a group's first member
+  on a tabbed form
+- **THEN** that member and the group's second member trade places
+
+#### Scenario: A root's drag stays on its tab
+
+- **WHEN** the developer drags a root card on a tabbed form
+- **THEN** only drop slots among the roots of that card's own tab accept it
+
+#### Scenario: A palette drop gives the tab to the outermost card
+
+- **WHEN** the catalog nests a field inside a group inside another group
+- **AND** the developer drags that field onto a tabbed form carrying neither card
+- **THEN** the outer group card carries the shown tab
+- **AND** neither the inner group card nor the member carries a `tab`
+
+#### Scenario: Removing a group card on a tabbed form
+
+- **WHEN** the developer removes a group card holding two members on a tabbed
+  form
+- **THEN** the view carries neither the card nor either member
+- **AND** every other entry keeps the `tab` it carried
+
+#### Scenario: The first tab gives no member a tab
+
+- **WHEN** the developer adds the first tab to a form holding a group card and
+  its members
+- **THEN** the group card carries the new tab, and no member carries a `tab`
+
+#### Scenario: Removing a tab carries a group card's members along
+
+- **WHEN** a form holds two tabs, with a group card and its members on the
+  second
+- **AND** the developer removes the second tab
+- **THEN** the group card names the first tab
+- **AND** its members still sit inside it, carrying no `tab`
+
 ## MODIFIED Requirements
 
 ### Requirement: A left palette lists catalog fields not yet on the form, and offers minting a new one
@@ -525,3 +615,75 @@ value the note never holds.
   `baseLocale`
 - **THEN** the editor reports it before publish, rather than letting publish be
   the first place an author learns of it
+
+### Requirement: A selected entry's strip assigns it to a tab
+
+The strip that already sets an entry's overrides SHALL carry a tab picker. It
+SHALL list the form's tabs and write the selected entry's `tab`. This covers
+both entry kinds. A note's strip carries the picker beside the note's group
+picker. A field's strip has no group picker, since the field catalog decides
+a field's group.
+
+The picker SHALL stay inert for an entry that names a group. Its group
+decides its tab, per the definition contract's rule that a group and its
+members share one tab. The picker SHALL show that group's tab, with a note
+saying the group decides it.
+
+Assigning a note to a group SHALL clear that note's own `tab`. Clearing a
+note's group on a tabbed form SHALL set its `tab` to the tab the canvas is
+showing. A field entry's group changes through the catalog move alone. The
+`studio-app` capability states what that move does on a tabbed form. Neither
+path leaves a draft the contract rejects.
+
+The picker SHALL offer no empty choice on a tabbed form. A root entry there
+always names a tab. No selectable state then reaches a draft the contract
+rejects.
+
+Moving a group between tabs SHALL move its members with it. The members have
+no `tab` of their own, so nothing else has to change.
+
+#### Scenario: The picker writes the selected entry's tab
+
+- **WHEN** the developer selects a root field and picks the second tab
+- **THEN** the draft records `tab` on that entry, and the card leaves the
+  first tab's canvas
+
+#### Scenario: A grouped entry's picker stays inert and says why
+
+- **WHEN** the developer selects a field that names a group
+- **THEN** the tab picker shows the group's tab and stays inert
+- **AND** it states that the group decides the tab
+
+#### Scenario: A field's strip offers a tab picker and no group picker
+
+- **WHEN** the developer selects a root field on a tabbed form
+- **THEN** the strip shows the tab picker
+- **AND** it shows no control for `group`
+
+#### Scenario: Moving a field into a group clears its tab
+
+- **WHEN** the canvas shows a root field on a tabbed form
+- **AND** the developer moves that field into a group in the field catalog
+- **THEN** the entry carries the group and no longer carries a `tab`
+
+#### Scenario: Moving a field out of a group assigns the shown tab
+
+- **WHEN** the canvas shows a group card and its member field on the second tab
+- **AND** the developer moves that field out of the group in the field catalog
+- **THEN** that entry names the second tab
+
+#### Scenario: Placing a note in a group clears its tab
+
+- **WHEN** the developer picks a group in a root note's strip
+- **THEN** the note entry carries the group and no longer carries a `tab`
+
+#### Scenario: Taking a note out of a group assigns the shown tab
+
+- **WHEN** the developer clears a note's group while the canvas shows the
+  second tab
+- **THEN** that note names the second tab
+
+#### Scenario: A note takes a tab the same way a field does
+
+- **WHEN** the developer selects a note and picks the third tab
+- **THEN** the draft records `tab` on the note entry
