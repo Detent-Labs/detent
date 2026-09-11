@@ -28,7 +28,7 @@ function draftFieldsById(catalogFields: DraftField[]): Map<FieldId, DraftField> 
  * - a field's `id` may be `undefined`; such a field holds no map entry,
  *   where the contract's version would key one on `undefined`
  * - a group's `key` may be `undefined` or empty; its children then map to
- *   nothing, the same as a top-level field (checkbox 4.4's case)
+ *   nothing, the same as a top-level field
  * - a parent carrying `fields` is not necessarily a `group` any more --
  *   `changeKind` (`EntityTabs.tsx`) rewrites a field's type and leaves its
  *   `fields` in place, so a group turned into a Text field keeps its
@@ -54,7 +54,7 @@ export function draftParentGroupKeyById(fields: DraftField[]): Map<FieldId, stri
 
 /** True for a placed entry that is a group's own card: a field entry whose
  * catalog field is `type: "group"` and carries a non-empty `key`. A
- * key-less group draws no card at all (checkbox 4.4) -- its own entry falls
+ * key-less group draws no card at all -- its own entry falls
  * through as a plain leaf, the same as any other entry whose `group` never
  * resolves. */
 function isGroupCard(entry: DraftViewEntry, fieldsById: Map<FieldId, DraftField>): boolean {
@@ -66,7 +66,7 @@ function isGroupCard(entry: DraftViewEntry, fieldsById: Map<FieldId, DraftField>
 /** Every group card's own row index, by the key that names it. Built from
  * the ROWS the view actually carries, not the catalog: a card the view
  * drops leaves its key absent here, which is exactly how "the view does not
- * carry" (checkbox 4.3) reads as unresolved below. */
+ * carry" reads as unresolved below. */
 function groupCardIndexByKey(rows: DraftViewEntry[], fieldsById: Map<FieldId, DraftField>): Map<string, number> {
   const out = new Map<string, number>();
   rows.forEach((entry, index) => {
@@ -79,8 +79,8 @@ function groupCardIndexByKey(rows: DraftViewEntry[], fieldsById: Map<FieldId, Dr
 
 /** The row index of the card an entry's own `.group` names, or `undefined`
  * for a root entry -- either one that carries no `group` at all, or one
- * whose `group` never resolves to a present card (checkbox 4.3: never
- * hidden, drawn at the root instead). This is the one place both the tree
+ * whose `group` never resolves to a present card (never hidden, drawn at
+ * the root instead). This is the one place both the tree
  * builder and the scoped move read a field's or a note's parent, so neither
  * can disagree about who is whose sibling. */
 function groupOf(entry: DraftViewEntry, cardIndexByKey: Map<string, number>): number | undefined {
@@ -99,7 +99,7 @@ export interface ViewTreeNode {
   /** Present, even as `[]`, only when this node is a group's own card
    * (`isGroupCard`). Absent for every other entry, whether or not it
    * happens to carry a `.group` of its own: an unresolved `.group` makes
-   * this a root leaf (checkbox 4.3), and a resolved one makes it someone
+   * this a root leaf, and a resolved one makes it someone
    * else's member instead of a root at all. Presence, not `.length`, is
    * the discriminant a renderer needs: a card with zero members still
    * draws a card. */
@@ -109,15 +109,16 @@ export interface ViewTreeNode {
 /**
  * The canvas's nested read of a step's view: the roots, and per group entry
  * its members, each node carrying that entry's own index in the original
- * array. Nothing here mutates or renders (checkboxes 4.1-4.4), so a unit
- * test drives all of it without a DOM.
+ * array. Nothing here mutates or renders, so a unit test drives all of it
+ * without a DOM.
  *
  * A group's members need not sit next to its card in `rows` -- membership
  * comes from each entry's own `.group` resolving to a present card, not
  * from array adjacency (`view-layout.ts`'s array keeps whatever order a
  * drag or a JSON edit gave it). A member that is itself a group's card (a
  * nested group) gets its own members attached the same way, so nesting goes
- * as deep as the catalog does.
+ * as deep as the catalog does. A card caught in a cycle of cards naming each
+ * other draws at the root, so a hand-edited body never hides a card.
  */
 export function viewTree(rows: DraftViewEntry[], catalogFields: DraftField[]): ViewTreeNode[] {
   const fieldsById = draftFieldsById(catalogFields);
@@ -129,10 +130,23 @@ export function viewTree(rows: DraftViewEntry[], catalogFields: DraftField[]): V
     members: isGroupCard(entry, fieldsById) ? [] : undefined,
   }));
 
+  const parentOf = rows.map((entry) => groupOf(entry, cardIndexByKey));
+  // True when climbing parents from `index` leads back to `index`: a card
+  // naming its own key, or two cards naming each other. Such a card hangs
+  // from nothing that reaches a root, so it draws as a root instead.
+  const inCycle = (index: number): boolean => {
+    const seen = new Set<number>();
+    for (let p = parentOf[index]; p !== undefined && !seen.has(p); p = parentOf[p]) {
+      if (p === index) return true;
+      seen.add(p);
+    }
+    return false;
+  };
+
   const roots: ViewTreeNode[] = [];
   nodes.forEach((node) => {
-    const parentIndex = groupOf(node.entry, cardIndexByKey);
-    if (parentIndex === undefined || parentIndex === node.index) {
+    const parentIndex = parentOf[node.index];
+    if (parentIndex === undefined || inCycle(node.index)) {
       roots.push(node);
       return;
     }
@@ -141,6 +155,19 @@ export function viewTree(rows: DraftViewEntry[], catalogFields: DraftField[]): V
     nodes[parentIndex]!.members!.push(node);
   });
   return roots;
+}
+
+/**
+ * The slot a drop on a group's own box names, and the slot its tail row
+ * names: one past the group's last member, or one past its card when the
+ * group has no member yet or the card sits later in `rows`. A palette field
+ * dropped there lands after the group's last member (`insertGroupedField`).
+ * A root card dropped there lands after the group in root order.
+ */
+export function groupTailSlot(node: ViewTreeNode): number {
+  const members = node.members ?? [];
+  const lastMemberIndex = members.length > 0 ? members[members.length - 1]!.index : node.index;
+  return Math.max(node.index, lastMemberIndex) + 1;
 }
 
 /** Every row index reachable from `rootIndex` through `.group` membership,
@@ -168,7 +195,7 @@ function subtreeIndices(rows: DraftViewEntry[], cardIndexByKey: Map<string, numb
 /**
  * Move a placed entry one position up or down among its own siblings, the
  * keyboard equivalent of dragging it across one neighbour -- scoped by the
- * entry's own group (checkbox 4.6). For a member, siblings are the other
+ * entry's own group. For a member, siblings are the other
  * entries naming the same group. For a root entry, siblings are the other
  * root entries, group cards included.
  *
@@ -220,7 +247,7 @@ export function nudgeViewField(
 
 /**
  * Remove a placed entry from the canvas, cascading when it is a group's own
- * card (checkbox 4.8): every entry naming that group's key -- field and note
+ * card: every entry naming that group's key -- field and note
  * members alike -- leaves with it, in the one change. A member left behind
  * would name a group the view no longer carries, a draft no publish
  * accepts (the "Removing a group card removes the members placed inside
@@ -262,6 +289,39 @@ function groupFieldIdByKey(fieldsById: Map<FieldId, DraftField>): Map<string, Fi
 }
 
 /**
+ * The group cards a view still lacks for `ref` to sit inside its catalog
+ * parent, outermost first. Each card carries its own parent's key as its
+ * `group`. The walk climbs from `ref` through its ancestors and stops at the
+ * first one already on the view, at the top of the chain, or at a cycle.
+ * Empty for a top-level field, and for a field under a key-less group.
+ *
+ * `insertGroupedField` places these ahead of a palette field, and
+ * `view-group-sync.ts::moveFieldAndSyncViews` places them ahead of a moved
+ * field's entry, so the two cannot disagree about which cards a form needs.
+ */
+export function missingAncestorCards(rows: DraftViewEntry[], ref: FieldId, catalogFields: DraftField[]): DraftViewEntry[] {
+  const parentKeyById = draftParentGroupKeyById(catalogFields);
+  const groupIdByKey = groupFieldIdByKey(draftFieldsById(catalogFields));
+  const isPresent = (fieldId: FieldId) => rows.some((r) => isDraftViewField(r) && r.ref === fieldId);
+
+  const cards: DraftViewEntry[] = [];
+  const seen = new Set<FieldId>();
+  let current = ref;
+  for (;;) {
+    const key = parentKeyById.get(current);
+    if (key === undefined) break;
+    const groupId = groupIdByKey.get(key);
+    if (groupId === undefined || seen.has(groupId)) break; // catalog inconsistency, or a cycle: stop rather than loop
+    seen.add(groupId);
+    if (isPresent(groupId)) break;
+    const ownGroup = parentKeyById.get(groupId);
+    cards.push(ownGroup === undefined ? { ref: groupId } : { ref: groupId, group: ownGroup });
+    current = groupId;
+  }
+  return cards.reverse();
+}
+
+/**
  * Where a new member lands among a group's existing members (the MODIFIED
  * "A left palette lists..." requirement's position rule): a drop on another
  * member's own edge -- `at` equal to that member's own index, or to one past
@@ -288,8 +348,8 @@ function memberInsertionSlot(rows: DraftViewEntry[], groupKey: string, cardIndex
 
 /**
  * Place a catalog field on the canvas at a drop slot, honoring the field's
- * catalog parent (checkbox 4.9, the MODIFIED "A left palette lists..."
- * requirement). A field the catalog nests inside a group lands carrying
+ * catalog parent (the MODIFIED "A left palette lists..." requirement). A
+ * field the catalog nests inside a group lands carrying
  * that group's key as its own `group`, wherever the drop named: among the
  * group's existing members, at the drop's own slot when that slot sits on
  * another member's edge, and after the group's last member otherwise
@@ -304,7 +364,7 @@ function memberInsertionSlot(rows: DraftViewEntry[], groupKey: string, cardIndex
  * scenario, generalized to a deeper chain).
  *
  * A top-level field -- no catalog parent, or a parent whose own key is
- * still empty (checkbox 4.4) -- places exactly like `insertViewField`: at
+ * still empty -- places exactly like `insertViewField`: at
  * the slot, carrying no `group`. A field already on the view is not
  * re-added, the same dedup `insertViewField` applies.
  */
@@ -319,38 +379,13 @@ export function insertGroupedField(
   const fieldsById = draftFieldsById(catalogFields);
   const parentKeyById = draftParentGroupKeyById(catalogFields);
   const groupIdByKey = groupFieldIdByKey(fieldsById);
-  const isPresent = (fieldId: FieldId) => rows.some((r) => isDraftViewField(r) && r.ref === fieldId);
-
-  // Walk from `ref` up through its ancestors, collecting every one whose own
-  // card is still missing from the view, innermost first, stopping the
-  // instant an already-placed ancestor (or the top of the chain) is
-  // reached: everything further out is either already on the view or has
-  // no group at all.
-  const missingAncestors: { id: FieldId; ownGroup: string | undefined }[] = [];
-  {
-    let current: FieldId | undefined = ref;
-    const seen = new Set<FieldId>();
-    for (;;) {
-      const key = parentKeyById.get(current);
-      if (key === undefined) break;
-      const groupId = groupIdByKey.get(key);
-      if (groupId === undefined || seen.has(groupId)) break; // catalog inconsistency, or a cycle: stop rather than loop
-      seen.add(groupId);
-      if (isPresent(groupId)) break;
-      missingAncestors.push({ id: groupId, ownGroup: parentKeyById.get(groupId) });
-      current = groupId;
-    }
-  }
-  missingAncestors.reverse(); // outermost first
 
   const at = Math.max(0, Math.min(slot, rows.length));
   const next = [...rows];
   const parentKey = parentKeyById.get(ref);
 
-  if (missingAncestors.length > 0) {
-    const cards: DraftViewEntry[] = missingAncestors.map((a) =>
-      a.ownGroup === undefined ? { ref: a.id } : { ref: a.id, group: a.ownGroup },
-    );
+  const cards = missingAncestorCards(rows, ref, catalogFields);
+  if (cards.length > 0) {
     const fieldEntry: DraftViewEntry = parentKey === undefined ? { ref } : { ref, group: parentKey };
     next.splice(at, 0, ...cards, fieldEntry);
     return next;
@@ -407,7 +442,7 @@ export function dragScopeByIndex(rows: DraftViewEntry[], catalogFields: DraftFie
 
 /**
  * Whether a card whose own drag origin sits at `draggedIndex` may legally
- * land at `targetScope` -- the whole task-6.5 refusal rule, as one equality
+ * land at `targetScope` -- the whole drag refusal rule, as one equality
  * check once `dragScopeByIndex` has already answered "whose scope is
  * this". A dragover handler calls `preventDefault` only where this reads
  * true; where it reads false, the browser draws its own no-drop cursor and

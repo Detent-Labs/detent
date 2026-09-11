@@ -13,7 +13,7 @@ import { flattenDraftFields } from "../draft/fields";
 import { fieldKindWord } from "../draft/field-type-labels";
 import { groupTargetsFor, moveFieldToGroup } from "./fieldCatalogLogic";
 import { flattenRailFields, issueCountForEntityId } from "../draft/panel-rail";
-import { syncViewGroupsOnFieldMove } from "../draft/view-group-sync";
+import { moveFieldAndSyncViews } from "../draft/view-group-sync";
 import { FieldCatalogPanel } from "./FieldCatalogPanel";
 import { DataSourcesPanel } from "./DataSourcesPanel";
 
@@ -427,22 +427,11 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
     if (next === fields) return;
 
     const fromGroupId = parentGroupId(fieldId);
-    // The destination group's own key, read off the moved tree rather than
-    // re-derived from `targetGroupId`: `moveFieldToGroup` grafts the field
-    // directly under that group, so its key is the field's whole new parent
-    // key (view-group-sync.ts's `newGroupKey`). `undefined` at the top level.
-    // A still-empty key passes through unchanged here on purpose:
-    // `syncViewGroupsOnFieldMove` itself normalizes "" to "no group", the
-    // same way `view-tree.ts::isGroupCard`'s `!!field.key` test does.
-    const newGroupKey = targetGroupId === undefined ? undefined : flattenDraftFields(next).find((f) => f.id === targetGroupId)?.key;
-    mutate((d) => {
-      d.fields = next;
-      // Same mutate as the field-array write above: a reader between the two
-      // must never see the catalog and the views disagree (studio-app: "A
-      // move rewrites no reference" / "A move to the top level clears the
-      // group on every entry").
-      syncViewGroupsOnFieldMove(d, fieldId, newGroupKey);
-    });
+    // One mutate carries the field-array write, the `group` rewrite on every
+    // view entry naming the field, and any group card a form now lacks, so a
+    // reader never sees the catalog and the views disagree
+    // (`view-group-sync.ts::moveFieldAndSyncViews`).
+    mutate((d) => moveFieldAndSyncViews(d, fieldId, targetGroupId));
 
     // Read the new place off the moved tree, not off the target argument: a
     // move into a nested group makes some ancestor the top-level row, and that
