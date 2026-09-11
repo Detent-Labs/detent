@@ -138,7 +138,8 @@ A key change matches field entries by catalog parentage. An entry whose `ref`
 names one of the group's direct children takes the new key. A note has no
 parent, so it follows by its old key. It follows only when both keys are
 non-empty and no other group holds either. Otherwise the note keeps the old
-key, and the checks rail reports it.
+key. The checks rail reports it while no group field its view carries holds
+that key.
 
 A group's first key places the group's card on a form carrying a child without
 it. It uses the same `missingAncestorCards` walk.

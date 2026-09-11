@@ -225,11 +225,11 @@ note naming the old key SHALL follow to the new key only when both hold:
 - no other group field, at any catalog depth, holds either key
 
 Otherwise the note SHALL keep the key it names. The checks rail reports it
-until the author repairs the key. Retyping the old key returns the note to its
-group, since the note never left that key. A group's first key therefore
-leaves every note in place, since the old key is empty.
+while no group field its view carries holds that key. Retyping the old key
+returns the note to its group, since the note never left that key. A group's
+first key therefore leaves every note in place, since the old key is empty.
 
-No key write SHALL leave an entry with an empty `group`.
+No key write SHALL write an empty `group`.
 
 A group's key input SHALL commit the typed key on blur or on Enter. Ordinary
 typing SHALL write nothing before the commit. A half-typed key could equal
@@ -268,7 +268,7 @@ rename.
 
 - **WHEN** the developer changes a group field's key from `request` to
   `order_request`
-- **AND** three step views carry entries naming `request`
+- **AND** three step views carry entries for that group's children
 - **THEN** all three entries name `order_request`
 
 #### Scenario: A rename carries a note along
