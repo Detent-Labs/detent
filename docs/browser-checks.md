@@ -1697,8 +1697,8 @@ Source: `field-catalog-editor-rework` task 6.5.
 Open a draft with several fields (`purchase_requisition`) and go to
 `/edit/panels/fields`.
 
-Pass: the rail lists each field by its resolved label and friendly type
-alone. No row prints a key.
+Pass: the rail lists each field by its resolved label alone. No row prints
+a key.
 
 Select a field. Pass: the Field tab shows key, label, description, type
 and the Technical checkbox without opening anything. A badge beside the
@@ -2734,10 +2734,11 @@ at either width. That count covered every element inside both halves and the
 rail.
 
 Read the editor's move control last. Its "Dieses Feld verschieben nach"
-label and its select both wrap instead of clipping. That is the same rule
-the screen's other controls follow. The rail has no visible kind word any
-more. The icon that leads a label does not need width of its own. Its name
-reaches only a tooltip and a screen reader.
+label wraps instead of clipping, the same rule the screen's other controls
+follow. The closed select stays inside its own half, with no horizontal
+scroll. The rail has no visible kind word any more. The icon that leads a
+label takes no width of its own. Its name reaches only a tooltip and a
+screen reader.
 
 A `bun:test` assertion covers the catalog's key set. It cannot see a clipped
 control, and it cannot see a German sentence that reads wrong beside its own
@@ -2750,11 +2751,13 @@ Source: `fields-rail-kind-icons` task 4.2.
 Open `it_offboarding`'s draft at `/edit/panels/fields`. The rail lists 51
 rows: 7 groups and 44 fields.
 
-Pass: every field row leads with an 18px icon ahead of its label. No row
-carries a select. The row for `immediate_lock_written_confirmation`,
-"Written confirmation of the immediate lock obtained", still fits inside
-the rail's 20rem width. Its icon and its whole label both show, with
-nothing else in the row.
+Pass: every field row leads with an 18px icon ahead of its label, and no
+row carries a select. The row for `immediate_lock_written_confirmation`
+truncates its label with an ellipsis. The rail's 20rem width does not fit
+the whole sentence, "Written confirmation of the immediate lock obtained".
+The label's `title` attribute still carries that whole sentence. The
+button's accessible name reads the whole label plus the kind word
+regardless.
 
 Hover that row's icon. Pass: a native tooltip reads "Yes/no". Select the
 row. Pass: its accessible name reads "Written confirmation of the immediate
@@ -2771,11 +2774,17 @@ that route through the editor instead.
 Open the Data sources tab on the same draft. Pass: its rail column also
 measures 20rem, the width the Fields tab's now holds too. Check the
 computed width in devtools, or confirm the two tabs' rails share one right
-edge. Nothing else on that tab changes: its own entries have no icon.
+edge.
 
 Repeat the icon and tooltip checks with the OS or browser color scheme set
-to dark. Pass: every icon reads in the same slate the row's text uses. No
-light-mode color remains, and no icon reads invisible against its row.
+to dark. Pass: every icon renders in the muted-text role. The label keeps
+its own text color, in the light and the dark scheme alike. No icon reads
+invisible against its row in either scheme.
+
+At a window about 1040px wide, just above the 64rem `NARROW` breakpoint,
+open a field's editor. Pass: its Key input and its move control both stay
+inside their own column. Pass: `document.documentElement.scrollWidth`
+equals `clientWidth` at that width too.
 
 ### Borders and fills that the compiler dropped (`stylex-shorthand-repair`)
 
