@@ -110,7 +110,7 @@ stage-by-stage status.
   question, and nothing today asks for it.
 - Three more display-element shapes for the `view`: a chart, a read-only
   table and a markup block. `openspec/changes/archive/2026-08-30-field-model-type-format-control/field-model-redesign.md` records this
-  as S2 and assigns it change 3, which shipped the first of the five, the
+  as S2 and assigns it change 3, which shipped the first of four, the
   note (`field-model-view-note`, `ViewNote`/`ViewEntry` in
   `src/schema/definition.ts`). The remaining three wait on their own design:
   each is one more `ViewEntry` union member, and each needs its own decision
@@ -119,7 +119,7 @@ stage-by-stage status.
   whether it accepts anything beyond plain text). Nothing is designed yet for
   any of the three.
 
-  `field-model-redesign.md` also parked a fourth shape here, a tab panel.
+  `field-model-redesign.md` also parked a fifth shape here, a tab panel.
   This change answers it with a view-level `tabs` list instead of the
   nesting `ViewEntry` member the record above described.
 - Studio's native `<dialog>` confirm dialogs do not fully hold a keyboard
