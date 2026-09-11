@@ -127,6 +127,11 @@ never sits on a filled surface: the border is the field. A focused field
 shows a 2px accent border plus the accent focus ring on top. The error list
 sits as a sibling of the label. It never nests inside the label.
 
+A field inside a toolbar row is the one exception to the label's place. Its
+label sits beside the control, 8px apart, so the row keeps one control's
+height. The canvas bar's group name is one such field. Every other field
+keeps its label above.
+
 **Error, emptiness, waiting.** A failed request shows its error where the
 data would normally sit. It never shows as a toast, and an empty result
 never stands in for an error. An empty state says so in words. It never

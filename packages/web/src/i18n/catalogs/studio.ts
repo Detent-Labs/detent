@@ -550,8 +550,10 @@ export const en = {
   "stepKind.terminal": "An end",
 
   // The note under the canvas bar's step-kind menu entries
-  // (`studio-guided-vocabulary`), read through `newStepNote`. Same three
-  // `performedBy.ts` values as `stepKind.*` above.
+  // (`studio-guided-vocabulary`), read through `newStepNote`. The bar's menu
+  // renders its two entries, subprocess and terminal. `participant` stays:
+  // `newStepNote` maps every kind of `guided-labels.ts`'s own closed union,
+  // not only the ones the menu draws.
   "stepKindNote.participant": "Someone fills its form and picks a path.",
   "stepKindNote.subprocess": "Waits for it and routes on its outcome.",
   "stepKindNote.terminal": "Closes the case with a named outcome.",
@@ -630,6 +632,7 @@ export const en = {
   "canvas.initialStamp": "start",
   "canvas.edgeStyleToggle": "Rounded corners",
   "canvas.selectionHeading": "Steps selected",
+  "canvas.selectionRemoveOne": "Remove step",
   "canvas.selectionRemove": "Remove steps",
   "canvas.groupCreate": "Group these steps",
   "canvas.groupDefaultName": "Group",
