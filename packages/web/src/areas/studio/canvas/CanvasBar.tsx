@@ -375,11 +375,21 @@ export function CanvasBar({
         </div>
       </div>
 
-      {/* One step selected reports its reachability; several report their
-          count instead, and nothing selected reports neither
-          (`studio-canvas`). */}
+      {/* One step selected reports its reachability, then offers Remove;
+          several report their count instead, then Remove steps; nothing
+          selected reports neither (`studio-canvas`). */}
       {selectedStepIds.length === 1 && unconnected && (
         <span {...stylex.props(styles.unconnectedReport)}>{t("canvas.unconnected")}</span>
+      )}
+
+      {selectedStepIds.length === 1 && (
+        <button
+          type="button"
+          className={`btn btn-secondary btn-destructive ${stylex.props(styles.control).className ?? ""}`.trim()}
+          onClick={onDeleteSelection}
+        >
+          {t("canvas.selectionRemoveOne")}
+        </button>
       )}
 
       {selectedStepIds.length > 1 && (
