@@ -30,7 +30,11 @@ const TOKENS_CSS = new URL("../src/shell/tokens.css", import.meta.url).pathname;
 
 const SRC = new URL("../src/", import.meta.url).pathname;
 
-const SECONDARY_OPENER = /^\.btn-secondary(:hover|:active)?\s*\{/;
+// Matches the selector prefix, not one exact opener: a grouped selector line
+// ending in "," (as tokens.css:138-139 and :191-192 both use) and any
+// pseudo-class or attribute after .btn-secondary both count as a rule that
+// must precede .btn-destructive.
+const SECONDARY_OPENER = /^\.btn-secondary\b[^{]*[{,]\s*$/;
 
 const HOVER_AND_PRESS = /^\.btn-destructive:hover,\s*\.btn-destructive:active\s*\{([^}]*)\}/m;
 
@@ -60,7 +64,16 @@ function declarations(body: string): Record<string, string> {
   );
 }
 
-/** Every `className` site naming `btn-destructive`, and whether it also names `btn-secondary`. */
+/**
+ * Every `className` site naming `btn-destructive`, and whether it also names `btn-secondary`.
+ *
+ * ponytail: scans one line at a time. Ceiling: a `className` wrapped across
+ * multiple lines goes unscanned and passes silently, since neither line
+ * carries both tokens — the sites-found positive control below does not
+ * catch it, because it only guards against an empty scan, not a partial
+ * one. Upgrade: read the JSX through the TypeScript compiler API instead of
+ * a text scan, when a call site actually wraps.
+ */
 function destructiveClassNameSites(files: string[]): { site: string; pairsSecondary: boolean }[] {
   return files.flatMap((file) =>
     readFileSync(file, "utf8")
