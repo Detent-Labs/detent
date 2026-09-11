@@ -2,7 +2,18 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Stamp } from "lucide-react";
 import * as stylex from "@stylexjs/stylex";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
-import { FieldForm, PathButtons, filterToEditable, firstTabWithIssue, resolveFieldsLocale, resolveTabsLocale, isResolvedViewField } from "form-ui";
+import {
+  FieldForm,
+  PathButtons,
+  filterToEditable,
+  firstTabWithIssue,
+  resolveFieldsLocale,
+  resolveTabsLocale,
+  resolveText,
+  isResolvedViewField,
+  tabIssueFieldCount,
+  tabSwitchAnnouncement,
+} from "form-ui";
 import type { SubmissionIssue } from "form-ui";
 import {
   cancelInstance,
@@ -76,6 +87,19 @@ const styles = stylex.create({
   taskDraftNotice: {
     fontSize: "0.85em",
     color: colors.textMuted,
+  },
+  // Off screen, never `display: none`: a hidden node is announced by no
+  // engine. `ProcessTabRow.tsx` carries the same pattern for the same reason.
+  visuallyHidden: {
+    position: "absolute",
+    width: 1,
+    height: 1,
+    margin: -1,
+    padding: 0,
+    overflow: "hidden",
+    clipPath: "inset(50%)",
+    whiteSpace: "nowrap",
+    borderWidth: 0,
   },
   taskTimestamp: {
     fontFamily: fonts.mono,
@@ -162,6 +186,12 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
   const [outcome, setOutcome] = useState<ErrorOutcome | undefined>(undefined);
   const [validationIssues, setValidationIssues] = useState<SubmissionIssue[]>([]);
   const [activeTab, setActiveTab] = useState<string | undefined>(undefined);
+  // What the live region below reads out after a failed submission opened a
+  // tab the participant did not choose. Data, not a sentence: the sentence
+  // needs the locale-resolved tab label the render body already builds.
+  // `undefined` is silence, which is what a participant's own tab click
+  // leaves behind.
+  const [tabSwitch, setTabSwitch] = useState<{ tabKey: string; fieldCount: number } | undefined>(undefined);
   const [comments, setComments] = useState<InstanceComment[]>([]);
   const [commentText, setCommentText] = useState("");
   const [attachments, setAttachments] = useState<InstanceAttachment[]>([]);
@@ -284,6 +314,7 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
     if (!view) return;
     const nextTab = firstTabWithIssue(view.fields, view.tabs ?? [], issuesByField);
     if (nextTab !== undefined) setActiveTab(nextTab);
+    setTabSwitch(nextTab === undefined ? undefined : { tabKey: nextTab, fieldCount: tabIssueFieldCount(view.fields, nextTab, issuesByField) });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [validationIssues, view]);
 
@@ -415,9 +446,31 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
             columns={view.columns ?? 1}
             tabs={resolveTabsLocale(view.tabs ?? [], locale, view.baseLocale)}
             activeTab={activeTab}
-            onTabChange={setActiveTab}
+            onTabChange={(tabKey) => {
+              setActiveTab(tabKey);
+              // A tab the participant chose announces nothing, and clearing
+              // here is also what lets the NEXT failed submission speak: a
+              // live region whose text is unchanged is announced by no
+              // engine, so returning to the same tab with the same count
+              // would otherwise pass in silence.
+              setTabSwitch(undefined);
+            }}
             tabsLabel={t(locale, "task.formTabsLabel")}
           />
+
+          {/* Outside the form, and mounted at all times so the engine
+              announces a change rather than an arrival. Polite: the
+              participant has just pressed Submit and is not mid-sentence
+              with anything else. */}
+          <p {...stylex.props(styles.visuallyHidden)} role="status" aria-live="polite">
+            {tabSwitch === undefined
+              ? ""
+              : tabSwitchAnnouncement(
+                  { one: t(locale, "task.formTabOpenedOne"), many: t(locale, "task.formTabOpenedMany") },
+                  resolveText(view.tabs?.find((tab) => tab.key === tabSwitch.tabKey)?.label, locale, view.baseLocale),
+                  tabSwitch.fieldCount,
+                )}
+          </p>
 
           <div {...stylex.props(styles.taskActions)}>
             {claimControls.state === "claimable" && (

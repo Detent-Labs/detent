@@ -174,6 +174,11 @@ const styles = stylex.create({
     paddingInline: space.s3,
     fontFamily: "inherit",
     fontSize: 14,
+    // Explicit, not the UA's `normal`. Unset, this tab measured 35.0px
+    // against the authoring strip's 38.5px on the form editor, where the two
+    // draw side by side over the same labels. 1.5 is the body line height
+    // `DESIGN.md` gives, and the authoring strip pins the same pair.
+    lineHeight: 1.5,
     textAlign: "left",
     cursor: "pointer",
   },
