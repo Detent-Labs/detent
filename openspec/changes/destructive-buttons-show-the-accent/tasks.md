@@ -26,5 +26,5 @@
 
 - [x] 5.1 Run `bun run typecheck` and `bun run build` in the devcontainer
 - [x] 5.2 Run the FULL `bun test` with `DATABASE_URL` set, through `silent-green.sh`
-- [ ] 5.3 Run the prose and whitespace push gates over the branch range
+- [x] 5.3 Run the prose and whitespace push gates over the branch range
 - [x] 5.4 Run `openspec validate destructive-buttons-show-the-accent --strict`
