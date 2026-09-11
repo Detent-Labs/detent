@@ -18,6 +18,7 @@ import {
   reorderIndex,
   setEntryGroup,
   shownTab,
+  tabAfterPlacement,
   unplacedRefs,
   type DraftView,
   type DraftViewEntry,
@@ -528,5 +529,31 @@ describe("setEntryGroup keeps a group and a tab from meeting on one entry", () =
       span: 2,
       group: "g1",
     });
+  });
+});
+
+describe("tabAfterPlacement shows the tab a palette placement landed on", () => {
+  const strip = [tab("t1"), tab("t2")];
+
+  it("shows the card's tab when a placed member joins a group card on another tab", () => {
+    const entries: DraftViewEntry[] = [{ ref: id("a"), tab: "t1" }, { ref: id("g1"), tab: "t2" }, { ref: id("x"), group: "g1" }];
+    expect(tabAfterPlacement(entries, id("x"), strip, "t1", groupKeyOf)).toBe("t2");
+  });
+
+  it("shows the outermost card's tab when the member sits in a nested group", () => {
+    const entries: DraftViewEntry[] = [{ ref: id("g1"), tab: "t2" }, { ref: id("g2"), group: "g1" }, { ref: id("x"), group: "g2" }];
+    expect(tabAfterPlacement(entries, id("x"), strip, "t1", groupKeyOf)).toBe("t2");
+  });
+
+  it("keeps the shown tab for an entry the placement put on it", () => {
+    const entries: DraftViewEntry[] = [{ ref: id("g1"), tab: "t1" }, { ref: id("x"), group: "g1" }, { ref: id("y"), tab: "t1" }];
+    expect(tabAfterPlacement(entries, id("x"), strip, "t1", groupKeyOf)).toBe("t1");
+    expect(tabAfterPlacement(entries, id("y"), strip, "t1", groupKeyOf)).toBe("t1");
+  });
+
+  it("keeps the shown tab on an untabbed view, and when the view carries no entry for the field", () => {
+    const entries: DraftViewEntry[] = [{ ref: id("x") }];
+    expect(tabAfterPlacement(entries, id("x"), undefined, undefined, groupKeyOf)).toBeUndefined();
+    expect(tabAfterPlacement(entries, id("missing"), strip, "t2", groupKeyOf)).toBe("t2");
   });
 });

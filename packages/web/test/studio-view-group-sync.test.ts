@@ -480,3 +480,49 @@ describe("writeGroupLabel", () => {
     expect(rowsOf(draft)[1]).toEqual([ref("li"), ref("b", "custom")]);
   });
 });
+
+describe("writeGroupKey keeps a tabbed form's tab rules", () => {
+  const tabs = [tab("t1"), tab("t2")];
+
+  it("gives each child the group card's tab when a root group's key is cleared, and leaves a note as it stood", () => {
+    const draft = draftWithViews([leaf("x", "x"), group("g", "g", [leaf("a", "a"), leaf("b", "b")])], {
+      tabs,
+      fields: [onTab(ref("x"), "t1"), onTab(ref("g"), "t2"), ref("a", "g"), note("Inside", "g"), ref("b", "g")],
+    });
+
+    writeGroupKey(draft, "g", "");
+
+    expect(rowsOf(draft)[0]).toEqual([onTab(ref("x"), "t1"), onTab(ref("g"), "t2"), onTab(ref("a"), "t2"), note("Inside", "g"), onTab(ref("b"), "t2")]);
+  });
+
+  it("gives each child the outermost card's tab when a nested group's key is cleared", () => {
+    const draft = draftWithViews([group("outer", "outer", [group("inner", "inner", [leaf("z", "z")])])], {
+      tabs,
+      fields: [onTab(ref("outer"), "t2"), ref("inner", "outer"), ref("z", "inner")],
+    });
+
+    writeGroupKey(draft, "inner", "");
+
+    expect(rowsOf(draft)[0]).toEqual([onTab(ref("outer"), "t2"), ref("inner", "outer"), onTab(ref("z"), "t2")]);
+  });
+
+  it("takes the tab off each child when a group gains its first key", () => {
+    const draft = draftWithViews([group("g", "", [leaf("a", "a"), leaf("b", "b")])], {
+      tabs,
+      fields: [onTab(ref("g"), "t1"), onTab(ref("a"), "t1"), onTab(ref("b"), "t2")],
+    });
+
+    writeGroupKey(draft, "g", "named");
+
+    expect(rowsOf(draft)[0]).toEqual([onTab(ref("g"), "t1"), ref("a", "named"), ref("b", "named")]);
+  });
+
+  it("writes no tab on a view declaring none when a key is cleared", () => {
+    const draft = draftWith([group("g", "g", [leaf("a", "a")])], [ref("g"), ref("a", "g")]);
+
+    writeGroupKey(draft, "g", "");
+
+    expect(rowsOf(draft)[0]).toEqual([ref("g"), ref("a")]);
+    expect(rowsOf(draft)[0]!.some((entry) => "tab" in entry)).toBe(false);
+  });
+});

@@ -123,6 +123,12 @@ export function syncViewGroupsOnFieldMove(draft: Draft, fieldId: string, newGrou
  *   another group holds ties it to that group as well. Otherwise the note
  *   keeps `oldKey`, and the checks rail reports it rather than the form
  *   losing it.
+ * - On a tabbed view the rewrite keeps the tab rules. A cleared key lifts
+ *   each child's entry to the root, where it takes the tab it drew on: the
+ *   tab of the outermost card holding this group's own entry
+ *   (`view-layout.ts::homeTab`, read before the key changes). A non-empty
+ *   key makes each child's entry a member, which carries no `tab`. A note's
+ *   `tab` stays as it was.
  *
  * Writes no `group: ""` anywhere. A field that is not `type: "group"` gets
  * its key written and nothing else: a non-group parent hands its leftover
@@ -134,24 +140,44 @@ export function writeGroupKey(draft: Draft, groupFieldId: string, newKey: string
   if (!group) return;
   const oldKey = group.key ?? "";
   if (oldKey === newKey) return;
+  const steps = draft.workflow?.steps ?? [];
+  const childIds = new Set((group.fields ?? []).map((f) => f.id).filter((fid): fid is FieldId => fid !== undefined));
+  // The tab each child's entry draws on, read while its `group` still names
+  // this group's card. Indexed by step and entry, since the rewrite below
+  // walks the same arrays in the same order.
+  const clearing = group.type === "group" && newKey === "";
+  const groupKeyOf = cardGroupKey(draft.fields ?? []);
+  const formerTabs = steps.map((step) => {
+    const rows = step.view?.fields ?? [];
+    return rows.map((entry) =>
+      clearing && isDraftViewField(entry) && entry.ref !== undefined && childIds.has(entry.ref)
+        ? homeTab(entry, rows, step.view?.tabs, groupKeyOf)
+        : undefined,
+    );
+  });
   group.key = newKey;
   if (group.type !== "group") return;
 
-  const childIds = new Set((group.fields ?? []).map((f) => f.id).filter((fid): fid is FieldId => fid !== undefined));
   const heldElsewhere = (key: string) => fields.some((f) => f.id !== groupFieldId && f.type === "group" && f.key === key);
   const notesFollow = oldKey !== "" && newKey !== "" && !heldElsewhere(oldKey) && !heldElsewhere(newKey);
 
-  for (const step of draft.workflow?.steps ?? []) {
-    for (const entry of step.view?.fields ?? []) {
+  steps.forEach((step, s) => {
+    (step.view?.fields ?? []).forEach((entry, i) => {
       if (isDraftViewField(entry)) {
-        if (entry.ref === undefined || !childIds.has(entry.ref)) continue;
-        if (newKey === "") delete entry.group;
-        else entry.group = newKey;
+        if (entry.ref === undefined || !childIds.has(entry.ref)) return;
+        if (newKey === "") {
+          delete entry.group;
+          const formerTab = formerTabs[s]![i];
+          if (formerTab !== undefined) entry.tab = formerTab;
+        } else {
+          entry.group = newKey;
+          delete entry.tab;
+        }
       } else if (notesFollow && entry.group === oldKey) {
         entry.group = newKey;
       }
-    }
-  }
+    });
+  });
 }
 
 /**

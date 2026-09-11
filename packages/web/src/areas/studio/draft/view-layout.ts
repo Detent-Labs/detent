@@ -291,6 +291,23 @@ export function drawnRows(
   return rows;
 }
 
+/** The tab the canvas shows once a placement has put `ref` on the form: the
+ * tab its entry now draws on (`homeTab`, which reads `owningTab`). A member
+ * joining a group card on another tab draws on that card's tab, and a drop
+ * that changed nothing on the shown canvas reads as a failure. `shown`
+ * stands when the view carries no entry for `ref`. */
+export function tabAfterPlacement(
+  entries: DraftViewEntry[],
+  ref: FieldId,
+  tabs: DraftViewTab[] | undefined,
+  shown: string | undefined,
+  groupKeyOf: (entry: DraftViewEntry) => string | undefined,
+): string | undefined {
+  const entry = entries.find((e) => isDraftViewField(e) && e.ref === ref);
+  if (entry === undefined) return shown;
+  return homeTab(entry, entries, tabs, groupKeyOf) ?? shown;
+}
+
 /** Every root entry carrying no `tab` takes `tab`. On a tabbed view a
  * freshly placed entry is the only one that can be missing one, so this is
  * what keeps a palette drop, a mint and a new note inside the tab the canvas

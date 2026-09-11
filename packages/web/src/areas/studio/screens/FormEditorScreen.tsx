@@ -23,6 +23,7 @@ import {
   renameViewTab,
   setEntryGroup,
   shownTab,
+  tabAfterPlacement,
   unplacedRefs,
   type DraftViewEntry,
   type DraftViewField,
@@ -878,6 +879,18 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
     setSelected(undefined);
   };
 
+  /** Places a palette field through `insertGroupedField`, then shows the tab
+   * its entry landed on (`tabAfterPlacement`). A member joining a group card
+   * another tab draws lands on that card's tab, and a drop that left the
+   * shown canvas as it was would hide where the member went. */
+  const placeFromPalette = (ref: FieldId, slot: number) => {
+    const next = insertGroupedField(rows, ref, slot, fields, shown);
+    if (next === rows) return;
+    setRows(next);
+    const landedTab = tabAfterPlacement(next, ref, tabs, shown, groupKeyOf);
+    if (landedTab !== shown) setActiveTab(landedTab);
+  };
+
   /** Mints a catalog field and places it on this step's view, in one Draft
    * mutation: both the new `fields` entry and the new `view`
    * row commit together, so a mid-mutation reader never sees one without
@@ -917,7 +930,7 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
       // wherever the drop named — `insertGroupedField` owns that slot
       // decision (the MODIFIED "A left palette lists..." requirement). On a
       // tabbed form the root entry it places takes the shown tab.
-      setRows(insertGroupedField(rows, dragging.ref, slot, fields, shown));
+      placeFromPalette(dragging.ref, slot);
       setSelected(undefined);
     } else if (dragging.kind === "mint") {
       mintAndPlace(dragging.fieldKind, slot);
@@ -1246,7 +1259,7 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
                     draggable
                     onDragStart={() => setDragging({ kind: "palette", ref: id })}
                     onDragEnd={() => setDragging(undefined)}
-                    onClick={() => setRows(insertGroupedField(rows, id, rows.length, fields, shown))}
+                    onClick={() => placeFromPalette(id, rows.length)}
                   >
                     <span {...stylex.props(styles.formPaletteKey)}>{labelFor(id)}</span>
                     <span {...stylex.props(styles.formPaletteType)}>{typeLabel(fieldFor(id)?.type)}</span>
