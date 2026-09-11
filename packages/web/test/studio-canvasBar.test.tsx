@@ -21,7 +21,7 @@ import type { StepGroup } from "../src/areas/studio/canvas/groups.js";
  * too. That Escape dismisses the open menu and returns focus to the caret
  * trigger needs a real browser. Both land in `docs/browser-checks.md`.
  */
-const MENU_KINDS: readonly StepKind[] = ["task", "subprocess", "end"];
+const MENU_KINDS: readonly StepKind[] = ["subprocess", "end"];
 
 function render(
   over: {
@@ -127,7 +127,7 @@ describe("The bar's own element", () => {
 });
 
 describe("The add-step menu", () => {
-  it("lists three menu items, one per step kind, each with its own phrase and note", () => {
+  it("lists two menu items, the kinds Add step does not add, each with its own phrase and note", () => {
     const html = render();
     const items = html.match(/<button[^>]*role="menuitem"[^>]*>[\s\S]*?<\/button>/g) ?? [];
 
@@ -137,6 +137,13 @@ describe("The add-step menu", () => {
       expect(item).toBeDefined();
       expect(item).toContain(`>${newStepNote(kind)}<`);
     }
+  });
+
+  it("offers no step someone works", () => {
+    const html = render();
+    const items = html.match(/<button[^>]*role="menuitem"[^>]*>[\s\S]*?<\/button>/g) ?? [];
+
+    expect(items.some((b) => b.includes(`>${newStepPhrase("task")}<`))).toBe(false);
   });
 });
 
