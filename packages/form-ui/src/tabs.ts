@@ -27,6 +27,23 @@ export function drawnTabs(entries: ResolvedViewEntry[], tabs: ResolvedViewTab[])
 }
 
 /**
+ * The tab a drawn strip is showing: `activeTab` when the strip draws that
+ * tab, and the first drawn tab otherwise. That one expression covers an
+ * `activeTab` naming a tab whose entries all resolved invisible, an open tab
+ * that disappears on a value change, and a consumer that has stored no
+ * `activeTab` yet. `undefined` means no strip draws.
+ *
+ * `FieldForm` derives the tab it opens from this, and `tabSwitchState` below
+ * asks the same question when it decides whether a submission moved the
+ * participant anywhere. The two readings have to agree: a consumer holding
+ * `undefined` is still looking at a tab, and comparing against `activeTab`
+ * itself would read that as a switch.
+ */
+export function openTabKey(strip: ResolvedViewTab[], activeTab: string | undefined): string | undefined {
+  return strip.some((tab) => tab.key === activeTab) ? activeTab : strip[0]?.key;
+}
+
+/**
  * The tab an entry draws on. A group's members carry no `tab` of their own —
  * the authoring rules forbid one — so a member's tab is its group's, and a
  * group nested in a group walks up again. The hop count is bounded by the
@@ -104,6 +121,43 @@ export function tabIssueFieldCount(
     if ((issuesByField.get(entry.field.id)?.length ?? 0) > 0) count++;
   }
   return count;
+}
+
+/** What a consumer's live region carries after a submission failed. */
+export interface TabSwitch {
+  /** The tab that opened. The consumer resolves its label in its own locale. */
+  tabKey: string;
+  /** How many of that tab's fields still need an entry. */
+  fieldCount: number;
+  /** Rises by one on every announcement, and exists only to be a value that
+   * changes. Two identical failures in a row otherwise build the same
+   * sentence, React writes no DOM for an unchanged string, and the second
+   * attempt passes in silence. A consumer spends this as the `key` of the
+   * node holding the sentence, so React replaces that node rather than
+   * diffing its text, which is the mutation a live region announces. */
+  attempt: number;
+}
+
+/**
+ * What the live region should say after a submission failed, given what it
+ * says now. `undefined` is silence.
+ *
+ * It reports a switch that actually happened and nothing else. A participant
+ * already standing on the offending tab watched no tab open, so a sentence
+ * saying one did would describe something that did not occur. `openTabKey`
+ * above is the comparison rather than `activeTab` itself: a consumer that has
+ * stored no `activeTab` is still looking at the strip's first drawn tab.
+ */
+export function tabSwitchState(
+  previous: TabSwitch | undefined,
+  entries: ResolvedViewEntry[],
+  tabs: ResolvedViewTab[],
+  activeTab: string | undefined,
+  nextTab: string | undefined,
+  fieldCount: number,
+): TabSwitch | undefined {
+  if (nextTab === undefined || nextTab === openTabKey(drawnTabs(entries, tabs), activeTab)) return undefined;
+  return { tabKey: nextTab, fieldCount, attempt: (previous?.attempt ?? 0) + 1 };
 }
 
 /**

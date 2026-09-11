@@ -4882,12 +4882,16 @@ Each label stays unresolved, as `LocalizedText`, and the browser applies the
 locale. The type is `ResolvedViewTab`, exported there beside
 `ResolvedViewEntry`. An entry's own `tab` rides along on the entry itself.
 
-The module `packages/form-ui/src/tabs.ts` is new. It holds `drawnTabs`,
-`tabIssueCount`, `firstTabWithIssue` and `nextTabIndex`, each a pure function
-over a resolved view. The package's `index.ts` publishes three of them, and
-`tabIssueCount` stays internal. Two more exports landed beside it:
-`resolveTabsLocale` in `locale.ts`, and the `ResolvedViewTab` type in
-`types.ts`.
+The module `packages/form-ui/src/tabs.ts` is new. It exports eight pure
+functions over a resolved view, plus the `TabSwitch` type. Three answer what
+the strip draws and which tab is open: `drawnTabs`, `openTabKey` and
+`nextTabIndex`. Three count issues: `tabIssueCount`, `firstTabWithIssue` and
+`tabIssueFieldCount`. Two shape the switch announcement: `tabSwitchState` and
+`tabSwitchAnnouncement`. The package's `index.ts` publishes six of them and
+the type, while `openTabKey` and `tabIssueCount` stay inside the package.
+
+Two more exports landed beside it: `resolveTabsLocale` in `locale.ts`, and the
+`ResolvedViewTab` type in `types.ts`.
 
 The renderer `FieldForm` draws the strip above its grid. The open tab's
 entries make the one panel under it. A closed tab's entries are absent from
@@ -4901,6 +4905,11 @@ Three consumers own the tab switch: `areas/app/screens/TaskScreen.tsx`,
 from a `useEffect` after a failed submission, keyed on `validationIssues`
 alone. The suite `packages/web/test/form-tab-switch-effect.test.ts` pins that
 dependency list by reading the source.
+
+Each of the first two also carries a visually hidden `role="status"` region.
+It names the tab a failed submission opened and how many fields there still
+need an entry. A tab that was already open announces nothing. An `attempt`
+counter keys the announced node, so a repeat failure speaks again.
 
 The component `areas/studio/panels/FormTabStrip.tsx` is the authoring strip,
 above the form editor's canvas. It reads `nextTabIndex` from `form-ui`, so
