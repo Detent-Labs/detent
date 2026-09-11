@@ -556,9 +556,9 @@ export const en = {
 
   // The note under the canvas bar's step-kind menu entries
   // (`studio-guided-vocabulary`), read through `newStepNote`. The bar's menu
-  // renders only its two entries now, subprocess and terminal. `participant`
-  // stays: `newStepNote` maps every kind of `guided-labels.ts`'s own closed
-  // union, not only the ones the menu currently draws.
+  // renders its two entries, subprocess and terminal. `participant` stays:
+  // `newStepNote` maps every kind of `guided-labels.ts`'s own closed union,
+  // not only the ones the menu draws.
   "stepKindNote.participant": "Someone fills its form and picks a path.",
   "stepKindNote.subprocess": "Waits for it and routes on its outcome.",
   "stepKindNote.terminal": "Closes the case with a named outcome.",
