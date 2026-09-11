@@ -9,13 +9,6 @@ import { groupMembersDomId } from "./CanvasView.js";
 import { canGroup, groupMatching, type StepGroup } from "./groups.js";
 import { dragDelta, exceedsClickThreshold, type Point } from "./geometry.js";
 
-/**
- * The bar's height, set by its tallest child: the group-name field, a label
- * over a control. Every other state renders shorter inside the same row, so
- * the bar's height never changes and the canvas never reflows (design D6).
- */
-const BAR_MIN_HEIGHT = "5.5rem";
-
 /** Mirrors `--space-1`: the gap `Chrome.tsx`'s account menu sits below its own
  * trigger by. */
 const MENU_GAP_PX = 4;
@@ -30,13 +23,15 @@ const MENU_KINDS: readonly StepKind[] = ["subprocess", "end"];
 
 const styles = stylex.create({
   // The ledger rule under the tab row: one flex row, content flush left, a
-  // hairline against the canvas below it. Zero radius, no shadow.
+  // hairline against the canvas below it. Zero radius, no shadow. No
+  // minHeight: Add step is the tallest control in every selection state, so
+  // its own height is the row's floor (`studio-canvas`'s "The bar stands one
+  // control row tall").
   bar: {
     display: "flex",
     alignItems: "center",
     flexWrap: "nowrap",
     gap: space.s3,
-    minHeight: BAR_MIN_HEIGHT,
     paddingBlock: space.s2,
     paddingInline: 0,
     borderBottomWidth: 1,
@@ -81,35 +76,34 @@ const styles = stylex.create({
     fontFamily: fonts.mono,
     fontVariantNumeric: "tabular-nums",
   },
-  // The field's own box is the input's box: the bar centres every control on
-  // one line (D6), and a label inside the flow would grow the field taller
-  // than its siblings and drop the input off that line. The label sits
-  // absolutely above it instead, anchored by `position: relative` here. No
-  // `cursor: grab`: nothing in the bar drags a group.
+  // The one exception `DESIGN.md`'s Fields list carries: a toolbar field's
+  // label sits beside the field, not above it, so the row never grows past
+  // the height Add step already sets. No `cursor: grab`: nothing in the bar
+  // drags a group.
   groupNameField: {
-    position: "relative",
+    display: "flex",
+    alignItems: "center",
+    gap: space.s2,
     flexShrink: 0,
   },
   // The design language's field label: 11px, uppercase, tracked 0.1em, in
-  // slate (mirrors `StepPage.tsx`'s `fieldLabelText`, flush left, 4px above
-  // the control).
+  // slate (mirrors `StepPage.tsx`'s `fieldLabelText`), now flush against the
+  // input beside it instead of floated above it.
   groupNameLabelText: {
-    position: "absolute",
-    bottom: "100%",
-    left: 0,
-    marginBottom: space.s1,
     fontSize: 11,
-    // The bar leaves about 17px above the input for this label. At `normal`
-    // the host's own system-ui metrics decide the label's height, so a fixed
-    // 1 pins it to 11px plus the 4px margin on every platform.
     lineHeight: 1,
     textTransform: "uppercase",
     letterSpacing: "0.1em",
     color: colors.textMuted,
     whiteSpace: "nowrap",
   },
+  // The button's own type, 14px at `line-height: normal`: inheriting the
+  // body's 15px at that same `normal` drew the input one pixel taller than
+  // Add step, which would grow the bar past its floor.
   groupNameInput: {
     width: "9rem",
+    fontSize: 14,
+    lineHeight: "normal",
   },
   // The popover's own top-layer promotion strips any CSS anchoring to the
   // trigger, so the panel's position is set inline off the trigger's live
