@@ -20,11 +20,11 @@
 
 ## 4. Rules and docs
 
-- [ ] 4.1 Add the icon sentence from design.md to the Icons section of `design-language.md`. Drop the kind word and `railType` from its entity rail paragraph. Verify with task 5.4.
-- [ ] 4.2 Add one walk to `docs/browser-checks.md`, on the IT Offboarding draft. It covers the icons, the tooltip and the missing rail picker. It covers both rail widths and both schemes. Verify in task 5.5.
-- [ ] 4.3 Rewrite the move gesture walk in `docs/browser-checks.md`. The keyboard moves a field through the editor's control. The walk counts the Tab stops from the selected entry to it. Focus returns there, and the live region speaks. Verify in task 5.5.
-- [ ] 4.4 Update the German walk and the walk that moves `order` into `line_item`. Neither names the rail picker any more. Verify both in task 5.5.
-- [ ] 4.5 Name the new icon sentence in the closing report. The main checkout's design language file under `tmp/` needs it too. This worktree lacks that file.
+- [x] 4.1 Add the icon sentence from design.md to the Icons section of `design-language.md`. Drop the kind word and `railType` from its entity rail paragraph. Verify with task 5.4.
+- [x] 4.2 Add one walk to `docs/browser-checks.md`, on the IT Offboarding draft. It covers the icons, the tooltip and the missing rail picker. It covers both rail widths and both schemes. Verify in task 5.5.
+- [x] 4.3 Rewrite the move gesture walk in `docs/browser-checks.md`. The keyboard moves a field through the editor's control. The walk counts the Tab stops from the selected entry to it. Focus returns there, and the live region speaks. Verify in task 5.5.
+- [x] 4.4 Update the German walk and the walk that moves `order` into `line_item`. Neither names the rail picker any more. Verify both in task 5.5.
+- [x] 4.5 Name the new icon sentence in the closing report. The main checkout's design language file under `tmp/` needs it too. This worktree lacks that file.
 
 ## 5. Verification
 

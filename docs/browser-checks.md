@@ -1140,9 +1140,9 @@ card keeps its place.
 Drag `unit_price` from the palette onto the `line_item` legend itself. Pass:
 it lands inside the box, after `quantity`, the box's last member.
 
-Open the Fields tab and move `order` into `line_item` with the rail's move
-control. Return to the `await_goods` form. Pass: the `order` box draws inside
-the `line_item` box, with `po_number` inside `order`.
+Open the Fields tab, select `order`, and move it into `line_item` with its
+editor's move control. Return to the `await_goods` form. Pass: the `order`
+box draws inside the `line_item` box, with `po_number` inside `order`.
 
 Read the count on the `line_item` box's remove control. Pass: it matches every
 card inside the box, the nested `order` box and its member included. Press
@@ -2641,39 +2641,56 @@ Throughout: zero console errors, in every area.
 Source: `studio-field-authoring-surface` task 9.3.
 
 Open `purchase_requisition`'s draft at `/edit/panels/fields`. The rail lists
-22 fields, four of them indented once under the `Line Item` group.
+29 rows: nine top-level entries (eight groups and the plain field
+`po_status`) and twenty children spread across those eight groups.
 
-Tab to the move picker beside `Vendor`. Open it. Pass: it lists "Top level"
-and every group the catalog carries. Its own value reads "Top level".
+Select `po_status`'s row, the rail's sixth. Tab forward, counting every
+stop. Pass: 23 stops cross the rest of the rail, from `request` through
+`invoice_amount`; the 24th lands on "+ Add field"; the last four reach the
+editor: Label, Description, Key, then the move control. 28 stops in all.
+No stop lands on a row's kind icon or its issue mark; neither takes focus.
 
-Pick `Line Item`. Pass: `Vendor` indents under `Line Item`. The live region
-reads "Vendor moved into Line Item." Focus stays on the same control. The
-picker's value now reads `Line Item`.
+Open the control. Pass: it lists "Top level" and all eight groups the
+catalog carries. Its own value reads "Top level", `po_status`'s place
+today.
 
-Pick "Top level" on that same control. Pass: `Vendor` un-indents. The region
-reads "Vendor moved out of Line Item, to the top level." Focus stays put.
+Pick `Line Item`. Pass: `po_status` indents under `Line Item`, its fifth
+child. The live region reads "PO Status moved into Line Item." Focus stays
+on the same control.
 
-Add a second group. Read the picker again. Pass: it names both groups. The
-single arrow this replaced could not pass that check. It reached the nearest
-group above and no other. Measured 2026-09-04 on a draft carrying two groups:
-every row named both groups and the top level.
+Pick "Top level" on that same control. Pass: `po_status` un-indents, back
+to a top-level row after `invoice`. The region reads "PO Status moved out
+of Line Item, to the top level." Focus stays put.
 
 A move out appends the field to the end of the top level. It does not return
 it to the place it came from. That is what the helper writes, and the rail
 shows it.
 
-Drag `Vendor`'s row onto `Line Item`'s row with the pointer. Pass: the same
-indent and the same announcement. Drag it onto a row outside any group. Pass:
-the same move out. Both gestures reach one helper, and both reach the same
-set of destinations. A difference between them is a defect.
+Drag `po_status`'s row onto `Line Item`'s row with the pointer. Pass: the
+same indent and the same announcement. Drag it onto a row outside any
+group. Pass: the same move out. Both gestures reach one helper, and both
+reach the same set of destinations. A difference between them is a defect.
 
-The picker is the whole visible control. Its accessible name is "Move this
-field to", on its `aria-label` and its `title`. A catalog with no group at all
-renders it disabled, carrying "Top level" alone.
+Now select `discrepancy_note`, the one child of `resolution`. A group
+child's row has no label or description ahead of the key. Its move control
+therefore sits second, right after it.
 
-Neither gesture survives a `renderToStaticMarkup` test. An HTML5 drag needs a
-real pointer. An effect writes the live region's text after the move commits.
-The web package carries no DOM harness.
+Open the control and pick "Top level". Pass: `discrepancy_note` un-indents
+to a top-level row, after `po_status`. The tab keeps it selected. Keyboard
+focus lands on the move control inside the field's own new editor.
+
+It is a `FieldEditor` now: the move took `discrepancy_note` out of
+`resolution`'s `SubFieldRow` list. The live region reads "Discrepancy Note
+moved out of Resolution, to the top level."
+
+The control is the whole visible move UI now; no rail row carries one. Its
+accessible name comes from the `<label>` wrapping it, "Move this field to".
+A catalog with no group at all still renders it, disabled, holding "Top
+level" alone.
+
+Neither gesture survives a `renderToStaticMarkup` test. A real Tab sequence
+and a real focus read both need a live draft store and a live DOM. An HTML5
+drag needs a real pointer too. The web package has no DOM harness.
 
 ### The Fields view at a narrow width (`studio-field-authoring-surface`)
 
@@ -2704,9 +2721,9 @@ two ways. One is an authored label in a German content locale. The other is a
 No control on this screen may take its width from an English label.
 
 Open the same route with German text in place of every label this view draws.
-Use "Wonach dieses Feld fragt", "Woher die Werte kommen" and "Auf der
-Zeichenfläche anzeigen". Use the kind words "Ja/Nein", "Mehrfachauswahl" and
-"Gruppe".
+Use "Wonach dieses Feld fragt", "Woher die Werte kommen", "Auf der
+Zeichenfläche anzeigen" and "Dieses Feld verschieben nach". Use the kind
+words "Ja/Nein", "Mehrfachauswahl" and "Gruppe".
 
 Pass: no heading, no button and no rail row clips. A label that wraps to two
 lines is correct; one cut off at its container's edge is not. Pass: the page
@@ -2716,13 +2733,49 @@ Measured 2026-09-04: zero elements reported `scrollWidth` past `clientWidth`
 at either width. That count covered every element inside both halves and the
 rail.
 
-Read the rail last. Its kind word is the one German string in a fixed column.
-The move control beside it truncates rather than wrapping. Neither grows
-with the translation.
+Read the editor's move control last. Its "Dieses Feld verschieben nach"
+label and its select both wrap instead of clipping. That is the same rule
+the screen's other controls follow. The rail has no visible kind word any
+more. The icon that leads a label does not need width of its own. Its name
+reaches only a tooltip and a screen reader.
 
 A `bun:test` assertion covers the catalog's key set. It cannot see a clipped
 control, and it cannot see a German sentence that reads wrong beside its own
 control.
+
+### The Fields view's kind icons (`fields-rail-kind-icons`)
+
+Source: `fields-rail-kind-icons` task 4.2.
+
+Open `it_offboarding`'s draft at `/edit/panels/fields`. The rail lists 51
+rows: 7 groups and 44 fields.
+
+Pass: every field row leads with an 18px icon ahead of its label. No row
+carries a select. The row for `immediate_lock_written_confirmation`,
+"Written confirmation of the immediate lock obtained", still fits inside
+the rail's 20rem width. Its icon and its whole label both show, with
+nothing else in the row.
+
+Hover that row's icon. Pass: a native tooltip reads "Yes/no". Select the
+row. Pass: its accessible name reads "Written confirmation of the immediate
+lock obtained Yes/no". The kind word sits in that name, though nothing
+paints it. Repeat on `forwarding_until` (tooltip "Date") and on
+`auto_reply_text` (tooltip "One choice"). Repeat once more on a group's own
+row: its icon reads "Group".
+
+Select a group. Pass: its children indent once, each with its own icon.
+None of the 51 rows carries a select of any kind. No row offers a keyboard
+route to move a field. The Fields view's move gesture walk above covers
+that route through the editor instead.
+
+Open the Data sources tab on the same draft. Pass: its rail column also
+measures 20rem, the width the Fields tab's now holds too. Check the
+computed width in devtools, or confirm the two tabs' rails share one right
+edge. Nothing else on that tab changes: its own entries have no icon.
+
+Repeat the icon and tooltip checks with the OS or browser color scheme set
+to dark. Pass: every icon reads in the same slate the row's text uses. No
+light-mode color remains, and no icon reads invisible against its row.
 
 ### Borders and fills that the compiler dropped (`stylex-shorthand-repair`)
 
