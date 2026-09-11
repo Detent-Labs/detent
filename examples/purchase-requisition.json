@@ -1,7 +1,7 @@
 {
   "processId": "proc_7d41e0b6-5c2a-4f19-9e83-6b0d4a71c58f",
   "version": 1,
-  "definitionHash": "14b17864fd1138ad914ab895dcf76e9cf556d4c81fce9343401cebc53254864f",
+  "definitionHash": "83a99e89d77544e5125849939844c5d6b990f0f5b4f84dbec7372e334a928959",
   "status": "published",
   "publishedAt": "2026-08-15T09:00:00Z",
   "definition": {
@@ -152,7 +152,7 @@
           "en": "Request"
         },
         "description": {
-          "en": "Catalog grouping only. Each step's view places fields under this heading."
+          "en": "Holds the fields nested below it. Any of them a step's view places draws under this heading."
         },
         "type": "group",
         "fields": [
@@ -248,7 +248,7 @@
           "en": "Vendor"
         },
         "description": {
-          "en": "Catalog grouping only. Each step's view places fields under this heading."
+          "en": "Holds the fields nested below it. Any of them a step's view places draws under this heading."
         },
         "type": "group",
         "fields": [
@@ -287,7 +287,7 @@
           "en": "Decision"
         },
         "description": {
-          "en": "Catalog grouping only. Each step's view places fields under this heading."
+          "en": "Holds the fields nested below it. Any of them a step's view places draws under this heading."
         },
         "type": "group",
         "fields": [
@@ -361,24 +361,13 @@
         ]
       },
       {
-        "id": "field_9c7e5b31-0026-4a1c-8e2f-000000000026",
-        "key": "ordered",
-        "label": {
-          "en": "Ordered"
-        },
-        "description": {
-          "en": "Catalog grouping only. Each step's view places fields under this heading."
-        },
-        "type": "group"
-      },
-      {
         "id": "field_9c7e5b31-0027-4a1c-8e2f-000000000027",
         "key": "receipt",
         "label": {
           "en": "Receipt"
         },
         "description": {
-          "en": "Catalog grouping only. Each step's view places fields under this heading."
+          "en": "Holds the fields nested below it. Any of them a step's view places draws under this heading."
         },
         "type": "group",
         "fields": [
@@ -407,24 +396,13 @@
         ]
       },
       {
-        "id": "field_9c7e5b31-0028-4a1c-8e2f-000000000028",
-        "key": "ordered_vs_received",
-        "label": {
-          "en": "Ordered vs received"
-        },
-        "description": {
-          "en": "Catalog grouping only. Each step's view places fields under this heading."
-        },
-        "type": "group"
-      },
-      {
         "id": "field_9c7e5b31-0029-4a1c-8e2f-000000000029",
         "key": "resolution",
         "label": {
           "en": "Resolution"
         },
         "description": {
-          "en": "Catalog grouping only. Each step's view places fields under this heading."
+          "en": "Holds the fields nested below it. Any of them a step's view places draws under this heading."
         },
         "type": "group",
         "fields": [
@@ -448,7 +426,7 @@
           "en": "Order"
         },
         "description": {
-          "en": "Catalog grouping only. Each step's view places fields under this heading."
+          "en": "Holds the fields nested below it. Any of them a step's view places draws under this heading."
         },
         "type": "group",
         "fields": [
@@ -472,7 +450,7 @@
           "en": "Invoice"
         },
         "description": {
-          "en": "Catalog grouping only. Each step's view places fields under this heading."
+          "en": "Holds the fields nested below it. Any of them a step's view places draws under this heading."
         },
         "type": "group",
         "fields": [
