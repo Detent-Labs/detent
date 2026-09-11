@@ -168,10 +168,10 @@ interface Props {
  * each step by number and label"). One ruled row per step, numbered, each
  * carrying its label and its open issue count.
  *
- * Reachability order is `registerOrder`'s, the order the steps register read
- * before this replaced it. Reordering writes the draft's own `workflow.steps`
- * order, which is what the canvas's Up/Down traversal and the serialized
- * definition both read; the rail's own order stays derived from the graph.
+ * The steps rail's order is `registerOrder`'s reachability order. Reordering
+ * writes the draft's own `workflow.steps` order, which is what the canvas's
+ * Up/Down traversal and the serialized definition both read; the rail's own
+ * order stays derived from the graph.
  */
 export function StepsRail({ currentStepId, onSelectStep, onReorder, onAddStep }: Props) {
   const { draft, validation, contentLocale } = useDraft();

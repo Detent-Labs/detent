@@ -4466,10 +4466,10 @@ meets `scope=started` should infer no new permission tier from it.
 
   The tab component `FormsTab.tsx` plates one card per step declaring a view.
   The module `panels/formCardRows.ts` yields each card's label, role, field
-  count, miniature entries and issue badge. The module `draft/roleStamp.ts`
-  maps each step to `initial`, `task`, `subprocess` or `end`, with its tone,
-  for the card's role. It is a pure function with its own `bun:test` behind
-  it. A card takes a 1px hairline box. An empty form takes a 2px box in the
+  count, miniature entries and issue badge. It is a pure function with its
+  own `bun:test` behind it. The module `draft/roleStamp.ts` maps each step to
+  `initial`, `task`, `subprocess` or `end`, with its tone, for the card's
+  role. A card takes a 1px hairline box. An empty form takes a 2px box in the
   advisory color instead.
 
   The form editor's trailing pane is `FormPreview.tsx`. It mounts
