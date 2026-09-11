@@ -1166,6 +1166,30 @@ group control. Clear that group's key and press Enter. Pass: the checks rail
 reports the note's group, which still names the old key. Type the key back
 and press Enter. Pass: the note draws inside the box again.
 
+The last walk needs a tabbed form and the seeded layout. Discard the draft,
+and start this walk from a freshly seeded one. Open the form editor for step
+`finance_review`. Its form declares two tabs, "Review" and "Decision". The
+`request` and `line_item` boxes draw on "Review", and the `decision` box
+draws on "Decision".
+
+Open "Decision" and select `finance_note` inside the `decision` box. Pass:
+the strip's tab control reads disabled, set to "Decision". Under it, a line
+reads "The group decides the tab."
+
+With "Decision" still open, drag `category` from the palette onto the canvas.
+Its catalog group is `request`, whose box draws on "Review". Pass: the canvas
+switches to "Review" by itself, with `category` inside the `request` box after
+`cost_center`.
+
+Open the Fields tab and select the `decision` group. Clear its key and press
+Enter. Return to the `finance_review` form and open "Decision". Pass:
+`manager_note`, `finance_note` and `rejection_reason` draw there at the form's
+root, outside any box. Open "Review". Pass: none of the three draws there.
+
+Type `decision` back into the group's key and press Enter. Return to the form
+and open "Decision". Pass: the three draw inside the `decision` box again, and
+each one's tab control reads "Decision", disabled.
+
 <!-- antislop: allow-file synonym-rotation -->
 <!-- Why: this file already carries the rule's two collisions elsewhere.
      "JSON surface" is `.claude/rules/ui-glossary.md`'s fixed name, and an
