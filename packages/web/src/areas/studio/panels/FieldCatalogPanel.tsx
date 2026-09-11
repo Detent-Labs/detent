@@ -6,7 +6,6 @@ import {
   type DataSourceDef,
   type Expression,
   type FieldDef,
-  type FieldId,
   type FieldKindName,
   type FieldOption,
 } from "workflow-engine/schema";
@@ -28,7 +27,7 @@ import { FieldValidationEditor } from "./shared/FieldValidationEditor";
 import { DefaultValueEditor } from "./shared/DefaultValueEditor";
 import { fieldLocaleGaps, missingTranslationWarning, resolveDraftLocalizedText, seedLocalizedText } from "../draft/localized-text";
 import { draftFields } from "../draft/fields";
-import { syncViewGroupsOnGroupKeyGained, syncViewGroupsOnGroupRename } from "../draft/view-group-sync.js";
+import { writeGroupKey, writeGroupLabel } from "../draft/view-group-sync.js";
 import { droppedByKindChange, nextFieldKey } from "./fieldCatalogLogic.js";
 import { fieldCheckZone, type FieldCheckZone } from "./fieldCheckZone.js";
 import { fieldKindLabel } from "../draft/field-type-labels";
@@ -380,62 +379,51 @@ function isCustomType(type: DraftField["type"]): type is DraftOf<FieldDef>["type
   return typeof type === "object" && type !== null;
 }
 
+interface FieldKeyInputProps {
+  field: DraftField;
+  mutate: Mutate;
+  onChange: (patch: Partial<DraftField>) => void;
+  /** Fires on a group key's commit, which bypasses `onChange`. `FieldEditor`
+   * counts a definition-half write there, so its usage rows still tint. */
+  onWrite?: () => void;
+}
+
 /**
- * The key input's own write, at both sites that carry one: the top-level
- * `FieldEditor` and the recursive `SubFieldRow` (a group's own child, at any
- * depth, including a group nested inside another group). An ordinary key
- * edit -- not a group, or a group whose key hasn't actually changed -- stays
- * on the existing `onChange` patch path.
+ * The key input, at both sites that carry one: the top-level `FieldEditor`
+ * and the recursive `SubFieldRow`, a group's child at any depth. A non-group
+ * field writes its key through `onChange` on every keystroke.
  *
- * A `type: "group"` field's real key change goes through `mutate` directly
- * instead, because it must also rewrite view entries the catalog write
- * (`onChange`, bubbled to `updateInDraftArray`) never reaches. Two shapes:
- *
- * - The group already carried a key (`oldKey !== ""`): every entry naming
- *   `oldKey` gets `newKey` (`syncViewGroupsOnGroupRename`).
- * - The group is GAINING its first key (`oldKey === ""`): no entry could
- *   ever have named `""`, so that rewrite would match nothing -- but the
- *   group's own direct children just became nameable for the first time,
- *   and any of them already placed on a view needs `group: newKey`
- *   (`syncViewGroupsOnGroupKeyGained`). Leaving them unset strands them the
- *   same way an unsynced rename would (`studio-app`, and
- *   `compile.ts::checkViewGroupReferences`'s third half).
- *
- * `field.id`, not an array index, finds the target inside the mutate's own
- * draft clone: `SubFieldRow` never learns its own path through the catalog
- * tree, and the id resolves at any depth.
- *
- * `onWrite`, when given, fires on every write this function makes,
- * including the direct-`mutate` branch -- which bypasses `onChange` and so
- * cannot trigger `FieldEditor`'s own `setDefinitionWrites` bump the way the
- * ordinary branch does for free (`studio-app`: a definition-half write
- * tints the effect half's usage rows). The bump is independent local UI
- * state, not a second Draft write; the catalog and view halves still land
- * in the one `mutate` either way.
+ * A group's key is what view entries store, so changing it rewrites them
+ * (`view-group-sync.ts::writeGroupKey`). The input holds the typed text
+ * locally and commits it on blur or Enter, in one `mutate`, so ordinary
+ * typing never hands the rewrite a half-typed key. `field.id` finds the
+ * group inside the mutate's draft clone, at any depth.
  */
-function writeFieldKey(
-  mutate: Mutate,
-  field: DraftField,
-  onChange: (patch: Partial<DraftField>) => void,
-  newKey: string,
-  onWrite?: () => void,
-): void {
-  const oldKey = field.key ?? "";
-  if (field.type !== "group" || oldKey === newKey) {
-    onChange({ key: newKey });
-    return;
+function FieldKeyInput({ field, mutate, onChange, onWrite }: FieldKeyInputProps) {
+  const [typed, setTyped] = useState<string | undefined>(undefined);
+  const groupId = field.type === "group" ? field.id : undefined;
+  if (groupId === undefined) {
+    return <input type="text" {...stylex.props(styles.studioMono)} value={field.key ?? ""} onChange={(e) => onChange({ key: e.target.value })} />;
   }
-  onWrite?.();
-  mutate((d) => {
-    const target = draftFields(d).find((f) => f.id === field.id);
-    if (target) target.key = newKey;
-    if (oldKey === "") {
-      const childIds = (field.fields ?? []).map((f) => f.id).filter((fid): fid is FieldId => fid !== undefined);
-      syncViewGroupsOnGroupKeyGained(d, childIds, newKey);
-    } else {
-      syncViewGroupsOnGroupRename(d, oldKey, newKey);
-    }
-  });
+  const commit = () => {
+    if (typed === undefined) return;
+    setTyped(undefined);
+    if (typed === (field.key ?? "")) return;
+    onWrite?.();
+    mutate((d) => writeGroupKey(d, groupId, typed));
+  };
+  return (
+    <input
+      type="text"
+      {...stylex.props(styles.studioMono)}
+      value={typed ?? field.key ?? ""}
+      onChange={(e) => setTyped(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") commit();
+      }}
+    />
+  );
 }
 
 /**
@@ -542,8 +530,14 @@ function SubFieldRow({ field, dataSources, lists, mutate, onChange, onRemove }: 
   const baseLocale = draft.baseLocale ?? "en";
   /** Deduped against the whole catalog, not just this group's own children
    * (design.md: `FieldDef.key` is one flat CEL namespace regardless of
-   * nesting depth). */
+   * nesting depth). A group's label goes through `writeGroupLabel`, so the
+   * key it derives rewrites the view entries naming the old one. */
   const updateLabel = (label: DraftField["label"]) => {
+    const groupId = field.type === "group" ? field.id : undefined;
+    if (groupId !== undefined) {
+      mutate((d) => writeGroupLabel(d, groupId, label, baseLocale));
+      return;
+    }
     const taken = new Set(draftFields(draft).filter((f) => f.id !== field.id).map((f) => f.key ?? ""));
     const derivedKey = nextFieldKey(field.key ?? "", field.label, label, baseLocale, taken);
     onChange(derivedKey === undefined ? { label } : { label, key: derivedKey });
@@ -614,12 +608,7 @@ function SubFieldRow({ field, dataSources, lists, mutate, onChange, onRemove }: 
     <div {...stylex.props(styles.fieldRow)} id={field.id === undefined ? undefined : `field-row-${field.id}`}>
       <label {...stylex.props(styles.fieldRowLabel)}>
         {t("fieldCatalog.keyLabel")}
-        <input
-          type="text"
-          {...stylex.props(styles.studioMono)}
-          value={field.key ?? ""}
-          onChange={(e) => writeFieldKey(mutate, field, onChange, e.target.value)}
-        />
+        <FieldKeyInput field={field} mutate={mutate} onChange={onChange} />
       </label>
       <label {...stylex.props(styles.fieldRowLabel)}>
         {t("fieldCatalog.labelLabel")}
@@ -962,8 +951,15 @@ function FieldEditor({
   const baseLocale = draft.baseLocale ?? "en";
   const fieldId = field.id;
   /** Deduped against the whole catalog, including every group's nested
-   * children (design.md: `FieldDef.key` is one flat CEL namespace). */
+   * children (design.md: `FieldDef.key` is one flat CEL namespace). A
+   * group's label goes through `writeGroupLabel`, so the key it derives
+   * rewrites the view entries naming the old one. */
   const updateLabel = (label: DraftField["label"]) => {
+    if (field.type === "group" && fieldId !== undefined) {
+      setDefinitionWrites((n) => n + 1);
+      mutate((d) => writeGroupLabel(d, fieldId, label, baseLocale));
+      return;
+    }
     const taken = new Set(draftFields(draft).filter((f) => f.id !== field.id).map((f) => f.key ?? ""));
     const derivedKey = nextFieldKey(field.key ?? "", field.label, label, baseLocale, taken);
     onChange(derivedKey === undefined ? { label } : { label, key: derivedKey });
@@ -1047,12 +1043,7 @@ function FieldEditor({
             )}
             <label {...stylex.props(styles.fieldRowLabel)}>
               {t("fieldCatalog.keyLabel")}
-              <input
-                type="text"
-                {...stylex.props(styles.studioMono)}
-                value={field.key ?? ""}
-                onChange={(e) => writeFieldKey(mutate, field, onChange, e.target.value, () => setDefinitionWrites((n) => n + 1))}
-              />
+              <FieldKeyInput field={field} mutate={mutate} onChange={onChange} onWrite={() => setDefinitionWrites((n) => n + 1)} />
             </label>
           </Zone>
 
