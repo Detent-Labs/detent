@@ -522,10 +522,10 @@ interface MoveFieldControlProps {
  * around the control (design.md, decision: "The move control leaves the
  * rail for the editor").
  *
- * Disabled with fewer than two destinations, the rule the rail's own picker
- * held before this control replaced it.
+ * Disabled with fewer than two destinations: a field with nowhere else to go
+ * has nothing for the control to offer.
  */
-function MoveFieldControl({ fieldId, fields, contentLocale, baseLocale, onMoveField }: MoveFieldControlProps) {
+export function MoveFieldControl({ fieldId, fields, contentLocale, baseLocale, onMoveField }: MoveFieldControlProps) {
   const { currentId, targetIds } = moveTargetsFor(fields, fieldId);
   const flat = flattenDraftFields(fields);
   const targetLabel = (targetId: string | undefined) => {
@@ -826,7 +826,7 @@ function SubFieldRow({ field, dataSources, lists, mutate, onChange, onRemove, on
 
       <FieldValidationEditor field={field} validation={field.validation} onChange={(validation) => onChange({ validation })} />
 
-      {field.type === "group" && (
+      {(isGroup || (field.fields?.length ?? 0) > 0) && (
         <fieldset>
           <legend>{t("fieldCatalog.subFieldsLegend")}</legend>
           {(field.fields ?? []).map((sub, i) => (
@@ -841,9 +841,14 @@ function SubFieldRow({ field, dataSources, lists, mutate, onChange, onRemove, on
               onMoveField={onMoveField}
             />
           ))}
-          <button type="button" className="btn btn-secondary" onClick={addSubField}>
-            {t("fieldCatalog.addSubField")}
-          </button>
+          {/* A parent `changeKind` rewrote out of `group` keeps its
+              children (`fieldCatalogLogic.ts::moveFieldToGroup`'s own
+              comment), but it names no group to add a new one into. */}
+          {isGroup && (
+            <button type="button" className="btn btn-secondary" onClick={addSubField}>
+              {t("fieldCatalog.addSubField")}
+            </button>
+          )}
         </fieldset>
       )}
 
@@ -1206,7 +1211,7 @@ function FieldEditor({
             <FieldValidationEditor field={field} validation={field.validation} onChange={(validation) => onChange({ validation })} />
           </Zone>
 
-          {isGroup && (
+          {(isGroup || (field.fields?.length ?? 0) > 0) && (
             <fieldset>
               <legend>{t("fieldCatalog.groupChildrenHeading")}</legend>
               {(field.fields ?? []).map((sub, i) => (
@@ -1221,9 +1226,14 @@ function FieldEditor({
                   onMoveField={onMoveField}
                 />
               ))}
-              <button type="button" className="btn btn-secondary" onClick={addSubField}>
-                {t("fieldCatalog.addSubField")}
-              </button>
+              {/* A parent `changeKind` rewrote out of `group` keeps its
+                  children (`fieldCatalogLogic.ts::moveFieldToGroup`'s own
+                  comment), but it names no group to add a new one into. */}
+              {isGroup && (
+                <button type="button" className="btn btn-secondary" onClick={addSubField}>
+                  {t("fieldCatalog.addSubField")}
+                </button>
+              )}
             </fieldset>
           )}
 

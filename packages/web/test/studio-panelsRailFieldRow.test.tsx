@@ -59,14 +59,17 @@ describe("PanelsRailFieldRow", () => {
   // twice.
   it("wraps the kind icon in an aria-hidden span carrying the kind name as its title", () => {
     const html = renderToStaticMarkup(<PanelsRailFieldRow {...BASE} />);
-    expect(html).toContain('aria-hidden="true"');
-    expect(html).toContain('title="Number"');
+    // One wrapper, not the SVG's own `aria-hidden` (lucide-react adds that to
+    // every icon regardless): the whole span carries both attributes.
+    expect(html).toContain('<span aria-hidden="true" title="Number"');
   });
 
   it("keeps the kind name inside the button, as hidden text", () => {
     const html = renderToStaticMarkup(<PanelsRailFieldRow {...BASE} />);
     expect(html.indexOf(">Number<")).toBeGreaterThan(html.indexOf("<button"));
     expect(html.indexOf(">Number<")).toBeLessThan(html.indexOf("</button>"));
+    // The same `visuallyHidden` style `railIssues` is checked against above.
+    expect(html.slice(0, html.indexOf(">Number<"))).toContain("visuallyHidden");
   });
 
   it("renders no icon for a row naming no field", () => {

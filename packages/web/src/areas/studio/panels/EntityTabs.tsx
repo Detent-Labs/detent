@@ -12,7 +12,7 @@ import { addToDraftArray } from "../draft/draft-array-crud";
 import { resolveDraftLocalizedText, seedLocalizedText } from "../draft/localized-text";
 import { flattenDraftFields } from "../draft/fields";
 import { fieldKindIcon, fieldKindWord } from "../draft/field-type-labels";
-import { moveControlId, moveFieldToGroup } from "./fieldCatalogLogic";
+import { moveControlId, moveFieldToGroup, parentIdOf } from "./fieldCatalogLogic";
 import { flattenRailFields, issueCountForEntityId } from "../draft/panel-rail";
 import { moveFieldAndSyncViews } from "../draft/view-group-sync";
 import { FieldCatalogPanel } from "./FieldCatalogPanel";
@@ -21,7 +21,7 @@ import { DataSourcesPanel } from "./DataSourcesPanel";
 type DraftDataSource = DraftOf<DataSourceDef>;
 
 /** Below this width the rail and the open editor no longer fit beside one
- * another. The rail holds its 16rem, and `FieldCatalogPanel` stacks its own
+ * another. The rail holds its 20rem, and `FieldCatalogPanel` stacks its own
  * two halves at the same width, so the whole tab turns at once. */
 const NARROW = "@media (max-width: 64rem)";
 
@@ -89,8 +89,8 @@ const styles = stylex.create({
     paddingLeft: space.s6,
   },
   // The row's own wrapper: it carries the hairline, the indentation and the
-  // drop target for the field's drag (`studio-app`). The move itself now
-  // lives in the field's own editor, not on this row.
+  // drop target for the field's drag (`studio-app`). The move control lives
+  // in the field's own editor, not on this row.
   railFieldRow: {
     display: "flex",
     alignItems: "baseline",
@@ -338,22 +338,18 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
     return label || t("panelsScreen.unnamedField");
   };
 
-  /** The group a rail row currently hangs in, or `undefined` at the top level. */
-  const parentGroupId = (fieldId: string): string | undefined =>
-    flattenDraftFields(draft.fields).find((f) => (f.fields ?? []).some((c) => c.id === fieldId))?.id;
-
   /**
    * The one write both gestures reach (a keyboard move must not become a
    * second write path beside the drag). It re-hangs the field, keeps it
    * selected through its new top-level ancestor, announces where it landed,
-   * and hands focus back to the row's own move control.
+   * and hands focus back to the field's own move control in its editor.
    */
   const moveField = (fieldId: string, targetGroupId: string | undefined) => {
     const fields = draft.fields ?? [];
     const next = moveFieldToGroup(fields, fieldId, targetGroupId);
     if (next === fields) return;
 
-    const fromGroupId = parentGroupId(fieldId);
+    const fromGroupId = parentIdOf(fields, fieldId);
     // One mutate carries the field-array write, the `group` rewrite on every
     // view entry naming the field, and any group card a form now lacks, so a
     // reader never sees the catalog and the views disagree
@@ -382,6 +378,12 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
     if (dragFieldId === undefined || dragFieldId === targetId) return;
     const target = fieldsById.get(targetId);
     moveField(dragFieldId, target?.type === "group" ? targetId : undefined);
+    // A pointer drop is not a move "made through the control", so it must not
+    // carry the keyboard focus into the editor the way a control-driven move
+    // does (`spa-accessibility`). `moveField` and this call batch into one
+    // update, so the effect that reads `refocusId` never sees the value
+    // `moveField` set.
+    setRefocusId(undefined);
     setDragFieldId(undefined);
   };
 
