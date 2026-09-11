@@ -1186,9 +1186,10 @@ Enter. Return to the `finance_review` form and open "Decision". Pass:
 `manager_note`, `finance_note` and `rejection_reason` draw there at the form's
 root, outside any box. Open "Review". Pass: none of the three draws there.
 
-Type `decision` back into the group's key and press Enter. Return to the form
-and open "Decision". Pass: the three draw inside the `decision` box again, and
-each one's tab control reads "Decision", disabled.
+Open the Fields tab again. Type `decision` back into the `decision` group's
+key and press Enter. Return to the form and open "Decision". Pass: the three
+draw inside the `decision` box again. Select each one. Pass: its tab control
+reads "Decision", disabled.
 
 <!-- antislop: allow-file synonym-rotation -->
 <!-- Why: this file already carries the rule's two collisions elsewhere.
