@@ -29,7 +29,7 @@ import { initialSaveState, type DraftSaveState } from "./draftSaveLogic.js";
 import { isDirty } from "./draftToolbarState.js";
 import { CanvasView } from "../canvas/CanvasView.js";
 import { CanvasBar } from "../canvas/CanvasBar.js";
-import { reachableStepIds, registerOrder } from "../draft/registerOrder.js";
+import { reachableStepIds } from "../draft/registerOrder.js";
 import {
   freeLatticePoint,
   snapToGrid,
@@ -477,12 +477,15 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, go, initial
   const inspectedStepId = selectedStepIds.length === 1 ? selectedStepIds[0] : undefined;
 
   // The rail's own order, read three times: for the row list's current mark,
-  // for the walk's two ends, and for the step the page falls back to.
-  const railOrder = registerOrder(steps, draft.workflow?.initialStep);
-  // The same walk the rail's order rests on, over the same two inputs
-  // (design D7). The canvas bar reads it for one selected step: a step the
-  // initial step reaches over paths reads as nothing, and one no chain
-  // reaches reads as unconnected. A set of several carries its count instead.
+  // for the walk's two ends, and for the step the page falls back to. It is
+  // the draft's own `workflow.steps` order, the same order `StepsRail` lists.
+  const railOrder = steps;
+  // The bar's own reachability walk over the same two inputs (design D7). It
+  // no longer shares the rail's order — the rail lists the draft's own
+  // `workflow.steps` order, and this walk stays independent. The canvas bar
+  // reads it for one selected step: a step the initial step reaches over
+  // paths reads as nothing, and one no chain reaches reads as unconnected. A
+  // set of several carries its count instead.
   const reachable = useMemo(() => reachableStepIds(steps, draft.workflow?.initialStep), [steps, draft.workflow?.initialStep]);
   const unconnected = selectedStepIds.length === 1 && !reachable.has(selectedStepIds[0]);
   // The step the step page holds, and the row the rail reads as current.
@@ -507,9 +510,9 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, go, initial
   };
 
   /** The rail's reorder control. It trades two steps' places in the draft's
-   * own `workflow.steps` order — what the canvas's Up/Down traversal and the
-   * serialized definition both read. The rail's own order stays derived from
-   * the graph, so a reachable step keeps its place there. */
+   * own `workflow.steps` order — the swap moves the step in that order,
+   * which is what the rail, the canvas traversal and the serialized
+   * definition all read. */
   const onReorderStep = (stepId: string, neighbourId: string) => {
     mutate((d) => {
       const list = d.workflow?.steps;
