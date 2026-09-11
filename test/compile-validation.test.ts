@@ -1226,11 +1226,11 @@ describe("compile: org.actor-from-field fieldId names a person-formatted field",
 // out, therefore vanishes from the form with no message. Three published
 // examples carried the shape and drew 37 empty forms between them.
 //
-// group-fields-stay-in-their-group adds a third half: a field entry's
+// group-fields-stay-in-their-group adds a third clause: a field entry's
 // `group` must name the key of the group field that holds it in the
 // catalog's own `fields` (or stay empty when the catalog holds it at the
 // top level), reached via `parentGroupKeyById`. A note entry, which names no
-// catalog field, is exempt from this half alone.
+// catalog field, is exempt from this clause alone.
 describe("compile: a view entry's group names a group field the view carries", () => {
   /**
    * `baseBody` plus one group field holding `field_amount` as its one
@@ -1437,8 +1437,8 @@ describe("compile: a view entry's group names a group field the view carries", (
     // A note names no catalog field, so it has no catalog parent to agree
     // with. field_person is a top-level group here — a field entry naming
     // it would need an empty group — but a note is exempt from the
-    // parentage half entirely, so naming "person" still publishes as long
-    // as the view carries a ref to it (the first two halves still bind it).
+    // parentage clause entirely, so naming "person" still publishes as long
+    // as the view carries a ref to it (the first two clauses still bind it).
     const b = grouped([
       { ref: "field_person" },
       { kind: "note", text: { en: "Hello." }, group: "person" },

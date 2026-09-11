@@ -959,19 +959,19 @@ function checkRedactableFields(body: ProcessBody): CompileIssue[] {
 // 7c. View group back-reference: a view entry's `group` names a group field's
 // key, and that same view carries an entry referencing that group field.
 // `form-ui` draws only the entries carrying no `group`, and a group field then
-// draws the entries naming its own key. An entry failing either half leaves
+// draws the entries naming its own key. An entry failing either clause leaves
 // the form with no message at all: it is not a field the participant can skip,
 // it is a field nobody can see. Three published examples carried the shape and
 // drew 37 empty forms between them.
 //
 // An empty `group` reads as no group, matching what the renderer already does
-// with it — but only the first two halves take that at face value. The
-// third half below still holds an absent/empty `group` to the catalog.
+// with it — but only the first two clauses take that at face value. The
+// third clause below still holds an absent/empty `group` to the catalog.
 //
-// A third half binds a field entry (one carrying a `ref`) to the catalog: its
+// A third clause binds a field entry (one carrying a `ref`) to the catalog: its
 // `group` must name the key of the group field that holds that field in the
 // catalog's own `fields` (`parentGroupKeyById`), or stay empty when the
-// catalog holds the field at the top level. The half binds in both
+// catalog holds the field at the top level. The clause binds in both
 // directions: a field the catalog holds inside a group must declare that
 // group's key, so an absent or empty `group` on such an entry fails too — a
 // hand-authored body cannot lift a grouped field onto the form's root while
@@ -1013,9 +1013,9 @@ function checkViewGroupReferences(body: ProcessBody): CompileIssue[] {
       const group = typeof rawGroup === "string" ? rawGroup : "";
       const loc = `steps[${si}].view.fields[${vi}].group`;
 
-      // First two halves: reached only by a non-empty declared group. An
+      // First two clauses: reached only by a non-empty declared group. An
       // absent or empty one always sits at the form's root as far as they're
-      // concerned; the third half below is where that placement is tested
+      // concerned; the third clause below is where that placement is tested
       // against the catalog.
       if (group !== "") {
         const groupId = groupIdByKey.get(group);
