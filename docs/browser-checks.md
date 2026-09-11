@@ -3183,3 +3183,33 @@ and Delete list turns disabled. That version stays, so walk this control last,
 on a database you can reseed.
 
 Discard every draft the walk created before you finish.
+
+### Steps rail rows without a summary line (`steps-rail-rows-drop-summary-line`)
+
+Each rail row dropped its grey summary line under the label. A row now
+shows a number, a label and its move controls. No `bun:test` assertion sees
+a row's visual layout, so this check lands here.
+
+Build the production bundle and open it on the engine's own port. Seed the
+database, then sign in as `demo-superuser@example.test`, password
+`seed-demo-password`. The account holds every role the studio needs.
+
+Open `it-offboarding` and go to its Steps tab, at
+`/studio/processes/<id>/edit/steps`. Resize the window to 1440px wide.
+
+Pass: each row shows its number, label, "Move earlier" and "Move later",
+with no summary line under it.
+
+Open the rail's "Add" foot and choose "Add a call to another process".
+Pass: the new row's issue badge sits at its trailing edge, reading "1 open
+issue".
+
+Rename a step to "Process offboarding equipment and revoke every system
+access", 60 characters. Pass: the label wraps inside its row instead of
+overflowing it.
+
+Narrow the window to 420px wide. Pass: the rail stands above the step page,
+capped at 20rem tall, and scrolls inside that cap. Every row still shows
+its number, label and move controls, and none show a summary line.
+
+Choose "Discard draft" in the header bar to leave no draft behind.
