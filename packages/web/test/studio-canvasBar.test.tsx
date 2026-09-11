@@ -21,7 +21,7 @@ import type { StepGroup } from "../src/areas/studio/canvas/groups.js";
  * too. That Escape dismisses the open menu and returns focus to the caret
  * trigger needs a real browser. Both land in `docs/browser-checks.md`.
  */
-const MENU_KINDS: readonly StepKind[] = ["task", "subprocess", "end"];
+const MENU_KINDS: readonly StepKind[] = ["subprocess", "end"];
 
 function render(
   over: {
@@ -60,6 +60,8 @@ describe("CanvasBar with nothing selected", () => {
     expect(html).toContain(`aria-label="${t("canvas.addStepMore")}"`);
     expect(html).not.toContain(t("canvas.selectionHeading"));
     expect(html).not.toContain(t("canvas.unconnected"));
+    expect(html).not.toContain(`>${t("canvas.selectionRemoveOne")}<`);
+    expect(html).not.toContain(`>${t("canvas.selectionRemove")}<`);
   });
 });
 
@@ -75,6 +77,25 @@ describe("CanvasBar with one step selected", () => {
     const html = render({ selectedStepIds: ["s1"], unconnected: true });
 
     expect(html).toContain(t("canvas.unconnected"));
+  });
+
+  it("renders the Remove control labelled for one step, with no count and no group control", () => {
+    const html = render({ selectedStepIds: ["s1"] });
+
+    expect(html).toContain(`>${t("canvas.selectionRemoveOne")}<`);
+    expect(html).not.toContain(t("canvas.selectionHeading"));
+    expect(html).not.toContain(`>${t("canvas.groupCreate")}<`);
+    expect(html).not.toContain(t("canvas.groupName"));
+  });
+
+  it("pins the order for an unconnected step: its report, then Remove step", () => {
+    const html = render({ selectedStepIds: ["s1"], unconnected: true });
+
+    const reportIndex = html.indexOf(t("canvas.unconnected"));
+    const removeIndex = html.indexOf(`>${t("canvas.selectionRemoveOne")}<`);
+
+    expect(reportIndex).toBeGreaterThan(-1);
+    expect(removeIndex).toBeGreaterThan(reportIndex);
   });
 });
 
@@ -97,6 +118,18 @@ describe("CanvasBar with two steps selected", () => {
     expect(html).not.toContain(t("canvas.groupName"));
   });
 
+  it("pins the order: the count, then Remove steps, then the group control", () => {
+    const html = render({ selectedStepIds: ["s1", "s2"] });
+
+    const countIndex = html.indexOf(t("canvas.selectionHeading"));
+    const removeIndex = html.indexOf(`>${t("canvas.selectionRemove")}<`);
+    const groupIndex = html.indexOf(`>${t("canvas.groupCreate")}<`);
+
+    expect(countIndex).toBeGreaterThan(-1);
+    expect(removeIndex).toBeGreaterThan(countIndex);
+    expect(groupIndex).toBeGreaterThan(removeIndex);
+  });
+
   it("renders that group's own name, collapse and ungroup controls instead of the group control, for a selection matching one group", () => {
     const groups: StepGroup[] = [{ id: "g1", stepIds: ["s1", "s2"], name: "Approvals" }];
     const html = render({ selectedStepIds: ["s1", "s2"], groups });
@@ -105,6 +138,19 @@ describe("CanvasBar with two steps selected", () => {
     expect(html).toContain(`>${t("canvas.groupCollapse")}<`);
     expect(html).toContain(`>${t("canvas.groupUngroup")}<`);
     expect(html).not.toContain(`>${t("canvas.groupCreate")}<`);
+  });
+
+  it("pins the order for a selection matching one group: the count, then Remove steps, then the group's own controls", () => {
+    const groups: StepGroup[] = [{ id: "g1", stepIds: ["s1", "s2"], name: "Approvals" }];
+    const html = render({ selectedStepIds: ["s1", "s2"], groups });
+
+    const countIndex = html.indexOf(t("canvas.selectionHeading"));
+    const removeIndex = html.indexOf(`>${t("canvas.selectionRemove")}<`);
+    const groupIndex = html.indexOf(t("canvas.groupName"));
+
+    expect(countIndex).toBeGreaterThan(-1);
+    expect(removeIndex).toBeGreaterThan(countIndex);
+    expect(groupIndex).toBeGreaterThan(removeIndex);
   });
 });
 
@@ -127,7 +173,7 @@ describe("The bar's own element", () => {
 });
 
 describe("The add-step menu", () => {
-  it("lists three menu items, one per step kind, each with its own phrase and note", () => {
+  it("lists two menu items, the kinds Add step does not add, each with its own phrase and note", () => {
     const html = render();
     const items = html.match(/<button[^>]*role="menuitem"[^>]*>[\s\S]*?<\/button>/g) ?? [];
 
@@ -137,6 +183,13 @@ describe("The add-step menu", () => {
       expect(item).toBeDefined();
       expect(item).toContain(`>${newStepNote(kind)}<`);
     }
+  });
+
+  it("offers no step someone works", () => {
+    const html = render();
+    const items = html.match(/<button[^>]*role="menuitem"[^>]*>[\s\S]*?<\/button>/g) ?? [];
+
+    expect(items.some((b) => b.includes(`>${newStepPhrase("task")}<`))).toBe(false);
   });
 });
 

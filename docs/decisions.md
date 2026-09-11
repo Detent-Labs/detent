@@ -1472,6 +1472,81 @@ each entry carries the anchor that holds today. All nine stay open.
   from one actor issues one grant query each. The review calls it documented
   and correctly bounded, and recommends nothing.
 
+## Open from the 2026-09-11 design audits (each needs its own OpenSpec change)
+
+Two changes ran `/impeccable critique` and `/impeccable audit` on 2026-09-11:
+`destructive-buttons-show-the-accent` on the admin instance screen, and
+`tighter-canvas-bar` on the Studio Canvas tab. Their browser walks found the
+rest. Every item below sits outside the change that found it, and each was
+recorded rather than fixed.
+
+- **A canvas removal drops keyboard focus, and nothing announces it.**
+  `deleteSelection` (`packages/web/src/areas/studio/screens/EditScreen.tsx:540`)
+  clears the selection. The pressed control unmounts with it, so focus lands on
+  `<body>` and the next Tab reaches Fit to view. Remove steps behaved this way
+  before Remove step joined it. Risk: a keyboard or screen-reader user loses
+  their place after every removal (WCAG 2.4.3, and 4.1.3 for the silence). The
+  fix moves focus to the canvas's own tab stop, which
+  `packages/web/src/areas/studio/canvas/CanvasView.tsx:770` already reassigns,
+  and announces the removal in a polite live region.
+- **The canvas bar's caret menu ignores the arrow keys.** The panel carries
+  `role="menu"` (`packages/web/src/areas/studio/canvas/CanvasBar.tsx:360`), and
+  ArrowDown leaves focus on its trigger. Risk: a screen reader announces a menu
+  whose keys answer nothing (WCAG 4.1.2).
+- **No key takes a selected step out of the draft.** Delete and Backspace on a
+  selected node do nothing (`canvas/CanvasView.tsx`). A removal needs the
+  pointer, or a Tab back to the canvas bar's own control.
+- **A field's border reads 1.32:1 in light and 1.64:1 in dark.** The 1px
+  hairline sits at `packages/web/src/shell/global.css:68`. WCAG 1.4.11 asks 3:1
+  of a boundary that identifies a control. `DESIGN.md`'s Inputs / Fields entry
+  sets that hairline, so the call belongs to the design language.
+- **Every `.btn` stands 36 to 37px tall, under the 44px touch target.** Its
+  padding sits at `packages/web/src/shell/tokens.css:125`. The studio serves a
+  desktop audience, so this one waits on a touch one.
+- **`createStep.ts` calls the canvas add controls "the palette".** The retired
+  word sits at `packages/web/src/areas/studio/draft/createStep.ts:8` and `:15`.
+  `.claude/rules/ui-glossary.md` keeps *palette* for the form editor's field
+  list alone.
+- **Cancel instance commits on one press, touches Refresh, and drops focus.**
+  `doCancel` (`packages/web/src/areas/admin/screens/InstanceScreen.tsx:275`)
+  asks nothing, while `doRedact` at `:288` confirms first. Cancel instance also
+  ends where Refresh begins, a 0px gap that reads as one segmented control. The
+  press disables the focused button, which the refresh then unmounts (`:382`),
+  so focus drops to the document. Risk: one stray press cancels a running case.
+- **The accent carries two meanings on the instance screen.** The RUNNING
+  stamp's 2px outline and Cancel instance's 1px outline sit about 110px apart.
+  `DESIGN.md`'s Stamp Rule and its Destructive entry each ask for theirs, so
+  the tension sits in `DESIGN.md` itself.
+- **`.btn-ghost` text falls under 4.5:1 on its own washes.** The draft
+  confirmation dialog's Cancel carries it
+  (`packages/web/src/areas/studio/panels/ProcessHeaderBar.tsx:578`). Its accent
+  text reads 3.90:1 hovered and 3.44:1 pressed in light, and 4.15:1 pressed in
+  dark. `destructive-buttons-show-the-accent` cleared the same shortfall for
+  `.btn-destructive` with `--color-accent-on-muted`, and this one wants the
+  same treatment.
+- **The step page's Remove step has no destructive treatment.**
+  `packages/web/src/areas/studio/panels/StepPage.tsx:610` renders
+  `btn btn-secondary` and commits at once. `DESIGN.md` asks that a destructive
+  action stay outlined in the accent.
+- **A leaf field's label beside a key-less field derives `_2`.** Both leaf
+  label paths (`panels/FieldCatalogPanel.tsx:541` and `:963`) build their
+  dedupe set with `""` in it. A label whose key derives empty, such as `!!!`,
+  then takes `_2` instead of its own key. The group path already drops `""`
+  (`draft/view-group-sync.ts`). A leaf key references nothing, so no view
+  breaks.
+- **A span-1 card's label collapses to zero width in a two-column form.**
+  Measured at 1440x900 on the form editor canvas: `cost_center` draws eleven
+  letters down one column. The member row spends about 315px on Move up, Move
+  down and Remove, which leaves the card 51px. Any span-1 card in a two-column
+  form collapses, inside a group or not.
+- **Creating a draft takes tens of seconds and shows no progress.** One
+  measurement read 56.9s on the seeded `purchase_requisition` v3. Another
+  watched eight `GET /drafts/<id>` polls answer 404 over 7.5s. The button gives
+  no sign meanwhile, so a second press is easy.
+- **Two browser-check entries name retired UI.** `docs/browser-checks.md:883`
+  and `:913` still name the configuration pane and the ribbon bar.
+  `.claude/rules/ui-glossary.md` retired both words with the process surface.
+
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 
 Each entry below names a cut somebody proposed, the reason a reviewer refused
