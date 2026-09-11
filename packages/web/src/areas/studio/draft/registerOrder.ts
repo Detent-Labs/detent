@@ -39,15 +39,15 @@ export function reachableStepIds(steps: DraftStep[] | undefined, initialStep: st
 }
 
 /**
- * The order the steps register lists a draft's steps in (`studio-canvas`'s
- * "The steps register lists every step in reachability order").
+ * The order the steps rail lists a draft's steps in (`studio-step-page`'s
+ * "The steps rail lists each step by number and label").
  *
  * Three groups, concatenated. Reachable non-terminal steps come first, in
  * breadth-first order from `initialStep`, per `reachableStepIds`. A step no
  * path reaches follows, in the draft's own order. Terminal steps come last,
  * also in the draft's own order, whether or not a path reaches them.
  *
- * Breadth-first, not depth-first: the register reads as distance from the
+ * Breadth-first, not depth-first: the rail reads as distance from the
  * start, so a step the initial step reaches directly outranks one two hops
  * down another branch. Over `examples/expense-approval.json` that is what
  * puts `escalated_review` (two hops) ahead of `booking_error` (three).
