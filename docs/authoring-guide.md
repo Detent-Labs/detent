@@ -844,14 +844,22 @@ another position to reorder the view. Each card also carries move-up and
 move-down buttons, which make the same change without a pointer. Take a card
 off the canvas and its field returns to the palette.
 
+A group draws as a box, with its placed members inside. A group nested in
+another group draws inside that box too. A member's drag and its move buttons
+stay inside its own group. Drop a group's field from the palette, and it lands
+inside that group. A form lacking the group's box gains that box as well.
+Take a group's box off the canvas and every field inside it returns to the
+palette.
+
 A toggle above the canvas sets the form to one column or two. Select a card
 and the strip sets that field's visible, required, readonly and span. Each
 of the first three takes `true`, `false`, or a CEL expression.
 
 A field's `group` no longer sits in the strip. It follows the field's
 catalog parent, and moving a field between groups happens in the field
-catalog. A note is the exception. Its own strip keeps a `group` select,
-since a note has no catalog parent to follow.
+catalog. A move there updates every form carrying the field, and adds the
+group's box where a form lacks it. A note is the exception. Its own strip
+keeps a `group` select, since a note has no catalog parent to follow.
 
 For a field marked `technical` in the field catalog, the strip omits the
 required and readonly controls. The definition contract forbids declaring

@@ -171,12 +171,12 @@ that sequence, over one `walkFieldsIndexed` pass
   the body declares at any depth, and the same view carries a `ref` entry for
   that group field. `form-ui` draws only the entries with no `group`, and a
   group field then draws the entries naming its key, so an entry failing
-  either half leaves the form with no message. An empty `group` reads as no
+  either clause leaves the form with no message. An empty `group` reads as no
   group, matching the renderer. The rule reaches a note entry too.
   A third clause binds a field entry (one carrying a `ref`): its `group` names
   the group field that holds it in the catalog's own `fields`, the catalog's
   one answer to where a field belongs for the whole process. A field the
-  catalog holds at the top level has no `group` at all. This half binds both
+  catalog holds at the top level has no `group` at all. This clause binds both
   ways — a field entry whose catalog parent is a group must declare that
   group's key, and an absent or empty `group` on such an entry fails to
   publish exactly as a wrong one does, closing the hole where a
@@ -185,7 +185,7 @@ that sequence, over one `walkFieldsIndexed` pass
   entry the same way, against the outer group's key.
   `purchase-requisition.json` now nests each such field under one catalog
   parent instead of naming a different group per step. A note is exempt from
-  the third half alone; the first two halves still bind it, so its `group`
+  the third clause alone; the first two clauses still bind it, so its `group`
   may name any group field the same view carries. A group whose own `key` is
   empty is the one exception on the catalog side — its children can name
   nothing, so they have no `group` either, and such a body already fails the
