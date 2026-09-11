@@ -100,11 +100,11 @@ SHALL stay fixed whatever the canvas selection holds. That height SHALL be one
 row of its controls. A field in the bar SHALL carry its label beside the
 field, so no selection state grows the row.
 
-The bar SHALL carry three add controls. They read as a step someone works, a
-call to another process, and an end, per `studio-guided-vocabulary`. No
-control prints "terminal". A step someone works SHALL stand as the bar's own
-button, under an action phrase. The menu its caret opens SHALL list the other
-two kinds alone: a call to another process, and an end.
+The bar SHALL carry three add controls. They add a step someone works, a call
+to another process, and an end, per `studio-guided-vocabulary`. No control
+prints "terminal". A step someone works SHALL stand as the bar's own button,
+under an action phrase. The menu its caret opens SHALL list the other two
+kinds alone: a call to another process, and an end.
 
 Each add control SHALL be a drag source. Dragging one onto the canvas SHALL
 add a step of that kind at the drop point. That SHALL use the same
@@ -220,7 +220,7 @@ The set SHALL be empty after the delete.
 - **THEN** the canvas bar reports a count of two
 - **AND** the step page has no section for the set
 
-#### Scenario: One selected step shows the delete control alone
+#### Scenario: One selected step shows the delete control, and no count
 
 - **WHEN** an author selects one step
 - **THEN** the canvas bar carries the delete control, labelled for one step
@@ -244,3 +244,45 @@ The set SHALL be empty after the delete.
 
 - **WHEN** the set holds the draft's initial step and an author deletes it
 - **THEN** the draft's `workflow.initialStep` names the first remaining step
+
+### Requirement: The canvas introduces no authoring operation unavailable through the panels
+
+<!-- Why: the copied paragraphs repeat the base spec's wording; remove and delete name two controls. -->
+<!-- antislop: allow sentence-length passive-voice synonym-rotation -->
+
+Every mutation the canvas can trigger SHALL have an existing panel-based
+equivalent. Those mutations are positioning a step, connecting a path,
+inserting a step into a path, and deleting a selection. The canvas SHALL NOT
+be the only way to perform any authoring operation. Deletion keeps its panel
+route. The step page's own remove control removes each step the canvas bar's
+delete control removes.
+
+The insert gesture holds to this rule by composition. It performs no mutation
+the panels lack. The rail's own existing step-creation drag creates the step.
+Then `PathsPanel` retargets the source step's existing path to the new step.
+It also adds a new path on it, naming the old target. Both are
+already-existing panel actions.
+
+The canvas spends one gesture where the panels spend four operations, and
+reaches the same draft.
+
+Selection and traversal answer the keyboard directly now. A drag gesture stays
+pointer-driven, and the panel route is its keyboard equivalent.
+
+#### Scenario: A step and its paths remain deletable without the canvas
+
+<!-- Why: the scenario repeats the base spec's own wording, character for character. -->
+<!-- antislop: allow passive-voice synonym-rotation -->
+- **WHEN** a step or path is deleted through its panel
+- **THEN** the deletion succeeds identically to before this change, with no
+  canvas-only deletion affordance introduced
+
+#### Scenario: The panels reach an inserted step's end state
+
+<!-- Why: this scenario repeats the base spec's own wording; the rail carries that name on the screen. -->
+<!-- antislop: allow synonym-rotation -->
+- **WHEN** the developer drags a Step from the edit rail onto empty canvas
+- **AND** retargets the source step's path to it in `PathsPanel`
+- **AND** adds a path on the new step naming the old target
+- **THEN** the draft matches what one drop on that path produces
+- **AND** it differs in the new step's position and the cleared waypoints
