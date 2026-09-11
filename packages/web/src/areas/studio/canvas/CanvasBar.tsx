@@ -37,9 +37,9 @@ const styles = stylex.create({
     borderBottomWidth: 1,
     borderBottomStyle: "solid",
     borderBottomColor: colors.border,
-    // Below ~760px the row's controls outrun the viewport (Ungroup is the
-    // last to go). A scrollbar keeps every control reachable by pointer
-    // instead of clipping the tail with no hint.
+    // Below a ~862px window the group state's controls outrun the viewport
+    // (Ungroup is the last to go). A scrollbar keeps every control reachable
+    // by pointer instead of clipping the tail with no hint.
     overflowX: "auto",
   },
   // Nothing in the row shrinks: a shrunk button wraps its own label, which

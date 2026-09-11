@@ -344,25 +344,34 @@ Source: `studio-canvas-bar` tasks 7.1, 7.2, 8.3, 9.3, 9.4.
 Seed the database and open a draft on the Canvas tab.
 
 Select nothing, then one step, then several steps, then a selection
-matching one group. Pass, measured: the bar holds at 88px in every state,
-and the canvas never reflows. Two selected steps print their count, Remove
-steps, and Group these steps in the bar. A selection matching one group
-prints Group name with its input, Collapse and Ungroup.
+matching one group. Pass: the bar stands one control row tall in every
+state, and the canvas never reflows. The one-control-row walk below holds
+the figures.
+
+One selected step prints Remove step. Two selected steps print their count,
+Remove steps, and Group these steps in the bar. A selection matching one
+group prints Group name with its input, Collapse and Ungroup.
 
 Select one step that no path reaches. Pass: the bar prints "unconnected".
 Select a reached step instead. Pass: the bar prints nothing there.
 
-Open the caret's menu. Pass, measured: it opens under the caret with three
-entries, each a phrase over a muted note. Press Escape. Pass: the menu
-closes, and focus returns to the caret button. Reopen the menu, then press
-outside the panel. Pass: the menu closes there too.
+Open the caret's menu. Pass, measured: it opens under the caret with two
+entries, each a phrase over a muted note. They name a call to another
+process and an end.
 
-Start a drag from inside the open menu, and keep the pointer over the
-canvas for the whole gesture. Pass, measured: the menu stays open for the
-whole drag and closes on release, dropping the step. Repeat the drag,
-releasing over a rendered path instead. Pass, measured: the targeted path
-draws at 3px in the accent. The release inserts the step into that path,
-raising both the step count and the path count by one.
+Press Escape. Pass: the menu closes, and focus returns to the caret button.
+Reopen the menu, then press outside the panel. Pass: the menu closes there
+too.
+
+Open the caret's menu. Start a drag from its call to another process.
+Keep the pointer over the canvas for the whole gesture. Pass, measured: the
+menu stays open for the whole drag and closes on release, dropping the step.
+
+Repeat the drag from that entry, releasing over a rendered path instead. An
+end never lands inside a path, so the check needs the call entry. Pass,
+measured: the targeted path draws at 3px in the accent. The release inserts
+the step into that path, raising both the step count and the path count by
+one.
 
 The drop-target class is no longer literal: `.canvas-edge-insert-target`
 now compiles through StyleX. A check written against that class name reads
@@ -393,13 +402,17 @@ above every z-index, including the ghost's. Drag the pointer past the
 panel's edge. Pass: the ghost appears once the pointer clears it.
 
 Reach the group state: select two steps, then Group these steps. Narrow
-the window's width to 800px. Pass: the bar still fits, and Ungroup sits
-inside it. Narrow it to 700px. Pass: the bar scrolls sideways, and the
-page behind it keeps its own width.
+the window's width to 800px, then to 700px. Pass: at both widths the bar
+scrolls sideways, with Ungroup past its right edge. The page behind it
+keeps its own width.
 
 Wheel the pointer right over the bar. Pass: Ungroup scrolls into view and
-takes a click there. Measured at 700px: a 676px bar over 749px of content,
-so 73px of it scrolls. The bar stands 88px tall at both widths.
+takes a click there.
+
+Measured on 2026-09-11 in a 1000px-tall window, the group state holds 838px
+of content. At 800px a 776px bar leaves 62px to scroll. At 700px a 676px bar
+leaves 162px. The bar fits from an 862px window up, and stands 54px tall at
+both widths.
 
 None of the pointer, focus, or height checks above has coverage in
 `packages/web/test/`. Every suite there renders through
@@ -409,6 +422,47 @@ event, read focus, or measure a rendered height.
 `studio-canvasBar.test.tsx` does cover the reachability text, against a
 rendered string rather than a live pointer or focus event. This walk
 confirms the real DOM wires that text to the bar as that test expects.
+
+### Studio canvas bar: one control row
+
+Source: `tighter-canvas-bar` tasks 5.1 to 5.6.
+
+Seed the database. Open a draft on the Canvas tab. The canvas region carries
+the id `studio-canvas-body`, and the bar is its previous sibling. Read the
+bar's height and the region's top edge from those two elements. Read Add
+step's own height beside them, as the positive control.
+
+Select nothing, then one step, then three steps, then a set matching one
+group. Pass: every state reads the nothing-selected height, with Add step
+whole inside the bar. The region's top edge stays put.
+
+Measured on 2026-09-11, Chromium on Windows, 1280 by 1000: the bar stands
+54px in all four states. Add step stands 37px. The region's top edge holds
+at 271.5px.
+
+Repeat the four states in a 1280 by 720 window. Pass: the bar keeps that
+same height, with Add step whole.
+
+In the group state, read the Group name field. Pass, measured: its label
+stands left of the input, 8px apart, on the input's centre line. The input
+stands 37px tall, at 14px type.
+
+Open the caret's menu. Pass, measured: it lists two entries, a call to
+another process and an end.
+
+Select one step other than the initial step. Pass, measured: the bar shows
+Remove step, with no count and no group control. Press Remove step. Pass,
+measured: on `purchase_requisition` the draft drops from 13 steps to 12. The
+bar then shows Add step alone.
+
+Select the initial step. Press Remove step. Pass, measured: the start marker
+moves to the first remaining step. On `purchase_requisition` it moved from
+Draft Requisition to Manager Approval.
+
+Neither press saves the draft. Reload without saving once the walk ends.
+
+The static-markup suite pins the menu's entries and the Remove labels. It
+computes no height or position, so those checks live in this walk.
 
 ### Users screen: the manager control past one page
 
@@ -853,8 +907,8 @@ selected step.
 Press a member of a selection and release without moving. Pass: nothing moves.
 
 Select three steps and choose Remove steps. Pass: those three are gone, the
-others stay, and the pane shows the register's first remaining step. If one
-of them was the initial step, the start marker moved to a remaining step.
+others stay, and the canvas bar shows Add step alone. If one of them was the
+initial step, the start marker moved to the first remaining step.
 
 Select two steps and read the ribbon bar. Pass: the collapsed checks summary
 still sits there, with the same count it showed for one step.
@@ -3131,9 +3185,9 @@ Pass: the dialog's Discard draft reads a transparent background. The browser's
 own grey button fill showed there before this change. Pass: the border alone
 sets it apart from Cancel, and the two still read as two controls.
 
-**Canvas bar.** On the Canvas tab, click one step, then shift-click a second.
-Remove steps appears once you select two or more steps. Fit to view is the
-plain control.
+**Canvas bar.** On the Canvas tab, click one step. The bar shows Remove step.
+Shift-click a second step, and the same control reads Remove steps. Read it
+under both labels. Fit to view is the plain control.
 
 **Form editor.** Open a form holding a group, such as the `await_goods` step
 of `purchase_requisition`. Each group card's legend holds Move up, Move down
