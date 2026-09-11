@@ -7,11 +7,13 @@ import {
   isDraftViewField,
   moveViewField,
   removeViewTab,
+  tabAfterPlacement,
   type DraftView,
   type DraftViewEntry,
   type DraftViewTab,
 } from "../src/areas/studio/draft/view-layout";
 import {
+  cardGroupKey,
   draftParentGroupKeyById,
   dragScopeByIndex,
   groupTailSlot,
@@ -794,5 +796,25 @@ describe("Adding and removing a tab keeps a group whole", () => {
     expect(next.tabs).toBeUndefined();
     expect(tabRuleBreaks(next)).toEqual([]);
     expect(next.fields!.map((e) => e.group)).toEqual([undefined, "g", "g", "h"]);
+  });
+});
+
+describe("On a tabbed form, a palette placement shows the tab its entry landed on", () => {
+  const catalog = [group("group_g", "g", [leaf("field_x", "x")]), leaf("field_a", "a")];
+  const tabs = [tab("t1"), tab("t2")];
+
+  it("shows the card's tab when the placed member joins a group card another tab draws", () => {
+    const rows = [onTab(ref("field_a"), "t1"), onTab(ref("group_g"), "t2")];
+    const next = insertGroupedField(rows, id("field_x"), 1, catalog, "t1");
+    const shown = tabAfterPlacement(next, id("field_x"), tabs, "t1", cardGroupKey(catalog));
+    expect(shown).toBe("t2");
+    const memberAt = next.findIndex((e) => isDraftViewField(e) && e.ref === id("field_x"));
+    expect(drawnRows(next, tabs, shown, cardGroupKey(catalog))).toContain(memberAt);
+  });
+
+  it("keeps the shown tab when the placement puts a new card and its member on that tab", () => {
+    const rows = [onTab(ref("field_a"), "t1")];
+    const next = insertGroupedField(rows, id("field_x"), 1, catalog, "t1");
+    expect(tabAfterPlacement(next, id("field_x"), tabs, "t1", cardGroupKey(catalog))).toBe("t1");
   });
 });
