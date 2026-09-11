@@ -1,8 +1,20 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
-import { FieldForm, PathButtons, filterToEditable, resolveFieldsLocale, isResolvedViewField } from "form-ui";
-import type { SubmissionIssue } from "form-ui";
+import {
+  FieldForm,
+  PathButtons,
+  filterToEditable,
+  firstTabWithIssue,
+  resolveFieldsLocale,
+  resolveTabsLocale,
+  resolveText,
+  isResolvedViewField,
+  tabIssueFieldCount,
+  tabSwitchAnnouncement,
+  tabSwitchState,
+} from "form-ui";
+import type { SubmissionIssue, TabSwitch } from "form-ui";
 import { createInstance, createTestInstance, getInstanceView, submitPath, claimStep, releaseClaim, getInstanceRecord, StudioClientError } from "../api/client.js";
 import type { InstanceView, InstanceRecordElement } from "../api/types.js";
 import { seedFormValues, createAndOpenInstance, isTestInstance } from "./playerLogic.js";
@@ -49,6 +61,19 @@ const styles = stylex.create({
     display: "block",
     paddingLeft: 0,
     marginBottom: space.s3,
+  },
+  // Off screen, never `display: none`: a hidden node is announced by no
+  // engine. `ProcessTabRow.tsx` carries the same pattern for the same reason.
+  visuallyHidden: {
+    position: "absolute",
+    width: 1,
+    height: 1,
+    margin: -1,
+    padding: 0,
+    overflow: "hidden",
+    clipPath: "inset(50%)",
+    whiteSpace: "nowrap",
+    borderWidth: 0,
   },
   studioControls: {
     display: "flex",
@@ -134,6 +159,13 @@ export function PlayerScreen({ processId, token, navigate, onUnauthorized }: Pla
   const [loading, setLoading] = useState(false);
   const [outcome, setOutcome] = useState<string | undefined>(undefined);
   const [validationIssues, setValidationIssues] = useState<SubmissionIssue[]>([]);
+  const [activeTab, setActiveTab] = useState<string | undefined>(undefined);
+  // What the live region below reads out after a failed submission opened a
+  // tab the operator did not choose. Data, not a sentence: the sentence needs
+  // the resolved tab label the render body already builds. `undefined` is
+  // silence, which is what an operator's own tab click leaves behind, and
+  // what a submission that opened nothing leaves behind.
+  const [tabSwitch, setTabSwitch] = useState<TabSwitch | undefined>(undefined);
   const failRecord = useFail(onUnauthorized, (e) => setRecordError(describeCaughtError(e)));
 
   const loadRecord = useCallback(
@@ -194,6 +226,47 @@ export function PlayerScreen({ processId, token, navigate, onUnauthorized }: Pla
     },
     [onUnauthorized],
   );
+
+  // Built once per render and read from both the tab-switch effect below and
+  // the JSX return: `fieldIds`/`unmatchedIssues` split raw server issues into
+  // the ones a rendered field owns and the ones nothing on this view claims.
+  const fieldIds = new Set(view?.fields.filter(isResolvedViewField).map((f) => f.field.id) ?? []);
+  const issuesByField = new Map<string, SubmissionIssue[]>();
+  const unmatchedIssues: SubmissionIssue[] = [];
+  for (const issue of validationIssues) {
+    if (fieldIds.has(issue.fieldId)) {
+      const arr = issuesByField.get(issue.fieldId) ?? [];
+      arr.push(issue);
+      issuesByField.set(issue.fieldId, arr);
+    } else {
+      unmatchedIssues.push(issue);
+    }
+  }
+
+  // A required field on an unopened tab otherwise blocks the submission with
+  // nothing on screen to explain it (form-view-tabs design.md, "The issue
+  // switch belongs to the consumer"). Keyed on `validationIssues` alone, NOT
+  // on `issuesByField` above: that Map is a fresh object every render, and
+  // keying this effect on it would re-run it, and so re-call
+  // `firstTabWithIssue`, on every unrelated re-render (record paging, a
+  // refresh) — forcing the operator back onto the offending tab even after
+  // they had deliberately switched away from it while the same stale issues
+  // sat in state. `form-tab-switch-effect.test.ts` pins this dependency
+  // list; `form-ui`'s own `tabs.test.tsx` covers the decision itself.
+  useEffect(() => {
+    if (!view) return;
+    const nextTab = firstTabWithIssue(view.fields, view.tabs ?? [], issuesByField);
+    if (nextTab !== undefined) setActiveTab(nextTab);
+    // `activeTab` read from this render's own closure, not from the
+    // dependency list: the effect re-runs on a new `validationIssues`, and
+    // the render that hands it that array carries the tab the operator is
+    // standing on. `tabSwitchState` answers `undefined` when that tab is
+    // already the one the issues name, so the region below never reports an
+    // opening nobody saw.
+    const fieldCount = nextTab === undefined ? 0 : tabIssueFieldCount(view.fields, nextTab, issuesByField);
+    setTabSwitch((prev) => tabSwitchState(prev, view.fields, view.tabs ?? [], activeTab, nextTab, fieldCount));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [validationIssues, view]);
 
   const doCreate = () =>
     withErrorHandling(async () => {
@@ -258,19 +331,6 @@ export function PlayerScreen({ processId, token, navigate, onUnauthorized }: Pla
       .catch(failRecord);
   }, [instanceId, recordCursor, token, failRecord]);
 
-  const fieldIds = new Set(view?.fields.filter(isResolvedViewField).map((f) => f.field.id) ?? []);
-  const issuesByField = new Map<string, SubmissionIssue[]>();
-  const unmatchedIssues: SubmissionIssue[] = [];
-  for (const issue of validationIssues) {
-    if (fieldIds.has(issue.fieldId)) {
-      const arr = issuesByField.get(issue.fieldId) ?? [];
-      arr.push(issue);
-      issuesByField.set(issue.fieldId, arr);
-    } else {
-      unmatchedIssues.push(issue);
-    }
-  }
-
   return (
     <main {...stylex.props(styles.studioScreen, styles.studioPlayerScreen)}>
       <button type="button" className="btn btn-ghost" {...stylex.props(styles.studioBack)} onClick={() => navigate({ name: "edit", processId })}>
@@ -330,7 +390,41 @@ export function PlayerScreen({ processId, token, navigate, onUnauthorized }: Pla
               locale="en"
               issuesByField={issuesByField}
               columns={view.columns ?? 1}
+              tabs={resolveTabsLocale(view.tabs ?? [], "en", view.baseLocale)}
+              activeTab={activeTab}
+              onTabChange={(tabKey) => {
+                setActiveTab(tabKey);
+                // A tab the operator chose announces nothing: they watched it
+                // open. The repeat case is the `attempt` key below, not this
+                // clear.
+                setTabSwitch(undefined);
+              }}
+              tabsLabel={t("player.formTabsLabel")}
             />
+
+            {/* Outside the form, and mounted at all times so the engine
+                announces a change rather than an arrival. Polite: the
+                operator has just pressed a path button and is not mid-sentence
+                with anything else. The literal "en" is this screen's own
+                locale everywhere, `resolveText` included. */}
+            <p {...stylex.props(styles.visuallyHidden)} role="status" aria-live="polite">
+              {tabSwitch === undefined ? (
+                ""
+              ) : (
+                // Keyed on the attempt: a second failed submission naming the
+                // same tab and the same count builds the same sentence, and
+                // React writes no DOM for an unchanged string. The key
+                // replaces the node instead, which is the mutation the engine
+                // speaks.
+                <span key={tabSwitch.attempt}>
+                  {tabSwitchAnnouncement(
+                    { one: t("player.formTabOpenedOne"), many: t("player.formTabOpenedMany") },
+                    resolveText(view.tabs?.find((tab) => tab.key === tabSwitch.tabKey)?.label, "en", view.baseLocale),
+                    tabSwitch.fieldCount,
+                  )}
+                </span>
+              )}
+            </p>
 
             <div {...stylex.props(styles.studioControls)}>
               {!claimedByMe && (

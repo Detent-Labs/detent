@@ -1,7 +1,16 @@
 import { describe, expect, it } from "bun:test";
 import type { FieldId } from "workflow-engine/schema";
 import type { DraftField } from "../src/areas/studio/draft/fields";
-import { isDraftViewField, type DraftViewEntry } from "../src/areas/studio/draft/view-layout";
+import {
+  addViewTab,
+  drawnRows,
+  isDraftViewField,
+  moveViewField,
+  removeViewTab,
+  type DraftView,
+  type DraftViewEntry,
+  type DraftViewTab,
+} from "../src/areas/studio/draft/view-layout";
 import {
   draftParentGroupKeyById,
   dragScopeByIndex,
@@ -12,8 +21,8 @@ import {
   nudgeViewField,
   removeViewEntry,
   viewTree,
+  type ViewTreeNode,
 } from "../src/areas/studio/draft/view-tree";
-import { moveViewField } from "../src/areas/studio/draft/view-layout";
 
 /** The form editor's canvas interaction, the nested half: which entries the
  * canvas draws inside a group's own card, and the array operations scoped by
@@ -439,27 +448,27 @@ describe("dragScopeByIndex maps every row to the scope its own edges answer to",
   ];
   const scopeByIndex = dragScopeByIndex(rows, catalog);
 
-  it("gives a root entry no scope", () => {
-    expect(scopeByIndex.get(0)).toBeUndefined();
-    expect(scopeByIndex.get(3)).toBeUndefined();
+  it("gives a root entry an untabbed form's root scope", () => {
+    expect(scopeByIndex.get(0)).toEqual({ tab: undefined });
+    expect(scopeByIndex.get(3)).toEqual({ tab: undefined });
   });
 
   it("gives a group's own card the scope of the level it sits at, not its own key", () => {
-    expect(scopeByIndex.get(1)).toBeUndefined();
+    expect(scopeByIndex.get(1)).toEqual({ tab: undefined });
   });
 
   it("gives each member its group's own key", () => {
-    expect(scopeByIndex.get(2)).toBe("g");
-    expect(scopeByIndex.get(4)).toBe("g");
+    expect(scopeByIndex.get(2)).toEqual({ group: "g" });
+    expect(scopeByIndex.get(4)).toEqual({ group: "g" });
   });
 
   it("gives a nested group's own card the OUTER group's key, and its members the INNER key", () => {
     const nestedCatalog = [group("group_outer", "outer", [group("group_inner", "inner", [leaf("field_z", "z")])])];
     const nestedRows = [ref("group_outer"), ref("group_inner", "outer"), ref("field_z", "inner")];
     const nested = dragScopeByIndex(nestedRows, nestedCatalog);
-    expect(nested.get(0)).toBeUndefined();
-    expect(nested.get(1)).toBe("outer");
-    expect(nested.get(2)).toBe("inner");
+    expect(nested.get(0)).toEqual({ tab: undefined });
+    expect(nested.get(1)).toEqual({ group: "outer" });
+    expect(nested.get(2)).toEqual({ group: "inner" });
   });
 
   it("confines a nested group's member to its own group rather than the form root -- a top-level-only field lookup would give it the root's own scope and wrongly let it drag out", () => {
@@ -481,13 +490,13 @@ describe("dragScopeByIndex maps every row to the scope its own edges answer to",
     const rows = [ref("group_a"), ref("group_b", "A"), ref("field_leaf", "B")];
     const scopeByIndex = dragScopeByIndex(rows, catalog);
 
-    expect(scopeByIndex.get(0)).toBeUndefined(); // A's own card sits at the form root
-    expect(scopeByIndex.get(1)).toBe("A"); // B's own card is a member of A
-    expect(scopeByIndex.get(2)).toBe("B"); // the leaf is a member of B -- not of A, and not of the root
+    expect(scopeByIndex.get(0)).toEqual({ tab: undefined }); // A's own card sits at the form root
+    expect(scopeByIndex.get(1)).toEqual({ group: "A" }); // B's own card is a member of A
+    expect(scopeByIndex.get(2)).toEqual({ group: "B" }); // the leaf is a member of B -- not of A, and not of the root
 
-    // The leaf's scope ("B") differs from the root's (`undefined`), so a
-    // drag of the leaf to a root-level slot is refused.
-    expect(isLawfulCardDrop(scopeByIndex, 2, undefined)).toBe(false);
+    // The leaf's scope (group B) differs from the root's, so a drag of the
+    // leaf to a root-level slot is refused.
+    expect(isLawfulCardDrop(scopeByIndex, 2, { tab: undefined })).toBe(false);
   });
 });
 
@@ -497,19 +506,19 @@ describe("isLawfulCardDrop reads the drag refusal rule off a scope map", () => {
   const scopeByIndex = dragScopeByIndex(rows, catalog);
 
   it("refuses a member dragged to a root slot", () => {
-    expect(isLawfulCardDrop(scopeByIndex, 2, undefined)).toBe(false);
+    expect(isLawfulCardDrop(scopeByIndex, 2, { tab: undefined })).toBe(false);
   });
 
   it("allows a member dragged to a sibling's edge inside its own group", () => {
-    expect(isLawfulCardDrop(scopeByIndex, 2, "g")).toBe(true);
+    expect(isLawfulCardDrop(scopeByIndex, 2, { group: "g" })).toBe(true);
   });
 
   it("refuses a root dragged to a slot inside a group", () => {
-    expect(isLawfulCardDrop(scopeByIndex, 0, "g")).toBe(false);
+    expect(isLawfulCardDrop(scopeByIndex, 0, { group: "g" })).toBe(false);
   });
 
   it("allows a group card dragged among the roots", () => {
-    expect(isLawfulCardDrop(scopeByIndex, 1, undefined)).toBe(true);
+    expect(isLawfulCardDrop(scopeByIndex, 1, { tab: undefined })).toBe(true);
   });
 });
 
@@ -542,5 +551,248 @@ describe("landedIndex reads a moved entry's new position off the array a move re
     const rows = [ref("a"), ref("b")];
     const next = removeViewEntry(rows, 0, catalog);
     expect(landedIndex(rows, next, 0)).toBeUndefined();
+  });
+});
+
+/**
+ * Groups on a tabbed form. A tab holds roots, a root may be a group card, and
+ * a card holds its members, which carry no `tab` of their own. The fixtures
+ * below read a group key through the catalog, the way the screen's own
+ * `groupKeyOf` does, and ask `drawnRows` which roots a tab shows.
+ */
+const tab = (key: string): DraftViewTab => ({ key, label: { en: key } });
+
+const onTab = (entry: DraftViewEntry, tabKey: string): DraftViewEntry => ({ ...entry, tab: tabKey });
+
+const cardKeyOf = (catalog: DraftField[]) => {
+  const byId = new Map<string, DraftField>();
+  const walk = (fs: DraftField[]) =>
+    fs.forEach((f) => {
+      if (f.id !== undefined) byId.set(f.id, f);
+      walk(f.fields ?? []);
+    });
+  walk(catalog);
+  return (entry: DraftViewEntry) => {
+    if (!isDraftViewField(entry) || entry.ref === undefined) return undefined;
+    const field = byId.get(entry.ref);
+    return field?.type === "group" && field.key ? field.key : undefined;
+  };
+};
+
+/** Every row index a node list draws, members included. */
+const drawnIndices = (nodes: ViewTreeNode[]): number[] => nodes.flatMap((n) => [n.index, ...drawnIndices(n.members ?? [])]);
+
+/** The roots the canvas draws on `tabKey`: the tree's roots `drawnRows` places there. */
+const rootsOnTab = (rows: DraftViewEntry[], catalog: DraftField[], tabs: DraftViewTab[], tabKey: string): ViewTreeNode[] => {
+  const on = new Set(drawnRows(rows, tabs, tabKey, cardKeyOf(catalog)));
+  return viewTree(rows, catalog).filter((n) => on.has(n.index));
+};
+
+/** Rules 2 to 5 of the definition contract's tab hierarchy, over one view. */
+const tabRuleBreaks = (view: DraftView): string[] => {
+  const keys = new Set((view.tabs ?? []).map((t) => t.key));
+  const breaks: string[] = [];
+  (view.fields ?? []).forEach((entry, i) => {
+    if (keys.size === 0) {
+      if (entry.tab) breaks.push(`${i}: a tab on an untabbed view`);
+      return;
+    }
+    if (entry.tab && !keys.has(entry.tab)) breaks.push(`${i}: an undeclared tab`);
+    if (entry.group && entry.tab) breaks.push(`${i}: a tab inside a group`);
+    if (!entry.group && !entry.tab) breaks.push(`${i}: a root without a tab`);
+  });
+  return breaks;
+};
+
+describe("On a tabbed form, the canvas tree and drawnRows agree on what each tab shows", () => {
+  const catalog = [
+    leaf("alpha", "alpha"),
+    group("billing", "billing", [leaf("beta", "beta"), group("address", "address", [leaf("street", "street")])]),
+    leaf("gamma", "gamma"),
+  ];
+  const tabs = [tab("t1"), tab("t2")];
+  // `gamma` and a note on t2 interleave t1's group subtree in the array.
+  const rows = [
+    onTab(ref("alpha"), "t1"),
+    onTab(ref("gamma"), "t2"),
+    onTab(ref("billing"), "t1"),
+    ref("beta", "billing"),
+    onTab(note("On the second tab"), "t2"),
+    ref("address", "billing"),
+    note("Inside address", "address"),
+    ref("street", "address"),
+  ];
+
+  it("draws each tab's roots with their whole subtrees, and exactly the entries drawnRows places on that tab", () => {
+    for (const key of ["t1", "t2"]) {
+      const shown = drawnIndices(rootsOnTab(rows, catalog, tabs, key)).sort((a, b) => a - b);
+      expect(shown).toEqual(drawnRows(rows, tabs, key, cardKeyOf(catalog)));
+    }
+    expect(refs(rootsOnTab(rows, catalog, tabs, "t1").map((n) => n.entry))).toEqual(["alpha", "billing"]);
+    expect(refs(rootsOnTab(rows, catalog, tabs, "t2").map((n) => n.entry))).toEqual(["gamma", "note:On the second tab"]);
+  });
+});
+
+describe("nudgeViewField moves a card past the neighbour the author can SEE", () => {
+  it("swaps two cards the array does not place side by side", () => {
+    // b and d are on the shown tab; a and c are not. Moving d up must land it
+    // above b, not between a and c where it would look like a no-op.
+    const start = [ref("a"), ref("b"), ref("c"), ref("d")];
+    expect(refs(nudgeViewField(start, 3, -1, [], [1, 3]))).toEqual(["a", "d", "b", "c"]);
+  });
+
+  it("moves down past the next drawn card", () => {
+    const start = [ref("a"), ref("b"), ref("c"), ref("d")];
+    expect(refs(nudgeViewField(start, 1, 1, [], [1, 3]))).toEqual(["a", "c", "d", "b"]);
+  });
+
+  it("is a no-op at either end of the drawn list", () => {
+    const start = [ref("a"), ref("b"), ref("c"), ref("d")];
+    expect(nudgeViewField(start, 1, -1, [], [1, 3])).toBe(start);
+    expect(nudgeViewField(start, 3, 1, [], [1, 3])).toBe(start);
+  });
+
+  it("keeps its untabbed behavior when no drawn list is passed", () => {
+    const start = [ref("a"), ref("b"), ref("c")];
+    expect(refs(nudgeViewField(start, 2, -1, []))).toEqual(refs(nudgeViewField(start, 2, -1, [], [0, 1, 2])));
+  });
+});
+
+describe("On a tabbed form, one keyboard move bounds a root by its tab and a member by its group", () => {
+  const catalog = [group("g", "g", [leaf("x", "x"), leaf("y", "y")])];
+  const tabs = [tab("t1"), tab("t2")];
+  // t1 draws a, the group g with x and y, and c. b sits on t2, between a and g in the array.
+  const rows = [onTab(ref("a"), "t1"), onTab(ref("b"), "t2"), onTab(ref("g"), "t1"), ref("x", "g"), ref("y", "g"), onTab(ref("c"), "t1")];
+  const drawnOn = (list: DraftViewEntry[], key: string) => drawnRows(list, tabs, key, cardKeyOf(catalog));
+  const t1Roots = (list: DraftViewEntry[]) => refs(rootsOnTab(list, catalog, tabs, "t1").map((n) => n.entry));
+  const membersOf = (list: DraftViewEntry[], card: string) =>
+    refs(viewTree(list, catalog).find((n) => refs([n.entry])[0] === card)!.members!.map((n) => n.entry));
+
+  it("steps a root down past the whole group, past no entry another tab draws", () => {
+    const next = nudgeViewField(rows, 0, 1, catalog, drawnOn(rows, "t1"));
+    expect(t1Roots(next)).toEqual(["g", "a", "c"]);
+    expect(membersOf(next, "g")).toEqual(["x", "y"]);
+    expect(refs(rootsOnTab(next, catalog, tabs, "t2").map((n) => n.entry))).toEqual(["b"]);
+  });
+
+  it("steps a root up past the whole group, not past one of its members", () => {
+    const next = nudgeViewField(rows, 5, -1, catalog, drawnOn(rows, "t1"));
+    expect(t1Roots(next)).toEqual(["a", "c", "g"]);
+    expect(membersOf(next, "g")).toEqual(["x", "y"]);
+  });
+
+  it("moves a member among its own group's members, whatever tab the canvas shows", () => {
+    const next = nudgeViewField(rows, 3, 1, catalog, drawnOn(rows, "t2"));
+    expect(membersOf(next, "g")).toEqual(["y", "x"]);
+  });
+
+  it("leaves the last root a tab draws where it is, though another tab's root follows it in the array", () => {
+    const list = [onTab(ref("a"), "t1"), onTab(ref("b"), "t2")];
+    expect(nudgeViewField(list, 0, 1, [], drawnRows(list, tabs, "t1", cardKeyOf([])))).toBe(list);
+  });
+});
+
+describe("On a tabbed form, a root's drag scope is its tab's roots and a member's is its group", () => {
+  const catalog = [group("g", "g", [leaf("x", "x"), leaf("y", "y")])];
+  const tabs = [tab("t1"), tab("t2")];
+  const rows = [onTab(ref("a"), "t1"), onTab(ref("b"), "t2"), onTab(ref("g"), "t1"), ref("x", "g"), ref("y", "g"), onTab(ref("c"), "t1")];
+  const scopeByIndex = dragScopeByIndex(rows, catalog, tabs);
+
+  it("lets a root land among the roots its own tab draws", () => {
+    expect(isLawfulCardDrop(scopeByIndex, 0, scopeByIndex.get(5)!)).toBe(true);
+    expect(isLawfulCardDrop(scopeByIndex, 0, { tab: "t1" })).toBe(true);
+  });
+
+  it("refuses a root at a slot among another tab's roots", () => {
+    expect(isLawfulCardDrop(scopeByIndex, 0, scopeByIndex.get(1)!)).toBe(false);
+    expect(isLawfulCardDrop(scopeByIndex, 1, { tab: "t1" })).toBe(false);
+  });
+
+  it("confines a member to its own group, and lets no root slot take it", () => {
+    expect(isLawfulCardDrop(scopeByIndex, 3, scopeByIndex.get(4)!)).toBe(true);
+    expect(isLawfulCardDrop(scopeByIndex, 3, { group: "g" })).toBe(true);
+    expect(isLawfulCardDrop(scopeByIndex, 3, { tab: "t1" })).toBe(false);
+  });
+
+  it("gives the group's own card its tab's root scope, not its members' scope", () => {
+    expect(isLawfulCardDrop(scopeByIndex, 2, { tab: "t1" })).toBe(true);
+    expect(isLawfulCardDrop(scopeByIndex, 2, { group: "g" })).toBe(false);
+  });
+});
+
+describe("On a tabbed form, a palette placement gives the shown tab to the one root entry it places", () => {
+  it("gives the outermost card of a placed chain the tab, and neither the inner card nor the member one", () => {
+    const catalog = [group("group_outer", "outer", [group("group_inner", "inner", [leaf("field_z", "z")])])];
+    const rows = [onTab(ref("root1"), "t1")];
+    const next = insertGroupedField(rows, id("field_z"), 1, catalog, "t1");
+    expect(next).toEqual([
+      { ref: id("root1"), tab: "t1" },
+      { ref: id("group_outer"), tab: "t1" },
+      { ref: id("group_inner"), group: "outer" },
+      { ref: id("field_z"), group: "inner" },
+    ]);
+    expect(tabRuleBreaks({ tabs: [tab("t1")], fields: next })).toEqual([]);
+  });
+
+  it("places a member into a card the form already carries, with no tab of its own", () => {
+    const catalog = [group("group_g", "g", [leaf("field_x", "x")])];
+    const rows = [onTab(ref("group_g"), "t2")];
+    const next = insertGroupedField(rows, id("field_x"), 1, catalog, "t1");
+    expect(next).toEqual([{ ref: id("group_g"), tab: "t2" }, { ref: id("field_x"), group: "g" }]);
+    expect(tabRuleBreaks({ tabs: [tab("t1"), tab("t2")], fields: next })).toEqual([]);
+  });
+
+  it("gives a top-level field the tab", () => {
+    expect(insertGroupedField([], id("field_a"), 0, [leaf("field_a", "a")], "t1")).toEqual([{ ref: id("field_a"), tab: "t1" }]);
+  });
+
+  it("writes no tab on an untabbed form", () => {
+    const catalog = [group("group_g", "g", [leaf("field_x", "x")])];
+    const next = insertGroupedField([], id("field_x"), 0, catalog, undefined);
+    expect(next.every((entry) => !("tab" in entry))).toBe(true);
+  });
+});
+
+describe("On a tabbed form, removing a group card takes its members and leaves every other entry's tab alone", () => {
+  it("removes the card, its field and note members, and nothing on another tab", () => {
+    const catalog = [group("group_g", "g", [leaf("x", "x")])];
+    const rows = [onTab(ref("a"), "t1"), onTab(ref("group_g"), "t2"), ref("x", "g"), note("Inside", "g"), onTab(ref("b"), "t2")];
+    const next = removeViewEntry(rows, 1, catalog);
+    expect(next).toEqual([onTab(ref("a"), "t1"), onTab(ref("b"), "t2")]);
+    expect(tabRuleBreaks({ tabs: [tab("t1"), tab("t2")], fields: next })).toEqual([]);
+  });
+});
+
+describe("Adding and removing a tab keeps a group whole", () => {
+  const catalog = [group("group_g", "g", [leaf("x", "x"), group("group_h", "h", [leaf("z", "z")])])];
+
+  it("the first tab sweeps the roots and no member, so that tab draws the card with every member", () => {
+    const view: DraftView = { fields: [ref("a"), ref("group_g"), ref("x", "g"), ref("group_h", "g"), ref("z", "h"), note("Inside", "g")] };
+    const next = addViewTab(view, { en: "Details" });
+    const key = next.tabs![0]!.key!;
+    expect(next.fields!.map((e) => e.tab)).toEqual([key, key, undefined, undefined, undefined, undefined]);
+    expect(tabRuleBreaks(next)).toEqual([]);
+    expect(drawnIndices(rootsOnTab(next.fields!, catalog, next.tabs!, key)).sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4, 5]);
+  });
+
+  it("removing a tab hands its group card to the neighbour, and the members follow with no tab of their own", () => {
+    const view: DraftView = {
+      tabs: [tab("t1"), tab("t2")],
+      fields: [onTab(ref("a"), "t1"), onTab(ref("group_g"), "t2"), ref("x", "g"), ref("group_h", "g"), ref("z", "h")],
+    };
+    const next = removeViewTab(view, "t2");
+    expect(next.fields!.map((e) => e.tab)).toEqual(["t1", "t1", undefined, undefined, undefined]);
+    expect(tabRuleBreaks(next)).toEqual([]);
+    const roots = rootsOnTab(next.fields!, catalog, next.tabs!, "t1");
+    expect(refs(roots.map((n) => n.entry))).toEqual(["a", "group_g"]);
+    expect(drawnIndices(roots).sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4]);
+  });
+
+  it("removing the last tab clears every tab and keeps each member in its group", () => {
+    const view: DraftView = { tabs: [tab("t1")], fields: [onTab(ref("group_g"), "t1"), ref("x", "g"), ref("group_h", "g"), ref("z", "h")] };
+    const next = removeViewTab(view, "t1");
+    expect(next.tabs).toBeUndefined();
+    expect(tabRuleBreaks(next)).toEqual([]);
+    expect(next.fields!.map((e) => e.group)).toEqual([undefined, "g", "g", "h"]);
   });
 });

@@ -8,15 +8,25 @@ import { useDraft } from "../draft/store";
 import { t, type CatalogKey } from "../catalog.js";
 import { updateInDraftArray } from "../draft/draft-array-crud";
 import {
+  addViewTab,
   clampSpan,
+  drawnRows,
   dropSlot,
+  fillMissingTabs,
   insertViewField,
   insertViewNote,
   isDraftViewField,
   moveViewField,
+  moveViewTab,
+  owningTab,
+  removeViewTab,
+  renameViewTab,
+  setEntryGroup,
+  shownTab,
   unplacedRefs,
   type DraftViewEntry,
   type DraftViewField,
+  type DraftViewTab,
   type DropSide,
 } from "../draft/view-layout";
 import {
@@ -28,6 +38,8 @@ import {
   nudgeViewField,
   removeViewEntry,
   viewTree,
+  cardGroupKey,
+  type DragScope,
   type ViewTreeNode,
 } from "../draft/view-tree";
 import { PALETTE_FIELD_KINDS, mintCatalogField, type PaletteFieldKind } from "../draft/mintField";
@@ -37,6 +49,7 @@ import { LocalizedTextInput } from "../panels/shared/LocalizedTextInput";
 import { isExpression, type BoolOrExpr } from "../panels/shared/overrideMode";
 import { effectiveFlag, gatedKeys, setFlag, writtenFieldCounts, type FlagKey, type WrittenAccessor } from "../draft/view-flags";
 import { FormPreview } from "../panels/FormPreview";
+import { FormTabStrip, formTabDomId, formTabPanelDomId } from "../panels/FormTabStrip";
 
 type DraftStep = DraftOf<Step>;
 type DraftView = DraftOf<View>;
@@ -523,6 +536,72 @@ function OverrideField({
   );
 }
 
+/** One choice in a strip's tab picker: the tab's minted `key`, and its label
+ * already resolved for the content locale. Both strips take their options
+ * this way rather than reading the draft, so neither needs a locale of its
+ * own and `FormEditorStrip` stays renderable with no provider around it. */
+export interface TabOption {
+  key: string;
+  label: string;
+}
+
+/** The element the disabled picker's reason names, so the reason reaches a
+ * screen reader as the control's description rather than as loose text
+ * beside it. One strip renders at a time, so one id is enough. */
+const TAB_FROM_GROUP_ID = "form-editor-tab-from-group";
+
+/**
+ * The tab picker both strips carry (`studio-form-editor`: "A selected
+ * entry's strip assigns it to a tab"). The note strip carries it beside its
+ * group picker; a field's group follows its catalog parent, so the field
+ * strip carries no group picker. An untabbed form draws none — there is no
+ * tab to assign.
+ *
+ * It offers no empty choice: on a tabbed form a root entry always names a
+ * tab, so an empty option would be a selectable state the definition
+ * contract rejects. For an entry naming a group the picker is disabled and
+ * says why, rather than sitting inert with no reason: rule 4 of the tab
+ * hierarchy makes the group's own tab the entry's, and `value` is that
+ * group's tab.
+ */
+function TabPicker({
+  options,
+  value,
+  inGroup,
+  onChange,
+}: {
+  options: TabOption[];
+  value: string | undefined;
+  inGroup: boolean;
+  onChange: (tab: string) => void;
+}) {
+  if (options.length === 0) return null;
+  return (
+    <div {...stylex.props(styles.formStripOverride)}>
+      <label {...stylex.props(styles.formStripField)}>
+        {t("formEditor.tab")}
+        <select
+          value={value ?? ""}
+          disabled={inGroup}
+          aria-describedby={inGroup ? TAB_FROM_GROUP_ID : undefined}
+          onChange={(e) => onChange(e.target.value)}
+        >
+          {options.map((option) => (
+            <option key={option.key} value={option.key}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      {inGroup && (
+        <p id={TAB_FROM_GROUP_ID} {...stylex.props(styles.studioDialogNote)}>
+          {t("formEditor.tabFromGroup")}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export interface FormEditorStripProps {
   row: DraftViewField;
   label: string;
@@ -531,15 +610,21 @@ export interface FormEditorStripProps {
   written: WrittenAccessor;
   technicalFieldIds: Set<string>;
   isGroup: boolean;
+  /** The form's tabs, empty on an untabbed form. */
+  tabOptions: TabOption[];
+  /** The tab this entry draws on: its own on a root entry, its group's on a
+   * member of one. */
+  tabValue: string | undefined;
   onChangeFlag: (key: FlagKey, next: BoolOrExpr) => void;
   onChangeSpan: (span: 1 | 2) => void;
+  onChangeTab: (tab: string) => void;
 }
 
 /**
  * The selected field's overrides — pulled out of `FormEditorScreen` so a
  * server render can exercise it directly with an arbitrary `row`, without
  * simulating the click that selects one (`renderToStaticMarkup` fires no DOM
- * events). Purely presentational: every write goes back through the two
+ * events). Purely presentational: every write goes back through its
  * callback props, `FormEditorScreen`'s own `setViewFlag`/`updateRow`.
  */
 export function FormEditorStrip({
@@ -550,8 +635,11 @@ export function FormEditorStrip({
   written,
   technicalFieldIds,
   isGroup,
+  tabOptions,
+  tabValue,
   onChangeFlag,
   onChangeSpan,
+  onChangeTab,
 }: FormEditorStripProps) {
   // A technical field's view entry may declare neither key at all (the
   // definition contract rejects both) — the strip removes the `required`/
@@ -603,6 +691,7 @@ export function FormEditorStrip({
           </select>
         </label>
       )}
+      <TabPicker options={tabOptions} value={tabValue} inGroup={!!row.group} onChange={onChangeTab} />
     </section>
   );
 }
@@ -615,10 +704,16 @@ export interface NoteEditorStripProps {
   stepId: DraftStep["id"];
   baseLocale: string | undefined;
   groupKeys: string[];
+  /** The same two the field strip takes: a note takes a tab the same way a
+   * field does (`studio-form-editor`: "This requirement covers both entry
+   * kinds"). */
+  tabOptions: TabOption[];
+  tabValue: string | undefined;
   onChangeText: (text: DraftLocalizedText) => void;
   onChangeVisible: (visible: BoolOrExpr) => void;
   onChangeSpan: (span: 1 | 2) => void;
   onChangeGroup: (group: string | undefined) => void;
+  onChangeTab: (tab: string) => void;
 }
 
 /**
@@ -628,7 +723,19 @@ export interface NoteEditorStripProps {
  * span and its group. No requiredness, no readonly state, no validation —
  * a note carries none of those.
  */
-export function NoteEditorStrip({ row, stepId, baseLocale, groupKeys, onChangeText, onChangeVisible, onChangeSpan, onChangeGroup }: NoteEditorStripProps) {
+export function NoteEditorStrip({
+  row,
+  stepId,
+  baseLocale,
+  groupKeys,
+  tabOptions,
+  tabValue,
+  onChangeText,
+  onChangeVisible,
+  onChangeSpan,
+  onChangeGroup,
+  onChangeTab,
+}: NoteEditorStripProps) {
   const { contentLocale } = useDraft();
   return (
     <section {...stylex.props(styles.formStrip)} aria-label={t("formEditor.stripLabel")}>
@@ -659,6 +766,7 @@ export function NoteEditorStrip({ row, stepId, baseLocale, groupKeys, onChangeTe
           ))}
         </select>
       </label>
+      <TabPicker options={tabOptions} value={tabValue} inGroup={!!row.group} onChange={onChangeTab} />
     </section>
   );
 }
@@ -699,13 +807,21 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
   );
   const [selected, setSelected] = useState<number | undefined>(undefined);
   const [dragging, setDragging] = useState<Dragging | undefined>(undefined);
+  /** The one selected-tab value, driving the canvas AND the preview beside it
+   * (`studio-form-editor`: "One selected-tab value SHALL drive both halves").
+   * The tab actually shown is derived from it on every render by `shownTab`,
+   * so removing the open tab or opening another step needs no repair here. */
+  const [activeTab, setActiveTab] = useState<string | undefined>(undefined);
 
-  // The selection belongs to the step this page was opened for.
+  // The selection belongs to the step this page was opened for, and so does
+  // the open tab: another step's tab keys name nothing here.
   useEffect(() => {
     setSelected(undefined);
+    setActiveTab(undefined);
   }, [step.id]);
 
   const rows: DraftViewEntry[] = step.view?.fields ?? [];
+  const baseLocale = draft.baseLocale ?? "en";
   // Absent means one column, which is the width every view had before
   // `view.columns` existed. A form built before this editor therefore opens
   // one-column with every card full width, in its existing array order.
@@ -742,11 +858,21 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
     setRows(rows.map((r, i) => (i === rowIndex ? setFlag(r as DraftViewField, key, next) : r)));
   };
 
+  /** The one writer for a note's group (`studio-form-editor`: assigning a
+   * group clears the entry's own `tab`, and clearing it on a tabbed form
+   * writes the tab the canvas is showing). `updateRow`'s plain spread cannot
+   * delete a key, and both halves of the rule are a deletion. A field's group
+   * follows its catalog parent, so the note strip is the one caller. */
+  const changeGroup = (rowIndex: number, group: string | undefined) => {
+    setRows(rows.map((r, i) => (i === rowIndex ? setEntryGroup(r, group, shown) : r)));
+  };
+
   /** Cascades through `removeViewEntry` (`draft/view-tree.ts`): removing a
    * group card takes every entry placed inside it along, field and note
    * members alike and a nested group's members too, in the one change (the
    * "Removing a group card removes the members placed inside it"
-   * requirement). Removing anything else removes that one entry. */
+   * requirement). Removing anything else removes that one entry. A member
+   * carries no `tab`, so a tabbed form needs nothing more. */
   const removeRow = (rowIndex: number) => {
     setRows(removeViewEntry(rows, rowIndex, fields));
     setSelected(undefined);
@@ -764,7 +890,7 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
       const s = d.workflow?.steps?.[index];
       if (!s) return;
       s.view ??= { fields: [] };
-      s.view.fields = insertViewField(s.view.fields ?? [], field.id!, slot);
+      s.view.fields = fillMissingTabs(insertViewField(s.view.fields ?? [], field.id!, slot), shown);
     });
     setSelected(undefined);
   };
@@ -776,8 +902,7 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
    * after `zod` (design.md Risks: "A half-typed note card blanks the whole
    * checks rail"). */
   const insertNote = () => {
-    const baseLocale = draft.baseLocale ?? "en";
-    setRows(insertViewNote(rows, { [baseLocale]: t("formEditor.newNoteText") }, rows.length));
+    setRows(fillMissingTabs(insertViewNote(rows, { [baseLocale]: t("formEditor.newNoteText") }, rows.length), shown));
     setSelected(rows.length);
   };
 
@@ -790,8 +915,9 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
       // A field the catalog nests inside a group lands among that group's
       // members (and brings the group's own card too, when it is missing)
       // wherever the drop named — `insertGroupedField` owns that slot
-      // decision (the MODIFIED "A left palette lists..." requirement).
-      setRows(insertGroupedField(rows, dragging.ref, slot, fields));
+      // decision (the MODIFIED "A left palette lists..." requirement). On a
+      // tabbed form the root entry it places takes the shown tab.
+      setRows(insertGroupedField(rows, dragging.ref, slot, fields, shown));
       setSelected(undefined);
     } else if (dragging.kind === "mint") {
       mintAndPlace(dragging.fieldKind, slot);
@@ -806,13 +932,14 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
   };
 
   const move = (rowIndex: number, delta: -1 | 1) => {
-    const next = nudgeViewField(rows, rowIndex, delta, fields);
+    const next = nudgeViewField(rows, rowIndex, delta, fields, drawn);
     if (next === rows) return;
     setRows(next);
     // The landed index, read off the array the move returned (`view-tree.ts`'s
     // `landedIndex`) rather than assumed as `rowIndex + delta`: a root
-    // entry's move can step over a whole group's footprint, landing more
-    // than one position away.
+    // entry's move can step over a whole group's footprint, and on a tabbed
+    // form over entries another tab draws, landing more than one position
+    // away.
     setSelected(landedIndex(rows, next, rowIndex));
   };
 
@@ -834,19 +961,78 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
     .map((f) => f!.key)
     .filter((k): k is string => k !== undefined && k !== "");
 
+  /** The group an entry DECLARES, as `owningTab` and `drawnRows` read it: a
+   * group card's catalog `key`, which is the value another entry's `group`
+   * names, read by the same test `viewTree` draws a card by. Everything else
+   * answers `undefined`. */
+  const groupKeyOf = useMemo(() => cardGroupKey(fields), [fields]);
+
+  const tabs = step.view?.tabs ?? [];
+  /** The tab the canvas draws. Derived, never stored: `activeTab` while it
+   * still names a tab, the first tab otherwise, and `undefined` on a form
+   * declaring none. */
+  const shown = shownTab(tabs, activeTab);
+  /** The entry indices the shown tab draws, in view order: a root on its own
+   * tab, a member on its group's (`drawnRows`). The canvas below draws the
+   * tree's roots this holds, and a root's keyboard move steps among them. */
+  const drawn = drawnRows(rows, tabs, shown, groupKeyOf);
+  const tabOptions = tabs
+    .filter((tab): tab is DraftViewTab & { key: string } => !!tab.key)
+    .map((tab) => ({ key: tab.key, label: resolveDraftLocalizedText(tab.label, contentLocale, baseLocale) || t("formEditor.unnamedTab") }));
+
+  const addTab = () => {
+    // A non-empty base-locale entry, not `seedLocalizedText`'s empty one: a
+    // tab with no base-locale text fails the authored-content-localization
+    // invariant on the spot, the same reason `insertNote` seeds its text
+    // (`studio-form-editor`: "Adding a tab SHALL seed its `label` with a
+    // non-empty base-locale entry").
+    const next = addViewTab(step.view ?? { fields: [] }, { [baseLocale]: t("formEditor.newTabName") });
+    writeView(next);
+    setActiveTab(next.tabs?.[next.tabs.length - 1]?.key);
+    setSelected(undefined);
+  };
+
+  const renameTab = (key: string, label: DraftLocalizedText) => {
+    writeView(renameViewTab(step.view ?? { fields: [] }, key, label));
+  };
+
+  // `from` is the strip's own index into this same `tabs` array, so the
+  // strip's Move-left/right end guards and this splice act on one set of
+  // positions. `moveViewTab` holds the range guard.
+  const moveTab = (from: number, delta: -1 | 1) => {
+    const target = from + delta;
+    writeView({ ...(step.view ?? { fields: [] }), tabs: moveViewTab(tabs, from, delta === 1 ? target + 1 : target) });
+  };
+
+  const removeTab = (key: string) => {
+    const index = tabs.findIndex((tab) => tab.key === key);
+    if (index === -1) return;
+    writeView(removeViewTab(step.view ?? { fields: [] }, key));
+    // The tab that took the removed tab's entries, which is where the
+    // author's work went. `removeViewTab` picks the same neighbour.
+    setActiveTab(tabs[index === 0 ? 1 : index - 1]?.key);
+    setSelected(undefined);
+  };
+
   // The canvas's nested read of `rows` (`draft/view-tree.ts`): the
   // roots, and per group entry its members, each node carrying that entry's
   // own index into `rows`. The renderer below walks this; every handler
   // still addresses `rows[i]`.
   const tree = useMemo(() => viewTree(rows, fields), [rows, fields]);
+  // The roots the shown tab draws, each still nesting its whole subtree.
+  // `drawnRows` puts a member on its group card's own tab, so a card and its
+  // members show together or not at all.
+  const drawnSet = new Set(drawn);
+  const drawnRoots = tree.filter((node) => drawnSet.has(node.index));
 
-  // Every row's own drag scope: `undefined` at the form's root, or the
-  // group's own key for a member — whichever nested `<ol>` a card's edges
-  // and tail slot belong to (`view-tree.ts`'s `dragScopeByIndex`). Built once
+  // Every row's own drag scope: a member's is its group, and a root's is the
+  // roots its own tab draws (`view-tree.ts`'s `dragScopeByIndex`). Built once
   // per render so a dragover handler can compare the dragged entry's own
   // scope against the target's (design.md: "A refused drop uses the
   // browser's own no-drop cursor").
-  const scopeByIndex = useMemo(() => dragScopeByIndex(rows, fields), [rows, fields]);
+  const scopeByIndex = useMemo(() => dragScopeByIndex(rows, fields, step.view?.tabs), [rows, fields, step.view?.tabs]);
+  /** The scope of every slot the canvas draws at its own root level. */
+  const rootScope: DragScope = { tab: shown };
 
   /** Whether a dragover at `scope` should call `preventDefault` — the whole
    * refusal mechanism: the browser draws its own no-drop
@@ -855,20 +1041,20 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
    * lands (`insertGroupedField` and the group-less mint rule each resolve
    * their own placement); a card payload is welcome only at the scope it
    * already occupies, `view-tree.ts`'s `isLawfulCardDrop`. */
-  const lawfulDrop = (scope: string | undefined) => {
+  const lawfulDrop = (scope: DragScope) => {
     if (!dragging) return false;
     if (dragging.kind !== "card") return true;
     return isLawfulCardDrop(scopeByIndex, dragging.index, scope);
   };
 
-  /** One placed card, leaf or group, at its own nesting level. `scope` is the
-   * key of the group whose `<ol>` this level renders inside, or `undefined`
-   * at the form's root — every drop target here compares a dragged card's
-   * own scope against it. `isFirst`/`isLast` are this node's
-   * position among the array it was mapped over (the tree's own roots, or a
+  /** One placed card, leaf or group, at its own nesting level. `scope` names
+   * the sibling list this level renders: the group whose `<ol>` holds it, or
+   * the roots the shown tab draws — every drop target here compares a
+   * dragged card's own scope against it. `isFirst`/`isLast` are this node's
+   * position among the array it was mapped over (the shown tab's roots, or a
    * group node's own `members`) — not `rowIndex === 0`, wrong once a group
    * can sit among the roots. */
-  const renderEntry = (node: ViewTreeNode, isFirst: boolean, isLast: boolean, scope: string | undefined) => {
+  const renderEntry = (node: ViewTreeNode, isFirst: boolean, isLast: boolean, scope: DragScope) => {
     const row = node.entry;
     const rowIndex = node.index;
     const isField = isDraftViewField(row);
@@ -885,7 +1071,7 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
     // means a member's edge sits inside its group's own `<li>`, and without
     // it an outer, looser-scoped handler would get a second, wrong-scoped
     // opinion once the event bubbles.
-    const allowDrop = (dropScope: string | undefined) => (e: DragEvent) => {
+    const allowDrop = (dropScope: DragScope) => (e: DragEvent) => {
       e.stopPropagation();
       if (lawfulDrop(dropScope)) e.preventDefault();
     };
@@ -900,6 +1086,7 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
       // A group's card is always a field entry (never a note), so `field` is
       // defined here.
       const groupKey = field?.key;
+      const memberScope: DragScope = { group: groupKey ?? "" };
       const memberCount = members.length;
       // A drop on the group's own box and a drop on its tail row both name
       // this slot (`view-tree.ts::groupTailSlot`). A palette field lands after
@@ -951,11 +1138,11 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
               {...stylex.props(columns === 2 ? styles.formCanvasTwoCol : styles.formCanvasOneCol, styles.formGroupMembersSpacing)}
               data-columns={columns}
             >
-              {members.map((member, i) => renderEntry(member, i === 0, i === memberCount - 1, groupKey))}
+              {members.map((member, i) => renderEntry(member, i === 0, i === memberCount - 1, memberScope))}
               {/* The group's own tail slot: a group with no members yet
                   still has to offer a target, and a member's own
                   reorder-to-the-end has nowhere else to land either. */}
-              <li {...stylex.props(styles.formCanvasTail)} onDragOver={allowDrop(groupKey)} onDrop={dropOnTail}>
+              <li {...stylex.props(styles.formCanvasTail)} onDragOver={allowDrop(memberScope)} onDrop={dropOnTail}>
                 {t("formEditor.dropHere")}
               </li>
             </ol>
@@ -1059,7 +1246,7 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
                     draggable
                     onDragStart={() => setDragging({ kind: "palette", ref: id })}
                     onDragEnd={() => setDragging(undefined)}
-                    onClick={() => setRows(insertGroupedField(rows, id, rows.length, fields))}
+                    onClick={() => setRows(insertGroupedField(rows, id, rows.length, fields, shown))}
                   >
                     <span {...stylex.props(styles.formPaletteKey)}>{labelFor(id)}</span>
                     <span {...stylex.props(styles.formPaletteType)}>{typeLabel(fieldFor(id)?.type)}</span>
@@ -1123,29 +1310,53 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
             ))}
           </div>
 
-          <ol
-            {...stylex.props(columns === 2 ? styles.formCanvasTwoCol : styles.formCanvasOneCol)}
-            data-columns={columns}
-            aria-label={t("formEditor.canvasLabel")}
-          >
-            {rows.length === 0 && <li {...stylex.props(styles.formCanvasEmpty)}>{t("formEditor.canvasEmpty")}</li>}
-            {tree.map((node, i) => renderEntry(node, i === 0, i === tree.length - 1, undefined))}
-            {/* The tail slot, so a card can be dropped past the last one. */}
-            <li
-              {...stylex.props(styles.formCanvasTail)}
-              onDragOver={(e) => {
-                e.stopPropagation();
-                if (lawfulDrop(undefined)) e.preventDefault();
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                dropAt(rows.length);
-              }}
+          {/* Directly above the canvas, so the accent rule under the open
+              tab meets the entries it draws — the process tab row's own
+              relation to its body (design.md "Visual direction"). */}
+          <FormTabStrip
+            tabs={tabs}
+            open={shown}
+            contentLocale={contentLocale}
+            baseLocale={baseLocale}
+            onOpen={(key) => {
+              setActiveTab(key);
+              // The selection is an array index into the whole view, and the
+              // entry it names may sit on the tab just closed.
+              setSelected(undefined);
+            }}
+            onAdd={addTab}
+            onRename={renameTab}
+            onMove={moveTab}
+            onRemove={removeTab}
+          />
+
+          {/* The canvas is the open tab's one panel. An untabbed form draws
+              no strip, so it stands as the plain region it always was. */}
+          <div {...(shown === undefined ? {} : { role: "tabpanel", id: formTabPanelDomId(shown), "aria-labelledby": formTabDomId(shown) })}>
+            <ol
+              {...stylex.props(columns === 2 ? styles.formCanvasTwoCol : styles.formCanvasOneCol)}
+              data-columns={columns}
+              aria-label={t("formEditor.canvasLabel")}
             >
-              {t("formEditor.dropHere")}
-            </li>
-          </ol>
+              {drawnRoots.length === 0 && <li {...stylex.props(styles.formCanvasEmpty)}>{t("formEditor.canvasEmpty")}</li>}
+              {drawnRoots.map((node, i) => renderEntry(node, i === 0, i === drawnRoots.length - 1, rootScope))}
+              {/* The tail slot, so a card can be dropped past the last one. */}
+              <li
+                {...stylex.props(styles.formCanvasTail)}
+                onDragOver={(e) => {
+                  e.stopPropagation();
+                  if (lawfulDrop(rootScope)) e.preventDefault();
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  dropAt(rows.length);
+                }}
+              >
+                {t("formEditor.dropHere")}
+              </li>
+            </ol>
+          </div>
 
           {selectedRow && isDraftViewField(selectedRow) ? (
             <FormEditorStrip
@@ -1156,8 +1367,11 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
               written={written}
               technicalFieldIds={technicalIds}
               isGroup={isGroupRow(selectedRow)}
+              tabOptions={tabOptions}
+              tabValue={owningTab(selectedRow, rows, groupKeyOf)}
               onChangeFlag={(key, next) => setViewFlag(selected!, key, next)}
               onChangeSpan={(span) => updateRow(selected!, { span })}
+              onChangeTab={(tab) => updateRow(selected!, { tab })}
             />
           ) : selectedRow ? (
             <NoteEditorStrip
@@ -1165,10 +1379,13 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
               stepId={step.id}
               baseLocale={draft.baseLocale}
               groupKeys={groupKeys}
+              tabOptions={tabOptions}
+              tabValue={owningTab(selectedRow, rows, groupKeyOf)}
               onChangeText={(text) => updateRow(selected!, { text })}
               onChangeVisible={(visible) => setViewFlag(selected!, "visible", visible)}
               onChangeSpan={(span) => updateRow(selected!, { span })}
-              onChangeGroup={(group) => updateRow(selected!, { group })}
+              onChangeGroup={(group) => changeGroup(selected!, group)}
+              onChangeTab={(tab) => updateRow(selected!, { tab })}
             />
           ) : (
             <p {...stylex.props(styles.formStripEmpty)}>{t("formEditor.selectAField")}</p>
@@ -1183,7 +1400,9 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
           fields={fields}
           processLabel={processLabel}
           contentLocale={contentLocale}
-          baseLocale={draft.baseLocale ?? "en"}
+          baseLocale={baseLocale}
+          activeTab={shown}
+          onTabChange={setActiveTab}
           style={styles.formEditorPreview}
         />
       </div>

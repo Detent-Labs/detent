@@ -293,6 +293,24 @@ describe("moveFieldToGroup over examples/purchase-requisition.json", () => {
     expect(poError[statusAt]).toMatchObject({ ref: poStatus.id, group: "request" });
   });
 
+  it("keeps the tabbed finance_review step publishable when line_item moves into request, then cost_center leaves for the top level", () => {
+    const body = exampleDraft();
+    const lineItemId = groupIdOf(body);
+    const before = runValidation(body, undefined, {}, {});
+    expect(before.zodValid).toBe(true);
+
+    const nested = moveOnClone(body, lineItemId, groupIdOf(body, "request"));
+    const costCenter = draftFields(nested).find((f) => f.key === "cost_center")!;
+    const moved = moveOnClone(nested, costCenter.id!, undefined);
+
+    const after = runValidation(moved, undefined, {}, {});
+    expect(after.zodValid).toBe(true);
+    expect(after.issues).toEqual(before.issues);
+    const review = moved.workflow!.steps!.find((s) => s.key === "finance_review")!.view!.fields!;
+    expect(review.find((e) => "ref" in e && e.ref === lineItemId)).toEqual({ ref: lineItemId, group: "request" });
+    expect(review.find((e) => "ref" in e && e.ref === costCenter.id)).toMatchObject({ ref: costCenter.id, tab: "review" });
+  });
+
   it("keeps the body publishable when line_item is renamed through its label", () => {
     const body = exampleDraft();
     const lineItemId = groupIdOf(body);

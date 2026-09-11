@@ -193,6 +193,15 @@ that sequence, over one `walkFieldsIndexed` pass
   (`compile.ts::checkViewGroupReferences`). A Zod refinement on `viewField`
   would strand the pinned instances of three bodies published before the
   check — see `definition-contract`'s placement rule.
+- A view declaring `tabs` holds one hierarchy: tabs, then fields and groups,
+  then a group's own members. Two tabs in one view never share a `key`, and
+  every non-empty `tab` names a declared one. Once a view declares a tab,
+  every entry outside a group must declare one too. An entry inside a group
+  never declares its own tab — the group's own entry names the tab for the
+  whole group. An untabbed view's entries must not declare `tab` either. All
+  five are Zod refinements in `definition.ts`'s `view` superRefine: no body
+  published before `tabs` and `tab` existed could violate one, so none can
+  strand a pinned instance — see `definition-contract`'s placement rule.
 - A step whose `assignment.strategy.type === "org.group-members"` and whose
   `config.groupId` is a string must name a group id already present in the
   body's own `allowedGroups`. The compile pass checks this

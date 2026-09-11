@@ -1,7 +1,10 @@
 import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { FormEditorStrip } from "../src/areas/studio/screens/FormEditorScreen.js";
+import { FormEditorStrip, NoteEditorStrip } from "../src/areas/studio/screens/FormEditorScreen.js";
 import type { DraftViewField } from "../src/areas/studio/draft/view-layout.js";
+import type { Draft } from "../src/areas/studio/draft/types.js";
+import type { ValidationResult } from "../src/areas/studio/draft/validation.js";
+import { DraftContext, type DraftContextValue } from "../src/areas/studio/draft/store.js";
 
 /**
  * technical-field-marker task 4.2: the per-step strip omits `required` and
@@ -32,8 +35,11 @@ const render = (technicalFieldIds: Set<string>) =>
       written={() => 0}
       technicalFieldIds={technicalFieldIds}
       isGroup={false}
+      tabOptions={[]}
+      tabValue={undefined}
       onChangeFlag={() => {}}
       onChangeSpan={() => {}}
+      onChangeTab={() => {}}
     />,
   );
 
@@ -73,8 +79,11 @@ describe("FormEditorStrip: dominance-scoped gating", () => {
         written={written}
         technicalFieldIds={new Set()}
         isGroup={false}
+        tabOptions={[]}
+        tabValue={undefined}
         onChangeFlag={() => {}}
         onChangeSpan={() => {}}
+        onChangeTab={() => {}}
       />,
     );
 
@@ -91,5 +100,151 @@ describe("FormEditorStrip: dominance-scoped gating", () => {
   it("keeps gating engaged when the only writer is on a non-dominating step (a step index this accessor never credits)", () => {
     const html = renderGated(() => 0, 2);
     expect((html.match(/disabled=""/g) ?? []).length).toBe(1);
+  });
+});
+
+/**
+ * form-view-tabs task 5.8: both strips carry a tab picker
+ * (`studio-form-editor`: "A selected entry's strip assigns it to a tab"). The
+ * field strip carries no group picker beside it. Both mount the same
+ * `TabPicker`, with the same four props, so the field strip's renders below
+ * need no draft context; the note strip's own render at the end supplies one.
+ */
+const TABS = [
+  { key: "tab_1", label: "Details" },
+  { key: "tab_2", label: "Approval" },
+];
+
+const renderTabbed = (over: { tabOptions?: typeof TABS; tabValue?: string; group?: string } = {}) =>
+  renderToStaticMarkup(
+    <FormEditorStrip
+      row={{ ref: "field_amount" as never, group: over.group }}
+      label="Amount"
+      stepId={"step_a" as never}
+      ownStepIndex={0}
+      written={() => 1}
+      technicalFieldIds={new Set()}
+      isGroup={false}
+      tabOptions={over.tabOptions ?? TABS}
+      tabValue={over.tabValue}
+      onChangeFlag={() => {}}
+      onChangeSpan={() => {}}
+      onChangeTab={() => {}}
+    />,
+  );
+
+describe("the strip's tab picker", () => {
+  it("lists the form's tabs, and selects the one the entry names", () => {
+    const html = renderTabbed({ tabValue: "tab_2" });
+
+    expect(html).toContain(">tab<");
+    expect(html).toContain("Details");
+    expect(html).toContain("Approval");
+    expect(html).toContain('value="tab_2"');
+  });
+
+  it("offers no empty choice: a root entry on a tabbed form always names a tab", () => {
+    // The field strip carries no group picker, so no "(none)" option remains.
+    expect((renderTabbed({ tabValue: "tab_1" }).match(/<option value=""/g) ?? []).length).toBe(0);
+  });
+
+  it("carries the tab picker and no group control: the field catalog owns a field's group", () => {
+    const html = renderTabbed({ tabValue: "tab_1" });
+
+    expect(html).toContain(">tab<");
+    expect(html).not.toContain(">group<");
+  });
+
+  it("shows a member its group's tab, inert, with the reason beside it", () => {
+    const html = renderTabbed({ group: "approval", tabValue: "tab_2" });
+
+    expect(html).toMatch(/<option value="tab_2" selected="">Approval<\/option>/);
+    expect(html).toContain("The group decides the tab.");
+    expect(html).not.toContain(">group<");
+  });
+
+  it("draws no picker at all on an untabbed form", () => {
+    const html = renderTabbed({ tabOptions: [] });
+
+    expect(html).not.toContain(">tab<");
+  });
+
+  it("stays inert for an entry naming a group, and says why", () => {
+    const html = renderTabbed({ group: "approval", tabValue: "tab_1" });
+
+    expect(html).toContain("The group decides the tab.");
+    // The reason reaches a screen reader as the control's own description,
+    // not as loose text beside it.
+    expect(html).toContain('aria-describedby="form-editor-tab-from-group"');
+    expect(html).toContain('id="form-editor-tab-from-group"');
+    expect(html).toContain("disabled");
+  });
+
+  it("stays operable for a root entry", () => {
+    expect(renderTabbed({ tabValue: "tab_1" })).not.toContain("form-editor-tab-from-group");
+  });
+});
+
+/**
+ * A note has no catalog parent, so its own strip keeps the group picker
+ * beside the tab picker. `NoteEditorStrip` reads the content locale off the
+ * draft context, so this render supplies `DraftContext.Provider` the way
+ * `studio-formEditor-groupCanvas.test.tsx` does.
+ */
+function contextValue(draft: Draft): DraftContextValue {
+  const validation: ValidationResult = {
+    zodValid: true,
+    issues: [],
+    dimensions: {
+      zod: "ran",
+      duration: "ran",
+      structural: "ran",
+      actionType: "ran",
+      assignmentType: "ran",
+      dataSourceType: "ran",
+      registryConfig: "not-run",
+      cel: "ran",
+    },
+    subprocessStepStatus: {},
+    chainingSiteStatus: {},
+  };
+  return {
+    draft,
+    mutate: () => {},
+    replace: () => {},
+    validation,
+    loadedChildren: {},
+    setChildForStep: () => {},
+    registry: undefined,
+    loadedChainingTargets: {},
+    contentLocale: "en",
+    setContentLocale: () => {},
+    usedLocales: ["en"],
+    loadGeneration: 0,
+  };
+}
+
+describe("the note strip on a tabbed form", () => {
+  it("keeps both the group picker and the tab picker", () => {
+    const html = renderToStaticMarkup(
+      <DraftContext.Provider value={contextValue({ baseLocale: "en" } as unknown as Draft)}>
+        <NoteEditorStrip
+          row={{ kind: "note", text: { en: "Heads up" } }}
+          stepId={"step_a" as never}
+          baseLocale="en"
+          groupKeys={["approval"]}
+          tabOptions={TABS}
+          tabValue="tab_1"
+          onChangeText={() => {}}
+          onChangeVisible={() => {}}
+          onChangeSpan={() => {}}
+          onChangeGroup={() => {}}
+          onChangeTab={() => {}}
+        />
+      </DraftContext.Provider>,
+    );
+
+    expect(html).toContain(">group<");
+    expect(html).toContain(">tab<");
   });
 });

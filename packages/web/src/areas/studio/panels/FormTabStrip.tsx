@@ -1,0 +1,281 @@
+import { useState, type KeyboardEvent } from "react";
+import * as stylex from "@stylexjs/stylex";
+import { nextTabIndex } from "form-ui";
+import { colors, fonts, space } from "form-ui/tokens.stylex";
+import { t } from "../catalog.js";
+import { mergeLocalizedTextEntry, resolveDraftLocalizedText, type DraftLocalizedText } from "../draft/localized-text";
+import type { DraftViewTab } from "../draft/view-layout";
+
+/** The tab button's own element id, and the id of the canvas it controls.
+ * Both are exported so `FormEditorScreen` can stamp the matching
+ * `aria-labelledby` on the canvas without repeating the format. The
+ * `studio-form-` prefix keeps them apart from `form-ui`'s own
+ * `form-ui-tab-…`, which the participant preview on this same screen
+ * already emits for the same tab keys. */
+export const formTabDomId = (key: string) => `studio-form-tab-${key}`;
+export const formTabPanelDomId = (key: string) => `studio-form-tabpanel-${key}`;
+
+const styles = stylex.create({
+  // One line at every width, scrolling sideways in its own container rather
+  // than wrapping — the participant strip's own overflow model, so a form's
+  // tab strip behaves one way and not two. Wrapping put the 2px divider
+  // below the controls at 640px, 70px under the tabs, so the accent rule no
+  // longer met the canvas it marks, which is the whole reason the strip sits
+  // where it sits. Nothing wraps now, so no command can strand alone on a
+  // line either. The 4px block padding is the room the 2px focus ring at 2px
+  // offset needs: `overflowX` resolves `overflow-y` to `auto` as well, and a
+  // ring drawn outside the padding box would clip.
+  row: {
+    display: "flex",
+    alignItems: "stretch",
+    flexWrap: "nowrap",
+    gap: space.s1,
+    paddingBlock: space.s1,
+    overflowX: "auto",
+    overscrollBehavior: "contain",
+    borderBottomWidth: 2,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.divider,
+    marginBottom: space.s3,
+  },
+  tabs: {
+    display: "flex",
+    alignItems: "stretch",
+    flexWrap: "nowrap",
+    gap: space.s1,
+    flex: "none",
+  },
+  // `FieldForm.tsx`'s own tab, character for character (design.md "Visual
+  // direction": one tab language, two strips). That pair is the one a viewer
+  // compares, since both draw on this screen over the same labels.
+  tab: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: space.s2,
+    flex: "none",
+    whiteSpace: "nowrap",
+    backgroundColor: { default: "transparent", ":hover": colors.surfaceMuted },
+    color: "inherit",
+    borderWidth: 0,
+    paddingBlock: space.s2,
+    paddingInline: space.s3,
+    // Pinned, not inherited. `font: "inherit"` resolved against a 15px
+    // ambient and drew this strip 3.5px taller than the participant strip
+    // beside it on this same screen, over the same labels. 14px with an
+    // explicit 1.5 is `DESIGN.md`'s own action-label size and the size
+    // `FieldForm.tsx` pins, so neither strip depends on an ambient.
+    fontFamily: "inherit",
+    fontSize: 14,
+    lineHeight: 1.5,
+    textAlign: "left",
+    cursor: "pointer",
+  },
+  // The open tab: the accent rule under it plus weight 800, the written
+  // face's own second weight and no third.
+  tabSelected: {
+    fontWeight: 800,
+    boxShadow: `inset 0 -2px 0 ${colors.accent}`,
+  },
+  // The authoring controls, at the strip's TRAILING end. A participant never
+  // gets them, which is why they carry the mono face the machine marks on the
+  // canvas already read, not the tabs' own written face.
+  controls: {
+    display: "flex",
+    alignItems: "center",
+    flexWrap: "nowrap",
+    gap: space.s1,
+    flex: "none",
+    marginLeft: "auto",
+  },
+  // Plain, not accent. The Stamp Rule in `DESIGN.md` spends the accent on
+  // state and on one primary action per screen. Five accent commands beside
+  // two ink tabs made the servant louder than the thing it serves, and put
+  // two meanings on one colour inside one row: the rule under the open tab
+  // means THIS TAB IS OPEN, and a command 340px to its right meant CLICK ME.
+  // The accent keeps the first meaning alone now; focus is still the accent
+  // ring, from `tokens.css`.
+  //
+  // Transparent, muted ink and no border is a treatment `DESIGN.md`'s button
+  // catalogue does not list yet — Ghost is defined there as accent text, and
+  // the quiet documented option is Secondary, ink text with a divider border.
+  // The press therefore takes Secondary's own pressed wash, ink at 14%.
+  // Without it there is no pressed state at all: a StyleX atom is `:not(#\#)`
+  // at specificity 1,1,0, so the `transparent` default above outranks
+  // `.btn-ghost:active` in `tokens.css` and nothing replaces the wash it
+  // takes away.
+  control: {
+    fontFamily: fonts.mono,
+    fontSize: 11,
+    color: colors.textMuted,
+    backgroundColor: {
+      default: "transparent",
+      ":hover": colors.surfaceMuted,
+      ":active": `color-mix(in srgb, ${colors.text} 14%, transparent)`,
+    },
+  },
+  // The authored name itself, not a command, so it takes the ordinary ink.
+  rename: {
+    fontFamily: fonts.mono,
+    fontSize: 11,
+    minWidth: "8rem",
+    color: colors.text,
+  },
+});
+
+interface Props {
+  /** The draft's own tabs, in strip order. Empty draws the add control
+   * alone (`studio-form-editor`: "A form with no tab SHALL show the strip's
+   * add control alone"). */
+  tabs: DraftViewTab[];
+  /** The tab the canvas is showing — `shownTab`'s answer, so it always names
+   * one of `tabs` or nothing at all. */
+  open: string | undefined;
+  contentLocale: string;
+  baseLocale: string;
+  onOpen: (key: string) => void;
+  onAdd: () => void;
+  onRename: (key: string, label: DraftLocalizedText) => void;
+  /** Takes the open tab's index in `tabs`, not its key: the screen's own
+   * `moveViewTab` splices that same array, so the end guards below and the
+   * move act on one set of positions. A keyless tab (only the JSON view mints
+   * one) would otherwise shift the two apart. */
+  onMove: (index: number, delta: -1 | 1) => void;
+  onRemove: (key: string) => void;
+}
+
+/**
+ * The form's own tab strip, above the canvas (`studio-form-editor`: "A tab
+ * strip above the canvas authors the form's tabs"). Outside the JSON view it
+ * is the only control that writes `view.tabs`.
+ *
+ * The keyboard model is the plain-button pattern `spa-accessibility` gives an
+ * ordinary tab set: each tab is its own stop in the tab order, and a
+ * `<button>`'s own Enter and Space handling is what opens the focused one.
+ * The roving-tabindex variant that spec names is reserved for a many-tab row,
+ * which is `ProcessTabRow.tsx` above this one and nothing else. Both form
+ * strips scroll sideways as well, so the tab count is what separates them.
+ *
+ * Every write leaves through a callback: the screen owns the draft, and this
+ * component holds one piece of state, which tab the author is renaming.
+ */
+export function FormTabStrip({ tabs, open, contentLocale, baseLocale, onOpen, onAdd, onRename, onMove, onRemove }: Props) {
+  const [renaming, setRenaming] = useState<string | undefined>(undefined);
+  // A tab mid-mint with no `key` draws nothing: no entry can name it, and the
+  // strip's own DOM ids are built from the key.
+  const drawn = tabs.filter((tab): tab is DraftViewTab & { key: string } => !!tab.key);
+  const openTab = open === undefined ? undefined : drawn.find((tab) => tab.key === open);
+  // Over `tabs`, the array `onMove`'s consumer splices, rather than over
+  // `drawn`. The two agree for every draft the editor itself writes, and
+  // disagree for one carrying a keyless tab from the JSON view.
+  const openIndex = openTab === undefined ? -1 : tabs.indexOf(openTab);
+  const renamingOpen = openTab !== undefined && renaming === openTab.key;
+
+  // Arrow keys, `Home` and `End` move focus alone; a `<button>`'s own `Enter`
+  // and `Space` handling is what opens the focused tab. `nextTabIndex` is
+  // `form-ui`'s own, the one the participant's strip calls, so the two strips
+  // cannot answer one key two ways.
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    const buttons = Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+    const from = buttons.findIndex((b) => b === e.target || b.contains(e.target as Node));
+    const next = nextTabIndex(e.key, from, buttons.length);
+    if (next === undefined) return;
+    // `preventDefault` on the four handled keys alone, so a wrapped row's own
+    // scroll does not fire beside the focus move.
+    e.preventDefault();
+    buttons[next]?.focus();
+  };
+
+  return (
+    <div {...stylex.props(styles.row)}>
+      {drawn.length > 0 && (
+        <div {...stylex.props(styles.tabs)} role="tablist" aria-label={t("formEditor.tabRowLabel")} onKeyDown={onKeyDown}>
+          {drawn.map((tab) => {
+            const selected = tab.key === open;
+            return (
+              <button
+                key={tab.key}
+                id={formTabDomId(tab.key)}
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                // The open tab alone. One canvas is in the DOM, so
+                // `aria-controls` on a closed tab would name an element that
+                // is not there.
+                aria-controls={selected ? formTabPanelDomId(tab.key) : undefined}
+                {...stylex.props(styles.tab, selected && styles.tabSelected)}
+                onClick={() => {
+                  setRenaming(undefined);
+                  onOpen(tab.key);
+                }}
+              >
+                {resolveDraftLocalizedText(tab.label, contentLocale, baseLocale) || t("formEditor.unnamedTab")}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      <div {...stylex.props(styles.controls)}>
+        {/* Outside the `tablist`, whose ARIA content model owns `tab`
+            children alone. It writes the content locale on every keystroke,
+            the way every other authored-text input in this area does, so
+            leaving it needs no commit gesture: Enter, Escape and a blur all
+            just close it. autoFocus: the single input of an editor the
+            developer just opened by an explicit click. */}
+        {renamingOpen && (
+          <input
+            type="text"
+            autoFocus
+            aria-label={t("formEditor.tabName")}
+            {...ghost(styles.rename)}
+            value={openTab.label?.[contentLocale] ?? ""}
+            onChange={(e) => onRename(openTab.key, mergeLocalizedTextEntry(openTab.label, contentLocale, e.target.value))}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === "Escape") setRenaming(undefined);
+            }}
+            onBlur={() => setRenaming(undefined)}
+          />
+        )}
+        <button type="button" {...ghost(styles.control)} onClick={onAdd}>
+          {t("formEditor.addTab")}
+        </button>
+        {openTab !== undefined && (
+          <>
+            <button type="button" {...ghost(styles.control)} onClick={() => setRenaming(openTab.key)}>
+              {t("formEditor.renameTab")}
+            </button>
+            <button type="button" {...ghost(styles.control)} disabled={openIndex === 0} onClick={() => onMove(openIndex, -1)}>
+              {t("formEditor.moveTabLeft")}
+            </button>
+            <button
+              type="button"
+              {...ghost(styles.control)}
+              disabled={openIndex === tabs.length - 1}
+              onClick={() => onMove(openIndex, 1)}
+            >
+              {t("formEditor.moveTabRight")}
+            </button>
+            <button
+              type="button"
+              {...ghost(styles.control)}
+              onClick={() => {
+                setRenaming(undefined);
+                onRemove(openTab.key);
+              }}
+            >
+              {t("formEditor.removeTab")}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** `btn btn-ghost` plus a compiled style, as one set of props. Spreading
+ * `stylex.props(...)` beside a `className` attribute drops whichever of the
+ * two the JSX writes first, so the two class lists are joined here instead —
+ * the same join the form canvas already makes for a note card. */
+function ghost(style: stylex.StyleXStyles) {
+  const compiled = stylex.props(style);
+  return { ...compiled, className: `btn btn-ghost ${compiled.className ?? ""}`.trim() };
+}
