@@ -654,6 +654,16 @@ describe("nudgeViewField moves a card past the neighbour the author can SEE", ()
     expect(nudgeViewField(start, 3, 1, [], [1, 3])).toBe(start);
   });
 
+  it("is a no-op for a root the drawn list does not hold, in either direction", () => {
+    // The `pos === -1` guard: index 0 is a root the shown tab does not draw,
+    // so it has no position among the drawn siblings. Read as position -1, a
+    // move-down would target position 0 and splice it before index 3, the
+    // second drawn root.
+    const start = [ref("a"), ref("b"), ref("c"), ref("d")];
+    expect(nudgeViewField(start, 0, 1, [], [1, 3])).toBe(start);
+    expect(nudgeViewField(start, 0, -1, [], [1, 3])).toBe(start);
+  });
+
   it("keeps its untabbed behavior when no drawn list is passed", () => {
     const start = [ref("a"), ref("b"), ref("c")];
     expect(refs(nudgeViewField(start, 2, -1, []))).toEqual(refs(nudgeViewField(start, 2, -1, [], [0, 1, 2])));
