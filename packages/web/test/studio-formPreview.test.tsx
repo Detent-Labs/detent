@@ -39,11 +39,33 @@ function step(over: Record<string, unknown> = {}): DraftOf<Step> {
   } as unknown as DraftOf<Step>;
 }
 
-function render(s: DraftOf<Step> = step()): string {
+function render(s: DraftOf<Step> = step(), activeTab?: string): string {
   return renderToStaticMarkup(
-    <FormPreview step={s} fields={FIELDS} processLabel="Expense approval" contentLocale="en" baseLocale="en" />,
+    <FormPreview
+      step={s}
+      fields={FIELDS}
+      processLabel="Expense approval"
+      contentLocale="en"
+      baseLocale="en"
+      activeTab={activeTab}
+      onTabChange={() => {}}
+    />,
   );
 }
+
+/** The same step with a two-tab view, its two fields one per tab. */
+const TABBED = step({
+  view: {
+    tabs: [
+      { key: "tab_1", label: { en: "Details" } },
+      { key: "tab_2", label: { en: "Approval" } },
+    ],
+    fields: [
+      { ref: AMOUNT, required: true, tab: "tab_1" },
+      { ref: PURPOSE, tab: "tab_2" },
+    ],
+  },
+});
 
 describe("The participant preview", () => {
   it("names the process and the step above the fields", () => {
@@ -117,3 +139,73 @@ describe("The preview's own controls", () => {
     expect(render(step({ paths: [] }))).toContain("Submit");
   });
 });
+
+describe("The preview's tab strip", () => {
+  it("draws the draft's tabs, with their authored labels", () => {
+    const html = render(TABBED);
+
+    expect(html).toContain('role="tablist"');
+    expect(html).toContain("Details");
+    expect(html).toContain("Approval");
+  });
+
+  it("opens the tab the canvas is showing, and draws that tab's entries alone", () => {
+    const second = render(TABBED, "tab_2");
+
+    expect(second).toContain("Purpose");
+    // The closed tab's entries are absent from the DOM, not hidden.
+    expect(second).not.toContain("Amount");
+  });
+
+  it("opens the first tab where the canvas shows none yet", () => {
+    const first = render(TABBED);
+
+    expect(first).toContain("Amount");
+    expect(first).not.toContain("Purpose");
+  });
+
+  it("draws no strip for an untabbed form", () => {
+    expect(render()).not.toContain('role="tablist"');
+  });
+
+  it("draws that strip inside the inert container, so a tab there takes no click", () => {
+    // `studio-form-editor`: "The strip the preview draws SHALL NOT be
+    // interactive … `onTabChange` stays wired and stays silent while `inert`
+    // holds". The canvas carries the strip that answers a click.
+    //
+    // The click itself is a browser fact, and `inert` suppressing interaction
+    // on its subtree is a platform guarantee. What this repo owns is the one
+    // precondition under both: the strip is a DESCENDANT of an `inert`
+    // element. It is load-bearing — `onTabChange={setActiveTab}` means a
+    // strip that escaped that subtree really would move the canvas.
+    const html = render(TABBED);
+
+    // React emitted the attribute at all.
+    expect(html.indexOf('inert=""')).toBeGreaterThan(-1);
+    expect(tablistsInsideInert(html)).toBe(1);
+  });
+
+  it("counts no strip for one sitting BESIDE the inert container", () => {
+    // The arrangement the guard above exists to reject, and the reason it
+    // reads the tree rather than the string: in serialized markup a later
+    // string is a descendant OR a following sibling, and both of these put
+    // `role="tablist"` after `inert=""`.
+    expect(tablistsInsideInert('<div inert=""><div>m</div><div role="tablist"></div></div>')).toBe(1);
+    expect(tablistsInsideInert('<div inert=""><div>m</div></div><div role="tablist"></div>')).toBe(0);
+  });
+});
+
+/** How many tab strips sit inside an `inert` element. A descendant selector,
+ * which is the relation the scenario turns on; `HTMLRewriter` ships with Bun,
+ * so proving it costs no dependency and no DOM library. */
+function tablistsInsideInert(html: string): number {
+  let count = 0;
+  new HTMLRewriter()
+    .on("[inert] [role=tablist]", {
+      element() {
+        count++;
+      },
+    })
+    .transform(html);
+  return count;
+}

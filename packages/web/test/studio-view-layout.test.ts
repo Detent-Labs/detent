@@ -1,17 +1,29 @@
 import { describe, expect, it } from "bun:test";
 import { authoredProcessBody, type FieldId } from "workflow-engine/schema";
 import {
+  addViewTab,
   clampSpan,
+  drawnNeighbour,
+  drawnRows,
   dropSlot,
+  fillMissingTabs,
   insertViewField,
   insertViewNote,
   isDraftViewField,
   moveViewField,
+  moveViewTab,
   nudgeViewField,
+  owningTab,
+  removeViewTab,
+  renameViewTab,
   reorderIndex,
+  setEntryGroup,
+  shownTab,
   unplacedRefs,
+  type DraftView,
   type DraftViewEntry,
   type DraftViewField,
+  type DraftViewTab,
 } from "../src/areas/studio/draft/view-layout";
 
 /** The form editor's canvas interaction, as pure functions. `studio-canvas`
@@ -25,6 +37,7 @@ import {
 const id = (s: string) => s as FieldId;
 const rows = (...refs: string[]): DraftViewField[] => refs.map((ref) => ({ ref: id(ref) }));
 const refs = (list: DraftViewField[]): string[] => list.map((r) => String(r.ref));
+const tab = (key: string, label = key): DraftViewTab => ({ key, label: { en: label } });
 
 describe("dropSlot maps a card edge to an insertion index", () => {
   it("names the card's own index on its leading edge", () => {
@@ -210,5 +223,350 @@ describe("clampSpan never lets a field exceed its grid", () => {
 
   it("clamps a span-2 field on a one-column form", () => {
     expect(clampSpan(2, 1)).toBe(1);
+  });
+});
+
+describe("addViewTab sweeps the first tab, and mints a fresh key each call", () => {
+  it("moves every existing root entry onto the first tab", () => {
+    const view: DraftView = { fields: rows("a", "b", "c", "d") };
+    const next = addViewTab(view, { en: "Details" });
+    expect(next.tabs).toHaveLength(1);
+    expect(next.tabs![0]!.label).toEqual({ en: "Details" });
+    const key = next.tabs![0]!.key;
+    expect(key).toBeTruthy();
+    expect(next.fields!.every((e) => e.tab === key)).toBe(true);
+  });
+
+  it("sweeps a note entry too: it is a root entry like any other", () => {
+    const view: DraftView = { fields: [{ ref: id("a") }, { kind: "note", text: { en: "hi" } }] };
+    const next = addViewTab(view, { en: "Details" });
+    const key = next.tabs![0]!.key;
+    expect(next.fields!.every((e) => e.tab === key)).toBe(true);
+  });
+
+  it("skips a grouped entry: its group holds it, and the group's own entry names the tab", () => {
+    const view: DraftView = {
+      fields: [
+        { ref: id("group") },
+        { ref: id("a"), group: "group" },
+        { kind: "note", text: { en: "hi" }, group: "group" },
+      ],
+    };
+    const next = addViewTab(view, { en: "Details" });
+    const key = next.tabs![0]!.key;
+    expect(next.fields![0]!.tab).toBe(key);
+    expect(next.fields![1]!.tab).toBeUndefined();
+    expect(next.fields![2]!.tab).toBeUndefined();
+  });
+
+  it("mints a distinct key each time it is called", () => {
+    const first = addViewTab({ fields: [] }, { en: "A" });
+    const both = addViewTab(first, { en: "B" });
+    expect(both.tabs).toHaveLength(2);
+    expect(both.tabs![0]!.key).not.toBe(both.tabs![1]!.key);
+  });
+
+  it("sweeps nothing when adding a second tab: every existing root entry already names one", () => {
+    const first = addViewTab({ fields: rows("a", "b") }, { en: "First" });
+    const firstKey = first.tabs![0]!.key;
+    const second = addViewTab(first, { en: "Second" });
+    expect(second.tabs).toHaveLength(2);
+    expect(second.fields!.every((e) => e.tab === firstKey)).toBe(true);
+  });
+});
+
+describe("removeViewTab merges into a neighbour, or tears down the last tab", () => {
+  it("hands a middle tab's entries to the tab before it, in their existing order", () => {
+    const view: DraftView = {
+      tabs: [tab("t1"), tab("t2"), tab("t3")],
+      fields: [
+        { ref: id("a"), tab: "t1" },
+        { ref: id("b"), tab: "t2" },
+        { ref: id("c"), tab: "t2" },
+        { ref: id("d"), tab: "t3" },
+      ],
+    };
+    const next = removeViewTab(view, "t2");
+    expect(next.tabs!.map((t) => t.key)).toEqual(["t1", "t3"]);
+    expect(next.fields!.map((e) => e.tab)).toEqual(["t1", "t1", "t1", "t3"]);
+  });
+
+  it("hands the first tab's entries to the tab after it", () => {
+    const view: DraftView = {
+      tabs: [tab("t1"), tab("t2")],
+      fields: [
+        { ref: id("a"), tab: "t1" },
+        { ref: id("b"), tab: "t2" },
+      ],
+    };
+    const next = removeViewTab(view, "t1");
+    expect(next.tabs!.map((t) => t.key)).toEqual(["t2"]);
+    expect(next.fields!.map((e) => e.tab)).toEqual(["t2", "t2"]);
+  });
+
+  it("tears down the last remaining tab: no entry keeps a tab, and tabs drops from the view", () => {
+    const view: DraftView = {
+      tabs: [tab("t1")],
+      fields: [{ ref: id("a"), tab: "t1" }, { kind: "note", text: { en: "hi" }, tab: "t1" }],
+    };
+    const next = removeViewTab(view, "t1");
+    expect(next.tabs).toBeUndefined();
+    expect(next.fields!.every((e) => e.tab === undefined)).toBe(true);
+    expect("tab" in next.fields![0]!).toBe(false);
+  });
+
+  it("deletes no entry: the removed tab's own field count survives, just retargeted", () => {
+    const view: DraftView = {
+      tabs: [tab("t1"), tab("t2")],
+      fields: [
+        { ref: id("a"), tab: "t1" },
+        { ref: id("b"), tab: "t2" },
+      ],
+    };
+    const next = removeViewTab(view, "t1");
+    expect(next.fields).toHaveLength(2);
+  });
+
+  it("is a no-op for a key naming no tab", () => {
+    const view: DraftView = { tabs: [tab("t1")], fields: [{ ref: id("a"), tab: "t1" }] };
+    expect(removeViewTab(view, "missing")).toBe(view);
+  });
+});
+
+describe("moveViewTab reorders the strip alone, the tab-strip's own moveViewField", () => {
+  it("moves a tab forward, the same mechanics moveViewField's own test covers", () => {
+    const tabs: DraftViewTab[] = [tab("a"), tab("b"), tab("c"), tab("d")];
+    expect(moveViewTab(tabs, 0, 3).map((t) => t.key)).toEqual(["b", "c", "a", "d"]);
+  });
+
+  it("moves a tab backward", () => {
+    const tabs: DraftViewTab[] = [tab("a"), tab("b"), tab("c"), tab("d")];
+    expect(moveViewTab(tabs, 3, 1).map((t) => t.key)).toEqual(["a", "d", "b", "c"]);
+  });
+
+  it("returns the same array for a drop on the tab's own edge", () => {
+    const tabs: DraftViewTab[] = [tab("a"), tab("b")];
+    expect(moveViewTab(tabs, 0, 0)).toBe(tabs);
+    expect(moveViewTab(tabs, 0, 1)).toBe(tabs);
+  });
+});
+
+describe("renameViewTab writes the label alone — the key a helper never rewrites", () => {
+  it("keeps the key unchanged, and every entry naming it still resolves", () => {
+    const view: DraftView = {
+      tabs: [tab("t1", "Before"), tab("t2", "Other")],
+      fields: [
+        { ref: id("a"), tab: "t1" },
+        { ref: id("b"), tab: "t2" },
+      ],
+    };
+    const next = renameViewTab(view, "t1", { en: "After" });
+
+    const renamed = next.tabs!.find((t) => t.key === "t1")!;
+    expect(renamed.key).toBe("t1");
+    expect(renamed.label).toEqual({ en: "After" });
+
+    // The definition contract: an authoring surface must not rewrite a tab's
+    // key once an entry names it. Renaming leaves `fields` untouched by this
+    // function, so the entry's own `tab` still names "t1" — and "t1" still
+    // resolves, since the tab that renamed kept exactly that key.
+    const namingEntry = next.fields!.filter(isDraftViewField).find((e) => e.ref === id("a"))!;
+    expect(namingEntry.tab).toBe("t1");
+    expect(next.tabs!.some((t) => t.key === namingEntry.tab)).toBe(true);
+  });
+
+  it("touches no other tab's label", () => {
+    const view: DraftView = { tabs: [tab("t1", "A"), tab("t2", "B")] };
+    const next = renameViewTab(view, "t1", { en: "Changed" });
+    expect(next.tabs!.find((t) => t.key === "t2")!.label).toEqual({ en: "B" });
+  });
+
+  it("is a no-op for a key naming no tab", () => {
+    const view: DraftView = { tabs: [tab("t1", "A")] };
+    const next = renameViewTab(view, "missing", { en: "X" });
+    expect(next.tabs).toEqual([tab("t1", "A")]);
+  });
+});
+
+/** A view entry names its group by the group FIELD's catalog key, which the
+ * screen resolves through the field catalog. These tests carry no catalog, so
+ * an entry whose `ref` starts with "g" stands for a group field of that key —
+ * the one fact `owningTab` and `drawnRows` read through `groupKeyOf`. */
+const groupKeyOf = (entry: DraftViewEntry) =>
+  isDraftViewField(entry) && String(entry.ref).startsWith("g") ? String(entry.ref) : undefined;
+
+describe("shownTab derives the open tab rather than storing it", () => {
+  const strip = [tab("t1"), tab("t2")];
+
+  it("keeps the active tab while it still names one", () => {
+    expect(shownTab(strip, "t2")).toBe("t2");
+  });
+
+  it("falls back to the first tab when the active one is gone", () => {
+    // The state a removal leaves behind: no effect repairs it, this does.
+    expect(shownTab(strip, "t9")).toBe("t1");
+    expect(shownTab(strip, undefined)).toBe("t1");
+  });
+
+  it("answers undefined for a view declaring no tab", () => {
+    expect(shownTab([], "t1")).toBeUndefined();
+    expect(shownTab(undefined, undefined)).toBeUndefined();
+  });
+
+  it("skips a tab carrying no key yet: nothing can name it", () => {
+    expect(shownTab([{ label: { en: "half-typed" } }, tab("t2")], undefined)).toBe("t2");
+  });
+});
+
+describe("owningTab reads a member's tab off its group", () => {
+  it("answers a root entry's own tab", () => {
+    const entries: DraftViewEntry[] = [{ ref: id("a"), tab: "t1" }];
+    expect(owningTab(entries[0]!, entries, groupKeyOf)).toBe("t1");
+  });
+
+  it("answers a member's group's tab, since a member carries none of its own", () => {
+    const entries: DraftViewEntry[] = [{ ref: id("g1"), tab: "t2" }, { ref: id("a"), group: "g1" }];
+    expect(owningTab(entries[1]!, entries, groupKeyOf)).toBe("t2");
+  });
+
+  it("walks up a group nested in a group", () => {
+    const entries: DraftViewEntry[] = [
+      { ref: id("g1"), tab: "t2" },
+      { ref: id("g2"), group: "g1" },
+      { kind: "note", text: { en: "hi" }, group: "g2" },
+    ];
+    expect(owningTab(entries[2]!, entries, groupKeyOf)).toBe("t2");
+  });
+
+  it("terminates on a cycle rather than hanging", () => {
+    const entries: DraftViewEntry[] = [
+      { ref: id("g1"), group: "g2" },
+      { ref: id("g2"), group: "g1" },
+    ];
+    expect(owningTab(entries[0]!, entries, groupKeyOf)).toBeUndefined();
+  });
+});
+
+describe("drawnRows filters the canvas to one tab", () => {
+  const strip = [tab("t1"), tab("t2")];
+  const entries: DraftViewEntry[] = [
+    { ref: id("a"), tab: "t1" },
+    { ref: id("b"), tab: "t2" },
+    { kind: "note", text: { en: "hi" }, tab: "t2" },
+  ];
+
+  it("draws the entries naming the shown tab, in view order", () => {
+    expect(drawnRows(entries, strip, "t2", groupKeyOf)).toEqual([1, 2]);
+  });
+
+  it("draws every entry on an untabbed form", () => {
+    expect(drawnRows(entries, undefined, undefined, groupKeyOf)).toEqual([0, 1, 2]);
+  });
+
+  it("draws a group's members with their group, so a member stays reachable", () => {
+    const grouped: DraftViewEntry[] = [
+      { ref: id("g1"), tab: "t2" },
+      { ref: id("a"), group: "g1" },
+      { ref: id("b"), tab: "t1" },
+    ];
+    expect(drawnRows(grouped, strip, "t2", groupKeyOf)).toEqual([0, 1]);
+    expect(drawnRows(grouped, strip, "t1", groupKeyOf)).toEqual([2]);
+  });
+
+  it("draws an entry naming no tab on the FIRST tab, rather than on none", () => {
+    // A hand-authored JSON draft can break the every-root-entry-names-a-tab
+    // rule. A card no canvas draws is a card no author can repair.
+    const stranded: DraftViewEntry[] = [{ ref: id("a"), tab: "t2" }, { ref: id("b") }, { ref: id("c"), tab: "gone" }];
+    expect(drawnRows(stranded, strip, "t1", groupKeyOf)).toEqual([1, 2]);
+    expect(drawnRows(stranded, strip, "t2", groupKeyOf)).toEqual([0]);
+  });
+});
+
+describe("drawnNeighbour is the keyboard move's target within the drawn list", () => {
+  it("answers the neighbour in draw order, not in array order", () => {
+    expect(drawnNeighbour([0, 3, 4], 3, -1)).toBe(0);
+    expect(drawnNeighbour([0, 3, 4], 3, 1)).toBe(4);
+  });
+
+  it("answers undefined at either end, and for a row the canvas is not drawing", () => {
+    expect(drawnNeighbour([0, 3, 4], 0, -1)).toBeUndefined();
+    expect(drawnNeighbour([0, 3, 4], 4, 1)).toBeUndefined();
+    expect(drawnNeighbour([0, 3, 4], 2, -1)).toBeUndefined();
+  });
+});
+
+describe("nudgeViewField moves a card past the neighbour the author can SEE", () => {
+  it("swaps two cards the array does not place side by side", () => {
+    // b and d are on the shown tab; a and c are not. Moving d up must land it
+    // above b, not between a and c where it would look like a no-op.
+    const start = rows("a", "b", "c", "d");
+    expect(refs(nudgeViewField(start, 3, -1, [1, 3]) as DraftViewField[])).toEqual(["a", "d", "b", "c"]);
+  });
+
+  it("moves down past the next drawn card", () => {
+    const start = rows("a", "b", "c", "d");
+    expect(refs(nudgeViewField(start, 1, 1, [1, 3]) as DraftViewField[])).toEqual(["a", "c", "d", "b"]);
+  });
+
+  it("is a no-op at either end of the drawn list", () => {
+    const start = rows("a", "b", "c", "d");
+    expect(nudgeViewField(start, 1, -1, [1, 3])).toBe(start);
+    expect(nudgeViewField(start, 3, 1, [1, 3])).toBe(start);
+  });
+
+  it("keeps its old behavior when no drawn list is passed", () => {
+    const start = rows("a", "b", "c");
+    expect(refs(nudgeViewField(start, 2, -1) as DraftViewField[])).toEqual(
+      refs(nudgeViewField(start, 2, -1, [0, 1, 2]) as DraftViewField[]),
+    );
+  });
+});
+
+describe("fillMissingTabs keeps a freshly placed entry inside the shown tab", () => {
+  it("writes the tab on a root entry carrying none", () => {
+    const placed: DraftViewEntry[] = [{ ref: id("a"), tab: "t1" }, { ref: id("b") }];
+    expect(fillMissingTabs(placed, "t1")).toEqual([{ ref: id("a"), tab: "t1" }, { ref: id("b"), tab: "t1" }]);
+  });
+
+  it("leaves a grouped entry alone: its group carries the tab", () => {
+    const placed: DraftViewEntry[] = [{ ref: id("g1"), tab: "t1" }, { ref: id("a"), group: "g1" }];
+    expect(fillMissingTabs(placed, "t1")[1]).toEqual({ ref: id("a"), group: "g1" });
+  });
+
+  it("hands an untabbed form's array straight back, unchanged and identical", () => {
+    const placed = rows("a", "b");
+    expect(fillMissingTabs(placed, undefined)).toBe(placed);
+  });
+
+  it("keeps the array's identity when nothing is missing, so a no-op drag writes nothing", () => {
+    const placed: DraftViewEntry[] = [{ ref: id("a"), tab: "t1" }];
+    expect(fillMissingTabs(placed, "t1")).toBe(placed);
+  });
+});
+
+describe("setEntryGroup keeps a group and a tab from meeting on one entry", () => {
+  it("clears the entry's own tab when it takes a group", () => {
+    expect(setEntryGroup({ ref: id("a"), tab: "t1" }, "g1", "t1")).toEqual({ ref: id("a"), group: "g1" });
+  });
+
+  it("writes the shown tab when the group is cleared on a tabbed form", () => {
+    expect(setEntryGroup({ ref: id("a"), group: "g1" }, undefined, "t2")).toEqual({ ref: id("a"), tab: "t2" });
+  });
+
+  it("writes no tab when the group is cleared on an untabbed form", () => {
+    expect(setEntryGroup({ ref: id("a"), group: "g1" }, undefined, undefined)).toEqual({ ref: id("a") });
+  });
+
+  it("reads an empty group as no group at all, the way the renderer does", () => {
+    expect(setEntryGroup({ ref: id("a"), group: "g1" }, "", "t2")).toEqual({ ref: id("a"), tab: "t2" });
+  });
+
+  it("leaves every other key of the entry standing", () => {
+    expect(setEntryGroup({ kind: "note", text: { en: "hi" }, span: 2, tab: "t1" }, "g1", "t1")).toEqual({
+      kind: "note",
+      text: { en: "hi" },
+      span: 2,
+      group: "g1",
+    });
   });
 });

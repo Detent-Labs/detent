@@ -92,6 +92,7 @@ Every other term below belongs to one tab.
 | Forms tab | the tab holding one card per step that declares a view | `panels/FormsTab.tsx` |
 | form card | one bordered plate on the Forms tab. It carries a kicker, a label, a count and a miniature | `panels/formCardRows.ts` |
 | form preview | the form editor's right pane, mounting the renderer a participant meets | `panels/FormPreview.tsx` |
+| form tab strip | the row of a step form's own tabs, above the form canvas | `panels/FormTabStrip.tsx` |
 | checks rail | the validation issue list, grouped by check | `panels/ChecksRail.tsx` |
 
 The tab row replaced the ribbon over the bench. Seven words went with it:
@@ -117,6 +118,11 @@ the form editor's own field list (`screens/FormEditorScreen.tsx`), whose
 field catalog's own editor. It stands apart from the register tab, the shell's
 own header label. It stands apart from a tab on the tab row as well. All three
 are tab patterns, and each keeps its own name.
+
+**tab row** still names one thing only: the process surface's row of ten
+(`panels/ProcessTabRow.tsx`). The strip above the form canvas is the *form tab
+strip*. The participant meets that same strip inside `FieldForm`, drawn from
+the same `view.tabs`, and it takes the same name.
 
 The step page has no tab row of its own. Its two columns of open sections
 take the place of one.

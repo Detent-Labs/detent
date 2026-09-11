@@ -1451,6 +1451,11 @@ components:
             the matching `ViewField.span` and 1 when the view declares none.
             This is the declared span, not the drawn one — the renderer clamps
             it to the view's own column count.
+        tab:
+          type: string
+          description: >-
+            The matching `ViewField.tab`, or absent when it declares none.
+            Layout only, mirroring how `group` already resolves.
       required: [field, required, readonly, span]
 
     ResolvedViewNote:
@@ -1471,7 +1476,23 @@ components:
             the matching `ViewNote.span` and 1 when the view declares none.
             This is the declared span, not the drawn one — the renderer
             clamps it to the view's own column count.
+        tab:
+          type: string
+          description: See `ResolvedViewField.tab`.
       required: [kind, text]
+
+    ResolvedViewTab:
+      type: object
+      description: >-
+        One member of a resolved view's tab strip: the authored `key` plus
+        its `label`, left unresolved for the caller's own locale — the same
+        way a note's `text` is left unresolved.
+      properties:
+        key:
+          type: string
+        label:
+          $ref: "#/components/schemas/LocalizedText"
+      required: [key, label]
 
     AvailablePath:
       type: object
@@ -1521,6 +1542,14 @@ components:
           type: integer
           enum: [1, 2]
           description: The step view's column count, 1 when the view declares none.
+        tabs:
+          type: array
+          items:
+            $ref: "#/components/schemas/ResolvedViewTab"
+          description: >-
+            The step view's `tabs`, in declaration order, or an empty array
+            when the view declares none. Reports regardless of `status`, the
+            same way `columns` does.
         assignment:
           type: object
           allOf:
@@ -1530,7 +1559,7 @@ components:
           type: string
           format: date-time
           description: Set when data retention has redacted this instance's payload.
-      required: [instanceId, processId, version, status, step, fields, availablePaths, columns]
+      required: [instanceId, processId, version, status, step, fields, availablePaths, columns, tabs]
 
     InstanceSummary:
       type: object

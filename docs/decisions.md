@@ -108,17 +108,20 @@ stage-by-stage status.
   `body` canonical, which the read path needs, since it parses the whole jsonb
   back into an `Instance`. Shrinking `body` is a separate and much larger
   question, and nothing today asks for it.
-- Four more display-element shapes for the `view`: a chart, a read-only table,
-  a markup block and a tab panel. `openspec/changes/archive/2026-08-30-field-model-type-format-control/field-model-redesign.md` records this
-  as S2 and assigns it change 3, which shipped the first of the five, the
+- Three more display-element shapes for the `view`: a chart, a read-only
+  table and a markup block. `openspec/changes/archive/2026-08-30-field-model-type-format-control/field-model-redesign.md` records this
+  as S2 and assigns it change 3, which shipped the first of five, the
   note (`field-model-view-note`, `ViewNote`/`ViewEntry` in
-  `src/schema/definition.ts`). The remaining four wait on their own design:
+  `src/schema/definition.ts`). The remaining three wait on their own design:
   each is one more `ViewEntry` union member, and each needs its own decision
   of what config it carries (a table names which fields form its columns; a
   chart names a data source and an axis mapping; markup needs a decision on
-  whether it accepts anything beyond plain text; a tab panel groups other
-  entries under a label, so it nests rather than sitting flat like the other
-  four). Nothing is designed yet for any of the four.
+  whether it accepts anything beyond plain text). Nothing is designed yet for
+  any of the three.
+
+  `field-model-redesign.md` also parked a fifth shape here, a tab panel.
+  This change answers it with a view-level `tabs` list instead of the
+  nesting `ViewEntry` member the record above described.
 - Studio's native `<dialog>` confirm dialogs do not fully hold a keyboard
   user inside them. `stylex-phase-3-studio`'s own task 11.5 keyboard walk
   found two gaps, both pre-existing and unrelated to that phase's CSS-only

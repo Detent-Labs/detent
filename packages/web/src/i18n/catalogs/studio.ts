@@ -297,6 +297,21 @@ export const en = {
   "formEditor.noteType": "note",
   "formEditor.emptyNote": "(empty note)",
 
+  // The form's own tab strip, above the canvas. "tab" is the picker's label
+  // beside "group" and "span", and stays lowercase with them: all three name
+  // the JSON key they write.
+  "formEditor.tabRowLabel": "Form tabs",
+  "formEditor.addTab": "Add a tab",
+  "formEditor.renameTab": "Rename",
+  "formEditor.moveTabLeft": "Move left",
+  "formEditor.moveTabRight": "Move right",
+  "formEditor.removeTab": "Remove tab",
+  "formEditor.tabName": "Tab name",
+  "formEditor.newTabName": "New tab",
+  "formEditor.unnamedTab": "(unnamed tab)",
+  "formEditor.tab": "tab",
+  "formEditor.tabFromGroup": "The group decides the tab.",
+
   // The condition builder. "guard", "visible"/"required"/"readonly" and the CEL
   // operators stay untranslated, per this file's header: they name the JSON the
   // author is editing.
@@ -394,6 +409,9 @@ export const en = {
   // (`studio-form-editor`).
   "formPreview.heading": "What a participant meets",
   "formPreview.submit": "Submit",
+  // The strip inside the preview, named apart from the authoring strip above
+  // it: one form-editor screen draws both over the same tab labels.
+  "formPreview.formTabsLabel": "Form tabs in the preview",
 
   "columnMapping.heading": "Column mapping",
   "columnMapping.noColumns": "This list declares no column, so there is nothing to map.",
@@ -579,6 +597,12 @@ export const en = {
   "headerBar.jsonLeave": "Leave the JSON surface",
   "headerBar.versions": "Versions",
   "headerBar.player": "Player",
+
+  // The Player screen. Its own strings are still mostly inline English; this
+  // one is a catalog key because it is an accessible name.
+  "player.formTabsLabel": "Form tabs",
+  "player.formTabOpenedOne": "Opened the {tab} tab. 1 field still needs an entry.",
+  "player.formTabOpenedMany": "Opened the {tab} tab. {count} fields still need an entry.",
 
   "checksRail.heading": "Checks",
   "checksRail.heldBack": "Held back until earlier checks pass.",
