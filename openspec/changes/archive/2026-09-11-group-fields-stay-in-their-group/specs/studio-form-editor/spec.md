@@ -519,7 +519,6 @@ disable. The developer keeps a path to uncheck either one.
 - **THEN** the strip shows `visible` and `span`
 - **AND** the strip shows no `required` or `readonly` control
 
-
 #### Scenario: A field's strip offers no group control
 
 - **WHEN** the developer selects a placed field the catalog nests inside
