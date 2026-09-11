@@ -23,7 +23,7 @@
 - [x] 4.3 Reach the outbox row's control through a draft `http.request` action to a refused host
 - [x] 4.4 Run the walk on the production build in both schemes, reading computed color and border
 - [x] 4.5 Copy `.claude/skills/impeccable/` from the main checkout, then run critique and audit fresh
-- [ ] 4.6 Add hover and pressed to the walk, measured on three controls in both schemes
+- [x] 4.6 Add hover and pressed to the walk, measured on three controls in both schemes
 
 ## 5. Verification
 
