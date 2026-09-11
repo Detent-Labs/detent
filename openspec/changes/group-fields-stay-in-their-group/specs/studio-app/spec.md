@@ -228,6 +228,15 @@ SHALL lose its `tab`.
 On a form declaring no tabs, the rewrite SHALL write no `tab`. Every note
 SHALL keep its `tab` as it stood.
 
+A group's first key can reach a view that carries a child's entry and lacks
+the group's own card. That view SHALL gain the card, placed immediately
+before its first child entry. Every missing ancestor card SHALL come with it,
+outermost first. A view already carrying the card SHALL gain no second one.
+
+On a tabbed view the outermost placed card SHALL take the tab the first child
+carried. Every child then sits inside that card, whatever tab it named before
+the key changed.
+
 The definition contract already refuses a body whose entry names a group key
 no field declares. Before this requirement, renaming a group produced exactly
 that body. The author then met the error at publish, with nothing naming the
@@ -282,3 +291,35 @@ rename.
 - **WHEN** a step view declaring no tabs carries a group's card and a member
 - **AND** the developer clears that group's key
 - **THEN** the member's entry has no `tab`
+
+#### Scenario: A group's first key brings its card to a form lacking it
+
+- **WHEN** a step view carries a key-less group's child field and lacks the
+  group's card
+- **AND** the developer gives the group its first key
+- **THEN** that view carries the group's card immediately before the child's
+  entry
+
+#### Scenario: A first key's card takes the first child's tab
+
+- **WHEN** a tabbed step view carries two children of a key-less group, on
+  different tabs
+- **AND** that view lacks the group's card
+- **AND** the developer gives the group its first key
+- **THEN** the placed card names the tab of the child that comes first in the
+  view
+- **AND** both children sit inside it, with no `tab` of their own
+
+#### Scenario: A first key on a nested group brings the whole chain
+
+- **WHEN** a key-less group sits inside a keyed group in the catalog
+- **AND** a step view carries the inner group's child field and neither card
+- **AND** the developer gives the inner group its first key
+- **THEN** that view carries the outer card, then the inner card naming the
+  outer key, then the child's entry
+
+#### Scenario: A first key places no second card
+
+- **WHEN** a step view already carries a key-less group's card and its child
+- **AND** the developer gives the group its first key
+- **THEN** that view still carries exactly one card for that group

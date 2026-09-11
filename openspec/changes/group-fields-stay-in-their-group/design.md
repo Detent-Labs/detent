@@ -140,6 +140,9 @@ parent, so it follows by its old key. It follows only when both keys are
 non-empty and no other group holds either. Otherwise the note keeps the old
 key, and the checks rail reports it.
 
+A group's first key places the group's card on a form carrying a child without
+it. It uses the same `missingAncestorCards` walk.
+
 A group's key input holds the typed text and commits it on blur or Enter.
 Ordinary typing therefore never hands the rewrite a half-typed key, which
 could equal another group's key. Nothing writes `group: ""`.
