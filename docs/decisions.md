@@ -1472,6 +1472,43 @@ each entry carries the anchor that holds today. All nine stay open.
   from one actor issues one grant query each. The review calls it documented
   and correctly bounded, and recommends nothing.
 
+## Open from the 2026-09-11 steps rail review (each needs its own OpenSpec change)
+
+Six findings from the critique and the audit that ran beside
+`steps-rail-rows-drop-summary-line`. That change caused none of them and fixed
+none of them. Each one was read off the tree at 432bb3aa. The tags below are
+local to this section.
+
+- **RAIL-1: a move control leaves a reachable row in place.** The rail orders
+  reachable non-end steps by a breadth-first walk. That order comes from
+  `registerOrder`, which reads the graph rather than the array. The move
+  control swaps two entries in the draft's own steps array, which the canvas
+  traversal and the serialized definition both read. An end step and an
+  unreachable step follow the swap; a reachable step keeps its place.
+  Risk (Medium): the control stands enabled on every row, and most clicks
+  show no change.
+- **RAIL-2: a move control is 26px wide.** The button pads an 18px icon by
+  4px on each side, in the `move` style of `StepsRail.tsx`. Its height
+  follows the row. Risk (Low): that width clears the 24px minimum target and
+  misses the 44px enhanced one.
+- **RAIL-3: the rail clips its own focus ring.** The rail scrolls on its
+  block axis, and a scroll container on one axis clips the other. The shell
+  draws a 2px ring at a 2px offset, in `global.css`. Risk (Low): the ring's
+  leading edge falls outside the rail's box and disappears.
+- **RAIL-4: a move control names no step.** Each one carries the icon alone,
+  labelled "Move earlier" or "Move later". Every row repeats that pair.
+  Risk (Low): a screen reader reads one identical pair per row, and
+  `design-language.md` asks a label to sit beside an icon.
+- **RAIL-5: the issue badge marks severity by colour alone.** A blocker takes
+  the refusal ink and an advisory the muted ink, in `StepsRail.tsx`. The
+  label behind the count omits the severity. Risk (Medium): colour is the
+  only carrier, which WCAG 1.4.1 refuses.
+- **RAIL-6: the desktop rail is narrower than the phone rail.** The Steps tab
+  gives the rail 18rem beside the step page, in `EditScreen.tsx`. Below 64rem
+  the rail takes the full width and caps its height at 20rem.
+  Risk (Informational): a long label wraps on a wide screen and fits on a
+  narrow one.
+
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 
 Each entry below names a cut somebody proposed, the reason a reviewer refused
