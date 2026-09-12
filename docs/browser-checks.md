@@ -3311,3 +3311,37 @@ and Delete list turns disabled. That version stays, so walk this control last,
 on a database you can reseed.
 
 Discard every draft the walk created before you finish.
+
+### Steps rail rows without a summary line (`steps-rail-rows-drop-summary-line`)
+
+Each rail row dropped its grey summary line under the label. A row now
+shows a number, a label and its move controls. No `bun:test` assertion sees
+a row's visual layout, so this check lands here.
+
+Build the production bundle and open it on the engine's own port. Seed the
+database, then sign in as `demo-superuser@example.test`, password
+`seed-demo-password`. The account holds every role the studio needs.
+
+In the Processes list, find the row `it_offboarding` and choose "Create
+draft". Studio opens the draft at
+`/studio/processes/<id>/edit`. Choose the Steps tab, at
+`/studio/processes/<id>/edit/steps`. Resize the window to 1440px wide.
+
+Pass: each row shows its number, label, "Move earlier" and "Move later",
+with no summary line under it.
+
+In the rail's foot, under "Add", choose "Add a call to another process".
+Pass: the new row's issue badge sits at its trailing edge, showing a
+number. Read its `aria-label` in the inspector: pass if it reads that same
+number with "open issue" or "open issues".
+
+Select a step. Type "Process offboarding equipment and revoke every system
+access" into its LABEL field on the step page. That is 60 characters.
+Pass: the label wraps inside its rail row instead of overflowing it.
+
+Narrow the window to 420px wide. Pass: the rail stands above the step page,
+capped at 20rem tall, and scrolls inside that cap. Every row still shows
+its number, label and move controls, and none show a summary line.
+
+Choose "Discard draft" in the header bar. In the "Discard this draft"
+dialog, choose its own "Discard draft" to leave no draft behind.

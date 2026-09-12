@@ -8,13 +8,13 @@ import { registerOrder } from "../src/areas/studio/draft/registerOrder.js";
 import { StepsRail } from "../src/areas/studio/panels/StepsRail.js";
 
 /**
- * The Steps tab's leading column (`studio-step-page`: "The steps rail numbers
- * every step in reachability order", "A rail row carries its own open issue
+ * The Steps tab's leading column (`studio-step-page`: "The steps rail lists
+ * each step by number and label", "A rail row carries its own open issue
  * count", "The rail reorders steps and adds new ones").
  *
  * `development-toolchain`'s split rule sends these to assertions: the row
- * order, the numbers, the summary lines, the badge and the disabled state of
- * each end control are all properties of the rendered string.
+ * order, the numbers, the badge and the disabled state of each end control
+ * are all properties of the rendered string.
  *
  * `StepsRail` reads `draft`, `validation` and `contentLocale` off
  * `useDraft()`, which reads `useContext(DraftContext)` — never a live
@@ -89,10 +89,6 @@ const DRAFT = {
   },
 } as unknown as Draft;
 
-const PROCESSES = [
-  { processId: "proc_credit", version: 1, definitionHash: "h", key: "credit", label: { en: "Credit check" }, baseLocale: "en" },
-] as never[];
-
 function render(over: { current?: string; issues?: EditorIssue[]; draft?: Draft } = {}): string {
   return renderToStaticMarkup(
     <DraftContext.Provider value={contextValue(over.draft ?? DRAFT, over.issues ?? [])}>
@@ -101,7 +97,6 @@ function render(over: { current?: string; issues?: EditorIssue[]; draft?: Draft 
         onSelectStep={() => {}}
         onReorder={() => {}}
         onAddStep={() => {}}
-        processes={PROCESSES}
       />
     </DraftContext.Provider>,
   );
@@ -110,6 +105,13 @@ function render(over: { current?: string; issues?: EditorIssue[]; draft?: Draft 
 /** Every `<button ...>` open tag in a rendered string, in DOM order. */
 function buttonTags(html: string): string[] {
   return html.match(/<button[^>]*>/g) ?? [];
+}
+
+/** Every rendered rail row, one `<li>…</li>` per step, with every tag
+ * stripped. A move control's name sits in an attribute, so the strip removes
+ * it. */
+function rowTexts(html: string): string[] {
+  return (html.match(/<li[^>]*>[\s\S]*?<\/li>/g) ?? []).map((row) => row.replace(/<[^>]+>/g, ""));
 }
 
 describe("The steps rail's order and numbering", () => {
@@ -160,20 +162,17 @@ describe("A steps rail row selects rather than discloses", () => {
   });
 });
 
-describe("A steps-rail row's summary line", () => {
-  it("names who works a task step and how many fields its form carries", () => {
-    const html = render();
-
-    expect(html).toContain("Everyone in a group");
-    expect(html).toContain("2 form fields");
+describe("A steps-rail row carries only its number and label", () => {
+  it("gives a task row its number and label, and no assignment or field count", () => {
+    expect(rowTexts(render())[0]).toBe("1Intake");
   });
 
-  it("names the process a subprocess step calls", () => {
-    expect(render()).toContain("Calls Credit check");
+  it("gives a call row its number and label, and no process name", () => {
+    expect(rowTexts(render())[1]).toBe("2Credit check");
   });
 
-  it("names an end step's outcome", () => {
-    expect(render()).toContain("Ends as approved");
+  it("gives an end row its number and label, and no outcome", () => {
+    expect(rowTexts(render())[2]).toBe("3Done");
   });
 });
 

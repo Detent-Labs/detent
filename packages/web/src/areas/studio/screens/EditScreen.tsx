@@ -315,8 +315,7 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, go, initial
   const [changesCount, setChangesCount] = useState<number | undefined>(undefined);
   const onChangesCount = useCallback((count: number | undefined) => setChangesCount(count), []);
   // The processes a subprocess step may call. One fetch per mount, read by
-  // the steps rail's summary line and by the step page's own picker, so the
-  // two cannot name one process differently.
+  // the step page's own picker.
   const processes = useFetchOnce(token, listProcesses);
   const fields = draftFields(draft);
 
@@ -883,7 +882,6 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, go, initial
                 onSelectStep={(target) => onSelectStep(target)}
                 onReorder={onReorderStep}
                 onAddStep={onAddStep}
-                processes={processes ?? []}
               />
               <StepPage
                 fields={fields}
