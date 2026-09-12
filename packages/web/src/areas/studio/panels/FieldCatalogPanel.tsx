@@ -26,9 +26,9 @@ import { LocalizedTextInput } from "./shared/LocalizedTextInput";
 import { FieldValidationEditor } from "./shared/FieldValidationEditor";
 import { DefaultValueEditor } from "./shared/DefaultValueEditor";
 import { fieldLocaleGaps, missingTranslationWarning, resolveDraftLocalizedText, seedLocalizedText } from "../draft/localized-text";
-import { draftFields } from "../draft/fields";
+import { draftFields, flattenDraftFields } from "../draft/fields";
 import { writeGroupKey, writeGroupLabel } from "../draft/view-group-sync.js";
-import { droppedByKindChange, nextFieldKey } from "./fieldCatalogLogic.js";
+import { droppedByKindChange, moveControlId, moveTargetsFor, nextFieldKey } from "./fieldCatalogLogic.js";
 import { fieldCheckZone, type FieldCheckZone } from "./fieldCheckZone.js";
 import { fieldKindLabel } from "../draft/field-type-labels";
 import {
@@ -503,6 +503,55 @@ function KindPicker({ field, onChange }: { field: DraftField; onChange: (patch: 
   );
 }
 
+interface MoveFieldControlProps {
+  fieldId: string;
+  /** The catalog's own top-level array, `draft.fields ?? []`. `moveTargetsFor`
+   * walks the whole tree from there, regardless of `fieldId`'s own depth. */
+  fields: DraftField[];
+  contentLocale: string;
+  baseLocale: string;
+  onMoveField: (fieldId: string, targetGroupId: string | undefined) => void;
+}
+
+/**
+ * The keyboard half of the move (`spa-accessibility`): the field's own
+ * editor names every destination the rail's drag reaches, the top level
+ * included, and writes through the one function the drag also calls
+ * (`EntityTabs.tsx`'s `FieldsTab::moveField`, threaded here as
+ * `onMoveField`). Rendered like the key beside it, a `fieldRowLabel` label
+ * around the control (design.md, decision: "The move control leaves the
+ * rail for the editor").
+ *
+ * Disabled with fewer than two destinations: a field with nowhere else to go
+ * has nothing for the control to offer.
+ */
+export function MoveFieldControl({ fieldId, fields, contentLocale, baseLocale, onMoveField }: MoveFieldControlProps) {
+  const { currentId, targetIds } = moveTargetsFor(fields, fieldId);
+  const flat = flattenDraftFields(fields);
+  const targetLabel = (targetId: string | undefined) => {
+    if (targetId === undefined) return t("panelsScreen.moveTargetTopLevel");
+    const target = flat.find((f) => f.id === targetId);
+    return resolveDraftLocalizedText(target?.label, contentLocale, baseLocale) || t("panelsScreen.unnamedField");
+  };
+  return (
+    <label {...stylex.props(styles.fieldRowLabel)}>
+      {t("panelsScreen.moveTargetLabel")}
+      <select
+        id={moveControlId(fieldId)}
+        disabled={targetIds.length < 2}
+        value={currentId ?? ""}
+        onChange={(e) => onMoveField(fieldId, e.target.value === "" ? undefined : e.target.value)}
+      >
+        {targetIds.map((targetId) => (
+          <option key={targetId ?? ""} value={targetId ?? ""}>
+            {targetLabel(targetId)}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 interface SubFieldRowProps {
   field: DraftField;
   dataSources: DraftDataSource[];
@@ -514,6 +563,10 @@ interface SubFieldRowProps {
   mutate: Mutate;
   onChange: (patch: Partial<DraftField>) => void;
   onRemove: () => void;
+  /** The move's write, threaded down from `FieldsTab::moveField` through
+   * `FieldCatalogPanel` and `FieldEditor`. Passed on to a nested `SubFieldRow`
+   * unchanged, so a group inside a group reaches the same one write. */
+  onMoveField: (fieldId: string, targetGroupId: string | undefined) => void;
 }
 
 /**
@@ -525,7 +578,7 @@ interface SubFieldRowProps {
  * It keeps its own check list (`IssueList` below). A child row is not the
  * selected field, and the halves' zones describe the selected field alone.
  */
-function SubFieldRow({ field, dataSources, lists, mutate, onChange, onRemove }: SubFieldRowProps) {
+function SubFieldRow({ field, dataSources, lists, mutate, onChange, onRemove, onMoveField }: SubFieldRowProps) {
   const { draft, contentLocale } = useDraft();
   const baseLocale = draft.baseLocale ?? "en";
   /** Deduped against the whole catalog, not just this group's own children
@@ -610,6 +663,15 @@ function SubFieldRow({ field, dataSources, lists, mutate, onChange, onRemove }: 
         {t("fieldCatalog.keyLabel")}
         <FieldKeyInput field={field} mutate={mutate} onChange={onChange} />
       </label>
+      {field.id !== undefined && (
+        <MoveFieldControl
+          fieldId={field.id}
+          fields={draft.fields ?? []}
+          contentLocale={contentLocale}
+          baseLocale={baseLocale}
+          onMoveField={onMoveField}
+        />
+      )}
       <label {...stylex.props(styles.fieldRowLabel)}>
         {t("fieldCatalog.labelLabel")}
         <LocalizedTextInput value={field.label} onChange={updateLabel} />
@@ -764,7 +826,7 @@ function SubFieldRow({ field, dataSources, lists, mutate, onChange, onRemove }: 
 
       <FieldValidationEditor field={field} validation={field.validation} onChange={(validation) => onChange({ validation })} />
 
-      {field.type === "group" && (
+      {(isGroup || (field.fields?.length ?? 0) > 0) && (
         <fieldset>
           <legend>{t("fieldCatalog.subFieldsLegend")}</legend>
           {(field.fields ?? []).map((sub, i) => (
@@ -776,11 +838,17 @@ function SubFieldRow({ field, dataSources, lists, mutate, onChange, onRemove }: 
               mutate={mutate}
               onChange={(patch) => updateSubField(i, patch)}
               onRemove={() => removeSubField(i)}
+              onMoveField={onMoveField}
             />
           ))}
-          <button type="button" className="btn btn-secondary" onClick={addSubField}>
-            {t("fieldCatalog.addSubField")}
-          </button>
+          {/* A parent `changeKind` rewrote out of `group` keeps its
+              children (`fieldCatalogLogic.ts::moveFieldToGroup`'s own
+              comment), but it names no group to add a new one into. */}
+          {isGroup && (
+            <button type="button" className="btn btn-secondary" onClick={addSubField}>
+              {t("fieldCatalog.addSubField")}
+            </button>
+          )}
         </fieldset>
       )}
 
@@ -845,6 +913,10 @@ interface FieldEditorProps {
   onChange: (patch: Partial<DraftField>) => void;
   onRemove: () => void;
   onShowStep: (stepId: string) => void;
+  /** The move's one write (`EntityTabs.tsx`'s `FieldsTab::moveField`),
+   * threaded through `FieldCatalogPanel`. Renders as this field's own move
+   * control, and passes on to a group's `SubFieldRow` children unchanged. */
+  onMoveField: (fieldId: string, targetGroupId: string | undefined) => void;
 }
 
 /**
@@ -869,6 +941,7 @@ function FieldEditor({
   onChange: writeField,
   onRemove,
   onShowStep,
+  onMoveField,
 }: FieldEditorProps) {
   const { draft, mutate, contentLocale, validation } = useDraft();
 
@@ -1045,6 +1118,15 @@ function FieldEditor({
               {t("fieldCatalog.keyLabel")}
               <FieldKeyInput field={field} mutate={mutate} onChange={onChange} onWrite={() => setDefinitionWrites((n) => n + 1)} />
             </label>
+            {fieldId !== undefined && (
+              <MoveFieldControl
+                fieldId={fieldId}
+                fields={draft.fields ?? []}
+                contentLocale={contentLocale}
+                baseLocale={baseLocale}
+                onMoveField={onMoveField}
+              />
+            )}
           </Zone>
 
           <Zone heading={t("fieldCatalog.whatKindHeading")} issues={zoned("kind")} bordered>
@@ -1129,7 +1211,7 @@ function FieldEditor({
             <FieldValidationEditor field={field} validation={field.validation} onChange={(validation) => onChange({ validation })} />
           </Zone>
 
-          {isGroup && (
+          {(isGroup || (field.fields?.length ?? 0) > 0) && (
             <fieldset>
               <legend>{t("fieldCatalog.groupChildrenHeading")}</legend>
               {(field.fields ?? []).map((sub, i) => (
@@ -1141,11 +1223,17 @@ function FieldEditor({
                   mutate={mutate}
                   onChange={(patch) => updateSubField(i, patch)}
                   onRemove={() => removeSubField(i)}
+                  onMoveField={onMoveField}
                 />
               ))}
-              <button type="button" className="btn btn-secondary" onClick={addSubField}>
-                {t("fieldCatalog.addSubField")}
-              </button>
+              {/* A parent `changeKind` rewrote out of `group` keeps its
+                  children (`fieldCatalogLogic.ts::moveFieldToGroup`'s own
+                  comment), but it names no group to add a new one into. */}
+              {isGroup && (
+                <button type="button" className="btn btn-secondary" onClick={addSubField}>
+                  {t("fieldCatalog.addSubField")}
+                </button>
+              )}
             </fieldset>
           )}
 
@@ -1344,9 +1432,12 @@ interface Props {
   onAdd: () => void;
   onRemove: (index: number) => void;
   onShowStep: (stepId: string) => void;
+  /** The move's one write (`EntityTabs.tsx`'s `FieldsTab::moveField`),
+   * forwarded to `FieldEditor` as its own `onMoveField`. */
+  onMoveField: (fieldId: string, targetGroupId: string | undefined) => void;
 }
 
-export function FieldCatalogPanel({ token, selectedId, focusFieldId, onAdd, onRemove, onShowStep }: Props) {
+export function FieldCatalogPanel({ token, selectedId, focusFieldId, onAdd, onRemove, onShowStep, onMoveField }: Props) {
   const { draft, mutate, contentLocale } = useDraft();
   const fields = draft.fields ?? [];
   const dataSources = draft.dataSources ?? [];
@@ -1406,6 +1497,7 @@ export function FieldCatalogPanel({ token, selectedId, focusFieldId, onAdd, onRe
         onChange={updateField}
         onRemove={() => onRemove(index)}
         onShowStep={onShowStep}
+        onMoveField={onMoveField}
       />
       <button type="button" className="btn btn-secondary" onClick={onAdd}>
         {t("fieldCatalog.addField")}
