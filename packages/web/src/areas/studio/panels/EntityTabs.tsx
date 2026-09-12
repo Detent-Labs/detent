@@ -12,7 +12,7 @@ import { addToDraftArray } from "../draft/draft-array-crud";
 import { resolveDraftLocalizedText, seedLocalizedText } from "../draft/localized-text";
 import { flattenDraftFields } from "../draft/fields";
 import { fieldKindIcon, fieldKindWord } from "../draft/field-type-labels";
-import { appendToGroup, fieldLabelInputId, moveControlId, moveFieldToGroup, parentIdOf, railEntryId } from "./fieldCatalogLogic";
+import { appendToGroup, fieldLabelInputId, moveControlId, moveFieldToGroup, neighbourAfterRemove, parentIdOf, railEntryId, removeFieldIn } from "./fieldCatalogLogic";
 import { flattenRailFields, issueCountForEntityId } from "../draft/panel-rail";
 import { moveFieldAndSyncViews } from "../draft/view-group-sync";
 import { FieldCatalogPanel } from "./FieldCatalogPanel";
@@ -344,13 +344,20 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
     setSelectedFieldId(newId);
   };
 
-  const removeField = (index: number) => {
-    const fields = draft.fields ?? [];
-    const neighbor = fields[index + 1] ?? fields[index - 1];
+  /**
+   * Removes the field at any depth through `removeFieldIn`, and selects
+   * `neighbourAfterRemove`'s answer: the next sibling, then the previous
+   * sibling, then the parent group (design.md: "Remove selects a sibling,
+   * then the group"). Reads the neighbour from the draft in this closure
+   * before the `mutate` call below, since the store applies that recipe
+   * later and the draft here still holds the field being removed.
+   */
+  const removeField = (fieldId: string) => {
+    const neighbor = neighbourAfterRemove(draft.fields ?? [], fieldId);
     mutate((d) => {
-      d.fields?.splice(index, 1);
+      d.fields = removeFieldIn(d.fields ?? [], fieldId);
     });
-    setSelectedFieldId(neighbor?.id);
+    setSelectedFieldId(neighbor);
   };
 
   const fieldWord = (fieldId: string | undefined) => {
@@ -361,9 +368,9 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
 
   /**
    * The one write both gestures reach (a keyboard move must not become a
-   * second write path beside the drag). It re-hangs the field, keeps it
-   * selected through its new top-level ancestor, announces where it landed,
-   * and hands focus back to the field's own move control in its editor.
+   * second write path beside the drag). It re-hangs the field, keeps the
+   * moved field itself selected, announces where it landed, and hands focus
+   * back to the field's own move control in its editor.
    */
   const moveField = (fieldId: string, targetGroupId: string | undefined) => {
     const fields = draft.fields ?? [];
@@ -377,13 +384,11 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
     // (`view-group-sync.ts::moveFieldAndSyncViews`).
     mutate((d) => moveFieldAndSyncViews(d, fieldId, targetGroupId));
 
-    // Read the new place off the moved tree, not off the target argument: a
-    // move into a nested group makes some ancestor the top-level row, and that
-    // ancestor is what the selection has to name.
-    const landed = flattenRailFields(next).find((row) => row.id === fieldId);
-    if (landed) {
-      setSelectedFieldId(landed.rootId);
-    }
+    // The moved field stays selected, under whichever parent it landed in.
+    // Its own editor stays mounted across the move, since its key does not
+    // change, so the move control the refocus effect targets below is still
+    // there to take focus back.
+    setSelectedFieldId(fieldId);
     setAnnouncement(
       targetGroupId === undefined
         ? t("panelsScreen.movedToTopLevel").replace("{field}", fieldWord(fieldId)).replace("{group}", fieldWord(fromGroupId))

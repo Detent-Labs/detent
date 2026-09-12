@@ -1407,7 +1407,7 @@ interface Props {
    * catalog holds none at all — the screen otherwise keeps it resolved. */
   selectedId: string | undefined;
   onAdd: (groupId?: string) => void;
-  onRemove: (index: number) => void;
+  onRemove: (fieldId: string) => void;
   onShowStep: (stepId: string) => void;
   /** The move's one write (`EntityTabs.tsx`'s `FieldsTab::moveField`),
    * forwarded to `FieldEditor` as its own `onMoveField`. */
@@ -1471,7 +1471,10 @@ export function FieldCatalogPanel({ token, selectedId, onAdd, onRemove, onShowSt
         lists={lists}
         routeStepId={routeStepId}
         onChange={updateField}
-        onRemove={() => onRemove(index)}
+        onRemove={() => {
+          if (field.id === undefined) return;
+          onRemove(field.id);
+        }}
         onShowStep={onShowStep}
         onMoveField={onMoveField}
       />
