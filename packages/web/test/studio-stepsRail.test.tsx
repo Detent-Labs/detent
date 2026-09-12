@@ -4,12 +4,11 @@ import type { ValidationResult } from "../src/areas/studio/draft/validation.js";
 import type { Draft } from "../src/areas/studio/draft/types.js";
 import type { EditorIssue } from "../src/areas/studio/draft/issues.js";
 import { DraftContext, type DraftContextValue } from "../src/areas/studio/draft/store.js";
-import { registerOrder } from "../src/areas/studio/draft/registerOrder.js";
 import { StepsRail } from "../src/areas/studio/panels/StepsRail.js";
 
 /**
  * The Steps tab's leading column (`studio-step-page`: "The steps rail lists
- * each step by number and label", "A rail row carries its own open issue
+ * each step in the draft's own order", "A rail row carries its own open issue
  * count", "The rail reorders steps and adds new ones").
  *
  * `development-toolchain`'s split rule sends these to assertions: the row
@@ -89,6 +88,37 @@ const DRAFT = {
   },
 } as unknown as Draft;
 
+/** A second draft: `workflow.steps` runs call, end, task, while the paths run
+ * call to task to end. Proves the rail numbers rows by that array order, not
+ * by the walk from `initialStep` — the walk would reach the call directly and
+ * the end two hops down, ranking the end after the task instead of before
+ * it. */
+const ORDER_DRAFT = {
+  baseLocale: "en",
+  workflow: {
+    initialStep: "step_call",
+    steps: [
+      {
+        id: "step_call",
+        key: "check",
+        label: { en: "Credit check" },
+        type: "subprocess",
+        subprocess: { processId: "proc_credit" },
+        paths: [{ id: "path_1", to: "step_task" }],
+      },
+      { id: "step_end", key: "done", label: { en: "Done" }, type: "task", terminal: true, outcome: "approved" },
+      {
+        id: "step_task",
+        key: "intake",
+        label: { en: "Intake" },
+        type: "task",
+        assignment: { strategy: { type: "org.group-members", config: { groupId: "grp_1" } } },
+        paths: [{ id: "path_2", to: "step_end" }],
+      },
+    ],
+  },
+} as unknown as Draft;
+
 function render(over: { current?: string; issues?: EditorIssue[]; draft?: Draft } = {}): string {
   return renderToStaticMarkup(
     <DraftContext.Provider value={contextValue(over.draft ?? DRAFT, over.issues ?? [])}>
@@ -115,9 +145,9 @@ function rowTexts(html: string): string[] {
 }
 
 describe("The steps rail's order and numbering", () => {
-  it("lists every step of the draft, in the order `registerOrder` reads", () => {
+  it("renders a row for every step of the draft", () => {
     const html = render();
-    const expected = registerOrder(DRAFT.workflow?.steps, DRAFT.workflow?.initialStep).map((s) => s.label?.en as string);
+    const expected = (DRAFT.workflow?.steps ?? []).map((s) => s.label?.en as string);
 
     let cursor = -1;
     for (const name of expected) {
@@ -125,7 +155,12 @@ describe("The steps rail's order and numbering", () => {
       expect(at).toBeGreaterThan(cursor);
       cursor = at;
     }
-    expect(expected).toEqual(["Intake", "Credit check", "Done"]);
+  });
+
+  it("numbers the call one, the end two and the task three, when the array runs call, end, task", () => {
+    const rows = rowTexts(render({ draft: ORDER_DRAFT }));
+
+    expect(rows).toEqual(["1Credit check", "2Done", "3Intake"]);
   });
 
   it("numbers the rows from one", () => {

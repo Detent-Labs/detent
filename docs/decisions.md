@@ -1481,14 +1481,6 @@ They are `steps-rail-rows-drop-summary-line` on the Studio Steps tab,
 rest. Every item below sits outside the change that found it, and each was
 recorded rather than fixed. The RAIL tags are local to this section.
 
-- **RAIL-1: a move control leaves a reachable row in place.** The rail orders
-  reachable non-end steps by a breadth-first walk. That order comes from
-  `registerOrder`, which reads the graph rather than the array. The move
-  control swaps two entries in the draft's own steps array, which the canvas
-  traversal and the serialized definition both read. An end step and an
-  unreachable step follow the swap; a reachable step keeps its place.
-  Risk (Medium): the control stands enabled on every row, and most clicks
-  show no change.
 - **RAIL-2: a move control is 26px wide.** The button pads an 18px icon by
   4px on each side, in the `move` style of `StepsRail.tsx`. Its height
   follows the row. Risk (Low): that width clears the 24px minimum target and
@@ -1508,6 +1500,14 @@ recorded rather than fixed. The RAIL tags are local to this section.
 - **RAIL-6: the desktop rail is narrower than the phone rail.** The Steps tab
   gives the rail 18rem beside the step page, in `EditScreen.tsx`. Below 64rem
   the rail takes the full width and caps its height at 20rem.
+- **DRAFT-1: the header bar's Discard draft does nothing.** Choose it on a
+  draft's process surface, then choose the dialog's own Discard draft: the
+  dialog stays open, the draft survives, and the process list still lists it.
+  The console reports no error. Measured 2026-09-12 at 1440px and at 420px,
+  during a browser check for another change. The process list's own Discard
+  button does work, through a native browser confirm. Risk (High): the studio
+  has no undo, so an author who means to drop a draft keeps it, and the next
+  session reads that draft as current work.
   Risk (Informational): a long label wraps on a wide screen and fits on a
   narrow one.
 - **A canvas removal drops keyboard focus, and nothing announces it.**

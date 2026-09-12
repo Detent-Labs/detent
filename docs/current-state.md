@@ -4457,10 +4457,9 @@ meets `scope=started` should infer no new permission tier from it.
   `draft/checksRail.ts` decides blocker, advisory or clear, and only the
   blocker state colors the count.
 
-  The rail component `StepsRail.tsx` lists one numbered row per step. The
-  module `draft/registerOrder.ts` orders them by reachability from
-  `initialStep`, unreachable steps next, end steps last. The module
-  `panels/stepRailRow.ts` yields a row's issue badge.
+  The rail component `StepsRail.tsx` lists one numbered row per step, in the
+  draft's own `workflow.steps` order. A row's number names its place in that
+  array. The module `panels/stepRailRow.ts` yields a row's issue badge.
 
   The page component `StepPage.tsx` stands one step whole. A masthead holds
   the step number, the kind phrase, the name, the key and the description.
