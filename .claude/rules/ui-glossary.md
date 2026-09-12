@@ -76,7 +76,7 @@ Every other term below belongs to one tab.
 |---|---|---|
 | canvas | the graph surface an author draws a process on | `canvas/CanvasView.tsx` |
 | canvas bar | the row between the tab row and canvas: add controls, a reachability report, and selection controls | `canvas/CanvasBar.tsx` |
-| steps rail | the Steps tab's left column: one numbered row per step, in reachability order | `panels/StepsRail.tsx` |
+| steps rail | the Steps tab's left column: one numbered row per step, in the draft's own order | `panels/StepsRail.tsx` |
 | step page | the Steps tab's wide right column, editing the one selected step | `panels/StepPage.tsx` |
 | masthead | the step page's top zone. It holds the step number, the kind phrase, the name, the key, the description, and the issues no section claims | `panels/StepPage.tsx` |
 | section | one subject group on the step page, standing open in one of two columns | `panels/sectionsFor.ts` |

@@ -4,12 +4,11 @@ import type { DraftOf } from "./types";
 type DraftStep = DraftOf<Step>;
 
 /**
- * The role a step's stamp reads, in the steps register and in the
- * configuration pane's masthead (`studio-canvas`'s reachability-order and
- * masthead requirements).
+ * The role a step's stamp reads, on the Forms tab's cards and in the step
+ * page's masthead (`studio-canvas`'s masthead requirement).
  *
- * `initial` outranks the rest. A draft's `initialStep` is the one step the
- * register has to name before anything else, and a step is at most one of
+ * `initial` outranks the rest. A draft's `initialStep` is the one step a
+ * reader has to place before anything else, and a step is at most one of
  * these four.
  */
 export type StepRole = "initial" | "task" | "subprocess" | "end";
