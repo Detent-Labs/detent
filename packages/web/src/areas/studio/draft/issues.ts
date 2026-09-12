@@ -15,6 +15,21 @@ function findFieldById(fields: DraftField[] | undefined, id: string): DraftField
   return undefined;
 }
 
+/** The deepest field carrying an id that an index chain `fields[i].fields[j]`
+ * reaches. Stops at the first index the tree does not hold, so a chain
+ * through an id-less child still names the group above it. */
+function fieldAtPath(fields: DraftField[] | undefined, path: readonly number[]): DraftField | undefined {
+  let list = fields;
+  let found: DraftField | undefined;
+  for (const i of path) {
+    const f = list?.[i];
+    if (f === undefined) break;
+    if (f.id) found = f;
+    list = f.fields;
+  }
+  return found;
+}
+
 // "structural" covers src/schema/compile.ts's CompileValidationError — the
 // seven harden-publish-validation write-path checks (unknown keys, the
 // reserved action prefix, uncompilable/over-long patterns, unresolved
@@ -85,7 +100,7 @@ export function resolveLoc(
     : tokenize(loc);
 
   let stepIdx: number | undefined;
-  let fieldIdx: number | undefined;
+  const fieldPath: number[] = [];
   let fieldIdRef: string | undefined;
   let dataSourceIdx: number | undefined;
   let pathIdx: number | undefined;
@@ -103,7 +118,7 @@ export function resolveLoc(
         stepIdx = t.idx;
         break;
       case "fields":
-        if (fieldIdx === undefined && fieldIdRef === undefined) fieldIdx = t.idx;
+        if (fieldIdRef === undefined && t.idx !== undefined && (fieldPath.length === 0 || prevKey === "fields")) fieldPath.push(t.idx);
         break;
       case "dataSources":
         dataSourceIdx = t.idx;
@@ -136,9 +151,9 @@ export function resolveLoc(
         // "label"]`), never after one that already carried its own bracketed
         // index (e.g. `checkPatterns`' string-form
         // "fields[0].validation.pattern") — there the next segment
-        // ("validation") is a path segment, not a field id, and `fieldIdx`
-        // is already set from the "fields[0]" token itself.
-        if (prevKey === "fields" && fieldIdx === undefined && fieldIdRef === undefined) fieldIdRef = t.key;
+        // ("validation") is a path segment, not a field id, and `fieldPath`
+        // already holds an entry from the "fields[0]" token itself.
+        if (prevKey === "fields" && fieldPath.length === 0 && fieldIdRef === undefined) fieldIdRef = t.key;
         break;
     }
     prevKey = t.key;
@@ -173,7 +188,7 @@ export function resolveLoc(
 
   if (step?.id) return { entityType: "step", entityId: step.id };
 
-  const field = fieldIdRef !== undefined ? findFieldById(body.fields, fieldIdRef) : fieldIdx !== undefined ? body.fields?.[fieldIdx] : undefined;
+  const field = fieldIdRef !== undefined ? findFieldById(body.fields, fieldIdRef) : fieldAtPath(body.fields, fieldPath);
   if (field?.id) return { entityType: "field", entityId: field.id };
 
   const dataSource = dataSourceIdx !== undefined ? body.dataSources?.[dataSourceIdx] : undefined;
