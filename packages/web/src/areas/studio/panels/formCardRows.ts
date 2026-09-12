@@ -4,7 +4,6 @@ import type { DraftField } from "../draft/fields.js";
 import type { EditorIssue } from "../draft/issues.js";
 import { flattenDraftFields } from "../draft/fields.js";
 import { isDraftViewField, type DraftViewEntry } from "../draft/view-layout.js";
-import { registerOrder } from "../draft/registerOrder.js";
 import { resolveDraftLocalizedText } from "../draft/localized-text.js";
 import { roleStampFor, type StepRole } from "../draft/roleStamp.js";
 import { t } from "../catalog.js";
@@ -86,9 +85,9 @@ export function viewIssues(issues: readonly EditorIssue[], stepId: string): { co
 }
 
 /**
- * Every plate the Forms tab lays out, in the reachability order the steps
- * rail uses (`studio-forms-overview`: "The Forms tab carries one card per
- * step that asks for something").
+ * Every plate the Forms tab lays out, in the draft's own `workflow.steps`
+ * order, the same order the steps rail lists (`studio-forms-overview`: "The
+ * Forms tab carries one card per step that asks for something").
  *
  * A step declaring no view contributes no row. A step declaring an empty view
  * does contribute one: an empty form is a state an author has to see, and the
@@ -117,7 +116,7 @@ export function formCardRows(draft: Draft, issues: readonly EditorIssue[], conte
     };
   };
 
-  return registerOrder(draft.workflow?.steps, initialStep)
+  return (draft.workflow?.steps ?? [])
     .map(rowFor)
     .filter((row): row is FormCardRow => row !== undefined);
 }

@@ -1,13 +1,11 @@
 import * as stylex from "@stylexjs/stylex";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
-import type { ProcessSummary } from "../api/types.js";
 import { t } from "../catalog.js";
 import { useDraft } from "../draft/store.js";
-import { registerOrder } from "../draft/registerOrder.js";
 import { resolveDraftLocalizedText } from "../draft/localized-text.js";
 import type { StepKind } from "../draft/createStep.js";
-import { railRowIssues, railRowSummary } from "./stepRailRow.js";
+import { railRowIssues } from "./stepRailRow.js";
 
 /** The width below which the Steps tab stands one column, so the rail gives
  * up its own and caps its height instead of pushing the step page a screen
@@ -69,33 +67,21 @@ const styles = stylex.create({
     backgroundColor: colors.surfaceMuted,
     boxShadow: `inset 3px 0 0 ${colors.accent}`,
   },
-  // The step's place in the walk. A number that aligns down a column, so
-  // mono with tabular figures.
+  // The step's place in the draft's own order. A number that aligns down a
+  // column, so mono with tabular figures.
   number: {
     flex: "none",
     fontFamily: fonts.mono,
     fontVariantNumeric: "tabular-nums",
     color: colors.textMuted,
   },
-  identity: {
-    display: "flex",
-    flexDirection: "column",
-    gap: space.s1,
+  name: {
     flex: "1 1 auto",
     minWidth: 0,
-  },
-  name: {
     overflowWrap: "anywhere",
   },
   nameCurrent: {
     fontWeight: 800,
-  },
-  // Who works the step and how many fields its form carries — prose, so the
-  // written face rather than mono.
-  summary: {
-    fontSize: "0.8rem",
-    color: colors.textMuted,
-    overflowWrap: "anywhere",
   },
   badge: {
     flex: "none",
@@ -174,25 +160,22 @@ interface Props {
    * caller needs no index of its own. */
   onReorder: (stepId: string, neighbourId: string) => void;
   onAddStep: (kind: StepKind) => void;
-  /** The processes a subprocess step may call, for its summary line. Empty
-   * until the fetch resolves, and after a failed one. */
-  processes: readonly ProcessSummary[];
 }
 
 /**
- * The Steps tab's leading column (`studio-step-page`: "The steps rail numbers
- * every step in reachability order"). One ruled row per step, numbered, each
- * carrying its label, its summary line and its open issue count.
+ * The Steps tab's leading column (`studio-step-page`: "The steps rail lists
+ * each step in the draft's own order"). One ruled row per step, numbered,
+ * each carrying its label and its open issue count.
  *
- * Reachability order is `registerOrder`'s, the order the steps register read
- * before this replaced it. Reordering writes the draft's own `workflow.steps`
- * order, which is what the canvas's Up/Down traversal and the serialized
- * definition both read; the rail's own order stays derived from the graph.
+ * The rail lists the draft's own `workflow.steps` order. No walk over the
+ * paths decides where a row stands, and a move control writes that same
+ * `workflow.steps` order back, which is what the canvas's Up/Down traversal
+ * and the serialized definition both read.
  */
-export function StepsRail({ currentStepId, onSelectStep, onReorder, onAddStep, processes }: Props) {
+export function StepsRail({ currentStepId, onSelectStep, onReorder, onAddStep }: Props) {
   const { draft, validation, contentLocale } = useDraft();
   const baseLocale = draft.baseLocale ?? "en";
-  const ordered = registerOrder(draft.workflow?.steps, draft.workflow?.initialStep);
+  const ordered = draft.workflow?.steps ?? [];
   const footHeadingId = "studio-steps-rail-add";
 
   return (
@@ -216,11 +199,8 @@ export function StepsRail({ currentStepId, onSelectStep, onReorder, onAddStep, p
                   onClick={() => step.id !== undefined && onSelectStep(step.id)}
                 >
                   <span {...stylex.props(styles.number)}>{i + 1}</span>
-                  <span {...stylex.props(styles.identity)}>
-                    <span {...stylex.props(styles.name, current && styles.nameCurrent)}>
-                      {resolveDraftLocalizedText(step.label, contentLocale, baseLocale) || step.key || t("steps.unnamedStep")}
-                    </span>
-                    <span {...stylex.props(styles.summary)}>{railRowSummary(step, processes, contentLocale)}</span>
+                  <span {...stylex.props(styles.name, current && styles.nameCurrent)}>
+                    {resolveDraftLocalizedText(step.label, contentLocale, baseLocale) || step.key || t("steps.unnamedStep")}
                   </span>
                   {issues.count > 0 && (
                     <span

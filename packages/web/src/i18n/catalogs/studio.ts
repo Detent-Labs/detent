@@ -506,14 +506,9 @@ export const en = {
   "stepSections.outcomeField": "outcome",
   "stepSections.outcomeHint": "An outcome binds only on a contracted process.",
 
-  // The steps rail: one numbered row per step, in reachability order
+  // The steps rail: one numbered row per step, in the draft's own order
   // (`studio-step-page`).
   "stepsRail.label": "Steps",
-  "stepsRail.fieldCount": "{count} form fields",
-  "stepsRail.calls": "Calls {process}",
-  "stepsRail.callsNothing": "Calls no process yet",
-  "stepsRail.ends": "Ends as {outcome}",
-  "stepsRail.endsNoOutcome": "Ends with no outcome",
   "stepsRail.issueMark": "open issues",
   "stepsRail.issueMarkOne": "open issue",
   "stepsRail.moveEarlier": "Move earlier",
