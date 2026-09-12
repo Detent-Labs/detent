@@ -118,6 +118,58 @@ export function moveFieldToGroup(
 }
 
 /**
+ * Re-hangs a field into a group field's own `fields`, at the end, at any
+ * depth. Copies the tree the way `moveFieldToGroup` does: every field on the
+ * path from the root down to the target group is a new object, and every
+ * other field keeps its old reference. A missing `fields` array on the
+ * target starts as `[field]`.
+ *
+ * `FieldsTab`'s `addField` takes an optional group id and calls this inside
+ * the same `mutate` recipe `moveFieldToGroup` sits in, for the rail's
+ * "Fields inside this group" zone (design.md: "One add function serves the
+ * rail, the start state and the group zone"). The top-level "+ Add field"
+ * path appends to `fields` directly and never calls this.
+ *
+ * Answers the array it was given, unchanged, where `groupId` names no field
+ * in the tree.
+ */
+export function appendToGroup(fields: DraftField[], groupId: string, field: DraftField): DraftField[] {
+  const flat = flattenDraftFields(fields);
+  if (!flat.some((f) => f.id === groupId)) return fields;
+
+  const graft = (list: DraftField[]): DraftField[] =>
+    list.map((f) => {
+      if (f.id === groupId) return { ...f, fields: [...(f.fields ?? []), field] };
+      return f.fields ? { ...f, fields: graft(f.fields) } : f;
+    });
+
+  return graft(fields);
+}
+
+/**
+ * Removes the field carrying `fieldId` from the draft's field tree, at any
+ * depth. Copies the tree the way `moveFieldToGroup` does: every field on the
+ * path from the root down to the removed field's own parent is a new
+ * object, and every other field keeps its old reference.
+ *
+ * `FieldsTab`'s `removeField` calls this (design.md: "Remove selects a
+ * sibling, then the group"). Its caller reads `neighbourAfterRemove` first,
+ * against the tree this function is about to prune.
+ *
+ * Answers the array it was given, unchanged, where `fieldId` names no field
+ * in the tree.
+ */
+export function removeFieldIn(fields: DraftField[], fieldId: string): DraftField[] {
+  const flat = flattenDraftFields(fields);
+  if (!flat.some((f) => f.id === fieldId)) return fields;
+
+  const prune = (list: DraftField[]): DraftField[] =>
+    list.filter((f) => f.id !== fieldId).map((f) => (f.fields ? { ...f, fields: prune(f.fields) } : f));
+
+  return prune(fields);
+}
+
+/**
  * Every group the field may join, as ids, in rail order.
  *
  * The keyboard's target picker offers exactly this set plus the top level,
@@ -149,6 +201,22 @@ export function groupTargetsFor(fields: DraftField[], fieldId: string): string[]
 export const moveControlId = (fieldId: string) => `studio-field-move-${fieldId}`;
 
 /**
+ * The id a new field's label input takes, so the tab can focus it after an
+ * add lands the field inside a group (`spa-accessibility`). Sits beside
+ * `moveControlId`, in its style. `LocalizedTextInput` places it on the label
+ * input it renders.
+ */
+export const fieldLabelInputId = (fieldId: string) => `studio-field-label-${fieldId}`;
+
+/**
+ * The id a new field's rail entry takes, so the tab can scroll it into view
+ * after an add lands the field inside a group (`spa-accessibility`). Sits
+ * beside `moveControlId`, in its style. `PanelsRailFieldRow` places it on
+ * the entry's own button.
+ */
+export const railEntryId = (fieldId: string) => `studio-field-rail-${fieldId}`;
+
+/**
  * The id of the field currently holding `fieldId` as a child — a group, or a
  * parent `changeKind` rewrote out of one — or `undefined` at the top level.
  * `moveTargetsFor` below and `EntityTabs.tsx`'s `moveField` both read this
@@ -178,4 +246,40 @@ export function moveTargetsFor(
   const groupTargets = groupTargetsFor(fields, fieldId);
   const orphanedParent = currentId !== undefined && !groupTargets.includes(currentId) ? [currentId] : [];
   return { currentId, targetIds: [undefined, ...orphanedParent, ...groupTargets] };
+}
+
+/**
+ * The id to select after removing `fieldId` from the draft's field tree
+ * (design.md: "Remove selects a sibling, then the group"). Reads the tree as
+ * it stands before the removal: `FieldsTab`'s `removeField` reads this from
+ * its closure before its own `mutate` recipe splices the field out through
+ * `removeFieldIn`.
+ *
+ * A field nested in a group, at any depth: the next field in the same
+ * `fields` array, else the previous one, else that group's own id. A
+ * top-level field: the next top-level field, else the previous one, else
+ * `undefined` — today's rule in `EntityTabs.tsx`'s `removeField(index)`.
+ * `undefined` also answers for an id no field carries.
+ */
+export function neighbourAfterRemove(fields: DraftField[], fieldId: string): string | undefined {
+  const locate = (
+    list: DraftField[],
+    parentId: string | undefined,
+  ): { siblings: DraftField[]; parentId: string | undefined } | undefined => {
+    if (list.some((f) => f.id === fieldId)) return { siblings: list, parentId };
+    for (const f of list) {
+      if (f.fields) {
+        const found = locate(f.fields, f.id);
+        if (found) return found;
+      }
+    }
+    return undefined;
+  };
+
+  const located = locate(fields, undefined);
+  if (!located) return undefined;
+
+  const { siblings, parentId } = located;
+  const index = siblings.findIndex((f) => f.id === fieldId);
+  return siblings[index + 1]?.id ?? siblings[index - 1]?.id ?? parentId;
 }
