@@ -1168,12 +1168,12 @@ floor of 36rem. Past that floor the page scrolls.
 - **WHEN** an author opens the Canvas tab in a window shorter than the floor
 - **THEN** the canvas keeps 36rem and the page scrolls
 
-### Requirement: The steps register lists every step in reachability order
+### Requirement: The Canvas tab stands without a steps register
 
 The steps register SHALL NOT stand. The Canvas tab carries the canvas alone,
 and no register of rows beside it.
 
-The steps rail carries every step of the draft, in reachability order. That
+The steps rail carries every step of the draft, in the draft's own order. That
 rail and its rows belong to `studio-step-page`.
 
 The process links SHALL NOT stand either. Those were Fields, Data sources,
@@ -1186,17 +1186,18 @@ per `studio-process-tabs`.
 - **THEN** the canvas draws seven nodes
 - **AND** no register of rows stands beside them
 
-#### Scenario: Rows follow reachability
+#### Scenario: Rows follow the draft's own order
 
-- **WHEN** an author reads the draft's steps in reachability order
+- **WHEN** an author reads the draft's steps in the order `workflow.steps`
+  holds them
 - **THEN** the steps rail carries that order, per `studio-step-page`
-- **AND** the Canvas tab carries no such list
+- **AND** the Canvas tab has no such list
 
 #### Scenario: An issue count prints on its row
 
 - **WHEN** one step carries two open issues and another carries none
 - **THEN** the first step's rail row carries a count of two
-- **AND** the Canvas tab carries no row and no row count
+- **AND** the Canvas tab has no row and no row count
 
 #### Scenario: A row is a real control
 
@@ -1417,8 +1418,8 @@ the draft's initial step reaches through paths reads as nothing. A step no
 chain of paths reaches reads as unconnected.
 
 A step counts as reached when the draft's initial step reaches it over paths.
-That is the rule the steps register's own order already applies. A draft
-naming no initial step leaves every step unconnected. The rule reaches a
+That rule stands on its own. The steps rail's order no longer applies it. A
+draft naming no initial step leaves every step unconnected. The rule reaches a
 terminal step the same way it reaches any other.
 
 The report SHALL stand only for a selection of exactly one step. A selection
