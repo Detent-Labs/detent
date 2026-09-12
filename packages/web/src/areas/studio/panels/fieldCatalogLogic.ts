@@ -102,26 +102,39 @@ export function moveFieldToGroup(
   const currentParent = flat.find((f) => (f.fields ?? []).some((c) => c.id === fieldId));
   if (currentParent?.id === targetGroupId) return fields;
 
-  const prune = (list: DraftField[]): DraftField[] =>
-    list.filter((f) => f.id !== fieldId).map((f) => (f.fields ? { ...f, fields: prune(f.fields) } : f));
-
-  const pruned = prune(fields);
+  const pruned = pruneField(fields, fieldId);
   if (targetGroupId === undefined) return [...pruned, moved];
 
-  const graft = (list: DraftField[]): DraftField[] =>
-    list.map((f) => {
-      if (f.id === targetGroupId) return { ...f, fields: [...(f.fields ?? []), moved] };
-      return f.fields ? { ...f, fields: graft(f.fields) } : f;
-    });
-
-  return graft(pruned);
+  return graftField(pruned, targetGroupId, moved);
 }
 
 /**
+ * The recursive rebuild `moveFieldToGroup`, `appendToGroup` and
+ * `removeFieldIn` all share for dropping a field: every field on the path
+ * from the root down to the one carrying `targetId` is a new object, and
+ * every other field keeps its old reference. Not exported; each caller
+ * carries its own existence check and its own no-op case.
+ */
+const pruneField = (list: DraftField[], targetId: string): DraftField[] =>
+  list.filter((f) => f.id !== targetId).map((f) => (f.fields ? { ...f, fields: pruneField(f.fields, targetId) } : f));
+
+/**
+ * The recursive rebuild `moveFieldToGroup` and `appendToGroup` share for
+ * hanging a field: `field` lands at the end of the `fields` array belonging
+ * to whichever field in the tree carries `targetId`, and every field on
+ * that path down is a new object, exactly as `pruneField` copies its own
+ * path. Not exported; each caller carries its own existence check and its
+ * own no-op case.
+ */
+const graftField = (list: DraftField[], targetId: string, field: DraftField): DraftField[] =>
+  list.map((f) => {
+    if (f.id === targetId) return { ...f, fields: [...(f.fields ?? []), field] };
+    return f.fields ? { ...f, fields: graftField(f.fields, targetId, field) } : f;
+  });
+
+/**
  * Re-hangs a field into a group field's own `fields`, at the end, at any
- * depth. Copies the tree the way `moveFieldToGroup` does: every field on the
- * path from the root down to the target group is a new object, and every
- * other field keeps its old reference. A missing `fields` array on the
+ * depth, through the shared `graftField`. A missing `fields` array on the
  * target starts as `[field]`.
  *
  * `FieldsTab`'s `addField` takes an optional group id and calls this inside
@@ -137,20 +150,12 @@ export function appendToGroup(fields: DraftField[], groupId: string, field: Draf
   const flat = flattenDraftFields(fields);
   if (!flat.some((f) => f.id === groupId)) return fields;
 
-  const graft = (list: DraftField[]): DraftField[] =>
-    list.map((f) => {
-      if (f.id === groupId) return { ...f, fields: [...(f.fields ?? []), field] };
-      return f.fields ? { ...f, fields: graft(f.fields) } : f;
-    });
-
-  return graft(fields);
+  return graftField(fields, groupId, field);
 }
 
 /**
  * Removes the field carrying `fieldId` from the draft's field tree, at any
- * depth. Copies the tree the way `moveFieldToGroup` does: every field on the
- * path from the root down to the removed field's own parent is a new
- * object, and every other field keeps its old reference.
+ * depth, through the shared `pruneField`.
  *
  * `FieldsTab`'s `removeField` calls this (design.md: "Remove selects a
  * sibling, then the group"). Its caller reads `neighbourAfterRemove` first,
@@ -163,10 +168,7 @@ export function removeFieldIn(fields: DraftField[], fieldId: string): DraftField
   const flat = flattenDraftFields(fields);
   if (!flat.some((f) => f.id === fieldId)) return fields;
 
-  const prune = (list: DraftField[]): DraftField[] =>
-    list.filter((f) => f.id !== fieldId).map((f) => (f.fields ? { ...f, fields: prune(f.fields) } : f));
-
-  return prune(fields);
+  return pruneField(fields, fieldId);
 }
 
 /**
