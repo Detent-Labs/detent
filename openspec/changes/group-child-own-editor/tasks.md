@@ -7,9 +7,9 @@
 
 ## 2. Selection and writes in the tab
 
-- [ ] 2.1 In `FieldsTab`, store the chosen `row.id` as the selection. Mark only the entry whose id matches. Resolve the selection against every field id, with the first rail entry as the fallback. Verify with `bun run typecheck`.
-- [ ] 2.2 Remove the `focusFieldId` state from `FieldsTab`, with every call that sets it. Remove the prop from `FieldCatalogPanel` and `FieldEditor`, with the scroll effect that reads it. Remove both `field-row-<id>` anchors. Drop `focusFieldId={undefined}` from `studio-fieldCatalogPanel.test.tsx`. Verify with `bun run typecheck`.
-- [ ] 2.3 Reset the editor pane's scroll to its top whenever the selection changes. Declare that effect before the refocus effect. Verify in task 5.5.
+- [x] 2.1 In `FieldsTab`, store the chosen `row.id` as the selection. Mark only the entry whose id matches. Resolve the selection against every field id, with the first rail entry as the fallback. Verify with `bun run typecheck`.
+- [x] 2.2 Remove the `focusFieldId` state from `FieldsTab`, with every call that sets it. Remove the prop from `FieldCatalogPanel` and `FieldEditor`, with the scroll effect that reads it. Remove both `field-row-<id>` anchors. Drop `focusFieldId={undefined}` from `studio-fieldCatalogPanel.test.tsx`. Verify with `bun run typecheck`.
+- [x] 2.3 Reset the editor pane's scroll to its top whenever the selection changes. Declare that effect before the refocus effect. Verify in task 5.5.
 - [ ] 2.4 Give `addField` an optional group id. A given group id appends the new field through `appendToGroup`. Both paths select the new field. Type the panel's `onAdd` prop as `(groupId?: string) => void`. Wrap each add button's handler, as in `onClick={() => onAdd()}`. Verify with `bun run typecheck`.
 - [ ] 2.5 After an add into a group, focus the element `fieldLabelInputId` names. Scroll the element `railEntryId` names with `block: "nearest"` and no smooth option. Use the existing refocus effect. Verify in task 5.5.
 - [ ] 2.6 Make `removeField` take a field id. It removes that field through `removeFieldIn`, at any depth. It selects the id `neighbourAfterRemove` returns for the draft before the write. Type the panel's `onRemove` prop as `(fieldId: string) => void`. Pass `field.id` where the panel calls it. Verify with `bun run typecheck`.
