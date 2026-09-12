@@ -755,10 +755,10 @@ stage-by-stage status.
   landed as `promote-instance-scalar-columns` (2026-08-30). Change 2 (the
   assignment pair, `parent.instanceId`, `currentStepEnteredAt`,
   `chainedFrom`, and a rebuild of the five expression indexes those and the
-  six scalars share) shipped in three commits, pushed and never merged. The
-  annotated tag `change2-rejected` holds them. A benchmark on 2026-09-01 then
-  rejected it. Change 3, the rebuild of the three expression indexes no
-  Change 2 column replaces, shipped 2026-09-01 as
+  six scalars share) took three commits and never reached `main`. A
+  benchmark on 2026-09-01 rejected it. The team deleted those commits and
+  their tag on 2026-09-12. Change 3, the rebuild of the three expression
+  indexes no Change 2 column replaces, shipped 2026-09-01 as
   `rebuild-instance-expression-indexes`.
 
   **Change 2: built, measured, rejected.** The five columns bought no
@@ -772,10 +772,9 @@ stage-by-stage status.
   - Heap 104 → 116 MB, about 63 byte per row, +11.6%.
   - 200,000 inserts 1852 → 1960 ms, +5.8%.
 
-  The tag `change2-rejected` is the evidence, and its annotation carries this
-  verdict. A tag rather than a branch, for two reasons. Nobody can merge it by
-  accident, and it survives a branch cleanup. Nobody needs to redo that work,
-  and nobody should read the missing merge as work lost.
+  The code of Change 2 no longer exists, on purpose. The store schema and the
+  instance query have changed since then. A revival therefore starts from the
+  current tree. The numbers above and the triggers below carry over.
 
   **Change 3: measured, worth building.** The rebuild pays, and it needs no
   column Change 2 would add.
