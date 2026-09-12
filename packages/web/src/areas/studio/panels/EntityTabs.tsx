@@ -12,7 +12,7 @@ import { addToDraftArray } from "../draft/draft-array-crud";
 import { resolveDraftLocalizedText, seedLocalizedText } from "../draft/localized-text";
 import { flattenDraftFields } from "../draft/fields";
 import { fieldKindIcon, fieldKindWord } from "../draft/field-type-labels";
-import { moveControlId, moveFieldToGroup, parentIdOf } from "./fieldCatalogLogic";
+import { appendToGroup, fieldLabelInputId, moveControlId, moveFieldToGroup, parentIdOf, railEntryId } from "./fieldCatalogLogic";
 import { flattenRailFields, issueCountForEntityId } from "../draft/panel-rail";
 import { moveFieldAndSyncViews } from "../draft/view-group-sync";
 import { FieldCatalogPanel } from "./FieldCatalogPanel";
@@ -287,13 +287,16 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
 
   const [selectedFieldIdState, setSelectedFieldId] = useState<string | undefined>(undefined);
 
-  // The move gesture's own three pieces of state. `dragFieldId` is the row a
-  // pointer picked up; `announcement` is what the live region below reads out
-  // after a move; `refocusId` is the move control the keyboard has to get back
-  // (`spa-accessibility`: the moving entry keeps focus across the move).
+  // `dragFieldId` is the row a pointer picked up. `announcement` is what the
+  // live region below reads out after a move. `refocusId` names the element
+  // the tab hands keyboard focus back to: the move control after a move, or a
+  // new field's label input after an add into a group (`spa-accessibility`).
+  // `refocusRailId` names that new field's rail entry, to scroll into view
+  // alongside the same focus; only an add into a group sets it.
   const [dragFieldId, setDragFieldId] = useState<string | undefined>(undefined);
   const [announcement, setAnnouncement] = useState("");
   const [refocusId, setRefocusId] = useState<string | undefined>(undefined);
+  const [refocusRailId, setRefocusRailId] = useState<string | undefined>(undefined);
 
   // Resolved against every field id, at any depth — `railFields` already
   // lists one row per field, from `flattenRailFields`. Falls back to the
@@ -314,17 +317,31 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
   // React reorders keyed rows by moving the existing DOM nodes, which usually
   // carries focus along. It does not where the move changes which controls the
   // row renders, so the tab names the control it wants and takes it back
-  // itself rather than resting on the reconciler.
+  // itself rather than resting on the reconciler. An add into a group also
+  // brings the new rail entry into view, alongside that same focus.
   useEffect(() => {
     if (refocusId === undefined) return;
     document.getElementById(refocusId)?.focus();
+    if (refocusRailId !== undefined) {
+      document.getElementById(refocusRailId)?.scrollIntoView({ block: "nearest" });
+    }
     setRefocusId(undefined);
-  }, [refocusId]);
+    setRefocusRailId(undefined);
+  }, [refocusId, refocusRailId]);
 
-  const addField = () => {
-    const field: DraftField = { id: mintId("field"), key: "", label: seedLocalizedText(contentLocale), type: "string" };
-    addToDraftArray(mutate, (d) => (d.fields ??= []), field);
-    setSelectedFieldId(field.id);
+  const addField = (groupId?: string) => {
+    const newId = mintId("field");
+    const field: DraftField = { id: newId, key: "", label: seedLocalizedText(contentLocale), type: "string" };
+    if (groupId === undefined) {
+      addToDraftArray(mutate, (d) => (d.fields ??= []), field);
+    } else {
+      mutate((d) => {
+        d.fields = appendToGroup(d.fields ?? [], groupId, field);
+      });
+      setRefocusId(fieldLabelInputId(newId));
+      setRefocusRailId(railEntryId(newId));
+    }
+    setSelectedFieldId(newId);
   };
 
   const removeField = (index: number) => {
@@ -421,7 +438,7 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
             );
           })}
           <li>
-            <button type="button" {...stylex.props(styles.railRow)} onClick={addField}>
+            <button type="button" {...stylex.props(styles.railRow)} onClick={() => addField()}>
               {t("fieldCatalog.addField")}
             </button>
           </li>

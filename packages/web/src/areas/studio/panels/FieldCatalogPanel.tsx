@@ -1406,7 +1406,7 @@ interface Props {
   /** The one top-level field this panel renders. `undefined` only while the
    * catalog holds none at all — the screen otherwise keeps it resolved. */
   selectedId: string | undefined;
-  onAdd: () => void;
+  onAdd: (groupId?: string) => void;
   onRemove: (index: number) => void;
   onShowStep: (stepId: string) => void;
   /** The move's one write (`EntityTabs.tsx`'s `FieldsTab::moveField`),
@@ -1444,7 +1444,7 @@ export function FieldCatalogPanel({ token, selectedId, onAdd, onRemove, onShowSt
         <div {...stylex.props(styles.emptyState)}>
           <h4 {...stylex.props(styles.fieldCatalogStartHeading)}>{t("fieldCatalog.startHeading")}</h4>
           <p {...stylex.props(styles.studioEmpty, styles.fieldCatalogStartBody)}>{t("fieldCatalog.startBody")}</p>
-          <button type="button" className="btn btn-primary" onClick={onAdd}>
+          <button type="button" className="btn btn-primary" onClick={() => onAdd()}>
             {t("fieldCatalog.addFirstField")}
           </button>
         </div>
@@ -1475,7 +1475,7 @@ export function FieldCatalogPanel({ token, selectedId, onAdd, onRemove, onShowSt
         onShowStep={onShowStep}
         onMoveField={onMoveField}
       />
-      <button type="button" className="btn btn-secondary" onClick={onAdd}>
+      <button type="button" className="btn btn-secondary" onClick={() => onAdd()}>
         {t("fieldCatalog.addField")}
       </button>
     </div>
