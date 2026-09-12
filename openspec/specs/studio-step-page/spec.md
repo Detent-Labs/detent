@@ -23,27 +23,46 @@ mark which step the page holds.
 - **THEN** the step page holds that step
 - **AND** the rail marks that row as the current one
 
-### Requirement: The steps rail numbers every step in reachability order
+### Requirement: The steps rail lists each step in the draft's own order
 
-The rail SHALL list every step of the draft. The order SHALL be reachability
-order, the same order the steps register uses today. Each row SHALL carry a
-number, the step's label and one summary line.
+The rail SHALL list every step of the draft, in the order `workflow.steps`
+holds them. No walk over the paths SHALL decide where a row stands.
 
-The summary line SHALL name who works the step and how many fields its form
-carries. A subprocess step's line SHALL name the process it calls. An end
-step's line SHALL name its outcome.
+A row's number SHALL name the step's place in that order. Moving a row earlier
+or later SHALL move it in the rail and in the draft together.
 
-#### Scenario: A row summarizes its step
+Each row SHALL carry a number and the step's label. A row SHALL have no summary
+line under the label. That holds for every step kind: a task step, a call to
+another process, and an end step. The step page names who works a step, the
+fields its form carries, the process it calls and its outcome.
+
+#### Scenario: The rail numbers steps in the draft's own order
+
+- **WHEN** a draft holds a call step, then an end step, then a task step
+- **THEN** the rail numbers the call one, the end two and the task three
+
+#### Scenario: A move control moves its own row
+
+- **WHEN** an author presses Move earlier on the rail's third row
+- **THEN** that row stands second
+- **AND** the row that stood second stands third
+
+#### Scenario: A task row names no assignment and no field count
 
 - **WHEN** a task step names a group as its assignment and carries four view
   fields
-- **THEN** its rail row names that group
-- **AND** the same row reads four fields
+- **THEN** its rail row carries the step's number and label
+- **AND** the row names neither who works the step nor a field count
 
-#### Scenario: An end step names its outcome
+#### Scenario: A call row names no process
+
+- **WHEN** a subprocess step calls the process labeled "Credit check"
+- **THEN** its rail row has no line naming that process
+
+#### Scenario: An end row names no outcome
 
 - **WHEN** an end step declares the outcome `approved`
-- **THEN** its rail row names that outcome
+- **THEN** its rail row has no line naming that outcome
 
 ### Requirement: A rail row carries its own open issue count
 

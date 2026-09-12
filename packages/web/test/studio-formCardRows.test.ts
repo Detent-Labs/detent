@@ -2,7 +2,6 @@ import { describe, expect, it } from "bun:test";
 import type { Draft } from "../src/areas/studio/draft/types.js";
 import type { EditorIssue } from "../src/areas/studio/draft/issues.js";
 import { formCardRows, miniatureBarHeight, viewIssues } from "../src/areas/studio/panels/formCardRows.js";
-import { registerOrder } from "../src/areas/studio/draft/registerOrder.js";
 
 /**
  * The Forms tab's own row set (`studio-forms-overview`: "The Forms tab
@@ -61,6 +60,36 @@ const DRAFT = {
   },
 } as unknown as Draft;
 
+/** A second draft: `workflow.steps` runs review, intake, done, while the
+ * paths run intake to review to done. Proves the card order follows that
+ * array order, not the path order — the path order would put intake ahead of
+ * review, the array puts review first. */
+const ORDER_DRAFT = {
+  baseLocale: "en",
+  workflow: {
+    initialStep: "step_a",
+    steps: [
+      {
+        id: "step_b",
+        key: "review",
+        label: { en: "Review" },
+        type: "task",
+        view: { fields: [{ ref: PURPOSE }] },
+        paths: [{ id: "path_2", to: "step_end" }],
+      },
+      {
+        id: "step_a",
+        key: "intake",
+        label: { en: "Intake" },
+        type: "task",
+        view: { fields: [{ ref: AMOUNT }] },
+        paths: [{ id: "path_1", to: "step_b" }],
+      },
+      { id: "step_end", key: "done", label: { en: "Done" }, type: "task", terminal: true },
+    ],
+  },
+} as unknown as Draft;
+
 function viewIssue(stepId: string, index: number): EditorIssue {
   return {
     entityType: "step",
@@ -84,12 +113,10 @@ describe("The Forms tab's card set", () => {
     expect(empty?.fieldCount).toBe(0);
   });
 
-  it("follows the same reachability order the steps rail reads", () => {
-    const railOrder = registerOrder(DRAFT.workflow?.steps, DRAFT.workflow?.initialStep)
-      .filter((s) => s.view !== undefined)
-      .map((s) => s.id);
+  it("follows the draft's own `workflow.steps` order, not the path order", () => {
+    const rows = formCardRows(ORDER_DRAFT, [], "en");
 
-    expect(formCardRows(DRAFT, [], "en").map((r) => r.stepId)).toEqual(railOrder as string[]);
+    expect(rows.map((r) => r.label)).toEqual(["Review", "Intake"]);
   });
 
   it("names each step and reads its role for the kicker", () => {
