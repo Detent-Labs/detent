@@ -3,7 +3,7 @@
 - [x] 1.1 Add `neighbourAfterRemove(fields, fieldId)` to `fieldCatalogLogic.ts`. It follows the Remove rule in design.md. Add `fieldLabelInputId(fieldId)` and `railEntryId(fieldId)` beside `moveControlId`. Verify with `bun run typecheck`.
 - [x] 1.2 Add `appendToGroup(fields, groupId, field)` and `removeFieldIn(fields, fieldId)` beside `moveFieldToGroup`. Each returns a new top-level array, as `moveFieldToGroup` does. Verify with `bun run typecheck`.
 - [x] 1.3 Extend `studio-fieldCatalogLogic.test.ts` for `neighbourAfterRemove`. Assert the next sibling, the previous sibling, the parent group and both top-level fallbacks. Assert `appendToGroup` on a nested group and `removeFieldIn` at depth two. Pin both id helpers. Verify in the full suite.
-- [ ] 1.4 Make `resolveLoc` in `draft/issues.ts` follow the whole `fields[i].fields[j]` chain. A nested field's check then names that field. Add the nested cases to `studio-issues.test.ts`. Add a `runValidation` case to `studio-fieldCheckZone.test.ts`. Verify in the full suite.
+- [x] 1.4 Make `resolveLoc` in `draft/issues.ts` follow the whole `fields[i].fields[j]` chain. A nested field's check then names that field. Add the nested cases to `studio-issues.test.ts`. Add a `runValidation` case to `studio-fieldCheckZone.test.ts`. Verify in the full suite.
 
 ## 2. Selection and writes in the tab
 
