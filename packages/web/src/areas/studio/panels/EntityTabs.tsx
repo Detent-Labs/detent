@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
 import type { DataSourceDef } from "workflow-engine/schema";
@@ -286,10 +286,6 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
   const baseLocale = draft.baseLocale ?? "en";
 
   const [selectedFieldIdState, setSelectedFieldId] = useState<string | undefined>(undefined);
-  // The deepest row a rail click named — a top-level field's own id, or a
-  // group child's. `FieldCatalogPanel` owns the scroll, because the anchor
-  // this names belongs to a row that panel renders.
-  const [focusFieldId, setFocusFieldId] = useState<string | undefined>(undefined);
 
   // The move gesture's own three pieces of state. `dragFieldId` is the row a
   // pointer picked up; `announcement` is what the live region below reads out
@@ -299,13 +295,21 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
   const [announcement, setAnnouncement] = useState("");
   const [refocusId, setRefocusId] = useState<string | undefined>(undefined);
 
-  const topLevelFieldIds = (draft.fields ?? [])
-    .map((f) => f.id)
-    .filter((id): id is NonNullable<typeof id> => id !== undefined) as string[];
+  // Resolved against every field id, at any depth — `railFields` already
+  // lists one row per field, from `flattenRailFields`. Falls back to the
+  // first rail entry when the stored id names no field in the tree.
   const selectedFieldId =
-    selectedFieldIdState !== undefined && topLevelFieldIds.includes(selectedFieldIdState)
+    selectedFieldIdState !== undefined && railFields.some((row) => row.id === selectedFieldIdState)
       ? selectedFieldIdState
-      : topLevelFieldIds[0];
+      : railFields[0]?.id;
+
+  // The editor pane scrolls on its own; opening a different field's editor
+  // resets that scroll to the top rather than keeping the previous field's
+  // position. No `behavior` option, so the jump is immediate.
+  const editorRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    editorRef.current?.scrollTo({ top: 0 });
+  }, [selectedFieldId]);
 
   // React reorders keyed rows by moving the existing DOM nodes, which usually
   // carries focus along. It does not where the move changes which controls the
@@ -362,7 +366,6 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
     const landed = flattenRailFields(next).find((row) => row.id === fieldId);
     if (landed) {
       setSelectedFieldId(landed.rootId);
-      setFocusFieldId(fieldId);
     }
     setAnnouncement(
       targetGroupId === undefined
@@ -407,11 +410,8 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
                   kindIcon={kindIcon}
                   depth={row.depth}
                   issues={rowIssues}
-                  selected={selectedFieldId === row.rootId}
-                  onClick={() => {
-                    setSelectedFieldId(row.rootId);
-                    setFocusFieldId(row.id);
-                  }}
+                  selected={selectedFieldId === row.id}
+                  onClick={() => setSelectedFieldId(row.id)}
                   onDragStart={() => setDragFieldId(row.id)}
                   onDragEnd={() => setDragFieldId(undefined)}
                   onDrop={() => dropOnRow(row.id)}
@@ -435,11 +435,10 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
           {announcement}
         </p>
       </nav>
-      <div {...stylex.props(styles.editor, styles.layoutChild)}>
+      <div ref={editorRef} {...stylex.props(styles.editor, styles.layoutChild)}>
         <FieldCatalogPanel
           token={token}
           selectedId={selectedFieldId}
-          focusFieldId={focusFieldId}
           onAdd={addField}
           onRemove={removeField}
           onShowStep={onShowStep}

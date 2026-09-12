@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState, type ReactNode } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import * as stylex from "@stylexjs/stylex";
 import {
   FIELD_KINDS,
@@ -656,9 +656,7 @@ function SubFieldRow({ field, dataSources, lists, mutate, onChange, onRemove, on
   const removeSubField = (i: number) => onChange({ fields: removeAt(field.fields ?? [], i) });
 
   return (
-    // The anchor the shared modal's rail scrolls to. Recursive, so a nested
-    // group child carries its own id and the rail reaches it too.
-    <div {...stylex.props(styles.fieldRow)} id={field.id === undefined ? undefined : `field-row-${field.id}`}>
+    <div {...stylex.props(styles.fieldRow)}>
       <label {...stylex.props(styles.fieldRowLabel)}>
         {t("fieldCatalog.keyLabel")}
         <FieldKeyInput field={field} mutate={mutate} onChange={onChange} />
@@ -901,12 +899,6 @@ interface FieldEditorProps {
   field: DraftField;
   dataSources: DraftDataSource[];
   lists: StudioDataList[] | undefined;
-  /** The rail row a click most recently named — the selected top-level
-   * field's own id, or one of its children's. Undefined outside a rail
-   * click (a reload, an Add). Drives the scroll effect below; it is not
-   * cleared after use, and re-focusing the same row twice in a row is a
-   * harmless no-op the second time. */
-  focusFieldId: string | undefined;
   /** The step the effect half's empty state routes to — the draft's initial
    * step, or `undefined` while the workflow carries no step to reach. */
   routeStepId: string | undefined;
@@ -936,7 +928,6 @@ function FieldEditor({
   field,
   dataSources,
   lists,
-  focusFieldId,
   routeStepId,
   onChange: writeField,
   onRemove,
@@ -966,16 +957,6 @@ function FieldEditor({
     setDefinitionWrites((n) => n + 1);
     writeField(patch);
   };
-
-  // A rail click on a group's child scrolls to that child's own
-  // `field-row-<id>` anchor, which sits inside `SubFieldRow` in the
-  // definition half. Nothing hides it any more, so this needs no tab switch
-  // ahead of it. A stale `focusFieldId` naming a since-removed row finds
-  // nothing and is a no-op.
-  useEffect(() => {
-    if (focusFieldId === undefined) return;
-    document.getElementById(`field-row-${focusFieldId}`)?.scrollIntoView({ block: "start" });
-  }, [focusFieldId]);
 
   const custom = isCustomType(field.type);
   const hasOptions = (field.options?.length ?? 0) > 0;
@@ -1080,7 +1061,7 @@ function FieldEditor({
   const requiredDisabled = technicalChecked || requiredState.kind === "none";
 
   return (
-    <div {...stylex.props(styles.fieldRow)} id={field.id === undefined ? undefined : `field-row-${field.id}`}>
+    <div {...stylex.props(styles.fieldRow)}>
       <div {...stylex.props(styles.fieldCatalogHalves)}>
         <section aria-label={t("fieldCatalog.definitionHalfLabel")}>
           <IssueItems issues={unplaced} style={styles.zoneIssueList} />
@@ -1425,10 +1406,6 @@ interface Props {
   /** The one top-level field this panel renders. `undefined` only while the
    * catalog holds none at all — the screen otherwise keeps it resolved. */
   selectedId: string | undefined;
-  /** The rail row a click most recently named (`PanelsScreen.selectField`'s
-   * `deepestId`) — forwarded to `FieldEditor` so a group child's row can
-   * scroll to itself, whether or not the selection itself changed. */
-  focusFieldId: string | undefined;
   onAdd: () => void;
   onRemove: (index: number) => void;
   onShowStep: (stepId: string) => void;
@@ -1437,7 +1414,7 @@ interface Props {
   onMoveField: (fieldId: string, targetGroupId: string | undefined) => void;
 }
 
-export function FieldCatalogPanel({ token, selectedId, focusFieldId, onAdd, onRemove, onShowStep, onMoveField }: Props) {
+export function FieldCatalogPanel({ token, selectedId, onAdd, onRemove, onShowStep, onMoveField }: Props) {
   const { draft, mutate, contentLocale } = useDraft();
   const fields = draft.fields ?? [];
   const dataSources = draft.dataSources ?? [];
@@ -1492,7 +1469,6 @@ export function FieldCatalogPanel({ token, selectedId, focusFieldId, onAdd, onRe
         field={field}
         dataSources={dataSources}
         lists={lists}
-        focusFieldId={focusFieldId}
         routeStepId={routeStepId}
         onChange={updateField}
         onRemove={() => onRemove(index)}

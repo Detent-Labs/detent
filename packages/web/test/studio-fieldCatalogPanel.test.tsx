@@ -105,7 +105,6 @@ describe("FieldCatalogPanel", () => {
         <FieldCatalogPanel
           token="test-token"
           selectedId="field_r"
-          focusFieldId={undefined}
           onAdd={NOOP}
           onRemove={NOOP}
           onShowStep={NOOP}
