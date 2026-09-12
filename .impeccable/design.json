@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-02T00:00:00Z",
+  "generatedAt": "2026-09-12T00:00:00Z",
   "title": "Design System: Detent",
   "extensions": {
     "colorMeta": {
@@ -20,6 +20,22 @@
           "oklch(95% 0.03 33)"
         ]
       },
+      "accent-700": {
+        "role": "primary",
+        "displayName": "Accent on Muted",
+        "canonical": "#ae1800",
+        "darkValue": "#ff9783",
+        "tonalRamp": [
+          "oklch(15% 0.09 32)",
+          "oklch(26% 0.14 32)",
+          "oklch(37% 0.17 32)",
+          "oklch(46% 0.18 32)",
+          "oklch(59% 0.17 32)",
+          "oklch(72% 0.13 32)",
+          "oklch(84% 0.08 32)",
+          "oklch(95% 0.03 32)"
+        ]
+      },
       "refusal-700": {
         "role": "secondary",
         "displayName": "Refusal",
@@ -34,6 +50,22 @@
           "oklch(72% 0.13 32)",
           "oklch(84% 0.08 32)",
           "oklch(95% 0.03 32)"
+        ]
+      },
+      "accent-400": {
+        "role": "secondary",
+        "displayName": "Advisory",
+        "canonical": "#ff9783",
+        "darkValue": "#ff9783",
+        "tonalRamp": [
+          "oklch(15% 0.06 35)",
+          "oklch(26% 0.10 35)",
+          "oklch(37% 0.13 35)",
+          "oklch(48% 0.15 35)",
+          "oklch(59% 0.15 35)",
+          "oklch(76% 0.13 35)",
+          "oklch(86% 0.08 35)",
+          "oklch(95% 0.03 35)"
         ]
       },
       "paper-50": {
@@ -172,59 +204,83 @@
       },
       "title": {
         "displayName": "Title",
-        "purpose": "The h2 section heading. Uppercase, tracked, slate."
+        "purpose": "The h2 section heading."
       },
       "body": {
         "displayName": "Body",
-        "purpose": "Prose and control text. The reading column stays under 68 characters."
+        "purpose": "Prose and control text. The reading column stays under 68 characters. A table sets its text at 0.9rem."
       },
       "button": {
         "displayName": "Button",
-        "purpose": "Every action label, flush left in any button wider than its text."
+        "purpose": "The label of every .btn. A row's identity button and a menu item keep the body text."
       },
       "label": {
         "displayName": "Label",
-        "purpose": "A field label, a table header, a term in the profile register."
+        "purpose": "A field label, a kicker, a menu group label, a term in the profile register."
+      },
+      "legend": {
+        "displayName": "Legend",
+        "purpose": "A table header, a fieldset legend, a section heading on the step page."
       },
       "mono": {
         "displayName": "Mono",
-        "purpose": "Anything the engine matches exactly: a stamp, an id, a hash, a version, a role name, CEL, or a column of figures."
+        "purpose": "A stamp. The register tab tracks it wider, at 0.14em. A machine value inside running text takes the mono face at the size around it, with no uppercase."
       }
     },
     "shadows": [
       {
         "name": "shadow-md",
         "value": "0 3px 10px color-mix(in srgb, var(--color-text) 16%, transparent)",
-        "purpose": "The account menu popover and the dialog. The only two on-page surfaces that leave the page."
+        "purpose": "The account menu."
       },
       {
         "name": "shadow-lg",
         "value": "0 12px 32px color-mix(in srgb, var(--color-text) 22%, transparent)",
-        "purpose": "A deeper top-layer surface. Derived from the current scheme's ink, so it stays correct in dark mode."
+        "purpose": "A dialog, over a backdrop of black at 45%."
       }
     ],
     "motion": [
       {
-        "name": "none",
-        "value": "none",
-        "purpose": "The system declares no motion tokens. State changes are instant: a hover wash, an active darken, a focus ring. No transition, no easing curve, no duration token exists in tokens.css."
+        "name": "usage-flash",
+        "value": "1.2s ease-out, accent at 18% to transparent",
+        "purpose": "The one animation. When an author writes in the field catalog, the steps that write reached flash the accent. Under reduced motion it never runs."
+      },
+      {
+        "name": "reduced-motion-reset",
+        "value": "animation-duration: 0.01ms; transition-duration: 0.01ms",
+        "purpose": "A global rule in shell/global.css under prefers-reduced-motion: reduce. No component declares a transition."
       }
     ],
     "breakpoints": [
       {
         "name": "narrow",
         "value": "30rem",
-        "purpose": "Below this the shell header wraps, the nav takes its own row, and the profile register drops to one column."
+        "purpose": "The header wraps, and the nav takes a row of its own. The profile register drops to one column."
+      },
+      {
+        "name": "register-row",
+        "value": "40rem",
+        "purpose": "An app register row drops to one column. Its quantity moves to the left."
+      },
+      {
+        "name": "studio-stack",
+        "value": "64rem",
+        "purpose": "A studio tab body stacks its columns. A rail leaves its side column and caps its height at 20rem."
       },
       {
         "name": "reading-column",
         "value": "46rem",
-        "purpose": "The shell screen cap. A participant reads, so the column stays narrow."
+        "purpose": "The cap for app screens and the shell's own screens. A participant reads."
       },
       {
         "name": "tool-surface",
         "value": "60rem",
-        "purpose": "The reporting screen cap. An operator scans, so the surface goes wide."
+        "purpose": "The cap for admin, reporting and studio screens. An operator scans. The process surface takes no cap."
+      },
+      {
+        "name": "step-form-container",
+        "value": "34rem",
+        "purpose": "A container query: the step form stacks at 34rem of its own width."
       }
     ]
   },
@@ -241,7 +297,7 @@
       "name": "Secondary Button",
       "kind": "button",
       "refersTo": "button-secondary",
-      "description": "Every non-primary commit. Transparent, ink text, divider border.",
+      "description": "Every non-primary commit, and a nav entry. Transparent, ink text, divider border.",
       "html": "<button class=\"ds-btn ds-btn-secondary\">Cancel</button>",
       "css": ".ds-btn { display: inline-flex; align-items: center; gap: 4px; font-family: var(--font-heading, system-ui, sans-serif); font-weight: 800; font-size: 14px; border: 1px solid transparent; border-radius: 0; padding: 8px 14.4px; cursor: pointer; } .ds-btn:focus-visible { outline: 2px solid var(--color-accent, #d42b11); outline-offset: 2px; } .ds-btn-secondary { background: transparent; color: var(--color-text, #201e1d); border-color: var(--color-divider, color-mix(in srgb, #201e1d 40%, transparent)); } .ds-btn-secondary:hover { background: color-mix(in srgb, var(--color-text, #201e1d) 7%, transparent); } .ds-btn-secondary:active { background: color-mix(in srgb, var(--color-text, #201e1d) 14%, transparent); }"
     },
@@ -257,17 +313,25 @@
       "name": "Destructive Button",
       "kind": "button",
       "refersTo": "button-destructive",
-      "description": "A destructive commit. Outlined in the accent, never filled and never red.",
+      "description": "A destructive commit. Outlined in the accent, never filled and never red. On hover and press it switches to Accent on Muted.",
       "html": "<button class=\"ds-btn ds-btn-secondary ds-btn-destructive\">Cancel instance</button>",
-      "css": ".ds-btn { display: inline-flex; align-items: center; gap: 4px; font-family: var(--font-heading, system-ui, sans-serif); font-weight: 800; font-size: 14px; border: 1px solid transparent; border-radius: 0; padding: 8px 14.4px; cursor: pointer; background: transparent; } .ds-btn:focus-visible { outline: 2px solid var(--color-accent, #d42b11); outline-offset: 2px; } .ds-btn-destructive { border-color: var(--color-accent, #d42b11); color: var(--color-accent, #d42b11); } .ds-btn-destructive:hover { background: color-mix(in srgb, var(--color-text, #201e1d) 7%, transparent); }"
+      "css": ".ds-btn { display: inline-flex; align-items: center; gap: 4px; font-family: var(--font-heading, system-ui, sans-serif); font-weight: 800; font-size: 14px; border: 1px solid transparent; border-radius: 0; padding: 8px 14.4px; cursor: pointer; } .ds-btn:focus-visible { outline: 2px solid var(--color-accent, #d42b11); outline-offset: 2px; } .ds-btn-secondary { background: transparent; } .ds-btn-secondary:hover { background: color-mix(in srgb, var(--color-text, #201e1d) 7%, transparent); } .ds-btn-secondary:active { background: color-mix(in srgb, var(--color-text, #201e1d) 14%, transparent); } .ds-btn-destructive { border-color: var(--color-accent, #d42b11); color: var(--color-accent, #d42b11); } .ds-btn-destructive:hover, .ds-btn-destructive:active { border-color: var(--color-accent-on-muted, #ae1800); color: var(--color-accent-on-muted, #ae1800); }"
+    },
+    {
+      "name": "Form Tab Strip",
+      "kind": "custom",
+      "refersTo": "button-authoring",
+      "description": "The form editor's tab strip. The open tab takes weight 800 and the open mark. The trailing authoring commands take slate mono at 11px, so the accent stays with the open tab.",
+      "html": "<div class=\"ds-strip\"><button class=\"ds-strip-tab ds-strip-tab-open\">Request</button><button class=\"ds-strip-tab\">Approval</button><span class=\"ds-strip-cmds\"><button class=\"ds-btn ds-btn-authoring\">Add tab</button><button class=\"ds-btn ds-btn-authoring\">Rename</button><button class=\"ds-btn ds-btn-authoring\">Remove</button></span></div>",
+      "css": ".ds-strip { display: flex; align-items: stretch; flex-wrap: nowrap; gap: 4px; padding-block: 4px; overflow-x: auto; border-bottom: 2px solid var(--color-divider, color-mix(in srgb, #201e1d 40%, transparent)); } .ds-strip-tab { display: flex; align-items: baseline; flex: none; white-space: nowrap; background: transparent; color: inherit; border: 0; border-radius: 0; padding: 8px 12px; font-family: inherit; font-size: 14px; line-height: 1.5; cursor: pointer; } .ds-strip-tab:hover { background: var(--color-surface-muted, #eae9e9); } .ds-strip-tab:focus-visible { outline: 2px solid var(--color-accent, #d42b11); outline-offset: 2px; } .ds-strip-tab-open { font-weight: 800; box-shadow: inset 0 -2px 0 var(--color-accent, #d42b11); } .ds-strip-cmds { display: flex; align-items: center; gap: 4px; margin-left: auto; } .ds-btn { display: inline-flex; align-items: center; font-weight: 800; border: 1px solid transparent; border-radius: 0; padding: 8px 4px; cursor: pointer; } .ds-btn:focus-visible { outline: 2px solid var(--color-accent, #d42b11); outline-offset: 2px; } .ds-btn-authoring { font-family: var(--font-mono, ui-monospace, monospace); font-size: 11px; color: var(--color-text-muted, #605d5d); background: transparent; } .ds-btn-authoring:hover { background: var(--color-surface-muted, #eae9e9); } .ds-btn-authoring:active { background: color-mix(in srgb, var(--color-text, #201e1d) 14%, transparent); }"
     },
     {
       "name": "Text Field",
       "kind": "input",
       "refersTo": "input",
       "description": "Label above control, flush left, 4px apart. The border is the field; no fill stands behind it.",
-      "html": "<div class=\"ds-field\"><label class=\"ds-field-label\" for=\"ds-f1\">Cost centre</label><input class=\"ds-field-input\" id=\"ds-f1\" value=\"CC-4471\" /><ul class=\"ds-field-issues\"><li>Required.</li></ul></div>",
-      "css": ".ds-field { display: flex; flex-direction: column; gap: 4px; max-width: 22rem; } .ds-field-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--color-text-muted, #605d5d); } .ds-field-input { font: inherit; font-size: 14px; padding: 8px; border: 1px solid var(--color-border, #d7d3d3); border-radius: 0; background: var(--color-surface, #f3f2f2); color: var(--color-text, #201e1d); } .ds-field-input:focus-visible { border-color: var(--color-accent, #d42b11); outline: 2px solid var(--color-accent, #d42b11); outline-offset: 0; } .ds-field-issues { margin: 0; padding: 0; list-style: none; font-family: var(--font-mono, ui-monospace, monospace); font-size: 12px; color: var(--color-refusal, #ae1800); }"
+      "html": "<div class=\"ds-field\"><label class=\"ds-field-label\" for=\"ds-f1\">Cost centre <span class=\"ds-field-required\">*</span></label><input class=\"ds-field-input\" id=\"ds-f1\" value=\"CC-4471\" /><ul class=\"ds-field-issues\"><li>Required.</li></ul></div>",
+      "css": ".ds-field { display: flex; flex-direction: column; gap: 4px; max-width: 22rem; } .ds-field-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--color-text-muted, #605d5d); } .ds-field-required { color: var(--color-accent, #d42b11); margin-left: 4px; } .ds-field-input { font: inherit; font-size: 14px; padding: 8px; border: 1px solid var(--color-border, #d7d3d3); border-radius: 0; background: var(--color-surface, #f3f2f2); color: var(--color-text, #201e1d); } .ds-field-input:focus-visible { border-color: var(--color-accent, #d42b11); outline: 2px solid var(--color-accent, #d42b11); outline-offset: 0; } .ds-field-issues { margin: 0; padding: 0; list-style: none; font-family: var(--font-mono, ui-monospace, monospace); font-size: 12px; color: var(--color-refusal, #ae1800); }"
     },
     {
       "name": "State Stamp",
@@ -281,54 +345,86 @@
       "name": "Register Row",
       "kind": "custom",
       "refersTo": null,
-      "description": "The ledger row. Three columns: a stamp, an identity, and a right-aligned quantity in mono. The identity is a real control; the row carries no click handler.",
-      "html": "<ul class=\"ds-register\"><li class=\"ds-register-row\"><span class=\"ds-stamp ds-stamp-open\">Unclaimed</span><button class=\"ds-register-link\"><strong>Expense approval</strong><span class=\"ds-register-step\">Manager review</span></button><span class=\"ds-register-qty\">3d 04h</span></li><li class=\"ds-register-row\"><span class=\"ds-stamp ds-stamp-settled\">Completed</span><button class=\"ds-register-link\"><strong>Employee onboarding</strong><span class=\"ds-register-step\">Issue laptop</span></button><span class=\"ds-register-qty\">11h 22m</span></li></ul>",
-      "css": ".ds-register { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--color-border, #d7d3d3); } .ds-register-row { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--color-border, #d7d3d3); } .ds-register-row:hover { background: var(--color-surface-muted, #eae9e9); } .ds-register-link { display: flex; align-items: baseline; gap: 8px; width: 100%; background: none; border: none; border-radius: 0; margin: 0; padding: 0; text-align: left; font: inherit; color: inherit; cursor: pointer; } .ds-register-link:focus-visible { outline: 2px solid var(--color-accent, #d42b11); outline-offset: 2px; } .ds-register-step { color: var(--color-text-muted, #605d5d); font-size: 0.85rem; } .ds-register-qty { font-family: var(--font-mono, ui-monospace, monospace); font-variant-numeric: tabular-nums; font-size: 0.85rem; white-space: nowrap; } .ds-stamp { display: inline-block; font-family: var(--font-mono, ui-monospace, monospace); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; border: 2px solid currentcolor; padding: 2px 7px; } .ds-stamp-open { color: var(--color-accent, #d42b11); } .ds-stamp-settled { color: var(--color-text, #201e1d); }"
+      "description": "The ledger row. Three columns: a stamp, an identity, and a right-aligned quantity in mono. The identity is a real control; the row has no click handler.",
+      "html": "<ul class=\"ds-register\"><li class=\"ds-register-row\"><span class=\"ds-stamp ds-stamp-open\">Unclaimed</span><button class=\"ds-register-link\"><span class=\"ds-register-step\">Manager review</span><span class=\"ds-register-process\">Expense approval</span></button><span class=\"ds-register-qty\">3d 04h</span></li><li class=\"ds-register-row\"><span class=\"ds-stamp ds-stamp-open\">Unclaimed</span><button class=\"ds-register-link\"><span class=\"ds-register-step\">Issue laptop</span><span class=\"ds-register-process\">Employee onboarding</span></button><span class=\"ds-register-qty\">11h 22m</span></li></ul>",
+      "css": ".ds-register { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--color-border, #d7d3d3); } .ds-register-row { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--color-border, #d7d3d3); } .ds-register-row:hover { background: var(--color-surface-muted, #eae9e9); } .ds-register-row:hover .ds-register-step { text-decoration: underline; } .ds-register-link { display: flex; align-items: baseline; gap: 8px; width: 100%; background: none; border: none; border-radius: 0; margin: 0; padding: 0; text-align: left; font: inherit; color: inherit; cursor: pointer; } .ds-register-link:focus-visible { outline: 2px solid var(--color-accent, #d42b11); outline-offset: 2px; } .ds-register-process { color: var(--color-text-muted, #605d5d); font-size: 13px; } .ds-register-qty { font-family: var(--font-mono, ui-monospace, monospace); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; } .ds-stamp { display: inline-block; font-family: var(--font-mono, ui-monospace, monospace); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; border: 2px solid currentcolor; padding: 2px 7px; } .ds-stamp-open { color: var(--color-accent, #d42b11); }"
     },
     {
-      "name": "Register Tab",
+      "name": "Register Tab and Header",
       "kind": "nav",
       "refersTo": "register-tab",
-      "description": "The header's leading edge names the open area, set in the stamp voice with its trailing edge cut. A divider tab slotted into a ledger, never a pill.",
-      "html": "<header class=\"ds-header\"><span class=\"ds-tab\">Admin</span><nav class=\"ds-nav\"><a href=\"#\" aria-current=\"page\">Instances</a><a href=\"#\">Outbox</a><a href=\"#\">Timers</a></nav></header>",
-      "css": ".ds-header { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-bottom: 2px solid var(--color-divider, color-mix(in srgb, #201e1d 40%, transparent)); background: var(--color-surface-muted, #eae9e9); } .ds-tab { font-family: var(--font-mono, ui-monospace, monospace); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.14em; color: var(--color-accent-contrast, #f3f2f2); background: var(--color-accent, #d42b11); padding: 4px 14.4px 4px 8px; clip-path: polygon(0 0, 100% 0, calc(100% - 0.4rem) 100%, 0 100%); } .ds-nav { display: flex; gap: 8px; } .ds-nav a { color: inherit; text-decoration: none; padding: 4px 8px; font-size: 0.9rem; } .ds-nav a:hover { background: color-mix(in srgb, var(--color-text, #201e1d) 7%, transparent); } .ds-nav a[aria-current=\"page\"] { background: color-mix(in srgb, var(--color-text, #201e1d) 7%, transparent); } .ds-nav a:focus-visible { outline: 2px solid var(--color-accent, #d42b11); outline-offset: 2px; }"
+      "description": "The header's leading edge names the open area in the stamp voice, with its trailing edge cut. Nav entries are secondary buttons; the current one takes a 7% ink wash.",
+      "html": "<header class=\"ds-header\"><span class=\"ds-tab\">Admin</span><nav class=\"ds-nav\"><button class=\"ds-nav-entry ds-nav-entry-current\" aria-current=\"page\">Instances</button><button class=\"ds-nav-entry\">Outbox</button><button class=\"ds-nav-entry\">Timers</button></nav></header>",
+      "css": ".ds-header { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-bottom: 2px solid var(--color-divider, color-mix(in srgb, #201e1d 40%, transparent)); background: var(--color-surface-muted, #eae9e9); } .ds-tab { font-family: var(--font-mono, ui-monospace, monospace); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.14em; color: var(--color-accent-contrast, #f3f2f2); background: var(--color-accent, #d42b11); padding: 4px 14.4px 4px 8px; clip-path: polygon(0 0, 100% 0, calc(100% - 0.4rem) 100%, 0 100%); } .ds-nav { display: flex; gap: 8px; flex: 1; } .ds-nav-entry { font-family: var(--font-heading, system-ui, sans-serif); font-weight: 800; font-size: 14px; background: transparent; color: var(--color-text, #201e1d); border: 1px solid var(--color-divider, color-mix(in srgb, #201e1d 40%, transparent)); border-radius: 0; padding: 8px 14.4px; cursor: pointer; } .ds-nav-entry:hover { background: color-mix(in srgb, var(--color-text, #201e1d) 7%, transparent); } .ds-nav-entry-current { background: color-mix(in srgb, var(--color-text, #201e1d) 7%, transparent); } .ds-nav-entry:focus-visible { outline: 2px solid var(--color-accent, #d42b11); outline-offset: 2px; }"
     },
     {
-      "name": "Measuring Rule",
+      "name": "Tab Row",
+      "kind": "nav",
+      "refersTo": "tab",
+      "description": "The process surface's row of ten tabs. One line that scrolls sideways; the open tab takes weight 800 and the open mark; the Checks count turns refusal while a blocker is open.",
+      "html": "<div class=\"ds-tabrow\" role=\"tablist\"><button class=\"ds-tabrow-tab ds-tabrow-tab-open\" role=\"tab\" aria-selected=\"true\">Canvas</button><button class=\"ds-tabrow-tab\" role=\"tab\">Steps <span class=\"ds-tabrow-count\">6</span></button><button class=\"ds-tabrow-tab\" role=\"tab\">Fields <span class=\"ds-tabrow-count\">14</span></button><button class=\"ds-tabrow-tab\" role=\"tab\">Checks <span class=\"ds-tabrow-count ds-tabrow-count-blocker\">2</span></button></div>",
+      "css": ".ds-tabrow { display: flex; align-items: stretch; gap: 4px; flex-wrap: nowrap; overflow-x: auto; border-bottom: 2px solid var(--color-divider, color-mix(in srgb, #201e1d 40%, transparent)); } .ds-tabrow-tab { display: flex; align-items: baseline; gap: 8px; flex: none; white-space: nowrap; background: transparent; color: inherit; border: 0; border-radius: 0; padding: 8px 12px; font: inherit; cursor: pointer; } .ds-tabrow-tab:hover { background: var(--color-surface-muted, #eae9e9); } .ds-tabrow-tab:focus-visible { outline: 2px solid var(--color-accent, #d42b11); outline-offset: 2px; } .ds-tabrow-tab-open { font-weight: 800; box-shadow: inset 0 -2px 0 var(--color-accent, #d42b11); } .ds-tabrow-count { font-family: var(--font-mono, ui-monospace, monospace); font-variant-numeric: tabular-nums; color: var(--color-text-muted, #605d5d); } .ds-tabrow-count-blocker { color: var(--color-refusal, #ae1800); font-weight: 800; }"
+    },
+    {
+      "name": "Steps Rail",
       "kind": "custom",
-      "refersTo": null,
-      "description": "Reporting's one chart form. A hairline whose accent fill carries a quantity, with the figure printed beside it in mono. The bar is aria-hidden; the number is the content.",
-      "html": "<ul class=\"ds-measure\"><li class=\"ds-measure-row\"><span class=\"ds-measure-label\">Manager review</span><span class=\"ds-rule\" aria-hidden=\"true\"><span class=\"ds-rule-fill\" style=\"width:72%\"></span></span><span class=\"ds-figure\">3d 04h</span></li><li class=\"ds-measure-row\"><span class=\"ds-measure-label\">Finance check</span><span class=\"ds-rule\" aria-hidden=\"true\"><span class=\"ds-rule-fill ds-rule-fill-danger\" style=\"width:96%\"></span></span><span class=\"ds-figure\">9d 11h</span></li></ul>",
-      "css": ".ds-measure { list-style: none; margin: 0; padding: 0; } .ds-measure-row { display: flex; align-items: baseline; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--color-border, #d7d3d3); } .ds-measure-label { flex: 0 0 9rem; font-size: 0.9rem; } .ds-rule { flex: 1; min-width: 3rem; height: 0.5rem; border-bottom: 1px solid var(--color-border, #d7d3d3); display: flex; align-items: flex-end; } .ds-rule-fill { display: block; height: 0.5rem; background: var(--color-accent, #d42b11); opacity: 0.65; } .ds-rule-fill-danger { background: var(--color-refusal, #ae1800); opacity: 0.8; } .ds-figure { font-family: var(--font-mono, ui-monospace, monospace); font-variant-numeric: tabular-nums; font-size: 0.85rem; white-space: nowrap; }"
+      "refersTo": "check-badge-blocker",
+      "description": "A rail row: a mono number leads, the check badge closes. The current row takes the current mark, a ledger wash and weight 800.",
+      "html": "<ol class=\"ds-rail\"><li class=\"ds-rail-row\"><button class=\"ds-rail-main\"><span class=\"ds-rail-num\">1</span><span class=\"ds-rail-name\">Submit request</span></button></li><li class=\"ds-rail-row\"><button class=\"ds-rail-main ds-rail-main-current\" aria-current=\"true\"><span class=\"ds-rail-num\">2</span><span class=\"ds-rail-name ds-rail-name-current\">Manager review</span><span class=\"ds-badge ds-badge-blocker\">2</span></button></li><li class=\"ds-rail-row\"><button class=\"ds-rail-main\"><span class=\"ds-rail-num\">3</span><span class=\"ds-rail-name\">Finance check</span><span class=\"ds-badge ds-badge-advisory\">1</span></button></li></ol>",
+      "css": ".ds-rail { list-style: none; margin: 0; padding: 0; max-width: 20rem; border-right: 2px solid var(--color-divider, color-mix(in srgb, #201e1d 40%, transparent)); } .ds-rail-row { display: flex; border-bottom: 1px solid var(--color-border, #d7d3d3); } .ds-rail-main { display: flex; align-items: baseline; gap: 8px; flex: 1 1 auto; min-width: 0; background: transparent; color: inherit; border: 0; border-radius: 0; padding: 8px 12px; font: inherit; text-align: left; cursor: pointer; } .ds-rail-main:hover { background: var(--color-surface-muted, #eae9e9); } .ds-rail-main:focus-visible { outline: 2px solid var(--color-accent, #d42b11); outline-offset: 2px; } .ds-rail-main-current { background: var(--color-surface-muted, #eae9e9); box-shadow: inset 3px 0 0 var(--color-accent, #d42b11); } .ds-rail-num { flex: none; font-family: var(--font-mono, ui-monospace, monospace); font-variant-numeric: tabular-nums; color: var(--color-text-muted, #605d5d); } .ds-rail-name { flex: 1 1 auto; min-width: 0; } .ds-rail-name-current { font-weight: 800; } .ds-badge { flex: none; align-self: center; font-family: var(--font-mono, ui-monospace, monospace); font-variant-numeric: tabular-nums; font-size: 11px; font-weight: 600; border: 2px solid currentcolor; padding: 0 4px; } .ds-badge-blocker { color: var(--color-refusal, #ae1800); } .ds-badge-advisory { color: var(--color-text-muted, #605d5d); }"
+    },
+    {
+      "name": "Segmented Control",
+      "kind": "custom",
+      "refersTo": "segmented-option",
+      "description": "Options in one row share their edges. A pressed option takes an accent border, accent text and the open mark. Its legend takes the Legend style.",
+      "html": "<fieldset class=\"ds-seg\"><legend class=\"ds-seg-legend\">Step kind</legend><button class=\"ds-seg-opt ds-seg-opt-pressed\" aria-pressed=\"true\">Form</button><button class=\"ds-seg-opt ds-seg-opt-after\" aria-pressed=\"false\">Automatic</button><button class=\"ds-seg-opt ds-seg-opt-after\" aria-pressed=\"false\">Subprocess</button></fieldset>",
+      "css": ".ds-seg { display: flex; gap: 0; border: none; padding: 0; margin: 4px 0; } .ds-seg-legend { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-text-muted, #605d5d); padding: 0 0 4px; width: 100%; } .ds-seg-opt { flex: 1 1 auto; background: transparent; color: var(--color-text, #201e1d); border: 1px solid var(--color-border, #d7d3d3); border-radius: 0; padding: 4px 8px; font: inherit; cursor: pointer; } .ds-seg-opt:hover { background: var(--color-surface-muted, #eae9e9); } .ds-seg-opt:focus-visible { outline: 2px solid var(--color-accent, #d42b11); outline-offset: 2px; } .ds-seg-opt-after { border-left-width: 0; } .ds-seg-opt-pressed { border-color: var(--color-accent, #d42b11); color: var(--color-accent, #d42b11); box-shadow: inset 0 -2px 0 var(--color-accent, #d42b11); }"
+    },
+    {
+      "name": "Warning Callout",
+      "kind": "custom",
+      "refersTo": "warning-callout",
+      "description": "Refusal text beside a 3px rule in the advisory tone, in place next to the value it warns about.",
+      "html": "<p class=\"ds-callout\">This data source has no key column. A field bound to it cannot map its columns.</p>",
+      "css": ".ds-callout { margin: 0; color: var(--color-refusal, #ae1800); border-left: 3px solid #ff9783; padding-left: 8px; max-width: 34rem; }"
     },
     {
       "name": "Error Banner",
       "kind": "custom",
       "refersTo": null,
-      "description": "A failed request reported where its data would have sat. Never a toast. The stamp tilts here, because it marks an error rather than sitting in a row.",
-      "html": "<div class=\"ds-banner\" role=\"alert\"><span class=\"ds-banner-stamp\">Failed</span><p class=\"ds-banner-message\">The instance could not be cancelled. The engine returned 409.</p></div>",
-      "css": ".ds-banner { display: flex; align-items: baseline; gap: 12px; border: 2px solid var(--color-refusal, #ae1800); border-radius: 0; padding: 8px 12px; margin: 12px 0; } .ds-banner-stamp { flex: none; font-family: var(--font-mono, ui-monospace, monospace); font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--color-refusal, #ae1800); border: 2px solid currentcolor; padding: 2px 7px; transform: rotate(-2deg); } .ds-banner-message { flex: 1; margin: 0; color: var(--color-text, #201e1d); }"
+      "description": "A failed request reported where its data would have sat. Never a toast. The refusal stamp stays outlined here and tilts, because it marks an error rather than sitting in a row.",
+      "html": "<div class=\"ds-banner\" role=\"alert\"><span class=\"ds-banner-stamp\">Failed</span><p class=\"ds-banner-message\">The instance could not be cancelled. The engine returned 409.</p><button class=\"ds-banner-retry\">Retry</button></div>",
+      "css": ".ds-banner { display: flex; align-items: baseline; gap: 12px; border: 2px solid var(--color-refusal, #ae1800); border-radius: 0; padding: 8px 12px; margin: 12px 0; } .ds-banner-stamp { flex: none; font-family: var(--font-mono, ui-monospace, monospace); font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-refusal, #ae1800); border: 2px solid currentcolor; padding: 2px 7px; transform: rotate(-2deg); } .ds-banner-message { flex: 1; margin: 0; color: var(--color-text, #201e1d); } .ds-banner-retry { flex: none; font-family: var(--font-heading, system-ui, sans-serif); font-weight: 800; font-size: 14px; background: transparent; color: var(--color-text, #201e1d); border: 1px solid var(--color-divider, color-mix(in srgb, #201e1d 40%, transparent)); border-radius: 0; padding: 8px 14.4px; cursor: pointer; } .ds-banner-retry:hover { background: color-mix(in srgb, var(--color-text, #201e1d) 7%, transparent); } .ds-banner-retry:focus-visible { outline: 2px solid var(--color-accent, #d42b11); outline-offset: 2px; }"
+    },
+    {
+      "name": "Measuring Rule",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "Reporting's one chart form. A hairline track whose accent fill carries a quantity, with the figure printed beside it in mono. The bar is aria-hidden; the number is the content.",
+      "html": "<ul class=\"ds-measure\"><li class=\"ds-measure-row\"><span class=\"ds-measure-label\">Manager review</span><span class=\"ds-rule\" aria-hidden=\"true\"><span class=\"ds-rule-fill\" style=\"width:72%\"></span></span><span class=\"ds-figure\">3d 04h</span></li><li class=\"ds-measure-row\"><span class=\"ds-measure-label\">Finance check</span><span class=\"ds-rule\" aria-hidden=\"true\"><span class=\"ds-rule-fill ds-rule-fill-danger\" style=\"width:96%\"></span></span><span class=\"ds-figure\">9d 11h</span></li></ul>",
+      "css": ".ds-measure { list-style: none; margin: 0; padding: 0; } .ds-measure-row { display: flex; align-items: baseline; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--color-border, #d7d3d3); } .ds-measure-label { flex: 0 0 9rem; font-size: 0.9rem; } .ds-rule { flex: 1; min-width: 3rem; height: 0.5rem; border-bottom: 1px solid var(--color-border, #d7d3d3); display: flex; align-items: flex-end; } .ds-rule-fill { display: block; height: 0.5rem; background: var(--color-accent, #d42b11); opacity: 0.65; } .ds-rule-fill-danger { background: var(--color-refusal, #ae1800); opacity: 0.8; } .ds-figure { font-family: var(--font-mono, ui-monospace, monospace); font-variant-numeric: tabular-nums; font-size: 0.85rem; white-space: nowrap; }"
     }
   ],
   "narrative": {
     "northStar": "The Rubber Stamp Ledger",
-    "overview": "Detent moves a case through explicit states. The interface is the record of that movement. Two devices carry the whole identity. A ruled row holds the case. A stamp marks the state it reached.\n\nNothing floats. No surface pretends to be a card when it is a row in a register. Alignment and rules organize the page. Shadow, color and radius do not.\n\nThe screen prints two kinds of value. Prose takes the written face. A value the engine matches exactly takes the mono face. That split is a signal, not decoration.",
+    "overview": "Detent moves a case through explicit states. The interface is the record of that movement. Two devices carry the whole identity. A ruled row holds the case. A stamp marks the state it reached.\n\nNothing floats. No surface pretends to be a card when it is a row in a register. Alignment and rules organize the page. Shadow, color and radius do not.\n\nThe screen prints two kinds of value. Prose takes the written face. A value the engine matches exactly takes the mono face. The split itself is a signal.\n\nThe studio adds a selection mark in the accent. It shows what is open, pressed or current. A 2px rule sits under an open tab. A 3px rule sits on the leading edge of the current row.",
     "keyCharacteristics": [
-      "Zero radius, everywhere, with no exception.",
-      "Two rule weights, and nothing between them.",
-      "One accent, used as a stamp rather than as a paint.",
+      "Zero radius on every box. Only the canvas's SVG geometry curves.",
+      "Two structural rule weights, and nothing between them.",
+      "One accent, used as a stamp and as a selection mark, never as a ground.",
       "Machine values in mono, prose in the written face.",
       "Flush-left alignment, including inside a wide button."
     ],
     "rules": [
       {
         "name": "The Stamp Rule",
-        "body": "The accent marks state and one primary action per screen. It never becomes the ground under content.",
+        "body": "The accent marks state, selection, and one primary action per screen. It never becomes the ground under content.",
         "section": "colors"
       },
       {
         "name": "The Five Tones Rule",
-        "body": "A stamp has five tones and no sixth. Adding one is a design change, not a screen decision.",
+        "body": "A stamp has five tones and no sixth. Adding one is a design change. A single screen never decides it.",
         "section": "colors"
       },
       {
@@ -338,7 +434,7 @@
       },
       {
         "name": "The Role Rule",
-        "body": "A component reads a semantic role, never a ramp step and never a hex. The three flag tokens are the only exception.",
+        "body": "A component reads a semantic role, never a ramp step and never a hex. The three flag tokens are the only exception. A component compiled with StyleX reads that role from packages/form-ui/src/tokens.stylex.ts, which aliases the same custom property tokens.css declares. Advisory and Dormant still need a role there.",
         "section": "colors"
       },
       {
@@ -358,13 +454,23 @@
       },
       {
         "name": "The Escape Hatch Rule",
-        "body": "A shadow marks an element that left the page. On the page there is no shadow, at rest or on hover.",
+        "body": "A shadow marks an element that left the page. On the page there is no shadow, at rest or on hover. The inset selection mark is the one exception, because it draws a rule.",
         "section": "elevation"
       },
       {
         "name": "The Zero Radius Rule",
-        "body": "Every corner is square. No size, no state and no surface earns a curve.",
+        "body": "Every box is square. No size, no state and no surface earns a curve. The canvas's SVG geometry is the one exception.",
         "section": "shapes"
+      },
+      {
+        "name": "The Mark Rule",
+        "body": "A selection mark shows what is open, pressed or current. It never separates one region from another. Only the accent draws it, at 2px or 3px.",
+        "section": "shapes"
+      },
+      {
+        "name": "The Still Page Rule",
+        "body": "A state changes at once. A new animation counts as a design change.",
+        "section": "components"
       }
     ],
     "dos": [
@@ -372,19 +478,24 @@
       "Do give a screen exactly one filled primary action.",
       "Do print a machine value in mono. That means an id, a hash, a version, a role name, CEL, or a figure in a column.",
       "Do name a state with a stamp in one of the five tones.",
-      "Do style a state from the attribute the DOM already carries: [aria-current=\"page\"], [aria-expanded=\"true\"], :disabled, :focus-visible.",
-      "Do name a class prefix-block-element, one hyphen per level, with a variant as a suffix class.",
-      "Do wrap a row's identifying content in a real control."
+      "Do mark an open, pressed or current item with a selection mark.",
+      "Do declare a component's styles with stylex.create() beside its module.",
+      "Do pick a state's compiled style in code. Read the value that also sets the DOM attribute, such as aria-current.",
+      "Do name a literal class prefix-block-element, one hyphen per level, with a variant as a suffix class.",
+      "Do wrap a row's identifying content in a real control.",
+      "Do give a row of secondary studio commands the authoring command style."
     ],
     "donts": [
       "Don't add a sixth stamp tone.",
       "Don't read a primitive or a hex from a component. Read a role.",
-      "Don't style another area's prefix. Move a shared motif into shell/.",
+      "Don't read another area's style object. Move a shared motif into shell/.",
       "Don't turn success green, or a destructive action red.",
-      "Don't put a shadow on a resting surface, or on a hover state.",
+      "Don't put a drop shadow on a resting surface, or on a hover state.",
+      "Don't draw a structural rule in the accent.",
       "Don't report an error as a toast, or let an empty table stand in for one.",
       "Don't size a control from its English label.",
-      "Don't turn a state into a class name."
+      "Don't turn a state into a class name.",
+      "Don't add a literal class outside the .btn family. Declare a compiled style."
     ]
   }
 }

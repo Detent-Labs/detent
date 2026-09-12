@@ -19,7 +19,8 @@ decoration. No surface pretends to be a card when it is a row in a register.
 
 1. Alignment and rules organize the page, not shadow, color, or radius.
    Everything sits flush left, including labels inside a wide button.
-2. No corner has a radius. `--radius-md` is 0, everywhere, with no exception.
+2. No box has a radius. `--radius-md` is 0 on every box. Only the canvas's
+   SVG geometry curves.
 3. The accent is a stamp, not a paint. It marks state and the one primary
    action per screen.
 4. A value the engine matches exactly uses the mono face. Prose never does.
@@ -40,16 +41,16 @@ directly by a component. No other component reads any of the three
 ## Type
 
 Two faces, one rule each:
-- **The written face** carries everything a person writes: headings at weight
-  800, body copy, labels, and button text at weight 400. No other weight
-  appears. The stack is `system-ui, sans-serif`, from `tokens.css`. Archivo is
+- **The written face** carries everything a person writes. Headings and
+  button text take weight 800, and body copy and labels take weight 400. No
+  other weight appears. The stack is `system-ui, sans-serif`, from `tokens.css`. Archivo is
   the intended face and does not ship yet. Only the two weights bind until it
   lands, and `docs/decisions.md` records that deferral.
 - **Mono** carries everything the engine matches exactly. That includes ids,
   hashes, versions, role names, CEL, and any number that must align in a
   column. The stack is `ui-monospace, "SF Mono", "Cascadia Code", "Roboto
-  Mono", monospace`, unchanged from `tokens.css`. It is a semantic signal,
-  not decoration. A string uses mono only when you can name the reason.
+  Mono", monospace`, unchanged from `tokens.css`. It is a semantic signal.
+  A string uses mono only when you can name the reason.
   Otherwise it uses the body face.
 
 Body copy sits in one measure and never exceeds 68 characters.
@@ -64,9 +65,18 @@ softens into a tint.
   structural rule.
 - 1px hairline: between rows of a register or table. The ledger rule.
 
+A selection mark is a separate class of rule, outside the two weights. It
+marks what is open, pressed or current, and only the accent draws it.
+
+- 2px open mark: under an open tab or a pressed option.
+- 3px current mark: on the leading edge of the current row or card.
+
+A dashed border means not there yet. It marks an incomplete condition, an
+unresolved migration mapping, or a conditionally visible form card.
+
 A participant reads, so the reading column stays narrow. An operator scans,
-so the tool surface goes wide. Radius is 0 everywhere, on every surface,
-with no exception.
+so the tool surface goes wide. Radius is 0 on every box. The canvas's SVG
+geometry is the one exception: its stamps, handles and path corners curve.
 
 ## Icons
 
@@ -89,34 +99,50 @@ decide which of those the menu shows.
 style off a `stampTone`/`badgeTone` lookup on the value it marks. Three
 examples: `app`'s `TasksScreen.tsx`, `admin`'s `InstancesScreen.tsx`,
 `reporting`'s `components.tsx`. Mono, uppercase, tracked, with a 2px
-outline in the current color. Five tones exist and no sixth: adding one
-counts as a design change, not a screen decision.
+border in the current color. Five tones exist and no sixth. Adding one
+counts as a design change, and a single screen never decides it.
 
 The stamp tilts only where it marks an error, in the error banner or the
 boundary fallback. Inside a row or table cell it sits straight: a tilted
 column stops reading as a column. Each row carries one stamp. A second fact
-belongs in the row's own columns, not in a second badge.
+belongs in the row's own columns.
 
-**Stamp or plain text.** The system has one badge form on purpose. The only
-question is whether a value earns one.
+**Stamp or plain text.** The system has one stamp form on purpose. The only
+question is whether a value earns one. The check badge counts open check
+results and names no state.
 
 **Actions.** One primary action appears per screen, filled in the accent.
 Every other action stays outlined or plain. Labels sit flush left in any
-button wider than its text. A disabled action drops to 45% opacity. Focus
-always shows as a 2px accent ring at 2px offset. A destructive action stays
-outlined in the accent and never turns red.
+button wider than its text. A disabled action drops to 45% opacity.
+
+Focus always shows as a 2px accent ring at 2px offset. A field draws it at 0
+offset, and a grid cell at -2px. A destructive action stays outlined in the
+accent and never turns red.
+
+A row of secondary commands in the studio takes the authoring command: a
+ghost button in slate, mono at 11px. The form tab strip in
+`FormTabStrip.tsx` holds one such row. The accent there stays with the open
+tab.
 
 **The register row**, each app-area screen's own `taskList`/`taskRow`
 style pair (`TasksScreen.tsx` and its siblings). Three columns: a stamp,
 an identity, and a right-aligned quantity in the mono face, like a
 ledger's amount column. The row's identifying content is a real control. The
-row itself carries no click handler.
+row itself has no click handler.
 
 Studio's entity rail (`EntityTabs.tsx`'s `railRow`/`railName` styles)
 follows a plainer version of the same rule. A hairline sits between
-entries, and content stays flush left. It carries no stamp, so the rule
-holds without the first column. The steps rail in `StepsRail.tsx` adds one:
-a mono number leads and a mono count closes.
+entries, and content stays flush left. It has no stamp, so the rule holds
+without the first column. A field row leads with its kind icon. The current
+row takes the current mark.
+
+The steps rail in `StepsRail.tsx` adds two columns. A mono number leads, and
+the check badge closes. That badge is a 2px box around a mono count. It
+prints in refusal for a blocker, and in slate for an advisory result.
+
+**The warning callout.** Refusal text sits beside a 3px rule in the advisory
+tone, the accent ramp's light step. The advisory tone has no role in
+`tokens.css` yet.
 
 **The measuring rule**, `reporting/components.tsx`'s `DurationRule`.
 Reports' one chart form is a hairline with an accent fill whose length
@@ -125,7 +151,8 @@ bar carries `aria-hidden`. The number is the content.
 
 **Fields.** Label sits above control, both flush left, 4px apart. A field
 never sits on a filled surface: the border is the field. A focused field
-shows a 2px accent border plus the accent focus ring on top. The error list
+turns its 1px border accent, and the 2px accent ring sits on top at 0 offset.
+The error list
 sits as a sibling of the label. It never nests inside the label.
 
 A field inside a toolbar row is the one exception to the label's place. Its
@@ -174,8 +201,10 @@ and `.studio-dialog`. `web-styling` pins each to its own non-styling
 reason. Those reasons are a keyboard-focus selector, a pan-library
 contract, and a `::backdrop` the compiler cannot reach. Neither of the
 first two has a rule in any stylesheet; only `.studio-dialog::backdrop`
-does, in `shell/global.css`. No other literal class exists anywhere in
-`packages/web` or `packages/form-ui`.
+does, in `shell/global.css`. The shell's own frame, `.shell`, holds the one
+other literal rule there. Some literal class names still appear in markup with no
+rule behind them, such as `app-tasks`, `issue-list` and `empty`. A new component
+adds none.
 
 **Labels and locales.** Every string a person reads comes from a catalog.
 EN and DE ship in the shell, app, admin and reporting catalogs, each reached
