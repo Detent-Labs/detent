@@ -138,3 +138,44 @@ export function groupTargetsFor(fields: DraftField[], fieldId: string): string[]
     .filter((f) => f.type === "group" && f.id !== undefined && f.id !== fieldId && !inside.has(f.id))
     .map((f) => f.id as string);
 }
+
+/**
+ * The id a field's move control takes, so the tab can put focus back on it
+ * after a move re-orders the list (`spa-accessibility`). Lives here, not in
+ * `EntityTabs.tsx`: `FieldCatalogPanel` reads it, and `EntityTabs.tsx`
+ * imports `FieldCatalogPanel` (design.md, decision: "One write, one
+ * announcement, and focus back on the control").
+ */
+export const moveControlId = (fieldId: string) => `studio-field-move-${fieldId}`;
+
+/**
+ * The id of the field currently holding `fieldId` as a child — a group, or a
+ * parent `changeKind` rewrote out of one — or `undefined` at the top level.
+ * `moveTargetsFor` below and `EntityTabs.tsx`'s `moveField` both read this
+ * one lookup, so neither can disagree with the other about a field's parent.
+ */
+export function parentIdOf(fields: DraftField[], fieldId: string): string | undefined {
+  return flattenDraftFields(fields).find((f) => (f.fields ?? []).some((c) => c.id === fieldId))?.id;
+}
+
+/**
+ * Every destination a field's move control offers, plus the group (or
+ * non-group parent) holding it today. `undefined` names the top level.
+ *
+ * `targetIds` orders the top level first, then the current parent when it is
+ * no group — a field can sit inside a parent `changeKind` rewrote from a
+ * group into something else, and the control's value has to name an option
+ * it holds — then every group `groupTargetsFor` returns. `FieldCatalogPanel`'s
+ * move control and `EntityTabs.tsx`'s `FieldsTab` read this one function the
+ * same way, so the two agree on one shared build (design.md, decision: "One
+ * write, one announcement, and focus back on the control").
+ */
+export function moveTargetsFor(
+  fields: DraftField[],
+  fieldId: string,
+): { currentId: string | undefined; targetIds: (string | undefined)[] } {
+  const currentId = parentIdOf(fields, fieldId);
+  const groupTargets = groupTargetsFor(fields, fieldId);
+  const orphanedParent = currentId !== undefined && !groupTargets.includes(currentId) ? [currentId] : [];
+  return { currentId, targetIds: [undefined, ...orphanedParent, ...groupTargets] };
+}
