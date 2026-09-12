@@ -3279,8 +3279,10 @@ Narrow the window to 420px wide. Pass: the rail stands above the step page,
 capped at 20rem tall, and scrolls inside that cap. Every row still shows
 its number, label and move controls, and none show a summary line.
 
-Choose "Discard draft" in the header bar. In the "Discard this draft"
-dialog, choose its own "Discard draft" to leave no draft behind.
+Go back to the process list and choose "Discard" on the `it_offboarding` row.
+Accept the browser's confirm. That leaves no draft behind. The header bar's own
+"Discard draft" does not work, so do not use it here. See the
+`docs/decisions.md` entry DRAFT-1.
 
 ### Steps rail rows in the draft's own order (`steps-rail-follows-author-order`)
 
@@ -3297,5 +3299,8 @@ each on its own fresh draft.
    Pass: the rail now reads "Submit the Exit Notification", "Review the
    Exit Notification" and "Execute the Immediate Lock". Rows two and three
    traded places.
-3. Choose "Discard draft" in the header bar. In the "Discard this draft"
-   dialog, choose its own "Discard draft" to leave no draft behind.
+3. Go back to the process list and choose "Discard" on the `it_offboarding`
+   row, then accept the browser's confirm. Pass: that row reads an em dash
+   under Draft, with "Create draft" back beside "Versions". The header bar's
+   own "Discard draft" does not work, so do not use it here. See the
+   `docs/decisions.md` entry DRAFT-1.

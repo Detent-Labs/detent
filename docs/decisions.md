@@ -1500,6 +1500,14 @@ recorded rather than fixed. The RAIL tags are local to this section.
 - **RAIL-6: the desktop rail is narrower than the phone rail.** The Steps tab
   gives the rail 18rem beside the step page, in `EditScreen.tsx`. Below 64rem
   the rail takes the full width and caps its height at 20rem.
+- **DRAFT-1: the header bar's Discard draft does nothing.** Choose it on a
+  draft's process surface, then choose the dialog's own Discard draft: the
+  dialog stays open, the draft survives, and the process list still lists it.
+  The console reports no error. Measured 2026-09-12 at 1440px and at 420px,
+  during a browser check for another change. The process list's own Discard
+  button does work, through a native browser confirm. Risk (High): the studio
+  has no undo, so an author who means to drop a draft keeps it, and the next
+  session reads that draft as current work.
   Risk (Informational): a long label wraps on a wide screen and fits on a
   narrow one.
 - **A canvas removal drops keyboard focus, and nothing announces it.**

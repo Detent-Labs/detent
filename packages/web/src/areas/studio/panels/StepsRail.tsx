@@ -67,8 +67,8 @@ const styles = stylex.create({
     backgroundColor: colors.surfaceMuted,
     boxShadow: `inset 3px 0 0 ${colors.accent}`,
   },
-  // The step's place in the walk. A number that aligns down a column, so
-  // mono with tabular figures.
+  // The step's place in the draft's own order. A number that aligns down a
+  // column, so mono with tabular figures.
   number: {
     flex: "none",
     fontFamily: fonts.mono,

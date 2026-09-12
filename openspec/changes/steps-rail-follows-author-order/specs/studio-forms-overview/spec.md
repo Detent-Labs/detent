@@ -18,4 +18,5 @@ The tab SHALL lay the cards in a grid that reflows with the window width.
 #### Scenario: The cards follow the steps order
 
 - **WHEN** an author reads the Forms tab
-- **THEN** the first card names the step the steps rail numbers one
+- **THEN** the first card names the first step in the draft's own order that
+  declares a view
