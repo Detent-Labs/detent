@@ -145,7 +145,7 @@ function rowTexts(html: string): string[] {
 }
 
 describe("The steps rail's order and numbering", () => {
-  it("lists every step of the draft, in the order `workflow.steps` holds them", () => {
+  it("renders a row for every step of the draft", () => {
     const html = render();
     const expected = (DRAFT.workflow?.steps ?? []).map((s) => s.label?.en as string);
 
