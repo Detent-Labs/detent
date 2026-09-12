@@ -23,24 +23,29 @@ mark which step the page holds.
 - **THEN** the step page holds that step
 - **AND** the rail marks that row as the current one
 
-### Requirement: The steps rail lists each step by number and label
+### Requirement: The steps rail lists each step in the draft's own order
 
-The rail SHALL list every step of the draft, in reachability order. Non-end
-steps the initial step reaches over paths SHALL come first, nearest first. The
-other non-end steps SHALL follow, in the draft's own order. Every end step
-SHALL come last, in the draft's own order.
+The rail SHALL list every step of the draft, in the order `workflow.steps`
+holds them. No walk over the paths SHALL decide where a row stands.
+
+A row's number SHALL name the step's place in that order. Moving a row earlier
+or later SHALL move it in the rail and in the draft together.
 
 Each row SHALL carry a number and the step's label. A row SHALL have no summary
 line under the label. That holds for every step kind: a task step, a call to
 another process, and an end step. The step page names who works a step, the
 fields its form carries, the process it calls and its outcome.
 
-#### Scenario: The rail numbers steps in reachability order
+#### Scenario: The rail numbers steps in the draft's own order
 
-- **WHEN** a draft's initial step reaches a call step, which reaches an end
-  step
-- **THEN** the rail numbers the initial step one, the call two and the end
-  three
+- **WHEN** a draft holds a call step, then an end step, then a task step
+- **THEN** the rail numbers the call one, the end two and the task three
+
+#### Scenario: A move control moves its own row
+
+- **WHEN** an author presses Move earlier on the rail's third row
+- **THEN** that row stands second
+- **AND** the row that stood second stands third
 
 #### Scenario: A task row names no assignment and no field count
 
