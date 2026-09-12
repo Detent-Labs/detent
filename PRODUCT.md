@@ -20,8 +20,11 @@ of them and what happens next.
 
 Detent serves two further audiences. Neither outranks the two above. The
 operator keeps running instances healthy in the admin area: outbox rows,
-timers, migrations, stuck cases. The process owner reads cycle time,
-bottlenecks and SLA in the reporting area.
+timers, migrations, stuck cases. The operator also manages users, groups,
+data lists and UI string overrides there.
+
+The process owner reads cycle time, bottlenecks and SLA in the reporting
+area. They also build reports, save them, share them and export them as CSV.
 
 ## Product Purpose
 
@@ -40,11 +43,12 @@ claim all four without rebuilding itself.
 - One JSON definition serves three roles. The engine executes it, the studio
   builds it, and a person can hand-author it. No import step and no
   studio-only metadata sit between them.
-- The paradigm is a state-based finite-state machine, not BPMN token flow.
-  Exactly one step is active per instance. Every instance sits at a named
-  state a person can point at.
+- The paradigm is a state-based finite-state machine. BPMN token flow plays
+  no part in it. Exactly one step is active per instance. Every instance sits
+  at a named state a person can point at.
 - No-code and low-code both stay permanent. The builders cover the canvas,
-  forms, guards and plugin config. The JSON view and the CEL input stay
+  the form editor, plugin config, path guards and view overrides. Migration
+  plans and templates have builders too. The JSON view and the CEL input stay
   first-class beside them.
 - The engine's correctness promises are the product. A published version is
   immutable. An instance pins `{processId, version, definitionHash}`. CEL is
@@ -62,8 +66,12 @@ one address serve them.
 
 ## Capabilities and Constraints
 
-The engine stays headless and API-first. It carries no UI dependency. An
+The engine stays headless and API-first. It has no UI dependency. An
 integration drives a process over HTTP with no browser at all.
+
+One engine process can serve many tenants. Each tenant gets a database of its
+own, and a control plane lists them. Without a control plane, the engine runs
+one tenant on `DATABASE_URL`.
 
 Hard v1 boundaries hold until a deliberate decision moves them.
 
@@ -77,7 +85,7 @@ The project is pre-1.0. No deployment runs this engine. No stored instance
 pins a version anybody else depends on. A contract change costs an OpenSpec
 change plus a sweep of the examples, the tests and the authoring guide.
 
-Three domain words carry no synonym here. An operator is the admin area's
+Three domain words have no synonym here. An operator is the admin area's
 audience. A surface is what the studio presents. The phrase `definition
 contract` names the whole JSON definition, while `contract` alone names the
 `ProcessContract` a subprocess declares.
@@ -87,21 +95,13 @@ contract` names the whole JSON definition, while `contract` alone names the
 The product name is Detent. The repository is public, under
 AGPL-3.0-or-later.
 
-Two files carry the visual language, and both bind. The rule set lives in
+Three files carry the visual language, and all three bind. `DESIGN.md`
+holds the tokens and the component rules. The distilled rule set lives in
 `.claude/rules/design-language.md`. The full reference with swatches and
 specimens lives in `tmp/Detent Design Language.dc.html`.
 
-Five rules decide the rest. Alignment and rules organize the page, not shadow
-or color. No corner has a radius. The accent is a stamp, not a paint.
-
-A value the engine matches exactly uses the mono face. A component reads a
-semantic role, never a hex.
-
-The written face is the system stack, `system-ui, sans-serif`. Archivo is
-the intended face and does not ship yet. Both faces come from `tokens.css`.
-Icons are Lucide at 18px with a 1.75 stroke.
-
-The UI ships in English and German. Each area keeps its own catalog.
+The shell, app, admin and reporting areas ship in English and German. The
+studio ships in English only. Each area keeps its own catalog.
 
 ## Evidence on Hand
 
@@ -118,7 +118,7 @@ Real material exists. Use it instead of invented content.
 Nothing else exists yet. There are no customers, no testimonials, no
 benchmarks, no pricing and no case studies. Future work must not invent any.
 
-An open-source core with a commercial layer on top is intent, not fact. No
+An open-source core with a commercial layer on top is intent only. No
 hosted offering and no enterprise edition exists today.
 
 ## Product Principles
