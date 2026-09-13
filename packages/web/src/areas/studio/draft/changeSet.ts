@@ -344,6 +344,23 @@ interface Out {
 
 const newOut = (): Out => ({ properties: [], raw: [] });
 
+const anchorsOf = (members: readonly { anchor: string }[]): string[] => members.map((m) => m.anchor);
+
+/**
+ * One order property for a list whose shared members stand in a different
+ * sequence (D4). Only the anchors both sides hold count: a member added,
+ * removed or moved to another container never makes an order property alone.
+ */
+function orderProperty(key: CatalogKey, before: readonly string[], after: readonly string[], path: string | undefined, out: Out): void {
+  const beforeSet = new Set(before);
+  const afterSet = new Set(after);
+  const from = before.filter((anchor) => afterSet.has(anchor));
+  const to = after.filter((anchor) => beforeSet.has(anchor));
+  if (same(from, to)) return;
+  out.properties.push({ name: t(key), kind: "order", after: plain(t("changeList.value.reordered")) });
+  out.raw.push({ path: path ?? "", kind: "changed", from, to });
+}
+
 function row(group: ChangeGroup, anchor: string, kind: ChangeKind, label: string, out: Out, extra: Partial<ChangeRow> = {}): ChangeRow {
   return { key: `${group}:${anchor}`, group, kind, label, ...extra, properties: out.properties, raw: out.raw };
 }
@@ -390,6 +407,7 @@ function optionProperties(b: FieldMember | undefined, a: FieldMember | undefined
     }
     out.raw.push(...rawOf(bo?.value, ao?.value, octx));
   }
+  orderProperty("changeList.order.options", anchorsOf(before), anchorsOf(after), a && `${a.path}.options`, out);
 }
 
 function leafName(parent: Name, key: string): Name {
@@ -437,6 +455,13 @@ function fieldRows(sb: Side, sa: Side): ChangeRow[] {
     out.properties.push(...keyProperties(b?.value, a?.value, ["id", ...FIELD_LISTS, ...FIELD_KIND_KEYS], ctx));
     out.raw.push(...rawOf(omit(b?.value, FIELD_LISTS), omit(a?.value, FIELD_LISTS), ctx));
     optionProperties(b, a, ctx, out);
+    orderProperty(
+      "changeList.order.fields",
+      (b && sb.fieldChildren.get(b.anchor)) ?? [],
+      (a && sa.fieldChildren.get(a.anchor)) ?? [],
+      a && `${a.path}.fields`,
+      out,
+    );
     if (b && a && out.properties.length === 0) continue;
     const entity = (a ?? b)!;
     rows.push(
@@ -489,6 +514,7 @@ function actionProperties(
     });
     out.raw.push(...rawOf(b?.value, a?.value, { ...ctx, bPath: b?.path, aPath: a?.path }));
   }
+  orderProperty(`changeList.order.${list}`, anchorsOf(before), anchorsOf(after), aListPath, out);
 }
 
 const withoutFireActions = (timer: Obj): Obj =>
@@ -521,6 +547,7 @@ function timerProperties(b: Member | undefined, a: Member | undefined, ctx: Ctx,
       out,
     );
   }
+  orderProperty("changeList.order.timers", anchorsOf(before), anchorsOf(after), a && `${a.path}.timers`, out);
 }
 
 const STEP_ACTION_LISTS = ["onEntry", "onExit", "onCancel"] as const;
@@ -536,6 +563,8 @@ function stepRows(sb: Side, sa: Side): ChangeRow[] {
       actionProperties(list, b?.value[list], a?.value[list], b && `${b.path}.${list}`, a && `${a.path}.${list}`, ctx, out);
     }
     timerProperties(b, a, ctx, out);
+    const ownPaths = (side: Side, step: Member | undefined) => anchorsOf(side.paths.filter((p) => p.step === step));
+    orderProperty("changeList.order.paths", ownPaths(sb, b), ownPaths(sa, a), a && `${a.path}.paths`, out);
     if (b && a && out.properties.length === 0) continue;
     const entity = (a ?? b)!;
     rows.push(row("steps", anchor, kindOf(b, a), labelOf(entity.value, a ? sa : sb), out, { entityKey: str(entity.value.key) }));
@@ -640,6 +669,7 @@ function tabProperties(bView: Obj | undefined, aView: Obj | undefined, bPath: st
     }
     out.raw.push(...rawOf(b?.value, a?.value, tctx));
   }
+  orderProperty("changeList.order.tabs", anchorsOf(before), anchorsOf(after), aPath && `${aPath}.tabs`, out);
 }
 
 function formRows(sb: Side, sa: Side): ChangeRow[] {
@@ -660,6 +690,7 @@ function formRows(sb: Side, sa: Side): ChangeRow[] {
       entryProperties(be, ae, ectx, out);
       out.raw.push(...rawOf(be?.value, ae?.value, ectx));
     }
+    orderProperty("changeList.order.form", anchorsOf(before), anchorsOf(after), aPath && `${aPath}.fields`, out);
     tabProperties(bView, aView, bPath, aPath, ctx, out);
     out.properties.push(...keyProperties(bView, aView, VIEW_LISTS, ctx));
     out.raw.push(...rawOf(omit(bView, VIEW_LISTS), omit(aView, VIEW_LISTS), ctx));
@@ -692,7 +723,9 @@ function memberListProperties(list: MemberList, bList: unknown, aList: unknown, 
     if (list === "inputFields" || list === "outputFields") return typeof member === "string" ? plain(fieldLabel(member, side)) : json(member);
     return typeof member === "string" ? { text: member, mono: true } : json(member);
   };
-  for (const { b, a } of pair(members(bList), members(aList))) {
+  const before = members(bList);
+  const after = members(aList);
+  for (const { b, a } of pair(before, after)) {
     if (b && a) continue;
     out.properties.push({
       ...propName(list),
@@ -702,6 +735,7 @@ function memberListProperties(list: MemberList, bList: unknown, aList: unknown, 
     });
     out.raw.push(a ? { path: a.path, kind: "added", to: a.value } : { path: b!.path, kind: "removed", from: b!.value });
   }
+  orderProperty(`changeList.order.${list}`, anchorsOf(before), anchorsOf(after), listPath, out);
 }
 
 function contractRows(sb: Side, sa: Side): ChangeRow[] {
@@ -734,6 +768,9 @@ function processRows(sb: Side, sa: Side): ChangeRow[] {
   out.raw.push(...rawOf(omit(bWorkflow, WORKFLOW_LISTS), omit(aWorkflow, WORKFLOW_LISTS), wctx));
 
   memberListProperties("allowedGroups", b.allowedGroups, a.allowedGroups, "allowedGroups", ctx, out);
+  orderProperty("changeList.order.fields", sb.fieldChildren.get("") ?? [], sa.fieldChildren.get("") ?? [], "fields", out);
+  orderProperty("changeList.order.dataSources", anchorsOf(sb.dataSources), anchorsOf(sa.dataSources), "dataSources", out);
+  orderProperty("changeList.order.steps", anchorsOf(sb.steps), anchorsOf(sa.steps), "workflow.steps", out);
 
   if (out.properties.length === 0) return [];
   return [row("process", "process", "changed", labelOf(a, sa), out, { entityKey: str(a.key) ?? str(b.key) })];
