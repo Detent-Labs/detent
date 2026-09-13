@@ -2855,6 +2855,82 @@ open a field's editor. Pass: its Key input and its move control both stay
 inside their own column. Pass: `document.documentElement.scrollWidth`
 equals `clientWidth` at that width too.
 
+### The Fields view inside a group (`group-child-own-editor`)
+
+Source: `group-child-own-editor` tasks 4.4 and 4.5.
+
+Open the IT Offboarding draft on the Fields tab, at
+`/studio/processes/<id>/edit/fields`. The rail lists 51 rows: 7 groups and
+44 fields.
+
+Choose "Forward to this address" in "Data backup and email". Pass: that
+entry alone carries the current mark (`aria-current`), and the group's own
+entry and its siblings carry none. The view shows the field's own two
+halves, definition and effect.
+
+Scroll that field's editor down to its "Validation" zone, then choose
+"Hardware". Pass: the new editor opens at its top, at "What this field
+asks". It shows the "Fields inside this group" zone below "Validation".
+
+Scroll the rail so "Processing (Fabrikam)" (18 fields) shows and its last field,
+"Backup data deleted on", does not. Choose "Processing (Fabrikam)", then press
+"+ Add field to this group".
+
+Pass: the group now holds 19 fields, and the new entry, "(unnamed field)",
+carries the current mark. A focus ring shows around its own label input.
+The rail shows that same entry, scrolled no further than it needed to.
+Nothing animates: the rail lands there at once.
+
+Scroll the rail back up until the four fields inside "Hardware", and the
+"Permissions" entry right after them, both show. Choose "Hardware" again
+and press "+ Add field to this group" once more. Pass: the rail keeps its
+scroll position exactly, and the new entry still carries the current mark.
+
+The group "Notification" holds four fields. Choose its first field, "Early
+notice already on file". Click "Remove field". Pass: "Remarks", the field
+that followed it, becomes selected, and "Notification" now holds three
+fields.
+
+Choose "Submitted on", now the last of those three. Click "Remove field".
+Pass: "Submitted by", the field before it, becomes selected. It holds two
+fields now, "Remarks" and "Submitted by".
+
+On "Remarks", change its key to `my-field`. Pass: the check stands inside
+its own "What this field asks" zone, and that zone's heading takes the
+refusal tone. Its own rail entry carries the issue mark, and the
+"Notification" entry and editor carry none for it.
+
+Choose "Permissions". In its own move control, "Move this field to", pick
+"Hardware". Pass: "Permissions" indents once under "Hardware". The live
+region reads "Permissions moved into Hardware."
+
+Choose "Access Excel updated or prepared", the only field inside
+"Permissions". Pass: the rail's two-level cap treats that entry like a
+top-level row, unindented. It draws right after the "Permissions" entry,
+and it opens its own editor, with both halves.
+
+Click "Remove field" there. Pass: "Permissions", now empty, becomes
+selected.
+
+Choose `immediate_lock_written_confirmation` ("Written confirmation of the
+immediate lock obtained"). Pass: the rail entry truncates on one line. The
+editor's heading and its label input both hold the whole label, wrapped
+rather than clipped.
+
+Narrow the window below 64rem. Pass: the rail stands above the editor, in
+that reading order.
+
+Scroll back to "Forward to this address" in "Data backup and email" and
+choose it again. Pass: the same current mark and two-halves outcome holds.
+
+Scroll to "Processing (Fabrikam)" so its own entry shows while its last field
+stays hidden. Choose it. Press "+ Add field to this group" again. Pass: the
+same focus, current mark and no-scroll-animation outcomes hold, and the
+group now holds 20 fields.
+
+Focus, scroll position and the current mark need a live draft store and a
+real DOM.
+
 ### Borders and fills that the compiler dropped (`stylex-shorthand-repair`)
 
 StyleX emits no `border` rule and no `background` rule, so 113 declarations
