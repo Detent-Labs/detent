@@ -129,13 +129,15 @@ const styles = stylex.create({
   stampRemoved: {
     color: colors.dormant,
   },
+  // `overflowWrap` inherits, so a long mono label, key or property name
+  // wraps anywhere instead of overflowing its column.
   identity: {
     minWidth: 0,
+    overflowWrap: "anywhere",
   },
   entityKey: {
     marginInlineStart: space.s2,
     color: colors.textMuted,
-    overflowWrap: "anywhere",
   },
   context: {
     display: "block",
@@ -149,6 +151,7 @@ const styles = stylex.create({
     gap: space.s2,
     gridColumn: { default: "auto", "@media (max-width: 40rem)": "2" },
     minWidth: 0,
+    overflowWrap: "anywhere",
     fontSize: 13,
     color: colors.textMuted,
     textAlign: { default: "right", "@media (max-width: 40rem)": "left" },
