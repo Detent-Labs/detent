@@ -106,12 +106,14 @@ const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&
  * parsed tree decides, through `memberPath`, the way the condition builder
  * reads CEL: `'data.amount'` inside a string literal reads nothing, and an
  * index read such as `data["amount"]` goes uncounted. Source that fails to
- * parse reads a key when its text holds `data.<key>` on word boundaries.
+ * parse reads a key when its text holds `data.<key>` on word boundaries, with
+ * no identifier character or dot before `data`. So `child.data.<key>` reads
+ * nothing there either, as in the tree.
  */
 function keyReader(keys: readonly string[]): (src: string) => boolean {
   if (keys.length === 0) return () => false;
   const paths = new Set(keys.map((key) => `data.${key}`));
-  const patterns = keys.map((key) => new RegExp(`\\bdata\\.${escapeRegExp(key)}\\b`));
+  const patterns = keys.map((key) => new RegExp(`(?<![\\w.])data\\.${escapeRegExp(key)}\\b`));
   return (src) => {
     const ast = parseAst(src);
     if (!ast || !isCelNode(ast)) return patterns.some((pattern) => pattern.test(src));
@@ -133,8 +135,10 @@ function keyReader(keys: readonly string[]): (src: string) => boolean {
  * field holds.
  *
  * The settings walk names no plugin type. A string equal to a removed id
- * counts inside any `config`: on an action, a data source, an assignment
- * strategy, or the `type` of a plugin-typed field that stays.
+ * counts inside any object under a `config` key: on an action, a data source,
+ * an assignment strategy, or the `type` of a plugin-typed field that stays. A
+ * record entry keyed `config` whose value is no object, such as a column
+ * mapping's target, is no plugin config.
  */
 // ponytail: parses every CEL expression the draft holds on each call, so a
 // caller runs it once per press of Remove field, never per render. Cache the
@@ -187,7 +191,7 @@ export function fieldRemovalReach(draft: Draft, fieldId: string): FieldRemovalRe
     }
     for (const [key, child] of Object.entries(record)) {
       if (idKeyedMaps.has(record) && ids.has(key)) continue;
-      visit(child, inConfig || key === "config");
+      visit(child, inConfig || (key === "config" && typeof child === "object" && child !== null));
     }
   };
   visit(draft, false);

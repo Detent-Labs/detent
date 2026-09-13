@@ -51,6 +51,9 @@ const stepsOf = (...steps: ReturnType<typeof step>[]) => ({ workflow: { initialS
 /** An action at any of the five positions. */
 const action = (actionId: string, parts: Record<string, unknown> = {}) => ({ id: actionId, type: "http.request", config: {}, ...parts });
 
+/** An automatic path back to `step_a`, guarded by `src`. */
+const guarded = (pathId: string, src: string) => ({ id: pathId, key: pathId, label: pathId, to: "step_a", trigger: "automatic", guard: cel(src) });
+
 const NONE: Omit<FieldRemovalReach, "field"> = {
   fieldsInside: 0,
   steps: 0,
@@ -183,45 +186,44 @@ describe("fieldRemovalReach", () => {
     expect(fieldRemovalReach(draft, "fld_name")).toMatchObject({ ...NONE, columnMappings: 2 });
   });
 
-  it("counts each kept expression that reads the key, wherever the draft holds it", () => {
-    const draft = draftOf({
-      fields: [
-        leaf("fld_amount", "amount"),
-        leaf("fld_note", "note", { default: cel("data.amount * 2.0"), validation: { rule: cel("data.amount > 0.0") } }),
-      ],
-      ...stepsOf(
-        step("step_form", {
-          ...viewOf(
-            ref("fld_note", {
-              visible: cel("data.amount > 10.0"),
-              required: cel("data.amount > 100.0"),
-              readonly: cel("data.amount > 1000.0"),
-              validation: { rule: cel("data.amount < 5.0") },
-            }),
-            note({ visible: cel("data.amount > 1.0") }),
-          ),
-          timers: [{ id: "timer_a", deadline: cel("data.amount"), onFire: {} }],
-          onEntry: [action("act_start", { type: "process.start", config: { inputMapping: { fld_child: cel("data.amount") } } })],
-        }),
-        step("step_call", {
+  /** The removed field `amount`, a staying field `total` that `extra` extends,
+   * and `steps`: a draft that holds one expression site. */
+  const readSite = (extra: DraftField, ...steps: ReturnType<typeof step>[]) =>
+    draftOf({ fields: [leaf("fld_amount", "amount"), leaf("fld_total", "total", extra)], ...stepsOf(...steps) });
+  const readsAmount = () => cel("data.amount > 1.0");
+  const keptReadSites: [site: string, siteDraft: Draft][] = [
+    ["a staying field's default", readSite({ default: readsAmount() })],
+    ["a staying field's validation rule", readSite({ validation: { rule: readsAmount() } })],
+    ["a kept view entry's visible flag", readSite({}, step("step_a", viewOf(ref("fld_total", { visible: readsAmount() }))))],
+    ["a kept view entry's required flag", readSite({}, step("step_a", viewOf(ref("fld_total", { required: readsAmount() }))))],
+    ["a kept view entry's readonly flag", readSite({}, step("step_a", viewOf(ref("fld_total", { readonly: readsAmount() }))))],
+    ["a kept view entry's validation rule", readSite({}, step("step_a", viewOf(ref("fld_total", { validation: { rule: readsAmount() } }))))],
+    ["a kept note's visible flag", readSite({}, step("step_a", viewOf(note({ visible: readsAmount() }))))],
+    ["a path guard", readSite({}, step("step_a", { paths: [guarded("path_a", "data.amount > 1.0")] }))],
+    ["a timer deadline", readSite({}, step("step_a", { timers: [{ id: "timer_a", deadline: readsAmount(), onFire: {} }] }))],
+    [
+      "a process.start mapping value inside an action config",
+      readSite({}, step("step_a", { onEntry: [action("act_start", { type: "process.start", config: { inputMapping: { fld_child: readsAmount() } } })] })),
+    ],
+    [
+      "a subprocess input mapping value",
+      readSite(
+        {},
+        step("step_a", {
           type: "subprocess",
-          subprocess: {
-            processId: "proc_child",
-            versionBinding: "pinned",
-            pinnedVersion: 1,
-            inputMapping: { fld_child: cel("data.amount") },
-            outputMapping: {},
-          },
-          paths: [{ id: "path_big", key: "big", label: "Big", to: "step_form", trigger: "automatic", guard: cel("data.amount > 1.0") }],
+          subprocess: { processId: "proc_child", versionBinding: "pinned", pinnedVersion: 1, inputMapping: { fld_child: readsAmount() }, outputMapping: {} },
         }),
       ),
-    });
+    ],
+  ];
 
-    expect(fieldRemovalReach(draft, "fld_amount")).toMatchObject({ ...NONE, celReads: 11 });
-  });
+  for (const [site, siteDraft] of keptReadSites) {
+    it(`counts one read in ${site}`, () => {
+      expect(fieldRemovalReach(siteDraft, "fld_amount")).toMatchObject({ ...NONE, celReads: 1 });
+    });
+  }
 
   it("counts an expression once however often it reads removed keys, and reads the parsed tree rather than the text", () => {
-    const guarded = (pathId: string, src: string) => ({ id: pathId, key: pathId, label: pathId, to: "step_a", trigger: "automatic", guard: cel(src) });
     const draft = draftOf({
       fields: [group("fld_group", "grp", [leaf("fld_amount", "amount"), leaf("fld_limit", "limit")]), leaf("fld_amounts", "amounts")],
       ...stepsOf(
@@ -240,7 +242,6 @@ describe("fieldRemovalReach", () => {
   });
 
   it("counts an expression that fails to parse when its text reads the key on word boundaries", () => {
-    const guarded = (pathId: string, src: string) => ({ id: pathId, key: pathId, label: pathId, to: "step_a", trigger: "automatic", guard: cel(src) });
     const draft = draftOf({
       fields: [leaf("fld_amount", "amount"), leaf("fld_amounts", "amounts")],
       ...stepsOf(
@@ -256,6 +257,13 @@ describe("fieldRemovalReach", () => {
     });
 
     expect(fieldRemovalReach(draft, "fld_amount")).toMatchObject({ ...NONE, celReads: 2 });
+  });
+
+  it("counts no unparseable text that reads child.data.<key>, as the parsed tree counts none", () => {
+    const guardedBy = (src: string) => draftOf({ fields: [leaf("fld_amount", "amount")], ...stepsOf(step("step_a", { paths: [guarded("path_a", src)] })) });
+
+    expect(fieldRemovalReach(guardedBy("child.data.amount >"), "fld_amount")).toMatchObject({ ...NONE, celReads: 0 });
+    expect(fieldRemovalReach(guardedBy("data.amount >"), "fld_amount")).toMatchObject({ ...NONE, celReads: 1 });
   });
 
   it("counts every string value inside any plugin config that equals the id, and none outside a config", () => {
@@ -360,6 +368,14 @@ describe("fieldRemovalReach leaves out what the removal takes along", () => {
     });
 
     expect(fieldRemovalReach(draft, "fld_group")).toMatchObject({ ...NONE, fieldsInside: 3, columnMappings: 1, pluginSettings: 1 });
+  });
+
+  it("counts a column mapping keyed config as a column mapping, not as a plugin setting", () => {
+    const draft = draftOf({
+      fields: [leaf("fld_target", "target"), leaf("fld_lookup", "lookup", { columnMapping: { config: id("fld_target") } })],
+    });
+
+    expect(fieldRemovalReach(draft, "fld_target")).toMatchObject({ ...NONE, columnMappings: 1, pluginSettings: 0 });
   });
 
   it("counts no read for an output or output mapping entry the removal takes along", () => {
