@@ -370,12 +370,14 @@ A selection mark belongs to a separate class, which Shapes describes.
 
 The layout changes at these widths:
 
-- **30rem:** the header wraps, and the nav takes a row of its own. The profile
-  register drops to one column.
+- **30rem:** the nav takes a line of its own, under the register tab and the
+  account group. The profile register drops to one column.
 - **40rem:** an app register row drops to one column. Its quantity moves to
   the left.
 - **64rem:** a studio tab body stacks its columns. A rail leaves its side
   column and caps its height at 20rem.
+- **80rem:** the form editor's preview leaves its column. It stands under the
+  palette and the canvas, with the 2px divider on its top edge.
 - **Container queries:** the step form stacks at 34rem of its own width, and
   the player at 64rem.
 
@@ -542,7 +544,10 @@ stamp. The steps rail and the form card carry it.
 ### Navigation
 
 - **Header:** a flex row on the ledger surface, 8px by 12px padding, with the
-  2px divider under it.
+  2px divider under it. It wraps at every width, with a 12px gap between
+  lines. The identity span shortens to its 6rem floor first. Then the account
+  group takes a line of its own, at the trailing edge. The muted ground and
+  the divider span every line.
 - The register tab names the open area: mono, 11px, tracked 0.14em, accent
   fill, paper text, trailing edge clipped.
 - One tab shows at a time. The other three areas live in the account menu,
@@ -588,7 +593,11 @@ stamp. The steps rail and the form card carry it.
 Three strips share one tab language. The process surface has the tab row.
 The form editor has the form tab strip, and the step form has its own tabs.
 
-- **Row:** one line that scrolls sideways, with the 2px divider under it.
+- **Row:** one line that scrolls sideways, with the 2px divider under it. The
+  row jumps to keep the open tab whole in view. That tab keeps 32px clear of
+  an edge the row can still scroll past. An edge with tabs past it takes a 24px edge fade. The
+  fade leaves the divider and the scrollbar at full strength, and forced
+  colors drop it.
 - **Tab:** transparent, 8px by 12px padding. Hover washes to the ledger
   surface.
 - **Open tab:** weight 800 and the open mark, with no fill.

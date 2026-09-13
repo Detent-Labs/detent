@@ -26,11 +26,11 @@ codebase, "chrome" names the one header every area shares.
 ### The shell
 
 Every area's chrome is one component, `Chrome.tsx` in `src/shell/`. It wraps
-whichever area is open and renders the same header row around it every time.
+whichever area is open and renders the same header around it every time.
 
 | Term | Names | Lives in |
 |---|---|---|
-| header | the one fixed row atop every area, holding the register tab, the area nav and the account group | `Chrome.tsx` |
+| header | the top of every area, holding the register tab, the area nav and the account group. It wraps where its items run out of room | `Chrome.tsx` |
 | register tab | the label naming the open area, at the header's left edge; full definition in `design-language.md` | `Chrome.tsx` |
 | area nav | the open area's own navigation buttons, right of the register tab | passed into `Chrome` as its `nav` prop |
 | account group | the identity span and the account menu trigger, right-aligned in the header | `Chrome.tsx` |
@@ -53,6 +53,7 @@ nav, the header bar, the tab row, then one tab body.
 | screen nav | the row above the header bar. It holds Back to processes and nothing else | `screens/EditScreen.tsx` |
 | header bar | the process-identity row: name, key, revision, dirty/saved state, Save, Discard draft, Publish, the `⋮` menu | `panels/ProcessHeaderBar.tsx` |
 | tab row | the row of ten tabs over the body | `panels/ProcessTabRow.tsx` |
+| edge fade | the fade at an edge of the tab row with more tabs past it | `panels/ProcessTabRow.tsx` |
 | tab | one of the ten. The authoring order runs Canvas, Steps, Fields, Data sources, Paths, Forms, Field matrix, Contract, Changes and Checks | `routing.ts` |
 | structure surface | the ten tab bodies together, the JSON surface's one alternative | `EditScreen.tsx`, its `structureActive` prop |
 | JSON surface | the raw definition view, the structure surface's one alternative | `panels/JsonView.tsx` |
@@ -92,7 +93,7 @@ Every other term below belongs to one tab.
 | paths | the Paths tab, listing every path in the process, one row each | `panels/PathsView.tsx`, `panels/pathRows.ts` |
 | Forms tab | the tab holding one card per step that declares a view, with a legend above the cards | `panels/FormsTab.tsx` |
 | form card | one bordered plate on the Forms tab. It carries a kicker, a heading, a count and a miniature | `panels/formCardRows.ts` |
-| form preview | the form editor's right pane, mounting the renderer a participant meets | `panels/FormPreview.tsx` |
+| form preview | the form editor's trailing pane, under the canvas at 80rem and below, mounting the renderer a participant meets | `panels/FormPreview.tsx` |
 | form tab strip | the row of a step form's own tabs, above the form canvas | `panels/FormTabStrip.tsx` |
 | checks rail | the validation issue list, grouped by check | `panels/ChecksRail.tsx` |
 
