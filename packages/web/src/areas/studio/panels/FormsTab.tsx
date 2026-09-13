@@ -30,7 +30,9 @@ const styles = stylex.create({
   card: {
     display: "flex",
     flexDirection: "column",
-    gap: space.s2,
+    // 4px, not 8: the height budget in design.md ("The height budget") needs
+    // it to fit four rows of IT Offboarding's cards in the tab body.
+    gap: space.s1,
     minWidth: 0,
     borderWidth: 1,
     borderStyle: "solid",
@@ -158,10 +160,38 @@ const styles = stylex.create({
     paddingInline: space.s3,
     marginBlock: 0,
   },
-  // The plate's own control sits on its foot, so every plate in a row puts it
-  // on one line however many entries the miniature above it draws.
-  openControl: {
+  // The foot row: the count on the left, the authoring command on the right
+  // (design.md: "The count moves to the foot"). `marginBlockStart: "auto"`
+  // sits on the row rather than on the button alone now, so every plate in a
+  // row puts its foot on one line however many entries the miniature above
+  // it draws.
+  foot: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: space.s2,
     marginBlockStart: "auto",
+    minWidth: 0,
+  },
+  // The authoring command (design.md: "The open control becomes an
+  // authoring command"). The same treatment `FormTabStrip.tsx` calls
+  // `control` — mono face at 11px in `textMuted`, a `surfaceMuted` hover
+  // wash and an ink-14% press wash — copied here rather than exported,
+  // since `design-language.md` allows a deliberate duplicate and exporting
+  // it would tie a Forms tab restyle to the form editor's own file. One
+  // value departs from that treatment: block padding drops from `.btn`'s
+  // 8px default to 4px, the `button-authoring` token's own `8px 4px` in
+  // `DESIGN.md`.
+  openControl: {
+    fontFamily: fonts.mono,
+    fontSize: 11,
+    color: colors.textMuted,
+    paddingBlock: space.s1,
+    backgroundColor: {
+      default: "transparent",
+      ":hover": colors.surfaceMuted,
+      ":active": `color-mix(in srgb, ${colors.text} 14%, transparent)`,
+    },
   },
 });
 
@@ -203,13 +233,6 @@ function FormCard({ row, onOpenForm, onOpenChecks }: { row: FormCardRow } & Prop
         <span {...stylex.props(styles.identity)}>
           <span {...stylex.props(styles.kicker)}>{t(`stepRole.${row.role}`)}</span>
           <span {...stylex.props(styles.name)}>{row.label}</span>
-          <span {...stylex.props(styles.count)}>
-            {empty
-              ? t("formsTab.emptyForm")
-              : row.fieldCount === 1
-                ? t("formsTab.fieldCountOne")
-                : t("formsTab.fieldCount").replace("{count}", String(row.fieldCount))}
-          </span>
         </span>
         {row.issues.count > 0 && (
           <button
@@ -223,13 +246,22 @@ function FormCard({ row, onOpenForm, onOpenChecks }: { row: FormCardRow } & Prop
         )}
       </div>
       <Miniature row={row} />
-      <button
-        type="button"
-        className={`btn btn-secondary ${stylex.props(styles.openControl).className ?? ""}`}
-        onClick={() => onOpenForm(row.stepId)}
-      >
-        {t(empty ? "formsTab.startForm" : "formsTab.openForm")}
-      </button>
+      <div {...stylex.props(styles.foot)}>
+        <span {...stylex.props(styles.count)}>
+          {empty
+            ? t("formsTab.emptyForm")
+            : row.fieldCount === 1
+              ? t("formsTab.fieldCountOne")
+              : t("formsTab.fieldCount").replace("{count}", String(row.fieldCount))}
+        </span>
+        <button
+          type="button"
+          className={`btn btn-ghost ${stylex.props(styles.openControl).className ?? ""}`}
+          onClick={() => onOpenForm(row.stepId)}
+        >
+          {t(empty ? "formsTab.startForm" : "formsTab.openForm")}
+        </button>
+      </div>
     </li>
   );
 }

@@ -108,7 +108,7 @@ describe("The Forms tab's plates", () => {
   });
 
   it("counts the field entries a plate's view holds", () => {
-    expect(render()).toContain("1 field");
+    expect(render()).toContain(">1 field<");
   });
 
   it("counts a view holding several entries in its own sentence", () => {
@@ -126,7 +126,7 @@ describe("The Forms tab's plates", () => {
       },
     } as unknown as Draft;
 
-    expect(render({ draft: four })).toContain("4 fields");
+    expect(render({ draft: four })).toContain(">4 fields<");
   });
 
   it("names a view holding no entry as an empty form", () => {
@@ -138,6 +138,20 @@ describe("The Forms tab's plates", () => {
 
     expect(html).toContain("Start the form");
     expect(html).toContain("Open the form");
+  });
+
+  it("puts the count in the foot, after the miniature and before the open control", () => {
+    // studio-forms-overview: "The count stands beside the open control" —
+    // the field count and the open control share the card's last row, after
+    // the miniature that stands above it.
+    const html = render();
+    const miniatureIndex = html.indexOf('role="img"');
+    const countIndex = html.indexOf(">1 field<");
+    const controlIndex = html.indexOf("Open the form");
+
+    expect(miniatureIndex).toBeGreaterThan(-1);
+    expect(countIndex).toBeGreaterThan(miniatureIndex);
+    expect(controlIndex).toBeGreaterThan(countIndex);
   });
 
   it("says so in words when no step declares a form at all", () => {
