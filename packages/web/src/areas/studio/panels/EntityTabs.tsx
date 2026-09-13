@@ -315,10 +315,11 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
 
   // The editor pane scrolls on its own; opening a different field's editor
   // resets that scroll to the top rather than keeping the previous field's
-  // position. No `behavior` option, so the jump is immediate.
+  // position. `behavior: "instant"` makes the jump immediate whatever
+  // `scroll-behavior` a stylesheet sets.
   const editorRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    editorRef.current?.scrollTo({ top: 0 });
+    editorRef.current?.scrollTo({ top: 0, behavior: "instant" });
   }, [selectedFieldId]);
 
   // React reorders keyed rows by moving the existing DOM nodes, which usually
@@ -330,7 +331,7 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
     if (refocusId === undefined) return;
     document.getElementById(refocusId)?.focus();
     if (refocusRailId !== undefined) {
-      document.getElementById(refocusRailId)?.scrollIntoView({ block: "nearest" });
+      document.getElementById(refocusRailId)?.scrollIntoView({ block: "nearest", behavior: "instant" });
     }
     setRefocusId(undefined);
     setRefocusRailId(undefined);
