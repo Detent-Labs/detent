@@ -38,8 +38,8 @@
 
 ## 7. Verification
 
-- [ ] 7.1 Run `bun run typecheck`, then `bun run build`, in the devcontainer. Verify: both exit 0.
-- [ ] 7.2 Run the full `bun test` with `DATABASE_URL` set, piped through `scripts/gates/silent-green.sh`. Verify: no named failure.
-- [ ] 7.3 Run the prose gate and the whitespace gate over the pushed range. Verify: both pass.
-- [ ] 7.4 Walk the new `docs/browser-checks.md` entries in a real browser, at desktop width and at 400px. Verify: every pass line holds.
+- [x] 7.1 Run `bun run typecheck`, then `bun run build`, in the devcontainer. Verify: both exit 0.
+- [x] 7.2 Run the full `bun test` with `DATABASE_URL` set, piped through `scripts/gates/silent-green.sh`. Verify: no named failure.
+- [x] 7.3 Run the prose gate and the whitespace gate over the pushed range. Verify: both pass.
+- [x] 7.4 Walk the new `docs/browser-checks.md` entries in a real browser, at desktop width and at 400px. Verify: every pass line holds.
 - [ ] 7.5 Run `/impeccable critique`, `/impeccable audit`, the detector and `web-design-guidelines` on both changed screens. Verify: no open finding remains.
