@@ -26,6 +26,15 @@
         "value": "#726e6e",
         "createdAt": "2026-09-04T21:20:03.437Z",
         "reason": "design.json records it as .ds-stamp-dormant; the detector reads the token palette only. Copied verbatim from app-area InvolvedScreen.tsx's stampDormant."
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "0.8rem",
+        "files": [
+          "packages/web/src/areas/studio/panels/FieldCatalogPanel.tsx"
+        ],
+        "createdAt": "2026-09-13T00:51:59.814Z",
+        "reason": "0.8rem is the studio's secondary step (28 sites; PanelsScreen.tsx carries the same exception). The translation badge beside the label input is muted meta print, like the timeline meta line DESIGN.md sets at 0.8rem; a ramp step would outweigh the label it annotates. The line predates group-child-own-editor. Scoped to this file."
       }
     ]
   }
