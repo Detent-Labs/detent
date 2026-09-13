@@ -219,32 +219,48 @@ interface Side {
   fieldById: Map<string, Obj>;
   stepById: Map<string, Obj>;
   dataSourceById: Map<string, Obj>;
+  /** JSON path to value, for every shape the walker does not expect. Each
+   * reads as JSON on the Process row. */
+  unexpected: Map<string, unknown>;
 }
 
-/** Hands out the anchors of one collection on one side (D2). */
-function anchorer(): (base: unknown) => string | undefined {
-  return (base) => (typeof base === "string" && base !== "" ? base : undefined);
+/**
+ * Hands out the anchors of one collection on one side (D2). A member with no
+ * anchor takes `#<path>`, its JSON path, which is unique per side. A member
+ * whose anchor an earlier member already holds takes `<anchor>#<n>`, so it
+ * pairs with the n-th occurrence on the other side.
+ */
+function anchorer(): (base: unknown, path: string) => string {
+  const seen = new Map<string, number>();
+  return (base, path) => {
+    const anchor = typeof base === "string" && base !== "" ? base : `#${path}`;
+    const n = (seen.get(anchor) ?? 0) + 1;
+    seen.set(anchor, n);
+    return n === 1 ? anchor : `${anchor}#${n}`;
+  };
 }
 
-/** A list's object members with their JSON paths. */
-function membersOf(list: unknown, listPath: string): { value: Obj; path: string; index: number }[] {
-  if (!Array.isArray(list)) return [];
+/** A list's object members with their JSON paths. A list that is no array,
+ * and a member that is no object, land on `side.unexpected`. */
+function membersOf(list: unknown, listPath: string, side: Side): { value: Obj; path: string; index: number }[] {
+  if (list === undefined) return [];
+  if (!Array.isArray(list)) {
+    side.unexpected.set(listPath, list);
+    return [];
+  }
   const members: { value: Obj; path: string; index: number }[] = [];
   list.forEach((value, index) => {
-    if (isObj(value)) members.push({ value, path: `${listPath}[${index}]`, index });
+    const path = `${listPath}[${index}]`;
+    if (isObj(value)) members.push({ value, path, index });
+    else side.unexpected.set(path, value);
   });
   return members;
 }
 
 /** A list's members anchored on one key of each member. */
-function anchoredMembers(list: unknown, listPath: string, key: string): Member[] {
+function anchoredMembers(list: unknown, listPath: string, key: string, side: Side): Member[] {
   const take = anchorer();
-  const members: Member[] = [];
-  for (const m of membersOf(list, listPath)) {
-    const anchor = take(m.value[key]);
-    if (anchor !== undefined) members.push({ ...m, anchor });
-  }
-  return members;
+  return membersOf(list, listPath, side).map((m) => ({ ...m, anchor: take(m.value[key], m.path) }));
 }
 
 function readSide(body: Obj, locale: string | undefined): Side {
@@ -261,15 +277,18 @@ function readSide(body: Obj, locale: string | undefined): Side {
     fieldById: new Map(),
     stepById: new Map(),
     dataSourceById: new Map(),
+    unexpected: new Map(),
   };
+  for (const key of ["workflow", "contract"]) {
+    if (body[key] !== undefined && !isObj(body[key])) side.unexpected.set(key, body[key]);
+  }
 
   // Fields pair across the whole catalog, in depth-first order.
   const takeField = anchorer();
   const visit = (list: unknown, listPath: string, parent: FieldMember | undefined) => {
     const anchors: string[] = [];
-    for (const m of membersOf(list, listPath)) {
-      const anchor = takeField(m.value.id);
-      if (anchor === undefined) continue;
+    for (const m of membersOf(list, listPath, side)) {
+      const anchor = takeField(m.value.id, m.path);
       const member: FieldMember = { ...m, anchor, parent };
       side.fields.push(member);
       anchors.push(anchor);
@@ -280,7 +299,7 @@ function readSide(body: Obj, locale: string | undefined): Side {
   };
   visit(body.fields, "fields", undefined);
 
-  side.dataSources = anchoredMembers(body.dataSources, "dataSources", "id");
+  side.dataSources = anchoredMembers(body.dataSources, "dataSources", "id", side);
   for (const { value } of side.dataSources) {
     if (typeof value.id === "string" && !side.dataSourceById.has(value.id)) side.dataSourceById.set(value.id, value);
   }
@@ -289,15 +308,13 @@ function readSide(body: Obj, locale: string | undefined): Side {
   const workflow = isObj(body.workflow) ? body.workflow : undefined;
   const takeStep = anchorer();
   const takePath = anchorer();
-  for (const m of membersOf(workflow?.steps, "workflow.steps")) {
-    const anchor = takeStep(m.value.id);
-    if (anchor === undefined) continue;
-    const step: Member = { ...m, anchor };
+  for (const m of membersOf(workflow?.steps, "workflow.steps", side)) {
+    const step: Member = { ...m, anchor: takeStep(m.value.id, m.path) };
     side.steps.push(step);
     if (typeof m.value.id === "string" && !side.stepById.has(m.value.id)) side.stepById.set(m.value.id, m.value);
-    for (const p of membersOf(m.value.paths, `${m.path}.paths`)) {
-      const pathAnchor = takePath(p.value.id);
-      if (pathAnchor !== undefined) side.paths.push({ ...p, anchor: pathAnchor, step });
+    if (m.value.view !== undefined && !isObj(m.value.view)) side.unexpected.set(`${m.path}.view`, m.value.view);
+    for (const p of membersOf(m.value.paths, `${m.path}.paths`, side)) {
+      side.paths.push({ ...p, anchor: takePath(p.value.id, p.path), step });
     }
   }
   return side;
@@ -575,8 +592,8 @@ function fieldKindProperties(b: Obj | undefined, a: Obj | undefined, ctx: Ctx): 
 }
 
 function optionProperties(b: FieldMember | undefined, a: FieldMember | undefined, ctx: Ctx, out: Out): void {
-  const before = b ? anchoredMembers(b.value.options, `${b.path}.options`, "value") : [];
-  const after = a ? anchoredMembers(a.value.options, `${a.path}.options`, "value") : [];
+  const before = b ? anchoredMembers(b.value.options, `${b.path}.options`, "value", ctx.b) : [];
+  const after = a ? anchoredMembers(a.value.options, `${a.path}.options`, "value", ctx.a) : [];
   for (const { anchor, b: bo, a: ao } of pair(before, after)) {
     if (same(bo?.value, ao?.value)) continue;
     const octx: Ctx = { ...ctx, bPath: bo?.path, aPath: ao?.path };
@@ -689,8 +706,8 @@ function actionProperties(
   ctx: Ctx,
   out: Out,
 ): void {
-  const before = bListPath === undefined ? [] : anchoredMembers(bList, bListPath, "id");
-  const after = aListPath === undefined ? [] : anchoredMembers(aList, aListPath, "id");
+  const before = bListPath === undefined ? [] : anchoredMembers(bList, bListPath, "id", ctx.b);
+  const after = aListPath === undefined ? [] : anchoredMembers(aList, aListPath, "id", ctx.a);
   for (const { b, a } of pair(before, after)) {
     if (same(b?.value, a?.value)) continue;
     const type = (a ?? b)!.value.type;
@@ -727,8 +744,8 @@ const withoutFireActions = (timer: Obj): Obj =>
   isObj(timer.onFire) ? { ...timer, onFire: omit(timer.onFire, TIMER_ACTION_LISTS) } : timer;
 
 function timerProperties(b: Member | undefined, a: Member | undefined, ctx: Ctx, out: Out): void {
-  const before = b ? anchoredMembers(b.value.timers, `${b.path}.timers`, "id") : [];
-  const after = a ? anchoredMembers(a.value.timers, `${a.path}.timers`, "id") : [];
+  const before = b ? anchoredMembers(b.value.timers, `${b.path}.timers`, "id", ctx.b) : [];
+  const after = a ? anchoredMembers(a.value.timers, `${a.path}.timers`, "id", ctx.a) : [];
   for (const { b: bt, a: at } of pair(before, after)) {
     const tctx: Ctx = { ...ctx, bPath: bt?.path, aPath: at?.path };
     const bCopy = bt && withoutFireActions(bt.value);
@@ -855,21 +872,17 @@ interface EntryMember extends Member {
   note: number | undefined;
 }
 
-function viewEntries(view: Obj | undefined, viewPath: string | undefined): EntryMember[] {
+/** A field entry anchors on its `ref`; a note has none, so it anchors on its
+ * position among the view's notes. */
+function viewEntries(view: Obj | undefined, viewPath: string | undefined, side: Side): EntryMember[] {
   if (view === undefined || viewPath === undefined) return [];
   const take = anchorer();
-  const entries: EntryMember[] = [];
   let notes = 0;
-  for (const m of membersOf(view.fields, `${viewPath}.fields`)) {
-    if (m.value.kind !== undefined) {
-      entries.push({ ...m, anchor: `#note${notes}`, note: notes });
-      notes += 1;
-      continue;
-    }
-    const anchor = take(m.value.ref);
-    if (anchor !== undefined) entries.push({ ...m, anchor, note: undefined });
-  }
-  return entries;
+  return membersOf(view.fields, `${viewPath}.fields`, side).map((m) => {
+    if (m.value.kind === undefined) return { ...m, anchor: take(m.value.ref, m.path), note: undefined };
+    notes += 1;
+    return { ...m, anchor: `#note${notes - 1}`, note: notes - 1 };
+  });
 }
 
 function entryProperties(b: EntryMember | undefined, a: EntryMember | undefined, ctx: Ctx, out: Out): void {
@@ -885,7 +898,7 @@ function entryProperties(b: EntryMember | undefined, a: EntryMember | undefined,
       });
     } else {
       out.properties.push(
-        ...labelledProperties(name, b.value, a.value, "text", ["kind"], (key) => formEntryName(name.name, key), ctx),
+        ...labelledProperties(name, b.value, a.value, "text", [], (key) => formEntryName(name.name, key), ctx),
       );
     }
     return;
@@ -897,8 +910,8 @@ function entryProperties(b: EntryMember | undefined, a: EntryMember | undefined,
 }
 
 function tabProperties(bView: Obj | undefined, aView: Obj | undefined, bPath: string | undefined, aPath: string | undefined, ctx: Ctx, out: Out): void {
-  const before = bView && bPath !== undefined ? anchoredMembers(bView.tabs, `${bPath}.tabs`, "key") : [];
-  const after = aView && aPath !== undefined ? anchoredMembers(aView.tabs, `${aPath}.tabs`, "key") : [];
+  const before = bView && bPath !== undefined ? anchoredMembers(bView.tabs, `${bPath}.tabs`, "key", ctx.b) : [];
+  const after = aView && aPath !== undefined ? anchoredMembers(aView.tabs, `${aPath}.tabs`, "key", ctx.a) : [];
   for (const { anchor, b, a } of pair(before, after)) {
     if (same(b?.value, a?.value)) continue;
     const tctx: Ctx = { ...ctx, bPath: b?.path, aPath: a?.path };
@@ -930,8 +943,8 @@ function formRows(sb: Side, sa: Side): ChangeRow[] {
     const aPath = aView && `${a!.path}.view`;
     const ctx: Ctx = { b: sb, a: sa, bPath, aPath };
     const out = newOut();
-    const before = viewEntries(bView, bPath);
-    const after = viewEntries(aView, aPath);
+    const before = viewEntries(bView, bPath, sb);
+    const after = viewEntries(aView, aPath, sa);
     for (const { b: be, a: ae } of pair(before, after)) {
       if (same(be?.value, ae?.value)) continue;
       const ectx: Ctx = { ...ctx, bPath: be?.path, aPath: ae?.path };
@@ -942,6 +955,7 @@ function formRows(sb: Side, sa: Side): ChangeRow[] {
     tabProperties(bView, aView, bPath, aPath, ctx, out);
     out.properties.push(...keyProperties(bView, aView, VIEW_LISTS, ctx));
     out.raw.push(...rawOf(omit(bView, VIEW_LISTS), omit(aView, VIEW_LISTS), ctx));
+    if (bView && aView && out.properties.length === 0) continue;
     const step = aView ? a! : b!;
     rows.push(
       row("forms", anchor, kindOf(bView, aView), labelOf(step.value, aView ? sa : sb), out, { entityKey: str(step.value.key) }),
@@ -957,22 +971,24 @@ type MemberList = "allowedGroups" | (typeof CONTRACT_LISTS)[number];
 /** A list whose members are their own anchors. A member on both sides has
  * not changed, so only an added or removed member reads. */
 function memberListProperties(list: MemberList, bList: unknown, aList: unknown, listPath: string, ctx: Ctx, out: Out): void {
-  const members = (value: unknown) => {
-    if (!Array.isArray(value)) return [];
+  const members = (value: unknown, side: Side) => {
+    if (value === undefined) return [];
+    if (!Array.isArray(value)) {
+      side.unexpected.set(listPath, value);
+      return [];
+    }
     const take = anchorer();
-    const found: { anchor: string; path: string; value: unknown }[] = [];
-    value.forEach((member, index) => {
-      const anchor = take(typeof member === "string" ? member : canonicalize(member));
-      if (anchor !== undefined) found.push({ anchor, path: `${listPath}[${index}]`, value: member });
+    return value.map((member, index) => {
+      const path = `${listPath}[${index}]`;
+      return { anchor: take(typeof member === "string" ? member : canonicalize(member), path), path, value: member as unknown };
     });
-    return found;
   };
   const read = (member: unknown, side: Side): ChangeValue => {
     if (list === "inputFields" || list === "outputFields") return typeof member === "string" ? plain(fieldLabel(member, side)) : json(member);
     return typeof member === "string" ? { text: member, mono: true } : json(member);
   };
-  const before = members(bList);
-  const after = members(aList);
+  const before = members(bList, ctx.b);
+  const after = members(aList, ctx.a);
   for (const { b, a } of pair(before, after)) {
     if (b && a) continue;
     out.properties.push({
@@ -1020,21 +1036,53 @@ function processRows(sb: Side, sa: Side): ChangeRow[] {
   orderProperty("changeList.order.dataSources", anchorsOf(sb.dataSources), anchorsOf(sa.dataSources), "dataSources", out);
   orderProperty("changeList.order.steps", anchorsOf(sb.steps), anchorsOf(sa.steps), "workflow.steps", out);
 
+  // Every walk has recorded its unexpected shapes by now.
+  for (const path of new Set([...sb.unexpected.keys(), ...sa.unexpected.keys()])) {
+    const bv = sb.unexpected.get(path);
+    const av = sa.unexpected.get(path);
+    if (same(bv, av)) continue;
+    const kind = kindOf(bv, av);
+    out.properties.push({ name: path, nameMono: true, kind, before: json(bv), after: json(av) });
+    out.raw.push({ path, kind, from: bv, to: av });
+  }
+
   if (out.properties.length === 0) return [];
   return [row("process", "process", "changed", labelOf(a, sa), out, { entityKey: str(a.key) ?? str(b.key) })];
+}
+
+/** A body that is no object reads as one JSON property on the Process row. */
+function rootRows(before: unknown, after: unknown, locale: string | undefined): ChangeRow[] {
+  if (same(before, after)) return [];
+  const named = isObj(after) ? after : isObj(before) ? before : undefined;
+  const out: Out = {
+    properties: [{ name: "(root)", nameMono: true, kind: kindOf(before, after), before: json(before), after: json(after) }],
+    raw: diffJson(before, after),
+  };
+  return [row("process", "process", "changed", named ? labelOf(named, readSide(named, locale)) : "", out)];
+}
+
+/** A JSON copy: a draft object can carry `undefined`, which no JSON body holds. */
+function toJson(value: unknown): unknown {
+  const text = JSON.stringify(value);
+  return text === undefined ? undefined : JSON.parse(text);
 }
 
 /**
  * The rows that separate `before` from `after`, in group order. `locale` is
  * the content locale a `LocalizedText` reads in; without it each side reads
  * its own base locale.
+ *
+ * Total over any JSON value. The editor's load guard checks only the top
+ * level, so a shape the walker does not expect reads as JSON on the Process
+ * row, and nothing throws.
  */
 export function describeChanges(before: unknown, after: unknown, locale?: string): ChangeRow[] {
-  if (!isObj(before) || !isObj(after)) return [];
-  const sb = readSide(before, locale);
-  const sa = readSide(after, locale);
-  return [
-    ...processRows(sb, sa),
+  const b = toJson(before);
+  const a = toJson(after);
+  if (!isObj(b) || !isObj(a)) return rootRows(b, a, locale);
+  const sb = readSide(b, locale);
+  const sa = readSide(a, locale);
+  const rows = [
     ...fieldRows(sb, sa),
     ...dataSourceRows(sb, sa),
     ...stepRows(sb, sa),
@@ -1042,4 +1090,5 @@ export function describeChanges(before: unknown, after: unknown, locale?: string
     ...formRows(sb, sa),
     ...contractRows(sb, sa),
   ];
+  return [...processRows(sb, sa), ...rows];
 }
