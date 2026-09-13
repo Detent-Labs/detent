@@ -184,6 +184,9 @@ const styles = stylex.create({
     minHeight: 0,
     overflowY: "auto",
     overscrollBehavior: "contain",
+    // Contains the change list's hidden "Before:"/"After:" text; a
+    // positioned container clips and scrolls it instead of the page.
+    position: "relative",
   },
   tabBodyHidden: {
     display: "none",

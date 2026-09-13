@@ -1,92 +1,53 @@
-# studio-forms-overview Specification
+## ADDED Requirements
 
-## Purpose
+### Requirement: The Forms tab explains the miniature's marks
 
-The Forms tab gathers every form a process asks a participant to fill in. One
-card per step carries a miniature of that step's form. An author reads the
-whole process's paperwork at a glance and opens any one of them.
+The Forms tab SHALL carry one legend above its grid of cards. The legend SHALL
+name five marks. Each name SHALL stand beside a sample drawn the way the
+miniature draws that mark:
 
-## Requirements
+- an outline, named field
+- a solid fill, named required
+- a dashed outline, named required if a condition holds
+- a group break, named section
+- three outlines of rising height, named taller asks for more
 
-### Requirement: The Forms tab carries one card per step that asks for something
+The samples SHALL stay out of the accessibility tree. The legend's words SHALL
+stay in it, as a list whose name says what the list explains. The legend SHALL
+have no control and SHALL take no keyboard focus.
 
-The Forms tab SHALL carry one card for every step that declares a view. A step
-declaring no view SHALL have no card. The cards SHALL follow the same order the
-steps rail uses, which is the draft's own order.
+The legend SHALL keep its place while the grid scrolls. Where one line cannot
+hold it, the legend SHALL continue on a further line and clip nothing. A Forms
+tab with no card SHALL have no legend.
 
-The tab SHALL lay the cards in a grid that reflows with the window width.
+#### Scenario: The legend names every mark
 
-<!-- Why: "carries no card" is the screen's own phrasing, and a delta must match this scenario name. -->
-<!-- antislop: allow negation-habit -->
-#### Scenario: A step without a view carries no card
+- **WHEN** an author opens the Forms tab of a draft holding one form
+- **THEN** one legend stands above the first card
+- **AND** it names field, required, required if a condition holds, section,
+  and taller asks for more
 
-- **WHEN** a draft holds three task steps and one of them declares no view
-- **THEN** the Forms tab carries two cards
+#### Scenario: A screen reader reads the legend's words alone
 
-#### Scenario: The cards follow the steps order
+- **WHEN** a screen reader walks the legend
+- **THEN** it reads a named list of the five names
+- **AND** no sample adds anything to what it reads
 
-- **WHEN** an author reads the Forms tab
-- **THEN** the first card names the first step in the draft's own order that
-  declares a view
+#### Scenario: The legend takes no focus
 
-### Requirement: A card names its step and counts the fields it draws
+- **WHEN** an author walks the Forms tab with the Tab key
+- **THEN** the focus never lands inside the legend
 
-A card SHALL carry a kicker naming the step's kind. Under the kicker it SHALL
-carry the step's label. The card's foot SHALL carry the number of field
-entries the view holds that the miniature draws as a mark. A group entry and
-a note entry add nothing to that number. Where at least one of those entries
-declares `required: true`, the same sentence SHALL state how many do. That
-text SHALL share one row with the control that opens the form editor.
+#### Scenario: The legend stays while the grid scrolls
 
-A view holding no entry that draws a mark SHALL read as an empty form. A view
-holding only notes, only group entries, or both reads as empty too. That card
-SHALL take the advisory color the checks already use for an empty form. Its
-foot SHALL leave the count out.
+- **WHEN** an author scrolls a grid of cards taller than the tab body
+- **THEN** the legend stays in view above the grid
 
-#### Scenario: A card counts its field entries
+#### Scenario: A tab without a card has no legend
 
-- **WHEN** a step's view holds four field entries
-- **THEN** its card reads four fields
-
-#### Scenario: A group entry adds nothing to the count
-
-- **WHEN** a step's view holds a group entry and two field entries inside it
-- **THEN** its card reads two fields
-
-#### Scenario: The count states the required entries
-
-- **WHEN** a step's view holds four field entries and one of them declares
-  `required: true`
-- **THEN** its card's foot reads four fields, one required
-
-#### Scenario: A form without a required entry reads its count alone
-
-- **WHEN** a step's view holds three field entries and none declares
-  `required: true`
-- **THEN** its card's foot reads three fields
-- **AND** the foot states no required count
-
-#### Scenario: The count stands beside the open control
-
-- **WHEN** an author reads a card
-- **THEN** the field count and the open control share the card's last row
-
-#### Scenario: An empty form marks itself
-
-- **WHEN** a step's view has no field entry
-- **THEN** its card names the form as empty
-- **AND** the card takes the advisory color
-- **AND** its foot leaves the count out
-
-#### Scenario: A form of notes alone reads as empty
-
-- **WHEN** a step's view holds one note and no field entry
-- **THEN** its card names the form as empty
-
-#### Scenario: A form of group entries alone reads as empty
-
-- **WHEN** a step's view holds one group entry and no other field entry
-- **THEN** its card names the form as empty
+- **WHEN** no step in a draft declares a view
+- **THEN** the Forms tab says so in words
+- **AND** it has no legend
 
 ### Requirement: A card's step label is a heading
 
@@ -114,6 +75,8 @@ The heading SHALL keep the label's look: the body face and text size, weight
 - **WHEN** an author reads a card
 - **THEN** its step label prints at the body text size, in weight 800
 - **AND** it prints in the body face, without uppercase
+
+## MODIFIED Requirements
 
 ### Requirement: A card draws a miniature of its form for the eye alone
 
@@ -208,55 +171,6 @@ tree.
 - **WHEN** a step's view has no field entry
 - **THEN** the miniature's place on its card says the form has no fields yet
 - **AND** a screen reader reads that sentence
-
-### Requirement: The Forms tab explains the miniature's marks
-
-The Forms tab SHALL carry one legend above its grid of cards. The legend SHALL
-name five marks. Each name SHALL stand beside a sample drawn the way the
-miniature draws that mark:
-
-- an outline, named field
-- a solid fill, named required
-- a dashed outline, named required if a condition holds
-- a group break, named section
-- three outlines of rising height, named taller asks for more
-
-The samples SHALL stay out of the accessibility tree. The legend's words SHALL
-stay in it, as a list whose name says what the list explains. The legend SHALL
-have no control and SHALL take no keyboard focus.
-
-The legend SHALL keep its place while the grid scrolls. Where one line cannot
-hold it, the legend SHALL continue on a further line and clip nothing. A Forms
-tab with no card SHALL have no legend.
-
-#### Scenario: The legend names every mark
-
-- **WHEN** an author opens the Forms tab of a draft holding one form
-- **THEN** one legend stands above the first card
-- **AND** it names field, required, required if a condition holds, section,
-  and taller asks for more
-
-#### Scenario: A screen reader reads the legend's words alone
-
-- **WHEN** a screen reader walks the legend
-- **THEN** it reads a named list of the five names
-- **AND** no sample adds anything to what it reads
-
-#### Scenario: The legend takes no focus
-
-- **WHEN** an author walks the Forms tab with the Tab key
-- **THEN** the focus never lands inside the legend
-
-#### Scenario: The legend stays while the grid scrolls
-
-- **WHEN** an author scrolls a grid of cards taller than the tab body
-- **THEN** the legend stays in view above the grid
-
-#### Scenario: A tab without a card has no legend
-
-- **WHEN** no step in a draft declares a view
-- **THEN** the Forms tab says so in words
-- **AND** it has no legend
 
 ### Requirement: A card opens the form editor for its step
 

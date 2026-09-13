@@ -229,6 +229,65 @@ describe("the miniature wraps and clips nothing", () => {
   });
 });
 
+describe("the legend wraps and clips nothing", () => {
+  it("wraps onto a further line, 16px between items and 4px between lines", () => {
+    const block = styleBlock(stripComments(read("src/areas/studio/panels/FormsTab.tsx")), "legend");
+
+    // design.md, "The legend's box and the height budget": one line where
+    // the tab body is wide enough, a further line below about 720px.
+    expect(block).toMatch(/display: "flex"/);
+    expect(block).toMatch(/flexWrap: "wrap"/);
+    expect(block).not.toMatch(/overflow[XY]?: "hidden"/);
+    expect(block).toMatch(/columnGap: space\.s4\b/);
+    expect(block).toMatch(/rowGap: space\.s1\b/);
+  });
+
+  it("sets each item's words 4px after its sample group, on the group's bottom edge", () => {
+    const block = styleBlock(stripComments(read("src/areas/studio/panels/FormsTab.tsx")), "legendItem");
+
+    expect(block).toMatch(/display: "flex"/);
+    expect(block).toMatch(/alignItems: "flex-end"/);
+    expect(block).toMatch(/columnGap: space\.s1\b/);
+  });
+
+  it("stands each sample group 24px tall, its marks 4px apart on the bottom edge", () => {
+    const block = styleBlock(stripComments(read("src/areas/studio/panels/FormsTab.tsx")), "legendSample");
+
+    // A mark is an empty span, and an inline span ignores a width and a
+    // height, so the group is a flex container.
+    expect(block).toMatch(/display: "flex"/);
+    expect(block).toMatch(/alignItems: "flex-end"/);
+    expect(block).toMatch(/columnGap: space\.s1\b/);
+    expect(block).toMatch(/\bheight: 24\b/);
+  });
+});
+
+describe("the grid scrolls under the legend", () => {
+  it("keeps its own vertical scroll, so the legend above it stays put", () => {
+    const block = styleBlock(stripComments(read("src/areas/studio/panels/FormsTab.tsx")), "grid");
+
+    expect(block).toMatch(/overflowY: "auto"/);
+  });
+});
+
+describe("the card's heading keeps the label's look", () => {
+  it("resets every h2 declaration global.css makes, at weight 800", () => {
+    const block = styleBlock(stripComments(read("src/areas/studio/panels/FormsTab.tsx")), "name");
+
+    // design.md, "The step label becomes a level-2 heading": `global.css`
+    // gives every `h2` the heading face, a size, uppercase, tracking, a muted
+    // color and margins. A compiled class outranks the element selector, so
+    // the label prints as body text at weight 800.
+    expect(block).toMatch(/fontWeight: 800\b/);
+    expect(block).toMatch(/\bmargin: 0\b/);
+    expect(block).toMatch(/fontFamily: fonts\.body\b/);
+    expect(block).toMatch(/fontSize: "inherit"/);
+    expect(block).toMatch(/textTransform: "none"/);
+    expect(block).toMatch(/letterSpacing: "normal"/);
+    expect(block).toMatch(/\bcolor: colors\.text\b/);
+  });
+});
+
 describe("the required mark on the muted ground", () => {
   it("draws an ordinary mark as an outline, with no fill of its own", () => {
     const block = styleBlock(stripComments(read("src/areas/studio/panels/FormsTab.tsx")), "miniatureMark");
@@ -263,17 +322,39 @@ describe("the required mark on the muted ground", () => {
     expect(read(TOKENS_STYLEX)).toContain('accentOnMuted: "var(--color-accent-on-muted)"');
   });
 
-  it("keeps its fill under forced colors, where a plain background is erased", () => {
+  it("keeps its fill and its border in one system color under forced colors", () => {
     const source = stripComments(read("src/areas/studio/panels/FormsTab.tsx"));
 
     // The audit for forms-tab-form-strip: forced-colors mode maps
     // `accentOnMuted`'s background to Canvas, so a required mark drew as the
     // same outline as an ordinary one. `CanvasText` plus
-    // `forcedColorAdjust: "none"` keeps the fill solid there too.
+    // `forcedColorAdjust: "none"` keeps the fill solid there too. That
+    // `none` also stops the UA from replacing the border's color, so the
+    // border declares `CanvasText` as well: the outline, the fill and the dash
+    // read one system color and differ by shape alone (design.md, "The dashed
+    // mark").
     expect(source).toMatch(/const FORCED_COLORS = "@media \(forced-colors: active\)";/);
     const block = styleBlock(source, "miniatureRequired");
     expect(block).toMatch(/backgroundColor: \{\s*default: colors\.accentOnMuted,\s*\[FORCED_COLORS\]: "CanvasText",?\s*\}/);
+    expect(block).toMatch(/borderColor: \{\s*default: colors\.accentOnMuted,\s*\[FORCED_COLORS\]: "CanvasText",?\s*\}/);
     expect(block).toMatch(/forcedColorAdjust: \{\s*default: "auto",\s*\[FORCED_COLORS\]: "none",?\s*\}/);
+  });
+});
+
+describe("the conditional mark dashes its outline", () => {
+  it("draws a dashed outline in the required color, with no fill, and keeps it under forced colors", () => {
+    const source = stripComments(read("src/areas/studio/panels/FormsTab.tsx"));
+    const block = styleBlock(source, "miniatureConditional");
+
+    // design.md, "The dashed mark": the style stacks on `miniatureMark`, so
+    // it declares the dash and the color alone. Forced colors keep a border's
+    // style and replace its color, so `CanvasText` plus
+    // `forcedColorAdjust: "none"` matches the solid fill and the group break.
+    expect(block).toMatch(/borderStyle: "dashed"/);
+    expect(block).toMatch(/borderColor: \{\s*default: colors\.accentOnMuted,\s*\[FORCED_COLORS\]: "CanvasText",?\s*\}/);
+    expect(block).toMatch(/forcedColorAdjust: \{\s*default: "auto",\s*\[FORCED_COLORS\]: "none",?\s*\}/);
+    expect(block).not.toMatch(/backgroundColor/);
+    expect(block).not.toMatch(/colors\.[A-Za-z]+[0-9]/);
   });
 });
 
@@ -282,6 +363,14 @@ describe("the empty card's foot keeps the control's trailing edge", () => {
     const block = styleBlock(stripComments(read("src/areas/studio/panels/FormsTab.tsx")), "openControl");
 
     expect(block).toMatch(/marginInlineStart: "auto"/);
+  });
+});
+
+describe("the open control meets the minimum target size", () => {
+  it("stands at least 24px tall, WCAG 2.5.8's minimum", () => {
+    const block = styleBlock(stripComments(read("src/areas/studio/panels/FormsTab.tsx")), "openControl");
+
+    expect(block).toMatch(/minHeight: 24\b/);
   });
 });
 

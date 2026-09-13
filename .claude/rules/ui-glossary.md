@@ -90,11 +90,14 @@ Every other term below belongs to one tab.
 | changes | the Changes tab, listing the draft's difference against the base version | `panels/ChangesView.tsx` |
 | change list | the folded register of entity rows the Changes tab and the Versions screen both draw over `describeChanges`'s output | `panels/ChangeList.tsx` |
 | paths | the Paths tab, listing every path in the process, one row each | `panels/PathsView.tsx`, `panels/pathRows.ts` |
-| Forms tab | the tab holding one card per step that declares a view | `panels/FormsTab.tsx` |
-| form card | one bordered plate on the Forms tab. It carries a kicker, a label, a count and a miniature | `panels/formCardRows.ts` |
+| Forms tab | the tab holding one card per step that declares a view, with a legend above the cards | `panels/FormsTab.tsx` |
+| form card | one bordered plate on the Forms tab. It carries a kicker, a heading, a count and a miniature | `panels/formCardRows.ts` |
 | form preview | the form editor's right pane, mounting the renderer a participant meets | `panels/FormPreview.tsx` |
 | form tab strip | the row of a step form's own tabs, above the form canvas | `panels/FormTabStrip.tsx` |
 | checks rail | the validation issue list, grouped by check | `panels/ChecksRail.tsx` |
+
+The word *section* also names a form's group, on the form editor's palette and
+the Forms tab's legend. The table's row names the step page's subject group.
 
 The tab row replaced the ribbon over the bench. Seven words went with it:
 *ribbon*, *ribbon bar*, *bench*, *steps register*, *configuration pane*,

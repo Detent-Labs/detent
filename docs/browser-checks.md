@@ -2846,8 +2846,8 @@ and it drops its right-hand rule. The rail caps at 20rem. It scrolls inside
 that cap rather than pushing the editor off screen.
 
 Pass: `document.documentElement.scrollWidth` equals `clientWidth` at 1440,
-900 and 420. The page never scrolls sideways. Measured 2026-09-04: 1440/1440,
-900/900, 420/420.
+900 and 420. The page never scrolls sideways. Measured 2026-09-04 and again
+2026-09-13: 1440/1440, 900/900, 420/420.
 
 A media query is invisible to a static render, and so is the width that
 triggers it.
@@ -3639,9 +3639,10 @@ each on its own fresh draft.
 ### The Forms tab card miniature (`forms-tab-form-strip`)
 
 Source: `forms-tab-form-strip` tasks 3.5 and 3.6, `forms-tab-card-clarity`
-tasks 3.3 and 3.4. The height budget and a mark's own contrast both come
-off a screenshot, read by eye against a real window. No `bun:test`
-assertion sees either, so this check lands here.
+tasks 3.3 and 3.4, and `forms-card-legend` tasks 5.3 to 5.10. The height
+budget and a mark's own contrast both come off a screenshot, read by eye
+against a real window. No `bun:test` assertion sees either, so this check
+lands here.
 
 Build the production bundle and open it on the engine's own port. Seed the
 database, then sign in as `demo-superuser@example.test`, password
@@ -3651,8 +3652,9 @@ choose "Create draft". Open its Forms tab, at
 
 1. Resize the window to 1100px wide. Read the Forms tab body's own height in
    the inspector. Resize the window's height until that body measures 635px
-   tall. Pass: the twelfth card, last in the four-row grid, reads its open
-   control without scrolling the tab body.
+   tall. Pass: the legend stands on one line above the grid. The twelfth
+   card, last in the four-row grid, reads its open control without scrolling
+   the grid.
 2. Read "Submit the Exit Notification", the card with the most required
    entries. Pass: an ordinary mark draws as a hairline outline against the
    ledger ground. A required mark draws as a filled block instead. Both read
@@ -3661,7 +3663,7 @@ choose "Create draft". Open its Forms tab, at
    again. Pass: the outline and the filled mark still read apart, against
    the dark scheme's own ledger ground.
 4. Open "Submit the Exit Notification" from its card's open control. In the
-   form editor, add ten field entries and save. Return to the Forms tab.
+   form editor, add fifteen field entries and save. Return to the Forms tab.
    Pass: that card's marks continue onto a second line, and every mark stays
    whole and visible.
 5. Read the accessibility tree on "Review the Exit Notification", a card
@@ -3673,11 +3675,130 @@ choose "Create draft". Open its Forms tab, at
    pressing Save. Pass: back on the Forms tab, that card's foot holds
    "Start the form" alone, at the row's trailing edge. Its accessibility
    tree reads "No fields yet".
+7. Read the legend's words above the grid. Then read its tree through
+   `ariaSnapshot()`. Pass: a list named "What the marks mean" holds the five
+   names and no sample node.
 
-Choose "← Back to processes" to return to the process list. Step 6 left the
-draft dirty, so accept its leave-draft confirm. Then choose "Discard" on
-the `it_offboarding` row, and accept the browser's confirm. The header
-bar's own "Discard draft" does not work, so do not use it here. See the
+   Resize the window's height until the tab body measures about 400px tall.
+   Read three values: the grid's `scrollTop`, the tab body's own `scrollTop`
+   and the legend's `getBoundingClientRect().top`. Scroll the grid to its
+   end, then read them again. Pass: the grid's `scrollTop` reads above 0
+   after the scroll. The tab body's own `scrollTop` reads 0 both times, and
+   the legend's `getBoundingClientRect().top` holds its value. Close the step
+   by restoring step 1's 635px body.
+8. Read the tab's heading outline, then the computed style of one card label.
+   Pass: the process name stands at level 1, and each of the twelve labels at
+   level 2. Pass: the label computes 15px, weight 800, the body's font family,
+   no text transform and zero margin.
+9. Read the bounding box of one card's open control. Pass: its height reads
+   24px or more.
+10. On the "Prepare the Offboarding" card, choose the open control. In the
+    form editor, choose the "Forward to this address" entry, whose card prints
+    `forwarding_address`. In the "Selected field" strip that card opens, under
+    required, open the Developer view. Pick CEL in its select. Press "Edit as CEL" and type
+    `data.email_forwarding == true`.
+
+    Choose the `forwarding_address` card again, so the strip closes and opens
+    fresh for the next entry. Author the same condition on "M365 backup by Fabrikam
+    as standard", whose card prints `m365_backup_confirmed`. That entry is a
+    boolean, so its mark draws 8px. Choose "← Back to the process" without
+    pressing Save. Pass: that card draws two dashed marks in both color
+    schemes, and its foot still reads "16 fields".
+11. Turn forced colors on through a `run-code` call to
+    `page.emulateMedia({ forcedColors: "active" })`. Pass: the legend's four
+    sample kinds stay visible and read apart. Those are the outline, the solid
+    fill, the dashed outline and the group break. Step 10's two dashed marks
+    stay visible too.
+
+    Pass: the 8px dashed mark from step 10 reads apart from an ordinary 8px
+    mark on another card, such as the one "Offboarding Closed" draws. Where
+    those two do not read apart, the step fails. Clear the emulation at the
+    end, with
+    `page.emulateMedia({ forcedColors: null })` in a second `run-code` call.
+
+Under `playwright-cli`, pass `-s=forms-card-legend` on every call. Step 7
+reads the legend through this `run-code` function:
+
+```js
+async (page) => {
+  const legend = page.getByRole("list", { name: "What the marks mean" });
+  return { words: await legend.innerText(), tree: await legend.ariaSnapshot() };
+}
+```
+
+A passing tree reads as follows:
+
+```yaml
+- list "What the marks mean":
+  - listitem: field
+  - listitem: required
+  - listitem: required if a condition holds
+  - listitem: section
+  - listitem: taller asks for more
+```
+
+Step 7's scroll runs through this function, once the tab body stands about
+400px tall. A wheel over the grid scrolls it:
+
+```js
+async (page) => {
+  const body = page.locator('[role="tabpanel"]:not([hidden])');
+  const grid = page.getByRole("list", { name: "Forms in this process" });
+  const legend = page.getByRole("list", { name: "What the marks mean" });
+  const read = async () => ({
+    bodyHeight: await body.evaluate((el) => el.clientHeight),
+    bodyScrollTop: await body.evaluate((el) => el.scrollTop),
+    gridScrollTop: await grid.evaluate((el) => el.scrollTop),
+    legendTop: await legend.evaluate((el) => el.getBoundingClientRect().top),
+  });
+  const before = await read();
+  await grid.hover();
+  await page.mouse.wheel(0, 5000);
+  await page.waitForTimeout(500);
+  return { before, after: await read() };
+}
+```
+
+Step 8 reads the outline and one label's computed style through this one. The
+header bar's `h1` holds the process name in a text input, so the outline reads
+that input's value:
+
+```js
+async (page) => {
+  const outline = await page
+    .getByRole("heading")
+    .evaluateAll((els) =>
+      els.map((el) => `${el.tagName} ${el.querySelector("input")?.value ?? el.textContent.trim()}`),
+    );
+  const label = await page
+    .getByRole("list", { name: "Forms in this process" })
+    .getByRole("heading", { level: 2 })
+    .first()
+    .evaluate((el) => {
+      const s = getComputedStyle(el);
+      return {
+        fontSize: s.fontSize,
+        fontWeight: s.fontWeight,
+        fontFamily: s.fontFamily,
+        bodyFontFamily: getComputedStyle(document.body).fontFamily,
+        textTransform: s.textTransform,
+        margin: s.margin,
+      };
+    });
+  return { outline, label };
+}
+```
+
+Step 9 reads the first card's open control through this one:
+
+```js
+async (page) => page.getByRole("button", { name: /^Open the form / }).first().boundingBox()
+```
+
+Choose "← Back to processes" to return to the process list. Steps 6 and 10
+left the draft dirty, so accept its leave-draft confirm. Then choose
+"Discard" on the `it_offboarding` row, and accept the browser's confirm. The
+header bar's own "Discard draft" does not work, so do not use it here. See the
 `docs/decisions.md` entry DRAFT-1.
 
 ### The field matrix's height (`field-matrix-fill-height`)
@@ -3728,6 +3849,94 @@ and choose "Create draft". Studio opens the draft at
    inside it.
 9. Discard the `laptop_inventory` draft the same way step 5 discarded the
    first one.
+
+### Hidden text stays inside its scroll region (visually-hidden-text-page-bounds)
+
+Source: `visually-hidden-text-page-bounds` task 2.1.
+
+The test `packages/web/test/hiddenTextContainment.test.ts` pins
+`position: relative` on the four known containers, but `bun:test` lays out
+no page. A new scroll container around hidden text needs a browser to catch
+it. This probe walks every element in one `page.evaluate`:
+
+```js
+() => {
+  const isHidden = (el) => { const cs = getComputedStyle(el); return cs.position === 'absolute' && (cs.clipPath === 'inset(50%)' || cs.clip === 'rect(0px, 0px, 0px, 0px)') && el.offsetWidth <= 1; };
+  const clips = (el) => { const cs = getComputedStyle(el); return /(auto|scroll|hidden|clip)/.test(cs.overflowX + ' ' + cs.overflowY); };
+  const escaped = [];
+  for (const el of document.querySelectorAll('body *')) {
+    if (!isHidden(el) || el.getBoundingClientRect().width === 0 && el.getClientRects().length === 0) continue;
+    let c = el.parentElement; while (c && !clips(c)) c = c.parentElement;
+    const cb = el.offsetParent;
+    if (c && !(cb && (cb === c || c.contains(cb)))) escaped.push(el.textContent.slice(0, 40));
+  }
+  const d = document.documentElement;
+  return { nodes: document.querySelectorAll('*').length, scrollWidth: d.scrollWidth, clientWidth: d.clientWidth, scrollHeight: d.scrollHeight, clientHeight: d.clientHeight, escaped };
+}
+```
+
+The `nodes` count is the positive control. A zero there means the probe ran
+against no page. The `escaped` list names every hidden element whose
+containing block sits outside its nearest clipping ancestor. An element
+inside a closed tab body has no client rect, so the probe skips it
+there. It passes on an empty `escaped` list, and on `scrollWidth` and
+`scrollHeight` equal to their client counterparts.
+
+See this file's "Before you start" section for the build and the address.
+Seed the database and sign in as `demo-superuser@example.test`, password
+`seed-demo-password`.
+
+Open the IT Offboarding draft on the Canvas tab
+(`docs/browser-checks.md:3112`). Add a step from the canvas bar. Leave it
+unconnected, so the Checks tab counts a blocker. Narrow the window to
+400px. Run the probe on every tab in turn. A reload drops the unsaved step,
+so add it again after one.
+
+Pass: `scrollWidth` equals `clientWidth` on every tab. The Checks tab's
+hidden "blocking a publish" text scrolled the page to 900–912 of 400 before
+this change. Measured 2026-09-13 at 400x800: 400/400 on all ten tabs.
+
+Open the Fields tab, then the Changes tab. Choose "Expand all" there to open
+every row. Resize to 1280x720 and run the probe on both tabs.
+
+Pass: `scrollHeight` equals `clientHeight` on both. The Fields rail
+scrolled the page to 2306 of 720 before this change. Measured 2026-09-13:
+720/720 on both.
+
+Narrow the window to 400x800 and run the probe on both tabs again.
+
+Pass: `scrollHeight` equals `clientHeight` there too. The Fields rail
+reached 2539 of 800 before this change, and the Changes tab's hidden
+"Before:"/"After:" text reached 849 of 800. Measured 2026-09-13: 800/800 on
+both.
+
+Scroll the entity rail down, inside its own box, on the Fields tab. Read
+`getBoundingClientRect().top` of one hidden kind word and its row, before
+the scroll and after it. Run the probe again.
+
+Pass: `escaped` stays empty, before the scroll and after it, and the two
+rects move together. Measured 2026-09-13: a 400px wheel turn moved one
+hidden kind word and its row 400px each.
+
+Add `requester` and `finance-approver` to the account's own roles for this
+walk. The auth CLI in `src/auth/cli.ts`'s `set-roles` replaces the whole
+list. Note the account's current roles first, on `/admin/users`'s
+`demo-superuser@example.test` row. Pass that list back with `requester` and
+`finance-approver` appended.
+
+Manager Approval resolves through `org.manager-of-starter`, the starter's
+own manager. Set the account's manager to `demo-admin@example.test` with
+`set-manager`. Sign in as `demo-admin@example.test` to approve that step,
+then back in as the superuser to continue. Restore the superuser's original
+roles with `set-roles` when the walk finishes.
+
+Open `purchase-requisition`'s Player at 400px. Create an instance and
+drive it to Finance Review (`docs/browser-checks.md:3329`). Claim the step.
+Submit from "Review" with Finance Note, on "Decision", left empty.
+
+Pass: `escaped` stays empty, and `scrollWidth` equals `clientWidth`. The
+Decision tab's hidden failed-field count renders without widening the
+page. Measured 2026-09-13: 400/400, with "1 issue" as the hidden count.
 
 ### Create draft writes one draft per press (`process-list-create-once`)
 

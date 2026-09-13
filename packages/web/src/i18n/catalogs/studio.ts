@@ -420,8 +420,11 @@ export const en = {
   "formsTab.fieldCountOne": "1 field",
   "formsTab.openForm": "Open the form",
   "formsTab.startForm": "Start the form",
-  "formsTab.issueMark": "open issues on this form",
-  "formsTab.issueMarkOne": "open issue on this form",
+  // The check badge's accessible name, one whole sentence per plural form.
+  // `{count}` is the badge's visible number, and `{step}` is the step label
+  // the card's heading prints.
+  "formsTab.issueMark": "{count} open issues on {step}",
+  "formsTab.issueMarkOne": "1 open issue on {step}",
   // The foot's count text (`studio-forms-overview`: "A card names its step
   // and counts the fields it draws"), one key per plural form so a
   // translator sees the whole sentence. `fieldCount`/`fieldCountOne` state
@@ -431,6 +434,15 @@ export const en = {
   "formsTab.miniatureLabel": "{count} fields, {required} required",
   "formsTab.miniatureLabelOne": "1 field, {required} required",
   "formsTab.miniatureEmpty": "No fields yet",
+  // The legend above the grid (`studio-forms-overview`: "The Forms tab
+  // explains the miniature's marks"). `legendLabel` names the list. Each
+  // other key holds the words beside one sample, in `FORMS_LEGEND`'s order.
+  "formsTab.legendLabel": "What the marks mean",
+  "formsTab.legendField": "field",
+  "formsTab.legendRequired": "required",
+  "formsTab.legendConditional": "required if a condition holds",
+  "formsTab.legendSection": "section",
+  "formsTab.legendHeight": "taller asks for more",
 
   // The form editor's trailing pane: what a participant meets
   // (`studio-form-editor`).
