@@ -1866,6 +1866,33 @@ only the marks the miniature draws. The required count stands beside it.
   the card's marks and move buttons. Seen 2026-09-13 in a screenshot only;
   the column widths stand unmeasured. Risk (Low): an author cannot read a key
   on a common laptop width. The fix is its own `/impeccable adapt` change.
+- **FORMS-13: the check badge's name omits its step and joins two fragments.**
+  Its `aria-label` joins the count to a catalog phrase
+  (`panels/FormsTab.tsx:281`), from `formsTab.issueMark` and
+  `formsTab.issueMarkOne` (`packages/web/src/i18n/catalogs/studio.ts:401`).
+  Two cards with one check each carry one name. The design language bars a
+  sentence built from fragments. The `forms-tab-card-clarity` audit found this
+  on 2026-09-13. Risk (Medium): a screen reader's button list cannot tell the
+  badges apart (WCAG 2.4.6). The fix gives each plural one key holding
+  `{count}`, and names the step the way the open control does.
+- **FORMS-14: the empty card's border reads a ramp step.** The `cardEmpty`
+  style sets `colors.accent400` (`panels/FormsTab.tsx:55`), where a component
+  reads a role. The advisory tone has no role yet
+  (`.claude/rules/design-language.md:144`). Measured 2026-09-13, the 2px
+  border reads 1.88:1 against the light plate and 7.91:1 in dark. "No fields
+  yet" and "Start the form" state the empty form beside it. Risk (Low): the
+  signal fades at a glance in the light scheme, so the fix adds an advisory
+  role first.
+- **FORMS-15: at phone width the grid scrolls inside its own box.** The grid
+  sets `overflowY: "auto"` (`panels/FormsTab.tsx:29`). Measured 2026-09-13 at
+  400x800, the grid stood 394px tall over 1740px of content, under about
+  400px of chrome. Risk (Low): a reader on a phone scrolls a small box inside
+  the page. The studio targets a desktop, so this stays with an
+  `/impeccable adapt` pass.
+- **FORMS-16: at 400px the tab row scrolls the open tab out of view.** Seen
+  2026-09-13 in `panels/ProcessTabRow.tsx` during the same audit, and left
+  unmeasured. Risk (Low): an author at that width loses sight of which tab
+  stands open.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 

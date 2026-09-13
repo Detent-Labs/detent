@@ -21,8 +21,8 @@
 
 ## 4. Verification
 
-- [ ] 4.1 Run `bun run typecheck`, then `bun run build`, in the devcontainer. Verify both exit 0 and record what each printed.
-- [ ] 4.2 Run the full `bun test` with `DATABASE_URL` set, piped through `scripts/gates/silent-green.sh`. Verify zero failures and a skip count at or under the floor.
-- [ ] 4.3 Run `sh ~/.claude/skills/impeccable/scripts/impeccable detect --json packages/web/src/areas/studio/panels/FormsTab.tsx` once. Where the checkout has no detector hook, this run stands in for the per-edit one. Verify no finding remains open, or record why one stands.
-- [ ] 4.4 Run the Forms tab browser check with its two new steps, then `/impeccable critique` and `/impeccable audit` on the Forms tab. Pass `-s=forms-card-clarity` to every `playwright-cli` call, and read names through `run-code` with `ariaSnapshot()`. Verify every step passes, and record the names and foot texts read.
-- [ ] 4.5 Run the prose gate and the whitespace gate over the pushed range, per `CLAUDE.md`. Verify both exit 0.
+- [x] 4.1 Run `bun run typecheck`, then `bun run build`, in the devcontainer. Verify both exit 0 and record what each printed.
+- [x] 4.2 Run the full `bun test` with `DATABASE_URL` set, piped through `scripts/gates/silent-green.sh`. Verify zero failures and a skip count at or under the floor.
+- [x] 4.3 Run `sh ~/.claude/skills/impeccable/scripts/impeccable detect --json packages/web/src/areas/studio/panels/FormsTab.tsx` once. Where the checkout has no detector hook, this run stands in for the per-edit one. Verify no finding remains open, or record why one stands.
+- [x] 4.4 Run the Forms tab browser check with its two new steps, then `/impeccable critique` and `/impeccable audit` on the Forms tab. Pass `-s=forms-card-clarity` to every `playwright-cli` call, and read names through `run-code` with `ariaSnapshot()`. Verify every step passes, and record the names and foot texts read.
+- [x] 4.5 Run the prose gate and the whitespace gate over the pushed range, per `CLAUDE.md`. Verify both exit 0.
