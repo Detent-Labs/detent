@@ -18,7 +18,7 @@
 - [x] 3.1 Add `removeControlId` beside `moveControlId` in `panels/fieldCatalogLogic.ts`. Put it on Remove field in `FieldCatalogPanel.tsx`. Give "Add first field" a stable id. Verify: `studio-fieldCatalogPanel.test.tsx` asserts both ids.
 - [x] 3.2 Add `requestRemove` to `FieldsTab` in `panels/EntityTabs.tsx`. With no reach it removes at once, and with reach it opens `RemoveFieldDialog`. Point the hook's trigger ref at Remove field, and clear it before a confirm. Verify: `bun run typecheck` passes in the devcontainer.
 - [x] 3.3 Make `removeField` run `removeFieldAndReferences` in one `mutate`. Set the refocus ids from a pure `focusAfterRemove` in `panels/fieldCatalogLogic.ts`, with a case per branch. Write the announcement. Rename the region's label key to `panelsScreen.fieldAnnouncerLabel`. Rewrite the doc comments on `removeField`, the refocus effect, `removeFieldIn` and `neighbourAfterRemove`. Verify: typecheck and the new cases pass, and no test reads the old key.
-- [ ] 3.4 Extend `packages/web/test/studio-no-confirm.test.ts` to scan `panels/EntityTabs.tsx`. Add `panels/RemoveFieldDialog.tsx` and `panels/shared/confirmDialog.tsx` too. Rewrite the file's header, which says it names two files. Verify: the test passes.
+- [x] 3.4 Extend `packages/web/test/studio-no-confirm.test.ts` to scan `panels/EntityTabs.tsx`. Add `panels/RemoveFieldDialog.tsx` and `panels/shared/confirmDialog.tsx` too. Rewrite the file's header, which says it names two files. Verify: the test passes.
 
 ## 4. Documentation
 
