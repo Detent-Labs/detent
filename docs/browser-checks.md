@@ -3503,7 +3503,7 @@ choose "Create draft". Open its Forms tab, at
    "Start the form" alone, at the row's trailing edge. Its accessibility
    tree reads "No fields yet".
 
-Choose "Back to processes" to return to the process list. Step 6 left the
+Choose "← Back to processes" to return to the process list. Step 6 left the
 draft dirty, so accept its leave-draft confirm. Then choose "Discard" on
 the `it_offboarding` row, and accept the browser's confirm. The header
 bar's own "Discard draft" does not work, so do not use it here. See the

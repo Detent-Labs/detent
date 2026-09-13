@@ -85,7 +85,7 @@ function render(over: { draft?: Draft; issues?: EditorIssue[] } = {}): string {
 }
 
 /** Everything between the miniature's own `aria-hidden="true"` element and
- * its close. The miniature carries no name and no role any more, so the
+ * its close. The miniature carries no name and no role of its own, so the
  * element itself is what a test matches — a backreference to the tag name,
  * since the element is not pinned to one tag. */
 function miniatures(html: string): string[] {
@@ -246,9 +246,9 @@ describe("A plate's miniature", () => {
 
   it("names a view holding only a note as an empty form, offering to start it", () => {
     // Only step_a and step_c: step_b is dropped so this card is the only
-    // source of "Empty form"/"Start the form" in the render, and the negative
-    // assertions below have something to catch a notes-only card drawn as
-    // non-empty.
+    // source of "No fields yet"/"Start the form" in the render, and the
+    // negative assertions below have something to catch a notes-only card
+    // drawn as non-empty.
     const notesOnly = {
       ...DRAFT,
       workflow: {
@@ -290,8 +290,8 @@ describe("A plate's miniature", () => {
 });
 
 /** One HTML attribute's value off a tag string, or `undefined` where the tag
- * carries none. React 19's `useId` values can hold `:` and `«»`, so this
- * reads the attribute by name rather than assuming a `\w+`-safe id. */
+ * carries none. Reads the attribute by name, so the test does not depend on
+ * `useId`'s id format. */
 function attr(tag: string, name: string): string | undefined {
   return tag.match(new RegExp(`\\s${name}="([^"]*)"`))?.[1];
 }

@@ -1800,7 +1800,7 @@ only the marks the miniature draws. The required count stands beside it.
 
 - **FORMS-2: the miniature's marks have no key.** An outline, a solid fill, a
   1px group break and four heights (8, 12, 16 and 24px) each mean something
-  (`panels/FormsTab.tsx:111` to `:157`). The `studio-forms-overview`
+  (`panels/FormsTab.tsx:113` to `:159`). The `studio-forms-overview`
   requirement "A card draws a miniature of its form for the eye alone" bars
   pointer interaction. A tooltip is ruled out. Risk (Medium): an author
   learns the marks only by opening forms, so the miniature's encoding stays
