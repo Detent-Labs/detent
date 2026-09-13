@@ -1779,10 +1779,13 @@ paths under `panels/`, `draft/` and `screens/` start at
   a catalog sentence with `.replace("{field}", label)`. A string replacement
   to `String.prototype.replace` expands `$&`, `$$`, `$'` and `` $` `` instead
   of inserting the label as literal text. A label reading `Cost $&` turns
-  into the literal text `Cost {field}` inside the rendered sentence. `git
-  grep -n '\.replace("{' -- packages/web/src` counts 36 single-line call
-  sites across 11 files sharing the idiom, plus multi-line ones such as this
-  heading and `EntityTabs.tsx`'s two move sentences. Risk (Low): one
+  into the literal text `Cost {field}` inside the rendered sentence.
+
+  `git grep -n '\.replace("{' -- packages/web/src` counts 36 matching lines
+  across 11 files sharing the idiom. A line can carry two calls. Each of
+  `EntityTabs.tsx`'s two move sentences (`:523`, `:524`) chains a `{field}`
+  fill into a `{group}` fill on one line. The dialog heading's one call
+  splits across two lines instead, and the count misses it. Risk (Low): one
   replacer function closes every site at once: `.replace("{field}", () =>
   label)`.
 - **FIELDS-20: a second identical move announces nothing.** `moveField`
