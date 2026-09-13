@@ -84,22 +84,37 @@ describe("the field matrix grid takes the tab body's height", () => {
   const FIELD_MATRIX_PANEL = "src/areas/studio/panels/FieldMatrixPanel.tsx";
   const FIELD_MATRIX_GRID = "src/areas/studio/panels/FieldMatrixGrid.tsx";
 
-  it("gives the matrix column no automatic minimum of its own", () => {
+  it("grows the matrix column to fill the tab body, with no automatic minimum of its own", () => {
     const block = styleBlock(stripComments(read(FIELD_MATRIX_PANEL)), "matrix");
 
+    // The column fills the tab body instead of measuring its content, so the
+    // space it hands the grid follows the tab body's own height.
+    expect(block).toMatch(/flexGrow: 1/);
     // A flex item that is not a scroll container takes its content height as
     // its automatic minimum, so the column needs the explicit zero to shrink
     // into the tab body at all.
     expect(block).toMatch(/minHeight: 0/);
   });
 
-  it("holds the scroll region to a 24rem floor, with no fixed cap above it", () => {
+  it("holds the 24rem floor on a space around the scroll region", () => {
+    const block = styleBlock(stripComments(read(FIELD_MATRIX_GRID)), "matrixScrollSpace");
+
+    // The space is a flex column of its own, so the floor binds even when
+    // the scroll region inside it shrinks to a short grid's rows.
+    expect(block).toMatch(/display: "flex"/);
+    expect(block).toMatch(/flexDirection: "column"/);
+    expect(block).toMatch(/flex: "1 1 0"/);
+    expect(block).toMatch(/minHeight: "24rem"/);
+  });
+
+  it("leaves the scroll region's own height to its rows, with no cap or floor", () => {
     const block = styleBlock(stripComments(read(FIELD_MATRIX_GRID)), "matrixScroll");
 
-    // The floor is the region's only height constraint.
-    expect(block).toMatch(/minHeight: "24rem"/);
+    // The region's automatic minimum is already zero, so it shrinks to a
+    // short grid's rows inside the space that holds the floor.
+    expect(block).not.toMatch(/minHeight/);
     expect(block).not.toMatch(/maxHeight/);
-    // That constraint holds only because the region is a scroll container,
+    // That shrinking holds only because the region is a scroll container,
     // the way the steps rail's own `overflowY: "auto"` above depends on it.
     expect(block).toMatch(/overflow: "auto"/);
   });
