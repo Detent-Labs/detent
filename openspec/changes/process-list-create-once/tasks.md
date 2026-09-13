@@ -81,7 +81,7 @@ until then.
   devcontainer. Capture its output with `bun test 2>&1 | tee /tmp/t.log`.
   Then run `sh scripts/gates/silent-green.sh /tmp/t.log`. Verify: no test
   fails by name, and the gate passes.
-- [ ] 5.4 Run both gates on the host once every commit lands, since both
+- [x] 5.4 Run both gates on the host once every commit lands, since both
   read committed content. The devcontainer has no antislop. Run
   `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`. Then
   run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh`.
