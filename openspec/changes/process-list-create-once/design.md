@@ -161,7 +161,7 @@ every call. Then run this function through `run-code`:
 ```js
 async (page) => {
   await page.route("**/drafts/*", async (route) => {
-    if (route.request().method() === "PUT") await new Promise((resolve) => setTimeout(resolve, 20000));
+    if (route.request().method() === "PUT") await page.waitForTimeout(20000);
     await route.continue();
   });
 }
@@ -216,12 +216,14 @@ The entry's steps and pass lines:
    buttons within the 20 seconds. Pass: the pressed button reports `disabled`,
    a computed `opacity` of 0.45 and the accessible name "Create draft". The
    `access_request` button reports no `disabled`.
-3. Press the disabled button once more. Use `page.mouse.click` for that press.
-   Wait for the edit screen. Pass: the network log lists one `PUT` to
-   `/drafts/<id>`. It lists one `GET` of the published version as well.
+3. Press the disabled button once more, using `page.mouse.click` for that
+   press, then wait for the edit screen. Pass: the log lists one `PUT` to
+   `/drafts/<id>`. Before that `PUT` it lists one `GET` of
+   `/processes/<id>/versions/<v>`. The `GET` of that URL after the edit
+   screen opens is the Changes tab's base read.
 4. Take the delay off. Under `playwright-cli`, a `run-code` call to
-   `page.unroute` does that. Edit the process label. Press Save. Pass: the
-   header bar reads "Saved". No conflict banner shows.
+   `page.unroute("**/drafts/*")` does that. Edit the process label. Press
+   Save. Pass: the header bar reads "Saved". No conflict banner shows.
 5. Go back to the process list. Choose "Discard" on the `it_offboarding` row.
    Accept the browser's confirm. The header bar's own "Discard draft" does
    nothing, per DRAFT-1 in `docs/decisions.md`.

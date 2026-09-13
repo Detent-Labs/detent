@@ -1586,8 +1586,8 @@ recorded rather than fixed. The RAIL tags are local to this section.
   form collapses, inside a group or not.
 - **Creating a draft takes tens of seconds and shows no progress.** One
   measurement read 56.9s on the seeded `purchase_requisition` v3. Another
-  watched eight `GET /drafts/<id>` polls answer 404 over 7.5s. The button gives
-  no sign meanwhile, so a second press is easy.
+  watched eight `GET /drafts/<id>` polls answer 404 over 7.5s. The button
+  disables for that whole wait, but nothing signals how much longer it runs.
 - **Two browser-check entries name retired UI.** `docs/browser-checks.md:883`
   and `:913` still name the configuration pane and the ribbon bar.
   `.claude/rules/ui-glossary.md` retired both words with the process surface.

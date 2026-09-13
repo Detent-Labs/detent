@@ -1,6 +1,6 @@
 ## 1. The in-flight guard
 
-- [ ] 1.1 Add a `describe("createInFlightGuard")` block to
+- [x] 1.1 Add a `describe("createInFlightGuard")` block to
   `packages/web/test/studio-processListLogic.test.ts`. Hold the first write
   open with a promise the test resolves or rejects by hand. The block holds the
   five tests below. Each comes from design.md's decision "A helper owns the
@@ -14,7 +14,7 @@
   - A held key leaves a call for another key free to run its write.
   - The `onHeldChange` callback receives a new set object after each add and
     each free.
-- [ ] 1.2 Export `createInFlightGuard` from
+- [x] 1.2 Export `createInFlightGuard` from
   `packages/web/src/areas/studio/screens/processListLogic.ts`, as design.md
   specifies. Its doc comment names the double press it stops. The comment
   also states why the check runs before the first `await`. Verify: the five
@@ -22,14 +22,14 @@
 
 ## 2. The process list
 
-- [ ] 2.1 Add the `creating` state and the guard to
+- [x] 2.1 Add the `creating` state and the guard to
   `packages/web/src/areas/studio/screens/ProcessesScreen.tsx`. Follow
   design.md's decision "The screen mirrors the held set into state". Move the
   read, the write and the `navigate` call inside `createDraft` into one
   callback for `run`. The `catch` keeps calling `fail(err)`. Set
   `disabled={creating.has(row.processId)}` on the row's "Create draft" button.
   Verify: `bun run typecheck` passes in the devcontainer.
-- [ ] 2.2 Keep the button's label "Create draft", with no `aria-busy`. Rewrite
+- [x] 2.2 Keep the button's label "Create draft", with no `aria-busy`. Rewrite
   the doc comment above `createDraft` so it names the hold. Verify:
   `bun run build` passes in the devcontainer. The diff touches no file under
   `packages/web/src/i18n/`.

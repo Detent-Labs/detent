@@ -209,10 +209,11 @@ describe("templateDisplayName", () => {
 });
 
 describe("createInFlightGuard", () => {
-  it("resolves false for a second call on a held key, and its write never runs", async () => {
+  it("resolves false for a second call on a held key; once the held write rejects, a third call for that key runs its write", async () => {
     const guard = createInFlightGuard(() => {});
-    let resolveFirst: (() => void) | undefined;
-    const first = guard("p1", () => new Promise<void>((resolve) => (resolveFirst = resolve)));
+    const failure = new Error("write failed");
+    let rejectFirst: ((err: unknown) => void) | undefined;
+    const first = guard("p1", () => new Promise<void>((_resolve, reject) => (rejectFirst = reject)));
 
     let secondWriteRan = false;
     const second = await guard("p1", async () => {
@@ -222,8 +223,21 @@ describe("createInFlightGuard", () => {
     expect(second).toBe(false);
     expect(secondWriteRan).toBe(false);
 
-    resolveFirst!();
-    await first;
+    rejectFirst!(failure);
+    let caught: unknown;
+    try {
+      await first;
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBe(failure);
+
+    let thirdWriteRan = false;
+    const third = await guard("p1", async () => {
+      thirdWriteRan = true;
+    });
+    expect(third).toBe(true);
+    expect(thirdWriteRan).toBe(true);
   });
 
   it("frees a rejected write's key and rethrows the same error, so a later call for that key runs its write", async () => {
