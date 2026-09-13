@@ -103,14 +103,39 @@ const styles = stylex.create({
   // at specificity 1,1,0, so the `transparent` default above outranks
   // `.btn-ghost:active` in `tokens.css` and nothing replaces the wash it
   // takes away.
+  //
+  // Under the pointer and while pressed the text turns to ink, `colors.text`,
+  // over either wash. Slate reads 4.42:1 on the press wash in light and
+  // 3.82:1 in dark; ink reads 11.26:1 and 9.87:1.
   control: {
     fontFamily: fonts.mono,
     fontSize: 11,
-    color: colors.textMuted,
+    color: {
+      default: colors.textMuted,
+      ":hover": colors.text,
+      ":active": colors.text,
+    },
     backgroundColor: {
       default: "transparent",
       ":hover": colors.surfaceMuted,
       ":active": `color-mix(in srgb, ${colors.text} 14%, transparent)`,
+    },
+  },
+  // A disabled move control takes no hover or press look: slate text on a
+  // transparent ground under the pointer too. StyleX 0.19 orders `:disabled`
+  // (92) before `:hover` (130), so a `":disabled"` key inside `control` would
+  // lose under the pointer. This block therefore stacks after `control`, from
+  // the boolean that sets `disabled`, and restates all three conditions.
+  controlDisabled: {
+    color: {
+      default: colors.textMuted,
+      ":hover": colors.textMuted,
+      ":active": colors.textMuted,
+    },
+    backgroundColor: {
+      default: "transparent",
+      ":hover": "transparent",
+      ":active": "transparent",
     },
   },
   // The authored name itself, not a command, so it takes the ordinary ink.
@@ -168,6 +193,8 @@ export function FormTabStrip({ tabs, open, contentLocale, baseLocale, onOpen, on
   // `drawn`. The two agree for every draft the editor itself writes, and
   // disagree for one carrying a keyless tab from the JSON view.
   const openIndex = openTab === undefined ? -1 : tabs.indexOf(openTab);
+  const atStart = openIndex === 0;
+  const atEnd = openIndex === tabs.length - 1;
   const renamingOpen = openTab !== undefined && renaming === openTab.key;
 
   // Arrow keys, `Home` and `End` move focus alone; a `<button>`'s own `Enter`
@@ -243,13 +270,18 @@ export function FormTabStrip({ tabs, open, contentLocale, baseLocale, onOpen, on
             <button type="button" {...ghost(styles.control)} onClick={() => setRenaming(openTab.key)}>
               {t("formEditor.renameTab")}
             </button>
-            <button type="button" {...ghost(styles.control)} disabled={openIndex === 0} onClick={() => onMove(openIndex, -1)}>
+            <button
+              type="button"
+              {...ghost(styles.control, atStart && styles.controlDisabled)}
+              disabled={atStart}
+              onClick={() => onMove(openIndex, -1)}
+            >
               {t("formEditor.moveTabLeft")}
             </button>
             <button
               type="button"
-              {...ghost(styles.control)}
-              disabled={openIndex === tabs.length - 1}
+              {...ghost(styles.control, atEnd && styles.controlDisabled)}
+              disabled={atEnd}
               onClick={() => onMove(openIndex, 1)}
             >
               {t("formEditor.moveTabRight")}
@@ -271,11 +303,13 @@ export function FormTabStrip({ tabs, open, contentLocale, baseLocale, onOpen, on
   );
 }
 
-/** `btn btn-ghost` plus a compiled style, as one set of props. Spreading
+/** `btn btn-ghost` plus compiled styles, as one set of props. Spreading
  * `stylex.props(...)` beside a `className` attribute drops whichever of the
  * two the JSX writes first, so the two class lists are joined here instead —
- * the same join the form canvas already makes for a note card. */
-function ghost(style: stylex.StyleXStyles) {
-  const compiled = stylex.props(style);
+ * the same join the form canvas already makes for a note card. The styles
+ * arrive as separate arguments, as in `ChangeList.tsx`, so a conditional
+ * style stacks after the base one. */
+function ghost(...style: stylex.StyleXStyles[]) {
+  const compiled = stylex.props(...style);
   return { ...compiled, className: `btn btn-ghost ${compiled.className ?? ""}`.trim() };
 }

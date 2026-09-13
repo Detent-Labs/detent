@@ -320,7 +320,7 @@ const styles = stylex.create({
     color: colors.refusal,
     borderLeftWidth: 3,
     borderLeftStyle: "solid",
-    borderLeftColor: colors.accent400,
+    borderLeftColor: colors.advisory,
     paddingLeft: space.s2,
   },
   // The stale-column warning takes the whole line under the row instead of

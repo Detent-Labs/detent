@@ -95,6 +95,26 @@ describe("the form's tab strip", () => {
     expect((middle.match(/disabled=""/g) ?? []).length).toBe(0);
   });
 
+  it("stacks controlDisabled on the one move control that stands disabled", () => {
+    // `web-styling`: "A disabled authoring command SHALL take no hover or
+    // press look". The block stacks from the same boolean that sets
+    // `disabled`. The stub's `props` joins style keys, so the block's key
+    // reads as a class.
+    const marked = (html: string) =>
+      [...html.matchAll(/<button\b([^>]*)>([^<]*)<\/button>/g)]
+        .filter((m) => (/\bclass="([^"]*)"/.exec(m[1]!)?.[1] ?? "").split(/\s+/).includes("controlDisabled"))
+        .map((m) => m[2]);
+    const first = render(TABS, "t1");
+    const last = render(TABS, "t3");
+
+    // Each control is found by its text, so a renamed label fails here
+    // rather than reading as an unmarked control.
+    expect(first).toMatch(/>Move left<\/button>/);
+    expect(first).toMatch(/>Move right<\/button>/);
+    expect(marked(first)).toEqual(["Move left"]);
+    expect(marked(last)).toEqual(["Move right"]);
+  });
+
   it("reads the end guard off the whole array, so a keyless tab ahead of the open one keeps Move left live", () => {
     // `FormEditorScreen.moveTab` splices the whole `tabs` array, so the guard
     // has to index that array too. Over the drawn tabs alone, the open tab

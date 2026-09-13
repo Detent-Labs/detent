@@ -42,11 +42,16 @@ const styles = stylex.create({
   // The authoring command (`DESIGN.md` Buttons): a ghost button in slate,
   // mono at 11px. It composes over `btn btn-ghost`, whose accent it replaces.
   // An open command names a mono key that can outrun a 400px column, so its
-  // label wraps anywhere.
+  // label wraps anywhere. Under the pointer and while pressed its text turns
+  // to ink, `colors.text`, over the hover wash and the press wash.
   command: {
     fontFamily: fonts.mono,
     fontSize: 11,
-    color: colors.textMuted,
+    color: {
+      default: colors.textMuted,
+      ":hover": colors.text,
+      ":active": colors.text,
+    },
     textAlign: "left",
     overflowWrap: "anywhere",
     backgroundColor: {

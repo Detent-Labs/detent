@@ -62,7 +62,7 @@ const styles = stylex.create({
     color: colors.refusal,
     borderLeftWidth: 3,
     borderLeftStyle: "solid",
-    borderLeftColor: colors.accent400,
+    borderLeftColor: colors.advisory,
     paddingLeft: space.s2,
   },
   headerBarKey: {

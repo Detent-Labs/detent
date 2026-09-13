@@ -37,7 +37,7 @@ const styles = stylex.create({
     backgroundColor: colors.surfaceMuted,
   },
   conditionRowIncomplete: {
-    borderColor: colors.accent400,
+    borderColor: colors.advisory,
     borderStyle: "dashed",
   },
   conditionJoiner: {
