@@ -1901,6 +1901,12 @@ only the marks the miniature draws. The required count stands beside it.
   2026-09-13 in `panels/ProcessTabRow.tsx` during the same audit, and left
   unmeasured. Risk (Low): an author at that width loses sight of which tab
   stands open.
+- **FORMS-18: at 200% zoom the grid shows less than one card.** A 1100x876
+  window at 200% zoom lays out at 550x438 CSS px. Measured 2026-09-13 at that
+  size, the tab body stood 118px tall and the grid 94px. The header bar takes
+  three rows above it, and the legend keeps 24px. Risk (Low): a reader with
+  low vision scrolls a box shorter than one card. The fix belongs to the fixed
+  frame every tab of the process surface shares.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 

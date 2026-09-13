@@ -50,9 +50,9 @@
 - [x] 6.1 Run `bun run typecheck`, then `bun run build`, in the devcontainer. Verify both exit 0. Record what each printed.
 - [x] 6.2 Run the full `bun test` with `DATABASE_URL` set, piped through `scripts/gates/silent-green.sh`. Verify zero failures and a skip count at or under the floor.
 - [x] 6.3 Run `sh ~/.claude/skills/impeccable/scripts/impeccable detect --json packages/web/src/areas/studio/panels/FormsTab.tsx` once. Verify no finding stays open, or record why one stands.
-- [ ] 6.4 Run the Forms tab browser check in full, new steps included, on the production build. Pass `-s=forms-card-legend` to every `playwright-cli` call. Read names and headings through `run-code` with `ariaSnapshot()`. Verify every step passes. Record the heights, names and foot texts read.
-- [ ] 6.5 Run `/impeccable critique` on the Forms tab. Fix each finding, or record it in `docs/decisions.md`. Verify no finding stays unaddressed.
-- [ ] 6.6 Run `/impeccable audit` on the Forms tab. Fix each finding, or record it in `docs/decisions.md`. Verify no finding stays unaddressed.
-- [ ] 6.7 Repeat 5.13's citation sweep wherever a fix in 6.3 to 6.6 edited a file that `docs/decisions.md` cites. Verify each re-read citation matches its line, or record that no fix edited a cited file.
+- [x] 6.4 Run the Forms tab browser check in full, new steps included, on the production build. Pass `-s=forms-card-legend` to every `playwright-cli` call. Read names and headings through `run-code` with `ariaSnapshot()`. Verify every step passes. Record the heights, names and foot texts read.
+- [x] 6.5 Run `/impeccable critique` on the Forms tab. Fix each finding, or record it in `docs/decisions.md`. Verify no finding stays unaddressed.
+- [x] 6.6 Run `/impeccable audit` on the Forms tab. Fix each finding, or record it in `docs/decisions.md`. Verify no finding stays unaddressed.
+- [x] 6.7 Repeat 5.13's citation sweep wherever a fix in 6.3 to 6.6 edited a file that `docs/decisions.md` cites. Verify each re-read citation matches its line, or record that no fix edited a cited file.
 - [ ] 6.8 Run the prose gate over the pushed range: `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`. Verify it exits 0.
 - [ ] 6.9 Run the whitespace gate over the same range: `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh`. Verify it exits 0.
