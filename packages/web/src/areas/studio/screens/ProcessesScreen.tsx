@@ -13,6 +13,7 @@ import {
   getTemplate,
 } from "../api/client.js";
 import {
+  createInFlightGuard,
   deriveProcessRows,
   seedVersionFor,
   seededDraftInput,
@@ -339,6 +340,12 @@ export function ProcessesScreen({ token, navigate, onUnauthorized }: ProcessesSc
   const [templates, setTemplates] = useState<TemplateSummary[]>([]);
   const fail = useFail(onUnauthorized, (err) => setError(describeCaughtError(err)));
   const failImport = useFail(onUnauthorized, (err) => setImportError(describeCaughtError(err)));
+  // The set of processIds with a "Create draft" write in flight, mirrored
+  // from `runCreateDraft`'s own held set so the row's button can read it.
+  // `runCreateDraft` is created once, lazily: a `useRef` argument would
+  // create and drop a guard on every render.
+  const [creating, setCreating] = useState<ReadonlySet<string>>(() => new Set());
+  const [runCreateDraft] = useState(() => createInFlightGuard(setCreating));
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -362,12 +369,21 @@ export function ProcessesScreen({ token, navigate, onUnauthorized }: ProcessesSc
    * cannot be read, so the `saveDraft` below never runs on a failed seed —
    * writing an empty draft over a version the author wanted to continue from is
    * the bug this path exists to remove.
+   *
+   * `runCreateDraft` holds `processId` from before the read until `navigate`
+   * runs, so a second press on the same row's button while that hold stands
+   * sends no second read and no second write. `creating` mirrors the held
+   * set into render state, and the row's button reads `disabled` from it. A
+   * failed try frees the key: `fail(err)` reports the error, and the button
+   * reads enabled again for a later press.
    */
   const createDraft = async (processId: string, seedVersion?: number) => {
     try {
-      const input = await seededDraftInput(seedVersion, (v) => getVersionBody(processId, v, token));
-      await saveDraft(processId, input, token);
-      navigate({ name: "edit", processId });
+      await runCreateDraft(processId, async () => {
+        const input = await seededDraftInput(seedVersion, (v) => getVersionBody(processId, v, token));
+        await saveDraft(processId, input, token);
+        navigate({ name: "edit", processId });
+      });
     } catch (err) {
       fail(err);
     }
@@ -576,7 +592,12 @@ export function ProcessesScreen({ token, navigate, onUnauthorized }: ProcessesSc
                       </button>
                     </>
                   ) : (
-                    <button type="button" className="btn btn-secondary" onClick={() => void createDraft(row.processId, seedVersionFor(row))}>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => void createDraft(row.processId, seedVersionFor(row))}
+                      disabled={creating.has(row.processId)}
+                    >
                       Create draft
                     </button>
                   )}

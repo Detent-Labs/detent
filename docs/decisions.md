@@ -1618,8 +1618,8 @@ recorded rather than fixed. The RAIL tags are local to this section.
   form collapses, inside a group or not.
 - **Creating a draft takes tens of seconds and shows no progress.** One
   measurement read 56.9s on the seeded `purchase_requisition` v3. Another
-  watched eight `GET /drafts/<id>` polls answer 404 over 7.5s. The button gives
-  no sign meanwhile, so a second press is easy.
+  watched eight `GET /drafts/<id>` polls answer 404 over 7.5s. The button
+  disables for that whole wait, but nothing signals how much longer it runs.
 - **Two browser-check entries name retired UI.** `docs/browser-checks.md:883`
   and `:913` still name the configuration pane and the ribbon bar.
   `.claude/rules/ui-glossary.md` retired both words with the process surface.
@@ -2053,14 +2053,6 @@ only the marks the miniature draws. The required count stands beside it.
   The browser run wrapped three marks, since the form editor added one group
   entry on its own. Risk (Low): a sub-pixel column change can flip the pass
   line. The fix asks for fifteen entries.
-- **FORMS-10: a double press on Create draft sends two saves.** `createDraft`
-  (`screens/ProcessesScreen.tsx:366`) awaits the seed read and `saveDraft`
-  before it navigates. Its button (`:579`) stays enabled meanwhile. Measured
-  2026-09-13 during a slow navigation, a second press sent a second
-  `PUT /drafts/...`. The revision moved ahead of the open editor, and its
-  first save answered "This draft was changed elsewhere" (409). Risk
-  (Medium): the author's first save fails, and they reload and redo the
-  edit. The fix holds the button disabled until the navigation.
 - **FORMS-11: the shell header overflows between 30rem and its own width.**
   The header keeps `flexWrap: "nowrap"` down to 30rem
   (`packages/web/src/shell/Chrome.tsx:24`). Measured 2026-09-13 at 560px, the
