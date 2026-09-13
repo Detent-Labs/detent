@@ -255,16 +255,19 @@ describe("A card's miniature", () => {
       workflow: {
         ...DRAFT.workflow,
         steps: [
-          { ...DRAFT.workflow!.steps![0], view: { fields: [{ ref: SECTION }, { ref: AMOUNT }] } },
+          { ...DRAFT.workflow!.steps![0], view: { fields: [{ ref: SECTION }, { ref: AMOUNT }, { ref: PURPOSE }] } },
           ...DRAFT.workflow!.steps!.slice(1),
         ],
       },
     } as unknown as Draft;
     const row = formCardRows(withGroup, [], "en")[0];
 
-    expect(row?.fieldCount).toBe(1);
+    // studio-forms-overview: a group entry and two field entries inside it
+    // read two fields, over one group break and two marks.
+    expect(row?.fieldCount).toBe(2);
     expect(row?.entries[0]?.groupBreak).toBe(true);
-    expect(row?.entries[1]?.groupBreak).toBe(false);
+    expect(row?.entries.filter((e) => e.groupBreak)).toHaveLength(1);
+    expect(row?.entries.filter((e) => !e.groupBreak)).toHaveLength(2);
   });
 
   it("counts the required entries in requiredCount, skipping a group break even when it declares required", () => {

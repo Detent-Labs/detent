@@ -246,8 +246,9 @@ export function FormsTab({ onOpenForm, onOpenChecks }: Props) {
 
 /**
  * The foot's count text (`studio-forms-overview`: "A card names its step and
- * counts the fields it draws"). Undefined where the view draws no mark: the
- * foot then holds the open control alone, with no count span at all.
+ * counts the fields it draws"). Undefined where the view draws no mark, and
+ * `FormCard` then renders no count span, so the foot holds the open control
+ * alone.
  */
 function footCountText(row: FormCardRow): string | undefined {
   if (row.fieldCount === 0) return undefined;
@@ -263,6 +264,7 @@ function footCountText(row: FormCardRow): string | undefined {
 
 function FormCard({ row, onOpenForm, onOpenChecks }: { row: FormCardRow } & Props) {
   const empty = row.fieldCount === 0;
+  const countText = footCountText(row);
   const nameId = useId();
   const controlId = useId();
   return (
@@ -287,7 +289,7 @@ function FormCard({ row, onOpenForm, onOpenChecks }: { row: FormCardRow } & Prop
       </div>
       <Miniature row={row} />
       <div {...stylex.props(styles.foot)}>
-        {!empty && <span {...stylex.props(styles.count)}>{footCountText(row)}</span>}
+        {countText !== undefined && <span {...stylex.props(styles.count)}>{countText}</span>}
         <button
           type="button"
           id={controlId}

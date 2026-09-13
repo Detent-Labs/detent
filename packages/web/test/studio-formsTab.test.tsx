@@ -267,6 +267,26 @@ describe("A plate's miniature", () => {
     expect(miniatures(html)).toHaveLength(0);
   });
 
+  it("names a view holding only a group entry as an empty form, offering to start it", () => {
+    // Same fixture shape as the notes-only test: step_b is dropped, so this
+    // card alone can supply the empty-form texts.
+    const SECTION = "field_00000000-0000-4000-8000-0000000000a5";
+    const groupOnly = {
+      ...DRAFT,
+      fields: [...DRAFT.fields!, { id: SECTION, key: "section", type: "group", label: { en: "Section" } }],
+      workflow: {
+        ...DRAFT.workflow,
+        steps: [{ ...DRAFT.workflow!.steps![0], view: { fields: [{ ref: SECTION }] } }, DRAFT.workflow!.steps![2]],
+      },
+    } as unknown as Draft;
+    const html = render({ draft: groupOnly });
+
+    expect(html).toContain("No fields yet");
+    expect(html).toContain("Start the form");
+    expect(html).not.toContain("Open the form");
+    expect(miniatures(html)).toHaveLength(0);
+  });
+
   it("gives a required entry's mark a different compiled class than an ordinary one", () => {
     const twoEntries = {
       ...DRAFT,
