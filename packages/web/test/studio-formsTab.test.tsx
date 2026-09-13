@@ -482,6 +482,7 @@ describe("A plate's miniature", () => {
 function attr(tag: string, name: string): string | undefined {
   return tag.match(new RegExp(`\\s${name}="([^"]*)"`))?.[1];
 }
+
 describe("A plate's open control", () => {
   it("names its step through aria-labelledby: its own id, then the h2 heading holding the step label", () => {
     const html = render();

@@ -3605,8 +3605,8 @@ choose "Create draft". Open its Forms tab, at
 
     Pass: the 8px dashed mark from step 10 reads apart from an ordinary 8px
     mark on another card, such as the one "Offboarding Closed" draws. Where
-    those two do not read apart, record a new FORMS entry in
-    `docs/decisions.md`. Clear the emulation at the end, with
+    those two do not read apart, the step fails. Clear the emulation at the
+    end, with
     `page.emulateMedia({ forcedColors: null })` in a second `run-code` call.
 
 Under `playwright-cli`, pass `-s=forms-card-legend` on every call. Step 7

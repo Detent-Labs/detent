@@ -364,7 +364,7 @@ catch. A badge name's ampersand prints escaped, as `$&amp;`.
   from a required mark. Beside an ordinary 8px outline the dash alone tells
   the two apart, and forced colors leave nothing else. The browser check reads
   a 12px and an 8px conditional mark, in both schemes and under forced colors.
-  Where the 8px pair does not read apart, the check records a new FORMS entry.
+  Where the 8px pair does not read apart, the check fails.
   The owner's pick stays as it is.
 - [A screen reader never hears a conditional entry] → The owner kept the
   foot's count to literal `required: true`. The form editor's strip prints a
@@ -379,9 +379,10 @@ catch. A badge name's ampersand prints escaped, as `$&amp;`.
 - [FIELDS-7's repair may put item names under a tab-level heading] → The
   Forms tab's card labels then move with it. Today they sit at `h2`, as the
   headings in `ChecksRail.tsx` and `StepsRail.tsx` do.
-- [At 400px wide the legend wraps to two lines] → It takes 28px more from
-  the grid's scroll box. FORMS-15 measured that box at 394px. The studio
-  targets a desktop, and the owner kept FORMS-15 as is.
+- [At 400px wide the legend wraps to two lines] → Two lines take 52px of
+  the grid's scroll box. FORMS-15 measured that box at 394px with no legend
+  above it, so it now stands near 342px. The studio targets a desktop, and
+  the owner kept FORMS-15 as is.
 - [`tmp/Detent Design Language.dc.html` should change with `DESIGN.md`] →
   That file sits outside Git, in the main checkout alone. The owner updates it
   there.

@@ -54,5 +54,5 @@
 - [x] 6.5 Run `/impeccable critique` on the Forms tab. Fix each finding, or record it in `docs/decisions.md`. Verify no finding stays unaddressed.
 - [x] 6.6 Run `/impeccable audit` on the Forms tab. Fix each finding, or record it in `docs/decisions.md`. Verify no finding stays unaddressed.
 - [x] 6.7 Repeat 5.13's citation sweep wherever a fix in 6.3 to 6.6 edited a file that `docs/decisions.md` cites. Verify each re-read citation matches its line, or record that no fix edited a cited file.
-- [ ] 6.8 Run the prose gate over the pushed range: `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`. Verify it exits 0.
-- [ ] 6.9 Run the whitespace gate over the same range: `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh`. Verify it exits 0.
+- [x] 6.8 Run the prose gate over the pushed range: `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`. Verify it exits 0.
+- [x] 6.9 Run the whitespace gate over the same range: `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh`. Verify it exits 0.
