@@ -3505,3 +3505,10 @@ and choose "Create draft". Studio opens the draft at
    right under its last row. The grid draws no vertical scrollbar.
 7. Discard the `access_request` draft the same way step 5 discarded the
    first one.
+8. Find the row `laptop_inventory` and choose "Create draft". Open its Field
+   matrix tab at 1440x900. This step comes from
+   `field-matrix-short-grid-frame`, for a grid shorter than the 24rem floor.
+   Pass: the grid's frame ends right under its last row, with no empty band
+   inside it.
+9. Discard the `laptop_inventory` draft the same way step 5 discarded the
+   first one.
