@@ -36,18 +36,18 @@
 
 ## 3. Documentation
 
-- [ ] 3.1 Add the entry "Create draft writes one draft per press
+- [x] 3.1 Add the entry "Create draft writes one draft per press
   (`process-list-create-once`)" to the end of `docs/browser-checks.md`. Take
   its steps and pass lines from design.md's decision "The browser check slows
   the write". Carry its three `run-code` functions and its dev tools
   alternatives too. Its source line names task 4.1 of
   `process-list-create-once`. Verify: the antislop count on that file does not
   rise.
-- [ ] 3.2 Delete the FORMS-10 bullet from `docs/decisions.md`. Keep every other
+- [x] 3.2 Delete the FORMS-10 bullet from `docs/decisions.md`. Keep every other
   `FORMS-n` tag as it stands. Verify: a `git grep` for FORMS-10 under `docs/`
   prints nothing. No citation of a `decisions.md` line number moved with the
   deletion. The antislop count on that file does not rise.
-- [ ] 3.3 Add one paragraph to the seeding entry in `docs/current-state.md`,
+- [x] 3.3 Add one paragraph to the seeding entry in `docs/current-state.md`,
   near line 2700. It names `createInFlightGuard` and the hold on "Create
   draft" until the edit screen opens. First confirm the name with
   `git grep -n createInFlightGuard -- packages/web/src`. Verify: the antislop
