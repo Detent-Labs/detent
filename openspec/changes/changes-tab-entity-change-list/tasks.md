@@ -1,7 +1,7 @@
 ## 1. The dormant role
 
-- [ ] 1.1 Add the dormant primitive and role to `tokens.css` and `tokens.stylex.ts`, per D6. Verify: typecheck passes.
-- [ ] 1.2 Name the role in `DESIGN.md` and `.claude/rules/design-language.md`, and file the five literal colors in `docs/decisions.md`, per D11. Verify: antislop reports no new finding.
+- [x] 1.1 Add the dormant primitive and role to `tokens.css` and `tokens.stylex.ts`, per D6. Verify: typecheck passes.
+- [x] 1.2 Name the role in `DESIGN.md` and `.claude/rules/design-language.md`, and file the five literal colors in `docs/decisions.md`, per D11. Verify: antislop reports no new finding.
 
 ## 2. The change set logic
 

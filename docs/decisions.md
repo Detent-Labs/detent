@@ -1300,6 +1300,16 @@ stage-by-stage status.
   rewording untouched prose would exceed the delta and put new text under the
   prose ratchet. A sweep of the stale word wants its own change, together
   with the six requirements that still say "edit rail".
+- **Five literal `#726e6e` sites want the new `colors.dormant` role.**
+  `changes-tab-entity-change-list` gave the dormant tone a token,
+  `--color-dormant` in `tokens.css` and `colors.dormant` in
+  `tokens.stylex.ts`. Five call sites still write the hex literal instead:
+  `packages/web/src/areas/admin/screens/OutboxScreen.tsx`,
+  `InstanceScreen.tsx` and `InstancesScreen.tsx`, and
+  `packages/web/src/areas/app/screens/InvolvedScreen.tsx` and
+  `StartedScreen.tsx`. None moved in that change; it only added the role.
+  `.impeccable/config.json`'s `design-system-color` ignore for `#726e6e`
+  stays until all five move to the role.
 
 ## Open from the 2026-08-18 code review (each needs its own OpenSpec change)
 

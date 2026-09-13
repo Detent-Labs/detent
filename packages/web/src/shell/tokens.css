@@ -25,6 +25,7 @@
      passes at 5.26:1 and is untouched. */
   --stamp-600: #d42b11;
   --refusal-700: #ae1800;
+  --dormant-500: #726e6e;
   /* Field-matrix checkbox colors: one hue per FlagKey, distinct from the
      accent/refusal red family and from each other. No separate semantic
      alias — each token has exactly one consumer (design.md's Decisions,
@@ -70,6 +71,7 @@
      #2d2b2b. */
   --color-accent-on-muted: var(--color-accent-700);
   --color-refusal: var(--refusal-700);
+  --color-dormant: var(--dormant-500);
 
   --font-heading: system-ui, sans-serif;
   --font-heading-weight: 800;
@@ -111,6 +113,7 @@
     --hairline-300: #444141;
     --stamp-600: #ff563c;
     --refusal-700: #ff9783;
+    --dormant-500: #9b9797;
     --color-flag-visible: #6fa8ff;
     --color-flag-required: #d4a017;
     --color-flag-readonly: #b98aff;
