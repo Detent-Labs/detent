@@ -12,10 +12,24 @@ import { addToDraftArray } from "../draft/draft-array-crud";
 import { resolveDraftLocalizedText, seedLocalizedText } from "../draft/localized-text";
 import { flattenDraftFields } from "../draft/fields";
 import { fieldKindIcon, fieldKindWord } from "../draft/field-type-labels";
-import { appendToGroup, fieldLabelInputId, moveControlId, moveFieldToGroup, neighbourAfterRemove, parentIdOf, railEntryId, removeFieldIn } from "./fieldCatalogLogic";
+import {
+  ADD_FIRST_FIELD_ID,
+  appendToGroup,
+  fieldLabelInputId,
+  focusAfterRemove,
+  moveControlId,
+  moveFieldToGroup,
+  neighbourAfterRemove,
+  parentIdOf,
+  railEntryId,
+  removalAnnouncement,
+  removeControlId,
+} from "./fieldCatalogLogic";
 import { flattenRailFields, issueCountForEntityId } from "../draft/panel-rail";
 import { moveFieldAndSyncViews } from "../draft/view-group-sync";
+import { fieldRemovalReach, hasReach, removeFieldAndReferences, type FieldRemovalReach } from "../draft/field-removal";
 import { FieldCatalogPanel } from "./FieldCatalogPanel";
+import { RemoveFieldDialog } from "./RemoveFieldDialog";
 import { DataSourcesPanel } from "./DataSourcesPanel";
 
 type DraftDataSource = DraftOf<DataSourceDef>;
@@ -174,8 +188,9 @@ interface PanelsRailFieldRowProps {
   /** The DOM id for the entry's own button, `railEntryId(fieldId)`. Lets the
    * refocus effect scroll the entry into the rail's view after an add or a
    * move through the move control
-   * (design.md, "Focus and the rail entry after an add or a move"). Every
-   * entry `FieldsTab` renders passes one. */
+   * (design.md, "Focus and the rail entry after an add or a move"). The same
+   * effect focuses the entry after a removal. Every entry `FieldsTab` renders
+   * passes one. */
   id?: string;
   /** The resolved label, or the "unnamed field" fallback already applied. */
   label: string;
@@ -289,6 +304,15 @@ export function PanelsRailFieldRow({
   );
 }
 
+/** A removal `FieldsTab::requestRemove` has measured: the field, its label as
+ * the entity rail resolves it, and the removal's reach. The dialog's heading
+ * and the announcement read this one label, so the two name the field alike. */
+interface FieldRemoval {
+  fieldId: string;
+  label: string;
+  reach: FieldRemovalReach;
+}
+
 /**
  * The Fields tab: the catalog's own entity rail beside the open field's
  * editor (`studio-app`). The rail survives the index rail's removal because a
@@ -308,16 +332,27 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
   const [selectedFieldIdState, setSelectedFieldId] = useState<string | undefined>(undefined);
 
   // `dragFieldId` is the row a pointer picked up. `announcement` is what the
-  // live region below reads out after a move. `refocusId` names the element
-  // the tab hands keyboard focus to after the next commit: the new field's
-  // label input after any add, or the move control after a move through that
-  // control (`spa-accessibility`). `refocusRailId` names the same field's rail
-  // entry, which that commit scrolls into the rail's view. Every add and every
-  // move sets both ids; a pointer drop clears both again.
+  // live region below reads out after a move or a removal. `refocusId` names
+  // the element the tab hands keyboard focus to after the next commit: the new
+  // field's label input after any add, the move control after a move through
+  // that control (`spa-accessibility`), or `focusAfterRemove`'s answer after a
+  // removal. `refocusRailId` names the rail entry that commit scrolls into the
+  // rail's view: the added or moved field's own, or the entry a removal
+  // focuses. Every add, every move and every removal sets `refocusId`. Each
+  // sets `refocusRailId` too, but for a removal that focuses the first-field
+  // control, which leaves it undefined. A pointer drop clears both again.
   const [dragFieldId, setDragFieldId] = useState<string | undefined>(undefined);
   const [announcement, setAnnouncement] = useState("");
   const [refocusId, setRefocusId] = useState<string | undefined>(undefined);
   const [refocusRailId, setRefocusRailId] = useState<string | undefined>(undefined);
+
+  // `pendingRemoval` is the removal `RemoveFieldDialog` asks about, while the
+  // dialog stays open. `removeTriggerRef` holds that removal's Remove field
+  // control, where `useConfirmDialog` returns focus on a decline.
+  // `announcementFrame` holds the frame a removal's sentence waits for.
+  const [pendingRemoval, setPendingRemoval] = useState<FieldRemoval | undefined>(undefined);
+  const removeTriggerRef = useRef<HTMLButtonElement>(null);
+  const announcementFrame = useRef<number | undefined>(undefined);
 
   // Resolved against every field id, at any depth — `railFields` already
   // lists one row per field, from `flattenRailFields`. Falls back to the
@@ -340,7 +375,12 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
   // only then. It focuses that input after an add, and re-asserts focus on the
   // move control after a move through that control. The same run scrolls the
   // field's rail entry into the rail's view, `nearest`
-  // (design.md, "Focus and the rail entry after an add or a move").
+  // (design.md, "Focus and the rail entry after an add or a move"). After a
+  // removal it focuses what `focusAfterRemove` names, a rail entry or the
+  // start state's first-field control, and scrolls a rail entry into view the
+  // same way. By then the removed field's editor has left the DOM with Remove
+  // field, and the start state exists only from that commit on (design.md,
+  // decision: "The tab renders the dialog, and focus follows the removal").
   useEffect(() => {
     if (refocusId === undefined) return;
     document.getElementById(refocusId)?.focus();
@@ -350,6 +390,17 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
     setRefocusId(undefined);
     setRefocusRailId(undefined);
   }, [refocusId, refocusRailId]);
+
+  /** Drops a removal's sentence still waiting for its frame, so it never lands
+   * over a newer write to the live region. */
+  const cancelAnnouncementFrame = () => {
+    if (announcementFrame.current === undefined) return;
+    cancelAnimationFrame(announcementFrame.current);
+    announcementFrame.current = undefined;
+  };
+  // An unmounted tab has no live region left to write, so a waiting frame goes
+  // with it.
+  useEffect(() => () => cancelAnnouncementFrame(), []);
 
   /**
    * Every add reaches this: the rail's "+ Add field", the start state, the
@@ -374,26 +425,71 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
     setRefocusRailId(railEntryId(newId));
   };
 
-  /**
-   * Removes the field at any depth through `removeFieldIn`, and selects
-   * `neighbourAfterRemove`'s answer: the next sibling, then the previous
-   * sibling, then the parent group (design.md: "Remove selects a sibling,
-   * then the group"). Reads the neighbour from the draft in this closure
-   * before the `mutate` call below, since the store applies that recipe
-   * later and the draft here still holds the field being removed.
-   */
-  const removeField = (fieldId: string) => {
-    const neighbor = neighbourAfterRemove(draft.fields ?? [], fieldId);
-    mutate((d) => {
-      d.fields = removeFieldIn(d.fields ?? [], fieldId);
-    });
-    setSelectedFieldId(neighbor);
-  };
-
   const fieldWord = (fieldId: string | undefined) => {
     const field = fieldId === undefined ? undefined : fieldsById.get(fieldId);
     const label = field ? resolveDraftLocalizedText(field.label, contentLocale, baseLocale) : undefined;
     return label || t("panelsScreen.unnamedField");
+  };
+
+  /**
+   * Remove field's press in the selected field's editor reaches this, as
+   * `FieldCatalogPanel`'s `onRemove`. It measures the removal's reach on this
+   * render's draft, once per press. A removal with no reach runs at once. One
+   * with reach waits in `pendingRemoval` for `RemoveFieldDialog`, which the
+   * tab renders outside the keyed `FieldEditor`: a confirm mounts a new
+   * editor, and that remount must not take the dialog along mid-press
+   * (design.md, decision: "The tab renders the dialog, and focus follows the
+   * removal"). The trigger ref points at the pressed control, found by
+   * `removeControlId`, so a decline hands focus back to it. An id no field
+   * carries does nothing.
+   */
+  const requestRemove = (fieldId: string) => {
+    const reach = fieldRemovalReach(draft, fieldId);
+    if (reach === undefined) return;
+    const removal: FieldRemoval = { fieldId, label: fieldWord(fieldId), reach };
+    if (!hasReach(reach)) {
+      removeField(removal);
+      return;
+    }
+    const trigger = document.getElementById(removeControlId(fieldId));
+    removeTriggerRef.current = trigger instanceof HTMLButtonElement ? trigger : null;
+    setPendingRemoval(removal);
+  };
+
+  /**
+   * Makes a removal `requestRemove` measured, at once or on the dialog's
+   * confirm. One `mutate` runs `removeFieldAndReferences`, so the field, every
+   * field below it and every id reference to them leave in one draft change
+   * (design.md, decision: "One recipe collects, then cleans, then prunes").
+   * The tab then selects `neighbourAfterRemove`'s answer (design.md: "Remove
+   * selects a sibling, then the group") and hands keyboard focus to
+   * `focusAfterRemove`'s. Both read the draft in this closure, which still
+   * holds the removed field.
+   *
+   * The announcement names the field by `label`, which `requestRemove`
+   * resolved before this `mutate` with the rail's own fallback. The dialog's
+   * heading reads the same string (design.md, "Announcements and the live
+   * region's name"). The region empties first and takes the sentence on the
+   * next animation frame. Two removals in a row with one sentence, as two
+   * unnamed fields give, would otherwise leave the region's text unchanged,
+   * and an unchanged text announces nothing.
+   */
+  const removeField = ({ fieldId, label, reach }: FieldRemoval) => {
+    const fields = draft.fields ?? [];
+    const neighbour = neighbourAfterRemove(fields, fieldId);
+    const focusId = focusAfterRemove(fields, fieldId);
+    mutate((d) => removeFieldAndReferences(d, fieldId));
+    setSelectedFieldId(neighbour);
+    setRefocusId(focusId);
+    setRefocusRailId(focusId === ADD_FIRST_FIELD_ID ? undefined : focusId);
+
+    cancelAnnouncementFrame();
+    setAnnouncement("");
+    const sentence = removalAnnouncement(label, reach.fieldsInside);
+    announcementFrame.current = requestAnimationFrame(() => {
+      announcementFrame.current = undefined;
+      setAnnouncement(sentence);
+    });
   };
 
   /**
@@ -421,6 +517,7 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
     // change, so the move control the refocus effect targets below is still
     // there to take focus back.
     setSelectedFieldId(fieldId);
+    cancelAnnouncementFrame();
     setAnnouncement(
       targetGroupId === undefined
         ? t("panelsScreen.movedToTopLevel").replace("{field}", fieldWord(fieldId)).replace("{group}", fieldWord(fromGroupId))
@@ -489,12 +586,12 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
             </button>
           </li>
         </ul>
-        {/* The move's own announcement. Polite, so it waits for a screen
-            reader to finish whatever it is reading rather than cutting the
-            row's own name off mid-word. It renders always: a live region
-            added to the DOM at the same moment its text arrives is announced
-            by no engine reliably. */}
-        <p {...stylex.props(styles.visuallyHidden)} role="status" aria-live="polite" aria-label={t("panelsScreen.moveAnnouncerLabel")}>
+        {/* The announcement of each move and each removal. Polite, so it
+            waits for a screen reader to finish whatever it is reading rather
+            than cutting the row's own name off mid-word. It renders always: a
+            live region added to the DOM at the same moment its text arrives
+            is announced by no engine reliably. */}
+        <p {...stylex.props(styles.visuallyHidden)} role="status" aria-live="polite" aria-label={t("panelsScreen.fieldAnnouncerLabel")}>
           {announcement}
         </p>
       </nav>
@@ -503,11 +600,30 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
           token={token}
           selectedId={selectedFieldId}
           onAdd={addField}
-          onRemove={removeField}
+          onRemove={requestRemove}
           onShowStep={onShowStep}
           onMoveField={moveField}
         />
       </div>
+      {/* Outside the keyed `FieldEditor`, which a confirm remounts. A modal
+          dialog sits in the top layer, so it takes no cell of this grid. A
+          confirm clears the trigger ref before the dialog unmounts: the
+          hook's focus return then finds nothing, and the refocus effect alone
+          places focus. A decline keeps the ref, so focus returns to Remove
+          field. */}
+      {pendingRemoval !== undefined && (
+        <RemoveFieldDialog
+          label={pendingRemoval.label}
+          reach={pendingRemoval.reach}
+          triggerRef={removeTriggerRef}
+          onCancel={() => setPendingRemoval(undefined)}
+          onConfirm={() => {
+            removeTriggerRef.current = null;
+            setPendingRemoval(undefined);
+            removeField(pendingRemoval);
+          }}
+        />
+      )}
     </div>
   );
 }

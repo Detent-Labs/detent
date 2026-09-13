@@ -386,7 +386,7 @@ export function PublishReasonLine({ canPublish, blocked }: { canPublish: boolean
 interface ConfirmDialogProps {
   processLabel: string;
   revision: number;
-  /** The nav control that opened this dialog, for the focus return above. */
+  /** The nav control that opened this dialog, for `useConfirmDialog`'s focus return. */
   triggerRef: RefObject<HTMLButtonElement | null>;
   /** The refusal to render inside the dialog, or null. A modal puts everything
    * behind it out of reach, so a banner on the screen reports nothing here

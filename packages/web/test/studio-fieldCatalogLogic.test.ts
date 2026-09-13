@@ -2,9 +2,11 @@ import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 import { FIELD_KINDS } from "workflow-engine/schema";
 import {
+  ADD_FIRST_FIELD_ID,
   appendToGroup,
   droppedByKindChange,
   fieldLabelInputId,
+  focusAfterRemove,
   groupTargetsFor,
   moveFieldToGroup,
   moveTargetsFor,
@@ -520,6 +522,35 @@ describe("neighbourAfterRemove", () => {
   });
 });
 
+/**
+ * Where keyboard focus lands after a removal (`studio-app`: "A removal on the
+ * Fields tab moves focus to the next rail entry and announces itself"). One
+ * case per branch of design.md's order: the neighbour's rail entry, the first
+ * rail entry the pruned catalog keeps, then Add the first field.
+ */
+describe("focusAfterRemove", () => {
+  it("focuses the rail entry of the field the neighbour rule selects", () => {
+    const fields = [grp("field_g", "g", [fld("field_a", "a"), fld("field_b", "b")])];
+
+    expect(focusAfterRemove(fields, "field_a")).toBe(railEntryId("field_b"));
+  });
+
+  // The rail lists no entry for a field without an id, so the neighbour rule
+  // answers nothing for `field_a`, whose parent carries none. The rail lists
+  // `field_a` first today, and only the pruned catalog's first entry is right.
+  it("focuses the first rail entry the pruned catalog keeps when the neighbour rule answers nothing", () => {
+    const idlessGroup = { key: "unsaved", label: { en: "Unsaved" }, type: "group", fields: [fld("field_a", "a")] } as unknown as DraftField;
+    const fields = [idlessGroup, fld("field_b", "b")];
+
+    expect(neighbourAfterRemove(fields, "field_a")).toBeUndefined();
+    expect(focusAfterRemove(fields, "field_a")).toBe(railEntryId("field_b"));
+  });
+
+  it("focuses Add the first field when the removal leaves the rail no entry", () => {
+    expect(focusAfterRemove([fld("field_a", "a")], "field_a")).toBe(ADD_FIRST_FIELD_ID);
+  });
+});
+
 describe("fieldLabelInputId and railEntryId", () => {
   it("pins the label input id", () => {
     expect(fieldLabelInputId("field_a")).toBe("studio-field-label-field_a");
@@ -543,5 +574,9 @@ describe("removalAnnouncement", () => {
     expect(removalAnnouncement("Processing (Fabrikam)", 18)).toBe(
       "Processing (Fabrikam) removed, with the 18 fields inside it.",
     );
+  });
+
+  it("keeps a label holding the literal text {count} as the author typed it", () => {
+    expect(removalAnnouncement("{count} copies", 2)).toBe("{count} copies removed, with the 2 fields inside it.");
   });
 });

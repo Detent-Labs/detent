@@ -451,7 +451,7 @@ export const en = {
   "panelsScreen.moveTargetTopLevel": "Top level",
   "panelsScreen.movedIntoGroup": "{field} moved into {group}.",
   "panelsScreen.movedToTopLevel": "{field} moved out of {group}, to the top level.",
-  "panelsScreen.moveAnnouncerLabel": "Field moves",
+  "panelsScreen.fieldAnnouncerLabel": "Field moves and removals",
   "panelsScreen.fieldRemoved": "{field} removed.",
   "panelsScreen.fieldRemovedWithOne": "{field} removed, with the one field inside it.",
   "panelsScreen.fieldRemovedWithMany": "{field} removed, with the {count} fields inside it.",

@@ -3,6 +3,7 @@ import { t } from "../catalog.js";
 import { deriveKey, dedupeKey, shouldAutoDeriveKey } from "../draft/deriveKey.js";
 import { flattenDraftFields, type DraftField } from "../draft/fields.js";
 import { resolveDraftLocalizedText, type DraftLocalizedText } from "../draft/localized-text.js";
+import { flattenRailFields } from "../draft/panel-rail.js";
 
 /**
  * A field's label edit's whole key decision (design.md: "Extract the
@@ -160,9 +161,11 @@ export function appendToGroup(fields: DraftField[], groupId: string, field: Draf
  * Removes the field carrying `fieldId` from the draft's field tree, at any
  * depth, through the shared `pruneField`.
  *
- * `FieldsTab`'s `removeField` calls this (design.md: "Remove selects a
- * sibling, then the group"). Its caller reads `neighbourAfterRemove` first,
- * against the tree this function is about to prune.
+ * `draft/field-removal.ts::removeFieldAndReferences` runs this as its last
+ * write, once every id reference to a removed field is gone (design.md,
+ * decision: "One recipe collects, then cleans, then prunes").
+ * `focusAfterRemove` reads its answer, a new tree, for the rail entries a
+ * removal keeps.
  *
  * Answers the array it was given, unchanged, where `fieldId` names no field
  * in the tree.
@@ -206,6 +209,15 @@ export function groupTargetsFor(fields: DraftField[], fieldId: string): string[]
 export const moveControlId = (fieldId: string) => `studio-field-move-${fieldId}`;
 
 /**
+ * The id a field's Remove field control takes. `FieldsTab` points the removal
+ * dialog's trigger ref at that control, so a declined removal hands focus
+ * back to it (design.md, decision: "The tab renders the dialog, and focus
+ * follows the removal"). Sits beside `moveControlId`, in its style.
+ * `FieldEditor` places it on the control.
+ */
+export const removeControlId = (fieldId: string) => `studio-field-remove-${fieldId}`;
+
+/**
  * The id a field's label input takes, so the tab can focus a new field's
  * label after any add (`spa-accessibility`). Sits beside `moveControlId`, in
  * its style. `LocalizedTextInput` places it on the label input it renders.
@@ -214,11 +226,20 @@ export const fieldLabelInputId = (fieldId: string) => `studio-field-label-${fiel
 
 /**
  * The id a field's rail entry takes, so the tab can scroll it into the rail's
- * view after an add or a move through the move control (`spa-accessibility`).
- * Sits beside `moveControlId`, in its style. `PanelsRailFieldRow` places it
- * on the entry's own button.
+ * view after an add or a move through the move control (`spa-accessibility`),
+ * and focus it after a removal (`focusAfterRemove`). Sits beside
+ * `moveControlId`, in its style. `PanelsRailFieldRow` places it on the
+ * entry's own button.
  */
 export const railEntryId = (fieldId: string) => `studio-field-rail-${fieldId}`;
+
+/**
+ * The id the start state's first-field control (`fieldCatalog.addFirstField`)
+ * takes, so the tab can focus it after a removal leaves the entity rail with
+ * no entry (`focusAfterRemove`). The start state renders one such control, so
+ * the id names no field.
+ */
+export const ADD_FIRST_FIELD_ID = "studio-field-add-first";
 
 /**
  * The id of the field currently holding `fieldId` as a child — a group, or a
@@ -257,8 +278,8 @@ export function moveTargetsFor(
  * The id to select after removing `fieldId` from the draft's field tree
  * (design.md: "Remove selects a sibling, then the group"). Reads the tree as
  * it stands before the removal: `FieldsTab`'s `removeField` reads this from
- * its closure before its own `mutate` recipe splices the field out through
- * `removeFieldIn`.
+ * its closure before its `mutate` recipe runs `removeFieldAndReferences`.
+ * `focusAfterRemove` hands keyboard focus to the answer's rail entry.
  *
  * A field nested in a group, at any depth: the next field in the same
  * `fields` array, else the previous one, else that group's own id. A
@@ -289,17 +310,39 @@ export function neighbourAfterRemove(fields: DraftField[], fieldId: string): str
 }
 
 /**
- * The sentence the Fields tab's live region announces for a confirmed
- * removal (design.md, "Announcements and the live region's name"). `label`
- * is the removed field's own resolved label; `fieldsInside` is its
- * `fieldRemovalReach` count, so a plain field (zero) reads apart from a
- * group that took fields with it.
+ * The id of the element that takes keyboard focus once `fieldId` leaves the
+ * draft's field tree (design.md, decision: "The tab renders the dialog, and
+ * focus follows the removal"). Reads the tree as it stands before the
+ * removal, the way `neighbourAfterRemove` does.
+ *
+ * The rail entry of the field `neighbourAfterRemove` selects. Else the first
+ * rail entry the pruned tree keeps, the entry `FieldsTab` selects when no
+ * other selection resolves: the neighbour rule answers nothing where neither
+ * adjacent sibling nor the parent carries an id, and the rail lists no field
+ * without one. Else `ADD_FIRST_FIELD_ID`, since a tree with no rail entry
+ * opens the start state.
+ */
+export function focusAfterRemove(fields: DraftField[], fieldId: string): string {
+  const neighbour = neighbourAfterRemove(fields, fieldId);
+  if (neighbour !== undefined) return railEntryId(neighbour);
+  const first = flattenRailFields(removeFieldIn(fields, fieldId))[0];
+  return first === undefined ? ADD_FIRST_FIELD_ID : railEntryId(first.id);
+}
+
+/**
+ * The sentence the Fields tab's live region announces for a removal
+ * (design.md, "Announcements and the live region's name"). `label` is the
+ * removed field's label as the entity rail resolves it, fallback included;
+ * `fieldsInside` is its `fieldRemovalReach` count, so a plain field (zero)
+ * reads apart from a group that took fields with it.
  *
  * One key per case under `panelsScreen`, matching the shape brief's copy
  * table: the bare form at zero, the singular at one, the plural above one.
+ * `{count}` fills before `{field}`, so a label holding the text `{count}`
+ * reads as the author typed it.
  */
 export function removalAnnouncement(label: string, fieldsInside: number): string {
   if (fieldsInside === 0) return t("panelsScreen.fieldRemoved").replace("{field}", label);
   if (fieldsInside === 1) return t("panelsScreen.fieldRemovedWithOne").replace("{field}", label);
-  return t("panelsScreen.fieldRemovedWithMany").replace("{field}", label).replace("{count}", String(fieldsInside));
+  return t("panelsScreen.fieldRemovedWithMany").replace("{count}", String(fieldsInside)).replace("{field}", label);
 }
