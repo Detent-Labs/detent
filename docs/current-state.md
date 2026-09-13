@@ -2748,7 +2748,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   A second press on the same row used to send a second write. The function
   `createInFlightGuard` (`processListLogic.ts:138`) now holds each process id
   at most once, in a set keyed by `processId`. Each row in flight adds its
-  own entry, so the set holds more than one at a time. The screen
+  own entry, so the set can hold several at once. The screen
   `ProcessesScreen` wires it through `runCreateDraft`. The pressed row's
   button reads disabled from that set. It stays disabled until the edit
   screen opens, or until the seed read or the write fails.

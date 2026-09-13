@@ -344,7 +344,7 @@ export function ProcessesScreen({ token, navigate, onUnauthorized }: ProcessesSc
   // from `runCreateDraft`'s own held set so the row's button can read it.
   // `runCreateDraft` is created once, lazily: a `useRef` argument would
   // create and drop a guard on every render.
-  const [creating, setCreating] = useState<ReadonlySet<string>>(new Set());
+  const [creating, setCreating] = useState<ReadonlySet<string>>(() => new Set());
   const [runCreateDraft] = useState(() => createInFlightGuard(setCreating));
 
   const load = useCallback(async () => {
