@@ -169,11 +169,13 @@ const styles = stylex.create({
     paddingBlockEnd: space.s3,
     paddingInlineStart: { default: `calc(5.5rem + ${space.s4})`, "@media (max-width: 40rem)": 0 },
   },
-  // Name, before, arrow, after. Below 40rem each property stacks as name,
-  // before, then the arrow leading the after value.
+  // Name, before, arrow, after. Each value column takes its widest value up to
+  // the 68-character measure, so a short before sits beside its after instead
+  // of across the tab body. Below 40rem each property stacks as name, before,
+  // then the arrow leading the after value.
   properties: {
     display: { default: "grid", "@media (max-width: 40rem)": "block" },
-    gridTemplateColumns: "fit-content(14rem) minmax(0, 1fr) auto minmax(0, 1fr)",
+    gridTemplateColumns: "fit-content(14rem) fit-content(68ch) max-content fit-content(68ch)",
     columnGap: space.s3,
     rowGap: space.s1,
     margin: 0,
