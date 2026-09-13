@@ -1,7 +1,10 @@
 import { describe, expect, it } from "bun:test";
+import { readFileSync } from "node:fs";
 import type { FieldId } from "workflow-engine/schema";
 import { fieldRemovalReach, hasReach, removeFieldAndReferences, type FieldRemovalReach } from "../src/areas/studio/draft/field-removal";
-import type { DraftField } from "../src/areas/studio/draft/fields";
+import { draftFields, type DraftField } from "../src/areas/studio/draft/fields";
+import { runValidation } from "../src/areas/studio/draft/validation";
+import type { EditorIssue } from "../src/areas/studio/draft/issues";
 import type { Draft } from "../src/areas/studio/draft/types";
 import type { DraftViewEntry, DraftViewField } from "../src/areas/studio/draft/view-layout";
 
@@ -688,5 +691,104 @@ describe("removeFieldAndReferences", () => {
     removeFieldAndReferences(draft, "fld_status");
 
     expect(draft).toStrictEqual(build([total()]));
+  });
+});
+
+/** An example file wraps its body under `definition`, the idiom
+ * `studio-fieldCatalogLogic.test.ts` already established for
+ * `examples/purchase-requisition.json`. */
+function loadExample(name: string): Draft {
+  const raw = JSON.parse(readFileSync(new URL(`../../../examples/${name}`, import.meta.url), "utf-8"));
+  return (raw.definition ?? raw) as Draft;
+}
+
+/** The field or group a scenario names, found by its base-locale label
+ * rather than a hardcoded id, so the fixture keeps tracking the example
+ * once an id changes. */
+function fieldIdByLabel(draft: Draft, label: string): string {
+  const field = draftFields(draft).find((f) => f.label?.en === label);
+  if (field?.id === undefined) throw new Error(`no field labelled "${label}" in this example`);
+  return field.id;
+}
+
+/** A stable projection of `runValidation`'s issues: source, loc and message,
+ * sorted. Comparing this instead of the array itself keeps an unrelated
+ * reorder from swinging a before/after equality check either way. */
+function projectIssues(issues: EditorIssue[]): string[] {
+  return issues.map((issue) => `${issue.source}|${issue.loc}|${issue.message}`).sort();
+}
+
+/** Every projected issue in `from` with no match left in `to`, one for one:
+ * a projection appearing twice in `from` and once in `to` counts once here,
+ * never zero. */
+function issuesOnlyIn(from: readonly string[], to: readonly string[]): string[] {
+  const remaining = [...to];
+  const onlyInFrom: string[] = [];
+  for (const issue of from) {
+    const at = remaining.indexOf(issue);
+    if (at === -1) onlyInFrom.push(issue);
+    else remaining.splice(at, 1);
+  }
+  return onlyInFrom;
+}
+
+/** Runs the recipe on the two shipped examples design.md's "Tests stay pure
+ * and static" section names, and on `runValidation`'s own verdict rather
+ * than a hand-built fixture. A removal with no reach into CEL or a plugin
+ * config leaves every issue exactly as it was; Booking Status has both kinds
+ * of guard reach, so its removal gains exactly the two guards' CEL issues. */
+describe("fieldRemovalReach and removeFieldAndReferences over shipped examples", () => {
+  it("counts the fields inside and steps design.md's dialog scenario states for the group Processing (Fabrikam)", () => {
+    const draft = loadExample("it-offboarding.json");
+
+    const reach = fieldRemovalReach(draft, fieldIdByLabel(draft, "Processing (Fabrikam)"));
+
+    expect(reach).toMatchObject({ ...NONE, fieldsInside: 18, steps: 10 });
+  });
+
+  it("reports the same issues after removing a field with no reach from IT Offboarding", () => {
+    const draft = loadExample("it-offboarding.json");
+    const before = projectIssues(runValidation(draft, undefined, {}, {}).issues);
+
+    removeFieldAndReferences(draft, fieldIdByLabel(draft, "Access Excel updated or prepared"));
+
+    const after = projectIssues(runValidation(draft, undefined, {}, {}).issues);
+    expect(after).toStrictEqual(before);
+  });
+
+  it("reports the same issues after removing a group with no reach from IT Offboarding, from a fresh copy", () => {
+    const draft = loadExample("it-offboarding.json");
+    const before = projectIssues(runValidation(draft, undefined, {}, {}).issues);
+
+    removeFieldAndReferences(draft, fieldIdByLabel(draft, "Processing (Fabrikam)"));
+
+    const after = projectIssues(runValidation(draft, undefined, {}, {}).issues);
+    expect(after).toStrictEqual(before);
+  });
+
+  it("counts the reach design.md's dialog scenario states for Booking Status, with no column mapping or plugin setting", () => {
+    const draft = loadExample("expense-approval.json");
+
+    const reach = fieldRemovalReach(draft, fieldIdByLabel(draft, "Booking Status"));
+
+    expect(reach).toMatchObject({ ...NONE, steps: 2, writers: 1, contractEntries: 1, celReads: 2 });
+  });
+
+  it("gains exactly two CEL issues naming booking_status after removing Booking Status from Expense Approval", () => {
+    const draft = loadExample("expense-approval.json");
+    const before = projectIssues(runValidation(draft, undefined, {}, {}).issues);
+
+    removeFieldAndReferences(draft, fieldIdByLabel(draft, "Booking Status"));
+
+    const after = projectIssues(runValidation(draft, undefined, {}, {}).issues);
+    const removedIssues = issuesOnlyIn(before, after);
+    const addedIssues = issuesOnlyIn(after, before);
+
+    expect(removedIssues).toStrictEqual([]);
+    expect(addedIssues).toHaveLength(2);
+    for (const issue of addedIssues) {
+      expect(issue.startsWith("cel|")).toBe(true);
+      expect(issue).toContain("booking_status");
+    }
   });
 });
