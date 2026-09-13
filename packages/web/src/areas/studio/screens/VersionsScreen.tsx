@@ -191,12 +191,10 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized }: V
       setWaiting(false);
       setComparison({
         key: `${selection.a}-${selection.b}`,
-        // `changeList.heading.versions`'s `{a}` is the AFTER version and `{b}`
-        // the BEFORE one, while `selection.a` is this screen's BEFORE side —
-        // the owner chose A as before (D7). So `{a}` fills from `selection.b`.
+        // Side A reads as before and side B as after (D7).
         heading: t("changeList.heading.versions")
-          .replace("{a}", () => String(selection.b))
-          .replace("{b}", () => String(selection.a)),
+          .replace("{after}", () => String(selection.b))
+          .replace("{before}", () => String(selection.a)),
         rows,
       });
     } catch (e) {
