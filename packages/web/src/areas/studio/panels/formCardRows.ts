@@ -12,9 +12,9 @@ type DraftStep = DraftOf<Step>;
 
 /**
  * One mark of a card's miniature: a field entry's own bar, or a group
- * entry's group break in its place (`studio-forms-overview`: "A card carries
- * a miniature of its form"). Drawn without a label — the miniature stands
- * for the form's shape, not its content.
+ * entry's group break in its place (`studio-forms-overview`: "A card draws a
+ * miniature of its form for the eye alone"). Drawn without a label — the
+ * miniature stands for the form's shape, not its content.
  *
  * `height` is the mark's own height in pixels, from the field's kind alone,
  * so a long-text field reads taller than a one-line field without the card
@@ -43,10 +43,15 @@ export interface FormCardRow {
   label: string;
   /** The kicker's subject — the step's role, worded by `stepRole.*`. */
   role: StepRole;
-  /** Field entries alone. A note occupies no catalog row and raises none. */
+  /** How many of `entries` draw a mark: every field entry but a group entry,
+   * which draws a group break instead, and a note, which occupies no
+   * catalog row and draws nothing at all. The foot's count text reads this
+   * number (`studio-forms-overview`: "A card names its step and counts the
+   * fields it draws"). */
   fieldCount: number;
   /** How many of `entries`, group breaks aside, declare `required: true` —
-   * the miniature's accessible name states this beside `fieldCount`. */
+   * the card's foot states this beside `fieldCount`. The miniature stays out
+   * of the accessibility tree and states neither number. */
   requiredCount: number;
   entries: MiniatureEntry[];
   /** The open issues naming this step's view, and whether any refuses a
@@ -124,7 +129,7 @@ export function formCardRows(draft: Draft, issues: readonly EditorIssue[], conte
       stepId: step.id,
       label: resolveDraftLocalizedText(step.label, contentLocale, baseLocale) || step.key || t("steps.unnamedStep"),
       role: roleStampFor(step, initialStep).role,
-      fieldCount: viewEntries.filter(isDraftViewField).length,
+      fieldCount: marks.filter((m) => !m.groupBreak).length,
       requiredCount: marks.filter((m) => !m.groupBreak && m.required).length,
       entries: marks,
       issues: viewIssues(issues, step.id),

@@ -3531,9 +3531,10 @@ each on its own fresh draft.
 
 ### The Forms tab card miniature (`forms-tab-form-strip`)
 
-Source: `forms-tab-form-strip` tasks 3.5 and 3.6. The height budget and a
-mark's own contrast both come off a screenshot, read by eye against a real
-window. No `bun:test` assertion sees either, so this check lands here.
+Source: `forms-tab-form-strip` tasks 3.5 and 3.6, `forms-tab-card-clarity`
+tasks 3.3 and 3.4. The height budget and a mark's own contrast both come
+off a screenshot, read by eye against a real window. No `bun:test`
+assertion sees either, so this check lands here.
 
 Build the production bundle and open it on the engine's own port. Seed the
 database, then sign in as `demo-superuser@example.test`, password
@@ -3556,11 +3557,21 @@ choose "Create draft". Open its Forms tab, at
    form editor, add ten field entries and save. Return to the Forms tab.
    Pass: that card's marks continue onto a second line, and every mark stays
    whole and visible.
+5. Read the accessibility tree on "Review the Exit Notification", a card
+   step 4 leaves untouched. Pass: its control's accessible name reads "Open
+   the form Review the Exit Notification". The foot reads "22 fields, 2
+   required", with no miniature node in the tree.
+6. On its card, choose the open control for "Hold and Close the Account".
+   Remove its five field entries. Choose "← Back to the process" without
+   pressing Save. Pass: back on the Forms tab, that card's foot holds
+   "Start the form" alone, at the row's trailing edge. Its accessibility
+   tree reads "No fields yet".
 
-Go back to the process list and choose "Discard" on the `it_offboarding`
-row, then accept the browser's confirm. The header bar's own "Discard
-draft" does not work, so do not use it here. See the `docs/decisions.md`
-entry DRAFT-1.
+Choose "← Back to processes" to return to the process list. Step 6 left the
+draft dirty, so accept its leave-draft confirm. Then choose "Discard" on
+the `it_offboarding` row, and accept the browser's confirm. The header
+bar's own "Discard draft" does not work, so do not use it here. See the
+`docs/decisions.md` entry DRAFT-1.
 
 ### The field matrix's height (`field-matrix-fill-height`)
 

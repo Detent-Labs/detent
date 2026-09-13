@@ -1,33 +1,4 @@
-# studio-forms-overview Specification
-
-## Purpose
-
-The Forms tab gathers every form a process asks a participant to fill in. One
-card per step carries a miniature of that step's form. An author reads the
-whole process's paperwork at a glance and opens any one of them.
-
-## Requirements
-
-### Requirement: The Forms tab carries one card per step that asks for something
-
-The Forms tab SHALL carry one card for every step that declares a view. A step
-declaring no view SHALL have no card. The cards SHALL follow the same order the
-steps rail uses, which is the draft's own order.
-
-The tab SHALL lay the cards in a grid that reflows with the window width.
-
-<!-- Why: "carries no card" is the screen's own phrasing, and a delta must match this scenario name. -->
-<!-- antislop: allow negation-habit -->
-#### Scenario: A step without a view carries no card
-
-- **WHEN** a draft holds three task steps and one of them declares no view
-- **THEN** the Forms tab carries two cards
-
-#### Scenario: The cards follow the steps order
-
-- **WHEN** an author reads the Forms tab
-- **THEN** the first card names the first step in the draft's own order that
-  declares a view
+## ADDED Requirements
 
 ### Requirement: A card names its step and counts the fields it draws
 
@@ -154,6 +125,8 @@ tree.
 - **THEN** the miniature's place on its card says the form has no fields yet
 - **AND** a screen reader reads that sentence
 
+## MODIFIED Requirements
+
 ### Requirement: A card opens the form editor for its step
 
 A card SHALL carry one control that opens the form editor for that step. The
@@ -191,25 +164,21 @@ Leaving the form editor SHALL return to the Forms tab where the author started.
 - **WHEN** an author opens the form editor from a card and then leaves it
 - **THEN** the Forms tab is the open one
 
-### Requirement: A card reports its step's form issues
+## REMOVED Requirements
 
-A card SHALL carry the number of open issues that name its step's view. A card
-whose step's view draws no issue SHALL carry no badge.
+### Requirement: A card names its step and counts its fields
 
-Pressing the badge SHALL open the Checks tab, narrowed to that step.
+**Reason**: A group entry stops counting as a field, and the foot states the
+required count. "A card names its step and counts the fields it draws"
+states the new rule.
 
-#### Scenario: A form issue reaches its card
+**Migration**: Read the count off the card's foot. It counts the entries the
+miniature draws as a mark.
 
-- **WHEN** one view entry names a field the catalog no longer declares
-- **THEN** that step's card carries a badge reading one
+### Requirement: A card carries a miniature of its form
 
-#### Scenario: The badge narrows the Checks tab to its own step
+**Reason**: The miniature leaves the accessibility tree, since the card's
+foot states its counts in text. "A card draws a miniature of its form for
+the eye alone" states the new rule.
 
-- **WHEN** an author presses a card's issue badge
-- **THEN** the Checks tab opens
-- **AND** it lists the open issues on that step alone
-
-#### Scenario: A narrowed Checks tab reaches every check again
-
-- **WHEN** an author reads a Checks tab narrowed to one step
-- **THEN** the tab carries a control that shows every check again
+**Migration**: A screen reader reads the counts from the card's foot.

@@ -1,3 +1,4 @@
+import { useId } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { t } from "../catalog.js";
@@ -105,9 +106,10 @@ const styles = stylex.create({
     color: colors.textMuted,
   },
   // The miniature: a row of marks standing for the form's fields, on the one
-  // muted surface (`studio-forms-overview`: "A card carries a miniature of
-  // its form"). It draws no label per mark, wraps rather than overruns the
-  // card, and clips nothing that wraps.
+  // muted surface (`studio-forms-overview`: "A card draws a miniature of its
+  // form for the eye alone"). It draws no label per mark, wraps rather than
+  // overruns the card, and clips nothing that wraps. It stays out of the
+  // accessibility tree — the card's foot states the counts in text.
   miniature: {
     display: "flex",
     flexWrap: "wrap",
@@ -200,6 +202,10 @@ const styles = stylex.create({
     fontSize: 11,
     color: colors.textMuted,
     paddingBlock: space.s1,
+    // A lone control on an empty card's foot keeps the row's trailing edge
+    // this way; beside a count the row's own `space-between` already puts it
+    // there (design.md: "The empty card's foot holds the control alone").
+    marginInlineStart: "auto",
     backgroundColor: {
       default: "transparent",
       ":hover": colors.surfaceMuted,
@@ -238,14 +244,37 @@ export function FormsTab({ onOpenForm, onOpenChecks }: Props) {
   );
 }
 
+/**
+ * The foot's count text (`studio-forms-overview`: "A card names its step and
+ * counts the fields it draws"). Undefined where the view draws no mark, and
+ * `FormCard` then renders no count span, so the foot holds the open control
+ * alone.
+ */
+function footCountText(row: FormCardRow): string | undefined {
+  if (row.fieldCount === 0) return undefined;
+  if (row.requiredCount > 0) {
+    return (row.fieldCount === 1 ? t("formsTab.miniatureLabelOne") : t("formsTab.miniatureLabel"))
+      .replace("{count}", String(row.fieldCount))
+      .replace("{required}", String(row.requiredCount));
+  }
+  return row.fieldCount === 1
+    ? t("formsTab.fieldCountOne")
+    : t("formsTab.fieldCount").replace("{count}", String(row.fieldCount));
+}
+
 function FormCard({ row, onOpenForm, onOpenChecks }: { row: FormCardRow } & Props) {
   const empty = row.fieldCount === 0;
+  const countText = footCountText(row);
+  const nameId = useId();
+  const controlId = useId();
   return (
     <li {...stylex.props(styles.card, empty && styles.cardEmpty)}>
       <div {...stylex.props(styles.head)}>
         <span {...stylex.props(styles.identity)}>
           <span {...stylex.props(styles.kicker)}>{t(`stepRole.${row.role}`)}</span>
-          <span {...stylex.props(styles.name)}>{row.label}</span>
+          <span id={nameId} {...stylex.props(styles.name)}>
+            {row.label}
+          </span>
         </span>
         {row.issues.count > 0 && (
           <button
@@ -260,15 +289,11 @@ function FormCard({ row, onOpenForm, onOpenChecks }: { row: FormCardRow } & Prop
       </div>
       <Miniature row={row} />
       <div {...stylex.props(styles.foot)}>
-        <span {...stylex.props(styles.count)}>
-          {empty
-            ? t("formsTab.emptyForm")
-            : row.fieldCount === 1
-              ? t("formsTab.fieldCountOne")
-              : t("formsTab.fieldCount").replace("{count}", String(row.fieldCount))}
-        </span>
+        {countText !== undefined && <span {...stylex.props(styles.count)}>{countText}</span>}
         <button
           type="button"
+          id={controlId}
+          aria-labelledby={`${controlId} ${nameId}`}
           className={`btn btn-ghost ${stylex.props(styles.openControl).className ?? ""}`}
           onClick={() => onOpenForm(row.stepId)}
         >
@@ -281,19 +306,17 @@ function FormCard({ row, onOpenForm, onOpenChecks }: { row: FormCardRow } & Prop
 
 /**
  * A card's miniature: one mark per field entry, a group break per group
- * entry, drawn without a label (`studio-forms-overview`: "A card carries a
- * miniature of its form"). One `role="img"` element carries the whole
- * miniature's accessible name; the marks inside carry no text and no role of
- * their own, so a screen reader announces one image rather than a list of
- * unnamed items.
+ * entry, drawn without a label (`studio-forms-overview`: "A card draws a
+ * miniature of its form for the eye alone"). It carries `aria-hidden="true"`
+ * and no role: the card's foot states the field count and the required
+ * count in text, so the miniature adds nothing a screen reader needs. On an
+ * empty form the sentence standing in its place stays in the accessibility
+ * tree instead.
  */
 function Miniature({ row }: { row: FormCardRow }) {
   if (row.fieldCount === 0) return <p {...stylex.props(styles.miniatureEmpty)}>{t("formsTab.miniatureEmpty")}</p>;
-  const name = (row.fieldCount === 1 ? t("formsTab.miniatureLabelOne") : t("formsTab.miniatureLabel"))
-    .replace("{count}", String(row.fieldCount))
-    .replace("{required}", String(row.requiredCount));
   return (
-    <div {...stylex.props(styles.miniature)} role="img" aria-label={name}>
+    <div {...stylex.props(styles.miniature)} aria-hidden="true">
       {row.entries.map((entry: MiniatureEntry) =>
         entry.groupBreak ? (
           <span key={entry.index} {...stylex.props(styles.miniatureGroupBreak)} style={{ height: entry.height }} />

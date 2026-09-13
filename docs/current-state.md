@@ -4502,10 +4502,16 @@ meets `scope=started` should infer no new permission tier from it.
   own fixed height, `GROUP_BREAK_HEIGHT`. An ordinary mark draws as an
   outline, and a required entry's mark fills solid.
 
-  The `Miniature` component carries the whole row as one `role="img"`
-  element, named from the field count and the required count. The foot row
-  carries that count on the left and the open control on the right. Those
-  two styles live in `FormsTab.tsx`, as `styles.foot` and `styles.openControl`.
+  The `Miniature` component carries `aria-hidden="true"` and no role, so a
+  screen reader skips it. The function `footCountText` builds the foot's
+  text from the field count and the required count, one catalog key per
+  shape. The component `FormCard` mints two ids with `useId`, one for the
+  step name span and one for the open control. The control's
+  `aria-labelledby` lists its own id first, then the name span's, joining
+  the two into one accessible name. That name leads with the visible
+  words, then states the step's label. The foot row carries its text on
+  the left and the open control on the right, taking `styles.foot` and
+  `styles.openControl`.
 
   The form editor's trailing pane is `FormPreview.tsx`. It mounts
   `packages/form-ui`'s own `FieldForm` and `PathButtons`, the two the Player
