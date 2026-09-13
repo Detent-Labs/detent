@@ -80,6 +80,71 @@ describe("the steps rail scrolls, not the document", () => {
   });
 });
 
+describe("the field matrix grid takes the tab body's height", () => {
+  const FIELD_MATRIX_PANEL = "src/areas/studio/panels/FieldMatrixPanel.tsx";
+  const FIELD_MATRIX_GRID = "src/areas/studio/panels/FieldMatrixGrid.tsx";
+
+  it("grows the matrix column to fill the tab body, with no automatic minimum of its own", () => {
+    const block = styleBlock(stripComments(read(FIELD_MATRIX_PANEL)), "matrix");
+
+    // The column fills the tab body instead of measuring its content, so the
+    // space it hands the grid follows the tab body's own height.
+    expect(block).toMatch(/flexGrow: 1/);
+    // A flex item that is not a scroll container takes its content height as
+    // its automatic minimum, so the column needs the explicit zero to shrink
+    // into the tab body at all.
+    expect(block).toMatch(/minHeight: 0/);
+  });
+
+  it("holds the 24rem floor on a space around the scroll region", () => {
+    const block = styleBlock(stripComments(read(FIELD_MATRIX_GRID)), "matrixScrollSpace");
+
+    // The space is a flex column of its own, so the floor binds even when
+    // the scroll region inside it shrinks to a short grid's rows.
+    expect(block).toMatch(/display: "flex"/);
+    expect(block).toMatch(/flexDirection: "column"/);
+    expect(block).toMatch(/flex: "1 1 0"/);
+    expect(block).toMatch(/minHeight: "24rem"/);
+  });
+
+  it("leaves the scroll region's own height to its rows, with no cap or floor", () => {
+    const block = styleBlock(stripComments(read(FIELD_MATRIX_GRID)), "matrixScroll");
+
+    // The region's automatic minimum is already zero, so it shrinks to a
+    // short grid's rows inside the space that holds the floor.
+    expect(block).not.toMatch(/minHeight/);
+    expect(block).not.toMatch(/maxHeight/);
+    // That shrinking holds only because the region is a scroll container,
+    // the way the steps rail's own `overflowY: "auto"` above depends on it.
+    expect(block).toMatch(/overflow: "auto"/);
+  });
+
+  it("draws the scroll region's own focus ring inside its frame", () => {
+    const block = styleBlock(stripComments(read(FIELD_MATRIX_GRID)), "matrixScroll");
+
+    // The frame reaches the tab body's clipping edge, so a positive offset
+    // ring would clip there the way `studio-fieldMatrixTabStops.test.tsx`
+    // records for this grid's headers; this region pulls its own ring
+    // inward the same way.
+    expect(block).toMatch(/outlineOffset: "-2px"/);
+  });
+
+  it("wraps the scroll region's markup inside the space's own element", () => {
+    const source = stripComments(read(FIELD_MATRIX_GRID));
+
+    // The space only holds the floor if its element is the scroll region's
+    // actual DOM parent. A style assertion alone cannot see that; this reads
+    // the markup and requires `matrixScrollSpace`'s div to open before
+    // `matrixScroll`'s div, with nothing between the two but whitespace,
+    // `>`, `{(` and `<div`. Removing the wrapper's opening tag fails this
+    // match (proven with a one-off `bun -e` run against a copy of the
+    // source, recorded in the change's fix report).
+    expect(source).toMatch(
+      /stylex\.props\(styles\.matrixScrollSpace\)\}>\s*\{\(\s*<div\s+\{\.\.\.stylex\.props\(styles\.matrixScroll\)/,
+    );
+  });
+});
+
 describe("what StyleX drops", () => {
   it("clears a fieldset's UA groove with the longhand", () => {
     for (const file of [...GUIDED, "src/areas/studio/panels/PathsPanel.tsx"]) {
@@ -146,16 +211,43 @@ describe("the design language's own numbers", () => {
   });
 });
 
+describe("the miniature wraps and clips nothing", () => {
+  it("wraps its marks onto a further line, aligned to the baseline", () => {
+    const block = styleBlock(stripComments(read("src/areas/studio/panels/FormsTab.tsx")), "miniature");
+
+    // design.md, "The miniature's box": marks and group breaks align to the
+    // line's bottom edge, and a long form's marks wrap rather than overrun
+    // the card.
+    expect(block).toMatch(/flexWrap: "wrap"/);
+    expect(block).toMatch(/alignItems: "flex-end"/);
+  });
+
+  it("clips no mark that outgrows one line", () => {
+    const block = styleBlock(stripComments(read("src/areas/studio/panels/FormsTab.tsx")), "miniature");
+
+    expect(block).not.toMatch(/overflow[XY]?: "hidden"/);
+  });
+});
+
 describe("the required mark on the muted ground", () => {
-  it("reads a semantic alias, never a ramp step", () => {
+  it("draws an ordinary mark as an outline, with no fill of its own", () => {
+    const block = styleBlock(stripComments(read("src/areas/studio/panels/FormsTab.tsx")), "miniatureMark");
+
+    expect(block).toMatch(/borderWidth: 1/);
+    expect(block).not.toMatch(/backgroundColor/);
+  });
+
+  it("fills solid rather than merely coloring text, and reads a semantic alias, never a ramp step", () => {
     const source = stripComments(read("src/areas/studio/panels/FormsTab.tsx"));
 
-    // `design-language.md`: a component reads a semantic role, never a hex or
-    // a ramp step directly. `accentOnMuted` is the alias, `accent400` and its
-    // siblings are the ramp. The neighbouring `cardEmpty` reads `accent400`
-    // and predates this change, so the pattern stays on this one block.
+    // design.md, "Required marks differ in fill as well as color": a required
+    // mark fills solid, so the block sets `backgroundColor`, not `color` — the
+    // mark itself is a box, not text. `accentOnMuted` is the semantic alias;
+    // `accent400` and its siblings are the ramp. The neighbouring `cardEmpty`
+    // reads `accent400` and predates this change, so the pattern stays on
+    // this one block.
     const block = styleBlock(source, "miniatureRequired");
-    expect(block).toMatch(/color: colors\.accentOnMuted/);
+    expect(block).toMatch(/backgroundColor: \{\s*default: colors\.accentOnMuted,/);
     expect(block).not.toMatch(/colors\.accent[0-9]/);
   });
 
@@ -169,5 +261,35 @@ describe("the required mark on the muted ground", () => {
     expect(css).toContain("--color-accent-on-muted: var(--color-accent-700);");
     expect(dark).toContain("--color-accent-on-muted: var(--color-accent-400);");
     expect(read(TOKENS_STYLEX)).toContain('accentOnMuted: "var(--color-accent-on-muted)"');
+  });
+
+  it("keeps its fill under forced colors, where a plain background is erased", () => {
+    const source = stripComments(read("src/areas/studio/panels/FormsTab.tsx"));
+
+    // The audit for forms-tab-form-strip: forced-colors mode maps
+    // `accentOnMuted`'s background to Canvas, so a required mark drew as the
+    // same outline as an ordinary one. `CanvasText` plus
+    // `forcedColorAdjust: "none"` keeps the fill solid there too.
+    expect(source).toMatch(/const FORCED_COLORS = "@media \(forced-colors: active\)";/);
+    const block = styleBlock(source, "miniatureRequired");
+    expect(block).toMatch(/backgroundColor: \{\s*default: colors\.accentOnMuted,\s*\[FORCED_COLORS\]: "CanvasText",?\s*\}/);
+    expect(block).toMatch(/forcedColorAdjust: \{\s*default: "auto",\s*\[FORCED_COLORS\]: "none",?\s*\}/);
+  });
+});
+
+describe("the group break survives forced colors", () => {
+  it("draws with a 1px border there, since a background alone is erased", () => {
+    const source = stripComments(read("src/areas/studio/panels/FormsTab.tsx"));
+    const block = styleBlock(source, "miniatureGroupBreak");
+
+    // The audit: the group break is a 1px `background-color` line with no
+    // border, so it vanishes under forced colors and the miniature ground
+    // merges with the plate. A 1px system-color border, active only under
+    // forced colors, keeps the break visible without changing its normal-mode
+    // look (design.md, "Required marks differ in fill as well as color").
+    expect(block).toMatch(/backgroundColor: colors\.textMuted/);
+    expect(block).toMatch(/borderWidth: \{\s*default: 0,\s*\[FORCED_COLORS\]: 1,?\s*\}/);
+    expect(block).toMatch(/borderColor: \{\s*default: "transparent",\s*\[FORCED_COLORS\]: "CanvasText",?\s*\}/);
+    expect(block).toMatch(/forcedColorAdjust: \{\s*default: "auto",\s*\[FORCED_COLORS\]: "none",?\s*\}/);
   });
 });

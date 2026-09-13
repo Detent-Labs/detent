@@ -1,33 +1,4 @@
-# studio-forms-overview Specification
-
-## Purpose
-
-The Forms tab gathers every form a process asks a participant to fill in. One
-card per step carries a miniature of that step's form. An author reads the
-whole process's paperwork at a glance and opens any one of them.
-
-## Requirements
-
-### Requirement: The Forms tab carries one card per step that asks for something
-
-The Forms tab SHALL carry one card for every step that declares a view. A step
-declaring no view SHALL have no card. The cards SHALL follow the same order the
-steps rail uses, which is the draft's own order.
-
-The tab SHALL lay the cards in a grid that reflows with the window width.
-
-<!-- Why: "carries no card" is the screen's own phrasing, and a delta must match this scenario name. -->
-<!-- antislop: allow negation-habit -->
-#### Scenario: A step without a view carries no card
-
-- **WHEN** a draft holds three task steps and one of them declares no view
-- **THEN** the Forms tab carries two cards
-
-#### Scenario: The cards follow the steps order
-
-- **WHEN** an author reads the Forms tab
-- **THEN** the first card names the first step in the draft's own order that
-  declares a view
+## MODIFIED Requirements
 
 ### Requirement: A card names its step and counts its fields
 
@@ -140,26 +111,3 @@ Leaving the form editor SHALL return to the Forms tab where the author started.
 
 - **WHEN** an author opens the form editor from a card and then leaves it
 - **THEN** the Forms tab is the open one
-
-### Requirement: A card reports its step's form issues
-
-A card SHALL carry the number of open issues that name its step's view. A card
-whose step's view draws no issue SHALL carry no badge.
-
-Pressing the badge SHALL open the Checks tab, narrowed to that step.
-
-#### Scenario: A form issue reaches its card
-
-- **WHEN** one view entry names a field the catalog no longer declares
-- **THEN** that step's card carries a badge reading one
-
-#### Scenario: The badge narrows the Checks tab to its own step
-
-- **WHEN** an author presses a card's issue badge
-- **THEN** the Checks tab opens
-- **AND** it lists the open issues on that step alone
-
-#### Scenario: A narrowed Checks tab reaches every check again
-
-- **WHEN** an author reads a Checks tab narrowed to one step
-- **THEN** the tab carries a control that shows every check again

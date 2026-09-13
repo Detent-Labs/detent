@@ -3519,3 +3519,85 @@ each on its own fresh draft.
    under Draft, with "Create draft" back beside "Versions". The header bar's
    own "Discard draft" does not work, so do not use it here. See the
    `docs/decisions.md` entry DRAFT-1.
+
+### The Forms tab card miniature (`forms-tab-form-strip`)
+
+Source: `forms-tab-form-strip` tasks 3.5 and 3.6. The height budget and a
+mark's own contrast both come off a screenshot, read by eye against a real
+window. No `bun:test` assertion sees either, so this check lands here.
+
+Build the production bundle and open it on the engine's own port. Seed the
+database, then sign in as `demo-superuser@example.test`, password
+`seed-demo-password`. In the Processes list, find `it_offboarding` and
+choose "Create draft". Open its Forms tab, at
+`/studio/processes/<id>/edit/forms`.
+
+1. Resize the window to 1100px wide. Read the Forms tab body's own height in
+   the inspector. Resize the window's height until that body measures 635px
+   tall. Pass: the twelfth card, last in the four-row grid, reads its open
+   control without scrolling the tab body.
+2. Read "Submit the Exit Notification", the card with the most required
+   entries. Pass: an ordinary mark draws as a hairline outline against the
+   ledger ground. A required mark draws as a filled block instead. Both read
+   apart from each other and from the ground, in the light scheme.
+3. Switch the OS or browser to the dark color scheme and read the same card
+   again. Pass: the outline and the filled mark still read apart, against
+   the dark scheme's own ledger ground.
+4. Open "Submit the Exit Notification" from its card's open control. In the
+   form editor, add ten field entries and save. Return to the Forms tab.
+   Pass: that card's marks continue onto a second line, and every mark stays
+   whole and visible.
+
+Go back to the process list and choose "Discard" on the `it_offboarding`
+row, then accept the browser's confirm. The header bar's own "Discard
+draft" does not work, so do not use it here. See the `docs/decisions.md`
+entry DRAFT-1.
+
+### The field matrix's height (`field-matrix-fill-height`)
+
+A `bun:test` assertion already holds the field matrix's layout declarations
+in place. Three parts carry them: the matrix column's growth, the invisible
+space around the scroll region, and the frame itself. The same test file,
+`studio-guidedSurfaceStyle.test.ts`, guards the steps rail's own scroll rule
+this way. The harness lays out nothing, so that assertion reads no rendered
+height. This entry proves the height those declarations produce.
+
+See this file's "Before you start" section for the build and the address.
+Seed the database and sign in as `demo-superuser@example.test`, password
+`seed-demo-password`. In the Processes list, find the row `it_offboarding`
+and choose "Create draft". Studio opens the draft at
+`/studio/processes/<id>/edit`. Choose the Field matrix tab.
+
+1. Resize the window to 1440x900. Pass: the grid's bottom edge sits on the
+   tab body's own bottom edge. The tab body itself holds still, with no
+   scroll of its own.
+2. Scroll that grid down, then narrow the window to 1280x900 and scroll it
+   sideways. At 1440 wide the grid has no horizontal overflow (scrollWidth
+   1414 equals clientWidth 1414). Pass: the step header row and the field
+   header column keep their place. The toolbar stays above the grid the
+   whole time.
+3. Resize the window to 1440x1200. Pass: the grid grows with the window and
+   shows more rows than it did at 900.
+4. Resize the window to 1440x600, then scroll the tab body itself (not the
+   grid) to its end. Pass: the grid holds 384px, the 24rem floor, and the
+   toolbar keeps its own height untouched. The header row plus two field
+   rows show inside the grid. A mouse wheel over the grid will not scroll
+   the tab body back up from here. Use the tab body's own scrollbar or the
+   keyboard instead.
+5. Go back to the process list and choose "Discard" on the `it_offboarding`
+   row, then accept the browser's confirm. The header bar's own "Discard
+   draft" does not work, so do not use it here. See the `docs/decisions.md`
+   entry DRAFT-1.
+6. Find the row `access_request` and choose "Create draft". Open its Field
+   matrix tab at 1440x1200. First confirm the grid's own height sits between
+   384px and the height under the toolbar. Pass: the grid's own frame ends
+   right under its last row. The grid draws no vertical scrollbar.
+7. Discard the `access_request` draft the same way step 5 discarded the
+   first one.
+8. Find the row `laptop_inventory` and choose "Create draft". Open its Field
+   matrix tab at 1440x900. This step comes from
+   `field-matrix-short-grid-frame`, for a grid shorter than the 24rem floor.
+   Pass: the grid's frame ends right under its last row, with no empty band
+   inside it.
+9. Discard the `laptop_inventory` draft the same way step 5 discarded the
+   first one.

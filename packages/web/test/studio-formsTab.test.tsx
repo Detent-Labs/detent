@@ -84,9 +84,12 @@ function render(over: { draft?: Draft; issues?: EditorIssue[] } = {}): string {
   );
 }
 
-/** Everything between the miniature's own `<ul>` and its close. */
+/** Everything between the miniature's own `role="img"` element and its
+ * close. The miniature carries no list semantics any more, so the element
+ * itself is what a test matches — a backreference to the tag name, since the
+ * element is not pinned to one tag. */
 function miniatures(html: string): string[] {
-  return [...html.matchAll(/<ul(?![^>]*aria-label)[^>]*>(.*?)<\/ul>/gs)].map((m) => m[1]!);
+  return [...html.matchAll(/<(\w+)[^>]*\srole="img"[^>]*>(.*?)<\/\1>/gs)].map((m) => m[2]!);
 }
 
 describe("The Forms tab's plates", () => {
@@ -105,7 +108,7 @@ describe("The Forms tab's plates", () => {
   });
 
   it("counts the field entries a plate's view holds", () => {
-    expect(render()).toContain("1 field");
+    expect(render()).toContain(">1 field<");
   });
 
   it("counts a view holding several entries in its own sentence", () => {
@@ -123,7 +126,7 @@ describe("The Forms tab's plates", () => {
       },
     } as unknown as Draft;
 
-    expect(render({ draft: four })).toContain("4 fields");
+    expect(render({ draft: four })).toContain(">4 fields<");
   });
 
   it("names a view holding no entry as an empty form", () => {
@@ -137,6 +140,20 @@ describe("The Forms tab's plates", () => {
     expect(html).toContain("Open the form");
   });
 
+  it("puts the count in the foot, after the miniature and before the open control", () => {
+    // studio-forms-overview: "The count stands beside the open control" —
+    // the field count and the open control share the card's last row, after
+    // the miniature that stands above it.
+    const html = render();
+    const miniatureIndex = html.indexOf('role="img"');
+    const countIndex = html.indexOf(">1 field<");
+    const controlIndex = html.indexOf("Open the form");
+
+    expect(miniatureIndex).toBeGreaterThan(-1);
+    expect(countIndex).toBeGreaterThan(miniatureIndex);
+    expect(controlIndex).toBeGreaterThan(countIndex);
+  });
+
   it("says so in words when no step declares a form at all", () => {
     const bare = {
       baseLocale: "en",
@@ -148,19 +165,91 @@ describe("The Forms tab's plates", () => {
 });
 
 describe("A plate's miniature", () => {
+  it("draws one miniature per plate whose view holds a field entry", () => {
+    // DRAFT: step_a holds one field entry, step_b's view is empty and draws
+    // "No fields yet" in the miniature's place instead, step_c has no view.
+    expect(miniatures(render())).toHaveLength(1);
+  });
+
   it("takes no keyboard focus, so a walk with the Tab key never lands inside one", () => {
-    for (const inner of miniatures(render())) {
+    const inners = miniatures(render());
+    expect(inners.length).toBeGreaterThan(0);
+    for (const inner of inners) {
       expect(inner).not.toContain("<button");
       expect(inner).not.toContain("<a ");
       expect(inner).not.toContain("tabindex");
     }
   });
 
-  it("marks a required entry beside its label", () => {
-    const [first] = miniatures(render());
+  it("carries one accessible name stating the field count and the required count", () => {
+    // step_a's view holds one required entry.
+    expect(render()).toContain('aria-label="1 field, 1 required"');
+  });
 
-    expect(first).toContain("Amount");
-    expect(first).toContain('aria-label="required"');
+  it("states both counts for a view holding several entries", () => {
+    const four = {
+      ...DRAFT,
+      workflow: {
+        ...DRAFT.workflow,
+        steps: [
+          {
+            ...DRAFT.workflow!.steps![0],
+            view: { fields: [{ ref: AMOUNT, required: true }, { ref: AMOUNT }, { ref: AMOUNT }, { ref: AMOUNT }] },
+          },
+          ...DRAFT.workflow!.steps!.slice(1),
+        ],
+      },
+    } as unknown as Draft;
+
+    expect(render({ draft: four })).toContain('aria-label="4 fields, 1 required"');
+  });
+
+  it("says the form has no fields yet where the miniature would stand on an empty view", () => {
+    expect(render()).toContain("No fields yet");
+  });
+
+  it("names a view holding only a note as an empty form, offering to start it", () => {
+    // Only step_a and step_c: step_b is dropped so this card is the only
+    // source of "Empty form"/"Start the form" in the render, and the negative
+    // assertions below have something to catch a notes-only card drawn as
+    // non-empty.
+    const notesOnly = {
+      ...DRAFT,
+      workflow: {
+        ...DRAFT.workflow,
+        steps: [
+          { ...DRAFT.workflow!.steps![0], view: { fields: [{ kind: "note", text: { en: "Read this first" } }] } },
+          DRAFT.workflow!.steps![2],
+        ],
+      },
+    } as unknown as Draft;
+    const html = render({ draft: notesOnly });
+
+    expect(html).toContain("Empty form");
+    expect(html).toContain("Start the form");
+    expect(html).not.toContain("Open the form");
+    expect(miniatures(html)).toHaveLength(0);
+  });
+
+  it("gives a required entry's mark a different compiled class than an ordinary one", () => {
+    const twoEntries = {
+      ...DRAFT,
+      workflow: {
+        ...DRAFT.workflow,
+        steps: [
+          {
+            ...DRAFT.workflow!.steps![0],
+            view: { fields: [{ ref: AMOUNT, required: true }, { ref: AMOUNT }] },
+          },
+          ...DRAFT.workflow!.steps!.slice(1),
+        ],
+      },
+    } as unknown as Draft;
+    const [inner] = miniatures(render({ draft: twoEntries }));
+    const classes = [...inner!.matchAll(/<span class="([^"]*)"/g)].map((m) => m[1]);
+
+    expect(classes).toHaveLength(2);
+    expect(classes[0]).not.toBe(classes[1]);
   });
 });
 

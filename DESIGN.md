@@ -240,8 +240,9 @@ scheme swaps the primitives and keeps every semantic role in place.
   to the point that clears 4.5:1 at 11px.
 - **Accent on Muted** (`#ae1800` light, `#ff9783` dark): the accent as text on
   the ledger ground or on a hover wash. Plain Docket Red measures under 4.5:1
-  there. It colors the required marker in a form card miniature, and a
-  destructive button on hover and press.
+  there. It fills the required mark in a form card miniature. That mark is a
+  graphic, clearing the 3:1 minimum. A destructive button's hover and press
+  color stays held to the 4.5:1 minimum instead.
 
 ### Secondary
 
@@ -473,8 +474,9 @@ mono face and the stamp, never from the control itself.
   field draws it at 0 offset, and a grid cell at -2px.
 - A label sits flush left in any button wider than its own text.
 
-A row of secondary commands in the studio takes the authoring command. The
-form tab strip holds one such row. The accent there stays with the open tab.
+A row of secondary commands in the studio takes the authoring command. A
+form card's single open control takes it too. The form tab strip holds one
+such row. The accent there stays with the open tab.
 
 ### Icons
 
@@ -611,13 +613,18 @@ own.
 
 - A 1px hairline box on paper, 12px padding, in an auto-fill grid of columns
   at least 280px wide.
-- An empty form takes a 2px box in the advisory tone instead.
+- An empty form takes a 2px box in the advisory tone instead, with a sentence
+  standing where the miniature would.
 - The kicker takes mono at 11px, uppercase at 0.08em, in slate. The step name
-  takes weight 800.
-- The miniature sits on the ledger ground and draws each entry as a bar. A
-  bar's height shows the control's kind, from 8px to 32px.
-- The check badge closes the head. The open control is a secondary button at
-  the foot.
+  takes weight 800. The check badge closes the head, on a step carrying an
+  open check result.
+- The miniature sits on the ledger ground. It draws one mark, 4px wide, for
+  each field entry other than a group entry. An ordinary mark draws as an
+  outline. A required entry's mark fills solid instead. A group entry draws a
+  group break, a 1px line, where a mark would stand.
+- The foot row carries the field count on the left and the open control on
+  the right. The control takes the authoring command style, at 4px block
+  padding. The authoring command elsewhere takes 8px.
 
 ### The Field Matrix
 
@@ -722,7 +729,8 @@ design change.
 - **Do** name a literal class `prefix-block-element`, one hyphen per level,
   with a variant as a suffix class.
 - **Do** wrap a row's identifying content in a real control.
-- **Do** give a row of secondary studio commands the authoring command style.
+- **Do** give a row of secondary studio commands, or a form card's single
+  open control, the authoring command style.
 
 ### Don't:
 

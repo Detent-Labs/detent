@@ -122,9 +122,9 @@ offset, and a grid cell at -2px. A destructive action stays outlined in the
 accent and never turns red.
 
 A row of secondary commands in the studio takes the authoring command: a
-ghost button in slate, mono at 11px. The form tab strip in
-`FormTabStrip.tsx` holds one such row. The accent there stays with the open
-tab.
+ghost button in slate, mono at 11px. So does a form card's single open
+control. The form tab strip in `FormTabStrip.tsx` holds one such row. The
+accent there stays with the open tab.
 
 **The register row**, each app-area screen's own `taskList`/`taskRow`
 style pair (`TasksScreen.tsx` and its siblings). Three columns: a stamp,
