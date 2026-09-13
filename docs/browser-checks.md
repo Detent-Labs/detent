@@ -3500,11 +3500,12 @@ entry DRAFT-1.
 
 ### The field matrix's height (`field-matrix-fill-height`)
 
-A `bun:test` assertion already holds the field matrix's two style
-declarations in place. The same test file, `studio-guidedSurfaceStyle.test.ts`,
-guards the steps rail's own scroll rule this way. The harness lays out
-nothing, so that assertion reads no rendered height. This entry proves the
-height those declarations produce.
+A `bun:test` assertion already holds the field matrix's layout declarations
+in place. Three parts carry them: the matrix column's growth, the invisible
+space around the scroll region, and the frame itself. The same test file,
+`studio-guidedSurfaceStyle.test.ts`, guards the steps rail's own scroll rule
+this way. The harness lays out nothing, so that assertion reads no rendered
+height. This entry proves the height those declarations produce.
 
 See this file's "Before you start" section for the build and the address.
 Seed the database and sign in as `demo-superuser@example.test`, password
@@ -3523,7 +3524,7 @@ and choose "Create draft". Studio opens the draft at
 3. Resize the window to 1440x1200. Pass: the grid grows with the window and
    shows more rows than it did at 900.
 4. Resize the window to 1440x600, then scroll the tab body itself (not the
-   grid) to its end. Pass: the grid holds 384px, its 24rem floor, and the
+   grid) to its end. Pass: the grid holds 384px, the 24rem floor, and the
    toolbar keeps its own height untouched. The header row plus two field
    rows show inside the grid. A mouse wheel over the grid will not scroll
    the tab body back up from here. Use the tab body's own scrollbar or the

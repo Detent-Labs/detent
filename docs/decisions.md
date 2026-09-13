@@ -1760,9 +1760,10 @@ by that change. The MATRIX tags are local to this section.
   scrollTop 156. The grid's `overscroll-behavior: contain` stops the chain
   there, and no tab body area is left to wheel on. Shift+Tab still reaches
   the toolbar.
-  - Not caused by this change. The old 32rem cap already trapped the tab
-    body below a 753.5px window. The 24rem floor lowers that threshold to
-    about 625.5px, narrowing the trap window instead of widening it.
+  - Not caused by `field-matrix-fill-height`. The old 32rem cap already
+    trapped the tab body below a 753.5px window. The 24rem floor lowers
+    that threshold to about 625.5px, narrowing the trap window instead of
+    widening it.
   - A grid shorter than the floor has left blank tab body under its frame
     since `field-matrix-short-grid-frame`. A wheel there scrolls the tab
     body. On 2026-09-13, `laptop_inventory` at 1440x600 had the tab body at
