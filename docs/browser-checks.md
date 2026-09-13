@@ -2838,8 +2838,8 @@ and it drops its right-hand rule. The rail caps at 20rem. It scrolls inside
 that cap rather than pushing the editor off screen.
 
 Pass: `document.documentElement.scrollWidth` equals `clientWidth` at 1440,
-900 and 420. The page never scrolls sideways. Measured 2026-09-04: 1440/1440,
-900/900, 420/420.
+900 and 420. The page never scrolls sideways. Measured 2026-09-04 and again
+2026-09-13: 1440/1440, 900/900, 420/420.
 
 A media query is invisible to a static render, and so is the width that
 triggers it.
@@ -3661,34 +3661,44 @@ Seed the database and sign in as `demo-superuser@example.test`, password
 Open the IT Offboarding draft on the Canvas tab
 (`docs/browser-checks.md:3112`). Add a step from the canvas bar. Leave it
 unconnected, so the Checks tab counts a blocker. Narrow the window to
-400px. Run the probe on every tab in turn.
+400px. Run the probe on every tab in turn. A reload drops the unsaved step,
+so add it again after one.
 
 Pass: `scrollWidth` equals `clientWidth` on every tab. The Checks tab's
-hidden "blocking a publish" text scrolled the page to 905 of 400 before
-this change.
+hidden "blocking a publish" text scrolled the page to 900–912 of 400 before
+this change. Measured 2026-09-13 at 400x800: 400/400 on all ten tabs.
 
-Open the Fields tab, then the Changes tab with every row opened. Resize to
-1280x720 and run the probe on both tabs.
+Open the Fields tab, then the Changes tab. Choose "Expand all" there to open
+every row. Resize to 1280x720 and run the probe on both tabs.
 
 Pass: `scrollHeight` equals `clientHeight` on both. The Fields rail
-scrolled the page to 2306 of 720 before this change.
+scrolled the page to 2306 of 720 before this change. Measured 2026-09-13:
+720/720 on both.
 
 Narrow the window to 400x800 and run the probe on both tabs again.
 
 Pass: `scrollHeight` equals `clientHeight` there too. The Fields rail
 reached 2539 of 800 before this change, and the Changes tab's hidden
-"Before:"/"After:" text reached 849 of 800.
+"Before:"/"After:" text reached 849 of 800. Measured 2026-09-13: 800/800 on
+both.
 
 Scroll the entity rail down, inside its own box, on the Fields tab. Run the
 probe again.
 
 Pass: `escaped` stays empty, before the scroll and after it. The hidden
-text moves with the rail rather than staying fixed to the page.
+text moves with the rail rather than staying fixed to the page. Measured
+2026-09-13: a 400px wheel turn moved one hidden kind word and its row 400px
+each.
+
+Your account needs the `requester` and `finance-approver` roles for this
+walk. Manager Approval asks for the starter's manager, so set one on the
+account. The auth CLI in `src/auth/cli.ts` sets both, through `set-roles`
+and `set-manager`.
 
 Open `purchase-requisition`'s Player at 400px. Create an instance and
-drive it to Finance Review (`docs/browser-checks.md:3329`). Submit from
-"Review" with Finance Note, on "Decision", left empty.
+drive it to Finance Review (`docs/browser-checks.md:3329`). Claim the step.
+Submit from "Review" with Finance Note, on "Decision", left empty.
 
 Pass: `escaped` stays empty, and `scrollWidth` equals `clientWidth`. The
 Decision tab's hidden failed-field count renders without widening the
-page.
+page. Measured 2026-09-13: 400/400, with "1 issue" as the hidden count.

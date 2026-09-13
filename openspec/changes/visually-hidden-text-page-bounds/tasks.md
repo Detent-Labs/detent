@@ -13,8 +13,8 @@
 
 ## 3. Verification
 
-- [ ] 3.1 Run `bun run typecheck` and `bun run build` in the devcontainer. Verify: both exit 0.
-- [ ] 3.2 Run the full `bun test` with `DATABASE_URL` set, piped through `scripts/gates/silent-green.sh`. Verify: 0 fail, and the gate exits 0.
-- [ ] 3.3 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh`, then the same pipe into `prose.sh`. Verify: both exit 0.
-- [ ] 3.4 Walk the new `docs/browser-checks.md` entry and the Fields view's narrow-width check on the production build. Verify: every Pass line holds, with measured numbers recorded.
-- [ ] 3.5 Run the design detector from the CLI on the four edited files, after a positive control. Run `/impeccable critique` and `/impeccable audit` on the two routes design D4 names. Verify: no finding this change causes.
+- [x] 3.1 Run `bun run typecheck` and `bun run build` in the devcontainer. Verify: both exit 0.
+- [x] 3.2 Run the full `bun test` with `DATABASE_URL` set, piped through `scripts/gates/silent-green.sh`. Verify: 0 fail, and the gate exits 0.
+- [x] 3.3 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh`, then the same pipe into `prose.sh`. Verify: both exit 0.
+- [x] 3.4 Walk the new `docs/browser-checks.md` entry and the Fields view's narrow-width check on the production build. Verify: every Pass line holds, with measured numbers recorded.
+- [x] 3.5 Run the design detector from the CLI on the four edited files, after a positive control. Run `/impeccable critique` and `/impeccable audit` on the two routes design D4 names. Verify: no finding this change causes.
