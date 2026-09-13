@@ -133,14 +133,18 @@ them. The entry in `docs/browser-checks.md` then proves the height itself.
 - Risk: a grid of two rows, or three under a short header, can run under 24rem.
   Its frame then holds an empty band. Mitigation: accepted. The examples
   `laptop_inventory` and `credit_check` carry two fields and one field.
-- Risk: on a short window both the tab body and the grid scroll. Mitigation:
-  both regions contain their overscroll, so the wheel stops at the grid's end.
-  DESIGN.md's Layout section already states that rule.
+- Risk: overscroll containment traps an upward wheel over the grid below a
+  626px window. Mitigation: accepted, narrower than the trap under the old
+  32rem cap, and recorded in `docs/decisions.md` (MATRIX-1).
 - Risk: a hidden tab body lays out nothing. Mitigation: no script measures a
   height. The browser lays the grid out again when the tab opens.
 - Risk: the measurements come from one screenshot. Mitigation: task 3.5
   measures the same parts in the built bundle before the floor counts as
   proven.
+- Consequence: the grid now reaches the tab body's clipping edge. That cut
+  the scroll region's own focus ring at 1440x900, fixed in commit
+  `d246e374`. The ring now draws inside the frame at -2px, the way a cell's
+  ring already does.
 
 ## Migration Plan
 
