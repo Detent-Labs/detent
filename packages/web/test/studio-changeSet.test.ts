@@ -731,17 +731,19 @@ describe("describeChanges: values", () => {
     });
   });
 
-  it("finds no row naming the cancel sink between two stripped compiled bodies", () => {
-    const body = example("subprocess-credit-check-child.json");
-    const relabeled = { ...body, label: { en: "Credit review" } };
+  it("finds no row naming the cancel sink between a stripped uncontracted body and a stripped contracted one", () => {
+    // Compiling binds the reserved outcome to the sink in a contracted body
+    // alone, so the two sinks differ and only stripping keeps them out.
+    const contracted = example("subprocess-credit-check-child.json");
+    const uncontracted: Body = structuredClone(contracted);
+    delete uncontracted.contract;
 
     const rows = describeChanges(
-      stripCompiledContent(compileProcessBody(body)),
-      stripCompiledContent(compileProcessBody(relabeled)),
+      stripCompiledContent(compileProcessBody(uncontracted)),
+      stripCompiledContent(compileProcessBody(contracted)),
     );
 
-    expect(keys(rows)).toEqual(["process:process"]);
-    expect(names(rows[0])).toEqual(["Label"]);
+    expect(keys(rows)).toEqual(["contract:contract"]);
     expect(JSON.stringify(rows)).not.toContain("cancel_sink");
     expect(JSON.stringify(rows)).not.toContain("cancelled");
   });

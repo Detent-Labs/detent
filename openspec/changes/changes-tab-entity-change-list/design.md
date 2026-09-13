@@ -397,9 +397,10 @@ a delta.
   walk follow.
 - The same file checks the guided words. A step turned into an end reads Kind,
   before "A step someone works", after "An end". An assignment whose
-  `config.groupId` alone changed shows both ids. Two compiled bodies of
-  `examples/subprocess-credit-check-child.json`, each stripped, yield no row
-  naming the cancel sink.
+  `config.groupId` alone changed shows both ids. The contracted
+  `examples/subprocess-credit-check-child.json` and a copy with no contract
+  compile to two different sinks. Stripped, the pair yields no row naming the
+  cancel sink.
 - `packages/web/test/studio-changeList.test.tsx` uses `renderToStaticMarkup`,
   the way `studio-checksRail-narrowing.test.tsx` does. Rows stand folded, and
   a summary names four properties before "+2 more". No row carries an open
@@ -442,8 +443,8 @@ caller. Some of those return an author somewhere other than the tab row.
   the content locale to German and renames a field's German label. Pass: that
   row reads the German label before and after.
 - `docs/browser-checks.md`, the Versions walk. It checks the A-before reading.
-  It compares two published versions of `subprocess-credit-check-child`, one
-  with a changed label. Pass: no row names the cancel-sink step or the
+  It compares `laptop_inventory`'s version 1, with no contract, against a
+  contracted version 2. Pass: no row names the cancel-sink step or the
   `cancelled` outcome. It then mocks the version-body route to answer 500 with
   playwright-cli. Pass: one waiting line stands, then the error takes its
   place.

@@ -1487,9 +1487,11 @@ walks above already made.
 
 Source: `changes-tab-entity-change-list` task 6.1.
 
-Seed the database. Open `subprocess-credit-check-child`'s draft, rename the
-`decide` step's label to `Review credit`, save, and publish. The seed already
-published version 1, so this publish becomes version 2.
+Seed the database. The seed publishes `laptop_inventory` as version 1, with no
+contract. Create its draft from the process list. On the Contract tab, tick
+"this process is subprocess-callable" and add the outcome `issued`. On the
+Steps tab, open the Issued end step and choose `issued` as its outcome. Save,
+and publish version 2.
 
 Open the Versions screen. Pass: the table lists both versions. Mark version 1
 as side A and version 2 as side B, then choose Diff selected. Pass: a waiting
@@ -1498,8 +1500,9 @@ heading reads "Version 2 compared with version 1". Side A stays the before
 side, whichever column marks it.
 
 Pass: no row names the cancel-sink step or its `cancelled` outcome. Publishing
-compiles that step into both bodies, and stripping it before the compare is
-the whole point.
+compiles that step into both bodies. Only version 2's contract binds
+`cancelled` to it, so the two sinks differ. The strip before the compare alone
+keeps them out of the list.
 
 Reload the screen. With playwright-cli's `route` command, mock `GET
 /processes/:processId/versions/:version` to answer 500 for one version's id.

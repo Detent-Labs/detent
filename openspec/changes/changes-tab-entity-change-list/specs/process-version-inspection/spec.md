@@ -72,7 +72,8 @@ seeding uses.
 
 #### Scenario: Two published versions show no compiled content
 
-- **WHEN** a developer compares two published versions of a contracted process
+- **WHEN** a developer compares a published version with no contract against a
+  published version of the same process with one
 - **THEN** no row names the cancel-sink step or the reserved cancel outcome
 
 #### Scenario: A row on the Versions screen opens no tab
