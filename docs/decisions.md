@@ -1546,7 +1546,7 @@ recorded rather than fixed. The RAIL tags are local to this section.
   of a boundary that identifies a control. `DESIGN.md`'s Inputs / Fields entry
   sets that hairline, so the call belongs to the design language.
 - **Every `.btn` stands 36 to 37px tall, under the 44px touch target.** Its
-  padding sits at `packages/web/src/shell/tokens.css:125`. The studio serves a
+  padding sits at `packages/web/src/shell/tokens.css:139`. The studio serves a
   desktop audience, so this one waits on a touch one.
 - **`createStep.ts` calls the canvas add controls "the palette".** The retired
   word sits at `packages/web/src/areas/studio/draft/createStep.ts:8` and `:15`.
@@ -1698,15 +1698,15 @@ paths under `panels/`, `draft/` and `screens/` start at
   That design also records the owner's own anti-goal "no breadcrumb in the
   heading" (`:69`).
 - **FIELDS-10: the field editor's type drifts from `DESIGN.md`.** Measured
-  2026-09-13, the field's `h3` computes weight 700, where `DESIGN.md:311`
+  2026-09-13, the field's `h3` computes weight 700, where `DESIGN.md:317`
   allows 800 and 400. Its `panelHeading` style
   (`panels/FieldCatalogPanel.tsx:72`) sets no weight. Field labels compute
   14.4px, sentence case, in ink (`:94`), where the Label role is 11px
-  uppercase tracked slate (`DESIGN.md:326`). Zone headings compute 14.4px at
+  uppercase tracked slate (`DESIGN.md:332`). Zone headings compute 14.4px at
   800 in ink (`panels/FieldCatalogPanel.tsx:246`), and none takes the Title
-  role (`DESIGN.md:320`). The Remove field button
+  role (`DESIGN.md:326`). The Remove field button
   (`panels/FieldCatalogPanel.tsx:915`) is an accent ghost
-  (`packages/web/src/shell/tokens.css:197`), and its text starts 5px right of
+  (`packages/web/src/shell/tokens.css:211`), and its text starts 5px right of
   the column's flush-left edge. Risk (Low): the field editor sets type outside
   the roles `DESIGN.md` names.
 - **FIELDS-11: a nested plugin-typed field's length check lands on another field.**
@@ -1862,14 +1862,6 @@ foot holds the control alone, and "No fields yet" stands once, in the
 miniature's place. The card's count now excludes a group entry, stating
 only the marks the miniature draws. The required count stands beside it.
 
-- **FORMS-7: the authoring command's hover is faint, and its press drops text
-  contrast.** The hover wash measures 1.08:1 light and 1.18:1 dark against the
-  plate (`panels/FormsTab.tsx:277`). While pressed, the ink-14% wash (`:278`)
-  drops the command's text to 4.42:1 light and 3.82:1 dark, under WCAG 1.4.3's
-  4.5:1. `FormTabStrip.tsx`'s own `control` style draws the same washes
-  (`panels/FormTabStrip.tsx:112`, `:113`), and `DESIGN.md:473` states them.
-  Risk (Low): the dark press fails for as long as the button is held. The fix
-  belongs to the authoring command `DESIGN.md` defines for both screens.
 - **FORMS-11: the shell header overflows between 30rem and its own width.**
   The header keeps `flexWrap: "nowrap"` down to 30rem
   (`packages/web/src/shell/Chrome.tsx:24`). Measured 2026-09-13 at 560px, the
@@ -1883,14 +1875,6 @@ only the marks the miniature draws. The required count stands beside it.
   the card's marks and move buttons. Seen 2026-09-13 in a screenshot only;
   the column widths stand unmeasured. Risk (Low): an author cannot read a key
   on a common laptop width. The fix is its own `/impeccable adapt` change.
-- **FORMS-14: the empty card's border reads a ramp step.** The `cardEmpty`
-  style sets `colors.accent400` (`panels/FormsTab.tsx:96`), where a component
-  reads a role. The advisory tone has no role yet
-  (`.claude/rules/design-language.md:146`). Measured 2026-09-13, the 2px
-  border reads 1.88:1 against the light plate and 7.91:1 in dark. "No fields
-  yet" and "Start the form" state the empty form beside it. Risk (Low): the
-  signal fades at a glance in the light scheme, so the fix adds an advisory
-  role first.
 - **FORMS-15: at phone width the grid scrolls inside its own box.** The grid
   sets `overflowY: "auto"` (`panels/FormsTab.tsx:70`). Measured 2026-09-13 at
   400x800, the grid stood 394px tall over 1740px of content, under about
@@ -1907,6 +1891,26 @@ only the marks the miniature draws. The required count stands beside it.
   three rows above it, and the legend keeps 24px. Risk (Low): a reader with
   low vision scrolls a box shorter than one card. The fix belongs to the fixed
   frame every tab of the process surface shares.
+
+## Open from the authoring-command-ink-advisory-role review (each needs its own OpenSpec change)
+
+The change `authoring-command-ink-advisory-role` ran its review on 2026-09-13,
+and this section records what that review found outside the change. The TONE
+tags are local to this section. Paths under `panels/` and `screens/` start at
+`packages/web/src/areas/studio/`.
+
+- **TONE-1: the missing-translation message takes two looks.** The step page
+  draws `missingTranslationWarning` beside a 2px refusal rule, its `warning`
+  block (`panels/StepPage.tsx:130`). Three other sites draw the same message
+  beside the 3px advisory rule. Those are the header bar's `warning` block
+  (`panels/ProcessHeaderBar.tsx:61`) and the field catalog's `studioWarning`
+  (`panels/FieldCatalogPanel.tsx:319`). The form editor's `studioWarning`
+  (`screens/FormEditorScreen.tsx:117`) is the third.
+  - Two more 3px rules mix refusal at 55%. The checks rail draws one in
+    `checksGroupHeldBack` (`panels/ChecksRail.tsx:46`). The timers panel draws
+    the other in `refusal` (`panels/TimersPanel.tsx:54`).
+  - Risk (Low): an author meets one message in two tones on one process
+    surface, so the tone stops telling a warning from a refusal.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 

@@ -3298,6 +3298,85 @@ Choose "Add a tab". Pass: a third tab appears, named "New tab", open. Choose
 Restore the step to its original two tabs before leaving, or discard the
 draft.
 
+From `authoring-command-ink-advisory-role` tasks 4.13 to 4.15. Hover "Add a
+tab", then hold it down, in both schemes. After each read, move the pointer
+off the control with `page.mouse.move`, then call `page.mouse.up()`. Pass:
+"Add a tab" reads ink text over the ledger wash, then over the press wash.
+Pass: the strip still holds two tabs after each release.
+
+Choose "Review" first, so the first tab stands open. Hover "Move left",
+which stands disabled there, in both schemes. Pass: its text stays slate,
+`rgb(96, 93, 93)` light and `rgb(155, 151, 151)` dark. Pass: its ground
+stays transparent.
+
+Under `playwright-cli`, this `run-code` function walks both paragraphs. It
+releases each press over the strip's own top padding, which has no click
+handler:
+
+```js
+async (page) => {
+  const addTab = page.getByRole("button", { name: "Add a tab" });
+  const strip = addTab.locator("xpath=../..");
+  const moveLeft = strip.getByRole("button", { name: "Move left" });
+  const read = (control) =>
+    control.evaluate((el) => {
+      const s = getComputedStyle(el);
+      return { color: s.color, backgroundColor: s.backgroundColor, disabled: el.disabled };
+    });
+  const pointAt = async (control) => {
+    const box = await control.boundingBox();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.waitForTimeout(200);
+  };
+  const rest = async () => {
+    const box = await strip.boundingBox();
+    await page.mouse.move(box.x + 1, box.y + 1);
+  };
+  const result = {};
+  for (const scheme of ["light", "dark"]) {
+    await page.emulateMedia({ colorScheme: scheme });
+    await pointAt(addTab);
+    const hover = await read(addTab);
+    await page.mouse.down();
+    await page.waitForTimeout(200);
+    const press = await read(addTab);
+    await rest();
+    await page.mouse.up();
+    await page.waitForTimeout(200);
+    result[scheme] = { hover, press, tabs: await strip.getByRole("tab").count() };
+  }
+  await strip.getByRole("tab", { name: "Review", exact: true }).click();
+  for (const scheme of ["light", "dark"]) {
+    await page.emulateMedia({ colorScheme: scheme });
+    await pointAt(moveLeft);
+    result[scheme].moveLeft = await read(moveLeft);
+    await rest();
+  }
+  await page.emulateMedia({ colorScheme: null });
+  return result;
+}
+```
+
+A passing run returns these values. Chrome prints a transparent ground as
+`rgba(0, 0, 0, 0)`:
+
+```json
+{
+  "light": {
+    "hover": { "color": "rgb(32, 30, 29)", "backgroundColor": "rgb(234, 233, 233)", "disabled": false },
+    "press": { "color": "rgb(32, 30, 29)", "backgroundColor": "color(srgb 0.12549 0.117647 0.113725 / 0.14)", "disabled": false },
+    "tabs": 2,
+    "moveLeft": { "color": "rgb(96, 93, 93)", "backgroundColor": "rgba(0, 0, 0, 0)", "disabled": true }
+  },
+  "dark": {
+    "hover": { "color": "rgb(243, 242, 242)", "backgroundColor": "rgb(45, 43, 43)", "disabled": false },
+    "press": { "color": "rgb(243, 242, 242)", "backgroundColor": "color(srgb 0.952941 0.94902 0.94902 / 0.14)", "disabled": false },
+    "tabs": 2,
+    "moveLeft": { "color": "rgb(155, 151, 151)", "backgroundColor": "rgba(0, 0, 0, 0)", "disabled": true }
+  }
+}
+```
+
 **The preview pane matches the canvas.** Beside the canvas, the trailing
 pane draws the identical strip. It already sits open on the tab the canvas
 shows. Click the canvas's own "Decision" tab. Pass: the preview's own strip
@@ -3532,7 +3611,8 @@ each on its own fresh draft.
 ### The Forms tab card miniature (`forms-tab-form-strip`)
 
 Source: `forms-tab-form-strip` tasks 3.5 and 3.6, `forms-tab-card-clarity`
-tasks 3.3 and 3.4, and `forms-card-legend` tasks 5.3 to 5.10. The height
+tasks 3.3 and 3.4, and `forms-card-legend` tasks 5.3 to 5.10. Step 12 comes
+from `authoring-command-ink-advisory-role` tasks 4.10 to 4.12. The height
 budget and a mark's own contrast both come off a screenshot, read by eye
 against a real window. No `bun:test` assertion sees either, so this check
 lands here.
@@ -3608,6 +3688,23 @@ choose "Create draft". Open its Forms tab, at
     those two do not read apart, the step fails. Clear the emulation at the
     end, with
     `page.emulateMedia({ forcedColors: null })` in a second `run-code` call.
+12. Read "Review the Exit Notification", a card steps 4, 6 and 10 leave
+    untouched. Hover its open control, then read the control's computed
+    `color` and `backgroundColor`. Hold it down through `page.mouse.down()`
+    and read both again. After the reads, move the pointer off the control
+    with `page.mouse.move`, then call `page.mouse.up()`. Repeat the hover, the
+    press and the release in the other color scheme.
+
+    Pass: the text reads `rgb(32, 30, 29)` light and
+    `rgb(243, 242, 242)` dark, both times. Pass: the hover ground reads
+    `rgb(234, 233, 233)` light and `rgb(45, 43, 43)` dark, and the press
+    ground reads ink at alpha 0.14. Pass: the Forms tab stays open after each
+    release.
+
+    Then read "Hold and Close the Account", the card step 6 empties. Where
+    that card holds fields again, repeat step 6's removal first. Read the
+    card's computed border color in both schemes. Pass: it reads
+    `rgb(226, 90, 64)` light and `rgb(255, 151, 131)` dark.
 
 Under `playwright-cli`, pass `-s=forms-card-legend` on every call. Step 7
 reads the legend through this `run-code` function:
@@ -3688,10 +3785,220 @@ Step 9 reads the first card's open control through this one:
 async (page) => page.getByRole("button", { name: /^Open the form / }).first().boundingBox()
 ```
 
+Step 12 reads both cards through this one. It releases each press over the
+card's own heading, which has no click handler, so the control never opens:
+
+```js
+async (page) => {
+  const grid = page.getByRole("list", { name: "Forms in this process" });
+  const card = (name) =>
+    grid.getByRole("listitem").filter({ has: page.getByRole("heading", { name, exact: true }) });
+  const review = card("Review the Exit Notification");
+  const control = review.getByRole("button", { name: /^Open the form / });
+  const heading = review.getByRole("heading", { level: 2 });
+  const center = async (locator) => {
+    const box = await locator.boundingBox();
+    return [box.x + box.width / 2, box.y + box.height / 2];
+  };
+  const read = () =>
+    control.evaluate((el) => {
+      const s = getComputedStyle(el);
+      return { color: s.color, backgroundColor: s.backgroundColor };
+    });
+  const result = {};
+  for (const scheme of ["light", "dark"]) {
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.mouse.move(...(await center(control)));
+    await page.waitForTimeout(200);
+    const hover = await read();
+    await page.mouse.down();
+    await page.waitForTimeout(200);
+    const press = await read();
+    await page.mouse.move(...(await center(heading)));
+    await page.mouse.up();
+    await page.waitForTimeout(200);
+    const emptyBorder = await card("Hold and Close the Account").evaluate(
+      (el) => getComputedStyle(el).borderTopColor,
+    );
+    result[scheme] = { hover, press, emptyBorder, formsTabOpen: page.url().endsWith("/edit/forms") };
+  }
+  await page.emulateMedia({ colorScheme: null });
+  return result;
+}
+```
+
+A passing run returns these values. Chrome prints the press ground, ink at
+alpha 0.14, in `color(srgb …)` notation:
+
+```json
+{
+  "light": {
+    "hover": { "color": "rgb(32, 30, 29)", "backgroundColor": "rgb(234, 233, 233)" },
+    "press": { "color": "rgb(32, 30, 29)", "backgroundColor": "color(srgb 0.12549 0.117647 0.113725 / 0.14)" },
+    "emptyBorder": "rgb(226, 90, 64)",
+    "formsTabOpen": true
+  },
+  "dark": {
+    "hover": { "color": "rgb(243, 242, 242)", "backgroundColor": "rgb(45, 43, 43)" },
+    "press": { "color": "rgb(243, 242, 242)", "backgroundColor": "color(srgb 0.952941 0.94902 0.94902 / 0.14)" },
+    "emptyBorder": "rgb(255, 151, 131)",
+    "formsTabOpen": true
+  }
+}
+```
+
 Choose "← Back to processes" to return to the process list. Steps 6 and 10
 left the draft dirty, so accept its leave-draft confirm. Then choose
 "Discard" on the `it_offboarding` row, and accept the browser's confirm. The
 header bar's own "Discard draft" does not work, so do not use it here. See the
+`docs/decisions.md` entry DRAFT-1.
+
+### The advisory role and the change list's command (`authoring-command-ink-advisory-role`)
+
+Source: `authoring-command-ink-advisory-role` tasks 4.16 to 4.19. No DOM test
+library exists here, so each computed color lands in this entry.
+
+Build the production bundle and open it on the engine's own port. Seed the
+database, then sign in as `demo-superuser@example.test`, password
+`seed-demo-password`. In the Processes list, find `it_offboarding` and choose
+"Create draft". Under `playwright-cli`, pass `-s=advisory-role` on every call.
+
+1. Open the header bar's `⋮` menu, named "More actions". Type `de` into its
+   add-locale control, the input reading "add locale (e.g. de)". Then choose
+   "+ add locale". Pass: the warning callout beside the process name draws its
+   3px rule in `rgb(226, 90, 64)` light and `rgb(255, 151, 131)` dark.
+2. Open the Steps tab and choose "Submit the Exit Notification" in the steps
+   rail. In that step page's "Path to" section, under the first path's
+   "triggered by", choose "a condition". Under "Only when", choose "+ Add row"
+   and leave the row's value empty. Pass: the row's dashed border reads the
+   same two colors as the first step.
+3. Open the Changes tab, which lists the path the second step changed. Hover
+   "Expand all" and hold it down, in both schemes. After each read, move the
+   pointer off the control with `page.mouse.move`, then call
+   `page.mouse.up()`. Pass: its text reads ink both times, in the values of
+   the Forms tab card entry. Pass: every change row stays folded after each
+   release.
+
+Step 1 reads the callout through this `run-code` function. The callout is the
+paragraph right after the header bar's `h1`:
+
+```js
+async (page) => {
+  const callout = page.getByRole("heading", { level: 1 }).locator("xpath=following-sibling::p[1]");
+  const result = { text: await callout.innerText() };
+  for (const scheme of ["light", "dark"]) {
+    await page.emulateMedia({ colorScheme: scheme });
+    result[scheme] = await callout.evaluate((el) => {
+      const s = getComputedStyle(el);
+      return { width: s.borderLeftWidth, style: s.borderLeftStyle, color: s.borderLeftColor };
+    });
+  }
+  await page.emulateMedia({ colorScheme: null });
+  return result;
+}
+```
+
+A passing run returns these values:
+
+```json
+{
+  "text": "No de translation yet. Publishing still works; a reader of de sees the en text.",
+  "light": { "width": "3px", "style": "solid", "color": "rgb(226, 90, 64)" },
+  "dark": { "width": "3px", "style": "solid", "color": "rgb(255, 151, 131)" }
+}
+```
+
+Step 2 reads the new row through this one:
+
+```js
+async (page) => {
+  const row = page.getByRole("group", { name: "Only when" }).getByRole("listitem").first();
+  const result = {};
+  for (const scheme of ["light", "dark"]) {
+    await page.emulateMedia({ colorScheme: scheme });
+    result[scheme] = await row.evaluate((el) => {
+      const s = getComputedStyle(el);
+      return { style: s.borderTopStyle, color: s.borderTopColor };
+    });
+  }
+  await page.emulateMedia({ colorScheme: null });
+  return result;
+}
+```
+
+A passing run returns `dashed` beside the two colors of step 1:
+
+```json
+{
+  "light": { "style": "dashed", "color": "rgb(226, 90, 64)" },
+  "dark": { "style": "dashed", "color": "rgb(255, 151, 131)" }
+}
+```
+
+Step 3 runs through this one. It releases each press over the change list's
+own heading, which has no click handler, so the command never fires:
+
+```js
+async (page) => {
+  const command = page.getByRole("button", { name: /^(Expand|Collapse) all$/ });
+  const list = command.locator("xpath=../..");
+  const heading = command.locator("xpath=..").getByRole("heading", { level: 2 });
+  const center = async (locator) => {
+    const box = await locator.boundingBox();
+    return [box.x + box.width / 2, box.y + box.height / 2];
+  };
+  const read = () =>
+    command.evaluate((el) => {
+      const s = getComputedStyle(el);
+      return { color: s.color, backgroundColor: s.backgroundColor };
+    });
+  const result = {};
+  for (const scheme of ["light", "dark"]) {
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.mouse.move(...(await center(command)));
+    await page.waitForTimeout(200);
+    const hover = await read();
+    await page.mouse.down();
+    await page.waitForTimeout(200);
+    const press = await read();
+    await page.mouse.move(...(await center(heading)));
+    await page.mouse.up();
+    await page.waitForTimeout(200);
+    result[scheme] = {
+      hover,
+      press,
+      label: await command.innerText(),
+      openRows: await list.locator("details[open]").count(),
+    };
+  }
+  await page.emulateMedia({ colorScheme: null });
+  return result;
+}
+```
+
+A passing run returns these values:
+
+```json
+{
+  "light": {
+    "hover": { "color": "rgb(32, 30, 29)", "backgroundColor": "rgb(234, 233, 233)" },
+    "press": { "color": "rgb(32, 30, 29)", "backgroundColor": "color(srgb 0.12549 0.117647 0.113725 / 0.14)" },
+    "label": "Expand all",
+    "openRows": 0
+  },
+  "dark": {
+    "hover": { "color": "rgb(243, 242, 242)", "backgroundColor": "rgb(45, 43, 43)" },
+    "press": { "color": "rgb(243, 242, 242)", "backgroundColor": "color(srgb 0.952941 0.94902 0.94902 / 0.14)" },
+    "label": "Expand all",
+    "openRows": 0
+  }
+}
+```
+
+Choose "← Back to processes" to return to the process list. Step 2 left the
+draft dirty, so accept its leave-draft confirm. Then choose "Discard" on the
+`it_offboarding` row, and accept the browser's confirm. The header bar's own
+"Discard draft" does not work, so do not use it here. See the
 `docs/decisions.md` entry DRAFT-1.
 
 ### The field matrix's height (`field-matrix-fill-height`)
@@ -3824,7 +4131,7 @@ then back in as the superuser to continue. Restore the superuser's original
 roles with `set-roles` when the walk finishes.
 
 Open `purchase-requisition`'s Player at 400px. Create an instance and
-drive it to Finance Review (`docs/browser-checks.md:3329`). Claim the step.
+drive it to Finance Review (`docs/browser-checks.md:3408`). Claim the step.
 Submit from "Review" with Finance Note, on "Decision", left empty.
 
 Pass: `escaped` stays empty, and `scrollWidth` equals `clientWidth`. The

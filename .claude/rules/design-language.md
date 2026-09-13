@@ -31,9 +31,12 @@ decoration. No surface pretends to be a card when it is a row in a register.
 
 One accent sits on a light ground. Roles, such as `Unclaimed` and `Booked`,
 form the semantic layer that components reference. The ramp steps behind them
-are primitives. A component must never touch a primitive directly. The
-dormant tone reads `--color-dormant` (`colors.dormant` in the token module),
-backed by the `--dormant-500` primitive.
+are primitives. A component must never touch a primitive directly.
+
+The dormant tone reads `--color-dormant` (`colors.dormant` in the token
+module), backed by the `--dormant-500` primitive. The advisory tone reads
+`--color-advisory` (`colors.advisory`), backed by the `--advisory-500`
+primitive. It draws a rule or a border, and never a stamp.
 
 The field matrix's `--color-flag-visible`/`-required`/`-readonly` tokens are
 a scoped exception. Each is a single token with no ramp behind it, read
@@ -124,7 +127,9 @@ accent and never turns red.
 A row of secondary commands in the studio takes the authoring command: a
 ghost button in slate, mono at 11px. So does a form card's single open
 control. The form tab strip in `FormTabStrip.tsx` holds one such row. The
-accent there stays with the open tab.
+accent there stays with the open tab. Under the pointer and while pressed,
+the command's text turns to ink over its wash. A disabled command keeps slate
+text and a transparent ground under the pointer.
 
 **The register row**, each app-area screen's own `taskList`/`taskRow`
 style pair (`TasksScreen.tsx` and its siblings). Three columns: a stamp,
@@ -142,9 +147,8 @@ The steps rail in `StepsRail.tsx` adds two columns. A mono number leads, and
 the check badge closes. That badge is a 2px box around a mono count. It
 prints in refusal for a blocker, and in slate for an advisory result.
 
-**The warning callout.** Refusal text sits beside a 3px rule in the advisory
-tone, the accent ramp's light step. The advisory tone has no role in
-`tokens.css` yet.
+**The warning callout.** Refusal text sits beside a 3px rule, and the rule
+reads the advisory role.
 
 **The measuring rule**, `reporting/components.tsx`'s `DurationRule`.
 Reports' one chart form is a hairline with an accent fill whose length
