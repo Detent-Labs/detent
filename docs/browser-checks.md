@@ -3019,9 +3019,10 @@ field" again. Pass: no dialog opens either. The live region clears to
 empty again, then reads "(unnamed field) removed." once more. A screen
 reader hears that sentence twice.
 
-Open `/studio` and click "+ New process", then "Empty process". Its Fields
-tab shows the start state, "This process collects nothing yet". Click "Add
-the first field". Pass: a new field exists, selected.
+Open `/studio` and click "+ New process", then "Empty process". Open the
+new draft's Fields tab. Pass: it shows the start state, "This process
+collects nothing yet". Click "Add the first field". Pass: a new field
+exists, selected.
 
 Click "Remove field". Pass: no dialog opens, since the new field has no
 reach. The start state returns, "This process collects nothing yet", and
