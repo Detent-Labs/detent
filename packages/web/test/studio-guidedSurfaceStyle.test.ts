@@ -182,7 +182,7 @@ describe("the required mark on the muted ground", () => {
     // reads `accent400` and predates this change, so the pattern stays on
     // this one block.
     const block = styleBlock(source, "miniatureRequired");
-    expect(block).toMatch(/backgroundColor: colors\.accentOnMuted/);
+    expect(block).toMatch(/backgroundColor: \{\s*default: colors\.accentOnMuted,/);
     expect(block).not.toMatch(/colors\.accent[0-9]/);
   });
 
@@ -196,5 +196,35 @@ describe("the required mark on the muted ground", () => {
     expect(css).toContain("--color-accent-on-muted: var(--color-accent-700);");
     expect(dark).toContain("--color-accent-on-muted: var(--color-accent-400);");
     expect(read(TOKENS_STYLEX)).toContain('accentOnMuted: "var(--color-accent-on-muted)"');
+  });
+
+  it("keeps its fill under forced colors, where a plain background is erased", () => {
+    const source = stripComments(read("src/areas/studio/panels/FormsTab.tsx"));
+
+    // The audit for forms-tab-form-strip: forced-colors mode maps
+    // `accentOnMuted`'s background to Canvas, so a required mark drew as the
+    // same outline as an ordinary one. `CanvasText` plus
+    // `forcedColorAdjust: "none"` keeps the fill solid there too.
+    expect(source).toMatch(/const FORCED_COLORS = "@media \(forced-colors: active\)";/);
+    const block = styleBlock(source, "miniatureRequired");
+    expect(block).toMatch(/backgroundColor: \{\s*default: colors\.accentOnMuted,\s*\[FORCED_COLORS\]: "CanvasText",?\s*\}/);
+    expect(block).toMatch(/forcedColorAdjust: \{\s*default: "auto",\s*\[FORCED_COLORS\]: "none",?\s*\}/);
+  });
+});
+
+describe("the group break survives forced colors", () => {
+  it("draws with a 1px border there, since a background alone is erased", () => {
+    const source = stripComments(read("src/areas/studio/panels/FormsTab.tsx"));
+    const block = styleBlock(source, "miniatureGroupBreak");
+
+    // The audit: the group break is a 1px `background-color` line with no
+    // border, so it vanishes under forced colors and the miniature ground
+    // merges with the plate. A 1px system-color border, active only under
+    // forced colors, keeps the break visible without changing its normal-mode
+    // look (design.md, "Required marks differ in fill as well as color").
+    expect(block).toMatch(/backgroundColor: colors\.textMuted/);
+    expect(block).toMatch(/borderWidth: \{\s*default: 0,\s*\[FORCED_COLORS\]: 1,?\s*\}/);
+    expect(block).toMatch(/borderColor: \{\s*default: "transparent",\s*\[FORCED_COLORS\]: "CanvasText",?\s*\}/);
+    expect(block).toMatch(/forcedColorAdjust: \{\s*default: "auto",\s*\[FORCED_COLORS\]: "none",?\s*\}/);
   });
 });

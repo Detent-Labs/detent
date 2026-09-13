@@ -127,6 +127,10 @@ against the light ground, but 1.9:1 against the required red. The `divider`
 role, ink at 40%, reads 2.4:1 and 2.5:1. A flat mark cannot clear both at
 once. A grey far enough from the red sits too close to the ground.
 
+Under `forced-colors: active`, the required mark fills with `CanvasText`
+(`forcedColorAdjust: "none"`) and the group break draws as a 1px border, so
+both survive.
+
 ### The miniature's box
 
 The mockup spaced marks 2px apart. The design language places every gap on

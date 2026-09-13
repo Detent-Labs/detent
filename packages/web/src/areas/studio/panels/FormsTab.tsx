@@ -4,6 +4,12 @@ import { t } from "../catalog.js";
 import { useDraft } from "../draft/store.js";
 import { formCardRows, type FormCardRow, type MiniatureEntry } from "./formCardRows.js";
 
+/** Forced-colors mode maps an ordinary `background-color` to `Canvas`, so the
+ * required mark's fill and the group break's line both need a system-color
+ * declaration under this query to stay visible (`/impeccable audit` finding
+ * on `forms-tab-form-strip`). */
+const FORCED_COLORS = "@media (forced-colors: active)";
+
 const styles = stylex.create({
   // The grid reflows on a 280px minimum track (design.md: "The form card is a
   // bordered plate"). No fixed column count: the tab holds ten plates in a
@@ -133,14 +139,22 @@ const styles = stylex.create({
   // `--color-accent-on-muted` comment in `tokens.css` for why accentOnMuted is
   // the role read here.
   miniatureRequired: {
-    backgroundColor: colors.accentOnMuted,
+    backgroundColor: { default: colors.accentOnMuted, [FORCED_COLORS]: "CanvasText" },
     borderColor: colors.accentOnMuted,
+    // Keep the forced-colors fill: without this the UA would otherwise
+    // re-flatten `CanvasText` back toward the border's own forced color.
+    forcedColorAdjust: { default: "auto", [FORCED_COLORS]: "none" },
   },
   // A group entry's group break: a 1px line marking where a section of the
-  // form opens, in place of a mark.
+  // form opens, in place of a mark. Under forced colors a background alone
+  // is erased, so a 1px system-color border stands in for it there.
   miniatureGroupBreak: {
     width: 1,
     backgroundColor: colors.textMuted,
+    borderWidth: { default: 0, [FORCED_COLORS]: 1 },
+    borderStyle: "solid",
+    borderColor: { default: "transparent", [FORCED_COLORS]: "CanvasText" },
+    forcedColorAdjust: { default: "auto", [FORCED_COLORS]: "none" },
   },
   // Stands where the miniature would on an empty form, at the miniature's own
   // height so a grid row of one-line miniatures still ends level.
