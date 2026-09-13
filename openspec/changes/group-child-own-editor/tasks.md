@@ -40,8 +40,8 @@
 
 ## 5. Verification
 
-- [ ] 5.1 Run `bun run typecheck`, then `bun run build`, in the devcontainer. Both exit with status 0.
-- [ ] 5.2 Run the full `bun test` with `DATABASE_URL` set. Pipe its log through `scripts/gates/silent-green.sh`. No test fails, and the skip floor holds.
-- [ ] 5.3 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh`. It reports no finding.
-- [ ] 5.4 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`. No Markdown file gains a finding.
-- [ ] 5.5 Run the walks from tasks 4.1 to 4.5 on the production build. Run `/impeccable critique` and `/impeccable audit` on the Fields tab. Run the impeccable detector once over the changed files.
+- [x] 5.1 Run `bun run typecheck`, then `bun run build`, in the devcontainer. Both exit with status 0.
+- [x] 5.2 Run the full `bun test` with `DATABASE_URL` set. Pipe its log through `scripts/gates/silent-green.sh`. No test fails, and the skip floor holds.
+- [x] 5.3 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh`. It reports no finding.
+- [x] 5.4 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`. No Markdown file gains a finding.
+- [x] 5.5 Run the walks from tasks 4.1 to 4.5 on the production build. Run `/impeccable critique` and `/impeccable audit` on the Fields tab. Run the impeccable detector once over the changed files.
