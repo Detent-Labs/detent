@@ -128,6 +128,21 @@ describe("the field matrix grid takes the tab body's height", () => {
     // inward the same way.
     expect(block).toMatch(/outlineOffset: "-2px"/);
   });
+
+  it("wraps the scroll region's markup inside the space's own element", () => {
+    const source = stripComments(read(FIELD_MATRIX_GRID));
+
+    // The space only holds the floor if its element is the scroll region's
+    // actual DOM parent. A style assertion alone cannot see that; this reads
+    // the markup and requires `matrixScrollSpace`'s div to open before
+    // `matrixScroll`'s div, with nothing between the two but whitespace,
+    // `>`, `{(` and `<div`. Removing the wrapper's opening tag fails this
+    // match (proven with a one-off `bun -e` run against a copy of the
+    // source, recorded in the change's fix report).
+    expect(source).toMatch(
+      /stylex\.props\(styles\.matrixScrollSpace\)\}>\s*\{\(\s*<div\s+\{\.\.\.stylex\.props\(styles\.matrixScroll\)/,
+    );
+  });
 });
 
 describe("what StyleX drops", () => {
