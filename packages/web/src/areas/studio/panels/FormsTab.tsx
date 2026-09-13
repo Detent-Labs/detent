@@ -7,7 +7,8 @@ import { formCardRows, type FormCardRow, type MiniatureEntry } from "./formCardR
 
 /** Forced-colors mode maps an ordinary `background-color` to `Canvas`, so the
  * required mark's fill and the group break's line both need a system-color
- * declaration under this query to stay visible. */
+ * declaration under this query to stay visible. The dashed mark declares the
+ * same system color on its border, so all three read one color there. */
 const FORCED_COLORS = "@media (forced-colors: active)";
 
 const styles = stylex.create({
@@ -146,6 +147,16 @@ const styles = stylex.create({
     // its own forced background.
     forcedColorAdjust: { default: "auto", [FORCED_COLORS]: "none" },
   },
+  // A CEL-conditional entry's mark: a dashed outline in the required color,
+  // with no fill. It stacks on `miniatureMark`, which keeps the 4px width,
+  // the 1px border and the box sizing. Forced colors keep a border's style and
+  // replace its color, so under `CanvasText` the outline, the fill and the
+  // dash differ by shape alone.
+  miniatureConditional: {
+    borderStyle: "dashed",
+    borderColor: { default: colors.accentOnMuted, [FORCED_COLORS]: "CanvasText" },
+    forcedColorAdjust: { default: "auto", [FORCED_COLORS]: "none" },
+  },
   // A group entry's group break: a 1px line marking where a section of the
   // form opens, in place of a mark. Under forced colors a background alone
   // is erased, so a 1px system-color border stands in for it there.
@@ -196,12 +207,15 @@ const styles = stylex.create({
   // it would tie a Forms tab restyle to the form editor's own file. One
   // value departs from that treatment: block padding drops from 8px
   // (`.btn`'s default, which the `button-authoring` token's `8px 4px` in
-  // `DESIGN.md` records) to 4px.
+  // `DESIGN.md` records) to 4px. `minHeight: 24` keeps the control at WCAG
+  // 2.5.8's minimum target size; `shell/global.css` sets `box-sizing:
+  // border-box` on every element, so 24px bounds the border box.
   openControl: {
     fontFamily: fonts.mono,
     fontSize: 11,
     color: colors.textMuted,
     paddingBlock: space.s1,
+    minHeight: 24,
     // A lone control on an empty card's foot keeps the row's trailing edge
     // this way; beside a count the row's own `space-between` already puts it
     // there (design.md: "The empty card's foot holds the control alone").
@@ -317,17 +331,33 @@ function Miniature({ row }: { row: FormCardRow }) {
   if (row.fieldCount === 0) return <p {...stylex.props(styles.miniatureEmpty)}>{t("formsTab.miniatureEmpty")}</p>;
   return (
     <div {...stylex.props(styles.miniature)} aria-hidden="true">
-      {row.entries.map((entry: MiniatureEntry) =>
-        entry.groupBreak ? (
-          <span key={entry.index} {...stylex.props(styles.miniatureGroupBreak)} style={{ height: entry.height }} />
-        ) : (
-          <span
-            key={entry.index}
-            {...stylex.props(styles.miniatureMark, entry.required && styles.miniatureRequired)}
-            style={{ height: entry.height }}
-          />
-        ),
-      )}
+      {row.entries.map((entry: MiniatureEntry) => (
+        <MiniatureMark key={entry.index} entry={entry} />
+      ))}
     </div>
+  );
+}
+
+/**
+ * One mark or one group break, drawn from a `MiniatureEntry`: an outline, a
+ * solid fill for a `"required"` entry, a dashed outline for a
+ * `"conditional"` one, or a group break. The miniature and the legend's
+ * samples both draw through it, so a sample cannot drift from the mark it
+ * names. The span is empty; its flex parent gives it the width and the
+ * height an inline span would ignore.
+ */
+function MiniatureMark({ entry }: { entry: MiniatureEntry }) {
+  if (entry.groupBreak) {
+    return <span {...stylex.props(styles.miniatureGroupBreak)} style={{ height: entry.height }} />;
+  }
+  return (
+    <span
+      {...stylex.props(
+        styles.miniatureMark,
+        entry.requirement === "required" && styles.miniatureRequired,
+        entry.requirement === "conditional" && styles.miniatureConditional,
+      )}
+      style={{ height: entry.height }}
+    />
   );
 }

@@ -409,6 +409,15 @@ export const en = {
   "formsTab.miniatureLabel": "{count} fields, {required} required",
   "formsTab.miniatureLabelOne": "1 field, {required} required",
   "formsTab.miniatureEmpty": "No fields yet",
+  // The legend above the grid (`studio-forms-overview`: "The Forms tab
+  // explains the miniature's marks"). `legendLabel` names the list. Each
+  // other key holds the words beside one sample, in `FORMS_LEGEND`'s order.
+  "formsTab.legendLabel": "What the marks mean",
+  "formsTab.legendField": "field",
+  "formsTab.legendRequired": "required",
+  "formsTab.legendConditional": "required if a condition holds",
+  "formsTab.legendSection": "section",
+  "formsTab.legendHeight": "taller asks for more",
 
   // The form editor's trailing pane: what a participant meets
   // (`studio-form-editor`).

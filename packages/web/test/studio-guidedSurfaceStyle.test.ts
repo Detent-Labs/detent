@@ -277,11 +277,36 @@ describe("the required mark on the muted ground", () => {
   });
 });
 
+describe("the conditional mark dashes its outline", () => {
+  it("draws a dashed outline in the required color, with no fill, and keeps it under forced colors", () => {
+    const source = stripComments(read("src/areas/studio/panels/FormsTab.tsx"));
+    const block = styleBlock(source, "miniatureConditional");
+
+    // design.md, "The dashed mark": the style stacks on `miniatureMark`, so
+    // it declares the dash and the color alone. Forced colors keep a border's
+    // style and replace its color, so `CanvasText` plus
+    // `forcedColorAdjust: "none"` matches the solid fill and the group break.
+    expect(block).toMatch(/borderStyle: "dashed"/);
+    expect(block).toMatch(/borderColor: \{\s*default: colors\.accentOnMuted,\s*\[FORCED_COLORS\]: "CanvasText",?\s*\}/);
+    expect(block).toMatch(/forcedColorAdjust: \{\s*default: "auto",\s*\[FORCED_COLORS\]: "none",?\s*\}/);
+    expect(block).not.toMatch(/backgroundColor/);
+    expect(block).not.toMatch(/colors\.[A-Za-z]+[0-9]/);
+  });
+});
+
 describe("the empty card's foot keeps the control's trailing edge", () => {
   it("gives the open control its own margin, for when it stands alone in the foot", () => {
     const block = styleBlock(stripComments(read("src/areas/studio/panels/FormsTab.tsx")), "openControl");
 
     expect(block).toMatch(/marginInlineStart: "auto"/);
+  });
+});
+
+describe("the open control meets the minimum target size", () => {
+  it("stands at least 24px tall, WCAG 2.5.8's minimum", () => {
+    const block = styleBlock(stripComments(read("src/areas/studio/panels/FormsTab.tsx")), "openControl");
+
+    expect(block).toMatch(/minHeight: 24\b/);
   });
 });
 

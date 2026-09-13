@@ -287,25 +287,32 @@ describe("A plate's miniature", () => {
     expect(miniatures(html)).toHaveLength(0);
   });
 
-  it("gives a required entry's mark a different compiled class than an ordinary one", () => {
-    const twoEntries = {
+  it("gives a required, a CEL-conditional and an ordinary entry's marks three different compiled classes", () => {
+    const threeEntries = {
       ...DRAFT,
       workflow: {
         ...DRAFT.workflow,
         steps: [
           {
             ...DRAFT.workflow!.steps![0],
-            view: { fields: [{ ref: AMOUNT, required: true }, { ref: AMOUNT }] },
+            view: {
+              fields: [
+                { ref: AMOUNT, required: true },
+                { ref: AMOUNT, required: { lang: "cel", src: "data.amount > 100" } },
+                { ref: AMOUNT },
+              ],
+            },
           },
           ...DRAFT.workflow!.steps!.slice(1),
         ],
       },
     } as unknown as Draft;
-    const [inner] = miniatures(render({ draft: twoEntries }));
+    const [inner] = miniatures(render({ draft: threeEntries }));
     const classes = [...inner!.matchAll(/<span class="([^"]*)"/g)].map((m) => m[1]);
 
-    expect(classes).toHaveLength(2);
-    expect(classes[0]).not.toBe(classes[1]);
+    // A solid fill, a dashed outline and an ordinary outline.
+    expect(classes).toHaveLength(3);
+    expect(new Set(classes).size).toBe(3);
   });
 });
 
