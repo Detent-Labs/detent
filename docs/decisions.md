@@ -1872,7 +1872,7 @@ only the marks the miniature draws. The required count stands beside it.
 
 - **FORMS-7: the authoring command's hover is faint, and its press drops text
   contrast.** The hover wash measures 1.08:1 light and 1.18:1 dark against the
-  plate (`panels/FormsTab.tsx:276`). While pressed, the ink-14% wash (`:277`)
+  plate (`panels/FormsTab.tsx:277`). While pressed, the ink-14% wash (`:278`)
   drops the command's text to 4.42:1 light and 3.82:1 dark, under WCAG 1.4.3's
   4.5:1. `FormTabStrip.tsx`'s own `control` style draws the same washes
   (`panels/FormTabStrip.tsx:112`, `:113`), and `DESIGN.md:473` states them.

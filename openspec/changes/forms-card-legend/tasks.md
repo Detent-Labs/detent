@@ -47,9 +47,9 @@
 
 ## 6. Verification
 
-- [ ] 6.1 Run `bun run typecheck`, then `bun run build`, in the devcontainer. Verify both exit 0. Record what each printed.
-- [ ] 6.2 Run the full `bun test` with `DATABASE_URL` set, piped through `scripts/gates/silent-green.sh`. Verify zero failures and a skip count at or under the floor.
-- [ ] 6.3 Run `sh ~/.claude/skills/impeccable/scripts/impeccable detect --json packages/web/src/areas/studio/panels/FormsTab.tsx` once. Verify no finding stays open, or record why one stands.
+- [x] 6.1 Run `bun run typecheck`, then `bun run build`, in the devcontainer. Verify both exit 0. Record what each printed.
+- [x] 6.2 Run the full `bun test` with `DATABASE_URL` set, piped through `scripts/gates/silent-green.sh`. Verify zero failures and a skip count at or under the floor.
+- [x] 6.3 Run `sh ~/.claude/skills/impeccable/scripts/impeccable detect --json packages/web/src/areas/studio/panels/FormsTab.tsx` once. Verify no finding stays open, or record why one stands.
 - [ ] 6.4 Run the Forms tab browser check in full, new steps included, on the production build. Pass `-s=forms-card-legend` to every `playwright-cli` call. Read names and headings through `run-code` with `ariaSnapshot()`. Verify every step passes. Record the heights, names and foot texts read.
 - [ ] 6.5 Run `/impeccable critique` on the Forms tab. Fix each finding, or record it in `docs/decisions.md`. Verify no finding stays unaddressed.
 - [ ] 6.6 Run `/impeccable audit` on the Forms tab. Fix each finding, or record it in `docs/decisions.md`. Verify no finding stays unaddressed.
