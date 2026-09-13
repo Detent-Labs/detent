@@ -1747,6 +1747,40 @@ paths under `panels/`, `draft/` and `screens/` start at
   (Informational): the cost grows with the square of the catalog's size and
   stays harmless at 51 entries.
 
+## Open from the field-matrix-fill-height browser check (each needs its own OpenSpec change)
+
+The browser check for `field-matrix-fill-height` found two pre-existing
+defects. That check is task group 3 in the change's archived `tasks.md`, and
+`docs/browser-checks.md` keeps its steps. Neither defect is caused or worsened
+by that change. The MATRIX tags are local to this section.
+
+- **MATRIX-1: a short window traps the wheel below the tab body's end.**
+  Measured 2026-09-13 at 1440x600, with the tab body scrolled to its end at
+  scrollTop 156. Four wheel-ups over the grid's centre left the tab body at
+  scrollTop 156. The grid's `overscroll-behavior: contain` stops the chain
+  there, and no tab body area is left to wheel on. Shift+Tab still reaches
+  the toolbar.
+  - Not caused by this change. The old 32rem cap already trapped the tab
+    body below a 753.5px window. The 24rem floor lowers that threshold to
+    about 625.5px, narrowing the trap window instead of widening it.
+  - Two points are unmeasured. A classic-scrollbar desktop's own tab-body
+    scrollbar stays a wheel and drag target, hidden by the headless browser
+    run. A grid under 384px that also overflows sideways is unmeasured too,
+    since `overscroll-behavior: contain` covers both axes.
+  - Risk (Low): a keyboard user recovers with Shift+Tab. A mouse-only user
+    under a 626px window needs the tab body's own scrollbar instead.
+  - Fix: its own `/impeccable adapt` change.
+- **MATRIX-2: the sticky field header column lets cell content show
+  through on a sideways scroll.** Measured 2026-09-13 at 1280x900,
+  scrollLeft 87. Letters of the first step header show at the corner's
+  right edge. A first-cell checkbox paints over the `access_exc...` row
+  header.
+  - Not caused by this change. The row header computes `z-index: auto`
+    against the corner's `zIndex: 3`. This change touched no width or
+    stacking rule.
+  - Risk (Low): a sideways scroll briefly shows a cell's content through a
+    sticky header.
+
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 
 Each entry below names a cut somebody proposed, the reason a reviewer refused
