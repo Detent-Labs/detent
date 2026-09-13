@@ -1855,7 +1855,7 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   plugin settings keep their text." and "Check each one before you publish."
   (`panels/RemoveFieldDialog.tsx:192-193`). It names no expression and no
   setting, and no later screen lists them all
-  (`openspec/changes/remove-field-takes-its-references/specs/studio-app/spec.md:82-84`).
+  (`openspec/specs/studio-app/spec.md:4100-4102`).
   A kept CEL read surfaces later as an unknown-key result on the Checks tab.
   A kept `valueFromField` or `instanceIdField` setting, and a kept
   `process.start` mapping value, fail the way FIELDS-17 already describes.
@@ -1863,10 +1863,11 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   The step list the note leans on, "Used in", sits out of view when the
   author presses Remove field. Measured: its heading sat at -59px on one
   field and -190px on another, and the pane behind the open dialog stayed
-  inert. The always-shown note's "step entry" is an internal word;
-  `design.md:96`'s copy table fixed that wording, so a rewrite needs the
-  owner's sign-off too. Risk (Medium): the note tells the author to check
-  references the dialog never lists.
+  inert. The always-shown note's "step entry" is an internal word. The copy
+  table of `remove-field-takes-its-references` fixed that wording
+  (`openspec/changes/archive/2026-09-13-remove-field-takes-its-references/design.md:99`),
+  so a rewrite needs the owner's sign-off too. Risk (Medium): the note tells
+  the author to check references the dialog never lists.
 
   Name the routes: an advisory "kept reference" check, a
   `studio-checks-rail` change, or naming locations in the dialog directly,
