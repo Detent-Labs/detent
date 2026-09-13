@@ -20,10 +20,10 @@ It covered each process-surface tab, the form editor, the Player, the Versions
 screen, a task screen and the report builder. It flagged three offending scroll
 containers:
 
-| Container | Hidden text it holds | Measured |
+| Container | Hidden text it holds | Document `scrollWidth`/`scrollHeight` |
 |---|---|---|
 | `ProcessTabRow.tsx` `styles.row` | the Checks tab's "blocking a publish" | `scrollWidth` 900–912 at 400px, every tab |
-| `EntityTabs.tsx` `styles.rail` | 96 rail kind words and group names | `scrollHeight` 2306 at 1280x720, 2539 at 400x800 |
+| `EntityTabs.tsx` `styles.rail` | 95 kind words and group names, plus the move live region | `scrollHeight` 2306 at 1280x720, 2539 at 400x800 |
 | `EditScreen.tsx` `styles.tabBody` | the change list's "Before:"/"After:" | `scrollHeight` 849 at 400x800 |
 
 `FieldForm.tsx`'s `styles.tabRow` scrolls sideways. A tab there holds a hidden
@@ -62,15 +62,26 @@ Rejected: an inset of 0 on the hidden style (`insetBlockStart: 0`,
 `insetInlineStart: 0`). It is the smaller diff, and one copy-wide rule could
 guard it. It pins every hidden text to its containing block's corner, which is
 often the page's top left. NVDA's browse mode and VoiceOver scroll the view to
-the text the reading cursor lands on. A hidden label read mid-page would pull
-the view to the top and back. The container fix keeps the text in place, and
-`ChangeList.tsx`'s Developer view box already follows it.
+the text the reading cursor lands on.
+
+The change list's "Before:" and "After:" read as text of their own inside a
+`dd`. Pinned to the page corner, they would pull the view to the top and back.
+Hidden text inside a control's name reaches the reader with that control. The
+change list's copy alone still rules the inset out. The container fix keeps the
+text in place. `ChangeList.tsx`'s Developer view box already follows it.
 
 `position: relative` with no inset moves nothing visible. With no `z-index`, it
-creates no stacking context. Inside the four containers, the hidden text is the
-only style that sets `position: "absolute"`. The canvas's absolute layers sit
-under `CanvasView.tsx`'s own positioned root. `styles.tabBody` therefore
-changes nothing for them.
+creates no stacking context. Only hidden text changes its containing block:
+- `CanvasView.tsx`'s absolute toolbar, marquee and reject message sit under its
+  own positioned `styles.wrap`.
+- `CanvasBar.tsx`'s menu is a top-layer popover. Its drag ghost sets
+  `position: fixed`.
+- `FieldMatrixGrid.tsx`'s sticky headers resolve against their own scroll box.
+  Only their `offsetParent` moves, and no source reads it.
+- `ProcessHeaderBar.tsx`'s menu panel sets `zIndex: 1` and stays on top.
+
+Measured 2026-09-13 with the property set inline: every such element kept its
+coordinates, and the menu panel kept every hit point.
 
 ### D2. The four containers
 
@@ -98,15 +109,19 @@ stripping comments. It fails once a later commit drops the property.
 
 The class of defect is a new scroll container around hidden text. Only a
 browser sees that one. `docs/browser-checks.md` gains the probe this design's
-measurement used. It lists every hidden text whose containing block lies
-outside its nearest scroll container, and passes on an empty list.
+measurement used. It lists every hidden text whose `offsetParent` is neither
+its nearest clipping ancestor nor inside it. A clipping ancestor is any
+ancestor whose computed `overflow-x` or `overflow-y` reads `auto`, `scroll`,
+`hidden` or `clip`. The probe passes on an empty list.
 
 ### D4. Design skills
 
-Nothing visible moves, so `/impeccable shape` has no layout to decide and
-`/impeccable critique` no visual to judge. The design detector still runs on
-the four files this change touches. `/impeccable audit` runs on the process
-surface at 400px. Its responsive and accessibility checks cover this change.
+Nothing visible moves, so `/impeccable shape` has no layout to decide. The
+design detector runs on the four files from the CLI, after a positive control.
+The hook that runs after each file write does nothing in this worktree.
+`/impeccable critique` and `/impeccable audit` run on the process surface at
+400px. They also run on the Task screen of a `purchase-requisition` instance at
+Finance Review. That participant route draws `FieldForm`'s tab strip.
 
 ## Risks / Trade-offs
 
@@ -117,9 +132,10 @@ surface at 400px. Its responsive and accessibility checks cover this change.
 - [A new scroll container around hidden text reintroduces the defect] → the
   browser probe in `docs/browser-checks.md` lists it. The source test covers
   only the four known containers.
-- [No probe has measured the fourth container] → the browser check opens a
-  tabbed step form in the Player at 400px. It submits the form with a required
-  field empty on its last tab. The probe runs once that tab shows its count.
+- [No probe has measured the fourth container] → the browser check opens
+  `purchase-requisition`'s Finance Review in the Player at 400px. It submits from
+  "Review" with Finance Note empty. The probe runs once that tab shows its
+  count.
 
 ## Migration Plan
 

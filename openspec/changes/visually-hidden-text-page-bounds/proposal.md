@@ -15,8 +15,8 @@ unscrolled, and the page grows to reach it.
 - Four scroll containers that hold hidden text set `position: relative`. The
   hidden text then lays out inside them, clipped and scrolling with its entry:
   - the studio tab row (`panels/ProcessTabRow.tsx`, `styles.row`)
-  - the entity rail on the Fields and Data sources tabs
-    (`panels/EntityTabs.tsx`, `styles.rail`)
+  - the entity rail (`panels/EntityTabs.tsx`, `styles.rail`), whose Fields tab
+    holds hidden text; the Data sources tab shares the style
   - the process surface's tab body (`screens/EditScreen.tsx`,
     `styles.tabBody`)
   - a step form's tab strip (`packages/form-ui/src/FieldForm.tsx`,
@@ -29,7 +29,9 @@ unscrolled, and the page grows to reach it.
 - `docs/browser-checks.md` gains a probe that lists every hidden text whose
   nearest scroll container fails to clip it. The Fields view's narrow-width
   Pass line holds again.
-- `docs/decisions.md` drops CHANGES-1 and FIELDS-2.
+- `docs/decisions.md` drops CHANGES-1 and FIELDS-2. It files one older defect
+  the review met: content in the tab body paints over the header bar's open
+  `⋮` menu.
 
 ## Capabilities
 
