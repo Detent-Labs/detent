@@ -1749,16 +1749,17 @@ paths under `panels/`, `draft/` and `screens/` start at
 
 ## Open from the field-matrix-fill-height browser check (each needs its own OpenSpec change)
 
-Group 3's browser check for `field-matrix-fill-height`
-(`.superpowers/sdd/tasks/group-3-report.md`) found two pre-existing defects.
-Neither is caused or worsened by that change. The MATRIX tags are local to
-this section.
+The browser check for `field-matrix-fill-height` found two pre-existing
+defects. That check is task group 3 in the change's archived `tasks.md`, and
+`docs/browser-checks.md` keeps its steps. Neither defect is caused or worsened
+by that change. The MATRIX tags are local to this section.
 
 - **MATRIX-1: a short window traps the wheel below the tab body's end.**
-  Measured 2026-09-13 at 1440x600: four wheel-ups over the grid left the tab
-  body at its own top, scrollTop 156. The grid's `overscroll-behavior:
-  contain` stops the chain there, and no tab body area is left to wheel on.
-  Shift+Tab still reaches the toolbar.
+  Measured 2026-09-13 at 1440x600, with the tab body scrolled to its end at
+  scrollTop 156. Four wheel-ups over the grid's centre left the tab body at
+  scrollTop 156. The grid's `overscroll-behavior: contain` stops the chain
+  there, and no tab body area is left to wheel on. Shift+Tab still reaches
+  the toolbar.
   - Not caused by this change. The old 32rem cap already trapped the tab
     body below a 753.5px window. The 24rem floor lowers that threshold to
     about 625.5px, narrowing the trap window instead of widening it.
