@@ -31,7 +31,7 @@
 ## 5. Browser check and design review
 
 - [x] 5.1 Run the new and rewritten walks on the production bundle with `playwright-cli`, in a named session. Read the DOM through `run-code` and `page.evaluate`. Rerun the walk "Where a confirmation dialog leaves the focus" for both header bar dialogs. Verify: every walk step records a pass.
-- [ ] 5.2 Run `/impeccable critique` and `/impeccable audit` on the Fields tab's removal flow. Fix each finding inside this change's scope. Record the others in `docs/decisions.md`. A finding an open entry already covers goes into that entry. After a fix, rerun the walks 5.1 ran. Verify: both reports exist and every finding has an outcome.
+- [x] 5.2 Run `/impeccable critique` and `/impeccable audit` on the Fields tab's removal flow. Fix each finding inside this change's scope. Record the others in `docs/decisions.md`. A finding an open entry already covers goes into that entry. After a fix, rerun the walks 5.1 ran. Verify: both reports exist and every finding has an outcome.
 
 ## 6. Verification
 
