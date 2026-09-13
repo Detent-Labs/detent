@@ -2330,6 +2330,8 @@ of the focus.
 
 Source: `studio-publish-gate-and-report` task 13.19.
 
+Measured on 2026-09-13 against the production build served from `WEB_ROOT`.
+
 A rendered string carries no active element. So the file
 `packages/web/test/studio-processHeaderBar-publishGate.test.tsx` asserts which
 control the markup primes, and nothing beyond that. Where the focus sits, and
