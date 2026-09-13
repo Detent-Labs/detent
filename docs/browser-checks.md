@@ -1455,16 +1455,18 @@ step it enters. An automatic path shows its priority and its guard's CEL.
 
 A manual path with neither reads "No priority" and "No guard".
 
-Rename `quantity`'s label on the Fields tab, without saving. Open Changes.
-Pass: a Fields row stands folded under the Fields heading, its stamp reads
-Changed. Open that row.
+Rename `quantity`'s label on the Fields tab, without saving. The key follows
+the label, so type `quantity` back into Key: a guard reads `data.quantity`.
+Open Changes. Pass: a Fields row stands folded under the Fields heading, its
+stamp reads Changed. Open that row.
 
 Switch back to the Fields tab and rename `unit_price` too, without saving.
-Return to Changes. Pass: a second Fields row now stands beside the first,
+Type `unit_price` back into its Key. Return to Changes. Pass: a second Fields row now stands beside the first,
 and `quantity`'s row still stands open. Its open set survives the
 recompute: `ChangesView` stays mounted throughout.
 
-Save the draft, then switch the content locale to German. Give `quantity`
+Save the draft. Add the `de` locale from the header's `⋮` menu, which makes
+German the content locale. Give `quantity`
 a German label, `Menge`, and publish. Rename `quantity`'s German label to
 `Anzahl`, without saving, then open Changes again. Pass: `quantity`'s row
 reads `Menge` before and `Anzahl` after. Both read as German, since the
