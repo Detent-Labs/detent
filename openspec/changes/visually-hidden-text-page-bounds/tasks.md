@@ -1,7 +1,7 @@
 ## 1. Contain the hidden text
 
-- [ ] 1.1 Write `packages/web/test/hiddenTextContainment.test.ts` per design D3. It covers `ProcessTabRow.tsx` `row`, `EntityTabs.tsx` `rail`, `EditScreen.tsx` `tabBody` and `form-ui`'s `FieldForm.tsx` `tabRow`. Verify: the full `bun test` with `DATABASE_URL` set names four failures in that file.
-- [ ] 1.2 Add `position: "relative"` to those four styles, each with a one-line comment naming the hidden text it contains (design D1, D2). Verify: after `bun install --frozen-lockfile` in the container, `bun run typecheck` passes. The full `bun test` then names no failure in that file.
+- [x] 1.1 Write `packages/web/test/hiddenTextContainment.test.ts` per design D3. It covers `ProcessTabRow.tsx` `row`, `EntityTabs.tsx` `rail`, `EditScreen.tsx` `tabBody` and `form-ui`'s `FieldForm.tsx` `tabRow`. Verify: the full `bun test` with `DATABASE_URL` set names four failures in that file.
+- [x] 1.2 Add `position: "relative"` to those four styles, each with a one-line comment naming the hidden text it contains (design D1, D2). Verify: after `bun install --frozen-lockfile` in the container, `bun run typecheck` passes. The full `bun test` then names no failure in that file.
 
 ## 2. Documents
 
