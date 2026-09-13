@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { t, type CatalogKey } from "../catalog.js";
@@ -23,6 +23,11 @@ const TAB_LABEL: Record<ProcessTab, CatalogKey> = {
   checks: "tabs.checks",
 };
 
+/** Forced colors promise system contrast for every visible letter, and a fade
+ * lowers it on a partly visible tab. Each fade style drops its mask under this
+ * query, and the row's scrollbar stays the cue. */
+const FORCED_COLORS = "@media (forced-colors: active)";
+
 const styles = stylex.create({
   // The row scrolls sideways rather than wrapping: ten tabs overflow a narrow
   // window, and a second line would move the body down a row on every resize
@@ -40,8 +45,42 @@ const styles = stylex.create({
     borderBottomStyle: "solid",
     borderBottomColor: colors.divider,
     // Contains the Checks tab's hidden "blocking a publish" text; a
-    // positioned container clips and scrolls it instead of the page.
+    // positioned container clips and scrolls it instead of the page. It also
+    // makes each button's `offsetLeft` read against the row's content.
     position: "relative",
+    // `scrollTabIntoRow` stops 32px clear of each edge the row can still
+    // scroll past, outside the 24px fade and the tab's 4px focus ring.
+    // `tabRestsInView` reads this value back off the computed style.
+    scrollPaddingInline: space.s8,
+    // A fade style's mask holds two layers. The gradient covers the band, the
+    // row's `clientHeight`, which the resize observer writes as
+    // `--tab-row-band`. The solid layer covers the rest, so the scrollbar and
+    // the 2px divider keep full strength. With no fade style these size no image.
+    maskSize: "100% var(--tab-row-band, 100%), 100% calc(100% - var(--tab-row-band, 100%))",
+    maskPosition: "top, bottom",
+    maskRepeat: "no-repeat",
+  },
+  // One style per `fadeState` value other than `"none"`. Each gradient runs
+  // transparent at a fading edge to opaque 24px in from it. The opaque stops
+  // read `colors.text`; a mask reads alpha alone, so that color never reaches
+  // the screen.
+  fadeStart: {
+    maskImage: {
+      default: `linear-gradient(to right, transparent, ${colors.text} ${space.s6}), linear-gradient(${colors.text}, ${colors.text})`,
+      [FORCED_COLORS]: "none",
+    },
+  },
+  fadeEnd: {
+    maskImage: {
+      default: `linear-gradient(to left, transparent, ${colors.text} ${space.s6}), linear-gradient(${colors.text}, ${colors.text})`,
+      [FORCED_COLORS]: "none",
+    },
+  },
+  fadeBoth: {
+    maskImage: {
+      default: `linear-gradient(to right, transparent, ${colors.text} ${space.s6}, ${colors.text} calc(100% - ${space.s6}), transparent), linear-gradient(${colors.text}, ${colors.text})`,
+      [FORCED_COLORS]: "none",
+    },
   },
   tab: {
     display: "flex",
@@ -137,6 +176,82 @@ export function announcementAfter(was: boolean, now: boolean, sentence: string):
   return "";
 }
 
+/** Which edges of the tab row fade. */
+export type FadeState = "none" | "start" | "end" | "both";
+
+/** The slack every row measure allows. It absorbs a fractional `scrollLeft`
+ * on a high-density screen. */
+const SLACK_PX = 1;
+
+/**
+ * Which edges of the tab row fade, from the row's own scroll measures
+ * (`studio-process-tabs`). The leading edge fades once `scrollLeft` passes
+ * 1px. The trailing edge fades while more than 1px of content lies past the
+ * view.
+ */
+export function fadeState(scrollLeft: number, clientWidth: number, scrollWidth: number): FadeState {
+  const start = scrollLeft > SLACK_PX;
+  const end = scrollWidth - clientWidth - scrollLeft > SLACK_PX;
+  if (start) return end ? "both" : "start";
+  return end ? "end" : "none";
+}
+
+/**
+ * Whether a tab's box rests in the row's view (`studio-process-tabs`). The
+ * box stands whole inside the visible range. At each edge the row can still
+ * scroll past, it also keeps `padding` clear. At an edge where `scrollLeft`
+ * sits at its limit, 0 or `scrollWidth - clientWidth`, the padding counts as
+ * met. Each measure allows 1px of slack, as in `fadeState`.
+ *
+ * `tabStart` and `tabEnd` read against the row's content, as a button's
+ * `offsetLeft` does inside the positioned row.
+ */
+export function tabRestsInView(
+  tabStart: number,
+  tabEnd: number,
+  scrollLeft: number,
+  clientWidth: number,
+  scrollWidth: number,
+  padding: number,
+): boolean {
+  const atStart = scrollLeft <= SLACK_PX;
+  const atEnd = scrollWidth - clientWidth - scrollLeft <= SLACK_PX;
+  const viewStart = scrollLeft + (atStart ? 0 : padding);
+  const viewEnd = scrollLeft + clientWidth - (atEnd ? 0 : padding);
+  return tabStart >= viewStart - SLACK_PX && tabEnd <= viewEnd + SLACK_PX;
+}
+
+/**
+ * The one call that scrolls the tab row (`studio-process-tabs`). The row
+ * moves by the least distance that brings the button whole into view, clear
+ * of the row's scroll padding, and jumps there. A tab already in view leaves
+ * the row where it stands. Each caller focuses with `preventScroll: true`
+ * first, so this call alone decides where the row stands.
+ */
+export function scrollTabIntoRow(button: HTMLElement): void {
+  button.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "instant" });
+}
+
+/** `tabRestsInView` over the live row and the open tab's button. The padding
+ * comes off the row's computed scroll padding, so the record and the scroll
+ * read one value. */
+function openTabRests(row: HTMLElement | null, button: HTMLElement | null): boolean {
+  if (row === null || button === null) return false;
+  const padding = Number.parseFloat(getComputedStyle(row).scrollPaddingInlineStart) || 0;
+  const start = button.offsetLeft;
+  return tabRestsInView(start, start + button.offsetWidth, row.scrollLeft, row.clientWidth, row.scrollWidth, padding);
+}
+
+/** True for a keyboard focus. An engine that cannot parse `:focus-visible`
+ * reads false, so its pointer presses never scroll. */
+function focusVisible(element: Element): boolean {
+  try {
+    return element.matches(":focus-visible");
+  } catch {
+    return false;
+  }
+}
+
 /**
  * The process surface's tab row (`studio-process-tabs`). Ten tabs in
  * authoring order, and nothing else — the trailing edge is the last tab.
@@ -153,8 +268,16 @@ export function announcementAfter(was: boolean, now: boolean, sentence: string):
 export function ProcessTabRow({ open, counts, checksBlocked, onOpen, jsonOpen }: Props) {
   const [focusedTab, setFocusedTab] = useState<ProcessTab>(open);
   const [announcement, setAnnouncement] = useState("");
+  const [fade, setFade] = useState<FadeState>("none");
   const tabRefs = useRef(new Map<ProcessTab, HTMLButtonElement>());
   const wasBlocked = useRef(checksBlocked);
+  const rowRef = useRef<HTMLDivElement>(null);
+  // The open tab's button, for the resize observer, which serves every tab.
+  const openButton = useRef<HTMLButtonElement | null>(null);
+  // Whether the open tab rests in view, as of the last scroll event or the
+  // last `scrollTabIntoRow` call this component made. A call that moves
+  // nothing fires no scroll event, so each call records it as well.
+  const openRests = useRef(false);
 
   // Opening a tab brings focus and selection back together, whatever opened
   // it (`studio-process-tabs`). A click on the already-open tab moves no
@@ -162,6 +285,56 @@ export function ProcessTabRow({ open, counts, checksBlocked, onOpen, jsonOpen }:
   useEffect(() => {
     setFocusedTab(open);
   }, [open]);
+
+  // The open tab stands whole in view on mount and after every tab change,
+  // whatever changed the tab. A layout effect: a passive one would paint the
+  // row at its old position for one frame, then jump. A pointer press opens
+  // its tab on `click`, after the press ends, so the row never moves under it.
+  useLayoutEffect(() => {
+    const button = tabRefs.current.get(open) ?? null;
+    openButton.current = button;
+    if (button !== null) scrollTabIntoRow(button);
+    openRests.current = openTabRests(rowRef.current, button);
+  }, [open]);
+
+  // One observer over the row and its ten buttons. A window resize moves the
+  // row's width, and a count's digits move a button's. The callback writes
+  // the band the fade mask sizes its gradient to, and recomputes the fade.
+  // A row width change scrolls the open tab back into view. A button width
+  // change scrolls it only while it rested in view, so a tab the author
+  // scrolled away by hand stays where it is.
+  useEffect(() => {
+    const row = rowRef.current;
+    if (row === null || typeof ResizeObserver === "undefined") return;
+    const widths = new Map<Element, number>();
+    const observer = new ResizeObserver((entries) => {
+      let rowMoved = false;
+      let tabMoved = false;
+      for (const entry of entries) {
+        const width = entry.contentRect.width;
+        const was = widths.get(entry.target);
+        widths.set(entry.target, width);
+        if (was === undefined || was === width) continue;
+        if (entry.target === row) rowMoved = true;
+        else tabMoved = true;
+      }
+      row.style.setProperty("--tab-row-band", `${row.clientHeight}px`);
+      const button = openButton.current;
+      if (button !== null && (rowMoved || (tabMoved && openRests.current))) scrollTabIntoRow(button);
+      setFade(fadeState(row.scrollLeft, row.clientWidth, row.scrollWidth));
+      openRests.current = openTabRests(row, button);
+    });
+    observer.observe(row);
+    for (const button of tabRefs.current.values()) observer.observe(button);
+    return () => observer.disconnect();
+  }, []);
+
+  const onScroll = () => {
+    const row = rowRef.current;
+    if (row === null) return;
+    setFade(fadeState(row.scrollLeft, row.clientWidth, row.scrollWidth));
+    openRests.current = openTabRests(row, openButton.current);
+  };
 
   useEffect(() => {
     const next = announcementAfter(wasBlocked.current, checksBlocked, t("tabs.checksBlockingAnnounced"));
@@ -185,12 +358,39 @@ export function ProcessTabRow({ open, counts, checksBlocked, onOpen, jsonOpen }:
     const next = PROCESS_TABS[(from + step + PROCESS_TABS.length) % PROCESS_TABS.length];
     if (next === undefined) return;
     setFocusedTab(next);
-    tabRefs.current.get(next)?.focus();
+    const button = tabRefs.current.get(next);
+    if (button === undefined) return;
+    button.focus({ preventScroll: true });
+    scrollTabIntoRow(button);
+    openRests.current = openTabRests(rowRef.current, openButton.current);
+  };
+
+  // A pointer press focuses its button on `mousedown`, and a scroll then would
+  // move the button before `mouseup`, so the click would miss it. No engine
+  // matches a press against `:focus-visible`, and a Tab-key entry does match,
+  // so only a keyboard focus scrolls here.
+  const onTabFocus = (tab: ProcessTab, button: HTMLButtonElement) => {
+    setFocusedTab(tab);
+    if (!focusVisible(button)) return;
+    scrollTabIntoRow(button);
+    openRests.current = openTabRests(rowRef.current, openButton.current);
   };
 
   return (
     <>
-    <div {...stylex.props(styles.row)} role="tablist" aria-label={t("tabs.rowLabel")} onKeyDown={onKeyDown}>
+    <div
+      ref={rowRef}
+      {...stylex.props(
+        styles.row,
+        fade === "start" && styles.fadeStart,
+        fade === "end" && styles.fadeEnd,
+        fade === "both" && styles.fadeBoth,
+      )}
+      role="tablist"
+      aria-label={t("tabs.rowLabel")}
+      onKeyDown={onKeyDown}
+      onScroll={onScroll}
+    >
       {PROCESS_TABS.map((tab) => {
         const count = counts[tab];
         // The JSON surface stands no tab, so none reports itself selected
@@ -213,7 +413,7 @@ export function ProcessTabRow({ open, counts, checksBlocked, onOpen, jsonOpen }:
             tabIndex={tab === focusedTab ? 0 : -1}
             {...stylex.props(styles.tab, selected && styles.tabSelected)}
             onClick={() => onOpen(tab)}
-            onFocus={() => setFocusedTab(tab)}
+            onFocus={(e) => onTabFocus(tab, e.currentTarget)}
           >
             <span>{t(TAB_LABEL[tab])}</span>
             {count !== undefined && (
