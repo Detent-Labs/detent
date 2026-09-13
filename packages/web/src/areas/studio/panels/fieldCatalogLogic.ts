@@ -109,11 +109,11 @@ export function moveFieldToGroup(
 }
 
 /**
- * The recursive rebuild `moveFieldToGroup`, `appendToGroup` and
- * `removeFieldIn` all share for dropping a field: every field on the path
- * from the root down to the one carrying `targetId` is a new object, and
- * every other field keeps its old reference. Not exported; each caller
- * carries its own existence check and its own no-op case.
+ * The recursive rebuild `moveFieldToGroup` and `removeFieldIn` share for
+ * dropping a field: it filters the field carrying `targetId` out of the tree,
+ * at any depth. Every field holding a `fields` array becomes a new object; a
+ * leaf keeps its reference. Not exported; each caller carries its own
+ * existence check and its own no-op case.
  */
 const pruneField = (list: DraftField[], targetId: string): DraftField[] =>
   list.filter((f) => f.id !== targetId).map((f) => (f.fields ? { ...f, fields: pruneField(f.fields, targetId) } : f));
@@ -121,10 +121,11 @@ const pruneField = (list: DraftField[], targetId: string): DraftField[] =>
 /**
  * The recursive rebuild `moveFieldToGroup` and `appendToGroup` share for
  * hanging a field: `field` lands at the end of the `fields` array belonging
- * to whichever field in the tree carries `targetId`, and every field on
- * that path down is a new object, exactly as `pruneField` copies its own
- * path. Not exported; each caller carries its own existence check and its
- * own no-op case.
+ * to whichever field in the tree carries `targetId`. The target becomes a new
+ * object, and so does every field holding a `fields` array outside the
+ * target's own subtree. Every other leaf, and every field below the target,
+ * keeps its reference. Not exported; each caller carries its own existence
+ * check and its own no-op case.
  */
 const graftField = (list: DraftField[], targetId: string, field: DraftField): DraftField[] =>
   list.map((f) => {
@@ -133,15 +134,14 @@ const graftField = (list: DraftField[], targetId: string, field: DraftField): Dr
   });
 
 /**
- * Re-hangs a field into a group field's own `fields`, at the end, at any
- * depth, through the shared `graftField`. A missing `fields` array on the
- * target starts as `[field]`.
+ * Appends `field` to the `fields` of the field carrying `groupId`, at any
+ * depth, through the shared `graftField`. A missing `fields` array on that
+ * field starts as `[field]`.
  *
- * `FieldsTab`'s `addField` takes an optional group id and calls this inside
- * the same `mutate` recipe `moveFieldToGroup` sits in, for the rail's
- * "Fields inside this group" zone (design.md: "One add function serves the
- * rail, the start state and the group zone"). The top-level "+ Add field"
- * path appends to `fields` directly and never calls this.
+ * The "Fields inside this group" zone in a group's `FieldEditor` reaches this
+ * through `FieldsTab::addField`, in its own `mutate` recipe (design.md: "One
+ * add function serves the rail, the start state and the group zone"). An add
+ * without a group id appends to `fields` directly and never calls this.
  *
  * Answers the array it was given, unchanged, where `groupId` names no field
  * in the tree.
@@ -260,8 +260,7 @@ export function moveTargetsFor(
  * A field nested in a group, at any depth: the next field in the same
  * `fields` array, else the previous one, else that group's own id. A
  * top-level field: the next top-level field, else the previous one, else
- * `undefined` — today's rule in `EntityTabs.tsx`'s `removeField(index)`.
- * `undefined` also answers for an id no field carries.
+ * `undefined`. `undefined` also answers for an id no field carries.
  */
 export function neighbourAfterRemove(fields: DraftField[], fieldId: string): string | undefined {
   const locate = (

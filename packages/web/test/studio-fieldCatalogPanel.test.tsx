@@ -67,12 +67,12 @@ function validation(issues: EditorIssue[] = []): ValidationResult {
   };
 }
 
-function contextValue(draft: Draft): DraftContextValue {
+function contextValue(draft: Draft, issues: EditorIssue[] = []): DraftContextValue {
   return {
     draft,
     mutate: () => {},
     replace: () => {},
-    validation: validation(),
+    validation: validation(issues),
     loadedChildren: {},
     setChildForStep: () => {},
     registry: undefined,
@@ -173,5 +173,90 @@ describe("FieldCatalogPanel", () => {
     );
 
     expect(html).not.toContain("Fields inside this group");
+    expect(html).toContain(`id="${fieldLabelInputId("field_a")}"`);
+  });
+
+  // A kind switch rewrote `resolution` out of `group` and left its `fields` in
+  // place. Only a group's editor holds the zone, so the child's rail entry is
+  // its one route in. The panel finds that child through `flattenDraftFields`,
+  // whatever its parent's `type`.
+  it("renders the own editor of a field whose parent is no group", () => {
+    const draft: Draft = {
+      baseLocale: "en",
+      fields: [{ ...fld("field_r", "resolution"), fields: [fld("field_c", "discrepancy_note")] }] as unknown as Draft["fields"],
+    };
+    const html = renderToStaticMarkup(
+      <DraftContext.Provider value={contextValue(draft)}>
+        <FieldCatalogPanel
+          token="test-token"
+          selectedId="field_c"
+          onAdd={NOOP}
+          onRemove={NOOP}
+          onShowStep={NOOP}
+          onMoveField={NOOP}
+        />
+      </DraftContext.Provider>,
+    );
+
+    expect(html).toContain(`id="${moveControlId("field_c")}"`);
+    expect(html).toContain(`id="${fieldLabelInputId("field_c")}"`);
+  });
+
+  // `FieldsTab` passes `undefined` while no field carries an id, since the rail
+  // lists no entry for an id-less field. Without the lookup's guard, the
+  // id-less field would match that `undefined` and open an editor whose every
+  // write `updateField` drops.
+  it("renders the start state for a catalog whose only field carries no id", () => {
+    const draft: Draft = {
+      baseLocale: "en",
+      fields: [{ key: "unsaved", type: "string" }] as unknown as Draft["fields"],
+    };
+    const html = renderToStaticMarkup(
+      <DraftContext.Provider value={contextValue(draft)}>
+        <FieldCatalogPanel
+          token="test-token"
+          selectedId={undefined}
+          onAdd={NOOP}
+          onRemove={NOOP}
+          onShowStep={NOOP}
+          onMoveField={NOOP}
+        />
+      </DraftContext.Provider>,
+    );
+
+    expect(html).toContain("This process collects nothing yet");
+    expect(html).not.toContain("studio-field-label-");
+  });
+
+  // `studio-app`: "A group's child row keeps its own list". The key check on a
+  // nested field stands in that field's own "What this field asks" zone, whose
+  // heading carries `data-checked`, and the group's editor carries none.
+  it("stands a nested field's check in its own zone, and none in its group's editor", () => {
+    const draft: Draft = {
+      baseLocale: "en",
+      fields: [grp("field_g", "g", [fld("field_c", "c")])] as unknown as Draft["fields"],
+    };
+    const issues: EditorIssue[] = [
+      { entityType: "field", entityId: "field_c", loc: "fields[0].fields[0].key", source: "structural", message: "x" },
+    ];
+    const render = (selectedId: string) =>
+      renderToStaticMarkup(
+        <DraftContext.Provider value={contextValue(draft, issues)}>
+          <FieldCatalogPanel
+            token="test-token"
+            selectedId={selectedId}
+            onAdd={NOOP}
+            onRemove={NOOP}
+            onShowStep={NOOP}
+            onMoveField={NOOP}
+          />
+        </DraftContext.Provider>,
+      );
+
+    const child = render("field_c");
+    expect(child.split('data-checked="failed"').length - 1).toBe(1);
+    expect(child).toMatch(/data-checked="failed"[^>]*>What this field asks</);
+
+    expect(render("field_g")).not.toContain("data-checked");
   });
 });

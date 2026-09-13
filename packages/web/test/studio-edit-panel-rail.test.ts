@@ -57,6 +57,19 @@ describe("flattenRailFields", () => {
     ]);
   });
 
+  it("indents the child of a parent that is no group once", () => {
+    // A kind switch can leave `fields` on a parent it rewrote out of `group`.
+    // The walk reads `fields` whatever the parent's `type`, and that entry is
+    // the child's one route to its own editor.
+    const fields = [
+      { id: OUTER, key: "resolution", type: "string", fields: [{ id: LEAF, key: "discrepancy_note", type: "string" }] },
+    ] as DraftField[];
+    expect(flattenRailFields(fields)).toEqual([
+      { id: OUTER, key: "resolution", depth: 0 },
+      { id: LEAF, key: "discrepancy_note", depth: 1 },
+    ]);
+  });
+
   it("skips a field with no id, since the rail has no anchor for it", () => {
     const fields = [{ key: "unsaved", type: "string" }, { id: LEAF, key: "city", type: "string" }] as DraftField[];
     expect(flattenRailFields(fields)).toEqual([{ id: LEAF, key: "city", depth: 0 }]);

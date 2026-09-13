@@ -1083,8 +1083,8 @@ function FieldEditor({
 interface Props {
   token: string;
   /** The one field this panel renders, at any nesting depth. `undefined` only
-   * while the catalog holds none at all — the screen otherwise keeps it
-   * resolved. */
+   * while the catalog has no field carrying an id — the screen otherwise keeps
+   * it resolved. */
   selectedId: string | undefined;
   onAdd: (groupId?: string) => void;
   onRemove: (fieldId: string) => void;

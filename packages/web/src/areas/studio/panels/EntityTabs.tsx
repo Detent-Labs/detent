@@ -174,8 +174,7 @@ interface PanelsRailFieldRowProps {
   /** The DOM id for the entry's own button, `railEntryId(fieldId)`. Lets the
    * refocus effect scroll a newly added group child into view alongside its
    * label input (design.md, "Focus and the rail entry after an add into a
-   * group"). Absent from `FieldsTab`'s "+ Add field" row, which names no
-   * field. */
+   * group"). Every entry `FieldsTab` renders passes one. */
   id?: string;
   /** The resolved label, or the "unnamed field" fallback already applied. */
   label: string;
