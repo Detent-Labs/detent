@@ -1,8 +1,14 @@
+import { useId } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { t } from "../catalog.js";
 import { useDraft } from "../draft/store.js";
 import { formCardRows, type FormCardRow, type MiniatureEntry } from "./formCardRows.js";
+
+/** Forced-colors mode maps an ordinary `background-color` to `Canvas`, so the
+ * required mark's fill and the group break's line both need a system-color
+ * declaration under this query to stay visible. */
+const FORCED_COLORS = "@media (forced-colors: active)";
 
 const styles = stylex.create({
   // The grid reflows on a 280px minimum track (design.md: "The form card is a
@@ -18,7 +24,7 @@ const styles = stylex.create({
     paddingInline: space.s3,
     // Stretch, not start: a row of plates that ends at different heights puts
     // its open controls on different lines, and alignment is what organizes
-    // this page (`design-language.md`). The control below takes the slack.
+    // this page (`design-language.md`). The foot row takes the slack.
     alignItems: "stretch",
     overflowY: "auto",
     overscrollBehavior: "contain",
@@ -30,7 +36,9 @@ const styles = stylex.create({
   card: {
     display: "flex",
     flexDirection: "column",
-    gap: space.s2,
+    // 4px, not 8: the height budget in design.md ("The height budget") needs
+    // it to fit four rows of IT Offboarding's cards in the tab body.
+    gap: space.s1,
     minWidth: 0,
     borderWidth: 1,
     borderStyle: "solid",
@@ -97,14 +105,18 @@ const styles = stylex.create({
   badgeAdvisory: {
     color: colors.textMuted,
   },
-  // The miniature sits on the one muted surface, inset from the plate's edge.
+  // The miniature: a row of marks standing for the form's fields, on the one
+  // muted surface (`studio-forms-overview`: "A card draws a miniature of its
+  // form for the eye alone"). It draws no label per mark, wraps rather than
+  // overruns the card, and clips nothing that wraps. It stays out of the
+  // accessibility tree — the card's foot states the counts in text.
   miniature: {
     display: "flex",
-    flexDirection: "column",
-    gap: space.s2,
-    listStyle: "none",
-    margin: 0,
-    paddingBlock: space.s2,
+    flexWrap: "wrap",
+    alignItems: "flex-end",
+    gap: space.s1,
+    minHeight: 32,
+    paddingBlock: space.s1,
     paddingInline: space.s2,
     backgroundColor: colors.surfaceMuted,
     // It carries no control and answers no gesture: it stands for the form,
@@ -113,35 +125,46 @@ const styles = stylex.create({
     pointerEvents: "none",
     userSelect: "none",
   },
-  miniatureEntry: {
-    display: "flex",
-    flexDirection: "column",
-    gap: space.s1,
-    minWidth: 0,
-  },
-  miniatureLabel: {
-    fontSize: 11,
-    color: colors.textMuted,
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-  },
-  // The asterisk sits at 11px on the miniature's muted ground, where the
-  // plain accent role reads 4.17:1 light and 4.46:1 dark — both under the
-  // 4.5:1 AA text minimum. `--color-accent-on-muted` is the accent step far
-  // enough from that ground to clear it.
-  miniatureRequired: {
-    color: colors.accentOnMuted,
-  },
-  // The bar standing for the control. Its height is the field's kind, so the
-  // miniature reads as a form's shape without drawing one input.
-  miniatureBar: {
+  // One field entry's mark, 4px wide. `boxSizing: "border-box"` keeps the
+  // outline inside that width and the entry's own height.
+  miniatureMark: {
+    boxSizing: "border-box",
+    width: 4,
     borderWidth: 1,
     borderStyle: "solid",
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderColor: colors.textMuted,
   },
+  // A required entry's mark fills solid instead of drawing an outline, so the
+  // difference carries in fill as well as color (WCAG 1.4.1). Both colors
+  // clear the 3:1 minimum a graphic needs against the muted ground; see the
+  // `--color-accent-on-muted` comment in `tokens.css` for why accentOnMuted is
+  // the role read here.
+  miniatureRequired: {
+    backgroundColor: { default: colors.accentOnMuted, [FORCED_COLORS]: "CanvasText" },
+    borderColor: colors.accentOnMuted,
+    // `none` under forced colors stops the UA from replacing this fill with
+    // its own forced background.
+    forcedColorAdjust: { default: "auto", [FORCED_COLORS]: "none" },
+  },
+  // A group entry's group break: a 1px line marking where a section of the
+  // form opens, in place of a mark. Under forced colors a background alone
+  // is erased, so a 1px system-color border stands in for it there.
+  miniatureGroupBreak: {
+    width: 1,
+    backgroundColor: colors.textMuted,
+    borderWidth: { default: 0, [FORCED_COLORS]: 1 },
+    borderStyle: "solid",
+    borderColor: { default: "transparent", [FORCED_COLORS]: "CanvasText" },
+    forcedColorAdjust: { default: "auto", [FORCED_COLORS]: "none" },
+  },
+  // Stands where the miniature would on an empty form, at the miniature's own
+  // height so a grid row of one-line miniatures still ends level.
   miniatureEmpty: {
+    display: "flex",
+    alignItems: "center",
+    minHeight: 32,
+    paddingInline: space.s2,
+    backgroundColor: colors.surfaceMuted,
     fontSize: 11,
     color: colors.textMuted,
     margin: 0,
@@ -152,10 +175,42 @@ const styles = stylex.create({
     paddingInline: space.s3,
     marginBlock: 0,
   },
-  // The plate's own control sits on its foot, so every plate in a row puts it
-  // on one line however many entries the miniature above it draws.
-  openControl: {
+  // The foot row: the count on the left, the authoring command on the right
+  // (design.md: "The count moves to the foot"). `marginBlockStart: "auto"`
+  // sits on the row rather than on the button alone, so every plate in a row
+  // puts its foot on one line however many entries the miniature above it
+  // draws.
+  foot: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: space.s2,
     marginBlockStart: "auto",
+    minWidth: 0,
+  },
+  // The authoring command (design.md: "The open control becomes an
+  // authoring command"). The same treatment `FormTabStrip.tsx` calls
+  // `control` — mono face at 11px in `textMuted`, a `surfaceMuted` hover
+  // wash and an ink-14% press wash — copied here rather than exported,
+  // since `design-language.md` allows a deliberate duplicate and exporting
+  // it would tie a Forms tab restyle to the form editor's own file. One
+  // value departs from that treatment: block padding drops from 8px
+  // (`.btn`'s default, which the `button-authoring` token's `8px 4px` in
+  // `DESIGN.md` records) to 4px.
+  openControl: {
+    fontFamily: fonts.mono,
+    fontSize: 11,
+    color: colors.textMuted,
+    paddingBlock: space.s1,
+    // A lone control on an empty card's foot keeps the row's trailing edge
+    // this way; beside a count the row's own `space-between` already puts it
+    // there (design.md: "The empty card's foot holds the control alone").
+    marginInlineStart: "auto",
+    backgroundColor: {
+      default: "transparent",
+      ":hover": colors.surfaceMuted,
+      ":active": `color-mix(in srgb, ${colors.text} 14%, transparent)`,
+    },
   },
 });
 
@@ -189,20 +244,36 @@ export function FormsTab({ onOpenForm, onOpenChecks }: Props) {
   );
 }
 
+/**
+ * The foot's count text (`studio-forms-overview`: "A card names its step and
+ * counts the fields it draws"). Undefined where the view draws no mark, and
+ * `FormCard` then renders no count span, so the foot holds the open control
+ * alone.
+ */
+function footCountText(row: FormCardRow): string | undefined {
+  if (row.fieldCount === 0) return undefined;
+  if (row.requiredCount > 0) {
+    return (row.fieldCount === 1 ? t("formsTab.miniatureLabelOne") : t("formsTab.miniatureLabel"))
+      .replace("{count}", String(row.fieldCount))
+      .replace("{required}", String(row.requiredCount));
+  }
+  return row.fieldCount === 1
+    ? t("formsTab.fieldCountOne")
+    : t("formsTab.fieldCount").replace("{count}", String(row.fieldCount));
+}
+
 function FormCard({ row, onOpenForm, onOpenChecks }: { row: FormCardRow } & Props) {
   const empty = row.fieldCount === 0;
+  const countText = footCountText(row);
+  const nameId = useId();
+  const controlId = useId();
   return (
     <li {...stylex.props(styles.card, empty && styles.cardEmpty)}>
       <div {...stylex.props(styles.head)}>
         <span {...stylex.props(styles.identity)}>
           <span {...stylex.props(styles.kicker)}>{t(`stepRole.${row.role}`)}</span>
-          <span {...stylex.props(styles.name)}>{row.label}</span>
-          <span {...stylex.props(styles.count)}>
-            {empty
-              ? t("formsTab.emptyForm")
-              : row.fieldCount === 1
-                ? t("formsTab.fieldCountOne")
-                : t("formsTab.fieldCount").replace("{count}", String(row.fieldCount))}
+          <span id={nameId} {...stylex.props(styles.name)}>
+            {row.label}
           </span>
         </span>
         {row.issues.count > 0 && (
@@ -216,35 +287,47 @@ function FormCard({ row, onOpenForm, onOpenChecks }: { row: FormCardRow } & Prop
           </button>
         )}
       </div>
-      <Miniature entries={row.entries} />
-      <button
-        type="button"
-        className={`btn btn-secondary ${stylex.props(styles.openControl).className ?? ""}`}
-        onClick={() => onOpenForm(row.stepId)}
-      >
-        {t(empty ? "formsTab.startForm" : "formsTab.openForm")}
-      </button>
+      <Miniature row={row} />
+      <div {...stylex.props(styles.foot)}>
+        {countText !== undefined && <span {...stylex.props(styles.count)}>{countText}</span>}
+        <button
+          type="button"
+          id={controlId}
+          aria-labelledby={`${controlId} ${nameId}`}
+          className={`btn btn-ghost ${stylex.props(styles.openControl).className ?? ""}`}
+          onClick={() => onOpenForm(row.stepId)}
+        >
+          {t(empty ? "formsTab.startForm" : "formsTab.openForm")}
+        </button>
+      </div>
     </li>
   );
 }
 
-function Miniature({ entries }: { entries: readonly MiniatureEntry[] }) {
-  if (entries.length === 0) return <p {...stylex.props(styles.miniatureEmpty)}>{t("formsTab.emptyForm")}</p>;
+/**
+ * A card's miniature: one mark per field entry, a group break per group
+ * entry, drawn without a label (`studio-forms-overview`: "A card draws a
+ * miniature of its form for the eye alone"). It carries `aria-hidden="true"`
+ * and no role: the card's foot states the field count and the required
+ * count in text, so the miniature adds nothing a screen reader needs. On an
+ * empty form the sentence standing in its place stays in the accessibility
+ * tree instead.
+ */
+function Miniature({ row }: { row: FormCardRow }) {
+  if (row.fieldCount === 0) return <p {...stylex.props(styles.miniatureEmpty)}>{t("formsTab.miniatureEmpty")}</p>;
   return (
-    <ul {...stylex.props(styles.miniature)}>
-      {entries.map((entry) => (
-        <li key={entry.index} {...stylex.props(styles.miniatureEntry)}>
-          <span {...stylex.props(styles.miniatureLabel)}>
-            {entry.label}
-            {entry.required && (
-              <span {...stylex.props(styles.miniatureRequired)} aria-label={t("formsTab.requiredMark")}>
-                {" *"}
-              </span>
-            )}
-          </span>
-          <span {...stylex.props(styles.miniatureBar)} style={{ height: entry.height }} />
-        </li>
-      ))}
-    </ul>
+    <div {...stylex.props(styles.miniature)} aria-hidden="true">
+      {row.entries.map((entry: MiniatureEntry) =>
+        entry.groupBreak ? (
+          <span key={entry.index} {...stylex.props(styles.miniatureGroupBreak)} style={{ height: entry.height }} />
+        ) : (
+          <span
+            key={entry.index}
+            {...stylex.props(styles.miniatureMark, entry.required && styles.miniatureRequired)}
+            style={{ height: entry.height }}
+          />
+        ),
+      )}
+    </div>
   );
 }

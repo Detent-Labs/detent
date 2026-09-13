@@ -1323,6 +1323,22 @@ stage-by-stage status.
   rewording untouched prose would exceed the delta and put new text under the
   prose ratchet. A sweep of the stale word wants its own change, together
   with the six requirements that still say "edit rail".
+- **Five literal `#726e6e` sites want the new `colors.dormant` role.**
+  `changes-tab-entity-change-list` gave the dormant tone a token,
+  `--color-dormant` in `tokens.css` and `colors.dormant` in
+  `tokens.stylex.ts`. Five call sites still write the hex literal instead:
+  `packages/web/src/areas/admin/screens/OutboxScreen.tsx`,
+  `InstanceScreen.tsx` and `InstancesScreen.tsx`, and
+  `packages/web/src/areas/app/screens/InvolvedScreen.tsx` and
+  `StartedScreen.tsx`. None moved in that change; it only added the role.
+  `.impeccable/config.json`'s `design-system-color` ignore for `#726e6e`
+  stays until all five move to the role.
+
+  The dormant stamp also misses AA on a hovered row. Measured 2026-09-13 on
+  the Versions screen's change list, it reads 4.51:1 at rest. On the ledger
+  hover wash, `rgb(234, 233, 233)`, it reads 4.16:1. Every register row that
+  carries a dormant stamp and washes on hover shares that gap. `DESIGN.md`
+  pins `#726e6e`, so retuning the tone is a design change of its own.
 
 ## Open from the 2026-08-18 code review (each needs its own OpenSpec change)
 
@@ -1660,10 +1676,10 @@ paths under `panels/`, `draft/` and `screens/` start at
 - **FIELDS-6: the entity rail is a flat list of tab stops.** IT Offboarding's
   rail holds 51 entries plus "+ Add field". That makes 52 tab stops, with no
   arrow keys and no filter. Its landmark is a `nav` named "Editors"
-  (`panelsScreen.railLabel`, `packages/web/src/i18n/catalogs/studio.ts:423`).
+  (`panelsScreen.railLabel`, `packages/web/src/i18n/catalogs/studio.ts:429`).
   An entry's check badge reads "1 issues" for one check
   (`panels/EntityTabs.tsx:283`), from the key `panelsScreen.issueMark`
-  (`packages/web/src/i18n/catalogs/studio.ts:426`). Risk (Low): a keyboard
+  (`packages/web/src/i18n/catalogs/studio.ts:432`). Risk (Low): a keyboard
   user presses Tab up to 52 times to cross the rail.
 - **FIELDS-7: the Fields tab's headings and checks lack structure.** The
   outline jumps from the header bar's `h1` to the field's `h3`. They sit at
@@ -1885,10 +1901,206 @@ paths under `panels/`, `draft/` and `screens/` start at
 
   Name the fix: separate the two commands, with spacing and a rule between
   them, or move Remove field into the field's own heading row.
-- **FIELDS-25: the Changes tab shows a field removal as a raw JSON diff.**
-  After a removal, `panels/ChangesView.tsx` renders the change the same way
-  it renders every other diff: a path, a kind, and a `from`/`to` value in
-  `JSON.stringify`. It is the only after-the-fact record of the removal.
+
+## Open from the 2026-09-13 Changes tab audit (each needs its own OpenSpec change)
+
+The change `changes-tab-entity-change-list` ran browser walks,
+`/impeccable critique`, `/impeccable audit` and `web-design-guidelines` on
+the Studio Changes tab and the Versions screen on 2026-09-13. Every item
+below predates that change or belongs to another component. The `CHANGES-n`
+tags are local to this section; paths under `panels/` and `screens/` start at
+`packages/web/src/areas/studio/`.
+
+- **CHANGES-1: the Checks tab's hidden label widens the page at 400px.**
+  FIELDS-2 records the recipe. The hidden "blocking a publish" text sits at
+  `panels/ProcessTabRow.tsx:219`. Measured 2026-09-13 at 400px, on the Changes
+  tab of a draft with blocking checks, `document.documentElement.scrollWidth`
+  read 905. The page scrolled 505px sideways, and hiding that one span gave
+  400. Risk (Medium): while Checks counts a blocker, a narrow window scrolls
+  sideways into blank ground on every tab.
+- **CHANGES-2: every tab body clips the edge of a focus ring.** The tab body
+  scrolls and sets no inline padding (`screens/EditScreen.tsx:180`). The
+  shell's 2px ring at a 2px offset (`packages/web/src/shell/global.css:37`)
+  loses its edge against either side of that box. On the Changes tab it cuts
+  the Expand all command's right edge, and at 400px the open command's left
+  edge. The change list's row summary insets its own ring instead.
+  This is RAIL-3 and FIELDS-4 on the tab body itself. Risk (Low): the ring
+  still meets WCAG 2.4.7.
+- **CHANGES-3: the Versions screen scrolls sideways at 400px.** Its six-column
+  table sits in no scroll box of its own (`screens/VersionsScreen.tsx`).
+  Measured 2026-09-13 at 400px, the table reached x=441 and the page scrolled
+  41px.
+
+  The hash column prints a machine value in the written face. Most of
+  the screen's text skips the studio catalog. That covers the heading, the
+  back link, the column headers and the three commands under the table. It
+  also covers Export and the loading, empty and no-difference lines. Risk
+  (Medium): the page scrolls sideways, and a UI-string override cannot reach
+  those strings.
+- **CHANGES-4: no studio waiting line reaches a screen reader.** Each one is a
+  plain paragraph with no live region. The Changes tab's line sits at
+  `panels/ChangesView.tsx:135`, and the Versions screen's two at
+  `screens/VersionsScreen.tsx:268` and `:349`. The process surface, the
+  Processes screen, the Tools screen and the migration plan screen draw
+  theirs the same way. Risk (Low): a screen reader hears nothing while a
+  body loads (WCAG 4.1.3).
+
+## Open from the field-matrix-fill-height browser check (each needs its own OpenSpec change)
+
+The browser check for `field-matrix-fill-height` found two pre-existing
+defects. That check is task group 3 in the change's archived `tasks.md`, and
+`docs/browser-checks.md` keeps its steps. Neither defect is caused or worsened
+by that change. The MATRIX tags are local to this section.
+
+- **MATRIX-1: a short window traps the wheel below the tab body's end.**
+  Measured 2026-09-13 at 1440x600, with the tab body scrolled to its end at
+  scrollTop 156. Four wheel-ups over the grid's centre left the tab body at
+  scrollTop 156. The grid's `overscroll-behavior: contain` stops the chain
+  there, and no tab body area is left to wheel on. Shift+Tab still reaches
+  the toolbar.
+  - Not caused by `field-matrix-fill-height`. The old 32rem cap already
+    trapped the tab body below a 753.5px window. The 24rem floor lowers
+    that threshold to about 625.5px, narrowing the trap window instead of
+    widening it.
+  - A grid shorter than the floor has left blank tab body under its frame
+    since `field-matrix-short-grid-frame`. A wheel there scrolls the tab
+    body. On 2026-09-13, `laptop_inventory` at 1440x600 had the tab body at
+    scrollTop 156. One wheel-up of 300 below its frame took scrollTop to 0,
+    and three more held it there. A grid of 24rem or more still traps the
+    wheel: `it_offboarding` held scrollTop 156 through four wheel-ups.
+  - The same run used headed Chrome with classic 15px scrollbars. The tab
+    body's own scrollbar stays a wheel and drag target there. On
+    `it_offboarding` at 1440x600, two wheel-ups of 60 over it took scrollTop
+    from 156 to 96, then 36. An 80px drag of its thumb took scrollTop from
+    156 to 29.
+  - A grid under 384px that also overflows sideways stays unmeasured, since
+    `overscroll-behavior: contain` covers both axes.
+  - Risk (Low): a keyboard user recovers with Shift+Tab. A mouse-only user
+    under a 626px window needs the tab body's own scrollbar instead.
+  - Fix: its own `/impeccable adapt` change.
+- **MATRIX-2: the sticky field header column lets cell content show
+  through on a sideways scroll.** Measured 2026-09-13 at 1280x900,
+  scrollLeft 87. Letters of the first step header show at the corner's
+  right edge. A first-cell checkbox paints over the `access_exc...` row
+  header.
+  - Not caused by this change. The row header computes `z-index: auto`
+    against the corner's `zIndex: 3`. This change touched no width or
+    stacking rule.
+  - Risk (Low): a sideways scroll briefly shows a cell's content through a
+    sticky header.
+
+## Open from the 2026-09-13 Forms tab audits (each needs its own OpenSpec change)
+
+The change `forms-tab-form-strip` (PR #109) ran a final code review, a browser
+check, `/impeccable critique` and `/impeccable audit` on the Studio Forms tab
+on 2026-09-13. The browser check ran on the IT Offboarding draft at 1100x876.
+Every item below sits outside that change, and this section records it in
+place of a fix. The `FORMS-n` tags are local to this section; paths under
+`panels/` and `screens/` start at `packages/web/src/areas/studio/`.
+
+The owner answered three questions on 2026-09-13, on a mockup built from
+IT Offboarding's real rows (`forms-tab-card-clarity`). Each card's open
+control now carries `aria-labelledby`, joining its own id to the step name
+span's. Its accessible name therefore states the step. An empty card's
+foot holds the control alone, and "No fields yet" stands once, in the
+miniature's place. The card's count now excludes a group entry, stating
+only the marks the miniature draws. The required count stands beside it.
+
+- **FORMS-2: the miniature's marks have no key.** An outline, a solid fill, a
+  1px group break and four heights (8, 12, 16 and 24px) each mean something
+  (`panels/FormsTab.tsx:113` to `:159`). The `studio-forms-overview`
+  requirement "A card draws a miniature of its form for the eye alone" bars
+  pointer interaction. A tooltip is ruled out. Risk (Medium): an author
+  learns the marks only by opening forms, so the miniature's encoding stays
+  private. The fix adds a legend line above the grid, in the 47px the
+  measured grid leaves free. The legend waits, since the foot's required
+  count now stands under the filled marks.
+- **FORMS-5: a CEL-conditional required entry draws as an ordinary outline.**
+  `miniatureEntry` sets `required: entry.required === true`
+  (`panels/formCardRows.ts:155`). An entry declaring `required` as a CEL
+  expression therefore draws an outline, and `requiredCount` (`:133`) leaves
+  it out. No file under `examples/` declares one today. Risk (Low): the
+  miniature under-reports such a form, and the foot's count now repeats it
+  in text. The fix can borrow the dashed border, which already marks a
+  conditional form card in `design-language.md`. The spec's scenario names
+  the literal `required: true`, so that fix is a spec delta.
+- **FORMS-6: the open control stands 23px tall.** Its `openControl` style
+  sets 4px block padding (`panels/FormsTab.tsx:204`), which the card's height
+  budget needed (`DESIGN.md:626`). Measured 2026-09-13 at 93.8x23px, one pixel
+  under WCAG 2.5.8's 24px. It passes on that criterion's spacing exception.
+  At phone width it is the card's only target. Risk (Low): the studio targets
+  a desktop, so this stays polish.
+- **FORMS-7: the authoring command's hover is faint, and its press drops text
+  contrast.** The hover wash measures 1.08:1 light and 1.18:1 dark against the
+  plate (`panels/FormsTab.tsx:211`). While pressed, the ink-14% wash (`:212`)
+  drops the command's text to 4.42:1 light and 3.82:1 dark, under WCAG 1.4.3's
+  4.5:1. `FormTabStrip.tsx`'s own `control` style draws the same washes
+  (`panels/FormTabStrip.tsx:112`, `:113`), and `DESIGN.md:468` states them.
+  Risk (Low): the dark press fails for as long as the button is held. The fix
+  belongs to the authoring command `DESIGN.md` defines for both screens.
+- **FORMS-8: card names are spans, and the grid offers no jump.** The name
+  (`panels/FormsTab.tsx:273`) is no heading, so heading navigation cannot move
+  between cards. A keyboard user presses Tab twelve times to reach the
+  twelfth card's control, more where cards carry a check badge (`:277`). The
+  header bar's `h1` sits at `panels/ProcessHeaderBar.tsx:783`, and FIELDS-7
+  records the outline gap below it. Risk (Low): both predate the change. The
+  fix makes each name a heading, at the level FIELDS-7's outline repair
+  settles.
+- **FORMS-9: the browser check's wrap step clears its line by a few pixels.**
+  Step 4 of "The Forms tab card miniature" adds ten field entries
+  (`docs/browser-checks.md:3493`). The final review computed about 308.7px of
+  mark room per card at 1100px, against 314px for the resulting marks.
+  The browser run wrapped three marks, since the form editor added one group
+  entry on its own. Risk (Low): a sub-pixel column change can flip the pass
+  line. The fix asks for fifteen entries.
+- **FORMS-10: a double press on Create draft sends two saves.** `createDraft`
+  (`screens/ProcessesScreen.tsx:366`) awaits the seed read and `saveDraft`
+  before it navigates. Its button (`:579`) stays enabled meanwhile. Measured
+  2026-09-13 during a slow navigation, a second press sent a second
+  `PUT /drafts/...`. The revision moved ahead of the open editor, and its
+  first save answered "This draft was changed elsewhere" (409). Risk
+  (Medium): the author's first save fails, and they reload and redo the
+  edit. The fix holds the button disabled until the navigation.
+- **FORMS-11: the shell header overflows between 30rem and its own width.**
+  The header keeps `flexWrap: "nowrap"` down to 30rem
+  (`packages/web/src/shell/Chrome.tsx:24`). Measured 2026-09-13 at 560px, the
+  document's `scrollWidth` read 627 and the Account button sat clipped. Risk
+  (Low): the page scrolls sideways at that width. German labels widen the row
+  further, so the fix lets it wrap wherever it runs out of room.
+- **FORMS-12: at 1100px the form editor squeezes field keys to one character
+  per line.** Above the 64rem breakpoint (`screens/FormEditorScreen.tsx:60`)
+  the editor keeps three columns: a 16rem palette, the canvas, and a preview
+  up to 22rem (`:165`). A key (`formCardKey`, `:356`) wraps anywhere, beside
+  the card's marks and move buttons. Seen 2026-09-13 in a screenshot only;
+  the column widths stand unmeasured. Risk (Low): an author cannot read a key
+  on a common laptop width. The fix is its own `/impeccable adapt` change.
+- **FORMS-13: the check badge's name omits its step and joins two fragments.**
+  Its `aria-label` joins the count to a catalog phrase
+  (`panels/FormsTab.tsx:281`), from `formsTab.issueMark` and
+  `formsTab.issueMarkOne` (`packages/web/src/i18n/catalogs/studio.ts:401`).
+  Two cards with one check each carry one name. The design language bars a
+  sentence built from fragments. The `forms-tab-card-clarity` audit found this
+  on 2026-09-13. Risk (Medium): a screen reader's button list cannot tell the
+  badges apart (WCAG 2.4.6). The fix gives each plural one key holding
+  `{count}`, and names the step the way the open control does.
+- **FORMS-14: the empty card's border reads a ramp step.** The `cardEmpty`
+  style sets `colors.accent400` (`panels/FormsTab.tsx:55`), where a component
+  reads a role. The advisory tone has no role yet
+  (`.claude/rules/design-language.md:144`). Measured 2026-09-13, the 2px
+  border reads 1.88:1 against the light plate and 7.91:1 in dark. "No fields
+  yet" and "Start the form" state the empty form beside it. Risk (Low): the
+  signal fades at a glance in the light scheme, so the fix adds an advisory
+  role first.
+- **FORMS-15: at phone width the grid scrolls inside its own box.** The grid
+  sets `overflowY: "auto"` (`panels/FormsTab.tsx:29`). Measured 2026-09-13 at
+  400x800, the grid stood 394px tall over 1740px of content, under about
+  400px of chrome. Risk (Low): a reader on a phone scrolls a small box inside
+  the page. The studio targets a desktop, so this stays with an
+  `/impeccable adapt` pass.
+- **FORMS-16: at 400px the tab row scrolls the open tab out of view.** Seen
+  2026-09-13 in `panels/ProcessTabRow.tsx` during the same audit, and left
+  unmeasured. Risk (Low): an author at that width loses sight of which tab
+  stands open.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 

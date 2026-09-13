@@ -31,7 +31,9 @@ decoration. No surface pretends to be a card when it is a row in a register.
 
 One accent sits on a light ground. Roles, such as `Unclaimed` and `Booked`,
 form the semantic layer that components reference. The ramp steps behind them
-are primitives. A component must never touch a primitive directly.
+are primitives. A component must never touch a primitive directly. The
+dormant tone reads `--color-dormant` (`colors.dormant` in the token module),
+backed by the `--dormant-500` primitive.
 
 The field matrix's `--color-flag-visible`/`-required`/`-readonly` tokens are
 a scoped exception. Each is a single token with no ramp behind it, read
@@ -120,9 +122,9 @@ offset, and a grid cell at -2px. A destructive action stays outlined in the
 accent and never turns red.
 
 A row of secondary commands in the studio takes the authoring command: a
-ghost button in slate, mono at 11px. The form tab strip in
-`FormTabStrip.tsx` holds one such row. The accent there stays with the open
-tab.
+ghost button in slate, mono at 11px. So does a form card's single open
+control. The form tab strip in `FormTabStrip.tsx` holds one such row. The
+accent there stays with the open tab.
 
 **The register row**, each app-area screen's own `taskList`/`taskRow`
 style pair (`TasksScreen.tsx` and its siblings). Three columns: a stamp,

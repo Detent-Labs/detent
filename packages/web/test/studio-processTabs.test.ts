@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { formEditorReturnTab, processTabCounts, tabForIssue } from "../src/areas/studio/draft/process-tabs.js";
+import { formEditorReturnTab, processTabCounts, tabForChangeGroup, tabForIssue } from "../src/areas/studio/draft/process-tabs.js";
+import { CHANGE_GROUPS } from "../src/areas/studio/draft/changeSet.js";
 import { checksDotState, groupChecksBySource } from "../src/areas/studio/draft/checksRail.js";
 import type { EditorIssue, EntityType } from "../src/areas/studio/draft/issues.js";
 import type { ValidationResult } from "../src/areas/studio/draft/validation.js";
@@ -120,6 +121,27 @@ describe("tabForIssue", () => {
     const every: EntityType[] = ["process", "field", "dataSource", "step", "path", "timer", "action", "contract"];
 
     for (const entityType of every) expect(PROCESS_TABS).toContain(tabForIssue(entityType));
+  });
+});
+
+describe("tabForChangeGroup", () => {
+  it("maps every change group to the tab owning its rows, and the Process group to none", () => {
+    expect(CHANGE_GROUPS.map((group) => [group, tabForChangeGroup(group)])).toEqual([
+      ["process", undefined],
+      ["fields", "fields"],
+      ["dataSources", "dataSources"],
+      ["steps", "steps"],
+      ["paths", "paths"],
+      ["forms", "forms"],
+      ["contract", "contract"],
+    ]);
+  });
+
+  it("names a tab the row actually holds, for every group that has one", () => {
+    for (const group of CHANGE_GROUPS.filter((g) => g !== "process")) {
+      const tab = tabForChangeGroup(group);
+      expect(tab !== undefined && PROCESS_TABS.includes(tab)).toBe(true);
+    }
   });
 });
 

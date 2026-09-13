@@ -11,21 +11,30 @@ import { t } from "../catalog.js";
 type DraftStep = DraftOf<Step>;
 
 /**
- * One line of a card's miniature: the entry's label and the bar standing for
- * its control (`studio-forms-overview`: "A card carries a miniature of its
- * form").
+ * One mark of a card's miniature: a field entry's own bar, or a group
+ * entry's group break in its place (`studio-forms-overview`: "A card draws a
+ * miniature of its form for the eye alone"). Drawn without a label — the
+ * miniature stands for the form's shape, not its content.
  *
- * `height` is the bar's own height in pixels, from the field's kind alone, so
- * a long-text field reads taller than a one-line field without the card
- * drawing a single real control.
+ * `height` is the mark's own height in pixels, from the field's kind alone,
+ * so a long-text field reads taller than a one-line field without the card
+ * drawing a single real control. On a group break `height` is the group
+ * break's own fixed height, not a field kind's.
  */
 export interface MiniatureEntry {
   /** The entry's index in `view.fields`, the miniature's React key. */
   index: number;
-  label: string;
+  /** True where this entry is a group entry: it draws a group break, not a
+   * mark. */
+  groupBreak: boolean;
   height: number;
   required: boolean;
 }
+
+/** The group break's own fixed height, in pixels — a group opens a section
+ * of the form, not a field of its own, so it draws at one height regardless
+ * of any field kind. */
+const GROUP_BREAK_HEIGHT = 24;
 
 /** One plate on the Forms tab: everything the card prints, resolved. */
 export interface FormCardRow {
@@ -34,8 +43,16 @@ export interface FormCardRow {
   label: string;
   /** The kicker's subject — the step's role, worded by `stepRole.*`. */
   role: StepRole;
-  /** Field entries alone. A note occupies no catalog row and raises none. */
+  /** How many of `entries` draw a mark: every field entry but a group entry,
+   * which draws a group break instead, and a note, which occupies no
+   * catalog row and draws nothing at all. The foot's count text reads this
+   * number (`studio-forms-overview`: "A card names its step and counts the
+   * fields it draws"). */
   fieldCount: number;
+  /** How many of `entries`, group breaks aside, declare `required: true` —
+   * the card's foot states this beside `fieldCount`. The miniature stays out
+   * of the accessibility tree and states neither number. */
+  requiredCount: number;
   entries: MiniatureEntry[];
   /** The open issues naming this step's view, and whether any refuses a
    * publish. `count` at zero draws no badge. */
@@ -43,23 +60,22 @@ export interface FormCardRow {
 }
 
 /**
- * The bar height one view entry draws, in pixels, on the 4-point scale
+ * The mark height one field entry draws, in pixels, on the 4-point scale
  * `design-language.md` fixes.
  *
- * Four heights and no fifth. A long-text control takes the tallest, a
- * multi-choice control the next, a one-line control the middle, and anything
- * that draws no control of its own — a note, a group's heading — the
- * shortest. A field the catalog no longer declares takes the one-line height:
- * the entry still stands in the view, and the card's own badge is what
- * reports the unresolved reference.
+ * Four heights and no fifth: 8 for a checkbox, 12 for a one-line field, 16
+ * for a choice — a `radio` or `checkboxes` control, or a `list` field — and
+ * 24 for long text. A field the catalog no longer declares takes the
+ * one-line height: the entry still stands in the view, and the card's own
+ * badge is what reports the unresolved reference. A group entry never
+ * reaches this function; it draws a group break instead.
  */
 export function miniatureBarHeight(field: DraftField | undefined): number {
-  if (field === undefined) return 16;
-  if (field.type === "group") return 8;
-  if (field.control === "multiline") return 32;
-  if (field.control === "radio" || field.control === "checkboxes" || field.type === "list") return 24;
-  if (field.type === "boolean") return 12;
-  return 16;
+  if (field === undefined) return 12;
+  if (field.control === "multiline") return 24;
+  if (field.control === "radio" || field.control === "checkboxes" || field.type === "list") return 16;
+  if (field.type === "boolean") return 8;
+  return 12;
 }
 
 /** True where an issue's location names the step's view rather than anything
@@ -105,13 +121,17 @@ export function formCardRows(draft: Draft, issues: readonly EditorIssue[], conte
 
   const rowFor = (step: DraftStep): FormCardRow | undefined => {
     if (step.id === undefined || step.view === undefined) return undefined;
-    const entries: DraftViewEntry[] = step.view.fields ?? [];
+    const viewEntries: DraftViewEntry[] = step.view.fields ?? [];
+    const marks = viewEntries
+      .map((entry, index) => miniatureEntry(entry, index, byId))
+      .filter((entry): entry is MiniatureEntry => entry !== undefined);
     return {
       stepId: step.id,
       label: resolveDraftLocalizedText(step.label, contentLocale, baseLocale) || step.key || t("steps.unnamedStep"),
       role: roleStampFor(step, initialStep).role,
-      fieldCount: entries.filter(isDraftViewField).length,
-      entries: entries.map((entry, index) => miniatureEntry(entry, index, byId, contentLocale, baseLocale)),
+      fieldCount: marks.filter((m) => !m.groupBreak).length,
+      requiredCount: marks.filter((m) => !m.groupBreak && m.required).length,
+      entries: marks,
       issues: viewIssues(issues, step.id),
     };
   };
@@ -121,32 +141,17 @@ export function formCardRows(draft: Draft, issues: readonly EditorIssue[], conte
     .filter((row): row is FormCardRow => row !== undefined);
 }
 
-function miniatureEntry(
-  entry: DraftViewEntry,
-  index: number,
-  byId: Map<string, DraftField>,
-  contentLocale: string,
-  baseLocale: string,
-): MiniatureEntry {
-  if (!isDraftViewField(entry)) {
-    return {
-      index,
-      label: resolveDraftLocalizedText(entry.text, contentLocale, baseLocale) || t("formsTab.noteEntry"),
-      height: 8,
-      required: false,
-    };
-  }
+/** A note draws no mark, so it yields `undefined` here — `formCardRows`
+ * drops it from `entries`. A group entry draws a group break in place of a
+ * mark, at the group break's own fixed height. */
+function miniatureEntry(entry: DraftViewEntry, index: number, byId: Map<string, DraftField>): MiniatureEntry | undefined {
+  if (!isDraftViewField(entry)) return undefined;
   const field = entry.ref === undefined ? undefined : byId.get(entry.ref);
+  const groupBreak = field?.type === "group";
   return {
     index,
-    // The field's own name, then its key, then the reference the catalog no
-    // longer resolves — the miniature names what the view holds either way.
-    label:
-      resolveDraftLocalizedText(field?.label, contentLocale, baseLocale) ||
-      field?.key ||
-      entry.ref ||
-      t("formEditor.unnamedField"),
-    height: miniatureBarHeight(field),
+    groupBreak,
+    height: groupBreak ? GROUP_BREAK_HEIGHT : miniatureBarHeight(field),
     required: entry.required === true,
   };
 }

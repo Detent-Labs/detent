@@ -2163,12 +2163,14 @@ Stage-by-stage status is in `ROADMAP.md`.
   draft against the last-saved snapshot) — a `confirm()` prompt offers to
   save then publish when dirty, mirroring the existing discard-confirmation
   convention rather than silently chaining or hard-blocking; a Versions
-  screen listing published versions and diffing any two (or a draft against
-  its `base_version`) via a from-scratch JSON diff
-  (`screens/versionDiffLogic.ts::diffJson`) — no diff library exists
-  anywhere in the repo to reuse, and none was added, objects recurse
-  key-by-key and everything else (including arrays) compares whole (since
-  `seed-draft-from-published`, by canonical JSON rather than
+  screen listing published versions and comparing any two (or a draft
+  against its `base_version`) as a change list
+  (`draft/changeSet.ts::describeChanges`, pairing each side's members by
+  anchor (a note position or one of `id`, `ref`, `value`, `key`),
+  backed by `screens/versionDiffLogic.ts::diffJson`) — no diff library
+  exists anywhere in the repo to reuse, and none was added, objects
+  recurse key-by-key and everything else (including arrays) compares
+  whole (since `seed-draft-from-published`, by canonical JSON rather than
   `JSON.stringify`, and the base body is stripped first — see the seeding
   entry at the end of this file); and a
   migration-plan authoring screen, a JSON-textarea editor over
@@ -4456,11 +4458,13 @@ meets `scope=started` should infer no new permission tier from it.
   attribute takes a hidden subtree out of the tab order and out of the
   accessibility tree, with no CSS.
 
-  The module `draft/process-tabs.ts` carries three pure functions. The first,
+  The module `draft/process-tabs.ts` carries four pure functions. The first,
   `processTabCounts`, yields the number beside each tab name. It answers
   `undefined` for Canvas and Contract, which count nothing. The second,
   `tabForIssue`, maps an issue's entity type onto the tab that owns it. The
-  third, `formEditorReturnTab`, yields the tab the form editor returns to.
+  third, `tabForChangeGroup`, maps a change-list row's group onto the tab
+  that owns it, and answers `undefined` for Process. The fourth,
+  `formEditorReturnTab`, yields the tab the form editor returns to.
 
   The row component `ProcessTabRow.tsx` renders a `tablist` of buttons. The
   whole row is one tab stop, on `spa-accessibility`'s roving-tabindex
@@ -4472,6 +4476,13 @@ meets `scope=started` should infer no new permission tier from it.
   and Player instead, under its "Views" group. The JSON entry names its own
   state, so an author reads what pressing it does
   (`studio-header-menu-merge`).
+
+  A Checks row's or a Changes row's own open command hands focus to the tab
+  it opens. The hand-off itself is `EditScreen.tsx`'s `openTabFromRow`: it
+  switches through `goToTab`, then focuses `tabDomId(target)` once that tab
+  is open. A target already open focuses at once instead.
+  `ProcessTabRow.tsx`'s own roving `tabindex="0"` already marks the focused
+  tab, so the hand-off only moves focus onto the id that attribute tracks.
 
   Save, Discard draft and Publish render directly in `ProcessHeaderBar.tsx`,
   right-aligned ahead of its `⋮` menu trigger. That component already sits
@@ -4501,11 +4512,29 @@ meets `scope=started` should infer no new permission tier from it.
 
   The tab component `FormsTab.tsx` plates one card per step declaring a view.
   The module `panels/formCardRows.ts` yields each card's label, role, field
-  count, miniature entries and issue badge. It is a pure function with its
-  own `bun:test` behind it. The module `draft/roleStamp.ts` maps each step to
-  `initial`, `task`, `subprocess` or `end`, with its tone, for the card's
-  role. A card takes a 1px hairline box. An empty form takes a 2px box in the
-  advisory color instead.
+  count, required count, miniature entries and issue badge. It is a pure
+  function with its own `bun:test` behind it. The module `draft/roleStamp.ts`
+  maps each step to `initial`, `task`, `subprocess` or `end`, with its tone,
+  for the card's role. A card takes a 1px hairline box. An empty form takes a
+  2px box in the advisory color instead.
+
+  The miniature draws one mark for each field entry other than a group
+  entry. A group entry draws a group break instead, both through
+  `miniatureEntry`. The function `miniatureBarHeight` sets a mark's height
+  from the field's kind: 8px, 12px, 16px or 24px. A group break takes its
+  own fixed height, `GROUP_BREAK_HEIGHT`. An ordinary mark draws as an
+  outline, and a required entry's mark fills solid.
+
+  The `Miniature` component carries `aria-hidden="true"` and no role, so a
+  screen reader skips it. The function `footCountText` builds the foot's
+  text from the field count and the required count, one catalog key per
+  shape. The component `FormCard` mints two ids with `useId`, one for the
+  step name span and one for the open control. The control's
+  `aria-labelledby` lists its own id first, then the name span's, joining
+  the two into one accessible name. That name leads with the visible
+  words, then states the step's label. The foot row carries its text on
+  the left and the open control on the right, taking `styles.foot` and
+  `styles.openControl`.
 
   The form editor's trailing pane is `FormPreview.tsx`. It mounts
   `packages/form-ui`'s own `FieldForm` and `PathButtons`, the two the Player
@@ -4526,11 +4555,13 @@ meets `scope=started` should infer no new permission tier from it.
   window `validateDurations` enforces at publish. A duration the pair cannot
   state keeps its written form, `P1DT4H30M` for one.
 
-  The Changes view runs `diffJson(strippedBase, draft)` over the LIVE draft,
-  unsaved edits included. Base first is load-bearing. The function reports a
-  key present in its second argument alone as `added`, and it reads `from` off
-  the first. So the draft-first order `VersionsScreen.diffAgainstBase()` uses
-  would read every addition as a removal.
+  The Changes view runs `describeChanges(strippedBase, draft, contentLocale)`
+  over the LIVE draft, unsaved edits included. Base first is load-bearing. The
+  function `describeChanges` reports an entity present in its second argument
+  alone as added. Each row's Developer view then reads its `from` value off
+  the first side, through `diffJson`. The handler
+  `VersionsScreen.diffAgainstBase()` passes the stripped base first too. A
+  draft-first call would read every addition as a removal.
 
   The Paths view gives one row per path over source step, trigger, priority,
   guard and target. The module `panels/pathRows.ts` carries that derivation
@@ -4549,8 +4580,10 @@ meets `scope=started` should infer no new permission tier from it.
   Changes view then refetches after a publish with no reload.
 
   The grid `FieldMatrixGrid.tsx` lost its `compact` prop and its
-  `matrixScrollCompact` style with the dock. Its `matrixScroll` style still
-  caps at 32rem and scrolls itself, and `FieldMatrixPanel` is its one mount.
+  `matrixScrollCompact` style with the dock. A `matrixScrollSpace` wrapper now
+  holds the 24rem floor and fills the height under the toolbar. Its
+  `matrixScroll` frame follows its rows up to that space and scrolls past it;
+  `FieldMatrixPanel` remains its one mount.
 
   The catalog namespace `dock.` went with the strip it named. Eleven of its
   keys read `pathsView.` and `changesView.` now, one namespace per component
