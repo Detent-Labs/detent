@@ -118,6 +118,40 @@ export function templateDisplayName(
   return label[locale] ?? Object.values(label).find((text) => text !== undefined && text !== "") ?? templateKey;
 }
 
+/**
+ * Stops a second press on one process row's "Create draft" from writing a
+ * second draft while the first write is still in flight. The returned
+ * `run(key, write)` checks the held set before `write`'s first `await`,
+ * synchronously inside the call. A held key resolves `false` and never
+ * calls `write`. React would disable the button in time on its own — it
+ * commits a click's new state in a microtask, ahead of the browser's next
+ * click — but a synchronous check needs no render cycle at all, so a
+ * `bun:test` suite drives the same rule with no DOM: two calls in one tick
+ * still write once.
+ *
+ * Otherwise the key joins the held set, and `onHeldChange` receives a fresh
+ * `Set` copy. React skips a re-render given the same object, so a mutated
+ * set would never disable the button. A rejected `write` frees the key,
+ * passes another copy to `onHeldChange`, and rethrows the same error. A
+ * resolved `write` leaves the key held and resolves `true`.
+ */
+export function createInFlightGuard(onHeldChange: (held: ReadonlySet<string>) => void) {
+  const held = new Set<string>();
+  return async function run(key: string, write: () => Promise<void>): Promise<boolean> {
+    if (held.has(key)) return false;
+    held.add(key);
+    onHeldChange(new Set(held));
+    try {
+      await write();
+      return true;
+    } catch (err) {
+      held.delete(key);
+      onHeldChange(new Set(held));
+      throw err;
+    }
+  };
+}
+
 export function deriveProcessRows(processes: ProcessSummary[], drafts: DraftSummary[]): ProcessRow[] {
   const rows = new Map<string, ProcessRow>();
 

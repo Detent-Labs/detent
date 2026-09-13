@@ -3702,3 +3702,88 @@ Submit from "Review" with Finance Note, on "Decision", left empty.
 Pass: `escaped` stays empty, and `scrollWidth` equals `clientWidth`. The
 Decision tab's hidden failed-field count renders without widening the
 page. Measured 2026-09-13: 400/400, with "1 issue" as the hidden count.
+
+### Create draft writes one draft per press (`process-list-create-once`)
+
+Source: `process-list-create-once` task 4.1. No `bun:test` assertion presses a
+rendered button twice and reads the network log. The check stays here, by
+`development-toolchain`'s split rule.
+
+Seed the database and sign in as `demo-superuser@example.test`, password
+`seed-demo-password`. This entry uses the `it_offboarding` row for the
+pressed button and `access_request` for the other row, both from the seeded
+demo data.
+
+The check delays each `PUT` to `/drafts/` by 20000 ms. Two ways work. In the
+browser's dev tools, a custom throttling profile with 20000 ms of latency
+slows every request. With `playwright-cli`, pass `-s=process-list-create-once`
+on every call. Then run this function through `run-code`:
+
+```js
+async (page) => {
+  await page.route("**/drafts/*", async (route) => {
+    if (route.request().method() === "PUT") await page.waitForTimeout(20000);
+    await route.continue();
+  });
+}
+```
+
+A locator click waits for an enabled button. The extra press therefore goes
+through `page.mouse.click` at the button's center, which dispatches a trusted
+event.
+
+Under `playwright-cli`, steps 2 and 3 run as one `run-code` call. Separate
+calls each cost an agent turn, and three turns can outlast the delay. The
+`getByRole` lookup resolves only while the name reads "Create draft":
+
+```js
+async (page) => {
+  const row = (key) => page.getByRole("row").filter({ hasText: key });
+  const pressed = row("it_offboarding").getByRole("button", { name: "Create draft", exact: true });
+  const other = row("access_request").getByRole("button", { name: "Create draft", exact: true });
+  const read = (button) => button.evaluate((el) => ({ disabled: el.disabled, opacity: getComputedStyle(el).opacity }));
+  await pressed.dblclick();
+  const result = { pressed: await read(pressed), other: await read(other) };
+  const box = await pressed.boundingBox();
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  return result;
+}
+```
+
+In dev tools, blocking the `/drafts/` request URL fails the write in step 6
+below. Under `playwright-cli`, this function answers the `PUT` with a 500
+instead:
+
+```js
+async (page) => {
+  await page.unroute("**/drafts/*");
+  await page.route("**/drafts/*", (route) =>
+    route.request().method() === "PUT" ? route.fulfill({ status: 500 }) : route.continue(),
+  );
+}
+```
+
+1. Reload `/studio/` so the request log starts empty. Read the
+   `it_offboarding` and `access_request` rows. Pass: each reads an em dash
+   under Draft. Discard a draft first where a row has one.
+2. Install the delay. Double-click that row's "Create draft". Read both rows'
+   buttons within the 20 seconds. Pass: the pressed button reports
+   `disabled`, a computed `opacity` of 0.45 and the accessible name "Create
+   draft". The `access_request` button reports no `disabled`.
+3. Press the disabled button once more, using `page.mouse.click` for that
+   press, then wait for the edit screen. Pass: the log lists one `PUT` to
+   `/drafts/<id>`. Before that `PUT` it lists one `GET` of
+   `/processes/<id>/versions/<v>`. The `GET` of that URL after the edit
+   screen opens is the Changes tab's base read.
+4. Take the delay off. Under `playwright-cli`, a `run-code` call to
+   `page.unroute("**/drafts/*")` does that. Edit the process label. Press
+   Save. Pass: the header bar reads "Saved". No conflict banner shows.
+5. Go back to the process list. Choose "Discard" on the `it_offboarding` row.
+   Accept the browser's confirm. The header bar's own "Discard draft" does
+   nothing, per DRAFT-1 in `docs/decisions.md`.
+6. Install the 500 route. Press that row's "Create draft". Pass: the error
+   banner shows its "Failed" stamp. The row still reads an em dash under
+   Draft. Its button reports no `disabled`.
+7. Take the 500 route off. Under `playwright-cli`, a `run-code` call to
+   `page.unroute("**/drafts/*")` does that. Press "Create draft" once more.
+   Pass: the edit screen opens. Discard that draft the way step 5 did.
