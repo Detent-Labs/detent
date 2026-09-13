@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { authoredProcessBody } from "workflow-engine/schema";
 import {
+  createInFlightGuard,
   deriveProcessRows,
   seedVersionFor,
   seededDraftInput,
@@ -204,5 +205,106 @@ describe("templateDisplayName", () => {
 
   it("skips an empty string rather than rendering a blank name", () => {
     expect(templateDisplayName({ en: "" }, "de", "approval")).toBe("approval");
+  });
+});
+
+describe("createInFlightGuard", () => {
+  it("resolves false for a second call on a held key; once the held write rejects, a third call for that key runs its write", async () => {
+    const guard = createInFlightGuard(() => {});
+    const failure = new Error("write failed");
+    let rejectFirst: ((err: unknown) => void) | undefined;
+    const first = guard("p1", () => new Promise<void>((_resolve, reject) => (rejectFirst = reject)));
+
+    let secondWriteRan = false;
+    const second = await guard("p1", async () => {
+      secondWriteRan = true;
+    });
+
+    expect(second).toBe(false);
+    expect(secondWriteRan).toBe(false);
+
+    rejectFirst!(failure);
+    let caught: unknown;
+    try {
+      await first;
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBe(failure);
+
+    let thirdWriteRan = false;
+    const third = await guard("p1", async () => {
+      thirdWriteRan = true;
+    });
+    expect(third).toBe(true);
+    expect(thirdWriteRan).toBe(true);
+  });
+
+  it("frees a rejected write's key and rethrows the same error, so a later call for that key runs its write", async () => {
+    const guard = createInFlightGuard(() => {});
+    const failure = new Error("write failed");
+    let caught: unknown;
+    try {
+      await guard("p1", async () => {
+        throw failure;
+      });
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBe(failure);
+
+    let laterRan = false;
+    const later = await guard("p1", async () => {
+      laterRan = true;
+    });
+    expect(later).toBe(true);
+    expect(laterRan).toBe(true);
+  });
+
+  it("keeps a resolved write's key held, so a later call for that key resolves false", async () => {
+    const guard = createInFlightGuard(() => {});
+    const first = await guard("p1", async () => {});
+    expect(first).toBe(true);
+
+    let laterRan = false;
+    const later = await guard("p1", async () => {
+      laterRan = true;
+    });
+    expect(later).toBe(false);
+    expect(laterRan).toBe(false);
+  });
+
+  it("leaves another key free to run its write while one key is held", async () => {
+    const guard = createInFlightGuard(() => {});
+    let resolveFirst: (() => void) | undefined;
+    const first = guard("p1", () => new Promise<void>((resolve) => (resolveFirst = resolve)));
+
+    let otherRan = false;
+    const other = await guard("p2", async () => {
+      otherRan = true;
+    });
+    expect(other).toBe(true);
+    expect(otherRan).toBe(true);
+
+    resolveFirst!();
+    await first;
+  });
+
+  it("passes a new set object to onHeldChange after each add and each free", async () => {
+    const sets: ReadonlySet<string>[] = [];
+    const guard = createInFlightGuard((held) => sets.push(held));
+    const failure = new Error("boom");
+    try {
+      await guard("p1", async () => {
+        throw failure;
+      });
+    } catch {
+      // asserted by the rejection test above; this test only reads onHeldChange
+    }
+
+    expect(sets.length).toBe(2);
+    expect(sets[0]!.has("p1")).toBe(true);
+    expect(sets[1]!.has("p1")).toBe(false);
+    expect(sets[0]).not.toBe(sets[1]);
   });
 });

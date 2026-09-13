@@ -2745,6 +2745,14 @@ Stage-by-stage status is in `ROADMAP.md`.
   does. An unmodified seeded draft now diffs as "No differences", which
   agrees with publishing it returning the version it came from.
 
+  A second press on the same row used to send a second write. The function
+  `createInFlightGuard` (`processListLogic.ts:138`) now holds each process id
+  at most once, in a set keyed by `processId`. Each row in flight adds its
+  own entry, so the set can hold several at once. The screen
+  `ProcessesScreen` wires it through `runCreateDraft`. The pressed row's
+  button reads disabled from that set. It stays disabled until the edit
+  screen opens, or until the seed read or the write fails.
+
 - The suite's own database (`bunfig.toml`, `test/preload-db.ts`,
   `make-db-suites-deterministic`): a `bun test` run used to share the
   devcontainer's one Postgres database with `bun run serve`, `bun run seed`
