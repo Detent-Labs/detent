@@ -200,6 +200,10 @@ const styles = stylex.create({
     fontSize: 11,
     color: colors.textMuted,
     paddingBlock: space.s1,
+    // A lone control on an empty card's foot keeps the row's trailing edge
+    // this way; beside a count the row's own `space-between` already puts it
+    // there (design.md: "The empty card's foot holds the control alone").
+    marginInlineStart: "auto",
     backgroundColor: {
       default: "transparent",
       ":hover": colors.surfaceMuted,
@@ -238,6 +242,23 @@ export function FormsTab({ onOpenForm, onOpenChecks }: Props) {
   );
 }
 
+/**
+ * The foot's count text (`studio-forms-overview`: "A card names its step and
+ * counts the fields it draws"). Undefined where the view draws no mark: the
+ * foot then holds the open control alone, with no count span at all.
+ */
+function footCountText(row: FormCardRow): string | undefined {
+  if (row.fieldCount === 0) return undefined;
+  if (row.requiredCount > 0) {
+    return (row.fieldCount === 1 ? t("formsTab.miniatureLabelOne") : t("formsTab.miniatureLabel"))
+      .replace("{count}", String(row.fieldCount))
+      .replace("{required}", String(row.requiredCount));
+  }
+  return row.fieldCount === 1
+    ? t("formsTab.fieldCountOne")
+    : t("formsTab.fieldCount").replace("{count}", String(row.fieldCount));
+}
+
 function FormCard({ row, onOpenForm, onOpenChecks }: { row: FormCardRow } & Props) {
   const empty = row.fieldCount === 0;
   return (
@@ -260,13 +281,7 @@ function FormCard({ row, onOpenForm, onOpenChecks }: { row: FormCardRow } & Prop
       </div>
       <Miniature row={row} />
       <div {...stylex.props(styles.foot)}>
-        <span {...stylex.props(styles.count)}>
-          {empty
-            ? t("formsTab.emptyForm")
-            : row.fieldCount === 1
-              ? t("formsTab.fieldCountOne")
-              : t("formsTab.fieldCount").replace("{count}", String(row.fieldCount))}
-        </span>
+        {!empty && <span {...stylex.props(styles.count)}>{footCountText(row)}</span>}
         <button
           type="button"
           className={`btn btn-ghost ${stylex.props(styles.openControl).className ?? ""}`}

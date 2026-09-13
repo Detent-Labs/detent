@@ -43,7 +43,11 @@ export interface FormCardRow {
   label: string;
   /** The kicker's subject — the step's role, worded by `stepRole.*`. */
   role: StepRole;
-  /** Field entries alone. A note occupies no catalog row and raises none. */
+  /** How many of `entries` draw a mark: every field entry but a group entry,
+   * which draws a group break instead, and a note, which occupies no
+   * catalog row and draws nothing at all. The foot's count text reads this
+   * number (`studio-forms-overview`: "A card names its step and counts the
+   * fields it draws"). */
   fieldCount: number;
   /** How many of `entries`, group breaks aside, declare `required: true` —
    * the miniature's accessible name states this beside `fieldCount`. */
@@ -124,7 +128,7 @@ export function formCardRows(draft: Draft, issues: readonly EditorIssue[], conte
       stepId: step.id,
       label: resolveDraftLocalizedText(step.label, contentLocale, baseLocale) || step.key || t("steps.unnamedStep"),
       role: roleStampFor(step, initialStep).role,
-      fieldCount: viewEntries.filter(isDraftViewField).length,
+      fieldCount: marks.filter((m) => !m.groupBreak).length,
       requiredCount: marks.filter((m) => !m.groupBreak && m.required).length,
       entries: marks,
       issues: viewIssues(issues, step.id),

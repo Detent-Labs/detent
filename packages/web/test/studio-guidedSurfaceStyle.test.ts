@@ -247,6 +247,14 @@ describe("the required mark on the muted ground", () => {
   });
 });
 
+describe("the empty card's foot keeps the control's trailing edge", () => {
+  it("gives the open control its own margin, for when it stands alone in the foot", () => {
+    const block = styleBlock(stripComments(read("src/areas/studio/panels/FormsTab.tsx")), "openControl");
+
+    expect(block).toMatch(/marginInlineStart: "auto"/);
+  });
+});
+
 describe("the group break survives forced colors", () => {
   it("draws with a 1px border there, since a background alone is erased", () => {
     const source = stripComments(read("src/areas/studio/panels/FormsTab.tsx"));

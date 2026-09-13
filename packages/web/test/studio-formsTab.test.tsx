@@ -107,11 +107,45 @@ describe("The Forms tab's plates", () => {
     expect(html.indexOf("Initial")).toBeLessThan(html.indexOf("Intake"));
   });
 
-  it("counts the field entries a plate's view holds", () => {
-    expect(render()).toContain(">1 field<");
+  it("states the count alone for a view of one optional entry", () => {
+    const oneOptional = {
+      ...DRAFT,
+      workflow: {
+        ...DRAFT.workflow,
+        steps: [
+          { ...DRAFT.workflow!.steps![0], view: { fields: [{ ref: AMOUNT }] } },
+          ...DRAFT.workflow!.steps!.slice(1),
+        ],
+      },
+    } as unknown as Draft;
+
+    expect(render({ draft: oneOptional })).toContain(">1 field<");
   });
 
-  it("counts a view holding several entries in its own sentence", () => {
+  it("states the required count beside the field count for one required entry", () => {
+    // DRAFT: step_a's one entry declares `required: true`.
+    expect(render()).toContain(">1 field, 1 required<");
+  });
+
+  it("states the required count beside several field entries", () => {
+    const four = {
+      ...DRAFT,
+      workflow: {
+        ...DRAFT.workflow,
+        steps: [
+          {
+            ...DRAFT.workflow!.steps![0],
+            view: { fields: [{ ref: AMOUNT, required: true }, { ref: AMOUNT }, { ref: AMOUNT }, { ref: AMOUNT }] },
+          },
+          ...DRAFT.workflow!.steps!.slice(1),
+        ],
+      },
+    } as unknown as Draft;
+
+    expect(render({ draft: four })).toContain(">4 fields, 1 required<");
+  });
+
+  it("counts a view holding several entries in its own sentence, with none required", () => {
     const four = {
       ...DRAFT,
       workflow: {
@@ -129,8 +163,15 @@ describe("The Forms tab's plates", () => {
     expect(render({ draft: four })).toContain(">4 fields<");
   });
 
-  it("names a view holding no entry as an empty form", () => {
-    expect(render()).toContain("Empty form");
+  it("holds the control alone in an empty card's foot, with no count span", () => {
+    const html = render();
+    const noFieldsIndex = html.indexOf("No fields yet");
+    const startFormIndex = html.indexOf("Start the form");
+
+    expect(html).not.toContain("Empty form");
+    expect(noFieldsIndex).toBeGreaterThan(-1);
+    expect(startFormIndex).toBeGreaterThan(noFieldsIndex);
+    expect(html.slice(noFieldsIndex, startFormIndex)).not.toContain("<span");
   });
 
   it("offers to start the form on an empty one and to open an existing one", () => {
@@ -146,7 +187,7 @@ describe("The Forms tab's plates", () => {
     // the miniature that stands above it.
     const html = render();
     const miniatureIndex = html.indexOf('role="img"');
-    const countIndex = html.indexOf(">1 field<");
+    const countIndex = html.indexOf(">1 field, 1 required<");
     const controlIndex = html.indexOf("Open the form");
 
     expect(miniatureIndex).toBeGreaterThan(-1);
@@ -225,7 +266,7 @@ describe("A plate's miniature", () => {
     } as unknown as Draft;
     const html = render({ draft: notesOnly });
 
-    expect(html).toContain("Empty form");
+    expect(html).toContain("No fields yet");
     expect(html).toContain("Start the form");
     expect(html).not.toContain("Open the form");
     expect(miniatures(html)).toHaveLength(0);

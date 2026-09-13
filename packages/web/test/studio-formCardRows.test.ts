@@ -6,8 +6,8 @@ import { formCardRows, miniatureBarHeight, viewIssues } from "../src/areas/studi
 /**
  * The Forms tab's own row set (`studio-forms-overview`: "The Forms tab
  * carries one card per step that asks for something", "A card names its step
- * and counts its fields", "A card carries a miniature of its form", "A card
- * reports its step's form issues").
+ * and counts the fields it draws", "A card draws a miniature of its form for
+ * the eye alone", "A card reports its step's form issues").
  *
  * `development-toolchain`'s split rule sends these to assertions: the row
  * set, the order, the counts, the miniature's order, its bar heights and the
@@ -165,6 +165,22 @@ describe("The Forms tab's card set", () => {
 
     expect(formCardRows(notesOnly, [], "en")[0]?.fieldCount).toBe(0);
   });
+
+  it("counts a view holding only a group entry as empty", () => {
+    const groupOnly = {
+      ...DRAFT,
+      fields: [...DRAFT.fields!, { id: SECTION, key: "section", type: "group", label: { en: "Section" } }],
+      workflow: {
+        ...DRAFT.workflow,
+        steps: [
+          { ...DRAFT.workflow!.steps![0], view: { fields: [{ ref: SECTION }] } },
+          ...DRAFT.workflow!.steps!.slice(1),
+        ],
+      },
+    } as unknown as Draft;
+
+    expect(formCardRows(groupOnly, [], "en")[0]?.fieldCount).toBe(0);
+  });
 });
 
 describe("A card's miniature", () => {
@@ -232,7 +248,7 @@ describe("A card's miniature", () => {
     expect(formCardRows(withNote, [], "en")[0]?.entries).toHaveLength(1);
   });
 
-  it("draws a group entry as a group break, not a mark, and still counts it in fieldCount", () => {
+  it("draws a group entry as a group break, not a mark", () => {
     const withGroup = {
       ...DRAFT,
       fields: [...DRAFT.fields!, { id: SECTION, key: "section", type: "group", label: { en: "Section" } }],
@@ -246,7 +262,7 @@ describe("A card's miniature", () => {
     } as unknown as Draft;
     const row = formCardRows(withGroup, [], "en")[0];
 
-    expect(row?.fieldCount).toBe(2);
+    expect(row?.fieldCount).toBe(1);
     expect(row?.entries[0]?.groupBreak).toBe(true);
     expect(row?.entries[1]?.groupBreak).toBe(false);
   });
