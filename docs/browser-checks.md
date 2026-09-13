@@ -2825,15 +2825,17 @@ row carries a select. The row for `immediate_lock_written_confirmation`
 truncates its label with an ellipsis. The rail's 20rem width does not fit
 the whole sentence, "Written confirmation of the immediate lock obtained".
 The label's `title` attribute still carries that whole sentence. The
-button's accessible name reads the whole label plus the kind word
-regardless.
+button's accessible name reads the whole label, the kind word and the
+group's name regardless.
 
 Hover that row's icon. Pass: a native tooltip reads "Yes/no". Select the
 row. Pass: its accessible name reads "Written confirmation of the immediate
-lock obtained Yes/no". The kind word sits in that name, though nothing
-paints it. Repeat on `forwarding_until` (tooltip "Date") and on
-`auto_reply_text` (tooltip "One choice"). Repeat once more on a group's own
-row: its icon reads "Group".
+lock obtained Yes/no in Processing (Fabrikam)". The kind word and the group's name
+sit in it, though nothing paints either.
+
+Repeat the tooltip check on `forwarding_until` (tooltip "Date") and on
+`auto_reply_text` (tooltip "One choice"). Repeat it once more on a group's
+own row: its icon reads "Group".
 
 Select a group. Pass: its children indent once, each with its own icon.
 None of the 51 rows carries a select of any kind. No row offers a keyboard
