@@ -4538,8 +4538,10 @@ meets `scope=started` should infer no new permission tier from it.
   Changes view then refetches after a publish with no reload.
 
   The grid `FieldMatrixGrid.tsx` lost its `compact` prop and its
-  `matrixScrollCompact` style with the dock. Its `matrixScroll` style still
-  caps at 32rem and scrolls itself, and `FieldMatrixPanel` is its one mount.
+  `matrixScrollCompact` style with the dock. Its `matrixScroll` style grows
+  with its rows to the tab body's height under the toolbar, above a 24rem
+  floor. It still scrolls itself, and `FieldMatrixPanel` remains its one
+  mount.
 
   The catalog namespace `dock.` went with the strip it named. Eleven of its
   keys read `pathsView.` and `changesView.` now, one namespace per component

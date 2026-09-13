@@ -3497,3 +3497,44 @@ Go back to the process list and choose "Discard" on the `it_offboarding`
 row, then accept the browser's confirm. The header bar's own "Discard
 draft" does not work, so do not use it here. See the `docs/decisions.md`
 entry DRAFT-1.
+
+### The field matrix's height (`field-matrix-fill-height`)
+
+A `bun:test` assertion already holds the field matrix's two style
+declarations in place. The same test file, `studio-guidedSurfaceStyle.test.ts`,
+guards the steps rail's own scroll rule this way. The harness lays out
+nothing, so that assertion reads no rendered height. This entry proves the
+height those declarations produce.
+
+See this file's "Before you start" section for the build and the address.
+Seed the database and sign in as `demo-superuser@example.test`, password
+`seed-demo-password`. In the Processes list, find the row `it_offboarding`
+and choose "Create draft". Studio opens the draft at
+`/studio/processes/<id>/edit`. Choose the Field matrix tab.
+
+1. Resize the window to 1440x900. Pass: the grid's bottom edge sits on the
+   tab body's own bottom edge. The tab body itself holds still, with no
+   scroll of its own.
+2. Scroll that grid down, then narrow the window to 1280x900 and scroll it
+   sideways. At 1440 wide the grid has no horizontal overflow (scrollWidth
+   1414 equals clientWidth 1414). Pass: the step header row and the field
+   header column keep their place. The toolbar stays above the grid the
+   whole time.
+3. Resize the window to 1440x1200. Pass: the grid grows with the window and
+   shows more rows than it did at 900.
+4. Resize the window to 1440x600, then scroll the tab body itself (not the
+   grid) to its end. Pass: the grid holds 384px, its 24rem floor, and the
+   toolbar keeps its own height untouched. The header row plus two field
+   rows show inside the grid. A mouse wheel over the grid will not scroll
+   the tab body back up from here. Use the tab body's own scrollbar or the
+   keyboard instead.
+5. Go back to the process list and choose "Discard" on the `it_offboarding`
+   row, then accept the browser's confirm. The header bar's own "Discard
+   draft" does not work, so do not use it here. See the `docs/decisions.md`
+   entry DRAFT-1.
+6. Find the row `access_request` and choose "Create draft". Open its Field
+   matrix tab at 1440x1200. First confirm the grid's own height sits between
+   384px and the height under the toolbar. Pass: the grid's own frame ends
+   right under its last row. The grid draws no vertical scrollbar.
+7. Discard the `access_request` draft the same way step 5 discarded the
+   first one.

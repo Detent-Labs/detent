@@ -28,13 +28,25 @@ import {
 } from "./fieldMatrixLogic";
 
 const styles = stylex.create({
+  // The scroll region's automatic minimum is already zero, since it is a
+  // scroll container, which lets it shrink below its content height. Its
+  // `auto` flex basis is that content height, so a short grid still keeps
+  // its own height above this floor (`studio-app`: "The field matrix takes
+  // the height the tab body leaves").
   matrixScroll: {
     overflow: "auto",
     overscrollBehavior: "contain",
     borderWidth: 1,
     borderStyle: "solid",
     borderColor: colors.border,
-    maxHeight: "32rem",
+    minHeight: "24rem",
+    // The frame reaches the tab body's side and bottom edges, and the tab
+    // body clips anything past them, so the ring sits inside the frame the
+    // way a cell's own ring does.
+    ":focus-visible": {
+      outline: `2px solid ${colors.accent}`,
+      outlineOffset: "-2px",
+    },
   },
   matrixTable: {
     borderCollapse: "separate",
