@@ -1576,6 +1576,177 @@ recorded rather than fixed. The RAIL tags are local to this section.
   and `:913` still name the configuration pane and the ribbon bar.
   `.claude/rules/ui-glossary.md` retired both words with the process surface.
 
+## Open from the 2026-09-13 Fields tab audits (each needs its own OpenSpec change)
+
+The change `group-child-own-editor` ran a final code review, browser walks,
+`/impeccable critique` and `/impeccable audit` on the Studio Fields tab on
+2026-09-13. Every item below sits outside that change, and this section
+records it in place of a fix. The `FIELDS-n` tags are local to this section;
+paths under `panels/`, `draft/` and `screens/` start at
+`packages/web/src/areas/studio/`.
+
+- **FIELDS-1: Remove field commits on one press.** Its button
+  (`panels/FieldCatalogPanel.tsx:915`) asks nothing. The handler
+  `FieldsTab::removeField` (`panels/EntityTabs.tsx:385`) prunes the field
+  through `removeFieldIn` and leaves every step view entry naming it. A move
+  rewrites such entries, through `moveFieldAndSyncViews`
+  (`draft/view-group-sync.ts:49`). No undo exists, and nothing announces the
+  removal. Focus drops to `<body>`, since the pressed button unmounts with
+  `FieldEditor`, keyed by the field's id (`panels/FieldCatalogPanel.tsx:1148`).
+  Measured 2026-09-13 on the IT Offboarding draft, removing "Access Excel
+  updated or prepared" raised 8 blocking checks: four
+  `view ref does not resolve: field_…` and four
+  `a view entry's group must be empty; the catalog holds this field at the top level`.
+
+  Removing a group takes its subtree (`panels/fieldCatalogLogic.ts:118`):
+  "Processing (Fabrikam)" holds 18 fields that 10 steps show. Risk (High): the
+  most destructive action on the tab is the least guarded (WCAG 2.4.3, and
+  4.1.3 for the silence). The fix confirms in the studio's own `<dialog>`
+  (`panels/ProcessHeaderBar.tsx:407`), with counts, when the field sits on a
+  step or holds fields. The removal's own `mutate` also removes the field's
+  view entries. Focus lands on the newly selected rail entry, and the tab's
+  live region announces the removal (`panels/EntityTabs.tsx:497`). The
+  2026-09-11 entry "A canvas removal drops keyboard focus, and nothing
+  announces it" records the canvas form of this gap.
+- **FIELDS-2: visually hidden text escapes its container and scrolls the page.**
+  The `visuallyHidden` style (`panels/EntityTabs.tsx:151`) sets
+  `position: "absolute"` with no inset. The entity rail's own style (`:53`)
+  sets no `position`. Its hidden kind words, group names and move live region
+  (`:278`, `:280`, `:497`) therefore lay out against the page. Measured
+  2026-09-13: 39 such elements report `offsetParent` BODY. The document's
+  `scrollHeight` read 2272 at 1280x720 and 2314 at 900x720, and pinning them
+  to `top: 0` gave 720. One mouse wheel over the header bar scrolled the page
+  900px into blank ground.
+
+  The same recipe sits in `panels/ProcessTabRow.tsx:87`,
+  `screens/PlayerScreen.tsx:68`,
+  `packages/web/src/areas/app/screens/TaskScreen.tsx:95` and
+  `packages/form-ui/src/FieldForm.tsx:206`. The reporting area's `srOnly`
+  (`packages/web/src/areas/reporting/screens/ReportBuilderScreen.tsx:101`) is
+  a variant that clips with `clip`. At 900x900 on the Fields tab, the Checks
+  tab's hidden "blocking a publish" text (`panels/ProcessTabRow.tsx:219`)
+  reached x=905, and `document.documentElement.scrollWidth` read 905 against
+  `clientWidth` 900. The narrow-width walk asserts the two widths equal at 900
+  (`docs/browser-checks.md:2776`), so its Pass line fails today. Risk
+  (Medium): the page scrolls into blank ground, and at 900px it scrolls
+  sideways too. The fix sets `position: "relative"` on the container, or an
+  inset of 0 on the style.
+- **FIELDS-3: below 64rem a short window leaves the editor a strip.** The
+  rail stacks above the editor, capped at 20rem (`panels/EntityTabs.tsx:57`).
+  Measured 2026-09-13: the editor pane stands 105px tall at 900x720, and 18px
+  at 420x720 with its heading cut off. No 2px rule separates the two scroll
+  regions: the rail drops its right-hand border there (`:54`). Risk (Medium):
+  the rail keeps its 20rem and the editor gets what remains.
+- **FIELDS-4: the entity rail and the editor pane clip the focus ring.** This
+  is RAIL-3 on the Fields tab. The shell's 2px ring at a 2px offset
+  (`packages/web/src/shell/global.css:37`) loses its edge against both scroll
+  boxes (`panels/EntityTabs.tsx:46`, `:58`). On the chosen entry the ring and
+  the 3px current mark (`:86`) share one accent. Risk (Low): the ring still
+  meets WCAG 2.4.7.
+- **FIELDS-5: the Validation disclosure takes its count as its name.** Its
+  `<summary>` prints `({carried.length})` alone
+  (`panels/shared/FieldValidationEditor.tsx:77`). With no validation key
+  carried, its accessible name reads "(0)". Risk (Low): a screen reader hears
+  a bare count (WCAG 2.4.6).
+- **FIELDS-6: the entity rail is a flat list of tab stops.** IT Offboarding's
+  rail holds 51 entries plus "+ Add field". That makes 52 tab stops, with no
+  arrow keys and no filter. Its landmark is a `nav` named "Editors"
+  (`panelsScreen.railLabel`, `packages/web/src/i18n/catalogs/studio.ts:423`).
+  An entry's check badge reads "1 issues" for one check
+  (`panels/EntityTabs.tsx:283`), from the key `panelsScreen.issueMark`
+  (`packages/web/src/i18n/catalogs/studio.ts:426`). Risk (Low): a keyboard
+  user presses Tab up to 52 times to cross the rail.
+- **FIELDS-7: the Fields tab's headings and checks lack structure.** The
+  outline jumps from the header bar's `h1` to the field's `h3`. They sit at
+  `panels/ProcessHeaderBar.tsx:783` and `panels/FieldCatalogPanel.tsx:1142`,
+  with zone headings at `h4` (`:566`). A zone's check list (`:569`) sits above
+  its controls, and neither `aria-invalid` nor `aria-describedby` ties a check
+  to its control. The zone heading marks a check by colour alone (`:252`,
+  `:566`). Risk (Medium): the heading levels skip, a check names no control,
+  and colour alone marks a zone (WCAG 1.3.1 and 1.4.1).
+- **FIELDS-8: check messages speak the engine's layers.** Measured 2026-09-13,
+  the Fields tab showed `ZOD missing baseLocale ('en') entry` and
+  `field key must match /^[a-z_][a-z0-9_]*$/ to be a valid CEL identifier`.
+  After a press on Remove field the tab showed
+  `view ref does not resolve: field_0fb5a2c4-0022-…`, an id the author can no
+  longer look up. Adding an empty field raises the banner at
+  `screens/EditScreen.tsx:780` before the author types. The banner reads
+  `Draft is not yet structurally valid — CEL, registry, duration, and cross-process checks are held back until it is (see the Zod issues below)`,
+  and it pushes the page down 35px at 1400px and 99px at 900px. The messages
+  come from `src/schema/definition.ts:990`, `src/schema/compile.ts:629` and
+  `src/schema/definition.ts:1071`, and the "ZOD" label from
+  `panels/shared/IssueList.tsx:45`. Risk (Medium): an author reads Zod, CEL
+  grammar and raw ids where a plain sentence belongs.
+- **FIELDS-9: a group's editor leads with zones a group cannot use.** Its
+  definition half shows "Where values come from"
+  (`panels/FieldCatalogPanel.tsx:827`). It also shows a disabled "Default
+  value" (`:878`), "Validation" (`:882`) and a disabled Technical checkbox
+  (`:811`). Its effect half shows "A participant must fill this in" (`:1015`)
+  and up to 12 "Show on the canvas" buttons. Each button's accessible name
+  omits its step (`:948`). The group's one action, the zone "Fields inside
+  this group" (`:893`), comes after "Validation". Measured 2026-09-13 at
+  1400x900, its heading sits at y=1078, 200px below the pane's bottom.
+
+  The zone's body looks the same for 18 fields and for none, and its button
+  (`:894`) names no group. A screen reader also reads the "+" leading its
+  label. A nested field's editor names its group only in the move control's
+  value (`:526`). Risk (Medium): the group's one action sits out of view,
+  behind controls a group cannot use.
+
+  This item needs the owner's call before any change. The zone's place after
+  "Validation" is a `studio-app` requirement
+  (`openspec/specs/studio-app/spec.md:2572`). The Non-Goals of
+  `group-child-own-editor` keep "Where values come from" and "Validation" on a
+  group's editor
+  (`openspec/changes/archive/2026-09-13-group-child-own-editor/design.md:94`).
+  That design also records the owner's own anti-goal "no breadcrumb in the
+  heading" (`:69`).
+- **FIELDS-10: the field editor's type drifts from `DESIGN.md`.** Measured
+  2026-09-13, the field's `h3` computes weight 700, where `DESIGN.md:306`
+  allows 800 and 400. Its `panelHeading` style
+  (`panels/FieldCatalogPanel.tsx:72`) sets no weight. Field labels compute
+  14.4px, sentence case, in ink (`:94`), where the Label role is 11px
+  uppercase tracked slate (`DESIGN.md:321`). Zone headings compute 14.4px at
+  800 in ink (`panels/FieldCatalogPanel.tsx:246`), and none takes the Title
+  role (`DESIGN.md:315`). The Remove field button
+  (`panels/FieldCatalogPanel.tsx:915`) is an accent ghost
+  (`packages/web/src/shell/tokens.css:197`), and its text starts 5px right of
+  the column's flush-left edge. Risk (Low): the field editor sets type outside
+  the roles `DESIGN.md` names.
+- **FIELDS-11: a nested plugin-typed field's length check lands on another field.**
+  The engine's `collectPluginTypeSites` (`src/schema/compile.ts:737`) locates
+  it as `fields[i].type.type`. There `i` is the flat `collectFieldsDeep` index
+  (`:752`, over `src/schema/definition.ts:374`). The studio's `resolveLoc`
+  (`draft/issues.ts:87`) reads `fields[i]` as a top-level index and follows
+  `fields[i].fields[j]` chains (`:121`). The compile pass's other field-tree
+  checks write that chain through `walkFieldsIndexed`
+  (`src/schema/compile.ts:225`). Risk (Low): the check shows on an unrelated
+  field or on the process. The fix touches `src/`.
+- **FIELDS-12: the Checks tab opens the Fields tab without the field.** A
+  check row calls `goToTab(tabForIssue(issue.entityType))`
+  (`screens/EditScreen.tsx:945`). That function takes a tab alone (`:726`),
+  and `FieldsTab` accepts no selected field (`:907`). The spec
+  `studio-process-tabs` asks for that field to open selected
+  (`openspec/specs/studio-process-tabs/spec.md:209`). Risk (Medium): the
+  author lands on the Fields tab and must find the field in the entity rail.
+- **FIELDS-13: the glossary names a tab set that no longer exists.** Its
+  "field tabs" row sits at `.claude/rules/ui-glossary.md:86`. It defines the
+  Field / Values / Rules tab set for the one selected top-level field. A
+  paragraph at `:117` repeats that definition. The field editor has two halves
+  and no tab set (`panels/FieldCatalogPanel.tsx:600`,
+  `openspec/specs/studio-app/spec.md:2564`), and it edits a field at any
+  depth. Risk (Low): the glossary teaches a word for a UI that is gone.
+- **FIELDS-14: `FieldsTab` walks the field tree once per rail entry.** Each
+  call of `FieldsTab` walks the whole tree twice, in `flattenRailFields` and
+  `flattenDraftFields` (`panels/EntityTabs.tsx:304`, `:305`). Each rail entry
+  then walks it once more through `parentIdOf` (`:465`,
+  `panels/fieldCatalogLogic.ts:227`), top-level entries included. Each entry
+  also scans the whole check list for its badge count
+  (`panels/EntityTabs.tsx:455`, `draft/panel-rail.ts:104`). For N entries
+  that makes N + 2 tree walks and N scans of the check list. Risk
+  (Informational): the cost grows with the square of the catalog's size and
+  stays harmless at 51 entries.
+
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 
 Each entry below names a cut somebody proposed, the reason a reviewer refused
