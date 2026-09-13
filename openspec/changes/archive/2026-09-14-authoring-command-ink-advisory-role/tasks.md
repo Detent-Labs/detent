@@ -56,5 +56,5 @@
 - [x] 5.5 Run `/impeccable critique` on the Forms tab, the form editor and the Changes tab. Run it on a step page showing an incomplete condition too. Run it on the Fields tab with the `de` locale added, where a field's warning callout meets the current mark. Fix each finding, or record it in `docs/decisions.md`. Verify no finding stays unaddressed.
 - [x] 5.6 Run `/impeccable audit` on each screen that 5.5 names. Fix each finding, or record it in `docs/decisions.md`. Verify no finding stays unaddressed.
 - [x] 5.7 Wherever a fix in 5.3 to 5.6 touched a file, re-read every citation of that file anywhere in `docs/decisions.md`. Read each bare `:NNN` continuation after one too. Correct each line that no longer matches. Verify each re-read citation matches its line, or record that no fix touched a cited file.
-- [ ] 5.8 Run the prose gate over the pushed range: `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`. Verify it exits 0.
-- [ ] 5.9 Run the whitespace gate over the same range: `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh`. Verify it exits 0.
+- [x] 5.8 Run the prose gate over the pushed range: `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`. Verify it exits 0.
+- [x] 5.9 Run the whitespace gate over the same range: `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh`. Verify it exits 0.

@@ -39,9 +39,10 @@ declares `required: true`, the same sentence SHALL state how many do. That
 text SHALL share one row with the control that opens the form editor.
 
 A view holding no entry that draws a mark SHALL read as an empty form. A view
-holding only notes, only group entries, or both reads as empty too. That card
-SHALL take the advisory color the checks already use for an empty form. Its
-foot SHALL leave the count out.
+holding only notes, only group entries, or both reads as empty too. That
+card's border SHALL take the advisory role, the tone a warning callout's rule
+takes. The border SHALL clear WCAG 1.4.11's 3:1 non-text minimum against the
+card's ground, in both color schemes. Its foot SHALL leave the count out.
 
 #### Scenario: A card counts its field entries
 
@@ -75,8 +76,13 @@ foot SHALL leave the count out.
 
 - **WHEN** a step's view has no field entry
 - **THEN** its card names the form as empty
-- **AND** the card takes the advisory color
+- **AND** the card's border takes the advisory role
 - **AND** its foot leaves the count out
+
+#### Scenario: The empty card's border clears the non-text minimum
+
+- **WHEN** an author reads an empty form's card in either color scheme
+- **THEN** its border measures at least 3:1 against the card's ground
 
 #### Scenario: A form of notes alone reads as empty
 
