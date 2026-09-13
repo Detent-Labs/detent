@@ -268,6 +268,17 @@ interface ProcessSurfaceProps {
 }
 
 /**
+ * Focuses a tab's own button, then scrolls the tab row so the whole button
+ * shows. At a narrow width the row scrolls sideways, and `focus()` alone can
+ * leave the button part-clipped at the row's edge.
+ */
+function focusTabButton(tab: ProcessTab): void {
+  const button = document.getElementById(tabDomId(tab));
+  button?.focus();
+  button?.scrollIntoView({ block: "nearest", inline: "nearest" });
+}
+
+/**
  * The one process surface (`studio-process-tabs`). It replaces the edit-screen
  * and panels-screen pair: a header bar, then a tab row, then one tab body.
  *
@@ -740,7 +751,7 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, go, initial
   // until the switch lands.
   const openTabFromRow = (target: ProcessTab) => {
     if (target === openTab) {
-      document.getElementById(tabDomId(target))?.focus();
+      focusTabButton(target);
       return;
     }
     goToTab(target);
@@ -750,7 +761,7 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, go, initial
   // clears the pending value either way, so a stale value never pulls focus
   // on a later, unrelated tab switch.
   useEffect(() => {
-    if (pendingTabFocus === openTab) document.getElementById(tabDomId(openTab))?.focus();
+    if (pendingTabFocus === openTab) focusTabButton(openTab);
     setPendingTabFocus(undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openTab]);
