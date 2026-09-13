@@ -338,8 +338,8 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
   // carries focus along. It does not where the move changes which controls the
   // row renders, so the tab names the control it wants and takes it back
   // itself rather than resting on the reconciler. The same run scrolls the
-  // field's rail entry into the rail's view, `nearest`, so neither an add nor
-  // a move leaves its entry out of sight (design.md, "Focus and the rail entry
+  // field's rail entry into the rail's view, `nearest`, after an add and after
+  // a move through the move control (design.md, "Focus and the rail entry
   // after an add into a group").
   useEffect(() => {
     if (refocusId === undefined) return;
