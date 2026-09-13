@@ -16,7 +16,10 @@ import { canonicalize } from "workflow-engine/schema/canonical-json";
 import { t, type CatalogKey } from "../catalog.js";
 import { diffJson, type DiffEntry } from "../screens/versionDiffLogic.js";
 import { fieldKindWord } from "./field-type-labels.js";
+import { assignmentWord, stepKindPhrase } from "./guided-labels.js";
 import { resolveDraftLocalizedText, type DraftLocalizedText } from "./localized-text.js";
+import { performedByFor } from "./performedBy.js";
+import { timeLimitParts, type TimeLimitUnit } from "./time-limit.js";
 
 export type ChangeGroup = "process" | "fields" | "dataSources" | "steps" | "paths" | "forms" | "contract";
 export type ChangeKind = "added" | "removed" | "changed";
@@ -65,6 +68,18 @@ export const PROPERTY_WORDS: { readonly [key: string]: CatalogKey | undefined } 
   initialStep: "changeList.prop.initialStep",
   allowedGroups: "changeList.prop.allowedGroups",
   config: "changeList.prop.config",
+  type: "changeList.prop.type",
+  terminal: "changeList.prop.terminal",
+  assignment: "changeList.prop.assignment",
+  subprocess: "changeList.prop.subprocess",
+  versionBinding: "changeList.prop.versionBinding",
+  pinnedVersion: "changeList.prop.pinnedVersion",
+  contractRef: "changeList.prop.contractRef",
+  inputMapping: "changeList.prop.inputMapping",
+  outputMapping: "changeList.prop.outputMapping",
+  to: "changeList.prop.to",
+  guard: "changeList.prop.guard",
+  technical: "changeList.prop.technical",
   required: "changeList.prop.required",
   inputFields: "changeList.prop.inputFields",
   outputFields: "changeList.prop.outputFields",
@@ -153,6 +168,7 @@ interface Side {
   paths: PathMember[];
   fieldById: Map<string, Obj>;
   stepById: Map<string, Obj>;
+  dataSourceById: Map<string, Obj>;
 }
 
 /** Hands out the anchors of one collection on one side (D2). */
@@ -181,12 +197,12 @@ function anchoredMembers(list: unknown, listPath: string, key: string): Member[]
   return members;
 }
 
-function readSide(body: Obj): Side {
+function readSide(body: Obj, locale: string | undefined): Side {
   const baseLocale = str(body.baseLocale) ?? "en";
   const side: Side = {
     body,
     baseLocale,
-    locale: baseLocale,
+    locale: locale ?? baseLocale,
     fields: [],
     fieldChildren: new Map(),
     dataSources: [],
@@ -194,6 +210,7 @@ function readSide(body: Obj): Side {
     paths: [],
     fieldById: new Map(),
     stepById: new Map(),
+    dataSourceById: new Map(),
   };
 
   // Fields pair across the whole catalog, in depth-first order.
@@ -214,6 +231,9 @@ function readSide(body: Obj): Side {
   visit(body.fields, "fields", undefined);
 
   side.dataSources = anchoredMembers(body.dataSources, "dataSources", "id");
+  for (const { value } of side.dataSources) {
+    if (typeof value.id === "string" && !side.dataSourceById.has(value.id)) side.dataSourceById.set(value.id, value);
+  }
 
   // Paths pair across every step, in step order.
   const workflow = isObj(body.workflow) ? body.workflow : undefined;
@@ -267,15 +287,48 @@ function fieldLabel(ref: unknown, side: Side): string {
   return field ? labelOf(field, side) : ref;
 }
 
+/** Keys holding a `LocalizedText`, and the prose a string there carries. */
 const TEXT_KEYS = new Set(["label", "description", "text"]);
+/** Keys that stay one property, printed as JSON, whatever they hold (D5). */
+const JSON_KEYS = new Set(["config", "attributes", "columnMapping", "default"]);
+/** Declared nested objects: each leaf reads as `{property} · {leaf}`. */
+const NESTED_KEYS = new Set(["validation", "subprocess"]);
+/** Records keyed by field id: each entry reads under that field's label. */
+const FIELD_RECORD_KEYS = new Set(["inputMapping", "outputMapping"]);
+/** Keys holding another entity's id, and the kind of entity it names. */
+const REFERENCES = new Map<string, "step" | "field" | "dataSource">([
+  ["initialStep", "step"],
+  ["to", "step"],
+  ["dataSource", "dataSource"],
+  ["fieldId", "field"],
+]);
 
+const isExpression = (v: unknown): v is { lang: "cel"; src: string } => isObj(v) && v.lang === "cel" && typeof v.src === "string";
+
+/** An id reads as the label of the entity it names, on its own side. A data
+ * source has no label, so its key names it. An id naming nothing prints raw. */
+function reference(kind: "step" | "field" | "dataSource", id: string, side: Side): ChangeValue {
+  const entity = (kind === "step" ? side.stepById : kind === "field" ? side.fieldById : side.dataSourceById).get(id);
+  if (entity === undefined) return { text: id, mono: true };
+  return kind === "dataSource" ? { text: str(entity.key) || id, mono: true } : plain(labelOf(entity, side));
+}
+
+/** One value, by the D5 rule for its shape. A string outside the prose keys
+ * is a machine value, so it prints in mono. */
 function valueOf(key: string, v: unknown, side: Side): ChangeValue {
   if (v === undefined) return none();
+  if (JSON_KEYS.has(key)) return json(v);
+  if (typeof v === "boolean") return plain(t(v ? "changeList.value.yes" : "changeList.value.no"));
+  const kind = REFERENCES.get(key);
+  if (kind !== undefined && typeof v === "string") return reference(kind, v, side);
+  if (key === "versionBinding" && v === "pinned") return plain(t("subprocess.bindingPinned"));
+  if (key === "versionBinding" && v === "latest-at-spawn") return plain(t("subprocess.bindingLatest"));
+  if (isExpression(v)) return { text: v.src, mono: true };
   if (TEXT_KEYS.has(key) && isObj(v)) {
     const text = localized(v, side);
     return text === undefined ? none() : plain(text);
   }
-  if (typeof v === "string") return plain(v);
+  if (typeof v === "string") return { text: v, mono: !TEXT_KEYS.has(key) };
   return json(v);
 }
 
@@ -287,8 +340,89 @@ interface Ctx {
   aPath: string | undefined;
 }
 
+const objectOrAbsent = (v: unknown): v is Obj | undefined => v === undefined || isObj(v);
+
+/** The properties one differing key reads as. A key with no word reads as
+ * JSON under its own name. */
 function valueProperties(key: string, name: Name, bv: unknown, av: unknown, ctx: Ctx): ChangeProperty[] {
-  return [{ ...name, kind: kindOf(bv, av), before: valueOf(key, bv, ctx.b), after: valueOf(key, av, ctx.a) }];
+  const kind = kindOf(bv, av);
+  if (name.nameMono) return [{ ...name, kind, before: json(bv), after: json(av) }];
+  if (objectOrAbsent(bv) && objectOrAbsent(av)) {
+    if (TEXT_KEYS.has(key)) return localizedProperties(name, bv, av, ctx);
+    if (NESTED_KEYS.has(key)) return keyProperties(bv, av, [], ctx, (leaf) => (FIELD_RECORD_KEYS.has(leaf) ? propName(leaf) : leafName(name, leaf)));
+    if (FIELD_RECORD_KEYS.has(key)) return fieldRecordProperties(name, bv, av, ctx);
+  }
+  return [{ ...name, kind, before: valueOf(key, bv, ctx.b), after: valueOf(key, av, ctx.a) }];
+}
+
+/**
+ * A `LocalizedText` reads in each side's reading locale. A difference in any
+ * other locale adds a property named with that locale. The one locale left
+ * out is the locale the plain property reads on both sides; when a side falls
+ * back to its base locale, that is the base locale.
+ */
+function localizedProperties(name: Name, b: Obj | undefined, a: Obj | undefined, ctx: Ctx): ChangeProperty[] {
+  const properties: ChangeProperty[] = [];
+  const bText = b && localized(b, ctx.b);
+  const aText = a && localized(a, ctx.a);
+  if (bText !== aText) {
+    properties.push({ ...name, kind: kindOf(b, a), before: bText === undefined ? none() : plain(bText), after: aText === undefined ? none() : plain(aText) });
+  }
+  const reads = (value: Obj, side: Side) => (typeof value[side.locale] === "string" ? side.locale : side.baseLocale);
+  const bReads = b && reads(b, ctx.b);
+  const aReads = a && reads(a, ctx.a);
+  const covered = bReads === undefined ? aReads : aReads === undefined || aReads === bReads ? bReads : undefined;
+  const entry = (v: unknown) => (typeof v === "string" ? plain(v) : json(v));
+  for (const locale of new Set([...Object.keys(a ?? {}), ...Object.keys(b ?? {})])) {
+    if (locale === covered || same(b?.[locale], a?.[locale])) continue;
+    properties.push({
+      name: fill("changeList.name.locale", { property: name.name, locale }),
+      ...(name.nameMono && { nameMono: true }),
+      kind: kindOf(b?.[locale], a?.[locale]),
+      before: entry(b?.[locale]),
+      after: entry(a?.[locale]),
+    });
+  }
+  return properties;
+}
+
+/** A record keyed by field id names each entry by that field's label. */
+function fieldRecordProperties(name: Name, b: Obj | undefined, a: Obj | undefined, ctx: Ctx): ChangeProperty[] {
+  const properties: ChangeProperty[] = [];
+  for (const id of new Set([...Object.keys(a ?? {}), ...Object.keys(b ?? {})])) {
+    if (same(b?.[id], a?.[id])) continue;
+    const leaf = fieldLabel(id, a?.[id] !== undefined ? ctx.a : ctx.b);
+    properties.push({
+      name: fill("changeList.name.leaf", { property: name.name, leaf }),
+      kind: kindOf(b?.[id], a?.[id]),
+      before: valueOf("", b?.[id], ctx.b),
+      after: valueOf("", a?.[id], ctx.a),
+    });
+  }
+  return properties;
+}
+
+/**
+ * The differing entries under an envelope, each under its JSON key with a D5
+ * value. A guided word that matches on both sides reads these instead: the
+ * word reads only part of the value. `strategy` and `config` open onto their
+ * own entries.
+ */
+function envelopeEntries(b: unknown, a: unknown, ctx: Ctx): ChangeProperty[] {
+  const bo = isObj(b) ? b : undefined;
+  const ao = isObj(a) ? a : undefined;
+  const properties: ChangeProperty[] = [];
+  for (const key of new Set([...Object.keys(ao ?? {}), ...Object.keys(bo ?? {})])) {
+    const bv = bo?.[key];
+    const av = ao?.[key];
+    if (same(bv, av)) continue;
+    if ((key === "strategy" || key === "config") && objectOrAbsent(bv) && objectOrAbsent(av)) {
+      properties.push(...envelopeEntries(bv, av, ctx));
+      continue;
+    }
+    properties.push({ name: key, nameMono: true, kind: kindOf(bv, av), before: valueOf(key, bv, ctx.b), after: valueOf(key, av, ctx.a) });
+  }
+  return properties;
 }
 
 /** One property run per differing key of a pair, skipping the keys the row
@@ -383,6 +517,10 @@ function fieldKindProperties(b: Obj | undefined, a: Obj | undefined, ctx: Ctx): 
   const aWord = a && fieldKindValue(a);
   const name = { name: t("changeList.name.kind") };
   if (!b || !a || !same(bWord, aWord)) return [{ ...name, kind: kindOf(b, a), before: bWord ?? none(), after: aWord ?? none() }];
+  // `fieldKindWord` answers one word for every plugin type.
+  if (isObj(bKind.type) && isObj(aKind.type)) {
+    return [...envelopeEntries(bKind.type, aKind.type, ctx), ...keyProperties(bKind, aKind, ["type"], ctx)];
+  }
   return keyProperties(bKind, aKind, [], ctx);
 }
 
@@ -517,6 +655,24 @@ function actionProperties(
   orderProperty(`changeList.order.${list}`, anchorsOf(before), anchorsOf(after), aListPath, out);
 }
 
+const differingKeys = (b: Obj, a: Obj): string[] =>
+  [...new Set([...Object.keys(a), ...Object.keys(b)])].filter((key) => !same(b[key], a[key]));
+
+const TIME_LIMIT_UNITS: Record<TimeLimitUnit, CatalogKey> = {
+  hours: "timeLimit.unitHours",
+  days: "timeLimit.unitDays",
+  weeks: "timeLimit.unitWeeks",
+};
+
+/** A duration a number and a unit can state reads as both; any other prints
+ * in mono, exactly as it stands. */
+function timeLimitValue(duration: unknown): ChangeValue {
+  if (typeof duration !== "string") return json(duration);
+  const parts = timeLimitParts(duration);
+  if (parts === undefined) return { text: duration, mono: true };
+  return plain(fill("changeList.value.timeLimit", { count: String(parts.count), unit: t(TIME_LIMIT_UNITS[parts.unit]) }));
+}
+
 const withoutFireActions = (timer: Obj): Obj =>
   isObj(timer.onFire) ? { ...timer, onFire: omit(timer.onFire, TIMER_ACTION_LISTS) } : timer;
 
@@ -528,11 +684,14 @@ function timerProperties(b: Member | undefined, a: Member | undefined, ctx: Ctx,
     const bCopy = bt && withoutFireActions(bt.value);
     const aCopy = at && withoutFireActions(at.value);
     if (!same(bCopy, aCopy)) {
+      // A timer whose duration alone differs reads the time limit.
+      const durationAlone = bCopy !== undefined && aCopy !== undefined && differingKeys(bCopy, aCopy).join() === "duration";
+      const read = (copy: Obj | undefined) => (copy === undefined ? none() : durationAlone ? timeLimitValue(copy.duration) : json(copy));
       out.properties.push({
         name: fill("changeList.name.timer", { n: String((at ?? bt)!.index + 1) }),
         kind: kindOf(bt, at),
-        before: bCopy ? json(bCopy) : none(),
-        after: aCopy ? json(aCopy) : none(),
+        before: read(bCopy),
+        after: read(aCopy),
       });
       out.raw.push(...rawOf(bCopy, aCopy, tctx));
     }
@@ -551,13 +710,52 @@ function timerProperties(b: Member | undefined, a: Member | undefined, ctx: Ctx,
 }
 
 const STEP_ACTION_LISTS = ["onEntry", "onExit", "onCancel"] as const;
+const STEP_KIND_KEYS = ["type", "terminal"] as const;
+
+/** `type` and `terminal` fold into one Kind, in the guided vocabulary's phrase. */
+function stepKindProperties(b: Obj | undefined, a: Obj | undefined, ctx: Ctx): ChangeProperty[] {
+  const bKind = pick(b, STEP_KIND_KEYS);
+  const aKind = pick(a, STEP_KIND_KEYS);
+  if (same(bKind, aKind)) return [];
+  const phrase = (step: Obj) =>
+    plain(stepKindPhrase(performedByFor(step.type === "subprocess" ? "subprocess" : undefined, step.terminal === true)));
+  const bWord = b && phrase(b);
+  const aWord = a && phrase(a);
+  if (!b || !a || !same(bWord, aWord)) {
+    return [{ name: t("changeList.name.kind"), kind: kindOf(b, a), before: bWord ?? none(), after: aWord ?? none() }];
+  }
+  return keyProperties(bKind, aKind, [], ctx);
+}
+
+/** An assignment reads as its strategy's plain name. When that name matches
+ * on both sides, the differing entries under the strategy read instead. */
+function assignmentProperties(b: Obj | undefined, a: Obj | undefined, ctx: Ctx): ChangeProperty[] {
+  const bv = b?.assignment;
+  const av = a?.assignment;
+  if (same(bv, av)) return [];
+  const word = (step: Obj | undefined, v: unknown): ChangeValue | undefined => {
+    if (step === undefined) return undefined;
+    const { text, mono } = assignmentWord(isObj(v) && isObj(v.strategy) ? v.strategy : undefined);
+    return { text, mono };
+  };
+  const bWord = word(b, bv);
+  const aWord = word(a, av);
+  const name = propName("assignment");
+  if (!bWord || !aWord || !same(bWord, aWord)) {
+    return [{ ...name, kind: kindOf(bv, av), before: bWord ?? none(), after: aWord ?? none() }];
+  }
+  const entries = envelopeEntries(bv, av, ctx);
+  return entries.length > 0 ? entries : [{ ...name, kind: kindOf(bv, av), before: json(bv), after: json(av) }];
+}
 
 function stepRows(sb: Side, sa: Side): ChangeRow[] {
   const rows: ChangeRow[] = [];
   for (const { anchor, b, a } of pair(sb.steps, sa.steps)) {
     const ctx: Ctx = { b: sb, a: sa, bPath: b?.path, aPath: a?.path };
     const out = newOut();
-    out.properties.push(...keyProperties(b?.value, a?.value, ["id", ...STEP_LISTS], ctx));
+    out.properties.push(...stepKindProperties(b?.value, a?.value, ctx));
+    out.properties.push(...assignmentProperties(b?.value, a?.value, ctx));
+    out.properties.push(...keyProperties(b?.value, a?.value, ["id", ...STEP_LISTS, ...STEP_KIND_KEYS, "assignment"], ctx));
     out.raw.push(...rawOf(omit(b?.value, STEP_LISTS), omit(a?.value, STEP_LISTS), ctx));
     for (const list of STEP_ACTION_LISTS) {
       actionProperties(list, b?.value[list], a?.value[list], b && `${b.path}.${list}`, a && `${a.path}.${list}`, ctx, out);
@@ -781,10 +979,10 @@ function processRows(sb: Side, sa: Side): ChangeRow[] {
  * the content locale a `LocalizedText` reads in; without it each side reads
  * its own base locale.
  */
-export function describeChanges(before: unknown, after: unknown, _locale?: string): ChangeRow[] {
+export function describeChanges(before: unknown, after: unknown, locale?: string): ChangeRow[] {
   if (!isObj(before) || !isObj(after)) return [];
-  const sb = readSide(before);
-  const sa = readSide(after);
+  const sb = readSide(before, locale);
+  const sa = readSide(after, locale);
   return [
     ...processRows(sb, sa),
     ...fieldRows(sb, sa),
