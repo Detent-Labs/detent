@@ -12,7 +12,7 @@
 - [x] 2.5 Add the D5 value rules, the guided words from D3 and the `locale` argument. Verify: the locale, guided-word and JSON-key cases pass.
 - [x] 2.6 Complete the D5 word table until the coverage walk from 2.1 passes. Verify: it names every declared key it checks.
 - [x] 2.7 Make the walker total over malformed bodies, and add D2's two fallback rules. Verify: those cases pass and throw nothing.
-- [ ] 2.8 Add `tabForChangeGroup` to `draft/process-tabs.ts`, per D10. Verify: a case in `studio-processTabs.test.ts` maps every group.
+- [x] 2.8 Add `tabForChangeGroup` to `draft/process-tabs.ts`, per D10. Verify: a case in `studio-processTabs.test.ts` maps every group.
 
 ## 3. The change list component
 

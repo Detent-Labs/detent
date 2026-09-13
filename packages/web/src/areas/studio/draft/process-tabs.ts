@@ -1,3 +1,4 @@
+import type { ChangeGroup } from "./changeSet";
 import type { DraftField } from "./fields";
 import type { DraftViewEntry } from "./view-layout";
 import type { EditorIssue, EntityType } from "./issues";
@@ -75,6 +76,32 @@ export function tabForIssue(entityType: EntityType): ProcessTab {
       return "contract";
     case "process":
       return "checks";
+  }
+}
+
+/**
+ * The tab an open command on a change-list row opens (`studio-app`: "An open
+ * row SHALL offer a command opening the tab that owns its entity").
+ *
+ * `undefined` for Process: no single tab holds the process's own keys, so
+ * that row offers no open command.
+ */
+export function tabForChangeGroup(group: ChangeGroup): ProcessTab | undefined {
+  switch (group) {
+    case "process":
+      return undefined;
+    case "fields":
+      return "fields";
+    case "dataSources":
+      return "dataSources";
+    case "steps":
+      return "steps";
+    case "paths":
+      return "paths";
+    case "forms":
+      return "forms";
+    case "contract":
+      return "contract";
   }
 }
 
