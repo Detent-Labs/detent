@@ -10,7 +10,7 @@
 
 ## 2. Shared confirmation dialog
 
-- [ ] 2.1 Run `/impeccable hooks on` in the apply worktree first. Move `useConfirmDialog` into `panels/shared/confirmDialog.tsx`. Import it back in `panels/ProcessHeaderBar.tsx`, with no markup change. Rewrite its doc comment, which names only the header bar's controls and `pendingDialog`. Verify: `studio-processHeaderBar-publishGate.test.tsx` passes unchanged.
+- [x] 2.1 Run `/impeccable hooks on` in the apply worktree first. Move `useConfirmDialog` into `panels/shared/confirmDialog.tsx`. Import it back in `panels/ProcessHeaderBar.tsx`, with no markup change. Rewrite its doc comment, which names only the header bar's controls and `pendingDialog`. Verify: `studio-processHeaderBar-publishGate.test.tsx` passes unchanged.
 - [ ] 2.2 Create `panels/RemoveFieldDialog.tsx` from the shape brief, with its own copy of the header bar's dialog styles. Add its catalog keys under `fieldCatalog`. Add `packages/web/test/studio-removeFieldDialog.test.tsx`. Check the heading per kind, rows only for hits and the key in mono. Check the notes, `aria-labelledby`, Cancel's `autoFocus` and the confirming control's classes. Verify: the new cases pass.
 
 ## 3. Fields tab wiring
