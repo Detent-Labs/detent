@@ -54,12 +54,12 @@ known value first as a positive control. Read `getBoundingClientRect`,
 
 ## 4. Verification
 
-- [ ] 4.1 Run `bun run typecheck`, then `bun run build`, in the devcontainer.
+- [x] 4.1 Run `bun run typecheck`, then `bun run build`, in the devcontainer.
   Verify: both exit 0.
-- [ ] 4.2 Run the full `bun test` with `DATABASE_URL` set, in the devcontainer.
+- [x] 4.2 Run the full `bun test` with `DATABASE_URL` set, in the devcontainer.
   Pipe its output through `scripts/gates/silent-green.sh`. Verify: no named
   failure, and the gate passes.
-- [ ] 4.3 Run both gates on the host, never in the devcontainer, which carries
+- [x] 4.3 Run both gates on the host, never in the devcontainer, which carries
   no antislop. Pipe `sh scripts/gates/range.sh < /dev/null` into
   `sh scripts/gates/prose.sh`, then into `sh scripts/gates/whitespace.sh`.
   Verify: neither prints a SKIPPED line, and both exit 0.
