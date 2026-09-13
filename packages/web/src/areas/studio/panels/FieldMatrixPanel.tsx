@@ -17,13 +17,16 @@ const styles = stylex.create({
     color: colors.accent,
     boxShadow: `inset 0 -2px 0 ${colors.accent}`,
   },
-  // A flex item that is not a scroll container takes its content height as
-  // its automatic minimum, so the column needs the explicit zero to shrink
-  // into the tab body and hand the grid the height under the toolbar.
+  // The growth fills the tab body instead of measuring the toolbar and the
+  // grid's own content, so the space under the toolbar reaches the tab
+  // body's edge. A flex item that is not a scroll container takes its
+  // content height as its automatic minimum, so the column also needs the
+  // explicit zero to shrink into the tab body at all.
   matrix: {
     display: "flex",
     flexDirection: "column",
     gap: space.s3,
+    flexGrow: 1,
     minHeight: 0,
   },
   matrixToolbar: {
