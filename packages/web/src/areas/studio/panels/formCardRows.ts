@@ -30,7 +30,9 @@ type DraftStep = DraftOf<Step>;
  * ignores it.
  */
 export interface MiniatureEntry {
-  /** The entry's index in `view.fields`, the miniature's React key. */
+  /** The React key either way: in a miniature, the entry's index in
+   * `view.fields`; in a legend sample, the mark's place within its sample
+   * group. */
   index: number;
   /** True where this entry is a group entry: it draws a group break, not a
    * mark. */

@@ -3,7 +3,7 @@ import * as stylex from "@stylexjs/stylex";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { t } from "../catalog.js";
 import { useDraft } from "../draft/store.js";
-import { formCardRows, type FormCardRow, type MiniatureEntry } from "./formCardRows.js";
+import { FORMS_LEGEND, formCardRows, type FormCardRow, type MiniatureEntry } from "./formCardRows.js";
 
 /** Forced-colors mode maps an ordinary `background-color` to `Canvas`, so the
  * required mark's fill and the group break's line both need a system-color
@@ -12,6 +12,43 @@ import { formCardRows, type FormCardRow, type MiniatureEntry } from "./formCardR
 const FORCED_COLORS = "@media (forced-colors: active)";
 
 const styles = stylex.create({
+  // The legend above the grid (`studio-forms-overview`: "The Forms tab
+  // explains the miniature's marks"). It is the grid's sibling in the tab
+  // body, so it keeps its place while the grid scrolls under it. Where one
+  // line cannot hold it, it wraps onto a further line and clips nothing. Its
+  // inline padding puts its left edge on the cards' 12px inset. The words
+  // take the empty form sentence's type: 11px, slate, the body face.
+  legend: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "flex-end",
+    columnGap: space.s4,
+    rowGap: space.s1,
+    listStyle: "none",
+    margin: 0,
+    paddingBlock: 0,
+    paddingInline: space.s3,
+    fontFamily: fonts.body,
+    fontSize: 11,
+    color: colors.textMuted,
+  },
+  // One legend item: its sample group, then its words 4px later on the
+  // group's bottom edge. The item stands at the group's own 24px, where a
+  // default list item would set the group on a text baseline.
+  legendItem: {
+    display: "flex",
+    alignItems: "flex-end",
+    columnGap: space.s1,
+  },
+  // One sample group: the miniature's own marks, 4px apart on the bottom
+  // edge of a 24px box. A mark is an empty span, and an inline span ignores a
+  // width and a height, so the group lays its marks out as flex items.
+  legendSample: {
+    display: "flex",
+    alignItems: "flex-end",
+    columnGap: space.s1,
+    height: 24,
+  },
   // The grid reflows on a 280px minimum track (design.md: "The form card is a
   // bordered plate"). No fixed column count: the tab holds ten plates in a
   // wide window and one in a narrow one, from the same declaration.
@@ -27,6 +64,9 @@ const styles = stylex.create({
     // its open controls on different lines, and alignment is what organizes
     // this page (`design-language.md`). The foot row takes the slack.
     alignItems: "stretch",
+    // The grid scrolls, not the tab body, so the legend above it stays in
+    // view. A scroll container's automatic minimum height is zero, so the
+    // grid shrinks to the height the legend leaves.
     overflowY: "auto",
     overscrollBehavior: "contain",
   },
@@ -77,8 +117,19 @@ const styles = stylex.create({
     letterSpacing: "0.08em",
     color: colors.textMuted,
   },
+  // The step label, a level-2 heading that prints as body text at weight 800.
+  // `shell/global.css` gives every `h2` the heading face, a size, uppercase,
+  // tracking, a muted color and margins; each declaration below but the
+  // weight and the wrap resets one of them. The compiled class outranks that
+  // element selector.
   name: {
+    margin: 0,
+    fontFamily: fonts.body,
+    fontSize: "inherit",
     fontWeight: 800,
+    textTransform: "none",
+    letterSpacing: "normal",
+    color: colors.text,
     overflowWrap: "anywhere",
   },
   count: {
@@ -250,9 +301,37 @@ export function FormsTab({ onOpenForm, onOpenChecks }: Props) {
   if (rows.length === 0) return <p {...stylex.props(styles.empty)}>{t("formsTab.empty")}</p>;
 
   return (
-    <ul {...stylex.props(styles.grid)} aria-label={t("formsTab.gridLabel")}>
-      {rows.map((row) => (
-        <FormCard key={row.stepId} row={row} onOpenForm={onOpenForm} onOpenChecks={onOpenChecks} />
+    <>
+      <Legend />
+      <ul {...stylex.props(styles.grid)} aria-label={t("formsTab.gridLabel")}>
+        {rows.map((row) => (
+          <FormCard key={row.stepId} row={row} onOpenForm={onOpenForm} onOpenChecks={onOpenChecks} />
+        ))}
+      </ul>
+    </>
+  );
+}
+
+/**
+ * The legend line above the grid, one item per entry of `FORMS_LEGEND`
+ * (`studio-forms-overview`: "The Forms tab explains the miniature's marks").
+ * Each sample group draws through `MiniatureMark` and carries
+ * `aria-hidden="true"`, so a screen reader reads a named list of the words
+ * alone. WebKit drops a list's role under `listStyle: "none"`; the explicit
+ * `role="list"` keeps it. The legend holds no control and takes no focus.
+ */
+function Legend() {
+  return (
+    <ul {...stylex.props(styles.legend)} role="list" aria-label={t("formsTab.legendLabel")}>
+      {FORMS_LEGEND.map((item) => (
+        <li key={item.key} {...stylex.props(styles.legendItem)}>
+          <span {...stylex.props(styles.legendSample)} aria-hidden="true">
+            {item.samples.map((sample) => (
+              <MiniatureMark key={sample.index} entry={sample} />
+            ))}
+          </span>
+          {t(item.key)}
+        </li>
       ))}
     </ul>
   );
@@ -279,22 +358,29 @@ function footCountText(row: FormCardRow): string | undefined {
 function FormCard({ row, onOpenForm, onOpenChecks }: { row: FormCardRow } & Props) {
   const empty = row.fieldCount === 0;
   const countText = footCountText(row);
+  // The check badge's accessible name (`studio-forms-overview`: "A card
+  // reports its step's form issues"): one whole sentence that leads with the
+  // visible count and names the step as the heading prints it. `{step}` fills
+  // through a function, so a label holding `$&` prints as the author typed it.
+  const badgeName = t(row.issues.count === 1 ? "formsTab.issueMarkOne" : "formsTab.issueMark")
+    .replace("{count}", String(row.issues.count))
+    .replace("{step}", () => row.label);
   const nameId = useId();
   const controlId = useId();
   return (
     <li {...stylex.props(styles.card, empty && styles.cardEmpty)}>
       <div {...stylex.props(styles.head)}>
-        <span {...stylex.props(styles.identity)}>
+        <div {...stylex.props(styles.identity)}>
           <span {...stylex.props(styles.kicker)}>{t(`stepRole.${row.role}`)}</span>
-          <span id={nameId} {...stylex.props(styles.name)}>
+          <h2 id={nameId} {...stylex.props(styles.name)}>
             {row.label}
-          </span>
-        </span>
+          </h2>
+        </div>
         {row.issues.count > 0 && (
           <button
             type="button"
             {...stylex.props(styles.badge, row.issues.blocker ? styles.badgeBlocker : styles.badgeAdvisory)}
-            aria-label={`${row.issues.count} ${t(row.issues.count === 1 ? "formsTab.issueMarkOne" : "formsTab.issueMark")}`}
+            aria-label={badgeName}
             onClick={() => onOpenChecks(row.stepId)}
           >
             {row.issues.count}

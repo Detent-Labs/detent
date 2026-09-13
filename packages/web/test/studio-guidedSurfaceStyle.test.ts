@@ -229,6 +229,65 @@ describe("the miniature wraps and clips nothing", () => {
   });
 });
 
+describe("the legend wraps and clips nothing", () => {
+  it("wraps onto a further line, 16px between items and 4px between lines", () => {
+    const block = styleBlock(stripComments(read("src/areas/studio/panels/FormsTab.tsx")), "legend");
+
+    // design.md, "The legend's box and the height budget": one line where
+    // the tab body is wide enough, a further line below about 720px.
+    expect(block).toMatch(/display: "flex"/);
+    expect(block).toMatch(/flexWrap: "wrap"/);
+    expect(block).not.toMatch(/overflow[XY]?: "hidden"/);
+    expect(block).toMatch(/columnGap: space\.s4\b/);
+    expect(block).toMatch(/rowGap: space\.s1\b/);
+  });
+
+  it("sets each item's words 4px after its sample group, on the group's bottom edge", () => {
+    const block = styleBlock(stripComments(read("src/areas/studio/panels/FormsTab.tsx")), "legendItem");
+
+    expect(block).toMatch(/display: "flex"/);
+    expect(block).toMatch(/alignItems: "flex-end"/);
+    expect(block).toMatch(/columnGap: space\.s1\b/);
+  });
+
+  it("stands each sample group 24px tall, its marks 4px apart on the bottom edge", () => {
+    const block = styleBlock(stripComments(read("src/areas/studio/panels/FormsTab.tsx")), "legendSample");
+
+    // A mark is an empty span, and an inline span ignores a width and a
+    // height, so the group is a flex container.
+    expect(block).toMatch(/display: "flex"/);
+    expect(block).toMatch(/alignItems: "flex-end"/);
+    expect(block).toMatch(/columnGap: space\.s1\b/);
+    expect(block).toMatch(/\bheight: 24\b/);
+  });
+});
+
+describe("the grid scrolls under the legend", () => {
+  it("keeps its own vertical scroll, so the legend above it stays put", () => {
+    const block = styleBlock(stripComments(read("src/areas/studio/panels/FormsTab.tsx")), "grid");
+
+    expect(block).toMatch(/overflowY: "auto"/);
+  });
+});
+
+describe("the card's heading keeps the label's look", () => {
+  it("resets every h2 declaration global.css makes, at weight 800", () => {
+    const block = styleBlock(stripComments(read("src/areas/studio/panels/FormsTab.tsx")), "name");
+
+    // design.md, "The step label becomes a level-2 heading": `global.css`
+    // gives every `h2` the heading face, a size, uppercase, tracking, a muted
+    // color and margins. A compiled class outranks the element selector, so
+    // the label prints as the body text it was.
+    expect(block).toMatch(/fontWeight: 800\b/);
+    expect(block).toMatch(/\bmargin: 0\b/);
+    expect(block).toMatch(/fontFamily: fonts\.body\b/);
+    expect(block).toMatch(/fontSize: "inherit"/);
+    expect(block).toMatch(/textTransform: "none"/);
+    expect(block).toMatch(/letterSpacing: "normal"/);
+    expect(block).toMatch(/\bcolor: colors\.text\b/);
+  });
+});
+
 describe("the required mark on the muted ground", () => {
   it("draws an ordinary mark as an outline, with no fill of its own", () => {
     const block = styleBlock(stripComments(read("src/areas/studio/panels/FormsTab.tsx")), "miniatureMark");

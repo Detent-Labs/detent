@@ -10,8 +10,8 @@ import { FormsTab } from "../src/areas/studio/panels/FormsTab.js";
  * The Forms tab as it renders (`studio-forms-overview`). The row set, the
  * counts and the miniature's own values are asserted in
  * `studio-formCardRows.test.ts`; this covers what only the markup can say —
- * the control naming its own act, the badge, and the miniature taking no
- * keyboard focus.
+ * the legend, the control naming its own act and its step's heading, the
+ * badge's sentence, and the miniature taking no keyboard focus.
  *
  * `FormsTab` reads `draft`, `validation` and `contentLocale` off `useDraft()`,
  * so the test supplies `DraftContext.Provider` directly rather than a live
@@ -76,6 +76,12 @@ const DRAFT = {
   },
 } as unknown as Draft;
 
+/** A draft whose one step declares no view: the Forms tab holds no card. */
+const NO_VIEW = {
+  baseLocale: "en",
+  workflow: { initialStep: "step_a", steps: [{ id: "step_a", key: "only", label: { en: "Only" }, type: "task" }] },
+} as unknown as Draft;
+
 function render(over: { draft?: Draft; issues?: EditorIssue[] } = {}): string {
   return renderToStaticMarkup(
     <DraftContext.Provider value={contextValue(over.draft ?? DRAFT, over.issues ?? [])}>
@@ -84,12 +90,27 @@ function render(over: { draft?: Draft; issues?: EditorIssue[] } = {}): string {
   );
 }
 
+/** The grid's own label. The compiled `class` precedes `aria-label` on the
+ * grid's `<ul>`, so a test finds the grid by the attribute alone. Nothing else
+ * on the tab carries this label. */
+const GRID_ANCHOR = 'aria-label="Forms in this process"';
+
+/** Where the grid starts in the markup. The legend stands ahead of it, and its
+ * sample groups carry `aria-hidden="true"` as the miniature does, so every
+ * miniature lookup reads from this point onward. */
+function gridStart(html: string): number {
+  const start = html.indexOf(GRID_ANCHOR);
+  expect(start).toBeGreaterThan(-1);
+  return start;
+}
+
 /** Everything between the miniature's own `aria-hidden="true"` element and
- * its close. The miniature carries no name and no role of its own, so the
- * element itself is what a test matches — a backreference to the tag name,
- * since the element is not pinned to one tag. */
+ * its close, in the grid alone. The miniature carries no name and no role of
+ * its own, so the element itself is what a test matches — a backreference to
+ * the tag name, since the element is not pinned to one tag. */
 function miniatures(html: string): string[] {
-  return [...html.matchAll(/<(\w+)[^>]*\saria-hidden="true"[^>]*>(.*?)<\/\1>/gs)].map((m) => m[2]!);
+  const grid = html.slice(gridStart(html));
+  return [...grid.matchAll(/<(\w+)[^>]*\saria-hidden="true"[^>]*>(.*?)<\/\1>/gs)].map((m) => m[2]!);
 }
 
 describe("The Forms tab's plates", () => {
@@ -186,7 +207,7 @@ describe("The Forms tab's plates", () => {
     // the field count and the open control share the card's last row, after
     // the miniature that stands above it.
     const html = render();
-    const miniatureIndex = html.indexOf('aria-hidden="true"');
+    const miniatureIndex = html.indexOf('aria-hidden="true"', gridStart(html));
     const countIndex = html.indexOf(">1 field, 1 required<");
     const controlIndex = html.indexOf("Open the form");
 
@@ -196,12 +217,109 @@ describe("The Forms tab's plates", () => {
   });
 
   it("says so in words when no step declares a form at all", () => {
-    const bare = {
-      baseLocale: "en",
-      workflow: { initialStep: "step_a", steps: [{ id: "step_a", key: "only", label: { en: "Only" }, type: "task" }] },
-    } as unknown as Draft;
+    expect(render({ draft: NO_VIEW })).toContain("No step in this process declares a form yet.");
+  });
+});
 
-    expect(render({ draft: bare })).toContain("No step in this process declares a form yet.");
+/** The legend's own label. Like the grid's, it follows the compiled `class`,
+ * so a test finds the legend by the attribute alone. */
+const LEGEND_ANCHOR = 'aria-label="What the marks mean"';
+
+/** The legend's `<ul>`: where its opening tag starts, the tag itself, and the
+ * markup inside it. The legend holds no list of its own, so the first `</ul>`
+ * after the tag closes it. */
+function legend(html: string): { index: number; tag: string; inner: string } {
+  const anchor = html.indexOf(LEGEND_ANCHOR);
+  expect(anchor).toBeGreaterThan(-1);
+  const index = html.lastIndexOf("<", anchor);
+  const tagEnd = html.indexOf(">", anchor) + 1;
+  return { index, tag: html.slice(index, tagEnd), inner: html.slice(tagEnd, html.indexOf("</ul>", tagEnd)) };
+}
+
+/** The markup inside each of the legend's `<li>` elements. */
+function legendItems(html: string): string[] {
+  return [...legend(html).inner.matchAll(/<li\b[^>]*>(.*?)<\/li>/gs)].map((m) => m[1]!);
+}
+
+/**
+ * One item's markup, split at its `aria-hidden="true"` subtrees: the text a
+ * screen reader reads, the text inside a hidden subtree, how many hidden
+ * subtrees the item holds, and how many elements stand inside them. It reads
+ * the tags in order and counts depth, so a subtree's nested `<span>` does not
+ * end the subtree early.
+ */
+function splitHidden(markup: string): { visible: string; hidden: string; groups: number; hiddenElements: number } {
+  const out = { visible: "", hidden: "", groups: 0, hiddenElements: 0 };
+  // Elements open inside the current hidden subtree; 0 outside one.
+  let depth = 0;
+  for (const m of markup.matchAll(/<(\/?)\w+[^>]*>|[^<]+/g)) {
+    const token = m[0];
+    if (!token.startsWith("<")) {
+      if (depth > 0) out.hidden += token;
+      else out.visible += token;
+    } else if (m[1] === "/") {
+      if (depth > 0) depth--;
+    } else if (depth > 0) {
+      depth++;
+      out.hiddenElements++;
+    } else if (/\saria-hidden="true"/.test(token)) {
+      depth = 1;
+      out.groups++;
+    }
+  }
+  return out;
+}
+
+describe("The Forms tab's legend", () => {
+  it("stands ahead of the grid as one list, named for what it explains", () => {
+    const html = render();
+    const { index, tag } = legend(html);
+
+    expect(html.split(LEGEND_ANCHOR)).toHaveLength(2);
+    expect(tag).toMatch(/^<ul\b/);
+    expect(tag).toContain('role="list"');
+    expect(index).toBeLessThan(gridStart(html));
+  });
+
+  it("names the five marks in the legend table's order, one item each", () => {
+    expect(legendItems(render()).map((item) => splitHidden(item).visible)).toEqual([
+      "field",
+      "required",
+      "required if a condition holds",
+      "section",
+      "taller asks for more",
+    ]);
+  });
+
+  it("hides each item's sample group from a screen reader and keeps the item's words outside it", () => {
+    const items = legendItems(render()).map(splitHidden);
+
+    expect(items).toHaveLength(5);
+    for (const item of items) {
+      expect(item.groups).toBe(1);
+      expect(item.hidden).toBe("");
+    }
+    // One mark each for field, required, the conditional and the section's
+    // group break; three outlines for the heights.
+    expect(items.map((item) => item.hiddenElements)).toEqual([1, 1, 1, 1, 3]);
+  });
+
+  it("takes no keyboard focus, so a walk with the Tab key never lands inside it", () => {
+    const { tag, inner } = legend(render());
+    const markup = tag + inner;
+
+    expect(markup).toContain("<li");
+    expect(markup).not.toContain("<button");
+    expect(markup).not.toContain("<a ");
+    expect(markup).not.toContain("tabindex");
+  });
+
+  it("stands on no tab without a card", () => {
+    const html = render({ draft: NO_VIEW });
+
+    expect(html).toContain("No step in this process declares a form yet.");
+    expect(html).not.toContain("What the marks mean");
+    expect(html).not.toContain("taller asks for more");
   });
 });
 
@@ -322,9 +440,8 @@ describe("A plate's miniature", () => {
 function attr(tag: string, name: string): string | undefined {
   return tag.match(new RegExp(`\\s${name}="([^"]*)"`))?.[1];
 }
-
 describe("A plate's open control", () => {
-  it("names its step through aria-labelledby: its own id, then the span holding the step label", () => {
+  it("names its step through aria-labelledby: its own id, then the h2 heading holding the step label", () => {
     const html = render();
     const controls = [...html.matchAll(/<button\b[^>]*>/g)]
       .map((m) => m[0])
@@ -339,9 +456,14 @@ describe("A plate's open control", () => {
       const [ownIdRef, nameIdRef] = labelledby.split(" ");
       expect(ownIdRef).toBe(id);
       expect(nameIdRef).toBeTruthy();
-      const nameSpan = html.match(new RegExp(`<span id="${nameIdRef}"[^>]*>([^<]*)</span>`));
-      expect(nameSpan).not.toBeNull();
-      return nameSpan![1];
+      // By the `id` attribute alone: the compiled `class` may precede it.
+      const heading = new RegExp(`<h2\\b[^>]*\\sid="${nameIdRef}"[^>]*>([^<]*)</h2>`).exec(html);
+      expect(heading).not.toBeNull();
+      // A heading cannot sit inside a span: every span opened ahead of the
+      // heading has closed by the time it starts.
+      const before = html.slice(0, heading!.index);
+      expect(before.match(/<span\b/g)?.length ?? 0).toBe(before.match(/<\/span>/g)?.length ?? 0);
+      return heading![1];
     });
 
     expect(names).toEqual(["Intake", "Review"]);
@@ -358,17 +480,42 @@ describe("A plate's issue badge", () => {
     loc: "workflow.steps[0].view.fields[0].ref",
   };
 
-  it("reads the number of open issues naming that step's view", () => {
+  it("reads the number of open issues naming that step's view, then the step, in one sentence", () => {
     expect(render({ issues: [ISSUE, { ...ISSUE, message: "a second one" }] })).toContain(
-      'aria-label="2 open issues on this form"',
+      'aria-label="2 open issues on Intake"',
     );
   });
 
-  it("names one issue in the singular", () => {
-    expect(render({ issues: [ISSUE] })).toContain('aria-label="1 open issue on this form"');
+  it("names one issue in the singular, in one sentence naming the step", () => {
+    expect(render({ issues: [ISSUE] })).toContain('aria-label="1 open issue on Intake"');
+  });
+
+  it("gives two cards' badges different names, each naming its own step", () => {
+    // step_b's view is empty, and an issue naming it still reaches its card.
+    const reviewIssue: EditorIssue = { ...ISSUE, entityId: "step_b", loc: "workflow.steps[1].view.fields[0].ref" };
+    const html = render({ issues: [ISSUE, reviewIssue] });
+    const names = [...html.matchAll(/aria-label="([^"]*open issues? on[^"]*)"/g)].map((m) => m[1]);
+
+    expect(names).toEqual(["1 open issue on Intake", "1 open issue on Review"]);
+  });
+
+  it("prints a step label holding a replacement pattern as the author typed it", () => {
+    const dollar = {
+      ...DRAFT,
+      workflow: {
+        ...DRAFT.workflow,
+        steps: [{ ...DRAFT.workflow!.steps![0], label: { en: "$&" } }, ...DRAFT.workflow!.steps!.slice(1)],
+      },
+    } as unknown as Draft;
+
+    // The markup escapes the ampersand.
+    expect(render({ draft: dollar, issues: [ISSUE] })).toContain('aria-label="1 open issue on $&amp;"');
   });
 
   it("draws no badge on a plate whose view draws no issue", () => {
-    expect(render()).not.toContain("open issue on this form");
+    // The same tab with one issue prints the words, so the negative below has
+    // something to catch.
+    expect(render({ issues: [ISSUE] })).toContain("open issue");
+    expect(render()).not.toContain("open issue");
   });
 });
