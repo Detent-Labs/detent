@@ -28,21 +28,31 @@ import {
 } from "./fieldMatrixLogic";
 
 const styles = stylex.create({
-  // The scroll region's automatic minimum is already zero, since it is a
-  // scroll container, which lets it shrink below its content height. Its
-  // `auto` flex basis is that content height, so a short grid still keeps
-  // its own height above this floor (`studio-app`: "The field matrix takes
-  // the height the tab body leaves").
+  // An invisible flex column around the scroll region. It takes what the
+  // matrix column leaves under the toolbar, and never less than the floor,
+  // so the floor binds here instead of on the frame the author sees
+  // (`studio-app`: "The field matrix takes the height the tab body leaves").
+  // It draws no border, fill or focus stop.
+  matrixScrollSpace: {
+    display: "flex",
+    flexDirection: "column",
+    flex: "1 1 0",
+    minHeight: "24rem",
+  },
+  // The scroll region's automatic minimum is zero, since it is a scroll
+  // container, so it can shrink below its content height. Its `auto` flex
+  // basis is that content height. Inside `matrixScrollSpace`, a short
+  // grid's frame therefore ends under its own rows, and a long grid's
+  // frame shrinks to the space and scrolls.
   matrixScroll: {
     overflow: "auto",
     overscrollBehavior: "contain",
     borderWidth: 1,
     borderStyle: "solid",
     borderColor: colors.border,
-    minHeight: "24rem",
-    // The frame reaches the tab body's side and bottom edges, and the tab
-    // body clips anything past them, so the ring sits inside the frame the
-    // way a cell's own ring does.
+    // The frame reaches the tab body's side edges (and its bottom edge
+    // when the rows fill the space), and the tab body clips past them, so
+    // the ring sits inside the frame the way a cell's ring does.
     ":focus-visible": {
       outline: `2px solid ${colors.accent}`,
       outlineOffset: "-2px",
@@ -645,6 +655,7 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
   return (
     <>
       {liveRegion}
+      <div {...stylex.props(styles.matrixScrollSpace)}>
       {(
     <div
       {...stylex.props(styles.matrixScroll)}
@@ -832,6 +843,7 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
       </table>
         </div>
       )}
+      </div>
     </>
   );
 }

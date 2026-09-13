@@ -1760,13 +1760,23 @@ by that change. The MATRIX tags are local to this section.
   scrollTop 156. The grid's `overscroll-behavior: contain` stops the chain
   there, and no tab body area is left to wheel on. Shift+Tab still reaches
   the toolbar.
-  - Not caused by this change. The old 32rem cap already trapped the tab
-    body below a 753.5px window. The 24rem floor lowers that threshold to
-    about 625.5px, narrowing the trap window instead of widening it.
-  - Two points are unmeasured. A classic-scrollbar desktop's own tab-body
-    scrollbar stays a wheel and drag target, hidden by the headless browser
-    run. A grid under 384px that also overflows sideways is unmeasured too,
-    since `overscroll-behavior: contain` covers both axes.
+  - Not caused by `field-matrix-fill-height`. The old 32rem cap already
+    trapped the tab body below a 753.5px window. The 24rem floor lowers
+    that threshold to about 625.5px, narrowing the trap window instead of
+    widening it.
+  - A grid shorter than the floor has left blank tab body under its frame
+    since `field-matrix-short-grid-frame`. A wheel there scrolls the tab
+    body. On 2026-09-13, `laptop_inventory` at 1440x600 had the tab body at
+    scrollTop 156. One wheel-up of 300 below its frame took scrollTop to 0,
+    and three more held it there. A grid of 24rem or more still traps the
+    wheel: `it_offboarding` held scrollTop 156 through four wheel-ups.
+  - The same run used headed Chrome with classic 15px scrollbars. The tab
+    body's own scrollbar stays a wheel and drag target there. On
+    `it_offboarding` at 1440x600, two wheel-ups of 60 over it took scrollTop
+    from 156 to 96, then 36. An 80px drag of its thumb took scrollTop from
+    156 to 29.
+  - A grid under 384px that also overflows sideways stays unmeasured, since
+    `overscroll-behavior: contain` covers both axes.
   - Risk (Low): a keyboard user recovers with Shift+Tab. A mouse-only user
     under a 626px window needs the tab body's own scrollbar instead.
   - Fix: its own `/impeccable adapt` change.
