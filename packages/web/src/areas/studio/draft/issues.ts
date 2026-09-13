@@ -15,10 +15,9 @@ function findFieldById(fields: DraftField[] | undefined, id: string): DraftField
   return undefined;
 }
 
-/** The deepest field carrying an id that an index chain `fields[i].fields[j]`
- * reaches. The walk skips an id-less field on the chain and answers the
- * deepest id-carrying field it reaches. It stops at the first index the tree
- * does not hold. */
+/** The deepest id-carrying field an index chain `fields[i].fields[j]`
+ * reaches. The walk skips an id-less field on the chain. It stops at the
+ * first index the tree does not hold. */
 function fieldAtPath(fields: DraftField[] | undefined, path: readonly number[]): DraftField | undefined {
   let list = fields;
   let found: DraftField | undefined;

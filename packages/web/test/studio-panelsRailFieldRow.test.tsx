@@ -98,9 +98,10 @@ describe("PanelsRailFieldRow", () => {
   });
 
   // The refocus effect scrolls this id into the rail's view after an add or a
-  // move through the move control (design.md, "Focus and the rail entry after
-  // an add into a group"). The id sits on the button, not the wrapper, so it
-  // lands on the same element a click or a focus targets.
+  // move through the move control
+  // (design.md, "Focus and the rail entry after an add or a move"). The id
+  // sits on the button, not the wrapper, so it lands on the same element a
+  // click or a focus targets.
   it("places a given id on the button, and no id attribute without one", () => {
     const html = renderToStaticMarkup(<PanelsRailFieldRow {...BASE} id="studio-field-rail-field_1" />);
     expect(html).toContain('<button id="studio-field-rail-field_1"');

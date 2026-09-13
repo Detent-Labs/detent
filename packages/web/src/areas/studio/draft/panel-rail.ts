@@ -42,9 +42,9 @@ export function panelEntityCounts(draft: {
   };
 }
 
-/** One row of the panels screen's index rail under the Fields view. `depth` is
- * capped at 1: a group field's children indent once, and anything deeper takes
- * a top-level row instead. The cap is a rail-rendering rule, not a schema one —
+/** One row of the Fields tab's entity rail. `depth` is capped at 1: a group
+ * field's children indent once, and anything deeper takes a top-level row
+ * instead. The cap is a rail-rendering rule, not a schema one —
  * `FieldDef`'s `group` nesting carries no depth limit and this adds none. */
 export interface RailFieldRow {
   id: string;
@@ -59,10 +59,10 @@ export interface RailFieldRow {
  *
  * A field at depth 0 or 1 keeps that depth. A field at depth 2 or deeper takes
  * depth 0, so it relocates to a top-level row rather than indenting further.
- * The relocation stays visible: the row still carries the field's own key.
  *
- * A field with no `id` is skipped. The id is the rail's React key and the
- * anchor a row scrolls to, and a mid-edit catalog can hold neither.
+ * A field with no `id` is skipped. The id is the rail's React key, the
+ * selection, and the base of `fieldCatalogLogic.ts`'s `railEntryId`, and a
+ * field without one can serve as none of them.
  */
 export function flattenRailFields(fields: DraftField[] | undefined): RailFieldRow[] {
   const rows: RailFieldRow[] = [];

@@ -220,8 +220,9 @@ export const railEntryId = (fieldId: string) => `studio-field-rail-${fieldId}`;
 /**
  * The id of the field currently holding `fieldId` as a child — a group, or a
  * parent `changeKind` rewrote out of one — or `undefined` at the top level.
- * `moveTargetsFor` below and `EntityTabs.tsx`'s `moveField` both read this
- * one lookup, so neither can disagree with the other about a field's parent.
+ * `moveTargetsFor` below, and `FieldsTab`'s `moveField` and its rail loop in
+ * `EntityTabs.tsx`, all read this one lookup, so none of them can disagree
+ * about a field's parent.
  */
 export function parentIdOf(fields: DraftField[], fieldId: string): string | undefined {
   return flattenDraftFields(fields).find((f) => (f.fields ?? []).some((c) => c.id === fieldId))?.id;

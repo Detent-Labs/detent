@@ -173,17 +173,19 @@ const styles = stylex.create({
 interface PanelsRailFieldRowProps {
   /** The DOM id for the entry's own button, `railEntryId(fieldId)`. Lets the
    * refocus effect scroll the entry into the rail's view after an add or a
-   * move through the move control (design.md, "Focus and the rail entry after
-   * an add into a group"). Every entry `FieldsTab` renders passes one. */
+   * move through the move control
+   * (design.md, "Focus and the rail entry after an add or a move"). Every
+   * entry `FieldsTab` renders passes one. */
   id?: string;
   /** The resolved label, or the "unnamed field" fallback already applied. */
   label: string;
   typeLabel: string | undefined;
-  /** The resolved label of the field that holds this entry's field, given for
-   * a nested entry alone. It reaches the button's accessible name as hidden
-   * text after the kind name and prints nothing visible. A screen reader hears
-   * no indent, and a field past the rail's indent cap draws at depth 0
-   * (design.md, "A nested rail entry names its group in hidden text"). */
+  /** The resolved label of the field that holds this entry's field, or the
+   * "unnamed field" fallback already applied, given for a nested entry alone.
+   * It reaches the button's accessible name as hidden text after the kind name
+   * and prints nothing visible. A screen reader hears no indent, and a field
+   * past the rail's indent cap draws at depth 0 (design.md, "A nested rail
+   * entry names its group in hidden text"). */
   groupLabel?: string;
   depth: 0 | 1;
   issues: number;
@@ -334,13 +336,11 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
     editorRef.current?.scrollTo({ top: 0, behavior: "instant" });
   }, [selectedFieldId]);
 
-  // React reorders keyed rows by moving the existing DOM nodes, which usually
-  // carries focus along. It does not where the move changes which controls the
-  // row renders, so the tab names the control it wants and takes it back
-  // itself rather than resting on the reconciler. The same run scrolls the
-  // field's rail entry into the rail's view, `nearest`, after an add and after
-  // a move through the move control (design.md, "Focus and the rail entry
-  // after an add into a group").
+  // The effect runs after the commit, since a new field's label input exists
+  // only then. It focuses that input after an add, and re-asserts focus on the
+  // move control after a move through that control. The same run scrolls the
+  // field's rail entry into the rail's view, `nearest`
+  // (design.md, "Focus and the rail entry after an add or a move").
   useEffect(() => {
     if (refocusId === undefined) return;
     document.getElementById(refocusId)?.focus();

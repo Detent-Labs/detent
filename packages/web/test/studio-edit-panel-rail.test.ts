@@ -70,7 +70,7 @@ describe("flattenRailFields", () => {
     ]);
   });
 
-  it("skips a field with no id, since the rail has no anchor for it", () => {
+  it("skips a field with no id, since the rail keys and selects every entry by its id", () => {
     const fields = [{ key: "unsaved", type: "string" }, { id: LEAF, key: "city", type: "string" }] as DraftField[];
     expect(flattenRailFields(fields)).toEqual([{ id: LEAF, key: "city", depth: 0 }]);
   });

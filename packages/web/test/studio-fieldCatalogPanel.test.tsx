@@ -152,6 +152,14 @@ describe("FieldCatalogPanel", () => {
     expect(html).toContain("Fields inside this group");
     expect(html).toContain("+ Add field to this group");
     expect(html).not.toContain(`id="${moveControlId("field_c")}"`);
+
+    // The zone stands directly after "Validation": the next zone heading after
+    // "Validation" is its own, and the group's preview follows it.
+    const validationAt = html.indexOf(">Validation<");
+    const zoneAt = html.indexOf(">Fields inside this group<");
+    expect(validationAt).toBeGreaterThan(-1);
+    expect(html.indexOf("<h4", validationAt)).toBe(html.lastIndexOf("<h4", zoneAt));
+    expect(zoneAt).toBeLessThan(html.indexOf(">How it will look<"));
   });
 
   it("renders no group zone for a selected top-level field", () => {
