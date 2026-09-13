@@ -41,11 +41,14 @@ const styles = stylex.create({
   },
   // The authoring command (`DESIGN.md` Buttons): a ghost button in slate,
   // mono at 11px. It composes over `btn btn-ghost`, whose accent it replaces.
+  // An open command names a mono key that can outrun a 400px column, so its
+  // label wraps anywhere.
   command: {
     fontFamily: fonts.mono,
     fontSize: 11,
     color: colors.textMuted,
     textAlign: "left",
+    overflowWrap: "anywhere",
     backgroundColor: {
       default: "transparent",
       ":hover": colors.surfaceMuted,
@@ -86,8 +89,11 @@ const styles = stylex.create({
   },
   // Three columns: the stamp, the identity, the property names. The stamp
   // column's minimum fits "Removed" and grows for a longer override, so no
-  // stamp clips. Below 40rem the names move under the identity.
+  // stamp clips. Below 40rem the names move under the identity. The row spans
+  // the tab body, whose scroll box clips an outer ring, so the focus ring
+  // sits inside it, as a grid cell's does.
   summary: {
+    outlineOffset: -2,
     display: "grid",
     gridTemplateColumns: {
       default: "minmax(5.5rem, max-content) minmax(0, 1fr) fit-content(50%)",
@@ -136,7 +142,7 @@ const styles = stylex.create({
     overflowWrap: "anywhere",
   },
   entityKey: {
-    marginInlineStart: space.s2,
+    marginInlineStart: space.s1,
     color: colors.textMuted,
   },
   context: {
@@ -229,8 +235,11 @@ const styles = stylex.create({
     cursor: "pointer",
   },
   // The Developer view scrolls inside its own box, so a long JSON value never
-  // widens the page. A path wraps anywhere.
+  // widens the page. A path wraps anywhere. The box positions its visually
+  // hidden "Before:" and "After:" text, so that text scrolls with the value
+  // instead of widening the page from its place at the end of a long line.
   developerBox: {
+    position: "relative",
     overflowX: "auto",
     marginBlockStart: space.s1,
     padding: space.s2,
@@ -387,7 +396,13 @@ function Row({ row, open, onToggle, onOpenRow }: RowProps) {
         <span {...stylex.props(styles.identity)}>
           {/* A data source has no label, so its row names its key, a machine value. */}
           <span {...stylex.props(row.group === "dataSources" && styles.mono)}>{row.label}</span>
-          {row.entityKey !== undefined && <code {...stylex.props(styles.mono, styles.entityKey)}>{row.entityKey}</code>}
+          {/* The space keeps the label and the key two words in the summary's accessible name. */}
+          {row.entityKey !== undefined && (
+            <>
+              {" "}
+              <code {...stylex.props(styles.mono, styles.entityKey)}>{row.entityKey}</code>
+            </>
+          )}
           {row.context !== undefined && (
             <span {...stylex.props(styles.context)}>{t("changeList.context.from").replace("{step}", row.context)}</span>
           )}

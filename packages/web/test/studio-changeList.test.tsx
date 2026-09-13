@@ -67,6 +67,14 @@ describe("The change list", () => {
     expect(summary).toContain("+2 more");
   });
 
+  it("separates a row's label from its key, so the summary's text reads them as two words", () => {
+    const html = renderToStaticMarkup(<ChangeList rows={[fieldRow]} heading={HEADING} />);
+    const summary = html.match(/<summary\b[^>]*>(.*?)<\/summary>/s)?.[1] ?? "";
+    const text = summary.replace(/<[^>]+>/g, "");
+
+    expect(text).toContain("Forwarding address forwarding_address");
+  });
+
   it("offers no open command without onOpenRow", () => {
     const html = renderToStaticMarkup(<ChangeList rows={[fieldRow]} heading={HEADING} />);
 
