@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { listVersions, getVersionBody, getDraft } from "../api/client.js";
@@ -137,6 +137,11 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized }: V
   // in the same branch that either sets the comparison or calls `fail`, so it
   // never stands beside the result it precedes.
   const [waiting, setWaiting] = useState(false);
+  // Each compare press takes the next number. Only the response carrying the
+  // latest number writes the comparison, the waiting line or the failure, so
+  // an earlier press answering late neither replaces a newer result nor
+  // clears the waiting line under a compare still in flight.
+  const latestCompare = useRef(0);
   const [loading, setLoading] = useState(true);
   // Diff-action failures (shown next to the diff controls) — distinct from
   // loadError below (the versions list itself failed to load), since
@@ -182,11 +187,13 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized }: V
    */
   const diffSelected = async () => {
     if (!canDiff(selection)) return;
+    const compare = ++latestCompare.current;
     setError(null);
     setComparison(undefined);
     setWaiting(true);
     try {
       const [bodyA, bodyB] = await Promise.all([getVersionBody(processId, selection.a, token), getVersionBody(processId, selection.b, token)]);
+      if (compare !== latestCompare.current) return;
       const rows = describeChanges(stripCompiledContent(bodyA as ProcessBody), stripCompiledContent(bodyB as ProcessBody));
       setWaiting(false);
       setComparison({
@@ -198,6 +205,7 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized }: V
         rows,
       });
     } catch (e) {
+      if (compare !== latestCompare.current) return;
       setWaiting(false);
       fail(e);
     }
@@ -205,11 +213,13 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized }: V
 
   const diffAgainstBase = async () => {
     if (baseVersion === null) return;
+    const compare = ++latestCompare.current;
     setError(null);
     setComparison(undefined);
     setWaiting(true);
     try {
       const [draft, baseBody] = await Promise.all([getDraft(processId, token), getVersionBody(processId, baseVersion, token)]);
+      if (compare !== latestCompare.current) return;
       // A draft is authored-shape, a published body compiled. Comparing them
       // raw reports the compile pass's cancel-sink injection as a change the
       // author neither made nor can act on — it is re-injected at the next
@@ -223,6 +233,7 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized }: V
         rows,
       });
     } catch (e) {
+      if (compare !== latestCompare.current) return;
       setWaiting(false);
       fail(e);
     }
