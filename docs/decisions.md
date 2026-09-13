@@ -1588,12 +1588,12 @@ recorded rather than fixed. The RAIL tags are local to this section.
   the tension sits in `DESIGN.md` itself.
 - **`.btn-ghost` text falls under 4.5:1 on its own washes.** The draft
   confirmation dialog's Cancel carries it
-  (`packages/web/src/areas/studio/panels/ProcessHeaderBar.tsx:578`). Its accent
+  (`packages/web/src/areas/studio/panels/ProcessHeaderBar.tsx:544`). Its accent
   text reads 3.90:1 hovered and 3.44:1 pressed in light, and 4.15:1 pressed in
   dark. `destructive-buttons-show-the-accent` cleared the same shortfall for
   `.btn-destructive` with `--color-accent-on-muted`, and this one wants the
   same treatment. The removal dialog's Cancel
-  (`packages/web/src/areas/studio/panels/RemoveFieldDialog.tsx:202`) and the
+  (`packages/web/src/areas/studio/panels/RemoveFieldDialog.tsx:204`) and the
   field catalog's Remove field trigger
   (`packages/web/src/areas/studio/panels/FieldCatalogPanel.tsx:926`) carry the
   same class. Both read 4.53:1 at rest, 3.90:1 hovered and 3.45:1 pressed, in
@@ -1637,10 +1637,10 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
 `panels/`, `draft/` and `screens/` start at `packages/web/src/areas/studio/`.
 
 - **FIELDS-2: visually hidden text escapes its container and scrolls the page.**
-  The `visuallyHidden` style (`panels/EntityTabs.tsx:151`) sets
-  `position: "absolute"` with no inset. The entity rail's own style (`:53`)
+  The `visuallyHidden` style (`panels/EntityTabs.tsx:165`) sets
+  `position: "absolute"` with no inset. The entity rail's own style (`:67`)
   sets no `position`. Its hidden kind words, group names and move live region
-  (`:278`, `:280`, `:497`) therefore lay out against the page. Measured
+  (`:293`, `:295`, `:613`) therefore lay out against the page. Measured
   2026-09-13: 39 such elements report `offsetParent` BODY. The document's
   `scrollHeight` read 2272 at 1280x720 and 2314 at 900x720, and pinning them
   to `top: 0` gave 720. One mouse wheel over the header bar scrolled the page
@@ -1655,21 +1655,21 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   tab's hidden "blocking a publish" text (`panels/ProcessTabRow.tsx:219`)
   reached x=905, and `document.documentElement.scrollWidth` read 905 against
   `clientWidth` 900. The narrow-width walk asserts the two widths equal at 900
-  (`docs/browser-checks.md:2776`), so its Pass line fails today. Risk
+  (`docs/browser-checks.md:2848`), so its Pass line fails today. Risk
   (Medium): the page scrolls into blank ground, and at 900px it scrolls
   sideways too. The fix sets `position: "relative"` on the container, or an
   inset of 0 on the style.
 - **FIELDS-3: below 64rem a short window leaves the editor a strip.** The
-  rail stacks above the editor, capped at 20rem (`panels/EntityTabs.tsx:57`).
+  rail stacks above the editor, capped at 20rem (`panels/EntityTabs.tsx:71`).
   Measured 2026-09-13: the editor pane stands 105px tall at 900x720, and 18px
   at 420x720 with its heading cut off. No 2px rule separates the two scroll
-  regions: the rail drops its right-hand border there (`:54`). Risk (Medium):
+  regions: the rail drops its right-hand border there (`:68`). Risk (Medium):
   the rail keeps its 20rem and the editor gets what remains.
 - **FIELDS-4: the entity rail and the editor pane clip the focus ring.** This
   is RAIL-3 on the Fields tab. The shell's 2px ring at a 2px offset
   (`packages/web/src/shell/global.css:37`) loses its edge against both scroll
-  boxes (`panels/EntityTabs.tsx:46`, `:58`). On the chosen entry the ring and
-  the 3px current mark (`:86`) share one accent. Risk (Low): the ring still
+  boxes (`panels/EntityTabs.tsx:60`, `:72`). On the chosen entry the ring and
+  the 3px current mark (`:100`) share one accent. Risk (Low): the ring still
   meets WCAG 2.4.7.
 - **FIELDS-5: the Validation disclosure takes its count as its name.** Its
   `<summary>` prints `({carried.length})` alone
@@ -1681,16 +1681,16 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   arrow keys and no filter. Its landmark is a `nav` named "Editors"
   (`panelsScreen.railLabel`, `packages/web/src/i18n/catalogs/studio.ts:451`).
   An entry's check badge reads "1 issues" for one check
-  (`panels/EntityTabs.tsx:283`), from the key `panelsScreen.issueMark`
+  (`panels/EntityTabs.tsx:298`), from the key `panelsScreen.issueMark`
   (`packages/web/src/i18n/catalogs/studio.ts:454`). Risk (Low): a keyboard
   user presses Tab up to 52 times to cross the rail.
 - **FIELDS-7: the Fields tab's headings and checks lack structure.** The
   outline jumps from the header bar's `h1` to the field's `h3`. They sit at
-  `panels/ProcessHeaderBar.tsx:783` and `panels/FieldCatalogPanel.tsx:1142`,
-  with zone headings at `h4` (`:566`). A zone's check list (`:569`) sits above
+  `panels/ProcessHeaderBar.tsx:749` and `panels/FieldCatalogPanel.tsx:1157`,
+  with zone headings at `h4` (`:574`). A zone's check list (`:577`) sits above
   its controls, and neither `aria-invalid` nor `aria-describedby` ties a check
-  to its control. The zone heading marks a check by colour alone (`:252`,
-  `:566`). Risk (Medium): the heading levels skip, a check names no control,
+  to its control. The zone heading marks a check by colour alone (`:260`,
+  `:574`). Risk (Medium): the heading levels skip, a check names no control,
   and colour alone marks a zone (WCAG 1.3.1 and 1.4.1).
 - **FIELDS-8: check messages speak the engine's layers.** Measured 2026-09-13,
   the Fields tab showed `ZOD missing baseLocale ('en') entry` and
@@ -1708,18 +1708,18 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   grammar and raw ids where a plain sentence belongs.
 - **FIELDS-9: a group's editor leads with zones a group cannot use.** Its
   definition half shows "Where values come from"
-  (`panels/FieldCatalogPanel.tsx:827`). It also shows a disabled "Default
-  value" (`:878`), "Validation" (`:882`) and a disabled Technical checkbox
-  (`:811`). Its effect half shows "A participant must fill this in" (`:1015`)
+  (`panels/FieldCatalogPanel.tsx:835`). It also shows a disabled "Default
+  value" (`:886`), "Validation" (`:890`) and a disabled Technical checkbox
+  (`:819`). Its effect half shows "A participant must fill this in" (`:1028`)
   and up to 12 "Show on the canvas" buttons. Each button's accessible name
-  omits its step (`:948`). The group's one action, the zone "Fields inside
-  this group" (`:893`), comes after "Validation". Measured 2026-09-13 at
+  omits its step (`:961`). The group's one action, the zone "Fields inside
+  this group" (`:901`), comes after "Validation". Measured 2026-09-13 at
   1400x900, its heading sits at y=1078, 200px below the pane's bottom.
 
   The zone's body looks the same for 18 fields and for none, and its button
-  (`:894`) names no group. A screen reader also reads the "+" leading its
+  (`:902`) names no group. A screen reader also reads the "+" leading its
   label. A nested field's editor names its group only in the move control's
-  value (`:526`). Risk (Medium): the group's one action sits out of view,
+  value (`:534`). Risk (Medium): the group's one action sits out of view,
   behind controls a group cannot use.
 
   This item needs the owner's call before any change. The zone's place after
@@ -1733,12 +1733,12 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
 - **FIELDS-10: the field editor's type drifts from `DESIGN.md`.** Measured
   2026-09-13, the field's `h3` computes weight 700, where `DESIGN.md:306`
   allows 800 and 400. Its `panelHeading` style
-  (`panels/FieldCatalogPanel.tsx:72`) sets no weight. Field labels compute
-  14.4px, sentence case, in ink (`:94`), where the Label role is 11px
+  (`panels/FieldCatalogPanel.tsx:80`) sets no weight. Field labels compute
+  14.4px, sentence case, in ink (`:102`), where the Label role is 11px
   uppercase tracked slate (`DESIGN.md:321`). Zone headings compute 14.4px at
-  800 in ink (`panels/FieldCatalogPanel.tsx:246`), and none takes the Title
+  800 in ink (`panels/FieldCatalogPanel.tsx:254`), and none takes the Title
   role (`DESIGN.md:315`). The Remove field button
-  (`panels/FieldCatalogPanel.tsx:915`) is an accent ghost
+  (`panels/FieldCatalogPanel.tsx:926`) is an accent ghost
   (`packages/web/src/shell/tokens.css:197`), and its text starts 5px right of
   the column's flush-left edge. Risk (Low): the field editor sets type outside
   the roles `DESIGN.md` names.
@@ -1762,16 +1762,16 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   "field tabs" row sits at `.claude/rules/ui-glossary.md:86`. It defines the
   Field / Values / Rules tab set for the one selected top-level field. A
   paragraph at `:117` repeats that definition. The field editor has two halves
-  and no tab set (`panels/FieldCatalogPanel.tsx:600`,
+  and no tab set (`panels/FieldCatalogPanel.tsx:608`,
   `openspec/specs/studio-app/spec.md:2564`), and it edits a field at any
   depth. Risk (Low): the glossary teaches a word for a UI that is gone.
 - **FIELDS-14: `FieldsTab` walks the field tree once per rail entry.** Each
   call of `FieldsTab` walks the whole tree twice, in `flattenRailFields` and
-  `flattenDraftFields` (`panels/EntityTabs.tsx:304`, `:305`). Each rail entry
-  then walks it once more through `parentIdOf` (`:465`,
-  `panels/fieldCatalogLogic.ts:227`), top-level entries included. Each entry
+  `flattenDraftFields` (`panels/EntityTabs.tsx:339`, `:340`). Each rail entry
+  then walks it once more through `parentIdOf` (`:581`,
+  `panels/fieldCatalogLogic.ts:252`), top-level entries included. Each entry
   also scans the whole check list for its badge count
-  (`panels/EntityTabs.tsx:455`, `draft/panel-rail.ts:104`). For N entries
+  (`panels/EntityTabs.tsx:571`, `draft/panel-rail.ts:104`). For N entries
   that makes N + 2 tree walks and N scans of the check list. Risk
   (Informational): the cost grows with the square of the catalog's size and
   stays harmless at 51 entries.
@@ -1781,7 +1781,7 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   unlike the Fields tab's own `FieldEditor`, keyed by the field's id
   (`panels/FieldCatalogPanel.tsx:1162`). A press on "Remove data source" or
   "Remove this step" therefore keeps its own button element in the DOM.
-  `removeDataSource` (`panels/EntityTabs.tsx:656`) and `onRemoveStep`
+  `removeDataSource` (`panels/EntityTabs.tsx:678`) and `onRemoveStep`
   (`screens/EditScreen.tsx:541`) each pick a neighbour, and the same button
   then renders that neighbour's own remove control. This is a code reading;
   no browser run has confirmed it. Risk (Medium): a second Enter or Space
@@ -1829,7 +1829,7 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   `$'` and `` $` `` instead of inserting the label as literal text. A label
   reading `Cost $&` turns into the literal text `Cost {field}` inside the
   rendered sentence. This change fixed the removal sentences. Both
-  `removalAnnouncement` (`panels/fieldCatalogLogic.ts:346`) and the removal
+  `removalAnnouncement` (`panels/fieldCatalogLogic.ts:347`) and the removal
   dialog's heading (`panels/RemoveFieldDialog.tsx:116`) pass a replacer
   function, `() => label`.
 
@@ -1838,7 +1838,7 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   `panels/ChangeList.tsx`, `panels/ChangesView.tsx` and
   `screens/VersionsScreen.tsx`. The other 42 pass a string, in 10 files. Six
   calls split across lines, and two lines carry two calls each:
-  `EntityTabs.tsx`'s move sentences (`:541`, `:542`). The grep
+  `EntityTabs.tsx`'s move sentences (`:542`, `:543`). The grep
   `git grep -n '\.replace("{' -- packages/web/src` therefore matches 46 lines.
 
   Two helpers build the placeholder in a template literal, which that grep
@@ -1848,9 +1848,9 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   function. Risk (Low): one replacer function closes every site that still
   passes a string: `.replace("{field}", () => label)`.
 - **FIELDS-20: a second identical move announces nothing.** `moveField`
-  (`panels/EntityTabs.tsx:503`) writes its sentence straight into the shared
-  live region (`:521`), a pattern that predates this change. `removeField`
-  (`:477`) empties the region first and writes on the next animation frame
+  (`panels/EntityTabs.tsx:522`) writes its sentence straight into the shared
+  live region (`:540`), a pattern that predates this change. `removeField`
+  (`:496`) empties the region first and writes on the next animation frame
   instead. That step matters when one removal sentence repeats, since two
   different sentences announce without it. Two unnamed fields moved into the
   same group, one after another, still produce one sentence twice: the live
@@ -1872,7 +1872,7 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
 - **FIELDS-22: the kept-reference note names no location.** When a removal
   keeps a CEL read or a plugin setting, the dialog adds "CEL expressions and
   plugin settings keep their text." and "Check each one before you publish."
-  (`panels/RemoveFieldDialog.tsx:190-191`). It names no expression and no
+  (`panels/RemoveFieldDialog.tsx:192-193`). It names no expression and no
   setting, and no later screen lists them all
   (`openspec/changes/remove-field-takes-its-references/specs/studio-app/spec.md:82-84`).
   A kept CEL read surfaces later as an unknown-key result on the Checks tab.
@@ -1905,7 +1905,7 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   1440x900: Remove field `[344, 802, 101×37]`, "+ Add field"
   `[344, 839, 109×37]`, 0px apart; `panels/FieldCatalogPanel.tsx:279-285`
   draws the 2px rule above Remove field only. A field with no reach leaves
-  on one press (`panels/EntityTabs.tsx:450-453`), and a freshly added field
+  on one press (`panels/EntityTabs.tsx:468-471`), and a freshly added field
   always has no reach. A double click removes a field, then opens the
   neighbour field's Data source select. Risk (Medium): a press meant for
   "+ Add field" can remove the field just configured, with no undo.
@@ -2059,7 +2059,7 @@ only the marks the miniature draws. The required count stands beside it.
   settles.
 - **FORMS-9: the browser check's wrap step clears its line by a few pixels.**
   Step 4 of "The Forms tab card miniature" adds ten field entries
-  (`docs/browser-checks.md:3583`). The final review computed about 308.7px of
+  (`docs/browser-checks.md:3664`). The final review computed about 308.7px of
   mark room per card at 1100px, against 314px for the resulting marks.
   The browser run wrapped three marks, since the form editor added one group
   entry on its own. Risk (Low): a sub-pixel column change can flip the pass
