@@ -4478,11 +4478,22 @@ meets `scope=started` should infer no new permission tier from it.
 
   The tab component `FormsTab.tsx` plates one card per step declaring a view.
   The module `panels/formCardRows.ts` yields each card's label, role, field
-  count, miniature entries and issue badge. It is a pure function with its
-  own `bun:test` behind it. The module `draft/roleStamp.ts` maps each step to
-  `initial`, `task`, `subprocess` or `end`, with its tone, for the card's
-  role. A card takes a 1px hairline box. An empty form takes a 2px box in the
-  advisory color instead.
+  count, required count, miniature entries and issue badge. It is a pure
+  function with its own `bun:test` behind it. The module `draft/roleStamp.ts`
+  maps each step to `initial`, `task`, `subprocess` or `end`, with its tone,
+  for the card's role. A card takes a 1px hairline box. An empty form takes a
+  2px box in the advisory color instead.
+
+  The miniature draws one mark per field entry and a group break per group
+  entry, through `miniatureEntry`. The function `miniatureBarHeight` sets a
+  mark's height from the field's kind: 8px, 12px, 16px or 24px. A group break
+  takes its own fixed height, `GROUP_BREAK_HEIGHT`. An ordinary mark draws as
+  an outline, and a required entry's mark fills solid.
+
+  The `Miniature` component carries the whole row as one `role="img"`
+  element, named from the field count and the required count. The foot row
+  carries that count on the left and the open control on the right. Those
+  two styles live in `FormsTab.tsx`, as `styles.foot` and `styles.openControl`.
 
   The form editor's trailing pane is `FormPreview.tsx`. It mounts
   `packages/form-ui`'s own `FieldForm` and `PathButtons`, the two the Player
