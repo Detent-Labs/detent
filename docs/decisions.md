@@ -125,7 +125,7 @@ stage-by-stage status.
 - Studio's native `<dialog>` confirm dialogs do not fully hold a keyboard
   user inside them. `stylex-phase-3-studio`'s own task 11.5 keyboard walk
   found two gaps, both pre-existing and unrelated to that phase's CSS-only
-  change: verified via the untouched JS in `ProcessHeaderBar.tsx`'s
+  change: verified via the untouched JS in `panels/shared/confirmDialog.tsx`'s
   `useConfirmDialog` and `ProcessesScreen.tsx`'s `StartPickerDialog`.
 
   First: Tab from the publish- and discard-confirm dialogs' focused Cancel
@@ -138,6 +138,11 @@ stage-by-stage status.
   cause: it may never register with the browser's own tab-order
   bookkeeping for the modal.
 
+  The removal dialog (`panels/RemoveFieldDialog.tsx`) is a third consumer of
+  the same hook. It shows the identical escape: forward Tab from its focused
+  Cancel lands on `<body>`. Shift+Tab wraps correctly inside the dialog. Only
+  the forward-Tab transition from Cancel breaks.
+
   Second: `StartPickerDialog` and `PromotionPreviewDialog` (`+ New
   process`, "Import a promoted version") call `showModal()` on mount with
   no cleanup. Escape and Cancel both close the dialog and drop focus to
@@ -148,6 +153,24 @@ stage-by-stage status.
   No follow-up change tracks this yet. It belongs to `studio-publish` or
   `spa-accessibility`, not `web-styling`: a CSS migration cannot cause or
   fix either gap.
+- **The studio's three confirmation dialogs (Publish, Discard draft, Remove
+  field) share presentation gaps.**
+  - The heading takes the global `h2` Title role
+    (`packages/web/src/shell/global.css:94-100`: 13.6px, weight 800,
+    uppercase, slate), the least prominent text in the dialog, and renders an
+    author's own label in capitals.
+  - Cancel prints in the accent (`rgb(212, 43, 17)`), beside the
+    accent-outlined destructive confirm.
+  - The fact counts print in the written face, where `DESIGN.md` puts a
+    figure in a column in mono.
+  - The Publish dialog's `<code>` falls back to the browser's `monospace`.
+  - At 420px the dialog spans the viewport with no gutter: the compiled
+    `maxWidth: "34rem"` replaces the browser's own modal width cap.
+  - Discard's heading is a statement, and Remove's is a question.
+  - Publish and Discard have no `aria-describedby`.
+
+  Name the fix: one `DESIGN.md` "Dialogs" decision, applied to all three
+  dialogs.
 - `NotFoundError` is served as HTTP 500 where most APIs answer 404. The
   mapping sits at `src/http/errors.ts:95`, and the header comment at `:10-16`
   calls it the one exception carved out of the message-free fallback. The
@@ -1552,11 +1575,20 @@ recorded rather than fixed. The RAIL tags are local to this section.
   text reads 3.90:1 hovered and 3.44:1 pressed in light, and 4.15:1 pressed in
   dark. `destructive-buttons-show-the-accent` cleared the same shortfall for
   `.btn-destructive` with `--color-accent-on-muted`, and this one wants the
-  same treatment.
-- **The step page's Remove step has no destructive treatment.**
-  `packages/web/src/areas/studio/panels/StepPage.tsx:610` renders
-  `btn btn-secondary` and commits at once. `DESIGN.md` asks that a destructive
-  action stay outlined in the accent.
+  same treatment. The removal dialog's Cancel
+  (`packages/web/src/areas/studio/panels/RemoveFieldDialog.tsx:202`) and the
+  field catalog's Remove field trigger
+  (`packages/web/src/areas/studio/panels/FieldCatalogPanel.tsx:926`) carry the
+  same class. Both read 4.53:1 at rest, 3.90:1 hovered and 3.45:1 pressed, in
+  light.
+- **Remove step and the field catalog's Remove field trigger have no
+  destructive treatment.** `packages/web/src/areas/studio/panels/StepPage.tsx:610`
+  renders `btn btn-secondary` and commits at once.
+  `packages/web/src/areas/studio/panels/FieldCatalogPanel.tsx:926` renders
+  `btn btn-ghost` and opens `RemoveFieldDialog` instead. `DESIGN.md` asks that
+  a destructive action stay outlined in the accent. The field catalog's
+  trigger also reads "Remove field" on every entity, group included; its own
+  dialog a moment later reads "Remove group".
 - **A leaf field's label beside a key-less field derives `_2`.** The leaf
   label path, `FieldEditor::updateLabel` in `panels/FieldCatalogPanel.tsx`,
   builds its dedupe set with `""` in it. A label whose key derives empty,
@@ -1810,6 +1842,53 @@ paths under `panels/`, `draft/` and `screens/` start at
   Two fixes exist, each a change of its own: drop the route from that
   sentence, or add a deliberate backdrop dismissal (`closedby="any"`) to
   every studio confirmation dialog, with its focus return.
+- **FIELDS-22: the kept-reference note names no location.** When a removal
+  keeps a CEL read or a plugin setting, the dialog adds "CEL expressions and
+  plugin settings keep their text." and "Check each one before you publish."
+  (`panels/RemoveFieldDialog.tsx:190-191`). It names no expression and no
+  setting, and no later screen lists them all
+  (`openspec/changes/remove-field-takes-its-references/specs/studio-app/spec.md:82-84`).
+  A kept CEL read surfaces later as an unknown-key result on the Checks tab.
+  A kept `valueFromField` or `instanceIdField` setting, and a kept
+  `process.start` mapping value, fail the way FIELDS-17 already describes.
+
+  The step list the note leans on, "Used in", sits out of view when the
+  author presses Remove field. Measured: its heading sat at -59px on one
+  field and -190px on another, and the pane behind the open dialog stayed
+  inert. The always-shown note's "step entry" is an internal word;
+  `design.md:96`'s copy table fixed that wording, so a rewrite needs the
+  owner's sign-off too. Risk (Medium): the note tells the author to check
+  references the dialog never lists.
+
+  Name the routes: an advisory "kept reference" check, a
+  `studio-checks-rail` change, or naming locations in the dialog directly,
+  which reopens the owner's "counts only" choice from 2026-09-13.
+- **FIELDS-23: removing a group's last field leaves an empty group card.**
+  Removing "Access Excel updated or prepared" on IT Offboarding left its
+  group, "Permissions", with no field on 4 step forms. Its "How it will
+  look" preview is an empty box, the Forms tab shows the same empty card,
+  and Checks reads 0. Neither the dialog nor the announcement mentions the
+  group. Risk (Medium): a participant meets an empty section after publish,
+  with no signal to the author beforehand.
+
+  Name the routes: count the emptied group as reach, with its own row and
+  note, or add an advisory check for a step that shows a group with no
+  field. Either needs a `studio-app` change.
+- **FIELDS-24: Remove field sits flush against "+ Add field".** Measured at
+  1440x900: Remove field `[344, 802, 101×37]`, "+ Add field"
+  `[344, 839, 109×37]`, 0px apart; `panels/FieldCatalogPanel.tsx:279-285`
+  draws the 2px rule above Remove field only. A field with no reach leaves
+  on one press (`panels/EntityTabs.tsx:450-453`), and a freshly added field
+  always has no reach. A double click removes a field, then opens the
+  neighbour field's Data source select. Risk (Medium): a press meant for
+  "+ Add field" can remove the field just configured, with no undo.
+
+  Name the fix: separate the two commands, with spacing and a rule between
+  them, or move Remove field into the field's own heading row.
+- **FIELDS-25: the Changes tab shows a field removal as a raw JSON diff.**
+  After a removal, `panels/ChangesView.tsx` renders the change the same way
+  it renders every other diff: a path, a kind, and a `from`/`to` value in
+  `JSON.stringify`. It is the only after-the-fact record of the removal.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 

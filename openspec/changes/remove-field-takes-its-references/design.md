@@ -83,7 +83,7 @@ this brief. Mockup: <https://claude.ai/code/artifact/fb6fe7ae-02fe-4a80-9a88-45a
   key shows its label alone. A long label wraps inside the dialog.
 - **Focus.** The dialog opens on Cancel. A decline returns focus to Remove
   field. A removal focuses the next rail entry and scrolls it into view. An
-  emptied catalog focuses "Add first field".
+  emptied catalog focuses "Add the first field".
 
 Copy, from the studio catalog, one key per sentence:
 
@@ -231,7 +231,7 @@ style shape does not add a mechanism.
 - `removeField` sets `refocusId` and `refocusRailId` to the neighbour's
   `railEntryId`. When the neighbour rule answers nothing, it takes the first
   rail entry the pruned catalog keeps. An emptied catalog takes a new id on the
-  "Add first field" button. A pure `focusAfterRemove(fields, fieldId)` in
+  "Add the first field" button. A pure `focusAfterRemove(fields, fieldId)` in
   `panels/fieldCatalogLogic.ts` picks that id.
 
 ### Announcements and the live region's name
