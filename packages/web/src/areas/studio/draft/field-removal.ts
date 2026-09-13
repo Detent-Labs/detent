@@ -168,7 +168,7 @@ export function fieldRemovalReach(draft: Draft, fieldId: string): FieldRemovalRe
     if (taken.length > 0) steps++;
     for (const entry of taken) takenAlong.add(entry);
     for (const map of [...stepActions(step).map((action) => action.output), step.subprocess?.outputMapping]) {
-      if (map === undefined) continue;
+      if (map == null) continue;
       idKeyedMaps.add(map);
       writers += Object.keys(map).filter(namesRemoved).length;
     }
@@ -255,23 +255,23 @@ export function removeFieldAndReferences(draft: Draft, fieldId: string): void {
   const steps = draft.workflow?.steps ?? [];
 
   for (const step of steps) {
-    if (step.view?.fields !== undefined) step.view.fields = step.view.fields.filter((entry) => !takesEntry(removal, entry));
+    if (step.view?.fields != null) step.view.fields = step.view.fields.filter((entry) => !takesEntry(removal, entry));
   }
 
   for (const action of steps.flatMap(stepActions)) {
-    if (action.output !== undefined && dropEntries(action.output, keyedByRemoved)) delete action.output;
+    if (action.output != null && dropEntries(action.output, keyedByRemoved)) delete action.output;
   }
 
   for (const step of steps) {
-    if (step.subprocess?.outputMapping !== undefined) dropEntries(step.subprocess.outputMapping, keyedByRemoved);
+    if (step.subprocess?.outputMapping != null) dropEntries(step.subprocess.outputMapping, keyedByRemoved);
   }
 
   const contract = draft.contract;
-  if (contract?.inputFields !== undefined) contract.inputFields = contract.inputFields.filter((entry) => !ids.has(entry));
-  if (contract?.outputFields !== undefined) contract.outputFields = contract.outputFields.filter((entry) => !ids.has(entry));
+  if (contract?.inputFields != null) contract.inputFields = contract.inputFields.filter((entry) => !ids.has(entry));
+  if (contract?.outputFields != null) contract.outputFields = contract.outputFields.filter((entry) => !ids.has(entry));
 
   for (const f of staying) {
-    if (f.columnMapping !== undefined && dropEntries(f.columnMapping, targetsRemoved)) delete f.columnMapping;
+    if (f.columnMapping != null && dropEntries(f.columnMapping, targetsRemoved)) delete f.columnMapping;
   }
 
   draft.fields = removeFieldIn(draft.fields ?? [], fieldId);

@@ -564,6 +564,38 @@ describe("removeFieldAndReferences", () => {
     );
   });
 
+  it("keeps a column mapping that was already empty", () => {
+    const draft = draftOf({
+      fields: [leaf("fld_amount", "amount"), leaf("fld_lookup", "lookup", { columnMapping: {} })],
+    });
+
+    removeFieldAndReferences(draft, "fld_amount");
+
+    expect(draft).toStrictEqual(draftOf({ fields: [leaf("fld_lookup", "lookup", { columnMapping: {} })] }));
+  });
+
+  it("removes one column mapping entry on a staying field nested inside a group", () => {
+    const draft = draftOf({
+      fields: [
+        group("fld_group", "grp", [
+          leaf("fld_name", "name"),
+          leaf("fld_lookup", "lookup", { columnMapping: { first: id("fld_name"), second: id("fld_other") } }),
+        ]),
+        leaf("fld_other", "other"),
+      ],
+    });
+
+    removeFieldAndReferences(draft, "fld_other");
+
+    expect(draft).toStrictEqual(
+      draftOf({
+        fields: [
+          group("fld_group", "grp", [leaf("fld_name", "name"), leaf("fld_lookup", "lookup", { columnMapping: { first: id("fld_name") } })]),
+        ],
+      }),
+    );
+  });
+
   it("takes a group's card and the members and notes inside it at every depth, and keeps every other entry in its place", () => {
     const build = () =>
       draftOf({
@@ -691,6 +723,72 @@ describe("removeFieldAndReferences", () => {
     removeFieldAndReferences(draft, "fld_status");
 
     expect(draft).toStrictEqual(build([total()]));
+  });
+});
+
+/** The JSON surface loads a draft whose nested containers can be `null`:
+ * `draft/load-guard.ts::checkDraftShape` checks top-level keys only. Both
+ * functions must treat a `null` container the way they already treat an
+ * absent (`undefined`) one, and neither may write to one. */
+describe("field-removal tolerates a null container the JSON surface can load", () => {
+  it("answers reach and completes the recipe when a step's view.fields is null", () => {
+    const draft = draftOf({
+      fields: [leaf("fld_amount", "amount")],
+      ...stepsOf(step("step_a", { view: { fields: null } })),
+    });
+
+    expect(() => fieldRemovalReach(draft, "fld_amount")).not.toThrow();
+    expect(() => removeFieldAndReferences(draft, "fld_amount")).not.toThrow();
+    expect(draft.workflow?.steps?.[0]?.view?.fields).toBeNull();
+  });
+
+  it("answers reach and completes the recipe when contract.inputFields is null", () => {
+    const draft = draftOf({
+      fields: [leaf("fld_amount", "amount")],
+      contract: { inputFields: null, outputFields: [id("fld_amount")], outcomes: ["done"] },
+    });
+
+    expect(() => fieldRemovalReach(draft, "fld_amount")).not.toThrow();
+    expect(() => removeFieldAndReferences(draft, "fld_amount")).not.toThrow();
+    expect(draft.contract?.inputFields).toBeNull();
+    expect(draft.contract?.outputFields).toStrictEqual([]);
+  });
+
+  it("answers reach and completes the recipe when a field's columnMapping is null", () => {
+    const draft = draftOf({
+      fields: [leaf("fld_amount", "amount"), { ...leaf("fld_lookup", "lookup"), columnMapping: null }],
+    });
+
+    expect(() => fieldRemovalReach(draft, "fld_amount")).not.toThrow();
+    expect(() => removeFieldAndReferences(draft, "fld_amount")).not.toThrow();
+    expect(draft.fields?.[0]?.columnMapping).toBeNull();
+  });
+
+  it("answers reach and completes the recipe when an action's output is null", () => {
+    const draft = draftOf({
+      fields: [leaf("fld_amount", "amount")],
+      ...stepsOf(step("step_a", { onEntry: [action("act_a", { output: null })] })),
+    });
+
+    expect(() => fieldRemovalReach(draft, "fld_amount")).not.toThrow();
+    expect(() => removeFieldAndReferences(draft, "fld_amount")).not.toThrow();
+    expect(draft.workflow?.steps?.[0]?.onEntry?.[0]?.output).toBeNull();
+  });
+
+  it("answers reach and completes the recipe when a subprocess's outputMapping is null", () => {
+    const draft = draftOf({
+      fields: [leaf("fld_amount", "amount")],
+      ...stepsOf(
+        step("step_a", {
+          type: "subprocess",
+          subprocess: { processId: "proc_child", versionBinding: "pinned", pinnedVersion: 1, inputMapping: {}, outputMapping: null },
+        }),
+      ),
+    });
+
+    expect(() => fieldRemovalReach(draft, "fld_amount")).not.toThrow();
+    expect(() => removeFieldAndReferences(draft, "fld_amount")).not.toThrow();
+    expect(draft.workflow?.steps?.[0]?.subprocess?.outputMapping).toBeNull();
   });
 });
 
