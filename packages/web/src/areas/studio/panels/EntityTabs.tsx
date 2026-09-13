@@ -350,8 +350,8 @@ export function FieldsTab({
   // removal. `refocusRailId` names the rail entry that commit scrolls into the
   // rail's view: the added or moved field's own, or the entry a removal
   // focuses. Every add, every move and every removal sets `refocusId`. Each
-  // sets `refocusRailId` too, but for a removal that focuses the first-field
-  // control, which leaves it undefined. A pointer drop clears both again.
+  // sets `refocusRailId` too. A removal that focuses the first-field control
+  // sets it to undefined. A pointer drop clears both again.
   const [dragFieldId, setDragFieldId] = useState<string | undefined>(undefined);
   const [announcement, setAnnouncement] = useState("");
   const [refocusId, setRefocusId] = useState<string | undefined>(undefined);
@@ -477,8 +477,9 @@ export function FieldsTab({
   /**
    * Makes a removal `requestRemove` measured, at once or on the dialog's
    * confirm. One `mutate` runs `removeFieldAndReferences`, so the field, every
-   * field below it and every id reference to them leave in one draft change
-   * (design.md, decision: "One recipe collects, then cleans, then prunes").
+   * field below it and every id reference to them outside a plugin `config`
+   * leave in one draft change (design.md, decision: "One recipe collects, then
+   * cleans, then prunes").
    * The tab then selects `neighbourAfterRemove`'s answer (design.md: "Remove
    * selects a sibling, then the group") and hands keyboard focus to
    * `focusAfterRemove`'s. Both read the draft in this closure, which still

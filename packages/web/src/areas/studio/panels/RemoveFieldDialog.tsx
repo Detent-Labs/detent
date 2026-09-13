@@ -9,8 +9,8 @@ import { useConfirmDialog } from "./shared/confirmDialog.js";
  * Copied from `ProcessHeaderBar.tsx`'s own dialog styles, not imported: each
  * component keeps its own style module (design.md, "The dialog hook moves
  * into a shared studio module"; `stylex-phase-3-studio` D9 keeps that copy
- * the norm). `::backdrop` stays a literal fallback in `app.css`, matched by
- * the `studio-dialog` class beside this compiled style.
+ * the norm). `::backdrop` stays a literal fallback in `shell/global.css`,
+ * matched by the `studio-dialog` class beside this compiled style.
  */
 const styles = stylex.create({
   dialog: {

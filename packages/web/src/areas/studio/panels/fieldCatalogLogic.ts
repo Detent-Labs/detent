@@ -162,8 +162,9 @@ export function appendToGroup(fields: DraftField[], groupId: string, field: Draf
  * depth, through the shared `pruneField`.
  *
  * `draft/field-removal.ts::removeFieldAndReferences` runs this as its last
- * write, once every id reference to a removed field is gone (design.md,
- * decision: "One recipe collects, then cleans, then prunes").
+ * write, once every id reference to a removed field outside a plugin `config`
+ * is gone (design.md, decision: "One recipe collects, then cleans, then
+ * prunes").
  * `focusAfterRemove` reads its answer, a new tree, for the rail entries a
  * removal keeps.
  *

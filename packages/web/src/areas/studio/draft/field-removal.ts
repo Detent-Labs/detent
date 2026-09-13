@@ -12,7 +12,7 @@ import { isDraftViewField, type DraftViewEntry } from "./view-layout";
  * any field below it. `fieldRemovalReach` measures a removal on the draft
  * before any write, and `hasReach` tells a removal with reach from one
  * without. `removeFieldAndReferences` makes the removal, and takes every id
- * reference to a removed field along.
+ * reference to a removed field outside a plugin `config` along.
  */
 
 /** A removal's reach: the removed field, and one count per kind of reference. */
@@ -222,8 +222,8 @@ function dropEntries(map: object, named: (key: string, value: unknown) => boolea
 
 /**
  * Removes `fieldId` from the catalog, with every id reference to a removed
- * field, as a `mutate` recipe: it writes the draft it receives. An id no field
- * carries leaves the draft unchanged.
+ * field outside a plugin `config`, as a `mutate` recipe: it writes the draft
+ * it receives. An id no field carries leaves the draft unchanged.
  *
  * The removed ids and group keys come from the catalog as it stands, before
  * any write, since the prune changes what the catalog answers. The writes then
