@@ -1591,6 +1591,35 @@ recorded rather than fixed. The RAIL tags are local to this section.
 - **Two browser-check entries name retired UI.** `docs/browser-checks.md:894`
   and `:923` still name the configuration pane and the ribbon bar.
   `.claude/rules/ui-glossary.md` retired both words with the process surface.
+- **STEP-1: at 1280px a condition row runs under the next section.** The
+  critique of `authoring-command-ink-advisory-role` measured it on
+  2026-09-14. The IT Offboarding draft's first path had a condition row.
+  - The "Only when" fieldset keeps the default `min-inline-size: min-content`
+    (`panels/PathsPanel.tsx:234`). The row's field select takes its longest
+    option's width, 647px (`panels/shared/ConditionBuilder.tsx:194`). The
+    fieldset then ends at x=1028, past the Path to section's edge at x=863.
+  - The On exit section covers the row's last 107px, its remove control
+    included. At 1600px the row fits.
+  - Risk (Medium): a pointer cannot reach the row's remove control at 1280px,
+    and the dashed box runs under another section.
+- **STEP-2: the guard's label wraps the whole condition builder.** One
+  `<label>` holds the guard text and the builder (`panels/PathsPanel.tsx:246`).
+  - Before a row exists, "+ Add row" is that label's first labelable control
+    (`panels/shared/ConditionBuilder.tsx:161`). Measured 2026-09-14, a click on
+    the label's own text added a row. The button's accessible name then reads
+    every word inside the label, from "guard" to "Developer view".
+  - An empty row's hint links to no control. The value input has no
+    `aria-describedby` pointing at it (`:233`).
+  - Risk (Medium): a stray click adds a row, and a screen reader hears a name
+    without the visible words (WCAG 2.5.3 and 1.3.1).
+- **STEP-3: three literal sizes sit off the type ramp.** The detector flagged
+  them on 2026-09-14. The step page's `hint` sets written text at 0.8rem
+  (`panels/StepPage.tsx:143`). A condition row's remove glyph sets 1.1rem
+  (`panels/shared/ConditionBuilder.tsx:53`). The header bar's name sets 1rem,
+  where the Headline role asks 1.25rem (`panels/ProcessHeaderBar.tsx:33`).
+  - Four more flags on the step page mark mono machine values at 0.8rem.
+    The Hierarchy in `DESIGN.md` allows that size for them.
+  - Risk (Low): type drifts outside the roles `DESIGN.md` names.
 
 ## Open from the 2026-09-13 Fields tab audits (each needs its own OpenSpec change)
 
@@ -1891,6 +1920,19 @@ only the marks the miniature draws. The required count stands beside it.
   three rows above it, and the legend keeps 24px. Risk (Low): a reader with
   low vision scrolls a box shorter than one card. The fix belongs to the fixed
   frame every tab of the process surface shares.
+- **FORMS-19: ten buttons lose their `.btn` classes.** Each one sets a literal
+  `className` and then spreads `stylex.props`, whose own `className` replaces
+  it. Measured 2026-09-14, "← Back to processes" computes three compiled
+  classes and no `btn`. Its ground reads `rgb(240, 240, 240)` in light and
+  `rgb(107, 107, 107)` in dark, the browser's own button face. The form
+  editor's pressed column option loses its box and weight the same way.
+  - The sites are `screens/EditScreen.tsx:817`, `:1046` and `:1062`, and
+    `screens/FormEditorScreen.tsx:1236`, `:1300` and `:1316`. The rest sit at
+    `screens/VersionsScreen.tsx:263`, `screens/ToolsScreen.tsx:189`,
+    `screens/PlayerScreen.tsx:336` and `screens/MigrationPlanScreen.tsx:281`.
+  - Risk (Medium): the back link draws a gray box on every dark studio
+    screen. The unpressed column option looks pressed. The fix joins the
+    literal classes into the spread, as the strip's `ghost` helper does.
 
 ## Open from the authoring-command-ink-advisory-role review (each needs its own OpenSpec change)
 
@@ -1911,6 +1953,17 @@ tags are local to this section. Paths under `panels/` and `screens/` start at
     the other in `refusal` (`panels/TimersPanel.tsx:54`).
   - Risk (Low): an author meets one message in two tones on one process
     surface, so the tone stops telling a warning from a refusal.
+- **TONE-2: the advisory role sits close to two neighbours.** The change's
+  critique measured it on 2026-09-14, on the Fields tab with `de` added.
+  - In light, a field's callout rule (`#e25a40`) reads 1.39:1 against the
+    entity rail's current mark (`#d42b11`). Their OKLab distance is 0.082.
+    At 400px the header bar's callout rule and that mark share one left edge.
+  - In dark, the advisory, refusal and accent on muted roles all resolve to
+    `#ff9783`. A callout's rule and its refusal text then read 1.00:1. The
+    empty form card's box matches the required mark's fill.
+  - Risk (Low): the advisory tone reads as the accent in light and as refusal
+    in dark. Shape, place and the callout's own sentence still tell the marks
+    apart.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 
