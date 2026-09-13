@@ -2,16 +2,18 @@ import { describe, expect, it } from "bun:test";
 import type { Draft } from "../src/areas/studio/draft/types.js";
 import type { EditorIssue } from "../src/areas/studio/draft/issues.js";
 import { formCardRows, miniatureBarHeight, viewIssues } from "../src/areas/studio/panels/formCardRows.js";
+import * as cardRows from "../src/areas/studio/panels/formCardRows.js";
 
 /**
  * The Forms tab's own row set (`studio-forms-overview`: "The Forms tab
  * carries one card per step that asks for something", "A card names its step
  * and counts the fields it draws", "A card draws a miniature of its form for
- * the eye alone", "A card reports its step's form issues").
+ * the eye alone", "A card reports its step's form issues", "The Forms tab
+ * explains the miniature's marks").
  *
  * `development-toolchain`'s split rule sends these to assertions: the row
- * set, the order, the counts, the miniature's order, its bar heights and the
- * issue tally are all values a pure function returns.
+ * set, the order, the counts, the miniature's order, its bar heights, the
+ * issue tally and the legend's items are all values a pure module returns.
  */
 
 const AMOUNT = "field_00000000-0000-4000-8000-0000000000a1";
@@ -195,8 +197,54 @@ describe("A card's miniature", () => {
   it("marks the entry that declares itself required", () => {
     const entries = formCardRows(DRAFT, [], "en")[0]?.entries ?? [];
 
-    expect(entries[0]?.required).toBe(true);
-    expect(entries[1]?.required).toBe(false);
+    // Amount declares `required: true`; Purpose declares no `required`.
+    expect(entries[0]?.requirement).toBe("required");
+    expect(entries[1]?.requirement).toBe("optional");
+  });
+
+  it("reads an entry whose required holds a CEL expression as conditional, and leaves it out of requiredCount", () => {
+    const conditional = {
+      ...DRAFT,
+      workflow: {
+        ...DRAFT.workflow,
+        steps: [
+          {
+            ...DRAFT.workflow!.steps![0],
+            view: {
+              fields: [
+                { ref: AMOUNT, required: { lang: "cel", src: "data.purpose != ''" } },
+                // design.md: an expression with an empty `src` still reads as
+                // conditional; the Checks tab reports it as incomplete.
+                { ref: NOTES, required: { lang: "cel", src: "" } },
+                { ref: PURPOSE, required: true },
+              ],
+            },
+          },
+          ...DRAFT.workflow!.steps!.slice(1),
+        ],
+      },
+    } as unknown as Draft;
+    const row = formCardRows(conditional, [], "en")[0];
+
+    expect(row?.entries.map((e) => e.requirement)).toEqual(["conditional", "conditional", "required"]);
+    expect(row?.requiredCount).toBe(1);
+  });
+
+  it("reads an entry declaring required: false as optional", () => {
+    const literalFalse = {
+      ...DRAFT,
+      workflow: {
+        ...DRAFT.workflow,
+        steps: [
+          { ...DRAFT.workflow!.steps![0], view: { fields: [{ ref: AMOUNT, required: false }] } },
+          ...DRAFT.workflow!.steps!.slice(1),
+        ],
+      },
+    } as unknown as Draft;
+    const row = formCardRows(literalFalse, [], "en")[0];
+
+    expect(row?.entries[0]?.requirement).toBe("optional");
+    expect(row?.requiredCount).toBe(0);
   });
 
   it("draws a long-text field taller than a one-line field", () => {
@@ -291,6 +339,58 @@ describe("A card's miniature", () => {
 
   it("reads requiredCount off DRAFT, one required entry among four", () => {
     expect(formCardRows(DRAFT, [], "en")[0]?.requiredCount).toBe(1);
+  });
+});
+
+/** The samples of the legend item naming one catalog key, or `undefined` where the module
+ * exports no legend or the legend holds no such item. Read through the
+ * namespace import, so a missing export fails the assertion rather than the
+ * module load. */
+function legendSamples(key: string) {
+  return cardRows.FORMS_LEGEND?.find((item) => item.key === key)?.samples;
+}
+
+describe("The Forms tab's legend", () => {
+  it("lists five items in the legend table's order, each by its catalog key", () => {
+    expect(cardRows.FORMS_LEGEND?.map((item) => item.key)).toEqual([
+      "formsTab.legendField",
+      "formsTab.legendRequired",
+      "formsTab.legendConditional",
+      "formsTab.legendSection",
+      "formsTab.legendHeight",
+    ]);
+  });
+
+  it("samples field with one 12px outline", () => {
+    expect(legendSamples("formsTab.legendField")).toEqual([
+      { index: 0, groupBreak: false, height: 12, requirement: "optional" },
+    ]);
+  });
+
+  it("samples required with one 12px solid fill", () => {
+    expect(legendSamples("formsTab.legendRequired")).toEqual([
+      { index: 0, groupBreak: false, height: 12, requirement: "required" },
+    ]);
+  });
+
+  it("samples required if a condition holds with one 12px dashed outline", () => {
+    expect(legendSamples("formsTab.legendConditional")).toEqual([
+      { index: 0, groupBreak: false, height: 12, requirement: "conditional" },
+    ]);
+  });
+
+  it("samples section with one 24px group break", () => {
+    expect(legendSamples("formsTab.legendSection")).toEqual([
+      { index: 0, groupBreak: true, height: 24, requirement: "optional" },
+    ]);
+  });
+
+  it("samples taller asks for more with three outlines, 8px, 16px and 24px", () => {
+    expect(legendSamples("formsTab.legendHeight")).toEqual([
+      { index: 0, groupBreak: false, height: 8, requirement: "optional" },
+      { index: 1, groupBreak: false, height: 16, requirement: "optional" },
+      { index: 2, groupBreak: false, height: 24, requirement: "optional" },
+    ]);
   });
 });
 

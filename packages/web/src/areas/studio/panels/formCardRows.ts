@@ -6,7 +6,8 @@ import { flattenDraftFields } from "../draft/fields.js";
 import { isDraftViewField, type DraftViewEntry } from "../draft/view-layout.js";
 import { resolveDraftLocalizedText } from "../draft/localized-text.js";
 import { roleStampFor, type StepRole } from "../draft/roleStamp.js";
-import { t } from "../catalog.js";
+import { t, type CatalogKey } from "../catalog.js";
+import { isExpression, type BoolOrExpr } from "./shared/overrideMode.js";
 
 type DraftStep = DraftOf<Step>;
 
@@ -14,27 +15,64 @@ type DraftStep = DraftOf<Step>;
  * One mark of a card's miniature: a field entry's own bar, or a group
  * entry's group break in its place (`studio-forms-overview`: "A card draws a
  * miniature of its form for the eye alone"). Drawn without a label — the
- * miniature stands for the form's shape, not its content.
+ * miniature stands for the form's shape, not its content. A legend sample is
+ * one too, so the legend draws the very marks it names.
  *
  * `height` is the mark's own height in pixels, from the field's kind alone,
  * so a long-text field reads taller than a one-line field without the card
  * drawing a single real control. On a group break `height` is the group
  * break's own fixed height, not a field kind's.
+ *
+ * `requirement` reads the entry's own `required`. Literal `true` reads
+ * `"required"`, a solid fill. A CEL expression reads `"conditional"`, a dashed
+ * outline, even while its `src` stays empty. Literal `false` and an absent
+ * `required` both read `"optional"`, the ordinary outline. A group break
+ * ignores it.
  */
 export interface MiniatureEntry {
-  /** The entry's index in `view.fields`, the miniature's React key. */
+  /** The React key either way: in a miniature, the entry's index in
+   * `view.fields`; in a legend sample, the mark's place within its sample
+   * group. */
   index: number;
   /** True where this entry is a group entry: it draws a group break, not a
    * mark. */
   groupBreak: boolean;
   height: number;
-  required: boolean;
+  requirement: "optional" | "required" | "conditional";
 }
 
 /** The group break's own fixed height, in pixels — a group opens a section
  * of the form, not a field of its own, so it draws at one height regardless
  * of any field kind. */
 const GROUP_BREAK_HEIGHT = 24;
+
+/**
+ * The Forms tab's legend, in the order it prints (`studio-forms-overview`:
+ * "The Forms tab explains the miniature's marks"). Each item names the
+ * catalog key holding its words, and the marks its sample draws. A sample is
+ * a `MiniatureEntry`, drawn through the same component as the miniature, so a
+ * sample cannot drift from the mark it names.
+ */
+export const FORMS_LEGEND: readonly { key: CatalogKey; samples: readonly MiniatureEntry[] }[] = [
+  { key: "formsTab.legendField", samples: [{ index: 0, groupBreak: false, height: 12, requirement: "optional" }] },
+  { key: "formsTab.legendRequired", samples: [{ index: 0, groupBreak: false, height: 12, requirement: "required" }] },
+  {
+    key: "formsTab.legendConditional",
+    samples: [{ index: 0, groupBreak: false, height: 12, requirement: "conditional" }],
+  },
+  {
+    key: "formsTab.legendSection",
+    samples: [{ index: 0, groupBreak: true, height: GROUP_BREAK_HEIGHT, requirement: "optional" }],
+  },
+  {
+    key: "formsTab.legendHeight",
+    samples: [
+      { index: 0, groupBreak: false, height: 8, requirement: "optional" },
+      { index: 1, groupBreak: false, height: 16, requirement: "optional" },
+      { index: 2, groupBreak: false, height: 24, requirement: "optional" },
+    ],
+  },
+];
 
 /** One plate on the Forms tab: everything the card prints, resolved. */
 export interface FormCardRow {
@@ -49,9 +87,11 @@ export interface FormCardRow {
    * number (`studio-forms-overview`: "A card names its step and counts the
    * fields it draws"). */
   fieldCount: number;
-  /** How many of `entries`, group breaks aside, declare `required: true` —
-   * the card's foot states this beside `fieldCount`. The miniature stays out
-   * of the accessibility tree and states neither number. */
+  /** How many of `entries`, group breaks aside, read `requirement` as
+   * `"required"`: a literal `required: true`. A CEL-conditional entry stays
+   * out of this count. The card's foot states it beside `fieldCount`. The
+   * miniature stays out of the accessibility tree and states neither
+   * number. */
   requiredCount: number;
   entries: MiniatureEntry[];
   /** The open issues naming this step's view, and whether any refuses a
@@ -130,7 +170,7 @@ export function formCardRows(draft: Draft, issues: readonly EditorIssue[], conte
       label: resolveDraftLocalizedText(step.label, contentLocale, baseLocale) || step.key || t("steps.unnamedStep"),
       role: roleStampFor(step, initialStep).role,
       fieldCount: marks.filter((m) => !m.groupBreak).length,
-      requiredCount: marks.filter((m) => !m.groupBreak && m.required).length,
+      requiredCount: marks.filter((m) => !m.groupBreak && m.requirement === "required").length,
       entries: marks,
       issues: viewIssues(issues, step.id),
     };
@@ -152,6 +192,13 @@ function miniatureEntry(entry: DraftViewEntry, index: number, byId: Map<string, 
     index,
     groupBreak,
     height: groupBreak ? GROUP_BREAK_HEIGHT : miniatureBarHeight(field),
-    required: entry.required === true,
+    requirement: requirementOf(entry.required),
   };
+}
+
+/** A view entry's `required`, read as one of three states. */
+function requirementOf(required: BoolOrExpr): MiniatureEntry["requirement"] {
+  if (required === true) return "required";
+  if (isExpression(required)) return "conditional";
+  return "optional";
 }

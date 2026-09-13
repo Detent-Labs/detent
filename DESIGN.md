@@ -240,8 +240,10 @@ scheme swaps the primitives and keeps every semantic role in place.
   to the point that clears 4.5:1 at 11px.
 - **Accent on Muted** (`#ae1800` light, `#ff9783` dark): the accent as text on
   the ledger ground or on a hover wash. Plain Docket Red measures under 4.5:1
-  there. It fills the required mark in a form card miniature. That mark is a
-  graphic, clearing the 3:1 minimum. A destructive button's hover and press
+  there. It fills the required mark in a form card miniature and draws the
+  conditional mark's dashed outline. Both marks are graphics, clearing the 3:1
+  minimum. The Forms tab legend repeats both on paper: 6.4:1 in light, 7.9:1
+  in dark, and 5.8:1 for slate in both. A destructive button's hover and press
   color stays held to the 4.5:1 minimum instead.
 
 ### Secondary
@@ -422,7 +424,8 @@ visible through it.
 A dashed border means not there yet. It marks an incomplete condition, an
 unresolved migration mapping, and a conditionally visible form card. It also
 marks a field kind the catalog lacks, the drop target at a form's tail, and a
-suggested role. The process name in the header bar takes a dashed underline
+suggested role. A form card miniature draws one for an entry that a condition
+makes required. The process name in the header bar takes a dashed underline
 while an author can still rename it in place. On the canvas, a dash marks a
 manual path and the keyboard focus ring.
 
@@ -611,22 +614,30 @@ own.
 
 ### The Form Card
 
+- A legend line stands above the grid, its left edge on the cards' 12px
+  inset. It names five marks, each beside a sample the miniature's own
+  component draws. Its words take 11px in slate, in the body face, without the
+  Legend style's uppercase. It keeps its place while the grid scrolls, and
+  wraps where one line cannot hold it. A tab with no card has no legend.
 - A 1px hairline box on paper, 12px padding, in an auto-fill grid of columns
   at least 280px wide.
 - An empty form takes a 2px box in the advisory tone instead, with a sentence
   standing where the miniature would.
-- The kicker takes mono at 11px, uppercase at 0.08em, in slate. The step name
-  takes weight 800. The check badge closes the head, on a step carrying an
-  open check result.
+- The kicker takes mono at 11px, uppercase at 0.08em, in slate. The step label
+  is a level-2 heading. The label's `h2` keeps the body text at weight 800,
+  apart from the Hierarchy's Title entry. The check badge closes the head, on
+  a step carrying an open check result.
 - The miniature sits on the ledger ground. It draws one mark, 4px wide, for
   each field entry other than a group entry. An ordinary mark draws as an
-  outline. A required entry's mark fills solid instead. A group entry draws a
-  group break, a 1px line, where a mark would stand.
+  outline. A required entry's mark fills solid instead. An entry whose
+  `required` holds CEL draws a dashed outline in Accent on Muted, with no fill.
+  A group entry draws a group break, a 1px line, where a mark would stand.
 - The foot row carries the field count on the left and the open control on
   the right. It adds the required count where an entry declares
-  `required: true`. An empty form's foot holds the control alone, at the
-  row's trailing edge. The control takes the authoring command style, at
-  4px block padding. The authoring command elsewhere takes 8px.
+  `required: true`. A conditional entry stays out of that count. An empty
+  form's foot holds the control alone, at the row's trailing edge. The control
+  takes the authoring command style, at 4px block padding and a 24px minimum
+  height. The authoring command elsewhere takes 8px.
 
 ### The Field Matrix
 
