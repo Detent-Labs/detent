@@ -396,15 +396,16 @@ export const en = {
   "formsTab.empty": "No step in this process declares a form yet.",
   "formsTab.fieldCount": "{count} fields",
   "formsTab.fieldCountOne": "1 field",
-  "formsTab.emptyForm": "Empty form",
   "formsTab.openForm": "Open the form",
   "formsTab.startForm": "Start the form",
   "formsTab.issueMark": "open issues on this form",
   "formsTab.issueMarkOne": "open issue on this form",
-  // The miniature's own accessible name (`studio-forms-overview`: "A card
-  // carries a miniature of its form"), one key per plural form so a
-  // translator sees the whole sentence. `miniatureEmpty` stands in the
-  // miniature's place on a form with no field entry.
+  // The foot's count text (`studio-forms-overview`: "A card names its step
+  // and counts the fields it draws"), one key per plural form so a
+  // translator sees the whole sentence. `fieldCount`/`fieldCountOne` state
+  // the field count alone; `miniatureLabel`/`miniatureLabelOne` state the
+  // required count beside it. `miniatureEmpty` stands in the miniature's
+  // place on a form with no field entry.
   "formsTab.miniatureLabel": "{count} fields, {required} required",
   "formsTab.miniatureLabelOne": "1 field, {required} required",
   "formsTab.miniatureEmpty": "No fields yet",
