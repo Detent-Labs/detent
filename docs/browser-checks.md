@@ -2895,10 +2895,10 @@ Choose "Submitted on", now the last of those three. Click "Remove field".
 Pass: "Submitted by", the field before it, becomes selected. It holds two
 fields now, "Remarks" and "Submitted by".
 
-On "Remarks", change its key to `my-field`. Pass: the check stands inside
-its own "What this field asks" zone, and that zone's heading takes the
-refusal tone. Its own rail entry carries the issue mark, and the
-"Notification" entry and editor carry none for it.
+Choose "Remarks" in the rail, then change its key to `my-field`. Pass: the
+check stands inside its own "What this field asks" zone, and that zone's
+heading takes the refusal tone. Its own rail entry carries the issue mark,
+and the "Notification" entry and editor carry none for it.
 
 Choose "Permissions". In its own move control, "Move this field to", pick
 "Hardware". Pass: "Permissions" indents once under "Hardware". The live
@@ -2914,8 +2914,9 @@ selected.
 
 Choose `immediate_lock_written_confirmation` ("Written confirmation of the
 immediate lock obtained"). Pass: the rail entry truncates on one line. The
-editor's heading and its label input both hold the whole label, wrapped
-rather than clipped.
+editor's heading shows the whole label, wrapped rather than clipped. The
+label input's value holds the whole label too. A person reads it by moving
+the caret to the end, or the input scrolls.
 
 Narrow the window below 64rem. Pass: the rail stands above the editor, in
 that reading order.
