@@ -1442,9 +1442,10 @@ step, the row carries `aria-current`, and its node reads as selected.
 Resize to 1000px wide. Pass: the steps register collapses to a disclosure
 above the configuration pane, and no column clips.
 
-### The Changes and Paths panels views (`studio-step-bench`)
+### The Changes and Paths panels views (`studio-step-bench`, `changes-tab-entity-change-list`)
 
-Source: `studio-step-bench` tasks 3.1 and 3.2.
+Source: `studio-step-bench` tasks 3.1 and 3.2; `changes-tab-entity-change-list`
+task 6.1.
 
 Seed the database and open a draft on the structure surface.
 
@@ -1454,13 +1455,26 @@ step it enters. An automatic path shows its priority and its guard's CEL.
 
 A manual path with neither reads "No priority" and "No guard".
 
-Rename the process without saving, then open Changes. Pass: the entry reads
-`label.en`, its first value is the published name and its second is the unsaved
-one. That order is the whole point. The reverse reads every addition as a
-removal.
+Rename `quantity`'s label on the Fields tab, without saving. The key follows
+the label, so type `quantity` back into Key: a guard reads `data.quantity`.
+Open Changes. Pass: a Fields row stands folded under the Fields heading, its
+stamp reads Changed. Open that row.
 
-Save, then publish from the header menu. Pass: the view refetches with no
-reload, and it reports that the draft matches the version just published.
+Switch back to the Fields tab and rename `unit_price` too, without saving.
+Type `unit_price` back into its Key. Return to Changes. Pass: a second Fields row now stands beside the first,
+and `quantity`'s row still stands open. Its open set survives the
+recompute: `ChangesView` stays mounted throughout.
+
+Save the draft. Add the `de` locale from the header's `⋮` menu, which makes
+German the content locale. Give `quantity`
+a German label, `Menge`, and publish. Rename `quantity`'s German label to
+`Anzahl`, without saving, then open Changes again. Pass: `quantity`'s row
+reads `Menge` before and `Anzahl` after. Both read as German, since the
+content locale reads the `de` entry on both sides now.
+
+Publish the rest of the draft from the header menu. Pass: the view
+refetches with no reload, and it reports that the draft matches the
+version just published.
 
 Narrow the window to 1024px wide with Paths open. Pass: the table scrolls
 inside its own view. Neither the page nor the screen scrolls sideways.
@@ -1468,6 +1482,56 @@ inside its own view. Neither the page nor the screen scrolls sideways.
 Switch the account menu's Language to German. Pass: both views still read
 English. The studio catalog carries English only, the same finding the two
 walks above already made.
+
+### The Versions screen: A as before, a waiting line, and a fetch failure (`changes-tab-entity-change-list`)
+
+Source: `changes-tab-entity-change-list` task 6.1.
+
+Seed the database. The seed publishes `laptop_inventory` as version 1, with no
+contract. Create its draft from the process list. On the Contract tab, tick
+"this process is subprocess-callable" and add the outcome `issued`. On the
+Steps tab, open the Issued end step and choose `issued` as its outcome. Save,
+and publish version 2.
+
+Open the Versions screen. Pass: the table lists both versions. Mark version 1
+as side A and version 2 as side B, then choose Diff selected. Pass: a waiting
+line stands while both bodies load, then the change list replaces it. The
+heading reads "Version 2 compared with version 1". Side A stays the before
+side, whichever column marks it.
+
+Pass: no row names the cancel-sink step or its `cancelled` outcome. Publishing
+compiles that step into both bodies. Only version 2's contract binds
+`cancelled` to it, so the two sinks differ. The strip before the compare alone
+keeps them out of the list.
+
+Back on the draft, add a field on the Fields tab, label it `Condition`, and
+save. Return to the Versions screen and choose Diff draft against base. Pass:
+the heading reads "Draft compared with version 2". The `Condition` row stands
+under Fields, stamped Added. A compare passing the draft first would stamp it
+Removed.
+
+Reload the screen. With playwright-cli's `route` command, mock `GET
+/processes/:processId/versions/:version` to answer 500 for one version's id.
+Choose Diff selected again. Pass: one waiting line stands, then the error
+banner takes its place.
+
+### Keyboard focus hand-off from a Checks row and a Changes row (`changes-tab-entity-change-list`)
+
+Source: `changes-tab-entity-change-list` task 6.1.
+
+Open a draft whose Checks tab lists a step-level issue and a process-level
+issue. Reach the Checks tab by keyboard and press Enter on the step-level
+row. Pass: focus lands on the Steps tab's own button in the tab row, and Steps
+stands open.
+
+Return to the Checks tab and press Enter on the process-level row. Pass:
+focus stays on the Checks tab's own button. A process-level issue names no
+tab. Arrow to the Paths button and press Enter. Pass: focus moves to Paths,
+and Paths stands open.
+
+Open Changes with at least one unsaved field rename, and reach its row's own
+open command by keyboard. Press Enter on it. Pass: focus lands on the Fields
+tab's own button in the tab row, and Fields stands open.
 
 ### `useFail`: no refetch loop
 

@@ -59,7 +59,7 @@ nav, the header bar, the tab row, then one tab body.
 
 The open tab stands in the address, at `/studio/processes/:id/edit/:tab`. All
 ten bodies stay mounted at once, and `hidden` shows one. A body keeps its own
-edit state across a switch: a half-typed outcome name, a selected field.
+half-typed state across a switch: an outcome name, a selected field.
 Unmounting on every switch would lose that state.
 
 Save, Discard draft and Publish stand in the header bar, right-aligned ahead
@@ -77,17 +77,18 @@ Every other term below belongs to one tab.
 | canvas | the graph surface an author draws a process on | `canvas/CanvasView.tsx` |
 | canvas bar | the row between the tab row and canvas: add controls, a reachability report, and selection controls | `canvas/CanvasBar.tsx` |
 | steps rail | the Steps tab's left column: one numbered row per step, in the draft's own order | `panels/StepsRail.tsx` |
-| step page | the Steps tab's wide right column, editing the one selected step | `panels/StepPage.tsx` |
+| step page | the Steps tab's wide right column, open on the one selected step | `panels/StepPage.tsx` |
 | masthead | the step page's top zone. It holds the step number, the kind phrase, the name, the key, the description, and the issues no section claims | `panels/StepPage.tsx` |
 | section | one subject group on the step page, standing open in one of two columns | `panels/sectionsFor.ts` |
-| Developer view | the step page's disclosure over that step's raw JSON. It stands closed on open | `panels/StepPage.tsx` |
+| Developer view | a disclosure over the raw JSON behind a step page or a change-list row. It stands closed on open | `panels/StepPage.tsx`, `panels/ChangeList.tsx` |
 | entity rail | the Fields and Data sources tabs' own left column: one row per entity | `panels/EntityTabs.tsx` |
 | field catalog | the Fields tab's editor over the process's field definitions | `panels/FieldCatalogPanel.tsx` |
 | field tabs | the Field / Values / Rules tab set inside the field catalog's editor, for the one selected top-level field | `panels/FieldCatalogPanel.tsx`, `FieldEditor` |
 | data sources | the Data sources tab's editor over the process's data source definitions | `panels/DataSourcesPanel.tsx` |
-| contract | the Contract tab, editing the process's `ProcessContract`: input fields, output fields, outcomes | `panels/ContractPanel.tsx` |
+| contract | the Contract tab, over the process's `ProcessContract`: input fields, output fields, outcomes | `panels/ContractPanel.tsx` |
 | field matrix | the Field matrix tab's grid of every field against every step | `panels/FieldMatrixPanel.tsx`, `panels/FieldMatrixGrid.tsx` |
 | changes | the Changes tab, listing the draft's difference against the base version | `panels/ChangesView.tsx` |
+| change list | the folded register of entity rows the Changes tab and the Versions screen both draw over `describeChanges`'s output | `panels/ChangeList.tsx` |
 | paths | the Paths tab, listing every path in the process, one row each | `panels/PathsView.tsx`, `panels/pathRows.ts` |
 | Forms tab | the tab holding one card per step that declares a view | `panels/FormsTab.tsx` |
 | form card | one bordered plate on the Forms tab. It carries a kicker, a label, a count and a miniature | `panels/formCardRows.ts` |

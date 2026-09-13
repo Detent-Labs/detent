@@ -1,15 +1,14 @@
 /**
- * The panels screen's Changes view: what a publish would change
+ * The Changes tab's body: what a publish would change, as a change list
  * (`studio-app`'s Changes-view requirements).
  *
  * It reads the draft as the editor holds it — unsaved edits included.
  * `VersionsScreen.diffAgainstBase()` reads the SAVED draft from the server
- * instead; a developer reading this view is mid-edit, so the live one is the
- * useful left side.
+ * instead; a developer on this tab is mid-edit, so the after side here is the
+ * live draft.
  *
- * The dock hosted this until the bench replaced it. Only the host moved: the
- * fetch still re-runs when `baseVersion` moves, and every rule about the
- * difference's direction holds.
+ * The base fetch re-runs when `baseVersion` moves, so a publish refreshes the
+ * list with no reload.
  */
 import { useEffect, useMemo, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
@@ -19,13 +18,13 @@ import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { t } from "../catalog.js";
 import { getVersionBody } from "../api/client.js";
 import { describeCaughtError } from "../errors.js";
-import { diffJson, type DiffEntry, type DiffKind } from "../screens/versionDiffLogic.js";
+import { describeChanges, type ChangeRow } from "../draft/changeSet.js";
+import { ChangeList } from "./ChangeList.js";
 import type { Draft } from "../draft/types.js";
 
 /**
- * The `.studio-empty` and `.studio-error-banner*` shapes, plus the three
- * `.studio-diff*` ones, all from `app.css`. Duplicated on purpose (D9) rather
- * than shared: `.studio-empty` and the error-banner shape each appear
+ * The `.studio-empty` and `.studio-error-banner*` shapes, both from
+ * `app.css`. Duplicated on purpose (D9) rather than shared: they each appear
  * near-identically in ten other studio files.
  */
 const styles = stylex.create({
@@ -65,41 +64,7 @@ const styles = stylex.create({
     flex: 1,
     color: colors.text,
   },
-  diff: {
-    listStyle: "none",
-    marginBlockStart: space.s3,
-    marginBlockEnd: 0,
-    marginInline: 0,
-    padding: 0,
-    fontSize: "0.85rem",
-  },
-  diffItem: {
-    paddingBlock: space.s1,
-    paddingInline: 0,
-    borderBottomWidth: 1,
-    borderBottomStyle: "solid",
-    borderBottomColor: colors.border,
-  },
-  diffCode: {
-    fontFamily: fonts.mono,
-    fontSize: "0.8rem",
-  },
-  diffAdded: {
-    color: colors.neutral900,
-  },
-  diffRemoved: {
-    color: colors.refusal,
-  },
 });
-
-// `DiffKind` is a closed three-value union (D3): `changed` gets no color
-// override, matching `.studio-diff-changed code:first-child`'s absence from
-// `app.css` today.
-const DIFF_KIND_STYLE: Record<DiffKind, stylex.StyleXStyles | undefined> = {
-  added: styles.diffAdded,
-  removed: styles.diffRemoved,
-  changed: undefined,
-};
 
 type BaseState =
   | { kind: "idle" }
@@ -115,14 +80,19 @@ interface Props {
    * `publishResult.version` by `EditorArea`, so a publish moves it and this
    * view refetches with no reload. */
   baseVersion: number | null;
-  /** Reports the difference's entry count to the index rail, which has no
-   * other way to reach it: the count is a fetch away and `panelEntityCounts`
-   * derives from the draft alone. `undefined` while nothing has been
-   * compared. */
+  /** The editor's content locale: the locale a `LocalizedText` reads in
+   * (D5), the same one `PathsView` takes. */
+  contentLocale: string;
+  /** Reports the change list's row count up to the Changes tab's own button
+   * in the tab row, which has no other way to reach it: the count is a fetch
+   * away and `processTabCounts` derives every other count from the draft
+   * alone. `undefined` while nothing has been compared. */
   onCount: (count: number | undefined) => void;
+  /** What a row's open command does. Without it no row offers one. */
+  onOpenRow?: (row: ChangeRow) => void;
 }
 
-export function ChangesView({ processId, token, draft, baseVersion, onCount }: Props) {
+export function ChangesView({ processId, token, draft, baseVersion, contentLocale, onCount, onOpenRow }: Props) {
   const [state, setState] = useState<BaseState>({ kind: "idle" });
 
   useEffect(() => {
@@ -144,20 +114,21 @@ export function ChangesView({ processId, token, draft, baseVersion, onCount }: P
     };
   }, [processId, token, baseVersion]);
 
-  // Base FIRST. `diffJson` reports a key present in its second argument alone
-  // as "added" and reads `from` off the first, so base-first runs every entry
-  // from the published value toward the draft — the direction a publish
-  // moves. `VersionsScreen` passes the draft first, which suits its neutral
-  // A-against-B framing beside `diffSelected` and would read a newly added
-  // field here as removed.
-  const diff = useMemo<DiffEntry[] | null>(() => {
+  // Base FIRST. `describeChanges` reads its `before` argument as the
+  // published value and its `after` argument as the draft, so base-first runs
+  // every row from the published value toward the draft — the direction a
+  // publish moves. `VersionsScreen` also passes its base or its side A first
+  // (D7), so both screens agree on which side reads as before.
+  // `describeChanges` JSON-copies both arguments, so memoizing on `state` and
+  // `draft` (rather than recomputing on every render) matters.
+  const rows = useMemo<ChangeRow[] | null>(() => {
     if (state.kind !== "loaded") return null;
-    return diffJson(stripCompiledContent(state.body as ProcessBody), draft);
-  }, [state, draft]);
+    return describeChanges(stripCompiledContent(state.body as ProcessBody), draft, contentLocale);
+  }, [state, draft, contentLocale]);
 
   useEffect(() => {
-    onCount(diff?.length);
-  }, [diff, onCount]);
+    onCount(rows?.length);
+  }, [rows, onCount]);
 
   if (baseVersion === null) return <p {...stylex.props(styles.empty)}>{t("changesView.firstPublish")}</p>;
   if (state.kind === "loading") return <p {...stylex.props(styles.empty)}>{t("changesView.loading")}</p>;
@@ -168,28 +139,9 @@ export function ChangesView({ processId, token, draft, baseVersion, onCount }: P
         <span {...stylex.props(styles.errorBannerMessage)}>{state.message}</span>
       </div>
     );
-  if (!diff) return null;
-  if (diff.length === 0) return <p {...stylex.props(styles.empty)}>{t("changesView.none")}</p>;
+  if (!rows) return null;
+  if (rows.length === 0) return <p {...stylex.props(styles.empty)}>{t("changesView.none")}</p>;
 
-  return (
-    <ul {...stylex.props(styles.diff)}>
-      {diff.map((d, i) => (
-        <li key={i} {...stylex.props(styles.diffItem)}>
-          <code {...stylex.props(styles.diffCode, DIFF_KIND_STYLE[d.kind])}>{d.path}</code> — {d.kind}
-          {d.kind !== "added" && (
-            <>
-              {" "}
-              from <code {...stylex.props(styles.diffCode)}>{JSON.stringify(d.from)}</code>
-            </>
-          )}
-          {d.kind !== "removed" && (
-            <>
-              {" "}
-              to <code {...stylex.props(styles.diffCode)}>{JSON.stringify(d.to)}</code>
-            </>
-          )}
-        </li>
-      ))}
-    </ul>
-  );
+  const heading = t("changeList.heading.base").replace("{version}", () => String(baseVersion));
+  return <ChangeList rows={rows} heading={heading} onOpenRow={onOpenRow} />;
 }

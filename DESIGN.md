@@ -17,6 +17,7 @@ colors:
   flag-visible: "#1450b8"
   flag-required: "#7a4d00"
   flag-readonly: "#6b2fa0"
+  dormant-500: "#726e6e"
 typography:
   headline:
     fontFamily: "system-ui, sans-serif"
@@ -129,7 +130,7 @@ components:
     padding: "2px 7px"
   stamp-dormant:
     backgroundColor: "transparent"
-    textColor: "#726e6e"
+    textColor: "{colors.dormant-500}"
     typography: "{typography.mono}"
     rounded: "{rounded.md}"
     padding: "2px 7px"
@@ -295,7 +296,8 @@ green. A destructive action stays outlined in the accent and never turns red.
 never a hex. The three flag tokens are the only exception. A component
 compiled with StyleX reads that role from
 `packages/form-ui/src/tokens.stylex.ts`, which aliases the same custom
-property `tokens.css` declares. Advisory and Dormant still need a role there.
+property `tokens.css` declares. Dormant now has one, as `colors.dormant`.
+Advisory still needs a role there.
 
 ## Typography
 

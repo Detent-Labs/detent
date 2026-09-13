@@ -23,7 +23,7 @@ import { getDraft, listProcesses } from "../api/client.js";
 import { useFetchOnce } from "../panels/shared/useFetchOnce.js";
 import type { DraftRecord, PublishResult } from "../api/types.js";
 import { DEFAULT_TAB, type ProcessTab, type Route } from "../routing.js";
-import { formEditorReturnTab, processTabCounts, tabForIssue } from "../draft/process-tabs.js";
+import { formEditorReturnTab, processTabCounts, tabForChangeGroup, tabForIssue } from "../draft/process-tabs.js";
 import { checksDotState, groupChecksBySource } from "../draft/checksRail.js";
 import { initialSaveState, type DraftSaveState } from "./draftSaveLogic.js";
 import { isDirty } from "./draftToolbarState.js";
@@ -265,6 +265,17 @@ interface ProcessSurfaceProps {
   navigate: (route: Route, opts?: NavigateOptions) => void;
   onUnauthorized: () => void;
   onDirtyChange?: (dirty: boolean) => void;
+}
+
+/**
+ * Focuses a tab's own button, then scrolls the tab row so the whole button
+ * shows. At a narrow width the row scrolls sideways, and `focus()` alone can
+ * leave the button part-clipped at the row's edge.
+ */
+function focusTabButton(tab: ProcessTab): void {
+  const button = document.getElementById(tabDomId(tab));
+  button?.focus();
+  button?.scrollIntoView({ block: "nearest", inline: "nearest" });
 }
 
 /**
@@ -729,6 +740,33 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, go, initial
     if (target !== "checks") setChecksStepId(undefined);
     navigate({ name: "edit", processId, tab: target });
   };
+  // The pending focus target for `openTabFromRow` below (D10): the tab a row
+  // command asked to open, until the effect below moves focus there.
+  const [pendingTabFocus, setPendingTabFocus] = useState<ProcessTab | undefined>(undefined);
+  // A row command hands focus to the tab it opens (`studio-process-tabs`).
+  // A target already open takes focus at once and records nothing: the
+  // effect below only fires on a tab switch, and this target's tab is not
+  // switching. Any other target goes through `goToTab` and becomes the
+  // pending focus. `openTab` follows the route on a later render, and the
+  // effect waits for that render, so focus lands on a tab button that
+  // already carries `aria-selected="true"` rather than on one still
+  // unselected.
+  const openTabFromRow = (target: ProcessTab) => {
+    if (target === openTab) {
+      focusTabButton(target);
+      return;
+    }
+    goToTab(target);
+    setPendingTabFocus(target);
+  };
+  // Moves focus onto the open tab only while it is the pending target, and
+  // clears the pending value either way, so a stale value never pulls focus
+  // on a later, unrelated tab switch.
+  useEffect(() => {
+    if (pendingTabFocus === openTab) focusTabButton(openTab);
+    setPendingTabFocus(undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openTab]);
   // What the Checks tab narrows to, resolved from the step the badge named.
   // A step the draft no longer holds narrows nothing: the filter drops rather
   // than showing an empty list nobody can widen back by pressing a badge.
@@ -930,7 +968,18 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, go, initial
               token={token}
               draft={draft}
               baseVersion={changesBaseVersion}
+              contentLocale={contentLocale}
               onCount={onChangesCount}
+              onOpenRow={(row) => {
+                // ponytail: the open command opens the owning tab and selects
+                // nothing inside it, so the author finds the entity there by
+                // eye. Ceiling: a tab holding many entities of the row's kind.
+                // Upgrade: hand the row's anchor to the target tab's own
+                // selection (the steps rail's step, the entity rail's field)
+                // beside `openTabFromRow`.
+                const tab = tabForChangeGroup(row.group);
+                if (tab) openTabFromRow(tab);
+              }}
             />,
           )}
           {/* The one place the full grouped rail stands. A row opens the tab
@@ -942,7 +991,7 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, go, initial
               canPublish={canPublish}
               narrowedTo={checksNarrowedTo}
               onShowEvery={() => setChecksStepId(undefined)}
-              onOpenIssue={(issue) => goToTab(tabForIssue(issue.entityType))}
+              onOpenIssue={(issue) => openTabFromRow(tabForIssue(issue.entityType))}
             />,
           )}
         </div>

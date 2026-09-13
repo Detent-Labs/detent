@@ -1,16 +1,18 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { listVersions, getVersionBody, getDraft } from "../api/client.js";
 import type { VersionSummary } from "../api/types.js";
 import type { ProcessBody } from "workflow-engine/schema";
 import { stripCompiledContent } from "workflow-engine/schema/strip-compiled";
-import { canDiff, diffJson, type VersionSelection, type DiffEntry } from "./versionDiffLogic.js";
+import { canDiff, type VersionSelection } from "./versionDiffLogic.js";
 import { buildPromotionFile, promotionFilename } from "./promotionExportLogic.js";
 import type { Route } from "../routing.js";
 import { describeCaughtError } from "../errors.js";
 import { useFail } from "../../../shell/useFail.js";
 import { t } from "../catalog.js";
+import { describeChanges, type ChangeRow } from "../draft/changeSet.js";
+import { ChangeList } from "../panels/ChangeList.js";
 
 const styles = stylex.create({
   studioScreen: {
@@ -93,45 +95,7 @@ const styles = stylex.create({
     marginBottom: space.s3,
     alignItems: "center",
   },
-  studioError: {
-    color: colors.refusal,
-  },
-  studioDiff: {
-    listStyle: "none",
-    marginBlockStart: space.s3,
-    marginBlockEnd: 0,
-    marginInline: 0,
-    padding: 0,
-    fontSize: "0.85rem",
-  },
-  studioDiffItem: {
-    paddingBlock: space.s1,
-    paddingInline: 0,
-    borderBottomWidth: 1,
-    borderBottomStyle: "solid",
-    borderBottomColor: colors.border,
-  },
-  studioDiffCode: {
-    fontFamily: fonts.mono,
-    fontSize: "0.8rem",
-  },
-  // `.studio-diff-added code:first-child`.
-  studioDiffAddedFirstCode: {
-    color: colors.neutral900,
-  },
-  // `.studio-diff-removed code:first-child`.
-  studioDiffRemovedFirstCode: {
-    color: colors.refusal,
-  },
 });
-
-// `DiffKind`'s three values, exhaustive: `changed` earns no extra style on
-// its leading `<code>`, matching today's stylesheet.
-const DIFF_KIND_FIRST_CODE_STYLE = {
-  added: styles.studioDiffAddedFirstCode,
-  removed: styles.studioDiffRemovedFirstCode,
-  changed: undefined,
-} satisfies Record<DiffEntry["kind"], unknown>;
 
 interface VersionsScreenProps {
   processId: string;
@@ -168,7 +132,16 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized }: V
    */
   const [canPlanMigration, setCanPlanMigration] = useState(false);
   const [selection, setSelection] = useState<VersionSelection>({});
-  const [diff, setDiff] = useState<DiffEntry[] | undefined>(undefined);
+  const [comparison, setComparison] = useState<{ key: string; heading: string; rows: ChangeRow[] } | undefined>(undefined);
+  // Drives the waiting line while both compared bodies are in flight. Cleared
+  // in the same branch that either sets the comparison or calls `fail`, so it
+  // never stands beside the result it precedes.
+  const [waiting, setWaiting] = useState(false);
+  // Each compare press takes the next number. Only the response carrying the
+  // latest number writes the comparison, the waiting line or the failure, so
+  // an earlier press answering late neither replaces a newer result nor
+  // clears the waiting line under a compare still in flight.
+  const latestCompare = useRef(0);
   const [loading, setLoading] = useState(true);
   // Diff-action failures (shown next to the diff controls) — distinct from
   // loadError below (the versions list itself failed to load), since
@@ -207,40 +180,61 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized }: V
 
   useEffect(() => load(), [load]);
 
-  const runDiff = async (a: unknown, b: unknown) => {
-    setError(null);
-    setDiff(undefined);
-    try {
-      setDiff(diffJson(a, b));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "diff failed");
-    }
-  };
-
+  /**
+   * Both published bodies are compiled, so each loses the compile pass's
+   * injected content before they compare (D7) — otherwise the cancel sink
+   * would read as a change neither developer made.
+   */
   const diffSelected = async () => {
     if (!canDiff(selection)) return;
+    const compare = ++latestCompare.current;
     setError(null);
-    setDiff(undefined);
+    setComparison(undefined);
+    setWaiting(true);
     try {
       const [bodyA, bodyB] = await Promise.all([getVersionBody(processId, selection.a, token), getVersionBody(processId, selection.b, token)]);
-      await runDiff(bodyA, bodyB);
+      if (compare !== latestCompare.current) return;
+      const rows = describeChanges(stripCompiledContent(bodyA as ProcessBody), stripCompiledContent(bodyB as ProcessBody));
+      setWaiting(false);
+      setComparison({
+        key: `${selection.a}-${selection.b}`,
+        // Side A reads as before and side B as after (D7).
+        heading: t("changeList.heading.versions")
+          .replace("{after}", () => String(selection.b))
+          .replace("{before}", () => String(selection.a)),
+        rows,
+      });
     } catch (e) {
+      if (compare !== latestCompare.current) return;
+      setWaiting(false);
       fail(e);
     }
   };
 
   const diffAgainstBase = async () => {
     if (baseVersion === null) return;
+    const compare = ++latestCompare.current;
     setError(null);
-    setDiff(undefined);
+    setComparison(undefined);
+    setWaiting(true);
     try {
       const [draft, baseBody] = await Promise.all([getDraft(processId, token), getVersionBody(processId, baseVersion, token)]);
+      if (compare !== latestCompare.current) return;
       // A draft is authored-shape, a published body compiled. Comparing them
       // raw reports the compile pass's cancel-sink injection as a change the
       // author neither made nor can act on — it is re-injected at the next
       // publish. Strip the base so both sides are the same kind of artifact.
-      await runDiff(draft?.body, stripCompiledContent(baseBody as ProcessBody));
+      // The base reads as before, the draft as after (D7).
+      const rows = describeChanges(stripCompiledContent(baseBody as ProcessBody), draft?.body);
+      setWaiting(false);
+      setComparison({
+        key: `base-${baseVersion}`,
+        heading: t("changeList.heading.draft").replace("{version}", () => String(baseVersion)),
+        rows,
+      });
     } catch (e) {
+      if (compare !== latestCompare.current) return;
+      setWaiting(false);
       fail(e);
     }
   };
@@ -354,30 +348,19 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized }: V
           </div>
         </>
       )}
-      {error && <p {...stylex.props(styles.studioError)}>{error}</p>}
-      {diff &&
-        (diff.length === 0 ? (
+      {/* A diff or export failure reports where the change list would appear, as the Changes tab's does. */}
+      {error && (
+        <div {...stylex.props(styles.errorBanner)} role="alert">
+          <span {...stylex.props(styles.errorBannerStamp)}>{t("error.failed")}</span>
+          <span {...stylex.props(styles.errorBannerMessage)}>{error}</span>
+        </div>
+      )}
+      {waiting && <p {...stylex.props(styles.studioEmpty)}>{t("versionsScreen.waiting")}</p>}
+      {comparison &&
+        (comparison.rows.length === 0 ? (
           <p {...stylex.props(styles.studioEmpty)}>No differences.</p>
         ) : (
-          <ul {...stylex.props(styles.studioDiff)}>
-            {diff.map((d, i) => (
-              <li key={i} {...stylex.props(styles.studioDiffItem)}>
-                <code {...stylex.props(styles.studioDiffCode, DIFF_KIND_FIRST_CODE_STYLE[d.kind])}>{d.path}</code> — {d.kind}
-                {d.kind !== "added" && (
-                  <>
-                    {" "}
-                    from <code {...stylex.props(styles.studioDiffCode)}>{JSON.stringify(d.from)}</code>
-                  </>
-                )}
-                {d.kind !== "removed" && (
-                  <>
-                    {" "}
-                    to <code {...stylex.props(styles.studioDiffCode)}>{JSON.stringify(d.to)}</code>
-                  </>
-                )}
-              </li>
-            ))}
-          </ul>
+          <ChangeList key={comparison.key} rows={comparison.rows} heading={comparison.heading} />
         ))}
     </main>
   );
