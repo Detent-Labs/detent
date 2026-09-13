@@ -244,12 +244,12 @@ function legendItems(html: string): string[] {
 /**
  * One item's markup, split at its `aria-hidden="true"` subtrees: the text a
  * screen reader reads, the text inside a hidden subtree, how many hidden
- * subtrees the item holds, and how many elements stand inside them. It reads
- * the tags in order and counts depth, so a subtree's nested `<span>` does not
- * end the subtree early.
+ * subtrees the item holds, and the `class` of each element inside them, in
+ * order, `""` for an element carrying none. It reads the tags in order and
+ * counts depth, so a subtree's nested `<span>` does not end the subtree early.
  */
-function splitHidden(markup: string): { visible: string; hidden: string; groups: number; hiddenElements: number } {
-  const out = { visible: "", hidden: "", groups: 0, hiddenElements: 0 };
+function splitHidden(markup: string): { visible: string; hidden: string; groups: number; hiddenClasses: string[] } {
+  const out = { visible: "", hidden: "", groups: 0, hiddenClasses: [] as string[] };
   // Elements open inside the current hidden subtree; 0 outside one.
   let depth = 0;
   for (const m of markup.matchAll(/<(\/?)\w+[^>]*>|[^<]+/g)) {
@@ -261,7 +261,7 @@ function splitHidden(markup: string): { visible: string; hidden: string; groups:
       if (depth > 0) depth--;
     } else if (depth > 0) {
       depth++;
-      out.hiddenElements++;
+      out.hiddenClasses.push(/\sclass="([^"]*)"/.exec(token)?.[1] ?? "");
     } else if (/\saria-hidden="true"/.test(token)) {
       depth = 1;
       out.groups++;
@@ -299,9 +299,51 @@ describe("The Forms tab's legend", () => {
       expect(item.groups).toBe(1);
       expect(item.hidden).toBe("");
     }
+  });
+
+  it("draws each sample with the class stack the miniature gives the mark it names", () => {
+    // A miniature holding an ordinary, a required and a CEL-conditional entry,
+    // then a group entry, in that order.
+    const SECTION = "field_00000000-0000-4000-8000-0000000000a5";
+    const fourMarks = {
+      ...DRAFT,
+      fields: [...DRAFT.fields!, { id: SECTION, key: "section", type: "group", label: { en: "Section" } }],
+      workflow: {
+        ...DRAFT.workflow,
+        steps: [
+          {
+            ...DRAFT.workflow!.steps![0],
+            view: {
+              fields: [
+                { ref: AMOUNT },
+                { ref: AMOUNT, required: true },
+                { ref: AMOUNT, required: { lang: "cel", src: "data.amount > 100" } },
+                { ref: SECTION },
+              ],
+            },
+          },
+          ...DRAFT.workflow!.steps!.slice(1),
+        ],
+      },
+    } as unknown as Draft;
+    const [inner] = miniatures(render({ draft: fourMarks }));
+    const miniatureClasses = [...inner!.matchAll(/<span class="([^"]*)"/g)].map((m) => m[1]!);
+
+    // Four styled marks that differ, so an unstyled sample matches none.
+    expect(miniatureClasses).toHaveLength(4);
+    expect(new Set(miniatureClasses).size).toBe(4);
+    expect(miniatureClasses).not.toContain("");
+    const [outline, fill, dash, groupBreak] = miniatureClasses;
+
     // One mark each for field, required, the conditional and the section's
     // group break; three outlines for the heights.
-    expect(items.map((item) => item.hiddenElements)).toEqual([1, 1, 1, 1, 3]);
+    expect(legendItems(render()).map((item) => splitHidden(item).hiddenClasses)).toEqual([
+      [outline],
+      [fill],
+      [dash],
+      [groupBreak],
+      [outline, outline, outline],
+    ]);
   });
 
   it("takes no keyboard focus, so a walk with the Tab key never lands inside it", () => {
@@ -510,6 +552,25 @@ describe("A plate's issue badge", () => {
 
     // The markup escapes the ampersand.
     expect(render({ draft: dollar, issues: [ISSUE] })).toContain('aria-label="1 open issue on $&amp;"');
+  });
+
+  it("fills the count before the step, so a label holding {count} prints as the author typed it", () => {
+    const braces = {
+      ...DRAFT,
+      workflow: {
+        ...DRAFT.workflow,
+        steps: [
+          { ...DRAFT.workflow!.steps![0], label: { en: "Collect {count} signatures" } },
+          ...DRAFT.workflow!.steps!.slice(1),
+        ],
+      },
+    } as unknown as Draft;
+
+    // One issue: the singular sentence holds no `{count}` of its own, so a
+    // step-first fill would put the count into the label.
+    expect(render({ draft: braces, issues: [ISSUE] })).toContain(
+      'aria-label="1 open issue on Collect {count} signatures"',
+    );
   });
 
   it("draws no badge on a plate whose view draws no issue", () => {

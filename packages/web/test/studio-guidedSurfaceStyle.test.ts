@@ -277,7 +277,7 @@ describe("the card's heading keeps the label's look", () => {
     // design.md, "The step label becomes a level-2 heading": `global.css`
     // gives every `h2` the heading face, a size, uppercase, tracking, a muted
     // color and margins. A compiled class outranks the element selector, so
-    // the label prints as the body text it was.
+    // the label prints as body text at weight 800.
     expect(block).toMatch(/fontWeight: 800\b/);
     expect(block).toMatch(/\bmargin: 0\b/);
     expect(block).toMatch(/fontFamily: fonts\.body\b/);
@@ -322,16 +322,21 @@ describe("the required mark on the muted ground", () => {
     expect(read(TOKENS_STYLEX)).toContain('accentOnMuted: "var(--color-accent-on-muted)"');
   });
 
-  it("keeps its fill under forced colors, where a plain background is erased", () => {
+  it("keeps its fill and its border in one system color under forced colors", () => {
     const source = stripComments(read("src/areas/studio/panels/FormsTab.tsx"));
 
     // The audit for forms-tab-form-strip: forced-colors mode maps
     // `accentOnMuted`'s background to Canvas, so a required mark drew as the
     // same outline as an ordinary one. `CanvasText` plus
-    // `forcedColorAdjust: "none"` keeps the fill solid there too.
+    // `forcedColorAdjust: "none"` keeps the fill solid there too. That
+    // `none` also stops the UA from replacing the border's color, so the
+    // border declares `CanvasText` as well: the outline, the fill and the dash
+    // read one system color and differ by shape alone (design.md, "The dashed
+    // mark").
     expect(source).toMatch(/const FORCED_COLORS = "@media \(forced-colors: active\)";/);
     const block = styleBlock(source, "miniatureRequired");
     expect(block).toMatch(/backgroundColor: \{\s*default: colors\.accentOnMuted,\s*\[FORCED_COLORS\]: "CanvasText",?\s*\}/);
+    expect(block).toMatch(/borderColor: \{\s*default: colors\.accentOnMuted,\s*\[FORCED_COLORS\]: "CanvasText",?\s*\}/);
     expect(block).toMatch(/forcedColorAdjust: \{\s*default: "auto",\s*\[FORCED_COLORS\]: "none",?\s*\}/);
   });
 });

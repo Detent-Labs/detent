@@ -4520,9 +4520,10 @@ meets `scope=started` should infer no new permission tier from it.
   Each `MiniatureEntry` carries a `requirement`, reading the entry's
   `required` as one of three states. Literal `true` reads `"required"`, and a
   CEL expression reads `"conditional"`. Literal `false` and an absent key both
-  read `"optional"`. The component `MiniatureMark` draws them as an outline, a
-  solid fill and a dashed outline. The miniature and the legend both draw
-  through it, and `requiredCount` counts `"required"` alone.
+  read `"optional"`. The component `MiniatureMark` draws `"required"` as a
+  solid fill, `"conditional"` as a dashed outline and `"optional"` as an
+  outline. The miniature and the legend both draw through it, and
+  `requiredCount` counts `"required"` alone.
 
   The `Miniature` component carries `aria-hidden="true"` and no role, so a
   screen reader skips it. The function `footCountText` builds the foot's

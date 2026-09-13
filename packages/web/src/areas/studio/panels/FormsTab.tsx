@@ -193,9 +193,10 @@ const styles = stylex.create({
   // the role read here.
   miniatureRequired: {
     backgroundColor: { default: colors.accentOnMuted, [FORCED_COLORS]: "CanvasText" },
-    borderColor: colors.accentOnMuted,
+    borderColor: { default: colors.accentOnMuted, [FORCED_COLORS]: "CanvasText" },
     // `none` under forced colors stops the UA from replacing this fill with
-    // its own forced background.
+    // its own forced background. It stops the UA from replacing the border's
+    // color too, so the border declares the same system color as the fill.
     forcedColorAdjust: { default: "auto", [FORCED_COLORS]: "none" },
   },
   // A CEL-conditional entry's mark: a dashed outline in the required color,
