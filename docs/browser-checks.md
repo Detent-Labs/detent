@@ -3465,6 +3465,39 @@ each on its own fresh draft.
    own "Discard draft" does not work, so do not use it here. See the
    `docs/decisions.md` entry DRAFT-1.
 
+### The Forms tab card miniature (`forms-tab-form-strip`)
+
+Source: `forms-tab-form-strip` tasks 3.5 and 3.6. The height budget and a
+mark's own contrast both come off a screenshot, read by eye against a real
+window. No `bun:test` assertion sees either, so this check lands here.
+
+Build the production bundle and open it on the engine's own port. Seed the
+database, then sign in as `demo-superuser@example.test`, password
+`seed-demo-password`. In the Processes list, find `it_offboarding` and
+choose "Create draft". Open its Forms tab, at
+`/studio/processes/<id>/edit/forms`.
+
+1. Resize the window to 1100px wide. Read the Forms tab body's own height in
+   the inspector. Resize the window's height until that body measures 635px
+   tall. Pass: the twelfth card, last in the four-row grid, reads its open
+   control without scrolling the tab body.
+2. Read "Submit the Exit Notification", the card with the most required
+   entries. Pass: an ordinary mark draws as a hairline outline against the
+   ledger ground. A required mark draws as a filled block instead. Both read
+   apart from each other and from the ground, in the light scheme.
+3. Switch the OS or browser to the dark color scheme and read the same card
+   again. Pass: the outline and the filled mark still read apart, against
+   the dark scheme's own ledger ground.
+4. Open "Submit the Exit Notification" from its card's open control. In the
+   form editor, add ten field entries and save. Return to the Forms tab.
+   Pass: that card's marks continue onto a second line, and every mark stays
+   whole and visible.
+
+Go back to the process list and choose "Discard" on the `it_offboarding`
+row, then accept the browser's confirm. The header bar's own "Discard
+draft" does not work, so do not use it here. See the `docs/decisions.md`
+entry DRAFT-1.
+
 ### The field matrix's height (`field-matrix-fill-height`)
 
 A `bun:test` assertion already holds the field matrix's two style

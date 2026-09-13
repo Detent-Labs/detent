@@ -1790,6 +1790,114 @@ by that change. The MATRIX tags are local to this section.
   - Risk (Low): a sideways scroll briefly shows a cell's content through a
     sticky header.
 
+## Open from the 2026-09-13 Forms tab audits (each needs its own OpenSpec change)
+
+The change `forms-tab-form-strip` (PR #109) ran a final code review, a browser
+check, `/impeccable critique` and `/impeccable audit` on the Studio Forms tab
+on 2026-09-13. The browser check ran on the IT Offboarding draft at 1100x876.
+Every item below sits outside that change, and this section records it in
+place of a fix. The `FORMS-n` tags are local to this section; paths under
+`panels/` and `screens/` start at `packages/web/src/areas/studio/`.
+
+Three questions wait on the owner's call. FORMS-1 and FORMS-2 share one:
+which of the two lands first. FORMS-3 and FORMS-4 carry one each.
+
+- **FORMS-1: twelve open controls share one accessible name.** Each card's
+  open control (`panels/FormsTab.tsx:270`) reads "Open the form"
+  (`packages/web/src/i18n/catalogs/studio.ts:400`). The step's name is a
+  sibling span in the card's head (`panels/FormsTab.tsx:248`), and nothing
+  ties it to the button. The words predate the change, which moved the
+  control into the card's foot, further from the name. Risk (Medium): a
+  screen reader hears "Open the form, button" twelve times on IT Offboarding
+  and cannot tell the controls apart (WCAG 2.4.6). The fix points
+  `aria-describedby` at the name span; a visually hidden step name inside the
+  button would first need FIELDS-2's fix.
+- **FORMS-2: the miniature's marks have no key.** An outline, a solid fill, a
+  1px group break and four heights (8, 12, 16 and 24px) each mean something
+  (`panels/FormsTab.tsx:111` to `:157`). An author learns them only by opening
+  forms. The miniature takes no pointer interaction (`:123`), as its spec
+  requires (`openspec/specs/studio-forms-overview/spec.md:83`), so a tooltip
+  is ruled out. Risk (Medium): the miniature's encoding stays private to
+  whoever read the design. The fix adds a legend line above the grid, in the
+  47px the measured grid leaves free. Owner's call: FORMS-1 or FORMS-2 first.
+- **FORMS-3: an empty card states one fact twice.** "No fields yet" stands in
+  the miniature's place (`panels/FormsTab.tsx:291`), and "Empty form" stands
+  in the foot (`:265`), 4px apart. Measured 2026-09-13 by emptying "Hold and
+  Close the Account" unsaved, the card stood 134px tall. The spec asks for
+  both sentences (`openspec/specs/studio-forms-overview/spec.md:39`, `:84`),
+  so dropping one is a spec delta. The card's 2px advisory border
+  (`panels/FormsTab.tsx:52`) measures 1.88:1 on light paper; both sentences
+  carry the condition beside it. Risk (Low): the card repeats itself. Owner's
+  call: keep both sentences, or drop one.
+- **FORMS-4: the count includes group entries the miniature draws as breaks.**
+  "Submit the Exit Notification" reads "32 fields". Its miniature draws 26
+  marks and 6 group breaks. `fieldCount` counts every field entry
+  (`panels/formCardRows.ts:127`), as the spec requires
+  (`openspec/specs/studio-forms-overview/spec.md:36`). A screen reader also
+  hears the count twice: first in the miniature's name (`panels/FormsTab.tsx:292`),
+  then in the foot (`:263`). Risk (Low): the number and the drawing disagree
+  on what a field is. Owner's call: keep counting group entries, or count
+  what the miniature draws as a mark.
+- **FORMS-5: a CEL-conditional required entry draws as an ordinary outline.**
+  `miniatureEntry` sets `required: entry.required === true`
+  (`panels/formCardRows.ts:150`). An entry declaring `required` as a CEL
+  expression therefore draws an outline, and `requiredCount` (`:128`) leaves
+  it out. No file under `examples/` declares one today. Risk (Low): the
+  miniature under-reports a form whose requiredness depends on data. The fix
+  can borrow the dashed border, which already marks a conditional form card
+  in `design-language.md`. The spec's scenario names the literal
+  `required: true`, so that fix is a spec delta.
+- **FORMS-6: the open control stands 23px tall.** Its `openControl` style
+  sets 4px block padding (`panels/FormsTab.tsx:202`), which the card's height
+  budget needed (`DESIGN.md:624`). Measured 2026-09-13 at 93.8x23px, one pixel
+  under WCAG 2.5.8's 24px. It passes on that criterion's spacing exception.
+  At phone width it is the card's only target. Risk (Low): the studio targets
+  a desktop, so this stays polish.
+- **FORMS-7: the authoring command's hover is faint, and its press drops text
+  contrast.** The hover wash measures 1.08:1 light and 1.18:1 dark against the
+  plate (`panels/FormsTab.tsx:205`). While pressed, the ink-14% wash (`:206`)
+  drops the command's text to 4.42:1 light and 3.82:1 dark, under WCAG 1.4.3's
+  4.5:1. `FormTabStrip.tsx`'s own `control` style draws the same washes
+  (`panels/FormTabStrip.tsx:112`, `:113`), and `DESIGN.md:468` states them.
+  Risk (Low): the dark press fails for as long as the button is held. The fix
+  belongs to the authoring command `DESIGN.md` defines for both screens.
+- **FORMS-8: card names are spans, and the grid offers no jump.** The name
+  (`panels/FormsTab.tsx:248`) is no heading, so heading navigation cannot move
+  between cards. A keyboard user presses Tab twelve times to reach the
+  twelfth card's control, more where cards carry a check badge (`:251`). The
+  header bar's `h1` sits at `panels/ProcessHeaderBar.tsx:783`, and FIELDS-7
+  records the outline gap below it. Risk (Low): both predate the change. The
+  fix makes each name a heading, at the level FIELDS-7's outline repair
+  settles.
+- **FORMS-9: the browser check's wrap step clears its line by a few pixels.**
+  Step 4 of "The Forms tab card miniature" adds ten field entries
+  (`docs/browser-checks.md:3492`). The final review computed about 308.7px of
+  mark room per card at 1100px, against 314px for the resulting marks.
+  The browser run wrapped three marks, since the form editor added one group
+  entry on its own. Risk (Low): a sub-pixel column change can flip the pass
+  line. The fix asks for fifteen entries.
+- **FORMS-10: a double press on Create draft sends two saves.** `createDraft`
+  (`screens/ProcessesScreen.tsx:366`) awaits the seed read and `saveDraft`
+  before it navigates. Its button (`:579`) stays enabled meanwhile. Measured
+  2026-09-13 during a slow navigation, a second press sent a second
+  `PUT /drafts/...`. The revision moved ahead of the open editor, and its
+  first save answered "This draft was changed elsewhere" (409). Risk
+  (Medium): the author's first save fails, and they reload and redo the
+  edit. The fix holds the button disabled until the navigation.
+- **FORMS-11: the shell header overflows between 30rem and its own width.**
+  The header keeps `flexWrap: "nowrap"` down to 30rem
+  (`packages/web/src/shell/Chrome.tsx:24`). Measured 2026-09-13 at 560px, the
+  document's `scrollWidth` read 627 and the Account button sat clipped. Risk
+  (Low): the page scrolls sideways at that width. German labels widen the row
+  further, so the fix lets it wrap wherever it runs out of room.
+- **FORMS-12: at 1100px the form editor squeezes field keys to one character
+  per line.** Above the 64rem breakpoint (`screens/FormEditorScreen.tsx:60`)
+  the editor keeps three columns: a 16rem palette, the canvas, and a preview
+  up to 22rem (`:165`). A key (`formCardKey`, `:356`) wraps anywhere, beside
+  the card's marks and move buttons. Seen 2026-09-13 in a screenshot only;
+  the column widths stand unmeasured. Risk (Low): an author cannot read a key
+  on a common laptop width. The fix is its own `/impeccable adapt` change.
+
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 
 Each entry below names a cut somebody proposed, the reason a reviewer refused
