@@ -225,6 +225,12 @@ const styles = stylex.create({
   openCommand: {
     marginBlockStart: space.s2,
   },
+  // `.btn-ghost`'s inline padding and `.btn`'s 1px border would set the open
+  // command's text right of the property names. This command alone pulls back
+  // by both, so its text stands flush left.
+  openCommandFlush: {
+    marginInlineStart: `calc(-1 * (${space.s1} + 1px))`,
+  },
   developer: {
     marginBlockStart: space.s2,
   },
@@ -433,7 +439,7 @@ function Row({ row, open, onToggle, onOpenRow }: RowProps) {
         )}
         {openKey !== undefined && onOpenRow && (
           <div {...stylex.props(styles.openCommand)}>
-            <button type="button" {...ghost(styles.command)} onClick={() => onOpenRow(row)}>
+            <button type="button" {...ghost(styles.command, styles.openCommandFlush)} onClick={() => onOpenRow(row)}>
               {t(openKey).replace("{label}", row.label)}
             </button>
           </div>
@@ -512,11 +518,11 @@ function RawEntry({ entry }: { entry: DiffEntry }) {
   );
 }
 
-/** `btn btn-ghost` plus a compiled style, as one set of props. Spreading
+/** `btn btn-ghost` plus compiled styles, as one set of props. Spreading
  * `stylex.props(...)` beside a `className` attribute drops whichever of the
  * two the JSX writes first, so the class lists join here, as in
  * `FormTabStrip.tsx`. */
-function ghost(style: stylex.StyleXStyles) {
-  const compiled = stylex.props(style);
+function ghost(...style: stylex.StyleXStyles[]) {
+  const compiled = stylex.props(...style);
   return { ...compiled, className: `btn btn-ghost ${compiled.className ?? ""}`.trim() };
 }
