@@ -2962,6 +2962,8 @@ real DOM.
 
 Source: `remove-field-takes-its-references` tasks 2.2, 3.2 and 3.3.
 
+Measured on 2026-09-13 against the production build served from `WEB_ROOT`.
+
 Open the IT Offboarding draft's Fields tab. Choose the group "Processing
 (Fabrikam)". Click "Remove field". Pass: a modal dialog opens, titled `Remove
 the group “Processing (Fabrikam)”?`. It names `processing_fabrikam` beside the label.
@@ -3006,9 +3008,9 @@ The guard on the path from Book to Booked still reads `data.booking_status
 == 'booked'`. The guard on the path from Book to Booking Error still reads
 `data.booking_status == 'failed'`.
 
-Back on the IT Offboarding draft, click "+ Add field" twice. Pass: each new
-"(unnamed field)" entry lands at the top level. Each takes the current mark
-and keyboard focus in its own label input, in turn.
+Back on the IT Offboarding draft, open its Fields tab. Click "+ Add field"
+twice. Pass: each new "(unnamed field)" entry lands at the top level. Each
+takes the current mark and keyboard focus in its own label input, in turn.
 
 Choose the rail's last entry, the second new row, and click "Remove
 field". Pass: no dialog opens, since it has no reach. The live region
@@ -3385,6 +3387,8 @@ The destructive rule in `tokens.css` lost to a later rule on every screen. A
 now pins the rule order and the class pairing:
 `packages/web/test/btn-destructive-accent.test.ts`. Whether the accent
 renders stays a visual judgment, so it lands here.
+
+Measured on 2026-09-13 against the production build served from `WEB_ROOT`.
 
 Build the production bundle and open it on the engine's own port. Seed the
 database first. The studio controls need the author role, and the admin
