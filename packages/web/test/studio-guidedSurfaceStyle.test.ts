@@ -181,16 +181,43 @@ describe("the design language's own numbers", () => {
   });
 });
 
+describe("the miniature wraps and clips nothing", () => {
+  it("wraps its marks onto a further line, aligned to the baseline", () => {
+    const block = styleBlock(stripComments(read("src/areas/studio/panels/FormsTab.tsx")), "miniature");
+
+    // design.md, "The miniature's box": marks and group breaks align to the
+    // line's bottom edge, and a long form's marks wrap rather than overrun
+    // the card.
+    expect(block).toMatch(/flexWrap: "wrap"/);
+    expect(block).toMatch(/alignItems: "flex-end"/);
+  });
+
+  it("clips no mark that outgrows one line", () => {
+    const block = styleBlock(stripComments(read("src/areas/studio/panels/FormsTab.tsx")), "miniature");
+
+    expect(block).not.toMatch(/overflow[XY]?: "hidden"/);
+  });
+});
+
 describe("the required mark on the muted ground", () => {
-  it("reads a semantic alias, never a ramp step", () => {
+  it("draws an ordinary mark as an outline, with no fill of its own", () => {
+    const block = styleBlock(stripComments(read("src/areas/studio/panels/FormsTab.tsx")), "miniatureMark");
+
+    expect(block).toMatch(/borderWidth: 1/);
+    expect(block).not.toMatch(/backgroundColor/);
+  });
+
+  it("fills solid rather than merely coloring text, and reads a semantic alias, never a ramp step", () => {
     const source = stripComments(read("src/areas/studio/panels/FormsTab.tsx"));
 
-    // `design-language.md`: a component reads a semantic role, never a hex or
-    // a ramp step directly. `accentOnMuted` is the alias, `accent400` and its
-    // siblings are the ramp. The neighbouring `cardEmpty` reads `accent400`
-    // and predates this change, so the pattern stays on this one block.
+    // design.md, "Required marks differ in fill as well as color": a required
+    // mark fills solid, so the block sets `backgroundColor`, not `color` — the
+    // mark itself is a box, not text. `accentOnMuted` is the semantic alias;
+    // `accent400` and its siblings are the ramp. The neighbouring `cardEmpty`
+    // reads `accent400` and predates this change, so the pattern stays on
+    // this one block.
     const block = styleBlock(source, "miniatureRequired");
-    expect(block).toMatch(/color: colors\.accentOnMuted/);
+    expect(block).toMatch(/backgroundColor: \{\s*default: colors\.accentOnMuted,/);
     expect(block).not.toMatch(/colors\.accent[0-9]/);
   });
 
@@ -204,5 +231,35 @@ describe("the required mark on the muted ground", () => {
     expect(css).toContain("--color-accent-on-muted: var(--color-accent-700);");
     expect(dark).toContain("--color-accent-on-muted: var(--color-accent-400);");
     expect(read(TOKENS_STYLEX)).toContain('accentOnMuted: "var(--color-accent-on-muted)"');
+  });
+
+  it("keeps its fill under forced colors, where a plain background is erased", () => {
+    const source = stripComments(read("src/areas/studio/panels/FormsTab.tsx"));
+
+    // The audit for forms-tab-form-strip: forced-colors mode maps
+    // `accentOnMuted`'s background to Canvas, so a required mark drew as the
+    // same outline as an ordinary one. `CanvasText` plus
+    // `forcedColorAdjust: "none"` keeps the fill solid there too.
+    expect(source).toMatch(/const FORCED_COLORS = "@media \(forced-colors: active\)";/);
+    const block = styleBlock(source, "miniatureRequired");
+    expect(block).toMatch(/backgroundColor: \{\s*default: colors\.accentOnMuted,\s*\[FORCED_COLORS\]: "CanvasText",?\s*\}/);
+    expect(block).toMatch(/forcedColorAdjust: \{\s*default: "auto",\s*\[FORCED_COLORS\]: "none",?\s*\}/);
+  });
+});
+
+describe("the group break survives forced colors", () => {
+  it("draws with a 1px border there, since a background alone is erased", () => {
+    const source = stripComments(read("src/areas/studio/panels/FormsTab.tsx"));
+    const block = styleBlock(source, "miniatureGroupBreak");
+
+    // The audit: the group break is a 1px `background-color` line with no
+    // border, so it vanishes under forced colors and the miniature ground
+    // merges with the plate. A 1px system-color border, active only under
+    // forced colors, keeps the break visible without changing its normal-mode
+    // look (design.md, "Required marks differ in fill as well as color").
+    expect(block).toMatch(/backgroundColor: colors\.textMuted/);
+    expect(block).toMatch(/borderWidth: \{\s*default: 0,\s*\[FORCED_COLORS\]: 1,?\s*\}/);
+    expect(block).toMatch(/borderColor: \{\s*default: "transparent",\s*\[FORCED_COLORS\]: "CanvasText",?\s*\}/);
+    expect(block).toMatch(/forcedColorAdjust: \{\s*default: "auto",\s*\[FORCED_COLORS\]: "none",?\s*\}/);
   });
 });

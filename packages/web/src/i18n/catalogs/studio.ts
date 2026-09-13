@@ -401,8 +401,13 @@ export const en = {
   "formsTab.startForm": "Start the form",
   "formsTab.issueMark": "open issues on this form",
   "formsTab.issueMarkOne": "open issue on this form",
-  "formsTab.requiredMark": "required",
-  "formsTab.noteEntry": "Note",
+  // The miniature's own accessible name (`studio-forms-overview`: "A card
+  // carries a miniature of its form"), one key per plural form so a
+  // translator sees the whole sentence. `miniatureEmpty` stands in the
+  // miniature's place on a form with no field entry.
+  "formsTab.miniatureLabel": "{count} fields, {required} required",
+  "formsTab.miniatureLabelOne": "1 field, {required} required",
+  "formsTab.miniatureEmpty": "No fields yet",
 
   // The form editor's trailing pane: what a participant meets
   // (`studio-form-editor`).
