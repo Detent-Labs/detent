@@ -248,9 +248,10 @@ Values follow one rule per shape:
 - An id reads as the label of the entity it names, looked up on its own side.
   An id naming nothing prints raw, in mono.
 - A record keyed by field id names each property by that field's label, looked
-  up on its own side. `SubprocessSpec.inputMapping` and
-  `SubprocessSpec.outputMapping` are such records. An action stays one property,
-  so its `output` prints as JSON inside it.
+  up on its own side. A subprocess step's `outputMapping` is such a record. The
+  child contract's field ids key its `inputMapping`, and the parent body
+  declares none of them. Each of its properties names the raw id, in mono. An
+  action stays one property, so its `output` prints as JSON inside it.
 - An `Expression` reads as its `src`, in mono.
 - An absent value reads "none".
 - Anything else prints as `JSON.stringify`, in mono.

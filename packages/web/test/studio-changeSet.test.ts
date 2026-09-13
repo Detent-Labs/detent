@@ -538,6 +538,32 @@ describe("describeChanges: values", () => {
     ]);
   });
 
+  it("reads a translation added or removed in the content locale as one property", () => {
+    const translated = base();
+    translated.fields[0].fields[1].label.de = "E-Mail";
+
+    expect(only(describeChanges(base(), translated, "de")).properties).toEqual([
+      { name: "Label", kind: "changed", before: { text: "Email", mono: false }, after: { text: "E-Mail", mono: false } },
+    ]);
+    expect(only(describeChanges(translated, base(), "de")).properties).toEqual([
+      { name: "Label", kind: "changed", before: { text: "E-Mail", mono: false }, after: { text: "Email", mono: false } },
+    ]);
+  });
+
+  it("still names a base-locale change the content locale does not read", () => {
+    const after = base();
+    after.fields[1].fields[0].label.en = "Forward to";
+
+    expect(only(describeChanges(base(), after, "de")).properties).toEqual([
+      {
+        name: "Label (en)",
+        kind: "changed",
+        before: { text: "Forwarding address", mono: false },
+        after: { text: "Forward to", mono: false },
+      },
+    ]);
+  });
+
   it("reads a yes-or-no value as yes or no, and an absent value as none", () => {
     const required = base();
     required.workflow.steps[0].view.fields[0].required = false;
@@ -637,19 +663,21 @@ describe("describeChanges: values", () => {
     expect(only(describeChanges(base(), written)).properties[0]!.after).toEqual({ text: "P1DT4H30M", mono: true });
   });
 
-  it("reads a subprocess step's version binding in plain words, and a mapping entry under its field's label", () => {
+  it("reads a subprocess step's version binding in plain words, and each mapping entry under the id its record keys by", () => {
     const spec = { processId: "proc_child", versionBinding: "pinned", pinnedVersion: 2, inputMapping: {}, outputMapping: {} };
     const before = minimal(
       [{ id: "step_call", key: "call", label: { en: "Call" }, type: "subprocess", subprocess: spec, paths: [] }],
       [{ id: "field_amount", key: "amount", label: { en: "Amount" }, type: "number" }],
     );
     const after = structuredClone(before);
+    // `inputMapping` keys by the child contract's field ids, which the parent
+    // declares none of; `outputMapping` keys by the parent's own fields.
     after.workflow.steps[0].subprocess = {
       processId: "proc_child",
       versionBinding: "latest-at-spawn",
       contractRef: "sig_1",
-      inputMapping: { field_amount: { lang: "cel", src: "data.amount" } },
-      outputMapping: {},
+      inputMapping: { field_child_total: { lang: "cel", src: "data.amount" } },
+      outputMapping: { field_amount: { lang: "cel", src: "child.data.total" } },
     };
 
     const row = only(describeChanges(before, after));
@@ -660,11 +688,18 @@ describe("describeChanges: values", () => {
       before: { text: t("subprocess.bindingPinned"), mono: false },
       after: { text: t("subprocess.bindingLatest"), mono: false },
     });
-    expect(row.properties.find((p) => p.name === "Input mapping · Amount")).toEqual({
-      name: "Input mapping · Amount",
+    expect(row.properties.find((p) => p.name === "Input mapping · field_child_total")).toEqual({
+      name: "Input mapping · field_child_total",
+      nameMono: true,
       kind: "added",
       before: none,
       after: { text: "data.amount", mono: true },
+    });
+    expect(row.properties.find((p) => p.name === "Output mapping · Amount")).toEqual({
+      name: "Output mapping · Amount",
+      kind: "added",
+      before: none,
+      after: { text: "child.data.total", mono: true },
     });
   });
 

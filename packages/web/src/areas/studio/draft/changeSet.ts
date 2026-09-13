@@ -360,7 +360,7 @@ const TEXT_KEYS = new Set(["label", "description", "text"]);
 const JSON_KEYS = new Set(["config", "attributes", "columnMapping", "default"]);
 /** Declared nested objects: each leaf reads as `{property} · {leaf}`. */
 const NESTED_KEYS = new Set(["validation", "subprocess"]);
-/** Records keyed by field id: each entry reads under that field's label. */
+/** Records keyed by field id: each entry reads as a property of its own. */
 const FIELD_RECORD_KEYS = new Set(["inputMapping", "outputMapping"]);
 /** Keys holding another entity's id, and the kind of entity it names. */
 const REFERENCES = new Map<string, "step" | "field" | "dataSource">([
@@ -417,16 +417,18 @@ function valueProperties(key: string, name: Name, bv: unknown, av: unknown, ctx:
   if (objectOrAbsent(bv) && objectOrAbsent(av)) {
     if (TEXT_KEYS.has(key)) return localizedProperties(name, bv, av, ctx);
     if (NESTED_KEYS.has(key)) return keyProperties(bv, av, [], ctx, (leaf) => (FIELD_RECORD_KEYS.has(leaf) ? propName(leaf) : leafName(name, leaf)));
-    if (FIELD_RECORD_KEYS.has(key)) return fieldRecordProperties(name, bv, av, ctx);
+    if (FIELD_RECORD_KEYS.has(key)) return fieldRecordProperties(key, name, bv, av, ctx);
   }
   return [{ ...name, kind, before: valueOf(key, bv, ctx.b), after: valueOf(key, av, ctx.a) }];
 }
 
 /**
  * A `LocalizedText` reads in each side's reading locale. A difference in any
- * other locale adds a property named with that locale. The one locale left
- * out is the locale the plain property reads on both sides; when a side falls
- * back to its base locale, that is the base locale.
+ * other locale adds a property named with that locale. A locale stays out when
+ * each side either reads it or has no entry for it: the plain property already
+ * shows that difference, so a translation added or removed in the content
+ * locale prints once. A change to a base-locale entry neither side reads
+ * still prints under its locale.
  */
 function localizedProperties(name: Name, b: Obj | undefined, a: Obj | undefined, ctx: Ctx): ChangeProperty[] {
   const properties: ChangeProperty[] = [];
@@ -436,12 +438,12 @@ function localizedProperties(name: Name, b: Obj | undefined, a: Obj | undefined,
     properties.push({ ...name, kind: kindOf(b, a), before: bText === undefined ? none() : plain(bText), after: aText === undefined ? none() : plain(aText) });
   }
   const reads = (value: Obj, side: Side) => (typeof value[side.locale] === "string" ? side.locale : side.baseLocale);
-  const bReads = b && reads(b, ctx.b);
-  const aReads = a && reads(a, ctx.a);
-  const covered = bReads === undefined ? aReads : aReads === undefined || aReads === bReads ? bReads : undefined;
+  const shownPlainly = (value: Obj | undefined, side: Side, locale: string) =>
+    value === undefined || value[locale] === undefined || reads(value, side) === locale;
   const entry = (v: unknown) => (typeof v === "string" ? plain(v) : json(v));
   for (const locale of new Set([...Object.keys(a ?? {}), ...Object.keys(b ?? {})])) {
-    if (locale === covered || same(b?.[locale], a?.[locale])) continue;
+    if (same(b?.[locale], a?.[locale])) continue;
+    if (shownPlainly(b, ctx.b, locale) && shownPlainly(a, ctx.a, locale)) continue;
     properties.push({
       name: fill("changeList.name.locale", { property: name.name, locale }),
       ...(name.nameMono && { nameMono: true }),
@@ -453,14 +455,21 @@ function localizedProperties(name: Name, b: Obj | undefined, a: Obj | undefined,
   return properties;
 }
 
-/** A record keyed by field id names each entry by that field's label. */
-function fieldRecordProperties(name: Name, b: Obj | undefined, a: Obj | undefined, ctx: Ctx): ChangeProperty[] {
+/**
+ * A record keyed by field id. `outputMapping` keys by the process's own
+ * fields, so each entry reads under that field's label on its own side.
+ * `inputMapping` keys by the child contract's field ids, which this body
+ * declares none of, so each entry reads under the raw id, in mono.
+ */
+function fieldRecordProperties(key: string, name: Name, b: Obj | undefined, a: Obj | undefined, ctx: Ctx): ChangeProperty[] {
   const properties: ChangeProperty[] = [];
+  const childIds = key === "inputMapping";
   for (const id of new Set([...Object.keys(a ?? {}), ...Object.keys(b ?? {})])) {
     if (same(b?.[id], a?.[id])) continue;
-    const leaf = fieldLabel(id, a?.[id] !== undefined ? ctx.a : ctx.b);
+    const leaf = childIds ? id : fieldLabel(id, a?.[id] !== undefined ? ctx.a : ctx.b);
     properties.push({
       name: fill("changeList.name.leaf", { property: name.name, leaf }),
+      ...(childIds && { nameMono: true }),
       kind: kindOf(b?.[id], a?.[id]),
       before: valueOf("", b?.[id], ctx.b),
       after: valueOf("", a?.[id], ctx.a),
