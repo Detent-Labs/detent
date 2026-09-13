@@ -759,6 +759,33 @@ describe("describeChanges: values", () => {
   });
 });
 
+describe("describeChanges: direction", () => {
+  it("reads an addition as a removal, a removal as an addition, and a changed value the other way round once the sides swap", () => {
+    const after = base();
+    after.fields.push({ id: "field_new", key: "new", label: { en: "New" }, type: "string" });
+    after.dataSources = [];
+    after.workflow.steps[1].paths[0].label = "Accept";
+    const kinds = (rows: ChangeRow[]) => Object.fromEntries(rows.map((r) => [r.key, r.kind]));
+
+    expect(kinds(describeChanges(base(), after))).toEqual({
+      "fields:field_new": "added",
+      "dataSources:ds_people": "removed",
+      "paths:path_approve": "changed",
+    });
+
+    const swapped = describeChanges(after, base());
+
+    expect(kinds(swapped)).toEqual({
+      "fields:field_new": "removed",
+      "dataSources:ds_people": "added",
+      "paths:path_approve": "changed",
+    });
+    expect(swapped.find((r) => r.key === "paths:path_approve")?.properties).toEqual([
+      { name: "Label", kind: "changed", before: { text: "Accept", mono: false }, after: { text: "Approve", mono: false } },
+    ]);
+  });
+});
+
 describe("describeChanges: totality", () => {
   it("anchors a member with no id at its own JSON path", () => {
     const before = minimal([], [{ key: "a", label: { en: "A" }, type: "string" }]);

@@ -445,7 +445,8 @@ caller. Some of those return an author somewhere other than the tab row.
 - `docs/browser-checks.md`, the Versions walk. It checks the A-before reading.
   It compares `laptop_inventory`'s version 1, with no contract, against a
   contracted version 2. Pass: no row names the cancel-sink step or the
-  `cancelled` outcome. It then mocks the version-body route to answer 500 with
+  `cancelled` outcome. A field added to the draft then reads Added against the
+  base. It then mocks the version-body route to answer 500 with
   playwright-cli. Pass: one waiting line stands, then the error takes its
   place.
 - `docs/browser-checks.md`, a keyboard walk. It covers the focus hand-off from

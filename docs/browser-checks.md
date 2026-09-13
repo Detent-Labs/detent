@@ -1504,6 +1504,12 @@ compiles that step into both bodies. Only version 2's contract binds
 `cancelled` to it, so the two sinks differ. The strip before the compare alone
 keeps them out of the list.
 
+Back on the draft, add a field on the Fields tab, label it `Condition`, and
+save. Return to the Versions screen and choose Diff draft against base. Pass:
+the heading reads "Draft compared with version 2". The `Condition` row stands
+under Fields, stamped Added. A compare passing the draft first would stamp it
+Removed.
+
 Reload the screen. With playwright-cli's `route` command, mock `GET
 /processes/:processId/versions/:version` to answer 500 for one version's id.
 Choose Diff selected again. Pass: one waiting line stands, then the error
