@@ -184,8 +184,8 @@ export function countTechnicalClearKeys(draft: Draft, fieldId: string): number {
 
 /**
  * Whether the Technical checkbox needs to raise its confirm dialog before
- * running the clearing pass. `SubFieldRow` and `FieldEditor` both call this
- * with `next` and `countTechnicalClearKeys`'s own result, and skip
+ * running the clearing pass. `FieldEditor` calls this with `next` and
+ * `countTechnicalClearKeys`'s own result, and skips
  * `confirm()` entirely when it reads `false`: unchecking the box (task 3.6)
  * needs no confirmation, and neither does checking a field with nothing to
  * clear (task 3.8). Pulled out so the decision itself is unit-testable —
@@ -196,7 +196,7 @@ export function countTechnicalClearKeys(draft: Draft, fieldId: string): number {
  * `DraftToolbar`'s discard no longer raises a native prompt at all. It opens a
  * modal dialog of the application's own, and that dialog is what the browser
  * check exercises there. This checkbox keeps the native prompt: converting the
- * studio's seven remaining prompts is a named follow-up.
+ * studio's six remaining prompts is a named follow-up.
  */
 export function needsTechnicalToggleConfirm(next: boolean, clearCount: number): boolean {
   return next && clearCount > 0;

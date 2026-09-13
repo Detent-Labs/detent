@@ -1216,20 +1216,20 @@ stage-by-stage status.
     and that blob is per-draft. One author's stored state would open for
     every author of the draft. A later "remember my view" requirement needs
     a per-author preference store, which no area has today.
-- **The studio's seven remaining `confirm()` prompts.**
+- **The studio's six remaining `confirm()` prompts.**
   `studio-publish-gate-and-report` converted the two on the publish path to
   the application's own modal dialog. The others stay:
   `root.tsx:86`, `EditScreen.tsx`'s arrange gate,
   `ProcessesScreen.tsx`'s draft discard, `TemplatesScreen.tsx`'s template
-  discard, and three in `FieldCatalogPanel.tsx`. Two hardcode English rather
+  discard, and two in `FieldCatalogPanel.tsx`. Two hardcode English rather
   than reading the catalog, in `ProcessesScreen.tsx` and
   `TemplatesScreen.tsx`. The navigation prompt at `root.tsx:86` is the odd one
   out: `studio-app` states the `confirm()`/`t()` pattern for it as a
   requirement, so converting it rewrites that requirement and every scenario
-  under it. The other six belong to `studio-form-editor` and `studio-app`, and
+  under it. The other five belong to `studio-form-editor` and `studio-app`, and
   each carries its own facts, its own dialog copy and its own catalog keys.
   Deferred 2026-09-02, on capability ownership and effort, not on
-  reversibility: two of the six discard server state and the studio carries no
+  reversibility: two of the five discard server state and the studio carries no
   undo.
 - **The 22 failure renders outside the studio edit screen.**
   `packages/web/src` rendered 27 failure states with no alert role.
@@ -1557,12 +1557,12 @@ recorded rather than fixed. The RAIL tags are local to this section.
   `packages/web/src/areas/studio/panels/StepPage.tsx:610` renders
   `btn btn-secondary` and commits at once. `DESIGN.md` asks that a destructive
   action stay outlined in the accent.
-- **A leaf field's label beside a key-less field derives `_2`.** Both leaf
-  label paths (`panels/FieldCatalogPanel.tsx:541` and `:963`) build their
-  dedupe set with `""` in it. A label whose key derives empty, such as `!!!`,
-  then takes `_2` instead of its own key. The group path already drops `""`
-  (`draft/view-group-sync.ts`). A leaf key references nothing, so no view
-  breaks.
+- **A leaf field's label beside a key-less field derives `_2`.** The leaf
+  label path, `FieldEditor::updateLabel` in `panels/FieldCatalogPanel.tsx`,
+  builds its dedupe set with `""` in it. A label whose key derives empty,
+  such as `!!!`, then takes `_2` instead of its own key. The group path
+  already drops `""` (`draft/view-group-sync.ts`). A leaf key references
+  nothing, so no view breaks.
 - **A span-1 card's label collapses to zero width in a two-column form.**
   Measured at 1440x900 on the form editor canvas: `cost_center` draws eleven
   letters down one column. The member row spends about 315px on Move up, Move

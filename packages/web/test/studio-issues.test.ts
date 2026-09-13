@@ -55,4 +55,23 @@ describe("resolveLoc", () => {
     const b = { baseLocale: "en", fields: [], workflow: { steps: [{ id: "step_a" }, { id: "step_b" }] } } as unknown as Draft;
     expect(resolveLoc(b, ["workflow", "steps", 1, "view", "fields", 0, "text"])).toEqual({ entityType: "step", entityId: "step_b" });
   });
+
+  it("follows a nested field's index chain to the nested field", () => {
+    const b = body([
+      { id: "field_top", key: "top", type: "string" },
+      {
+        id: "field_g",
+        key: "g",
+        type: "group",
+        fields: [
+          { id: "field_child", key: "child", type: "string" },
+          { id: "field_inner", key: "inner", type: "group", fields: [{ id: "field_leaf", key: "leaf", type: "string" }] },
+        ],
+      },
+    ]);
+    expect(resolveLoc(b, "fields[1].fields[0].key")).toEqual({ entityType: "field", entityId: "field_child" });
+    expect(resolveLoc(b, ["fields", 1, "fields", 0, "key"])).toEqual({ entityType: "field", entityId: "field_child" });
+    expect(resolveLoc(b, "fields[1].fields[1].fields[0].validation.rule")).toEqual({ entityType: "field", entityId: "field_leaf" });
+    expect(resolveLoc(b, "fields[1].key")).toEqual({ entityType: "field", entityId: "field_g" });
+  });
 });

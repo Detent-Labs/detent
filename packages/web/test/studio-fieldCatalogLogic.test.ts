@@ -2,11 +2,16 @@ import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 import { FIELD_KINDS } from "workflow-engine/schema";
 import {
+  appendToGroup,
   droppedByKindChange,
+  fieldLabelInputId,
   groupTargetsFor,
   moveFieldToGroup,
   moveTargetsFor,
+  neighbourAfterRemove,
   nextFieldKey,
+  railEntryId,
+  removeFieldIn,
 } from "../src/areas/studio/panels/fieldCatalogLogic.js";
 import { mergeLocalizedTextEntry } from "../src/areas/studio/draft/localized-text.js";
 import { mintCatalogField } from "../src/areas/studio/draft/mintField.js";
@@ -163,6 +168,47 @@ describe("moveFieldToGroup", () => {
     const before = JSON.stringify(fields);
 
     moveFieldToGroup(fields, "field_a", "field_g");
+
+    expect(JSON.stringify(fields)).toBe(before);
+  });
+});
+
+describe("appendToGroup", () => {
+  it("appends a field into a group nested inside another group", () => {
+    const fields = [grp("field_outer", "outer", [grp("field_inner", "inner", [fld("field_a", "a")])])];
+    const field = fld("field_new", "new");
+
+    const next = appendToGroup(fields, "field_inner", field);
+
+    expect(ids(next[0].fields![0].fields)).toEqual(["field_a", "field_new"]);
+  });
+
+  it("leaves the array it was given untouched", () => {
+    const fields = [grp("field_outer", "outer", [grp("field_inner", "inner", [fld("field_a", "a")])])];
+    const before = JSON.stringify(fields);
+
+    appendToGroup(fields, "field_inner", fld("field_new", "new"));
+
+    expect(JSON.stringify(fields)).toBe(before);
+  });
+});
+
+describe("removeFieldIn", () => {
+  it("removes a field at depth two, inside a group inside a group", () => {
+    const fields = [
+      grp("field_outer", "outer", [grp("field_inner", "inner", [fld("field_a", "a"), fld("field_b", "b")])]),
+    ];
+
+    const next = removeFieldIn(fields, "field_a");
+
+    expect(ids(next[0].fields![0].fields)).toEqual(["field_b"]);
+  });
+
+  it("leaves the array it was given untouched", () => {
+    const fields = [grp("field_outer", "outer", [grp("field_inner", "inner", [fld("field_a", "a")])])];
+    const before = JSON.stringify(fields);
+
+    removeFieldIn(fields, "field_a");
 
     expect(JSON.stringify(fields)).toBe(before);
   });
@@ -426,5 +472,59 @@ describe("moveTargetsFor", () => {
 
     expect(currentId).toBe("field_g");
     expect(targetIds).toEqual([undefined, "field_g"]);
+  });
+});
+
+describe("neighbourAfterRemove", () => {
+  it("selects the next sibling when a group's first field is removed", () => {
+    const fields = [grp("field_g", "g", [fld("field_a", "a"), fld("field_b", "b"), fld("field_c", "c")])];
+
+    expect(neighbourAfterRemove(fields, "field_a")).toBe("field_b");
+  });
+
+  it("selects the previous sibling when a group's last field is removed", () => {
+    const fields = [grp("field_g", "g", [fld("field_a", "a"), fld("field_b", "b"), fld("field_c", "c")])];
+
+    expect(neighbourAfterRemove(fields, "field_c")).toBe("field_b");
+  });
+
+  it("selects the parent group when its only field is removed", () => {
+    const fields = [grp("field_g", "g", [fld("field_a", "a")])];
+
+    expect(neighbourAfterRemove(fields, "field_a")).toBe("field_g");
+  });
+
+  it("selects the next top-level field", () => {
+    const fields = [fld("field_a", "a"), fld("field_b", "b"), fld("field_c", "c")];
+
+    expect(neighbourAfterRemove(fields, "field_a")).toBe("field_b");
+  });
+
+  it("selects the previous top-level field when the last one is removed", () => {
+    const fields = [fld("field_a", "a"), fld("field_b", "b"), fld("field_c", "c")];
+
+    expect(neighbourAfterRemove(fields, "field_c")).toBe("field_b");
+  });
+
+  it("selects nothing when the only top-level field is removed", () => {
+    const fields = [fld("field_a", "a")];
+
+    expect(neighbourAfterRemove(fields, "field_a")).toBeUndefined();
+  });
+
+  it("selects nothing for an id no field carries", () => {
+    const fields = [fld("field_a", "a"), grp("field_g", "g", [fld("field_b", "b")])];
+
+    expect(neighbourAfterRemove(fields, "field_missing")).toBeUndefined();
+  });
+});
+
+describe("fieldLabelInputId and railEntryId", () => {
+  it("pins the label input id", () => {
+    expect(fieldLabelInputId("field_a")).toBe("studio-field-label-field_a");
+  });
+
+  it("pins the rail entry id", () => {
+    expect(railEntryId("field_a")).toBe("studio-field-rail-field_a");
   });
 });

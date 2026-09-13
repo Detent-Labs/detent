@@ -662,7 +662,8 @@ too. Choosing an entity SHALL select it. The tab SHALL open that one entity's
 editor.
 
 The Add entry SHALL add an entity, through the call the panel's own add control
-makes. A group field's children indent one level under it.
+makes. On the Fields tab, the Add entry SHALL add a top-level field. A group
+field's children indent one level under it.
 
 A field entry SHALL be the drag source that moves its field into a group and
 out of it. The entry SHALL have no move control of its own, since the field's
@@ -675,8 +676,12 @@ matrix draws a grid, so its tab SHALL stand none either.
 
 A tab SHALL stand its own rail alone. No tab SHALL list another tab's entities.
 
-A group field SHALL keep one recursive editor. Choosing a child in the rail SHALL
-select the parent group and scroll the child into view inside that editor.
+Choosing a field nested inside a group SHALL select that field. The tab SHALL
+open that field's own editor, the same one a top-level field opens. The rail
+SHALL mark that entry alone, and it SHALL leave the group's own entry unmarked.
+
+On the Fields tab, a newly chosen field's editor SHALL open at its top. A move
+keeps the same field selected, and the editor keeps its scroll position.
 
 A selection SHALL live in component state and SHALL take no address of its own.
 The tab SHALL select the first entity on mount. It SHALL select the added entity
@@ -684,8 +689,9 @@ after an Add.
 
 <!-- antislop: allow synonym-rotation -->
 <!-- The panel's Remove control drops one entity; the area nav's Discard control drops every unsaved change. -->
-It SHALL select the neighbour after a Remove. Switching to another tab and back
-SHALL keep the selection the first tab held.
+It SHALL select the neighbour after a Remove. Inside a group, the neighbour
+SHALL be the next field of that group, then the previous one, then the group.
+Switching to another tab and back SHALL keep the selection the first tab held.
 
 Each entity entry SHALL carry its own issue mark, separate from the tab's issue
 count. One entity at a time otherwise hides a broken entity behind whichever
@@ -708,7 +714,9 @@ that same line. The issue mark SHALL follow the label there.
 
 The entry SHALL print neither the kind name nor a group's name as visible
 text. The indent alone SHALL show the group. The kind name SHALL stay the
-icon's tooltip, and it SHALL stay part of the entry's accessible name.
+icon's tooltip, and it SHALL stay part of the entry's accessible name. A
+nested entry's accessible name SHALL also carry the name of the group that
+holds its field. The indent shows that group to a sighted author alone.
 
 The row SHALL NOT print the field's key. The key stays in the definition
 half's "What this field asks" zone, once an author selects that field. The
@@ -798,11 +806,20 @@ empty-key field did before.
   fields and data sources
 - **THEN** that tab's rail lists the data sources, and it lists no field
 
+<!-- The heading keeps the live spec's wording, since a MODIFIED block keeps every scenario; the child now opens its own editor. -->
 #### Scenario: A group child selects its group
 
 - **WHEN** the author picks a group field's child in the rail
-- **THEN** the tab renders the group's own recursive editor, and it scrolls
-  the child into view inside that editor
+- **THEN** the tab renders that child's own editor, with both halves
+- **AND** the rail marks the child's entry alone, and neither the group's
+  entry nor a sibling's entry
+
+#### Scenario: A newly chosen field's editor opens at its top
+
+- **WHEN** the author scrolls a field's editor down to its "Validation" zone
+- **AND** the author picks another field in the rail
+- **THEN** the editor shows that field's "What this field asks" zone at its
+  top
 
 #### Scenario: The Fields rail adds a field
 
@@ -819,11 +836,18 @@ empty-key field did before.
   data source entry offers one
 - **AND** no rail entry carries a move control of its own
 
+<!-- The heading keeps the live spec's wording, since a MODIFIED block keeps every scenario; "names" means printed text, and a nested entry's accessible name carries the group's name. -->
 #### Scenario: A rail entry names no group
 
 - **WHEN** a draft carries a group field holding two fields
 - **THEN** both child entries indent once under the group's entry
 - **AND** neither child entry prints the group's name
+
+#### Scenario: A nested entry's accessible name carries its group's name
+
+- **WHEN** a draft carries a group field holding a field
+- **THEN** the child entry's accessible name carries the group's name
+- **AND** the entry prints no group name as visible text
 
 #### Scenario: Removing a field selects its neighbour
 
@@ -831,6 +855,21 @@ empty-key field did before.
   three
 - **THEN** the tab renders a neighbouring field, and it reports no empty
   selection
+
+#### Scenario: Removing a field inside a group selects the field after it
+
+- **WHEN** a group holds three fields, and the author removes the first
+- **THEN** the tab renders the field that followed it in that group
+
+#### Scenario: Removing a group's last field selects the field before it
+
+- **WHEN** a group holds three fields, and the author removes the third
+- **THEN** the tab renders the group's second field
+
+#### Scenario: Removing a group's only field selects the group
+
+- **WHEN** a group holds one field, and the author removes it
+- **THEN** the tab renders the group's own editor
 
 #### Scenario: A reload selects the first entity
 
@@ -860,6 +899,12 @@ empty-key field did before.
 - **WHEN** a draft's second field holds a validation issue, and the author
   has the first field selected
 - **THEN** the second field's own rail entry carries an issue mark
+
+#### Scenario: A nested field's entry marks its own check
+
+- **WHEN** a field inside a group carries a check on its key
+- **THEN** that field's own rail entry carries the issue mark
+- **AND** the group's entry carries none for that check
 
 #### Scenario: The screen keeps every missing-translation warning
 
@@ -1052,10 +1097,10 @@ The Paths tab SHALL print the path count as its own count.
 ### Requirement: The field catalog's definition half offers a Technical control
 
 The field catalog's definition half SHALL offer a Technical checkbox for
-the selected field. It SHALL offer one for each of a group's children in
-the same half. Checking it SHALL write `technical: true`. Unchecking it SHALL delete
-the `technical` key. Every other view-flag control in the studio already
-follows that same convention for its own default value.
+the selected field. A field nested inside a group SHALL offer it in that
+field's own editor. Checking it SHALL write `technical: true`. Unchecking it
+SHALL delete the `technical` key. Every other view-flag control in the studio
+already follows that same convention for its own default value.
 
 A group's child holds a value of its own, and a structural source can
 write it. The compile rule and the rail's own finding both read the
@@ -1072,8 +1117,8 @@ Every builder control that could clear one also goes away as the
 developer checks the box. The strip omits them, the matrix cell disables
 them, the row offers no bulk badge. Without the clearing pass, a stale
 key would block the publish. The JSON view would be the only route back
-to it. The pass SHALL walk every step, not only the steps the field
-matrix currently draws.
+to it. The pass SHALL walk every step, including a step the field matrix
+omits.
 
 Unchecking SHALL write no `required` or `readonly` key back. The pass
 records no prior state, so an uncheck cannot restore an authored
@@ -1109,14 +1154,14 @@ field. Offering the control there would only invite a rejected publish.
 
 - **WHEN** the developer unchecks Technical on a field already carrying
   `technical: true`
-- **THEN** that field carries no `technical` key
+- **THEN** that field has no `technical` key
 - **AND** no view entry regains a `required` or `readonly` key
 
 #### Scenario: A group's child offers the control
 
-- **WHEN** the field catalog's definition half draws the recursive field row
-  for a field nested inside the selected `type: "group"` field
-- **THEN** that row offers the Technical checkbox
+- **WHEN** the developer selects a field nested inside a `type: "group"`
+  field
+- **THEN** that field's own definition half offers the Technical checkbox
 
 #### Scenario: A group field disables the Technical control
 
@@ -1141,71 +1186,83 @@ field. Offering the control there would only invite a rejected publish.
 
 ### Requirement: The field catalog's field key auto-derives from the field label
 
-The field catalog's key field SHALL auto-fill from the edited field's label
-as the developer types it, for a field whose key is empty or still equal to
-what derivation would produce from the label's prior value. This applies to
-a top-level catalog field and to a field nested inside a `group` field's
-own child editor alike. Derivation SHALL read only the field label's
-base-locale entry: an edit to any other locale's translation SHALL NOT
-trigger key derivation. Derivation SHALL lower-case the label, collapse
-every run of characters outside `[a-z0-9]` to a single `_`, and trim a
-leading or trailing `_`; a result starting with a digit SHALL gain a
-leading `_` — the same shape the definition contract's identifier grammar
-(`/^[a-z_][a-z0-9_]*$/`) already requires of a published `FieldDef.key`.
+The field catalog's key field SHALL auto-fill from the field's label as the
+developer types it. It SHALL do so while the key is empty. It SHALL also do
+so while the key still equals what derivation produces from the label's prior
+value. In any other case, a write to the label SHALL leave the key as it
+stands. This applies to a top-level catalog field and to a field nested inside
+a `group` field alike.
 
-When the derived key would collide with another key already present
-anywhere in the process's field catalog — a top-level field or a field
-nested inside any `group` — the field catalog SHALL append `_2`, and, if
-that also collides, `_3`, and so on, until the candidate is unique across
-the whole catalog.
+Derivation SHALL read only the base-locale entry of the field's label. A write
+to any other locale's translation SHALL NOT trigger key derivation.
+Derivation SHALL lower-case the label. It SHALL collapse every run of
+characters outside `[a-z0-9]` to a single `_`. It SHALL trim a leading or
+trailing `_`. A result starting with a digit SHALL gain a leading `_`.
 
-The first edit the developer types directly into a field's key field SHALL
-stop this auto-fill for that one field for the remainder of the draft's
-lifetime in the browser. The key field SHALL remain an ordinary editable
-text input throughout.
+The result then takes the shape the definition contract's identifier grammar
+already requires of a published `FieldDef.key`: `/^[a-z_][a-z0-9_]*$/`.
+
+A derived key can collide with a key that another field already carries.
+That other field can sit at the top level or inside any `group`. The field
+catalog SHALL then append `_2`. A second collision SHALL swap `_2` for `_3`.
+The catalog SHALL keep raising the number until no other field carries the
+candidate.
+
+The developer's first direct write to a field's key field SHALL stop this
+auto-fill for that one field. The stop SHALL hold for the rest of the draft's
+lifetime in the browser. The key field SHALL remain an ordinary, writable text
+input throughout.
 
 #### Scenario: A new top-level field's key follows its label as the developer types
 
-- **WHEN** the developer, while the studio's content locale is the draft's
-  base locale, drops a new field onto the canvas and types "Requested
-  amount" into its label, having never touched its key field
+- **WHEN** the studio's content locale is the draft's base locale
+- **AND** the developer drops a new field onto the canvas
+- **AND** the developer types "Requested amount" into its label, never
+  touching its key field
 - **THEN** the field's key reads `requested_amount`
 
 #### Scenario: A new field's key stays empty while the developer types in a non-base content locale
 
 - **WHEN** the developer has switched the studio's content locale away from
-  the draft's base locale, drops a new field onto the canvas, and types a
-  label into it, having never touched its key field
-- **THEN** the field's key stays empty, since a newly created field's label
-  seeds under the current content locale and derivation reads only the
-  base-locale entry
+  the draft's base locale
+- **AND** the developer drops a new field onto the canvas
+- **AND** the developer types a label into it, never touching its key field
+- **THEN** the field's key stays empty. A new field's label seeds under the
+  current content locale. Derivation reads the base-locale entry alone
 
 #### Scenario: A new nested field's key follows its label as the developer types
 
-- **WHEN** the developer adds a field inside a `group` field and types a
-  label into it, having never touched that nested field's key field
+- **WHEN** the developer adds a field inside a `group` field
+- **AND** the developer types a label into it, never touching its key field
 - **THEN** the nested field's key derives from its own label the same way a
   top-level field's does
 
 #### Scenario: A colliding derived field key gets a numeric suffix
 
 - **WHEN** the developer types a label that derives to a key another field
-  in the catalog already carries, whether that field is top-level or
-  nested inside a group
+  in the catalog already carries
+- **AND** that other field sits at the top level or inside a group
 - **THEN** the new field's key reads the colliding key with a `_2` suffix
+
+#### Scenario: A second collision takes the next number
+
+- **WHEN** the developer types a label that derives to `amount`
+- **AND** other fields already carry `amount` and `amount_2`
+- **THEN** the new field's key reads `amount_3`
 
 #### Scenario: A hand-edited field key stops following its label
 
-- **WHEN** the developer changes a field's auto-derived key and then edits
-  that field's label further
+- **WHEN** the developer types over a field's auto-derived key
+- **AND** the developer then types more into that field's label
 - **THEN** that field's key stays what the developer typed
 
 #### Scenario: Editing a non-base-locale translation leaves an already-derived field key untouched
 
-- **WHEN** the developer types a base-locale field label (deriving a key),
-  switches the studio's content locale, and types a translation into the
-  field label's non-base-locale entry
-- **THEN** the field's key is unchanged
+- **WHEN** the developer types a base-locale field label, which derives a key
+- **AND** the developer switches the studio's content locale
+- **AND** the developer types a translation into the label's entry for that
+  locale
+- **THEN** the field's key keeps the value it derived
 
 ### Requirement: The field matrix lists every catalog field against every workflow step
 
@@ -1221,7 +1278,7 @@ Each cell SHALL draw in one of three states:
 - **Hatched**, where the column's step declares no `view` at all. Every
   cell in that column SHALL draw hatched, regardless of the row.
 - **Blank**, where the step declares a `view` and that view's `fields`
-  carries no entry referencing the row's field.
+  has no entry referencing the row's field.
 - **Live**, where such an entry exists. A live cell SHALL show
   independent `visible`, `required` and `readonly` controls. Each
   control SHALL show that entry's own resolved value. Where a flag
@@ -1239,7 +1296,7 @@ Each cell SHALL draw in one of three states:
 
 - **WHEN** the field catalog declares a group field with nested fields
 - **THEN** the group's row sits immediately above its children's rows,
-  in the same order the field catalog panel lists them
+  in the order the Fields rail lists them
 
 #### Scenario: A step with no view hatches its whole column
 
@@ -1249,7 +1306,7 @@ Each cell SHALL draw in one of three states:
 
 #### Scenario: An unreferenced field on a view-bearing step draws blank
 
-- **WHEN** a workflow step declares a `view` whose `fields` carries no
+- **WHEN** a workflow step declares a `view` whose `fields` has no
   entry for a given catalog field
 - **THEN** that field's cell in that step's column draws blank
 
@@ -2337,9 +2394,9 @@ there SHALL sit beside a call to `missingTranslationWarning`. An exempt site
 SHALL instead carry an inline comment stating why. A hand-kept list does not
 grow with the code. This rule does.
 
-That rule also pins the number of sites it found. The note's text is the
-tenth. A change adding a site SHALL move that literal in the same commit.
-Otherwise the rule rejects a site it exists to admit.
+That rule also pins the number of sites it found. A change adding or
+removing a site SHALL move that literal in the same commit. Otherwise the
+rule rejects a tree it exists to admit.
 
 #### Scenario: A step label missing the current locale draws a warning
 
@@ -2379,7 +2436,7 @@ Otherwise the rule rejects a site it exists to admit.
 
 #### Scenario: An exempt site says why
 
-- **WHEN** a site legitimately needs no warning
+- **WHEN** a site legitimately does not need a warning
 - **THEN** an inline comment states the reason, and the rule skips it
 
 #### Scenario: A note's text missing the current locale draws a warning
@@ -2506,10 +2563,21 @@ The Fields view SHALL edit one field through two halves under one
 heading. The definition half comes first, the effect half second. The
 view SHALL have no tab set.
 
-The definition half says what the field is. It SHALL hold five zones. Their
-order reads "What this field asks", "What kind of field", "Where values
-come from", "Default value", "Validation". Each zone SHALL sit under its
-own heading, with a rule between it and its neighbour.
+The definition half says what the field is. It SHALL hold five zones, plus
+a sixth for a group field. Their order reads "What this field asks", "What
+kind of field", "Where values come from", "Default value", "Validation". Each
+zone SHALL sit under its own heading, with a rule between it and its
+neighbour.
+
+A group field's definition half SHALL hold a sixth zone after "Validation",
+named "Fields inside this group". That zone SHALL draw none of the group's
+fields, since the entity rail lists them. It SHALL hold one control, which
+adds a field at the end of the group. The tab SHALL then select that new field.
+
+Keyboard focus SHALL then land in the new field's label input, since a new
+field needs its label first. The rail SHALL bring the new field's entry into
+view where it sits outside the rail's visible part. It SHALL scroll no further
+than that, and it SHALL NOT animate the scroll.
 
 "What this field asks" holds the label, the description, the key and the
 move control, in that order. "What kind of field" holds the kind picker and
@@ -2550,6 +2618,39 @@ effect half. That tint SHALL be the only motion the two halves carry.
 - **THEN** "What this field asks" holds the move control directly under the key
 - **AND** the control names the group that holds the field, or the top level
 
+#### Scenario: A group's own zone adds a field and selects it
+
+- **WHEN** the developer uses the control in a group field's "Fields inside
+  this group" zone
+- **THEN** the group's `fields` array carries one more field, at its end
+- **AND** the tab selects that field and shows its own two halves
+- **AND** keyboard focus sits in that field's label input
+
+#### Scenario: The rail brings a new field in a long group into view
+
+- **WHEN** a group holds 18 fields, and the rail shows the group's entry but
+  not its last field's entry
+- **AND** the developer uses the control in that group's "Fields inside this
+  group" zone
+- **THEN** the rail shows the new field's entry, carrying the current mark
+- **AND** the rail reaches that position at once, with no smooth scroll
+
+#### Scenario: A new entry the rail already shows moves no rail
+
+- **WHEN** the rail shows a group's last field and the entry after it
+- **AND** the developer uses the control in that group's "Fields inside this
+  group" zone
+- **THEN** the rail keeps its scroll position
+- **AND** the new field's entry carries the current mark
+
+#### Scenario: Only a group field holds the sixth zone
+
+- **WHEN** the developer opens the Fields view on a group field, then on a
+  `string` field
+- **THEN** the group field's definition half shows "Fields inside this group"
+  directly after "Validation"
+- **AND** the `string` field's definition half shows no such zone
+
 ### Requirement: A field's checks stand at the zone each one belongs to
 
 The Fields view SHALL place a check on the selected field at the zone
@@ -2566,11 +2667,11 @@ rule needs the model to carry it through. The `studio-app` capability
 states no shape for that model. What it states is the outcome: two
 checks on one field, naming two zones, stand apart.
 
-A group's child rows SHALL keep their own check list. A child row is not
-the selected field, and the zones describe the selected field alone. The
-child row's list SHALL show the child's own checks, as it does today.
+A nested field's check SHALL stand in that field's own editor, at the
+zone the check names. The group's editor SHALL show the group's own checks
+alone.
 
-The view SHALL carry no consolidated check list of its own. The
+The view SHALL have no consolidated check list of its own. The
 draft-wide roll-up and the publish gate sit in the docked summary the
 `studio-checks-rail` capability states.
 
@@ -2590,6 +2691,8 @@ nothing to open.
   draws
 - **THEN** the check shows at the top of the definition half
 
+<!-- antislop: allow negation-habit -->
+<!-- The live heading and body, unchanged; the negation names what the rule forbids. -->
 #### Scenario: The view carries no consolidated list
 
 - **WHEN** the developer opens the Fields view on a field carrying two
@@ -2597,12 +2700,13 @@ nothing to open.
 - **THEN** each check shows at its own zone, and no list gathers both
   in one place
 
+<!-- The heading keeps the live spec's wording, since a MODIFIED block keeps every scenario; the child row is now the child's own editor. -->
 #### Scenario: A group's child row keeps its own list
 
-- **WHEN** the developer selects a group field whose child carries a
-  check
-- **THEN** that child's row shows the check in its own list, and the
-  group's zones show the group's own checks
+- **WHEN** a field nested inside a group carries a check on its key
+- **THEN** selecting that field shows the check inside its own "What this
+  field asks" zone
+- **AND** selecting the group shows the group's own checks alone
 
 ### Requirement: The effect half states its own empty state
 
@@ -2630,21 +2734,20 @@ field no step asks for yet is an unfinished draft, not a broken one.
 
 ### Requirement: The Fields view's definition half states values, a default and a preview
 
-The two halves SHALL edit the selected TOP-LEVEL field alone. A group
-field's children SHALL render inside the definition half through the
-area's existing flat, recursive field row. They SHALL carry no halves
-of their own.
+The two halves SHALL belong to the selected field alone, at any nesting
+depth. A field nested inside a group SHALL take the same two halves a
+top-level field takes. A group field's halves SHALL have no editor for any
+of its children. Inside the halves, only the group's preview draws them.
 
 Translation status SHALL show as a badge beside the label input. The
 badge SHALL name the current locale's missing count. The field SHALL
-carry no separate translation-status list. Adding a language SHALL stay
+have no separate translation-status list. Adding a language SHALL stay
 draft-scoped in the content-locale switcher.
 
 "How it will look" SHALL sit in the definition half, inside a collapsed
 `<details>` disclosure. It SHALL start closed. The developer view SHALL
 keep its own existing, separate `<details>` disclosure, untouched by
-this change. A group field's children SHALL stay outside any
-disclosure.
+this change.
 
 Remove field SHALL sit below a rule at the definition half's end. It
 SHALL read as the half's least frequent action.
@@ -2677,8 +2780,8 @@ still works there too.
 
 <!-- antislop: allow sentence-length -->
 <!-- Why: copied byte for byte from the live requirement. -->
-The note the zone shows in the person case SHALL name the people list,
-not a data source. The existing note names a data source by hand, and
+The note the zone shows in the person case SHALL name the people list
+rather than a data source. The existing note names a data source by hand, and
 this field declares none; an author reading it would learn the wrong
 thing about their own draft.
 
@@ -2689,14 +2792,14 @@ references.
 
 For a `group` field the whole Default value zone SHALL also show
 disabled. It SHALL state that a group's own default is never read. A
-group carries no slot of its own in the flat data payload. A literal
+group has no slot of its own in the flat data payload. A literal
 or CEL default written there would silently never apply.
 
 Every other type gets a link-styled toggle. It SHALL switch the zone
 to a raw CEL text input for an expression default. This mirrors the
 toggle affordance the condition zone already uses. The zone SHALL NOT
 mount the guard-shaped condition-builder component. A default is a
-value, not a boolean. It needs no comparison-row builder.
+value rather than a boolean. It does not need a comparison-row builder.
 
 Writing through the literal input SHALL set the field's `default` key
 to that literal value. Writing through the CEL input SHALL set it to `{
@@ -2710,7 +2813,7 @@ component, read-only, inside its disclosure. Every previewed entry's
 
 The preview runs over a synthesized single-field view. For a group
 field it synthesizes the group's own entry, plus one entry per
-descendant. That reaches every depth, not only the group's immediate
+descendant. That reaches every depth, beyond the group's immediate
 children.
 
 A group holding a group SHALL preview both levels. That is the
@@ -2721,7 +2824,7 @@ them, keyed by field id.
 <!-- antislop: allow sentence-length -->
 <!-- Why: copied byte for byte from the live requirement. -->
 A dataSource-backed field SHALL preview with no option list. The
-draft carries no resolved rows for one. The row stating so SHALL name
+draft has no resolved rows for one. The row stating so SHALL name
 that the field resolves at runtime. An author previews what a
 participant gets. A field declaring `format: "person"` and neither
 `options` nor `dataSource` SHALL preview the same way, for the
@@ -2739,12 +2842,19 @@ be the format's sample inside an array. A scalar there would draw a
 multi-select with nothing selected, since the shared form component
 reads a non-array value as an empty selection.
 
+<!-- The heading keeps the live spec's wording, since a MODIFIED block keeps every scenario; the group's halves now draw no child at all. -->
 #### Scenario: A group's children render without halves of their own
 
 - **WHEN** the developer selects a `group` field carrying two children
-- **THEN** both children render as recursive field rows inside the
-  definition half
-- **AND** neither child draws a definition half of its own
+- **THEN** the definition half draws no row for either child
+- **AND** the rail still lists both children, indented under the group
+
+#### Scenario: A nested field takes the same two halves
+
+- **WHEN** the developer selects a `string` field nested inside a `group`
+  field
+- **THEN** the view shows that field's definition half and effect half
+- **AND** the definition half shows the Default value zone and the preview
 
 #### Scenario: Translation status shows as a badge
 
@@ -2793,7 +2903,7 @@ reads a non-array value as an empty selection.
 
 - **WHEN** the developer clears a field's Default value input, whether
   literal or CEL
-- **THEN** the draft's field carries no `default` key
+- **THEN** the draft's field has no `default` key
 
 #### Scenario: A literal default on a Choice field uses its own options
 
@@ -2816,7 +2926,7 @@ reads a non-array value as an empty selection.
   `dataSource`
 - **THEN** the literal control offers no option, and the CEL toggle
   still lets the developer write an expression default
-- **AND** the note names the people list, not a data source
+- **AND** the note names the people list rather than a data source
 
 #### Scenario: A bare person list's default offers no checkbox group
 
@@ -2878,7 +2988,7 @@ reads a non-array value as an empty selection.
 <!-- antislop: allow sentence-length -->
 <!-- Why: copied byte for byte from the live requirement. -->
 - **THEN** the synthesized sample value is an array holding the person
-  format's own sample, not that sample as a bare scalar
+  format's own sample rather than that sample as a bare scalar
 - **AND** the `{type: "string"}` twin still previews the scalar
 
 ### Requirement: The Fields view's effect half states usage, a condition and requiredness
@@ -3069,8 +3179,8 @@ move can carry it.
 
 A pointer SHALL move the field by dragging its rail entry. The keyboard
 SHALL move the same field through the move control in that field's own
-editor. A group child's control stands in the child's own row, inside the
-group's editor. The `spa-accessibility` capability names this route for a
+editor. A field nested inside a group carries that control in its own
+editor too. The `spa-accessibility` capability names this route for a
 move into a group or out of one. Both gestures SHALL reach one write.
 
 The two gestures SHALL reach the same set of destinations. A drop names
@@ -3100,8 +3210,8 @@ that field's own two halves.
 
 #### Scenario: A field moves out of a group with the keyboard
 
-- **WHEN** the developer focuses a group child's move control inside the
-  group's editor, and picks the top level
+- **WHEN** the developer focuses the move control in a group child's own
+  editor, and picks the top level
 - **THEN** the draft carries that field at the top level, and the
   group's remaining children keep their order
 

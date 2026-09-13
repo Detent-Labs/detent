@@ -1518,29 +1518,31 @@ tool that dispatches trusted pointer events, e.g. `playwright-cli`.
 
 Source: `panels-list-and-detail` tasks 6.5-6.6.
 
-Open a draft with many fields (`purchase_requisition`, 22 fields, one data
-source) and go to `/edit/panels/fields`.
+Open a draft with many fields (`purchase_requisition`, 29 rail entries, one
+data source) and go to `/edit/panels/fields`.
 
-Pass: the rail lists all 22 field labels under Fields, indenting
-`line_item`'s four children once. No row prints a key. The main view renders
-one field's editor, the first (`cost_center`), not all 22 stacked. That row
-alone carries `aria-current`.
+Pass: the rail lists 29 entries under Fields. Nine stand at the top level:
+eight groups and the plain field `po_status`. The other twenty sit inside
+those groups, each indented once, `line_item`'s four among them. No row prints
+a key. The main view renders one editor alone, for the first entry,
+`line_item`. That row alone carries `aria-current`.
 
-Click a top-level field (`line_item`, a group). Pass: the view switches to
+Click a top-level field (`request`, a group). Pass: the view switches to
 that field's editor and the rail marks it current.
 
 Click a nested child (`item_description`, under `line_item`). Pass: the rail
-marks the parent (`line_item`) current, not the child. The child's own input
-scrolls into view, inside the still-open group editor.
+marks `item_description` alone and leaves `line_item`'s entry unmarked. The
+view shows `item_description`'s own editor, with its two halves, and that
+editor opens at its top.
 
 Click "+ Add field" (either the rail's own entry or the panel's own button;
-both call the same handler). Pass: a new "(unnamed field)" row appears at
-the end of the rail sub-list, selected at once. Its key input is empty and
-focus-ready. It carries an issue-mark badge reading "1", aria-label "1
-issues": the empty key is a real validation issue, live.
+both call the same handler). Pass: a new "(unnamed field)" entry appears
+last in the entity rail, selected. Keyboard focus sits in its label input,
+and the rail shows the entry. Its issue mark reads "2", aria-label "2
+issues": the empty base-locale label and the empty key.
 
-Click "Remove field". Pass: the neighbour (the field before it, since it was
-last) becomes selected.
+Click "Remove field". Pass: `invoice`, the top-level field before the
+removed one, becomes selected.
 
 Open the Data sources view. Pass: the Fields sub-list disappears, and a Data
 sources sub-list appears in its place. The two never show at once. The new
@@ -1551,7 +1553,7 @@ selected at once. Click "Remove data source". Pass: `approved_vendors`, the
 only remaining entry, becomes selected.
 
 Reload the page: a fresh navigation to the same URL. Pass: selection resets
-to the first field, `cost_center`. That matches the reset a canvas round
+to the first field, `line_item`. That matches the reset a canvas round
 trip already gives every other screen-owned selection here.
 
 Throughout: zero console errors or warnings. `playwright-cli console`
@@ -2719,8 +2721,9 @@ catalog carries. Its own value reads "Top level", `po_status`'s place
 today.
 
 Pick `Line Item`. Pass: `po_status` indents under `Line Item`, its fifth
-child. The live region reads "PO Status moved into Line Item." Focus stays
-on the same control.
+child, and the rail marks `po_status` alone. The live region reads "PO
+Status moved into Line Item." Focus stays on the same control, and the
+editor still shows `po_status`'s two halves.
 
 Pick "Top level" on that same control. Pass: `po_status` un-indents, back
 to a top-level row after `invoice`. The region reads "PO Status moved out
@@ -2732,22 +2735,23 @@ shows it.
 
 Drag `po_status`'s row onto `Line Item`'s row with the pointer. Pass: the
 same indent and the same announcement. Now drag `finance_note`'s row onto
-`po_status`'s row, a top-level row that is no group. Pass: the same move
+`po_status`'s row, a row that is no group. Pass: the same move
 out. Both gestures reach one helper, and both reach the same destinations.
 
 The "+ Add field" row takes no drop. Measured 2026-09-12.
 
-Now select `discrepancy_note`, the one child of `resolution`. A group
-child's row has no label or description ahead of the key. Its move control
-therefore sits second, right after it.
+Now select `discrepancy_note`, the one child of `resolution`. Pass: it
+opens its own `FieldEditor`, the same one a top-level field opens. Its move
+control sits after the Label, the Description and the Key, like every
+field's.
 
 Open the control and pick "Top level". Pass: `discrepancy_note` un-indents
-to a top-level row, after `po_status`. The tab keeps it selected. Keyboard
-focus lands on the move control inside the field's own new editor.
+to a top-level row, after `finance_note`. The tab keeps it selected. Keyboard
+focus lands on the move control inside the field's own editor.
 
-It is a `FieldEditor` now: the move took `discrepancy_note` out of
-`resolution`'s `SubFieldRow` list. The live region reads "Discrepancy Note
-moved out of Resolution, to the top level."
+The `FieldEditor` for `discrepancy_note` was already open before the move.
+The live region reads "Discrepancy Note moved out of Resolution, to the top
+level."
 
 The control is the whole visible move UI now; no rail row carries one. Its
 accessible name comes from the `<label>` wrapping it, "Move this field to".
@@ -2765,10 +2769,9 @@ Source: `studio-field-authoring-surface` task 9.3.
 Open the same route and narrow the window to 900px, then to 420px.
 
 Pass: the three regions stack in the reading order list, definition, effect.
-The rail collapses to a disclosure header reading "Editors", a real `<button>`
-carrying `aria-expanded="false"`. Press it. Pass: `aria-expanded` reads
-`true`, and the entry list shows. The rail caps at 20rem. It scrolls inside
-that cap rather than pushing the open view off screen.
+The rail stands above the editor as an open list, with no disclosure button,
+and it drops its right-hand rule. The rail caps at 20rem. It scrolls inside
+that cap rather than pushing the editor off screen.
 
 Pass: `document.documentElement.scrollWidth` equals `clientWidth` at 1440,
 900 and 420. The page never scrolls sideways. Measured 2026-09-04: 1440/1440,
@@ -2822,15 +2825,17 @@ row carries a select. The row for `immediate_lock_written_confirmation`
 truncates its label with an ellipsis. The rail's 20rem width does not fit
 the whole sentence, "Written confirmation of the immediate lock obtained".
 The label's `title` attribute still carries that whole sentence. The
-button's accessible name reads the whole label plus the kind word
-regardless.
+button's accessible name reads the whole label, the kind word and the
+group's name regardless.
 
 Hover that row's icon. Pass: a native tooltip reads "Yes/no". Select the
 row. Pass: its accessible name reads "Written confirmation of the immediate
-lock obtained Yes/no". The kind word sits in that name, though nothing
-paints it. Repeat on `forwarding_until` (tooltip "Date") and on
-`auto_reply_text` (tooltip "One choice"). Repeat once more on a group's own
-row: its icon reads "Group".
+lock obtained Yes/no in Processing (Fabrikam)". The kind word and the group's name
+sit in it, though nothing paints either.
+
+Repeat the tooltip check on `forwarding_until` (tooltip "Date") and on
+`auto_reply_text` (tooltip "One choice"). Repeat it once more on a group's
+own row: its icon reads "Group".
 
 Select a group. Pass: its children indent once, each with its own icon.
 None of the 51 rows carries a select of any kind. No row offers a keyboard
@@ -2851,6 +2856,97 @@ At a window about 1040px wide, just above the 64rem `NARROW` breakpoint,
 open a field's editor. Pass: its Key input and its move control both stay
 inside their own column. Pass: `document.documentElement.scrollWidth`
 equals `clientWidth` at that width too.
+
+### The Fields view inside a group (`group-child-own-editor`)
+
+Source: `group-child-own-editor` tasks 4.4 and 4.5.
+
+Open the IT Offboarding draft on the Fields tab, at
+`/studio/processes/<id>/edit/fields`. The entity rail lists 51 rows: 7 groups
+and 44 fields.
+
+Choose "Forward to this address" in "Data backup and email". Pass: that
+entry alone carries the current mark (`aria-current`), and the group's own
+entry and its siblings carry none. The view shows the field's own two
+halves, definition and effect. The entry's accessible name carries "in Data
+backup and email", though the rail prints no group name.
+
+Scroll that field's editor down to its "Validation" zone, then choose
+"Hardware". Pass: the new editor opens at its top, at "What this field
+asks". It shows the "Fields inside this group" zone below "Validation".
+
+Scroll the rail so "Processing (Fabrikam)" (18 fields) shows and its last field,
+"Backup data deleted on", does not. Choose "Processing (Fabrikam)", then press
+"+ Add field to this group".
+
+Pass: the group now holds 19 fields, and the new entry, "(unnamed field)",
+carries the current mark. A focus ring shows around its own label input.
+The rail shows that same entry, scrolled no further than it needed to.
+Nothing animates: the rail lands there at once.
+
+Scroll the rail back up until the four fields inside "Hardware", and the
+"Permissions" entry right after them, both show. Choose "Hardware" again
+and press "+ Add field to this group" once more. Pass: the rail keeps its
+scroll position exactly, and the new entry still carries the current mark.
+
+The new field inside "Hardware" stays selected. Scroll its editor to the end.
+Press the editor's own "+ Add field", below "Remove field". Pass: the tab
+selects a new top-level "(unnamed field)", unindented, the rail's last entry.
+Keyboard focus sits in its label input, and the rail shows its entry.
+
+The group "Notification" holds four fields. Choose its first field, "Early
+notice already on file". Click "Remove field". Pass: "Remarks", the field
+that followed it, becomes selected, and "Notification" now holds three
+fields.
+
+Choose "Submitted on", now the last of those three. Click "Remove field".
+Pass: "Submitted by", the field before it, becomes selected. "Notification"
+now holds two fields, "Remarks" and "Submitted by".
+
+Choose "Remarks" in the rail, then change its key to `my-field`. Pass: the
+check stands inside its own "What this field asks" zone, and that zone's
+heading takes the refusal tone. Its own rail entry carries the issue mark,
+and the "Notification" entry and editor carry none for it.
+
+Choose "Permissions". In its own move control, "Move this field to", pick
+"Hardware". Pass: "Permissions" indents once under "Hardware". The live
+region reads "Permissions moved into Hardware." The rail shows the moved
+entry, and focus stays on the move control.
+
+Choose "Access Excel updated or prepared", the only field inside
+"Permissions". Pass: the rail's two-level cap treats that entry like a
+top-level row, unindented. It draws right after the "Permissions" entry,
+and it opens its own editor, with both halves.
+
+Click "Remove field" there. Pass: "Permissions", now empty, becomes
+selected.
+
+Choose `immediate_lock_written_confirmation` ("Written confirmation of the
+immediate lock obtained"). Pass: the rail entry truncates on one line. The
+editor's heading shows the whole label, wrapped rather than clipped. The
+label input's value holds the whole label too. A person reads the rest by
+moving the caret to the end.
+
+Narrow the window below 64rem. Pass: the rail stands above the editor, in
+that reading order.
+
+Scroll back to "Forward to this address" in "Data backup and email" and
+choose it again. Pass: the same current mark and two-halves outcome holds.
+
+Scroll to "Processing (Fabrikam)" so its own entry shows while its last field
+stays hidden. Choose it. Press "+ Add field to this group" again. Pass: the
+same focus, current mark and no-scroll-animation outcomes hold, and the
+group now holds 20 fields.
+
+Last, open `/studio` and press "+ New process", then "Empty process". The
+new draft has no field yet. Open its Fields tab, at
+`/studio/processes/<id>/edit/fields`. Pass: the editor shows the start state,
+"This process collects nothing yet". Press "Add the first field". Pass:
+keyboard focus sits in the new field's label input, and its entry carries the
+current mark.
+
+Focus, scroll position and the current mark need a live draft store and a
+real DOM.
 
 ### Borders and fills that the compiler dropped (`stylex-shorthand-repair`)
 

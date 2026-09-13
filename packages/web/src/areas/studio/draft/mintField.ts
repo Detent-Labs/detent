@@ -34,10 +34,11 @@ export function baseTypeForPaletteKind(kind: PaletteFieldKind): (typeof FIELD_KI
 /**
  * One field-minting call for the palette's drop (task 3.2) and its
  * click-to-place fallback: `mintId` and an empty seeded label, the same
- * pattern `FieldCatalogPanel.addField` and the rail's add controls already
- * follow (design.md: "one call site keeps them from drifting by
+ * pattern `FieldsTab::addField` in `EntityTabs.tsx` follows for every add on
+ * the Fields tab (design.md: "one call site keeps them from drifting by
  * construction"). A `group` field seeds an empty `fields` array, since its
- * own sub-field editor (`FieldCatalogPanel`) reads and appends to it.
+ * own "Fields inside this group" zone (`FieldCatalogPanel`'s `FieldEditor`)
+ * appends into it.
  */
 export function mintCatalogField(kind: PaletteFieldKind, label: DraftField["label"]): DraftField {
   const { type, format, control } = baseTypeForPaletteKind(kind);

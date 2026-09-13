@@ -34,15 +34,14 @@ describe("flattenRailFields", () => {
       { id: OUTER, key: "address", type: "group", fields: [{ id: LEAF, key: "city", type: "string" }] },
     ] as DraftField[];
     expect(flattenRailFields(fields)).toEqual([
-      { id: OUTER, key: "address", depth: 0, rootId: OUTER },
-      { id: LEAF, key: "city", depth: 1, rootId: OUTER },
+      { id: OUTER, key: "address", depth: 0 },
+      { id: LEAF, key: "city", depth: 1 },
     ]);
   });
 
-  it("relocates a twice-nested field to its own top-level row instead of a third indent, keeping its real ancestor as rootId", () => {
+  it("relocates a twice-nested field to its own top-level row instead of a third indent", () => {
     // The rail caps indentation at two levels. The draft keeps its own
-    // nesting: this function reads the tree, it never rewrites it. rootId
-    // stays the true top-level ancestor (OUTER) even though depth reads 0.
+    // nesting: this function reads the tree, it never rewrites it.
     const fields = [
       {
         id: OUTER,
@@ -52,20 +51,33 @@ describe("flattenRailFields", () => {
       },
     ] as DraftField[];
     expect(flattenRailFields(fields)).toEqual([
-      { id: OUTER, key: "address", depth: 0, rootId: OUTER },
-      { id: MIDDLE, key: "street", depth: 1, rootId: OUTER },
-      { id: LEAF, key: "number", depth: 0, rootId: OUTER },
+      { id: OUTER, key: "address", depth: 0 },
+      { id: MIDDLE, key: "street", depth: 1 },
+      { id: LEAF, key: "number", depth: 0 },
     ]);
   });
 
-  it("skips a field with no id, since the rail has no anchor for it", () => {
+  it("indents the child of a parent that is no group once", () => {
+    // A kind switch can leave `fields` on a parent it rewrote out of `group`.
+    // The walk reads `fields` whatever the parent's `type`, and that entry is
+    // the child's one route to its own editor.
+    const fields = [
+      { id: OUTER, key: "resolution", type: "string", fields: [{ id: LEAF, key: "discrepancy_note", type: "string" }] },
+    ] as DraftField[];
+    expect(flattenRailFields(fields)).toEqual([
+      { id: OUTER, key: "resolution", depth: 0 },
+      { id: LEAF, key: "discrepancy_note", depth: 1 },
+    ]);
+  });
+
+  it("skips a field with no id, since the rail keys and selects every entry by its id", () => {
     const fields = [{ key: "unsaved", type: "string" }, { id: LEAF, key: "city", type: "string" }] as DraftField[];
-    expect(flattenRailFields(fields)).toEqual([{ id: LEAF, key: "city", depth: 0, rootId: LEAF }]);
+    expect(flattenRailFields(fields)).toEqual([{ id: LEAF, key: "city", depth: 0 }]);
   });
 
   it("reads an untyped key as the empty string rather than dropping the row", () => {
     expect(flattenRailFields([{ id: LEAF, type: "string" }] as DraftField[])).toEqual([
-      { id: LEAF, key: "", depth: 0, rootId: LEAF },
+      { id: LEAF, key: "", depth: 0 },
     ]);
   });
 

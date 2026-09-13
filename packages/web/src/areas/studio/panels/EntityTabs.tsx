@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
 import type { DataSourceDef } from "workflow-engine/schema";
@@ -12,7 +12,7 @@ import { addToDraftArray } from "../draft/draft-array-crud";
 import { resolveDraftLocalizedText, seedLocalizedText } from "../draft/localized-text";
 import { flattenDraftFields } from "../draft/fields";
 import { fieldKindIcon, fieldKindWord } from "../draft/field-type-labels";
-import { moveControlId, moveFieldToGroup, parentIdOf } from "./fieldCatalogLogic";
+import { appendToGroup, fieldLabelInputId, moveControlId, moveFieldToGroup, neighbourAfterRemove, parentIdOf, railEntryId, removeFieldIn } from "./fieldCatalogLogic";
 import { flattenRailFields, issueCountForEntityId } from "../draft/panel-rail";
 import { moveFieldAndSyncViews } from "../draft/view-group-sync";
 import { FieldCatalogPanel } from "./FieldCatalogPanel";
@@ -171,9 +171,22 @@ const styles = stylex.create({
 });
 
 interface PanelsRailFieldRowProps {
+  /** The DOM id for the entry's own button, `railEntryId(fieldId)`. Lets the
+   * refocus effect scroll the entry into the rail's view after an add or a
+   * move through the move control
+   * (design.md, "Focus and the rail entry after an add or a move"). Every
+   * entry `FieldsTab` renders passes one. */
+  id?: string;
   /** The resolved label, or the "unnamed field" fallback already applied. */
   label: string;
   typeLabel: string | undefined;
+  /** The resolved label of the field that holds this entry's field, or the
+   * "unnamed field" fallback already applied, given for a nested entry alone.
+   * It reaches the button's accessible name as hidden text after the kind name
+   * and prints nothing visible. A screen reader hears no indent, and a field
+   * past the rail's indent cap draws at depth 0 (design.md, "A nested rail
+   * entry names its group in hidden text"). */
+  groupLabel?: string;
   depth: 0 | 1;
   issues: number;
   selected: boolean;
@@ -199,9 +212,10 @@ interface PanelsRailFieldRowProps {
  * stays in the definition half once an author selects that field. The kind
  * name is the icon's tooltip, and it stays in the button's accessible name
  * as hidden text (design.md, decision: "The kind name stays inside the
- * button, visually hidden"). Pulled out of the render loop so it can be
- * exercised directly, the same reason `FormEditorStrip` sits beside
- * `FormEditorScreen`.
+ * button, visually hidden"). A nested entry's button also names the group
+ * holding its field, as hidden text after the kind name. Pulled out of the
+ * render loop so it can be exercised directly, the same reason
+ * `FormEditorStrip` sits beside `FormEditorScreen`.
  *
  * The row moves a field by drag alone; the keyboard route is the move
  * control in the field's own editor (`spa-accessibility`). The wrapper still
@@ -209,8 +223,10 @@ interface PanelsRailFieldRowProps {
  * one button still reads as one row.
  */
 export function PanelsRailFieldRow({
+  id,
   label,
   typeLabel,
+  groupLabel,
   kindIcon: KindIcon,
   depth,
   issues,
@@ -237,6 +253,7 @@ export function PanelsRailFieldRow({
       }}
     >
       <button
+        id={id}
         type="button"
         {...stylex.props(styles.railRow, styles.railFieldInRow, selected && styles.railRowCurrent)}
         draggable
@@ -259,6 +276,9 @@ export function PanelsRailFieldRow({
           {label}
         </span>
         {typeLabel && <span {...stylex.props(styles.visuallyHidden)}>{typeLabel}</span>}
+        {groupLabel !== undefined && (
+          <span {...stylex.props(styles.visuallyHidden)}>{t("panelsScreen.railEntryGroup").replace("{group}", groupLabel)}</span>
+        )}
         {issues > 0 && (
           <span {...stylex.props(styles.railIssues)} aria-label={`${issues} ${t("panelsScreen.issueMark")}`}>
             {issues}
@@ -286,50 +306,88 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
   const baseLocale = draft.baseLocale ?? "en";
 
   const [selectedFieldIdState, setSelectedFieldId] = useState<string | undefined>(undefined);
-  // The deepest row a rail click named — a top-level field's own id, or a
-  // group child's. `FieldCatalogPanel` owns the scroll, because the anchor
-  // this names belongs to a row that panel renders.
-  const [focusFieldId, setFocusFieldId] = useState<string | undefined>(undefined);
 
-  // The move gesture's own three pieces of state. `dragFieldId` is the row a
-  // pointer picked up; `announcement` is what the live region below reads out
-  // after a move; `refocusId` is the move control the keyboard has to get back
-  // (`spa-accessibility`: the moving entry keeps focus across the move).
+  // `dragFieldId` is the row a pointer picked up. `announcement` is what the
+  // live region below reads out after a move. `refocusId` names the element
+  // the tab hands keyboard focus to after the next commit: the new field's
+  // label input after any add, or the move control after a move through that
+  // control (`spa-accessibility`). `refocusRailId` names the same field's rail
+  // entry, which that commit scrolls into the rail's view. Every add and every
+  // move sets both ids; a pointer drop clears both again.
   const [dragFieldId, setDragFieldId] = useState<string | undefined>(undefined);
   const [announcement, setAnnouncement] = useState("");
   const [refocusId, setRefocusId] = useState<string | undefined>(undefined);
+  const [refocusRailId, setRefocusRailId] = useState<string | undefined>(undefined);
 
-  const topLevelFieldIds = (draft.fields ?? [])
-    .map((f) => f.id)
-    .filter((id): id is NonNullable<typeof id> => id !== undefined) as string[];
+  // Resolved against every field id, at any depth — `railFields` already
+  // lists one row per field, from `flattenRailFields`. Falls back to the
+  // first rail entry when the stored id names no field in the tree.
   const selectedFieldId =
-    selectedFieldIdState !== undefined && topLevelFieldIds.includes(selectedFieldIdState)
+    selectedFieldIdState !== undefined && railFields.some((row) => row.id === selectedFieldIdState)
       ? selectedFieldIdState
-      : topLevelFieldIds[0];
+      : railFields[0]?.id;
 
-  // React reorders keyed rows by moving the existing DOM nodes, which usually
-  // carries focus along. It does not where the move changes which controls the
-  // row renders, so the tab names the control it wants and takes it back
-  // itself rather than resting on the reconciler.
+  // The editor pane scrolls on its own; opening a different field's editor
+  // resets that scroll to the top rather than keeping the previous field's
+  // position. `behavior: "instant"` makes the jump immediate whatever
+  // `scroll-behavior` a stylesheet sets.
+  const editorRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    editorRef.current?.scrollTo({ top: 0, behavior: "instant" });
+  }, [selectedFieldId]);
+
+  // The effect runs after the commit, since a new field's label input exists
+  // only then. It focuses that input after an add, and re-asserts focus on the
+  // move control after a move through that control. The same run scrolls the
+  // field's rail entry into the rail's view, `nearest`
+  // (design.md, "Focus and the rail entry after an add or a move").
   useEffect(() => {
     if (refocusId === undefined) return;
     document.getElementById(refocusId)?.focus();
+    if (refocusRailId !== undefined) {
+      document.getElementById(refocusRailId)?.scrollIntoView({ block: "nearest", behavior: "instant" });
+    }
     setRefocusId(undefined);
-  }, [refocusId]);
+    setRefocusRailId(undefined);
+  }, [refocusId, refocusRailId]);
 
-  const addField = () => {
-    const field: DraftField = { id: mintId("field"), key: "", label: seedLocalizedText(contentLocale), type: "string" };
-    addToDraftArray(mutate, (d) => (d.fields ??= []), field);
-    setSelectedFieldId(field.id);
+  /**
+   * Every add reaches this: the rail's "+ Add field", the start state, the
+   * panel's own "+ Add field" and a group's "Fields inside this group" zone.
+   * Without `groupId` the new field lands at the catalog's end; with one, at
+   * the end of that group. Each path ends the same way: the new field
+   * selected, keyboard focus in its label input, and its rail entry in the
+   * rail's view.
+   */
+  const addField = (groupId?: string) => {
+    const newId = mintId("field");
+    const field: DraftField = { id: newId, key: "", label: seedLocalizedText(contentLocale), type: "string" };
+    if (groupId === undefined) {
+      addToDraftArray(mutate, (d) => (d.fields ??= []), field);
+    } else {
+      mutate((d) => {
+        d.fields = appendToGroup(d.fields ?? [], groupId, field);
+      });
+    }
+    setSelectedFieldId(newId);
+    setRefocusId(fieldLabelInputId(newId));
+    setRefocusRailId(railEntryId(newId));
   };
 
-  const removeField = (index: number) => {
-    const fields = draft.fields ?? [];
-    const neighbor = fields[index + 1] ?? fields[index - 1];
+  /**
+   * Removes the field at any depth through `removeFieldIn`, and selects
+   * `neighbourAfterRemove`'s answer: the next sibling, then the previous
+   * sibling, then the parent group (design.md: "Remove selects a sibling,
+   * then the group"). Reads the neighbour from the draft in this closure
+   * before the `mutate` call below, since the store applies that recipe
+   * later and the draft here still holds the field being removed.
+   */
+  const removeField = (fieldId: string) => {
+    const neighbor = neighbourAfterRemove(draft.fields ?? [], fieldId);
     mutate((d) => {
-      d.fields?.splice(index, 1);
+      d.fields = removeFieldIn(d.fields ?? [], fieldId);
     });
-    setSelectedFieldId(neighbor?.id);
+    setSelectedFieldId(neighbor);
   };
 
   const fieldWord = (fieldId: string | undefined) => {
@@ -340,9 +398,11 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
 
   /**
    * The one write both gestures reach (a keyboard move must not become a
-   * second write path beside the drag). It re-hangs the field, keeps it
-   * selected through its new top-level ancestor, announces where it landed,
-   * and hands focus back to the field's own move control in its editor.
+   * second write path beside the drag). It re-hangs the field, keeps the
+   * moved field itself selected, announces where it landed, hands focus back
+   * to the field's own move control in its editor, and scrolls the field's
+   * rail entry into the rail's view. `dropOnRow` clears both refocus ids
+   * again for a pointer drop.
    */
   const moveField = (fieldId: string, targetGroupId: string | undefined) => {
     const fields = draft.fields ?? [];
@@ -356,20 +416,18 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
     // (`view-group-sync.ts::moveFieldAndSyncViews`).
     mutate((d) => moveFieldAndSyncViews(d, fieldId, targetGroupId));
 
-    // Read the new place off the moved tree, not off the target argument: a
-    // move into a nested group makes some ancestor the top-level row, and that
-    // ancestor is what the selection has to name.
-    const landed = flattenRailFields(next).find((row) => row.id === fieldId);
-    if (landed) {
-      setSelectedFieldId(landed.rootId);
-      setFocusFieldId(fieldId);
-    }
+    // The moved field stays selected, under whichever parent it landed in.
+    // Its own editor stays mounted across the move, since its key does not
+    // change, so the move control the refocus effect targets below is still
+    // there to take focus back.
+    setSelectedFieldId(fieldId);
     setAnnouncement(
       targetGroupId === undefined
         ? t("panelsScreen.movedToTopLevel").replace("{field}", fieldWord(fieldId)).replace("{group}", fieldWord(fromGroupId))
         : t("panelsScreen.movedIntoGroup").replace("{field}", fieldWord(fieldId)).replace("{group}", fieldWord(targetGroupId)),
     );
     setRefocusId(moveControlId(fieldId));
+    setRefocusRailId(railEntryId(fieldId));
   };
 
   /** Where a drop on `targetId` sends the dragged field: into it when it is a
@@ -380,10 +438,12 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
     moveField(dragFieldId, target?.type === "group" ? targetId : undefined);
     // A pointer drop is not a move "made through the control", so it must not
     // carry the keyboard focus into the editor the way a control-driven move
-    // does (`spa-accessibility`). `moveField` and this call batch into one
-    // update, so the effect that reads `refocusId` never sees the value
-    // `moveField` set.
+    // does (`spa-accessibility`). `moveField` and these calls batch into one
+    // update, so the refocus effect never sees the ids `moveField` set. The
+    // rail id clears too: only a run holding a `refocusId` resets it, so a
+    // stale id would otherwise linger until that run.
     setRefocusId(undefined);
+    setRefocusRailId(undefined);
     setDragFieldId(undefined);
   };
 
@@ -399,19 +459,22 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
             // kind picker shows for this field.
             const typeLabel = field ? fieldKindWord(field) : undefined;
             const kindIcon = field ? fieldKindIcon(field) : undefined;
+            // The field that holds this one, at any depth. A field past the
+            // indent cap draws at depth 0, and this still names the group
+            // that holds it rather than the root.
+            const parentId = parentIdOf(draft.fields ?? [], row.id);
             return (
               <li key={row.id}>
                 <PanelsRailFieldRow
+                  id={railEntryId(row.id)}
                   label={label || t("panelsScreen.unnamedField")}
                   typeLabel={typeLabel}
+                  groupLabel={parentId === undefined ? undefined : fieldWord(parentId)}
                   kindIcon={kindIcon}
                   depth={row.depth}
                   issues={rowIssues}
-                  selected={selectedFieldId === row.rootId}
-                  onClick={() => {
-                    setSelectedFieldId(row.rootId);
-                    setFocusFieldId(row.id);
-                  }}
+                  selected={selectedFieldId === row.id}
+                  onClick={() => setSelectedFieldId(row.id)}
                   onDragStart={() => setDragFieldId(row.id)}
                   onDragEnd={() => setDragFieldId(undefined)}
                   onDrop={() => dropOnRow(row.id)}
@@ -421,7 +484,7 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
             );
           })}
           <li>
-            <button type="button" {...stylex.props(styles.railRow)} onClick={addField}>
+            <button type="button" {...stylex.props(styles.railRow)} onClick={() => addField()}>
               {t("fieldCatalog.addField")}
             </button>
           </li>
@@ -435,11 +498,10 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
           {announcement}
         </p>
       </nav>
-      <div {...stylex.props(styles.editor, styles.layoutChild)}>
+      <div ref={editorRef} {...stylex.props(styles.editor, styles.layoutChild)}>
         <FieldCatalogPanel
           token={token}
           selectedId={selectedFieldId}
-          focusFieldId={focusFieldId}
           onAdd={addField}
           onRemove={removeField}
           onShowStep={onShowStep}

@@ -74,20 +74,14 @@ describe("area boundaries", () => {
         expect(ok, `${file}:${i + 1} has no adjacent missingTranslationWarning call or exemption comment`).toBe(true);
       });
     }
-    // studio-app's requirement enumerates seven kinds by hand: process
-    // label, step label, step description, field label, field description,
-    // field option label, and a note's text. Nine textual sites carried the
-    // first six: process label and step label/description sit in
-    // ProcessHeaderBar.tsx/StepPage.tsx, one each. field-catalog-redesign
-    // split the field catalog's single recursive FieldRow into two
-    // source-level components — FieldEditor for the selected top-level
-    // field's tab set, SubFieldRow for a group's children — so field label,
-    // field description and field option label each appear once in each
-    // component's own source: six sites for three kinds. field-model-view-note
-    // adds a note's text as the tenth site, in FormEditorScreen.tsx's
-    // NoteEditorStrip. This confirms the rule actually finds every site
+    // studio-app's requirement enumerates seven sites by hand: the process
+    // label (ProcessHeaderBar.tsx), the step label and the step description
+    // (StepPage.tsx), the field label, the field description and the option
+    // label (FieldCatalogPanel.tsx's FieldEditor, one component rendering a
+    // field at any nesting depth), and a note's text (FormEditorScreen.tsx's
+    // NoteEditorStrip). This confirms the rule actually finds every site
     // rather than silently checking zero.
-    expect(sitesChecked).toBe(10);
+    expect(sitesChecked).toBe(7);
   });
 });
 

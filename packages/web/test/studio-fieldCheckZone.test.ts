@@ -91,4 +91,23 @@ describe("EditorIssue carries the check's own location", () => {
     expect(issue!.loc).toBe("fields.field_amount.technical");
     expect(fieldCheckZone(issue!.loc)).toBe("kind");
   });
+
+  it("anchors a nested field's key check on the nested field", () => {
+    const draft = body();
+    draft.fields = [
+      {
+        id: "field_g",
+        key: "g",
+        label: { en: "G" },
+        type: "group",
+        fields: [{ id: "field_amount", key: "my-field", label: { en: "Amount" }, type: "number" }],
+      },
+    ] as unknown as Draft["fields"];
+
+    const issue = runValidation(draft, undefined, {}, {}).issues.find((i) => i.source === "structural");
+
+    expect(issue?.loc).toBe("fields[0].fields[0].key");
+    expect(issue?.entityId).toBe("field_amount");
+    expect(fieldCheckZone(issue!.loc)).toBe("asks");
+  });
 });

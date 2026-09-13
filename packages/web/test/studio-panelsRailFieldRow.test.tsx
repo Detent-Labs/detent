@@ -72,6 +72,21 @@ describe("PanelsRailFieldRow", () => {
     expect(html.slice(0, html.indexOf(">Number<"))).toContain("visuallyHidden");
   });
 
+  // A screen reader hears no indent, so a nested entry names its group in the
+  // button's accessible name, as hidden text after the kind name (design.md,
+  // "A nested rail entry names its group in hidden text").
+  it("names a given group as hidden text inside the button, and no group without one", () => {
+    const html = renderToStaticMarkup(<PanelsRailFieldRow {...BASE} depth={1} groupLabel="Processing (Fabrikam)" />);
+    expect(html).toContain("in Processing (Fabrikam)");
+    const at = html.indexOf(">in Processing (Fabrikam)<");
+    expect(at).toBeGreaterThan(html.indexOf(">Number<"));
+    expect(at).toBeLessThan(html.indexOf("</button>"));
+    expect(html.slice(html.lastIndexOf("<span", at), at)).toContain("visuallyHidden");
+
+    const withoutGroup = renderToStaticMarkup(<PanelsRailFieldRow {...BASE} depth={1} />);
+    expect(withoutGroup).not.toMatch(/>in [^<]*</);
+  });
+
   it("renders no icon for a row naming no field", () => {
     const html = renderToStaticMarkup(<PanelsRailFieldRow {...BASE} kindIcon={undefined} typeLabel={undefined} />);
     expect(html).not.toContain("aria-hidden");
@@ -80,5 +95,19 @@ describe("PanelsRailFieldRow", () => {
   it("marks the row a pointer has picked up", () => {
     expect(renderToStaticMarkup(<PanelsRailFieldRow {...BASE} dragging />)).toContain('data-dragging="true"');
     expect(renderToStaticMarkup(<PanelsRailFieldRow {...BASE} />)).not.toContain("data-dragging");
+  });
+
+  // The refocus effect scrolls this id into the rail's view after an add or a
+  // move through the move control
+  // (design.md, "Focus and the rail entry after an add or a move"). The id
+  // sits on the button, not the wrapper, so it lands on the same element a
+  // click or a focus targets.
+  it("places a given id on the button, and no id attribute without one", () => {
+    const html = renderToStaticMarkup(<PanelsRailFieldRow {...BASE} id="studio-field-rail-field_1" />);
+    expect(html).toContain('<button id="studio-field-rail-field_1"');
+
+    const withoutId = renderToStaticMarkup(<PanelsRailFieldRow {...BASE} />);
+    const buttonTag = withoutId.slice(withoutId.indexOf("<button"), withoutId.indexOf(">", withoutId.indexOf("<button")) + 1);
+    expect(buttonTag).not.toContain(" id=");
   });
 });
