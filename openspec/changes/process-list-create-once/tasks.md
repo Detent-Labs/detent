@@ -75,9 +75,9 @@ until then.
 
 ## 5. Verification
 
-- [ ] 5.1 Run `bun run typecheck` in the devcontainer. Verify: it exits 0.
-- [ ] 5.2 Run `bun run build` in the devcontainer. Verify: it exits 0.
-- [ ] 5.3 Run the full `bun test` with `DATABASE_URL` set, in the
+- [x] 5.1 Run `bun run typecheck` in the devcontainer. Verify: it exits 0.
+- [x] 5.2 Run `bun run build` in the devcontainer. Verify: it exits 0.
+- [x] 5.3 Run the full `bun test` with `DATABASE_URL` set, in the
   devcontainer. Capture its output with `bun test 2>&1 | tee /tmp/t.log`.
   Then run `sh scripts/gates/silent-green.sh /tmp/t.log`. Verify: no test
   fails by name, and the gate passes.
