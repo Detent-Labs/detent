@@ -208,6 +208,7 @@ empty-key field did before.
   data source entry offers one
 - **AND** no rail entry carries a move control of its own
 
+<!-- The heading keeps the live spec's wording, since a MODIFIED block keeps every scenario; "names" means printed text, and a nested entry's accessible name carries the group's name. -->
 #### Scenario: A rail entry names no group
 
 - **WHEN** a draft carries a group field holding two fields
@@ -520,8 +521,8 @@ neighbour.
 
 A group field's definition half SHALL hold a sixth zone after "Validation",
 named "Fields inside this group". That zone SHALL draw none of the group's
-fields, since the rail lists them. It SHALL hold one control, which adds a
-field at the end of the group. The tab SHALL then select that new field.
+fields, since the entity rail lists them. It SHALL hold one control, which
+adds a field at the end of the group. The tab SHALL then select that new field.
 
 Keyboard focus SHALL then land in the new field's label input, since a new
 field needs its label first. The rail SHALL bring the new field's entry into

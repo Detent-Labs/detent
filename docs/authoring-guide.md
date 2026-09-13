@@ -452,10 +452,11 @@ The engine drops an entry whose type does not match its target field, and the
 submission still succeeds. The instance record names the drop. That mismatch
 comes from operator data, and the participant can do nothing about it.
 
-The field catalog builds a mapping. Under the data source picker it
-shows one row per mapped column. The first control picks a column key the
-bound list declares. The second picks the catalog field it writes. A row whose
-key the list no longer declares carries a mark.
+The field catalog builds a mapping in its effect half, the half that says
+where a field acts. The "Column mapping" zone there shows one row per mapped
+column. The first control picks a column key the bound list declares. The
+second picks the catalog field it writes. A row whose key the list no longer
+declares carries a mark.
 
 The editor appears for a `string` field bound to a `db.list` source. For any
 other source type, write the mapping as JSON in the studio's raw definition

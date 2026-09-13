@@ -1536,13 +1536,13 @@ view shows `item_description`'s own editor, with its two halves, and that
 editor opens at its top.
 
 Click "+ Add field" (either the rail's own entry or the panel's own button;
-both call the same handler). Pass: a new "(unnamed field)" row appears at
-the end of the rail sub-list, selected at once. Its key input is empty and
-focus-ready. It carries an issue-mark badge reading "1", aria-label "1
-issues": the empty key is a real validation issue, live.
+both call the same handler). Pass: a new "(unnamed field)" entry appears
+last in the entity rail, selected. Keyboard focus sits in its label input,
+and the rail shows the entry. Its issue mark reads "2", aria-label "2
+issues": the empty base-locale label and the empty key.
 
-Click "Remove field". Pass: the neighbour (the field before it, since it was
-last) becomes selected.
+Click "Remove field". Pass: `invoice`, the top-level field before the
+removed one, becomes selected.
 
 Open the Data sources view. Pass: the Fields sub-list disappears, and a Data
 sources sub-list appears in its place. The two never show at once. The new
@@ -2771,7 +2771,7 @@ Open the same route and narrow the window to 900px, then to 420px.
 Pass: the three regions stack in the reading order list, definition, effect.
 The rail stands above the editor as an open list, with no disclosure button,
 and it drops its right-hand rule. The rail caps at 20rem. It scrolls inside
-that cap rather than pushing the open view off screen.
+that cap rather than pushing the editor off screen.
 
 Pass: `document.documentElement.scrollWidth` equals `clientWidth` at 1440,
 900 and 420. The page never scrolls sideways. Measured 2026-09-04: 1440/1440,
@@ -2862,8 +2862,8 @@ equals `clientWidth` at that width too.
 Source: `group-child-own-editor` tasks 4.4 and 4.5.
 
 Open the IT Offboarding draft on the Fields tab, at
-`/studio/processes/<id>/edit/fields`. The rail lists 51 rows: 7 groups and
-44 fields.
+`/studio/processes/<id>/edit/fields`. The entity rail lists 51 rows: 7 groups
+and 44 fields.
 
 Choose "Forward to this address" in "Data backup and email". Pass: that
 entry alone carries the current mark (`aria-current`), and the group's own
@@ -2900,8 +2900,8 @@ that followed it, becomes selected, and "Notification" now holds three
 fields.
 
 Choose "Submitted on", now the last of those three. Click "Remove field".
-Pass: "Submitted by", the field before it, becomes selected. It holds two
-fields now, "Remarks" and "Submitted by".
+Pass: "Submitted by", the field before it, becomes selected. "Notification"
+now holds two fields, "Remarks" and "Submitted by".
 
 Choose "Remarks" in the rail, then change its key to `my-field`. Pass: the
 check stands inside its own "What this field asks" zone, and that zone's
@@ -2937,6 +2937,13 @@ Scroll to "Processing (Fabrikam)" so its own entry shows while its last field
 stays hidden. Choose it. Press "+ Add field to this group" again. Pass: the
 same focus, current mark and no-scroll-animation outcomes hold, and the
 group now holds 20 fields.
+
+Last, open `/studio` and press "+ New process", then "Empty process". The
+new draft has no field yet. Open its Fields tab, at
+`/studio/processes/<id>/edit/fields`. Pass: the editor shows the start state,
+"This process collects nothing yet". Press "Add the first field". Pass:
+keyboard focus sits in the new field's label input, and its entry carries the
+current mark.
 
 Focus, scroll position and the current mark need a live draft store and a
 real DOM.

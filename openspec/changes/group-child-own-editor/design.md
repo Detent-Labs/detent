@@ -94,7 +94,8 @@ built on the IT Offboarding fields.
 - The zones "Where values come from" and "Validation" still show for a group.
 - Focus after Remove keeps the behavior it has today.
 - The glossary row for "field tabs" in `.claude/rules/ui-glossary.md` still
-  describes a tab set that no longer exists.
+  describes a tab set that no longer exists. It also names the one selected
+  top-level field, where the editor now opens at any depth.
 - The rail's two-level indent cap and the drag stay as they are.
 
 ## Decisions
@@ -157,7 +158,7 @@ holds "Fields inside this group". The button reuses `fieldCatalog.addSubField`,
 and its text becomes "+ Add field to this group". The studio catalog ships
 English alone, so no German entry follows.
 
-### Focus and the rail entry after an add into a group
+### Focus and the rail entry after an add or a move
 
 Every add path stores two ids for the commit that follows. The paths are the
 rail's "+ Add field", the start state, the panel's own "+ Add field" and the
@@ -185,7 +186,10 @@ the rail.
 `PanelsRailFieldRow` gains an optional `id`, placed on its `button`.
 
 Considered: focus on the new rail entry. A keyboard user would then tab through
-every later entry to reach the label. The owner chose the label input.
+every later entry to reach the label. The owner chose the label input for the
+group zone. The apply phase gave the other three add paths the same focus and
+rail scroll. It added the rail scroll after a move through the move control as
+well.
 
 ### Remove selects a sibling, then the group
 
@@ -253,7 +257,7 @@ A group's editor used to list its children in a `<fieldset>`, which told a
 screen reader what the group holds. Now only the rail's indent shows which
 group holds a field, and a screen reader hears no indent. The rail entry
 component, `PanelsRailFieldRow`, therefore takes an optional `groupLabel`. The
-entry prints it as visually hidden text after the kind name, through the
+entry carries it as visually hidden text after the kind name, through the
 catalog key `panelsScreen.railEntryGroup` ("in {group}").
 
 The tab passes the resolved label of a nested entry's parent, found through
@@ -315,29 +319,34 @@ replaces them at archive. The delta's first block therefore ends in the same
 two lines.
 
 The key auto-derive requirement takes the largest rewrite. Its long sentences
-become short ones, and the rules they state stay the same. Each other
-requirement loses its findings through small wording fixes.
+become short ones, and the rules they state stay the same. It gains one
+scenario for a second collision, a rule its live prose already states. Each
+other requirement loses its findings through small wording fixes.
 
-OpenSpec 1.13 refuses a MODIFIED block that drops a scenario heading. Three
-headings therefore keep the live wording above a body that now states the new
-behavior. A fourth keeps a live wording the linter flags, under a targeted
-directive. A one-line comment above each heading says why.
+OpenSpec 1.13 refuses a MODIFIED block that drops a scenario heading. Four
+headings therefore keep a live wording that no longer matches the delta. Three
+stand above a body that now states the new behavior. The fourth, "A rail entry
+names no group", reads against the new accessible-name sentence. A fifth keeps
+a live wording the linter flags, under a targeted directive. A one-line comment
+above each heading says why.
 
 ## Risks / Trade-offs
 
 - [A group's editor no longer shows what the group holds] → The rail lists the
   group's fields directly beside the editor. The group's preview still draws
   every descendant.
-- [Focus leaves the rail after an add, the rail's own add included] → The owner
-  chose the label input on 2026-09-12. A new field needs its label before
-  anything else.
+- [Focus leaves the rail after an add, the rail's own add included] → A new
+  field needs its label first. The owner chose the label input for the group
+  zone on 2026-09-12. The apply phase widened that choice to every add path.
+  Focus left on the panel's own "+ Add field" would sit off screen once the
+  new editor opens at its top.
 - [The scroll moves the page on a narrow window] → Below 64rem the rail stands
   above the editor. The scroll moves only as far as the entry needs.
 - [A former group keeps its children after a kind switch] → The rail still
   lists those children. Each one opens its own editor, and its move control
   takes it out.
-- [Three scenario headings no longer describe their bodies] → The tool forces
-  the headings to stay. The comment above each names the new behavior.
+- [Four scenario headings no longer match what the delta states] → The tool
+  forces the headings to stay. The comment above each names what holds now.
 - [A check that named a group now names its field] → Every other reader of
   `entityId` compares a step, path, timer or action id. The Fields tab's count
   reads `entityType` alone.

@@ -12,7 +12,8 @@ owner asked for it to open the same editor a top-level field opens.
 
 The owner approved the behavior below on 2026-09-12, after
 [a clickable mockup](https://claude.ai/code/artifact/6c932e86-9806-4da7-ba91-ce9008e2103d)
-built on the same draft.
+built on the same draft. Two points came later, from the apply phase, and
+What Changes lists them last.
 
 ## What Changes
 
@@ -40,6 +41,18 @@ built on the same draft.
   the count of `LocalizedTextInput` sites. The other points the field matrix at
   the panel's child list.
 
+The apply phase added these two points:
+
+- Every add path ends the way the group zone's add ends. The paths are the
+  rail's "+ Add field", the start state, the panel's own "+ Add field" and the
+  group zone. Each add selects the new field and focuses its label input. Its
+  rail entry scrolls into the rail's view, `nearest` and without animation. A
+  move through the move control scrolls the moved entry into the rail's view
+  too.
+- A nested rail entry names the group that holds its field, as visually hidden
+  text in its accessible name. A screen reader hears no indent, and a field
+  past the rail's indent cap draws at depth 0.
+
 ## Capabilities
 
 ### New Capabilities
@@ -51,7 +64,8 @@ None.
 - `studio-app`: nine requirements change.
   - "The panels screen keeps every change and states so": a child entry
     selects its own field, and Add and Remove name the field they select. A
-    newly chosen field's editor opens at its top.
+    newly chosen field's editor opens at its top. A nested entry's accessible
+    name carries its group's name.
   - "The field catalog's definition half offers a Technical control": a nested
     field offers the control in its own editor.
   - "The field catalog's field key auto-derives from the field label": the
@@ -77,11 +91,12 @@ None.
 - `packages/web/src/areas/studio/panels/EntityTabs.tsx`: the selection names
   the chosen entry. A new selection resets the editor pane's scroll. Add takes
   an optional group. Remove takes a field id. A move keeps its own field
-  selected.
+  selected. The rail entry component, `PanelsRailFieldRow`, takes two optional
+  props: `id` for its button, and `groupLabel` for the hidden group name.
 - `packages/web/src/areas/studio/panels/fieldCatalogLogic.ts`: pure helpers
   answer which field Remove selects next. Two more append a field to a group
   and remove a field at any depth. Two id helpers name the label input and the
-  rail entry that the add control reaches.
+  rail entry that the refocus effect reaches.
 - `packages/web/src/areas/studio/draft/issues.ts`: `resolveLoc` follows a
   nested field's whole index path.
 - `packages/web/src/areas/studio/panels/shared/LocalizedTextInput.tsx`: an
@@ -89,7 +104,8 @@ None.
 - `packages/web/src/areas/studio/draft/panel-rail.ts`: `rootId` goes.
 - `packages/web/src/i18n/catalogs/studio.ts`: `fieldCatalog.addSubField` reads
   "+ Add field to this group". `fieldCatalog.subFieldsLegend` and
-  `fieldCatalog.optionsLegend` go.
+  `fieldCatalog.optionsLegend` go. The new key `panelsScreen.railEntryGroup`
+  reads "in {group}".
 - Comments that describe the old editor, in `draft/field-usage.ts`,
   `draft/mintField.ts` and `panels/shared/FieldValidationEditor.tsx`.
 - Seven test files:
@@ -99,4 +115,7 @@ None.
   - `boundaries.test.ts`, which counts `LocalizedTextInput` sites. `SubFieldRow`
     holds three of its ten.
 - `docs/browser-checks.md`, `docs/current-state.md` and `docs/decisions.md`.
+- `.impeccable/config.json`: its 0.8rem font-size exception names
+  `FieldCatalogPanel.tsx`, whose translation badge takes that size. The file
+  it named before, `PanelsScreen.tsx`, no longer exists.
 - No engine code changes, and the definition contract stays as it is.
