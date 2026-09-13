@@ -286,6 +286,13 @@ describe("Which edges of the tab row fade", () => {
   it("still reads the end one pixel short of the limit", () => {
     expect(tabRow.fadeState(LIMIT - 1, CLIENT, CONTENT)).toBe("start");
   });
+
+  it("fades both edges 2px in from either limit, past the 1px slack", () => {
+    // The other side of each threshold: a slack wider than 1px would read
+    // these two positions as a limit.
+    expect(tabRow.fadeState(2, CLIENT, CONTENT)).toBe("both");
+    expect(tabRow.fadeState(LIMIT - 2, CLIENT, CONTENT)).toBe("both");
+  });
 });
 
 describe("Whether the open tab rests in the row's view", () => {
@@ -314,5 +321,30 @@ describe("Whether the open tab rests in the row's view", () => {
 
   it("reads true for the last tab 0.5px short of the end limit", () => {
     expect(tabRow.tabRestsInView(CONTENT - 100, CONTENT, LIMIT - 0.5, CLIENT, CONTENT, PADDING)).toBe(true);
+  });
+
+  it("reads true for the first tab 0.5px past the start limit", () => {
+    // A high-density screen can rest `scrollLeft` at a fraction.
+    expect(tabRow.tabRestsInView(0, 100, 0.5, CLIENT, CONTENT, PADDING)).toBe(true);
+  });
+});
+
+/**
+ * The resize observer's move test. Its first report for an element arrives at
+ * the first rendering update after `observe()`, not at `observe()`. A count
+ * printed inside that frame has already widened a tab by then, so a first
+ * report must count as a move.
+ */
+describe("Whether a resize report moved an element's width", () => {
+  it("counts an element's first report as a move", () => {
+    expect(tabRow.widthMoved(undefined, 120)).toBe(true);
+  });
+
+  it("counts a changed width as a move", () => {
+    expect(tabRow.widthMoved(120, 132)).toBe(true);
+  });
+
+  it("reads an unchanged width as no move", () => {
+    expect(tabRow.widthMoved(120, 120)).toBe(false);
   });
 });

@@ -242,6 +242,16 @@ function openTabRests(row: HTMLElement | null, button: HTMLElement | null): bool
   return tabRestsInView(start, start + button.offsetWidth, row.scrollLeft, row.clientWidth, row.scrollWidth, padding);
 }
 
+/**
+ * Whether a resize report moved an element's width, given the width its last
+ * report held (`undefined` before any). A first report counts as a move. It
+ * arrives at the first rendering update after `observe()`, and a count
+ * printed before that update has already widened a tab.
+ */
+export function widthMoved(was: number | undefined, width: number): boolean {
+  return was !== width;
+}
+
 /** True for a keyboard focus. An engine that cannot parse `:focus-visible`
  * reads false, so its pointer presses never scroll. */
 function focusVisible(element: Element): boolean {
@@ -302,7 +312,9 @@ export function ProcessTabRow({ open, counts, checksBlocked, onOpen, jsonOpen }:
   // the band the fade mask sizes its gradient to, and recomputes the fade.
   // A row width change scrolls the open tab back into view. A button width
   // change scrolls it only while it rested in view, so a tab the author
-  // scrolled away by hand stays where it is.
+  // scrolled away by hand stays where it is. The first report counts as a
+  // move (`widthMoved`): its scroll moves nothing when no width changed since
+  // the layout effect, and corrects the row when a count printed in between.
   useEffect(() => {
     const row = rowRef.current;
     if (row === null || typeof ResizeObserver === "undefined") return;
@@ -314,7 +326,7 @@ export function ProcessTabRow({ open, counts, checksBlocked, onOpen, jsonOpen }:
         const width = entry.contentRect.width;
         const was = widths.get(entry.target);
         widths.set(entry.target, width);
-        if (was === undefined || was === width) continue;
+        if (!widthMoved(was, width)) continue;
         if (entry.target === row) rowMoved = true;
         else tabMoved = true;
       }
