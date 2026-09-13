@@ -3532,9 +3532,10 @@ each on its own fresh draft.
 ### The Forms tab card miniature (`forms-tab-form-strip`)
 
 Source: `forms-tab-form-strip` tasks 3.5 and 3.6, `forms-tab-card-clarity`
-tasks 3.3 and 3.4. The height budget and a mark's own contrast both come
-off a screenshot, read by eye against a real window. No `bun:test`
-assertion sees either, so this check lands here.
+tasks 3.3 and 3.4, and `forms-card-legend` tasks 5.3 to 5.10. The height
+budget and a mark's own contrast both come off a screenshot, read by eye
+against a real window. No `bun:test` assertion sees either, so this check
+lands here.
 
 Build the production bundle and open it on the engine's own port. Seed the
 database, then sign in as `demo-superuser@example.test`, password
@@ -3544,8 +3545,9 @@ choose "Create draft". Open its Forms tab, at
 
 1. Resize the window to 1100px wide. Read the Forms tab body's own height in
    the inspector. Resize the window's height until that body measures 635px
-   tall. Pass: the twelfth card, last in the four-row grid, reads its open
-   control without scrolling the tab body.
+   tall. Pass: the legend stands on one line above the grid. The twelfth
+   card, last in the four-row grid, reads its open control without scrolling
+   the grid.
 2. Read "Submit the Exit Notification", the card with the most required
    entries. Pass: an ordinary mark draws as a hairline outline against the
    ledger ground. A required mark draws as a filled block instead. Both read
@@ -3554,7 +3556,7 @@ choose "Create draft". Open its Forms tab, at
    again. Pass: the outline and the filled mark still read apart, against
    the dark scheme's own ledger ground.
 4. Open "Submit the Exit Notification" from its card's open control. In the
-   form editor, add ten field entries and save. Return to the Forms tab.
+   form editor, add fifteen field entries and save. Return to the Forms tab.
    Pass: that card's marks continue onto a second line, and every mark stays
    whole and visible.
 5. Read the accessibility tree on "Review the Exit Notification", a card
@@ -3566,11 +3568,130 @@ choose "Create draft". Open its Forms tab, at
    pressing Save. Pass: back on the Forms tab, that card's foot holds
    "Start the form" alone, at the row's trailing edge. Its accessibility
    tree reads "No fields yet".
+7. Read the legend's words above the grid. Then read its tree through
+   `ariaSnapshot()`. Pass: a list named "What the marks mean" holds the five
+   names and no sample node.
 
-Choose "← Back to processes" to return to the process list. Step 6 left the
-draft dirty, so accept its leave-draft confirm. Then choose "Discard" on
-the `it_offboarding` row, and accept the browser's confirm. The header
-bar's own "Discard draft" does not work, so do not use it here. See the
+   Resize the window's height until the tab body measures about 400px tall.
+   Read three values: the grid's `scrollTop`, the tab body's own `scrollTop`
+   and the legend's `getBoundingClientRect().top`. Scroll the grid to its
+   end, then read them again. Pass: the grid's `scrollTop` reads above 0
+   after the scroll. The tab body's own `scrollTop` reads 0 both times, and
+   the legend's `getBoundingClientRect().top` holds its value. Close the step
+   by restoring step 1's 635px body.
+8. Read the tab's heading outline, then the computed style of one card label.
+   Pass: the process name stands at level 1, and each of the twelve labels at
+   level 2. Pass: the label computes 15px, weight 800, the body's font family,
+   no text transform and zero margin.
+9. Read the bounding box of one card's open control. Pass: its height reads
+   24px or more.
+10. On the "Prepare the Offboarding" card, choose the open control. In the
+    form editor, choose the "Forward to this address" entry, whose card prints
+    `forwarding_address`. In the "Selected field" strip that card opens, under
+    required, open the Developer view. Pick CEL in its select. Press "Edit as CEL" and type
+    `data.email_forwarding == true`.
+
+    Choose the `forwarding_address` card again, so the strip closes and opens
+    fresh for the next entry. Author the same condition on "M365 backup by Fabrikam
+    as standard", whose card prints `m365_backup_confirmed`. That entry is a
+    boolean, so its mark draws 8px. Choose "← Back to the process" without
+    pressing Save. Pass: that card draws two dashed marks in both color
+    schemes, and its foot still reads "16 fields".
+11. Turn forced colors on through a `run-code` call to
+    `page.emulateMedia({ forcedColors: "active" })`. Pass: the legend's four
+    sample kinds stay visible and read apart. Those are the outline, the solid
+    fill, the dashed outline and the group break. Step 10's two dashed marks
+    stay visible too.
+
+    Pass: the 8px dashed mark from step 10 reads apart from an ordinary 8px
+    mark on another card, such as the one "Offboarding Closed" draws. Where
+    those two do not read apart, record a new FORMS entry in
+    `docs/decisions.md`. Clear the emulation at the end, with
+    `page.emulateMedia({ forcedColors: null })` in a second `run-code` call.
+
+Under `playwright-cli`, pass `-s=forms-card-legend` on every call. Step 7
+reads the legend through this `run-code` function:
+
+```js
+async (page) => {
+  const legend = page.getByRole("list", { name: "What the marks mean" });
+  return { words: await legend.innerText(), tree: await legend.ariaSnapshot() };
+}
+```
+
+A passing tree reads as follows:
+
+```yaml
+- list "What the marks mean":
+  - listitem: field
+  - listitem: required
+  - listitem: required if a condition holds
+  - listitem: section
+  - listitem: taller asks for more
+```
+
+Step 7's scroll runs through this function, once the tab body stands about
+400px tall. A wheel over the grid scrolls it:
+
+```js
+async (page) => {
+  const body = page.locator('[role="tabpanel"]:not([hidden])');
+  const grid = page.getByRole("list", { name: "Forms in this process" });
+  const legend = page.getByRole("list", { name: "What the marks mean" });
+  const read = async () => ({
+    bodyHeight: await body.evaluate((el) => el.clientHeight),
+    bodyScrollTop: await body.evaluate((el) => el.scrollTop),
+    gridScrollTop: await grid.evaluate((el) => el.scrollTop),
+    legendTop: await legend.evaluate((el) => el.getBoundingClientRect().top),
+  });
+  const before = await read();
+  await grid.hover();
+  await page.mouse.wheel(0, 5000);
+  await page.waitForTimeout(500);
+  return { before, after: await read() };
+}
+```
+
+Step 8 reads the outline and one label's computed style through this one. The
+header bar's `h1` holds the process name in a text input, so the outline reads
+that input's value:
+
+```js
+async (page) => {
+  const outline = await page
+    .getByRole("heading")
+    .evaluateAll((els) =>
+      els.map((el) => `${el.tagName} ${el.querySelector("input")?.value ?? el.textContent.trim()}`),
+    );
+  const label = await page
+    .getByRole("list", { name: "Forms in this process" })
+    .getByRole("heading", { level: 2 })
+    .first()
+    .evaluate((el) => {
+      const s = getComputedStyle(el);
+      return {
+        fontSize: s.fontSize,
+        fontWeight: s.fontWeight,
+        fontFamily: s.fontFamily,
+        bodyFontFamily: getComputedStyle(document.body).fontFamily,
+        textTransform: s.textTransform,
+        margin: s.margin,
+      };
+    });
+  return { outline, label };
+}
+```
+
+Step 9 reads the first card's open control through this one:
+
+```js
+async (page) => page.getByRole("button", { name: /^Open the form / }).first().boundingBox()
+```
+
+Choose "← Back to processes" to return to the process list. Steps 6 and 10
+left the draft dirty, so accept its leave-draft confirm. Then choose
+"Discard" on the `it_offboarding` row, and accept the browser's confirm. The
+header bar's own "Discard draft" does not work, so do not use it here. See the
 `docs/decisions.md` entry DRAFT-1.
 
 ### The field matrix's height (`field-matrix-fill-height`)

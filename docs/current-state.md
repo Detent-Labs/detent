@@ -4503,23 +4503,43 @@ meets `scope=started` should infer no new permission tier from it.
   for the card's role. A card takes a 1px hairline box. An empty form takes a
   2px box in the advisory color instead.
 
+  A legend stands above the grid, as the grid's sibling in the tab body. The
+  grid scrolls on its own, so the legend keeps its place. The `Legend`
+  component renders a `<ul role="list">` named "What the marks mean". It
+  draws one item per entry of `FORMS_LEGEND`, which `formCardRows.ts` exports.
+  Each entry names a catalog key and the marks its sample draws. Each sample
+  group carries `aria-hidden="true"`, so a screen reader reads the five names
+  alone.
+
   The miniature draws one mark for each field entry other than a group
   entry. A group entry draws a group break instead, both through
   `miniatureEntry`. The function `miniatureBarHeight` sets a mark's height
   from the field's kind: 8px, 12px, 16px or 24px. A group break takes its
-  own fixed height, `GROUP_BREAK_HEIGHT`. An ordinary mark draws as an
-  outline, and a required entry's mark fills solid.
+  own fixed height, `GROUP_BREAK_HEIGHT`.
+
+  Each `MiniatureEntry` carries a `requirement`, reading the entry's
+  `required` as one of three states. Literal `true` reads `"required"`, and a
+  CEL expression reads `"conditional"`. Literal `false` and an absent key both
+  read `"optional"`. The component `MiniatureMark` draws them as an outline, a
+  solid fill and a dashed outline. The miniature and the legend both draw
+  through it, and `requiredCount` counts `"required"` alone.
 
   The `Miniature` component carries `aria-hidden="true"` and no role, so a
   screen reader skips it. The function `footCountText` builds the foot's
   text from the field count and the required count, one catalog key per
-  shape. The component `FormCard` mints two ids with `useId`, one for the
-  step name span and one for the open control. The control's
-  `aria-labelledby` lists its own id first, then the name span's, joining
-  the two into one accessible name. That name leads with the visible
-  words, then states the step's label. The foot row carries its text on
-  the left and the open control on the right, taking `styles.foot` and
-  `styles.openControl`.
+  shape. The component `FormCard` prints the step label in an `<h2>`, and its
+  `name` style resets the heading rule in `shell/global.css`. It mints two ids
+  with `useId`, one for that heading and one for the open control. The
+  control's `aria-labelledby` lists its own id first, then the heading's. That
+  name leads with the visible words, then states the step's label.
+
+  The check badge's `aria-label` reads one sentence, "{count} open issues on
+  {step}", from `formsTab.issueMark`. The key `formsTab.issueMarkOne` holds the
+  singular sentence. The count fills first, then the heading's text fills
+  `{step}` through a function, so a label holding `$&` prints as typed. The
+  foot row carries its text on the left and the open control on the right,
+  taking `styles.foot` and `styles.openControl`. The open control's style sets
+  a 24px minimum height.
 
   The form editor's trailing pane is `FormPreview.tsx`. It mounts
   `packages/form-ui`'s own `FieldForm` and `PathButtons`, the two the Player
