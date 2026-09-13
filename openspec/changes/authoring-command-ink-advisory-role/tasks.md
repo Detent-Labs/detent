@@ -49,9 +49,9 @@
 
 ## 5. Verification
 
-- [ ] 5.1 Run `bun run typecheck`, then `bun run build`, in the devcontainer. Verify both exit 0. Record what each printed.
-- [ ] 5.2 Run the full `bun test` with `DATABASE_URL` set, piped through `scripts/gates/silent-green.sh`. Verify zero failures and a skip count at or under the floor.
-- [ ] 5.3 Run `sh ~/.claude/skills/impeccable/scripts/impeccable detect --json` on each of the thirteen component files the Impact section of `proposal.md` lists. Verify no finding stays open, or record why one stands.
+- [x] 5.1 Run `bun run typecheck`, then `bun run build`, in the devcontainer. Verify both exit 0. Record what each printed.
+- [x] 5.2 Run the full `bun test` with `DATABASE_URL` set, piped through `scripts/gates/silent-green.sh`. Verify zero failures and a skip count at or under the floor.
+- [x] 5.3 Run `sh ~/.claude/skills/impeccable/scripts/impeccable detect --json` on each of the thirteen component files the Impact section of `proposal.md` lists. Verify no finding stays open, or record why one stands.
 - [ ] 5.4 Run the three browser check entries this change touched, on the production build. Pass `-s=authoring-command-ink-advisory-role` to every `playwright-cli` call. Read computed styles through `run-code` with `page.evaluate`. Switch the scheme through `page.emulateMedia`. Verify every new pass line holds, and record each color read.
 - [ ] 5.5 Run `/impeccable critique` on the Forms tab, the form editor and the Changes tab. Run it on a step page showing an incomplete condition too. Run it on the Fields tab with the `de` locale added, where a field's warning callout meets the current mark. Fix each finding, or record it in `docs/decisions.md`. Verify no finding stays unaddressed.
 - [ ] 5.6 Run `/impeccable audit` on each screen that 5.5 names. Fix each finding, or record it in `docs/decisions.md`. Verify no finding stays unaddressed.
