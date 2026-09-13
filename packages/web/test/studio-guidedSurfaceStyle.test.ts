@@ -80,6 +80,29 @@ describe("the steps rail scrolls, not the document", () => {
   });
 });
 
+describe("the field matrix grid takes the tab body's height", () => {
+  const FIELD_MATRIX_PANEL = "src/areas/studio/panels/FieldMatrixPanel.tsx";
+  const FIELD_MATRIX_GRID = "src/areas/studio/panels/FieldMatrixGrid.tsx";
+
+  it("gives the matrix column no automatic minimum of its own", () => {
+    const block = styleBlock(stripComments(read(FIELD_MATRIX_PANEL)), "matrix");
+
+    // A flex item that is not a scroll container takes its content height as
+    // its automatic minimum, so the column needs the explicit zero to shrink
+    // into the tab body at all.
+    expect(block).toMatch(/minHeight: 0/);
+  });
+
+  it("holds the scroll region to a 24rem floor, with no fixed cap above it", () => {
+    const block = styleBlock(stripComments(read(FIELD_MATRIX_GRID)), "matrixScroll");
+
+    // A scroll container's automatic minimum is already zero, so a floor
+    // replaces the old cap rather than joining it.
+    expect(block).toMatch(/minHeight: "24rem"/);
+    expect(block).not.toMatch(/maxHeight/);
+  });
+});
+
 describe("what StyleX drops", () => {
   it("clears a fieldset's UA groove with the longhand", () => {
     for (const file of [...GUIDED, "src/areas/studio/panels/PathsPanel.tsx"]) {
