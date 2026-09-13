@@ -4310,11 +4310,11 @@ meets `scope=started` should infer no new permission tier from it.
   Stage 62 moved both views onto their own tabs, and `FieldsTab` and
   `DataSourcesTab` in `EntityTabs.tsx` host them.
 
-  A row in `RailFieldRow` gained `rootId`. That id names the top-level
-  ancestor a row resolves to, regardless of the row's rendered indent depth.
-  A relocated (depth-2+) row therefore still selects the group that contains
-  it. The module `panel-rail.ts` gained `issueCountForEntityId`, joining its
-  other counting functions for the per-row issue mark.
+  A row in `RailFieldRow` has no `rootId`. A rail entry selects its own
+  field at any depth. A relocated (depth-2+) row keeps its own id, rather
+  than resolving to the group that contains it. The module `panel-rail.ts`
+  gained `issueCountForEntityId`, joining its other counting functions for
+  the per-row issue mark.
 
   Each tab holds its own selection as component state. It resolves that
   selection against the current draft on every render, with a fallback to the
@@ -4323,8 +4323,10 @@ meets `scope=started` should infer no new permission tier from it.
 
   The components `FieldCatalogPanel` and `DataSourcesPanel` lost their own
   Add and Remove handlers. The hosting tab owns both now. It needs the new id
-  to select after an Add. It needs the removed index to pick a neighbour after
-  a Remove.
+  to select after an Add. The Fields tab passes the removed field's id, and
+  `neighbourAfterRemove` picks the next sibling, then the previous sibling,
+  then the parent group. The Data sources tab still passes the removed index
+  to pick a neighbour.
 
   Both panels gained the field CSS the area already states elsewhere. A
   label sits above its control. A 2px rule sits under each heading.
