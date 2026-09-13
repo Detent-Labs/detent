@@ -11,6 +11,7 @@ import {
   neighbourAfterRemove,
   nextFieldKey,
   railEntryId,
+  removalAnnouncement,
   removeFieldIn,
 } from "../src/areas/studio/panels/fieldCatalogLogic.js";
 import { mergeLocalizedTextEntry } from "../src/areas/studio/draft/localized-text.js";
@@ -526,5 +527,21 @@ describe("fieldLabelInputId and railEntryId", () => {
 
   it("pins the rail entry id", () => {
     expect(railEntryId("field_a")).toBe("studio-field-rail-field_a");
+  });
+});
+
+describe("removalAnnouncement", () => {
+  it("announces a plain field with no sentence about fields inside it", () => {
+    expect(removalAnnouncement("Booking Status", 0)).toBe("Booking Status removed.");
+  });
+
+  it("uses the singular form for exactly one field inside", () => {
+    expect(removalAnnouncement("Some Group", 1)).toBe("Some Group removed, with the one field inside it.");
+  });
+
+  it("uses the plural form and states the count for more than one field inside", () => {
+    expect(removalAnnouncement("Processing (Fabrikam)", 18)).toBe(
+      "Processing (Fabrikam) removed, with the 18 fields inside it.",
+    );
   });
 });

@@ -1,4 +1,5 @@
 import type { FieldControl, FieldFormat } from "workflow-engine/schema";
+import { t } from "../catalog.js";
 import { deriveKey, dedupeKey, shouldAutoDeriveKey } from "../draft/deriveKey.js";
 import { flattenDraftFields, type DraftField } from "../draft/fields.js";
 import { resolveDraftLocalizedText, type DraftLocalizedText } from "../draft/localized-text.js";
@@ -285,4 +286,20 @@ export function neighbourAfterRemove(fields: DraftField[], fieldId: string): str
   const { siblings, parentId } = located;
   const index = siblings.findIndex((f) => f.id === fieldId);
   return siblings[index + 1]?.id ?? siblings[index - 1]?.id ?? parentId;
+}
+
+/**
+ * The sentence the Fields tab's live region announces for a confirmed
+ * removal (design.md, "Announcements and the live region's name"). `label`
+ * is the removed field's own resolved label; `fieldsInside` is its
+ * `fieldRemovalReach` count, so a plain field (zero) reads apart from a
+ * group that took fields with it.
+ *
+ * One key per case under `panelsScreen`, matching the shape brief's copy
+ * table: the bare form at zero, the singular at one, the plural above one.
+ */
+export function removalAnnouncement(label: string, fieldsInside: number): string {
+  if (fieldsInside === 0) return t("panelsScreen.fieldRemoved").replace("{field}", label);
+  if (fieldsInside === 1) return t("panelsScreen.fieldRemovedWithOne").replace("{field}", label);
+  return t("panelsScreen.fieldRemovedWithMany").replace("{field}", label).replace("{count}", String(fieldsInside));
 }

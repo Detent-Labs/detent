@@ -430,6 +430,9 @@ export const en = {
   "panelsScreen.movedIntoGroup": "{field} moved into {group}.",
   "panelsScreen.movedToTopLevel": "{field} moved out of {group}, to the top level.",
   "panelsScreen.moveAnnouncerLabel": "Field moves",
+  "panelsScreen.fieldRemoved": "{field} removed.",
+  "panelsScreen.fieldRemovedWithOne": "{field} removed, with the one field inside it.",
+  "panelsScreen.fieldRemovedWithMany": "{field} removed, with the {count} fields inside it.",
   "panelsScreen.keepsChanges": "This screen keeps every change. Save from the toolbar to persist it.",
 
   "fieldMatrix.heading": "Field matrix",
