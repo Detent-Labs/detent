@@ -14,21 +14,20 @@ import { colors, fonts, space } from "form-ui/tokens.stylex";
 import type { DraftOf } from "../draft/types";
 import { useDraft, type Mutate } from "../draft/store";
 import { t, type CatalogKey } from "../catalog.js";
-import { mintId } from "../draft/ids";
 import { removeAt, updateAt } from "../draft/list-ops";
 import { updateInDraftArray } from "../draft/draft-array-crud";
 import { PluginEnvelopeEditor } from "./shared/PluginEnvelopeEditor";
 import { useDataLists } from "./shared/useDataLists.js";
 import { columnMappingRows, declaredColumns, mappableTargets, showsColumnMapping } from "./columnMappingLogic.js";
 import type { StudioDataList } from "../api/types.js";
-import { IssueItems, IssueList } from "./shared/IssueList";
+import { IssueItems } from "./shared/IssueList";
 import { LocalizedTextInput } from "./shared/LocalizedTextInput";
 import { FieldValidationEditor } from "./shared/FieldValidationEditor";
 import { DefaultValueEditor } from "./shared/DefaultValueEditor";
 import { fieldLocaleGaps, missingTranslationWarning, resolveDraftLocalizedText, seedLocalizedText } from "../draft/localized-text";
 import { draftFields, flattenDraftFields } from "../draft/fields";
 import { writeGroupKey, writeGroupLabel } from "../draft/view-group-sync.js";
-import { droppedByKindChange, moveControlId, moveTargetsFor, nextFieldKey } from "./fieldCatalogLogic.js";
+import { droppedByKindChange, fieldLabelInputId, moveControlId, moveTargetsFor, nextFieldKey } from "./fieldCatalogLogic.js";
 import { fieldCheckZone, type FieldCheckZone } from "./fieldCheckZone.js";
 import { fieldKindLabel } from "../draft/field-type-labels";
 import {
@@ -552,313 +551,6 @@ export function MoveFieldControl({ fieldId, fields, contentLocale, baseLocale, o
   );
 }
 
-interface SubFieldRowProps {
-  field: DraftField;
-  dataSources: DraftDataSource[];
-  /** `undefined` until the fetch resolves, and after a failed one. */
-  lists: StudioDataList[] | undefined;
-  /** Threaded from the caller's own `useDraft()`, for the Technical checkbox's
-   * `mutate`-recipe write — `onChange`'s `Object.assign` patch cannot delete a
-   * key (`view-flags.ts:34-41`). */
-  mutate: Mutate;
-  onChange: (patch: Partial<DraftField>) => void;
-  onRemove: () => void;
-  /** The move's write, threaded down from `FieldsTab::moveField` through
-   * `FieldCatalogPanel` and `FieldEditor`. Passed on to a nested `SubFieldRow`
-   * unchanged, so a group inside a group reaches the same one write. */
-  onMoveField: (fieldId: string, targetGroupId: string | undefined) => void;
-}
-
-/**
- * A group field's own child, and any of ITS children in turn — the flat,
- * recursive field row this whole panel used before the two halves. It draws
- * no halves of its own, so nesting a child inside the selected field never
- * nests a second definition half inside the first.
- *
- * It keeps its own check list (`IssueList` below). A child row is not the
- * selected field, and the halves' zones describe the selected field alone.
- */
-function SubFieldRow({ field, dataSources, lists, mutate, onChange, onRemove, onMoveField }: SubFieldRowProps) {
-  const { draft, contentLocale } = useDraft();
-  const baseLocale = draft.baseLocale ?? "en";
-  /** Deduped against the whole catalog, not just this group's own children
-   * (design.md: `FieldDef.key` is one flat CEL namespace regardless of
-   * nesting depth). A group's label goes through `writeGroupLabel`, so the
-   * key it derives rewrites the view entries naming the old one. */
-  const updateLabel = (label: DraftField["label"]) => {
-    const groupId = field.type === "group" ? field.id : undefined;
-    if (groupId !== undefined) {
-      mutate((d) => writeGroupLabel(d, groupId, label, baseLocale));
-      return;
-    }
-    const taken = new Set(draftFields(draft).filter((f) => f.id !== field.id).map((f) => f.key ?? ""));
-    const derivedKey = nextFieldKey(field.key ?? "", field.label, label, baseLocale, taken);
-    onChange(derivedKey === undefined ? { label } : { label, key: derivedKey });
-  };
-  const custom = isCustomType(field.type);
-  const hasOptions = (field.options?.length ?? 0) > 0;
-  const hasDataSource = field.dataSource !== undefined;
-  const isGroup = field.type === "group";
-  const fieldId = field.id;
-  const technicalChecked = field.technical === true;
-  const toggleTechnical = (next: boolean) => {
-    if (fieldId === undefined) return;
-    const clearCount = countTechnicalClearKeys(draft, fieldId);
-    if (needsTechnicalToggleConfirm(next, clearCount) && !confirm(t("fieldCatalog.technicalClearConfirm").replace("{count}", String(clearCount)))) return;
-    mutate((d) => applyTechnicalMarker(d, fieldId, next));
-  };
-
-  const setOptions = (options: DraftOption[]) => onChange({ options, dataSource: options.length > 0 ? undefined : field.dataSource });
-
-  const mappingRows = columnMappingRows(field, dataSources, lists);
-  const columns = declaredColumns(field, dataSources, lists);
-  const targets = mappableTargets(field, draft.fields ?? []);
-  /** The first declared column no row holds yet, or `undefined` when every one is mapped. */
-  const unmapped = columns.find((c) => !mappingRows.some((r) => r.column === c));
-
-  /**
-   * Writes the mapping back, or drops the key entirely when the result is
-   * empty. An empty object is not the same as no mapping: the schema reads
-   * `columnMapping` as optional, and a body carrying `{}` says an author meant
-   * something they did not.
-   */
-  const writeMapping = (next: Record<string, string>) =>
-    onChange({ columnMapping: (Object.keys(next).length === 0 ? undefined : next) as DraftField["columnMapping"] });
-
-  const setMapping = (column: string, target: string) => {
-    const next = { ...((field.columnMapping ?? {}) as Record<string, string>) };
-    next[column] = target;
-    writeMapping(next);
-  };
-
-  // Rebuilt rather than patched in place, so the row keeps its position: a
-  // delete-then-add would send the renamed key to the end of the list.
-  const renameMapping = (from: string, to: string) => {
-    const current = (field.columnMapping ?? {}) as Record<string, string>;
-    writeMapping(Object.fromEntries(Object.entries(current).map(([k, v]) => (k === from ? [to, v] : [k, v]))));
-  };
-
-  const removeMapping = (column: string) => {
-    const next = { ...((field.columnMapping ?? {}) as Record<string, string>) };
-    delete next[column];
-    writeMapping(next);
-  };
-
-  const addMapping = () => unmapped !== undefined && setMapping(unmapped, "");
-
-  const addOption = () => setOptions([...(field.options ?? []), { value: "", label: seedLocalizedText(contentLocale) }]);
-  const updateOption = (i: number, patch: Partial<DraftOption>) => setOptions(updateAt(field.options ?? [], i, patch));
-  const removeOption = (i: number) => setOptions(removeAt(field.options ?? [], i));
-
-  const addSubField = () =>
-    onChange({ fields: [...(field.fields ?? []), { id: mintId("field"), key: "", label: seedLocalizedText(contentLocale), type: "string" }] });
-  const updateSubField = (i: number, patch: Partial<DraftField>) => onChange({ fields: updateAt(field.fields ?? [], i, patch) });
-  const removeSubField = (i: number) => onChange({ fields: removeAt(field.fields ?? [], i) });
-
-  return (
-    <div {...stylex.props(styles.fieldRow)}>
-      <label {...stylex.props(styles.fieldRowLabel)}>
-        {t("fieldCatalog.keyLabel")}
-        <FieldKeyInput field={field} mutate={mutate} onChange={onChange} />
-      </label>
-      {field.id !== undefined && (
-        <MoveFieldControl
-          fieldId={field.id}
-          fields={draft.fields ?? []}
-          contentLocale={contentLocale}
-          baseLocale={baseLocale}
-          onMoveField={onMoveField}
-        />
-      )}
-      <label {...stylex.props(styles.fieldRowLabel)}>
-        {t("fieldCatalog.labelLabel")}
-        <LocalizedTextInput value={field.label} onChange={updateLabel} />
-      </label>
-      {/* Sibling of the label, never nested inside it: a <label> takes
-          phrasing content, and the design language keeps a field's own
-          messages beside the label. */}
-      {missingTranslationWarning(field.label, contentLocale, draft.baseLocale) && (
-        <p {...stylex.props(styles.studioWarning)}>{missingTranslationWarning(field.label, contentLocale, draft.baseLocale)}</p>
-      )}
-      <label {...stylex.props(styles.fieldRowLabel)}>
-        {t("fieldCatalog.descriptionLabel")}
-        <LocalizedTextInput value={field.description} onChange={(description) => onChange({ description })} />
-      </label>
-      {missingTranslationWarning(field.description, contentLocale, draft.baseLocale) && (
-        <p {...stylex.props(styles.studioWarning)}>
-          {missingTranslationWarning(field.description, contentLocale, draft.baseLocale)}
-        </p>
-      )}
-      <KindPicker field={field} onChange={onChange} />
-      <label {...stylex.props(styles.fieldRowLabel, styles.checkboxLabel)}>
-        {t("fieldCatalog.technicalLabel")}
-        <input
-          type="checkbox"
-          checked={technicalChecked}
-          disabled={isGroup}
-          onChange={(e) => toggleTechnical(e.target.checked)}
-        />
-      </label>
-
-      {custom && (
-        <details {...stylex.props(styles.studioDevview)}>
-          <summary {...stylex.props(styles.studioDevviewSummary)}>{t("fieldCatalog.developerView")}</summary>
-          <PluginEnvelopeEditor
-            label={t("fieldCatalog.customTypeLabel")}
-            value={field.type as DraftOf<FieldDef>["type"] & object}
-            onChange={(type) => onChange({ type })}
-          />
-        </details>
-      )}
-
-      <fieldset>
-        <legend>{t("fieldCatalog.optionsLegend")}</legend>
-        <label>
-          {t("fieldCatalog.dataSourceLabel")}
-          <select
-            value={field.dataSource ?? ""}
-            disabled={hasOptions}
-            onChange={(e) => onChange({ dataSource: e.target.value === "" ? undefined : (e.target.value as DraftField["dataSource"]) })}
-          >
-            <option value="">{t("fieldCatalog.noneOption")}</option>
-            {dataSources.map((ds) => (
-              <option key={ds.id} value={ds.id}>
-                {ds.key ?? ds.id}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="options-editor">
-          {(field.options ?? []).map((opt, i) => {
-            // Under the row, not inside it: `.option-row` lays its three
-            // controls out on one line, and a <p> between them would break
-            // the line in half.
-            const optionWarning = missingTranslationWarning(opt.label, contentLocale, draft.baseLocale);
-            return (
-              <Fragment key={i}>
-                <div {...stylex.props(styles.optionRow)}>
-                  <input
-                    type="text"
-                    {...stylex.props(styles.optionRowInput)}
-                    placeholder={t("fieldCatalog.optionValuePlaceholder")}
-                    disabled={hasDataSource}
-                    value={opt.value ?? ""}
-                    onChange={(e) => updateOption(i, { value: e.target.value })}
-                  />
-                  <LocalizedTextInput
-                    {...stylex.props(styles.optionRowInput)}
-                    placeholder={t("fieldCatalog.optionLabelPlaceholder")}
-                    disabled={hasDataSource}
-                    value={opt.label}
-                    onChange={(label) => updateOption(i, { label })}
-                  />
-                  <button type="button" className="btn btn-secondary" onClick={() => removeOption(i)}>
-                    {t("fieldCatalog.removeOption")}
-                  </button>
-                </div>
-                {optionWarning && <p {...stylex.props(styles.studioWarning)}>{optionWarning}</p>}
-              </Fragment>
-            );
-          })}
-          <button type="button" className="btn btn-secondary" onClick={addOption} disabled={hasDataSource}>
-            {t("fieldCatalog.addOption")}
-          </button>
-        </div>
-
-        {/* The mapping sits under the source that feeds it: the fieldset above
-            groups where a field's choices come from, and this answers what a
-            chosen row then writes. Hidden where a mapping cannot publish, and
-            hiding it never deletes what the field already carries. */}
-        {showsColumnMapping(field, dataSources) && (
-          <div {...stylex.props(styles.studioColumnMapping)}>
-            <p {...stylex.props(styles.studioColumnMappingHeading)}>{t("columnMapping.heading")}</p>
-            {columns.length === 0 ? (
-              <p {...stylex.props(styles.studioNote)}>{t("columnMapping.noColumns")}</p>
-            ) : (
-              <>
-                {mappingRows.map((row) => (
-                  <div {...stylex.props(styles.studioColumnMappingRow)} key={row.column}>
-                    <select
-                      {...stylex.props(styles.studioColumnMappingRowSelect)}
-                      aria-label={t("columnMapping.columnAria")}
-                      value={row.column}
-                      onChange={(e) => renameMapping(row.column, e.target.value)}
-                    >
-                      {/* A stale key is not among the declared ones, so it needs
-                          its own entry to stay selected and visible. */}
-                      {row.stale && <option value={row.column}>{row.column}</option>}
-                      {columns.map((c) => (
-                        <option key={c} value={c}>
-                          {c}
-                        </option>
-                      ))}
-                    </select>
-                    <span aria-hidden="true">-&gt;</span>
-                    <select
-                      {...stylex.props(styles.studioColumnMappingRowSelect)}
-                      aria-label={t("columnMapping.targetAria")}
-                      value={row.target}
-                      onChange={(e) => setMapping(row.column, e.target.value)}
-                    >
-                      <option value="">{t("fieldCatalog.noneOption")}</option>
-                      {targets.map((f) => (
-                        <option key={f.id} value={f.id}>
-                          {f.key === "" || f.key === undefined ? f.id : f.key}
-                        </option>
-                      ))}
-                    </select>
-                    <button type="button" className="btn btn-secondary" onClick={() => removeMapping(row.column)}>
-                      {t("columnMapping.removeRow")}
-                    </button>
-                    {row.stale && <p {...stylex.props(styles.studioWarning, styles.studioWarningInMappingRow)}>{t("columnMapping.staleColumn")}</p>}
-                  </div>
-                ))}
-                <button type="button" className="btn btn-secondary" onClick={addMapping} disabled={unmapped === undefined}>
-                  {t("columnMapping.addRow")}
-                </button>
-              </>
-            )}
-          </div>
-        )}
-      </fieldset>
-
-      <FieldValidationEditor field={field} validation={field.validation} onChange={(validation) => onChange({ validation })} />
-
-      {(isGroup || (field.fields?.length ?? 0) > 0) && (
-        <fieldset>
-          <legend>{t("fieldCatalog.subFieldsLegend")}</legend>
-          {(field.fields ?? []).map((sub, i) => (
-            <SubFieldRow
-              key={sub.id ?? i}
-              field={sub}
-              dataSources={dataSources}
-              lists={lists}
-              mutate={mutate}
-              onChange={(patch) => updateSubField(i, patch)}
-              onRemove={() => removeSubField(i)}
-              onMoveField={onMoveField}
-            />
-          ))}
-          {/* A parent `changeKind` rewrote out of `group` keeps its
-              children (`fieldCatalogLogic.ts::moveFieldToGroup`'s own
-              comment), but it names no group to add a new one into. */}
-          {isGroup && (
-            <button type="button" className="btn btn-secondary" onClick={addSubField}>
-              {t("fieldCatalog.addSubField")}
-            </button>
-          )}
-        </fieldset>
-      )}
-
-      <IssueList entityId={field.id} />
-
-      <button type="button" className="btn btn-secondary" onClick={onRemove}>
-        {t("fieldCatalog.removeField")}
-      </button>
-    </div>
-  );
-}
-
 function usageStepLabel(usage: FieldUsageRow[], stepId: string): string {
   const label = usage.find((u) => u.stepId === stepId)?.stepLabel;
   return label && label !== "" ? label : t("steps.unnamedStep");
@@ -909,20 +601,28 @@ interface FieldEditorProps {
    * threaded through `FieldCatalogPanel`. Renders as this field's own move
    * control, and passes on to a group's `SubFieldRow` children unchanged. */
   onMoveField: (fieldId: string, targetGroupId: string | undefined) => void;
+  /** Adds a field at the end of this group and selects it. Rendered only in
+   * the "Fields inside this group" zone, for a field whose `type` is
+   * `"group"`. `FieldCatalogPanel` hands its own `onAdd` prop straight
+   * through (design.md: "One add function serves the rail, the start state
+   * and the group zone"). */
+  onAdd: (groupId: string) => void;
 }
 
 /**
- * The editor for the SELECTED TOP-LEVEL field alone, in two halves under one
- * heading: what the field is, then where it acts in the process. Neither half
- * sits behind a disclosure, and the view carries no tab set.
+ * The editor for the SELECTED field alone, at any nesting depth, in two
+ * halves under one heading: what the field is, then where it acts in the
+ * process. Neither half sits behind a disclosure, and the view carries no
+ * tab set.
  *
  * Every zone stays mounted while the field stays selected. Each builder holds
  * an incomplete row the draft does not carry, and the developer view holds a
  * half-typed config in component state; unmounting would drop both.
  *
- * A group field's children render inside the definition half through the flat
- * `SubFieldRow` — never through this component recursively, so one pair of
- * halves exists per open editor.
+ * A group field's own editor draws none of its children: the "Fields inside
+ * this group" zone holds one control that adds a field and selects it. Each
+ * child opens its own instance of this same component, so one pair of halves
+ * exists per open editor regardless of nesting depth.
  */
 function FieldEditor({
   field,
@@ -933,6 +633,7 @@ function FieldEditor({
   onRemove,
   onShowStep,
   onMoveField,
+  onAdd,
 }: FieldEditorProps) {
   const { draft, mutate, contentLocale, validation } = useDraft();
 
@@ -997,11 +698,6 @@ function FieldEditor({
   const updateOption = (i: number, patch: Partial<DraftOption>) => setOptions(updateAt(field.options ?? [], i, patch));
   const removeOption = (i: number) => setOptions(removeAt(field.options ?? [], i));
 
-  const addSubField = () =>
-    onChange({ fields: [...(field.fields ?? []), { id: mintId("field"), key: "", label: seedLocalizedText(contentLocale), type: "string" }] });
-  const updateSubField = (i: number, patch: Partial<DraftField>) => onChange({ fields: updateAt(field.fields ?? [], i, patch) });
-  const removeSubField = (i: number) => onChange({ fields: removeAt(field.fields ?? [], i) });
-
   const baseLocale = draft.baseLocale ?? "en";
   const fieldId = field.id;
   /** Deduped against the whole catalog, including every group's nested
@@ -1060,6 +756,11 @@ function FieldEditor({
 
   const requiredDisabled = technicalChecked || requiredState.kind === "none";
 
+  const addFieldToGroup = () => {
+    if (fieldId === undefined) return;
+    onAdd(fieldId);
+  };
+
   return (
     <div {...stylex.props(styles.fieldRow)}>
       <div {...stylex.props(styles.fieldCatalogHalves)}>
@@ -1070,7 +771,11 @@ function FieldEditor({
             <div {...stylex.props(styles.fieldLabelRow)}>
               <label {...stylex.props(styles.fieldRowLabel, styles.fieldLabelRowLabel)}>
                 {t("fieldCatalog.labelLabel")}
-                <LocalizedTextInput value={field.label} onChange={updateLabel} />
+                <LocalizedTextInput
+                  id={fieldId === undefined ? undefined : fieldLabelInputId(fieldId)}
+                  value={field.label}
+                  onChange={updateLabel}
+                />
               </label>
               {/* Names only the active contentLocale's own gap: the
                   content-locale switcher carries the draft-wide per-locale
@@ -1192,30 +897,16 @@ function FieldEditor({
             <FieldValidationEditor field={field} validation={field.validation} onChange={(validation) => onChange({ validation })} />
           </Zone>
 
-          {(isGroup || (field.fields?.length ?? 0) > 0) && (
-            <fieldset>
-              <legend>{t("fieldCatalog.groupChildrenHeading")}</legend>
-              {(field.fields ?? []).map((sub, i) => (
-                <SubFieldRow
-                  key={sub.id ?? i}
-                  field={sub}
-                  dataSources={dataSources}
-                  lists={lists}
-                  mutate={mutate}
-                  onChange={(patch) => updateSubField(i, patch)}
-                  onRemove={() => removeSubField(i)}
-                  onMoveField={onMoveField}
-                />
-              ))}
-              {/* A parent `changeKind` rewrote out of `group` keeps its
-                  children (`fieldCatalogLogic.ts::moveFieldToGroup`'s own
-                  comment), but it names no group to add a new one into. */}
-              {isGroup && (
-                <button type="button" className="btn btn-secondary" onClick={addSubField}>
-                  {t("fieldCatalog.addSubField")}
-                </button>
-              )}
-            </fieldset>
+          {/* The rail lists the group's own children, indented under it, so this
+              zone draws none of them (design.md's shape brief: no child list
+              inside the editor). Each child opens its own instance of this
+              component when the author selects its rail entry. */}
+          {isGroup && (
+            <Zone heading={t("fieldCatalog.groupChildrenHeading")} issues={[]} bordered>
+              <button type="button" className="btn btn-secondary" onClick={addFieldToGroup}>
+                {t("fieldCatalog.addSubField")}
+              </button>
+            </Zone>
           )}
 
           {preview && (
@@ -1403,8 +1094,9 @@ function FieldEditor({
 
 interface Props {
   token: string;
-  /** The one top-level field this panel renders. `undefined` only while the
-   * catalog holds none at all — the screen otherwise keeps it resolved. */
+  /** The one field this panel renders, at any nesting depth. `undefined` only
+   * while the catalog holds none at all — the screen otherwise keeps it
+   * resolved. */
   selectedId: string | undefined;
   onAdd: (groupId?: string) => void;
   onRemove: (fieldId: string) => void;
@@ -1422,15 +1114,15 @@ export function FieldCatalogPanel({ token, selectedId, onAdd, onRemove, onShowSt
   // and the column picker here cannot offer different lists.
   const lists = useDataLists(token);
 
-  const index = fields.findIndex((f) => f.id === selectedId);
-  const field = index === -1 ? undefined : fields[index];
+  const field = flattenDraftFields(fields).find((f) => f.id === selectedId);
 
   const steps = draft.workflow?.steps ?? [];
   const routeStepId = draft.workflow?.initialStep ?? steps[0]?.id;
 
   const updateField = (patch: Partial<DraftField>) => {
-    if (index === -1) return;
-    updateInDraftArray(mutate, (d) => d.fields?.[index], patch);
+    const fieldId = field?.id;
+    if (fieldId === undefined) return;
+    updateInDraftArray(mutate, (d) => flattenDraftFields(d.fields).find((f) => f.id === fieldId), patch);
   };
 
   // The start state replaces both halves, since neither has a field to
@@ -1465,7 +1157,7 @@ export function FieldCatalogPanel({ token, selectedId, onAdd, onRemove, onShowSt
           view's half-typed config — the same way the selection change
           already resets the rest. */}
       <FieldEditor
-        key={field.id ?? index}
+        key={field.id}
         field={field}
         dataSources={dataSources}
         lists={lists}
@@ -1477,6 +1169,7 @@ export function FieldCatalogPanel({ token, selectedId, onAdd, onRemove, onShowSt
         }}
         onShowStep={onShowStep}
         onMoveField={onMoveField}
+        onAdd={onAdd}
       />
       <button type="button" className="btn btn-secondary" onClick={() => onAdd()}>
         {t("fieldCatalog.addField")}

@@ -104,7 +104,7 @@ describe("FieldCatalogPanel", () => {
       <DraftContext.Provider value={contextValue(draft)}>
         <FieldCatalogPanel
           token="test-token"
-          selectedId="field_r"
+          selectedId="field_c"
           onAdd={NOOP}
           onRemove={NOOP}
           onShowStep={NOOP}

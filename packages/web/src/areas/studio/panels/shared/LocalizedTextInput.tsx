@@ -14,18 +14,23 @@ interface Props {
    * platform default, unchanged. */
   className?: string;
   style?: CSSProperties;
+  /** Lets a caller put focus on this input from elsewhere, e.g. `fieldCatalogLogic.ts`'s
+   * `fieldLabelInputId`, which `FieldEditor`'s label input carries so the tab
+   * can focus a new field's label after an add. Every other caller omits it. */
+  id?: string;
 }
 
 /** Edits one locale entry of a LocalizedText value at a time, bound to the
  * Draft's current content locale — independent of the app's own
  * UI-chrome locale. Writes only the
  * current locale's key, leaving every other locale entry untouched. */
-export function LocalizedTextInput({ value, onChange, placeholder, disabled, className, style }: Props) {
+export function LocalizedTextInput({ value, onChange, placeholder, disabled, className, style, id }: Props) {
   const { contentLocale } = useDraft();
 
   return (
     <input
       type="text"
+      id={id}
       placeholder={placeholder}
       disabled={disabled}
       className={className}

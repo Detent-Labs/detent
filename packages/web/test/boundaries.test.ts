@@ -87,7 +87,7 @@ describe("area boundaries", () => {
     // adds a note's text as the tenth site, in FormEditorScreen.tsx's
     // NoteEditorStrip. This confirms the rule actually finds every site
     // rather than silently checking zero.
-    expect(sitesChecked).toBe(10);
+    expect(sitesChecked).toBe(7);
   });
 });
 
