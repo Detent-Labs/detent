@@ -754,6 +754,18 @@ describe("field-removal tolerates a null container the JSON surface can load", (
     expect(draft.contract?.outputFields).toStrictEqual([]);
   });
 
+  it("answers reach and completes the recipe when contract.outputFields is null", () => {
+    const draft = draftOf({
+      fields: [leaf("fld_amount", "amount")],
+      contract: { inputFields: [id("fld_amount")], outputFields: null, outcomes: ["done"] },
+    });
+
+    expect(() => fieldRemovalReach(draft, "fld_amount")).not.toThrow();
+    expect(() => removeFieldAndReferences(draft, "fld_amount")).not.toThrow();
+    expect(draft.contract?.outputFields).toBeNull();
+    expect(draft.contract?.inputFields).toStrictEqual([]);
+  });
+
   it("answers reach and completes the recipe when a field's columnMapping is null", () => {
     const draft = draftOf({
       fields: [leaf("fld_amount", "amount"), { ...leaf("fld_lookup", "lookup"), columnMapping: null }],
@@ -844,7 +856,7 @@ describe("fieldRemovalReach and removeFieldAndReferences over shipped examples",
     expect(reach).toMatchObject({ ...NONE, fieldsInside: 18, steps: 10 });
   });
 
-  it("reports the same issues after removing a field with no reach from IT Offboarding", () => {
+  it("reports the same issues after removing a field on 4 steps, with no CEL or plugin reach, from IT Offboarding", () => {
     const draft = loadExample("it-offboarding.json");
     const before = projectIssues(runValidation(draft, undefined, {}, {}).issues);
 
@@ -854,7 +866,7 @@ describe("fieldRemovalReach and removeFieldAndReferences over shipped examples",
     expect(after).toStrictEqual(before);
   });
 
-  it("reports the same issues after removing a group with no reach from IT Offboarding, from a fresh copy", () => {
+  it("reports the same issues after removing a group with 18 fields inside and 10 steps, with no CEL or plugin reach, from a fresh copy of IT Offboarding", () => {
     const draft = loadExample("it-offboarding.json");
     const before = projectIssues(runValidation(draft, undefined, {}, {}).issues);
 

@@ -35,6 +35,7 @@ const FILES = [
   "src/areas/studio/panels/ProcessHeaderBar.tsx",
   // `FieldsTab` decides whether a removal asks first, and renders the dialog.
   "src/areas/studio/panels/EntityTabs.tsx",
+  // The removal dialog itself, whose own two controls confirm and decline.
   "src/areas/studio/panels/RemoveFieldDialog.tsx",
   // The hook the publish, discard and removal dialogs open through.
   "src/areas/studio/panels/shared/confirmDialog.tsx",

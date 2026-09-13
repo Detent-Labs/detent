@@ -535,15 +535,21 @@ describe("focusAfterRemove", () => {
     expect(focusAfterRemove(fields, "field_a")).toBe(railEntryId("field_b"));
   });
 
-  // The rail lists no entry for a field without an id, so the neighbour rule
-  // answers nothing for `field_a`, whose parent carries none. The rail lists
-  // `field_a` first today, and only the pruned catalog's first entry is right.
+  // The neighbour rule answers nothing for `field_g`: it has no sibling, and
+  // its parent group carries no id. Before the removal the rail lists
+  // `field_g`, then `field_a` inside it, then `field_b`. The group takes
+  // `field_a` along, so only `field_b` is right.
   it("focuses the first rail entry the pruned catalog keeps when the neighbour rule answers nothing", () => {
-    const idlessGroup = { key: "unsaved", label: { en: "Unsaved" }, type: "group", fields: [fld("field_a", "a")] } as unknown as DraftField;
+    const idlessGroup = {
+      key: "unsaved",
+      label: { en: "Unsaved" },
+      type: "group",
+      fields: [grp("field_g", "g", [fld("field_a", "a")])],
+    } as unknown as DraftField;
     const fields = [idlessGroup, fld("field_b", "b")];
 
-    expect(neighbourAfterRemove(fields, "field_a")).toBeUndefined();
-    expect(focusAfterRemove(fields, "field_a")).toBe(railEntryId("field_b"));
+    expect(neighbourAfterRemove(fields, "field_g")).toBeUndefined();
+    expect(focusAfterRemove(fields, "field_g")).toBe(railEntryId("field_b"));
   });
 
   it("focuses Add the first field when the removal leaves the rail no entry", () => {

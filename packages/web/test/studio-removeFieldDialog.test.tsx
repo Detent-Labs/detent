@@ -91,10 +91,11 @@ describe("RemoveFieldDialog's facts", () => {
     expect(html).toMatch(/<code[^>]*>booking_status<\/code>/);
   });
 
-  it("omits the key element for a field with an empty key", () => {
-    const html = renderDialog({ reach: reach({ key: "" }) });
+  it("omits the key element for a field with an empty key, and states the label alone", () => {
+    const html = renderDialog({ label: "Booking status", reach: reach({ key: "" }) });
 
-    expect(html).not.toContain("<code>");
+    expect(html).not.toMatch(/<code[^>]*>/);
+    expect(html).toMatch(/<dd[^>]*>Booking status<\/dd>/);
   });
 
   it("states a row only for a count above zero, one per kind", () => {
@@ -123,16 +124,6 @@ describe("RemoveFieldDialog's facts", () => {
     expect(html).toContain(">18<");
     expect(html).toContain("Steps showing it");
     expect(html).toContain(">10<");
-  });
-
-  it("carries only the kinds the removal reaches, and lacks the rest", () => {
-    const html = renderDialog({
-      reach: reach({ steps: 2, writers: 1, contractEntries: 1, celReads: 2 }),
-    });
-
-    expect(html).not.toContain("Fields inside it");
-    expect(html).not.toContain("Column mappings targeting it");
-    expect(html).not.toContain("Plugin settings naming it");
   });
 });
 
