@@ -38,12 +38,16 @@ None.
 ## Impact
 
 - `packages/web/src/areas/studio/panels/FieldMatrixGrid.tsx`: the scroll
-  region's style trades its fixed maximum height for a floor.
+  region's style trades its fixed maximum height for a floor. Its focus ring
+  draws inside its frame, since the grid now reaches the tab body's clipping
+  edge.
 - `packages/web/src/areas/studio/panels/FieldMatrixPanel.tsx`: the wrapper
   column may shrink into the tab body.
 - `packages/web/test/studio-guidedSurfaceStyle.test.ts`: one new `describe`
-  block over both declarations.
+  block over both declarations and the focus ring.
 - `docs/current-state.md`: the passage naming the ceiling.
 - `docs/browser-checks.md`: one new entry, since a layout height needs a real
   browser.
+- `docs/decisions.md`: MATRIX-1 and MATRIX-2, two open findings the browser
+  check surfaced. Neither comes from this change.
 - No engine code, no API, no definition contract, no i18n catalog key.

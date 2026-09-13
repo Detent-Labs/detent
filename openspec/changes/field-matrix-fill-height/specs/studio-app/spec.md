@@ -8,9 +8,10 @@ height the height under the toolbar. Past that height the grid SHALL scroll
 inside itself. The grid SHALL have no fixed maximum height. A taller window
 therefore shows more rows, and no empty band sits below the grid.
 
-The grid SHALL hold a floor of 24rem. On a window with room for the toolbar and
-that floor, the tab body SHALL NOT scroll. On a shorter window the grid holds
-the floor and the tab body scrolls.
+The grid SHALL hold a floor of 24rem. On a window with room for everything above
+the grid and for that floor, the tab body SHALL NOT scroll. That room counts the
+toolbar and the spacing between the toolbar and the grid. On a shorter window
+the grid holds the floor and the tab body scrolls.
 
 A grid SHALL end under its last row when its rows need less than the height
 under the toolbar. The floor still binds it.
@@ -47,8 +48,8 @@ height first, down to its floor.
 
 #### Scenario: A short window holds the floor
 
-- **WHEN** the Field matrix tab opens on a window too short for the toolbar and
-  the floor
+- **WHEN** the Field matrix tab opens on a window too short for everything
+  above the grid and the floor
 - **THEN** the grid holds its 24rem floor
 - **AND** the toolbar keeps its own height
 - **AND** the tab body scrolls to reach the rest of the grid
