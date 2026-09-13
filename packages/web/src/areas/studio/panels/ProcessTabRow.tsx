@@ -39,6 +39,9 @@ const styles = stylex.create({
     borderBottomWidth: 2,
     borderBottomStyle: "solid",
     borderBottomColor: colors.divider,
+    // Contains the Checks tab's hidden "blocking a publish" text; a
+    // positioned container clips and scrolls it instead of the page.
+    position: "relative",
   },
   tab: {
     display: "flex",

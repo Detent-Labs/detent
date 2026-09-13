@@ -263,8 +263,7 @@ with it."
 The alternative added a "Forms" heading at level 2 and set each card label
 at level 3. Only a visually hidden heading keeps today's look. The
 `tabpanel` already takes its name from the tab, so the hidden heading would
-repeat it. The studio's visually hidden recipe also escapes its container,
-FIELDS-2 in `docs/decisions.md`.
+repeat it.
 
 ### The badge's name
 

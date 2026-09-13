@@ -160,6 +160,10 @@ const styles = stylex.create({
     borderBottomStyle: "solid",
     borderBottomColor: colors.divider,
     marginBottom: space.s4,
+    // Contains a tab's hidden count of its own fields that failed
+    // validation; a positioned container clips and scrolls it instead of
+    // the page.
+    position: "relative",
   },
   tab: {
     display: "flex",

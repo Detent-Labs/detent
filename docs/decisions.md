@@ -1603,7 +1603,7 @@ paths under `panels/`, `draft/` and `screens/` start at
 
 - **FIELDS-1: Remove field commits on one press.** Its button
   (`panels/FieldCatalogPanel.tsx:915`) asks nothing. The handler
-  `FieldsTab::removeField` (`panels/EntityTabs.tsx:385`) prunes the field
+  `FieldsTab::removeField` (`panels/EntityTabs.tsx:389`) prunes the field
   through `removeFieldIn` and leaves every step view entry naming it. A move
   rewrites such entries, through `moveFieldAndSyncViews`
   (`draft/view-group-sync.ts:49`). No undo exists, and nothing announces the
@@ -1621,32 +1621,9 @@ paths under `panels/`, `draft/` and `screens/` start at
   (`panels/ProcessHeaderBar.tsx:407`), with counts, when the field sits on a
   step or holds fields. The removal's own `mutate` also removes the field's
   view entries. Focus lands on the newly selected rail entry, and the tab's
-  live region announces the removal (`panels/EntityTabs.tsx:497`). The
+  live region announces the removal (`panels/EntityTabs.tsx:501`). The
   2026-09-11 entry "A canvas removal drops keyboard focus, and nothing
   announces it" records the canvas form of this gap.
-- **FIELDS-2: visually hidden text escapes its container and scrolls the page.**
-  The `visuallyHidden` style (`panels/EntityTabs.tsx:151`) sets
-  `position: "absolute"` with no inset. The entity rail's own style (`:53`)
-  sets no `position`. Its hidden kind words, group names and move live region
-  (`:278`, `:280`, `:497`) therefore lay out against the page. Measured
-  2026-09-13: 39 such elements report `offsetParent` BODY. The document's
-  `scrollHeight` read 2272 at 1280x720 and 2314 at 900x720, and pinning them
-  to `top: 0` gave 720. One mouse wheel over the header bar scrolled the page
-  900px into blank ground.
-
-  The same recipe sits in `panels/ProcessTabRow.tsx:87`,
-  `screens/PlayerScreen.tsx:68`,
-  `packages/web/src/areas/app/screens/TaskScreen.tsx:95` and
-  `packages/form-ui/src/FieldForm.tsx:206`. The reporting area's `srOnly`
-  (`packages/web/src/areas/reporting/screens/ReportBuilderScreen.tsx:101`) is
-  a variant that clips with `clip`. At 900x900 on the Fields tab, the Checks
-  tab's hidden "blocking a publish" text (`panels/ProcessTabRow.tsx:219`)
-  reached x=905, and `document.documentElement.scrollWidth` read 905 against
-  `clientWidth` 900. The narrow-width walk asserts the two widths equal at 900
-  (`docs/browser-checks.md:2840`), so its Pass line fails today. Risk
-  (Medium): the page scrolls into blank ground, and at 900px it scrolls
-  sideways too. The fix sets `position: "relative"` on the container, or an
-  inset of 0 on the style.
 - **FIELDS-3: below 64rem a short window leaves the editor a strip.** The
   rail stacks above the editor, capped at 20rem (`panels/EntityTabs.tsx:57`).
   Measured 2026-09-13: the editor pane stands 105px tall at 900x720, and 18px
@@ -1669,7 +1646,7 @@ paths under `panels/`, `draft/` and `screens/` start at
   arrow keys and no filter. Its landmark is a `nav` named "Editors"
   (`panelsScreen.railLabel`, `packages/web/src/i18n/catalogs/studio.ts:441`).
   An entry's check badge reads "1 issues" for one check
-  (`panels/EntityTabs.tsx:283`), from the key `panelsScreen.issueMark`
+  (`panels/EntityTabs.tsx:287`), from the key `panelsScreen.issueMark`
   (`packages/web/src/i18n/catalogs/studio.ts:444`). Risk (Low): a keyboard
   user presses Tab up to 52 times to cross the rail.
 - **FIELDS-7: the Fields tab's headings and checks lack structure.** The
@@ -1689,7 +1666,7 @@ paths under `panels/`, `draft/` and `screens/` start at
   After a press on Remove field the tab showed
   `view ref does not resolve: field_0fb5a2c4-0022-…`, an id the author can no
   longer look up. Adding an empty field raises the banner at
-  `screens/EditScreen.tsx:780` before the author types. The banner reads
+  `screens/EditScreen.tsx:821` before the author types. The banner reads
   `Draft is not yet structurally valid — CEL, registry, duration, and cross-process checks are held back until it is (see the Zod issues below)`,
   and it pushes the page down 35px at 1400px and 99px at 900px. The messages
   come from `src/schema/definition.ts:990`, `src/schema/compile.ts:629` and
@@ -1757,11 +1734,11 @@ paths under `panels/`, `draft/` and `screens/` start at
   depth. Risk (Low): the glossary teaches a word for a UI that is gone.
 - **FIELDS-14: `FieldsTab` walks the field tree once per rail entry.** Each
   call of `FieldsTab` walks the whole tree twice, in `flattenRailFields` and
-  `flattenDraftFields` (`panels/EntityTabs.tsx:304`, `:305`). Each rail entry
+  `flattenDraftFields` (`panels/EntityTabs.tsx:308`, `:309`). Each rail entry
   then walks it once more through `parentIdOf` (`:465`,
   `panels/fieldCatalogLogic.ts:227`), top-level entries included. Each entry
   also scans the whole check list for its badge count
-  (`panels/EntityTabs.tsx:455`, `draft/panel-rail.ts:104`). For N entries
+  (`panels/EntityTabs.tsx:459`, `draft/panel-rail.ts:104`). For N entries
   that makes N + 2 tree walks and N scans of the check list. Risk
   (Informational): the cost grows with the square of the catalog's size and
   stays harmless at 51 entries.
@@ -1775,13 +1752,6 @@ below predates that change or belongs to another component. The `CHANGES-n`
 tags are local to this section; paths under `panels/` and `screens/` start at
 `packages/web/src/areas/studio/`.
 
-- **CHANGES-1: the Checks tab's hidden label widens the page at 400px.**
-  FIELDS-2 records the recipe. The hidden "blocking a publish" text sits at
-  `panels/ProcessTabRow.tsx:219`. Measured 2026-09-13 at 400px, on the Changes
-  tab of a draft with blocking checks, `document.documentElement.scrollWidth`
-  read 905. The page scrolled 505px sideways, and hiding that one span gave
-  400. Risk (Medium): while Checks counts a blocker, a narrow window scrolls
-  sideways into blank ground on every tab.
 - **CHANGES-2: every tab body clips the edge of a focus ring.** The tab body
   scrolls and sets no inline padding (`screens/EditScreen.tsx:180`). The
   shell's 2px ring at a 2px offset (`packages/web/src/shell/global.css:37`)
@@ -1808,6 +1778,28 @@ tags are local to this section; paths under `panels/` and `screens/` start at
   Processes screen, the Tools screen and the migration plan screen draw
   theirs the same way. Risk (Low): a screen reader hears nothing while a
   body loads (WCAG 4.1.3).
+- **CHANGES-5: the header bar's open `⋮` menu panel loses hit points to
+  tab-body content.** Its panel sets `zIndex: 1`
+  (`panels/ProcessHeaderBar.tsx:197`). The review measured this
+  2026-09-13, identical with and without `visually-hidden-text-page-bounds`:
+  at 1280x720 on the Field matrix tab, an `elementFromPoint` sweep lost 15
+  of 36 hit points to the grid's sticky headers, which set `zIndex: 2` and
+  `zIndex: 3` (`panels/FieldMatrixGrid.tsx:81`, `:96`). At 400x800 on the
+  Canvas tab, the same sweep lost 5 of 30 hit points to the canvas toolbar,
+  which sets `zIndex: 1` later in tree order (`canvas/CanvasView.tsx:83`).
+  Neither element stood confirmed as the cause. Risk (Medium): a click
+  meant for the open menu can land on tab-body content instead.
+- **CHANGES-6: the participant Task screen scrolls sideways at 400px.** The
+  `visually-hidden-text-page-bounds` audit met it on the app area's Task
+  screen. Its claim row sets `display: "flex"` with no `flexWrap`
+  (`packages/web/src/areas/app/screens/TaskScreen.tsx:108`,
+  `styles.taskActions`). A claimed step fills that row with Release, the
+  delegate input, Delegate to, Save and Discard case.
+
+  Measured 2026-09-13 at 400x800 on `purchase_requisition`'s Finance Review,
+  Save ended at x=463 and Discard case at x=554. The page scrolled 154px
+  sideways. Risk (Medium): a participant on a phone scrolls sideways to reach
+  Save and Discard case.
 
 ## Open from the field-matrix-fill-height browser check (each needs its own OpenSpec change)
 
