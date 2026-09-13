@@ -564,6 +564,34 @@ describe("describeChanges: values", () => {
     ]);
   });
 
+  it("names a content-locale translation added with the text the label already fell back to", () => {
+    const untranslated = base();
+    delete untranslated.fields[0].fields[0].label.de;
+
+    expect(only(describeChanges(untranslated, base(), "de")).properties).toEqual([
+      { name: "Label (de)", kind: "added", before: none, after: { text: "Name", mono: false } },
+    ]);
+  });
+
+  it("names a content-locale translation removed that matched the text the label falls back to", () => {
+    const untranslated = base();
+    delete untranslated.fields[0].fields[0].label.de;
+
+    expect(only(describeChanges(base(), untranslated, "de")).properties).toEqual([
+      { name: "Label (de)", kind: "removed", before: { text: "Name", mono: false }, after: none },
+    ]);
+  });
+
+  it("names a difference in a locale entry that holds no text", () => {
+    const before = minimal([], [{ id: "field_a", key: "a", label: { en: 5 }, type: "string" }]);
+    const after = structuredClone(before);
+    after.fields[0].label.en = 6;
+
+    expect(only(describeChanges(before, after)).properties).toEqual([
+      { name: "Label (en)", kind: "changed", before: { text: "5", mono: true }, after: { text: "6", mono: true } },
+    ]);
+  });
+
   it("reads a yes-or-no value as yes or no, and an absent value as none", () => {
     const required = base();
     required.workflow.steps[0].view.fields[0].required = false;

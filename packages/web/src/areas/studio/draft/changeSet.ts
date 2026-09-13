@@ -424,17 +424,19 @@ function valueProperties(key: string, name: Name, bv: unknown, av: unknown, ctx:
 
 /**
  * A `LocalizedText` reads in each side's reading locale. A difference in any
- * other locale adds a property named with that locale. A locale stays out when
- * each side either reads it or has no entry for it: the plain property already
- * shows that difference, so a translation added or removed in the content
- * locale prints once. A change to a base-locale entry neither side reads
- * still prints under its locale.
+ * other locale adds a property named with that locale. A locale stays out only
+ * when the plain property prints and each side either reads that locale or has
+ * no entry for it: the plain property then already shows that difference, so a
+ * translation added or removed in the content locale prints once. When both
+ * sides read the same text, a differing entry still prints under its locale: a
+ * translation equal to its fallback, or an entry that holds no text.
  */
 function localizedProperties(name: Name, b: Obj | undefined, a: Obj | undefined, ctx: Ctx): ChangeProperty[] {
   const properties: ChangeProperty[] = [];
   const bText = b && localized(b, ctx.b);
   const aText = a && localized(a, ctx.a);
-  if (bText !== aText) {
+  const plainPrints = bText !== aText;
+  if (plainPrints) {
     properties.push({ ...name, kind: kindOf(b, a), before: bText === undefined ? none() : plain(bText), after: aText === undefined ? none() : plain(aText) });
   }
   const reads = (value: Obj, side: Side) => (typeof value[side.locale] === "string" ? side.locale : side.baseLocale);
@@ -443,7 +445,7 @@ function localizedProperties(name: Name, b: Obj | undefined, a: Obj | undefined,
   const entry = (v: unknown) => (typeof v === "string" ? plain(v) : json(v));
   for (const locale of new Set([...Object.keys(a ?? {}), ...Object.keys(b ?? {})])) {
     if (same(b?.[locale], a?.[locale])) continue;
-    if (shownPlainly(b, ctx.b, locale) && shownPlainly(a, ctx.a, locale)) continue;
+    if (plainPrints && shownPlainly(b, ctx.b, locale) && shownPlainly(a, ctx.a, locale)) continue;
     properties.push({
       name: fill("changeList.name.locale", { property: name.name, locale }),
       ...(name.nameMono && { nameMono: true }),

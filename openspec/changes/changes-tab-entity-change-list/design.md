@@ -241,9 +241,11 @@ Values follow one rule per shape:
   content locale, which `EditScreen` already hands to
   `resolveDraftLocalizedText`. The Versions screen passes none.
 - A difference in another locale adds a property named with that locale, such
-  as "Label (en)". The one locale left out is the one the plain property reads
-  on both sides. When neither side has a content-locale entry, the fallback
-  makes that the base locale. That change then prints once.
+  as "Label (en)". A locale stays out only when the plain property prints. Each
+  side must then either read that locale or have no entry for it. A translation
+  added or removed in the content locale then prints once. When both sides read
+  the same text, each differing entry prints under its own locale. A translation
+  equal to its fallback prints that way, and so does an entry holding no text.
 - A boolean reads "yes" or "no".
 - An id reads as the label of the entity it names, looked up on its own side.
   An id naming nothing prints raw, in mono.
