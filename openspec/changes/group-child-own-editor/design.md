@@ -159,15 +159,27 @@ English alone, so no German entry follows.
 
 ### Focus and the rail entry after an add into a group
 
-The group-zone path stores two ids for the commit that follows. One names the
-new field's label input, through a new `fieldLabelInputId(fieldId)`. The other
-names the new rail entry, through a new `railEntryId(fieldId)`. Both helpers
-sit in `fieldCatalogLogic.ts`, beside `moveControlId`.
+Every add path stores two ids for the commit that follows. The paths are the
+rail's "+ Add field", the start state, the panel's own "+ Add field" and the
+group zone. One id names the new field's label input, through a new
+`fieldLabelInputId(fieldId)`. The other names the new rail entry, through a new
+`railEntryId(fieldId)`. Both helpers sit in `fieldCatalogLogic.ts`, beside
+`moveControlId`.
+
+The panel's own "+ Add field" stands under every nested field's editor, and
+its new field lands at the catalog's end. Focus left on that button would sit
+off screen once the editor opens at its top. The new entry would sit below the
+rail's fold.
 
 The existing refocus effect focuses the label input. The same effect calls
-`scrollIntoView({ block: "nearest" })` on the rail entry. A `nearest` scroll
-does nothing while the entry already shows. The call omits the smooth behavior
-option.
+`scrollIntoView({ block: "nearest", behavior: "instant" })` on the rail entry.
+A `nearest` scroll does nothing while the entry already shows. The `instant`
+behavior keeps any stylesheet's `scroll-behavior` from animating it.
+
+A move through the move control stores the moved field's rail entry as well.
+The effect scrolls that entry into the rail's view, and focus returns to the
+move control. A pointer drop clears both ids, so it moves neither focus nor
+the rail.
 
 `LocalizedTextInput` gains an optional `id`, placed on its `input`.
 `PanelsRailFieldRow` gains an optional `id`, placed on its `button`.
@@ -299,8 +311,9 @@ directive. A one-line comment above each heading says why.
 - [A group's editor no longer shows what the group holds] → The rail lists the
   group's fields directly beside the editor. The group's preview still draws
   every descendant.
-- [Focus leaves the rail after an add into a group] → The owner chose the label
-  input on 2026-09-12. A new field needs its label before anything else.
+- [Focus leaves the rail after an add, the rail's own add included] → The owner
+  chose the label input on 2026-09-12. A new field needs its label before
+  anything else.
 - [The scroll moves the page on a narrow window] → Below 64rem the rail stands
   above the editor. The scroll moves only as far as the entry needs.
 - [A former group keeps its children after a kind switch] → The rail still

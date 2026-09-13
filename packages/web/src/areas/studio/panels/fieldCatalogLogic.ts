@@ -203,18 +203,17 @@ export function groupTargetsFor(fields: DraftField[], fieldId: string): string[]
 export const moveControlId = (fieldId: string) => `studio-field-move-${fieldId}`;
 
 /**
- * The id a new field's label input takes, so the tab can focus it after an
- * add lands the field inside a group (`spa-accessibility`). Sits beside
- * `moveControlId`, in its style. `LocalizedTextInput` places it on the label
- * input it renders.
+ * The id a field's label input takes, so the tab can focus a new field's
+ * label after any add (`spa-accessibility`). Sits beside `moveControlId`, in
+ * its style. `LocalizedTextInput` places it on the label input it renders.
  */
 export const fieldLabelInputId = (fieldId: string) => `studio-field-label-${fieldId}`;
 
 /**
- * The id a new field's rail entry takes, so the tab can scroll it into view
- * after an add lands the field inside a group (`spa-accessibility`). Sits
- * beside `moveControlId`, in its style. `PanelsRailFieldRow` places it on
- * the entry's own button.
+ * The id a field's rail entry takes, so the tab can scroll it into the rail's
+ * view after an add or a move through the move control (`spa-accessibility`).
+ * Sits beside `moveControlId`, in its style. `PanelsRailFieldRow` places it
+ * on the entry's own button.
  */
 export const railEntryId = (fieldId: string) => `studio-field-rail-${fieldId}`;
 

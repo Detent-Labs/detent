@@ -172,9 +172,9 @@ const styles = stylex.create({
 
 interface PanelsRailFieldRowProps {
   /** The DOM id for the entry's own button, `railEntryId(fieldId)`. Lets the
-   * refocus effect scroll a newly added group child into view alongside its
-   * label input (design.md, "Focus and the rail entry after an add into a
-   * group"). Every entry `FieldsTab` renders passes one. */
+   * refocus effect scroll the entry into the rail's view after an add or a
+   * move through the move control (design.md, "Focus and the rail entry after
+   * an add into a group"). Every entry `FieldsTab` renders passes one. */
   id?: string;
   /** The resolved label, or the "unnamed field" fallback already applied. */
   label: string;
@@ -296,10 +296,11 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
 
   // `dragFieldId` is the row a pointer picked up. `announcement` is what the
   // live region below reads out after a move. `refocusId` names the element
-  // the tab hands keyboard focus back to: the move control after a move, or a
-  // new field's label input after an add into a group (`spa-accessibility`).
-  // `refocusRailId` names that new field's rail entry, to scroll into view
-  // alongside the same focus; only an add into a group sets it.
+  // the tab hands keyboard focus to after the next commit: the new field's
+  // label input after any add, or the move control after a move through that
+  // control (`spa-accessibility`). `refocusRailId` names the same field's rail
+  // entry, which that commit scrolls into the rail's view. Every add and every
+  // move sets both ids; a pointer drop clears both again.
   const [dragFieldId, setDragFieldId] = useState<string | undefined>(undefined);
   const [announcement, setAnnouncement] = useState("");
   const [refocusId, setRefocusId] = useState<string | undefined>(undefined);
@@ -325,8 +326,10 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
   // React reorders keyed rows by moving the existing DOM nodes, which usually
   // carries focus along. It does not where the move changes which controls the
   // row renders, so the tab names the control it wants and takes it back
-  // itself rather than resting on the reconciler. An add into a group also
-  // brings the new rail entry into view, alongside that same focus.
+  // itself rather than resting on the reconciler. The same run scrolls the
+  // field's rail entry into the rail's view, `nearest`, so neither an add nor
+  // a move leaves its entry out of sight (design.md, "Focus and the rail entry
+  // after an add into a group").
   useEffect(() => {
     if (refocusId === undefined) return;
     document.getElementById(refocusId)?.focus();
@@ -337,6 +340,14 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
     setRefocusRailId(undefined);
   }, [refocusId, refocusRailId]);
 
+  /**
+   * Every add reaches this: the rail's "+ Add field", the start state, the
+   * panel's own "+ Add field" and a group's "Fields inside this group" zone.
+   * Without `groupId` the new field lands at the catalog's end; with one, at
+   * the end of that group. Each path ends the same way: the new field
+   * selected, keyboard focus in its label input, and its rail entry in the
+   * rail's view.
+   */
   const addField = (groupId?: string) => {
     const newId = mintId("field");
     const field: DraftField = { id: newId, key: "", label: seedLocalizedText(contentLocale), type: "string" };
@@ -346,10 +357,10 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
       mutate((d) => {
         d.fields = appendToGroup(d.fields ?? [], groupId, field);
       });
-      setRefocusId(fieldLabelInputId(newId));
-      setRefocusRailId(railEntryId(newId));
     }
     setSelectedFieldId(newId);
+    setRefocusId(fieldLabelInputId(newId));
+    setRefocusRailId(railEntryId(newId));
   };
 
   /**
@@ -377,8 +388,10 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
   /**
    * The one write both gestures reach (a keyboard move must not become a
    * second write path beside the drag). It re-hangs the field, keeps the
-   * moved field itself selected, announces where it landed, and hands focus
-   * back to the field's own move control in its editor.
+   * moved field itself selected, announces where it landed, hands focus back
+   * to the field's own move control in its editor, and scrolls the field's
+   * rail entry into the rail's view. `dropOnRow` clears both refocus ids
+   * again for a pointer drop.
    */
   const moveField = (fieldId: string, targetGroupId: string | undefined) => {
     const fields = draft.fields ?? [];
@@ -403,6 +416,7 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
         : t("panelsScreen.movedIntoGroup").replace("{field}", fieldWord(fieldId)).replace("{group}", fieldWord(targetGroupId)),
     );
     setRefocusId(moveControlId(fieldId));
+    setRefocusRailId(railEntryId(fieldId));
   };
 
   /** Where a drop on `targetId` sends the dragged field: into it when it is a
@@ -413,10 +427,12 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
     moveField(dragFieldId, target?.type === "group" ? targetId : undefined);
     // A pointer drop is not a move "made through the control", so it must not
     // carry the keyboard focus into the editor the way a control-driven move
-    // does (`spa-accessibility`). `moveField` and this call batch into one
-    // update, so the effect that reads `refocusId` never sees the value
-    // `moveField` set.
+    // does (`spa-accessibility`). `moveField` and these calls batch into one
+    // update, so the refocus effect never sees the ids `moveField` set. The
+    // rail id clears too: only a run holding a `refocusId` resets it, so a
+    // stale id would otherwise linger until that run.
     setRefocusId(undefined);
+    setRefocusRailId(undefined);
     setDragFieldId(undefined);
   };
 
