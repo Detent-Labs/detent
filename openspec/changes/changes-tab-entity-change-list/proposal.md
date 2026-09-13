@@ -47,6 +47,8 @@ None.
   states that a reorder reads as an order property on its container.
 - `studio-process-tabs`: a new requirement moves focus onto the tab a Checks
   row or a Changes row opens.
+- `spa-accessibility`: the disclosure requirement names the change list. Its
+  rows are native pairs, and its Expand all command carries its expanded state.
 
 ## Impact
 
@@ -67,5 +69,8 @@ None.
 - `docs/browser-checks.md`, `docs/current-state.md`, `docs/decisions.md`,
   `.claude/rules/ui-glossary.md` and `openspec/config.yaml` move with the code.
   So does the Purpose of `openspec/specs/process-version-inspection/spec.md`.
+- `openspec/specs/spa-accessibility/spec.md` stops counting two disclosures
+  across the studio. It counts them on the step page, and names the change
+  list's own.
 - No engine code, no HTTP route and no part of the definition contract
   changes.
