@@ -169,8 +169,9 @@ stage-by-stage status.
   - Discard's heading is a statement, and Remove's is a question.
   - Publish and Discard have no `aria-describedby`.
 
-  Name the fix: one `DESIGN.md` "Dialogs" decision, applied to all three
-  dialogs.
+  The change `remove-field-takes-its-references` found these in its
+  2026-09-13 critique and audit. Name the fix: one `DESIGN.md` "Dialogs"
+  decision, applied to all three dialogs.
 - `NotFoundError` is served as HTTP 500 where most APIs answer 404. The
   mapping sits at `src/http/errors.ts:95`, and the header comment at `:10-16`
   calls it the one exception carved out of the message-free fallback. The
@@ -1628,10 +1629,12 @@ recorded rather than fixed. The RAIL tags are local to this section.
 
 The change `group-child-own-editor` ran a final code review, browser walks,
 `/impeccable critique` and `/impeccable audit` on the Studio Fields tab on
-2026-09-13. Every item below sits outside that change, and this section
-records it in place of a fix. The `FIELDS-n` tags are local to this section;
-paths under `panels/`, `draft/` and `screens/` start at
-`packages/web/src/areas/studio/`.
+2026-09-13. They found FIELDS-2 to FIELDS-14. The change
+`remove-field-takes-its-references` added FIELDS-15 to FIELDS-24 on the same
+day, from its design, reviews, browser walks and audits. Every item below
+sits outside the change that found it, and this section records it in place
+of a fix. The `FIELDS-n` tags are local to this section; paths under
+`panels/`, `draft/` and `screens/` start at `packages/web/src/areas/studio/`.
 
 - **FIELDS-2: visually hidden text escapes its container and scrolls the page.**
   The `visuallyHidden` style (`panels/EntityTabs.tsx:151`) sets
@@ -1848,12 +1851,12 @@ paths under `panels/`, `draft/` and `screens/` start at
   (`panels/EntityTabs.tsx:503`) writes its sentence straight into the shared
   live region (`:521`), a pattern that predates this change. `removeField`
   (`:477`) empties the region first and writes on the next animation frame
-  instead, so two different removal sentences in a row both announce. Two
-  unnamed fields moved into the same group, one after another, still produce
-  one sentence twice: the live region's text never changes, so a screen
-  reader announces the first move and stays silent on the second. Risk
-  (Low): one shared writer, emptying the region first, closes the gap for
-  both sentences.
+  instead. That step matters when one removal sentence repeats, since two
+  different sentences announce without it. Two unnamed fields moved into the
+  same group, one after another, still produce one sentence twice: the live
+  region's text never changes, so a screen reader announces the first move
+  and stays silent on the second. Risk (Low): one shared writer, emptying the
+  region first, closes the gap for both sentences.
 - **FIELDS-21: the live `studio-publish` requirement names a backdrop
   dismissal no dialog has.** Its "Publishing confirms in a modal dialog that
   names the version and its immutability" requirement names "a backdrop

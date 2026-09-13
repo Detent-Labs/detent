@@ -3046,6 +3046,10 @@ Press Escape. Pass: the dialog closes. The draft still holds "Processing
 (Fabrikam)" and its 18 fields. Focus returns to "Remove field" on the group's
 own editor.
 
+Click "Remove field" again. Click "Cancel". Pass: the dialog closes. The draft
+still holds "Processing (Fabrikam)" and its 18 fields. Focus returns to "Remove
+field" on the group's own editor.
+
 Open the Canvas tab, then the Fields tab, so the browser's Back has a known
 destination. Choose "Processing (Fabrikam)". Click "Remove field". With the dialog
 open, press the browser's Back. Pass: the Canvas tab shows, and the page holds
@@ -3061,7 +3065,7 @@ removal from outside the tab, so this step is the check.
 
 Click "Remove field" again. Click its own "Remove group" to confirm. Pass:
 the entity rail no longer lists "Processing (Fabrikam)" or its 18 fields. Focus
-lands on "Notification", the top-level entry before it, and the rail
+lands on "Notification", the top-level entry before it, and the entity rail
 scrolls that entry into view. The live region reads "Processing (Fabrikam)
 removed, with the 18 fields inside it."
 
@@ -3093,11 +3097,11 @@ Back on the IT Offboarding draft, open its Fields tab. Click "+ Add field"
 twice. Pass: each new "(unnamed field)" entry lands at the top level. Each
 takes the current mark and keyboard focus in its own label input, in turn.
 
-Choose the rail's last entry, the second new row, and click "Remove
+Choose the entity rail's last entry, the second new row, and click "Remove
 field". Pass: no dialog opens, since it has no reach. The live region
 clears to empty, then reads "(unnamed field) removed."
 
-Choose the rail's new last entry, the first new row, and click "Remove
+Choose the entity rail's new last entry, the first new row, and click "Remove
 field" again. Pass: no dialog opens either. The live region clears to
 empty again, then reads "(unnamed field) removed." once more. A screen
 reader hears that sentence twice.

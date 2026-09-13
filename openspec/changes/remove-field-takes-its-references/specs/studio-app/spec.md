@@ -118,11 +118,12 @@ emptied action output map or column mapping SHALL leave the draft too. A
 subprocess output mapping stays as an empty map, since the definition contract
 requires that key.
 
-Outside the removed fields and view entries, a removal SHALL leave every CEL
-expression and plugin `config` as it stands. A guard that
-reads a removed key keeps its text, and the checks rail reports it. No part of
-the removal SHALL land in a separate draft change. A reader between two writes
-would see a catalog and references that disagree.
+The removed fields, and the entries the removal takes out, leave with the CEL
+expressions they hold. Outside those, the removal SHALL keep every CEL
+expression and plugin `config` as it stands. A guard that reads a removed key
+keeps its text, and the checks rail reports it. No part of the removal SHALL
+land in a separate draft change. A reader between two writes would see a
+catalog and references that disagree.
 
 #### Scenario: A removed group keeps another group's entries
 

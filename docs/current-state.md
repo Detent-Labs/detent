@@ -4350,13 +4350,15 @@ meets `scope=started` should infer no new permission tier from it.
   `ProcessHeaderBar.tsx` into the shared `panels/shared/confirmDialog.tsx`,
   and the header bar imports it back for Publish and Discard draft.
 
-  A confirm runs `removeFieldAndReferences` inside one draft change. The
-  field then leaves the catalog. So does every reference naming it: each
-  view entry, action output, subprocess output mapping, contract entry and
-  column mapping. A view entry naming a removed group's key leaves too.
+  A removal runs `removeFieldAndReferences` inside one draft change, at once
+  or on a confirm. The field then leaves the catalog. So does every reference
+  naming it: each view entry, action output, subprocess output mapping,
+  contract entry and column mapping. A view entry naming a removed group's
+  key leaves too.
 
-  A CEL expression or a plugin `config` naming the removed id keeps its
-  text. The tab then selects `neighbourAfterRemove`'s answer: the next
+  Every CEL expression outside what leaves keeps its text, even one reading
+  a removed field's key. So does a plugin `config` naming a removed field's
+  id. The tab then selects `neighbourAfterRemove`'s answer: the next
   sibling, then the previous sibling, then the parent group. It moves
   keyboard focus to `focusAfterRemove`'s target in `fieldCatalogLogic.ts`,
   and announces the removal through the rail's live region.

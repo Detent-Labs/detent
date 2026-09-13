@@ -158,8 +158,9 @@ removed field and one count per kind:
 An expression is any object in the draft that carries `lang: "cel"` and a
 string `src`. The walk visits the whole draft, so a `process.start` mapping
 value counts too. It skips every expression the removal takes along: the
-`validation.rule` and `default` of a removed field, and the flags and
-`validation.rule` of a view entry the removal takes out. The rule builder
+`validation.rule` and `default` of a removed field, the flags and
+`validation.rule` of a view entry the removal takes out, and the value of an
+`output` or `outputMapping` entry keyed by a removed id. The rule builder
 writes `data.<key>` into a field's own rule, so that rule leaves with the
 field. The walk also skips an empty key and a key a remaining field holds. An
 expression that fails to parse counts when its text matches `data.<key>` on
@@ -265,8 +266,8 @@ renders static markup.
   expression, the config walk and an unknown id.
 - The same file covers `removeFieldAndReferences` for each kind, a nested group
   with notes, and untouched entries of other fields. It checks that an empty
-  `output` and `columnMapping` leave, an empty `outputMapping` stays, and CEL
-  and configs stay unchanged.
+  `output` and `columnMapping` leave, an empty `outputMapping` stays, and the
+  CEL and configs the removal keeps stay unchanged.
 - The same file removes "Access Excel updated or prepared" and "Processing
   (Fabrikam)" from `examples/it-offboarding.json`. The studio's `runValidation`
   then reports the issues it reported before the removal.
