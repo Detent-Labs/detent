@@ -26,7 +26,7 @@
       and 0 when it exits 0. The dispatch supplies the linter's absolute path
       and the scratch directory in place of `<antislop>` and `<scratch>`.
       Verify:
-      `git show 79569c77:openspec/specs/studio-json-view/spec.md > <scratch>/sjv-base.md`
+      `git show 98aed5ed:openspec/specs/studio-json-view/spec.md > <scratch>/sjv-base.md`
       then `python3 <antislop> check <scratch>/sjv-base.md 2>&1 | grep -c .`
       prints 40. Verify:
       `python3 <antislop> check openspec/specs/studio-json-view/spec.md 2>&1 | grep -c .`

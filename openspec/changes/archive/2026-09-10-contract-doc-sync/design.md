@@ -221,7 +221,7 @@ names the U+2014 em dash in both rule files.
 ## Risks / Trade-offs
 
 - [An anchor drifts between this proposal and the apply phase] -> The anchors
-  are byte-exact against `55f36abb`. The implementer reads each file immediately
+  are byte-exact against `db31d74f`. The implementer reads each file immediately
   before editing it, per `CLAUDE.md`. A `grep` for the anchor that returns
   nothing means the tree moved. The reader then re-derives from the cited
   `file:line` rather than guessing.

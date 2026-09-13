@@ -1,7 +1,7 @@
 ## Context
 
 See `proposal.md` for motivation. Seven measured facts fix the shape of this
-change. This session checked each one at the source, in the tree at `4b5d20f3`.
+change. This session checked each one at the source, in the tree at `87a040d2`.
 
 **One.** `docs/field-model-redesign.md` holds 319 lines, 25 numbered decisions
 (D1-D25, no gaps) and 5 scope exclusions (S1-S5). A brainstorming session

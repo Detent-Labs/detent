@@ -4,7 +4,7 @@ See `proposal.md` for motivation. Five facts fix the shape of this change.
 
 The source of record is `tmp/doc-audit/10-carryover.md`. That report re-checked
 all ten action-list items of `docs/CODE_REVIEW.md` against the tree on
-2026-09-09, at `55f36abb`. For each one it names the file and the line that
+2026-09-09, at `db31d74f`. For each one it names the file and the line that
 proves it open. It also rejects four claims of the audit that started this
 effort. Where the report and the audit disagree, the report wins.
 
@@ -92,7 +92,7 @@ of the 2026-08-18 code review". That description stays true for the ten, and
 the label carries the difference for the eleventh.
 
 **Five facts in report 10 needed a correction.** This session re-checked all
-five against the tree at `b94f7d04`.
+five against the tree at `3c515b56`.
 
 - CQ-1's count. The report says 68 directives across nine files. That omits
   the root `test/` tree, which holds 13 more across six files. The repository
