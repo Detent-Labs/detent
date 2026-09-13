@@ -1530,8 +1530,9 @@ Click a top-level field (`line_item`, a group). Pass: the view switches to
 that field's editor and the rail marks it current.
 
 Click a nested child (`item_description`, under `line_item`). Pass: the rail
-marks the parent (`line_item`) current, not the child. The child's own input
-scrolls into view, inside the still-open group editor.
+marks `item_description` alone and leaves `line_item`'s entry unmarked. The
+view shows `item_description`'s own editor, with its two halves, and that
+editor opens at its top.
 
 Click "+ Add field" (either the rail's own entry or the panel's own button;
 both call the same handler). Pass: a new "(unnamed field)" row appears at
@@ -2719,8 +2720,9 @@ catalog carries. Its own value reads "Top level", `po_status`'s place
 today.
 
 Pick `Line Item`. Pass: `po_status` indents under `Line Item`, its fifth
-child. The live region reads "PO Status moved into Line Item." Focus stays
-on the same control.
+child, and the rail marks `po_status` alone. The live region reads "PO
+Status moved into Line Item." Focus stays on the same control, and the
+editor still shows `po_status`'s two halves.
 
 Pick "Top level" on that same control. Pass: `po_status` un-indents, back
 to a top-level row after `invoice`. The region reads "PO Status moved out
@@ -2737,17 +2739,18 @@ out. Both gestures reach one helper, and both reach the same destinations.
 
 The "+ Add field" row takes no drop. Measured 2026-09-12.
 
-Now select `discrepancy_note`, the one child of `resolution`. A group
-child's row has no label or description ahead of the key. Its move control
-therefore sits second, right after it.
+Now select `discrepancy_note`, the one child of `resolution`. Pass: it
+opens its own `FieldEditor`, the same one a top-level field opens. Its move
+control sits after the Label, the Description and the Key, like every
+field's.
 
 Open the control and pick "Top level". Pass: `discrepancy_note` un-indents
 to a top-level row, after `po_status`. The tab keeps it selected. Keyboard
-focus lands on the move control inside the field's own new editor.
+focus lands on the move control inside the field's own editor.
 
-It is a `FieldEditor` now: the move took `discrepancy_note` out of
-`resolution`'s `SubFieldRow` list. The live region reads "Discrepancy Note
-moved out of Resolution, to the top level."
+The `FieldEditor` for `discrepancy_note` was already open before the move.
+The live region reads "Discrepancy Note moved out of Resolution, to the top
+level."
 
 The control is the whole visible move UI now; no rail row carries one. Its
 accessible name comes from the `<label>` wrapping it, "Move this field to".
