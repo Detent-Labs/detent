@@ -29,9 +29,10 @@ unscrolled, and the page grows to reach it.
 - `docs/browser-checks.md` gains a probe that lists every hidden text whose
   nearest scroll container fails to clip it. The Fields view's narrow-width
   Pass line holds again.
-- `docs/decisions.md` drops CHANGES-1 and FIELDS-2. It files one older defect
-  the review met: content in the tab body paints over the header bar's open
-  `⋮` menu.
+- `docs/decisions.md` drops CHANGES-1 and FIELDS-2. It files two older
+  defects the review met. Content in the tab body paints over the header
+  bar's open `⋮` menu. The participant Task screen also scrolls sideways at
+  400px.
 
 ## Capabilities
 

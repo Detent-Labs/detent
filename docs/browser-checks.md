@@ -3626,10 +3626,10 @@ and choose "Create draft". Studio opens the draft at
 
 Source: `visually-hidden-text-page-bounds` task 2.1.
 
-The source test above pins `position: relative` on the four known
-containers, but `bun:test` lays out no page. A new scroll container around
-hidden text needs a browser to catch it. This probe walks every element in
-one `page.evaluate`:
+The test `packages/web/test/hiddenTextContainment.test.ts` pins
+`position: relative` on the four known containers, but `bun:test` lays out
+no page. A new scroll container around hidden text needs a browser to catch
+it. This probe walks every element in one `page.evaluate`:
 
 ```js
 () => {
@@ -3682,18 +3682,25 @@ reached 2539 of 800 before this change, and the Changes tab's hidden
 "Before:"/"After:" text reached 849 of 800. Measured 2026-09-13: 800/800 on
 both.
 
-Scroll the entity rail down, inside its own box, on the Fields tab. Run the
-probe again.
+Scroll the entity rail down, inside its own box, on the Fields tab. Read
+`getBoundingClientRect().top` of one hidden kind word and its row, before
+the scroll and after it. Run the probe again.
 
-Pass: `escaped` stays empty, before the scroll and after it. The hidden
-text moves with the rail rather than staying fixed to the page. Measured
-2026-09-13: a 400px wheel turn moved one hidden kind word and its row 400px
-each.
+Pass: `escaped` stays empty, before the scroll and after it, and the two
+rects move together. Measured 2026-09-13: a 400px wheel turn moved one
+hidden kind word and its row 400px each.
 
-Your account needs the `requester` and `finance-approver` roles for this
-walk. Manager Approval asks for the starter's manager, so set one on the
-account. The auth CLI in `src/auth/cli.ts` sets both, through `set-roles`
-and `set-manager`.
+Add `requester` and `finance-approver` to the account's own roles for this
+walk. The auth CLI in `src/auth/cli.ts`'s `set-roles` replaces the whole
+list. Note the account's current roles first, on `/admin/users`'s
+`demo-superuser@example.test` row. Pass that list back with `requester` and
+`finance-approver` appended.
+
+Manager Approval resolves through `org.manager-of-starter`, the starter's
+own manager. Set the account's manager to `demo-admin@example.test` with
+`set-manager`. Sign in as `demo-admin@example.test` to approve that step,
+then back in as the superuser to continue. Restore the superuser's original
+roles with `set-roles` when the walk finishes.
 
 Open `purchase-requisition`'s Player at 400px. Create an instance and
 drive it to Finance Review (`docs/browser-checks.md:3329`). Claim the step.

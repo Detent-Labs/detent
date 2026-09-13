@@ -9,7 +9,7 @@
   - Setup one: the IT Offboarding draft, with one unconnected step added from the canvas bar as the blocker (`docs/browser-checks.md:3112`).
   - Setup two: that draft's Fields tab, and its Changes tab with every row opened.
   - Setup three: `purchase-requisition`'s Finance Review in the Player, submitted from "Review" with Finance Note empty (`docs/browser-checks.md:3329`).
-- [x] 2.2 Remove CHANGES-1 and FIELDS-2 from `docs/decisions.md`. File the menu paint-over the review met, from this change's `proposal.md` What Changes. Verify: no other entry still points at either tag, and antislop stays at or below `origin/main`.
+- [x] 2.2 Remove CHANGES-1 and FIELDS-2 from `docs/decisions.md`. File the menu paint-over and the Task screen's sideways scroll the review met, from this change's `proposal.md` What Changes. Verify: no other entry still points at either tag, and antislop stays at or below `origin/main`.
 
 ## 3. Verification
 

@@ -1603,7 +1603,7 @@ paths under `panels/`, `draft/` and `screens/` start at
 
 - **FIELDS-1: Remove field commits on one press.** Its button
   (`panels/FieldCatalogPanel.tsx:915`) asks nothing. The handler
-  `FieldsTab::removeField` (`panels/EntityTabs.tsx:385`) prunes the field
+  `FieldsTab::removeField` (`panels/EntityTabs.tsx:389`) prunes the field
   through `removeFieldIn` and leaves every step view entry naming it. A move
   rewrites such entries, through `moveFieldAndSyncViews`
   (`draft/view-group-sync.ts:49`). No undo exists, and nothing announces the
@@ -1621,7 +1621,7 @@ paths under `panels/`, `draft/` and `screens/` start at
   (`panels/ProcessHeaderBar.tsx:407`), with counts, when the field sits on a
   step or holds fields. The removal's own `mutate` also removes the field's
   view entries. Focus lands on the newly selected rail entry, and the tab's
-  live region announces the removal (`panels/EntityTabs.tsx:497`). The
+  live region announces the removal (`panels/EntityTabs.tsx:501`). The
   2026-09-11 entry "A canvas removal drops keyboard focus, and nothing
   announces it" records the canvas form of this gap.
 - **FIELDS-3: below 64rem a short window leaves the editor a strip.** The
@@ -1646,7 +1646,7 @@ paths under `panels/`, `draft/` and `screens/` start at
   arrow keys and no filter. Its landmark is a `nav` named "Editors"
   (`panelsScreen.railLabel`, `packages/web/src/i18n/catalogs/studio.ts:429`).
   An entry's check badge reads "1 issues" for one check
-  (`panels/EntityTabs.tsx:283`), from the key `panelsScreen.issueMark`
+  (`panels/EntityTabs.tsx:287`), from the key `panelsScreen.issueMark`
   (`packages/web/src/i18n/catalogs/studio.ts:432`). Risk (Low): a keyboard
   user presses Tab up to 52 times to cross the rail.
 - **FIELDS-7: the Fields tab's headings and checks lack structure.** The
@@ -1663,7 +1663,7 @@ paths under `panels/`, `draft/` and `screens/` start at
   After a press on Remove field the tab showed
   `view ref does not resolve: field_0fb5a2c4-0022-…`, an id the author can no
   longer look up. Adding an empty field raises the banner at
-  `screens/EditScreen.tsx:780` before the author types. The banner reads
+  `screens/EditScreen.tsx:821` before the author types. The banner reads
   `Draft is not yet structurally valid — CEL, registry, duration, and cross-process checks are held back until it is (see the Zod issues below)`,
   and it pushes the page down 35px at 1400px and 99px at 900px. The messages
   come from `src/schema/definition.ts:990`, `src/schema/compile.ts:629` and
@@ -1731,11 +1731,11 @@ paths under `panels/`, `draft/` and `screens/` start at
   depth. Risk (Low): the glossary teaches a word for a UI that is gone.
 - **FIELDS-14: `FieldsTab` walks the field tree once per rail entry.** Each
   call of `FieldsTab` walks the whole tree twice, in `flattenRailFields` and
-  `flattenDraftFields` (`panels/EntityTabs.tsx:304`, `:305`). Each rail entry
+  `flattenDraftFields` (`panels/EntityTabs.tsx:308`, `:309`). Each rail entry
   then walks it once more through `parentIdOf` (`:465`,
   `panels/fieldCatalogLogic.ts:227`), top-level entries included. Each entry
   also scans the whole check list for its badge count
-  (`panels/EntityTabs.tsx:455`, `draft/panel-rail.ts:104`). For N entries
+  (`panels/EntityTabs.tsx:459`, `draft/panel-rail.ts:104`). For N entries
   that makes N + 2 tree walks and N scans of the check list. Risk
   (Informational): the cost grows with the square of the catalog's size and
   stays harmless at 51 entries.

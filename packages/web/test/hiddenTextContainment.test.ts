@@ -5,10 +5,11 @@ import { describe, expect, it } from "bun:test";
  * `visually-hidden-text-page-bounds` design.md D1-D3: a scroll container
  * that sets no `position` clips no hidden text laid out inside it, so the
  * text keeps its static position against the page and the document grows to
- * reach it. Four containers carry hidden text and set no `position` of their
- * own. `bun:test` cannot lay out a page, so it cannot see containment; this
- * guards the source the way `studio-guidedSurfaceStyle.test.ts` guards its
- * own layout rules — read the file, strip comments, match a pattern.
+ * reach it. Four scroll containers carry hidden text, and each must set
+ * `position: relative`. `bun:test` cannot lay out a page, so it cannot see
+ * containment; this guards the source the way
+ * `studio-guidedSurfaceStyle.test.ts` guards its own layout rules — read the
+ * file, strip comments, match a pattern.
  * `docs/browser-checks.md` covers what only a browser can see: that a
  * container actually clips and scrolls the text it holds.
  */
