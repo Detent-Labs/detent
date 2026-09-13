@@ -84,9 +84,12 @@ function render(over: { draft?: Draft; issues?: EditorIssue[] } = {}): string {
   );
 }
 
-/** Everything between the miniature's own `<ul>` and its close. */
+/** Everything between the miniature's own `role="img"` element and its
+ * close. The miniature carries no list semantics any more, so the element
+ * itself is what a test matches — a backreference to the tag name, since the
+ * element is not pinned to one tag. */
 function miniatures(html: string): string[] {
-  return [...html.matchAll(/<ul(?![^>]*aria-label)[^>]*>(.*?)<\/ul>/gs)].map((m) => m[1]!);
+  return [...html.matchAll(/<(\w+)[^>]*\srole="img"[^>]*>(.*?)<\/\1>/gs)].map((m) => m[2]!);
 }
 
 describe("The Forms tab's plates", () => {
@@ -148,6 +151,12 @@ describe("The Forms tab's plates", () => {
 });
 
 describe("A plate's miniature", () => {
+  it("draws one miniature per plate whose view holds a field entry", () => {
+    // DRAFT: step_a holds one field entry, step_b's view is empty and draws
+    // "No fields yet" in the miniature's place instead, step_c has no view.
+    expect(miniatures(render())).toHaveLength(1);
+  });
+
   it("takes no keyboard focus, so a walk with the Tab key never lands inside one", () => {
     for (const inner of miniatures(render())) {
       expect(inner).not.toContain("<button");
@@ -156,11 +165,48 @@ describe("A plate's miniature", () => {
     }
   });
 
-  it("marks a required entry beside its label", () => {
-    const [first] = miniatures(render());
+  it("carries one accessible name stating the field count and the required count", () => {
+    // step_a's view holds one required entry.
+    expect(render()).toContain('aria-label="1 field, 1 required"');
+  });
 
-    expect(first).toContain("Amount");
-    expect(first).toContain('aria-label="required"');
+  it("states both counts for a view holding several entries", () => {
+    const four = {
+      ...DRAFT,
+      workflow: {
+        ...DRAFT.workflow,
+        steps: [
+          {
+            ...DRAFT.workflow!.steps![0],
+            view: { fields: [{ ref: AMOUNT, required: true }, { ref: AMOUNT }, { ref: AMOUNT }, { ref: AMOUNT }] },
+          },
+          ...DRAFT.workflow!.steps!.slice(1),
+        ],
+      },
+    } as unknown as Draft;
+
+    expect(render({ draft: four })).toContain('aria-label="4 fields, 1 required"');
+  });
+
+  it("says the form has no fields yet where the miniature would stand on an empty view", () => {
+    expect(render()).toContain("No fields yet");
+  });
+
+  it("names a view holding only a note as an empty form, offering to start it", () => {
+    const notesOnly = {
+      ...DRAFT,
+      workflow: {
+        ...DRAFT.workflow,
+        steps: [
+          { ...DRAFT.workflow!.steps![0], view: { fields: [{ kind: "note", text: { en: "Read this first" } }] } },
+          ...DRAFT.workflow!.steps!.slice(1),
+        ],
+      },
+    } as unknown as Draft;
+    const html = render({ draft: notesOnly });
+
+    expect(html).toContain("Empty form");
+    expect(html).toContain("Start the form");
   });
 });
 
