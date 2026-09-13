@@ -620,9 +620,11 @@ own.
   each field entry other than a group entry. An ordinary mark draws as an
   outline. A required entry's mark fills solid instead. A group entry draws a
   group break, a 1px line, where a mark would stand.
-- The foot row carries the field count on the left and the open control on
-  the right. The control takes the authoring command style, at 4px block
-  padding. The authoring command elsewhere takes 8px.
+- The foot row carries the field count on the left. It adds the required
+  count where an entry declares `required: true`. An empty form's foot
+  holds the control alone, at the row's trailing edge. The control takes
+  the authoring command style, at 4px block padding. The authoring command
+  elsewhere takes 8px.
 
 ### The Field Matrix
 
