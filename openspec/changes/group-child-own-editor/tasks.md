@@ -14,8 +14,8 @@
 - [x] 2.5 After an add into a group, focus the element `fieldLabelInputId` names. Scroll the element `railEntryId` names with `block: "nearest"` and no smooth option. Use the existing refocus effect. Verify in task 5.5.
 - [x] 2.6 Make `removeField` take a field id. It removes that field through `removeFieldIn`, at any depth. It selects the id `neighbourAfterRemove` returns for the draft before the write. Type the panel's `onRemove` prop as `(fieldId: string) => void`. Pass `field.id` where the panel calls it. Verify with `bun run typecheck`.
 - [x] 2.7 Make `moveField` keep `fieldId` selected. Keep its refocus on `moveControlId(fieldId)`. Rewrite the comments that name its top-level ancestor. Verify in task 5.5.
-- [ ] 2.8 Give `PanelsRailFieldRow` an optional `id` on its button. Pass `railEntryId` for each field entry. Assert in `studio-panelsRailFieldRow.test.tsx` that the id lands on the button. Verify in the full suite.
-- [ ] 2.9 Remove `rootId` from `RailFieldRow`, from its doc comments and from `flattenRailFields` in `draft/panel-rail.ts`. Drop it from the expected rows in `studio-edit-panel-rail.test.ts`. Rename the test whose title names `rootId`. Verify with `bun run typecheck`.
+- [x] 2.8 Give `PanelsRailFieldRow` an optional `id` on its button. Pass `railEntryId` for each field entry. Assert in `studio-panelsRailFieldRow.test.tsx` that the id lands on the button. Verify in the full suite.
+- [x] 2.9 Remove `rootId` from `RailFieldRow`, from its doc comments and from `flattenRailFields` in `draft/panel-rail.ts`. Drop it from the expected rows in `studio-edit-panel-rail.test.ts`. Rename the test whose title names `rootId`. Verify with `bun run typecheck`.
 
 ## 3. Editor
 
