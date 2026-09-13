@@ -6,8 +6,7 @@ import { formCardRows, type FormCardRow, type MiniatureEntry } from "./formCardR
 
 /** Forced-colors mode maps an ordinary `background-color` to `Canvas`, so the
  * required mark's fill and the group break's line both need a system-color
- * declaration under this query to stay visible (`/impeccable audit` finding
- * on `forms-tab-form-strip`). */
+ * declaration under this query to stay visible. */
 const FORCED_COLORS = "@media (forced-colors: active)";
 
 const styles = stylex.create({
@@ -141,8 +140,8 @@ const styles = stylex.create({
   miniatureRequired: {
     backgroundColor: { default: colors.accentOnMuted, [FORCED_COLORS]: "CanvasText" },
     borderColor: colors.accentOnMuted,
-    // Keep the forced-colors fill: without this the UA would otherwise
-    // re-flatten `CanvasText` back toward the border's own forced color.
+    // `none` under forced colors stops the UA from replacing this fill with
+    // its own forced background.
     forcedColorAdjust: { default: "auto", [FORCED_COLORS]: "none" },
   },
   // A group entry's group break: a 1px line marking where a section of the
