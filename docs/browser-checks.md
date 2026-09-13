@@ -1512,7 +1512,7 @@ Source: `changes-tab-entity-change-list` task 6.1.
 
 Open a draft whose Checks tab lists a step-level issue and a process-level
 issue. Reach the Checks tab by keyboard and press Enter on the step-level
-row. Pass: focus lands on that step's own button in the tab row, and Steps
+row. Pass: focus lands on the Steps tab's own button in the tab row, and Steps
 stands open.
 
 Return to the Checks tab and press Enter on the process-level row. Pass:

@@ -747,8 +747,10 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, go, initial
   // A target already open takes focus at once and records nothing: the
   // effect below only fires on a tab switch, and this target's tab is not
   // switching. Any other target goes through `goToTab` and becomes the
-  // pending focus, since the tab body it moves focus into does not exist
-  // until the switch lands.
+  // pending focus. `openTab` follows the route on a later render, and the
+  // effect waits for that render, so focus lands on a tab button that
+  // already carries `aria-selected="true"` rather than on one still
+  // unselected.
   const openTabFromRow = (target: ProcessTab) => {
     if (target === openTab) {
       focusTabButton(target);

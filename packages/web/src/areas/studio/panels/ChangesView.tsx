@@ -1,15 +1,14 @@
 /**
- * The panels screen's Changes view: what a publish would change
+ * The Changes tab's body: what a publish would change, as a change list
  * (`studio-app`'s Changes-view requirements).
  *
  * It reads the draft as the editor holds it — unsaved edits included.
  * `VersionsScreen.diffAgainstBase()` reads the SAVED draft from the server
- * instead; a developer reading this view is mid-edit, so the live one is the
- * useful left side.
+ * instead; a developer on this tab is mid-edit, so the after side here is the
+ * live draft.
  *
- * The dock hosted this until the bench replaced it. Only the host moved: the
- * fetch still re-runs when `baseVersion` moves, and every rule about the
- * difference's direction holds.
+ * The base fetch re-runs when `baseVersion` moves, so a publish refreshes the
+ * list with no reload.
  */
 import { useEffect, useMemo, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
@@ -84,10 +83,10 @@ interface Props {
   /** The editor's content locale: the locale a `LocalizedText` reads in
    * (D5), the same one `PathsView` takes. */
   contentLocale: string;
-  /** Reports the difference's entry count to the index rail, which has no
-   * other way to reach it: the count is a fetch away and `panelEntityCounts`
-   * derives from the draft alone. `undefined` while nothing has been
-   * compared. */
+  /** Reports the change list's row count up to the Changes tab's own button
+   * in the tab row, which has no other way to reach it: the count is a fetch
+   * away and `processTabCounts` derives every other count from the draft
+   * alone. `undefined` while nothing has been compared. */
   onCount: (count: number | undefined) => void;
   /** What a row's open command does. Without it no row offers one. */
   onOpenRow?: (row: ChangeRow) => void;

@@ -2165,7 +2165,8 @@ Stage-by-stage status is in `ROADMAP.md`.
   convention rather than silently chaining or hard-blocking; a Versions
   screen listing published versions and comparing any two (or a draft
   against its `base_version`) as a change list
-  (`draft/changeSet.ts::describeChanges`, pairing each side by anchor id,
+  (`draft/changeSet.ts::describeChanges`, pairing each side's members by
+  anchor (a note position or one of `id`, `ref`, `value`, `key`),
   backed by `screens/versionDiffLogic.ts::diffJson`) — no diff library
   exists anywhere in the repo to reuse, and none was added, objects
   recurse key-by-key and everything else (including arrays) compares
@@ -4529,9 +4530,9 @@ meets `scope=started` should infer no new permission tier from it.
   over the LIVE draft, unsaved edits included. Base first is load-bearing. The
   function `describeChanges` reports an entity present in its second argument
   alone as added. Each row's Developer view then reads its `from` value off
-  the first side, through `diffJson`. So the draft-first order
-  `VersionsScreen.diffAgainstBase()` uses would read every addition as a
-  removal.
+  the first side, through `diffJson`. The handler
+  `VersionsScreen.diffAgainstBase()` passes the stripped base first too. A
+  draft-first call would read every addition as a removal.
 
   The Paths view gives one row per path over source step, trigger, priority,
   guard and target. The module `panels/pathRows.ts` carries that derivation
