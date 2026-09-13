@@ -1605,8 +1605,9 @@ last in the entity rail, selected. Keyboard focus sits in its label input,
 and the rail shows the entry. Its issue mark reads "2", aria-label "2
 issues": the empty base-locale label and the empty key.
 
-Click "Remove field". Pass: `invoice`, the top-level field before the
-removed one, becomes selected.
+Click "Remove field". Pass: no dialog opens, since the new field has no
+reach. The field `invoice`, the top-level entry just before it, becomes
+selected, with keyboard focus on its rail entry.
 
 Open the Data sources view. Pass: the Fields sub-list disappears, and a Data
 sources sub-list appears in its place. The two never show at once. The new
@@ -2386,36 +2387,43 @@ open and unchanged.
 To see a refusal render, sign back in as `demo-developer` and open the draft.
 Publish through the browser console rather than through the gated control.
 Pass: the failure renders as a bordered banner with a FAILED stamp. It sits as
-its own block below the header row. A screen reader announces it, with no move
+its own block below the header bar. A screen reader announces it, with no move
 of the focus.
 
 ### Where a confirmation dialog leaves the focus (`studio-publish-gate-and-report`)
 
 Source: `studio-publish-gate-and-report` task 13.19.
 
+Measured on 2026-09-13 against the production build served from `WEB_ROOT`.
+
 A rendered string carries no active element. So the file
 `packages/web/test/studio-processHeaderBar-publishGate.test.tsx` asserts which
 control the markup primes, and nothing beyond that. Where the focus sits, and
 where it goes on close, needs a browser.
 
-Open a draft as an account holding `system:publish`. Open the header bar's
-kebab menu and choose Publish. Pass: the focus ring sits on Cancel, not on
-Publish. Press Enter without moving. Pass: the dialog closes and no `POST` goes
-out.
+Open a draft as an account holding `system:publish`. Save, Discard draft and
+Publish stand as their own controls on the header bar, each ahead of the `⋮`
+menu trigger. Choose Publish. Pass: the focus ring sits on Cancel, not on
+Publish. Press Enter without moving. Pass: the dialog closes and no `POST`
+goes out.
 
-Open the menu again and choose Discard. Pass: the focus ring sits on Cancel,
-never on Discard draft. This one matters most: the studio carries no undo, and
-Discard draft is the first focusable control in DOM order.
+Choose Discard draft, its own control on the header bar. Pass: the focus ring
+sits on Cancel, never on Discard draft. This one matters most: the studio
+carries no undo, and Discard draft is the first focusable control in DOM
+order.
 
 Now close each dialog by each of its routes, and watch where the focus lands
-every time. Cancel it. Press Escape. Click the backdrop. Confirm a publish and
-let it finish.
+every time. Cancel it. Press Escape. Confirm a publish and let it finish.
 
-Pass: after each route the focus ring returns to the kebab trigger. It never
-lands on the top of the page, and never on nothing at all.
+Pass: each dialog opens from its own control on the header bar. Every route
+returns the focus ring to that same control, Publish or Discard draft in
+turn. It never lands on the top of the page, and never on nothing at all.
 
-Press Tab straight after each close. Pass: the next stop is the control after
-the kebab trigger, not the first control on the screen.
+Press Tab straight after each close. Pass: the next stop sits right after
+whichever control opened it, not the first control on the screen.
+
+Click the backdrop on each dialog in turn. Pass: the dialog stays open and
+the focus stays inside it.
 
 ### Keyboard access to the canvas (`studio-canvas-keyboard`)
 
@@ -2959,13 +2967,17 @@ selects a new top-level "(unnamed field)", unindented, the rail's last entry.
 Keyboard focus sits in its label input, and the rail shows its entry.
 
 The group "Notification" holds four fields. Choose its first field, "Early
-notice already on file". Click "Remove field". Pass: "Remarks", the field
-that followed it, becomes selected, and "Notification" now holds three
-fields.
+notice already on file", and click "Remove field". Pass: a dialog opens,
+with "Steps showing it" reading 2 and no other row. Click its own "Remove
+field" to confirm. Pass: "Remarks", the field that followed it, becomes
+selected, with keyboard focus on its rail entry. "Notification" now holds
+three fields.
 
-Choose "Submitted on", now the last of those three. Click "Remove field".
-Pass: "Submitted by", the field before it, becomes selected. "Notification"
-now holds two fields, "Remarks" and "Submitted by".
+Choose "Submitted on", now the last of those three, and click "Remove
+field". Pass: a dialog opens, with "Steps showing it" reading 1 and no
+other row. Click its own "Remove field" to confirm. Pass: "Submitted by",
+the field before it, becomes selected, with keyboard focus on its rail
+entry. "Notification" now holds two fields, "Remarks" and "Submitted by".
 
 Choose "Remarks" in the rail, then change its key to `my-field`. Pass: the
 check stands inside its own "What this field asks" zone, and that zone's
@@ -2982,8 +2994,10 @@ Choose "Access Excel updated or prepared", the only field inside
 top-level row, unindented. It draws right after the "Permissions" entry,
 and it opens its own editor, with both halves.
 
-Click "Remove field" there. Pass: "Permissions", now empty, becomes
-selected.
+Click "Remove field" there. Pass: a dialog opens, with "Steps showing it"
+reading 4 and no other row. Click its own "Remove field" to confirm. Pass:
+"Permissions", now empty, becomes selected. Keyboard focus lands on its
+rail entry too, since the removed field was its only child.
 
 Choose `immediate_lock_written_confirmation` ("Written confirmation of the
 immediate lock obtained"). Pass: the rail entry truncates on one line. The
@@ -3011,6 +3025,95 @@ current mark.
 
 Focus, scroll position and the current mark need a live draft store and a
 real DOM.
+
+### Removing a field that reaches past the field catalog confirms first (`remove-field-takes-its-references`)
+
+Source: `remove-field-takes-its-references` tasks 2.2, 3.2 and 3.3.
+
+Measured on 2026-09-13 against the production build served from `WEB_ROOT`.
+
+Open the IT Offboarding draft's Fields tab. Choose the group "Processing
+(Fabrikam)". Click "Remove field". Pass: a modal dialog opens, titled `Remove
+the group “Processing (Fabrikam)”?`. It names `processing_fabrikam` beside the label.
+
+Its facts read "Fields inside it" 18 and "Steps showing it" 10, no other
+row. Its first note reads "Removing it also clears every step entry and
+reference that names it." A second reads "Every field inside the group
+leaves with it." Focus opens on "Cancel". The confirming "Remove group"
+control never holds it.
+
+Press Escape. Pass: the dialog closes. The draft still holds "Processing
+(Fabrikam)" and its 18 fields. Focus returns to "Remove field" on the group's
+own editor.
+
+Click "Remove field" again. Click "Cancel". Pass: the dialog closes. The draft
+still holds "Processing (Fabrikam)" and its 18 fields. Focus returns to "Remove
+field" on the group's own editor.
+
+Open the Canvas tab, then the Fields tab, so the browser's Back has a known
+destination. Choose "Processing (Fabrikam)". Click "Remove field". With the dialog
+open, press the browser's Back. Pass: the Canvas tab shows, and the page holds
+no `dialog[open]`.
+
+Press the browser's Forward. Pass: the Fields tab shows with no dialog open,
+and the entity rail still lists "Processing (Fabrikam)".
+
+Click the Canvas tab in the tab row, then the Fields tab. Pass: each tab opens
+on its click. A tab click adds a history entry and drops any Forward entry, so
+the clicks come after the Forward. No `bun:test` case can hold the pending
+removal from outside the tab, so this step is the check.
+
+Click "Remove field" again. Click its own "Remove group" to confirm. Pass:
+the entity rail no longer lists "Processing (Fabrikam)" or its 18 fields. Focus
+lands on "Notification", the top-level entry before it, and the entity rail
+scrolls that entry into view. The live region reads "Processing (Fabrikam)
+removed, with the 18 fields inside it."
+
+Pass: the `<dialog>` element leaves the page's DOM. Only the selected
+field's own preview container carries `inert`, exactly as it does for any
+selected field. Press Tab once. Pass: focus moves off "Notification"'s
+rail entry, to the next control in the tab order.
+
+Open the Expense Approval draft's Fields tab. Choose "Booking Status".
+Click "Remove field". Pass: the dialog titles `Remove “Booking Status”?`,
+beside `booking_status` in mono.
+
+Its facts read "Steps showing it" 2 and "Actions and mappings writing it" 1.
+They add "Contract entries" 1 and "CEL expressions reading it" 2. It has no
+"Column mappings targeting it" row and no "Plugin settings naming it" row.
+Its notes state "Removing it also clears every step entry and reference
+that names it." They add "CEL expressions and plugin settings keep their
+text." and "Check each one before you publish."
+
+Click its own "Remove field" to confirm. Pass: the live region reads
+"Booking Status removed." Open the Checks tab. Pass: it reports two new
+issues, one per guard.
+
+The guard on the path from Book to Booked still reads `data.booking_status
+== 'booked'`. The guard on the path from Book to Booking Error still reads
+`data.booking_status == 'failed'`.
+
+Back on the IT Offboarding draft, open its Fields tab. Click "+ Add field"
+twice. Pass: each new "(unnamed field)" entry lands at the top level. Each
+takes the current mark and keyboard focus in its own label input, in turn.
+
+Choose the entity rail's last entry, the second new row, and click "Remove
+field". Pass: no dialog opens, since it has no reach. The live region
+clears to empty, then reads "(unnamed field) removed."
+
+Choose the entity rail's new last entry, the first new row, and click "Remove
+field" again. Pass: no dialog opens either. The live region clears to
+empty again, then reads "(unnamed field) removed." once more. A screen
+reader hears that sentence twice.
+
+Open `/studio` and click "+ New process", then "Empty process". Open the
+new draft's Fields tab. Pass: it shows the start state, "This process
+collects nothing yet". Click "Add the first field". Pass: a new field
+exists, selected.
+
+Click "Remove field". Pass: no dialog opens, since the new field has no
+reach. The start state returns, "This process collects nothing yet", and
+keyboard focus lands on "Add the first field".
 
 ### Borders and fills that the compiler dropped (`stylex-shorthand-repair`)
 
@@ -3370,16 +3473,20 @@ now pins the rule order and the class pairing:
 `packages/web/test/btn-destructive-accent.test.ts`. Whether the accent
 renders stays a visual judgment, so it lands here.
 
+Measured on 2026-09-13 against the production build served from `WEB_ROOT`.
+
 Build the production bundle and open it on the engine's own port. Seed the
 database first. The studio controls need the author role, and the admin
 controls need the admin role. The seeded `demo-superuser@example.test` account
 holds both.
 
-Ten controls carry `btn btn-secondary btn-destructive`. Read each at rest,
-under a real pointer hover, while the pointer holds it down, and under keyboard
-focus. Read the computed `color`, `border-color` and `background-color` in the
-inspector each time. Compare them with a plain `btn btn-secondary` control on
-the same screen. Walk all ten in the light scheme, then again in the dark.
+Eleven controls carry `btn btn-secondary btn-destructive`. The eleventh sits
+inside the Fields tab's removal dialog, reached by clicking Remove field on a
+field with reach. Read each at rest, under a real pointer hover, while the
+pointer holds it down, and under keyboard focus. Read the computed `color`,
+`border-color` and `background-color` in the inspector each time. Compare
+them with a plain `btn btn-secondary` control on the same screen. Walk all
+eleven in the light scheme, then again in the dark.
 
 Most of these controls commit on a click. To read the pressed state, hold the
 pointer down on the control. Slide the pointer off the control before you

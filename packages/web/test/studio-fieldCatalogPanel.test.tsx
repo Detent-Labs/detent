@@ -6,9 +6,15 @@ import type { ValidationResult } from "../src/areas/studio/draft/validation.js";
 import type { EditorIssue } from "../src/areas/studio/draft/issues.js";
 import { DraftContext, type DraftContextValue } from "../src/areas/studio/draft/store.js";
 import { FieldCatalogPanel, MoveFieldControl } from "../src/areas/studio/panels/FieldCatalogPanel.js";
-import { fieldLabelInputId, moveControlId } from "../src/areas/studio/panels/fieldCatalogLogic.js";
+import { ADD_FIRST_FIELD_ID, fieldLabelInputId, moveControlId, removeControlId } from "../src/areas/studio/panels/fieldCatalogLogic.js";
 
 const NOOP = () => {};
+
+/** Each `<button>` element whole, from its opening tag to its own
+ * `</button>`. No button holds another, so the first close is its own. */
+function buttonElements(html: string): string[] {
+  return html.match(/<button[^>]*>[\s\S]*?<\/button>/g) ?? [];
+}
 
 const fld = (id: string, key: string, extra: object = {}): DraftField =>
   ({ id, key, label: { en: key }, type: "string", ...extra }) as unknown as DraftField;
@@ -182,6 +188,53 @@ describe("FieldCatalogPanel", () => {
 
     expect(html).not.toContain("Fields inside this group");
     expect(html).toContain(`id="${fieldLabelInputId("field_a")}"`);
+  });
+
+  // `FieldsTab` points the removal dialog's trigger ref at Remove field by
+  // this id, so a declined removal hands focus back to that control.
+  it("puts the field's own remove id on Remove field", () => {
+    const draft: Draft = {
+      baseLocale: "en",
+      fields: [grp("field_g", "g", [fld("field_c", "c")])] as unknown as Draft["fields"],
+    };
+    const html = renderToStaticMarkup(
+      <DraftContext.Provider value={contextValue(draft)}>
+        <FieldCatalogPanel
+          token="test-token"
+          selectedId="field_c"
+          onAdd={NOOP}
+          onRemove={NOOP}
+          onShowStep={NOOP}
+          onMoveField={NOOP}
+        />
+      </DraftContext.Provider>,
+    );
+
+    const remove = buttonElements(html).find((b) => b.includes(`id="${removeControlId("field_c")}"`));
+    expect(remove).toBeDefined();
+    expect(remove).toEndWith(">Remove field</button>");
+  });
+
+  // A removal that leaves the entity rail with no entry hands focus to this
+  // control, by this id (`fieldCatalogLogic.ts::focusAfterRemove`).
+  it("puts the stable first-field id on the start state's Add the first field", () => {
+    const draft: Draft = { baseLocale: "en", fields: [] as unknown as Draft["fields"] };
+    const html = renderToStaticMarkup(
+      <DraftContext.Provider value={contextValue(draft)}>
+        <FieldCatalogPanel
+          token="test-token"
+          selectedId={undefined}
+          onAdd={NOOP}
+          onRemove={NOOP}
+          onShowStep={NOOP}
+          onMoveField={NOOP}
+        />
+      </DraftContext.Provider>,
+    );
+
+    const addFirst = buttonElements(html).find((b) => b.includes(`id="${ADD_FIRST_FIELD_ID}"`));
+    expect(addFirst).toBeDefined();
+    expect(addFirst).toEndWith(">Add the first field</button>");
   });
 
   // A kind switch rewrote `resolution` out of `group` and left its `fields` in

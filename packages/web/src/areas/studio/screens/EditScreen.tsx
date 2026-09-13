@@ -945,7 +945,11 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, go, initial
 
           {tabPanel(
             "fields",
-            <FieldsTab token={token} onShowStep={(target) => navigate({ name: "edit", processId, stepId: target })} />,
+            <FieldsTab
+              token={token}
+              visible={!jsonOpen && openTab === "fields"}
+              onShowStep={(target) => navigate({ name: "edit", processId, stepId: target })}
+            />,
           )}
           {tabPanel("dataSources", <DataSourcesTab token={token} />)}
           {tabPanel("paths", <PathsView draft={draft} contentLocale={contentLocale} />)}

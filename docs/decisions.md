@@ -125,7 +125,7 @@ stage-by-stage status.
 - Studio's native `<dialog>` confirm dialogs do not fully hold a keyboard
   user inside them. `stylex-phase-3-studio`'s own task 11.5 keyboard walk
   found two gaps, both pre-existing and unrelated to that phase's CSS-only
-  change: verified via the untouched JS in `ProcessHeaderBar.tsx`'s
+  change: verified via the untouched JS in `panels/shared/confirmDialog.tsx`'s
   `useConfirmDialog` and `ProcessesScreen.tsx`'s `StartPickerDialog`.
 
   First: Tab from the publish- and discard-confirm dialogs' focused Cancel
@@ -138,6 +138,11 @@ stage-by-stage status.
   cause: it may never register with the browser's own tab-order
   bookkeeping for the modal.
 
+  The removal dialog (`panels/RemoveFieldDialog.tsx`) is a third consumer of
+  the same hook. It shows the identical escape: forward Tab from its focused
+  Cancel lands on `<body>`. Shift+Tab wraps correctly inside the dialog. Only
+  the forward-Tab transition from Cancel breaks.
+
   Second: `StartPickerDialog` and `PromotionPreviewDialog` (`+ New
   process`, "Import a promoted version") call `showModal()` on mount with
   no cleanup. Escape and Cancel both close the dialog and drop focus to
@@ -148,6 +153,25 @@ stage-by-stage status.
   No follow-up change tracks this yet. It belongs to `studio-publish` or
   `spa-accessibility`, not `web-styling`: a CSS migration cannot cause or
   fix either gap.
+- **The studio's three confirmation dialogs (Publish, Discard draft, Remove
+  field) share presentation gaps.**
+  - The heading takes the global `h2` Title role
+    (`packages/web/src/shell/global.css:94-100`: 13.6px, weight 800,
+    uppercase, slate), the least prominent text in the dialog, and renders an
+    author's own label in capitals.
+  - Cancel prints in the accent (`rgb(212, 43, 17)`), beside the
+    accent-outlined destructive confirm.
+  - The fact counts print in the written face, where `DESIGN.md` puts a
+    figure in a column in mono.
+  - The Publish dialog's `<code>` falls back to the browser's `monospace`.
+  - At 420px the dialog spans the viewport with no gutter: the compiled
+    `maxWidth: "34rem"` replaces the browser's own modal width cap.
+  - Discard's heading is a statement, and Remove's is a question.
+  - Publish and Discard have no `aria-describedby`.
+
+  The change `remove-field-takes-its-references` found these in its
+  2026-09-13 critique and audit. Name the fix: one `DESIGN.md` "Dialogs"
+  decision, applied to all three dialogs.
 - `NotFoundError` is served as HTTP 500 where most APIs answer 404. The
   mapping sits at `src/http/errors.ts:95`, and the header comment at `:10-16`
   calls it the one exception carved out of the message-free fallback. The
@@ -1564,15 +1588,24 @@ recorded rather than fixed. The RAIL tags are local to this section.
   the tension sits in `DESIGN.md` itself.
 - **`.btn-ghost` text falls under 4.5:1 on its own washes.** The draft
   confirmation dialog's Cancel carries it
-  (`packages/web/src/areas/studio/panels/ProcessHeaderBar.tsx:578`). Its accent
+  (`packages/web/src/areas/studio/panels/ProcessHeaderBar.tsx:544`). Its accent
   text reads 3.90:1 hovered and 3.44:1 pressed in light, and 4.15:1 pressed in
   dark. `destructive-buttons-show-the-accent` cleared the same shortfall for
   `.btn-destructive` with `--color-accent-on-muted`, and this one wants the
-  same treatment.
-- **The step page's Remove step has no destructive treatment.**
-  `packages/web/src/areas/studio/panels/StepPage.tsx:610` renders
-  `btn btn-secondary` and commits at once. `DESIGN.md` asks that a destructive
-  action stay outlined in the accent.
+  same treatment. The removal dialog's Cancel
+  (`packages/web/src/areas/studio/panels/RemoveFieldDialog.tsx:204`) and the
+  field catalog's Remove field trigger
+  (`packages/web/src/areas/studio/panels/FieldCatalogPanel.tsx:926`) carry the
+  same class. Both read 4.53:1 at rest, 3.90:1 hovered and 3.45:1 pressed, in
+  light.
+- **Remove step and the field catalog's Remove field trigger have no
+  destructive treatment.** `packages/web/src/areas/studio/panels/StepPage.tsx:610`
+  renders `btn btn-secondary` and commits at once.
+  `packages/web/src/areas/studio/panels/FieldCatalogPanel.tsx:926` renders
+  `btn btn-ghost` and opens `RemoveFieldDialog` instead. `DESIGN.md` asks that
+  a destructive action stay outlined in the accent. The field catalog's
+  trigger also reads "Remove field" on every entity, group included; its own
+  dialog a moment later reads "Remove group".
 - **A leaf field's label beside a key-less field derives `_2`.** The leaf
   label path, `FieldEditor::updateLabel` in `panels/FieldCatalogPanel.tsx`,
   builds its dedupe set with `""` in it. A label whose key derives empty,
@@ -1596,45 +1629,25 @@ recorded rather than fixed. The RAIL tags are local to this section.
 
 The change `group-child-own-editor` ran a final code review, browser walks,
 `/impeccable critique` and `/impeccable audit` on the Studio Fields tab on
-2026-09-13. Every item below sits outside that change, and this section
-records it in place of a fix. The `FIELDS-n` tags are local to this section;
-paths under `panels/`, `draft/` and `screens/` start at
-`packages/web/src/areas/studio/`.
+2026-09-13. They found FIELDS-2 to FIELDS-14, and the change
+`visually-hidden-text-page-bounds` fixed FIELDS-2. The change
+`remove-field-takes-its-references` added FIELDS-15 to FIELDS-24 on the same
+day, from its design, reviews, browser walks and audits. Every item below
+sits outside the change that found it, and this section records it in place
+of a fix. The `FIELDS-n` tags are local to this section; paths under
+`panels/`, `draft/` and `screens/` start at `packages/web/src/areas/studio/`.
 
-- **FIELDS-1: Remove field commits on one press.** Its button
-  (`panels/FieldCatalogPanel.tsx:915`) asks nothing. The handler
-  `FieldsTab::removeField` (`panels/EntityTabs.tsx:389`) prunes the field
-  through `removeFieldIn` and leaves every step view entry naming it. A move
-  rewrites such entries, through `moveFieldAndSyncViews`
-  (`draft/view-group-sync.ts:49`). No undo exists, and nothing announces the
-  removal. Focus drops to `<body>`, since the pressed button unmounts with
-  `FieldEditor`, keyed by the field's id (`panels/FieldCatalogPanel.tsx:1148`).
-  Measured 2026-09-13 on the IT Offboarding draft, removing "Access Excel
-  updated or prepared" raised 8 blocking checks: four
-  `view ref does not resolve: field_…` and four
-  `a view entry's group must be empty; the catalog holds this field at the top level`.
-
-  Removing a group takes its subtree (`panels/fieldCatalogLogic.ts:118`):
-  "Processing (Fabrikam)" holds 18 fields that 10 steps show. Risk (High): the
-  most destructive action on the tab is the least guarded (WCAG 2.4.3, and
-  4.1.3 for the silence). The fix confirms in the studio's own `<dialog>`
-  (`panels/ProcessHeaderBar.tsx:407`), with counts, when the field sits on a
-  step or holds fields. The removal's own `mutate` also removes the field's
-  view entries. Focus lands on the newly selected rail entry, and the tab's
-  live region announces the removal (`panels/EntityTabs.tsx:501`). The
-  2026-09-11 entry "A canvas removal drops keyboard focus, and nothing
-  announces it" records the canvas form of this gap.
 - **FIELDS-3: below 64rem a short window leaves the editor a strip.** The
-  rail stacks above the editor, capped at 20rem (`panels/EntityTabs.tsx:57`).
+  rail stacks above the editor, capped at 20rem (`panels/EntityTabs.tsx:71`).
   Measured 2026-09-13: the editor pane stands 105px tall at 900x720, and 18px
   at 420x720 with its heading cut off. No 2px rule separates the two scroll
-  regions: the rail drops its right-hand border there (`:54`). Risk (Medium):
+  regions: the rail drops its right-hand border there (`:68`). Risk (Medium):
   the rail keeps its 20rem and the editor gets what remains.
 - **FIELDS-4: the entity rail and the editor pane clip the focus ring.** This
   is RAIL-3 on the Fields tab. The shell's 2px ring at a 2px offset
   (`packages/web/src/shell/global.css:37`) loses its edge against both scroll
-  boxes (`panels/EntityTabs.tsx:46`, `:58`). On the chosen entry the ring and
-  the 3px current mark (`:86`) share one accent. Risk (Low): the ring still
+  boxes (`panels/EntityTabs.tsx:60`, `:72`). On the chosen entry the ring and
+  the 3px current mark (`:104`) share one accent. Risk (Low): the ring still
   meets WCAG 2.4.7.
 - **FIELDS-5: the Validation disclosure takes its count as its name.** Its
   `<summary>` prints `({carried.length})` alone
@@ -1644,18 +1657,18 @@ paths under `panels/`, `draft/` and `screens/` start at
 - **FIELDS-6: the entity rail is a flat list of tab stops.** IT Offboarding's
   rail holds 51 entries plus "+ Add field". That makes 52 tab stops, with no
   arrow keys and no filter. Its landmark is a `nav` named "Editors"
-  (`panelsScreen.railLabel`, `packages/web/src/i18n/catalogs/studio.ts:441`).
+  (`panelsScreen.railLabel`, `packages/web/src/i18n/catalogs/studio.ts:463`).
   An entry's check badge reads "1 issues" for one check
-  (`panels/EntityTabs.tsx:287`), from the key `panelsScreen.issueMark`
-  (`packages/web/src/i18n/catalogs/studio.ts:444`). Risk (Low): a keyboard
+  (`panels/EntityTabs.tsx:302`), from the key `panelsScreen.issueMark`
+  (`packages/web/src/i18n/catalogs/studio.ts:466`). Risk (Low): a keyboard
   user presses Tab up to 52 times to cross the rail.
 - **FIELDS-7: the Fields tab's headings and checks lack structure.** The
   outline jumps from the header bar's `h1` to the field's `h3`. They sit at
-  `panels/ProcessHeaderBar.tsx:783` and `panels/FieldCatalogPanel.tsx:1142`,
-  with zone headings at `h4` (`:566`). A zone's check list (`:569`) sits above
+  `panels/ProcessHeaderBar.tsx:749` and `panels/FieldCatalogPanel.tsx:1157`,
+  with zone headings at `h4` (`:574`). A zone's check list (`:577`) sits above
   its controls, and neither `aria-invalid` nor `aria-describedby` ties a check
-  to its control. The zone heading marks a check by colour alone (`:252`,
-  `:566`). Risk (Medium): the heading levels skip, a check names no control,
+  to its control. The zone heading marks a check by colour alone (`:260`,
+  `:574`). Risk (Medium): the heading levels skip, a check names no control,
   and colour alone marks a zone (WCAG 1.3.1 and 1.4.1).
 
   Since `forms-card-legend`, the Forms tab's card labels stand at `h2` under
@@ -1663,7 +1676,8 @@ paths under `panels/`, `draft/` and `screens/` start at
 - **FIELDS-8: check messages speak the engine's layers.** Measured 2026-09-13,
   the Fields tab showed `ZOD missing baseLocale ('en') entry` and
   `field key must match /^[a-z_][a-z0-9_]*$/ to be a valid CEL identifier`.
-  After a press on Remove field the tab showed
+  A view entry naming an id no field carries — the shape an unfixed field
+  removal left then, and a JSON-view edit can still write today — showed
   `view ref does not resolve: field_0fb5a2c4-0022-…`, an id the author can no
   longer look up. Adding an empty field raises the banner at
   `screens/EditScreen.tsx:821` before the author types. The banner reads
@@ -1675,18 +1689,18 @@ paths under `panels/`, `draft/` and `screens/` start at
   grammar and raw ids where a plain sentence belongs.
 - **FIELDS-9: a group's editor leads with zones a group cannot use.** Its
   definition half shows "Where values come from"
-  (`panels/FieldCatalogPanel.tsx:827`). It also shows a disabled "Default
-  value" (`:878`), "Validation" (`:882`) and a disabled Technical checkbox
-  (`:811`). Its effect half shows "A participant must fill this in" (`:1015`)
+  (`panels/FieldCatalogPanel.tsx:835`). It also shows a disabled "Default
+  value" (`:886`), "Validation" (`:890`) and a disabled Technical checkbox
+  (`:819`). Its effect half shows "A participant must fill this in" (`:1028`)
   and up to 12 "Show on the canvas" buttons. Each button's accessible name
-  omits its step (`:948`). The group's one action, the zone "Fields inside
-  this group" (`:893`), comes after "Validation". Measured 2026-09-13 at
+  omits its step (`:961`). The group's one action, the zone "Fields inside
+  this group" (`:901`), comes after "Validation". Measured 2026-09-13 at
   1400x900, its heading sits at y=1078, 200px below the pane's bottom.
 
   The zone's body looks the same for 18 fields and for none, and its button
-  (`:894`) names no group. A screen reader also reads the "+" leading its
+  (`:902`) names no group. A screen reader also reads the "+" leading its
   label. A nested field's editor names its group only in the move control's
-  value (`:526`). Risk (Medium): the group's one action sits out of view,
+  value (`:534`). Risk (Medium): the group's one action sits out of view,
   behind controls a group cannot use.
 
   This item needs the owner's call before any change. The zone's place after
@@ -1700,12 +1714,12 @@ paths under `panels/`, `draft/` and `screens/` start at
 - **FIELDS-10: the field editor's type drifts from `DESIGN.md`.** Measured
   2026-09-13, the field's `h3` computes weight 700, where `DESIGN.md:311`
   allows 800 and 400. Its `panelHeading` style
-  (`panels/FieldCatalogPanel.tsx:72`) sets no weight. Field labels compute
-  14.4px, sentence case, in ink (`:94`), where the Label role is 11px
+  (`panels/FieldCatalogPanel.tsx:80`) sets no weight. Field labels compute
+  14.4px, sentence case, in ink (`:102`), where the Label role is 11px
   uppercase tracked slate (`DESIGN.md:326`). Zone headings compute 14.4px at
-  800 in ink (`panels/FieldCatalogPanel.tsx:246`), and none takes the Title
+  800 in ink (`panels/FieldCatalogPanel.tsx:254`), and none takes the Title
   role (`DESIGN.md:320`). The Remove field button
-  (`panels/FieldCatalogPanel.tsx:915`) is an accent ghost
+  (`panels/FieldCatalogPanel.tsx:926`) is an accent ghost
   (`packages/web/src/shell/tokens.css:197`), and its text starts 5px right of
   the column's flush-left edge. Risk (Low): the field editor sets type outside
   the roles `DESIGN.md` names.
@@ -1729,19 +1743,157 @@ paths under `panels/`, `draft/` and `screens/` start at
   "field tabs" row sits at `.claude/rules/ui-glossary.md:86`. It defines the
   Field / Values / Rules tab set for the one selected top-level field. A
   paragraph at `:117` repeats that definition. The field editor has two halves
-  and no tab set (`panels/FieldCatalogPanel.tsx:600`,
+  and no tab set (`panels/FieldCatalogPanel.tsx:608`,
   `openspec/specs/studio-app/spec.md:2564`), and it edits a field at any
   depth. Risk (Low): the glossary teaches a word for a UI that is gone.
 - **FIELDS-14: `FieldsTab` walks the field tree once per rail entry.** Each
   call of `FieldsTab` walks the whole tree twice, in `flattenRailFields` and
-  `flattenDraftFields` (`panels/EntityTabs.tsx:308`, `:309`). Each rail entry
-  then walks it once more through `parentIdOf` (`:465`,
-  `panels/fieldCatalogLogic.ts:227`), top-level entries included. Each entry
+  `flattenDraftFields` (`panels/EntityTabs.tsx:343`, `:344`). Each rail entry
+  then walks it once more through `parentIdOf` (`:585`,
+  `panels/fieldCatalogLogic.ts:252`), top-level entries included. Each entry
   also scans the whole check list for its badge count
-  (`panels/EntityTabs.tsx:459`, `draft/panel-rail.ts:104`). For N entries
+  (`panels/EntityTabs.tsx:575`, `draft/panel-rail.ts:104`). For N entries
   that makes N + 2 tree walks and N scans of the check list. Risk
   (Informational): the cost grows with the square of the catalog's size and
   stays harmless at 51 entries.
+- **FIELDS-15: a step or data source removal reuses its own button for the
+  next entity.** `panels/DataSourcesPanel.tsx`'s `DataSourceRow` (`:161`) and
+  `screens/EditScreen.tsx`'s `<StepPage>` (`:930`) render with no `key`,
+  unlike the Fields tab's own `FieldEditor`, keyed by the field's id
+  (`panels/FieldCatalogPanel.tsx:1162`). A press on "Remove data source" or
+  "Remove this step" therefore keeps its own button element in the DOM.
+  `removeDataSource` (`panels/EntityTabs.tsx:682`) and `onRemoveStep`
+  (`screens/EditScreen.tsx:544`) each pick a neighbour, and the same button
+  then renders that neighbour's own remove control. This is a code reading;
+  no browser run has confirmed it. Risk (Medium): a second Enter or Space
+  removes a neighbour with no separate confirmation.
+- **FIELDS-16: two check messages call a removed field present.** A removal
+  leaves a kept `org.actor-from-field` assignment setting that names the
+  removed id, since `fieldRemovalReach` only counts a plugin setting
+  (`draft/field-removal.ts`, the `pluginSettings` kind).
+  `checkActorFromFieldReference` (`src/schema/compile.ts:538`) then reports
+  the field as one that `does not declare format: "person"` (`:555`),
+  wording that still assumes the field exists. A stored dangling view entry
+  — the shape an unfixed field removal once left — reaches
+  `checkViewGroupReferences`'s third clause (`src/schema/compile.ts:1046`)
+  the same way. With no catalog parent left for the id, the check reports
+  `the catalog holds this field at the top level` (`:1054`), naming a field
+  the catalog no longer holds. Risk (Medium): both messages read as a field
+  to fix, when the field is already gone.
+- **FIELDS-17: two kept settings fail no check the draft ever runs.** A
+  removal leaves a `valueFromField` or `instanceIdField` value that names a
+  removed id, since both are plugin-config settings `fieldRemovalReach` only
+  counts. `checkInstanceQueryValueFromField` (`src/engine/definitions.ts:224`)
+  and `validateInstanceTransitionReferences` (`:373`) reject an unresolved
+  one, but only `publishBody` calls them. The studio's own checks rail,
+  `draft/validation.ts::runValidation` (`:82`), calls `validateStructure` and
+  `validateReferences` alone, so neither check runs before publish. A
+  `process.start` action's `config.inputMapping` value goes further:
+  `validateProcessChaining` (`src/engine/definitions.ts:531`) checks only the
+  mapping's target keys against the started process, and reads no mapping
+  value's CEL text at all. Risk (Medium): an author sees no warning until a
+  live instance drops the mapped entry (`mapping.entry-dropped`).
+- **FIELDS-18: a reused key rebinds an old expression with no message.** A
+  removal leaves every CEL expression that reads a removed field's key,
+  since `fieldRemovalReach`'s `celReads` count and `removeFieldAndReferences`
+  both stop at counting and keeping them. The checks rail then reports each
+  one's key as unknown, the same way it reports any other guard reading a
+  key no field holds. A field the author later adds with that same key
+  resolves every such expression again: `data.<key>` becomes valid CEL,
+  against a different field than the one that wrote it. No check compares a
+  field's id across that gap, so the checks rail falls silent, and the
+  rebind has no message of its own. Risk (Medium): an old guard or
+  `validation.rule` reads a new field's value under an identity change
+  nobody marked.
+- **FIELDS-19: a label holding a `$` pattern breaks a sentence that fills
+  it.** A string replacement to `String.prototype.replace` expands `$&`, `$$`,
+  `$'` and `` $` `` instead of inserting the label as literal text. A label
+  reading `Cost $&` turns into the literal text `Cost {field}` inside the
+  rendered sentence. This change fixed the removal sentences. Both
+  `removalAnnouncement` (`panels/fieldCatalogLogic.ts:347`) and the removal
+  dialog's heading (`panels/RemoveFieldDialog.tsx:116`) pass a replacer
+  function, `() => label`.
+
+  Measured 2026-09-13, `packages/web/src` holds 54 `.replace("{` calls in 15
+  files. Twelve pass a replacer function: the five removal fills, and seven in
+  `panels/ChangeList.tsx`, `panels/ChangesView.tsx` and
+  `screens/VersionsScreen.tsx`. The other 42 pass a string, in 10 files. Six
+  calls split across lines, and two lines carry two calls each:
+  `EntityTabs.tsx`'s move sentences (`:546`, `:547`). The grep
+  `git grep -n '\.replace("{' -- packages/web/src` therefore matches 46 lines.
+
+  Two helpers build the placeholder in a template literal, which that grep
+  misses. The admin area's `tFill`
+  (`packages/web/src/areas/admin/catalog.ts:17`) passes a string to
+  `replaceAll`. The helper `fill` (`draft/changeSet.ts:171`) passes a replacer
+  function. Risk (Low): one replacer function closes every site that still
+  passes a string: `.replace("{field}", () => label)`.
+- **FIELDS-20: a second identical move announces nothing.** `moveField`
+  (`panels/EntityTabs.tsx:526`) writes its sentence straight into the shared
+  live region (`:544`), a pattern that predates this change. `removeField`
+  (`:500`) empties the region first and writes on the next animation frame
+  instead. That step matters when one removal sentence repeats, since two
+  different sentences announce without it. Two unnamed fields moved into the
+  same group, one after another, still produce one sentence twice: the live
+  region's text never changes, so a screen reader announces the first move
+  and stays silent on the second. Risk (Low): one shared writer, emptying the
+  region first, closes the gap for both sentences.
+- **FIELDS-21: the live `studio-publish` requirement names a backdrop
+  dismissal no dialog has.** Its "Publishing confirms in a modal dialog that
+  names the version and its immutability" requirement names "a backdrop
+  dismissal" among the close routes that return focus
+  (`openspec/specs/studio-publish/spec.md:320`). A native modal has no such
+  route. Measured on 2026-09-13: a backdrop click leaves the Publish and the
+  Discard draft dialogs open. Risk (Low): the requirement asks for a route
+  no dialog offers.
+
+  Two fixes exist, each a change of its own: drop the route from that
+  sentence, or add a deliberate backdrop dismissal (`closedby="any"`) to
+  every studio confirmation dialog, with its focus return.
+- **FIELDS-22: the kept-reference note names no location.** When a removal
+  keeps a CEL read or a plugin setting, the dialog adds "CEL expressions and
+  plugin settings keep their text." and "Check each one before you publish."
+  (`panels/RemoveFieldDialog.tsx:192-193`). It names no expression and no
+  setting, and no later screen lists them all
+  (`openspec/specs/studio-app/spec.md:4100-4102`).
+  A kept CEL read surfaces later as an unknown-key result on the Checks tab.
+  A kept `valueFromField` or `instanceIdField` setting, and a kept
+  `process.start` mapping value, fail the way FIELDS-17 already describes.
+
+  The step list the note leans on, "Used in", sits out of view when the
+  author presses Remove field. Measured: its heading sat at -59px on one
+  field and -190px on another, and the pane behind the open dialog stayed
+  inert. The always-shown note's "step entry" is an internal word. The copy
+  table of `remove-field-takes-its-references` fixed that wording
+  (`openspec/changes/archive/2026-09-13-remove-field-takes-its-references/design.md:99`),
+  so a rewrite needs the owner's sign-off too. Risk (Medium): the note tells
+  the author to check references the dialog never lists.
+
+  Name the routes: an advisory "kept reference" check, a
+  `studio-checks-rail` change, or naming locations in the dialog directly,
+  which reopens the owner's "counts only" choice from 2026-09-13.
+- **FIELDS-23: removing a group's last field leaves an empty group card.**
+  Removing "Access Excel updated or prepared" on IT Offboarding left its
+  group, "Permissions", with no field on 4 step forms. Its "How it will
+  look" preview is an empty box, the Forms tab shows the same empty card,
+  and Checks reads 0. Neither the dialog nor the announcement mentions the
+  group. Risk (Medium): a participant meets an empty section after publish,
+  with no signal to the author beforehand.
+
+  Name the routes: count the emptied group as reach, with its own row and
+  note, or add an advisory check for a step that shows a group with no
+  field. Either needs a `studio-app` change.
+- **FIELDS-24: Remove field sits flush against "+ Add field".** Measured at
+  1440x900: Remove field `[344, 802, 101×37]`, "+ Add field"
+  `[344, 839, 109×37]`, 0px apart; `panels/FieldCatalogPanel.tsx:279-285`
+  draws the 2px rule above Remove field only. A field with no reach leaves
+  on one press (`panels/EntityTabs.tsx:472-475`), and a freshly added field
+  always has no reach. A double click removes a field, then opens the
+  neighbour field's Data source select. Risk (Medium): a press meant for
+  "+ Add field" can remove the field just configured, with no undo.
+
+  Name the fix: separate the two commands, with spacing and a rule between
+  them, or move Remove field into the field's own heading row.
 
 ## Open from the 2026-09-13 Changes tab audit (each needs its own OpenSpec change)
 
@@ -1780,7 +1932,7 @@ tags are local to this section; paths under `panels/` and `screens/` start at
   body loads (WCAG 4.1.3).
 - **CHANGES-5: the header bar's open `⋮` menu panel loses hit points to
   tab-body content.** Its panel sets `zIndex: 1`
-  (`panels/ProcessHeaderBar.tsx:197`). The review measured this
+  (`panels/ProcessHeaderBar.tsx:198`). The review measured this
   2026-09-13, identical with and without `visually-hidden-text-page-bounds`:
   at 1280x720 on the Field matrix tab, an `elementFromPoint` sweep lost 15
   of 36 hit points to the grid's sticky headers, which set `zIndex: 2` and

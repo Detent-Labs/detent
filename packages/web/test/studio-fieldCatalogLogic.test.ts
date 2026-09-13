@@ -2,15 +2,18 @@ import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 import { FIELD_KINDS } from "workflow-engine/schema";
 import {
+  ADD_FIRST_FIELD_ID,
   appendToGroup,
   droppedByKindChange,
   fieldLabelInputId,
+  focusAfterRemove,
   groupTargetsFor,
   moveFieldToGroup,
   moveTargetsFor,
   neighbourAfterRemove,
   nextFieldKey,
   railEntryId,
+  removalAnnouncement,
   removeFieldIn,
 } from "../src/areas/studio/panels/fieldCatalogLogic.js";
 import { mergeLocalizedTextEntry } from "../src/areas/studio/draft/localized-text.js";
@@ -519,6 +522,41 @@ describe("neighbourAfterRemove", () => {
   });
 });
 
+/**
+ * Where keyboard focus lands after a removal (`studio-app`: "A removal on the
+ * Fields tab moves focus to the next rail entry and announces itself"). One
+ * case per branch of design.md's order: the neighbour's rail entry, the first
+ * rail entry the pruned catalog keeps, then Add the first field.
+ */
+describe("focusAfterRemove", () => {
+  it("focuses the rail entry of the field the neighbour rule selects", () => {
+    const fields = [grp("field_g", "g", [fld("field_a", "a"), fld("field_b", "b")])];
+
+    expect(focusAfterRemove(fields, "field_a")).toBe(railEntryId("field_b"));
+  });
+
+  // The neighbour rule answers nothing for `field_g`: it has no sibling, and
+  // its parent group carries no id. Before the removal the rail lists
+  // `field_g`, then `field_a` inside it, then `field_b`. The group takes
+  // `field_a` along, so only `field_b` is right.
+  it("focuses the first rail entry the pruned catalog keeps when the neighbour rule answers nothing", () => {
+    const idlessGroup = {
+      key: "unsaved",
+      label: { en: "Unsaved" },
+      type: "group",
+      fields: [grp("field_g", "g", [fld("field_a", "a")])],
+    } as unknown as DraftField;
+    const fields = [idlessGroup, fld("field_b", "b")];
+
+    expect(neighbourAfterRemove(fields, "field_g")).toBeUndefined();
+    expect(focusAfterRemove(fields, "field_g")).toBe(railEntryId("field_b"));
+  });
+
+  it("focuses Add the first field when the removal leaves the rail no entry", () => {
+    expect(focusAfterRemove([fld("field_a", "a")], "field_a")).toBe(ADD_FIRST_FIELD_ID);
+  });
+});
+
 describe("fieldLabelInputId and railEntryId", () => {
   it("pins the label input id", () => {
     expect(fieldLabelInputId("field_a")).toBe("studio-field-label-field_a");
@@ -526,5 +564,32 @@ describe("fieldLabelInputId and railEntryId", () => {
 
   it("pins the rail entry id", () => {
     expect(railEntryId("field_a")).toBe("studio-field-rail-field_a");
+  });
+});
+
+describe("removalAnnouncement", () => {
+  it("announces a plain field with no sentence about fields inside it", () => {
+    expect(removalAnnouncement("Booking Status", 0)).toBe("Booking Status removed.");
+  });
+
+  it("uses the singular form for exactly one field inside", () => {
+    expect(removalAnnouncement("Some Group", 1)).toBe("Some Group removed, with the one field inside it.");
+  });
+
+  it("uses the plural form and states the count for more than one field inside", () => {
+    expect(removalAnnouncement("Processing (Fabrikam)", 18)).toBe(
+      "Processing (Fabrikam) removed, with the 18 fields inside it.",
+    );
+  });
+
+  it("keeps a label holding the literal text {count} as the author typed it", () => {
+    expect(removalAnnouncement("{count} copies", 2)).toBe("{count} copies removed, with the 2 fields inside it.");
+  });
+
+  // A string replacement would expand `$&` into the matched `{field}`.
+  it("keeps a label holding a $ pattern as the author typed it, in all three sentences", () => {
+    expect(removalAnnouncement("Cost $&", 0)).toBe("Cost $& removed.");
+    expect(removalAnnouncement("Cost $&", 1)).toBe("Cost $& removed, with the one field inside it.");
+    expect(removalAnnouncement("Cost $&", 2)).toBe("Cost $& removed, with the 2 fields inside it.");
   });
 });
