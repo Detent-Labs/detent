@@ -10,6 +10,7 @@ import { deriveKey, shouldAutoDeriveKey } from "../draft/deriveKey.js";
 import { ContentLocaleBadge, AddLocaleControl } from "./shared/ContentLocaleSwitcher.js";
 import { LocalizedTextInput } from "./shared/LocalizedTextInput.js";
 import { IssueList } from "./shared/IssueList.js";
+import { useConfirmDialog } from "./shared/confirmDialog.js";
 import { checksDotState, groupChecksBySource } from "../draft/checksRail.js";
 import { publishAvailability, nextVersionLabel } from "../screens/draftToolbarState.js";
 import type { DraftToolbarActions } from "./DraftToolbar.js";
@@ -382,45 +383,10 @@ export function PublishReasonLine({ canPublish, blocked }: { canPublish: boolean
   );
 }
 
-/**
- * Opens a mounted confirmation dialog modally, puts the initial focus on its
- * declining control, and returns focus to the nav control that opened it.
- *
- * Three separate mechanisms, because none of them alone holds:
- *
- * The `autoFocus` prop states the intent and is the property a rendered string
- * carries, so a static-markup test can assert it. On the client it is NOT an
- * attribute: React 19 skips it in `setProp` and calls `.focus()` from
- * `commitMount` instead.
- *
- * That client focus lands before this passive effect runs, and `showModal()`
- * then re-runs the dialog focusing steps. Those steps look for the `autofocus`
- * ATTRIBUTE, find none, and fall to the first focusable descendant — the
- * committing button, which for the discard dialog destroys the draft. So the
- * effect focuses the declining control again, after `showModal()`.
- *
- * The cleanup covers every close route at once: Cancel, Escape, a backdrop
- * dismissal, and a completed request all clear `pendingDialog`, which unmounts
- * the dialog. Without it focus drops to `<body>` and a keyboard user restarts
- * their traversal from the top of the screen.
- */
-function useConfirmDialog(triggerRef: RefObject<HTMLButtonElement | null>) {
-  const ref = useRef<HTMLDialogElement>(null);
-  const declineRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    ref.current?.showModal();
-    declineRef.current?.focus();
-    return () => triggerRef.current?.focus();
-  }, [triggerRef]);
-
-  return { ref, declineRef };
-}
-
 interface ConfirmDialogProps {
   processLabel: string;
   revision: number;
-  /** The nav control that opened this dialog, for the focus return above. */
+  /** The nav control that opened this dialog, for `useConfirmDialog`'s focus return. */
   triggerRef: RefObject<HTMLButtonElement | null>;
   /** The refusal to render inside the dialog, or null. A modal puts everything
    * behind it out of reach, so a banner on the screen reports nothing here

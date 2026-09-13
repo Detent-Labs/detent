@@ -27,7 +27,15 @@ import { DefaultValueEditor } from "./shared/DefaultValueEditor";
 import { fieldLocaleGaps, missingTranslationWarning, resolveDraftLocalizedText, seedLocalizedText } from "../draft/localized-text";
 import { draftFields, flattenDraftFields } from "../draft/fields";
 import { writeGroupKey, writeGroupLabel } from "../draft/view-group-sync.js";
-import { droppedByKindChange, fieldLabelInputId, moveControlId, moveTargetsFor, nextFieldKey } from "./fieldCatalogLogic.js";
+import {
+  ADD_FIRST_FIELD_ID,
+  droppedByKindChange,
+  fieldLabelInputId,
+  moveControlId,
+  moveTargetsFor,
+  nextFieldKey,
+  removeControlId,
+} from "./fieldCatalogLogic.js";
 import { fieldCheckZone, type FieldCheckZone } from "./fieldCheckZone.js";
 import { fieldKindLabel } from "../draft/field-type-labels";
 import {
@@ -912,7 +920,12 @@ function FieldEditor({
           )}
 
           <div {...stylex.props(styles.fieldHalfRemove)}>
-            <button type="button" className="btn btn-ghost" onClick={onRemove}>
+            <button
+              type="button"
+              id={fieldId === undefined ? undefined : removeControlId(fieldId)}
+              className="btn btn-ghost"
+              onClick={onRemove}
+            >
               {t("fieldCatalog.removeField")}
             </button>
           </div>
@@ -1087,6 +1100,8 @@ interface Props {
    * it resolved. */
   selectedId: string | undefined;
   onAdd: (groupId?: string) => void;
+  /** Remove field's press for the selected field (`EntityTabs.tsx`'s
+   * `FieldsTab::requestRemove`), which removes it at once or confirms first. */
   onRemove: (fieldId: string) => void;
   onShowStep: (stepId: string) => void;
   /** The move's one write (`EntityTabs.tsx`'s `FieldsTab::moveField`),
@@ -1124,7 +1139,7 @@ export function FieldCatalogPanel({ token, selectedId, onAdd, onRemove, onShowSt
         <div {...stylex.props(styles.emptyState)}>
           <h4 {...stylex.props(styles.fieldCatalogStartHeading)}>{t("fieldCatalog.startHeading")}</h4>
           <p {...stylex.props(styles.studioEmpty, styles.fieldCatalogStartBody)}>{t("fieldCatalog.startBody")}</p>
-          <button type="button" className="btn btn-primary" onClick={() => onAdd()}>
+          <button type="button" id={ADD_FIRST_FIELD_ID} className="btn btn-primary" onClick={() => onAdd()}>
             {t("fieldCatalog.addFirstField")}
           </button>
         </div>

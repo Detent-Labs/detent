@@ -4,7 +4,7 @@ See `proposal.md` for the motivation. This section carries the measurements the
 decisions below rest on. The three research reports that produced them sit under
 `tmp/`, which `.gitignore` covers, so every number worth keeping is restated here.
 
-### The four files, measured at `4b5d20f3`
+### The four files, measured at `87a040d2`
 
 | File | Lines | Date in header | antislop findings |
 |---|---|---|---|

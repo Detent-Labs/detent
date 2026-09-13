@@ -143,7 +143,7 @@ them. The entry in `docs/browser-checks.md` then proves the height itself.
   proven.
 - Consequence: the grid now reaches the tab body's clipping edge. That cut
   the scroll region's own focus ring at 1440x900, fixed in commit
-  `d246e374`. The ring now draws inside the frame at -2px, the way a cell's
+  `9ad3edcd`. The ring now draws inside the frame at -2px, the way a cell's
   ring already does.
 
 ## Migration Plan

@@ -87,10 +87,10 @@
 - [x] 3.4 The antislop prose gate covers every Markdown file this fix
   touched: `proposal.md`, `design.md`, `tasks.md`,
   `specs/studio-app/spec.md`. This gate needs a real commit. It stayed
-  blind to this fix until commit `0e5ba1fe` landed (see
+  blind to this fix until commit `b0f2ba61` landed (see
   `gates-cannot-see-uncommitted-work` in memory). That first run found
   105 findings across the three narrative files, plus 13 in the delta
-  spec. Commit `7f9b4aea` cleaned all of them. Running the following
+  spec. Commit `dba3a66f` cleaned all of them. Running the following
   over that range now reports zero rising findings:
   `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`.
 - [x] 3.5 The whitespace/CRLF gate runs over the same range. Running the
