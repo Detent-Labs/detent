@@ -79,8 +79,10 @@ this brief. Mockup: <https://claude.ai/code/artifact/fb6fe7ae-02fe-4a80-9a88-45a
   add a look beyond a copy of the header bar's dialog shapes. No red, no
   toast, no motion.
 - **States and ranges.** Reach runs from zero, which opens no dialog, to 18
-  fields inside and 15 steps on the shipped examples. A field with an empty
-  key shows its label alone. A long label wraps inside the dialog.
+  fields inside and 15 steps. On the shipped examples, Processing (Fabrikam) holds
+  18 fields on IT Offboarding and shows on 15 steps on IT Onboarding. A field
+  with an empty key shows its label alone. A long label wraps inside the
+  dialog.
 - **Focus.** The dialog opens on Cancel. A decline returns focus to Remove
   field. A removal focuses the next rail entry and scrolls it into view. An
   emptied catalog focuses "Add the first field".

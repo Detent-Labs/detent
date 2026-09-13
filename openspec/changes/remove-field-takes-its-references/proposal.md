@@ -49,7 +49,8 @@ None.
 - New tests under `packages/web/test/`: `studio-fieldRemoval.test.ts` and
   `studio-removeFieldDialog.test.tsx`.
 - Changed studio code: `panels/EntityTabs.tsx`, `panels/FieldCatalogPanel.tsx`,
-  `panels/fieldCatalogLogic.ts` and `panels/ProcessHeaderBar.tsx`.
+  `panels/fieldCatalogLogic.ts`, `panels/ProcessHeaderBar.tsx` and
+  `screens/EditScreen.tsx`.
 - Changed catalog: `packages/web/src/i18n/catalogs/studio.ts`.
 - Changed tests: `studio-no-confirm.test.ts`, `studio-fieldCatalogPanel.test.tsx`
   and `studio-fieldCatalogLogic.test.ts`.
