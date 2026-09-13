@@ -1518,15 +1518,16 @@ tool that dispatches trusted pointer events, e.g. `playwright-cli`.
 
 Source: `panels-list-and-detail` tasks 6.5-6.6.
 
-Open a draft with many fields (`purchase_requisition`, 22 fields, one data
-source) and go to `/edit/panels/fields`.
+Open a draft with many fields (`purchase_requisition`, 29 rail entries, one
+data source) and go to `/edit/panels/fields`.
 
-Pass: the rail lists all 22 field labels under Fields, indenting
-`line_item`'s four children once. No row prints a key. The main view renders
-one field's editor, the first (`cost_center`), not all 22 stacked. That row
-alone carries `aria-current`.
+Pass: the rail lists 29 entries under Fields. Nine stand at the top level:
+eight groups and the plain field `po_status`. The other twenty sit inside
+those groups, each indented once, `line_item`'s four among them. No row prints
+a key. The main view renders one editor alone, for the first entry,
+`line_item`. That row alone carries `aria-current`.
 
-Click a top-level field (`line_item`, a group). Pass: the view switches to
+Click a top-level field (`request`, a group). Pass: the view switches to
 that field's editor and the rail marks it current.
 
 Click a nested child (`item_description`, under `line_item`). Pass: the rail
@@ -1552,7 +1553,7 @@ selected at once. Click "Remove data source". Pass: `approved_vendors`, the
 only remaining entry, becomes selected.
 
 Reload the page: a fresh navigation to the same URL. Pass: selection resets
-to the first field, `cost_center`. That matches the reset a canvas round
+to the first field, `line_item`. That matches the reset a canvas round
 trip already gives every other screen-owned selection here.
 
 Throughout: zero console errors or warnings. `playwright-cli console`
@@ -2734,7 +2735,7 @@ shows it.
 
 Drag `po_status`'s row onto `Line Item`'s row with the pointer. Pass: the
 same indent and the same announcement. Now drag `finance_note`'s row onto
-`po_status`'s row, a top-level row that is no group. Pass: the same move
+`po_status`'s row, a row that is no group. Pass: the same move
 out. Both gestures reach one helper, and both reach the same destinations.
 
 The "+ Add field" row takes no drop. Measured 2026-09-12.
@@ -2745,7 +2746,7 @@ control sits after the Label, the Description and the Key, like every
 field's.
 
 Open the control and pick "Top level". Pass: `discrepancy_note` un-indents
-to a top-level row, after `po_status`. The tab keeps it selected. Keyboard
+to a top-level row, after `finance_note`. The tab keeps it selected. Keyboard
 focus lands on the move control inside the field's own editor.
 
 The `FieldEditor` for `discrepancy_note` was already open before the move.
@@ -2768,9 +2769,8 @@ Source: `studio-field-authoring-surface` task 9.3.
 Open the same route and narrow the window to 900px, then to 420px.
 
 Pass: the three regions stack in the reading order list, definition, effect.
-The rail collapses to a disclosure header reading "Editors", a real `<button>`
-carrying `aria-expanded="false"`. Press it. Pass: `aria-expanded` reads
-`true`, and the entry list shows. The rail caps at 20rem. It scrolls inside
+The rail stands above the editor as an open list, with no disclosure button,
+and it drops its right-hand rule. The rail caps at 20rem. It scrolls inside
 that cap rather than pushing the open view off screen.
 
 Pass: `document.documentElement.scrollWidth` equals `clientWidth` at 1440,
@@ -2866,7 +2866,8 @@ Open the IT Offboarding draft on the Fields tab, at
 Choose "Forward to this address" in "Data backup and email". Pass: that
 entry alone carries the current mark (`aria-current`), and the group's own
 entry and its siblings carry none. The view shows the field's own two
-halves, definition and effect.
+halves, definition and effect. The entry's accessible name carries "in Data
+backup and email", though the rail prints no group name.
 
 Scroll that field's editor down to its "Validation" zone, then choose
 "Hardware". Pass: the new editor opens at its top, at "What this field
@@ -2886,6 +2887,11 @@ Scroll the rail back up until the four fields inside "Hardware", and the
 and press "+ Add field to this group" once more. Pass: the rail keeps its
 scroll position exactly, and the new entry still carries the current mark.
 
+The new field inside "Hardware" stays selected. Scroll its editor to the end.
+Press the editor's own "+ Add field", below "Remove field". Pass: the tab
+selects a new top-level "(unnamed field)", unindented, the rail's last entry.
+Keyboard focus sits in its label input, and the rail shows its entry.
+
 The group "Notification" holds four fields. Choose its first field, "Early
 notice already on file". Click "Remove field". Pass: "Remarks", the field
 that followed it, becomes selected, and "Notification" now holds three
@@ -2902,7 +2908,8 @@ and the "Notification" entry and editor carry none for it.
 
 Choose "Permissions". In its own move control, "Move this field to", pick
 "Hardware". Pass: "Permissions" indents once under "Hardware". The live
-region reads "Permissions moved into Hardware."
+region reads "Permissions moved into Hardware." The rail shows the moved
+entry, and focus stays on the move control.
 
 Choose "Access Excel updated or prepared", the only field inside
 "Permissions". Pass: the rail's two-level cap treats that entry like a
@@ -2915,8 +2922,8 @@ selected.
 Choose `immediate_lock_written_confirmation` ("Written confirmation of the
 immediate lock obtained"). Pass: the rail entry truncates on one line. The
 editor's heading shows the whole label, wrapped rather than clipped. The
-label input's value holds the whole label too. A person reads it by moving
-the caret to the end, or the input scrolls.
+label input's value holds the whole label too. A person reads the rest by
+moving the caret to the end.
 
 Narrow the window below 64rem. Pass: the rail stands above the editor, in
 that reading order.

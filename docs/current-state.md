@@ -4310,11 +4310,11 @@ meets `scope=started` should infer no new permission tier from it.
   Stage 62 moved both views onto their own tabs, and `FieldsTab` and
   `DataSourcesTab` in `EntityTabs.tsx` host them.
 
-  A row in `RailFieldRow` has no `rootId`. A rail entry selects its own
-  field at any depth. A relocated (depth-2+) row keeps its own id, rather
-  than resolving to the group that contains it. The module `panel-rail.ts`
-  gained `issueCountForEntityId`, joining its other counting functions for
-  the per-row issue mark.
+  A rail entry selects its own field, by `RailFieldRow.id`, at any depth.
+  A relocated (depth-2+) row keeps its own id, rather than resolving to the
+  group that contains it. The module `panel-rail.ts` gained
+  `issueCountForEntityId`, joining its other counting functions for the
+  per-row issue mark.
 
   Each tab holds its own selection as component state. It resolves that
   selection against the current draft on every render, with a fallback to the
