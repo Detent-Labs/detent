@@ -1821,21 +1821,29 @@ paths under `panels/`, `draft/` and `screens/` start at
   rebind has no message of its own. Risk (Medium): an old guard or
   `validation.rule` reads a new field's value under an identity change
   nobody marked.
-- **FIELDS-19: a field label holding a `$` pattern breaks the sentence that
-  fills it.** `removalAnnouncement` (`panels/fieldCatalogLogic.ts:344`) and
-  the removal dialog's heading (`panels/RemoveFieldDialog.tsx:107`) each fill
-  a catalog sentence with `.replace("{field}", label)`. A string replacement
-  to `String.prototype.replace` expands `$&`, `$$`, `$'` and `` $` `` instead
-  of inserting the label as literal text. A label reading `Cost $&` turns
-  into the literal text `Cost {field}` inside the rendered sentence.
+- **FIELDS-19: a label holding a `$` pattern breaks a sentence that fills
+  it.** A string replacement to `String.prototype.replace` expands `$&`, `$$`,
+  `$'` and `` $` `` instead of inserting the label as literal text. A label
+  reading `Cost $&` turns into the literal text `Cost {field}` inside the
+  rendered sentence. This change fixed the removal sentences. Both
+  `removalAnnouncement` (`panels/fieldCatalogLogic.ts:346`) and the removal
+  dialog's heading (`panels/RemoveFieldDialog.tsx:116`) pass a replacer
+  function, `() => label`.
 
-  `git grep -n '\.replace("{' -- packages/web/src` counts 36 matching lines
-  across 11 files sharing the idiom. A line can carry two calls. Each of
-  `EntityTabs.tsx`'s two move sentences (`:523`, `:524`) chains a `{field}`
-  fill into a `{group}` fill on one line. The dialog heading's one call
-  splits across two lines instead, and the count misses it. Risk (Low): one
-  replacer function closes every site at once: `.replace("{field}", () =>
-  label)`.
+  Measured 2026-09-13, `packages/web/src` holds 54 `.replace("{` calls in 15
+  files. Twelve pass a replacer function: the five removal fills, and seven in
+  `panels/ChangeList.tsx`, `panels/ChangesView.tsx` and
+  `screens/VersionsScreen.tsx`. The other 42 pass a string, in 10 files. Six
+  calls split across lines, and two lines carry two calls each:
+  `EntityTabs.tsx`'s move sentences (`:541`, `:542`). The grep
+  `git grep -n '\.replace("{' -- packages/web/src` therefore matches 46 lines.
+
+  Two helpers build the placeholder in a template literal, which that grep
+  misses. The admin area's `tFill`
+  (`packages/web/src/areas/admin/catalog.ts:17`) passes a string to
+  `replaceAll`. The helper `fill` (`draft/changeSet.ts:171`) passes a replacer
+  function. Risk (Low): one replacer function closes every site that still
+  passes a string: `.replace("{field}", () => label)`.
 - **FIELDS-20: a second identical move announces nothing.** `moveField`
   (`panels/EntityTabs.tsx:503`) writes its sentence straight into the shared
   live region (`:521`), a pattern that predates this change. `removeField`

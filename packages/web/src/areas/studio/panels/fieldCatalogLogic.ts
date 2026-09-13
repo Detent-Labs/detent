@@ -339,10 +339,14 @@ export function focusAfterRemove(fields: DraftField[], fieldId: string): string 
  * One key per case under `panelsScreen`, matching the shape brief's copy
  * table: the bare form at zero, the singular at one, the plural above one.
  * `{count}` fills before `{field}`, so a label holding the text `{count}`
- * reads as the author typed it.
+ * reads as the author typed it. Each fill passes a replacer function, so
+ * `String.prototype.replace` expands no `$` pattern: a label holding `$&`
+ * reads as the author typed it too.
  */
 export function removalAnnouncement(label: string, fieldsInside: number): string {
-  if (fieldsInside === 0) return t("panelsScreen.fieldRemoved").replace("{field}", label);
-  if (fieldsInside === 1) return t("panelsScreen.fieldRemovedWithOne").replace("{field}", label);
-  return t("panelsScreen.fieldRemovedWithMany").replace("{count}", String(fieldsInside)).replace("{field}", label);
+  if (fieldsInside === 0) return t("panelsScreen.fieldRemoved").replace("{field}", () => label);
+  if (fieldsInside === 1) return t("panelsScreen.fieldRemovedWithOne").replace("{field}", () => label);
+  return t("panelsScreen.fieldRemovedWithMany")
+    .replace("{count}", () => String(fieldsInside))
+    .replace("{field}", () => label);
 }

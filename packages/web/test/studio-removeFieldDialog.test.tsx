@@ -72,6 +72,15 @@ describe("RemoveFieldDialog's heading", () => {
     expect(html).toContain("Remove the group “Processing (Fabrikam)”?");
     expect(html).not.toContain("Remove “Processing (Fabrikam)”?");
   });
+
+  // A string replacement would expand `$&` into the matched `{field}`. The
+  // markup escapes the label's `&` as `&amp;`.
+  it("keeps a label holding a $ pattern as the author typed it", () => {
+    const html = renderDialog({ label: "Cost $&" });
+
+    expect(html).toContain("Remove “Cost $&amp;”?");
+    expect(html).not.toContain("{field}");
+  });
 });
 
 describe("RemoveFieldDialog's facts", () => {

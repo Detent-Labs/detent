@@ -579,4 +579,11 @@ describe("removalAnnouncement", () => {
   it("keeps a label holding the literal text {count} as the author typed it", () => {
     expect(removalAnnouncement("{count} copies", 2)).toBe("{count} copies removed, with the 2 fields inside it.");
   });
+
+  // A string replacement would expand `$&` into the matched `{field}`.
+  it("keeps a label holding a $ pattern as the author typed it, in all three sentences", () => {
+    expect(removalAnnouncement("Cost $&", 0)).toBe("Cost $& removed.");
+    expect(removalAnnouncement("Cost $&", 1)).toBe("Cost $& removed, with the one field inside it.");
+    expect(removalAnnouncement("Cost $&", 2)).toBe("Cost $& removed, with the 2 fields inside it.");
+  });
 });

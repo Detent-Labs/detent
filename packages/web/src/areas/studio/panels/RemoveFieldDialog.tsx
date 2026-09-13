@@ -111,9 +111,11 @@ export function RemoveFieldDialog({ label, reach, triggerRef, onCancel, onConfir
   const fieldKey = reach.field.key;
   const hasCelOrSettings = reach.celReads > 0 || reach.pluginSettings > 0;
 
+  // A replacer function, so a label holding a `$` pattern such as `$&` fills
+  // in as the author typed it.
   const heading = t(isGroup ? "fieldCatalog.removeDialogHeadingGroup" : "fieldCatalog.removeDialogHeadingField").replace(
     "{field}",
-    label,
+    () => label,
   );
 
   return (
