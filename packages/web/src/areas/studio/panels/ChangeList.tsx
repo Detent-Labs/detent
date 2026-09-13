@@ -326,6 +326,10 @@ interface Props {
   onOpenRow?: (row: ChangeRow) => void;
 }
 
+// ponytail: every row renders its body and its Developer view's JSON into
+// markup, folded or not, with no windowing. Ceiling: a very large diff, such
+// as hundreds of rows after an import, renders slowly. Upgrade: window the
+// rows, or mount a row's body only while it stands open (design D6, Risks).
 export function ChangeList({ rows, heading, onOpenRow }: Props) {
   const listId = useId();
   const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set());

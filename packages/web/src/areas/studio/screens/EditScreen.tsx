@@ -971,6 +971,12 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, go, initial
               contentLocale={contentLocale}
               onCount={onChangesCount}
               onOpenRow={(row) => {
+                // ponytail: the open command opens the owning tab and selects
+                // nothing inside it, so the author finds the entity there by
+                // eye. Ceiling: a tab holding many entities of the row's kind.
+                // Upgrade: hand the row's anchor to the target tab's own
+                // selection (the steps rail's step, the entity rail's field)
+                // beside `openTabFromRow`.
                 const tab = tabForChangeGroup(row.group);
                 if (tab) openTabFromRow(tab);
               }}
