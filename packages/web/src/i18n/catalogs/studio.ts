@@ -819,6 +819,10 @@ export const en = {
   "changeList.open.contract": "Open {label} in the Contract tab",
   "changeList.developerView": "Developer view",
 
+  // The Versions screen's own waiting line, shown where its change list will
+  // stand while both compared bodies are in flight (process-version-inspection).
+  "versionsScreen.waiting": "Reading both versions…",
+
   "pathsView.source": "Source step",
   "pathsView.trigger": "Trigger",
   "pathsView.priority": "Priority",

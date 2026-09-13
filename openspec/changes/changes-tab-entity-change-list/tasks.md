@@ -27,7 +27,7 @@
 
 ## 5. The Versions screen
 
-- [ ] 5.1 Mount `ChangeList` in `VersionsScreen.tsx` with its waiting line, per D7. Drop the old list markup, its diff styles and the unused imports. Verify: typecheck passes, and `DIFF_KIND_FIRST_CODE_STYLE` is gone.
+- [x] 5.1 Mount `ChangeList` in `VersionsScreen.tsx` with its waiting line, per D7. Drop the old list markup, its diff styles and the unused imports. Verify: typecheck passes, and `DIFF_KIND_FIRST_CODE_STYLE` is gone.
 
 ## 6. Documents
 

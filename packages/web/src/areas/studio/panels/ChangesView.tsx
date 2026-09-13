@@ -118,10 +118,10 @@ export function ChangesView({ processId, token, draft, baseVersion, contentLocal
   // Base FIRST. `describeChanges` reads its `before` argument as the
   // published value and its `after` argument as the draft, so base-first runs
   // every row from the published value toward the draft — the direction a
-  // publish moves. `VersionsScreen` passes the draft first, which suits its
-  // neutral A-against-B framing and would read a newly added field here as
-  // removed. `describeChanges` JSON-copies both arguments, so memoizing on
-  // `state` and `draft` (rather than recomputing on every render) matters.
+  // publish moves. `VersionsScreen` also passes its base or its side A first
+  // (D7), so both screens agree on which side reads as before.
+  // `describeChanges` JSON-copies both arguments, so memoizing on `state` and
+  // `draft` (rather than recomputing on every render) matters.
   const rows = useMemo<ChangeRow[] | null>(() => {
     if (state.kind !== "loaded") return null;
     return describeChanges(stripCompiledContent(state.body as ProcessBody), draft, contentLocale);
