@@ -1,11 +1,11 @@
 ## 1. Reach and removal logic
 
 - [x] 1.1 Create `packages/web/src/areas/studio/draft/field-removal.ts` with `fieldRemovalReach` and `hasReach`. Follow design.md, "Reach is one pure walk over the draft". Add `packages/web/test/studio-fieldRemoval.test.ts`. Cover each kind, a group's subtree and one count per expression. Cover an unparseable expression, the config walk and an unknown id. Verify: the new cases pass.
-- [ ] 1.2 Add `removeFieldAndReferences` to the same module. Follow design.md, "One recipe collects, then cleans, then prunes". Test each reference kind, a nested group with notes and untouched entries of other fields. Test that an emptied `output` and `columnMapping` leave. Test that an emptied `outputMapping` stays, and CEL and configs stay unchanged. Verify: the new cases pass.
+- [x] 1.2 Add `removeFieldAndReferences` to the same module. Follow design.md, "One recipe collects, then cleans, then prunes". Test each reference kind, a nested group with notes and untouched entries of other fields. Test that an emptied `output` and `columnMapping` leave. Test that an emptied `outputMapping` stays, and CEL and configs stay unchanged. Verify: the new cases pass.
 - [ ] 1.3 In the same test file, run the recipe on `examples/it-offboarding.json`. Remove "Access Excel updated or prepared", then "Processing (Fabrikam)" from a fresh copy. Verify: `runValidation` reports the same issues after each removal as before it.
 - [x] 1.4 Add a pure `removalAnnouncement(label, fieldsInside)` to `panels/fieldCatalogLogic.ts`. Add its three sentence keys under `panelsScreen`, with the copy from design.md's shape brief. Verify: cases for zero, one and many fields pass.
 - [x] 1.5 Extend the reach cases. A field whose own rule reads its key counts no CEL read. A rule on a view entry the removal takes out counts none either. Cover two groups that share a key, a key-less group and a plugin-typed field's config. Verify: the new cases pass.
-- [ ] 1.6 Test that removing one of two groups sharing a key keeps the other group's card, members and notes. Verify: the new case passes.
+- [x] 1.6 Test that removing one of two groups sharing a key keeps the other group's card, members and notes. Verify: the new case passes.
 - [ ] 1.7 In the same test file, remove "Booking Status" from `examples/expense-approval.json`. Verify: its issues gain exactly two CEL issues, each naming `booking_status`.
 
 ## 2. Shared confirmation dialog

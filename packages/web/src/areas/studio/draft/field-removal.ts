@@ -1,4 +1,5 @@
 import { parseAst } from "workflow-engine/cel/check";
+import { removeFieldIn } from "../panels/fieldCatalogLogic";
 import { isCelNode, memberPath, type CelNode } from "../panels/shared/conditionLogic";
 import type { DraftStep } from "./createStep";
 import { draftFields, flattenDraftFields, type DraftField } from "./fields";
@@ -6,10 +7,12 @@ import type { Draft } from "./types";
 import { isDraftViewField, type DraftViewEntry } from "./view-layout";
 
 /**
- * What removing one field on the Fields tab reaches past the field catalog.
- * A removed field is the field the author removes, or any field below it.
- * `fieldRemovalReach` measures a removal on the draft before any write, and
- * `hasReach` tells a removal with reach from one without.
+ * What removing one field on the Fields tab reaches past the field catalog,
+ * and the removal itself. A removed field is the field the author removes, or
+ * any field below it. `fieldRemovalReach` measures a removal on the draft
+ * before any write, and `hasReach` tells a removal with reach from one
+ * without. `removeFieldAndReferences` makes the removal, and takes every id
+ * reference to a removed field along.
  */
 
 /** A removal's reach: the removed field, and one count per kind of reference. */
@@ -37,16 +40,19 @@ export interface FieldRemovalReach {
 }
 
 /**
- * What one removal takes from the catalog, collected from the catalog as it
- * stands. A removed group key is the non-empty key of a removed group that no
- * remaining group holds. `view-group-sync.ts::writeGroupKey` treats a key
- * another group holds the same way: that key still names a group.
+ * What one removal takes from the catalog, and what the catalog keeps,
+ * collected from the catalog as it stands. A removed group key is the
+ * non-empty key of a removed group that no remaining group holds.
+ * `view-group-sync.ts::writeGroupKey` treats a key another group holds the
+ * same way: that key still names a group.
  */
 interface Removal {
   /** The field the author removes. */
   field: DraftField;
   /** The removed field and every field below it. */
   fields: Set<DraftField>;
+  /** Every other field of the catalog, at every depth. */
+  staying: DraftField[];
   /** The id of every removed field. */
   ids: Set<string>;
   /** The removed group keys. */
@@ -58,14 +64,15 @@ function collectRemoval(draft: Draft, fieldId: string): Removal | undefined {
   const field = catalog.find((f) => f.id === fieldId);
   if (field === undefined) return undefined;
   const fields = new Set(flattenDraftFields([field]));
-  const heldKeys = new Set(catalog.filter((f) => f.type === "group" && !fields.has(f)).map((f) => f.key));
+  const staying = catalog.filter((f) => !fields.has(f));
+  const heldKeys = new Set(staying.filter((f) => f.type === "group").map((f) => f.key));
   const ids = new Set<string>();
   const groupKeys = new Set<string>();
   for (const f of fields) {
     if (f.id !== undefined) ids.add(f.id);
     if (f.type === "group" && f.key && !heldKeys.has(f.key)) groupKeys.add(f.key);
   }
-  return { field, fields, ids, groupKeys };
+  return { field, fields, staying, ids, groupKeys };
 }
 
 /** True for a view entry the removal takes out: its `ref` names a removed id,
@@ -146,7 +153,7 @@ function keyReader(keys: readonly string[]): (src: string) => boolean {
 export function fieldRemovalReach(draft: Draft, fieldId: string): FieldRemovalReach | undefined {
   const removal = collectRemoval(draft, fieldId);
   if (removal === undefined) return undefined;
-  const { field, fields, ids } = removal;
+  const { field, fields, staying, ids } = removal;
   const namesRemoved = (value: unknown) => typeof value === "string" && ids.has(value);
 
   // The walk below skips each object the removal takes along whole, and the
@@ -170,7 +177,6 @@ export function fieldRemovalReach(draft: Draft, fieldId: string): FieldRemovalRe
   const contract = draft.contract;
   const contractEntries = [...(contract?.inputFields ?? []), ...(contract?.outputFields ?? [])].filter(namesRemoved).length;
 
-  const staying = draftFields(draft).filter((f) => !fields.has(f));
   let columnMappings = 0;
   for (const f of staying) columnMappings += Object.values(f.columnMapping ?? {}).filter(namesRemoved).length;
 
@@ -203,4 +209,70 @@ export function fieldRemovalReach(draft: Draft, fieldId: string): FieldRemovalRe
 export function hasReach(reach: FieldRemovalReach): boolean {
   const { fieldsInside, steps, writers, contractEntries, columnMappings, celReads, pluginSettings } = reach;
   return [fieldsInside, steps, writers, contractEntries, columnMappings, celReads, pluginSettings].some((count) => count > 0);
+}
+
+/** Deletes each entry of `map` that `named` picks. True when that left the map
+ * empty: a map that lost no entry answers false, even an empty one. */
+function dropEntries(map: object, named: (key: string, value: unknown) => boolean): boolean {
+  const record = map as Record<string, unknown>;
+  const dropped = Object.keys(record).filter((key) => named(key, record[key]));
+  for (const key of dropped) delete record[key];
+  return dropped.length > 0 && Object.keys(record).length === 0;
+}
+
+/**
+ * Removes `fieldId` from the catalog, with every id reference to a removed
+ * field, as a `mutate` recipe: it writes the draft it receives. An id no field
+ * carries leaves the draft unchanged.
+ *
+ * The removed ids and group keys come from the catalog as it stands, before
+ * any write, since the prune changes what the catalog answers. The writes then
+ * run in this order:
+ *
+ * 1. Every step's view loses each entry whose `ref` names a removed id, or
+ *    whose `group` names a removed group key. A note follows the same rule.
+ * 2. Each `output` in the five action positions loses its keys naming a
+ *    removed id. An `output` this empties leaves its action.
+ * 3. Each `subprocess.outputMapping` loses the same keys. It stays when it
+ *    empties, since the definition contract requires the key.
+ * 4. `contract.inputFields` and `contract.outputFields` lose each removed id.
+ * 5. Each field that stays loses the `columnMapping` entries whose target is a
+ *    removed id. A `columnMapping` this empties leaves its field.
+ * 6. `removeFieldIn` prunes the field, with every field below it.
+ *
+ * The removed group keys cover every nesting level of a card's members, so
+ * one pass over each view matches what `view-tree.ts::removeViewEntry` does
+ * for a card. A CEL expression and a plugin `config` keep their text where
+ * they name a removed key or id: each needs the author's decision, and
+ * `fieldRemovalReach` counts them.
+ */
+export function removeFieldAndReferences(draft: Draft, fieldId: string): void {
+  const removal = collectRemoval(draft, fieldId);
+  if (removal === undefined) return;
+  const { staying, ids } = removal;
+  const keyedByRemoved = (key: string) => ids.has(key);
+  const targetsRemoved = (_column: string, target: unknown) => typeof target === "string" && ids.has(target);
+  const steps = draft.workflow?.steps ?? [];
+
+  for (const step of steps) {
+    if (step.view?.fields !== undefined) step.view.fields = step.view.fields.filter((entry) => !takesEntry(removal, entry));
+  }
+
+  for (const action of steps.flatMap(stepActions)) {
+    if (action.output !== undefined && dropEntries(action.output, keyedByRemoved)) delete action.output;
+  }
+
+  for (const step of steps) {
+    if (step.subprocess?.outputMapping !== undefined) dropEntries(step.subprocess.outputMapping, keyedByRemoved);
+  }
+
+  const contract = draft.contract;
+  if (contract?.inputFields !== undefined) contract.inputFields = contract.inputFields.filter((entry) => !ids.has(entry));
+  if (contract?.outputFields !== undefined) contract.outputFields = contract.outputFields.filter((entry) => !ids.has(entry));
+
+  for (const f of staying) {
+    if (f.columnMapping !== undefined && dropEntries(f.columnMapping, targetsRemoved)) delete f.columnMapping;
+  }
+
+  draft.fields = removeFieldIn(draft.fields ?? [], fieldId);
 }
