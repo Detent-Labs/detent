@@ -79,7 +79,7 @@ describe("RemoveFieldDialog's facts", () => {
     const html = renderDialog({ label: "Booking status", reach: reach({ key: "booking_status" }) });
 
     expect(html).toContain("Booking status");
-    expect(html).toContain("<code>booking_status</code>");
+    expect(html).toMatch(/<code[^>]*>booking_status<\/code>/);
   });
 
   it("omits the key element for a field with an empty key", () => {
@@ -166,6 +166,17 @@ describe("RemoveFieldDialog's accessible name and focus", () => {
 
     expect(described).not.toBeNull();
     expect(html).toContain(`<h2 id="${described![1]}"`);
+  });
+
+  it("points aria-describedby at the facts list and the notes", () => {
+    const html = renderDialog();
+    const described = /aria-describedby="([^"]+)"/.exec(html);
+
+    expect(described).not.toBeNull();
+    const [factsId, notesId] = described![1].split(" ");
+
+    expect(html).toContain(`<dl id="${factsId}"`);
+    expect(html).toContain(`<div id="${notesId}"`);
   });
 
   it("primes Cancel, and nothing else", () => {

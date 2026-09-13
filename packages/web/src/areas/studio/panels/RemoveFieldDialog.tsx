@@ -43,6 +43,9 @@ const styles = stylex.create({
     minWidth: 0,
     overflowWrap: "anywhere",
   },
+  studioMono: {
+    fontFamily: fonts.mono,
+  },
   dialogNote: {
     color: colors.textMuted,
     fontSize: "0.9rem",
@@ -58,6 +61,10 @@ const styles = stylex.create({
 
 /** One heading element either way, so one id names it regardless of kind. */
 const HEADING_ID = "remove-field-confirm-heading";
+/** `aria-describedby` on the dialog points at these two: the facts list and
+ * the notes below it. */
+const FACTS_ID = "remove-field-confirm-facts";
+const NOTES_ID = "remove-field-confirm-notes";
 
 interface Props {
   /**
@@ -115,10 +122,11 @@ export function RemoveFieldDialog({ label, reach, triggerRef, onCancel, onConfir
       className={`studio-dialog ${dialogProps.className}`}
       style={dialogProps.style}
       aria-labelledby={HEADING_ID}
+      aria-describedby={`${FACTS_ID} ${NOTES_ID}`}
       onCancel={onCancel}
     >
       <h2 id={HEADING_ID}>{heading}</h2>
-      <dl {...stylex.props(styles.dialogFacts)}>
+      <dl id={FACTS_ID} {...stylex.props(styles.dialogFacts)}>
         <dt {...stylex.props(styles.dialogFactsDt)}>
           {t(isGroup ? "fieldCatalog.removeDialogGroupTerm" : "fieldCatalog.removeDialogFieldTerm")}
         </dt>
@@ -127,7 +135,7 @@ export function RemoveFieldDialog({ label, reach, triggerRef, onCancel, onConfir
           {fieldKey && (
             <>
               {" "}
-              <code>{fieldKey}</code>
+              <code {...stylex.props(styles.studioMono)}>{fieldKey}</code>
             </>
           )}
         </dd>
@@ -174,14 +182,16 @@ export function RemoveFieldDialog({ label, reach, triggerRef, onCancel, onConfir
           </>
         )}
       </dl>
-      <p {...stylex.props(styles.dialogNote)}>{t("fieldCatalog.removeDialogNoteAlways")}</p>
-      {isGroup && <p {...stylex.props(styles.dialogNote)}>{t("fieldCatalog.removeDialogNoteGroup")}</p>}
-      {hasCelOrSettings && (
-        <>
-          <p {...stylex.props(styles.dialogNote)}>{t("fieldCatalog.removeDialogNoteCelKept")}</p>
-          <p {...stylex.props(styles.dialogNote)}>{t("fieldCatalog.removeDialogNoteCheckPublish")}</p>
-        </>
-      )}
+      <div id={NOTES_ID}>
+        <p {...stylex.props(styles.dialogNote)}>{t("fieldCatalog.removeDialogNoteAlways")}</p>
+        {isGroup && <p {...stylex.props(styles.dialogNote)}>{t("fieldCatalog.removeDialogNoteGroup")}</p>}
+        {hasCelOrSettings && (
+          <>
+            <p {...stylex.props(styles.dialogNote)}>{t("fieldCatalog.removeDialogNoteCelKept")}</p>
+            <p {...stylex.props(styles.dialogNote)}>{t("fieldCatalog.removeDialogNoteCheckPublish")}</p>
+          </>
+        )}
+      </div>
       <div {...stylex.props(styles.controls)}>
         <button type="button" className="btn btn-secondary btn-destructive" onClick={onConfirm}>
           {t(isGroup ? "fieldCatalog.removeDialogConfirmGroup" : "fieldCatalog.removeDialogConfirmField")}
