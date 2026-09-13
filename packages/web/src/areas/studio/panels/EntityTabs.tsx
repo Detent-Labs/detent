@@ -179,6 +179,12 @@ interface PanelsRailFieldRowProps {
   /** The resolved label, or the "unnamed field" fallback already applied. */
   label: string;
   typeLabel: string | undefined;
+  /** The resolved label of the field that holds this entry's field, given for
+   * a nested entry alone. It reaches the button's accessible name as hidden
+   * text after the kind name and prints nothing visible. A screen reader hears
+   * no indent, and a field past the rail's indent cap draws at depth 0
+   * (design.md, "A nested rail entry names its group in hidden text"). */
+  groupLabel?: string;
   depth: 0 | 1;
   issues: number;
   selected: boolean;
@@ -204,9 +210,10 @@ interface PanelsRailFieldRowProps {
  * stays in the definition half once an author selects that field. The kind
  * name is the icon's tooltip, and it stays in the button's accessible name
  * as hidden text (design.md, decision: "The kind name stays inside the
- * button, visually hidden"). Pulled out of the render loop so it can be
- * exercised directly, the same reason `FormEditorStrip` sits beside
- * `FormEditorScreen`.
+ * button, visually hidden"). A nested entry's button also names the group
+ * holding its field, as hidden text after the kind name. Pulled out of the
+ * render loop so it can be exercised directly, the same reason
+ * `FormEditorStrip` sits beside `FormEditorScreen`.
  *
  * The row moves a field by drag alone; the keyboard route is the move
  * control in the field's own editor (`spa-accessibility`). The wrapper still
@@ -217,6 +224,7 @@ export function PanelsRailFieldRow({
   id,
   label,
   typeLabel,
+  groupLabel,
   kindIcon: KindIcon,
   depth,
   issues,
@@ -266,6 +274,9 @@ export function PanelsRailFieldRow({
           {label}
         </span>
         {typeLabel && <span {...stylex.props(styles.visuallyHidden)}>{typeLabel}</span>}
+        {groupLabel !== undefined && (
+          <span {...stylex.props(styles.visuallyHidden)}>{t("panelsScreen.railEntryGroup").replace("{group}", groupLabel)}</span>
+        )}
         {issues > 0 && (
           <span {...stylex.props(styles.railIssues)} aria-label={`${issues} ${t("panelsScreen.issueMark")}`}>
             {issues}
@@ -448,12 +459,17 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
             // kind picker shows for this field.
             const typeLabel = field ? fieldKindWord(field) : undefined;
             const kindIcon = field ? fieldKindIcon(field) : undefined;
+            // The field that holds this one, at any depth. A field past the
+            // indent cap draws at depth 0, and this still names the group
+            // that holds it rather than the root.
+            const parentId = parentIdOf(draft.fields ?? [], row.id);
             return (
               <li key={row.id}>
                 <PanelsRailFieldRow
                   id={railEntryId(row.id)}
                   label={label || t("panelsScreen.unnamedField")}
                   typeLabel={typeLabel}
+                  groupLabel={parentId === undefined ? undefined : fieldWord(parentId)}
                   kindIcon={kindIcon}
                   depth={row.depth}
                   issues={rowIssues}

@@ -424,6 +424,7 @@ export const en = {
   "panelsScreen.unnamedField": "(unnamed field)",
   "panelsScreen.unnamedDataSource": "(unnamed data source)",
   "panelsScreen.issueMark": "issues",
+  "panelsScreen.railEntryGroup": "in {group}",
   "panelsScreen.moveTargetLabel": "Move this field to",
   "panelsScreen.moveTargetTopLevel": "Top level",
   "panelsScreen.movedIntoGroup": "{field} moved into {group}.",

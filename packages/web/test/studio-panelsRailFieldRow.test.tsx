@@ -72,6 +72,21 @@ describe("PanelsRailFieldRow", () => {
     expect(html.slice(0, html.indexOf(">Number<"))).toContain("visuallyHidden");
   });
 
+  // A screen reader hears no indent, so a nested entry names its group in the
+  // button's accessible name, as hidden text after the kind name (design.md,
+  // "A nested rail entry names its group in hidden text").
+  it("names a given group as hidden text inside the button, and no group without one", () => {
+    const html = renderToStaticMarkup(<PanelsRailFieldRow {...BASE} depth={1} groupLabel="Processing (Fabrikam)" />);
+    expect(html).toContain("in Processing (Fabrikam)");
+    const at = html.indexOf(">in Processing (Fabrikam)<");
+    expect(at).toBeGreaterThan(html.indexOf(">Number<"));
+    expect(at).toBeLessThan(html.indexOf("</button>"));
+    expect(html.slice(html.lastIndexOf("<span", at), at)).toContain("visuallyHidden");
+
+    const withoutGroup = renderToStaticMarkup(<PanelsRailFieldRow {...BASE} depth={1} />);
+    expect(withoutGroup).not.toMatch(/>in [^<]*</);
+  });
+
   it("renders no icon for a row naming no field", () => {
     const html = renderToStaticMarkup(<PanelsRailFieldRow {...BASE} kindIcon={undefined} typeLabel={undefined} />);
     expect(html).not.toContain("aria-hidden");

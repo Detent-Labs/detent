@@ -86,7 +86,9 @@ that same line. The issue mark SHALL follow the label there.
 
 The entry SHALL print neither the kind name nor a group's name as visible
 text. The indent alone SHALL show the group. The kind name SHALL stay the
-icon's tooltip, and it SHALL stay part of the entry's accessible name.
+icon's tooltip, and it SHALL stay part of the entry's accessible name. A
+nested entry's accessible name SHALL also carry the name of the group that
+holds its field. The indent shows that group to a sighted author alone.
 
 The row SHALL NOT print the field's key. The key stays in the definition
 half's "What this field asks" zone, once an author selects that field. The
@@ -211,6 +213,12 @@ empty-key field did before.
 - **WHEN** a draft carries a group field holding two fields
 - **THEN** both child entries indent once under the group's entry
 - **AND** neither child entry prints the group's name
+
+#### Scenario: A nested entry's accessible name carries its group's name
+
+- **WHEN** a draft carries a group field holding a field
+- **THEN** the child entry's accessible name carries the group's name
+- **AND** the entry prints no group name as visible text
 
 #### Scenario: Removing a field selects its neighbour
 

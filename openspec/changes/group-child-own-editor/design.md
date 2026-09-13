@@ -247,6 +247,23 @@ same count in `docs/decisions.md` follows.
 label. The expectation becomes 7, and the comment above it names the sites
 that remain.
 
+### A nested rail entry names its group in hidden text
+
+A group's editor used to list its children in a `<fieldset>`, which told a
+screen reader what the group holds. Now only the rail's indent shows which
+group holds a field, and a screen reader hears no indent. The rail entry
+component, `PanelsRailFieldRow`, therefore takes an optional `groupLabel`. The
+entry prints it as visually hidden text after the kind name, through the
+catalog key `panelsScreen.railEntryGroup` ("in {group}").
+
+The tab passes the resolved label of a nested entry's parent, found through
+`parentIdOf`. A field past the rail's indent cap therefore names the group that
+holds it.
+
+Considered: a nested `<ul>` inside each group's `<li>`. A field past the
+rail's cap draws at depth 0, so a nested list would place it under the root.
+Only text names its real group.
+
 ### Pure logic gets assertions, and the gestures get a walk
 
 `studio-fieldCatalogLogic.test.ts` covers `neighbourAfterRemove`: the next
