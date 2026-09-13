@@ -1311,6 +1311,12 @@ stage-by-stage status.
   `.impeccable/config.json`'s `design-system-color` ignore for `#726e6e`
   stays until all five move to the role.
 
+  The dormant stamp also misses AA on a hovered row. Measured 2026-09-13 on
+  the Versions screen's change list, it reads 4.51:1 at rest. On the ledger
+  hover wash, `rgb(234, 233, 233)`, it reads 4.16:1. Every register row that
+  carries a dormant stamp and washes on hover shares that gap. `DESIGN.md`
+  pins `#726e6e`, so retuning the tone is a design change of its own.
+
 ## Open from the 2026-08-18 code review (each needs its own OpenSpec change)
 
 All ten items on the Prioritized Action List of
@@ -1756,6 +1762,49 @@ paths under `panels/`, `draft/` and `screens/` start at
   that makes N + 2 tree walks and N scans of the check list. Risk
   (Informational): the cost grows with the square of the catalog's size and
   stays harmless at 51 entries.
+
+## Open from the 2026-09-13 Changes tab audit (each needs its own OpenSpec change)
+
+The change `changes-tab-entity-change-list` ran browser walks,
+`/impeccable critique`, `/impeccable audit` and `web-design-guidelines` on
+the Studio Changes tab and the Versions screen on 2026-09-13. Every item
+below predates that change or belongs to another component. The `CHANGES-n`
+tags are local to this section; paths under `panels/` and `screens/` start at
+`packages/web/src/areas/studio/`.
+
+- **CHANGES-1: the Checks tab's hidden label widens the page at 400px.**
+  FIELDS-2 records the recipe. The hidden "blocking a publish" text sits at
+  `panels/ProcessTabRow.tsx:219`. Measured 2026-09-13 at 400px, on the Changes
+  tab of a draft with blocking checks, `document.documentElement.scrollWidth`
+  read 905. The page scrolled 505px sideways, and hiding that one span gave
+  400. Risk (Medium): while Checks counts a blocker, a narrow window scrolls
+  sideways into blank ground on every tab.
+- **CHANGES-2: every tab body clips the edge of a focus ring.** The tab body
+  scrolls and sets no inline padding (`screens/EditScreen.tsx:180`). The
+  shell's 2px ring at a 2px offset (`packages/web/src/shell/global.css:37`)
+  loses its edge against either side of that box. On the Changes tab it cuts
+  the Expand all command's right edge, and at 400px the open command's left
+  edge. The change list's row summary insets its own ring instead.
+  This is RAIL-3 and FIELDS-4 on the tab body itself. Risk (Low): the ring
+  still meets WCAG 2.4.7.
+- **CHANGES-3: the Versions screen scrolls sideways at 400px.** Its six-column
+  table sits in no scroll box of its own (`screens/VersionsScreen.tsx`).
+  Measured 2026-09-13 at 400px, the table reached x=441 and the page scrolled
+  41px.
+
+  The hash column prints a machine value in the written face. Most of
+  the screen's text skips the studio catalog. That covers the heading, the
+  back link, the column headers and the three commands under the table. It
+  also covers Export and the loading, empty and no-difference lines. Risk
+  (Medium): the page scrolls sideways, and a UI-string override cannot reach
+  those strings.
+- **CHANGES-4: no studio waiting line reaches a screen reader.** Each one is a
+  plain paragraph with no live region. The Changes tab's line sits at
+  `panels/ChangesView.tsx:135`, and the Versions screen's two at
+  `screens/VersionsScreen.tsx:268` and `:349`. The process surface, the
+  Processes screen, the Tools screen and the migration plan screen draw
+  theirs the same way. Risk (Low): a screen reader hears nothing while a
+  body loads (WCAG 4.1.3).
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 
