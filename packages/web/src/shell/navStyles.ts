@@ -1,16 +1,18 @@
 import * as stylex from "@stylexjs/stylex";
 import { colors, space } from "form-ui/tokens.stylex";
 
-/** `.shell-nav`, its `[aria-current="page"]` state and its sub-30rem
- * collapse, from `shell.css`. Declared once; every area root imports it
- * (design.md D9), studio included. The attribute condition applies
- * directly to each nav button rather than through a descendant selector:
- * only a nav button ever carries `aria-current="page"` in these roots. */
+/** `.shell-nav` and its `[aria-current="page"]` state, from `shell.css`.
+ * Declared once; every area root imports it (design.md D9), studio included.
+ * The nav takes none of the header's free room, which the account group
+ * holds, and its buttons keep one line. At 30rem and below it moves to a line
+ * of its own, under the register tab and the account group. The attribute
+ * condition applies directly to each nav button rather than through a
+ * descendant selector: only a nav button ever carries `aria-current="page"`
+ * in these roots. */
 export const navStyles = stylex.create({
   nav: {
     display: "flex",
     gap: space.s2,
-    flex: 1,
     order: { default: 0, "@media (max-width: 30rem)": 3 },
     flexBasis: { default: "auto", "@media (max-width: 30rem)": "100%" },
   },

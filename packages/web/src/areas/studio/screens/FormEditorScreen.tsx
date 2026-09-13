@@ -55,9 +55,10 @@ import { FormTabStrip, formTabDomId, formTabPanelDomId } from "../panels/FormTab
 type DraftStep = DraftOf<Step>;
 type DraftView = DraftOf<View>;
 
-/** The width below which the preview no longer fits beside the canvas. The
- * same breakpoint the step page and the entity tabs already turn at. */
-const PREVIEW_NARROW = "@media (max-width: 64rem)";
+/** The width at and below which the preview no longer fits beside the canvas.
+ * In three columns under it, a card's field key wraps. `FormPreview.tsx`
+ * declares the same constant, so the preview's divider turns with this grid. */
+const PREVIEW_NARROW = "@media (max-width: 80rem)";
 
 const styles = stylex.create({
   formStripOverride: {
@@ -157,9 +158,8 @@ const styles = stylex.create({
     color: colors.textMuted,
   },
   // Three columns: the palette, the canvas, and the participant preview in
-  // the trailing pane (`studio-form-editor`). Below the breakpoint the
-  // preview gives up its column and stands under the canvas, the same turn
-  // the step page and the entity tabs already make at this width.
+  // the trailing pane (`studio-form-editor`). At 80rem and below the preview
+  // gives up its column and stands under the canvas, which takes its width.
   formEditorBody: {
     display: "grid",
     gridTemplateColumns: { default: "16rem minmax(0, 1fr) minmax(0, 22rem)", [PREVIEW_NARROW]: "16rem minmax(0, 1fr)" },

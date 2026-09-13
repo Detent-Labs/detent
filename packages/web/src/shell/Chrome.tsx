@@ -7,8 +7,10 @@ import type { UiLocale } from "../i18n/locale.js";
 import * as stylex from "@stylexjs/stylex";
 import { colors, fonts, space, shadow } from "form-ui/tokens.stylex";
 
-/** `.shell-header` and `.shell-tab` from `shell.css`, as StyleX. The header's
- * one narrow-viewport rule sits on the property it changes. */
+/** `.shell-header` and `.shell-tab` from `shell.css`, as StyleX. The header
+ * wraps at every width. The account group alone takes a line's free room,
+ * and the identity span contains its inline size: a line breaks on the span's
+ * 6rem floor, never on the actor's whole name. */
 const styles = stylex.create({
   header: {
     display: "flex",
@@ -21,7 +23,7 @@ const styles = stylex.create({
     borderBottomStyle: "solid",
     borderBottomColor: colors.divider,
     backgroundColor: colors.surfaceMuted,
-    flexWrap: { default: "nowrap", "@media (max-width: 30rem)": "wrap" },
+    flexWrap: "wrap",
   },
   tab: {
     fontFamily: fonts.mono,
@@ -41,11 +43,14 @@ const styles = stylex.create({
     display: "flex",
     alignItems: "center",
     gap: space.s2,
-    marginLeft: "auto",
+    flexGrow: 1,
     minWidth: 0,
   },
   accountName: {
     fontFamily: fonts.body,
+    contain: "inline-size",
+    flexGrow: 1,
+    textAlign: "end",
     minWidth: "6rem",
     overflow: "hidden",
     textOverflow: "ellipsis",
@@ -150,7 +155,8 @@ interface ChromeProps {
   onLogout: () => void;
   onGoToArea: (area: Area) => void;
   onGoToProfile: () => void;
-  /** The area's own navigation, rendered on the left of the one header row. */
+  /** The area's own navigation, rendered after the register tab. Its buttons
+   * keep one line while the header around them wraps. */
   nav?: ReactNode;
   children: ReactNode;
 }
@@ -208,8 +214,9 @@ export function Chrome({ area, roles, session, locale, onLocaleChange, onLogout,
         <span {...stylex.props(styles.tab)}>{t(locale, `area.${area}`)}</span>
         {nav}
         <div {...stylex.props(styles.accountGroup)}>
-          <span {...stylex.props(styles.accountName, identity.mono && styles.accountNameId)} title={identity.text}>
-            {identity.text}
+          {/* The outer span grows into the line's free room; the tooltip stays on the name itself. */}
+          <span {...stylex.props(styles.accountName, identity.mono && styles.accountNameId)}>
+            <span title={identity.text}>{identity.text}</span>
           </span>
           <div {...stylex.props(styles.account)}>
             <button

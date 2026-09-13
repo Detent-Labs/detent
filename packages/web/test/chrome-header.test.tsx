@@ -39,4 +39,15 @@ describe("Chrome's header", () => {
     const headerHtml = html.slice(html.indexOf("<header"), html.indexOf("</header>"));
     expect(headerHtml).toContain("Tasks");
   });
+
+  it("puts the name's tooltip on an inner span that holds the actor's name alone", () => {
+    const html = renderChrome();
+    const headerHtml = html.slice(html.indexOf("<header"), html.indexOf("</header>"));
+
+    // The identity span grows into the line's free room, so a `title` on it
+    // would raise the tooltip anywhere in that room. The inner span measures
+    // the name alone.
+    expect(headerHtml).toMatch(/<span\b[^>]*><span\b[^>]*\btitle="Ada Lovelace"[^>]*>Ada Lovelace<\/span><\/span>/);
+    expect(headerHtml.match(/\btitle="/g)?.length ?? 0).toBe(1);
+  });
 });
