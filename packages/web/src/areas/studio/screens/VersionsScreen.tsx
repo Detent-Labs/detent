@@ -95,9 +95,6 @@ const styles = stylex.create({
     marginBottom: space.s3,
     alignItems: "center",
   },
-  studioError: {
-    color: colors.refusal,
-  },
 });
 
 interface VersionsScreenProps {
@@ -342,7 +339,13 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized }: V
           </div>
         </>
       )}
-      {error && <p {...stylex.props(styles.studioError)}>{error}</p>}
+      {/* A diff or export failure reports where the change list would appear, as the Changes tab's does. */}
+      {error && (
+        <div {...stylex.props(styles.errorBanner)} role="alert">
+          <span {...stylex.props(styles.errorBannerStamp)}>{t("error.failed")}</span>
+          <span {...stylex.props(styles.errorBannerMessage)}>{error}</span>
+        </div>
+      )}
       {waiting && <p {...stylex.props(styles.studioEmpty)}>{t("versionsScreen.waiting")}</p>}
       {comparison &&
         (comparison.rows.length === 0 ? (
