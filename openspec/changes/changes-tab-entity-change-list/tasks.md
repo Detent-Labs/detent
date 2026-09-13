@@ -7,7 +7,7 @@
 
 - [x] 2.1 Write `packages/web/test/studio-changeSet.test.ts`, per D9. Verify: each case fails first.
 - [x] 2.2 Add every word `draft/changeSet.ts` returns to the studio catalog, per D4 and D5. Verify: typecheck passes.
-- [ ] 2.3 Build pairing and row ownership, per D1 to D3, without D2's two fallback rules. Verify: the anchor and ownership cases pass.
+- [x] 2.3 Build pairing and row ownership, per D1 to D3, without D2's two fallback rules. Verify: the anchor and ownership cases pass.
 - [ ] 2.4 Add order detection, per D4. Verify: the reorder case and the moved-field case pass.
 - [ ] 2.5 Add the D5 value rules, the guided words from D3 and the `locale` argument. Verify: the locale, guided-word and JSON-key cases pass.
 - [ ] 2.6 Complete the D5 word table until the coverage walk from 2.1 passes. Verify: it names every declared key it checks.
