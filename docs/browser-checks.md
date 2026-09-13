@@ -2838,8 +2838,8 @@ and it drops its right-hand rule. The rail caps at 20rem. It scrolls inside
 that cap rather than pushing the editor off screen.
 
 Pass: `document.documentElement.scrollWidth` equals `clientWidth` at 1440,
-900 and 420. The page never scrolls sideways. Measured 2026-09-04: 1440/1440,
-900/900, 420/420.
+900 and 420. The page never scrolls sideways. Measured 2026-09-04 and again
+2026-09-13: 1440/1440, 900/900, 420/420.
 
 A media query is invisible to a static render, and so is the width that
 triggers it.
@@ -3621,6 +3621,94 @@ and choose "Create draft". Studio opens the draft at
    inside it.
 9. Discard the `laptop_inventory` draft the same way step 5 discarded the
    first one.
+
+### Hidden text stays inside its scroll region (visually-hidden-text-page-bounds)
+
+Source: `visually-hidden-text-page-bounds` task 2.1.
+
+The test `packages/web/test/hiddenTextContainment.test.ts` pins
+`position: relative` on the four known containers, but `bun:test` lays out
+no page. A new scroll container around hidden text needs a browser to catch
+it. This probe walks every element in one `page.evaluate`:
+
+```js
+() => {
+  const isHidden = (el) => { const cs = getComputedStyle(el); return cs.position === 'absolute' && (cs.clipPath === 'inset(50%)' || cs.clip === 'rect(0px, 0px, 0px, 0px)') && el.offsetWidth <= 1; };
+  const clips = (el) => { const cs = getComputedStyle(el); return /(auto|scroll|hidden|clip)/.test(cs.overflowX + ' ' + cs.overflowY); };
+  const escaped = [];
+  for (const el of document.querySelectorAll('body *')) {
+    if (!isHidden(el) || el.getBoundingClientRect().width === 0 && el.getClientRects().length === 0) continue;
+    let c = el.parentElement; while (c && !clips(c)) c = c.parentElement;
+    const cb = el.offsetParent;
+    if (c && !(cb && (cb === c || c.contains(cb)))) escaped.push(el.textContent.slice(0, 40));
+  }
+  const d = document.documentElement;
+  return { nodes: document.querySelectorAll('*').length, scrollWidth: d.scrollWidth, clientWidth: d.clientWidth, scrollHeight: d.scrollHeight, clientHeight: d.clientHeight, escaped };
+}
+```
+
+The `nodes` count is the positive control. A zero there means the probe ran
+against no page. The `escaped` list names every hidden element whose
+containing block sits outside its nearest clipping ancestor. An element
+inside a closed tab body has no client rect, so the probe skips it
+there. It passes on an empty `escaped` list, and on `scrollWidth` and
+`scrollHeight` equal to their client counterparts.
+
+See this file's "Before you start" section for the build and the address.
+Seed the database and sign in as `demo-superuser@example.test`, password
+`seed-demo-password`.
+
+Open the IT Offboarding draft on the Canvas tab
+(`docs/browser-checks.md:3112`). Add a step from the canvas bar. Leave it
+unconnected, so the Checks tab counts a blocker. Narrow the window to
+400px. Run the probe on every tab in turn. A reload drops the unsaved step,
+so add it again after one.
+
+Pass: `scrollWidth` equals `clientWidth` on every tab. The Checks tab's
+hidden "blocking a publish" text scrolled the page to 900–912 of 400 before
+this change. Measured 2026-09-13 at 400x800: 400/400 on all ten tabs.
+
+Open the Fields tab, then the Changes tab. Choose "Expand all" there to open
+every row. Resize to 1280x720 and run the probe on both tabs.
+
+Pass: `scrollHeight` equals `clientHeight` on both. The Fields rail
+scrolled the page to 2306 of 720 before this change. Measured 2026-09-13:
+720/720 on both.
+
+Narrow the window to 400x800 and run the probe on both tabs again.
+
+Pass: `scrollHeight` equals `clientHeight` there too. The Fields rail
+reached 2539 of 800 before this change, and the Changes tab's hidden
+"Before:"/"After:" text reached 849 of 800. Measured 2026-09-13: 800/800 on
+both.
+
+Scroll the entity rail down, inside its own box, on the Fields tab. Read
+`getBoundingClientRect().top` of one hidden kind word and its row, before
+the scroll and after it. Run the probe again.
+
+Pass: `escaped` stays empty, before the scroll and after it, and the two
+rects move together. Measured 2026-09-13: a 400px wheel turn moved one
+hidden kind word and its row 400px each.
+
+Add `requester` and `finance-approver` to the account's own roles for this
+walk. The auth CLI in `src/auth/cli.ts`'s `set-roles` replaces the whole
+list. Note the account's current roles first, on `/admin/users`'s
+`demo-superuser@example.test` row. Pass that list back with `requester` and
+`finance-approver` appended.
+
+Manager Approval resolves through `org.manager-of-starter`, the starter's
+own manager. Set the account's manager to `demo-admin@example.test` with
+`set-manager`. Sign in as `demo-admin@example.test` to approve that step,
+then back in as the superuser to continue. Restore the superuser's original
+roles with `set-roles` when the walk finishes.
+
+Open `purchase-requisition`'s Player at 400px. Create an instance and
+drive it to Finance Review (`docs/browser-checks.md:3329`). Claim the step.
+Submit from "Review" with Finance Note, on "Decision", left empty.
+
+Pass: `escaped` stays empty, and `scrollWidth` equals `clientWidth`. The
+Decision tab's hidden failed-field count renders without widening the
+page. Measured 2026-09-13: 400/400, with "1 issue" as the hidden count.
 
 ### Create draft writes one draft per press (`process-list-create-once`)
 
