@@ -270,7 +270,7 @@ describe("A card's miniature", () => {
     expect(formCardRows(withGroup, [], "en")[0]?.requiredCount).toBe(1);
   });
 
-  it("reads requiredCount off today's DRAFT, one required entry among four", () => {
+  it("reads requiredCount off DRAFT, one required entry among four", () => {
     expect(formCardRows(DRAFT, [], "en")[0]?.requiredCount).toBe(1);
   });
 });

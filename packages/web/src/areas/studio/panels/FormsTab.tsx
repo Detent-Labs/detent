@@ -18,7 +18,7 @@ const styles = stylex.create({
     paddingInline: space.s3,
     // Stretch, not start: a row of plates that ends at different heights puts
     // its open controls on different lines, and alignment is what organizes
-    // this page (`design-language.md`). The control below takes the slack.
+    // this page (`design-language.md`). The foot row takes the slack.
     alignItems: "stretch",
     overflowY: "auto",
     overscrollBehavior: "contain",
@@ -129,9 +129,9 @@ const styles = stylex.create({
   },
   // A required entry's mark fills solid instead of drawing an outline, so the
   // difference carries in fill as well as color (WCAG 1.4.1). Both colors
-  // clear the 3:1 minimum a graphic needs against the muted ground; the plain
-  // accent role reads under the 4.5:1 AA text minimum here, but a filled mark
-  // is a graphic, not text.
+  // clear the 3:1 minimum a graphic needs against the muted ground; see the
+  // `--color-accent-on-muted` comment in `tokens.css` for why accentOnMuted is
+  // the role read here.
   miniatureRequired: {
     backgroundColor: colors.accentOnMuted,
     borderColor: colors.accentOnMuted,
@@ -162,9 +162,9 @@ const styles = stylex.create({
   },
   // The foot row: the count on the left, the authoring command on the right
   // (design.md: "The count moves to the foot"). `marginBlockStart: "auto"`
-  // sits on the row rather than on the button alone now, so every plate in a
-  // row puts its foot on one line however many entries the miniature above
-  // it draws.
+  // sits on the row rather than on the button alone, so every plate in a row
+  // puts its foot on one line however many entries the miniature above it
+  // draws.
   foot: {
     display: "flex",
     alignItems: "center",
@@ -179,9 +179,9 @@ const styles = stylex.create({
   // wash and an ink-14% press wash — copied here rather than exported,
   // since `design-language.md` allows a deliberate duplicate and exporting
   // it would tie a Forms tab restyle to the form editor's own file. One
-  // value departs from that treatment: block padding drops from `.btn`'s
-  // 8px default to 4px, the `button-authoring` token's own `8px 4px` in
-  // `DESIGN.md`.
+  // value departs from that treatment: block padding drops from 8px
+  // (`.btn`'s default, which the `button-authoring` token's `8px 4px` in
+  // `DESIGN.md` records) to 4px.
   openControl: {
     fontFamily: fonts.mono,
     fontSize: 11,

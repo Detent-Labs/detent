@@ -172,7 +172,9 @@ describe("A plate's miniature", () => {
   });
 
   it("takes no keyboard focus, so a walk with the Tab key never lands inside one", () => {
-    for (const inner of miniatures(render())) {
+    const inners = miniatures(render());
+    expect(inners.length).toBeGreaterThan(0);
+    for (const inner of inners) {
       expect(inner).not.toContain("<button");
       expect(inner).not.toContain("<a ");
       expect(inner).not.toContain("tabindex");
@@ -207,13 +209,17 @@ describe("A plate's miniature", () => {
   });
 
   it("names a view holding only a note as an empty form, offering to start it", () => {
+    // Only step_a and step_c: step_b is dropped so this card is the only
+    // source of "Empty form"/"Start the form" in the render, and the negative
+    // assertions below have something to catch a notes-only card drawn as
+    // non-empty.
     const notesOnly = {
       ...DRAFT,
       workflow: {
         ...DRAFT.workflow,
         steps: [
           { ...DRAFT.workflow!.steps![0], view: { fields: [{ kind: "note", text: { en: "Read this first" } }] } },
-          ...DRAFT.workflow!.steps!.slice(1),
+          DRAFT.workflow!.steps![2],
         ],
       },
     } as unknown as Draft;
@@ -221,6 +227,29 @@ describe("A plate's miniature", () => {
 
     expect(html).toContain("Empty form");
     expect(html).toContain("Start the form");
+    expect(html).not.toContain("Open the form");
+    expect(miniatures(html)).toHaveLength(0);
+  });
+
+  it("gives a required entry's mark a different compiled class than an ordinary one", () => {
+    const twoEntries = {
+      ...DRAFT,
+      workflow: {
+        ...DRAFT.workflow,
+        steps: [
+          {
+            ...DRAFT.workflow!.steps![0],
+            view: { fields: [{ ref: AMOUNT, required: true }, { ref: AMOUNT }] },
+          },
+          ...DRAFT.workflow!.steps!.slice(1),
+        ],
+      },
+    } as unknown as Draft;
+    const [inner] = miniatures(render({ draft: twoEntries }));
+    const classes = [...inner!.matchAll(/<span class="([^"]*)"/g)].map((m) => m[1]);
+
+    expect(classes).toHaveLength(2);
+    expect(classes[0]).not.toBe(classes[1]);
   });
 });
 

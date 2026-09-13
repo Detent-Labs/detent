@@ -4484,11 +4484,12 @@ meets `scope=started` should infer no new permission tier from it.
   for the card's role. A card takes a 1px hairline box. An empty form takes a
   2px box in the advisory color instead.
 
-  The miniature draws one mark per field entry and a group break per group
-  entry, through `miniatureEntry`. The function `miniatureBarHeight` sets a
-  mark's height from the field's kind: 8px, 12px, 16px or 24px. A group break
-  takes its own fixed height, `GROUP_BREAK_HEIGHT`. An ordinary mark draws as
-  an outline, and a required entry's mark fills solid.
+  The miniature draws one mark for each field entry other than a group
+  entry. A group entry draws a group break instead, both through
+  `miniatureEntry`. The function `miniatureBarHeight` sets a mark's height
+  from the field's kind: 8px, 12px, 16px or 24px. A group break takes its
+  own fixed height, `GROUP_BREAK_HEIGHT`. An ordinary mark draws as an
+  outline, and a required entry's mark fills solid.
 
   The `Miniature` component carries the whole row as one `role="img"`
   element, named from the field count and the required count. The foot row

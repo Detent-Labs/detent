@@ -58,10 +58,11 @@
   --color-accent-contrast: var(--paper-50);
   /* The accent as it must read on --color-surface-muted, where the plain role
      falls short. The required mark in a Forms card miniature (FormsTab.tsx,
-     .miniatureRequired) is a filled graphic, not text: WCAG 1.4.1 holds it to
-     the 3:1 non-text minimum, not the 4.5:1 AA text one. This token clears
-     3:1 by a wide margin in both schemes. It reads this token to keep the
-     required color the asterisk used. .btn-destructive's hover and press
+     .miniatureRequired) is a filled graphic, not text: WCAG 1.4.11 holds it
+     to the 3:1 non-text minimum, not the 4.5:1 AA text one. This token
+     clears 3:1 by a wide margin in both schemes. The mark reads this token so
+     the required color matches the rest of the accent-on-muted readers.
+     .btn-destructive's hover and press
      rule below is the one reader still held to 4.5:1, on the secondary
      control's washes. Same reasoning as --stamp-600 above, and the same fix:
      a step of the existing accent ramp far enough from the muted ground to

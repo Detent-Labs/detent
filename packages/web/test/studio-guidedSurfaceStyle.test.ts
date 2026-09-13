@@ -165,6 +165,13 @@ describe("the miniature wraps and clips nothing", () => {
 });
 
 describe("the required mark on the muted ground", () => {
+  it("draws an ordinary mark as an outline, with no fill of its own", () => {
+    const block = styleBlock(stripComments(read("src/areas/studio/panels/FormsTab.tsx")), "miniatureMark");
+
+    expect(block).toMatch(/borderWidth: 1/);
+    expect(block).not.toMatch(/backgroundColor/);
+  });
+
   it("fills solid rather than merely coloring text, and reads a semantic alias, never a ramp step", () => {
     const source = stripComments(read("src/areas/studio/panels/FormsTab.tsx"));
 

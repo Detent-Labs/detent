@@ -616,10 +616,10 @@ own.
 - The kicker takes mono at 11px, uppercase at 0.08em, in slate. The step name
   takes weight 800. The check badge closes the head, on a step carrying an
   open check result.
-- The miniature sits on the ledger ground and draws one mark per field entry,
-  4px wide. An ordinary mark draws as an outline. A required entry's mark
-  fills solid instead. A group entry draws a group break, a 1px line, where a
-  mark would stand.
+- The miniature sits on the ledger ground. It draws one mark, 4px wide, for
+  each field entry other than a group entry. An ordinary mark draws as an
+  outline. A required entry's mark fills solid instead. A group entry draws a
+  group break, a 1px line, where a mark would stand.
 - The foot row carries the field count on the left and the open control on
   the right. The control takes the authoring command style, at 4px block
   padding. The authoring command elsewhere takes 8px.
