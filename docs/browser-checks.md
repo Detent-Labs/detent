@@ -2347,8 +2347,7 @@ carries no undo, and Discard draft is the first focusable control in DOM
 order.
 
 Now close each dialog by each of its routes, and watch where the focus lands
-every time. Cancel it. Press Escape. Click the backdrop. Confirm a publish and
-let it finish.
+every time. Cancel it. Press Escape. Confirm a publish and let it finish.
 
 Pass: each dialog opens from its own control on the header bar. Every route
 returns the focus ring to that same control, Publish or Discard draft in
@@ -2356,6 +2355,9 @@ turn. It never lands on the top of the page, and never on nothing at all.
 
 Press Tab straight after each close. Pass: the next stop sits right after
 whichever control opened it, not the first control on the screen.
+
+Click the backdrop on each dialog in turn. Pass: the dialog stays open and
+the focus stays inside it.
 
 ### Keyboard access to the canvas (`studio-canvas-keyboard`)
 

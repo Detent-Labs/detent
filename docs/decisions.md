@@ -1798,6 +1798,18 @@ paths under `panels/`, `draft/` and `screens/` start at
   reader announces the first move and stays silent on the second. Risk
   (Low): one shared writer, emptying the region first, closes the gap for
   both sentences.
+- **FIELDS-21: the live `studio-publish` requirement names a backdrop
+  dismissal no dialog has.** Its "Publishing confirms in a modal dialog that
+  names the version and its immutability" requirement names "a backdrop
+  dismissal" among the close routes that return focus
+  (`openspec/specs/studio-publish/spec.md:320`). A native modal has no such
+  route. Measured on 2026-09-13: a backdrop click leaves the Publish and the
+  Discard draft dialogs open. Risk (Low): the requirement asks for a route
+  no dialog offers.
+
+  Two fixes exist, each a change of its own: drop the route from that
+  sentence, or add a deliberate backdrop dismissal (`closedby="any"`) to
+  every studio confirmation dialog, with its focus return.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 

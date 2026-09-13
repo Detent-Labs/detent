@@ -26,10 +26,10 @@ import { useEffect, useRef, type RefObject } from "react";
  * irreversible act would prime that act instead. So the effect focuses the
  * declining control again, after `showModal()`.
  *
- * The cleanup covers every route that unmounts the dialog: Cancel, Escape, a
- * backdrop dismissal, and a completed request all end with the caller
- * unmounting it. Without this cleanup, focus drops to `<body>` and a
- * keyboard user restarts their traversal from the top of the screen.
+ * The cleanup covers every route that unmounts the dialog: Cancel, Escape,
+ * and a completed request all end with the caller unmounting it. Without
+ * this cleanup, focus drops to `<body>` and a keyboard user restarts their
+ * traversal from the top of the screen.
  */
 export function useConfirmDialog(triggerRef: RefObject<HTMLButtonElement | null>) {
   const ref = useRef<HTMLDialogElement>(null);
