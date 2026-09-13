@@ -8,8 +8,8 @@
 
 ## 2. The foot row
 
-- [ ] 2.1 Add the foot assertions to `packages/web/test/studio-formsTab.test.tsx` first. The count follows the miniature and precedes the open control. The words "Open the form" and "Start the form" stay. Match the count as element text, `>1 field<` and `>4 fields<`, in the two existing count tests and in the order assertion. Verify the order assertion fails against today's code.
-- [ ] 2.2 Move the count into a foot row beside the open control, per `design.md`. Restyle the control as the authoring command with 4px block padding, and set the card's gap to 4px. Verify the foot assertions pass in the full suite run.
+- [x] 2.1 Add the foot assertions to `packages/web/test/studio-formsTab.test.tsx` first. The count follows the miniature and precedes the open control. The words "Open the form" and "Start the form" stay. Match the count as element text, `>1 field<` and `>4 fields<`, in the two existing count tests and in the order assertion. Verify the order assertion fails against today's code.
+- [x] 2.2 Move the count into a foot row beside the open control, per `design.md`. Restyle the control as the authoring command with 4px block padding, and set the card's gap to 4px. Verify the foot assertions pass in the full suite run.
 
 ## 3. Documentation
 
