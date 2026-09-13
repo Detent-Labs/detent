@@ -38,6 +38,13 @@ const styles = stylex.create({
     borderStyle: "solid",
     borderColor: colors.border,
     minHeight: "24rem",
+    // The frame reaches the tab body's side and bottom edges, and the tab
+    // body clips anything past them, so the ring sits inside the frame the
+    // way a cell's own ring does.
+    ":focus-visible": {
+      outline: `2px solid ${colors.accent}`,
+      outlineOffset: "-2px",
+    },
   },
   matrixTable: {
     borderCollapse: "separate",
