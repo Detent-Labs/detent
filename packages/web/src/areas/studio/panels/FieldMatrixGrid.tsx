@@ -28,9 +28,11 @@ import {
 } from "./fieldMatrixLogic";
 
 const styles = stylex.create({
-  // A scroll container's automatic minimum is already zero, so it grows with
-  // its rows up to the tab body's height and holds this floor instead of a
-  // fixed cap (`studio-app`: the grid takes the height the tab body leaves).
+  // The scroll region's automatic minimum is already zero, since it is a
+  // scroll container, which lets it shrink below its content height. Its
+  // `auto` flex basis is that content height, so a short grid still keeps
+  // its own height above this floor (`studio-app`: "The field matrix takes
+  // the height the tab body leaves").
   matrixScroll: {
     overflow: "auto",
     overscrollBehavior: "contain",

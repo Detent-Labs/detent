@@ -96,10 +96,22 @@ describe("the field matrix grid takes the tab body's height", () => {
   it("holds the scroll region to a 24rem floor, with no fixed cap above it", () => {
     const block = styleBlock(stripComments(read(FIELD_MATRIX_GRID)), "matrixScroll");
 
-    // A scroll container's automatic minimum is already zero, so a floor
-    // replaces the old cap rather than joining it.
+    // The floor is the region's only height constraint.
     expect(block).toMatch(/minHeight: "24rem"/);
     expect(block).not.toMatch(/maxHeight/);
+    // That constraint holds only because the region is a scroll container,
+    // the way the steps rail's own `overflowY: "auto"` above depends on it.
+    expect(block).toMatch(/overflow: "auto"/);
+  });
+
+  it("draws the scroll region's own focus ring inside its frame", () => {
+    const block = styleBlock(stripComments(read(FIELD_MATRIX_GRID)), "matrixScroll");
+
+    // The frame reaches the tab body's clipping edge, so a positive offset
+    // ring would clip there the way `studio-fieldMatrixTabStops.test.tsx`
+    // records for this grid's headers; this region pulls its own ring
+    // inward the same way.
+    expect(block).toMatch(/outlineOffset: "-2px"/);
   });
 });
 
