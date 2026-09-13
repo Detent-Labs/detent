@@ -52,8 +52,8 @@ interface Props {
 }
 
 /** A field's own `validation` object: a collapsed section inside the
- * Validation zone and inside a group child's own row, offering the keys its
- * declared type suits plus any it already carries. */
+ * Validation zone of that field's own `FieldEditor`, at any nesting depth,
+ * offering the keys its declared type suits plus any it already carries. */
 export function FieldValidationEditor({ field, validation, onChange }: Props) {
   const offered = offeredKeys(field.type ?? "string");
   const carried = carriedKeys(validation);
@@ -72,8 +72,8 @@ export function FieldValidationEditor({ field, validation, onChange }: Props) {
           summary carries only the count, so no redundant second label
           renders beneath it. A check on a validation rule stands at that
           zone, read off its own `loc` (`panels/fieldCheckZone.ts`), and a
-          group child's check stands in that row's own list — so this editor
-          draws no check list of its own. */}
+          nested field's check stands in its own editor's Validation zone the
+          same way — so this editor draws no check list of its own. */}
       <summary {...stylex.props(styles.fieldValidationSummary)}>({carried.length})</summary>
       {keys.map((key) => {
         const notEvaluated = !offered.includes(key);

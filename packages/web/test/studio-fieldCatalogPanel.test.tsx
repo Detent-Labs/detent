@@ -6,6 +6,7 @@ import type { ValidationResult } from "../src/areas/studio/draft/validation.js";
 import type { EditorIssue } from "../src/areas/studio/draft/issues.js";
 import { DraftContext, type DraftContextValue } from "../src/areas/studio/draft/store.js";
 import { FieldCatalogPanel, MoveFieldControl } from "../src/areas/studio/panels/FieldCatalogPanel.js";
+import { fieldLabelInputId, moveControlId } from "../src/areas/studio/panels/fieldCatalogLogic.js";
 
 const NOOP = () => {};
 
@@ -84,21 +85,21 @@ function contextValue(draft: Draft): DraftContextValue {
 }
 
 /**
- * Final-review Important 1: a field `changeKind` rewrote out of `group`
- * keeps its `fields` array (`fieldCatalogLogic.ts::moveFieldToGroup`'s own
- * comment on the point). `FieldEditor` and `SubFieldRow` used to draw
- * children `isGroup &&` alone, so such a field's children — and their own
- * move control — rendered nowhere. `FieldCatalogPanel` reads `useDraft()`
- * directly, so the test supplies `DraftContext.Provider`, the way
- * `studio-formsTab.test.tsx` already does.
+ * `FieldEditor` draws the selected field's own two halves at any nesting
+ * depth, a nested field the same way as a top-level one (`studio-app`: "A
+ * nested field takes the same two halves"). Only a selected `group` field's
+ * own editor adds the "Fields inside this group" zone (`studio-app`: "Only a
+ * group field holds the sixth zone"); a group's child renders in its own
+ * instance of this same component, with its own move control, never inside
+ * its parent's. `FieldCatalogPanel` reads `useDraft()` directly, so each test
+ * below supplies `DraftContext.Provider`, the way `studio-formsTab.test.tsx`
+ * already does.
  */
 describe("FieldCatalogPanel", () => {
-  it("draws a non-group field's children, move control included", () => {
+  it("renders a nested field's own move control, Technical checkbox and effect-half zones", () => {
     const draft: Draft = {
       baseLocale: "en",
-      fields: [
-        { ...fld("field_r", "resolution"), fields: [fld("field_c", "discrepancy_note")] } as unknown as DraftField,
-      ] as unknown as Draft["fields"],
+      fields: [grp("field_g", "g", [fld("field_c", "c")])] as unknown as Draft["fields"],
     };
     const html = renderToStaticMarkup(
       <DraftContext.Provider value={contextValue(draft)}>
@@ -112,6 +113,65 @@ describe("FieldCatalogPanel", () => {
         />
       </DraftContext.Provider>,
     );
-    expect(html).toContain('id="studio-field-move-field_c"');
+
+    expect(html).toContain(`id="${moveControlId("field_c")}"`);
+    expect(html).toContain(`id="${fieldLabelInputId("field_c")}"`);
+
+    // Narrowed to the Technical checkbox's own <label>...</label>, since the
+    // "Ask for this" checkbox elsewhere in the same markup is legitimately
+    // disabled for a field no step view references.
+    const technicalAt = html.indexOf("Technical");
+    expect(technicalAt).toBeGreaterThan(-1);
+    const technicalLabel = html.slice(html.lastIndexOf("<label", technicalAt), html.indexOf("</label>", technicalAt));
+    expect(technicalLabel).toContain('type="checkbox"');
+    expect(technicalLabel).not.toContain('disabled=""');
+
+    expect(html).toContain("Default value");
+    expect(html).toContain("How it will look");
+    expect(html).toContain("Used in");
+  });
+
+  it("renders a selected group's own zone, with no move control for its child", () => {
+    const draft: Draft = {
+      baseLocale: "en",
+      fields: [grp("field_g", "g", [fld("field_c", "c")])] as unknown as Draft["fields"],
+    };
+    const html = renderToStaticMarkup(
+      <DraftContext.Provider value={contextValue(draft)}>
+        <FieldCatalogPanel
+          token="test-token"
+          selectedId="field_g"
+          onAdd={NOOP}
+          onRemove={NOOP}
+          onShowStep={NOOP}
+          onMoveField={NOOP}
+        />
+      </DraftContext.Provider>,
+    );
+
+    expect(html).toContain("Fields inside this group");
+    expect(html).toContain("+ Add field to this group");
+    expect(html).not.toContain(`id="${moveControlId("field_c")}"`);
+  });
+
+  it("renders no group zone for a selected top-level field", () => {
+    const draft: Draft = {
+      baseLocale: "en",
+      fields: [fld("field_a", "a")] as unknown as Draft["fields"],
+    };
+    const html = renderToStaticMarkup(
+      <DraftContext.Provider value={contextValue(draft)}>
+        <FieldCatalogPanel
+          token="test-token"
+          selectedId="field_a"
+          onAdd={NOOP}
+          onRemove={NOOP}
+          onShowStep={NOOP}
+          onMoveField={NOOP}
+        />
+      </DraftContext.Provider>,
+    );
+
+    expect(html).not.toContain("Fields inside this group");
   });
 });

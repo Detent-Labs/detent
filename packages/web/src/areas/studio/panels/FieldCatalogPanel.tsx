@@ -302,22 +302,6 @@ const styles = stylex.create({
     maxWidth: "60ch",
     padding: 0,
   },
-  studioColumnMapping: {
-    marginTop: space.s3,
-    borderTopWidth: 1,
-    borderTopStyle: "solid",
-    borderTopColor: colors.border,
-    paddingTop: space.s2,
-  },
-  studioColumnMappingHeading: {
-    marginBlockEnd: space.s2,
-    marginBlockStart: 0,
-    marginInline: 0,
-    fontSize: 11,
-    letterSpacing: "0.05em",
-    textTransform: "uppercase",
-    color: colors.textMuted,
-  },
   studioColumnMappingRow: {
     display: "flex",
     alignItems: "baseline",
@@ -388,9 +372,9 @@ interface FieldKeyInputProps {
 }
 
 /**
- * The key input, at both sites that carry one: the top-level `FieldEditor`
- * and the recursive `SubFieldRow`, a group's child at any depth. A non-group
- * field writes its key through `onChange` on every keystroke.
+ * The key input, inside `FieldEditor`'s definition half, for the selected
+ * field at any nesting depth. A non-group field writes its key through
+ * `onChange` on every keystroke.
  *
  * A group's key is what view entries store, so changing it rewrites them
  * (`view-group-sync.ts::writeGroupKey`). The input holds the typed text
@@ -462,9 +446,10 @@ function confirmDrops(dropped: ("format" | "control")[]): boolean {
 }
 
 /**
- * The one picker that says what kind of field this is, at both editing
- * sites. It reads the engine package's own `FIELD_KINDS` table over the
- * exports map, so the studio declares no second table to drift from it.
+ * The one picker that says what kind of field this is, wherever
+ * `FieldEditor` renders it — the selected field, at any nesting depth. It
+ * reads the engine package's own `FIELD_KINDS` table over the exports map,
+ * so the studio declares no second table to drift from it.
  *
  * A field whose triple the curated table names no kind for keeps its own
  * entry, printing the raw triple in the mono face. That entry is a machine
@@ -598,10 +583,10 @@ interface FieldEditorProps {
   onRemove: () => void;
   onShowStep: (stepId: string) => void;
   /** The move's one write (`EntityTabs.tsx`'s `FieldsTab::moveField`),
-   * threaded through `FieldCatalogPanel`. Renders as this field's own move
-   * control, and passes on to a group's `SubFieldRow` children unchanged. */
+   * threaded through `FieldCatalogPanel`. Renders as the selected field's own
+   * move control, whatever its nesting depth. */
   onMoveField: (fieldId: string, targetGroupId: string | undefined) => void;
-  /** Adds a field at the end of this group and selects it. Rendered only in
+  /** Adds a field at the end of this group and selects it. Called only from
    * the "Fields inside this group" zone, for a field whose `type` is
    * `"group"`. `FieldCatalogPanel` hands its own `onAdd` prop straight
    * through (design.md: "One add function serves the rail, the start state
@@ -619,10 +604,11 @@ interface FieldEditorProps {
  * an incomplete row the draft does not carry, and the developer view holds a
  * half-typed config in component state; unmounting would drop both.
  *
- * A group field's own editor draws none of its children: the "Fields inside
- * this group" zone holds one control that adds a field and selects it. Each
- * child opens its own instance of this same component, so one pair of halves
- * exists per open editor regardless of nesting depth.
+ * A group field's own editor holds no editor for any of its children: the
+ * "Fields inside this group" zone holds one control that adds a field and
+ * selects it. Each child opens its own instance of this same component, so
+ * one pair of halves exists per open editor regardless of nesting depth. Its
+ * preview still draws every descendant.
  */
 function FieldEditor({
   field,
@@ -897,10 +883,12 @@ function FieldEditor({
             <FieldValidationEditor field={field} validation={field.validation} onChange={(validation) => onChange({ validation })} />
           </Zone>
 
-          {/* The rail lists the group's own children, indented under it, so this
-              zone draws none of them (design.md's shape brief: no child list
-              inside the editor). Each child opens its own instance of this
-              component when the author selects its rail entry. */}
+          {/* The rail indents a group's own children one level; a field two
+              levels down relocates to its own top-level row instead of
+              indenting further (`panel-rail.ts::flattenRailFields`). This
+              zone draws no child list of its own. Each child opens its own
+              instance of this component when the author selects its rail
+              entry. */}
           {isGroup && (
             <Zone heading={t("fieldCatalog.groupChildrenHeading")} issues={[]} bordered>
               <button type="button" className="btn btn-secondary" onClick={addFieldToGroup}>
@@ -1114,7 +1102,7 @@ export function FieldCatalogPanel({ token, selectedId, onAdd, onRemove, onShowSt
   // and the column picker here cannot offer different lists.
   const lists = useDataLists(token);
 
-  const field = flattenDraftFields(fields).find((f) => f.id === selectedId);
+  const field = selectedId === undefined ? undefined : flattenDraftFields(fields).find((f) => f.id === selectedId);
 
   const steps = draft.workflow?.steps ?? [];
   const routeStepId = draft.workflow?.initialStep ?? steps[0]?.id;

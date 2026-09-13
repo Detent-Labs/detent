@@ -37,7 +37,8 @@ export function baseTypeForPaletteKind(kind: PaletteFieldKind): (typeof FIELD_KI
  * pattern `FieldCatalogPanel.addField` and the rail's add controls already
  * follow (design.md: "one call site keeps them from drifting by
  * construction"). A `group` field seeds an empty `fields` array, since its
- * own sub-field editor (`FieldCatalogPanel`) reads and appends to it.
+ * own "Fields inside this group" zone (`FieldCatalogPanel`'s `FieldEditor`)
+ * appends into it.
  */
 export function mintCatalogField(kind: PaletteFieldKind, label: DraftField["label"]): DraftField {
   const { type, format, control } = baseTypeForPaletteKind(kind);
