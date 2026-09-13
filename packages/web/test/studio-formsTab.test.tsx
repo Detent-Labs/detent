@@ -84,12 +84,12 @@ function render(over: { draft?: Draft; issues?: EditorIssue[] } = {}): string {
   );
 }
 
-/** Everything between the miniature's own `role="img"` element and its
- * close. The miniature carries no list semantics any more, so the element
- * itself is what a test matches — a backreference to the tag name, since the
- * element is not pinned to one tag. */
+/** Everything between the miniature's own `aria-hidden="true"` element and
+ * its close. The miniature carries no name and no role any more, so the
+ * element itself is what a test matches — a backreference to the tag name,
+ * since the element is not pinned to one tag. */
 function miniatures(html: string): string[] {
-  return [...html.matchAll(/<(\w+)[^>]*\srole="img"[^>]*>(.*?)<\/\1>/gs)].map((m) => m[2]!);
+  return [...html.matchAll(/<(\w+)[^>]*\saria-hidden="true"[^>]*>(.*?)<\/\1>/gs)].map((m) => m[2]!);
 }
 
 describe("The Forms tab's plates", () => {
@@ -186,7 +186,7 @@ describe("The Forms tab's plates", () => {
     // the field count and the open control share the card's last row, after
     // the miniature that stands above it.
     const html = render();
-    const miniatureIndex = html.indexOf('role="img"');
+    const miniatureIndex = html.indexOf('aria-hidden="true"');
     const countIndex = html.indexOf(">1 field, 1 required<");
     const controlIndex = html.indexOf("Open the form");
 
@@ -222,31 +222,26 @@ describe("A plate's miniature", () => {
     }
   });
 
-  it("carries one accessible name stating the field count and the required count", () => {
-    // step_a's view holds one required entry.
-    expect(render()).toContain('aria-label="1 field, 1 required"');
-  });
+  it("carries no name and no role of its own, so a screen reader hears the counts once, from the foot", () => {
+    // step_a's view holds one required entry; the foot already states "1
+    // field, 1 required" (see "The Forms tab's plates" above) — the
+    // miniature must add nothing to what a screen reader reads.
+    const html = render();
 
-  it("states both counts for a view holding several entries", () => {
-    const four = {
-      ...DRAFT,
-      workflow: {
-        ...DRAFT.workflow,
-        steps: [
-          {
-            ...DRAFT.workflow!.steps![0],
-            view: { fields: [{ ref: AMOUNT, required: true }, { ref: AMOUNT }, { ref: AMOUNT }, { ref: AMOUNT }] },
-          },
-          ...DRAFT.workflow!.steps!.slice(1),
-        ],
-      },
-    } as unknown as Draft;
-
-    expect(render({ draft: four })).toContain('aria-label="4 fields, 1 required"');
+    expect(html).not.toContain('role="img"');
+    expect(html).not.toContain('aria-label="1 field, 1 required"');
   });
 
   it("says the form has no fields yet where the miniature would stand on an empty view", () => {
     expect(render()).toContain("No fields yet");
+  });
+
+  it("keeps the empty form's sentence in the accessibility tree", () => {
+    const html = render();
+    const sentence = html.match(/<p[^>]*>No fields yet<\/p>/);
+
+    expect(sentence).not.toBeNull();
+    expect(sentence![0]).not.toContain("aria-hidden");
   });
 
   it("names a view holding only a note as an empty form, offering to start it", () => {
@@ -291,6 +286,39 @@ describe("A plate's miniature", () => {
 
     expect(classes).toHaveLength(2);
     expect(classes[0]).not.toBe(classes[1]);
+  });
+});
+
+/** One HTML attribute's value off a tag string, or `undefined` where the tag
+ * carries none. React 19's `useId` values can hold `:` and `«»`, so this
+ * reads the attribute by name rather than assuming a `\w+`-safe id. */
+function attr(tag: string, name: string): string | undefined {
+  return tag.match(new RegExp(`\\s${name}="([^"]*)"`))?.[1];
+}
+
+describe("A plate's open control", () => {
+  it("names its step through aria-labelledby: its own id, then the span holding the step label", () => {
+    const html = render();
+    const controls = [...html.matchAll(/<button\b[^>]*>/g)]
+      .map((m) => m[0])
+      .map((tag) => ({ id: attr(tag, "id"), labelledby: attr(tag, "aria-labelledby") }))
+      .filter((c): c is { id: string; labelledby: string } => c.id !== undefined && c.labelledby !== undefined);
+
+    // step_a ("Intake") and step_b ("Review") each carry one open control;
+    // the issue badge button carries no `aria-labelledby`, so it is not here.
+    expect(controls).toHaveLength(2);
+
+    const names = controls.map(({ id, labelledby }) => {
+      const [ownIdRef, nameIdRef] = labelledby.split(" ");
+      expect(ownIdRef).toBe(id);
+      expect(nameIdRef).toBeTruthy();
+      const nameSpan = html.match(new RegExp(`<span id="${nameIdRef}"[^>]*>([^<]*)</span>`));
+      expect(nameSpan).not.toBeNull();
+      return nameSpan![1];
+    });
+
+    expect(names).toEqual(["Intake", "Review"]);
+    expect(names[0]).not.toBe(names[1]);
   });
 });
 

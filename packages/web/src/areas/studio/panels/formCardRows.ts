@@ -12,9 +12,9 @@ type DraftStep = DraftOf<Step>;
 
 /**
  * One mark of a card's miniature: a field entry's own bar, or a group
- * entry's group break in its place (`studio-forms-overview`: "A card carries
- * a miniature of its form"). Drawn without a label — the miniature stands
- * for the form's shape, not its content.
+ * entry's group break in its place (`studio-forms-overview`: "A card draws a
+ * miniature of its form for the eye alone"). Drawn without a label — the
+ * miniature stands for the form's shape, not its content.
  *
  * `height` is the mark's own height in pixels, from the field's kind alone,
  * so a long-text field reads taller than a one-line field without the card
@@ -50,7 +50,8 @@ export interface FormCardRow {
    * fields it draws"). */
   fieldCount: number;
   /** How many of `entries`, group breaks aside, declare `required: true` —
-   * the miniature's accessible name states this beside `fieldCount`. */
+   * the card's foot states this beside `fieldCount`. The miniature stays out
+   * of the accessibility tree and states neither number. */
   requiredCount: number;
   entries: MiniatureEntry[];
   /** The open issues naming this step's view, and whether any refuses a
