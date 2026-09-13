@@ -30,9 +30,9 @@
 
 ## 4. Docs
 
-- [ ] 4.1 Rewrite the `discrepancy_note` passage in `docs/browser-checks.md`. Selecting the child opens its own editor, and no `SubFieldRow` appears. Verify in task 5.5.
-- [ ] 4.2 Rewrite the "Pick `Line Item`" passage of the same walk. Its pass adds that the rail marks `po_status` alone. The editor still shows the two halves of `po_status`. Verify in task 5.5.
-- [ ] 4.3 Rewrite the nested-child passage of the walk "Panels screen: Fields and Data sources as list and detail". Clicking `item_description` marks that entry alone. It opens the field's own editor at its top. Verify in task 5.5.
+- [x] 4.1 Rewrite the `discrepancy_note` passage in `docs/browser-checks.md`. Selecting the child opens its own editor, and no `SubFieldRow` appears. Verify in task 5.5.
+- [x] 4.2 Rewrite the "Pick `Line Item`" passage of the same walk. Its pass adds that the rail marks `po_status` alone. The editor still shows the two halves of `po_status`. Verify in task 5.5.
+- [x] 4.3 Rewrite the nested-child passage of the walk "Panels screen: Fields and Data sources as list and detail". Clicking `item_description` marks that entry alone. It opens the field's own editor at its top. Verify in task 5.5.
 - [ ] 4.4 Add a walk to `docs/browser-checks.md` on the IT Offboarding draft. It covers selection, the add zone in "Processing (Fabrikam)", focus and the rail scroll. It checks that an entry already in view moves no rail, and that no scroll animates. It checks that a newly chosen field's editor opens at its top. Verify in task 5.5.
 - [ ] 4.5 Extend that walk with the three Remove cases and a nested field's check on its own rail entry. Move "Permissions" into "Hardware" through its move control. Select the field inside it, which draws at the rail's cap. Select `immediate_lock_written_confirmation` for the longest label. Repeat selection and the add zone below 64rem. Verify in task 5.5.
 - [ ] 4.6 Rewrite the `rootId` passage in `docs/current-state.md` for a selection that names the chosen field. Rewrite the Add and Remove paragraph below it too. The Fields tab passes the removed field's id, and the Data sources tab keeps the index. Verify in task 5.4.
