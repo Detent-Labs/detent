@@ -31,10 +31,10 @@
 
 ## 6. Documents
 
-- [ ] 6.1 Rewrite the Changes walk in `docs/browser-checks.md`, and add the Versions and keyboard walks, per D11. Verify: antislop reports no new finding.
-- [ ] 6.2 Rewrite the D11 passages in `docs/current-state.md`, including its Versions-screen sentence. Rewrite `openspec/config.yaml`'s context line too. Verify: antislop reports no new finding.
-- [ ] 6.3 Add the glossary's change list row, and rewrite its Developer view row, per D11. Verify: antislop reports no new finding.
-- [ ] 6.4 Reword the Purpose of `openspec/specs/process-version-inspection/spec.md` to name the change list. Verify: antislop reports no new finding on that file.
+- [x] 6.1 Rewrite the Changes walk in `docs/browser-checks.md`, and add the Versions and keyboard walks, per D11. Verify: antislop reports no new finding.
+- [x] 6.2 Rewrite the D11 passages in `docs/current-state.md`, including its Versions-screen sentence. Rewrite `openspec/config.yaml`'s context line too. Verify: antislop reports no new finding.
+- [x] 6.3 Add the glossary's change list row, and rewrite its Developer view row, per D11. Verify: antislop reports no new finding.
+- [x] 6.4 Reword the Purpose of `openspec/specs/process-version-inspection/spec.md` to name the change list. Verify: antislop reports no new finding on that file.
 
 ## 7. Verification
 

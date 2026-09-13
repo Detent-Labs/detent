@@ -2163,12 +2163,13 @@ Stage-by-stage status is in `ROADMAP.md`.
   draft against the last-saved snapshot) — a `confirm()` prompt offers to
   save then publish when dirty, mirroring the existing discard-confirmation
   convention rather than silently chaining or hard-blocking; a Versions
-  screen listing published versions and diffing any two (or a draft against
-  its `base_version`) via a from-scratch JSON diff
-  (`screens/versionDiffLogic.ts::diffJson`) — no diff library exists
-  anywhere in the repo to reuse, and none was added, objects recurse
-  key-by-key and everything else (including arrays) compares whole (since
-  `seed-draft-from-published`, by canonical JSON rather than
+  screen listing published versions and comparing any two (or a draft
+  against its `base_version`) as a change list
+  (`draft/changeSet.ts::describeChanges`, pairing each side by anchor id,
+  backed by `screens/versionDiffLogic.ts::diffJson`) — no diff library
+  exists anywhere in the repo to reuse, and none was added, objects
+  recurse key-by-key and everything else (including arrays) compares
+  whole (since `seed-draft-from-published`, by canonical JSON rather than
   `JSON.stringify`, and the base body is stripped first — see the seeding
   entry at the end of this file); and a
   migration-plan authoring screen, a JSON-textarea editor over
@@ -4433,11 +4434,13 @@ meets `scope=started` should infer no new permission tier from it.
   attribute takes a hidden subtree out of the tab order and out of the
   accessibility tree, with no CSS.
 
-  The module `draft/process-tabs.ts` carries three pure functions. The first,
+  The module `draft/process-tabs.ts` carries four pure functions. The first,
   `processTabCounts`, yields the number beside each tab name. It answers
   `undefined` for Canvas and Contract, which count nothing. The second,
   `tabForIssue`, maps an issue's entity type onto the tab that owns it. The
-  third, `formEditorReturnTab`, yields the tab the form editor returns to.
+  third, `tabForChangeGroup`, maps a change-list row's group onto the tab
+  that owns it, and answers `undefined` for Process. The fourth,
+  `formEditorReturnTab`, yields the tab the form editor returns to.
 
   The row component `ProcessTabRow.tsx` renders a `tablist` of buttons. The
   whole row is one tab stop, on `spa-accessibility`'s roving-tabindex
@@ -4449,6 +4452,13 @@ meets `scope=started` should infer no new permission tier from it.
   and Player instead, under its "Views" group. The JSON entry names its own
   state, so an author reads what pressing it does
   (`studio-header-menu-merge`).
+
+  A Checks row's or a Changes row's own open command hands focus to the tab
+  it opens. The hand-off itself is `EditScreen.tsx`'s `openTabFromRow`: it
+  switches through `goToTab`, then focuses `tabDomId(target)` once that tab
+  is open. A target already open focuses at once instead.
+  `ProcessTabRow.tsx`'s own roving `tabindex="0"` already marks the focused
+  tab, so the hand-off only moves focus onto the id that attribute tracks.
 
   Save, Discard draft and Publish render directly in `ProcessHeaderBar.tsx`,
   right-aligned ahead of its `⋮` menu trigger. That component already sits
@@ -4503,11 +4513,13 @@ meets `scope=started` should infer no new permission tier from it.
   window `validateDurations` enforces at publish. A duration the pair cannot
   state keeps its written form, `P1DT4H30M` for one.
 
-  The Changes view runs `diffJson(strippedBase, draft)` over the LIVE draft,
-  unsaved edits included. Base first is load-bearing. The function reports a
-  key present in its second argument alone as `added`, and it reads `from` off
-  the first. So the draft-first order `VersionsScreen.diffAgainstBase()` uses
-  would read every addition as a removal.
+  The Changes view runs `describeChanges(strippedBase, draft, contentLocale)`
+  over the LIVE draft, unsaved edits included. Base first is load-bearing. The
+  function `describeChanges` reports an entity present in its second argument
+  alone as added. Each row's Developer view then reads its `from` value off
+  the first side, through `diffJson`. So the draft-first order
+  `VersionsScreen.diffAgainstBase()` uses would read every addition as a
+  removal.
 
   The Paths view gives one row per path over source step, trigger, priority,
   guard and target. The module `panels/pathRows.ts` carries that derivation
