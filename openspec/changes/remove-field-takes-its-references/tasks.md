@@ -23,8 +23,8 @@
 ## 4. Documentation
 
 - [x] 4.1 Rewrite the Remove field steps in `docs/browser-checks.md` near lines 1544, 2897 and 2916. Read each field's reach in the example first. Add a walk for "Processing (Fabrikam)" with the dialog, Escape, a confirm, focus and the announcement. Add "Booking Status" on Expense Approval, with its guards reported afterwards. Add the new confirming control to the destructive controls walk. Verify: the prose gate passes for the file.
-- [ ] 4.2 Rewrite the removal passage in `docs/current-state.md` near line 4324. Name the shared dialog module there too. Verify: the prose gate passes for the file.
-- [ ] 4.3 In `docs/decisions.md`, remove FIELDS-1. Add the four follow-up entries design.md names. They cover the kept focus after two other removals and two misleading check messages. They also cover checks that run only at publish or never, and a rebound removed key. Rewrite FIELDS-8's Remove field example, which no removal reproduces now. Verify: the prose gate passes for the file.
+- [x] 4.2 Rewrite the removal passage in `docs/current-state.md` near line 4324. Name the shared dialog module there too. Verify: the prose gate passes for the file.
+- [x] 4.3 In `docs/decisions.md`, remove FIELDS-1. Add the four follow-up entries design.md names. They cover the kept focus after two other removals and two misleading check messages. They also cover checks that run only at publish or never, and a rebound removed key. Rewrite FIELDS-8's Remove field example, which no removal reproduces now. Verify: the prose gate passes for the file.
 - [x] 4.4 In `docs/browser-checks.md`, rewrite the walk "Where a confirmation dialog leaves the focus" for the header row. Each dialog opens from its own control on that row. Focus returns to that control after each close. Verify: the prose gate passes for the file.
 - [x] 4.5 Add a step to the new removal walk that removes two new unnamed fields in a row. It passes when the live region announces both. Verify: the prose gate passes for the file.
 

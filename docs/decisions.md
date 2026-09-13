@@ -1585,29 +1585,6 @@ records it in place of a fix. The `FIELDS-n` tags are local to this section;
 paths under `panels/`, `draft/` and `screens/` start at
 `packages/web/src/areas/studio/`.
 
-- **FIELDS-1: Remove field commits on one press.** Its button
-  (`panels/FieldCatalogPanel.tsx:915`) asks nothing. The handler
-  `FieldsTab::removeField` (`panels/EntityTabs.tsx:385`) prunes the field
-  through `removeFieldIn` and leaves every step view entry naming it. A move
-  rewrites such entries, through `moveFieldAndSyncViews`
-  (`draft/view-group-sync.ts:49`). No undo exists, and nothing announces the
-  removal. Focus drops to `<body>`, since the pressed button unmounts with
-  `FieldEditor`, keyed by the field's id (`panels/FieldCatalogPanel.tsx:1148`).
-  Measured 2026-09-13 on the IT Offboarding draft, removing "Access Excel
-  updated or prepared" raised 8 blocking checks: four
-  `view ref does not resolve: field_…` and four
-  `a view entry's group must be empty; the catalog holds this field at the top level`.
-
-  Removing a group takes its subtree (`panels/fieldCatalogLogic.ts:118`):
-  "Processing (Fabrikam)" holds 18 fields that 10 steps show. Risk (High): the
-  most destructive action on the tab is the least guarded (WCAG 2.4.3, and
-  4.1.3 for the silence). The fix confirms in the studio's own `<dialog>`
-  (`panels/ProcessHeaderBar.tsx:407`), with counts, when the field sits on a
-  step or holds fields. The removal's own `mutate` also removes the field's
-  view entries. Focus lands on the newly selected rail entry, and the tab's
-  live region announces the removal (`panels/EntityTabs.tsx:497`). The
-  2026-09-11 entry "A canvas removal drops keyboard focus, and nothing
-  announces it" records the canvas form of this gap.
 - **FIELDS-2: visually hidden text escapes its container and scrolls the page.**
   The `visuallyHidden` style (`panels/EntityTabs.tsx:151`) sets
   `position: "absolute"` with no inset. The entity rail's own style (`:53`)
@@ -1667,7 +1644,8 @@ paths under `panels/`, `draft/` and `screens/` start at
 - **FIELDS-8: check messages speak the engine's layers.** Measured 2026-09-13,
   the Fields tab showed `ZOD missing baseLocale ('en') entry` and
   `field key must match /^[a-z_][a-z0-9_]*$/ to be a valid CEL identifier`.
-  After a press on Remove field the tab showed
+  A view entry naming an id no field carries — the shape an unfixed field
+  removal left then, and a JSON-view edit can still write today — showed
   `view ref does not resolve: field_0fb5a2c4-0022-…`, an id the author can no
   longer look up. Adding an empty field raises the banner at
   `screens/EditScreen.tsx:780` before the author types. The banner reads
@@ -1746,6 +1724,77 @@ paths under `panels/`, `draft/` and `screens/` start at
   that makes N + 2 tree walks and N scans of the check list. Risk
   (Informational): the cost grows with the square of the catalog's size and
   stays harmless at 51 entries.
+- **FIELDS-15: a step or data source removal reuses its own button for the
+  next entity.** `panels/DataSourcesPanel.tsx`'s `DataSourceRow` (`:161`) and
+  `screens/EditScreen.tsx`'s `<StepPage>` (`:889`) render with no `key`,
+  unlike the Fields tab's own `FieldEditor`, keyed by the field's id
+  (`panels/FieldCatalogPanel.tsx:1162`). A press on "Remove data source" or
+  "Remove this step" therefore keeps its own button element in the DOM.
+  `removeDataSource` (`panels/EntityTabs.tsx:656`) and `onRemoveStep`
+  (`screens/EditScreen.tsx:530`) each pick a neighbour, and the same button
+  then renders that neighbour's own remove control. This is a code reading;
+  no browser run has confirmed it. Risk (Medium): a second Enter or Space
+  removes a neighbour with no separate confirmation.
+- **FIELDS-16: two check messages call a removed field present.** A removal
+  leaves a kept `org.actor-from-field` assignment setting that names the
+  removed id, since `fieldRemovalReach` only counts a plugin setting
+  (`draft/field-removal.ts`, the `pluginSettings` kind).
+  `checkActorFromFieldReference` (`src/schema/compile.ts:538`) then reports
+  the field as one that `does not declare format: "person"` (`:555`),
+  wording that still assumes the field exists. A stored dangling view entry
+  — the shape an unfixed field removal once left — reaches
+  `checkViewGroupReferences`'s third clause (`src/schema/compile.ts:1046`)
+  the same way. With no catalog parent left for the id, the check reports
+  `the catalog holds this field at the top level` (`:1054`), naming a field
+  the catalog no longer holds. Risk (Medium): both messages read as a field
+  to fix, when the field is already gone.
+- **FIELDS-17: two kept settings fail no check the draft ever runs.** A
+  removal leaves a `valueFromField` or `instanceIdField` value that names a
+  removed id, since both are plugin-config settings `fieldRemovalReach` only
+  counts. `checkInstanceQueryValueFromField` (`src/engine/definitions.ts:224`)
+  and `validateInstanceTransitionReferences` (`:373`) reject an unresolved
+  one, but only `publishBody` calls them. The studio's own checks rail,
+  `draft/validation.ts::runValidation` (`:82`), calls `validateStructure` and
+  `validateReferences` alone, so neither check runs before publish. A
+  `process.start` action's `config.inputMapping` value goes further:
+  `validateProcessChaining` (`src/engine/definitions.ts:531`) checks only the
+  mapping's target keys against the started process, and reads no mapping
+  value's CEL text at all. Risk (Medium): an author sees no warning until a
+  live instance drops the mapped entry (`mapping.entry-dropped`).
+- **FIELDS-18: a reused key rebinds an old expression with no message.** A
+  removal leaves every CEL expression that reads a removed field's key,
+  since `fieldRemovalReach`'s `celReads` count and `removeFieldAndReferences`
+  both stop at counting and keeping them. The checks rail then reports each
+  one's key as unknown, the same way it reports any other guard reading a
+  key no field holds. A field the author later adds with that same key
+  resolves every such expression again: `data.<key>` becomes valid CEL,
+  against a different field than the one that wrote it. No check compares a
+  field's id across that gap, so the checks rail falls silent, and the
+  rebind has no message of its own. Risk (Medium): an old guard or
+  `validation.rule` reads a new field's value under an identity change
+  nobody marked.
+- **FIELDS-19: a field label holding a `$` pattern breaks the sentence that
+  fills it.** `removalAnnouncement` (`panels/fieldCatalogLogic.ts:344`) and
+  the removal dialog's heading (`panels/RemoveFieldDialog.tsx:107`) each fill
+  a catalog sentence with `.replace("{field}", label)`. A string replacement
+  to `String.prototype.replace` expands `$&`, `$$`, `$'` and `` $` `` instead
+  of inserting the label as literal text. A label reading `Cost $&` turns
+  into the literal text `Cost {field}` inside the rendered sentence. `git
+  grep -n '\.replace("{' -- packages/web/src` counts 36 single-line call
+  sites across 11 files sharing the idiom, plus multi-line ones such as this
+  heading and `EntityTabs.tsx`'s two move sentences. Risk (Low): one
+  replacer function closes every site at once: `.replace("{field}", () =>
+  label)`.
+- **FIELDS-20: a second identical move announces nothing.** `moveField`
+  (`panels/EntityTabs.tsx:503`) writes its sentence straight into the shared
+  live region (`:521`), a pattern that predates this change. `removeField`
+  (`:477`) empties the region first and writes on the next animation frame
+  instead, so two different removal sentences in a row both announce. Two
+  unnamed fields moved into the same group, one after another, still produce
+  one sentence twice: the live region's text never changes, so a screen
+  reader announces the first move and stays silent on the second. Risk
+  (Low): one shared writer, emptying the region first, closes the gap for
+  both sentences.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 

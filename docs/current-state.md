@@ -4322,11 +4322,34 @@ meets `scope=started` should infer no new permission tier from it.
   other screen-owned state here.
 
   The components `FieldCatalogPanel` and `DataSourcesPanel` lost their own
-  Add and Remove handlers. The hosting tab owns both now. It needs the new id
-  to select after an Add. The Fields tab passes the removed field's id, and
-  `neighbourAfterRemove` picks the next sibling, then the previous sibling,
-  then the parent group. The Data sources tab still passes the removed index
-  to pick a neighbour.
+  Add and Remove handlers. The hosting tab owns both now, and each needs the
+  new id to select after an Add. The Data sources tab still passes the
+  removed index to pick a neighbour, with no reach measurement and no
+  dialog.
+
+  The Fields tab's own Remove field measures reach before it commits. A pure
+  walk, `fieldRemovalReach` in `draft/field-removal.ts`, counts what the
+  pressed field and its own fields below reach. That covers step view
+  entries, action outputs and subprocess output mappings, contract entries
+  and column mappings. It also covers the CEL reads and plugin settings a
+  removal keeps. With no reach, `FieldsTab.requestRemove` calls `removeField`
+  at once.
+
+  With reach, `requestRemove` opens `panels/RemoveFieldDialog.tsx`, a native
+  `<dialog>` built on `useConfirmDialog`. The hook moved out of
+  `ProcessHeaderBar.tsx` into the shared `panels/shared/confirmDialog.tsx`,
+  and the header bar imports it back for Publish and Discard draft.
+
+  A confirm runs `removeFieldAndReferences` inside one draft change. The
+  field then leaves the catalog. So does every reference naming it: each
+  view entry, action output, subprocess output mapping, contract entry and
+  column mapping. A view entry naming a removed group's key leaves too.
+
+  A CEL expression or a plugin `config` naming the removed id keeps its
+  text. The tab then selects `neighbourAfterRemove`'s answer: the next
+  sibling, then the previous sibling, then the parent group. It moves
+  keyboard focus to `focusAfterRemove`'s target in `fieldCatalogLogic.ts`,
+  and announces the removal through the rail's live region.
 
   Both panels gained the field CSS the area already states elsewhere. A
   label sits above its control. A 2px rule sits under each heading.
