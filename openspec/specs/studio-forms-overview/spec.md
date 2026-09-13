@@ -29,26 +29,42 @@ The tab SHALL lay the cards in a grid that reflows with the window width.
 - **THEN** the first card names the first step in the draft's own order that
   declares a view
 
-### Requirement: A card names its step and counts its fields
+### Requirement: A card names its step and counts the fields it draws
 
 A card SHALL carry a kicker naming the step's kind. Under the kicker it SHALL
 carry the step's label. The card's foot SHALL carry the number of field
-entries the view holds, a group entry included. That count SHALL share one
-row with the control that opens the form editor.
+entries the view holds that the miniature draws as a mark. A group entry and
+a note entry add nothing to that number. Where at least one of those entries
+declares `required: true`, the same sentence SHALL state how many do. That
+text SHALL share one row with the control that opens the form editor.
 
-A view holding no field entry SHALL read as an empty form. A view holding
-only notes reads as empty too. That card SHALL take the advisory color the
-checks already use for an empty form.
+A view holding no entry that draws a mark SHALL read as an empty form. A view
+holding only notes, only group entries, or both reads as empty too. That card
+SHALL take the advisory color the checks already use for an empty form. Its
+foot SHALL leave the count out.
 
 #### Scenario: A card counts its field entries
 
 - **WHEN** a step's view holds four field entries
 - **THEN** its card reads four fields
 
-#### Scenario: A group entry counts as a field entry
+#### Scenario: A group entry adds nothing to the count
 
 - **WHEN** a step's view holds a group entry and two field entries inside it
-- **THEN** its card reads three fields
+- **THEN** its card reads two fields
+
+#### Scenario: The count states the required entries
+
+- **WHEN** a step's view holds four field entries and one of them declares
+  `required: true`
+- **THEN** its card's foot reads four fields, one required
+
+#### Scenario: A form without a required entry reads its count alone
+
+- **WHEN** a step's view holds three field entries and none declares
+  `required: true`
+- **THEN** its card's foot reads three fields
+- **AND** the foot states no required count
 
 #### Scenario: The count stands beside the open control
 
@@ -60,13 +76,19 @@ checks already use for an empty form.
 - **WHEN** a step's view has no field entry
 - **THEN** its card names the form as empty
 - **AND** the card takes the advisory color
+- **AND** its foot leaves the count out
 
 #### Scenario: A form of notes alone reads as empty
 
 - **WHEN** a step's view holds one note and no field entry
 - **THEN** its card names the form as empty
 
-### Requirement: A card carries a miniature of its form
+#### Scenario: A form of group entries alone reads as empty
+
+- **WHEN** a step's view holds one group entry and no other field entry
+- **THEN** its card names the form as empty
+
+### Requirement: A card draws a miniature of its form for the eye alone
 
 A card SHALL carry a miniature of the step's form. The miniature SHALL follow
 the view's own order. Each field entry other than a group entry SHALL
@@ -79,10 +101,12 @@ required entry's mark SHALL fill solid, in a color apart from the outline's.
 Marks that outgrow the card's width SHALL continue on a further line, each
 one kept whole.
 
-The miniature SHALL carry one accessible name, stating the field count and
-the required count. It SHALL take no keyboard focus and no pointer
-interaction. On an empty form's card, a sentence SHALL stand in the
-miniature's place, saying the form has no fields yet.
+The miniature SHALL stay out of the accessibility tree, with no name and no
+role of its own. The card's foot states its counts in text instead. The
+miniature SHALL take no keyboard focus and no pointer interaction. On an
+empty form's card, a sentence SHALL stand in the miniature's place, saying
+the form has no fields yet. That sentence SHALL stay in the accessibility
+tree.
 
 #### Scenario: The miniature follows the view order
 
@@ -112,22 +136,35 @@ miniature's place, saying the form has no fields yet.
 - **THEN** the miniature continues on a second line
 - **AND** every mark stays whole and visible
 
-#### Scenario: The miniature names its counts
+#### Scenario: A screen reader hears the counts once
 
-- **WHEN** a step's view holds four field entries and marks one of them
-  required
-- **THEN** the miniature's accessible name reads four fields, one required
+- **WHEN** a screen reader walks a card whose view holds four field entries,
+  one of them required
+- **THEN** it reads four fields, one required, from the card's foot
+- **AND** the miniature adds nothing to what it reads
 
 #### Scenario: The miniature takes no focus
 
 - **WHEN** an author walks the Forms tab with the Tab key
 - **THEN** the focus never lands inside a miniature
 
+#### Scenario: An empty form says it has no fields yet
+
+- **WHEN** a step's view has no field entry
+- **THEN** the miniature's place on its card says the form has no fields yet
+- **AND** a screen reader reads that sentence
+
 ### Requirement: A card opens the form editor for its step
 
 A card SHALL carry one control that opens the form editor for that step. The
-control SHALL name whether it starts a form or opens an existing one. Pressing
-it SHALL open the form editor at `edit/form/:stepId`.
+control SHALL name whether it starts a form or opens an existing one. Its
+accessible name SHALL lead with those visible words. It SHALL then state the
+step's label, as the card's head prints it. Controls on two cards with
+different step labels SHALL carry different names. Pressing the control
+SHALL open the form editor at `edit/form/:stepId`.
+
+On an empty form's card the control SHALL stand alone in the foot, at the
+row's trailing edge.
 
 Leaving the form editor SHALL return to the Forms tab where the author started.
 
@@ -135,6 +172,19 @@ Leaving the form editor SHALL return to the Forms tab where the author started.
 
 - **WHEN** a step's view has no field entry
 - **THEN** its card's control names starting the form
+
+#### Scenario: Each control names its step
+
+- **WHEN** a draft holds two steps with a form, labelled Intake and Review
+- **THEN** the control on Intake's card carries an accessible name that
+  leads with its visible words and names Intake
+- **AND** the two controls' accessible names differ
+
+#### Scenario: The empty card's control keeps its edge
+
+- **WHEN** a step's view has no field entry
+- **THEN** its card's foot holds the control alone, at the row's trailing
+  edge
 
 #### Scenario: Leaving the form editor returns to Forms
 

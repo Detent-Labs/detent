@@ -122,8 +122,9 @@ The foot's text follows one table:
 | 16 | 0 | `formsTab.fieldCount` | 16 fields |
 | 26 | 7 | `formsTab.miniatureLabel` | 26 fields, 7 required |
 
-The keys keep their names. The `ui-string-overrides` capability lets an
-operator override a studio key, and a rename would orphan that override. The
+The keys keep their names, so the catalog's diff stays at one retired key. A
+rename to names that describe the foot stays open for a later change. No
+deployment runs this engine yet, so neither choice strands an override. The
 catalog comment over them moves from the miniature to the foot.
 
 The miniature drops `role` and `aria-label` and takes `aria-hidden="true"`.
