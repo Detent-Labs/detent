@@ -94,7 +94,7 @@ const styles = stylex.create({
     color: colors.text,
   },
   studioMapUnresolved: {
-    borderColor: colors.accent400,
+    borderColor: colors.advisory,
     borderStyle: "dashed",
     color: colors.refusal,
   },

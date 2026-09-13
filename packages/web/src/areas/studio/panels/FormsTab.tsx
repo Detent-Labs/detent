@@ -89,11 +89,11 @@ const styles = stylex.create({
     backgroundColor: colors.surface,
   },
   // An empty form marks itself with the border weight alone — a 2px box in
-  // the advisory color the checks rail's own dot already uses. No fill and no
-  // tint: the weight carries the whole difference.
+  // the advisory role, `colors.advisory`, the tone a warning callout's rule
+  // reads. No fill and no tint: the weight carries the whole difference.
   cardEmpty: {
     borderWidth: 2,
-    borderColor: colors.accent400,
+    borderColor: colors.advisory,
   },
   head: {
     display: "flex",
@@ -261,11 +261,18 @@ const styles = stylex.create({
   // (`.btn`'s default, which the `button-authoring` token's `8px 4px` in
   // `DESIGN.md` records) to 4px. `minHeight: 24` keeps the control at WCAG
   // 2.5.8's minimum target size; `shell/global.css` sets `box-sizing:
-  // border-box` on every element, so 24px bounds the border box.
+  // border-box` on every element, so 24px bounds the border box. Under the
+  // pointer and while pressed the text turns to ink, `colors.text`, as the
+  // strip's `control` does: ink reads 13.70:1 on the hover wash and 11.26:1
+  // on the press wash in light, 12.60:1 and 9.87:1 in dark.
   openControl: {
     fontFamily: fonts.mono,
     fontSize: 11,
-    color: colors.textMuted,
+    color: {
+      default: colors.textMuted,
+      ":hover": colors.text,
+      ":active": colors.text,
+    },
     paddingBlock: space.s1,
     minHeight: 24,
     // A lone control on an empty card's foot keeps the row's trailing edge

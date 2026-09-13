@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "bun:test";
 
 /**
@@ -302,9 +302,7 @@ describe("the required mark on the muted ground", () => {
     // design.md, "Required marks differ in fill as well as color": a required
     // mark fills solid, so the block sets `backgroundColor`, not `color` — the
     // mark itself is a box, not text. `accentOnMuted` is the semantic alias;
-    // `accent400` and its siblings are the ramp. The neighbouring `cardEmpty`
-    // reads `accent400` and predates this change, so the pattern stays on
-    // this one block.
+    // `accent400` and its siblings are the ramp.
     const block = styleBlock(source, "miniatureRequired");
     expect(block).toMatch(/backgroundColor: \{\s*default: colors\.accentOnMuted,/);
     expect(block).not.toMatch(/colors\.accent[0-9]/);
@@ -388,5 +386,187 @@ describe("the group break survives forced colors", () => {
     expect(block).toMatch(/borderWidth: \{\s*default: 0,\s*\[FORCED_COLORS\]: 1,?\s*\}/);
     expect(block).toMatch(/borderColor: \{\s*default: "transparent",\s*\[FORCED_COLORS\]: "CanvasText",?\s*\}/);
     expect(block).toMatch(/forcedColorAdjust: \{\s*default: "auto",\s*\[FORCED_COLORS\]: "none",?\s*\}/);
+  });
+});
+
+type RGB = [number, number, number];
+
+/** WCAG 2 relative luminance of one sRGB color, channels on 0-255, per
+ * design.md's "Contrast figures". A channel may be fractional, since a
+ * composited wash lands between integers. */
+function luminance(color: RGB): number {
+  const [r, g, b] = color.map((channel) => {
+    const c = channel / 255;
+    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  }) as RGB;
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** The WCAG 2 contrast ratio, the lighter color's luminance on top. */
+function contrast(a: RGB, b: RGB): number {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x) as [number, number];
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+/**
+ * One custom property's hex, read as `token()` in
+ * `studio-fieldMatrixBadge.test.ts` reads it: "light" takes the first
+ * declaration, "dark" the last, since the dark block overrides further down
+ * the same file.
+ */
+function token(css: string, name: string, scheme: "light" | "dark"): RGB {
+  const all = [...css.matchAll(new RegExp(`--${name}:\\s*(#[0-9a-f]{6})`, "gi"))].map((m) => m[1]!);
+  expect({ name, declared: all.length > 0 }).toEqual({ name, declared: true });
+  const hex = scheme === "light" ? all[0]! : all[all.length - 1]!;
+  return [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)) as RGB;
+}
+
+/** The CSS block opening at `header`, from the header to its matching brace. */
+function cssBlock(css: string, header: string): string {
+  const start = css.indexOf(header);
+  expect({ header, found: start > -1 }).toEqual({ header, found: true });
+  let depth = 0;
+  for (let i = css.indexOf("{", start); i < css.length; i++) {
+    if (css[i] === "{") depth++;
+    else if (css[i] === "}" && --depth === 0) return css.slice(start, i + 1);
+  }
+  throw new Error(`unterminated css block ${header}`);
+}
+
+const DARK_SCHEME = "@media (prefers-color-scheme: dark)";
+
+describe("the advisory tone reads its own role", () => {
+  it("declares the primitive and the alias in the light block, and the override alone in the dark block", () => {
+    const css = stripComments(read(TOKENS_CSS));
+    const light = cssBlock(css, ":root {");
+    const dark = cssBlock(css, DARK_SCHEME);
+
+    // design.md, "The advisory role rides its own primitive": the role
+    // aliases the primitive and follows its dark override, as the dormant
+    // and refusal roles do.
+    expect(light).toContain("--advisory-500: #e25a40;");
+    expect(light).toContain("--color-advisory: var(--advisory-500);");
+    expect(dark).toContain("--advisory-500: #ff9783;");
+    expect(dark).not.toContain("--color-advisory");
+  });
+
+  it("aliases the primitive and the role in the token module", () => {
+    const tokenModule = stripComments(read(TOKENS_STYLEX));
+
+    expect(tokenModule).toContain('advisory500: "var(--advisory-500)"');
+    expect(tokenModule).toContain('advisory: "var(--color-advisory)"');
+  });
+
+  it("clears WCAG 1.4.11's 3:1 non-text minimum against paper and ledger, in both schemes", () => {
+    const css = stripComments(read(TOKENS_CSS));
+
+    // The light role reads 3.0035:1 on ledger, so a token edit that drops it
+    // under the minimum fails here.
+    for (const scheme of ["light", "dark"] as const) {
+      const role = token(css, "advisory-500", scheme);
+      for (const ground of ["paper-50", "ledger-100"]) {
+        const ratio = contrast(role, token(css, ground, scheme));
+        expect(ratio, `${scheme}: the advisory role on ${ground}`).toBeGreaterThanOrEqual(3);
+      }
+    }
+  });
+
+  // design.md's context table: every block that draws an advisory mark.
+  const READERS = [
+    ["src/areas/studio/panels/FormsTab.tsx", "cardEmpty", "borderColor"],
+    ["src/areas/studio/panels/shared/ConditionBuilder.tsx", "conditionRowIncomplete", "borderColor"],
+    ["src/areas/studio/panels/shared/RuleBuilder.tsx", "conditionRowIncomplete", "borderColor"],
+    ["src/areas/studio/panels/MigrationSpecEditor.tsx", "studioMapUnresolved", "borderColor"],
+    ["src/areas/studio/panels/DataSourcesPanel.tsx", "studioWarning", "borderLeftColor"],
+    ["src/areas/studio/panels/FieldCatalogPanel.tsx", "studioWarning", "borderLeftColor"],
+    ["src/areas/studio/panels/ProcessHeaderBar.tsx", "warning", "borderLeftColor"],
+    ["src/areas/studio/panels/shared/InstanceQueryForm.tsx", "studioWarning", "borderLeftColor"],
+    ["src/areas/studio/screens/FormEditorScreen.tsx", "studioWarning", "borderLeftColor"],
+    ["src/areas/studio/screens/MigrationPlanScreen.tsx", "studioWarning", "borderLeftColor"],
+    ["src/areas/studio/screens/ProcessesScreen.tsx", "warning", "borderLeftColor"],
+  ] as const;
+
+  for (const [file, name, property] of READERS) {
+    it(`${name} in ${file} reads the role for its ${property}`, () => {
+      const block = styleBlock(stripComments(read(file)), name);
+
+      expect(block).toMatch(new RegExp(`\\b${property}: colors\\.advisory,`));
+    });
+  }
+
+  it("leaves no module reading the accent ramp's light step, and reads the role on a border color alone", () => {
+    const modules = ["src", "../form-ui/src"].flatMap((root) =>
+      readdirSync(`${ROOT}${root}`, { recursive: true, encoding: "utf8" })
+        .filter((path) => /\.tsx?$/.test(path))
+        .map((path) => `${root}/${path.replaceAll("\\", "/")}`),
+    );
+    // A walk that finds nothing would pass the two lists below.
+    expect(modules).toContain("src/areas/studio/panels/FormsTab.tsx");
+    expect(modules).toContain("../form-ui/src/tokens.stylex.ts");
+
+    const rampReaders: string[] = [];
+    const offBorder: string[] = [];
+    for (const file of modules) {
+      const source = stripComments(read(file));
+      // The primitive behind the role counts as a ramp read too: a component
+      // reads the role, never the step under it.
+      if (/\bcolors\.(?:accent400|advisory500)\b/.test(source)) rampReaders.push(file);
+      const reads = source.match(/\bcolors\.advisory\b/g)?.length ?? 0;
+      const onBorder = source.match(/\bborder[A-Za-z]*Color: colors\.advisory\b/g)?.length ?? 0;
+      if (reads !== onBorder) offBorder.push(file);
+    }
+
+    expect(rampReaders).toEqual([]);
+    expect(offBorder).toEqual([]);
+  });
+});
+
+describe("the authoring command turns its text to ink under the pointer", () => {
+  const STRIP = "src/areas/studio/panels/FormTabStrip.tsx";
+  const COMMANDS = [
+    ["src/areas/studio/panels/FormsTab.tsx", "openControl"],
+    [STRIP, "control"],
+    ["src/areas/studio/panels/ChangeList.tsx", "command"],
+  ] as const;
+
+  for (const [file, name] of COMMANDS) {
+    it(`${name} in ${file} sets slate text at rest and ink under the pointer and while pressed, over its two washes`, () => {
+      const block = styleBlock(stripComments(read(file)), name);
+
+      // design.md, "The command's text turns to ink on hover and on press".
+      // StyleX orders `:active` (170) after `:hover` (130), so a pressed
+      // control takes its press values.
+      expect(block).toMatch(/\bcolor: \{\s*default: colors\.textMuted,\s*":hover": colors\.text,\s*":active": colors\.text,?\s*\}/);
+      expect(block).not.toMatch(/\bcolor: colors\./);
+      expect(block).toMatch(
+        /backgroundColor: \{\s*default: "transparent",\s*":hover": colors\.surfaceMuted,\s*":active": `color-mix\(in srgb, \$\{colors\.text\} 14%, transparent\)`,?\s*\}/,
+      );
+    });
+  }
+
+  it("controlDisabled in the strip holds slate text and a transparent ground at rest, under the pointer and while pressed", () => {
+    const block = styleBlock(stripComments(read(STRIP)), "controlDisabled");
+
+    // design.md, "A disabled command takes no hover or press look": the block
+    // stacks after `control`, so it restates all three conditions of both
+    // properties.
+    expect(block).toMatch(/\bcolor: \{\s*default: colors\.textMuted,\s*":hover": colors\.textMuted,\s*":active": colors\.textMuted,?\s*\}/);
+    expect(block).toMatch(/backgroundColor: \{\s*default: "transparent",\s*":hover": "transparent",\s*":active": "transparent",?\s*\}/);
+  });
+
+  it("holds ink at 4.5:1 or more against the hover wash and the press wash, in both schemes", () => {
+    const css = stripComments(read(TOKENS_CSS));
+
+    for (const scheme of ["light", "dark"] as const) {
+      const ink = token(css, "ink-900", scheme);
+      const paper = token(css, "paper-50", scheme);
+      const ledger = token(css, "ledger-100", scheme);
+      // `color-mix(in srgb, ink 14%, transparent)` is ink at alpha 0.14,
+      // composited over the paper plate channel by channel.
+      const press = ink.map((c, i) => 0.14 * c + 0.86 * paper[i]!) as RGB;
+
+      expect(contrast(ink, ledger), `${scheme}: ink on the hover wash`).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(ink, press), `${scheme}: ink on the press wash`).toBeGreaterThanOrEqual(4.5);
+    }
   });
 });

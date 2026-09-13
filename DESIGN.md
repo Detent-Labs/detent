@@ -18,6 +18,7 @@ colors:
   flag-required: "#7a4d00"
   flag-readonly: "#6b2fa0"
   dormant-500: "#726e6e"
+  advisory-500: "#e25a40"
 typography:
   headline:
     fontFamily: "system-ui, sans-serif"
@@ -110,6 +111,11 @@ components:
     textColor: "{colors.slate-500}"
     rounded: "{rounded.md}"
     padding: "8px 4px"
+  button-authoring-hover:
+    backgroundColor: "{colors.ledger-100}"
+    textColor: "{colors.ink-900}"
+  button-authoring-active:
+    textColor: "{colors.ink-900}"
   input:
     backgroundColor: "{colors.paper-50}"
     textColor: "{colors.ink-900}"
@@ -252,11 +258,12 @@ scheme swaps the primitives and keeps every semantic role in place.
   `faulted` instance, a dead letter, an overdue timer and a field error. It
   fills the refusal stamp in a row, and it draws the error banner's box. A
   blocker count and the header bar's dirty state print in it too.
-- **Advisory** (`#ff9783` in both schemes): a check result that leaves publish
-  open.
-  It draws the warning callout's rule, an empty form card's box, and an
-  incomplete condition's dashed box. The accent ramp has no dark override, so
-  this value holds in both schemes.
+- **Advisory** (`#e25a40` light, `#ff9783` dark): the warning tone, a mark
+  beside a fact the author can still act on. It draws the warning callout's
+  rule and an empty form card's box. It also draws the dashed boxes of an
+  incomplete condition and an unresolved migration mapping. The light value
+  reads 3.26:1 on paper and 3.00:1 on ledger, both clearing the 3:1 minimum
+  for a graphic.
 
 ### Tertiary
 
@@ -299,7 +306,7 @@ never a hex. The three flag tokens are the only exception. A component
 compiled with StyleX reads that role from
 `packages/form-ui/src/tokens.stylex.ts`, which aliases the same custom
 property `tokens.css` declares. Dormant now has one, as `colors.dormant`.
-Advisory still needs a role there.
+Advisory has one too, as `colors.advisory`.
 
 ## Typography
 
@@ -471,7 +478,9 @@ mono face and the stamp, never from the control itself.
   rides alongside secondary. On hover and press it switches to Accent on
   Muted.
 - **Authoring command:** a ghost button in slate, mono at 11px. Hover washes
-  to the ledger surface, and press washes ink at 14%.
+  to the ledger surface, and press washes ink at 14%. Both turn the text to
+  ink. A disabled command keeps slate text and a transparent ground under the
+  pointer.
 - **Disabled:** 45% opacity and `cursor: not-allowed`.
 - **Focus:** a 2px accent outline at 2px offset, on every focusable thing. A
   field draws it at 0 offset, and a grid cell at -2px.
@@ -621,8 +630,8 @@ own.
   wraps where one line cannot hold it. A tab with no card has no legend.
 - A 1px hairline box on paper, 12px padding, in an auto-fill grid of columns
   at least 280px wide.
-- An empty form takes a 2px box in the advisory tone instead, with a sentence
-  standing where the miniature would.
+- An empty form takes a 2px box in Advisory instead, with a sentence standing
+  where the miniature would.
 - The kicker takes mono at 11px, uppercase at 0.08em, in slate. The step label
   is a level-2 heading. The label's `h2` keeps the body text at weight 800,
   apart from the Hierarchy's Title entry. The check badge closes the head, on
@@ -670,8 +679,8 @@ strokes, at 1, 1.5, 2 and 3px.
 
 ### The Warning Callout
 
-- Refusal text beside a 3px rule in the advisory tone, with 8px of padding
-  before the text.
+- Refusal text beside a 3px rule in Advisory, with 8px of padding before the
+  text.
 - It sits in place, next to the value it warns about.
 
 ### Screen Furniture

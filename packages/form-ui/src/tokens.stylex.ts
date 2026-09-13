@@ -12,7 +12,7 @@ import * as stylex from "@stylexjs/stylex";
  * semantic aliases) into one group, mirroring how `accent600`/`accent700`
  * already sat beside the semantic names before this move. `fonts`, `space`,
  * `radius` and `shadow` mirror `tokens.css`'s remaining sections one for
- * one. 42 variables total, matching `tokens.css`'s own count.
+ * one. 44 variables total, matching `tokens.css`'s own count.
  */
 export const colors = stylex.defineVars({
   // primitives
@@ -24,6 +24,7 @@ export const colors = stylex.defineVars({
   stamp600: "var(--stamp-600)",
   refusal700: "var(--refusal-700)",
   dormant500: "var(--dormant-500)",
+  advisory500: "var(--advisory-500)",
   flagVisible: "var(--color-flag-visible)",
   flagRequired: "var(--color-flag-required)",
   flagReadonly: "var(--color-flag-readonly)",
@@ -45,6 +46,7 @@ export const colors = stylex.defineVars({
   accentOnMuted: "var(--color-accent-on-muted)",
   refusal: "var(--color-refusal)",
   dormant: "var(--color-dormant)",
+  advisory: "var(--color-advisory)",
 });
 
 export const fonts = stylex.defineVars({

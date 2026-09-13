@@ -4526,7 +4526,7 @@ meets `scope=started` should infer no new permission tier from it.
   function with its own `bun:test` behind it. The module `draft/roleStamp.ts`
   maps each step to `initial`, `task`, `subprocess` or `end`, with its tone,
   for the card's role. A card takes a 1px hairline box. An empty form takes a
-  2px box in the advisory color instead.
+  2px box in the advisory role, `colors.advisory`, instead.
 
   A legend stands above the grid, as the grid's sibling in the tab body. The
   grid scrolls on its own, so the legend keeps its place. The `Legend`

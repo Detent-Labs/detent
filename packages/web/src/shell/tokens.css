@@ -26,6 +26,13 @@
   --stamp-600: #d42b11;
   --refusal-700: #ae1800;
   --dormant-500: #726e6e;
+  /* The advisory tone, drawn as a rule or a border and never as a stamp.
+     #e25a40 reads 3.26:1 on paper and 3.00:1 on ledger, clearing WCAG
+     1.4.11's 3:1 non-text minimum on both grounds. The value is no step of
+     the accent ramp: its OKLCH lightness of 0.640 sits on no step of the
+     ramp's shared lightness scale. The dark override reads 7.91:1 on paper
+     and 6.71:1 on ledger. */
+  --advisory-500: #e25a40;
   /* Field-matrix checkbox colors: one hue per FlagKey, distinct from the
      accent/refusal red family and from each other. No separate semantic
      alias — each token has exactly one consumer (design.md's Decisions,
@@ -74,6 +81,7 @@
   --color-accent-on-muted: var(--color-accent-700);
   --color-refusal: var(--refusal-700);
   --color-dormant: var(--dormant-500);
+  --color-advisory: var(--advisory-500);
 
   --font-heading: system-ui, sans-serif;
   --font-heading-weight: 800;
@@ -116,6 +124,7 @@
     --stamp-600: #ff563c;
     --refusal-700: #ff9783;
     --dormant-500: #9b9797;
+    --advisory-500: #ff9783;
     --color-flag-visible: #6fa8ff;
     --color-flag-required: #d4a017;
     --color-flag-readonly: #b98aff;
