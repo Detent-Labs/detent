@@ -22,8 +22,8 @@
 
 ## 4. The Changes tab
 
-- [ ] 4.1 Give `ChangesView` a `contentLocale` prop, passed from `EditScreen.tsx` as `PathsView` takes one. Mount `ChangeList` there, and drop the old list markup. Verify: the tab count reads the row count, and a German label reads in German.
-- [ ] 4.2 Add `openTabFromRow` to `EditScreen.tsx` and wire both row commands, per D10. Verify: typecheck passes.
+- [x] 4.1 Give `ChangesView` a `contentLocale` prop, passed from `EditScreen.tsx` as `PathsView` takes one. Mount `ChangeList` there, and drop the old list markup. Verify: the tab count reads the row count, and a German label reads in German.
+- [x] 4.2 Add `openTabFromRow` to `EditScreen.tsx` and wire both row commands, per D10. Verify: typecheck passes.
 
 ## 5. The Versions screen
 
