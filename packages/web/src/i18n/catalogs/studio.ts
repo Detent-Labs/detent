@@ -51,6 +51,28 @@ export const en = {
   "fieldCatalog.heading": "Field catalog",
   "fieldCatalog.addField": "+ Add field",
   "fieldCatalog.removeField": "Remove field",
+  // The removal confirmation dialog, `RemoveFieldDialog.tsx`, which renders
+  // when a removal reaches past the field catalog. One key per fact term and
+  // per note, so no sentence is assembled from fragments; `{field}` fills
+  // through `.replace()`, as `EntityTabs.tsx` does for the move sentences.
+  "fieldCatalog.removeDialogHeadingField": "Remove “{field}”?",
+  "fieldCatalog.removeDialogHeadingGroup": "Remove the group “{field}”?",
+  "fieldCatalog.removeDialogFieldTerm": "Field",
+  "fieldCatalog.removeDialogGroupTerm": "Group",
+  "fieldCatalog.removeDialogFieldsInsideTerm": "Fields inside it",
+  "fieldCatalog.removeDialogStepsTerm": "Steps showing it",
+  "fieldCatalog.removeDialogWritersTerm": "Actions and mappings writing it",
+  "fieldCatalog.removeDialogContractEntriesTerm": "Contract entries",
+  "fieldCatalog.removeDialogColumnMappingsTerm": "Column mappings targeting it",
+  "fieldCatalog.removeDialogCelReadsTerm": "CEL expressions reading it",
+  "fieldCatalog.removeDialogPluginSettingsTerm": "Plugin settings naming it",
+  "fieldCatalog.removeDialogNoteAlways": "Removing it also clears every step entry and reference that names it.",
+  "fieldCatalog.removeDialogNoteGroup": "Every field inside the group leaves with it.",
+  "fieldCatalog.removeDialogNoteCelKept": "CEL expressions and plugin settings keep their text.",
+  "fieldCatalog.removeDialogNoteCheckPublish": "Check each one before you publish.",
+  "fieldCatalog.removeDialogConfirmField": "Remove field",
+  "fieldCatalog.removeDialogConfirmGroup": "Remove group",
+  "fieldCatalog.removeDialogCancel": "Cancel",
   "fieldCatalog.customTypeOption": "custom (plugin)",
   "fieldCatalog.typeDropsFormatConfirm": "The new type doesn't allow this field's format. Switch anyway and drop it?",
   "fieldCatalog.typeDropsControlConfirm": "The new type doesn't allow this field's control. Switch anyway and drop it?",
