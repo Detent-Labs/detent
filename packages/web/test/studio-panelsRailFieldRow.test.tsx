@@ -81,4 +81,17 @@ describe("PanelsRailFieldRow", () => {
     expect(renderToStaticMarkup(<PanelsRailFieldRow {...BASE} dragging />)).toContain('data-dragging="true"');
     expect(renderToStaticMarkup(<PanelsRailFieldRow {...BASE} />)).not.toContain("data-dragging");
   });
+
+  // The refocus effect scrolls this id into view after an add into a group
+  // (design.md, "Focus and the rail entry after an add into a group"). The id
+  // sits on the button, not the wrapper, so it lands on the same element a
+  // click or a focus targets.
+  it("places a given id on the button, and no id attribute without one", () => {
+    const html = renderToStaticMarkup(<PanelsRailFieldRow {...BASE} id="studio-field-rail-field_1" />);
+    expect(html).toContain('<button id="studio-field-rail-field_1"');
+
+    const withoutId = renderToStaticMarkup(<PanelsRailFieldRow {...BASE} />);
+    const buttonTag = withoutId.slice(withoutId.indexOf("<button"), withoutId.indexOf(">", withoutId.indexOf("<button")) + 1);
+    expect(buttonTag).not.toContain(" id=");
+  });
 });

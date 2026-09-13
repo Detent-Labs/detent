@@ -51,11 +51,6 @@ export interface RailFieldRow {
   /** The field's own `key`, or `""` while the author has not typed one. */
   key: string;
   depth: 0 | 1;
-  /** The id of the TOP-LEVEL field this row sits under — equal to `id` for a
-   * top-level row. A relocated (depth-2+) row keeps its real ancestor here
-   * even though `depth` reads 0, so selecting it opens the group editor that
-   * actually contains it. */
-  rootId: string;
 }
 
 /**
@@ -65,24 +60,21 @@ export interface RailFieldRow {
  * A field at depth 0 or 1 keeps that depth. A field at depth 2 or deeper takes
  * depth 0, so it relocates to a top-level row rather than indenting further.
  * The relocation stays visible: the row still carries the field's own key.
- * `rootId` is unaffected by the relocation — it always names the real
- * top-level ancestor.
  *
  * A field with no `id` is skipped. The id is the rail's React key and the
  * anchor a row scrolls to, and a mid-edit catalog can hold neither.
  */
 export function flattenRailFields(fields: DraftField[] | undefined): RailFieldRow[] {
   const rows: RailFieldRow[] = [];
-  const walk = (fs: DraftField[], depth: number, rootId: string | undefined) => {
+  const walk = (fs: DraftField[], depth: number) => {
     for (const f of fs) {
-      const root = rootId ?? f.id;
-      if (f.id !== undefined && root !== undefined) {
-        rows.push({ id: f.id, key: f.key ?? "", depth: depth >= 2 ? 0 : (depth as 0 | 1), rootId: root });
+      if (f.id !== undefined) {
+        rows.push({ id: f.id, key: f.key ?? "", depth: depth >= 2 ? 0 : (depth as 0 | 1) });
       }
-      if (f.fields) walk(f.fields, depth + 1, root);
+      if (f.fields) walk(f.fields, depth + 1);
     }
   };
-  if (fields) walk(fields, 0, undefined);
+  if (fields) walk(fields, 0);
   return rows;
 }
 

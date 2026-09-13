@@ -171,6 +171,12 @@ const styles = stylex.create({
 });
 
 interface PanelsRailFieldRowProps {
+  /** The DOM id for the entry's own button, `railEntryId(fieldId)`. Lets the
+   * refocus effect scroll a newly added group child into view alongside its
+   * label input (design.md, "Focus and the rail entry after an add into a
+   * group"). Absent from `FieldsTab`'s "+ Add field" row, which names no
+   * field. */
+  id?: string;
   /** The resolved label, or the "unnamed field" fallback already applied. */
   label: string;
   typeLabel: string | undefined;
@@ -209,6 +215,7 @@ interface PanelsRailFieldRowProps {
  * one button still reads as one row.
  */
 export function PanelsRailFieldRow({
+  id,
   label,
   typeLabel,
   kindIcon: KindIcon,
@@ -237,6 +244,7 @@ export function PanelsRailFieldRow({
       }}
     >
       <button
+        id={id}
         type="button"
         {...stylex.props(styles.railRow, styles.railFieldInRow, selected && styles.railRowCurrent)}
         draggable
@@ -427,6 +435,7 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
             return (
               <li key={row.id}>
                 <PanelsRailFieldRow
+                  id={railEntryId(row.id)}
                   label={label || t("panelsScreen.unnamedField")}
                   typeLabel={typeLabel}
                   kindIcon={kindIcon}
