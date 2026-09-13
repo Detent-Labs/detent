@@ -112,18 +112,17 @@ heights, as before.
 
 - Risk: on a window too short for the floor, a short grid's tab body scrolls
   past blank space. At 1440x600 `laptop_inventory` scrolls 156px under its
-  frame. The tab body sits 241.5px short of the window height at every size.
-- The toolbar plus its two 12px gaps take 131px at 1440 wide, where the
-  toolbar itself is 107px. At 1024 wide the toolbar wraps to 137px, so that
-  sum is 161px. Those numbers, not the window height, set the derived
-  threshold below. The tab body scrolls once its visible height drops under
-  toolbar, gaps and the 384px floor. That threshold is under about 756px at
-  1440 wide, and under about 786px at 1024 wide.
-- That is a different number from MATRIX-1's wheel-trap threshold: 241.5 +
-  384 = 625.5px. MATRIX-1 measures a different event, a long grid filling
-  the whole tab body viewport. Mitigation: accepted. The tab body scrolled
-  this same 156px distance before the change, only inside an empty band the
-  frame drew. The blank space now has no frame around it.
+  frame.
+  - Where it starts, derived from measured parts. The tab body sits 241.5px
+    short of the window height. The toolbar and its two 12px gaps take 131px
+    at 1440 wide, and 161px at 1024 wide, where the toolbar wraps. Adding the
+    384px floor puts the start under about 756px at 1440 wide. At 1024 wide
+    it sits under about 786px.
+  - MATRIX-1's wheel trap is a different event, a long grid filling the tab
+    body. Its threshold is 241.5 + 384 = 625.5px.
+  - Mitigation: accepted. The tab body scrolled this same 156px before the
+    change, inside an empty band the frame drew. The blank space now has no
+    frame around it.
 - Risk: `FieldMatrixGrid`'s space fills only inside a flex column. Mitigation:
   `FieldMatrixPanel` is the grid's one mount, per `ui-glossary.md`. A bare
   test render lays nothing out and draws one more plain `div`. No test counts

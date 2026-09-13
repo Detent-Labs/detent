@@ -26,8 +26,8 @@ height first, down to the floor.
 
 #### Scenario: A long matrix reaches the bottom edge
 
-- **WHEN** the Field matrix tab opens on a draft whose grid is taller than the
-  height under the toolbar
+- **WHEN** the Field matrix tab opens on a window with room for the floor
+- **AND** the draft's grid is taller than the height under the toolbar
 - **THEN** the grid's bottom edge is the tab body's bottom edge
 - **AND** no empty band sits below the grid
 - **AND** the tab body itself does not scroll
