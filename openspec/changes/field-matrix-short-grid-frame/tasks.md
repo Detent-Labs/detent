@@ -1,6 +1,6 @@
 ## 1. Layout
 
-- [ ] 1.1 Rewrite the field matrix `describe` block in `packages/web/test/studio-guidedSurfaceStyle.test.ts`.
+- [x] 1.1 Rewrite the field matrix `describe` block in `packages/web/test/studio-guidedSurfaceStyle.test.ts`.
   Keep `styleBlock` after `stripComments`. The `matrix` block matches
   `/flexGrow: 1/` and `/minHeight: 0/`. A `matrixScrollSpace` block in
   `FieldMatrixGrid.tsx` matches `/display: "flex"/`, `/flexDirection: "column"/`,
@@ -8,10 +8,10 @@
   matches `/overflow: "auto"/` and `/outlineOffset: "-2px"/`, and matches
   neither `/minHeight/` nor `/maxHeight/`. Verify: the changed tests fail by
   name in the full suite.
-- [ ] 1.2 Give the `matrix` style in `FieldMatrixPanel.tsx` a `flexGrow: 1`
+- [x] 1.2 Give the `matrix` style in `FieldMatrixPanel.tsx` a `flexGrow: 1`
   beside its `minHeight: 0`. Its comment states why the column grows. Verify:
   `bun run typecheck` passes.
-- [ ] 1.3 In `FieldMatrixGrid.tsx`, add the `matrixScrollSpace` style from
+- [x] 1.3 In `FieldMatrixGrid.tsx`, add the `matrixScrollSpace` style from
   design.md and wrap the scroll region in a plain `div` carrying it. The empty
   state keeps returning the status line alone. Drop `minHeight` from
   `matrixScroll`, and state each comment as a fact. Verify: the block from 1.1
@@ -20,10 +20,10 @@
 
 ## 2. Documentation
 
-- [ ] 2.1 Rewrite the floor sentence in `docs/current-state.md`, near line 4529.
+- [x] 2.1 Rewrite the floor sentence in `docs/current-state.md`, near line 4529.
   It names the space that holds the 24rem floor and the frame that follows its
   rows. Verify: the antislop count on that file does not rise.
-- [ ] 2.2 In `docs/browser-checks.md`, entry "The field matrix's height
+- [x] 2.2 In `docs/browser-checks.md`, entry "The field matrix's height
   (`field-matrix-fill-height`)", add a step for `laptop_inventory` at
   1440x900. Pass: the frame ends under the last row, with no empty band inside
   it. Keep the other steps. Verify: the antislop count on that file does not
@@ -42,29 +42,29 @@ heights with `run-code` and `page.evaluate`, since the worktree guard refuses
 `eval`. Print a known value first as a positive control. Open each draft from
 its process list row. Discard it there afterwards, and accept the confirm.
 
-- [ ] 3.1 Open `laptop_inventory`'s Field matrix tab at 1440x900. Pass: the
+- [x] 3.1 Open `laptop_inventory`'s Field matrix tab at 1440x900. Pass: the
   frame's bottom sits within its 1px border of the table's bottom. The tab
   body's `scrollHeight` equals its `clientHeight`.
-- [ ] 3.2 Resize that tab to 1440x600 and scroll the tab body to its end. Move
+- [x] 3.2 Resize that tab to 1440x600 and scroll the tab body to its end. Move
   the pointer over the blank space under the frame and wheel up. Pass: the tab
   body's `scrollTop` falls.
-- [ ] 3.3 Open `it_offboarding`'s Field matrix tab at 1440x900. Pass: the
+- [x] 3.3 Open `it_offboarding`'s Field matrix tab at 1440x900. Pass: the
   grid's bottom edge equals the tab body's, and the tab body does not scroll.
   Record the toolbar's height.
-- [ ] 3.4 Resize to 1440x1200. Pass: the grid grows by the added height.
-- [ ] 3.5 Resize to 1440x600, then to 1280x600. Pass at both: the grid
+- [x] 3.4 Resize to 1440x1200. Pass: the grid grows by the added height.
+- [x] 3.5 Resize to 1440x600, then to 1280x600. Pass at both: the grid
   measures 384px and the tab body scrolls. The header row and two field rows
   fit in the grid's `clientHeight`. The toolbar measures the height 3.3
   recorded.
-- [ ] 3.6 Open `access_request`'s Field matrix tab at 1440x1200. Pass: the
+- [x] 3.6 Open `access_request`'s Field matrix tab at 1440x1200. Pass: the
   frame ends under the last row, and the grid's `scrollHeight` equals its
   `clientHeight`.
-- [ ] 3.7 On `it_offboarding` at 1440x900, move focus to the grid's scroll
+- [x] 3.7 On `it_offboarding` at 1440x900, move focus to the grid's scroll
   region with the keyboard. Pass: all four edges of its focus ring show.
-- [ ] 3.8 Run `/impeccable critique` and `/impeccable audit` against the Field
+- [x] 3.8 Run `/impeccable critique` and `/impeccable audit` against the Field
   matrix route. Run the impeccable detector once over both changed files.
   Resolve each finding this change causes.
-- [ ] 3.9 After 3.2 passes, rewrite MATRIX-1's bullet on its two unmeasured
+- [x] 3.9 After 3.2 passes, rewrite MATRIX-1's bullet on its two unmeasured
   points in `docs/decisions.md`. A grid shorter than the floor leaves blank tab
   body under its frame. A wheel there scrolls the tab body. A grid of 24rem or
   more still traps the wheel. Cite 3.2's measured `scrollTop` values.
