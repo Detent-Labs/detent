@@ -97,6 +97,23 @@ describe("The change list", () => {
     expect(buttons(html)).toBe(2);
   });
 
+  it("prints a label and a step name holding a `$` pattern as written", () => {
+    const priced: ChangeRow = { ...fieldRow, label: "Price in $'s" };
+    const sent: ChangeRow = {
+      key: "paths:path_send",
+      group: "paths",
+      kind: "changed",
+      label: "Send",
+      context: "Step $&",
+      properties: [changed("Target")],
+      raw: [],
+    };
+    const html = renderToStaticMarkup(<ChangeList rows={[priced, sent]} heading={HEADING} onOpenRow={() => {}} />);
+
+    expect(html).toContain("Open Price in $&#x27;s in the Fields tab");
+    expect(html).toContain("From Step $&amp;");
+  });
+
   it("gives the Expand all command aria-expanded false and aria-controls naming the list, while folded", () => {
     const html = renderToStaticMarkup(<ChangeList rows={[fieldRow, processRow]} heading={HEADING} />);
     const command = html.match(/<button\b[^>]*>Expand all<\/button>/)?.[0] ?? "";

@@ -412,7 +412,7 @@ function Row({ row, open, onToggle, onOpenRow }: RowProps) {
             </>
           )}
           {row.context !== undefined && (
-            <span {...stylex.props(styles.context)}>{t("changeList.context.from").replace("{step}", row.context)}</span>
+            <span {...stylex.props(styles.context)}>{t("changeList.context.from").replace("{step}", () => row.context ?? "")}</span>
           )}
         </span>
         <span {...stylex.props(styles.names)}>
@@ -424,7 +424,7 @@ function Row({ row, open, onToggle, onOpenRow }: RowProps) {
                 {property.nameMono ? <code {...stylex.props(styles.mono)}>{property.name}</code> : property.name}
               </Fragment>
             ))}
-            {more > 0 && ` ${t("changeList.more").replace("{count}", String(more))}`}
+            {more > 0 && ` ${t("changeList.more").replace("{count}", () => String(more))}`}
           </span>
           <Chevron size={18} strokeWidth={1.75} aria-hidden="true" {...stylex.props(styles.chevron)} />
         </span>
@@ -440,7 +440,8 @@ function Row({ row, open, onToggle, onOpenRow }: RowProps) {
         {openKey !== undefined && onOpenRow && (
           <div {...stylex.props(styles.openCommand)}>
             <button type="button" {...ghost(styles.command, styles.openCommandFlush)} onClick={() => onOpenRow(row)}>
-              {t(openKey).replace("{label}", row.label)}
+              {/* A function fills each slot, so a `$` pattern in a label prints as written. */}
+              {t(openKey).replace("{label}", () => row.label)}
             </button>
           </div>
         )}
