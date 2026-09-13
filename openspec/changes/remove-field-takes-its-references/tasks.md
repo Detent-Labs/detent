@@ -38,4 +38,4 @@
 - [ ] 6.1 Run `bun run typecheck` and then `bun run build` in the devcontainer. Verify: both exit 0.
 - [ ] 6.2 Run the full `bun test` with `DATABASE_URL` set, in the devcontainer. Pipe its output through `scripts/gates/silent-green.sh`. Verify: no test fails, and the gate exits 0.
 - [ ] 6.3 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` over the change's range. Run the same range through `scripts/gates/whitespace.sh`. Verify: both gates exit 0, and neither prints "nothing to check" or "SKIPPED".
-- [ ] 6.4 In `openspec/specs/studio-app/spec.md`, put a targeted `synonym-rotation` directive with a one-line reason above line 81. Append this delta's four requirements to a scratch copy of that spec. Verify: the copy and the live spec report the same antislop count.
+- [x] 6.4 In `openspec/specs/studio-app/spec.md`, put a targeted `synonym-rotation` directive with a one-line reason above line 81. Append this delta's four requirements to a scratch copy of that spec. Verify: the copy and the live spec report the same antislop count.

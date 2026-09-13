@@ -78,6 +78,8 @@ When the draft carries an unsaved change, a control SHALL ask for
 confirmation before navigating. This uses the browser's own `confirm()`
 prompt with a `t()` string.
 
+<!-- antislop: allow synonym-rotation -->
+<!-- Discard names the toolbar control; remove names a field removal. -->
 The toolbar's Publish and Discard controls no longer share that pattern.
 Each confirms in a dialog of the application's own instead. Each commits an
 act the developer cannot undo. See `studio-publish` for the publish dialog,
