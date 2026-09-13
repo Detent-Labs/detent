@@ -31,7 +31,9 @@ decoration. No surface pretends to be a card when it is a row in a register.
 
 One accent sits on a light ground. Roles, such as `Unclaimed` and `Booked`,
 form the semantic layer that components reference. The ramp steps behind them
-are primitives. A component must never touch a primitive directly.
+are primitives. A component must never touch a primitive directly. The
+dormant tone reads `--color-dormant` (`colors.dormant` in the token module),
+backed by the `--dormant-500` primitive.
 
 The field matrix's `--color-flag-visible`/`-required`/`-readonly` tokens are
 a scoped exception. Each is a single token with no ramp behind it, read

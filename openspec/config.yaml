@@ -55,9 +55,10 @@ context: |
   drafts (the `drafts` table, optimistic concurrency on a `revision` column),
   one tabbed process surface holding ten tabs (canvas, steps, fields, data
   sources, paths, forms, field matrix, contract, changes, checks), a routed
-  form editor, a replacing JSON surface, publish, published versions with a
-  JSON diff, migration-plan authoring, a registry/CEL-scratchpad Tools
-  screen, a Player beside the merged instance record, and a Templates screen
+  form editor, a replacing JSON surface, publish, published versions
+  compared as a change list, migration-plan authoring, a
+  registry/CEL-scratchpad Tools screen, a Player beside the merged instance
+  record, and a Templates screen
   holding the reusable bodies a new process seeds from. The canvas tab keeps
   drag-to-move and drag-to-connect; the steps tab pairs a numbered rail with
   one step page. Studio routes admit `system:author` or `system:developer`.
