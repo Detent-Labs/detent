@@ -1786,6 +1786,17 @@ tags are local to this section; paths under `panels/` and `screens/` start at
   which sets `zIndex: 1` later in tree order (`canvas/CanvasView.tsx:83`).
   Neither element stood confirmed as the cause. Risk (Medium): a click
   meant for the open menu can land on tab-body content instead.
+- **CHANGES-6: the participant Task screen scrolls sideways at 400px.** The
+  `visually-hidden-text-page-bounds` audit met it on the app area's Task
+  screen. Its claim row sets `display: "flex"` with no `flexWrap`
+  (`packages/web/src/areas/app/screens/TaskScreen.tsx:108`,
+  `styles.taskActions`). A claimed step fills that row with Release, the
+  delegate input, Delegate to, Save and Discard case.
+
+  Measured 2026-09-13 at 400x800 on `purchase_requisition`'s Finance Review,
+  Save ended at x=463 and Discard case at x=554. The page scrolled 154px
+  sideways. Risk (Medium): a participant on a phone scrolls sideways to reach
+  Save and Discard case.
 
 ## Open from the field-matrix-fill-height browser check (each needs its own OpenSpec change)
 
