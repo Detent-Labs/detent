@@ -72,11 +72,13 @@ export function droppedByKindChange(
  * A view entry's `group` is the one reference this move strands: the
  * definition contract binds it to the field's catalog parent, so this
  * function's caller owns rewriting it, in the same draft change as this
- * function's own result. `EntityTabs.tsx`'s `moveField` calls
- * `view-group-sync.ts::syncViewGroupsOnFieldMove`. Widening this function to
- * take the whole draft and do that rewrite itself would give the rail's pure
- * tree function a second job (design.md: "One helper keeps the view entries
- * level with the catalog").
+ * function's own result. `view-group-sync.ts::moveFieldAndSyncViews` is that
+ * caller: it runs this function, then `syncViewGroupsOnFieldMove`, inside the
+ * one `mutate` that `EntityTabs.tsx`'s `moveField` opens. `moveField` calls
+ * this function once before that, only to skip a refused move. Widening this
+ * function to take the whole draft and do that rewrite itself would give the
+ * rail's pure tree function a second job (design.md: "One helper keeps the
+ * view entries level with the catalog").
  *
  * Answers the array it was given, unchanged, where the move is not one to
  * make: no field carries `fieldId`, `targetGroupId` names no `group` field,
