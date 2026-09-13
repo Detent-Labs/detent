@@ -16,7 +16,7 @@
 
 ## 3. The change list component
 
-- [ ] 3.1 Add the component copy to the studio catalog, one key per sentence, per D6. Verify: typecheck passes.
+- [x] 3.1 Add the component copy to the studio catalog, one key per sentence, per D6. Verify: typecheck passes.
 - [ ] 3.2 Write `packages/web/test/studio-changeList.test.tsx`, per D9. Verify: each case fails first.
 - [ ] 3.3 Build `panels/ChangeList.tsx`, per D6 and its shape brief. Verify: the change list cases pass.
 

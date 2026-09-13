@@ -789,6 +789,35 @@ export const en = {
   // A time limit a number and a unit can state: `{count}` from
   // `timeLimitParts`, `{unit}` one of the `timeLimit.unit*` words.
   "changeList.value.timeLimit": "{count} {unit}",
+  // The copy `panels/ChangeList.tsx` draws around those words. The heading
+  // line names the comparison and never counts; each caller fills its own
+  // version numbers. The Fields to Contract headings read the `tabs.*` names.
+  "changeList.heading.base": "Compared with version {version}",
+  "changeList.heading.versions": "Version {a} compared with version {b}",
+  "changeList.heading.draft": "Draft compared with version {version}",
+  "changeList.group.process": "Process",
+  // A capitalized word; the stamp's own style sets it in capitals.
+  "changeList.stamp.added": "Added",
+  "changeList.stamp.changed": "Changed",
+  "changeList.stamp.removed": "Removed",
+  "changeList.expandAll": "Expand all",
+  "changeList.collapseAll": "Collapse all",
+  // A folded row names four properties, then this.
+  "changeList.more": "+{count} more",
+  // A path row's context line: the step the path leaves.
+  "changeList.context.from": "From {step}",
+  // Visually hidden before each value of an open row's property.
+  "changeList.before": "Before:",
+  "changeList.after": "After:",
+  // One open command per group, naming its entity, so a long list never
+  // repeats one accessible name. The Process row carries none.
+  "changeList.open.fields": "Open {label} in the Fields tab",
+  "changeList.open.dataSources": "Open {label} in the Data sources tab",
+  "changeList.open.steps": "Open {label} in the Steps tab",
+  "changeList.open.paths": "Open {label} in the Paths tab",
+  "changeList.open.forms": "Open {label} in the Forms tab",
+  "changeList.open.contract": "Open {label} in the Contract tab",
+  "changeList.developerView": "Developer view",
 
   "pathsView.source": "Source step",
   "pathsView.trigger": "Trigger",
