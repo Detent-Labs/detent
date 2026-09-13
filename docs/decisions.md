@@ -1676,10 +1676,10 @@ paths under `panels/`, `draft/` and `screens/` start at
 - **FIELDS-6: the entity rail is a flat list of tab stops.** IT Offboarding's
   rail holds 51 entries plus "+ Add field". That makes 52 tab stops, with no
   arrow keys and no filter. Its landmark is a `nav` named "Editors"
-  (`panelsScreen.railLabel`, `packages/web/src/i18n/catalogs/studio.ts:429`).
+  (`panelsScreen.railLabel`, `packages/web/src/i18n/catalogs/studio.ts:451`).
   An entry's check badge reads "1 issues" for one check
   (`panels/EntityTabs.tsx:283`), from the key `panelsScreen.issueMark`
-  (`packages/web/src/i18n/catalogs/studio.ts:432`). Risk (Low): a keyboard
+  (`packages/web/src/i18n/catalogs/studio.ts:454`). Risk (Low): a keyboard
   user presses Tab up to 52 times to cross the rail.
 - **FIELDS-7: the Fields tab's headings and checks lack structure.** The
   outline jumps from the header bar's `h1` to the field's `h3`. They sit at
@@ -1774,12 +1774,12 @@ paths under `panels/`, `draft/` and `screens/` start at
   stays harmless at 51 entries.
 - **FIELDS-15: a step or data source removal reuses its own button for the
   next entity.** `panels/DataSourcesPanel.tsx`'s `DataSourceRow` (`:161`) and
-  `screens/EditScreen.tsx`'s `<StepPage>` (`:889`) render with no `key`,
+  `screens/EditScreen.tsx`'s `<StepPage>` (`:927`) render with no `key`,
   unlike the Fields tab's own `FieldEditor`, keyed by the field's id
   (`panels/FieldCatalogPanel.tsx:1162`). A press on "Remove data source" or
   "Remove this step" therefore keeps its own button element in the DOM.
   `removeDataSource` (`panels/EntityTabs.tsx:656`) and `onRemoveStep`
-  (`screens/EditScreen.tsx:530`) each pick a neighbour, and the same button
+  (`screens/EditScreen.tsx:541`) each pick a neighbour, and the same button
   then renders that neighbour's own remove control. This is a code reading;
   no browser run has confirmed it. Risk (Medium): a second Enter or Space
   removes a neighbour with no separate confirmation.
@@ -2042,13 +2042,13 @@ only the marks the miniature draws. The required count stands beside it.
   (`panels/FormsTab.tsx:273`) is no heading, so heading navigation cannot move
   between cards. A keyboard user presses Tab twelve times to reach the
   twelfth card's control, more where cards carry a check badge (`:277`). The
-  header bar's `h1` sits at `panels/ProcessHeaderBar.tsx:783`, and FIELDS-7
+  header bar's `h1` sits at `panels/ProcessHeaderBar.tsx:749`, and FIELDS-7
   records the outline gap below it. Risk (Low): both predate the change. The
   fix makes each name a heading, at the level FIELDS-7's outline repair
   settles.
 - **FORMS-9: the browser check's wrap step clears its line by a few pixels.**
   Step 4 of "The Forms tab card miniature" adds ten field entries
-  (`docs/browser-checks.md:3493`). The final review computed about 308.7px of
+  (`docs/browser-checks.md:3583`). The final review computed about 308.7px of
   mark room per card at 1100px, against 314px for the resulting marks.
   The browser run wrapped three marks, since the form editor added one group
   entry on its own. Risk (Low): a sub-pixel column change can flip the pass
@@ -2077,7 +2077,7 @@ only the marks the miniature draws. The required count stands beside it.
 - **FORMS-13: the check badge's name omits its step and joins two fragments.**
   Its `aria-label` joins the count to a catalog phrase
   (`panels/FormsTab.tsx:281`), from `formsTab.issueMark` and
-  `formsTab.issueMarkOne` (`packages/web/src/i18n/catalogs/studio.ts:401`).
+  `formsTab.issueMarkOne` (`packages/web/src/i18n/catalogs/studio.ts:423`).
   Two cards with one check each carry one name. The design language bars a
   sentence built from fragments. The `forms-tab-card-clarity` audit found this
   on 2026-09-13. Risk (Medium): a screen reader's button list cannot tell the
