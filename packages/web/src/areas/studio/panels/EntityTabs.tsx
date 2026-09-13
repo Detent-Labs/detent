@@ -71,9 +71,9 @@ const styles = stylex.create({
     maxHeight: { default: "none", [NARROW]: "20rem" },
     overflowY: "auto",
     overscrollBehavior: "contain",
-    // Contains each row's hidden kind word and group name, plus the move
-    // live region; a positioned container clips and scrolls them instead of
-    // the page.
+    // Contains each row's hidden kind word and group name, plus the live
+    // region announcing field moves and removals; a positioned container
+    // clips and scrolls them instead of the page.
     position: "relative",
   },
   railList: {

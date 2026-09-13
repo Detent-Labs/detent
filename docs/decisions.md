@@ -1629,7 +1629,8 @@ recorded rather than fixed. The RAIL tags are local to this section.
 
 The change `group-child-own-editor` ran a final code review, browser walks,
 `/impeccable critique` and `/impeccable audit` on the Studio Fields tab on
-2026-09-13. They found FIELDS-2 to FIELDS-14. The change
+2026-09-13. They found FIELDS-2 to FIELDS-14, and the change
+`visually-hidden-text-page-bounds` fixed FIELDS-2. The change
 `remove-field-takes-its-references` added FIELDS-15 to FIELDS-24 on the same
 day, from its design, reviews, browser walks and audits. Every item below
 sits outside the change that found it, and this section records it in place
@@ -1646,7 +1647,7 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   is RAIL-3 on the Fields tab. The shell's 2px ring at a 2px offset
   (`packages/web/src/shell/global.css:37`) loses its edge against both scroll
   boxes (`panels/EntityTabs.tsx:60`, `:72`). On the chosen entry the ring and
-  the 3px current mark (`:100`) share one accent. Risk (Low): the ring still
+  the 3px current mark (`:104`) share one accent. Risk (Low): the ring still
   meets WCAG 2.4.7.
 - **FIELDS-5: the Validation disclosure takes its count as its name.** Its
   `<summary>` prints `({carried.length})` alone
@@ -1757,12 +1758,12 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   stays harmless at 51 entries.
 - **FIELDS-15: a step or data source removal reuses its own button for the
   next entity.** `panels/DataSourcesPanel.tsx`'s `DataSourceRow` (`:161`) and
-  `screens/EditScreen.tsx`'s `<StepPage>` (`:927`) render with no `key`,
+  `screens/EditScreen.tsx`'s `<StepPage>` (`:930`) render with no `key`,
   unlike the Fields tab's own `FieldEditor`, keyed by the field's id
   (`panels/FieldCatalogPanel.tsx:1162`). A press on "Remove data source" or
   "Remove this step" therefore keeps its own button element in the DOM.
-  `removeDataSource` (`panels/EntityTabs.tsx:678`) and `onRemoveStep`
-  (`screens/EditScreen.tsx:541`) each pick a neighbour, and the same button
+  `removeDataSource` (`panels/EntityTabs.tsx:682`) and `onRemoveStep`
+  (`screens/EditScreen.tsx:544`) each pick a neighbour, and the same button
   then renders that neighbour's own remove control. This is a code reading;
   no browser run has confirmed it. Risk (Medium): a second Enter or Space
   removes a neighbour with no separate confirmation.
@@ -1818,7 +1819,7 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   `panels/ChangeList.tsx`, `panels/ChangesView.tsx` and
   `screens/VersionsScreen.tsx`. The other 42 pass a string, in 10 files. Six
   calls split across lines, and two lines carry two calls each:
-  `EntityTabs.tsx`'s move sentences (`:542`, `:543`). The grep
+  `EntityTabs.tsx`'s move sentences (`:546`, `:547`). The grep
   `git grep -n '\.replace("{' -- packages/web/src` therefore matches 46 lines.
 
   Two helpers build the placeholder in a template literal, which that grep
@@ -1828,9 +1829,9 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   function. Risk (Low): one replacer function closes every site that still
   passes a string: `.replace("{field}", () => label)`.
 - **FIELDS-20: a second identical move announces nothing.** `moveField`
-  (`panels/EntityTabs.tsx:522`) writes its sentence straight into the shared
-  live region (`:540`), a pattern that predates this change. `removeField`
-  (`:496`) empties the region first and writes on the next animation frame
+  (`panels/EntityTabs.tsx:526`) writes its sentence straight into the shared
+  live region (`:544`), a pattern that predates this change. `removeField`
+  (`:500`) empties the region first and writes on the next animation frame
   instead. That step matters when one removal sentence repeats, since two
   different sentences announce without it. Two unnamed fields moved into the
   same group, one after another, still produce one sentence twice: the live
@@ -1885,7 +1886,7 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   1440x900: Remove field `[344, 802, 101×37]`, "+ Add field"
   `[344, 839, 109×37]`, 0px apart; `panels/FieldCatalogPanel.tsx:279-285`
   draws the 2px rule above Remove field only. A field with no reach leaves
-  on one press (`panels/EntityTabs.tsx:468-471`), and a freshly added field
+  on one press (`panels/EntityTabs.tsx:472-475`), and a freshly added field
   always has no reach. A double click removes a field, then opens the
   neighbour field's Data source select. Risk (Medium): a press meant for
   "+ Add field" can remove the field just configured, with no undo.
@@ -1930,7 +1931,7 @@ tags are local to this section; paths under `panels/` and `screens/` start at
   body loads (WCAG 4.1.3).
 - **CHANGES-5: the header bar's open `⋮` menu panel loses hit points to
   tab-body content.** Its panel sets `zIndex: 1`
-  (`panels/ProcessHeaderBar.tsx:197`). The review measured this
+  (`panels/ProcessHeaderBar.tsx:198`). The review measured this
   2026-09-13, identical with and without `visually-hidden-text-page-bounds`:
   at 1280x720 on the Field matrix tab, an `elementFromPoint` sweep lost 15
   of 36 hit points to the grid's sticky headers, which set `zIndex: 2` and

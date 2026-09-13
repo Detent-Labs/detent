@@ -62,8 +62,9 @@ A field's reference kinds, and the check that reports each dangling one:
 - Converting the two native `confirm()` prompts in `FieldCatalogPanel.tsx`.
 - Rewriting a CEL expression, or clearing a plugin `config`.
 - A new neighbour rule, or a new look for Remove field itself (FIELDS-10).
-- FIELDS-2, FIELDS-8 and FIELDS-13. The live region keeps its FIELDS-2 layout
-  defect until that entry's own change.
+- FIELDS-2, FIELDS-8 and FIELDS-13. The change
+  `visually-hidden-text-page-bounds` fixed FIELDS-2, the live region's layout
+  defect included.
 
 ## Shape brief
 
