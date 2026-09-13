@@ -3637,3 +3637,6 @@ async (page) => {
 6. Install the 500 route. Press that row's "Create draft". Pass: the error
    banner shows its "Failed" stamp. The row still reads an em dash under
    Draft. Its button reports no `disabled`.
+7. Take the 500 route off. Under `playwright-cli`, a `run-code` call to
+   `page.unroute("**/drafts/*")` does that. Press "Create draft" once more.
+   Pass: the edit screen opens. Discard that draft the way step 5 did.
