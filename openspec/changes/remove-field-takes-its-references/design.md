@@ -225,7 +225,8 @@ style shape does not add a mechanism.
 - Remove field carries `removeControlId(fieldId)`, a helper beside
   `moveControlId` in `panels/fieldCatalogLogic.ts`. When the dialog opens,
   `FieldsTab` points the hook's trigger ref at that button. On a decline, the
-  hook's cleanup focuses it.
+  hook's cleanup focuses it. Leaving the Fields tab with the dialog open
+  declines the removal, and a return to the tab shows no dialog.
 - On a confirm, `FieldsTab` clears the trigger ref first. Only the refocus
   effect then places focus.
 - `removeField` sets `refocusId` and `refocusRailId` to the neighbour's

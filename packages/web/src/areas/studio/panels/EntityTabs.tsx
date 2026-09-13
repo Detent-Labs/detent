@@ -322,7 +322,18 @@ interface FieldRemoval {
  * tab stays mounted for as long as the process surface is open, so a switch
  * away and back keeps whatever the author had selected.
  */
-export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (stepId: string) => void }) {
+export function FieldsTab({
+  token,
+  visible,
+  onShowStep,
+}: {
+  token: string;
+  /** False while the Fields tab hides. Every tab body stays mounted and nine
+   * hide, so a browser Back can hide this tab while its removal dialog stands
+   * open. A hide declines that removal. */
+  visible: boolean;
+  onShowStep: (stepId: string) => void;
+}) {
   const { draft, mutate, validation, contentLocale } = useDraft();
 
   const railFields = flattenRailFields(draft.fields);
@@ -353,6 +364,13 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
   const [pendingRemoval, setPendingRemoval] = useState<FieldRemoval | undefined>(undefined);
   const removeTriggerRef = useRef<HTMLButtonElement>(null);
   const announcementFrame = useRef<number | undefined>(undefined);
+
+  // A hide declines the pending removal. The update runs during this render,
+  // so no commit holds the dialog inside a hidden tab body, where it would
+  // stay modal: out of sight, yet blocking every click on the tab the author
+  // sees. A return to the tab shows no dialog, and the next press measures
+  // the reach again.
+  if (!visible && pendingRemoval !== undefined) setPendingRemoval(undefined);
 
   // Resolved against every field id, at any depth — `railFields` already
   // lists one row per field, from `flattenRailFields`. Falls back to the
@@ -610,8 +628,11 @@ export function FieldsTab({ token, onShowStep }: { token: string; onShowStep: (s
           confirm clears the trigger ref before the dialog unmounts: the
           hook's focus return then finds nothing, and the refocus effect alone
           places focus. A decline keeps the ref, so focus returns to Remove
-          field. */}
-      {pendingRemoval !== undefined && (
+          field. A hide, such as a browser Back to another tab, declines too:
+          the dialog renders only while the tab shows. The hook's focus return
+          then reaches a hidden Remove field and does nothing, and the tab the
+          Back opened keeps the page. */}
+      {visible && pendingRemoval !== undefined && (
         <RemoveFieldDialog
           label={pendingRemoval.label}
           reach={pendingRemoval.reach}

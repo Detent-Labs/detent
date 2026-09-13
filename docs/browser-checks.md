@@ -3046,6 +3046,19 @@ Press Escape. Pass: the dialog closes. The draft still holds "Processing
 (Fabrikam)" and its 18 fields. Focus returns to "Remove field" on the group's
 own editor.
 
+Open the Canvas tab, then the Fields tab, so the browser's Back has a known
+destination. Choose "Processing (Fabrikam)". Click "Remove field". With the dialog
+open, press the browser's Back. Pass: the Canvas tab shows, and the page holds
+no `dialog[open]`.
+
+Press the browser's Forward. Pass: the Fields tab shows with no dialog open,
+and the entity rail still lists "Processing (Fabrikam)".
+
+Click the Canvas tab in the tab row, then the Fields tab. Pass: each tab opens
+on its click. A tab click adds a history entry and drops any Forward entry, so
+the clicks come after the Forward. No `bun:test` case can hold the pending
+removal from outside the tab, so this step is the check.
+
 Click "Remove field" again. Click its own "Remove group" to confirm. Pass:
 the entity rail no longer lists "Processing (Fabrikam)" or its 18 fields. Focus
 lands on "Notification", the top-level entry before it, and the rail
