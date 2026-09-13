@@ -66,9 +66,9 @@ Pass `-s=process-list-create-once` on every `playwright-cli` call. Use
 native confirm. Accept it with `dialog-accept`, since it blocks every reader
 until then.
 
-- [ ] 4.1 Run the seven steps of the entry from 3.1. Record the value each pass
+- [x] 4.1 Run the seven steps of the entry from 3.1. Record the value each pass
   line reads, beside its step number, in the task report.
-- [ ] 4.2 Run `/impeccable critique` and `/impeccable audit` against
+- [x] 4.2 Run `/impeccable critique` and `/impeccable audit` against
   `/studio/`. Run the impeccable detector once over `ProcessesScreen.tsx`. The
   app's content security policy blocks the overlay, so report it as skipped.
   Resolve each finding the new code causes.
