@@ -102,7 +102,10 @@ describe("the form's tab strip", () => {
     // reads as a class.
     const marked = (html: string) =>
       [...html.matchAll(/<button\b([^>]*)>([^<]*)<\/button>/g)]
-        .filter((m) => (/\bclass="([^"]*)"/.exec(m[1]!)?.[1] ?? "").split(/\s+/).includes("controlDisabled"))
+        .filter((m) => {
+          const classes = (/\bclass="([^"]*)"/.exec(m[1]!)?.[1] ?? "").split(/\s+/);
+          return classes.indexOf("control") > -1 && classes.indexOf("controlDisabled") > classes.indexOf("control");
+        })
         .map((m) => m[2]);
     const first = render(TABS, "t1");
     const last = render(TABS, "t3");

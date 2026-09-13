@@ -258,11 +258,12 @@ scheme swaps the primitives and keeps every semantic role in place.
   `faulted` instance, a dead letter, an overdue timer and a field error. It
   fills the refusal stamp in a row, and it draws the error banner's box. A
   blocker count and the header bar's dirty state print in it too.
-- **Advisory** (`#e25a40` light, `#ff9783` dark): the tone for what is not
-  there yet. It draws the warning callout's rule and an empty form card's box.
-  It also draws the dashed boxes of an incomplete condition and an unresolved
-  migration mapping. The light value reads 3.26:1 on paper, clearing the 3:1
-  minimum for a graphic.
+- **Advisory** (`#e25a40` light, `#ff9783` dark): the warning tone, a mark
+  beside a fact the author can still act on. It draws the warning callout's
+  rule and an empty form card's box. It also draws the dashed boxes of an
+  incomplete condition and an unresolved migration mapping. The light value
+  reads 3.26:1 on paper and 3.00:1 on ledger, both clearing the 3:1 minimum
+  for a graphic.
 
 ### Tertiary
 
