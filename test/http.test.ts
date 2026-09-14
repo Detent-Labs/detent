@@ -92,6 +92,30 @@ const nonCancellableBody = (): ProcessBody =>
     },
   }) as unknown as ProcessBody;
 
+/** ProcessBody cancellable: false; step_a cancellable: true — the spec's "a step widens past a process-wide ban" case (specs/cancellation/spec.md). After a first cancel the instance rests on the cancel-sink, which declares no cancellable of its own, so resolution falls back to the process's false. For the I1 regression: a second cancel by the same starter must still no-op, not 403. */
+const processBanStepWidensBody = (): ProcessBody =>
+  ({
+    key: "process_ban_step_widens_body",
+    label: { en: "Process Ban Step Widens Body" },
+    baseLocale: "en",
+    fields: [],
+    cancellable: false,
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        {
+          id: "step_a",
+          key: "a",
+          label: { en: "A" },
+          type: "task",
+          cancellable: true,
+          paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }],
+        },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
 /** step_x: field_approved (boolean) --(path_done, manual, guard: data.approved == true)--> step_done. */
 const guardedBody = (): ProcessBody =>
   ({
@@ -2357,6 +2381,26 @@ test.skipIf(!DB)("POST /instances/:instanceId/cancel: system:admin alone does no
   expect(res.status).toBe(403);
   const body = (await res.json()) as { error: { type: string } };
   expect(body.error.type).toBe("authorization");
+});
+
+test.skipIf(!DB)("POST /instances/:instanceId/cancel: re-cancelling an already-cancelled instance no-ops instead of 403ing, even where the resolved step is not cancellable", async () => {
+  const PID = pid("proc_http_cancel_recancel_non_running");
+  await publishBody(PID, processBanStepWidensBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+
+  const first = await fetch(authedReq(`http://x/instances/${created.instanceId}/cancel`, "POST", user1));
+  expect(first.status).toBe(200);
+  const firstBody = (await first.json()) as { status: string };
+  expect(firstBody.status).toBe("cancelled");
+
+  // The instance now rests on the cancel-sink, which declares no cancellable
+  // of its own, so resolution falls back to the process's false. Re-invoking
+  // cancel here is the exact I1 regression: the gate must not apply to a
+  // non-running instance.
+  const second = await fetch(authedReq(`http://x/instances/${created.instanceId}/cancel`, "POST", user1));
+  expect(second.status).toBe(200);
+  const secondBody = (await second.json()) as { status: string };
+  expect(secondBody.status).toBe("cancelled");
 });
 
 test.skipIf(!DB)("POST /processes with a structurally invalid body (missing initialStep) maps to 422", async () => {

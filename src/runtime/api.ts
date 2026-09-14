@@ -1507,6 +1507,13 @@ export function isCancellableAtStep(body: ProcessBody, step: Step): boolean {
 async function canActorCancelInstance(actor: Actor, instance: Instance, body: ProcessBody, db: SQL): Promise<boolean> {
   if (await can(actor, "cancel", instance.processId, db)) return true;
   if (instance.startedBy !== actor.id) return false;
+  // The fields govern a running instance only (specs/cancellation/spec.md);
+  // the engine's own cancel primitive already no-ops on a non-running one,
+  // so this predicate must defer to that rather than gate it.
+  if (instance.status !== "running") return true;
+  // findStep can throw on a body/step mismatch — safe only because the
+  // starter and status checks above already ran, so only a starter of a
+  // known, running instance reaches here.
   const step = findStep(body, instance.currentStepId as string);
   return isCancellableAtStep(body, step);
 }
