@@ -9,12 +9,12 @@ carry On entry, On exit, Time limit, and Step form fields.
 
 A section SHALL stand only where the step's kind declares it. A task step
 carries Assignment. A subprocess step carries Which process it calls. An end
-step carries How the case ends. It carries no outgoing path, so it carries
+step carries How the case ends. It has no outgoing path, so it carries
 neither On exit nor Time limit.
 
-A task step and a subprocess step both carry Cancellable. An end step carries
-no Cancellable section: an instance resting on a terminal step has already
-left the running state the field governs, so the setting has nothing left to
+A task step and a subprocess step both carry Cancellable. An end step has no
+Cancellable section. An instance resting on a terminal step has already left
+the running state the field governs. So the setting has nothing left to
 apply to.
 
 This replaces the runtime-order register of collapsible sections. An author
@@ -25,13 +25,16 @@ reads every setting of one step without opening anything.
 - **WHEN** the step page holds a task step that is not an end
 - **THEN** the page carries Path to, Assignment, Cancellable, On entry, On
   exit, Time limit and Step form fields
-- **AND** the page carries no Which process it calls section
+- **AND** the page has no Which process it calls section
 
+<!-- Why: the scenario header below has to match the base spec's heading in
+     openspec/specs/studio-step-page/spec.md, byte for byte. -->
+<!-- antislop: allow negation-habit -->
 #### Scenario: An end step carries no outgoing path
 
 - **WHEN** the step page holds an end step
 - **THEN** the page carries How the case ends
-- **AND** the page carries no Path to section, no On exit section, no Time
+- **AND** the page has no Path to section, no On exit section, no Time
   limit section and no Cancellable section
 
 #### Scenario: Every section stands open
@@ -44,16 +47,16 @@ reads every setting of one step without opening anything.
 ### Requirement: The Cancellable section sets a step's participant-cancel override
 
 The Cancellable section SHALL let an author set that step's `cancellable`
-field to one of three states: unset (inherit the process's own default),
-explicitly cancellable, or explicitly not cancellable. Setting it SHALL write
+field to one of three states. Those are unset (inherit the process's own
+default), explicitly cancellable, or explicitly not cancellable. Setting it SHALL write
 `Step.cancellable` in the draft; choosing the inherit state SHALL remove the
 key from the step rather than writing a redundant explicit value equal to the
 process's current default.
 
-The section SHALL name the effective outcome in the inherit state — whether a
-running instance would in fact resolve as cancellable there — so an author
-does not need to open the process-wide setting separately to know what
-"inherit" currently means.
+The section SHALL name the effective outcome in the inherit state: whether a
+running instance would resolve as cancellable there. That way, an author
+need not open the process-wide setting separately to know what "inherit"
+currently means.
 
 #### Scenario: Setting a step to explicitly not cancellable
 
@@ -65,7 +68,7 @@ does not need to open the process-wide setting separately to know what
 
 - **WHEN** an author returns a step's Cancellable section from an explicit
   state to "inherit"
-- **THEN** the draft's step carries no `cancellable` key
+- **THEN** the draft's step has no `cancellable` key
 
 #### Scenario: The inherit state names the process's current default
 
