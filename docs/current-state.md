@@ -4479,20 +4479,49 @@ meets `scope=started` should infer no new permission tier from it.
   The row component `ProcessTabRow.tsx` renders a `tablist` of buttons. The
   whole row is one tab stop, on `spa-accessibility`'s roving-tabindex
   pattern: the focused tab carries `tabindex="0"` and the other nine
-  `tabindex="-1"`, and the arrow keys move focus without opening a tab. The
-  row scrolls sideways and never wraps, with no trailing control of its own. It still takes a `jsonOpen` prop, read-only,
-  to suppress every tab's `aria-selected` while the JSON surface stands
-  open. `ProcessHeaderBar.tsx`'s `⋮` menu carries the JSON surface, Versions
-  and Player instead, under its "Views" group. The JSON entry names its own
+  `tabindex="-1"`, and the arrow keys move focus without opening a tab. It
+  still takes a `jsonOpen` prop, read-only, to suppress every tab's
+  `aria-selected` while the JSON surface stands open. The header bar's `⋮`
+  menu, in `ProcessHeaderBar.tsx`, carries the JSON surface, Versions and
+  Player instead, under its "Views" group. The JSON entry names its own
   state, so an author reads what pressing it does
   (`studio-header-menu-merge`).
 
+  The row scrolls sideways and never wraps, with no trailing control of its
+  own. One exported function scrolls it, `scrollTabIntoRow`, a
+  `scrollIntoView` call with `inline: "nearest"` and `behavior: "instant"`.
+  The row's 32px `scrollPaddingInline` stops that scroll clear of each edge
+  the row can still scroll past. A layout effect on `open` calls it on mount
+  and on every tab change. The arrow-key handler calls it after its focus
+  move. A tab's `onFocus` calls it only when the button matches
+  `:focus-visible`, so a pointer press never moves the row under the pointer.
+  A window's return scrolls nothing: `focusScrollsRow` skips the focus that
+  follows a tab's blur while `document.hasFocus()` reads false.
+
+  The pure function `tabRestsInView` answers whether the open tab rests in
+  view, with 1px of slack. The row's `onScroll` handler records that answer,
+  and so does each call the component makes to `scrollTabIntoRow`. One
+  `ResizeObserver` watches the row and its ten buttons. Its callback writes
+  the row's `clientHeight` as `--tab-row-band`. A change to the row's width
+  scrolls the open tab back into view. So does a button's width change, while
+  that record reads true. The observer's first report counts as a width move
+  (`widthMoved`).
+
+  The pure function `fadeState` names the edges that fade: `"none"`,
+  `"start"`, `"end"` or `"both"`. The component keeps that value in state and
+  picks `fadeStart`, `fadeEnd` or `fadeBoth` from it. Each of those styles
+  masks the row with a 24px gradient over the band and a solid layer under
+  it. The scrollbar and the 2px divider therefore keep full strength. Under
+  forced colors each style drops its mask.
+
   A Checks row's or a Changes row's own open command hands focus to the tab
   it opens. The hand-off itself is `EditScreen.tsx`'s `openTabFromRow`: it
-  switches through `goToTab`, then focuses `tabDomId(target)` once that tab
-  is open. A target already open focuses at once instead.
-  `ProcessTabRow.tsx`'s own roving `tabindex="0"` already marks the focused
-  tab, so the hand-off only moves focus onto the id that attribute tracks.
+  switches through `goToTab`, then calls `focusTabButton` once that tab is
+  open. A target already open takes that call at once instead. That function
+  focuses `tabDomId(target)` with `preventScroll: true`, then hands the scroll
+  to `scrollTabIntoRow`. The roving `tabindex="0"` in `ProcessTabRow.tsx`
+  already marks the focused tab, so the hand-off only moves focus onto the id
+  that attribute tracks.
 
   Save, Discard draft and Publish render directly in `ProcessHeaderBar.tsx`,
   right-aligned ahead of its `⋮` menu trigger. That component already sits
@@ -4570,7 +4599,9 @@ meets `scope=started` should infer no new permission tier from it.
   The form editor's trailing pane is `FormPreview.tsx`. It mounts
   `packages/form-ui`'s own `FieldForm` and `PathButtons`, the two the Player
   mounts against a real instance. No second renderer exists. The pane carries
-  the `inert` attribute, so it answers no gesture and takes no focus.
+  the `inert` attribute, so it answers no gesture and takes no focus. At 80rem
+  and below the pane stands under the canvas, since `FormEditorScreen.tsx` and
+  `FormPreview.tsx` each declare `PREVIEW_NARROW` at that width.
 
   The module `draft/guided-labels.ts` words the authoring controls. The
   function `assignmentStrategyLabel` names the four shipped strategies, and

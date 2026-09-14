@@ -9,7 +9,7 @@ import { StepsRail } from "../panels/StepsRail.js";
 import { StepPage, type WalkNeighbour } from "../panels/StepPage.js";
 import { useDraftToolbarActions } from "../panels/DraftToolbar.js";
 import { ProcessHeaderBar } from "../panels/ProcessHeaderBar.js";
-import { ProcessTabRow, tabDomId, tabPanelDomId } from "../panels/ProcessTabRow.js";
+import { ProcessTabRow, scrollTabIntoRow, tabDomId, tabPanelDomId } from "../panels/ProcessTabRow.js";
 import { ChecksRail } from "../panels/ChecksRail.js";
 import { FieldsTab, DataSourcesTab } from "../panels/EntityTabs.js";
 import { ContractPanel } from "../panels/ContractPanel.js";
@@ -271,14 +271,16 @@ interface ProcessSurfaceProps {
 }
 
 /**
- * Focuses a tab's own button, then scrolls the tab row so the whole button
- * shows. At a narrow width the row scrolls sideways, and `focus()` alone can
- * leave the button part-clipped at the row's edge.
+ * Focuses a tab's own button without a scroll, then hands the scroll to
+ * `scrollTabIntoRow`, the one function that scrolls the tab row. At a narrow
+ * width the row scrolls sideways, and a plain `focus()` can leave the button
+ * part-clipped at the row's edge.
  */
 function focusTabButton(tab: ProcessTab): void {
   const button = document.getElementById(tabDomId(tab));
-  button?.focus();
-  button?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  if (button === null) return;
+  button.focus({ preventScroll: true });
+  scrollTabIntoRow(button);
 }
 
 /**

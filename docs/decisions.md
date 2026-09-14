@@ -1340,6 +1340,20 @@ stage-by-stage status.
   hover wash, `rgb(234, 233, 233)`, it reads 4.16:1. Every register row that
   carries a dormant stamp and washes on hover shares that gap. `DESIGN.md`
   pins `#726e6e`, so retuning the tone is a design change of its own.
+- **The studio stays a desktop tool at phone width.** The owner decided
+  this on 2026-09-13, as pick G2 of `studio-narrow-widths`. This entry
+  replaces FORMS-15.
+  - Measured that day at 400x800, before `forms-card-legend`, the Forms tab
+    grid scrolled a 394px box over 1740px of cards. That change's final
+    review put its two-line legend there at about 52px. The box then shrinks
+    to about 342px.
+  - Measured the same day, the process list table keeps its width at 480px
+    and below. The page scrolls sideways to its action column. The audit of
+    `process-list-create-once` found it.
+  - Both stay: the studio targets a desktop, and the canvas and field matrix
+    need the edit screen's fixed frame. A touch audience would reopen both.
+  - This entry does not decide FORMS-18 in the Forms tab audits section. A
+    200% zoom on a desktop window is no phone width.
 
 ## Open from the 2026-08-18 code review (each needs its own OpenSpec change)
 
@@ -1550,7 +1564,7 @@ recorded rather than fixed. The RAIL tags are local to this section.
   Risk (Informational): a long label wraps on a wide screen and fits on a
   narrow one.
 - **A canvas removal drops keyboard focus, and nothing announces it.**
-  `deleteSelection` (`packages/web/src/areas/studio/screens/EditScreen.tsx:540`)
+  `deleteSelection` (`packages/web/src/areas/studio/screens/EditScreen.tsx:558`)
   clears the selection. The pressed control unmounts with it, so focus lands on
   `<body>` and the next Tab reaches Fit to view. Remove steps behaved this way
   before Remove step joined it. Risk: a keyboard or screen-reader user loses
@@ -1709,7 +1723,7 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   removal left then, and a JSON-view edit can still write today — showed
   `view ref does not resolve: field_0fb5a2c4-0022-…`, an id the author can no
   longer look up. Adding an empty field raises the banner at
-  `screens/EditScreen.tsx:821` before the author types. The banner reads
+  `screens/EditScreen.tsx:823` before the author types. The banner reads
   `Draft is not yet structurally valid — CEL, registry, duration, and cross-process checks are held back until it is (see the Zod issues below)`,
   and it pushes the page down 35px at 1400px and 99px at 900px. The messages
   come from `src/schema/definition.ts:990`, `src/schema/compile.ts:629` and
@@ -1762,16 +1776,16 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   (`src/schema/compile.ts:225`). Risk (Low): the check shows on an unrelated
   field or on the process. The fix touches `src/`.
 - **FIELDS-12: the Checks tab opens the Fields tab without the field.** A
-  check row calls `goToTab(tabForIssue(issue.entityType))`
-  (`screens/EditScreen.tsx:945`). That function takes a tab alone (`:726`),
-  and `FieldsTab` accepts no selected field (`:907`). The spec
+  check row calls `openTabFromRow(tabForIssue(issue.entityType))`
+  (`screens/EditScreen.tsx:1003`). That function takes a tab alone (`:759`),
+  and `FieldsTab` accepts no selected field (`:950`). The spec
   `studio-process-tabs` asks for that field to open selected
   (`openspec/specs/studio-process-tabs/spec.md:209`). Risk (Medium): the
   author lands on the Fields tab and must find the field in the entity rail.
 - **FIELDS-13: the glossary names a tab set that no longer exists.** Its
-  "field tabs" row sits at `.claude/rules/ui-glossary.md:86`. It defines the
+  "field tabs" row sits at `.claude/rules/ui-glossary.md:87`. It defines the
   Field / Values / Rules tab set for the one selected top-level field. A
-  paragraph at `:117` repeats that definition. The field editor has two halves
+  paragraph at `:122` repeats that definition. The field editor has two halves
   and no tab set (`panels/FieldCatalogPanel.tsx:608`,
   `openspec/specs/studio-app/spec.md:2564`), and it edits a field at any
   depth. Risk (Low): the glossary teaches a word for a UI that is gone.
@@ -1787,12 +1801,12 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   stays harmless at 51 entries.
 - **FIELDS-15: a step or data source removal reuses its own button for the
   next entity.** `panels/DataSourcesPanel.tsx`'s `DataSourceRow` (`:161`) and
-  `screens/EditScreen.tsx`'s `<StepPage>` (`:930`) render with no `key`,
+  `screens/EditScreen.tsx`'s `<StepPage>` (`:932`) render with no `key`,
   unlike the Fields tab's own `FieldEditor`, keyed by the field's id
   (`panels/FieldCatalogPanel.tsx:1162`). A press on "Remove data source" or
   "Remove this step" therefore keeps its own button element in the DOM.
   `removeDataSource` (`panels/EntityTabs.tsx:682`) and `onRemoveStep`
-  (`screens/EditScreen.tsx:544`) each pick a neighbour, and the same button
+  (`screens/EditScreen.tsx:546`) each pick a neighbour, and the same button
   then renders that neighbour's own remove control. This is a code reading;
   no browser run has confirmed it. Risk (Medium): a second Enter or Space
   removes a neighbour with no separate confirmation.
@@ -2043,29 +2057,6 @@ foot holds the control alone, and "No fields yet" stands once, in the
 miniature's place. The card's count now excludes a group entry, stating
 only the marks the miniature draws. The required count stands beside it.
 
-- **FORMS-11: the shell header overflows between 30rem and its own width.**
-  The header keeps `flexWrap: "nowrap"` down to 30rem
-  (`packages/web/src/shell/Chrome.tsx:24`). Measured 2026-09-13 at 560px, the
-  document's `scrollWidth` read 627 and the Account button sat clipped. Risk
-  (Low): the page scrolls sideways at that width. German labels widen the row
-  further, so the fix lets it wrap wherever it runs out of room.
-- **FORMS-12: at 1100px the form editor squeezes field keys to one character
-  per line.** Above the 64rem breakpoint (`screens/FormEditorScreen.tsx:60`)
-  the editor keeps three columns: a 16rem palette, the canvas, and a preview
-  up to 22rem (`:165`). A key (`formCardKey`, `:356`) wraps anywhere, beside
-  the card's marks and move buttons. Seen 2026-09-13 in a screenshot only;
-  the column widths stand unmeasured. Risk (Low): an author cannot read a key
-  on a common laptop width. The fix is its own `/impeccable adapt` change.
-- **FORMS-15: at phone width the grid scrolls inside its own box.** The grid
-  sets `overflowY: "auto"` (`panels/FormsTab.tsx:70`). Measured 2026-09-13 at
-  400x800, the grid stood 394px tall over 1740px of content, under about
-  400px of chrome. Risk (Low): a reader on a phone scrolls a small box inside
-  the page. The studio targets a desktop, so this stays with an
-  `/impeccable adapt` pass.
-- **FORMS-16: at 400px the tab row scrolls the open tab out of view.** Seen
-  2026-09-13 in `panels/ProcessTabRow.tsx` during the same audit, and left
-  unmeasured. Risk (Low): an author at that width loses sight of which tab
-  stands open.
 - **FORMS-18: at 200% zoom the grid shows less than one card.** A 1100x876
   window at 200% zoom lays out at 550x438 CSS px. Measured 2026-09-13 at that
   size, the tab body stood 118px tall and the grid 94px. The header bar takes
@@ -2078,8 +2069,8 @@ only the marks the miniature draws. The required count stands beside it.
   classes and no `btn`. Its ground reads `rgb(240, 240, 240)` in light and
   `rgb(107, 107, 107)` in dark, the browser's own button face. The form
   editor's pressed column option loses its box and weight the same way.
-  - The sites are `screens/EditScreen.tsx:817`, `:1046` and `:1062`, and
-    `screens/FormEditorScreen.tsx:1236`, `:1300` and `:1316`. The rest sit at
+  - The sites are `screens/EditScreen.tsx:819`, `:1052` and `:1068`, and
+    `screens/FormEditorScreen.tsx:1234`, `:1298` and `:1314`. The rest sit at
     `screens/VersionsScreen.tsx:263`, `screens/ToolsScreen.tsx:189`,
     `screens/PlayerScreen.tsx:336` and `screens/MigrationPlanScreen.tsx:281`.
   - Risk (Medium): the back link draws a gray box on every dark studio
@@ -2099,7 +2090,7 @@ tags are local to this section. Paths under `panels/` and `screens/` start at
   beside the 3px advisory rule. Those are the header bar's `warning` block
   (`panels/ProcessHeaderBar.tsx:62`) and the field catalog's `studioWarning`
   (`panels/FieldCatalogPanel.tsx:327`). The form editor's `studioWarning`
-  (`screens/FormEditorScreen.tsx:117`) is the third.
+  (`screens/FormEditorScreen.tsx:118`) is the third.
   - Two more 3px rules mix refusal at 55%. The checks rail draws one in
     `checksGroupHeldBack` (`panels/ChecksRail.tsx:46`). The timers panel draws
     the other in `refusal` (`panels/TimersPanel.tsx:54`).
@@ -2116,6 +2107,47 @@ tags are local to this section. Paths under `panels/` and `screens/` start at
   - Risk (Low): the advisory tone reads as the accent in light and as refusal
     in dark. Shape, place and the callout's own sentence still tell the marks
     apart.
+
+## Open from the studio-narrow-widths review (each needs its own OpenSpec change)
+
+The first review of `studio-narrow-widths` measured the shell header on a
+replica in Chrome 152, on 2026-09-13. That change wraps the header and keeps
+each area nav's buttons on one line. Its browser check, critique and audit
+ran on 2026-09-14. The NAV, ROW, BAR and KEYS tags are local to this section.
+Paths under `panels/` and `screens/` start at `packages/web/src/areas/studio/`.
+
+- **NAV-1: an area nav wider than its line still overflows the header.** The
+  shared `nav` style never wraps its buttons
+  (`packages/web/src/shell/navStyles.ts:13`).
+  - On the replica, the English admin nav overflowed below about 900px. At
+    600px the admin header overflowed by 297px, down from 610px before that
+    change.
+  - On the replica at 400px, the English app nav overflowed its own line by
+    22px, as it did before. German labels widen both navs.
+  - The browser check measured the real headers in 5px steps. The English
+    admin nav overflowed from 895px, and the German one from 1090px. The
+    reporting nav overflowed from 505px in English and 540px in German. The
+    German app nav overflowed from 475px, and the English one fit at 400px.
+  - A wrap of the nav's buttons restyles the app, admin and reporting
+    headers. The owner picks its look on a mockup first.
+  - Risk (Low): an actor in a narrow window scrolls the page sideways to
+    reach a nav button.
+- **ROW-1: the tab row clips a tab's focus ring at its top and bottom.** The
+  row scrolls sideways (`panels/ProcessTabRow.tsx:42`), so it clips outside
+  its padding box. Measured at 400px, the Forms tab's ring ran from y=288 to
+  335.5. The row's padding box ran from 292 to 332. Both sides of the ring
+  stay, 32px clear of the edge fade. This is CHANGES-2 on the tab row. Risk
+  (Low): the ring still meets WCAG 2.4.7.
+- **BAR-1: the process name input takes its placeholder as its name.** The
+  input has no label (`panels/ProcessHeaderBar.tsx:750`). Its accessible name
+  read "(untitled process)" while it held IT Offboarding. Risk (Medium): a
+  screen reader announces an untitled process on every draft (WCAG 4.1.2).
+- **KEYS-1: the form editor still wraps a long key above 80rem.** Three
+  columns leave the canvas 619px at 1300px
+  (`screens/FormEditorScreen.tsx:165`). On "Submit the Exit Notification", 10
+  of 59 canvas keys took two lines there. The last one wrapped at 1381px. The
+  16rem palette wraps 10 of its 38 keys at every width. Risk (Low): an author
+  reads a long key broken mid-word from 1281px to about 1390px.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 

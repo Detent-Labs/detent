@@ -1,6 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { announcementAfter, ProcessTabRow, tabDomId, tabPanelDomId } from "../src/areas/studio/panels/ProcessTabRow.js";
+// The scroll and fade helpers read through the namespace: a missing export
+// fails each assertion below while the module and every other case still load.
+import * as tabRow from "../src/areas/studio/panels/ProcessTabRow.js";
 import { PROCESS_TABS, type ProcessTab } from "../src/areas/studio/routing.js";
 import { tabStops } from "./studio-fieldMatrixTabStops.test.js";
 
@@ -245,5 +248,131 @@ describe("The live region's text across a blocked-state transition", () => {
     }
 
     expect(region).toBe(SENTENCE);
+  });
+});
+
+/**
+ * The row's measured state, as pure functions of the numbers the component
+ * reads off the row and its buttons. The drawn fade and the scroll itself
+ * need a real browser, so they stand in `docs/browser-checks.md`.
+ *
+ * The row below is 400px wide over 968px of tabs, so its scroll limit is 568.
+ */
+const CLIENT = 400;
+const CONTENT = 968;
+const LIMIT = CONTENT - CLIENT;
+
+describe("Which edges of the tab row fade", () => {
+  it("fades neither edge on a row with room for every tab", () => {
+    expect(tabRow.fadeState(0, CONTENT, CONTENT)).toBe("none");
+  });
+
+  it("fades the trailing edge alone at the row's start", () => {
+    expect(tabRow.fadeState(0, CLIENT, CONTENT)).toBe("end");
+  });
+
+  it("fades both edges mid-scroll", () => {
+    expect(tabRow.fadeState(200, CLIENT, CONTENT)).toBe("both");
+  });
+
+  it("fades the leading edge alone at the row's end", () => {
+    expect(tabRow.fadeState(LIMIT, CLIENT, CONTENT)).toBe("start");
+  });
+
+  it("still reads the start at a scrollLeft of 1", () => {
+    expect(tabRow.fadeState(1, CLIENT, CONTENT)).toBe("end");
+  });
+
+  it("still reads the end one pixel short of the limit", () => {
+    expect(tabRow.fadeState(LIMIT - 1, CLIENT, CONTENT)).toBe("start");
+  });
+
+  it("fades both edges 2px in from either limit, past the 1px slack", () => {
+    // The other side of each threshold: a slack wider than 1px would read
+    // these two positions as a limit.
+    expect(tabRow.fadeState(2, CLIENT, CONTENT)).toBe("both");
+    expect(tabRow.fadeState(LIMIT - 2, CLIENT, CONTENT)).toBe("both");
+  });
+});
+
+describe("Whether the open tab rests in the row's view", () => {
+  const PADDING = 32;
+  // Mid-row: the view spans 200 to 600, and the row can scroll past both edges.
+  const MID = 200;
+
+  it("reads true for a tab mid-row 32px clear of either edge", () => {
+    expect(tabRow.tabRestsInView(MID + 32, MID + 132, MID, CLIENT, CONTENT, PADDING)).toBe(true);
+    expect(tabRow.tabRestsInView(MID + CLIENT - 132, MID + CLIENT - 32, MID, CLIENT, CONTENT, PADDING)).toBe(true);
+  });
+
+  it("reads true for a tab mid-row 31px clear, inside the 1px slack", () => {
+    expect(tabRow.tabRestsInView(MID + 31, MID + 131, MID, CLIENT, CONTENT, PADDING)).toBe(true);
+    expect(tabRow.tabRestsInView(MID + CLIENT - 131, MID + CLIENT - 31, MID, CLIENT, CONTENT, PADDING)).toBe(true);
+  });
+
+  it("reads false for a tab mid-row 20px from an edge", () => {
+    expect(tabRow.tabRestsInView(MID + 20, MID + 120, MID, CLIENT, CONTENT, PADDING)).toBe(false);
+    expect(tabRow.tabRestsInView(MID + CLIENT - 120, MID + CLIENT - 20, MID, CLIENT, CONTENT, PADDING)).toBe(false);
+  });
+
+  it("reads true for the first tab flush with the row's start at scrollLeft 0", () => {
+    expect(tabRow.tabRestsInView(0, 100, 0, CLIENT, CONTENT, PADDING)).toBe(true);
+  });
+
+  it("reads true for the last tab 0.5px short of the end limit", () => {
+    expect(tabRow.tabRestsInView(CONTENT - 100, CONTENT, LIMIT - 0.5, CLIENT, CONTENT, PADDING)).toBe(true);
+  });
+
+  it("reads true for the first tab 0.5px past the start limit", () => {
+    // A high-density screen can rest `scrollLeft` at a fraction.
+    expect(tabRow.tabRestsInView(0, 100, 0.5, CLIENT, CONTENT, PADDING)).toBe(true);
+  });
+});
+
+/**
+ * The resize observer's move test. Its first report for an element arrives at
+ * the first rendering update after `observe()`, not at `observe()`. A count
+ * printed inside that frame has already widened a tab by then, so a first
+ * report must count as a move.
+ */
+describe("Whether a resize report moved an element's width", () => {
+  it("counts an element's first report as a move", () => {
+    expect(tabRow.widthMoved(undefined, 120)).toBe(true);
+  });
+
+  it("counts a changed width as a move", () => {
+    expect(tabRow.widthMoved(120, 132)).toBe(true);
+  });
+
+  it("reads an unchanged width as no move", () => {
+    expect(tabRow.widthMoved(120, 120)).toBe(false);
+  });
+});
+
+/**
+ * Chromium dispatches `focus` to the active element again when the window
+ * regains focus, and that element still matches `:focus-visible`. A row the
+ * author scrolled by hand must stay put across that return
+ * (`studio-process-tabs`: "Between those moments an author MAY scroll the row
+ * freely").
+ */
+describe("Whether a tab's focus scrolls the row", () => {
+  const forms = { tab: "forms" };
+  const changes = { tab: "changes" };
+
+  it("scrolls on a keyboard focus", () => {
+    expect(tabRow.focusScrollsRow(null, forms, true)).toBe(true);
+  });
+
+  it("leaves the row on a pointer press", () => {
+    expect(tabRow.focusScrollsRow(null, forms, false)).toBe(false);
+  });
+
+  it("leaves the row when the window returns focus to the button whose blur left it", () => {
+    expect(tabRow.focusScrollsRow(forms, forms, true)).toBe(false);
+  });
+
+  it("scrolls on a keyboard focus of another button after the window left", () => {
+    expect(tabRow.focusScrollsRow(forms, changes, true)).toBe(true);
   });
 });

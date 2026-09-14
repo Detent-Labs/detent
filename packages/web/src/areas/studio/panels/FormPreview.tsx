@@ -11,10 +11,11 @@ import { t } from "../catalog.js";
 
 type DraftStep = DraftOf<Step>;
 
-/** The width below which the preview stands under the canvas rather than
- * beside it. Its host turns at the same width, so the rule separating the two
- * turns with it: down the gutter above the breakpoint, across the top below. */
-const NARROW = "@media (max-width: 64rem)";
+/** The width at and below which the preview stands under the canvas rather
+ * than beside it. `FormEditorScreen.tsx` turns its grid at the same constant,
+ * so the rule separating the two turns with it: down the gutter above the
+ * breakpoint, across the top at and below it. */
+const PREVIEW_NARROW = "@media (max-width: 80rem)";
 
 const styles = stylex.create({
   pane: {
@@ -22,10 +23,10 @@ const styles = stylex.create({
     flexDirection: "column",
     gap: space.s3,
     minWidth: 0,
-    borderLeftWidth: { default: 2, [NARROW]: 0 },
+    borderLeftWidth: { default: 2, [PREVIEW_NARROW]: 0 },
     borderLeftStyle: "solid",
     borderLeftColor: colors.divider,
-    borderTopWidth: { default: 0, [NARROW]: 2 },
+    borderTopWidth: { default: 0, [PREVIEW_NARROW]: 2 },
     borderTopStyle: "solid",
     borderTopColor: colors.divider,
     paddingBlock: space.s3,

@@ -1517,7 +1517,8 @@ banner takes its place.
 
 ### Keyboard focus hand-off from a Checks row and a Changes row (`changes-tab-entity-change-list`)
 
-Source: `changes-tab-entity-change-list` task 6.1.
+Source: `changes-tab-entity-change-list` task 6.1; `studio-narrow-widths` task
+5.32.
 
 Open a draft whose Checks tab lists a step-level issue and a process-level
 issue. Reach the Checks tab by keyboard and press Enter on the step-level
@@ -1532,6 +1533,42 @@ and Paths stands open.
 Open Changes with at least one unsaved field rename, and reach its row's own
 open command by keyboard. Press Enter on it. Pass: focus lands on the Fields
 tab's own button in the tab row, and Fields stands open.
+
+Open Changes again, with the same unsaved rename, in a window 400px wide.
+Scroll the tab row to its end before you press the open command. Under
+`playwright-cli`, this `run-code` function does both, then reads the Fields
+tab against the row. The command reads "Open … in the Fields tab".
+
+```js
+async (page) => {
+  await page.setViewportSize({ width: 400, height: 800 });
+  const twoFrames = () => page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
+  await page.evaluate(() => {
+    const row = document.querySelector('[role="tablist"][aria-label="Process surface"]');
+    row.scrollLeft = row.scrollWidth - row.clientWidth;
+  });
+  await twoFrames();
+  await page.getByRole("button", { name: /in the Fields tab$/ }).first().focus();
+  await page.keyboard.press("Enter");
+  await twoFrames();
+  return page.evaluate(() => {
+    const row = document.querySelector('[role="tablist"][aria-label="Process surface"]');
+    const tab = document.getElementById("studio-tab-fields");
+    const r = row.getBoundingClientRect();
+    const b = tab.getBoundingClientRect();
+    return {
+      focused: document.activeElement === tab,
+      open: tab.getAttribute("aria-selected") === "true",
+      leading: b.left - r.left,
+      trailing: r.left + row.clientWidth - b.right,
+    };
+  });
+}
+```
+
+Pass: `focused` and `open` read true. Pass: `leading` and `trailing` each
+read 31 or more. Fields then stands whole in view and 32px clear of the edge,
+to within one pixel.
 
 ### `useFail`: no refetch loop
 
@@ -2568,10 +2605,9 @@ Pass: the header and the register tab carry hash-only classes, such as
 `clip-path`. Pass: each equals the value `shell.css` declared on `main`
 before this change.
 
-Resize the viewport below 30rem. Pass: the header wraps onto a second line,
-the rule the header's own `flexWrap` condition carries. Hover the register
-tab, then Tab to it. Pass: both states still paint, unaffected by the move
-out of `shell.css`.
+The header's wrap has its own entry further down this file, "The shell header
+wraps at every width". Hover the register tab, then Tab to it. Pass: both
+states still paint, unaffected by the move out of `shell.css`.
 
 Open a process draft's field catalog. Select a text field. Read "How it will
 look". Pass: the rendered control's computed `font-size`, `padding` and
@@ -3480,11 +3516,11 @@ A passing run returns these values. Chrome prints a transparent ground as
 }
 ```
 
-**The preview pane matches the canvas.** Beside the canvas, the trailing
-pane draws the identical strip. It already sits open on the tab the canvas
-shows. Click the canvas's own "Decision" tab. Pass: the preview's own strip
-switches to "Decision" too, with no click of its own. One open-tab state
-drives both.
+**The preview pane matches the canvas.** Use a window wider than 1280px,
+where the trailing pane stands beside the canvas. That pane draws the
+identical strip, already open on the tab the canvas shows. Click the
+canvas's own "Decision" tab. Pass: the preview's own strip switches to
+"Decision" too, with no click of its own. One open-tab state drives both.
 
 Click a tab inside the preview pane itself. Pass: nothing moves. The pane
 carries `inert`, confirmed in the browser's own inspector, so a click there
@@ -4194,7 +4230,7 @@ Seed the database and sign in as `demo-superuser@example.test`, password
 `seed-demo-password`.
 
 Open the IT Offboarding draft on the Canvas tab
-(`docs/browser-checks.md:3112`). Add a step from the canvas bar. Leave it
+(`docs/browser-checks.md:3251`). Add a step from the canvas bar. Leave it
 unconnected, so the Checks tab counts a blocker. Narrow the window to
 400px. Run the probe on every tab in turn. A reload drops the unsaved step,
 so add it again after one.
@@ -4238,7 +4274,7 @@ then back in as the superuser to continue. Restore the superuser's original
 roles with `set-roles` when the walk finishes.
 
 Open `purchase-requisition`'s Player at 400px. Create an instance and
-drive it to Finance Review (`docs/browser-checks.md:3408`). Claim the step.
+drive it to Finance Review (`docs/browser-checks.md:3547`). Claim the step.
 Submit from "Review" with Finance Note, on "Decision", left empty.
 
 Pass: `escaped` stays empty, and `scrollWidth` equals `clientWidth`. The
@@ -4329,3 +4365,673 @@ async (page) => {
 7. Take the 500 route off. Under `playwright-cli`, a `run-code` call to
    `page.unroute("**/drafts/*")` does that. Press "Create draft" once more.
    Pass: the edit screen opens. Discard that draft the way step 5 did.
+
+### The shell header wraps at every width (`studio-narrow-widths`)
+
+Source: `studio-narrow-widths` tasks 5.12 to 5.17. The test
+`shell-headerWrap.test.ts` pins the header's declarations, and `bun:test`
+lays out no page. The wrap, the clip and the focus order land in this entry,
+by `development-toolchain`'s split rule.
+
+See this file's "Before you start" section for the build and the address.
+Seed the database and sign in as `demo-superuser@example.test`, password
+`seed-demo-password`. That account holds every role `scripts/dev-up.sh`
+grants, so all four areas open for it. Under `playwright-cli`, pass
+`-s=studio-narrow-widths` on every call. Each function below returns an
+object, so an empty printout means it threw.
+
+1. Open the studio's process list at `/studio/`. Run step 1's function there.
+   It reads the header's own `scrollWidth` against its `clientWidth` at 1440,
+   680, 640, 600, 560, 480 and 400px. It reads the document's width as well,
+   which counts at 560px alone. The process list table overflows at 480px and
+   below.
+   - Pass: at 1440px `lines` reads 1, and `wholeName` reads true. The header
+     holds one line, and the identity span shows the whole name.
+   - Pass: at every width `clipped` reads 0, and the header's `scrollWidth`
+     stays at or under its `clientWidth`. No width clips a header item.
+   - Pass: at 680px `lines` reads 1 and `wholeName` reads false. The header
+     holds one line, with the name cut to an ellipsis.
+   - Record `groupLeavesAt`, the width where the account group first leaves
+     the first line. Expect a value between 600 and 650px.
+   - Pass: at 560px the document's `scrollWidth` equals its `clientWidth`.
+   - Pass: at 560px `lines` reads 2, `divider` reads `2px`, and `background`
+     reads a color other than `rgba(0, 0, 0, 0)`. The value `lastLine` reads
+     no more than `dividerTop`. The muted background and the 2px divider span
+     both lines, with the divider under the second.
+   - Pass: at 400px `groupOnFirstLine` and `navUnderFirstLine` both read true.
+     The register tab and the account group share the first line.
+2. Run step 2's function, which works at 1440px. It reads
+   `document.elementFromPoint(x, y).closest('[title]')` over the free header
+   room, then over the name. Pass: `room` reads `null`, and `overName` reads
+   true. The inner span that holds the name answers over the name.
+3. Run step 3's function. It tabs through the header at 1440px, then at
+   560px, and lists the text of each control that takes focus. Pass: both
+   lists name the nav's buttons first, then "Account", in the same order.
+4. Run step 4's function. It repeats step 1's widths in the app, admin and
+   reporting areas, in English and then in German. Reporting opens on the
+   Cycle time view of `it_offboarding`, picked from its process list. The
+   function switches the language in the account menu, and sets English back
+   at the end.
+   - Pass: `accountInside` reads true at every width, in both locales. The
+     Account button's box stands inside the header's box.
+   - Record each width where `navOverflow` reads more than 0, per area and
+     locale. Record the first width where each header's `lines` reads more
+     than 1. The app and admin headers read 3 there, one line per item.
+
+Step 1 runs through this function. It also steps down from 680px in 5px steps
+to find `groupLeavesAt`:
+
+```js
+async (page) => {
+  const read = () => {
+    const header = document.querySelector(".shell > header");
+    const [tab, nav, group] = header.children;
+    const name = group.firstElementChild;
+    const box = header.getBoundingClientRect();
+    const rects = [...header.children].map((el) => el.getBoundingClientRect());
+    let lines = 0;
+    let bottom = -Infinity;
+    for (const r of [...rects].sort((a, b) => a.top - b.top)) {
+      if (r.top >= bottom - 1) lines += 1;
+      bottom = Math.max(bottom, r.bottom);
+    }
+    const t = tab.getBoundingClientRect();
+    const n = nav.getBoundingClientRect();
+    const g = group.getBoundingClientRect();
+    const s = getComputedStyle(header);
+    const doc = document.documentElement;
+    return {
+      header: { scrollWidth: header.scrollWidth, clientWidth: header.clientWidth },
+      document: { scrollWidth: doc.scrollWidth, clientWidth: doc.clientWidth },
+      lines,
+      clipped: rects.filter((r) => r.left < box.left - 1 || r.right > box.right + 1).length,
+      wholeName: name.scrollWidth <= name.clientWidth,
+      groupOnFirstLine: g.top < t.bottom,
+      navUnderFirstLine: n.top >= Math.max(t.bottom, g.bottom) - 1,
+      lastLine: bottom,
+      dividerTop: box.bottom - parseFloat(s.borderBottomWidth),
+      divider: s.borderBottomWidth,
+      background: s.backgroundColor,
+    };
+  };
+  const result = {};
+  for (const width of [1440, 680, 640, 600, 560, 480, 400]) {
+    await page.setViewportSize({ width, height: 800 });
+    await page.waitForTimeout(200);
+    result[width] = await page.evaluate(read);
+  }
+  for (let width = 680; width >= 560; width -= 5) {
+    await page.setViewportSize({ width, height: 800 });
+    await page.waitForTimeout(100);
+    const leaves = await page.evaluate(() => {
+      const [tab, , group] = document.querySelector(".shell > header").children;
+      return group.getBoundingClientRect().top >= tab.getBoundingClientRect().bottom;
+    });
+    if (leaves) {
+      result.groupLeavesAt = width;
+      break;
+    }
+  }
+  return result;
+}
+```
+
+Step 2 runs through this one. It aims at the middle of the free room, between
+the nav and the name:
+
+```js
+async (page) => {
+  await page.setViewportSize({ width: 1440, height: 800 });
+  await page.waitForTimeout(200);
+  return page.evaluate(() => {
+    const [, nav, group] = document.querySelector(".shell > header").children;
+    const name = group.querySelector("[title]");
+    const n = name.getBoundingClientRect();
+    const y = n.top + n.height / 2;
+    const roomX = (nav.getBoundingClientRect().right + n.left) / 2;
+    const room = document.elementFromPoint(roomX, y).closest("[title]");
+    const over = document.elementFromPoint(n.left + n.width / 2, y).closest("[title]");
+    return { roomX, nameLeft: n.left, room: room === null ? null : room.outerHTML, overName: over === name };
+  });
+}
+```
+
+Step 3 runs through this one. It starts each walk from the document's start:
+
+```js
+async (page) => {
+  const walk = async (width) => {
+    await page.setViewportSize({ width, height: 800 });
+    await page.waitForTimeout(200);
+    await page.evaluate(() => {
+      document.body.tabIndex = -1;
+      document.body.focus();
+      document.body.removeAttribute("tabindex");
+    });
+    const order = [];
+    for (let i = 0; i < 30; i += 1) {
+      await page.keyboard.press("Tab");
+      const text = await page.evaluate(() => {
+        const el = document.activeElement;
+        return el && el.closest(".shell > header") ? el.textContent.trim() : null;
+      });
+      if (text !== null) order.push(text);
+      else if (order.length > 0) break;
+    }
+    return order;
+  };
+  return { at1440: await walk(1440), at560: await walk(560) };
+}
+```
+
+Step 4 runs through this one:
+
+```js
+async (page) => {
+  const origin = page.url().match(/^https?:\/\/[^/]+/)[0];
+  const widths = [1440, 680, 640, 600, 560, 480, 400];
+  const read = () => {
+    const header = document.querySelector(".shell > header");
+    const box = header.getBoundingClientRect();
+    const account = header.querySelector(".shell-account-button").getBoundingClientRect();
+    const nav = header.querySelector("nav").getBoundingClientRect();
+    let lines = 0;
+    let bottom = -Infinity;
+    for (const r of [...header.children].map((el) => el.getBoundingClientRect()).sort((a, b) => a.top - b.top)) {
+      if (r.top >= bottom - 1) lines += 1;
+      bottom = Math.max(bottom, r.bottom);
+    }
+    return {
+      lines,
+      accountInside: account.left >= box.left - 1 && account.right <= box.right + 1 && account.top >= box.top - 1 && account.bottom <= box.bottom + 1,
+      navOverflow: Math.max(0, Math.round(nav.right - box.right)),
+    };
+  };
+  const measure = async () => {
+    const result = {};
+    for (const area of ["app", "admin", "reporting"]) {
+      await page.setViewportSize({ width: 1440, height: 800 });
+      await page.goto(`${origin}/${area}`);
+      if (area === "reporting") {
+        await page.getByRole("button", { name: /it_offboarding/ }).click();
+        await page.waitForURL(/\/cycle-time$/);
+      }
+      await page.waitForLoadState("networkidle");
+      result[area] = {};
+      for (const width of widths) {
+        await page.setViewportSize({ width, height: 800 });
+        await page.waitForTimeout(200);
+        result[area][width] = await page.evaluate(read);
+      }
+    }
+    return result;
+  };
+  const language = async (menu, label, value) => {
+    await page.setViewportSize({ width: 1440, height: 800 });
+    await page.getByRole("button", { name: menu, exact: true }).click();
+    await page.getByLabel(label).selectOption(value);
+    await page.keyboard.press("Escape");
+  };
+  const en = await measure();
+  await language("Account", "Language", "de");
+  const de = await measure();
+  await language("Konto", "Sprache", "en");
+  return { en, de };
+}
+```
+
+### The form editor's preview turns at 80rem (`studio-narrow-widths`)
+
+Source: `studio-narrow-widths` tasks 5.18 and 5.19. The test
+`studio-narrowWidths.test.ts` pins the 80rem query in both files, and it lays
+out no grid. This entry reads the turn and a key's line count in a browser.
+
+See this file's "Before you start" section for the build and the address.
+Seed the database and sign in as `demo-superuser@example.test`, password
+`seed-demo-password`. In the Processes list, find the row `it_offboarding`
+and choose "Create draft". Open the Forms tab. On the card headed "Submit the
+Exit Notification", choose "Open the form". Under `playwright-cli`, pass
+`-s=studio-narrow-widths` on every call.
+
+The function below reads the form editor at 1300, 1280 and 1100px wide. Per
+width it returns the grid's column tracks, the preview's place and its
+divider. It also compares the height of the `full_name` key's box with the
+key's computed line height, as `keyLines`.
+
+1. Read the result for 1300px. Pass: `columns` lists three tracks, and
+   `previewBeside` reads true. Three columns stand, with the preview beside
+   the canvas. Pass: `keyLines` reads 1.
+2. Read the result for 1280px. Pass: `columns` lists two tracks, and
+   `previewUnder` reads true. The preview stands under both columns. Pass:
+   `divider` reads `0px` left and `2px` top, on its top edge alone. Pass:
+   `keyLines` reads 1.
+3. Read the result for 1100px. Pass: the three pass lines of step 2 hold
+   here too. The key holds one line at this width as well.
+4. Choose "← Back to the process", then "← Back to processes". Choose
+   "Discard" on the `it_offboarding` row and accept the browser's confirm.
+   Under `playwright-cli`, `dialog-accept` answers it. The header bar's own
+   "Discard draft" does not work, per DRAFT-1 in `docs/decisions.md`.
+
+```js
+async (page) => {
+  const read = () => {
+    const palette = document.querySelector('nav[aria-label="Catalog fields not on this form"]');
+    const canvas = document.querySelector('ol[aria-label="Form layout"]');
+    const preview = document.querySelector('aside[aria-label="What a participant meets"]');
+    const key = [...canvas.querySelectorAll("span")].find((el) => el.textContent === "full_name");
+    const p = palette.getBoundingClientRect();
+    const c = canvas.getBoundingClientRect();
+    const v = preview.getBoundingClientRect();
+    const ps = getComputedStyle(preview);
+    const keyHeight = key.getBoundingClientRect().height;
+    const lineHeight = parseFloat(getComputedStyle(key).lineHeight);
+    return {
+      columns: getComputedStyle(preview.parentElement).gridTemplateColumns,
+      previewBeside: v.left >= c.right - 1 && v.top < c.bottom,
+      previewUnder: v.top >= Math.max(p.bottom, c.bottom) - 1,
+      divider: { left: ps.borderLeftWidth, top: ps.borderTopWidth },
+      keyHeight,
+      lineHeight,
+      keyLines: Math.round(keyHeight / lineHeight),
+    };
+  };
+  const result = {};
+  for (const width of [1300, 1280, 1100]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.waitForTimeout(200);
+    result[width] = await page.evaluate(read);
+  }
+  return result;
+}
+```
+
+### The tab row keeps the open tab in view (`studio-narrow-widths`)
+
+Source: `studio-narrow-widths` tasks 5.20 to 5.31, and step 13 from that
+change's final review. The row's pure functions have tests of their own in
+`studio-processTabRow.test.tsx`. No DOM test library exists here. The scroll,
+the drawn edge fade and the pointer press therefore land in this entry.
+
+See this file's "Before you start" section for the build and the address.
+Step 9 needs a classic scrollbar under the row. Headed Chrome on Windows draws
+one, as the MATRIX-1 run did. Open the session headed, with
+`playwright-cli -s=studio-narrow-widths open --headed`, and pass
+`-s=studio-narrow-widths` on every later call.
+
+Seed the database and sign in as `demo-superuser@example.test`, password
+`seed-demo-password`. In the Processes list, find the row `it_offboarding`
+and choose "Create draft". Studio opens the draft at
+`/studio/processes/<id>/edit`.
+
+Run the setup function below once, before step 1. It installs three helpers on
+the open page and on every page the session loads after it. The helper
+`tabRowProbe` reads one tab against the row. Its `leading` and `trailing` give
+the tab's distance from each edge of the row's view, in CSS px. A tab 32px
+clear of an edge, to within one pixel, reads 31 or more there. Each function
+returns an object, so an empty printout means it threw.
+
+1. Open the draft at `/studio/processes/<id>/edit/forms` in a 400x800 window.
+   Pass: `open` reads true, and `leading` and `trailing` each read 31 or
+   more. The Forms tab's box stands inside the row's box, 32px or more from
+   each edge.
+2. Move the row's `scrollLeft` to its start, its middle and its end. After
+   each move the function waits two animation frames, then reads the row's
+   computed `mask-image`.
+   - Pass: at the start its first gradient runs `to left` from one
+     transparent stop. The trailing edge fades alone.
+   - Pass: in the middle that gradient runs `to right`, with a transparent
+     stop at both ends. Both edges fade.
+   - Pass: at the end it runs `to right` from one transparent stop. The
+     leading edge fades alone.
+3. Open the draft at `/edit/canvas` in a 1440px window. Pass: `wide` reads
+   `none`. The function then opens Forms with a click, and narrows the window
+   to 400px. Pass: `narrow` reads 31 or more for `leading` and `trailing`, so
+   the Forms tab stands whole in view.
+4. Make the draft differ from its base version. Type into the process name in
+   the header bar. Press Save. Pass: the header bar reads "Saved".
+   - The function opens `/studio/processes/<id>/edit/checks` in a 400x800
+     window. It waits until the Changes tab's count prints.
+   - Pass: `atEnd` reads true, `leading` reads 31 or more and `trailing` reads
+     -1 or more. The Checks tab stands whole in view, with the row at its end.
+5. The function opens `/edit/forms` at 400px, then opens Canvas with a click.
+   It then presses the browser's Back button. Pass: `forms.open` reads true,
+   and its `leading` and `trailing` each read 31 or more. Pass: `scrolls`
+   holds one value, equal to `forms.scrollLeft`. Forms opens again and stands
+   whole in view, and the row jumps with no animated scroll.
+6. Walk the row by keyboard. The function focuses Forms and presses the right
+   arrow key three times. Pass: `focused` reads true for Changes, and
+   `leading` and `trailing` each read 31 or more. Focus stands on Changes,
+   whole in view and 32px clear of the edge, to within one pixel.
+7. Press a tab through `run-code`. The function scrolls the row to its start
+   and waits two animation frames. It presses 12px inside the row's trailing
+   edge with `page.mouse.down()` and `page.mouse.up()`.
+   - Pass: `point.tab` reads `studio-tab-dataSources`, so `elementFromPoint`
+     reads Data sources at that point.
+   - Pass: `during`, the row's `scrollLeft` read between down and up, equals
+     `point.scrollLeft`, its value before the press.
+   - Pass: `after.open` reads true, and its `leading` and `trailing` each read
+     31 or more. Data sources then opens and stands whole in view.
+8. At 400px, the function sets the row's `scrollLeft` to 0 and waits two
+   animation frames. It focuses Fields and presses Enter. Pass: `scrollLeft`
+   still reads 0. Pass: `open` reads true, so Fields is open.
+9. This step needs the headed session from
+   `playwright-cli -s=studio-narrow-widths open --headed`. The function scrolls
+   the row to its middle and saves a 64px-wide screenshot of each faded edge.
+   Pass: `scrollbar` reads more than 0, so a classic scrollbar stands under
+   the row. Open both files and zoom in. Pass: the scrollbar's arrows and the
+   2px divider keep full strength under each fade.
+10. The function emulates forced colors through `page.emulateMedia`, then
+    clears the emulation. Pass: `forced` reads `none` at 400px. Both `before`
+    and `cleared` hold a gradient, the positive control.
+11. At 400px, with Forms open, the function sets the row's `scrollLeft`. It
+    takes the Forms button's `offsetLeft + offsetWidth`, minus the row's
+    `clientWidth`, minus 8px. Forms then stands 8px past the trailing edge,
+    and the function waits two animation frames. It focuses the header bar's
+    `⋮` menu button, named "More actions", then presses Tab.
+    - Pass: `before.trailing` reads about -8.
+    - Pass: `after.focused` reads true, and `after.leading` and
+      `after.trailing` each read 31 or more. Focus stands on Forms, whole in
+      view and 32px clear of the edge, to within one pixel.
+12. In a 400x800 window, the function opens `/edit/forms` and sets the row's
+    `scrollLeft` to 0. It waits two animation frames, then clicks Fields. It
+    sets the Steps button's `style.minWidth` to its `offsetWidth` plus the
+    row's `clientWidth`, and waits two animation frames again. Pass:
+    `after.leading` and `after.trailing` each read 31 or more. The Fields tab
+    stands whole in view and 32px clear of the edge, to within one pixel.
+13. At 400px, with Forms open, the function sets the row's `scrollLeft` to 0.
+    Forms then stands past the trailing edge, as a scroll by hand leaves it.
+    It waits two animation frames. It sets the Steps button's `style.minWidth`
+    to its `offsetWidth` plus 40px, and waits two animation frames again.
+    - Pass: `before.open` reads true, and `before.trailing` reads less than 0.
+    - Pass: `grew` reads 40 or more, so the Steps tab widened.
+    - Pass: `after` reads 0. A tab's width change leaves the scrolled row
+      where it stands.
+14. Go back to the process list and choose "Discard" on the `it_offboarding`
+    row. Accept the browser's confirm, with `dialog-accept` under
+    `playwright-cli`. The header bar's own "Discard draft" does not work, per
+    DRAFT-1 in `docs/decisions.md`.
+
+The setup function:
+
+```js
+async (page) => {
+  const install = () => {
+    window.tabRow = () => document.querySelector('[role="tablist"][aria-label="Process surface"]');
+    window.twoFrames = () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+    window.tabRowProbe = (name) => {
+      const row = window.tabRow();
+      const tab = document.getElementById(`studio-tab-${name}`);
+      const r = row.getBoundingClientRect();
+      const b = tab.getBoundingClientRect();
+      const max = row.scrollWidth - row.clientWidth;
+      return {
+        scrollLeft: row.scrollLeft,
+        atStart: row.scrollLeft <= 1,
+        atEnd: max - row.scrollLeft <= 1,
+        leading: b.left - r.left,
+        trailing: r.left + row.clientWidth - b.right,
+        open: tab.getAttribute("aria-selected") === "true",
+        focused: document.activeElement === tab,
+        mask: getComputedStyle(row).maskImage,
+      };
+    };
+  };
+  await page.addInitScript(install);
+  await page.evaluate(install);
+  return page.evaluate(() => typeof window.tabRowProbe);
+}
+```
+
+Step 1:
+
+```js
+async (page) => {
+  await page.setViewportSize({ width: 400, height: 800 });
+  await page.goto(page.url().replace(/\/edit.*$/, "/edit/forms"));
+  await page.waitForLoadState("networkidle");
+  await page.evaluate(() => window.twoFrames());
+  return page.evaluate(() => window.tabRowProbe("forms"));
+}
+```
+
+Step 2:
+
+```js
+async (page) => {
+  const result = {};
+  for (const [edge, share] of [["start", 0], ["middle", 0.5], ["end", 1]]) {
+    await page.evaluate((f) => {
+      const row = window.tabRow();
+      row.scrollLeft = Math.round((row.scrollWidth - row.clientWidth) * f);
+    }, share);
+    await page.evaluate(() => window.twoFrames());
+    result[edge] = await page.evaluate(() => getComputedStyle(window.tabRow()).maskImage);
+  }
+  return result;
+}
+```
+
+Step 3:
+
+```js
+async (page) => {
+  await page.setViewportSize({ width: 1440, height: 800 });
+  await page.goto(page.url().replace(/\/edit.*$/, "/edit/canvas"));
+  await page.waitForLoadState("networkidle");
+  await page.evaluate(() => window.twoFrames());
+  const wide = await page.evaluate(() => getComputedStyle(window.tabRow()).maskImage);
+  await page.locator("#studio-tab-forms").click();
+  await page.setViewportSize({ width: 400, height: 800 });
+  await page.waitForTimeout(200);
+  await page.evaluate(() => window.twoFrames());
+  return { wide, narrow: await page.evaluate(() => window.tabRowProbe("forms")) };
+}
+```
+
+Step 4, after the Save:
+
+```js
+async (page) => {
+  await page.setViewportSize({ width: 400, height: 800 });
+  await page.goto(page.url().replace(/\/edit.*$/, "/edit/checks"));
+  await page.waitForFunction(() => document.getElementById("studio-tab-changes")?.children.length > 1);
+  await page.waitForLoadState("networkidle");
+  await page.evaluate(() => window.twoFrames());
+  return page.evaluate(() => window.tabRowProbe("checks"));
+}
+```
+
+Step 5:
+
+```js
+async (page) => {
+  await page.setViewportSize({ width: 400, height: 800 });
+  await page.goto(page.url().replace(/\/edit.*$/, "/edit/forms"));
+  await page.waitForLoadState("networkidle");
+  await page.locator("#studio-tab-canvas").click();
+  await page.evaluate(() => window.twoFrames());
+  await page.evaluate(() => {
+    window.rowScrolls = [];
+    window.tabRow().addEventListener("scroll", (e) => window.rowScrolls.push(e.currentTarget.scrollLeft));
+  });
+  await page.goBack();
+  await page.waitForURL(/\/edit\/forms$/);
+  await page.waitForTimeout(500);
+  return {
+    scrolls: await page.evaluate(() => window.rowScrolls),
+    forms: await page.evaluate(() => window.tabRowProbe("forms")),
+  };
+}
+```
+
+Step 6:
+
+```js
+async (page) => {
+  await page.locator("#studio-tab-forms").focus();
+  for (let i = 0; i < 3; i += 1) await page.keyboard.press("ArrowRight");
+  await page.evaluate(() => window.twoFrames());
+  return page.evaluate(() => window.tabRowProbe("changes"));
+}
+```
+
+Step 7:
+
+```js
+async (page) => {
+  await page.evaluate(() => {
+    window.tabRow().scrollLeft = 0;
+  });
+  await page.evaluate(() => window.twoFrames());
+  const point = await page.evaluate(() => {
+    const row = window.tabRow();
+    const r = row.getBoundingClientRect();
+    const x = r.left + row.clientWidth - 12;
+    const y = r.top + row.clientHeight / 2;
+    const tab = document.elementFromPoint(x, y)?.closest('[role="tab"]');
+    return { x, y, scrollLeft: row.scrollLeft, tab: tab ? tab.id : null };
+  });
+  await page.mouse.move(point.x, point.y);
+  await page.mouse.down();
+  await page.evaluate(() => window.twoFrames());
+  const during = await page.evaluate(() => window.tabRow().scrollLeft);
+  await page.mouse.up();
+  await page.evaluate(() => window.twoFrames());
+  return { point, during, after: await page.evaluate(() => window.tabRowProbe("dataSources")) };
+}
+```
+
+Step 8:
+
+```js
+async (page) => {
+  await page.setViewportSize({ width: 400, height: 800 });
+  await page.evaluate(() => {
+    window.tabRow().scrollLeft = 0;
+  });
+  await page.evaluate(() => window.twoFrames());
+  await page.locator("#studio-tab-fields").focus();
+  await page.keyboard.press("Enter");
+  await page.evaluate(() => window.twoFrames());
+  return page.evaluate(() => window.tabRowProbe("fields"));
+}
+```
+
+Step 9 saves its two files in the session's working directory:
+
+```js
+async (page) => {
+  await page.evaluate(() => {
+    const row = window.tabRow();
+    row.scrollLeft = Math.round((row.scrollWidth - row.clientWidth) / 2);
+  });
+  await page.evaluate(() => window.twoFrames());
+  const box = await page.evaluate(() => {
+    const row = window.tabRow();
+    const r = row.getBoundingClientRect();
+    return {
+      x: r.left,
+      y: r.top,
+      width: r.width,
+      height: r.height,
+      scrollbar: row.offsetHeight - row.clientHeight - 2,
+      mask: getComputedStyle(row).maskImage,
+    };
+  });
+  await page.screenshot({ path: "tab-row-leading-edge.png", clip: { x: box.x, y: box.y, width: 64, height: box.height } });
+  await page.screenshot({ path: "tab-row-trailing-edge.png", clip: { x: box.x + box.width - 64, y: box.y, width: 64, height: box.height } });
+  return box;
+}
+```
+
+Step 10:
+
+```js
+async (page) => {
+  await page.setViewportSize({ width: 400, height: 800 });
+  await page.evaluate(() => window.twoFrames());
+  const mask = () => page.evaluate(() => getComputedStyle(window.tabRow()).maskImage);
+  const before = await mask();
+  await page.emulateMedia({ forcedColors: "active" });
+  const forced = await mask();
+  await page.emulateMedia({ forcedColors: null });
+  const cleared = await mask();
+  return { before, forced, cleared };
+}
+```
+
+Step 11:
+
+```js
+async (page) => {
+  await page.setViewportSize({ width: 400, height: 800 });
+  await page.goto(page.url().replace(/\/edit.*$/, "/edit/forms"));
+  await page.waitForLoadState("networkidle");
+  await page.evaluate(() => {
+    const row = window.tabRow();
+    const forms = document.getElementById("studio-tab-forms");
+    row.scrollLeft = forms.offsetLeft + forms.offsetWidth - row.clientWidth - 8;
+  });
+  await page.evaluate(() => window.twoFrames());
+  const before = await page.evaluate(() => window.tabRowProbe("forms"));
+  await page.getByRole("button", { name: "More actions", exact: true }).focus();
+  await page.keyboard.press("Tab");
+  await page.evaluate(() => window.twoFrames());
+  return { before, after: await page.evaluate(() => window.tabRowProbe("forms")) };
+}
+```
+
+Step 12 sets the Steps button's width back when it finishes:
+
+```js
+async (page) => {
+  await page.setViewportSize({ width: 400, height: 800 });
+  await page.goto(page.url().replace(/\/edit.*$/, "/edit/forms"));
+  await page.waitForLoadState("networkidle");
+  await page.evaluate(() => {
+    window.tabRow().scrollLeft = 0;
+  });
+  await page.evaluate(() => window.twoFrames());
+  await page.locator("#studio-tab-fields").click();
+  await page.evaluate(() => window.twoFrames());
+  const before = await page.evaluate(() => window.tabRowProbe("fields"));
+  await page.evaluate(() => {
+    const steps = document.getElementById("studio-tab-steps");
+    steps.style.minWidth = `${steps.offsetWidth + window.tabRow().clientWidth}px`;
+  });
+  await page.evaluate(() => window.twoFrames());
+  const after = await page.evaluate(() => window.tabRowProbe("fields"));
+  await page.evaluate(() => {
+    document.getElementById("studio-tab-steps").style.minWidth = "";
+  });
+  return { before, after };
+}
+```
+
+Step 13 sets the Steps button's width back as well:
+
+```js
+async (page) => {
+  await page.setViewportSize({ width: 400, height: 800 });
+  await page.goto(page.url().replace(/\/edit.*$/, "/edit/forms"));
+  await page.waitForFunction(() => document.getElementById("studio-tab-changes")?.children.length > 1);
+  await page.waitForLoadState("networkidle");
+  await page.evaluate(() => {
+    window.tabRow().scrollLeft = 0;
+  });
+  await page.evaluate(() => window.twoFrames());
+  const before = await page.evaluate(() => window.tabRowProbe("forms"));
+  const grew = await page.evaluate(async () => {
+    const steps = document.getElementById("studio-tab-steps");
+    const was = steps.offsetWidth;
+    steps.style.minWidth = `${was + 40}px`;
+    await window.twoFrames();
+    return steps.offsetWidth - was;
+  });
+  const after = await page.evaluate(() => window.tabRow().scrollLeft);
+  await page.evaluate(() => {
+    document.getElementById("studio-tab-steps").style.minWidth = "";
+  });
+  return { before, grew, after };
+}
+```
