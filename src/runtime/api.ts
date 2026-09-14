@@ -778,7 +778,7 @@ function findStep(body: ProcessBody, stepId: string): Step {
  * `postComment`/`uploadAttachment`'s enforcement and `getInstanceView`'s
  * reported `collaboration` field so the chain exists in exactly one place.
  */
-function resolveCollaboration(body: ProcessBody, step: Step, key: "comments" | "attachments"): boolean {
+export function resolveCollaboration(body: ProcessBody, step: Step, key: "comments" | "attachments"): boolean {
   return step.collaboration?.[key] ?? body.collaboration?.[key] ?? true;
 }
 
