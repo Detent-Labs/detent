@@ -14,13 +14,13 @@
 
 ## 2. Sweep the participant/shell cap (46rem to 61rem)
 
-- [ ] 2.1 In `packages/web/src/shell/LoginScreen.tsx`,
+- [x] 2.1 In `packages/web/src/shell/LoginScreen.tsx`,
       `ProfilePage.tsx`, `ErrorBoundary.tsx` and `App.tsx`, replace the
       literal `"46rem"` `maxWidth` with `layout.capNarrow`, importing
       `layout` from `form-ui/tokens.stylex` where not already imported.
       Verify with
       `grep -rn '"46rem"' packages/web/src/shell` returning no matches.
-- [ ] 2.2 In `packages/web/src/areas/app/screens/TaskScreen.tsx`,
+- [x] 2.2 In `packages/web/src/areas/app/screens/TaskScreen.tsx`,
       `TasksScreen.tsx`, `InvolvedScreen.tsx`, `StartedScreen.tsx` and
       `StartScreen.tsx`, replace the literal `"46rem"` `maxWidth` with
       `layout.capNarrow`, importing `layout` where not already imported.
