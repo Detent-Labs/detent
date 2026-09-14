@@ -352,7 +352,7 @@ const styles = stylex.create({
     },
   },
   formCardKey: {
-    flex: 1,
+    flex: "auto",
     minWidth: 0,
     fontFamily: fonts.mono,
     overflowWrap: "break-word",
