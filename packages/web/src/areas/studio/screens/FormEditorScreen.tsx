@@ -390,7 +390,11 @@ const styles = stylex.create({
   // deliberate-duplicate precedent. `formCardMoves`' Move up/Move down at
   // both consumers, and the field card's own plain Remove, use this block;
   // the group's own `Remove ({count})` keeps its `.btn-secondary
-  // btn-destructive` classes unchanged.
+  // btn-destructive` classes unchanged. `paddingInline` matches
+  // `.btn-ghost`'s own override (`--space-1`, 4px) so these buttons read the
+  // same width as the two cited precedents despite carrying no `.btn` class
+  // (`tasks.md`'s own 1.1 verify line requires that these five buttons carry
+  // neither `btn` nor `btn-secondary`).
   authoringCommand: {
     fontFamily: fonts.mono,
     fontSize: 11,
@@ -400,11 +404,31 @@ const styles = stylex.create({
       ":active": colors.text,
     },
     paddingBlock: space.s2,
+    paddingInline: space.s1,
     minHeight: 24,
     backgroundColor: {
       default: "transparent",
       ":hover": colors.surfaceMuted,
       ":active": `color-mix(in srgb, ${colors.text} 14%, transparent)`,
+    },
+  },
+  // A disabled move control takes no hover or press look: slate text on a
+  // transparent ground under the pointer too, the same fix
+  // `FormTabStrip.tsx`'s `controlDisabled` applies for the same reason —
+  // StyleX orders `:disabled` (92) before `:hover` (130), so a `":disabled"`
+  // key inside `authoringCommand` would lose under the pointer. This block
+  // stacks after `authoringCommand`, from the boolean that sets `disabled`,
+  // and restates all three conditions.
+  authoringCommandDisabled: {
+    color: {
+      default: colors.textMuted,
+      ":hover": colors.textMuted,
+      ":active": colors.textMuted,
+    },
+    backgroundColor: {
+      default: "transparent",
+      ":hover": "transparent",
+      ":active": "transparent",
     },
   },
   // The group card (`studio-form-editor`'s fieldset/legend/nested-`<ol>`
@@ -1169,10 +1193,20 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
                 {labelFor(fieldRef)}
               </button>
               <span {...stylex.props(styles.formCardMoves)}>
-                <button type="button" {...stylex.props(styles.authoringCommand)} disabled={isFirst} onClick={() => move(rowIndex, -1)}>
+                <button
+                  type="button"
+                  {...stylex.props(styles.authoringCommand, isFirst && styles.authoringCommandDisabled)}
+                  disabled={isFirst}
+                  onClick={() => move(rowIndex, -1)}
+                >
                   {t("formEditor.moveUp")}
                 </button>
-                <button type="button" {...stylex.props(styles.authoringCommand)} disabled={isLast} onClick={() => move(rowIndex, 1)}>
+                <button
+                  type="button"
+                  {...stylex.props(styles.authoringCommand, isLast && styles.authoringCommandDisabled)}
+                  disabled={isLast}
+                  onClick={() => move(rowIndex, 1)}
+                >
                   {t("formEditor.moveDown")}
                 </button>
                 <button type="button" className="btn btn-secondary btn-destructive" onClick={() => removeRow(rowIndex)}>
@@ -1249,10 +1283,20 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
         {/* The keyboard route to the same array change a drag makes. A drag
             handle alone leaves reordering unreachable without a pointer. */}
         <span {...stylex.props(styles.formCardMoves)}>
-          <button type="button" {...stylex.props(styles.authoringCommand)} disabled={isFirst} onClick={() => move(rowIndex, -1)}>
+          <button
+            type="button"
+            {...stylex.props(styles.authoringCommand, isFirst && styles.authoringCommandDisabled)}
+            disabled={isFirst}
+            onClick={() => move(rowIndex, -1)}
+          >
             {t("formEditor.moveUp")}
           </button>
-          <button type="button" {...stylex.props(styles.authoringCommand)} disabled={isLast} onClick={() => move(rowIndex, 1)}>
+          <button
+            type="button"
+            {...stylex.props(styles.authoringCommand, isLast && styles.authoringCommandDisabled)}
+            disabled={isLast}
+            onClick={() => move(rowIndex, 1)}
+          >
             {t("formEditor.moveDown")}
           </button>
           <button type="button" {...stylex.props(styles.authoringCommand)} onClick={() => removeRow(rowIndex)}>
