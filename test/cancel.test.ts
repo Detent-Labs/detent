@@ -207,27 +207,24 @@ describe("schema: cancellable field", () => {
     expect(() => compileProcessBody(b)).not.toThrow();
   });
 
-  it("a step overrides its process's default (process: false, step: true)", () => {
+  it("a step overrides its process's default (process: true, step: false)", () => {
     const b: any = contractedBody();
-    b.cancellable = false;
-    b.workflow.steps[0].cancellable = true;
+    b.cancellable = true;
+    b.workflow.steps[0].cancellable = false;
     expect(() => compileProcessBody(b)).not.toThrow();
     const compiled = compileProcessBody(b);
-    expect(compiled.cancellable).toBe(false);
-    expect(compiled.workflow.steps[0].cancellable).toBe(true);
+    expect(compiled.cancellable).toBe(true);
+    expect(compiled.workflow.steps[0].cancellable).toBe(false);
   });
 
   it("a step widens past a process-wide ban (process: false, step: true)", () => {
     const b: any = contractedBody();
     b.cancellable = false;
     // Explicitly set another step to allow cancellation
-    const secondStep = b.workflow.steps[1];
-    if (secondStep) {
-      secondStep.cancellable = true;
-      expect(() => compileProcessBody(b)).not.toThrow();
-      const compiled = compileProcessBody(b);
-      expect(compiled.cancellable).toBe(false);
-      expect(compiled.workflow.steps[1].cancellable).toBe(true);
-    }
+    b.workflow.steps[1].cancellable = true;
+    expect(() => compileProcessBody(b)).not.toThrow();
+    const compiled = compileProcessBody(b);
+    expect(compiled.cancellable).toBe(false);
+    expect(compiled.workflow.steps[1].cancellable).toBe(true);
   });
 });
