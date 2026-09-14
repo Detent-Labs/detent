@@ -70,6 +70,7 @@ export const PROPERTY_WORDS: { readonly [key: string]: CatalogKey | undefined } 
   type: "changeList.prop.type",
   config: "changeList.prop.config",
   validation: "changeList.prop.validation",
+  cancellable: "changeList.prop.cancellable",
   // processBody, workflow, processContract
   baseLocale: "changeList.prop.baseLocale",
   allowedGroups: "changeList.prop.allowedGroups",

@@ -516,11 +516,21 @@ export const en = {
   "fieldMatrix.bulkClearRow": "Clears this flag from field {name}. Cells it writes: {total}.",
   "fieldMatrix.technicalRowMark": "Technical",
 
-  // The step page's eight section headings (`studio-step-page`). "Time
+  // The step page's nine section headings (`studio-step-page`). "Time
   // limit" is the word for a timer everywhere an author reads one; the
   // contract's own `deadline` key stays in the step's raw JSON.
   "stepSections.entry": "On entry",
   "stepSections.assignment": "Assignment",
+  "stepSections.cancellable": "Cancellable",
+  // The Cancellable section's own field label stays the raw, lowercase key
+  // name, matching keyField/labelField/descriptionField/outcomeField below —
+  // the section heading above already carries the guided phrase.
+  "stepSections.cancellableField": "cancellable",
+  "stepSections.cancellableInherit": "Inherit from process",
+  "stepSections.cancellableYes": "Cancellable",
+  "stepSections.cancellableNo": "Not cancellable",
+  "stepSections.cancellableResolvesYes": "Resolves to: cancellable.",
+  "stepSections.cancellableResolvesNo": "Resolves to: not cancellable.",
   "stepSections.form": "Step form fields",
   "stepSections.paths": "Path to",
   "stepSections.timers": "Time limit",
@@ -631,6 +641,7 @@ export const en = {
   "headerBar.findingCarriedByNone": "not carried by any live version",
   "headerBar.menuTrigger": "More actions",
   "headerBar.menuGroupDraft": "Process, saved with the draft",
+  "headerBar.cancellable": "Cancellable",
   "headerBar.manageGroups": "Manage assignment groups for this process",
   "headerBar.menuGroupViews": "Views",
   "headerBar.jsonOpen": "Open the JSON surface",
@@ -789,6 +800,7 @@ export const en = {
   "changeList.prop.maxLength": "Maximum length",
   "changeList.prop.pattern": "Pattern",
   "changeList.prop.rule": "Rule",
+  "changeList.prop.cancellable": "Cancellable",
   // Names the walker derives rather than reads off one key.
   "changeList.name.group": "Group",
   "changeList.name.kind": "Kind",
