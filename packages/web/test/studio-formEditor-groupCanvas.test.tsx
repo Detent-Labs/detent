@@ -136,6 +136,42 @@ function tabbedDraft(order: ["review", "decision"] | ["decision", "review"]): Dr
   return draft as unknown as Draft;
 }
 
+/** A minimal, self-contained draft covering `renderFieldKey`'s cases: a
+ * single underscore, no underscore, adjacent underscores, and the
+ * `email_address` example the field-label-wrapping change itself names.
+ * Kept apart from `DRAFT` above, whose fixture keys are deliberately
+ * underscore-free. */
+const FULL_NAME = "field_00000000-0000-4000-8000-0000000000c1";
+const PLAIN_KEY = "field_00000000-0000-4000-8000-0000000000c2";
+const ADJACENT = "field_00000000-0000-4000-8000-0000000000c3";
+const EMAIL_ADDRESS = "field_00000000-0000-4000-8000-0000000000c4";
+
+const KEY_WRAP_DRAFT = {
+  baseLocale: "en",
+  fields: [
+    { id: FULL_NAME, key: "full_name", type: "string", label: { en: "Full name" } },
+    { id: PLAIN_KEY, key: "plain", type: "string", label: { en: "Plain" } },
+    { id: ADJACENT, key: "a__b", type: "string", label: { en: "Adjacent" } },
+    { id: EMAIL_ADDRESS, key: "email_address", type: "string", label: { en: "Email address" } },
+  ],
+  workflow: {
+    initialStep: "step_a",
+    steps: [
+      {
+        id: "step_a",
+        key: "intake",
+        label: { en: "Intake" },
+        type: "task",
+        view: {
+          fields: [{ ref: FULL_NAME }, { ref: PLAIN_KEY }, { ref: ADJACENT }, { ref: EMAIL_ADDRESS }],
+        },
+        paths: [{ id: "path_1", to: "step_b", trigger: "automatic", priority: 1 }],
+      },
+      { id: "step_b", key: "review", label: { en: "Review" }, type: "task", terminal: true },
+    ],
+  },
+} as unknown as Draft;
+
 /** Renders the screen with the field list `EditScreen.tsx` hands it: the
  * whole catalog, flattened through `draftFields`. */
 function render(draft: Draft = DRAFT): string {
@@ -216,6 +252,26 @@ function isButtonDisabled(block: string, label: string): boolean {
   const tagStart = block.lastIndexOf("<button", labelIndex);
   const tagEnd = block.indexOf(">", tagStart);
   return block.slice(tagStart, tagEnd).includes("disabled");
+}
+
+/** The button showing `label` inside `block`, its own opening tag only --
+ * the same bound `isButtonDisabled` reads, kept here for a class-string
+ * assertion instead of a `disabled`-attribute one. */
+function buttonTagFor(block: string, label: string): string {
+  const labelIndex = block.indexOf(`>${label}<`);
+  expect(labelIndex, `expected to find a "${label}" button`).toBeGreaterThan(-1);
+  const tagStart = block.lastIndexOf("<button", labelIndex);
+  const tagEnd = block.indexOf(">", tagStart);
+  return block.slice(tagStart, tagEnd);
+}
+
+/** The exact `<wbr/>`-joined text `renderFieldKey` must produce for a key: a
+ * break right after every `_`, with no character lost. Built independently
+ * of the production helper (not exported, so not callable directly from a
+ * test) so the assertion states the contract rather than re-executes its
+ * implementation. */
+function wbrWrapped(key: string): string {
+  return key.replace(/_/g, "_<wbr/>");
 }
 
 describe("The canvas draws a group's members inside its own card", () => {
@@ -299,5 +355,45 @@ describe("On a tabbed form, the canvas draws the shown tab's roots, each group c
     const gamma = cardBlock(canvasHtml(render(tabbedDraft(["decision", "review"]))), "gamma");
     expect(isButtonDisabled(gamma, "Move up")).toBe(true);
     expect(isButtonDisabled(gamma, "Move down")).toBe(true);
+  });
+});
+
+describe("The migrated move/remove controls drop btn-secondary", () => {
+  it("no longer renders btn-secondary on a field card's move, move-down or remove control", () => {
+    const alpha = cardBlock(canvasHtml(render()), "alpha");
+    for (const label of ["Move up", "Move down", "Remove"]) {
+      expect(buttonTagFor(alpha, label)).not.toContain("btn-secondary");
+    }
+  });
+
+  it("no longer renders btn-secondary on the group's own move controls, while its Remove (count) keeps it", () => {
+    const billing = legendBlock(fieldsetBlock(canvasHtml(render()), "billing"));
+    expect(buttonTagFor(billing, "Move up")).not.toContain("btn-secondary");
+    expect(buttonTagFor(billing, "Move down")).not.toContain("btn-secondary");
+    expect(buttonTagFor(billing, "Remove (5)")).toContain("btn-secondary");
+  });
+});
+
+describe("renderFieldKey: how a placed field's key wraps", () => {
+  it("breaks a single underscore, keeping both segments intact", () => {
+    const canvas = canvasHtml(render(KEY_WRAP_DRAFT));
+    expect(canvas).toContain(wbrWrapped("full_name"));
+  });
+
+  it("renders no <wbr> at all for a key with no underscore", () => {
+    const plain = cardBlock(canvasHtml(render(KEY_WRAP_DRAFT)), "plain");
+    expect(plain).not.toContain("<wbr");
+  });
+
+  it("round-trips adjacent underscores, breaking after each one with no character lost", () => {
+    const canvas = canvasHtml(render(KEY_WRAP_DRAFT));
+    expect(canvas).toContain(wbrWrapped("a__b"));
+  });
+});
+
+describe("A placed field's key renders a <wbr> node immediately after each underscore", () => {
+  it("breaks email_address immediately after its underscore", () => {
+    const canvas = canvasHtml(render(KEY_WRAP_DRAFT));
+    expect(canvas).toContain(wbrWrapped("email_address"));
   });
 });
