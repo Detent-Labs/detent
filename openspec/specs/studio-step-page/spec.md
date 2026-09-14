@@ -67,12 +67,12 @@ fields its form carries, the process it calls and its outcome.
 ### Requirement: A rail row carries its own open issue count
 
 A rail row SHALL carry the number of open issues that name its step. A row
-with no issue SHALL carry no badge. The badge SHALL take the blocker color
+with no issue SHALL display no badge. The badge SHALL take the blocker color
 where any of those issues blocks a publish.
 
 #### Scenario: The rail marks a step with a blocker
 
-- **WHEN** one step leads nowhere and carries no other issue
+- **WHEN** one step leads nowhere and has no other issue
 - **THEN** that step's rail row carries a badge reading one
 - **AND** the badge takes the blocker color
 
@@ -125,10 +125,11 @@ exit, Time limit, Step form fields, and Collaboration.
 
 A section SHALL stand only where the step's kind declares it. A task step
 carries Assignment. A subprocess step carries Which process it calls. An end
-step carries How the case ends. It carries no outgoing path, so it carries
-neither On exit nor Time limit. A subprocess step carries no Collaboration
-section either: it is an automatic wait-state with no participant-facing task
-screen for the setting to govern.
+step carries How the case ends. It has no outgoing path, so it carries
+neither On exit nor Time limit.
+
+A subprocess step also drops the Collaboration section. It is an automatic
+wait-state with no participant-facing task screen for the setting to govern.
 
 This replaces the runtime-order register of collapsible sections. An author
 reads every setting of one step without opening anything.
@@ -138,14 +139,14 @@ reads every setting of one step without opening anything.
 - **WHEN** the step page holds a task step that is not an end
 - **THEN** the page carries Path to, Assignment, On entry, On exit, Time limit,
   Step form fields and Collaboration
-- **AND** the page carries no Which process it calls section
+- **AND** the page has no Which process it calls section
 
-#### Scenario: An end step carries no outgoing path
+#### Scenario: An end step has no outgoing path
 
 - **WHEN** the step page holds an end step
 - **THEN** the page carries How the case ends
-- **AND** the page carries no Path to section and no On exit section
-- **AND** the page carries no Time limit section
+- **AND** the page has neither a Path to section nor an On exit section
+- **AND** the page has no Time limit section
 
 #### Scenario: Every section stands open
 
@@ -168,14 +169,14 @@ process default at once, including any later change to it. Selecting On
 or Off SHALL set the step's own override to `true` or `false`. While
 Default is the selected state, the control SHALL visibly name the
 process-wide default's current resolved value for that key. That value
-might show as "Currently: on".
+might read as "Currently: on", for example.
 
 #### Scenario: Selecting Default clears the step's own override
 
 - **WHEN** an author selects Default on the Attachments control for a
   step that previously overrode `attachments: false`
 - **THEN** the step's `collaboration.attachments` becomes `undefined`,
-  and the control shows the process's current default value
+  and the control names the process's current default value
 
 #### Scenario: A step's override survives a later process-default change
 
@@ -228,6 +229,8 @@ The step page SHALL carry a Developer view disclosure at its foot. The
 disclosure SHALL stand closed until an author opens it. An open disclosure
 SHALL carry the step's own JSON and the step's `id`.
 
+<!-- antislop: allow synonym-rotation -->
+<!-- Why: "JSON surface" is this codebase's fixed UI-glossary term for the raw definition-editing screen (.claude/rules/ui-glossary.md), not a rotated synonym for a display/show/carry verb used elsewhere in this file. -->
 The JSON SHALL be read-only here. The JSON surface stays the one place for
 hand-authoring a definition.
 
