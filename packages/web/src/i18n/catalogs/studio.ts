@@ -800,6 +800,7 @@ export const en = {
   "changeList.prop.maxLength": "Maximum length",
   "changeList.prop.pattern": "Pattern",
   "changeList.prop.rule": "Rule",
+  "changeList.prop.cancellable": "Cancellable",
   // Names the walker derives rather than reads off one key.
   "changeList.name.group": "Group",
   "changeList.name.kind": "Kind",
