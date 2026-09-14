@@ -104,11 +104,11 @@
 
 ## 6. Verification
 
-- [ ] 6.1 Run `bun run typecheck` inside the devcontainer with zero
+- [x] 6.1 Run `bun run typecheck` inside the devcontainer with zero
       errors.
-- [ ] 6.2 Run `bun run build` inside the devcontainer and verify it
+- [x] 6.2 Run `bun run build` inside the devcontainer and verify it
       succeeds.
-- [ ] 6.3 Run the full `bun test` suite inside the devcontainer with
+- [x] 6.3 Run the full `bun test` suite inside the devcontainer with
       `DATABASE_URL` set (never a single-file rerun). Verify by reading
       the printed summary: pass count, zero unexpected failures, and the
       skip count consistent with `DATABASE_URL` actually being picked up
@@ -131,7 +131,7 @@
 - [ ] 6.6 Run `/impeccable critique` and `/impeccable audit` against the
       Task screen route and the Player screen route, and resolve any
       material finding either reports.
-- [ ] 6.7 Run the antislop prose gate and the whitespace gate over the
+- [x] 6.7 Run the antislop prose gate and the whitespace gate over the
       pushed range on every Markdown file this change touched:
       `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`
       and
