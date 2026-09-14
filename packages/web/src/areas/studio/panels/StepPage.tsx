@@ -314,6 +314,7 @@ const SECTION_LABEL: Record<SectionName, CatalogKey> = {
   exit: "stepSections.exit",
   subprocess: "stepSections.subprocess",
   howItEnds: "stepSections.howItEnds",
+  collaboration: "stepSections.collaboration",
 };
 
 const PERFORMED_BY_OPTIONS: PerformedBy[] = ["participant", "subprocess", "terminal"];
@@ -323,6 +324,66 @@ const PERFORMED_BY_OPTIONS: PerformedBy[] = ["participant", "subprocess", "termi
  * type, which is what an unnamed plugin has to be picked by. */
 function strategyOptionLabel(type: string): string {
   return isCuratedAssignmentStrategy(type) ? assignmentStrategyLabel(type).name : type;
+}
+
+/** The Collaboration section's per-field three-state control
+ * (`studio-step-page`: "The Collaboration section offers a three-state
+ * control per field"). `undefined` reads as Default, inheriting the
+ * process-wide value at once, including any later change to it. */
+type CollabOption = "default" | "on" | "off";
+const COLLAB_OPTIONS: CollabOption[] = ["default", "on", "off"];
+const COLLAB_OPTION_LABEL: Record<CollabOption, CatalogKey> = {
+  default: "collaboration.optionDefault",
+  on: "collaboration.optionOn",
+  off: "collaboration.optionOff",
+};
+
+function collabOptionFor(override: boolean | undefined): CollabOption {
+  return override === undefined ? "default" : override ? "on" : "off";
+}
+
+/** One field's Segmented Control: Default, On or Off. Reuses the step-kind
+ * control's own `segmented`/`segmentedOption` styles above. While Default
+ * stands pressed, a caption below names the process-wide default's current
+ * resolved value, so an author sees the effective setting without widening
+ * the control's own per-option text (design.md). */
+function CollaborationControl({
+  legend,
+  value,
+  resolvedDefault,
+  onChange,
+}: {
+  legend: CatalogKey;
+  value: boolean | undefined;
+  resolvedDefault: boolean;
+  onChange: (next: boolean | undefined) => void;
+}) {
+  const selected = collabOptionFor(value);
+  return (
+    <fieldset {...stylex.props(styles.segmented)} aria-label={t(legend)}>
+      <legend {...stylex.props(styles.segmentedLegend)}>{t(legend)}</legend>
+      {COLLAB_OPTIONS.map((option, optionIndex) => (
+        <button
+          key={option}
+          type="button"
+          {...stylex.props(
+            styles.segmentedOption,
+            optionIndex > 0 && styles.segmentedOptionAfterFirst,
+            selected === option && styles.segmentedOptionPressed,
+          )}
+          aria-pressed={selected === option}
+          onClick={() => onChange(option === "default" ? undefined : option === "on")}
+        >
+          {t(COLLAB_OPTION_LABEL[option])}
+        </button>
+      ))}
+      {selected === "default" && (
+        <p {...stylex.props(styles.hint)}>
+          {t("collaboration.currently").replace("{value}", t(resolvedDefault ? "collaboration.valueOn" : "collaboration.valueOff"))}
+        </p>
+      )}
+    </fieldset>
+  );
 }
 
 /** One end of the walk: the step a previous or next control opens, already
@@ -477,6 +538,23 @@ export function StepPage({
               {t("stepSections.viewBuildForm")}
             </button>
           </div>
+        );
+      case "collaboration":
+        return (
+          <>
+            <CollaborationControl
+              legend="collaboration.commentLegend"
+              value={step.collaboration?.comments}
+              resolvedDefault={draft.collaboration?.comments ?? true}
+              onChange={(comments) => updateStep({ collaboration: { ...(step.collaboration ?? {}), comments } })}
+            />
+            <CollaborationControl
+              legend="collaboration.attachmentsLegend"
+              value={step.collaboration?.attachments}
+              resolvedDefault={draft.collaboration?.attachments ?? true}
+              onChange={(attachments) => updateStep({ collaboration: { ...(step.collaboration ?? {}), attachments } })}
+            />
+          </>
         );
       case "paths":
         return (
