@@ -349,6 +349,12 @@ focus leaves a clipped tab where it stands, so that entry needs the call. A
 native focus centers a wholly hidden tab, so only a partly clipped one shows
 the call working.
 
+A window that regains focus dispatches `focus` to its active element again,
+and that focus still matches `:focus-visible`. Each tab's `onBlur` handler
+marks a blur while `document.hasFocus()` reads false. The exported
+`focusScrollsRow` then skips that button's next focus. A row scrolled by
+hand stays put when the author returns to the window.
+
 Why a width change as well: the pick names load and every tab change.
 Narrowing a window with Forms open would still strand the tab out of view.
 
@@ -402,9 +408,10 @@ One `ResizeObserver` watches the row and its ten buttons. A window resize
 moves the row's width, and a count's digits move a button's. Its callback
 recomputes the fade value and writes the band height below. It calls
 `scrollTabIntoRow` when the row's own width moved. It also calls it when a
-button's width moved while the record above reads true. The callback reads
-the open tab from a ref, which the layout effect on `open` updates. One
-observer then serves every tab.
+button's width moved while the record above reads true. The exported
+`widthMoved` counts the observer's first report as a move, since a count can
+print before that report arrives. The callback reads the open tab from a ref,
+which the layout effect on `open` updates. One observer then serves every tab.
 
 The cost stays small. A scroll event fires at most once a frame. It reads
 three numbers, and the open tab's box against the row's. React runs the

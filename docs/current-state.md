@@ -4495,6 +4495,8 @@ meets `scope=started` should infer no new permission tier from it.
   and on every tab change. The arrow-key handler calls it after its focus
   move. A tab's `onFocus` calls it only when the button matches
   `:focus-visible`, so a pointer press never moves the row under the pointer.
+  A window's return scrolls nothing: `focusScrollsRow` skips the focus that
+  follows a tab's blur while `document.hasFocus()` reads false.
 
   The pure function `tabRestsInView` answers whether the open tab rests in
   view, with 1px of slack. The row's `onScroll` handler records that answer,
@@ -4502,7 +4504,8 @@ meets `scope=started` should infer no new permission tier from it.
   `ResizeObserver` watches the row and its ten buttons. Its callback writes
   the row's `clientHeight` as `--tab-row-band`. A change to the row's width
   scrolls the open tab back into view. So does a button's width change, while
-  that record reads true.
+  that record reads true. The observer's first report counts as a width move
+  (`widthMoved`).
 
   The pure function `fadeState` names the edges that fade: `"none"`,
   `"start"`, `"end"` or `"both"`. The component keeps that value in state and

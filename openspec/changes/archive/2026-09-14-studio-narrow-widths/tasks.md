@@ -75,5 +75,5 @@
 - [x] 6.7 Run `/impeccable critique` on the form editor for "Submit the Exit Notification" at 1100px and at 1300px. Fix each finding, or note it in `docs/decisions.md`. Verify no finding stays unaddressed.
 - [x] 6.8 Run `/impeccable audit` on the same form editor route at the same widths. Fix each finding, or note it in `docs/decisions.md`. Verify no finding stays unaddressed.
 - [x] 6.9 Repeat task 5.33 wherever a fix in 6.3 to 6.8 touched a cited file. Verify each re-read citation matches its line.
-- [ ] 6.10 Run the prose gate over the pushed range: `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`. Verify it exits 0.
-- [ ] 6.11 Run the whitespace gate over the same range: `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh`. Verify it exits 0.
+- [x] 6.10 Run the prose gate over the pushed range: `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`. Verify it exits 0.
+- [x] 6.11 Run the whitespace gate over the same range: `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh`. Verify it exits 0.

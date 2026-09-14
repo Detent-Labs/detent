@@ -18,7 +18,9 @@ way. So SHALL a tab that takes focus from a row command's focus hand-off. So
 SHALL a tab that takes keyboard focus from the Tab key.
 
 The row SHALL move by the least distance that brings the tab to rest in view.
-A tab already resting in view SHALL leave the row where it stands. The row
+One case stands apart. The browser places a wholly hidden tab that takes Tab
+key focus by its own focus scroll. A tab already resting in view SHALL leave
+the row where it stands. The row
 SHALL jump to its new position, with no animated scroll. It SHALL stay one
 line, and the tab body under it SHALL keep its place.
 
