@@ -51,6 +51,11 @@ a `baseLocale` that every piece of display text must carry.
 The example has key `expense_approval`, label `Expense Approval`, and
 `baseLocale` `en`.
 
+A process may declare `cancellable: false` to prevent participant-initiated
+cancellation of running instances. Where absent, the default is `true`. This
+blocks only participants; operators and actors with reserved roles remain
+authorized to cancel regardless.
+
 ### Version
 
 You publish a process, and that publication is a version. A published version
@@ -475,6 +480,11 @@ property and the word the same way.
 
 The example has seven steps. `capture` is the initial step. `booked` and
 `rejected` are the ends.
+
+A step may declare `cancellable` to override the process-wide default for that
+step alone. Where a step declares nothing, it inherits the process's value. A
+step may be more permissive (step `true` on a process `false`) or more
+restrictive (step `false` on a process `true`).
 
 ### View
 
