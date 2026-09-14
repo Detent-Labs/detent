@@ -203,6 +203,27 @@ tab and while the JSON surface is active.
 - **WHEN** an author opens the JSON surface from the overflow menu
 - **THEN** Save, Discard draft and Publish still stand in the header bar row
 
+### Requirement: The process header bar carries the process-wide collaboration defaults
+
+The process header bar SHALL carry two checkboxes, labeled Comment and
+Attachments, bound to the draft's own `collaboration.comments` and
+`collaboration.attachments`. Checking or unchecking either SHALL update
+the draft body at once. Neither checkbox stands among the header bar's
+three right-aligned controls (Save, Discard draft, Publish); both stand
+distinct from them.
+
+#### Scenario: Unchecking a default disables it process-wide
+
+- **WHEN** an author unchecks the Attachments checkbox in the process
+  header bar
+- **THEN** the draft's `collaboration.attachments` is set to `false`
+
+#### Scenario: A step with no override still shows the process default
+
+- **WHEN** the process header bar's Comment checkbox is checked, and no
+  step declares its own `collaboration.comments` override
+- **THEN** every such step resolves `collaboration.comments` to `true`
+
 ### Requirement: A check opens the tab that owns its subject
 
 A row in the Checks tab SHALL open the place its subject lives. An issue about
