@@ -75,3 +75,8 @@ export const shadow = stylex.defineVars({
   md: "var(--shadow-md)",
   lg: "var(--shadow-lg)",
 });
+
+export const layout = stylex.defineVars({
+  capNarrow: "var(--layout-cap-narrow)",
+  capWide: "var(--layout-cap-wide)",
+});

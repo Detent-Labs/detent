@@ -106,6 +106,9 @@
   --shadow-md: 0 3px 10px color-mix(in srgb, var(--color-text) 16%, transparent);
   --shadow-lg: 0 12px 32px color-mix(in srgb, var(--color-text) 22%, transparent);
 
+  --layout-cap-narrow: 61rem;
+  --layout-cap-wide: 80rem;
+
   /* Native form controls and scrollbars follow the OS/browser dark chrome
      only when this is declared — background/color alone on an <input> or
      <select> doesn't reach a <select>'s own dropdown popup. Was previously
