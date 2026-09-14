@@ -641,6 +641,7 @@ export const en = {
   "headerBar.findingCarriedByNone": "not carried by any live version",
   "headerBar.menuTrigger": "More actions",
   "headerBar.menuGroupDraft": "Process, saved with the draft",
+  "headerBar.cancellable": "Cancellable",
   "headerBar.manageGroups": "Manage assignment groups for this process",
   "headerBar.menuGroupViews": "Views",
   "headerBar.jsonOpen": "Open the JSON surface",
