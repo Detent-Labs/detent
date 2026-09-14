@@ -39,8 +39,7 @@ event-construction steps.
 #### Scenario: Claim's guard is independent
 
 - **WHEN** `claimStep` is called against a step with no declared
-  assignment, an already-claimed step, or an actor the claim rule does not
-  admit
+  assignment, an already-claimed step, or an actor outside the claim rule
 - **THEN** the shared sequence's guard rejects with that operation's own
   error type: `NotAssignedError`, `AlreadyClaimedError`, or
   `NotACandidateError`. No write or event append occurs

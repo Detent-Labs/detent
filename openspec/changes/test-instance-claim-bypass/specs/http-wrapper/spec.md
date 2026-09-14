@@ -91,9 +91,10 @@ absence of a mapping.
 - **THEN** the response is `403` with `error.type` equal to `"not-assigned"`
 
 #### Scenario: A claim attempt by a non-candidate maps to 403
-- **WHEN** `POST /instances/:instanceId/claim` is called by an actor the
-  claim rule does not admit: no eligible candidate, and on a test instance
-  neither its starter nor a `system:admin` holder
+- **WHEN** `POST /instances/:instanceId/claim` is called by an actor who is
+  not an eligible candidate
+- **AND** on a test instance, that actor is neither its starter nor a
+  `system:admin` holder
 - **THEN** the response is `403` with `error.type` equal to
   `"not-a-candidate"`
 

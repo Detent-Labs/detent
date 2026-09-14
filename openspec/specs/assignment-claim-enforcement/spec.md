@@ -149,7 +149,7 @@ them.
 
 - **WHEN** neither an actor's `id` nor any entry of their `roles` appears in
   `instance.assignment.candidates`
-- **THEN** the actor is not eligible to claim the step
+- **THEN** the actor is not an eligible candidate for the step
 
 ### Requirement: Claiming a step is exclusive
 
@@ -167,6 +167,11 @@ taken, `status !== "running"` short-circuits to a silent no-op, and the
 instance is returned unchanged (see `assignment-claim-release-consolidation`)
 — not a rejection, since there is no assignment state to reject a change to.
 
+A test instance widens the candidate requirement alone. There, the claim also
+admits the instance's starter and any `system:admin` holder, per the
+`draft-test-instances` capability. The assignment and exclusivity checks stay
+as stated above.
+
 #### Scenario: An eligible candidate claims an unclaimed step
 
 - **WHEN** an eligible candidate actor claims a running instance's current
@@ -177,7 +182,7 @@ instance is returned unchanged (see `assignment-claim-release-consolidation`)
 
 #### Scenario: A non-candidate cannot claim
 
-- **WHEN** an actor who is not an eligible candidate attempts to claim a
+- **WHEN** a non-candidate actor attempts to claim a published instance's
   step with resolved candidates
 - **THEN** the claim is rejected and `assignment.claimedBy` remains unset
 
@@ -280,7 +285,7 @@ unchecked opaque ids the same way.
 
 - **WHEN** a delegate who is not an original candidate releases the claim
 - **THEN** the step returns to `claimedBy` unset, and only the original
-  `assignment.candidates` are eligible to claim it again
+  `assignment.candidates` are eligible candidates for it again
 
 #### Scenario: A second delegation supersedes the first
 

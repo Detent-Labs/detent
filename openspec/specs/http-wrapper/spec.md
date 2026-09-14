@@ -278,6 +278,8 @@ absence of a mapping.
 #### Scenario: A claim attempt by a non-candidate maps to 403
 - **WHEN** `POST /instances/:instanceId/claim` is called by an actor who is
   not an eligible candidate
+- **AND** on a test instance, that actor is neither its starter nor a
+  `system:admin` holder
 - **THEN** the response is `403` with `error.type` equal to
   `"not-a-candidate"`
 

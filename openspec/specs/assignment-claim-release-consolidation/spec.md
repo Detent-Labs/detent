@@ -18,7 +18,7 @@ actual claim/release contract it implements is specified by the
 callers of one shared sequence, not independently maintained copies of
 it. The sequence row-locks the instance and no-ops on a non-running
 instance. It runs an operation-specific guard against the current
-assignment. It computes the new assignment value, writes it, and appends
+assignment and the locked instance. It computes the new assignment value, writes it, and appends
 an operation-specific `InstanceEvent`.
 
 Its `claimedAt` (set by claim and delegate, cleared by release) SHALL
@@ -49,7 +49,7 @@ event-construction steps.
 #### Scenario: Claim's guard is independent
 
 - **WHEN** `claimStep` is called against a step with no declared
-  assignment, an already-claimed step, or a non-candidate actor
+  assignment, an already-claimed step, or an actor outside the claim rule
 - **THEN** the shared sequence's guard rejects with that operation's own
   error type: `NotAssignedError`, `AlreadyClaimedError`, or
   `NotACandidateError`. No write or event append occurs
