@@ -484,7 +484,8 @@ The example has seven steps. `capture` is the initial step. `booked` and
 A step may declare `cancellable` to override the process-wide default for that
 step alone. Where a step declares nothing, it inherits the process's value. A
 step may be more permissive (step `true` on a process `false`) or more
-restrictive (step `false` on a process `true`).
+restrictive (step `false` on a process `true`). This governs participant
+cancellation only; operators and reserved roles remain authorized regardless.
 
 ### View
 
