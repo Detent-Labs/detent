@@ -93,11 +93,11 @@
 
 ## 5. Design documentation
 
-- [ ] 5.1 Update `DESIGN.md`'s Layout section: change "cap at 46rem" to
+- [x] 5.1 Update `DESIGN.md`'s Layout section: change "cap at 46rem" to
       "cap at 61rem" and "cap at 60rem" to "cap at 80rem" in the sentence
       describing area screen caps. Verify by re-reading the updated
       lines.
-- [ ] 5.2 Grep `.claude/rules/design-language.md` and
+- [x] 5.2 Grep `.claude/rules/design-language.md` and
       `tmp/Detent Design Language.dc.html` for `46rem` and `60rem`; update
       any occurrence found to `61rem` / `80rem` to match. Verify with the
       same grep returning no stale occurrence in either file.
