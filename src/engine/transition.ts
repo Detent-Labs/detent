@@ -651,6 +651,13 @@ async function sweepCancelledChildren(
  * same seq resolves to exactly one winner — the loser gets ConcurrencyConflict).
  * A no-op — no HistoryEntry, no seq bump — on an instance that is not `running`.
  *
+ * Runs no authorization check of its own — it trusts its caller completely.
+ * Every participant/operator-facing entry point MUST go through
+ * `src/runtime/api.ts::cancelInstance` instead of calling this primitive
+ * directly: that wrapper is where `CANCEL_ANY_ROLE`, a per-process grant, and
+ * the starter/cancellable gate are enforced. A caller that reaches this
+ * function directly bypasses all three.
+ *
  * Downward-only subprocess propagation: when `resolveBody` is supplied, after the
  * parent commits its cancel this sweeps its active (running) children via
  * `sweepCancelledChildren` (recursively for nested chains — each child's own
