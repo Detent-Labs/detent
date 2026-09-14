@@ -82,7 +82,7 @@
 
 ## 4. Repo-wide sweep verification
 
-- [ ] 4.1 Run `grep -rln 'maxWidth: "46rem"\|maxWidth: "60rem"'
+- [x] 4.1 Run `grep -rln 'maxWidth: "46rem"\|maxWidth: "60rem"'
       packages/web/src` and verify the result is exactly these 4 files,
       none other: `components.tsx`, `ColumnEditor.tsx`, `ShareEditor.tsx`,
       `ReportBuilderScreen.tsx` (the last one for its untouched `scope`
