@@ -758,6 +758,7 @@ export const en = {
   "changeList.prop.outcome": "Outcome",
   "changeList.prop.subprocess": "Subprocess",
   "changeList.prop.assignment": "Assignment",
+  "changeList.prop.collaboration": "Collaboration",
   "changeList.prop.to": "Target",
   "changeList.prop.trigger": "Trigger",
   "changeList.prop.guard": "Guard",

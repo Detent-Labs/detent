@@ -82,6 +82,7 @@ export const PROPERTY_WORDS: { readonly [key: string]: CatalogKey | undefined } 
   outcome: "changeList.prop.outcome",
   assignment: "changeList.prop.assignment",
   subprocess: "changeList.prop.subprocess",
+  collaboration: "changeList.prop.collaboration",
   processId: "changeList.prop.processId",
   versionBinding: "changeList.prop.versionBinding",
   pinnedVersion: "changeList.prop.pinnedVersion",
