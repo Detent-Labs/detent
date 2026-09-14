@@ -487,9 +487,9 @@ export function StepPage({
               <option value="false">{t("stepSections.cancellableNo")}</option>
             </select>
             {cancellableValue === "inherit" && (
-              <p {...stylex.props(styles.hint)}>
+              <span {...stylex.props(styles.hint)}>
                 {t(processDefault ? "stepSections.cancellableResolvesYes" : "stepSections.cancellableResolvesNo")}
-              </p>
+              </span>
             )}
           </label>
         );
