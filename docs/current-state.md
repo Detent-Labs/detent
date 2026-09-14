@@ -1363,9 +1363,11 @@ Stage-by-stage status is in `ROADMAP.md`.
   strings checked directly — unlike `Step.assignment.strategy.type`, which
   resolves against the injected `AssignmentRegistry`. Deliberately
   unrelated to assignment/claim enforcement — `submitAndTransition`,
-  `claimStep`, `releaseClaim` are untouched, and an actor holding neither
+  `claimStep`, `releaseClaim` stayed untouched, and an actor holding neither
   reserved role still fully participates in any process instance it is an
-  assignment candidate for. Granting the roles needs no new tooling —
+  assignment candidate for. The later change `test-instance-claim-bypass`
+  gave `claimStep` one exception. A `system:admin` holder now also claims a
+  test instance's step outside its candidate list. Granting the roles needs no new tooling —
   `auth_users.roles` was already a free-form `string[]`, so the existing
   `cli.ts set-roles <email> system:publish,system:cancel-any` covers it.
   **BREAKING**: any account that published or cancelled instances before this
@@ -4890,6 +4892,13 @@ The single-instance read path narrows further. The function
 attachments. It limits a non-administrative actor's access to a test
 instance down to that instance's own `startedBy`. A claim or candidacy
 alone is enough for an ordinary instance. It is not enough here.
+
+A claim follows a different rule from that narrowed read. The function
+`claimStep` (`src/engine/transition.ts`) admits a test instance's own
+`startedBy` actor and any `system:admin` holder beside its eligible
+candidates. A published instance keeps the strict candidate check for every
+actor. The file `docs/decisions.md` records the resulting gap: a candidate
+can claim a test instance it cannot open.
 
 A `process.start` action dispatched from a test instance propagates the
 acting instance's own `kind` to the started instance, instead of
