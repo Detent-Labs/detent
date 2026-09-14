@@ -903,6 +903,7 @@ export const step = z
     description: localizedText.optional(),
     type: stepType,
     terminal: z.boolean().optional(),
+    cancellable: z.boolean().optional(),
     outcome: z.string().optional(),
     subprocess: subprocessSpec.optional(),
     view: view.optional(),
@@ -968,6 +969,7 @@ export const processBody = z
     // body predating this field keeps its definitionHash unchanged. Follows
     // dataSources, the other array-typed top-level field with the same shape.
     allowedGroups: z.array(z.string()).optional(),
+    cancellable: z.boolean().optional(),
     workflow,
   })
   .superRefine((b, ctx) => {
