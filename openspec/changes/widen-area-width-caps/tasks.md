@@ -113,22 +113,22 @@
       the printed summary: pass count, zero unexpected failures, and the
       skip count consistent with `DATABASE_URL` actually being picked up
       (not a silent all-DB-tests-skipped run).
-- [ ] 6.4 In a real browser, open the app area's My tasks screen and one
+- [x] 6.4 In a real browser, open the app area's My tasks screen and one
       task, and confirm the content column now renders visibly wider
       (61rem) and still centers correctly at both a wide and a narrow
       viewport.
-- [ ] 6.5 In a real browser, open the Player screen and confirm: (a) its
+- [x] 6.5 In a real browser, open the Player screen and confirm: (a) its
       content column renders visibly wider (80rem); (b) above roughly a
       64rem-equivalent viewport width, the form pane and the record pane
       now render side by side, the scenario `studio-player`'s own spec
       already specified but the previous 60rem cap made unreachable;
       (c) below that width, the layout still stacks with the record
       last. Screenshot both states.
-- [ ] 6.5a In the same browser session, open the process surface (any
+- [x] 6.5a In the same browser session, open the process surface (any
       process's Canvas tab) and confirm it still fills the full viewport
       width, unaffected by the studio area's new 80rem cap — matching
       `studio-app`'s "The process surface stays uncapped" scenario.
-- [ ] 6.6 Run `/impeccable critique` and `/impeccable audit` against the
+- [x] 6.6 Run `/impeccable critique` and `/impeccable audit` against the
       Task screen route and the Player screen route, and resolve any
       material finding either reports.
 - [x] 6.7 Run the antislop prose gate and the whitespace gate over the
