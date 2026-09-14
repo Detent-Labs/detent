@@ -69,11 +69,11 @@
 - [x] 6.1 Run `bun run typecheck`, then `bun run build`, in the devcontainer. Verify both exit 0. Record what each printed.
 - [x] 6.2 Run the full `bun test` with `DATABASE_URL` set, piped through `scripts/gates/silent-green.sh`. Verify zero failures and a skip count at or under the floor.
 - [x] 6.3 Run `sh ~/.claude/skills/impeccable/scripts/impeccable detect --json` once on each component file this change touched. The six are `Chrome.tsx`, `navStyles.ts`, `ProcessTabRow.tsx`, `EditScreen.tsx`, `FormEditorScreen.tsx` and `FormPreview.tsx`. Verify no finding stays open, or note why one stands.
-- [ ] 6.4 Open the session with `playwright-cli -s=studio-narrow-widths open --headed`, so the row draws a classic scrollbar. Run the three new browser-check entries and the 400px hand-off step on the production bundle. Pass `-s=studio-narrow-widths` to every later `playwright-cli` call. Read the DOM through `run-code` with `page.evaluate`. Verify every step passes, and note each threshold width the header entry finds.
-- [ ] 6.5 Run `/impeccable critique` on `/studio/processes/<id>/edit/forms` at 400px and at 1440px. Fix each finding, or note it in `docs/decisions.md`. Verify no finding stays unaddressed.
-- [ ] 6.6 Run `/impeccable audit` on the same route at the same widths. Fix each finding, or note it in `docs/decisions.md`. Verify no finding stays unaddressed.
-- [ ] 6.7 Run `/impeccable critique` on the form editor for "Submit the Exit Notification" at 1100px and at 1300px. Fix each finding, or note it in `docs/decisions.md`. Verify no finding stays unaddressed.
-- [ ] 6.8 Run `/impeccable audit` on the same form editor route at the same widths. Fix each finding, or note it in `docs/decisions.md`. Verify no finding stays unaddressed.
-- [ ] 6.9 Repeat task 5.33 wherever a fix in 6.3 to 6.8 touched a cited file. Verify each re-read citation matches its line.
+- [x] 6.4 Open the session with `playwright-cli -s=studio-narrow-widths open --headed`, so the row draws a classic scrollbar. Run the three new browser-check entries and the 400px hand-off step on the production bundle. Pass `-s=studio-narrow-widths` to every later `playwright-cli` call. Read the DOM through `run-code` with `page.evaluate`. Verify every step passes, and note each threshold width the header entry finds.
+- [x] 6.5 Run `/impeccable critique` on `/studio/processes/<id>/edit/forms` at 400px and at 1440px. Fix each finding, or note it in `docs/decisions.md`. Verify no finding stays unaddressed.
+- [x] 6.6 Run `/impeccable audit` on the same route at the same widths. Fix each finding, or note it in `docs/decisions.md`. Verify no finding stays unaddressed.
+- [x] 6.7 Run `/impeccable critique` on the form editor for "Submit the Exit Notification" at 1100px and at 1300px. Fix each finding, or note it in `docs/decisions.md`. Verify no finding stays unaddressed.
+- [x] 6.8 Run `/impeccable audit` on the same form editor route at the same widths. Fix each finding, or note it in `docs/decisions.md`. Verify no finding stays unaddressed.
+- [x] 6.9 Repeat task 5.33 wherever a fix in 6.3 to 6.8 touched a cited file. Verify each re-read citation matches its line.
 - [ ] 6.10 Run the prose gate over the pushed range: `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`. Verify it exits 0.
 - [ ] 6.11 Run the whitespace gate over the same range: `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh`. Verify it exits 0.

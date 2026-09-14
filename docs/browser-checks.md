@@ -4415,7 +4415,8 @@ object, so an empty printout means it threw.
    - Pass: `accountInside` reads true at every width, in both locales. The
      Account button's box stands inside the header's box.
    - Record each width where `navOverflow` reads more than 0, per area and
-     locale. Record the first width where each header's `lines` reads 2.
+     locale. Record the first width where each header's `lines` reads more
+     than 1. The app and admin headers read 3 there, one line per item.
 
 Step 1 runs through this function. It also steps down from 680px in 5px steps
 to find `groupLeavesAt`:
@@ -4527,7 +4528,7 @@ Step 4 runs through this one:
 
 ```js
 async (page) => {
-  const origin = new URL(page.url()).origin;
+  const origin = page.url().match(/^https?:\/\/[^/]+/)[0];
   const widths = [1440, 680, 640, 600, 560, 480, 400];
   const read = () => {
     const header = document.querySelector(".shell > header");

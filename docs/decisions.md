@@ -2112,7 +2112,9 @@ tags are local to this section. Paths under `panels/` and `screens/` start at
 
 The first review of `studio-narrow-widths` measured the shell header on a
 replica in Chrome 152, on 2026-09-13. That change wraps the header and keeps
-each area nav's buttons on one line. The NAV tags are local to this section.
+each area nav's buttons on one line. Its browser check, critique and audit
+ran on 2026-09-14. The NAV, ROW, BAR and KEYS tags are local to this section.
+Paths under `panels/` and `screens/` start at `packages/web/src/areas/studio/`.
 
 - **NAV-1: an area nav wider than its line still overflows the header.** The
   shared `nav` style never wraps its buttons
@@ -2120,14 +2122,32 @@ each area nav's buttons on one line. The NAV tags are local to this section.
   - On the replica, the English admin nav overflowed below about 900px. At
     600px the admin header overflowed by 297px, down from 610px before that
     change.
-  - At 400px the English app nav, four buttons wide, overflowed its own line
-    by 22px, as it did before. German labels widen both navs.
-  - The reporting nav holds five buttons on a view route, and stays
-    unmeasured.
+  - On the replica at 400px, the English app nav overflowed its own line by
+    22px, as it did before. German labels widen both navs.
+  - The browser check measured the real headers in 5px steps. The English
+    admin nav overflowed from 895px, and the German one from 1090px. The
+    reporting nav overflowed from 505px in English and 540px in German. The
+    German app nav overflowed from 475px, and the English one fit at 400px.
   - A wrap of the nav's buttons restyles the app, admin and reporting
     headers. The owner picks its look on a mockup first.
   - Risk (Low): an actor in a narrow window scrolls the page sideways to
     reach a nav button.
+- **ROW-1: the tab row clips a tab's focus ring at its top and bottom.** The
+  row scrolls sideways (`panels/ProcessTabRow.tsx:42`), so it clips outside
+  its padding box. Measured at 400px, the Forms tab's ring ran from y=288 to
+  335.5. The row's padding box ran from 292 to 332. Both sides of the ring
+  stay, 32px clear of the edge fade. This is CHANGES-2 on the tab row. Risk
+  (Low): the ring still meets WCAG 2.4.7.
+- **BAR-1: the process name input takes its placeholder as its name.** The
+  input has no label (`panels/ProcessHeaderBar.tsx:750`). Its accessible name
+  read "(untitled process)" while it held IT Offboarding. Risk (Medium): a
+  screen reader announces an untitled process on every draft (WCAG 4.1.2).
+- **KEYS-1: the form editor still wraps a long key above 80rem.** Three
+  columns leave the canvas 619px at 1300px
+  (`screens/FormEditorScreen.tsx:165`). On "Submit the Exit Notification", 10
+  of 59 canvas keys took two lines there. The last one wrapped at 1381px. The
+  16rem palette wraps 10 of its 38 keys at every width. Risk (Low): an author
+  reads a long key broken mid-word from 1281px to about 1390px.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 
