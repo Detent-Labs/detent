@@ -13,5 +13,5 @@
 
 - [x] 3.1 Run `bun run typecheck`, then `bun run build`, in the devcontainer. Both exit 0.
 - [x] 3.2 Run the full `bun test` with `DATABASE_URL` set, piped through `scripts/gates/silent-green.sh`. It reports no failure and no skip past the floor.
-- [ ] 3.3 Run the prose gate and the whitespace gate over the range, each fed by `scripts/gates/range.sh`. Both pass.
-- [ ] 3.4 In a real browser, open the Player for `it-onboarding` as a `system:admin` actor who is no candidate. Create a test instance and claim `service_request`. The claim succeeds and no "not a candidate" message appears.
+- [x] 3.3 Run the prose gate and the whitespace gate over the range, each fed by `scripts/gates/range.sh`. Both pass.
+- [x] 3.4 In a real browser, open the Player for `it-onboarding` as a `system:admin` actor who is no candidate. Create a test instance and claim `service_request`. The claim succeeds and no "not a candidate" message appears.
