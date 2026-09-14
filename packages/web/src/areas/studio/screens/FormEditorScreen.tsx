@@ -334,6 +334,7 @@ const styles = stylex.create({
   formCardBody: {
     display: "flex",
     alignItems: "baseline",
+    flexWrap: "wrap",
     gap: space.s2,
     flex: 1,
     minWidth: 0,
