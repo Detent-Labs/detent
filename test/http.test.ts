@@ -1235,7 +1235,7 @@ test.skipIf(!DB)("downloading an attachment id that belongs to a different insta
 
 test.skipIf(!DB)("POST /instances/:instanceId/comments with collaboration.comments disabled maps to 409 collaboration-disabled", async () => {
   const PID = pid("proc_http_comment_disabled");
-  const body: ProcessBody = {
+  const body = {
     key: "assigned_body_comment_disabled",
     label: { en: "Assigned Body" },
     baseLocale: "en",
@@ -1252,7 +1252,7 @@ test.skipIf(!DB)("POST /instances/:instanceId/comments with collaboration.commen
         { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
       ],
     },
-  };
+  } as unknown as ProcessBody;
   await publishBody(PID, body, reg, dataSourceReg);
   const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
 
@@ -1264,7 +1264,7 @@ test.skipIf(!DB)("POST /instances/:instanceId/comments with collaboration.commen
 
 test.skipIf(!DB)("POST /instances/:instanceId/attachments with collaboration.attachments disabled maps to 409 collaboration-disabled", async () => {
   const PID = pid("proc_http_attachment_disabled");
-  const body: ProcessBody = {
+  const body = {
     key: "assigned_body_attachment_disabled",
     label: { en: "Assigned Body" },
     baseLocale: "en",
@@ -1281,7 +1281,7 @@ test.skipIf(!DB)("POST /instances/:instanceId/attachments with collaboration.att
         { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
       ],
     },
-  };
+  } as unknown as ProcessBody;
   await publishBody(PID, body, reg, dataSourceReg);
   const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
 
