@@ -43,5 +43,5 @@ None. This change only extends six existing capabilities.
 - **HTTP**: no new route and no new error shape. Rejection stays the existing `AuthorizationError` → `403`.
 - **Studio UI**: `packages/web/src/areas/studio/panels/StepPage.tsx` (+ `sectionsFor.ts`), `packages/web/src/areas/studio/panels/ProcessHeaderBar.tsx` (one more row in the existing first `⋮`-menu group).
 - **Participant UI**: `packages/web/src/areas/app/screens/TaskScreen.tsx` (the "Discard case" control).
-- **Tests**: `test/cancel.test.ts` (schema) and `test/cancel.runtime.test.ts` (engine). The runtime suite includes a regression case proving the admin/grant bypass survives a non-cancellable step. Both new UI surfaces also get a browser check.
+- **Tests**: the schema gets `test/cancel.test.ts`. Engine and wrapper authorization gets `test/runtime-api.test.ts` and `test/http.test.ts`, plus a regression case proving the admin/grant bypass survives a non-cancellable step. The cascade gets `test/subprocess.test.ts`: a child's own `cancellable:false` does not block the parent's cancel. The Studio Cancellable section gets `packages/web/test/studio-sectionsFor.test.ts` and `packages/web/test/studio-stepPage.test.tsx`. Both new UI surfaces also get a browser check.
 - **Docs**: `docs/authoring-guide.md` gains the two fields.

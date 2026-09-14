@@ -138,10 +138,12 @@ whenever an author selects "Inherit." It mirrors the existing
 author sees the real result without jumping to the process-level setting.
 
 **Disabled-with-reason, kept visible, for the participant-facing Cancel
-control.** The "Discard case" control stays visible. It becomes `disabled`
-when `canCancel` is `false`, with a line beneath it naming why. The pattern
-reads: "{starter} can no longer discard this case. The point where they
-could withdraw it has passed."
+control.** While the case is running, the "Discard case" control stays
+visible. It becomes `aria-disabled` (never the native `disabled` attribute,
+which would drop it from the tab order) when `canCancel` is `false`. A line
+beneath it names why, wired through `aria-describedby` rather than a
+`title` tooltip. The shipped copy reads: "This case can no longer be
+discarded from here."
 
 A starter who used the control before and
 loses access to it (the CapEx-reaches-the-CEO case) deserves to know why.
