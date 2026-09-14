@@ -1720,7 +1720,7 @@ does not land, and the record names it.
 - **THEN** the instance carries a `datasource.attribute-dropped` event naming
   the mapping field, the column and the target
 
-#### Scenario: One drop does not stop the others
+#### Scenario: One drop does not block the others
 - **WHEN** one mapped attribute mismatches and another matches
 - **THEN** the matching one is written and only the mismatching one is recorded
 
