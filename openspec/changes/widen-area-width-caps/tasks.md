@@ -1,11 +1,11 @@
 ## 1. Shared token
 
-- [ ] 1.1 Add a Layout section to `packages/web/src/shell/tokens.css`'s
+- [x] 1.1 Add a Layout section to `packages/web/src/shell/tokens.css`'s
       `:root` with `--layout-cap-narrow: 61rem;` and
       `--layout-cap-wide: 80rem;`, placed the way the existing sections
       (space, radius, shadow) are. Verify by reading the file back: both
       declarations present, no other value in the file touched.
-- [ ] 1.2 Add a `layout` group to `packages/form-ui/src/tokens.stylex.ts`
+- [x] 1.2 Add a `layout` group to `packages/form-ui/src/tokens.stylex.ts`
       via `stylex.defineVars`, with `capNarrow: "var(--layout-cap-narrow)"`
       and `capWide: "var(--layout-cap-wide)"`, matching the `space` /
       `radius` / `shadow` groups' own pattern exactly. Verify with
