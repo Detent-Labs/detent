@@ -513,9 +513,9 @@ paths:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "403":
           description: >-
-            The actor is not an eligible candidate, or on a test instance is
-            neither the starter nor a `system:admin` holder. The step may
-            already be claimed by someone else.
+            The actor is not an eligible candidate and, on a test instance, is
+            neither its starter nor a `system:admin` holder; or the step is
+            already claimed by someone else.
           content:
             application/json:
               schema:

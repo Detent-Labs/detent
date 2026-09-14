@@ -22,6 +22,7 @@ import {
   NotFoundError,
   NotACandidateError,
   AlreadyClaimedError,
+  NotAssignedError,
 } from "../src/runtime/api.js";
 import { saveDraft } from "../src/engine/drafts.js";
 import { instance as instanceSchema } from "../src/schema/definition.js";
@@ -540,4 +541,31 @@ test.skipIf(!DB)("the admission does not override an existing claim on a test in
 
   const reloaded = await reloadInstance(testInst.instanceId);
   expect(reloaded.assignment?.claimedBy).toBe(claimant.id);
+});
+
+test.skipIf(!DB)("a plain candidate still claims a test instance's step", async () => {
+  const testInst = await unclaimedTestInstance();
+  const claimed = await claimStep(testInst.instanceId, claimant, sql);
+  expect(claimed.assignment?.claimedBy).toBe(claimant.id);
+});
+
+test.skipIf(!DB)("the starter and an administrator still need a declared assignment to claim a test instance", async () => {
+  const v = await publishBody(PID, runningBody("A"), reg, dataSourceReg);
+  const testInst = await createInstance(v.definition, { processId: PID, version: v.version, kind: "test", startedBy: starter.id });
+
+  let starterCaught: unknown;
+  try {
+    await claimStep(testInst.instanceId, starter, sql);
+  } catch (e) {
+    starterCaught = e;
+  }
+  expect(starterCaught).toBeInstanceOf(NotAssignedError);
+
+  let adminCaught: unknown;
+  try {
+    await claimStep(testInst.instanceId, adminActor, sql);
+  } catch (e) {
+    adminCaught = e;
+  }
+  expect(adminCaught).toBeInstanceOf(NotAssignedError);
 });

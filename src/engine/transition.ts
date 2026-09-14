@@ -1013,10 +1013,10 @@ async function updateAssignment(
   db: SQL,
   // The guard may return a promise, and this function awaits it: `delegateClaim`
   // has a check that reads the account directory, and that check must run under
-  // this row lock and after the claimant check. `releaseClaim` and
-  // `delegateClaim` ignore the second (locked instance) argument; `claimStep`
-  // reads its `kind` and `startedBy` to admit a test instance's starter and any
-  // `system:admin` holder beside its eligible candidates (draft-test-instances).
+  // this row lock and after the claimant check. The second (locked instance)
+  // argument lets a guard vary admission by instance state — a test
+  // instance's `kind`/`startedBy`, for example (draft-test-instances) — and a
+  // guard with no such need simply ignores it.
   guard: (assignment: AssignmentState | null | undefined, inst: Instance) => void | Promise<void>,
   computeNext: (assignment: AssignmentState, at: string) => AssignmentState,
   eventSpec: AssignmentEventSpec,

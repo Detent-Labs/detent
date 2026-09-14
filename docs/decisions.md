@@ -2162,6 +2162,9 @@ gap outside that change's own scope. The CLAIM tag is local to this section.
   state that the engine never hands an actor a task it cannot open. This gap
   predates `test-instance-claim-bypass`, which neither widens nor closes it.
   One direction refuses such a claim; the other admits such a read.
+  A delegate carries the same gap. `delegateClaim` never checks the
+  target's candidacy. `loadInstanceForActor` admits that target only as the
+  test instance's own starter or a `system:admin` holder.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 
