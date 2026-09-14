@@ -1,6 +1,6 @@
 ## 1. Claim admission
 
-- [x] 1.1 Add DB-backed cases to `test/draft-test-instances.test.ts`, one per scenario of "A test instance admits its starter and an administrator to a claim". Call the runtime `claimStep`. Confirm both admission cases fail against today's guard, in a full `bun test` run.
+- [x] 1.1 Cover each scenario of "A test instance admits its starter and an administrator to a claim". Put the DB-backed cases in `test/draft-test-instances.test.ts`. Call the runtime `claimStep`. Confirm both admission cases fail against today's guard, in a full `bun test` run.
 - [x] 1.2 Admit a test instance's starter and any `system:admin` holder in `src/engine/transition.ts::claimStep`, as design.md decides. Confirm every case from 1.1 passes, in a full `bun test` run.
 
 ## 2. Docs

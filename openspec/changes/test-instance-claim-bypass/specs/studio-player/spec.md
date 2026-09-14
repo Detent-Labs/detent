@@ -81,4 +81,3 @@ reaches it.
   version and uses the existing "Create new instance" action
 - **THEN** an ordinary instance is created against the newest published
   version, exactly as before, and is not marked as a test instance
-
