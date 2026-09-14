@@ -18,13 +18,16 @@ import {
   uploadAttachment,
   listAttachments,
   getAttachment,
+  claimStep,
   NotFoundError,
+  NotACandidateError,
+  AlreadyClaimedError,
 } from "../src/runtime/api.js";
 import { saveDraft } from "../src/engine/drafts.js";
 import { instance as instanceSchema } from "../src/schema/definition.js";
 import { definitionHash } from "../src/schema/hash.js";
 import { ADMIN_ROLE, AuthorizationError } from "../src/auth/authorize.js";
-import type { ProcessBody, ProcessId, Instance } from "../src/schema/definition.js";
+import type { ProcessBody, ProcessId, Instance, InstanceEvent } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
 import { clearInstanceAudit } from "./audit-cleanup.js";
 
@@ -400,4 +403,141 @@ test.skipIf(!DB)("uploadAttachment, listAttachments, and getAttachment apply the
     getCaught = e;
   }
   expect(getCaught).toBeInstanceOf(AuthorizationError);
+});
+
+// --- test-instance-claim-bypass: claimStep admits a test instance's starter and an administrator ------
+
+// A non-terminal initial step (with a manual exit) so a created instance's
+// status is "running" — claimStep no-ops on anything else. The step's own
+// `assignment` is never declared: every instance below sets its assignment
+// directly via createInstance's opts, bypassing step-entry resolution.
+const runningBody = (label: string): ProcessBody =>
+  ({
+    key: "wf",
+    label: { en: "WF" },
+    baseLocale: "en",
+    fields: [],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        { id: "step_a", key: "a", label: { en: label }, type: "task", paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }] },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+const eventsOf = async (id: string): Promise<InstanceEvent[]> => {
+  const r = (await sql`SELECT event FROM instance_events WHERE instance_id = ${id} ORDER BY id`) as { event: unknown }[];
+  return r.map((x) => (typeof x.event === "string" ? JSON.parse(x.event) : x.event) as InstanceEvent);
+};
+
+const reloadInstance = async (id: string): Promise<Instance> => {
+  const rows = (await sql`SELECT body FROM instances WHERE instance_id = ${id}`) as { body: unknown }[];
+  return instanceSchema.parse(typeof rows[0]!.body === "string" ? JSON.parse(rows[0]!.body as string) : rows[0]!.body);
+};
+
+const unclaimedTestInstance = async (candidates: string[] = [claimant.id]): Promise<Instance> => {
+  const v = await publishBody(PID, runningBody("A"), reg, dataSourceReg);
+  return createInstance(v.definition, {
+    processId: PID,
+    version: v.version,
+    kind: "test",
+    startedBy: starter.id,
+    assignment: { candidates },
+  });
+};
+
+const claimedRunningTestInstance = async (): Promise<Instance> => {
+  const v = await publishBody(PID, runningBody("A"), reg, dataSourceReg);
+  return createInstance(v.definition, {
+    processId: PID,
+    version: v.version,
+    kind: "test",
+    startedBy: starter.id,
+    assignment: { candidates: [claimant.id], claimedBy: claimant.id },
+  });
+};
+
+test.skipIf(!DB)("the starter claims a test instance's step without candidacy", async () => {
+  const testInst = await unclaimedTestInstance();
+  const claimed = await claimStep(testInst.instanceId, starter, sql);
+  expect(claimed.assignment?.claimedBy).toBe(starter.id);
+  expect(claimed.assignment?.candidates).toEqual([claimant.id]);
+
+  const events = await eventsOf(testInst.instanceId);
+  const claimedEvent = events.find((e) => e.kind === "assignment.claimed");
+  expect(claimedEvent).toBeDefined();
+  expect((claimedEvent as unknown as { payload: { actorId: string } }).payload).toEqual({ actorId: starter.id });
+});
+
+test.skipIf(!DB)("an administrator claims another actor's test instance without candidacy", async () => {
+  const testInst = await unclaimedTestInstance();
+  const claimed = await claimStep(testInst.instanceId, adminActor, sql);
+  expect(claimed.assignment?.claimedBy).toBe(adminActor.id);
+});
+
+test.skipIf(!DB)("any other non-candidate stays refused on a test instance", async () => {
+  const testInst = await unclaimedTestInstance();
+  let caught: unknown;
+  try {
+    await claimStep(testInst.instanceId, actor, sql);
+  } catch (e) {
+    caught = e;
+  }
+  expect(caught).toBeInstanceOf(NotACandidateError);
+
+  const reloaded = await reloadInstance(testInst.instanceId);
+  expect(reloaded.assignment?.claimedBy).toBeUndefined();
+  expect(reloaded.assignment?.candidates).toEqual([claimant.id]);
+});
+
+test.skipIf(!DB)("a published instance keeps the strict candidate check for both its starter and an administrator", async () => {
+  const v = await publishBody(PID, runningBody("A"), reg, dataSourceReg);
+  const published = await createInstance(v.definition, {
+    processId: PID,
+    version: v.version,
+    startedBy: starter.id,
+    assignment: { candidates: [claimant.id] },
+  });
+
+  let starterCaught: unknown;
+  try {
+    await claimStep(published.instanceId, starter, sql);
+  } catch (e) {
+    starterCaught = e;
+  }
+  expect(starterCaught).toBeInstanceOf(NotACandidateError);
+
+  let adminCaught: unknown;
+  try {
+    await claimStep(published.instanceId, adminActor, sql);
+  } catch (e) {
+    adminCaught = e;
+  }
+  expect(adminCaught).toBeInstanceOf(NotACandidateError);
+
+  const reloaded = await reloadInstance(published.instanceId);
+  expect(reloaded.assignment?.claimedBy).toBeUndefined();
+  expect(reloaded.assignment?.candidates).toEqual([claimant.id]);
+});
+
+test.skipIf(!DB)("the starter claims a test instance step whose candidate list is empty", async () => {
+  const testInst = await unclaimedTestInstance([]);
+  const claimed = await claimStep(testInst.instanceId, starter, sql);
+  expect(claimed.assignment?.claimedBy).toBe(starter.id);
+  expect(claimed.assignment?.candidates).toEqual([]);
+});
+
+test.skipIf(!DB)("the admission does not override an existing claim on a test instance", async () => {
+  const testInst = await claimedRunningTestInstance();
+  let caught: unknown;
+  try {
+    await claimStep(testInst.instanceId, starter, sql);
+  } catch (e) {
+    caught = e;
+  }
+  expect(caught).toBeInstanceOf(AlreadyClaimedError);
+
+  const reloaded = await reloadInstance(testInst.instanceId);
+  expect(reloaded.assignment?.claimedBy).toBe(claimant.id);
 });
