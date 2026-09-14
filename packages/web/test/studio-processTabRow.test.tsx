@@ -348,3 +348,31 @@ describe("Whether a resize report moved an element's width", () => {
     expect(tabRow.widthMoved(120, 120)).toBe(false);
   });
 });
+
+/**
+ * Chromium dispatches `focus` to the active element again when the window
+ * regains focus, and that element still matches `:focus-visible`. A row the
+ * author scrolled by hand must stay put across that return
+ * (`studio-process-tabs`: "Between those moments an author MAY scroll the row
+ * freely").
+ */
+describe("Whether a tab's focus scrolls the row", () => {
+  const forms = { tab: "forms" };
+  const changes = { tab: "changes" };
+
+  it("scrolls on a keyboard focus", () => {
+    expect(tabRow.focusScrollsRow(null, forms, true)).toBe(true);
+  });
+
+  it("leaves the row on a pointer press", () => {
+    expect(tabRow.focusScrollsRow(null, forms, false)).toBe(false);
+  });
+
+  it("leaves the row when the window returns focus to the button whose blur left it", () => {
+    expect(tabRow.focusScrollsRow(forms, forms, true)).toBe(false);
+  });
+
+  it("scrolls on a keyboard focus of another button after the window left", () => {
+    expect(tabRow.focusScrollsRow(forms, changes, true)).toBe(true);
+  });
+});

@@ -2606,8 +2606,8 @@ Pass: the header and the register tab carry hash-only classes, such as
 before this change.
 
 The header's wrap has its own entry further down this file, "The shell header
-wraps at every width". Hover the register tab, then Tab to it. Pass: both states still paint, unaffected by the move
-out of `shell.css`.
+wraps at every width". Hover the register tab, then Tab to it. Pass: both
+states still paint, unaffected by the move out of `shell.css`.
 
 Open a process draft's field catalog. Select a text field. Read "How it will
 look". Pass: the rendered control's computed `font-size`, `padding` and
@@ -3518,9 +3518,9 @@ A passing run returns these values. Chrome prints a transparent ground as
 
 **The preview pane matches the canvas.** Use a window wider than 1280px,
 where the trailing pane stands beside the canvas. That pane draws the
-identical strip, already open on the tab the canvas shows. Click the canvas's own "Decision" tab. Pass: the preview's own strip
-switches to "Decision" too, with no click of its own. One open-tab state
-drives both.
+identical strip, already open on the tab the canvas shows. Click the
+canvas's own "Decision" tab. Pass: the preview's own strip switches to
+"Decision" too, with no click of its own. One open-tab state drives both.
 
 Click a tab inside the preview pane itself. Pass: nothing moves. The pane
 carries `inert`, confirmed in the browser's own inspector, so a click there
@@ -4230,7 +4230,7 @@ Seed the database and sign in as `demo-superuser@example.test`, password
 `seed-demo-password`.
 
 Open the IT Offboarding draft on the Canvas tab
-(`docs/browser-checks.md:3112`). Add a step from the canvas bar. Leave it
+(`docs/browser-checks.md:3251`). Add a step from the canvas bar. Leave it
 unconnected, so the Checks tab counts a blocker. Narrow the window to
 400px. Run the probe on every tab in turn. A reload drops the unsaved step,
 so add it again after one.
@@ -4274,7 +4274,7 @@ then back in as the superuser to continue. Restore the superuser's original
 roles with `set-roles` when the walk finishes.
 
 Open `purchase-requisition`'s Player at 400px. Create an instance and
-drive it to Finance Review (`docs/browser-checks.md:3408`). Claim the step.
+drive it to Finance Review (`docs/browser-checks.md:3547`). Claim the step.
 Submit from "Review" with Finance Note, on "Decision", left empty.
 
 Pass: `escaped` stays empty, and `scrollWidth` equals `clientWidth`. The
@@ -4395,8 +4395,8 @@ object, so an empty printout means it threw.
      the first line. Expect a value between 600 and 650px.
    - Pass: at 560px the document's `scrollWidth` equals its `clientWidth`.
    - Pass: at 560px `lines` reads 2, `divider` reads `2px`, and `background`
-     reads a color other than `rgba(0, 0, 0, 0)`. The value `lastLine` stays
-     at or above `dividerTop`. The muted background and the 2px divider span
+     reads a color other than `rgba(0, 0, 0, 0)`. The value `lastLine` reads
+     no more than `dividerTop`. The muted background and the 2px divider span
      both lines, with the divider under the second.
    - Pass: at 400px `groupOnFirstLine` and `navUnderFirstLine` both read true.
      The register tab and the account group share the first line.
@@ -4646,10 +4646,10 @@ async (page) => {
 
 ### The tab row keeps the open tab in view (`studio-narrow-widths`)
 
-Source: `studio-narrow-widths` tasks 5.20 to 5.31. The row's pure functions
-have tests of their own in `studio-processTabRow.test.tsx`. No DOM test
-library exists here. The scroll, the drawn edge fade and the pointer press
-therefore land in this entry.
+Source: `studio-narrow-widths` tasks 5.20 to 5.31, and step 13 from that
+change's final review. The row's pure functions have tests of their own in
+`studio-processTabRow.test.tsx`. No DOM test library exists here. The scroll,
+the drawn edge fade and the pointer press therefore land in this entry.
 
 See this file's "Before you start" section for the build and the address.
 Step 9 needs a classic scrollbar under the row. Headed Chrome on Windows draws
@@ -4677,11 +4677,11 @@ returns an object, so an empty printout means it threw.
    each move the function waits two animation frames, then reads the row's
    computed `mask-image`.
    - Pass: at the start its first gradient runs `to left` from one
-     transparent stop. A trailing gradient stands alone.
+     transparent stop. The trailing edge fades alone.
    - Pass: in the middle that gradient runs `to right`, with a transparent
-     stop at both ends. Both gradients stand.
-   - Pass: at the end it runs `to right` from one transparent stop. A leading
-     gradient stands alone.
+     stop at both ends. Both edges fade.
+   - Pass: at the end it runs `to right` from one transparent stop. The
+     leading edge fades alone.
 3. Open the draft at `/edit/canvas` in a 1440px window. Pass: `wide` reads
    `none`. The function then opens Forms with a click, and narrows the window
    to 400px. Pass: `narrow` reads 31 or more for `leading` and `trailing`, so
@@ -4737,7 +4737,15 @@ returns an object, so an empty printout means it threw.
     row's `clientWidth`, and waits two animation frames again. Pass:
     `after.leading` and `after.trailing` each read 31 or more. The Fields tab
     stands whole in view and 32px clear of the edge, to within one pixel.
-13. Go back to the process list and choose "Discard" on the `it_offboarding`
+13. At 400px, with Forms open, the function sets the row's `scrollLeft` to 0.
+    Forms then stands past the trailing edge, as a scroll by hand leaves it.
+    It waits two animation frames. It sets the Steps button's `style.minWidth`
+    to its `offsetWidth` plus 40px, and waits two animation frames again.
+    - Pass: `before.open` reads true, and `before.trailing` reads less than 0.
+    - Pass: `grew` reads 40 or more, so the Steps tab widened.
+    - Pass: `after` reads 0. A tab's width change leaves the scrolled row
+      where it stands.
+14. Go back to the process list and choose "Discard" on the `it_offboarding`
     row. Accept the browser's confirm, with `dialog-accept` under
     `playwright-cli`. The header bar's own "Discard draft" does not work, per
     DRAFT-1 in `docs/decisions.md`.
@@ -4996,5 +5004,33 @@ async (page) => {
     document.getElementById("studio-tab-steps").style.minWidth = "";
   });
   return { before, after };
+}
+```
+
+Step 13 sets the Steps button's width back as well:
+
+```js
+async (page) => {
+  await page.setViewportSize({ width: 400, height: 800 });
+  await page.goto(page.url().replace(/\/edit.*$/, "/edit/forms"));
+  await page.waitForFunction(() => document.getElementById("studio-tab-changes")?.children.length > 1);
+  await page.waitForLoadState("networkidle");
+  await page.evaluate(() => {
+    window.tabRow().scrollLeft = 0;
+  });
+  await page.evaluate(() => window.twoFrames());
+  const before = await page.evaluate(() => window.tabRowProbe("forms"));
+  const grew = await page.evaluate(async () => {
+    const steps = document.getElementById("studio-tab-steps");
+    const was = steps.offsetWidth;
+    steps.style.minWidth = `${was + 40}px`;
+    await window.twoFrames();
+    return steps.offsetWidth - was;
+  });
+  const after = await page.evaluate(() => window.tabRow().scrollLeft);
+  await page.evaluate(() => {
+    document.getElementById("studio-tab-steps").style.minWidth = "";
+  });
+  return { before, grew, after };
 }
 ```

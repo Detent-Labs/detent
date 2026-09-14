@@ -2070,7 +2070,7 @@ only the marks the miniature draws. The required count stands beside it.
   `rgb(107, 107, 107)` in dark, the browser's own button face. The form
   editor's pressed column option loses its box and weight the same way.
   - The sites are `screens/EditScreen.tsx:819`, `:1052` and `:1068`, and
-    `screens/FormEditorScreen.tsx:1236`, `:1300` and `:1316`. The rest sit at
+    `screens/FormEditorScreen.tsx:1234`, `:1298` and `:1314`. The rest sit at
     `screens/VersionsScreen.tsx:263`, `screens/ToolsScreen.tsx:189`,
     `screens/PlayerScreen.tsx:336` and `screens/MigrationPlanScreen.tsx:281`.
   - Risk (Medium): the back link draws a gray box on every dark studio

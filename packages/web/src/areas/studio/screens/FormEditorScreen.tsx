@@ -165,8 +165,6 @@ const styles = stylex.create({
     gridTemplateColumns: { default: "16rem minmax(0, 1fr) minmax(0, 22rem)", [PREVIEW_NARROW]: "16rem minmax(0, 1fr)" },
     alignItems: "start",
   },
-  // Below the breakpoint the preview gives up its column and stands across
-  // the two the palette and the canvas keep.
   formEditorPreview: {
     gridColumn: { default: "auto", [PREVIEW_NARROW]: "1 / -1" },
   },

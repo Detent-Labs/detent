@@ -225,8 +225,9 @@ export function tabRestsInView(
  * The one call that scrolls the tab row (`studio-process-tabs`). The row
  * moves by the least distance that brings the button whole into view, clear
  * of the row's scroll padding, and jumps there. A tab already in view leaves
- * the row where it stands. Each caller focuses with `preventScroll: true`
- * first, so this call alone decides where the row stands.
+ * the row where it stands. A caller that moves focus passes
+ * `preventScroll: true` first. Where a native focus scrolls anyway, this call
+ * runs inside its `focus` event, ahead of that scroll.
  */
 export function scrollTabIntoRow(button: HTMLElement): void {
   button.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "instant" });
@@ -263,6 +264,17 @@ function focusVisible(element: Element): boolean {
 }
 
 /**
+ * Whether a tab's `focus` scrolls the row. A keyboard focus does, read as
+ * `visible`. A window that regains focus dispatches `focus` to its active
+ * element again, still matching `:focus-visible`. That focus lands on
+ * `windowBlurred`, the button whose blur left the window, and scrolls
+ * nothing.
+ */
+export function focusScrollsRow<T>(windowBlurred: T | null, button: T, visible: boolean): boolean {
+  return visible && windowBlurred !== button;
+}
+
+/**
  * The process surface's tab row (`studio-process-tabs`). Ten tabs in
  * authoring order, and nothing else — the trailing edge is the last tab.
  *
@@ -288,6 +300,8 @@ export function ProcessTabRow({ open, counts, checksBlocked, onOpen, jsonOpen }:
   // last `scrollTabIntoRow` call this component made. A call that moves
   // nothing fires no scroll event, so each call records it as well.
   const openRests = useRef(false);
+  // The button whose blur left the window, until its next focus or blur.
+  const windowBlurred = useRef<HTMLButtonElement | null>(null);
 
   // Opening a tab brings focus and selection back together, whatever opened
   // it (`studio-process-tabs`). A click on the already-open tab moves no
@@ -380,12 +394,21 @@ export function ProcessTabRow({ open, counts, checksBlocked, onOpen, jsonOpen }:
   // A pointer press focuses its button on `mousedown`, and a scroll then would
   // move the button before `mouseup`, so the click would miss it. No engine
   // matches a press against `:focus-visible`, and a Tab-key entry does match,
-  // so only a keyboard focus scrolls here.
+  // so only a keyboard focus scrolls here. A window's return scrolls nothing
+  // (`focusScrollsRow`), so a row scrolled by hand stays put.
   const onTabFocus = (tab: ProcessTab, button: HTMLButtonElement) => {
     setFocusedTab(tab);
-    if (!focusVisible(button)) return;
+    const scrolls = focusScrollsRow(windowBlurred.current, button, focusVisible(button));
+    windowBlurred.current = null;
+    if (!scrolls) return;
     scrollTabIntoRow(button);
     openRests.current = openTabRests(rowRef.current, openButton.current);
+  };
+
+  // A blur while the document loses focus is the window's, not a focus move
+  // inside the page: `document.hasFocus()` reads false only then.
+  const onTabBlur = (button: HTMLButtonElement) => {
+    windowBlurred.current = document.hasFocus() ? null : button;
   };
 
   return (
@@ -426,6 +449,7 @@ export function ProcessTabRow({ open, counts, checksBlocked, onOpen, jsonOpen }:
             {...stylex.props(styles.tab, selected && styles.tabSelected)}
             onClick={() => onOpen(tab)}
             onFocus={(e) => onTabFocus(tab, e.currentTarget)}
+            onBlur={(e) => onTabBlur(e.currentTarget)}
           >
             <span>{t(TAB_LABEL[tab])}</span>
             {count !== undefined && (

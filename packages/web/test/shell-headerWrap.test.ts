@@ -62,13 +62,15 @@ describe("the shell header wraps at every width", () => {
     }).toEqual({ contain: true, grow: true, textAlign: true, floor: true });
   });
 
-  it("leaves the area nav with no flex shorthand, and keeps its two 30rem rules", () => {
+  it("leaves the area nav with no flex growth, and keeps its two 30rem rules", () => {
     const block = styleBlock(stripComments(read("src/shell/navStyles.ts")), "nav");
 
+    // The shorthand and the longhand both grow the nav into the account
+    // group's free room.
     expect({
-      flexShorthand: /\bflex: /.test(block),
+      grows: /\bflex(Grow)?:\s/.test(block),
       order: /order: \{ default: 0, "@media \(max-width: 30rem\)": 3 \}/.test(block),
       basis: /flexBasis: \{ default: "auto", "@media \(max-width: 30rem\)": "100%" \}/.test(block),
-    }).toEqual({ flexShorthand: false, order: true, basis: true });
+    }).toEqual({ grows: false, order: true, basis: true });
   });
 });

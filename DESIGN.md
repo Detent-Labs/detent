@@ -546,7 +546,7 @@ stamp. The steps rail and the form card carry it.
 - **Header:** a flex row on the ledger surface, 8px by 12px padding, with the
   2px divider under it. It wraps at every width, with a 12px gap between
   lines. The identity span shortens to its 6rem floor first. Then the account
-  group takes a line of its own, at the trailing edge. The muted ground and
+  group takes a line of its own, at the trailing edge. The ledger surface and
   the divider span every line.
 - The register tab names the open area: mono, 11px, tracked 0.14em, accent
   fill, paper text, trailing edge clipped.
@@ -595,9 +595,9 @@ The form editor has the form tab strip, and the step form has its own tabs.
 
 - **Row:** one line that scrolls sideways, with the 2px divider under it. The
   row jumps to keep the open tab whole in view. That tab keeps 32px clear of
-  an edge the row can still scroll past. An edge with tabs past it takes a 24px edge fade. The
-  fade leaves the divider and the scrollbar at full strength, and forced
-  colors drop it.
+  an edge the row can still scroll past. An edge with tabs past it takes a
+  24px edge fade. The fade leaves the divider and the scrollbar at full
+  strength, and forced colors drop it.
 - **Tab:** transparent, 8px by 12px padding. Hover washes to the ledger
   surface.
 - **Open tab:** weight 800 and the open mark, with no fill.
