@@ -19,7 +19,7 @@ import { LoginScreen } from "./LoginScreen.js";
 import { ErrorBoundary } from "./ErrorBoundary.js";
 import { Chrome } from "./Chrome.js";
 import { ProfilePage } from "./ProfilePage.js";
-import { colors, space } from "form-ui/tokens.stylex";
+import { layout, colors, space } from "form-ui/tokens.stylex";
 
 /** `.shell-empty`'s own base declaration from `shell.css`, unmerged — this
  * file shares no component with `ErrorBoundary.tsx`, whose own `fallback`
@@ -30,7 +30,7 @@ const styles = stylex.create({
     flexDirection: "column",
     alignItems: "flex-start",
     gap: space.s3,
-    maxWidth: "46rem",
+    maxWidth: layout.capNarrow,
     marginInline: "auto",
     marginBlock: 0,
     paddingBlock: space.s6,

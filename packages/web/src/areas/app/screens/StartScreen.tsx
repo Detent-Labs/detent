@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
-import { colors, space } from "form-ui/tokens.stylex";
+import { layout, colors, space } from "form-ui/tokens.stylex";
 import { resolveText } from "form-ui";
 import { createInstance, listProcesses } from "../api/client.js";
 import { describeCaughtError } from "../errors.js";
@@ -14,7 +14,7 @@ import type { Route } from "../routing.js";
 /** `.app-screen`, `.app-empty` and `.app-process-list` from `app.css`. */
 const styles = stylex.create({
   screen: {
-    maxWidth: "46rem",
+    maxWidth: layout.capNarrow,
     marginInline: "auto",
     paddingTop: space.s4,
     paddingInline: space.s3,

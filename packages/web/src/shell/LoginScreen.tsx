@@ -4,14 +4,14 @@ import { login, AppClientError } from "../api/client.js";
 import { t } from "./catalog.js";
 import type { UiLocale } from "../i18n/locale.js";
 import type { Session } from "./session.js";
-import { colors, space } from "form-ui/tokens.stylex";
+import { layout, colors, space } from "form-ui/tokens.stylex";
 
 /** `.shell-screen`, `.shell-login-form` (+ its `label`) and `.shell-error`
  * from `shell.css`, as StyleX. `.shell-login` carries no rule of its own;
  * it stays a literal hook class beside the compiled `screen` style. */
 const styles = stylex.create({
   screen: {
-    maxWidth: "46rem",
+    maxWidth: layout.capNarrow,
     marginInline: "auto",
     paddingBlock: space.s6,
     paddingInline: space.s3,

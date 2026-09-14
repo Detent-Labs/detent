@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Stamp } from "lucide-react";
 import * as stylex from "@stylexjs/stylex";
-import { colors, fonts, space } from "form-ui/tokens.stylex";
+import { layout, colors, fonts, space } from "form-ui/tokens.stylex";
 import {
   FieldForm,
   PathButtons,
@@ -59,7 +59,7 @@ const CLAIM_BLOCKED_REASON_ID = "app-task-claim-blocked-reason";
  * hook: it belongs to the deferred `.btn`/`.app-back` family (design.md D1). */
 const styles = stylex.create({
   screen: {
-    maxWidth: "46rem",
+    maxWidth: layout.capNarrow,
     marginInline: "auto",
     paddingTop: space.s4,
     paddingInline: space.s3,
