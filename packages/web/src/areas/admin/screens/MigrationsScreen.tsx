@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
-import { colors, fonts, space } from "form-ui/tokens.stylex";
+import { layout, colors, fonts, space } from "form-ui/tokens.stylex";
 import { listProcesses, listVersions, runMigration } from "../api/client.js";
 import type { ProcessSummary, VersionSummary, MigrationResult } from "../api/types.js";
 import { describeCaughtError } from "../errors.js";
@@ -14,7 +14,7 @@ import type { UiLocale } from "../../../i18n/locale.js";
 /** `app.css`'s screen/controls/table rules, as StyleX. */
 const styles = stylex.create({
   screen: {
-    maxWidth: "60rem",
+    maxWidth: layout.capWide,
     marginInline: "auto",
     paddingTop: space.s4,
     paddingInline: space.s3,

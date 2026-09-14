@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { Upload } from "lucide-react";
-import { colors, fonts, space, shadow } from "form-ui/tokens.stylex";
+import { layout, colors, fonts, space, shadow } from "form-ui/tokens.stylex";
 import {
   listProcesses,
   listDrafts,
@@ -103,7 +103,7 @@ const styles = stylex.create({
     paddingInline: 0,
   },
   screen: {
-    maxWidth: "60rem",
+    maxWidth: layout.capWide,
     marginInline: "auto",
     marginBlock: 0,
     paddingBlock: `${space.s4} ${space.s6}`,
