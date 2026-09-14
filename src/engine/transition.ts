@@ -44,6 +44,7 @@ import {
 import { armStepTimers, minFireAt, type TimerDrop } from "./duration.js";
 import { deleteInstanceDraft } from "./instance-drafts.js";
 import { buildGuardContext, evalGuard, SYSTEM_ACTOR, type Actor } from "../cel/eval.js";
+import { ADMIN_ROLE } from "../auth/authorize.js";
 import { CANCEL_SINK_STEP_ID, instance as instanceSchema } from "../schema/definition.js";
 import type { ProcessBody, Instance, HistoryEntry, InstanceEvent, Action, Step, Path, AssignmentState } from "../schema/definition.js";
 import { log } from "../log.js";
@@ -1012,9 +1013,11 @@ async function updateAssignment(
   db: SQL,
   // The guard may return a promise, and this function awaits it: `delegateClaim`
   // has a check that reads the account directory, and that check must run under
-  // this row lock and after the claimant check. `claimStep` and `releaseClaim`
-  // return nothing and are unaffected.
-  guard: (assignment: AssignmentState | null | undefined) => void | Promise<void>,
+  // this row lock and after the claimant check. The second (locked instance)
+  // argument lets a guard vary admission by instance state — a test
+  // instance's `kind`/`startedBy`, for example (draft-test-instances) — and a
+  // guard with no such need simply ignores it.
+  guard: (assignment: AssignmentState | null | undefined, inst: Instance) => void | Promise<void>,
   computeNext: (assignment: AssignmentState, at: string) => AssignmentState,
   eventSpec: AssignmentEventSpec,
 ): Promise<Instance> {
@@ -1026,7 +1029,7 @@ async function updateAssignment(
     // after the fact and reject the caller-initiated request themselves.
     if (inst.status !== "running") return inst;
 
-    await guard(inst.assignment);
+    await guard(inst.assignment, inst);
     const at = new Date().toISOString();
     const next = computeNext(inst.assignment as AssignmentState, at);
     await tx`UPDATE instances SET body = jsonb_set(body, '{assignment}', (${[next]}::jsonb) -> 0)
@@ -1051,14 +1054,24 @@ async function updateAssignment(
   });
 }
 
+/**
+ * On a test instance, a claim also admits the instance's own `startedBy`
+ * actor and any `system:admin` holder, beside an eligible candidate —
+ * the same two actors the single-instance read rule admits
+ * (`runtime/api.ts::loadInstanceForActor`). An ordinary (`"published"`)
+ * instance admits no actor outside `isEligibleCandidate` (draft-test-instances).
+ */
 export async function claimStep(instanceId: string, actor: Actor, db: SQL = sql): Promise<Instance> {
   return updateAssignment(
     instanceId,
     db,
-    (assignment) => {
+    (assignment, inst) => {
       if (!assignment) throw new NotAssignedError(instanceId);
       if (assignment.claimedBy !== undefined) throw new AlreadyClaimedError(instanceId);
-      if (!isEligibleCandidate(actor, assignment.candidates)) throw new NotACandidateError(instanceId, actor.id);
+      const admittedOnTest = inst.kind === "test" && (actor.id === inst.startedBy || actor.roles.includes(ADMIN_ROLE));
+      if (!isEligibleCandidate(actor, assignment.candidates) && !admittedOnTest) {
+        throw new NotACandidateError(instanceId, actor.id);
+      }
     },
     (assignment, at) => ({ candidates: assignment.candidates, claimedBy: actor.id, claimedAt: at }),
     { kind: "assignment.claimed", payload: { actorId: actor.id } },
