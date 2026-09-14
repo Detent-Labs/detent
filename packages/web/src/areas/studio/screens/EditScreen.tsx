@@ -69,7 +69,7 @@ const styles = stylex.create({
     paddingInline: space.s3,
     paddingBottom: space.s6,
   },
-  // `.studio-edit-screen` widens past `.studio-screen`'s 60rem cap and takes
+  // `.studio-edit-screen` widens past `.studio-screen`'s 80rem cap and takes
   // the height `.shell` leaves it.
   //
   // The zero basis and the zero floor are what make that height the
