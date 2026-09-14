@@ -27,15 +27,17 @@ import {
   NotFoundError,
   InstanceNotRunningError,
   isResolvedViewField,
+  isCancellableAtStep,
   type InstanceRecordElement,
   type InstanceSummary,
   type DegradedInstanceSummary,
   type InstanceQueryFilter,
 } from "../src/runtime/api.js";
 import { redactInstance } from "../src/engine/retention.js";
-import { ADMIN_ROLE, DEVELOPER_ROLE, AUTHOR_ROLE, AuthorizationError } from "../src/auth/authorize.js";
+import { ADMIN_ROLE, CANCEL_ANY_ROLE, DEVELOPER_ROLE, AUTHOR_ROLE, AuthorizationError } from "../src/auth/authorize.js";
+import { writeGrant } from "../src/auth/grants.js";
 import { RequestShapeError } from "../src/errors.js";
-import type { ProcessBody, ProcessId, PathId, InstanceId, FieldId, Instance, StepId } from "../src/schema/definition.js";
+import type { ProcessBody, ProcessId, PathId, InstanceId, FieldId, Instance, StepId, Step } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
 import { clearInstanceAudit } from "./audit-cleanup.js";
 
@@ -382,6 +384,29 @@ const assignedViewBody = (): ProcessBody =>
           label: { en: "A" },
           type: "task",
           assignment: { strategy: { type: "static", config: { candidates: ["approver", "user_id_candidate"] } } },
+          paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }],
+        },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+/** step_a (cancellable: false, no assignment) --(path_ab, manual, guardless)--> step_b (terminal). For the canCancel/cancellable-gate tests. */
+const nonCancellableViewBody = (): ProcessBody =>
+  ({
+    key: "non_cancellable_view_body",
+    label: { en: "Non Cancellable View Body" },
+    baseLocale: "en",
+    fields: [],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        {
+          id: "step_a",
+          key: "a",
+          label: { en: "A" },
+          type: "task",
+          cancellable: false,
           paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }],
         },
         { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
@@ -1429,6 +1454,81 @@ test.skipIf(!DB)("getInstanceView keeps admitting an actor whose candidacy was o
 
   const view = await getInstanceView(created.instanceId, pastCandidate, dataSourceReg);
   expect(view.instanceId).toBe(created.instanceId);
+});
+
+// ============================================================
+// isCancellableAtStep + getInstanceView.canCancel (instance-cancel-behavior)
+// ============================================================
+
+const bareStep = (over: Record<string, unknown> = {}): Step =>
+  ({ id: "step_x", key: "x", label: { en: "X" }, type: "task", ...over }) as unknown as Step;
+const bareBody = (over: Record<string, unknown> = {}): ProcessBody =>
+  ({ baseLocale: "en", fields: [], workflow: { initialStep: "step_x", steps: [] }, ...over }) as unknown as ProcessBody;
+
+test("isCancellableAtStep: the step's own value wins over the process's", () => {
+  expect(isCancellableAtStep(bareBody({ cancellable: true }), bareStep({ cancellable: false }))).toBe(false);
+});
+
+test("isCancellableAtStep: falls back to the process's value when the step declares none", () => {
+  expect(isCancellableAtStep(bareBody({ cancellable: false }), bareStep())).toBe(false);
+});
+
+test("isCancellableAtStep: defaults to true when neither declares one", () => {
+  expect(isCancellableAtStep(bareBody(), bareStep())).toBe(true);
+});
+
+test.skipIf(!DB)("getInstanceView: the starter sees canCancel true on a cancellable step", async () => {
+  const PID = pid("proc_view_cancancel_starter_true");
+  await publishBody(PID, viewBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg, {
+    data: { field_amount: 100, field_name: "Bob", field_category: "a" } as unknown as Instance["data"],
+  });
+
+  const view = await getInstanceView(created.instanceId, actor, dataSourceReg);
+  expect(view.canCancel).toBe(true);
+});
+
+test.skipIf(!DB)("getInstanceView: the starter sees canCancel false on a non-cancellable step", async () => {
+  const PID = pid("proc_view_cancancel_starter_false");
+  await publishBody(PID, nonCancellableViewBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+
+  const view = await getInstanceView(created.instanceId, actor, dataSourceReg);
+  expect(view.canCancel).toBe(false);
+});
+
+test.skipIf(!DB)("getInstanceView: system:cancel-any sees canCancel true regardless of the step", async () => {
+  const PID = pid("proc_view_cancancel_role");
+  await publishBody(PID, nonCancellableViewBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+  const cancelAnyAdmin: Actor = { id: "user_cancel_any_admin", roles: [ADMIN_ROLE, CANCEL_ANY_ROLE] };
+
+  const view = await getInstanceView(created.instanceId, cancelAnyAdmin, dataSourceReg);
+  expect(view.canCancel).toBe(true);
+});
+
+test.skipIf(!DB)("getInstanceView: a cancel grant holder sees canCancel true regardless of the step", async () => {
+  const PID = pid("proc_view_cancancel_grant");
+  await publishBody(PID, nonCancellableViewBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+  const grantAdmin: Actor = { id: "user_grant_admin", roles: [ADMIN_ROLE, "finance-authors"] };
+  await writeGrant({ role: "finance-authors", permission: "cancel", scope: { type: "process", config: { processId: PID } } }, sql);
+
+  const view = await getInstanceView(created.instanceId, grantAdmin, dataSourceReg);
+  expect(view.canCancel).toBe(true);
+});
+
+test.skipIf(!DB)("getInstanceView: a non-running instance always reports canCancel false", async () => {
+  const PID = pid("proc_view_cancancel_not_running");
+  const published = await publishBody(PID, viewBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg, {
+    data: { field_amount: 100, field_name: "Bob", field_category: "a" } as unknown as Instance["data"],
+  });
+  const cancelled = await cancelInstance(created, published.definition, actor);
+  expect(cancelled.status).toBe("cancelled");
+
+  const view = await getInstanceView(cancelled.instanceId, actor, dataSourceReg);
+  expect(view.canCancel).toBe(false);
 });
 
 // ============================================================

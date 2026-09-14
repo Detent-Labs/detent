@@ -55,6 +55,9 @@ function readFileAsBase64(file: File): Promise<string> {
 /** Ties the disabled Claim button to its reason. One task renders at a time, so a literal is enough. */
 const CLAIM_BLOCKED_REASON_ID = "app-task-claim-blocked-reason";
 
+/** Ties the disabled Discard-case button to its reason. One task renders at a time, so a literal is enough. */
+const DISCARD_BLOCKED_REASON_ID = "app-task-discard-blocked-reason";
+
 /** `app.css`'s task-screen rules, as StyleX. `.app-back` stays a literal
  * hook: it belongs to the deferred `.btn`/`.app-back` family (design.md D1). */
 const styles = stylex.create({
@@ -543,9 +546,26 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
                 {t(locale, "task.save")}
               </button>
             )}
-            <button type="button" className="btn btn-secondary btn-destructive" disabled={loading} onClick={() => void doDiscard()}>
-              {t(locale, "task.discardCase")}
-            </button>
+            {view.status === "running" && view.canCancel && (
+              <button type="button" className="btn btn-secondary btn-destructive" disabled={loading} onClick={() => void doDiscard()}>
+                {t(locale, "task.discardCase")}
+              </button>
+            )}
+            {view.status === "running" && !view.canCancel && (
+              <span>
+                {/* aria-disabled, not the disabled attribute: a disabled button
+                    leaves the tab order and assistive technology skips it, so
+                    the reason would reach only sighted pointer users. No click
+                    handler, so activating it does nothing. */}
+                <button type="button" className="btn btn-secondary btn-destructive" aria-disabled="true" aria-describedby={DISCARD_BLOCKED_REASON_ID}>
+                  {t(locale, "task.discardCase")}
+                </button>
+                {/* Visible text, never a title tooltip: touch devices have no
+                    hover, and a disabled control suppresses the pointer events
+                    a tooltip needs. */}
+                <span id={DISCARD_BLOCKED_REASON_ID}>{t(locale, "task.discardCaseBlocked")}</span>
+              </span>
+            )}
           </div>
 
           {savedAt && (

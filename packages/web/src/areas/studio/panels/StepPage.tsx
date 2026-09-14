@@ -308,6 +308,7 @@ const styles = stylex.create({
 const SECTION_LABEL: Record<SectionName, CatalogKey> = {
   entry: "stepSections.entry",
   assignment: "stepSections.assignment",
+  cancellable: "stepSections.cancellable",
   form: "stepSections.form",
   paths: "stepSections.paths",
   timers: "stepSections.timers",
@@ -526,6 +527,34 @@ export function StepPage({
             {showAssignmentWarning && <p {...stylex.props(styles.warning)}>{t("stepSections.noAssignmentWarning")}</p>}
           </>
         );
+      case "cancellable": {
+        // Three states over one optional key: unset reads as "inherit", so the
+        // draft's step carries no `cancellable` key until an author picks an
+        // explicit state (`studio-step-page`).
+        const cancellableValue = step.cancellable === undefined ? "inherit" : String(step.cancellable);
+        const processDefault = draft.cancellable ?? true;
+        return (
+          <label {...stylex.props(styles.fieldLabel)}>
+            <span {...stylex.props(styles.fieldLabelText)}>{t("stepSections.cancellableField")}</span>
+            <select
+              value={cancellableValue}
+              onChange={(e) => {
+                const selected = e.target.value;
+                updateStep({ cancellable: selected === "inherit" ? undefined : selected === "true" });
+              }}
+            >
+              <option value="inherit">{t("stepSections.cancellableInherit")}</option>
+              <option value="true">{t("stepSections.cancellableYes")}</option>
+              <option value="false">{t("stepSections.cancellableNo")}</option>
+            </select>
+            {cancellableValue === "inherit" && (
+              <span {...stylex.props(styles.hint)}>
+                {t(processDefault ? "stepSections.cancellableResolvesYes" : "stepSections.cancellableResolvesNo")}
+              </span>
+            )}
+          </label>
+        );
+      }
       case "form":
         // The count and one control. The editor itself lives on its own
         // routed page, so nothing here mounts it.

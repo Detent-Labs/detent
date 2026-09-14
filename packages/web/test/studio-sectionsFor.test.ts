@@ -7,17 +7,18 @@ import { describe, expect, it } from "bun:test";
 import { sectionColumns, sectionsFor } from "../src/areas/studio/panels/sectionsFor.js";
 
 describe("sectionsFor", () => {
-  it("stands the seven task sections for a step someone works", () => {
+  it("stands the eight task sections for a step someone works", () => {
     const sections = sectionsFor("participant");
 
     expect(sections).toContain("paths");
     expect(sections).toContain("assignment");
+    expect(sections).toContain("cancellable");
     expect(sections).toContain("entry");
     expect(sections).toContain("exit");
     expect(sections).toContain("timers");
     expect(sections).toContain("form");
     expect(sections).toContain("collaboration");
-    expect(sections).toHaveLength(7);
+    expect(sections).toHaveLength(8);
   });
 
   it("names neither Which process it calls nor How the case ends on a task step", () => {
@@ -47,7 +48,7 @@ describe("sectionsFor", () => {
     const first = sectionsFor("participant");
     first.length = 0;
 
-    expect(sectionsFor("participant")).toHaveLength(7);
+    expect(sectionsFor("participant")).toHaveLength(8);
   });
 });
 
@@ -55,7 +56,7 @@ describe("sectionColumns", () => {
   it("puts the routing and the actor in the leading column", () => {
     const { leading, trailing } = sectionColumns(sectionsFor("participant"));
 
-    expect(leading).toEqual(["paths", "assignment"]);
+    expect(leading).toEqual(["paths", "assignment", "cancellable"]);
     expect(trailing).toEqual(["entry", "exit", "timers", "form", "collaboration"]);
   });
 
@@ -69,7 +70,7 @@ describe("sectionColumns", () => {
   it("leads a subprocess step with the process it calls", () => {
     const { leading, trailing } = sectionColumns(sectionsFor("subprocess"));
 
-    expect(leading).toEqual(["paths", "subprocess"]);
+    expect(leading).toEqual(["paths", "cancellable", "subprocess"]);
     expect(trailing).toEqual(["entry", "exit", "timers"]);
   });
 

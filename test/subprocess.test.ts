@@ -10,6 +10,8 @@ import { sql, initSchema, createInstance, withTransaction } from "../src/engine/
 import { startInstance, cancelInstance, selectAutomaticPath, executeAutomaticTransition } from "../src/engine/transition.js";
 import { publishBody, createDefinitionStore } from "../src/engine/definitions.js";
 import { registerSubprocessHandlers } from "../src/engine/subprocess.js";
+import { cancelInstance as apiCancelInstance } from "../src/runtime/api.js";
+import { CANCEL_ANY_ROLE } from "../src/auth/authorize.js";
 import { createAssignmentRegistry, type AssignmentRegistry } from "../src/engine/registry.js";
 import { drainOutbox } from "../src/engine/outbox.js";
 import { drainResolutions } from "../src/engine/resolution.js";
@@ -1115,6 +1117,33 @@ test.skipIf(!DB)("parent cancel cascades to an active child and a nested grandch
   expect((await loadInstance(gp.instanceId))!.status).toBe("cancelled");
   expect((await loadInstance(pId))!.status).toBe("cancelled"); // cascaded
   expect((await loadInstance(wId))!.status).toBe("cancelled"); // recursively cascaded
+});
+
+test.skipIf(!DB)("a child's own cancellable: false does not block the parent's cascade", async () => {
+  // The cascade drives each child through the engine's cancel primitive
+  // directly, with SYSTEM_ACTOR, never through the authorization wrapper
+  // (specs/cancellation/spec.md: "A child's own cancellable:false does not
+  // block propagation"). Cancelling through that wrapper here — not the raw
+  // engine primitive `cancelInstance` this file otherwise uses — is the
+  // point: it is the wrapper's own gate that could, if misapplied, reach
+  // into the cascade and strand a child.
+  const { registry } = engineRegistry();
+  const CHILD_NC_PID = "proc_waiting_not_cancellable" as Instance["processId"];
+  const CALLER_NC_PID = "proc_caller_not_cancellable" as Instance["processId"];
+  const cv = await publishBody(CHILD_NC_PID, { ...waitingChildBody(), cancellable: false }, emptyRegistry, dataSourceReg);
+  const pv = await publishBody(CALLER_NC_PID, callerBody("caller_nc", CHILD_NC_PID, cv.version), emptyRegistry, dataSourceReg);
+
+  const parent = await startInstance(pv.definition, { processId: CALLER_NC_PID, version: pv.version }, actor);
+  await drainAll(registry); // spawns the child, which parks at its manual wait step
+
+  const childId = subprocessChildId(parent.instanceId, 1, "step_sub");
+  expect((await loadInstance(childId))!.status).toBe("running");
+
+  const cancelAnyActor: Actor = { id: "user_cancel_any_i3", roles: [CANCEL_ANY_ROLE] };
+  await apiCancelInstance(parent.instanceId, cancelAnyActor, sql);
+
+  expect((await loadInstance(parent.instanceId))!.status).toBe("cancelled");
+  expect((await loadInstance(childId))!.status).toBe("cancelled");
 });
 
 test.skipIf(!DB)("cancelling an instance with no children touches only that instance", async () => {

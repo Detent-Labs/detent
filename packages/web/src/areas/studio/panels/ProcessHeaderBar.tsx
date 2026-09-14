@@ -927,6 +927,25 @@ export function ProcessHeaderBar({
                     onChange={(e) => changeBaseLocale(e.target.value)}
                   />
                 </label>
+                {/* Plain two-state checkbox, unlike the step-level override's
+                    three-state <select>: ProcessBody.cancellable sits at the
+                    root of the inheritance chain, so there is no parent
+                    default for a third "inherit" state to name (design.md).
+                    Defaults to checked when the draft carries no key yet,
+                    matching today's actual unconditional-cancel behavior. */}
+                <label {...stylex.props(styles.headerBarMenuRow)}>
+                  {t("headerBar.cancellable")}
+                  <input
+                    type="checkbox"
+                    disabled={!structureActive}
+                    checked={draft.cancellable ?? true}
+                    onChange={(e) =>
+                      mutate((d) => {
+                        d.cancellable = e.target.checked;
+                      })
+                    }
+                  />
+                </label>
                 {/* The process-wide collaboration defaults
                     (`studio-process-tabs`). Both call `mutate()` directly, so
                     both are `structureActive`-gated like key and baseLocale

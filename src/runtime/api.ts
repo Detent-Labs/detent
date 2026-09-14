@@ -172,6 +172,12 @@ export type InstanceView = {
   // configuration rather than instance state.
   collaboration: { comments: boolean; attachments: boolean };
   availablePaths: AvailablePath[];
+  // Whether the CALLING actor's own next call to cancelInstance would
+  // succeed right now — never whether some other actor could cancel the
+  // instance. False whenever `status` is not "running", mirroring
+  // availablePaths; resolved through the same predicate cancelInstance
+  // itself enforces (canActorCancelInstance), so the two cannot disagree.
+  canCancel: boolean;
   // The instance's persisted claim state, in the shape InstanceSummary
   // carries. Absent when the current step declares no assignment: there is
   // nothing to claim, which is what a caller rendering claim controls needs
@@ -1311,6 +1317,7 @@ export async function getInstanceView(instanceId: InstanceId, actor: Actor, regi
     tabs: (step.view?.tabs ?? []).map((t) => ({ key: t.key, label: t.label })),
     collaboration: { comments: resolveCollaboration(body, step, "comments"), attachments: resolveCollaboration(body, step, "attachments") },
     availablePaths: instance.status === "running" ? resolveAvailablePaths(body, step, instance, actor) : [],
+    canCancel: instance.status === "running" ? await canActorCancelInstance(actor, instance, body, db) : false,
     assignment: instance.assignment,
     redactedAt: instance.redactedAt,
     ...(storedDraft && storedDraft.stepId === step.id
@@ -1488,6 +1495,47 @@ export async function delegateClaim(instanceId: InstanceId, actor: Actor, toActo
 }
 
 /**
+ * Whether `step`'s effective `cancellable` resolves to true: the step's own
+ * value if declared, else the process's, else true when neither declares
+ * one. Pure and synchronous — no DB access — so it is trivially unit
+ * testable on its own, and safe to call from both the write path
+ * (`cancelInstance`, via `canActorCancelInstance`) and the read path
+ * (`getInstanceView`, via the same predicate).
+ */
+export function isCancellableAtStep(body: ProcessBody, step: Step): boolean {
+  return step.cancellable ?? body.cancellable ?? true;
+}
+
+/**
+ * Shared cancel-authorization predicate: `cancelInstance` calls it to
+ * enforce (throwing on false), `getInstanceView` calls it to report
+ * (`canCancel`) — parallel to `requireSubmitAuthority`, extracted so the two
+ * cannot drift. `can(actor, "cancel", ...)` already composes the
+ * `CANCEL_ANY_ROLE` role check and a stored per-process grant, and
+ * short-circuits to true before `isCancellableAtStep` is ever consulted: the
+ * cancellable gate binds the starter path alone, never the role or grant
+ * path.
+ *
+ * ponytail: only starter-vs-operator is distinguished here; no
+ * plugin/resolver for "who besides the starter may cancel" ships in v1 (see
+ * instance-cancel-behavior's design.md Non-Goals) — extend here if that need
+ * appears.
+ */
+async function canActorCancelInstance(actor: Actor, instance: Instance, body: ProcessBody, db: SQL): Promise<boolean> {
+  if (await can(actor, "cancel", instance.processId, db)) return true;
+  if (instance.startedBy !== actor.id) return false;
+  // The fields govern a running instance only (specs/cancellation/spec.md);
+  // the engine's own cancel primitive already no-ops on a non-running one,
+  // so this predicate must defer to that rather than gate it.
+  if (instance.status !== "running") return true;
+  // findStep can throw on a body/step mismatch — safe only because the
+  // starter and status checks above already ran, so only a starter of a
+  // known, running instance reaches here.
+  const step = findStep(body, instance.currentStepId as string);
+  return isCancellableAtStep(body, step);
+}
+
+/**
  * Cancel a running instance, loading its instance/body pair the same way
  * `getInstanceView` does. Delegation to `engine/transition.ts::cancelInstance`
  * for the actual semantics — skip onExit, enqueue `[onCancel, sink.onEntry]`,
@@ -1505,6 +1553,15 @@ export async function delegateClaim(instanceId: InstanceId, actor: Actor, toActo
  * path. A `system:cancel-any` holder never pays that load; a grant holder
  * does, because the fast path already put the global question and lost. The
  * two tests stay independent so neither can mask the other.
+ *
+ * A third, narrower test gates the starter path alone: the current step's
+ * effective `cancellable` (`isCancellableAtStep`) must also resolve true.
+ * `canActorCancelInstance` composes all three — the loaded branch below
+ * calls it in place of a bare `can`/`startedBy` check. A `system:cancel-any`
+ * holder or a grant holder short-circuits inside that predicate before the
+ * cancellable gate is ever consulted, so declaring a process or step not
+ * participant-cancellable can never strand a running instance no one is able
+ * to cancel.
  */
 export async function cancelInstance(instanceId: InstanceId, actor: Actor, db: SQL = sql): Promise<Instance> {
   // Fast, load-free path: a system:cancel-any caller is authorized before any
@@ -1531,7 +1588,7 @@ export async function cancelInstance(instanceId: InstanceId, actor: Actor, db: S
   } catch {
     throw new AuthorizationError(`actor '${actor.id}' may not cancel instance '${instanceId}'`);
   }
-  if (!(await can(actor, "cancel", instance.processId, db)) && instance.startedBy !== actor.id) {
+  if (!(await canActorCancelInstance(actor, instance, body, db))) {
     throw new AuthorizationError(`actor '${actor.id}' may not cancel instance '${instanceId}'`);
   }
   const store = getStore(db);

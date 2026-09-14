@@ -5,7 +5,8 @@ import type { Step } from "workflow-engine/schema";
 import type { DraftOf, Draft } from "../src/areas/studio/draft/types.js";
 import type { EditorIssue } from "../src/areas/studio/draft/issues.js";
 import type { ValidationResult } from "../src/areas/studio/draft/validation.js";
-import { DraftContext, type DraftContextValue } from "../src/areas/studio/draft/store.js";
+import { DraftContext, type DraftContextValue, type Mutate } from "../src/areas/studio/draft/store.js";
+import { updateInDraftArray } from "../src/areas/studio/draft/draft-array-crud.js";
 import { StepPage } from "../src/areas/studio/panels/StepPage.js";
 
 /**
@@ -139,10 +140,10 @@ describe("The step page's masthead", () => {
 });
 
 describe("The step page's section set", () => {
-  it("gives a task step Path to, Assignment, On entry, On exit, Time limit, Step form fields and Collaboration", () => {
+  it("gives a task step Path to, Assignment, Cancellable, On entry, On exit, Time limit, Step form fields and Collaboration", () => {
     const html = render();
 
-    for (const heading of ["Path to", "Assignment", "On entry", "On exit", "Time limit", "Step form fields", "Collaboration"]) {
+    for (const heading of ["Path to", "Assignment", "Cancellable", "On entry", "On exit", "Time limit", "Step form fields", "Collaboration"]) {
       expect(html).toContain(`>${heading}<`);
     }
     expect(html).not.toContain(">Which process it calls<");
@@ -191,6 +192,50 @@ describe("The step page's section set", () => {
 
     expect(headings.length).toBeGreaterThan(0);
     for (const heading of headings) expect(heading).not.toContain("aria-expanded");
+  });
+});
+
+describe("The step page's Cancellable section", () => {
+  /**
+   * The Cancellable <select>'s onChange writes through a local `updateStep`
+   * closure over `updateInDraftArray` — not exported, so not directly
+   * callable. `render()` uses `renderToStaticMarkup`, which never fires an
+   * event (`studio-draftToolbarState.test.ts`'s documented convention: test
+   * the extracted logic instead of simulating a DOM event). These two write
+   * cases hand-drive that same `updateInDraftArray` call, with the same two
+   * patches the select's non-inherit options produce.
+   */
+  function mutateStep(step: DraftStep, patch: Partial<DraftStep>): DraftStep {
+    const draft = draftWith(step);
+    const mutate: Mutate = (recipe) => recipe(draft);
+    updateInDraftArray(mutate, (d) => d.workflow?.steps?.[0], patch);
+    return step;
+  }
+
+  it("selecting 'Not cancellable' writes cancellable: false on the step", () => {
+    const after = mutateStep({ ...TASK_STEP }, { cancellable: false });
+
+    expect(after.cancellable).toBe(false);
+  });
+
+  it("returning to 'Inherit from process' leaves the step with no cancellable key, not a present undefined", () => {
+    const after = mutateStep({ ...TASK_STEP, cancellable: true }, { cancellable: undefined });
+
+    expect(after.cancellable).toBeUndefined();
+    // Object.assign sets an explicit `cancellable: undefined` own property;
+    // only a JSON round-trip (the shape canonicalize()/definitionHash see)
+    // proves the key is truly absent rather than present-but-undefined.
+    expect(JSON.stringify(after)).not.toContain("cancellable");
+  });
+
+  it("names the process's current default in the inherit state, and changes when that default changes", () => {
+    const whenProcessAllows = render();
+    expect(whenProcessAllows).toContain("Resolves to: cancellable.");
+    expect(whenProcessAllows).not.toContain("Resolves to: not cancellable.");
+
+    const whenProcessBans = render({ draft: { ...draftWith(TASK_STEP), cancellable: false } });
+    expect(whenProcessBans).toContain("Resolves to: not cancellable.");
+    expect(whenProcessBans).not.toContain("Resolves to: cancellable.");
   });
 });
 

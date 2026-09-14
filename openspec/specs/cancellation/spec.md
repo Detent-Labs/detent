@@ -125,6 +125,45 @@ become `"cancelled"`. The cancel transition SHALL reuse the transactional outbox
 - **WHEN** a cancel and a normal transition race on the same instance from the same `transitionSeq`
 - **THEN** exactly one wins the `transitionSeq` bump and the other observes the committed result as a concurrency conflict and does not double-apply
 
+### Requirement: A process or step MAY declare itself not participant-cancellable
+
+`ProcessBody` MAY declare `cancellable: boolean`. An absent key SHALL
+default to `true`. `Step` MAY declare its own `cancellable: boolean`. An
+absent key SHALL default to the owning `ProcessBody.cancellable`. Either MAY
+override the other in either direction: a process declaring `cancellable:
+false` MAY still declare one of its steps `cancellable: true`, and the
+reverse.
+
+Neither field SHALL change the cancel-sink injection, the synthetic cancel
+path, or any other mechanism this capability specifies. Both fields SHALL
+describe only whether a PARTICIPANT-initiated cancel command against a
+running instance resting on that step may proceed. The `authorization`
+capability's "An instance's starter may cancel it without the reserved role"
+requirement governs that decision. An actor holding `system:cancel-any`, or a
+stored per-process `cancel` grant, SHALL remain authorized regardless of
+either field's value. Neither field SHALL be able to strand a running
+instance beyond every operator's reach.
+
+#### Scenario: An unset process defaults to cancellable
+
+- **WHEN** a `ProcessBody` declares no `cancellable` key
+- **THEN** every one of its non-terminal steps resolves as cancellable, absent
+  a step-level override
+
+#### Scenario: A step overrides its process's default
+
+- **WHEN** a `ProcessBody` declares `cancellable: true` and one of its steps
+  declares `cancellable: false`
+- **THEN** a running instance resting on that step resolves as not
+  cancellable. An instance resting on any other step still resolves as
+  cancellable
+
+#### Scenario: A step widens past a process-wide ban
+
+- **WHEN** a `ProcessBody` declares `cancellable: false` and one of its steps
+  declares `cancellable: true`
+- **THEN** a running instance resting on that step resolves as cancellable
+
 ### Requirement: Downward-only subprocess cancel propagation
 
 Cancelling a parent instance SHALL recursively cancel its active child instances
@@ -156,6 +195,13 @@ already-cancelled instance itself — only its child cascade is resumed; the
 "cancelling a non-running instance is a no-op" contract for the instance's
 own record is unaffected.
 
+The sweep drives each child through the engine's cancel primitive directly.
+It never goes through the participant/operator-facing authorization wrapper.
+A child's own `cancellable`/`Step.cancellable` value, or its process's,
+therefore MUST NOT block propagation. The parent's cancellation was already
+authorized once, and the cascade is solely the engine's own consequence of
+that decision.
+
 #### Scenario: Parent cancel cascades to active children
 - **WHEN** a parent instance with an active subprocess child is cancelled
 - **THEN** the child instance is also cancelled (recursively for nested children)
@@ -180,6 +226,9 @@ own record is unaffected.
 - **WHEN** a child's own cancel commit loses a concurrency race during a sweep
 - **THEN** the sweep records that child as conflicted, not failed, and continues with its remaining siblings
 
+<!-- Why: this heading is what a future MODIFIED delta against this
+     requirement will need to match, byte for byte. -->
+<!-- antislop: allow passive-voice -->
 #### Scenario: An incomplete sweep is durably recorded
 - **WHEN** a parent's cancel commits and its direct-child sweep ends with at least one conflicted or failed child
 - **THEN** the parent's incomplete-sweep state survives a crash or process restart and is discoverable
@@ -192,6 +241,15 @@ own record is unaffected.
 - **WHEN** the cancel entry point resumes an incomplete sweep on an already-cancelled parent
 - **THEN** no new `HistoryEntry` is appended and `transitionSeq` does not change for that parent, matching the no-op contract for a non-running instance
 
+<!-- Why: this heading is what a future MODIFIED delta against this
+     requirement will need to match, byte for byte. -->
+<!-- antislop: allow negation-habit -->
 #### Scenario: A fully successful sweep needs no further resumption
 - **WHEN** a parent's cancel sweep cancels every active direct child with no conflicts or failures
 - **THEN** re-invoking the cancel entry point on that parent again attempts no further child cancellation
+
+#### Scenario: A child's own cancellable:false does not block propagation
+
+- **WHEN** a parent instance transitions to cancelled. One of its active children
+  currently rests on a step whose effective `cancellable` resolves to `false`
+- **THEN** that child is still cancelled as part of the cascade

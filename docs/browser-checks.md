@@ -5035,3 +5035,41 @@ async (page) => {
   return { before, grew, after };
 }
 ```
+
+### The blocked Discard control and the cancel-any bypass (`instance-cancel-behavior`)
+
+Source: `instance-cancel-behavior` task 8.1.
+
+Author a process, fresh or from an existing draft. Clear the process-wide
+Cancellable checkbox, in the header bar's `⋮` menu, "Process, saved with the
+draft" group. It has no per-step override. Its first step is then
+non-cancellable for its own starter already. The author account may lack
+`system:publish`. Switch to one that has it for that single click.
+
+<!-- antislop: allow passive-voice -->
+<!-- Why: quotes the product's own on-screen copy verbatim, itself passive. -->
+Start an instance as a participant. Open its task screen. Pass: "Discard
+case" carries `aria-disabled="true"`. The native `disabled` attribute stays
+unset: `el.disabled` reads `false`, and `tabIndex` stays `0`.
+Pass: `aria-describedby` names a sibling `<span>` holding real, visible
+text ("This case can no longer be discarded from here."). That reason text
+is real, visible DOM content, distinct from a `title` attribute.
+
+Log in as an actor holding `system:cancel-any` alone. Pass: the account menu
+offers no area switch, and `/admin` states the account has no access there.
+`system:cancel-any` does not reach the admin UI on its own. From that same
+session, reusing its own bearer token the way `api/client.ts::request` sends
+it, POST the blocked instance's `/cancel` route directly. Pass: it still
+returns 200, and the instance's status flips to `cancelled`. Confirm the
+stamp in the admin Instances list too, under an account holding
+`system:admin`. A plain `GET` of that instance can 403 for the same actor
+right up until the moment it cancels. Read authorization and cancel
+authorization are separate checks.
+
+`test/runtime-api.test.ts` and `test/http.test.ts` already cover
+`canCancel`'s resolution and the route's own authorization gate: a starter
+refused, `system:cancel-any` and a per-process cancel grant both still
+cancel, `system:admin` alone not enough. Neither reaches the rendered
+control. Whether the disabled state is the native attribute or
+`aria-disabled`, and whether the reason is real DOM or a `title`, both need a
+browser to see.
