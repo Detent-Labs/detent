@@ -818,6 +818,18 @@ export type View = z.infer<typeof view>;
 export const assignment = z.object({ strategy: plugin });
 export type Assignment = z.infer<typeof assignment>;
 
+// Comment/attachment availability, on both ProcessBody and Step. Each of
+// `comments`/`attachments` resolves independently: a step's own entry wins
+// over the process's own entry, which wins over `true` — a step may turn on
+// what the process default turns off, and vice versa. Optional, not
+// defaulted, at both levels: canonicalize() drops an undefined key, so a
+// body declaring neither key keeps its definitionHash unchanged.
+export const collaboration = z.object({
+  comments: z.boolean().optional(),
+  attachments: z.boolean().optional(),
+});
+export type Collaboration = z.infer<typeof collaboration>;
+
 // ============================================================
 // Subprocess: call-and-return; the parent step is a wait state.
 // latest-at-spawn is pinned by contractRef (the child contract signature).
@@ -907,6 +919,7 @@ export const step = z
     subprocess: subprocessSpec.optional(),
     view: view.optional(),
     assignment: assignment.optional(),
+    collaboration: collaboration.optional(),
     onEntry: z.array(action).optional(),
     onExit: z.array(action).optional(),
     // Cleanup on cancellation. Become the onPath actions of the step's
@@ -968,6 +981,7 @@ export const processBody = z
     // body predating this field keeps its definitionHash unchanged. Follows
     // dataSources, the other array-typed top-level field with the same shape.
     allowedGroups: z.array(z.string()).optional(),
+    collaboration: collaboration.optional(),
     workflow,
   })
   .superRefine((b, ctx) => {

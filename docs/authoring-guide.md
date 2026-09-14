@@ -779,6 +779,31 @@ The example assigns `capture` to `employee`. It assigns `review` and
 `finance-manager`. The steps `book`, `booked` and `rejected` carry no
 assignment, because no person acts on them.
 
+### Collaboration
+
+Whether a step accepts comments and file attachments while it runs. A
+process sets a `collaboration` default with two keys, `comments` and
+`attachments`. Any step may declare the same two keys to override either
+one on its own. An override is independent per key.
+
+A step's own value always wins over the process default. A step may
+disable what the process enables. A step may just as well enable what the
+process disables. A key set nowhere reads as `true`. That is the behavior
+every process had before this key existed.
+
+Neither key hides what is already there. A step that later disables
+attachments still shows every attachment a participant added earlier.
+Only the control that adds a new one disappears.
+
+The example declares no `collaboration` anywhere. Every one of its steps
+keeps both comments and attachments enabled, exactly as before this key
+existed.
+
+In Studio, the process default is two checkboxes on the process header bar.
+A step's own override is a three-way choice per key. Each key picks
+Default, On or Off. Picking Default shows the currently resolved value
+below the control.
+
 ### Instance
 
 One run of one process. It holds the payload, the active step, the claim, the
