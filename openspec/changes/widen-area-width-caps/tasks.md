@@ -30,7 +30,7 @@
 
 ## 3. Sweep the operator cap (60rem to 80rem)
 
-- [ ] 3.1 In the 10 admin screens carrying the literal
+- [x] 3.1 In the 10 admin screens carrying the literal
       (`UsersScreen.tsx`, `MigrationsScreen.tsx`, `OutboxScreen.tsx`,
       `TimersScreen.tsx`, `UiStringsScreen.tsx`, `GroupsScreen.tsx`,
       `InstanceScreen.tsx`, `InstancesScreen.tsx`, `DataListsScreen.tsx`,
@@ -40,7 +40,7 @@
       where not already imported. Verify with
       `grep -rn '"60rem"' packages/web/src/areas/admin` returning no
       matches.
-- [ ] 3.2 In exactly 4 reporting files — `ReportsListScreen.tsx`,
+- [x] 3.2 In exactly 4 reporting files — `ReportsListScreen.tsx`,
       `ProcessPickerScreen.tsx`, `ReportBuilderScreen.tsx` (all under
       `screens/`) and `root.tsx` (directly under `areas/reporting/`) —
       replace the literal `"60rem"` `maxWidth` on that file's `screen`
@@ -62,7 +62,7 @@
       packages/web/src/areas/reporting/screens/ShareEditor.tsx
       packages/web/src/areas/reporting/screens/ReportBuilderScreen.tsx`
       still reporting 2, 2, 1 and 2 respectively (untouched).
-- [ ] 3.3 In the 7 studio files carrying the literal
+- [x] 3.3 In the 7 studio files carrying the literal
       (`ToolsScreen.tsx`, `VersionsScreen.tsx`, `ProcessesScreen.tsx`,
       `TemplatesScreen.tsx`, `MigrationPlanScreen.tsx`, `PlayerScreen.tsx`,
       `EditScreen.tsx`, all under
