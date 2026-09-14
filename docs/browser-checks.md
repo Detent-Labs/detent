@@ -5040,17 +5040,20 @@ async (page) => {
 
 Source: `instance-cancel-behavior` task 8.1.
 
-Author a process, fresh or from an existing draft. Turn off the process-wide
-Cancellable checkbox — header bar's `⋮` menu, "Process, saved with the draft"
-group — and add no per-step override. Its first step is then non-cancellable
-for its own starter already. Publish needs `system:publish`; switch to an
-account that holds it for that one click, if the author account does not.
+Author a process, fresh or from an existing draft. Clear the process-wide
+Cancellable checkbox, in the header bar's `⋮` menu, "Process, saved with the
+draft" group. It has no per-step override. Its first step is then
+non-cancellable for its own starter already. The author account may lack
+`system:publish`. Switch to one that has it for that single click.
 
-Start an instance as a participant and open its task screen. Pass: "Discard
-case" carries `aria-disabled="true"`, not the native `disabled` attribute.
-Its `disabled` DOM property still reads `false`, and it keeps `tabIndex: 0`.
-Pass: `aria-describedby` names a sibling `<span>` holding real, visible text
-("This case can no longer be discarded from here."). It is never a `title`.
+<!-- antislop: allow passive-voice -->
+<!-- Why: quotes the product's own on-screen copy verbatim, itself passive. -->
+Start an instance as a participant. Open its task screen. Pass: "Discard
+case" carries `aria-disabled="true"`. The native `disabled` attribute stays
+unset: `el.disabled` reads `false`, and `tabIndex` stays `0`.
+Pass: `aria-describedby` names a sibling `<span>` holding real, visible
+text ("This case can no longer be discarded from here."). That reason text
+is real, visible DOM content, distinct from a `title` attribute.
 
 Log in as an actor holding `system:cancel-any` alone. Pass: the account menu
 offers no area switch, and `/admin` states the account has no access there.
