@@ -344,9 +344,9 @@ function collabOptionFor(override: boolean | undefined): CollabOption {
 
 /** One field's Segmented Control: Default, On or Off. Reuses the step-kind
  * control's own `segmented`/`segmentedOption` styles above. While Default
- * stands pressed, a caption below names the process-wide default's current
- * resolved value, so an author sees the effective setting without widening
- * the control's own per-option text (design.md). */
+ * stands pressed, a caption beside it names the process-wide default's
+ * current resolved value, so an author sees the effective setting without
+ * widening the control's own per-option text (design.md). */
 function CollaborationControl({
   legend,
   value,

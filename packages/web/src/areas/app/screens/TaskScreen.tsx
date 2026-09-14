@@ -167,6 +167,13 @@ const styles = stylex.create({
     alignItems: "center",
     marginTop: space.s2,
   },
+  // The "empty state says so in words" rule (design-language.md) applies the
+  // moment collaboration is off: with no entries yet and no add-control
+  // either, a bare heading over an empty list reads as broken, not disabled.
+  collaborationOffNote: {
+    fontSize: "0.85em",
+    color: colors.textMuted,
+  },
 });
 
 interface TaskScreenProps {
@@ -561,7 +568,7 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
                 </li>
               ))}
             </ul>
-            {(view.collaboration?.comments ?? true) && (
+            {(view.collaboration?.comments ?? true) ? (
               <div {...stylex.props(styles.taskCommentForm)}>
                 <textarea
                   {...stylex.props(styles.taskCommentTextarea)}
@@ -574,6 +581,8 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
                   {t(locale, "task.commentSubmit")}
                 </button>
               </div>
+            ) : (
+              <p {...stylex.props(styles.collaborationOffNote)}>{t(locale, "task.commentsDisabled")}</p>
             )}
           </section>
 
@@ -589,13 +598,15 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
                 </li>
               ))}
             </ul>
-            {(view.collaboration?.attachments ?? true) && (
+            {(view.collaboration?.attachments ?? true) ? (
               <div {...stylex.props(styles.taskAttachmentForm)}>
                 <input ref={fileInputRef} type="file" disabled={loading} />
                 <button type="button" className="btn btn-secondary" disabled={loading} onClick={() => void doUploadAttachment()}>
                   {t(locale, "task.attachmentUploadLabel")}
                 </button>
               </div>
+            ) : (
+              <p {...stylex.props(styles.collaborationOffNote)}>{t(locale, "task.attachmentsDisabled")}</p>
             )}
           </section>
         </>
