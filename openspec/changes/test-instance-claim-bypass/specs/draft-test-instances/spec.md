@@ -36,6 +36,10 @@ eligible candidates, whatever roles that actor holds.
 - **WHEN** a published instance's starter, or a `system:admin` holder, claims its step without candidacy
 - **THEN** the claim fails with `NotACandidateError`, and the assignment stays as it was
 
+#### Scenario: The starter claims a test instance step whose candidate list is empty
+- **WHEN** a test instance's current step resolved an empty candidate list, and its starter claims that step
+- **THEN** the claim succeeds, and the candidate list stays empty
+
 #### Scenario: The admission does not override an existing claim
 - **WHEN** a test instance's starter claims a step another actor already holds
 - **THEN** the claim fails with `AlreadyClaimedError`, and the existing claim stays as it was

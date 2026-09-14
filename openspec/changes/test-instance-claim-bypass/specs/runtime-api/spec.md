@@ -17,10 +17,11 @@ when `claimedBy` is already set. On a non-running instance it SHALL NOT
 throw — it returns the instance unchanged, a silent no-op (see
 `assignment-claim-release-consolidation`).
 
-On an instance whose `kind` is `"test"`, `claimStep` SHALL also admit the
-instance's `startedBy` actor and any actor holding `system:admin`, per the
-`draft-test-instances` capability. `NotACandidateError` there means the actor
-is neither an eligible candidate nor one of those two.
+The candidate requirement above widens on an instance whose `kind` is
+`"test"`. There, `claimStep` SHALL also admit the instance's `startedBy` actor
+and any `system:admin` holder. The `draft-test-instances` capability states
+that rule. `NotACandidateError` there means the actor is neither an eligible
+candidate nor one of those two.
 
 #### Scenario: An eligible candidate claims successfully
 - **WHEN** `claimStep` is called by an eligible candidate on a running

@@ -6,7 +6,8 @@
 ## 2. Docs
 
 - [ ] 2.1 In `docs/openapi.yaml`, name the test-instance admission in the claim route's description and in its 403 text. Confirm by reading the route entry back.
-- [ ] 2.2 In `docs/current-state.md`, add the claim admission to the "Draft test instances" section. Confirm with the prose gate over the range.
+- [ ] 2.2 In `docs/current-state.md`, add the claim admission to the "Draft test instances" section. Reconcile the authorization passage that calls `claimStep` untouched. Confirm with the prose gate over the range.
+- [ ] 2.3 In `docs/decisions.md`, add an open entry under its own heading: a candidate can claim a test instance it cannot open. Cite `authorization` and `instance-visibility-set`, which both say the engine never hands out such a task. Confirm with the prose gate.
 
 ## 3. Verification
 

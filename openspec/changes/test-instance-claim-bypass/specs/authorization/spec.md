@@ -8,8 +8,9 @@ Where a step declares an `assignment`, `submitAndTransition`, `claimStep`, and
 `releaseClaim` SHALL remain gated exclusively by the existing assignment/claim
 mechanism (`NotAssignedError`, `NotACandidateError`, `AlreadyClaimedError`,
 `NotClaimedError`, `NotClaimantError`), unrelated to `system:publish` /
-`system:cancel-any`. An actor may hold neither reserved role and still fully
-participate in process instances it is assigned to. (The one exception is the
+`system:cancel-any`, save for the two exceptions this requirement names. An
+actor may hold neither reserved role and still fully
+participate in process instances it is assigned to. (The first exception is the
 starter-or-operator floor `submitAndTransition` applies to a step that declares
 **no** assignment, where the assignment/claim mechanism defines no relationship
 to enforce — see the `runtime-api` capability.)
@@ -17,7 +18,8 @@ to enforce — see the `runtime-api` capability.)
 A second exception covers `claimStep` on a test instance. There, the claim
 also admits the instance's starter and any `system:admin` holder, per the
 `draft-test-instances` capability. On an instance whose `kind` is
-`"published"`, no reserved role admits a claim.
+`"published"`, holding a reserved role admits no claim beyond the candidate
+check.
 
 #### Scenario: An actor with no reserved roles can still submit an assigned step
 
