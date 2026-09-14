@@ -6,7 +6,7 @@ import { t } from "./catalog.js";
 import { ABSENT, accountChanges, editSeed, rolesText, type ProfileEdits } from "./profileFields.js";
 import type { AccountView } from "../api/types.js";
 import type { UiLocale } from "../i18n/locale.js";
-import { colors, fonts, space } from "form-ui/tokens.stylex";
+import { layout, colors, fonts, space } from "form-ui/tokens.stylex";
 
 /** `.shell-screen` (duplicated locally, same shape as `LoginScreen.tsx`'s —
  * the two share no component) plus `.shell-error` and every `.shell-profile-*`
@@ -16,7 +16,7 @@ import { colors, fonts, space } from "form-ui/tokens.stylex";
  * directly to this file's one `<input>`, since this component owns it. */
 const styles = stylex.create({
   screen: {
-    maxWidth: "46rem",
+    maxWidth: layout.capNarrow,
     marginInline: "auto",
     paddingBlock: space.s6,
     paddingInline: space.s3,

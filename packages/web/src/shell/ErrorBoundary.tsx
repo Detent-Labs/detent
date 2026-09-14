@@ -3,7 +3,7 @@ import { TriangleAlert } from "lucide-react";
 import * as stylex from "@stylexjs/stylex";
 import { t } from "./catalog.js";
 import type { UiLocale } from "../i18n/locale.js";
-import { colors, fonts, space } from "form-ui/tokens.stylex";
+import { layout, colors, fonts, space } from "form-ui/tokens.stylex";
 
 /** `.shell-boundary-fallback` (merged with the shared `.shell-empty` base
  * it overrides) and `.shell-boundary-stamp`, from `shell.css`. */
@@ -13,7 +13,7 @@ const styles = stylex.create({
     flexDirection: "column",
     alignItems: "flex-start",
     gap: space.s3,
-    maxWidth: "46rem",
+    maxWidth: layout.capNarrow,
     marginInline: "auto",
     marginBlock: 0,
     padding: space.s8,

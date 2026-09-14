@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
-import { colors, fonts, space } from "form-ui/tokens.stylex";
+import { layout, colors, fonts, space } from "form-ui/tokens.stylex";
 import { listInstances } from "../api/client.js";
 import type { DegradedInstanceSummary, InstanceStatus, InstanceSummaryItem } from "../api/types.js";
 import type { Route } from "../routing.js";
@@ -31,7 +31,7 @@ function isDegraded(item: InstanceSummaryItem): item is DegradedInstanceSummary 
  * is a closed union, so `badgeTone` is exhaustive (design.md D3). */
 const styles = stylex.create({
   screen: {
-    maxWidth: "60rem",
+    maxWidth: layout.capWide,
     marginInline: "auto",
     paddingTop: space.s4,
     paddingInline: space.s3,

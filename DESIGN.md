@@ -353,8 +353,8 @@ uppercase tracking must survive umlauts and eszett.
 
 Each area screen caps its own column and centers it. The shell sets no cap of
 its own. A participant reads, so the app area and the shell's own screens cap
-at 46rem. An operator scans, so admin, reporting and studio screens cap at
-60rem. The process surface takes no cap and fills the viewport height.
+at 61rem. An operator scans, so admin, reporting and studio screens cap at
+80rem. The process surface takes no cap and fills the viewport height.
 
 Inside a screen, a few blocks cap themselves. A prose note runs to 60ch. A
 dialog and a standalone note cap at 34rem. A single input on the profile page

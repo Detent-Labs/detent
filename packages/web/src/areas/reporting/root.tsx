@@ -5,7 +5,7 @@ import { matchRoute, routePath, type Route, type ViewName } from "./routing.js";
 import { useAreaRoute, PROFILE_PATH } from "../../shell/routing.js";
 import { Chrome } from "../../shell/Chrome.js";
 import { navStyles } from "../../shell/navStyles.js";
-import { colors, space } from "form-ui/tokens.stylex";
+import { layout, colors, space } from "form-ui/tokens.stylex";
 import { defaultRange, rangeIsValid, type DateRange } from "./screens/reportingLogic.js";
 import { ProcessPickerScreen } from "./screens/ProcessPickerScreen.js";
 import { CycleTimeScreen } from "./screens/CycleTimeScreen.js";
@@ -37,7 +37,7 @@ const BASE_LOCALE = "en";
  * bucket-2 rule). */
 const styles = stylex.create({
   screen: {
-    maxWidth: "60rem",
+    maxWidth: layout.capWide,
     marginInline: "auto",
     paddingTop: space.s4,
     paddingInline: space.s3,

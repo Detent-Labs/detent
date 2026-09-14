@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
-import { colors, fonts, space } from "form-ui/tokens.stylex";
+import { layout, colors, fonts, space } from "form-ui/tokens.stylex";
 import { checkAgainstFields } from "workflow-engine/cel/check";
 import { getRegistry, listProcesses, listVersions, getDraft, getVersionBody } from "../api/client.js";
 import type { ProcessSummary, VersionSummary, RegistryInfo } from "../api/types.js";
@@ -12,7 +12,7 @@ import { useFail } from "../../../shell/useFail.js";
 
 const styles = stylex.create({
   studioScreen: {
-    maxWidth: "60rem",
+    maxWidth: layout.capWide,
     marginInline: "auto",
     marginBlock: 0,
     paddingTop: space.s4,

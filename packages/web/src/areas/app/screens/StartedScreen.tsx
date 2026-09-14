@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
-import { colors, fonts, space } from "form-ui/tokens.stylex";
+import { layout, colors, fonts, space } from "form-ui/tokens.stylex";
 import { listInstances } from "../api/client.js";
 import { describeCaughtError } from "../errors.js";
 import { useFail } from "../../../shell/useFail.js";
@@ -19,7 +19,7 @@ import { processLabelOf, startedOnLabel, statusKey, statusTone, stepLabelOf } fr
  * (design.md D4), the same shape `TasksScreen.tsx` already verified. */
 const styles = stylex.create({
   screen: {
-    maxWidth: "46rem",
+    maxWidth: layout.capNarrow,
     marginInline: "auto",
     paddingTop: space.s4,
     paddingInline: space.s3,

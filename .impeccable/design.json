@@ -269,12 +269,12 @@
       },
       {
         "name": "reading-column",
-        "value": "46rem",
+        "value": "61rem",
         "purpose": "The cap for app screens and the shell's own screens. A participant reads."
       },
       {
         "name": "tool-surface",
-        "value": "60rem",
+        "value": "80rem",
         "purpose": "The cap for admin, reporting and studio screens. An operator scans. The process surface takes no cap."
       },
       {

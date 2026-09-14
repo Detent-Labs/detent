@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
-import { colors, fonts, space } from "form-ui/tokens.stylex";
+import { layout, colors, fonts, space } from "form-ui/tokens.stylex";
 import { listVersions, getVersionBody, getDraft } from "../api/client.js";
 import type { VersionSummary } from "../api/types.js";
 import type { ProcessBody } from "workflow-engine/schema";
@@ -16,7 +16,7 @@ import { ChangeList } from "../panels/ChangeList.js";
 
 const styles = stylex.create({
   studioScreen: {
-    maxWidth: "60rem",
+    maxWidth: layout.capWide,
     marginInline: "auto",
     marginBlock: 0,
     paddingTop: space.s4,

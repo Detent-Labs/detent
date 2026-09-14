@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
-import { colors, fonts, space } from "form-ui/tokens.stylex";
+import { layout, colors, fonts, space } from "form-ui/tokens.stylex";
 import { getDataList, updateDataList, putDataListValues, deleteDataList } from "../api/client.js";
 import type { DataListDetail } from "../api/types.js";
 import { useRefresh } from "../useRefresh.js";
@@ -29,7 +29,7 @@ import type { UiLocale } from "../../../i18n/locale.js";
  * inside `.admin-table-scroll`, replicating the child-combinator override. */
 const styles = stylex.create({
   screen: {
-    maxWidth: "60rem",
+    maxWidth: layout.capWide,
     marginInline: "auto",
     paddingTop: space.s4,
     paddingInline: space.s3,

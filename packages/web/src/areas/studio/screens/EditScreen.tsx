@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import * as stylex from "@stylexjs/stylex";
-import { colors, fonts, space } from "form-ui/tokens.stylex";
+import { layout, colors, fonts, space } from "form-ui/tokens.stylex";
 import { DraftProvider, useDraft } from "../draft/store.js";
 import { draftFields } from "../draft/fields.js";
 import type { Draft } from "../draft/types.js";
@@ -62,14 +62,14 @@ const CANVAS_BODY_ID = "studio-canvas-body";
 
 const styles = stylex.create({
   studioScreen: {
-    maxWidth: "60rem",
+    maxWidth: layout.capWide,
     marginInline: "auto",
     marginBlock: 0,
     paddingTop: space.s4,
     paddingInline: space.s3,
     paddingBottom: space.s6,
   },
-  // `.studio-edit-screen` widens past `.studio-screen`'s 60rem cap and takes
+  // `.studio-edit-screen` widens past `.studio-screen`'s 80rem cap and takes
   // the height `.shell` leaves it.
   //
   // The zero basis and the zero floor are what make that height the

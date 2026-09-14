@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
-import { colors, fonts, space } from "form-ui/tokens.stylex";
+import { layout, colors, fonts, space } from "form-ui/tokens.stylex";
 import { discardOutboxRow, listOutbox, retryOutboxRow } from "../api/client.js";
 import type { OutboxRow } from "../api/types.js";
 import { useRefresh } from "../useRefresh.js";
@@ -26,7 +26,7 @@ const PAGE_LIMIT = 50;
  * with no color override (design.md D3). */
 const styles = stylex.create({
   screen: {
-    maxWidth: "60rem",
+    maxWidth: layout.capWide,
     marginInline: "auto",
     paddingTop: space.s4,
     paddingInline: space.s3,

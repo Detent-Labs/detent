@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
-import { colors, fonts, space } from "form-ui/tokens.stylex";
+import { layout, colors, fonts, space } from "form-ui/tokens.stylex";
 import { stripCompiledContent } from "workflow-engine/schema/strip-compiled";
 import { listTemplates, saveTemplate, deleteTemplate, listProcesses, getVersionBody } from "../api/client.js";
 import { useFail } from "../../../shell/useFail.js";
@@ -25,7 +25,7 @@ type Source = { processId: string; version: number };
 
 const styles = stylex.create({
   studioScreen: {
-    maxWidth: "60rem",
+    maxWidth: layout.capWide,
     marginInline: "auto",
     marginBlock: 0,
     paddingTop: space.s4,

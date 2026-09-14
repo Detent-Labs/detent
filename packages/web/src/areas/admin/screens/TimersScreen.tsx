@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
-import { colors, fonts, space } from "form-ui/tokens.stylex";
+import { layout, colors, fonts, space } from "form-ui/tokens.stylex";
 import { listPendingTimers } from "../api/client.js";
 import type { PendingTimer } from "../api/types.js";
 import type { Route } from "../routing.js";
@@ -25,7 +25,7 @@ const PAGE_LIMIT = 50;
 /** `app.css`'s screen/controls/table/badge/load-more rules, as StyleX. */
 const styles = stylex.create({
   screen: {
-    maxWidth: "60rem",
+    maxWidth: layout.capWide,
     marginInline: "auto",
     paddingTop: space.s4,
     paddingInline: space.s3,

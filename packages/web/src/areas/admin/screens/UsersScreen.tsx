@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
-import { colors, fonts, space } from "form-ui/tokens.stylex";
+import { layout, colors, fonts, space } from "form-ui/tokens.stylex";
 import { listUsers, createUser, disableUser, enableUser, setUserRoles, setUserManager, setUserPassword } from "../api/client.js";
 import type { UserSummary } from "../api/types.js";
 import { useRefresh } from "../useRefresh.js";
@@ -60,7 +60,7 @@ const RESERVED_ROLES = [
  * `.admin-role-list`, kept here as its own unmerged `roleList` style. */
 const styles = stylex.create({
   screen: {
-    maxWidth: "60rem",
+    maxWidth: layout.capWide,
     marginInline: "auto",
     paddingTop: space.s4,
     paddingInline: space.s3,

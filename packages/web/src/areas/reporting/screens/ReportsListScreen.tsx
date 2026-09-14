@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
-import { colors, fonts, space } from "form-ui/tokens.stylex";
+import { layout, colors, fonts, space } from "form-ui/tokens.stylex";
 import { listMyReports } from "../api/client.js";
 import { describeCaughtError } from "./reportingLogic.js";
 import { EmptyState, ErrorNote, WaitingNote } from "../components.js";
@@ -18,7 +18,7 @@ import type { ClientError, Report } from "../api/types.js";
  * name here, matching this file's own selector. */
 const styles = stylex.create({
   screen: {
-    maxWidth: "60rem",
+    maxWidth: layout.capWide,
     marginInline: "auto",
     paddingTop: space.s4,
     paddingInline: space.s3,

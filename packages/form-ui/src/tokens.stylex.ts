@@ -11,8 +11,8 @@ import * as stylex from "@stylexjs/stylex";
  * `colors` folds `tokens.css`'s three color sections (primitives, ramps,
  * semantic aliases) into one group, mirroring how `accent600`/`accent700`
  * already sat beside the semantic names before this move. `fonts`, `space`,
- * `radius` and `shadow` mirror `tokens.css`'s remaining sections one for
- * one. 44 variables total, matching `tokens.css`'s own count.
+ * `radius`, `shadow` and `layout` mirror `tokens.css`'s remaining sections
+ * one for one. 46 variables total, matching `tokens.css`'s own count.
  */
 export const colors = stylex.defineVars({
   // primitives
@@ -74,4 +74,9 @@ export const radius = stylex.defineVars({
 export const shadow = stylex.defineVars({
   md: "var(--shadow-md)",
   lg: "var(--shadow-lg)",
+});
+
+export const layout = stylex.defineVars({
+  capNarrow: "var(--layout-cap-narrow)",
+  capWide: "var(--layout-cap-wide)",
 });
