@@ -3,7 +3,8 @@
 ### Requirement: The admin area's screens cap their content column at 80rem
 
 Every admin-area screen SHALL center its content in a column capped at
-80rem, so an operator scanning a wide table or record keeps room to work.
+80rem. That keeps room to work for an operator scanning a wide table or
+record.
 
 #### Scenario: A wide viewport still keeps the column capped
 

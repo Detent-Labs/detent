@@ -40,7 +40,7 @@
       where not already imported. Verify with
       `grep -rn '"60rem"' packages/web/src/areas/admin` returning no
       matches.
-- [x] 3.2 In exactly 4 reporting files — `ReportsListScreen.tsx`,
+- [x] 3.2 In exactly 4 reporting files: `ReportsListScreen.tsx`,
       `ProcessPickerScreen.tsx`, `ReportBuilderScreen.tsx` (all under
       `screens/`) and `root.tsx` (directly under `areas/reporting/`) —
       replace the literal `"60rem"` `maxWidth` on that file's `screen`
@@ -93,7 +93,7 @@
 
 ## 5. Design documentation
 
-- [x] 5.1 Update `DESIGN.md`'s Layout section: change "cap at 46rem" to
+- [x] 5.1 Change `DESIGN.md`'s Layout section: change "cap at 46rem" to
       "cap at 61rem" and "cap at 60rem" to "cap at 80rem" in the sentence
       describing area screen caps. Verify by re-reading the updated
       lines.

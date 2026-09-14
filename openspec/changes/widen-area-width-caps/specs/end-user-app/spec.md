@@ -3,8 +3,9 @@
 ### Requirement: The app area's screens cap their content column at 61rem
 
 Every app-area screen SHALL center its content in a column capped at
-61rem. The cap holds regardless of viewport width; on a narrower viewport
-the column shrinks with it, down to the screen's own side padding.
+61rem. The cap holds regardless of viewport width. On a narrower
+viewport, the column shrinks with it, down to the screen's own side
+padding.
 
 #### Scenario: A wide viewport still keeps the column capped
 
