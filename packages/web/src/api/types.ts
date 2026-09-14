@@ -90,6 +90,11 @@ export type ClientError =
   | { type: "not-assigned"; message: string }
   | { type: "guard-refused"; message: string }
   | { type: "concurrency-conflict" }
+  // `POST /instances/:id/comments` or `.../attachments` refused because the
+  // current step's resolved `collaboration` setting disables that field. A
+  // 409: a fact about the instance's current state, not about who the actor
+  // is (`CollaborationDisabledError`, `src/runtime/api.ts`).
+  | { type: "collaboration-disabled"; message: string }
   | { type: "authorization"; message: string }
   | { type: "actor-resolution"; message: string }
   | { type: "request-shape"; message: string }

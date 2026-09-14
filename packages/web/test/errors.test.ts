@@ -25,6 +25,10 @@ describe("describeError", () => {
     expect(describeError({ type: "concurrency-conflict" }, "en").kind).toBe("reload-moved-on");
   });
 
+  it("maps collaboration-disabled to reload-moved-on", () => {
+    expect(describeError({ type: "collaboration-disabled", message: "x" }, "en").kind).toBe("reload-moved-on");
+  });
+
   it("falls back to a localized generic message when the server sent none", () => {
     expect(describeError({ type: "internal", message: "" }, "de").message).toBe("Etwas ist schiefgelaufen.");
   });
@@ -91,6 +95,22 @@ describe("a server error type maps through every layer", () => {
   it("gives each manager refusal its own operator-facing text", async () => {
     expect(describeAdminError(await parse(400, "self-manager", "x"), "en")).toContain("their own manager");
     expect(describeAdminError(await parse(400, "unknown-manager", "x"), "en")).toContain("no longer exists");
+  });
+
+  // Proactive coverage for the same defect class as the two admin pairs
+  // above, for the app area's own new type: `collaboration-disabled` was
+  // added to all three layers (PASSTHROUGH, the ClientError union,
+  // describeError's switch) in the same change, so this pair pins that it
+  // stays that way rather than waiting for a fourth manual-browser catch.
+  it("carries collaboration-disabled through the parser rather than collapsing it to internal", async () => {
+    const parsed = await parse(409, "collaboration-disabled", "this step no longer accepts comments");
+    expect(parsed.type).toBe("collaboration-disabled");
+  });
+
+  it("gives collaboration-disabled its own reload-and-report outcome, not the generic fallback", () => {
+    const described = describeError({ type: "collaboration-disabled", message: "x" }, "en");
+    expect(described.kind).toBe("reload-moved-on");
+    expect(described.message).not.toBe("Something went wrong.");
   });
 
   it("still collapses a type no layer knows into internal", async () => {

@@ -27,6 +27,7 @@ import {
   NotClaimantError,
   UnknownDelegateError,
   ReportOwnerInvariantError,
+  CollaborationDisabledError,
 } from "../runtime/api.js";
 import { ActorResolutionError } from "../auth/resolve.js";
 import { AuthorizationError } from "../auth/authorize.js";
@@ -91,6 +92,7 @@ const MESSAGE_ERRORS: MessageMapping[] = [
   { ctor: GuardRefused, status: 409, type: "guard-refused" },
   { ctor: InstanceNotRunningError, status: 409, type: "instance-not-running" },
   { ctor: InstanceRunningError, status: 409, type: "instance-running" },
+  { ctor: CollaborationDisabledError, status: 409, type: "collaboration-disabled" },
   { ctor: PinMismatch, status: 500, type: "internal" },
   { ctor: NotFoundError, status: 500, type: "internal" },
   { ctor: ActorResolutionError, status: 401, type: "actor-resolution" },

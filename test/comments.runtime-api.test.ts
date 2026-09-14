@@ -7,9 +7,9 @@ import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, initSchema } from "../src/engine/store.js";
 import { publishBody } from "../src/engine/definitions.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
-import { createProcessInstance, postComment, listComments } from "../src/runtime/api.js";
+import { createProcessInstance, postComment, listComments, submitAndTransition, CollaborationDisabledError } from "../src/runtime/api.js";
 import { AuthorizationError, ADMIN_ROLE } from "../src/auth/authorize.js";
-import type { ProcessBody, ProcessId } from "../src/schema/definition.js";
+import type { ProcessBody, ProcessId, PathId } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
 import { clearInstanceAudit } from "./audit-cleanup.js";
 
@@ -60,6 +60,107 @@ const assignedBody = (): ProcessBody =>
       ],
     },
   }) as unknown as ProcessBody;
+
+// configure-task-collaboration: bodies exercising the resolved
+// `collaboration.comments` fallback chain at the Runtime API Layer boundary
+// (see runtime-api's "collaboration config can block adding a comment"
+// requirement). No assignment on step_a: these cases care about the
+// collaboration gate, not the claim gate, so the starter alone acts.
+const processDefaultDisablesComments = (): ProcessBody =>
+  ({
+    key: "comments_rt_pd_off",
+    label: { en: "Comments RT process-default off" },
+    baseLocale: "en",
+    fields: [],
+    collaboration: { comments: false },
+    workflow: {
+      initialStep: "step_a",
+      steps: [{ id: "step_a", key: "a", label: { en: "A" }, type: "task", terminal: true }],
+    },
+  }) as unknown as ProcessBody;
+
+const stepOverrideDisablesComments = (): ProcessBody =>
+  ({
+    key: "comments_rt_step_off",
+    label: { en: "Comments RT step off" },
+    baseLocale: "en",
+    fields: [],
+    workflow: {
+      initialStep: "step_a",
+      steps: [{ id: "step_a", key: "a", label: { en: "A" }, type: "task", terminal: true, collaboration: { comments: false } }],
+    },
+  }) as unknown as ProcessBody;
+
+// Mirrors design.md's own example: a step's override wins in either
+// direction, so a step can turn comments back on when the process default
+// turns them off.
+const stepOverrideEnablesComments = (): ProcessBody =>
+  ({
+    key: "comments_rt_step_on",
+    label: { en: "Comments RT step on" },
+    baseLocale: "en",
+    fields: [],
+    collaboration: { comments: false },
+    workflow: {
+      initialStep: "step_a",
+      steps: [{ id: "step_a", key: "a", label: { en: "A" }, type: "task", terminal: true, collaboration: { comments: true } }],
+    },
+  }) as unknown as ProcessBody;
+
+// step_a (comments enabled by default) --(path_ab)--> step_b (comments
+// disabled). Used to confirm listing survives a later step disabling further
+// additions.
+const transitionDisablesComments = (): ProcessBody =>
+  ({
+    key: "comments_rt_transition",
+    label: { en: "Comments RT transition" },
+    baseLocale: "en",
+    fields: [],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }] },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true, collaboration: { comments: false } },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+test.skipIf(!DB)("postComment rejects with CollaborationDisabledError when the process default disables comments", async () => {
+  await publishBody(PID, processDefaultDisablesComments(), reg, dataSourceReg);
+  const inst = await createProcessInstance(PID, starter, dataSourceReg);
+  await rejectsWith(postComment(inst.instanceId, starter, "should not land", sql), CollaborationDisabledError);
+  const page = await listComments(inst.instanceId, starter, {}, sql);
+  expect(page.items).toHaveLength(0);
+});
+
+test.skipIf(!DB)("postComment rejects with CollaborationDisabledError when a step override disables comments", async () => {
+  await publishBody(PID, stepOverrideDisablesComments(), reg, dataSourceReg);
+  const inst = await createProcessInstance(PID, starter, dataSourceReg);
+  await rejectsWith(postComment(inst.instanceId, starter, "should not land", sql), CollaborationDisabledError);
+});
+
+test.skipIf(!DB)("postComment accepts when a step override re-enables comments the process default disabled", async () => {
+  await publishBody(PID, stepOverrideEnablesComments(), reg, dataSourceReg);
+  const inst = await createProcessInstance(PID, starter, dataSourceReg);
+  const posted = await postComment(inst.instanceId, starter, "allowed", sql);
+  expect(posted.text).toBe("allowed");
+});
+
+test.skipIf(!DB)("listComments still returns a comment posted on an earlier step after the current step disables comments", async () => {
+  await publishBody(PID, transitionDisablesComments(), reg, dataSourceReg);
+  const inst = await createProcessInstance(PID, starter, dataSourceReg);
+  const posted = await postComment(inst.instanceId, starter, "posted while enabled", sql);
+  await submitAndTransition(inst.instanceId, "path_ab" as PathId, {}, starter, dataSourceReg, sql);
+  await rejectsWith(postComment(inst.instanceId, starter, "should not land now", sql), CollaborationDisabledError);
+  const page = await listComments(inst.instanceId, starter, {}, sql);
+  expect(page.items.map((c) => c.id)).toEqual([posted.id]);
+});
+
+test.skipIf(!DB)("an actor with no visibility gets AuthorizationError, not CollaborationDisabledError, even when the current step disables comments", async () => {
+  await publishBody(PID, processDefaultDisablesComments(), reg, dataSourceReg);
+  const inst = await createProcessInstance(PID, starter, dataSourceReg);
+  await rejectsWith(postComment(inst.instanceId, outsider, "should not land", sql), AuthorizationError);
+});
 
 test.skipIf(!DB)("an eligible candidate can post and list comments", async () => {
   await publishBody(PID, assignedBody(), reg, dataSourceReg);

@@ -1286,6 +1286,50 @@ test.skipIf(!DB)("getInstanceView on a cancelled instance still resolves, with n
   expect(view.availablePaths).toEqual([]);
 });
 
+/**
+ * configure-task-collaboration: process declares collaboration, step_a
+ * carries no override, so getInstanceView must resolve the process default
+ * alone. step_a --(path_ab, manual, guardless)--> step_b (terminal), used to
+ * drive the instance to "completed" for the status-independence check below.
+ */
+const collaborationViewBody = (): ProcessBody =>
+  ({
+    key: "collaboration_view_body",
+    label: { en: "Collaboration View Body" },
+    baseLocale: "en",
+    fields: [],
+    collaboration: { comments: true, attachments: false },
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }] },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+test.skipIf(!DB)("getInstanceView resolves collaboration from the process default when the current step declares no override", async () => {
+  const PID = pid("proc_view_collaboration");
+  await publishBody(PID, collaborationViewBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+
+  const view = await getInstanceView(created.instanceId, actor, dataSourceReg);
+  expect(view.collaboration).toEqual({ comments: true, attachments: false });
+});
+
+test.skipIf(!DB)("getInstanceView reports a fully resolved collaboration on a completed instance too, unlike availablePaths", async () => {
+  const PID = pid("proc_view_collaboration_completed");
+  await publishBody(PID, collaborationViewBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+  const result = await submitAndTransition(created.instanceId, "path_ab" as PathId, {}, actor, dataSourceReg);
+  expect(result.status).toBe("completed");
+
+  const view = await getInstanceView(result.instanceId, actor, dataSourceReg);
+  expect(view.status).toBe("completed");
+  expect(view.availablePaths).toEqual([]);
+  expect(view.collaboration).toEqual({ comments: true, attachments: false });
+});
+
 test.skipIf(!DB)("getInstanceView omits redactedAt before redaction and returns it after", async () => {
   const PID = pid("proc_view_redacted");
   await publishBody(PID, cascadeBody(), reg, dataSourceReg);

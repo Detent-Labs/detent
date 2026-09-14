@@ -27,6 +27,10 @@ export function describeError(error: Exclude<ClientError, { type: "validation" }
       return { kind: "claim-lost", message: t(locale, "error.notClaimed") };
     case "concurrency-conflict":
       return { kind: "reload-moved-on", message: t(locale, "error.concurrencyConflict") };
+    case "collaboration-disabled":
+      // Same "reload and report" shape as the OCC conflict above: both are
+      // cases where the state the participant was looking at moved on.
+      return { kind: "reload-moved-on", message: t(locale, "error.collaborationDisabled") };
     case "authorization":
       // The server's own message is a technical one ("actor 'x' may not
       // cancel instance 'y'") — not end-user copy, so this is the one case

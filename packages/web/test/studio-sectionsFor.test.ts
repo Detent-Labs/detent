@@ -7,7 +7,7 @@ import { describe, expect, it } from "bun:test";
 import { sectionColumns, sectionsFor } from "../src/areas/studio/panels/sectionsFor.js";
 
 describe("sectionsFor", () => {
-  it("stands the seven task sections for a step someone works", () => {
+  it("stands the eight task sections for a step someone works", () => {
     const sections = sectionsFor("participant");
 
     expect(sections).toContain("paths");
@@ -17,7 +17,8 @@ describe("sectionsFor", () => {
     expect(sections).toContain("exit");
     expect(sections).toContain("timers");
     expect(sections).toContain("form");
-    expect(sections).toHaveLength(7);
+    expect(sections).toContain("collaboration");
+    expect(sections).toHaveLength(8);
   });
 
   it("names neither Which process it calls nor How the case ends on a task step", () => {
@@ -34,19 +35,20 @@ describe("sectionsFor", () => {
     expect(sections).not.toContain("timers");
   });
 
-  it("omits Assignment and Step form fields on a subprocess step, which has no participant form", () => {
+  it("omits Assignment, Step form fields and Collaboration on a subprocess step, which has no participant form", () => {
     const sections = sectionsFor("subprocess");
 
     expect(sections).toContain("subprocess");
     expect(sections).not.toContain("assignment");
     expect(sections).not.toContain("form");
+    expect(sections).not.toContain("collaboration");
   });
 
   it("hands back a fresh array, so a caller cannot reach the module's own list", () => {
     const first = sectionsFor("participant");
     first.length = 0;
 
-    expect(sectionsFor("participant")).toHaveLength(7);
+    expect(sectionsFor("participant")).toHaveLength(8);
   });
 });
 
@@ -55,14 +57,14 @@ describe("sectionColumns", () => {
     const { leading, trailing } = sectionColumns(sectionsFor("participant"));
 
     expect(leading).toEqual(["paths", "assignment", "cancellable"]);
-    expect(trailing).toEqual(["entry", "exit", "timers", "form"]);
+    expect(trailing).toEqual(["entry", "exit", "timers", "form", "collaboration"]);
   });
 
   it("leads an end step with How the case ends", () => {
     const { leading, trailing } = sectionColumns(sectionsFor("terminal"));
 
     expect(leading).toEqual(["assignment", "howItEnds"]);
-    expect(trailing).toEqual(["entry", "form"]);
+    expect(trailing).toEqual(["entry", "form", "collaboration"]);
   });
 
   it("leads a subprocess step with the process it calls", () => {

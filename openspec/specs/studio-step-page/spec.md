@@ -67,12 +67,12 @@ fields its form carries, the process it calls and its outcome.
 ### Requirement: A rail row carries its own open issue count
 
 A rail row SHALL carry the number of open issues that name its step. A row
-with no issue SHALL carry no badge. The badge SHALL take the blocker color
+with no issue SHALL display no badge. The badge SHALL take the blocker color
 where any of those issues blocks a publish.
 
 #### Scenario: The rail marks a step with a blocker
 
-- **WHEN** one step leads nowhere and carries no other issue
+- **WHEN** one step leads nowhere and has no other issue
 - **THEN** that step's rail row carries a badge reading one
 - **AND** the badge takes the blocker color
 
@@ -121,7 +121,7 @@ that removes the step.
 The step page SHALL lay its sections in two columns. No section SHALL
 collapse. The leading column SHALL carry Path to, Assignment, Cancellable,
 Which process it calls, and How the case ends. The trailing column SHALL
-carry On entry, On exit, Time limit, and Step form fields.
+carry On entry, On exit, Time limit, Step form fields, and Collaboration.
 
 A section SHALL stand only where the step's kind declares it. A task step
 carries Assignment. A subprocess step carries Which process it calls. An end
@@ -133,6 +133,9 @@ Cancellable section. An instance resting on a terminal step has already left
 the running state the field governs. So the setting has nothing left to
 apply to.
 
+A subprocess step also drops the Collaboration section. It is an automatic
+wait-state with no participant-facing task screen for the setting to govern.
+
 This replaces the runtime-order register of collapsible sections. An author
 reads every setting of one step without opening anything.
 
@@ -140,7 +143,7 @@ reads every setting of one step without opening anything.
 
 - **WHEN** the step page holds a task step that is not an end
 - **THEN** the page carries Path to, Assignment, Cancellable, On entry, On
-  exit, Time limit and Step form fields
+  exit, Time limit, Step form fields and Collaboration
 - **AND** the page has no Which process it calls section
 
 <!-- Why: this heading is what a future MODIFIED delta against this
@@ -157,6 +160,12 @@ reads every setting of one step without opening anything.
 
 - **WHEN** an author opens any step on the step page
 - **THEN** every section of that step is readable without a press
+
+#### Scenario: A subprocess step has no Collaboration section
+
+- **WHEN** the step page holds a subprocess step
+- **THEN** the page carries Which process it calls
+- **AND** the page has no Collaboration section
 
 ### Requirement: The Cancellable section sets a step's participant-cancel override
 
@@ -189,6 +198,32 @@ currently means.
 - **WHEN** a step's Cancellable section stands in the inherit state and the
   process itself declares `cancellable: false`
 - **THEN** the section names the effective outcome as not cancellable
+
+### Requirement: The Collaboration section offers a three-state control per field
+
+The Collaboration section SHALL carry a three-state control each for
+Comment and Attachments, offering three states: Default, On, and Off.
+Selecting Default SHALL clear the step's own override for
+that key, so the step reads as `undefined` for it. It then inherits the
+process default at once, including any later change to it. Selecting On
+or Off SHALL set the step's own override to `true` or `false`. While
+Default is the selected state, the control SHALL visibly name the
+process-wide default's current resolved value for that key. That value
+might read as "Currently: on", for example.
+
+#### Scenario: Selecting Default clears the step's own override
+
+- **WHEN** an author selects Default on the Attachments control for a
+  step that previously overrode `attachments: false`
+- **THEN** the step's `collaboration.attachments` becomes `undefined`,
+  and the control names the process's current default value
+
+#### Scenario: A step's override survives a later process-default change
+
+- **WHEN** an author sets a step's Attachments control to On, overriding
+  a process default of `false`
+- **THEN** changing the process-wide default afterward SHALL NOT change
+  that step's resolved `attachments`, which stays `true`
 
 ### Requirement: A section prints its own open issues beside its heading
 
@@ -234,6 +269,8 @@ The step page SHALL carry a Developer view disclosure at its foot. The
 disclosure SHALL stand closed until an author opens it. An open disclosure
 SHALL carry the step's own JSON and the step's `id`.
 
+<!-- antislop: allow synonym-rotation -->
+<!-- Why: "JSON surface" is this codebase's fixed UI-glossary term for the raw definition-editing screen (.claude/rules/ui-glossary.md), not a rotated synonym for a display/show/carry verb used elsewhere in this file. -->
 The JSON SHALL be read-only here. The JSON surface stays the one place for
 hand-authoring a definition.
 

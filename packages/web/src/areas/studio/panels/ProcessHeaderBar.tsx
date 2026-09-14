@@ -236,6 +236,49 @@ const styles = stylex.create({
     gap: space.s1,
     fontSize: "0.85rem",
   },
+  // The process-wide collaboration defaults (`studio-process-tabs`): a row of
+  // related controls at the Filter Bar's 8px spacing, sitting after
+  // baseLocale in this same group. A `<fieldset>`, so the two checkboxes
+  // carry a group name for a screen-reader user — the same reason
+  // `StepPage.tsx`'s Segmented Control uses one. A bare fieldset draws UA
+  // chrome (a 2px groove border, its own margin and padding), the same trap
+  // that file's own `segmented` style documents; the longhand resets below
+  // clear it so the row still reads as this header's own compact cluster.
+  collaborationRow: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: space.s2,
+    borderStyle: "none",
+    margin: 0,
+    padding: 0,
+  },
+  // Off screen, never `display: none`: a hidden node is announced by no
+  // engine. Names what the two collaboration checkboxes configure, for a
+  // screen-reader user, with no visible text in the header bar's compact
+  // inline cluster (`ProcessTabRow.tsx`'s own `visuallyHidden` style is the
+  // precedent for this exact pattern in this area).
+  visuallyHidden: {
+    position: "absolute",
+    width: 1,
+    height: 1,
+    margin: -1,
+    padding: 0,
+    overflow: "hidden",
+    clipPath: "inset(50%)",
+    whiteSpace: "nowrap",
+    borderWidth: 0,
+  },
+  collaborationOption: {
+    display: "flex",
+    alignItems: "center",
+    gap: space.s1,
+    fontSize: "0.85rem",
+  },
+  // DESIGN.md: "A checkbox or radio drops the border and takes `accent-color`."
+  collaborationCheckbox: {
+    accentColor: colors.accent,
+  },
   headerBarMenuLink: {
     display: "flex",
     alignItems: "center",
@@ -903,6 +946,49 @@ export function ProcessHeaderBar({
                     }
                   />
                 </label>
+                {/* The process-wide collaboration defaults
+                    (`studio-process-tabs`). Both call `mutate()` directly, so
+                    both are `structureActive`-gated like key and baseLocale
+                    above them — `studio-json-view` bans every draft-body-
+                    mutating control from the header bar while the JSON
+                    surface is open. Absent reads as checked: the schema
+                    resolves an unset key to `true` (design.md). A
+                    `<fieldset>`/visually-hidden `<legend>` pair names the
+                    group for a screen reader, matching this row's own
+                    compact inline look for a sighted user. */}
+                <fieldset {...stylex.props(styles.collaborationRow)}>
+                  <legend {...stylex.props(styles.visuallyHidden)}>{t("headerBar.collaborationLegend")}</legend>
+                  <label {...stylex.props(styles.collaborationOption)}>
+                    <input
+                      type="checkbox"
+                      {...stylex.props(styles.collaborationCheckbox)}
+                      disabled={!structureActive}
+                      checked={draft.collaboration?.comments ?? true}
+                      onChange={(e) =>
+                        mutate((d) => {
+                          d.collaboration ??= {};
+                          d.collaboration.comments = e.target.checked;
+                        })
+                      }
+                    />
+                    {t("headerBar.collaborationComments")}
+                  </label>
+                  <label {...stylex.props(styles.collaborationOption)}>
+                    <input
+                      type="checkbox"
+                      {...stylex.props(styles.collaborationCheckbox)}
+                      disabled={!structureActive}
+                      checked={draft.collaboration?.attachments ?? true}
+                      onChange={(e) =>
+                        mutate((d) => {
+                          d.collaboration ??= {};
+                          d.collaboration.attachments = e.target.checked;
+                        })
+                      }
+                    />
+                    {t("headerBar.collaborationAttachments")}
+                  </label>
+                </fieldset>
                 <AddLocaleControl />
                 {/* Pure navigation, never gated by `structureActive`: it
                     mutates nothing the JSON surface itself edits, the same

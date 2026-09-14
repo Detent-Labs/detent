@@ -33,9 +33,9 @@ function toPublishIssues(raw: unknown): PublishIssue[] {
 }
 
 /**
- * Every one of these 19 kinds returns the byte-identical `{type, message}`
+ * Every one of these 20 kinds returns the byte-identical `{type, message}`
  * shape below — the type itself IS the payload, so a membership check
- * replaces 19 `case` labels that would otherwise carry no per-type
+ * replaces 20 `case` labels that would otherwise carry no per-type
  * information over the `Set` lookup.
  */
 const PASSTHROUGH = new Set<ClientError["type"]>([
@@ -46,6 +46,7 @@ const PASSTHROUGH = new Set<ClientError["type"]>([
   "unknown-delegate",
   "not-assigned",
   "guard-refused",
+  "collaboration-disabled",
   "authorization",
   "actor-resolution",
   "request-shape",

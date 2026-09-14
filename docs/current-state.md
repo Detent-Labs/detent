@@ -5059,3 +5059,35 @@ above the form editor's canvas. It reads `nextTabIndex` from `form-ui`, so
 both strips answer an arrow key one way. Every write leaves through a callback
 onto `draft/view-layout.ts`, which gained `addViewTab`, `renameViewTab`,
 `moveViewTab`, `removeViewTab` and `shownTab`.
+
+## Task collaboration (`configure-task-collaboration`)
+
+A process and its steps may each carry a `collaboration` object, defined
+in `src/schema/definition.ts`. The object and each of its two keys,
+`comments` and `attachments`, are independently optional booleans. Neither
+key is schema-enforced against the other, so every combination parses.
+
+Resolution is a plain per-key fallback. The exported `resolveCollaboration`,
+in `src/runtime/api.ts`, checks the step's own key, then the process
+default, and resolves `true` otherwise. Three call sites share it:
+`postComment`, `uploadAttachment` and `getInstanceView`.
+
+Both `postComment` and `uploadAttachment` throw a
+`CollaborationDisabledError` when their own key resolves to `false`,
+before the row insert runs. The file `src/http/errors.ts` maps that error
+to a `409` response, typed `collaboration-disabled`.
+
+The `InstanceView` field named `collaboration` reports both booleans for
+every instance status. That matches `baseLocale`, `columns` and `tabs`:
+each names the step's declared configuration rather than its runtime
+state. A completed or cancelled instance still reports it.
+
+The Task screen hides its comment box or its upload control once the
+matching flag resolves to `false`. A muted note takes its place, naming
+which kind of entry the step no longer accepts. The comment thread and
+the attachment list keep rendering regardless of either flag.
+
+Two studio screens edit the setting. The header bar's checkboxes hold the
+two process-wide defaults. The Steps tab's Collaboration section holds a
+per-key control instead: Default, On or Off. While Default stays pressed,
+a caption names the resolved default.

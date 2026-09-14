@@ -1277,6 +1277,71 @@ test.skipIf(!DB)("downloading an attachment id that belongs to a different insta
 });
 
 // ============================================================
+// CollaborationDisabledError -> 409 (comment/attachment routes with disabled collaboration)
+// ============================================================
+
+test.skipIf(!DB)("POST /instances/:instanceId/comments with collaboration.comments disabled maps to 409 collaboration-disabled", async () => {
+  const PID = pid("proc_http_comment_disabled");
+  const body = {
+    key: "assigned_body_comment_disabled",
+    label: { en: "Assigned Body" },
+    baseLocale: "en",
+    fields: [],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        {
+          id: "step_a", key: "a", label: { en: "A" }, type: "task",
+          assignment: { strategy: { type: "static", config: { candidates: ["approver", "user_1"] } } },
+          collaboration: { comments: false },
+          paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }],
+        },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
+      ],
+    },
+  } as unknown as ProcessBody;
+  await publishBody(PID, body, reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+
+  const res = await fetch(jsonReq(`http://x/instances/${created.instanceId}/comments`, "POST", user1, { text: "should be rejected" }));
+  expect(res.status).toBe(409);
+  const errorBody = (await res.json()) as { error: { type: string } };
+  expect(errorBody.error.type).toBe("collaboration-disabled");
+});
+
+test.skipIf(!DB)("POST /instances/:instanceId/attachments with collaboration.attachments disabled maps to 409 collaboration-disabled", async () => {
+  const PID = pid("proc_http_attachment_disabled");
+  const body = {
+    key: "assigned_body_attachment_disabled",
+    label: { en: "Assigned Body" },
+    baseLocale: "en",
+    fields: [],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        {
+          id: "step_a", key: "a", label: { en: "A" }, type: "task",
+          assignment: { strategy: { type: "static", config: { candidates: ["approver", "user_1"] } } },
+          collaboration: { attachments: false },
+          paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }],
+        },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
+      ],
+    },
+  } as unknown as ProcessBody;
+  await publishBody(PID, body, reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+
+  const dataBase64 = Buffer.from("should be rejected").toString("base64");
+  const res = await fetch(
+    jsonReq(`http://x/instances/${created.instanceId}/attachments`, "POST", user1, { filename: "rejected.txt", contentType: "text/plain", dataBase64 }),
+  );
+  expect(res.status).toBe(409);
+  const errorBody = (await res.json()) as { error: { type: string } };
+  expect(errorBody.error.type).toBe("collaboration-disabled");
+});
+
+// ============================================================
 // InstanceNotRunningError -> 409 (submit/claim/release against a non-running instance)
 // ============================================================
 

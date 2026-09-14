@@ -166,6 +166,11 @@ export type InstanceView = {
   // `columns` is: it describes the step's declared layout rather than
   // instance state.
   tabs: ResolvedViewTab[];
+  // The current step's resolved collaboration settings — always fully
+  // resolved booleans, never undefined. Reported for every status, the same
+  // way baseLocale/columns/tabs are: it describes the step's declared
+  // configuration rather than instance state.
+  collaboration: { comments: boolean; attachments: boolean };
   availablePaths: AvailablePath[];
   // Whether the CALLING actor's own next call to cancelInstance would
   // succeed right now — never whether some other actor could cancel the
@@ -772,6 +777,17 @@ function findStep(body: ProcessBody, stepId: string): Step {
   return step;
 }
 
+/**
+ * The one fallback chain for a step's resolved collaboration setting: the
+ * step's own value always wins, in either direction, over the process
+ * default, and an unset key resolves `true` at both levels. Shared by
+ * `postComment`/`uploadAttachment`'s enforcement and `getInstanceView`'s
+ * reported `collaboration` field so the chain exists in exactly one place.
+ */
+export function resolveCollaboration(body: ProcessBody, step: Step, key: "comments" | "attachments"): boolean {
+  return step.collaboration?.[key] ?? body.collaboration?.[key] ?? true;
+}
+
 // ============================================================
 // Submission validation
 // ============================================================
@@ -1299,6 +1315,7 @@ export async function getInstanceView(instanceId: InstanceId, actor: Actor, regi
     fields: await resolveFields(body, step, instance, actor, registry, db),
     columns: step.view?.columns ?? 1,
     tabs: (step.view?.tabs ?? []).map((t) => ({ key: t.key, label: t.label })),
+    collaboration: { comments: resolveCollaboration(body, step, "comments"), attachments: resolveCollaboration(body, step, "attachments") },
     availablePaths: instance.status === "running" ? resolveAvailablePaths(body, step, instance, actor) : [],
     canCancel: instance.status === "running" ? await canActorCancelInstance(actor, instance, body, db) : false,
     assignment: instance.assignment,
@@ -2600,8 +2617,28 @@ export async function grantVisibility(instanceId: InstanceId, targetActorId: str
   return changeVisibility(instanceId, targetActorId, actor, "granted", db);
 }
 
+/**
+ * Thrown by `postComment`/`uploadAttachment` when the instance's current step
+ * resolves the requested field's collaboration setting to `false`. Names the
+ * instance and which of `"comments"`/`"attachments"` is disabled. Thrown only
+ * after `loadInstanceForActor`'s own visibility check has already passed.
+ */
+export class CollaborationDisabledError extends Error {
+  constructor(
+    readonly instanceId: string,
+    readonly field: "comments" | "attachments",
+  ) {
+    super(`instance '${instanceId}' has '${field}' disabled on its current step`);
+    this.name = "CollaborationDisabledError";
+  }
+}
+
 export async function postComment(instanceId: InstanceId, actor: Actor, text: string, db: SQL = sql): Promise<InstanceComment> {
-  const { instance } = await loadInstanceForActor(instanceId, actor, db);
+  const { instance, body } = await loadInstanceForActor(instanceId, actor, db);
+  const step = findStep(body, instance.currentStepId as string);
+  if (!resolveCollaboration(body, step, "comments")) {
+    throw new CollaborationDisabledError(instance.instanceId, "comments");
+  }
   const id = `comment_${crypto.randomUUID()}`;
   const rows = (await db`
     INSERT INTO instance_comments (id, instance_id, actor_id, text)
@@ -2661,7 +2698,11 @@ export async function uploadAttachment(
   attachment: { filename: string; contentType: string; data: Uint8Array; sizeBytes: number },
   db: SQL = sql,
 ): Promise<InstanceAttachment> {
-  const { instance } = await loadInstanceForActor(instanceId, actor, db);
+  const { instance, body } = await loadInstanceForActor(instanceId, actor, db);
+  const step = findStep(body, instance.currentStepId as string);
+  if (!resolveCollaboration(body, step, "attachments")) {
+    throw new CollaborationDisabledError(instance.instanceId, "attachments");
+  }
   const id = `attachment_${crypto.randomUUID()}`;
   const rows = (await db`
     INSERT INTO instance_attachments (id, instance_id, actor_id, filename, content_type, size_bytes, data)

@@ -140,10 +140,10 @@ describe("The step page's masthead", () => {
 });
 
 describe("The step page's section set", () => {
-  it("gives a task step Path to, Assignment, On entry, On exit, Time limit and Step form fields", () => {
+  it("gives a task step Path to, Assignment, Cancellable, On entry, On exit, Time limit, Step form fields and Collaboration", () => {
     const html = render();
 
-    for (const heading of ["Path to", "Assignment", "Cancellable", "On entry", "On exit", "Time limit", "Step form fields"]) {
+    for (const heading of ["Path to", "Assignment", "Cancellable", "On entry", "On exit", "Time limit", "Step form fields", "Collaboration"]) {
       expect(html).toContain(`>${heading}<`);
     }
     expect(html).not.toContain(">Which process it calls<");
@@ -158,6 +158,9 @@ describe("The step page's section set", () => {
     expect(html).not.toContain(">On exit<");
     expect(html).not.toContain(">Time limit<");
     expect(html).toContain("A step that ends the process has no outgoing path and no time limit.");
+    // An end step still resolves an InstanceView and its collaboration field,
+    // so its Collaboration section stays (design.md).
+    expect(html).toContain(">Collaboration<");
   });
 
   it("gives a subprocess step Which process it calls, and no Assignment or form section", () => {
@@ -167,6 +170,16 @@ describe("The step page's section set", () => {
     expect(html).toContain(">Which process it calls<");
     expect(html).not.toContain(">Assignment<");
     expect(html).not.toContain(">Step form fields<");
+  });
+
+  it("gives a subprocess step no Collaboration section", () => {
+    // A subprocess step is an automatic wait-state with no
+    // participant-facing task screen for the setting to govern
+    // (`studio-step-page`).
+    const calls = { ...TASK_STEP, type: "subprocess" } as unknown as DraftStep;
+    const html = render({ step: calls });
+
+    expect(html).not.toContain(">Collaboration<");
   });
 
   it("stands every section open, so none carries a disclosure of its own", () => {
@@ -223,6 +236,36 @@ describe("The step page's Cancellable section", () => {
     const whenProcessBans = render({ draft: { ...draftWith(TASK_STEP), cancellable: false } });
     expect(whenProcessBans).toContain("Resolves to: not cancellable.");
     expect(whenProcessBans).not.toContain("Resolves to: cancellable.");
+  });
+});
+
+describe("The step page's Collaboration section", () => {
+  it("gives a three-state control for Comment and one for Attachments, both starting on Default", () => {
+    const html = render();
+
+    expect(html.match(/>Default</g)).toHaveLength(2);
+    expect(html.match(/>On</g)).toHaveLength(2);
+    expect(html.match(/>Off</g)).toHaveLength(2);
+  });
+
+  it("names the process default's current resolved value while Default is selected", () => {
+    const draft = { ...draftWith(TASK_STEP), collaboration: { attachments: false } } as unknown as Draft;
+    const html = render({ draft });
+
+    // Comment has no process-level entry, so it resolves the schema's own
+    // `true` fallback; Attachments resolves the draft's explicit `false`.
+    expect(html).toContain("Currently: on");
+    expect(html).toContain("Currently: off");
+  });
+
+  it("shows On pressed for a step that overrides a field, with no Currently caption for it", () => {
+    const overridden = { ...TASK_STEP, collaboration: { attachments: true } } as unknown as DraftStep;
+    const draft = { ...draftWith(overridden), collaboration: { attachments: false } } as unknown as Draft;
+    const html = render({ step: overridden, draft });
+
+    const attachmentsControl = html.slice(html.indexOf('aria-label="Attachments"'));
+    expect(attachmentsControl).toMatch(/aria-pressed="true"[^<]*>On</);
+    expect(attachmentsControl).not.toContain("Currently:");
   });
 });
 

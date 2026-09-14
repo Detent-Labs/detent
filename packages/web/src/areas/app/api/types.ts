@@ -41,6 +41,10 @@ export interface InstanceView {
    * on the engine's own type: a response predating the key omits it, and the
    * form reads that as no tabs. */
   tabs?: ResolvedViewTab[];
+  /** The step's resolved collaboration settings. Optional here, unlike on
+   * the engine's own type: a response predating the key omits it, and the
+   * screen reads that as both enabled. */
+  collaboration?: { comments: boolean; attachments: boolean };
   availablePaths: AvailablePath[];
   // Whether the current actor may cancel this instance right now. A live
   // field on every fresh getInstanceView call, unlike columns/tabs above —

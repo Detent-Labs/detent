@@ -536,6 +536,7 @@ export const en = {
   "stepSections.timers": "Time limit",
   "stepSections.exit": "On exit",
   "stepSections.howItEnds": "How the case ends",
+  "stepSections.collaboration": "Collaboration",
   "stepSections.terminalNoPathsOrTimers": "A step that ends the process has no outgoing path and no time limit.",
   "stepSections.noAssignmentWarning":
     "This step has no assignment. Only the starter or an admin can act on it, and it stays out of everyone's My-tasks inbox. Publishing still works.",
@@ -557,6 +558,23 @@ export const en = {
   "stepSections.descriptionField": "description",
   "stepSections.outcomeField": "outcome",
   "stepSections.outcomeHint": "An outcome binds only on a contracted process.",
+
+  // The Collaboration section's per-field three-state control
+  // (`studio-step-page`: "The Collaboration section offers a three-state
+  // control per field"). `commentLegend`/`attachmentsLegend` keep their own
+  // key rather than the header bar checkboxes' identical words, following
+  // this catalog's one-key-per-site convention (see the five separate
+  // "Developer view" keys). `currently` fills `{value}` with `valueOn`/
+  // `valueOff`, the lowercase pair, distinct from the capitalized
+  // `optionOn`/`optionOff` the control's own button prints.
+  "collaboration.commentLegend": "Comment",
+  "collaboration.attachmentsLegend": "Attachments",
+  "collaboration.optionDefault": "Default",
+  "collaboration.optionOn": "On",
+  "collaboration.optionOff": "Off",
+  "collaboration.currently": "Currently: {value}",
+  "collaboration.valueOn": "on",
+  "collaboration.valueOff": "off",
 
   // The steps rail: one numbered row per step, in the draft's own order
   // (`studio-step-page`).
@@ -648,6 +666,13 @@ export const en = {
   "headerBar.jsonLeave": "Leave the JSON surface",
   "headerBar.versions": "Versions",
   "headerBar.player": "Player",
+  // The process-wide collaboration defaults (`studio-process-tabs`): two
+  // checkboxes in the header bar's inline-editable cluster, after baseLocale.
+  // The legend names the pair for a screen reader; it renders visually
+  // hidden, so it carries no length pressure against the compact row.
+  "headerBar.collaborationLegend": "Collaboration",
+  "headerBar.collaborationComments": "Comment",
+  "headerBar.collaborationAttachments": "Attachments",
 
   // The Player screen. Its own strings are still mostly inline English; this
   // one is a catalog key because it is an accessible name.
@@ -747,6 +772,7 @@ export const en = {
   "changeList.prop.outcome": "Outcome",
   "changeList.prop.subprocess": "Subprocess",
   "changeList.prop.assignment": "Assignment",
+  "changeList.prop.collaboration": "Collaboration",
   "changeList.prop.to": "Target",
   "changeList.prop.trigger": "Trigger",
   "changeList.prop.guard": "Guard",
