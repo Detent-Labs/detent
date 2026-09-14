@@ -80,7 +80,7 @@ tasks.md instead.
   These are screen-level containers only; nested panels inherit their
   screen's cap. This change leaves `components.tsx`, `ColumnEditor.tsx` and
   `ShareEditor.tsx` (reporting) alone, as What Changes says.
-- A new shared width-cap token pair, replacing the 37 hardcoded literals.
+- A new shared width-cap token pair, replacing the 30 hardcoded literals.
   Exact placement is a design.md decision.
 - `DESIGN.md`'s Layout section (the two cap values), and
   `.claude/rules/design-language.md` / `tmp/Detent Design Language.dc.html`

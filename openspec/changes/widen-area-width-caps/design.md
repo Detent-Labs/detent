@@ -55,15 +55,14 @@ The process surface's five
 `EntityTabs.tsx`. They are viewport-relative media queries instead. No area
 cap reaches them, because the process surface carries none. The
 `maxWidth: "64rem"` in `MigrationSpecEditor.tsx` is an unrelated block-level
-cap inside that same uncapped process surface. None of these five files
-change in this change.
+cap inside that same uncapped process surface. None of these five breakpoints change in this change.
 
 ## Goals / Non-Goals
 
 **Goals:**
 - Raise both area caps by the approved amounts (60rem→80rem, 46rem→61rem)
   everywhere they apply.
-- Converge the 37 hardcoded literals onto one shared, reusable token pair.
+- Converge the 30 hardcoded literals onto one shared, reusable token pair.
 - Leave the Player's own reflow-threshold requirement text untouched; let
   the cap increase alone make its already-specified side-by-side state
   reachable.
@@ -159,7 +158,7 @@ gets stretched.
 
 Pure `packages/web` presentation change; no data migration. It deploys as an
 ordinary build, with no instance data, no API surface and no feature flag.
-Rollback is a plain revert of the commit(s). The two token values and the 33
+Rollback is a plain revert of the commit(s). The two token values and the 30
 call sites are the entire diff.
 
 ## Open Questions
