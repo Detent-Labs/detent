@@ -42,6 +42,10 @@ export interface InstanceView {
    * form reads that as no tabs. */
   tabs?: ResolvedViewTab[];
   availablePaths: AvailablePath[];
+  // Whether the current actor may cancel this instance right now. A live
+  // field on every fresh getInstanceView call, unlike columns/tabs above —
+  // no stored response predates it — so it stays required.
+  canCancel: boolean;
   assignment?: { candidates: string[]; claimedBy?: string; claimedAt?: string } | null;
   // The participant's saved form draft, present only when it matches the
   // current step — see the instance-form-drafts capability.
