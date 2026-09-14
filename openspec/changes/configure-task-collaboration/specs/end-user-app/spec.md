@@ -60,7 +60,8 @@ It SHALL provide a text box and a submit button. Submitting calls `POST
 /instances/:id/comments` and, on success, refetches the thread. This
 input SHALL show only when the instance view's `collaboration.comments`
 is `true`. When it is `false`, the thread above still renders, with no
-text box or submit button beside it.
+text box or submit button beside it. A note in their place explains
+that the step does not accept new comments.
 
 #### Scenario: Opening a task loads its comment thread
 
@@ -87,6 +88,7 @@ text box or submit button beside it.
   `collaboration.comments` to `false`
 - **THEN** the comment thread still renders, oldest first, but the text
   box and submit button are absent
+- **AND** a note explains that the step does not accept new comments
 
 ### Requirement: Task screen shows attachments with an upload control
 
@@ -102,7 +104,8 @@ fetched via `GET /instances/:id/attachments`, each with a download
 action. This list SHALL be visible to any actor who can open the task
 screen at all, independent of claim state. That holds even when
 `collaboration.attachments` is `false`: the list still renders, with no
-upload control beside it.
+upload control beside it, and a note in its place explains that the
+step does not accept new attachments.
 
 #### Scenario: Opening a task loads its attachment list
 
@@ -136,3 +139,4 @@ upload control beside it.
   `collaboration.attachments` to `false`
 - **THEN** the attachment list still renders, but the upload control is
   absent
+- **AND** a note explains that the step does not accept new attachments
