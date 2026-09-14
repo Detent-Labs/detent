@@ -1229,6 +1229,10 @@ test.skipIf(!DB)("downloading an attachment id that belongs to a different insta
   expect(res.status).toBe(500);
 });
 
+// ============================================================
+// CollaborationDisabledError -> 409 (comment/attachment routes with disabled collaboration)
+// ============================================================
+
 test.skipIf(!DB)("POST /instances/:instanceId/comments with collaboration.comments disabled maps to 409 collaboration-disabled", async () => {
   const PID = pid("proc_http_comment_disabled");
   const body: ProcessBody = {
