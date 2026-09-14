@@ -8,10 +8,10 @@ import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, initSchema } from "../src/engine/store.js";
 import { publishBody } from "../src/engine/definitions.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
-import { createProcessInstance, uploadAttachment, listAttachments, getAttachment } from "../src/runtime/api.js";
+import { createProcessInstance, uploadAttachment, listAttachments, getAttachment, submitAndTransition, CollaborationDisabledError } from "../src/runtime/api.js";
 import { AuthorizationError, ADMIN_ROLE } from "../src/auth/authorize.js";
 import { NotFoundError } from "../src/errors.js";
-import type { ProcessBody, ProcessId } from "../src/schema/definition.js";
+import type { ProcessBody, ProcessId, PathId } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
 import { clearInstanceAudit } from "./audit-cleanup.js";
 
@@ -67,6 +67,108 @@ const assignedBody = (): ProcessBody =>
       ],
     },
   }) as unknown as ProcessBody;
+
+// configure-task-collaboration: bodies exercising the resolved
+// `collaboration.attachments` fallback chain at the Runtime API Layer
+// boundary (see runtime-api's "collaboration config can block adding a
+// comment or an attachment" requirement). No assignment on step_a: these
+// cases care about the collaboration gate, not the claim gate, so the
+// starter alone acts.
+const processDefaultDisablesAttachments = (): ProcessBody =>
+  ({
+    key: "attachments_rt_pd_off",
+    label: { en: "Attachments RT process-default off" },
+    baseLocale: "en",
+    fields: [],
+    collaboration: { attachments: false },
+    workflow: {
+      initialStep: "step_a",
+      steps: [{ id: "step_a", key: "a", label: { en: "A" }, type: "task", terminal: true }],
+    },
+  }) as unknown as ProcessBody;
+
+const stepOverrideDisablesAttachments = (): ProcessBody =>
+  ({
+    key: "attachments_rt_step_off",
+    label: { en: "Attachments RT step off" },
+    baseLocale: "en",
+    fields: [],
+    workflow: {
+      initialStep: "step_a",
+      steps: [{ id: "step_a", key: "a", label: { en: "A" }, type: "task", terminal: true, collaboration: { attachments: false } }],
+    },
+  }) as unknown as ProcessBody;
+
+// Mirrors design.md's own example: a step's override wins in either
+// direction, so a step can turn attachments back on when the process default
+// turns them off.
+const stepOverrideEnablesAttachments = (): ProcessBody =>
+  ({
+    key: "attachments_rt_step_on",
+    label: { en: "Attachments RT step on" },
+    baseLocale: "en",
+    fields: [],
+    collaboration: { attachments: false },
+    workflow: {
+      initialStep: "step_a",
+      steps: [{ id: "step_a", key: "a", label: { en: "A" }, type: "task", terminal: true, collaboration: { attachments: true } }],
+    },
+  }) as unknown as ProcessBody;
+
+// step_a (attachments enabled by default) --(path_ab)--> step_b (attachments
+// disabled). Used to confirm listing survives a later step disabling further
+// additions.
+const transitionDisablesAttachments = (): ProcessBody =>
+  ({
+    key: "attachments_rt_transition",
+    label: { en: "Attachments RT transition" },
+    baseLocale: "en",
+    fields: [],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }] },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true, collaboration: { attachments: false } },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+test.skipIf(!DB)("uploadAttachment rejects with CollaborationDisabledError when the process default disables attachments", async () => {
+  await publishBody(PID, processDefaultDisablesAttachments(), reg, dataSourceReg);
+  const inst = await createProcessInstance(PID, starter, dataSourceReg);
+  await rejectsWith(uploadAttachment(inst.instanceId, starter, file("should not land"), sql), CollaborationDisabledError);
+  const page = await listAttachments(inst.instanceId, starter, {}, sql);
+  expect(page.items).toHaveLength(0);
+});
+
+test.skipIf(!DB)("uploadAttachment rejects with CollaborationDisabledError when a step override disables attachments", async () => {
+  await publishBody(PID, stepOverrideDisablesAttachments(), reg, dataSourceReg);
+  const inst = await createProcessInstance(PID, starter, dataSourceReg);
+  await rejectsWith(uploadAttachment(inst.instanceId, starter, file("should not land"), sql), CollaborationDisabledError);
+});
+
+test.skipIf(!DB)("uploadAttachment accepts when a step override re-enables attachments the process default disabled", async () => {
+  await publishBody(PID, stepOverrideEnablesAttachments(), reg, dataSourceReg);
+  const inst = await createProcessInstance(PID, starter, dataSourceReg);
+  const uploaded = await uploadAttachment(inst.instanceId, starter, file("allowed"), sql);
+  expect(uploaded.filename).toBe("note.txt");
+});
+
+test.skipIf(!DB)("listAttachments still returns an attachment uploaded on an earlier step after the current step disables attachments", async () => {
+  await publishBody(PID, transitionDisablesAttachments(), reg, dataSourceReg);
+  const inst = await createProcessInstance(PID, starter, dataSourceReg);
+  const uploaded = await uploadAttachment(inst.instanceId, starter, file("uploaded while enabled"), sql);
+  await submitAndTransition(inst.instanceId, "path_ab" as PathId, {}, starter, dataSourceReg, sql);
+  await rejectsWith(uploadAttachment(inst.instanceId, starter, file("should not land now"), sql), CollaborationDisabledError);
+  const page = await listAttachments(inst.instanceId, starter, {}, sql);
+  expect(page.items.map((a) => a.id)).toEqual([uploaded.id]);
+});
+
+test.skipIf(!DB)("an actor with no visibility gets AuthorizationError, not CollaborationDisabledError, even when the current step disables attachments", async () => {
+  await publishBody(PID, processDefaultDisablesAttachments(), reg, dataSourceReg);
+  const inst = await createProcessInstance(PID, starter, dataSourceReg);
+  await rejectsWith(uploadAttachment(inst.instanceId, outsider, file("should not land"), sql), AuthorizationError);
+});
 
 test.skipIf(!DB)("an eligible candidate can upload, list, and download an attachment", async () => {
   await publishBody(PID, assignedBody(), reg, dataSourceReg);
