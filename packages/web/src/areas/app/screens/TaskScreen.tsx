@@ -561,18 +561,20 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
                 </li>
               ))}
             </ul>
-            <div {...stylex.props(styles.taskCommentForm)}>
-              <textarea
-                {...stylex.props(styles.taskCommentTextarea)}
-                value={commentText}
-                disabled={loading}
-                placeholder={t(locale, "task.commentPlaceholder")}
-                onChange={(e) => setCommentText(e.target.value)}
-              />
-              <button type="button" className="btn btn-secondary" disabled={loading || !commentText.trim()} onClick={() => void doPostComment()}>
-                {t(locale, "task.commentSubmit")}
-              </button>
-            </div>
+            {(view.collaboration?.comments ?? true) && (
+              <div {...stylex.props(styles.taskCommentForm)}>
+                <textarea
+                  {...stylex.props(styles.taskCommentTextarea)}
+                  value={commentText}
+                  disabled={loading}
+                  placeholder={t(locale, "task.commentPlaceholder")}
+                  onChange={(e) => setCommentText(e.target.value)}
+                />
+                <button type="button" className="btn btn-secondary" disabled={loading || !commentText.trim()} onClick={() => void doPostComment()}>
+                  {t(locale, "task.commentSubmit")}
+                </button>
+              </div>
+            )}
           </section>
 
           <section {...stylex.props(styles.taskAttachments)}>
@@ -587,12 +589,14 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
                 </li>
               ))}
             </ul>
-            <div {...stylex.props(styles.taskAttachmentForm)}>
-              <input ref={fileInputRef} type="file" disabled={loading} />
-              <button type="button" className="btn btn-secondary" disabled={loading} onClick={() => void doUploadAttachment()}>
-                {t(locale, "task.attachmentUploadLabel")}
-              </button>
-            </div>
+            {(view.collaboration?.attachments ?? true) && (
+              <div {...stylex.props(styles.taskAttachmentForm)}>
+                <input ref={fileInputRef} type="file" disabled={loading} />
+                <button type="button" className="btn btn-secondary" disabled={loading} onClick={() => void doUploadAttachment()}>
+                  {t(locale, "task.attachmentUploadLabel")}
+                </button>
+              </div>
+            )}
           </section>
         </>
       )}
