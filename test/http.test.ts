@@ -69,6 +69,29 @@ const simpleBody = (): ProcessBody =>
     },
   }) as unknown as ProcessBody;
 
+/** Same shape as simpleBody, but step_a declares cancellable: false — for the cancellable-gate tests. */
+const nonCancellableBody = (): ProcessBody =>
+  ({
+    key: "non_cancellable_body",
+    label: { en: "Non Cancellable Body" },
+    baseLocale: "en",
+    fields: [],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        {
+          id: "step_a",
+          key: "a",
+          label: { en: "A" },
+          type: "task",
+          cancellable: false,
+          paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }],
+        },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
 /** step_x: field_approved (boolean) --(path_done, manual, guard: data.approved == true)--> step_done. */
 const guardedBody = (): ProcessBody =>
   ({
@@ -2285,6 +2308,55 @@ test.skipIf(!DB)("POST /instances/:instanceId/cancel with the system:cancel-any 
   expect(res.status).toBe(500);
   const body = (await res.json()) as { error: { type: string } };
   expect(body.error.type).toBe("internal");
+});
+
+test.skipIf(!DB)("POST /instances/:instanceId/cancel: a starter is refused at a non-cancellable step", async () => {
+  const PID = pid("proc_http_cancel_not_cancellable");
+  await publishBody(PID, nonCancellableBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/cancel`, "POST", user1));
+  expect(res.status).toBe(403);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("authorization");
+
+  const view = (await (await fetch(authedReq(`http://x/instances/${created.instanceId}`, "GET", user1))).json()) as { status: string };
+  expect(view.status).toBe("running");
+});
+
+test.skipIf(!DB)("POST /instances/:instanceId/cancel: system:cancel-any still cancels at a non-cancellable step", async () => {
+  const PID = pid("proc_http_cancel_any_bypasses_gate");
+  await publishBody(PID, nonCancellableBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/cancel`, "POST", admin));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { status: string };
+  expect(body.status).toBe("cancelled");
+});
+
+test.skipIf(!DB)("POST /instances/:instanceId/cancel: a cancel grant still cancels at a non-cancellable step", async () => {
+  const PID = pid("proc_http_cancel_grant_bypasses_gate");
+  await publishBody(PID, nonCancellableBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  await grantRole("finance-authors", "cancel", PID);
+
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/cancel`, "POST", financeAuthor));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { status: string };
+  expect(body.status).toBe("cancelled");
+});
+
+test.skipIf(!DB)("POST /instances/:instanceId/cancel: system:admin alone does not exempt a starter from the cancellable gate", async () => {
+  const PID = pid("proc_http_cancel_admin_role_only_starter");
+  await publishBody(PID, nonCancellableBody(), reg, dataSourceReg);
+  const adminRoleOnlyStarter: Actor = { id: "user_admin_role_only_starter", roles: [ADMIN_ROLE] };
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", adminRoleOnlyStarter))).json()) as { instanceId: string };
+
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/cancel`, "POST", adminRoleOnlyStarter));
+  expect(res.status).toBe(403);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("authorization");
 });
 
 test.skipIf(!DB)("POST /processes with a structurally invalid body (missing initialStep) maps to 422", async () => {
