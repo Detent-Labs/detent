@@ -637,6 +637,10 @@ export const en = {
   "headerBar.jsonLeave": "Leave the JSON surface",
   "headerBar.versions": "Versions",
   "headerBar.player": "Player",
+  // The process-wide collaboration defaults (`studio-process-tabs`): two
+  // checkboxes in the header bar's inline-editable cluster, after baseLocale.
+  "headerBar.collaborationComments": "Comment",
+  "headerBar.collaborationAttachments": "Attachments",
 
   // The Player screen. Its own strings are still mostly inline English; this
   // one is a catalog key because it is an accessible name.

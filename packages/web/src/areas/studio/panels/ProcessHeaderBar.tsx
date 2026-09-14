@@ -236,6 +236,25 @@ const styles = stylex.create({
     gap: space.s1,
     fontSize: "0.85rem",
   },
+  // The process-wide collaboration defaults (`studio-process-tabs`): a row of
+  // related controls at the Filter Bar's 8px spacing, sitting after
+  // baseLocale in this same group.
+  collaborationRow: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: space.s2,
+  },
+  collaborationOption: {
+    display: "flex",
+    alignItems: "center",
+    gap: space.s1,
+    fontSize: "0.85rem",
+  },
+  // DESIGN.md: "A checkbox or radio drops the border and takes `accent-color`."
+  collaborationCheckbox: {
+    accentColor: colors.accent,
+  },
   headerBarMenuLink: {
     display: "flex",
     alignItems: "center",
@@ -884,6 +903,45 @@ export function ProcessHeaderBar({
                     onChange={(e) => changeBaseLocale(e.target.value)}
                   />
                 </label>
+                {/* The process-wide collaboration defaults
+                    (`studio-process-tabs`). Both call `mutate()` directly, so
+                    both are `structureActive`-gated like key and baseLocale
+                    above them — `studio-json-view` bans every draft-body-
+                    mutating control from the header bar while the JSON
+                    surface is open. Absent reads as checked: the schema
+                    resolves an unset key to `true` (design.md). */}
+                <div {...stylex.props(styles.collaborationRow)}>
+                  <label {...stylex.props(styles.collaborationOption)}>
+                    <input
+                      type="checkbox"
+                      {...stylex.props(styles.collaborationCheckbox)}
+                      disabled={!structureActive}
+                      checked={draft.collaboration?.comments ?? true}
+                      onChange={(e) =>
+                        mutate((d) => {
+                          d.collaboration ??= {};
+                          d.collaboration.comments = e.target.checked;
+                        })
+                      }
+                    />
+                    {t("headerBar.collaborationComments")}
+                  </label>
+                  <label {...stylex.props(styles.collaborationOption)}>
+                    <input
+                      type="checkbox"
+                      {...stylex.props(styles.collaborationCheckbox)}
+                      disabled={!structureActive}
+                      checked={draft.collaboration?.attachments ?? true}
+                      onChange={(e) =>
+                        mutate((d) => {
+                          d.collaboration ??= {};
+                          d.collaboration.attachments = e.target.checked;
+                        })
+                      }
+                    />
+                    {t("headerBar.collaborationAttachments")}
+                  </label>
+                </div>
                 <AddLocaleControl />
                 {/* Pure navigation, never gated by `structureActive`: it
                     mutates nothing the JSON surface itself edits, the same
