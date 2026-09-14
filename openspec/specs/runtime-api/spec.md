@@ -842,6 +842,12 @@ when `claimedBy` is already set. On a non-running instance it SHALL NOT
 throw — it returns the instance unchanged, a silent no-op (see
 `assignment-claim-release-consolidation`).
 
+The candidate requirement above widens on an instance whose `kind` is
+`"test"`. There, `claimStep` SHALL also admit the instance's `startedBy` actor
+and any `system:admin` holder. The `draft-test-instances` capability states
+that rule. `NotACandidateError` there means the actor is neither an eligible
+candidate nor one of those two.
+
 #### Scenario: An eligible candidate claims successfully
 - **WHEN** `claimStep` is called by an eligible candidate on a running
   instance's unclaimed, assignment-bearing current step
@@ -860,9 +866,15 @@ throw — it returns the instance unchanged, a silent no-op (see
 - **THEN** it throws `NotAssignedError`
 
 #### Scenario: A non-candidate is rejected
-- **WHEN** `claimStep` is called by an actor who is not an eligible
-  candidate
+- **WHEN** `claimStep` is called by a non-candidate actor on a published
+  instance
 - **THEN** it throws `NotACandidateError` and the instance is unchanged
+
+#### Scenario: A test instance's starter claims without candidacy
+- **WHEN** a test instance's starter, matching no candidate, calls
+  `claimStep` on its unclaimed, assignment-bearing current step
+- **THEN** it returns the updated `Instance` with `assignment.claimedBy`
+  set to that actor's id
 
 #### Scenario: An already-claimed step is rejected
 - **WHEN** `claimStep` is called on a step whose `assignment.claimedBy` is

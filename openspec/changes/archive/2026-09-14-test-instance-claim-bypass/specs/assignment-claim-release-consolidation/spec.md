@@ -1,16 +1,6 @@
-<!-- antislop: allow-file passive-voice -->
-# assignment-claim-release-consolidation Specification
-
-## Purpose
-
-A structural (mechanism-level) requirement over `src/engine/transition.ts`'s
-`claimStep`/`releaseClaim`, keeping their identical row-lock/guard/write/
-event sequence from being maintained twice. This is an
-implementation-mechanism constraint, not user-visible behavior — the
-actual claim/release contract it implements is specified by the
-`assignment-claim-enforcement` capability.
-
-## Requirements
+<!-- antislop: allow-file em-dash long-words passive-voice sentence-length trailing-negation -->
+<!-- The MODIFIED block copies live requirement text verbatim; this directive covers that copied text. -->
+## MODIFIED Requirements
 
 ### Requirement: Claim and release share one row-lock-guard-write-event implementation
 

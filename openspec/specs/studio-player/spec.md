@@ -34,7 +34,9 @@ published version, the Player SHALL offer a separate "Create test instance"
 action that creates a real, running instance from the process's current
 draft body instead of a published version, via the studio-only creation
 route. This action needs no published version to exist. The resulting
-instance behaves exactly like any other from that point on: the screen
+instance behaves like any other from that point on, except that its claim
+also admits its starter and a `system:admin` holder (see
+`draft-test-instances`). The screen
 renders its current step as a form, accepts submissions through the same
 path-submission flow, and re-fetches the view the same way after every
 mutation.

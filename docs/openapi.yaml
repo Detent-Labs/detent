@@ -492,7 +492,10 @@ paths:
       tags: [instances]
       operationId: claimInstance
       summary: Claim the instance's current step
-      description: No reserved-role requirement; the actor must be an eligible, unclaimed candidate.
+      description: >-
+        No reserved-role requirement; the actor must be an eligible, unclaimed
+        candidate. On a test instance, the claim also admits the starter and a
+        `system:admin` holder outside that candidate list.
       parameters:
         - $ref: "#/components/parameters/instanceId"
       responses:
@@ -509,7 +512,10 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "403":
-          description: The actor is not an eligible candidate, or the step is already claimed by someone else.
+          description: >-
+            The actor is not an eligible candidate and, on a test instance, is
+            neither its starter nor a `system:admin` holder; or the step is
+            already claimed by someone else.
           content:
             application/json:
               schema:
