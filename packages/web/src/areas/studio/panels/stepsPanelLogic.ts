@@ -1,3 +1,4 @@
+import type { Collaboration } from "workflow-engine/schema";
 import { deriveKey, dedupeKey, shouldAutoDeriveKey } from "../draft/deriveKey.js";
 import { resolveDraftLocalizedText, type DraftLocalizedText } from "../draft/localized-text.js";
 import { isDraftViewField, type DraftViewEntry } from "../draft/view-layout.js";
@@ -36,4 +37,32 @@ export function nextStepKey(
  * alone. A note occupies no catalog row, so it raises this count by none. */
 export function configuredFieldCount(fields: DraftViewEntry[] | undefined): number {
   return (fields ?? []).filter(isDraftViewField).length;
+}
+
+/**
+ * A step's own `collaboration` override after the Collaboration section's
+ * Segmented Control sets one key to Default (`next === undefined`), On
+ * (`true`) or Off (`false`).
+ *
+ * Selecting Default deletes that key from the local copy rather than setting
+ * it to `undefined`: an explicit `undefined` still leaves the wrapper object
+ * behind (`JSON.stringify` drops the key but not its parent), so a step
+ * toggled and reverted would publish `"collaboration": {}` forever instead of
+ * carrying no `collaboration` key at all, moving `definitionHash` for a step
+ * that is otherwise identical to one nobody touched. Once the patched object
+ * holds no key, the return value is `undefined` so the caller drops the whole
+ * `collaboration` object instead of persisting `{}`.
+ */
+export function nextCollaborationOverride(
+  current: Collaboration | undefined,
+  key: keyof Collaboration,
+  next: boolean | undefined,
+): Collaboration | undefined {
+  const patched = { ...(current ?? {}) };
+  if (next === undefined) {
+    delete patched[key];
+  } else {
+    patched[key] = next;
+  }
+  return Object.keys(patched).length > 0 ? patched : undefined;
 }

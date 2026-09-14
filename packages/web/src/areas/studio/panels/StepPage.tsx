@@ -20,7 +20,7 @@ import { IssueItems, NotCheckedBadge } from "./shared/IssueList";
 import { LocalizedTextInput } from "./shared/LocalizedTextInput";
 import { parseChildProcessJson } from "../draft/io";
 import { missingTranslationWarning } from "../draft/localized-text";
-import { nextStepKey, configuredFieldCount } from "./stepsPanelLogic.js";
+import { nextStepKey, configuredFieldCount, nextCollaborationOverride } from "./stepsPanelLogic.js";
 import { sectionColumns, sectionsFor, type SectionName } from "./sectionsFor.js";
 import { headingIssues, sectionOfIssue } from "./sectionIssues.js";
 
@@ -546,13 +546,13 @@ export function StepPage({
               legend="collaboration.commentLegend"
               value={step.collaboration?.comments}
               resolvedDefault={draft.collaboration?.comments ?? true}
-              onChange={(comments) => updateStep({ collaboration: { ...(step.collaboration ?? {}), comments } })}
+              onChange={(comments) => updateStep({ collaboration: nextCollaborationOverride(step.collaboration, "comments", comments) })}
             />
             <CollaborationControl
               legend="collaboration.attachmentsLegend"
               value={step.collaboration?.attachments}
               resolvedDefault={draft.collaboration?.attachments ?? true}
-              onChange={(attachments) => updateStep({ collaboration: { ...(step.collaboration ?? {}), attachments } })}
+              onChange={(attachments) => updateStep({ collaboration: nextCollaborationOverride(step.collaboration, "attachments", attachments) })}
             />
           </>
         );

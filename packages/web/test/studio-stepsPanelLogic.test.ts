@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { nextStepKey, configuredFieldCount } from "../src/areas/studio/panels/stepsPanelLogic.js";
+import { nextStepKey, configuredFieldCount, nextCollaborationOverride } from "../src/areas/studio/panels/stepsPanelLogic.js";
 import { mergeLocalizedTextEntry } from "../src/areas/studio/draft/localized-text.js";
 import type { DraftViewEntry } from "../src/areas/studio/draft/view-layout.js";
 
@@ -65,5 +65,23 @@ describe("configuredFieldCount", () => {
 
   it("reports 0 for an undefined view", () => {
     expect(configuredFieldCount(undefined)).toBe(0);
+  });
+});
+
+describe("nextCollaborationOverride", () => {
+  it("sets a key on a step with no prior override", () => {
+    expect(nextCollaborationOverride(undefined, "comments", false)).toEqual({ comments: false });
+  });
+
+  it("clearing one of two overridden keys leaves the other key intact", () => {
+    const current = { comments: false, attachments: true };
+
+    expect(nextCollaborationOverride(current, "comments", undefined)).toEqual({ attachments: true });
+  });
+
+  it("clearing the last remaining key drops the whole object, not {}", () => {
+    const current = { attachments: false };
+
+    expect(nextCollaborationOverride(current, "attachments", undefined)).toBeUndefined();
   });
 });
