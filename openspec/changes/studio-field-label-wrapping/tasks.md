@@ -86,11 +86,11 @@
 
 ## 4. Verification
 
-- [ ] 4.1 Run `bun run typecheck` and confirm zero errors.
-- [ ] 4.2 Run the full `bun test` suite with `DATABASE_URL` set. This is
+- [x] 4.1 Run `bun run typecheck` and confirm zero errors.
+- [x] 4.2 Run the full `bun test` suite with `DATABASE_URL` set. This is
   never a single-file rerun, per `CLAUDE.md`. Confirm no new failures,
   and check the skip count as well as the pass count.
-- [ ] 4.3 Run a real browser check on the form editor. Use a step whose
+- [x] 4.3 Run a real browser check on the form editor. Use a step whose
   view carries a group with fields like `full_name` and `email_address`.
   Pick a card width narrow enough to have forced a mid-character wrap
   before this change.
@@ -100,7 +100,7 @@
   move/remove row renders as small mono ghost controls. The group's own
   Move up/Move down match it. The group's own `Remove ({count})` still
   reads as the outlined destructive control.
-- [ ] 4.4 Run the antislop prose gate and the whitespace gate over the
+- [x] 4.4 Run the antislop prose gate and the whitespace gate over the
   pushed range. Use `sh scripts/gates/range.sh < /dev/null | sh
   scripts/gates/prose.sh`, and the same piped into
   `scripts/gates/whitespace.sh`. Confirm both pass.
