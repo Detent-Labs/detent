@@ -163,7 +163,13 @@ const KEY_WRAP_DRAFT = {
         label: { en: "Intake" },
         type: "task",
         view: {
-          fields: [{ ref: FULL_NAME }, { ref: PLAIN_KEY }, { ref: ADJACENT }, { ref: EMAIL_ADDRESS }],
+          fields: [
+            { ref: FULL_NAME },
+            { ref: PLAIN_KEY },
+            { ref: ADJACENT },
+            { ref: EMAIL_ADDRESS },
+            { kind: "note", text: { en: "full_name appears above" } },
+          ],
         },
         paths: [{ id: "path_1", to: "step_b", trigger: "automatic", priority: 1 }],
       },
@@ -388,6 +394,12 @@ describe("renderFieldKey: how a placed field's key wraps", () => {
   it("round-trips adjacent underscores, breaking after each one with no character lost", () => {
     const canvas = canvasHtml(render(KEY_WRAP_DRAFT));
     expect(canvas).toContain(wbrWrapped("a__b"));
+  });
+
+  it("renders a note's own underscore-containing text with no <wbr>, unlike a field's key", () => {
+    const note = cardBlock(canvasHtml(render(KEY_WRAP_DRAFT)), "full_name appears above");
+    expect(note).not.toContain("<wbr");
+    expect(note).toContain(">full_name appears above<");
   });
 });
 
