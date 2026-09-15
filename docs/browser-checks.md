@@ -5073,3 +5073,43 @@ cancel, `system:admin` alone not enough. Neither reaches the rendered
 control. Whether the disabled state is the native attribute or
 `aria-disabled`, and whether the reason is real DOM or a `title`, both need a
 browser to see.
+
+### A field card's key and its move/remove row (`studio-field-label-wrapping`)
+
+Source: `studio-field-label-wrapping` tasks 3.2 and 4.3.
+
+Open the form editor for a step whose view carries a group with several
+underscore-keyed fields. Use a browser width around 1440px. The seeded
+`it_onboarding` process already has this shape: the "Submit the Service
+Request" step's `personal_details` group holds `full_name`,
+`email_address`, `person_category`, `role_area`, `start_date`, and
+`end_date`.
+
+Pass: each field's key renders on one line, unwrapped. The required/span
+marks (e.g. "required 1/2") and the type label (e.g. "string") sit beside
+the key on that same line when there is room. They wrap to their own
+second line beneath it when there is not. Neither ever forces the key
+itself down to a sliver.
+
+The field card's own Move up, Move down and Remove render as small mono
+ghost controls. They match the group legend's own Move up and Move down.
+The group's own `Remove ({count})` stays the larger, outlined,
+destructive-red control: it keeps that look instead of the smaller ghost
+style.
+
+Resize the window down to roughly 900px. That is narrow enough that a key
+no longer fits its card on one line. Pass: the key wraps immediately after
+a `_` (e.g. `full_` / `name`). It never wraps mid-syllable. A single
+underscore-delimited run can still be too wide for the card on its own.
+Only that one run then falls back to a mid-word break (e.g.
+`person_category`'s `categ` / `ory`). Every other run in the same key
+still breaks at its own `_` first.
+
+This stays manual because it is a pixel-layout judgment. Whether marks and
+type reflow instead of crushing the key, and where a wrap lands, are not
+`bun:test`-observable properties. This is the second try at this specific
+defect within the same change. A first fix, changing the key's own
+flex-basis, passed its own task review on CSS-mechanism reasoning alone.
+A live browser check then found it made no measurable difference. That
+history is the reason this check belongs here, alongside the unit tests
+rather than in their place.

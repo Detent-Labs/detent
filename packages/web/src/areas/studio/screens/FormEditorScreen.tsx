@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type DragEvent } from "react";
+import { useEffect, useMemo, useState, type DragEvent, type ReactNode } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
 import type { FieldId, Step, View, ViewNote } from "workflow-engine/schema";
@@ -334,6 +334,7 @@ const styles = stylex.create({
   formCardBody: {
     display: "flex",
     alignItems: "baseline",
+    flexWrap: "wrap",
     gap: space.s2,
     flex: 1,
     minWidth: 0,
@@ -352,10 +353,10 @@ const styles = stylex.create({
     },
   },
   formCardKey: {
-    flex: 1,
+    flex: "auto",
     minWidth: 0,
     fontFamily: fonts.mono,
-    overflowWrap: "anywhere",
+    overflowWrap: "break-word",
   },
   formCardNotePreview: {
     flex: 1,
@@ -382,6 +383,55 @@ const styles = stylex.create({
     alignItems: "center",
     gap: space.s1,
     paddingRight: space.s2,
+  },
+  // The same authoring-command shape as `FormsTab.tsx`'s `openControl` and
+  // `FormTabStrip.tsx`'s `control` (mono face, 11px, `textMuted` turning to
+  // `text` on hover/press, a `surfaceMuted` hover wash, an ink-14% press
+  // wash) — copied here rather than exported, per `design-language.md`'s
+  // deliberate-duplicate precedent. `formCardMoves`' Move up/Move down at
+  // both consumers, and the field card's own plain Remove, use this block;
+  // the group's own `Remove ({count})` keeps its `.btn-secondary
+  // btn-destructive` classes unchanged. Like both cited precedents, this
+  // pairs with the shared `.btn.btn-ghost` reset (via the `ghost()` helper
+  // below) rather than standing alone: `.btn` supplies `font-weight: 800`
+  // (not covered anywhere else, and font-weight inherits, so a bare button
+  // would render at the page's normal weight) and `.btn-ghost` supplies the
+  // 4px `paddingInline` this block leaves unset on purpose, so there is one
+  // source of truth for that value.
+  authoringCommand: {
+    fontFamily: fonts.mono,
+    fontSize: 11,
+    color: {
+      default: colors.textMuted,
+      ":hover": colors.text,
+      ":active": colors.text,
+    },
+    paddingBlock: space.s2,
+    minHeight: 24,
+    backgroundColor: {
+      default: "transparent",
+      ":hover": colors.surfaceMuted,
+      ":active": `color-mix(in srgb, ${colors.text} 14%, transparent)`,
+    },
+  },
+  // A disabled move control takes no hover or press look: slate text on a
+  // transparent ground under the pointer too, the same fix
+  // `FormTabStrip.tsx`'s `controlDisabled` applies for the same reason —
+  // StyleX orders `:disabled` (92) before `:hover` (130), so a `":disabled"`
+  // key inside `authoringCommand` would lose under the pointer. This block
+  // stacks after `authoringCommand`, from the boolean that sets `disabled`,
+  // and restates all three conditions.
+  authoringCommandDisabled: {
+    color: {
+      default: colors.textMuted,
+      ":hover": colors.textMuted,
+      ":active": colors.textMuted,
+    },
+    backgroundColor: {
+      default: "transparent",
+      ":hover": "transparent",
+      ":active": "transparent",
+    },
   },
   // The group card (`studio-form-editor`'s fieldset/legend/nested-`<ol>`
   // shape): the `<li>` spans the canvas grid's full width, the
@@ -481,6 +531,26 @@ type Dragging = { kind: "palette"; ref: FieldId } | { kind: "card"; index: numbe
  * for a field whose type the author has not chosen yet. */
 function typeLabel(type: DraftField["type"]): string | undefined {
   return typeof type === "string" ? type : type?.type;
+}
+
+/** Renders a field's `key` with a break opportunity right after each `_`,
+ * so a wrap lands between underscore-delimited segments instead of at an
+ * arbitrary character. Splitting on `_` and rejoining with a literal `_`
+ * plus a `<wbr/>` reproduces the original string exactly, including a run
+ * of adjacent underscores (the empty segment between them renders as an
+ * empty text node). */
+function renderFieldKey(key: string): ReactNode[] {
+  const segments = key.split("_");
+  return segments.flatMap((segment, index) => (index === 0 ? [segment] : [`_`, <wbr key={index} />, segment]));
+}
+
+/** `btn btn-ghost` plus compiled styles, as one set of props — the same join
+ * `FormTabStrip.tsx`'s `ghost()` makes, since spreading `stylex.props(...)`
+ * beside a `className` attribute drops whichever of the two the JSX writes
+ * first. */
+function ghost(...style: stylex.StyleXStyles[]) {
+  const compiled = stylex.props(...style);
+  return { ...compiled, className: `btn btn-ghost ${compiled.className ?? ""}`.trim() };
 }
 
 const MINT_KIND_LABEL: Record<PaletteFieldKind, CatalogKey> = {
@@ -1134,10 +1204,20 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
                 {labelFor(fieldRef)}
               </button>
               <span {...stylex.props(styles.formCardMoves)}>
-                <button type="button" className="btn btn-secondary" disabled={isFirst} onClick={() => move(rowIndex, -1)}>
+                <button
+                  type="button"
+                  {...ghost(styles.authoringCommand, isFirst && styles.authoringCommandDisabled)}
+                  disabled={isFirst}
+                  onClick={() => move(rowIndex, -1)}
+                >
                   {t("formEditor.moveUp")}
                 </button>
-                <button type="button" className="btn btn-secondary" disabled={isLast} onClick={() => move(rowIndex, 1)}>
+                <button
+                  type="button"
+                  {...ghost(styles.authoringCommand, isLast && styles.authoringCommandDisabled)}
+                  disabled={isLast}
+                  onClick={() => move(rowIndex, 1)}
+                >
                   {t("formEditor.moveDown")}
                 </button>
                 <button type="button" className="btn btn-secondary btn-destructive" onClick={() => removeRow(rowIndex)}>
@@ -1198,7 +1278,9 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
           aria-pressed={selected === rowIndex}
           onClick={() => setSelected(selected === rowIndex ? undefined : rowIndex)}
         >
-          <span {...stylex.props(isField ? styles.formCardKey : styles.formCardNotePreview)}>{cardLabel}</span>
+          <span {...stylex.props(isField ? styles.formCardKey : styles.formCardNotePreview)}>
+            {isField ? renderFieldKey(cardLabel) : cardLabel}
+          </span>
           <span {...stylex.props(styles.formCardMarks)}>
             {isField && row.required === true && <span {...stylex.props(styles.formMachineMark)}>{t("formEditor.markRequired")}</span>}
             {isField && row.readonly === true && <span {...stylex.props(styles.formMachineMark)}>{t("formEditor.markReadonly")}</span>}
@@ -1212,13 +1294,23 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
         {/* The keyboard route to the same array change a drag makes. A drag
             handle alone leaves reordering unreachable without a pointer. */}
         <span {...stylex.props(styles.formCardMoves)}>
-          <button type="button" className="btn btn-secondary" disabled={isFirst} onClick={() => move(rowIndex, -1)}>
+          <button
+            type="button"
+            {...ghost(styles.authoringCommand, isFirst && styles.authoringCommandDisabled)}
+            disabled={isFirst}
+            onClick={() => move(rowIndex, -1)}
+          >
             {t("formEditor.moveUp")}
           </button>
-          <button type="button" className="btn btn-secondary" disabled={isLast} onClick={() => move(rowIndex, 1)}>
+          <button
+            type="button"
+            {...ghost(styles.authoringCommand, isLast && styles.authoringCommandDisabled)}
+            disabled={isLast}
+            onClick={() => move(rowIndex, 1)}
+          >
             {t("formEditor.moveDown")}
           </button>
-          <button type="button" className="btn btn-secondary" onClick={() => removeRow(rowIndex)}>
+          <button type="button" {...ghost(styles.authoringCommand)} onClick={() => removeRow(rowIndex)}>
             {t("formEditor.remove")}
           </button>
         </span>
