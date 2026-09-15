@@ -152,27 +152,23 @@ Four project facts the dispatch must carry, because the skill cannot know them:
 Call a change done only after all four checks pass. Report what each one
 printed, not that you ran it.
 - `bun run typecheck`, then `bun run build`, then the **full** `bun test` with
-  `DATABASE_URL` set. Both rules under Conventions apply. A green without the
-  variable is not evidence. A single-file rerun is not the signal.
+  `DATABASE_URL` set. `bun run check` runs the three in that order, then
+  `test:tz`, the reporting logic test under `TZ=Europe/Zurich`. Both rules under
+  Conventions apply. A green without the variable is not evidence. A single-file
+  rerun is not the signal.
 - The antislop linter, on every Markdown file the change touched. Run the same
   check the push gate runs, over the same range: `sh scripts/gates/range.sh <
   /dev/null | sh scripts/gates/prose.sh`. The empty-range fallback to
   `origin/main..HEAD` lives in `scripts/gates/range.sh`, not in `prose.sh`
   itself — `prose.sh` reads its ranges on stdin, and an empty list checks
-  nothing and exits 0.
+  nothing, says so, and exits 0.
 - Trailing whitespace, blank-at-eof, and CRLF. Run the same check the push gate
   runs, over the same range: `sh scripts/gates/range.sh < /dev/null | sh
   scripts/gates/whitespace.sh`. The `< /dev/null` belongs on `range.sh`, which
   falls back to `origin/main..HEAD`. Handing `whitespace.sh` an empty stdin
-  checks nothing; it now says so instead of exiting 0 in silence. Measured
-  2026-09-01, while it still passed in silence: that form went green twice while
-  the pre-push hook rejected the same tree for a blank line at EOF. Run the gate
-  rather than reconstructing its two probes by hand: `git diff --check` alone
-  misses CRLF here, since
-  `.gitattributes` sets `* text=auto eol=lf` and git normalizes a CRLF
-  worktree file on `git add`, and `grep -lI $'\r'` finds nothing in Git Bash,
-  since MSYS grep opens a file in text mode and strips the CR before matching.
-  The gate script already covers both traps with `git ls-files --eol`.
+  checks nothing. Run the gate rather than its probes by hand. Plain
+  `git diff --check` misses CRLF, since `.gitattributes` sets `eol=lf`, and MSYS
+  grep strips the CR before matching. The script reads `git ls-files --eol`.
 - A real browser, for any UI change. Green tests do not see an error dialog
   rendered behind a modal, a stale result row, or an `/admin/*` route
   collision. All three shipped past a green suite here. `docs/browser-checks.md`
@@ -212,16 +208,9 @@ adds the skip, with a row naming what the increase covers.
 count at the pushed range's base against the count at its tip. It blocks only a
 rise. A file already carrying findings passes, as long as the push adds none.
 
-Measurement sets that rule. Measured on 2026-08-04, the live specs under
-`openspec/specs/` held about 3166 findings across 52 of 80 files. The
-directory has grown since; count it rather than trust a number here.
-`instance-migration` alone held 287, `timers` 220, `transition-execution` 167.
-A whole-file gate makes each of those unpushable until somebody clears its
-debt in full.
-
-That happened on 2026-08-04. A change synced one requirement into
-`development-toolchain/spec.md` and paid a 28-finding prose rewrite. Every one
-of those findings predated it.
+The live specs under `openspec/specs/` carry thousands of old findings, some
+files hundreds each. A whole-file gate would make a one-requirement sync into
+any of them pay that whole debt.
 
 Clearing a touched file's debt stays the norm where it is cheap. That norm is
 advisory. The ratchet is the mechanical floor. The gate blocks a file getting
@@ -232,9 +221,8 @@ targeted form, `<!-- antislop: allow <rule> -->` next to the line it excuses,
 with a sentence saying why. A blanket directive at the top of a file silences
 rules nobody re-examines afterwards.
 
-`bbf37d1` put a six-rule `allow-file` line at the top of this file. `CLAUDE.md`
-reports 0 findings with it and 45 without. That is the pattern to avoid, not the
-one to copy.
+`bbf37d1` put a six-rule `allow-file` line at the top of this file, and it is
+still there. That line is the pattern to avoid. Copy the targeted form instead.
 
 Four defect classes recur here and have no gate, on purpose. Stale UI state after
 a mutation needs a browser, which is why the browser check above stays. Orphaned
@@ -257,8 +245,8 @@ tsconfig.json              strict; NodeNext ESM; covers src + test
 src/schema/definition.ts   Zod schemas = the definition contract; TS types via z.infer; invariants included
 src/engine/                executor: instance store, outbox, transitions, timers, subprocess, drafts,
                             definitions, migration, admin queries
-src/runtime/api.ts         Runtime API Layer: createProcessInstance / getInstanceView / submitAndTransition
-                            / claimStep / releaseClaim / cancelInstance / listInstances / getInstanceRecord
+src/runtime/api.ts         Runtime API Layer: instance create/view/submit, claims, cancel, queries,
+                            reports, visibility, comments, attachments
 src/http/                  REST/JSON wrapper over Bun.serve; one route file
                             per surface (routes.ts, admin-routes.ts,
                             studio-routes.ts, reporting-routes.ts,
@@ -267,7 +255,8 @@ src/http/                  REST/JSON wrapper over Bun.serve; one route file
                             in admin-routes.ts, /livez and /readyz in
                             server.ts
 src/auth/                  ActorResolver seam (dev-header + JWT), local accounts, login, roles, CLI
-src/handlers/              action handlers; http.request, notification.email and process.start ship
+src/handlers/              action handlers; http.request, notification.email, process.start and
+                            instance.transition ship
 examples/                  serialized example definitions
 test/                      bun:test suites; tests run inside the container
 packages/web/              the ONE browser package (React + Vite). One build, one login, one session,
@@ -309,9 +298,11 @@ packages/form-ui/          shared step-form renderer (source-only, no build step
   or `detect_changes` scoped to the file, rather than trusting the prose.
   This is a manual habit, not a gate — a grep-based staleness detector was
   tried here and rejected for a 76-of-786 false-positive rate (see the
-  "Four defect classes" passage below), and the graph query above stays
+  "Four defect classes" passage above), and the graph query above stays
   advisory for the same reason.
-- `docs/decisions.md` — open questions, and what is decided but not yet built.
+- `docs/decisions.md` — open questions, what is decided but not yet built, and
+  every open code-review finding under its own heading.
+  `openspec/changes/archive/2026-08-18-code-review-record/` — the four dated reviews.
 - `docs/authoring-guide.md` — teaches the definition contract to process authors.
 - `ROADMAP.md` — stage-by-stage status (DONE / NOT STARTED). Open stages in
   full; one table row per finished stage.
@@ -329,8 +320,6 @@ packages/form-ui/          shared step-form renderer (source-only, no build step
   per tenant, so dump each one.
 - `openspec/changes/archive/2026-08-30-field-model-type-format-control/field-model-redesign.md` — a design record, not a spec. What the
   2026-08-30 session settled about the field model.
-- `docs/decisions.md` — every open code-review finding, under its own heading.
-  `openspec/changes/archive/2026-08-18-code-review-record/` — the four dated reviews.
 - `DESIGN.md` — the design tokens the detector reads, and what each one means.
 - `docs/browser-checks.md` — the browser checks that stay manual, per screen.
 
@@ -408,28 +397,15 @@ after a substantial change lands.
 - **No `cd` prefix, no shell variable, and no whitespace-only argument, in any
   Bash command.** The Bash tool already starts in the repository root. On this
   Windows host the permission analyzer reads every operand as a possible path,
-  and three habits of ours stop it before it reaches the auto-approval
-  classifier.
-  - `cd "C:/.../detent" && ... "$HOME/AI/AntiSlop/antislop.py" ... "$f"` loses
-    the working directory. One `$VAR` anywhere in a `cd` chain makes the final
-    directory unknowable, reported as `Contains simple_expansion`. The analyzer
-    then cannot resolve the relative paths that follow, so it asks for manual
-    approval. Drop the `cd`. Pass an absolute path for anything outside the
-    repository, and a relative one for anything inside it.
-  - `R=$(gh run list ... -q '.[0].databaseId'); gh run watch $R ...` carries no
-    `cd` at all and draws the same `Contains simple_expansion` refusal. The
-    reason code names the `$R` token. The sentence printed under it still reads
-    "this cd-compound". That wording is fixed text attached to the reason code.
-    It does not describe the command. Do not treat a missing `cd` as permission
-    to use a variable. Never round-trip a value through a shell variable inside
-    one Bash call. Run the command that produces the value. Read the value.
-    Paste it literally into a second call. One CI run id is worth one extra
-    call.
-  - `tr '\n' ' '` passes a lone space as an argument. The analyzer resolves it
-    against the working directory, gets a last path component that ends in a
-    space, and denies it as a Cygwin-emulated symlink. `paste -sd' '` breaks
-    the same way. Join lines with `xargs echo`, or leave them unjoined.
-  None of these commands was unsafe, and no message named the operand at fault.
+  and each habit below sends a safe command to manual approval.
+  - A `cd` chain holding any `$VAR` loses the working directory, reported as
+    `Contains simple_expansion`. Drop the `cd`. Pass absolute paths outside the
+    repository and relative ones inside it.
+  - A variable draws the same refusal with no `cd` at all, and the message
+    still says "cd-compound". Run the command that produces a value, read it,
+    and paste it literally into a second call.
+  - `tr '\n' ' '` and `paste -sd' '` pass a lone space, which the analyzer
+    denies as a Cygwin symlink. Join lines with `xargs echo`.
 - PostgreSQL is the datastore. The engine reaches it via Bun's native `Bun.sql`
   (no client dependency); `DATABASE_URL` is the connection convention, set by the
   devcontainer compose.
@@ -473,6 +449,12 @@ after a substantial change lands.
   the Zod source) deliberately, never as a casual side effect of another task.
   Deliberately means its own OpenSpec change with the rule delta written down.
   It does not mean never. See the stage note above.
+- A new `ProcessBody` or `Step` field has hand-kept mirrors in the studio that no
+  type check ties to the schema, so a grep for schema consumers misses them.
+  Update them in the same change: `KNOWN_KEYS` in `load-guard.ts`,
+  `PROPERTY_WORDS` and `OWNED_LISTS` in `changeSet.ts`, the section arrays in
+  `sectionsFor.ts`, and every test that lists expected keys or sections. A
+  `toContain` loop in such a test stays green when its list goes stale.
 - An OpenSpec change that changes a rule `docs/authoring-guide.md` states must
   change the guide in the same commit.
 - Every invariant that lands ships with a test that rejects a violating input.
