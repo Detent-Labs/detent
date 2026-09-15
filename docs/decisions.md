@@ -2145,9 +2145,9 @@ Paths under `panels/` and `screens/` start at `packages/web/src/areas/studio/`.
 - **KEYS-1: the form editor still wraps a long key above 80rem.** Three
   columns leave the canvas 619px at 1300px
   (`screens/FormEditorScreen.tsx:165`). On "Submit the Exit Notification", 10
-  of 59 canvas keys took two lines there. The last one wrapped at 1381px. The
-  16rem palette wraps 10 of its 38 keys at every width. Risk (Low): an author
-  reads a long key broken mid-word from 1281px to about 1390px.
+  of 59 canvas keys took two lines there. The last one wrapped at 1381px.
+  Risk (Low): an author reads a long key broken mid-word from 1281px to
+  about 1390px.
 
 ## Open from test-instance-claim-bypass (needs its own OpenSpec change)
 
