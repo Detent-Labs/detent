@@ -100,6 +100,6 @@ test`, and antislop/whitespace on touched Markdown.
 
 ## Open Questions
 
-None. Reviewers walked through and approved this design in chat before
+None. The user walked through and approved this design in chat before
 this change opened. That review included the explicit scope boundary
 against the placed field cards.
