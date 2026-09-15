@@ -7,13 +7,15 @@ An authoring command is a studio ghost button in slate, in the mono face at
 SHALL turn to ink. While pressed it SHALL keep the wash of ink at 14%, and its
 text SHALL turn to ink. Against either wash its text SHALL measure at least
 4.5:1, in both color schemes.
+
 The rule SHALL hold for every authoring command. That covers a form card's
-open control, the form tab strip's controls, the change list's commands, and
-the form editor's move-up and move-down controls on both a placed field's
-card and a group card's own legend, plus a placed field's own remove
-control. A group card's own `Remove ({count})` control is exempt: it keeps
-its distinct destructive treatment, since it performs a cascading,
-multi-entry removal.
+open control, the form tab strip's controls, and the change list's commands.
+It also covers the form editor's move-up and move-down controls. Those
+controls sit on both a placed field's card and a group card's own legend.
+They also cover a placed field's own remove control. A group card's own
+`Remove ({count})` control is exempt: it keeps its distinct destructive
+treatment, since it performs a cascading, multi-entry removal.
+
 A disabled authoring command SHALL take no hover or press look. Its text SHALL
 stay slate under the pointer, and its ground SHALL stay transparent. It keeps
 the shared disabled opacity.
