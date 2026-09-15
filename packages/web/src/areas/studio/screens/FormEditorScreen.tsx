@@ -236,10 +236,6 @@ const styles = stylex.create({
     fontFamily: fonts.mono,
     overflowWrap: "anywhere",
   },
-  formPaletteType: {
-    fontFamily: fonts.mono,
-    color: colors.textMuted,
-  },
   formAddNote: {
     marginBlock: space.s2,
     marginInline: space.s3,
