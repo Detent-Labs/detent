@@ -90,6 +90,18 @@ A field already on the view SHALL NOT appear in the palette's
 place-an-existing-field list. Removing a field from the canvas SHALL
 return it to that list, if the field stays in the catalog.
 
+A place-an-existing-field row SHALL show that field's resolved label and
+its kind icon. This is the same presentation the Fields tab's entity rail
+already uses for the field (`studio-app`). It SHALL NOT show the field's
+raw `key` or its raw `type` string as visible text. A field the catalog
+nests inside a group SHALL indent under that group's own row. The indent
+matches the same hierarchy the entity rail already draws.
+
+This presentation rule reaches the
+place-an-existing-field list alone. The "add a field to the process"
+section names a field kind, not an existing catalog field, and stays
+unchanged.
+
 #### Scenario: A field leaves the palette once placed
 
 - **WHEN** the developer drags a palette field onto the canvas
@@ -152,6 +164,23 @@ return it to that list, if the field stays in the catalog.
 - **THEN** that field appears in the process's field catalog
 - **AND** it appears there the same way a field minted on the panels
   screen's Fields view does
+
+#### Scenario: A palette row shows the field's label and kind icon
+
+- **WHEN** the developer opens the form editor for a step
+- **AND** the catalog carries an unplaced field with key `full_name` and
+  resolved label "First and last name"
+- **THEN** the palette row for that field reads "First and last name"
+- **AND** the row carries that field's kind icon
+- **AND** the row shows no `full_name` text
+
+#### Scenario: A palette row indents a group's member under the group
+
+- **WHEN** the catalog nests a field inside a group
+- **AND** neither the group nor the member is yet on the form's view
+- **THEN** the palette lists the group's own row
+- **AND** the member's row indents under it, the same depth the Fields
+  tab's entity rail draws for that member
 
 ### Requirement: The canvas places fields at the view's column count, in array order
 

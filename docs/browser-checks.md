@@ -5113,3 +5113,40 @@ flex-basis, passed its own task review on CSS-mechanism reasoning alone.
 A live browser check then found it made no measurable difference. That
 history is the reason this check belongs here, alongside the unit tests
 rather than in their place.
+
+### The palette matches the Fields tab's entity rail (`studio-form-palette-rows`)
+
+Source: `studio-form-palette-rows` tasks 2.1 and 2.2.
+
+Open the form editor for the "Submit the Service Request" step of
+`it_onboarding`. This is the same step the sibling check above uses.
+
+Pass: every entry under "AVAILABLE FIELDS" shows a Lucide kind icon and a
+resolved, human-readable label. One example is "Processing (Fabrikam)". No
+entry shows a raw snake_case key or a raw type word as visible text.
+
+The catalog's "Processing (Fabrikam)" group sits unplaced next to its own
+unplaced member, "Ticket no. (Fabrikam)". That member's row indents 24px
+under the group's row. The "Handover" group gives its own unplaced member,
+"Handover type", the same 24px indent.
+
+Dragging a palette entry still places that field on the form. This check
+dragged "Ticket no. (Fabrikam)" onto the placed `full_name` card to confirm
+it. Clicking a palette entry still places it in a new group at the end.
+This check clicked "Handover type" to confirm that.
+
+The "Add a field to the process" section below stays the same. "Text",
+"Choice", "Date", "File" and "Section" still print as plain text, without
+icons. The placed field cards on the canvas keep their old look too. The
+`full_name` card under "Personal details" still shows the raw `key` in the
+mono face. It still carries required/span/type marks and Move up/Move
+down/Remove controls.
+
+The Fields tab's entity rail renders the same "Processing (Fabrikam)" /
+"Ticket no. (Fabrikam)" pair. It uses the same icon, the same label text and
+the same 24px indent. The two rails agree. The check found zero console
+errors.
+
+This stays manual because it is a padding-alignment judgment. A `bun:test`
+run cannot observe whether a nested row's padding lines up with its parent
+group's row.
