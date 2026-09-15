@@ -49,6 +49,9 @@ import { BooleanOrExpressionInput } from "../panels/shared/BooleanOrExpressionIn
 import { LocalizedTextInput } from "../panels/shared/LocalizedTextInput";
 import { isExpression, type BoolOrExpr } from "../panels/shared/overrideMode";
 import { effectiveFlag, gatedKeys, setFlag, writtenFieldCounts, type FlagKey, type WrittenAccessor } from "../draft/view-flags";
+import { PanelsRailFieldRow } from "../panels/EntityTabs";
+import { flattenRailFields } from "../draft/panel-rail";
+import { fieldKindIcon, fieldKindWord } from "../draft/field-type-labels";
 import { FormPreview } from "../panels/FormPreview";
 import { FormTabStrip, formTabDomId, formTabPanelDomId } from "../panels/FormTabStrip";
 
@@ -1033,7 +1036,8 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
   const isGroupRow = (row: DraftViewEntry) => isDraftViewField(row) && fieldFor(row.ref)?.type === "group";
 
   const catalogIds = fields.map((f) => f.id).filter((id): id is FieldId => id !== undefined);
-  const palette = unplacedRefs(catalogIds, rows);
+  const unplacedIds = new Set(unplacedRefs(catalogIds, rows));
+  const palette = flattenRailFields(draft.fields).filter((row) => unplacedIds.has(row.id as FieldId));
 
   const groupKeys = rows
     .filter(isDraftViewField)
@@ -1339,23 +1343,30 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
             <p className="empty">{t("formEditor.paletteEmpty")}</p>
           ) : (
             <ul {...stylex.props(styles.formPaletteList)}>
-              {palette.map((id) => (
-                <li key={id}>
-                  {/* Draggable for a pointer, and a plain activation for a
-                      keyboard: the same append the drop would make at the end. */}
-                  <button
-                    type="button"
-                    {...stylex.props(styles.formPaletteField)}
-                    draggable
-                    onDragStart={() => setDragging({ kind: "palette", ref: id })}
-                    onDragEnd={() => setDragging(undefined)}
-                    onClick={() => placeFromPalette(id, rows.length)}
-                  >
-                    <span {...stylex.props(styles.formPaletteKey)}>{labelFor(id)}</span>
-                    <span {...stylex.props(styles.formPaletteType)}>{typeLabel(fieldFor(id)?.type)}</span>
-                  </button>
-                </li>
-              ))}
+              {palette.map((row) => {
+                const id = row.id as FieldId;
+                const field = fieldFor(id);
+                const label = (field && resolveDraftLocalizedText(field.label, contentLocale, draft.baseLocale ?? "en")) || t("formEditor.unnamedField");
+                return (
+                  <li key={id}>
+                    <PanelsRailFieldRow
+                      id={id}
+                      label={label}
+                      typeLabel={field ? fieldKindWord(field) : undefined}
+                      groupLabel={undefined}
+                      kindIcon={field ? fieldKindIcon(field) : undefined}
+                      depth={row.depth}
+                      issues={0}
+                      selected={false}
+                      onClick={() => placeFromPalette(id, rows.length)}
+                      onDragStart={() => setDragging({ kind: "palette", ref: id })}
+                      onDragEnd={() => setDragging(undefined)}
+                      onDrop={() => {}}
+                      dragging={false}
+                    />
+                  </li>
+                );
+              })}
             </ul>
           )}
 
