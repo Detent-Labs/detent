@@ -2144,7 +2144,7 @@ Paths under `panels/` and `screens/` start at `packages/web/src/areas/studio/`.
   screen reader announces an untitled process on every draft (WCAG 4.1.2).
 - **KEYS-1: the form editor still wraps a long key above 80rem.** Three
   columns leave the canvas 619px at 1300px
-  (`screens/FormEditorScreen.tsx:165`). On "Submit the Exit Notification", 10
+  (`screens/FormEditorScreen.tsx:168`). On "Submit the Exit Notification", 10
   of 59 canvas keys took two lines there. The last one wrapped at 1381px.
   Risk (Low): an author reads a long key broken mid-word from 1281px to
   about 1390px.

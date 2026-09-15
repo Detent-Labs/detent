@@ -5147,7 +5147,6 @@ The Fields tab's entity rail renders the same "Processing (Fabrikam)" /
 the same 24px indent. The two rails agree. The check found zero console
 errors.
 
-This stays manual because it is a rendering, icon and indentation judgment.
-`bun:test` cannot observe whether an icon appears. It cannot observe whether
-a label reads as a resolved value instead of a raw key. It cannot observe
-whether a nested row's padding lines up with its parent group's row.
+This stays manual because it is a padding-alignment judgment: `bun:test`
+cannot observe whether a nested row's padding lines up with its parent
+group's row.

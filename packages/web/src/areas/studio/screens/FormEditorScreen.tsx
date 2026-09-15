@@ -1346,7 +1346,6 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
                 return (
                   <li key={id}>
                     <PanelsRailFieldRow
-                      id={id}
                       label={label}
                       typeLabel={field ? fieldKindWord(field) : undefined}
                       groupLabel={undefined}

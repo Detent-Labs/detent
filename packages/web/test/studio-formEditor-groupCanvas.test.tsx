@@ -28,6 +28,10 @@ const DELTA = "field_00000000-0000-4000-8000-0000000000b5";
 const ADDRESS = "field_00000000-0000-4000-8000-0000000000b6";
 const STREET = "field_00000000-0000-4000-8000-0000000000b7";
 const CITY = "field_00000000-0000-4000-8000-0000000000b8";
+// Neither id below is referenced by `DRAFT`'s view, so both stay unplaced
+// and land in the palette (`studio-form-palette-rows`).
+const PALETTE_GROUP = "field_00000000-0000-4000-8000-0000000000d1";
+const PALETTE_MEMBER = "field_00000000-0000-4000-8000-0000000000d2";
 
 function validation(): ValidationResult {
   return {
@@ -96,6 +100,13 @@ const DRAFT = {
       ],
     },
     { id: GAMMA, key: "gamma", type: "string", label: { en: "Gamma" } },
+    {
+      id: PALETTE_GROUP,
+      key: "extras",
+      type: "group",
+      label: { en: "Extras" },
+      fields: [{ id: PALETTE_MEMBER, key: "hidden_extra", type: "string", label: { en: "Extra field" } }],
+    },
   ],
   workflow: {
     initialStep: "step_a",
@@ -205,6 +216,17 @@ function previewHtml(html: string): string {
   const start = html.indexOf('aria-label="What a participant meets"');
   expect(start, "expected to find the preview pane").toBeGreaterThan(-1);
   return html.slice(start);
+}
+
+/** The palette region alone, bounded by its own `aria-label` and the
+ * canvas's, the same technique `canvasHtml` uses. The palette sits ahead of
+ * the canvas in the three-column layout, so this always finds it first. */
+function paletteHtml(html: string): string {
+  const start = html.indexOf('aria-label="Catalog fields not on this form"');
+  const end = html.indexOf('aria-label="Form layout"');
+  expect(start, "expected to find the palette region").toBeGreaterThan(-1);
+  expect(end, "expected to find the canvas region, to bound the palette region").toBeGreaterThan(-1);
+  return html.slice(start, end);
 }
 
 /** The whole `<fieldset>` whose legend shows `legendText`, start to its own
@@ -407,5 +429,17 @@ describe("A placed field's key renders a <wbr> node immediately after each under
   it("breaks email_address immediately after its underscore", () => {
     const canvas = canvasHtml(render(KEY_WRAP_DRAFT));
     expect(canvas).toContain(wbrWrapped("email_address"));
+  });
+});
+
+describe("The palette lists a catalog field the view has not placed", () => {
+  it("prints the resolved label, not the raw key, and indents an unplaced group's own unplaced member with its kind icon", () => {
+    const palette = paletteHtml(render());
+    expect(palette).toContain(">Extra field<");
+    expect(palette).not.toContain("hidden_extra");
+
+    const memberRow = cardBlock(palette, "Extra field");
+    expect(memberRow).toContain('data-depth="1"');
+    expect(memberRow).toContain("<svg");
   });
 });
