@@ -139,6 +139,20 @@ const styles = stylex.create({
   rowDropAfter: {
     boxShadow: `inset 0 -3px 0 0 ${colors.accent}`,
   },
+  // The keyboard move's live region. Off screen, never `display: none`: a
+  // hidden region is announced by no engine. `EntityTabs.tsx`'s own
+  // move-announcer style is the precedent for this exact pattern.
+  visuallyHidden: {
+    position: "absolute",
+    width: 1,
+    height: 1,
+    margin: -1,
+    padding: 0,
+    overflow: "hidden",
+    clipPath: "inset(50%)",
+    whiteSpace: "nowrap",
+    borderWidth: 0,
+  },
   // The foot: the three add controls. The 2px divider is the structural rule
   // between the steps above and the controls below.
   foot: {
@@ -206,6 +220,10 @@ export function StepsRail({ currentStepId, onSelectStep, onMove, onAddStep }: Pr
   const [dragIndex, setDragIndex] = useState<number | undefined>(undefined);
   const [dropGap, setDropGap] = useState<number | undefined>(undefined);
   const dragging = dragIndex !== undefined;
+  // The keyboard move's own announcement. The mouse-drag path never touches
+  // this: the delta spec's live-region assertion covers the keyboard
+  // scenario alone.
+  const [announcement, setAnnouncement] = useState("");
 
   const endDrag = () => {
     setDragIndex(undefined);
@@ -289,6 +307,15 @@ export function StepsRail({ currentStepId, onSelectStep, onMove, onAddStep }: Pr
                     setDragIndex(i);
                   }}
                   onDragEnd={endDrag}
+                  onKeyDown={(e) => {
+                    if (!e.altKey || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
+                    e.preventDefault();
+                    if (step.id === undefined) return;
+                    const target = Math.max(0, Math.min(i + (e.key === "ArrowUp" ? -1 : 1), ordered.length - 1));
+                    if (target === i) return;
+                    setAnnouncement(t("stepsRail.movedAnnouncement").replace("{step label}", label).replace("{position}", String(target + 1)));
+                    onMove(step.id, target);
+                  }}
                 >
                   <GripVertical size={18} strokeWidth={1.75} aria-hidden="true" />
                 </button>
@@ -297,6 +324,12 @@ export function StepsRail({ currentStepId, onSelectStep, onMove, onAddStep }: Pr
           })}
         </ol>
       )}
+      {/* The keyboard move's announcement. Polite, and mounted always: a live
+        * region added to the DOM at the same moment its text arrives is
+        * announced by no engine reliably. */}
+      <p {...stylex.props(styles.visuallyHidden)} role="status" aria-live="polite">
+        {announcement}
+      </p>
       <section {...stylex.props(styles.foot)} aria-labelledby={footHeadingId}>
         <h2 {...stylex.props(styles.footHeading)} id={footHeadingId}>
           {t("stepsRail.addLegend")}

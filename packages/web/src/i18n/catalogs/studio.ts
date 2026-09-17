@@ -585,6 +585,7 @@ export const en = {
   "stepsRail.moveEarlier": "Move earlier",
   "stepsRail.moveLater": "Move later",
   "stepsRail.dragHandle": "Reorder {step label}",
+  "stepsRail.movedAnnouncement": "{step label} moved to position {position}",
   "stepsRail.addLegend": "Add",
   "stepsRail.addStep": "Add a step",
   "stepsRail.addSubprocess": "Add a call to another process",

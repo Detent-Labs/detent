@@ -286,6 +286,14 @@ describe("The steps rail's reorder controls", () => {
   });
 });
 
+describe("The steps rail's keyboard-move announcement", () => {
+  it("renders a visually-hidden `aria-live=\"polite\"` region, empty before any move", () => {
+    const html = render();
+
+    expect(html).toMatch(/<p[^>]*aria-live="polite"[^>]*><\/p>/);
+  });
+});
+
 describe("The steps rail's foot", () => {
   it("carries three add controls: a step, a call to another process, and an end", () => {
     const html = render();
