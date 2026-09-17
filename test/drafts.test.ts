@@ -116,25 +116,47 @@ test.skipIf(!DB)("the creator lands on the Developer list at process creation", 
 });
 
 test.skipIf(!DB)("a forced failure on the access-list insert leaves neither the draft nor the access-list row behind", async () => {
-  // Same technique as events.test.ts's "a failed creation persists neither the
-  // instance nor its events": a temporary CHECK constraint makes the second
-  // write of the transaction unwritable, so the failure lands after the draft
-  // insert already ran, and only the rollback proves the two writes are atomic.
+  // Same technique as events.test.ts's atomicity tests: force a failure
+  // after the draft insert already ran, so only the rollback proves the two
+  // writes are atomic. The CHECK targets this test's own processId only, so
+  // it cannot block a concurrent test's or session's unrelated 'developer'
+  // insert against the shared database.
   const processId = pid();
-  await sql`ALTER TABLE process_access_roles ADD CONSTRAINT tmp_no_developer CHECK (kind <> 'developer')`;
+  await sql.unsafe(
+    `ALTER TABLE process_access_roles ADD CONSTRAINT tmp_no_developer_for_test CHECK (NOT (process_id = '${processId}' AND kind = 'developer'))`,
+  );
   let raised: unknown;
   try {
     await saveDraft(processId, { body: invalidBody("v1"), layout: {}, revision: 0, updatedBy: "user_creator" }, sql);
   } catch (e) {
     raised = e;
   } finally {
-    await sql`ALTER TABLE process_access_roles DROP CONSTRAINT tmp_no_developer`;
+    await sql`ALTER TABLE process_access_roles DROP CONSTRAINT tmp_no_developer_for_test`;
   }
   expect(raised).toBeInstanceOf(Error);
 
   expect(await getDraft(processId, sql)).toBeUndefined();
   const rows = (await sql`SELECT 1 FROM process_access_roles WHERE process_id = ${processId}`) as unknown[];
   expect(rows.length).toBe(0);
+});
+
+test.skipIf(!DB)("recreating a deleted draft for a published process does not add the recreator to the Developer list", async () => {
+  const processId = pid();
+  await saveDraft(processId, { body: invalidBody("v1"), layout: {}, revision: 0, updatedBy: "user_creator" }, sql);
+  await publishBody(processId, validBody("published"), reg, dataSourceReg, sql);
+  await deleteDraft(processId, sql);
+
+  await saveDraft(processId, { body: invalidBody("v2"), layout: {}, revision: 0, updatedBy: "user_recreator" }, sql);
+
+  const recreatorRow = (await sql`
+    SELECT 1 FROM process_access_roles WHERE process_id = ${processId} AND kind = 'developer' AND principal = 'user_recreator'
+  `) as unknown[];
+  expect(recreatorRow.length).toBe(0);
+
+  const creatorRow = (await sql`
+    SELECT 1 FROM process_access_roles WHERE process_id = ${processId} AND kind = 'developer' AND principal = 'user_creator'
+  `) as unknown[];
+  expect(creatorRow.length).toBe(1);
 });
 
 test.skipIf(!DB)("a structurally invalid body saves and reads back unchanged", async () => {

@@ -58,7 +58,7 @@ beforeAll(async () => {
   if (DB) await initSchema();
 });
 beforeEach(async () => {
-  if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, definitions, draft_snapshots, drafts, instance_comments, instance_attachments`;
+  if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, definitions, draft_snapshots, drafts, instance_comments, instance_attachments, process_access_roles`;
   if (DB) await clearInstanceAudit();
 });
 
