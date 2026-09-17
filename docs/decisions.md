@@ -1655,7 +1655,7 @@ recorded rather than fixed. The RAIL tags are local to this section.
   critique of `authoring-command-ink-advisory-role` measured it on
   2026-09-14. The IT Offboarding draft's first path had a condition row.
   - The "Only when" fieldset keeps the default `min-inline-size: min-content`
-    (`panels/PathsPanel.tsx:234`). The row's field select takes its longest
+    (`panels/PathsPanel.tsx:290`). The row's field select takes its longest
     option's width, 647px (`panels/shared/ConditionBuilder.tsx:194`). The
     fieldset then ends at x=1028, past the Path to section's edge at x=863.
   - The On exit section covers the row's last 107px, its remove control
@@ -1663,7 +1663,7 @@ recorded rather than fixed. The RAIL tags are local to this section.
   - Risk (Medium): a pointer cannot reach the row's remove control at 1280px,
     and the dashed box runs under another section.
 - **STEP-2: the guard's label wraps the whole condition builder.** One
-  `<label>` holds the guard text and the builder (`panels/PathsPanel.tsx:246`).
+  `<label>` holds the guard text and the builder (`panels/PathsPanel.tsx:302`).
   - Before a row exists, "+ Add row" is that label's first labelable control
     (`panels/shared/ConditionBuilder.tsx:161`). Measured 2026-09-14, a click on
     the label's own text added a row. The button's accessible name then reads
@@ -2178,6 +2178,21 @@ gap outside that change's own scope. The CLAIM tag is local to this section.
   A delegate carries the same gap. `delegateClaim` never checks the
   target's candidacy. `loadInstanceForActor` admits that target only as the
   test instance's own starter or a `system:admin` holder.
+
+## Open from the studio-path-row-field-order final review (needs its own OpenSpec change)
+
+The final whole-branch review for `studio-path-row-field-order` (2026-09-17)
+found one gap outside that change's own scope.
+
+- **The path row's `label`/`key`/`to` field captions are literal text.**
+  `PathsPanel.tsx`'s `fieldLabelText`-styled `<span>`s read the bare words
+  `label` (`panels/PathsPanel.tsx:223`), `key` (`:231`) and `to` (`:240`).
+  They skip the catalog. Every other string this file renders calls `t()`,
+  among them `t("paths.selectTargetStep")`, `t("paths.newPathTargetLabel")`,
+  `t("paths.triggeredByLabel")`, `t("paths.removePath")` and
+  `t("paths.addPath")`. The three captions predate `studio-path-row-field-order`,
+  which only re-wrapped the existing bare text into styled spans; they are
+  now more visible as prominent field labels instead of small inline text.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 
