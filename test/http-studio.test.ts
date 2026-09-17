@@ -162,6 +162,32 @@ test.skipIf(!DB)("a developer reads and writes a draft", async () => {
   expect(body.updatedBy).toBe(developer.id);
 });
 
+test.skipIf(!DB)("the engine refuses an unlisted developer on GET/PUT/DELETE for an existing draft", async () => {
+  const processId = pid();
+  await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: authoredBody("v1"), layout: {}, revision: 0 }));
+
+  const unlisted: Actor = { id: "user_unlisted_dev", roles: [DEVELOPER_ROLE] };
+  expect((await fetch(authedReq(`http://x/drafts/${processId}`, "GET", unlisted))).status).toBe(403);
+  expect(
+    (await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", unlisted, { body: authoredBody("v2"), layout: {}, revision: 0 })))
+      .status,
+  ).toBe(403);
+  expect((await fetch(authedReq(`http://x/drafts/${processId}`, "DELETE", unlisted))).status).toBe(403);
+
+  const stored = (await sql`SELECT revision FROM drafts WHERE process_id = ${processId}`) as { revision: number }[];
+  expect(stored[0]!.revision).toBe(0);
+});
+
+test.skipIf(!DB)("an admin reaches a draft with no Developer list", async () => {
+  const processId = pid();
+  await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: authoredBody("v1"), layout: {}, revision: 0 }));
+  await sql`DELETE FROM process_access_roles WHERE process_id = ${processId}`;
+
+  const admin: Actor = { id: "user_admin", roles: [ADMIN_ROLE] };
+  const res = await fetch(authedReq(`http://x/drafts/${processId}`, "GET", admin));
+  expect(res.status).toBe(200);
+});
+
 test.skipIf(!DB)("a developer's draft response reports canPlanMigration true", async () => {
   const processId = pid();
   await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: authoredBody("v1"), layout: {}, revision: 0 }));
@@ -816,15 +842,15 @@ test.skipIf(!DB)("a PUT carrying baseVersion stamps it and the GET reports it", 
   await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", publisher, { body: publishableBody("v1"), layout: {}, revision: 0 }));
   const published = await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", publisher));
   expect(published.status).toBe(200);
-  await fetch(authedReq(`http://x/drafts/${processId}`, "DELETE", developer));
+  await fetch(authedReq(`http://x/drafts/${processId}`, "DELETE", publisher));
 
   const put = await fetch(
-    authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: authoredBody("seeded"), layout: {}, revision: 0, baseVersion: 1 }),
+    authedReq(`http://x/drafts/${processId}`, "PUT", publisher, { body: authoredBody("seeded"), layout: {}, revision: 0, baseVersion: 1 }),
   );
   expect(put.status).toBe(200);
   expect(((await put.json()) as { baseVersion: number | null }).baseVersion).toBe(1);
 
-  const got = await fetch(authedReq(`http://x/drafts/${processId}`, "GET", developer));
+  const got = await fetch(authedReq(`http://x/drafts/${processId}`, "GET", publisher));
   expect(((await got.json()) as { baseVersion: number | null }).baseVersion).toBe(1);
 });
 

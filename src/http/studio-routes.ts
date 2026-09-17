@@ -6,8 +6,14 @@
  *
  * Each handler resolves the actor, then applies one of three gates before any
  * read or write:
- * - `requireAuthoring` (author OR developer) on the four draft routes, the
- *   publish route (beside `PUBLISH_ROLE`) and `GET /registry`.
+ * - `requireAuthoring` (author OR developer) on `GET /drafts`, the publish
+ *   route (beside `PUBLISH_ROLE`) and `GET /registry`. `GET`/`PUT`/`DELETE
+ *   /drafts/:processId` take it too, but only for a processId with neither a
+ *   draft nor a published version yet — `PUT` additionally needs
+ *   `CREATE_ROLE` there. Once one exists, those three instead need
+ *   `requireDeveloperListOrAdmin`: `ADMIN_ROLE` bypasses `requireAuthoring`
+ *   entirely there (matching `GET /processes/:processId/access` below), any
+ *   other actor still needs both.
  * - `requireStudioRead` (those two OR templates) on the two template reads and
  *   the published version body.
  * - `await requirePermission(actor, "migrate", processId, db)` alone on the
@@ -50,6 +56,7 @@ import {
 import { createDefaultAssignmentRegistry } from "../engine/assignment-strategies.js";
 import { describeConfigSchema, type ConfigFieldDescriptor } from "../engine/config-descriptor.js";
 import type { ZodTypeAny } from "zod";
+import type { Actor } from "../cel/eval.js";
 import type { ActorResolver } from "../auth/resolve.js";
 import { requireRole, requirePermission, can, AuthorizationError, DEVELOPER_ROLE, TEMPLATES_ROLE, AUTHOR_ROLE, ADMIN_ROLE, CREATE_ROLE } from "../auth/authorize.js";
 import { addAccessPrincipal, deleteAccessPrincipal, getAccessLists, processesMatchingAccessList, matchesAccessList, type AccessKind } from "../auth/process-access.js";
@@ -88,6 +95,19 @@ function requireStudioRead(actor: { id: string; roles: readonly string[] }): voi
   );
 }
 
+/**
+ * `ADMIN_ROLE`, or a match on that process's own Developer list
+ * (process-access-roles). Gates `GET`/`PUT`/`DELETE /drafts/:processId`
+ * for a process that already has a draft or a published version — the
+ * complement of Task 4.1's `CREATE_ROLE` check on the branch where
+ * neither exists yet.
+ */
+async function requireDeveloperListOrAdmin(actor: Actor, processId: ProcessId, db: SQL): Promise<void> {
+  if (actor.roles.includes(ADMIN_ROLE)) return;
+  if (await matchesAccessList(actor, processId, "developer", db)) return;
+  throw new AuthorizationError(`actor '${actor.id}' is not on process '${processId}''s Developer list`);
+}
+
 export async function handleListDrafts(req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
   return route(req, resolver, db, requireAuthoring, async () => {
     return { status: 200, body: await listDrafts(db) };
@@ -95,19 +115,34 @@ export async function handleListDrafts(req: Request, resolver: ActorResolver, db
 }
 
 export async function handleGetDraft(processId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
-  return route(req, resolver, db, requireAuthoring, async (actor) => {
-    const draft = await getDraft(processId as ProcessId, db);
-    if (!draft) return notFound(`no draft: ${processId}`);
-    const canPlanMigration = await can(actor, "migrate", processId as ProcessId, db);
-    // The same predicate `handlePublishDraft` enforces, reported rather than
-    // enforced: the studio reads it to decide whether to offer Publish at all
-    // (process-drafts). Neither authoring role implies the publish permission,
-    // and a scoped grant reaches it without either role, so a role check on the
-    // client would answer wrong in both directions.
-    const canPublish = await can(actor, "publish", processId as ProcessId, db);
-    const body: Draft & { canPlanMigration: boolean; canPublish: boolean } = { ...draft, canPlanMigration, canPublish };
-    return { status: 200, body };
-  });
+  return route(
+    req,
+    resolver,
+    db,
+    async (actor) => {
+      if (await hasNoDraftAndNoPublishedVersion(processId as ProcessId, db)) {
+        requireAuthoring(actor);
+      } else {
+        if (!actor.roles.includes(ADMIN_ROLE)) {
+          requireAuthoring(actor);
+        }
+        await requireDeveloperListOrAdmin(actor, processId as ProcessId, db);
+      }
+    },
+    async (actor) => {
+      const draft = await getDraft(processId as ProcessId, db);
+      if (!draft) return notFound(`no draft: ${processId}`);
+      const canPlanMigration = await can(actor, "migrate", processId as ProcessId, db);
+      // The same predicate `handlePublishDraft` enforces, reported rather than
+      // enforced: the studio reads it to decide whether to offer Publish at all
+      // (process-drafts). Neither authoring role implies the publish permission,
+      // and a scoped grant reaches it without either role, so a role check on the
+      // client would answer wrong in both directions.
+      const canPublish = await can(actor, "publish", processId as ProcessId, db);
+      const body: Draft & { canPlanMigration: boolean; canPublish: boolean } = { ...draft, canPlanMigration, canPublish };
+      return { status: 200, body };
+    },
+  );
 }
 
 export async function handleSaveDraft(processId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
@@ -116,11 +151,16 @@ export async function handleSaveDraft(processId: string, req: Request, resolver:
     resolver,
     db,
     async (actor) => {
-      requireAuthoring(actor);
       if (await hasNoDraftAndNoPublishedVersion(processId as ProcessId, db)) {
+        requireAuthoring(actor);
         if (!actor.roles.includes(CREATE_ROLE)) {
           throw new AuthorizationError(`actor '${actor.id}' lacks required role '${CREATE_ROLE}' to create process '${processId}'`);
         }
+      } else {
+        if (!actor.roles.includes(ADMIN_ROLE)) {
+          requireAuthoring(actor);
+        }
+        await requireDeveloperListOrAdmin(actor, processId as ProcessId, db);
       }
     },
     async (actor) => {
@@ -143,11 +183,26 @@ export async function handleSaveDraft(processId: string, req: Request, resolver:
 }
 
 export async function handleDeleteDraft(processId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
-  return route(req, resolver, db, requireAuthoring, async () => {
-    const removed = await deleteDraft(processId as ProcessId, db);
-    if (!removed) return notFound(`no draft: ${processId}`);
-    return { status: 204, body: null };
-  });
+  return route(
+    req,
+    resolver,
+    db,
+    async (actor) => {
+      if (await hasNoDraftAndNoPublishedVersion(processId as ProcessId, db)) {
+        requireAuthoring(actor);
+      } else {
+        if (!actor.roles.includes(ADMIN_ROLE)) {
+          requireAuthoring(actor);
+        }
+        await requireDeveloperListOrAdmin(actor, processId as ProcessId, db);
+      }
+    },
+    async () => {
+      const removed = await deleteDraft(processId as ProcessId, db);
+      if (!removed) return notFound(`no draft: ${processId}`);
+      return { status: 204, body: null };
+    },
+  );
 }
 
 /**
