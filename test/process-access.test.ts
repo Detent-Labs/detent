@@ -114,6 +114,8 @@ test.skipIf(!DB)("the engine refuses an unlisted actor", async () => {
 
   await expect(addAccessPrincipal(stranger, processId, "developer", "user_new", sql)).rejects.toThrow(AuthorizationError);
   await expect(addAccessPrincipal(stranger, processId, "owner", "user_new", sql)).rejects.toThrow(AuthorizationError);
+  await expect(deleteAccessPrincipal(stranger, processId, "developer", "user_new", sql)).rejects.toThrow(AuthorizationError);
+  await expect(deleteAccessPrincipal(stranger, processId, "owner", "user_new", sql)).rejects.toThrow(AuthorizationError);
 });
 
 test.skipIf(!DB)("an admin edits either list unconditionally", async () => {
@@ -149,6 +151,7 @@ test.skipIf(!DB)("the engine refuses a Developer holding no Owner entry", async 
   const dev: Actor = { id: "user_dev", roles: [DEVELOPER_ROLE] };
 
   await expect(addAccessPrincipal(dev, processId, "reader", "user_reader", sql)).rejects.toThrow(AuthorizationError);
+  await expect(deleteAccessPrincipal(dev, processId, "reader", "user_reader", sql)).rejects.toThrow(AuthorizationError);
 });
 
 test.skipIf(!DB)("an admin edits the Reader list unconditionally", async () => {
