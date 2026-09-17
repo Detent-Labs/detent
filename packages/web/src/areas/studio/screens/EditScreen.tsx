@@ -444,7 +444,7 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
     setSaveState((s) => ({ ...s, layout: { ...s.layout, [stepId]: point } }));
   };
 
-  // Overwrites every step's position at once, unlike onMoveStep's one-step
+  // Overwrites every step's position at once, unlike onMoveCanvasPosition's one-step
   // write, and clears every waypoint too (design.md, Decisions 2 and 4).
   // Gated by hasHandPlacedStep, through the browser's own confirm() with a
   // t() string. Publish and Discard no longer share that pattern: each commits
