@@ -584,6 +584,7 @@ export const en = {
   "stepsRail.issueMarkOne": "open issue",
   "stepsRail.moveEarlier": "Move earlier",
   "stepsRail.moveLater": "Move later",
+  "stepsRail.dragHandle": "Reorder {step label}",
   "stepsRail.addLegend": "Add",
   "stepsRail.addStep": "Add a step",
   "stepsRail.addSubprocess": "Add a call to another process",

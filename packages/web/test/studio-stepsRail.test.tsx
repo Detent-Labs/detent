@@ -137,11 +137,16 @@ function buttonTags(html: string): string[] {
   return html.match(/<button[^>]*>/g) ?? [];
 }
 
+/** Every rendered rail `<li>…</li>` row, tags intact. */
+function rawRows(html: string): string[] {
+  return html.match(/<li[^>]*>[\s\S]*?<\/li>/g) ?? [];
+}
+
 /** Every rendered rail row, one `<li>…</li>` per step, with every tag
  * stripped. A move control's name sits in an attribute, so the strip removes
  * it. */
 function rowTexts(html: string): string[] {
-  return (html.match(/<li[^>]*>[\s\S]*?<\/li>/g) ?? []).map((row) => row.replace(/<[^>]+>/g, ""));
+  return rawRows(html).map((row) => row.replace(/<[^>]+>/g, ""));
 }
 
 describe("The steps rail's order and numbering", () => {
@@ -240,32 +245,44 @@ describe("A steps-rail row's issue badge", () => {
 });
 
 describe("The steps rail's reorder controls", () => {
-  it("refuses the move-earlier control on the first row", () => {
-    const earlier = buttonTags(render()).filter((b) => b.includes('aria-label="Move earlier"'));
+  it("gives every row a drag handle naming the step it reorders", () => {
+    const grips = buttonTags(render()).filter((b) => b.includes('aria-label="Reorder '));
 
-    expect(earlier).toHaveLength(3);
-    expect(earlier[0]).toContain("disabled");
-    expect(earlier[1]).not.toContain("disabled");
-    expect(earlier[2]).not.toContain("disabled");
+    expect(grips).toHaveLength(3);
+    expect(grips[0]).toContain('aria-label="Reorder Intake"');
+    expect(grips[1]).toContain('aria-label="Reorder Credit check"');
+    expect(grips[2]).toContain('aria-label="Reorder Done"');
   });
 
-  it("refuses the move-later control on the last row", () => {
-    const later = buttonTags(render()).filter((b) => b.includes('aria-label="Move later"'));
+  it("enables every drag handle when the rail holds more than one step", () => {
+    const grips = buttonTags(render()).filter((b) => b.includes('aria-label="Reorder '));
 
-    expect(later).toHaveLength(3);
-    expect(later[0]).not.toContain("disabled");
-    expect(later[2]).toContain("disabled");
+    for (const grip of grips) expect(grip).not.toContain("disabled");
   });
 
-  it("gives a lone step both refusals, since it is first and last at once", () => {
+  it("disables the drag handle when the rail holds exactly one step", () => {
     const one = {
       baseLocale: "en",
       workflow: { initialStep: "step_a", steps: [{ id: "step_a", key: "only", label: { en: "Only" }, type: "task" }] },
     } as unknown as Draft;
-    const moves = buttonTags(render({ draft: one })).filter((b) => b.includes("Move "));
+    const grips = buttonTags(render({ draft: one })).filter((b) => b.includes('aria-label="Reorder '));
 
-    expect(moves).toHaveLength(2);
-    for (const move of moves) expect(move).toContain("disabled");
+    expect(grips).toHaveLength(1);
+    expect(grips[0]).toContain("disabled");
+  });
+
+  it("renders the grip as a sibling of the row's own button, never nested inside it", () => {
+    const rows = rawRows(render());
+
+    for (const row of rows) {
+      // The row's own button opens and closes before the grip's button
+      // opens: two sibling `<button>` elements, not one nested in the other.
+      const rowMainClose = row.indexOf("</button>");
+      const gripOpen = row.indexOf('aria-label="Reorder ');
+
+      expect(rowMainClose).toBeGreaterThan(-1);
+      expect(gripOpen).toBeGreaterThan(rowMainClose);
+    }
   });
 });
 

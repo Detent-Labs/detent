@@ -1,5 +1,6 @@
 import * as stylex from "@stylexjs/stylex";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { useState } from "react";
+import { GripVertical } from "lucide-react";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { t } from "../catalog.js";
 import { useDraft } from "../draft/store.js";
@@ -102,18 +103,41 @@ const styles = stylex.create({
   badgeAdvisory: {
     color: colors.textMuted,
   },
-  move: {
+  // The drag handle, at the row's trailing edge, in the chevrons' old
+  // position. Padding gives it a 24x24 CSS pixel hit area independent of the
+  // 18px icon inside it (`spa-accessibility`'s pointer-target minimum).
+  grip: {
     display: "flex",
     alignItems: "center",
+    justifyContent: "center",
     flex: "none",
+    minWidth: 24,
+    minHeight: 24,
     backgroundColor: { default: "transparent", ":hover": colors.surfaceMuted },
     color: { default: colors.textMuted, ":disabled": colors.textMuted },
     borderWidth: 0,
-    paddingBlock: 0,
+    paddingBlock: space.s1,
     paddingInline: space.s1,
     font: "inherit",
     opacity: { default: 1, ":disabled": 0.45 },
-    cursor: { default: "pointer", ":disabled": "not-allowed" },
+    cursor: { default: "grab", ":disabled": "not-allowed" },
+  },
+  // The dragged row: "this row is momentarily not where it belongs"
+  // (design.md), the same 45% opacity a disabled control already uses. No
+  // shadow, no radius, no lift.
+  rowDragging: {
+    opacity: 0.45,
+  },
+  // The drop-position indicator: the same `boxShadow` mechanism
+  // `rowMainCurrent` uses for its own 3px mark, turned horizontal. It marks
+  // the gap immediately before this row.
+  rowDropBefore: {
+    boxShadow: `inset 0 3px 0 0 ${colors.accent}`,
+  },
+  // The same mark, on this row's trailing edge, for the one gap after the
+  // last row.
+  rowDropAfter: {
+    boxShadow: `inset 0 -3px 0 0 ${colors.accent}`,
   },
   // The foot: the three add controls. The 2px divider is the structural rule
   // between the steps above and the controls below.
@@ -176,6 +200,17 @@ export function StepsRail({ currentStepId, onSelectStep, onMove, onAddStep }: Pr
   const baseLocale = draft.baseLocale ?? "en";
   const ordered = draft.workflow?.steps ?? [];
   const footHeadingId = "studio-steps-rail-add";
+  // The row index currently picked up, and the nearest drop gap (0..ordered.length,
+  // a gap index counted in the array's own numbering: gap `i` sits immediately
+  // before row `i`, and gap `ordered.length` sits after the last row).
+  const [dragIndex, setDragIndex] = useState<number | undefined>(undefined);
+  const [dropGap, setDropGap] = useState<number | undefined>(undefined);
+  const dragging = dragIndex !== undefined;
+
+  const endDrag = () => {
+    setDragIndex(undefined);
+    setDropGap(undefined);
+  };
 
   return (
     <nav {...stylex.props(styles.rail)} aria-label={t("stepsRail.label")}>
@@ -186,10 +221,40 @@ export function StepsRail({ currentStepId, onSelectStep, onMove, onAddStep }: Pr
           {ordered.map((step, i) => {
             const issues = railRowIssues(validation.issues, step);
             const current = step.id !== undefined && step.id === currentStepId;
-            const earlier = ordered[i - 1]?.id;
-            const later = ordered[i + 1]?.id;
+            const label = resolveDraftLocalizedText(step.label, contentLocale, baseLocale) || step.key || t("steps.unnamedStep");
+            const gripDisabled = step.id === undefined || ordered.length <= 1;
+            const dropBefore = dragging && dropGap === i;
+            const dropAfter = dragging && dropGap === ordered.length && i === ordered.length - 1;
             return (
-              <li key={step.id ?? `unsaved-${i}`} {...stylex.props(styles.row)}>
+              <li
+                key={step.id ?? `unsaved-${i}`}
+                {...stylex.props(
+                  styles.row,
+                  i === dragIndex && styles.rowDragging,
+                  dropBefore && styles.rowDropBefore,
+                  dropAfter && styles.rowDropAfter,
+                )}
+                onDragOver={(e) => {
+                  if (!dragging) return;
+                  e.preventDefault();
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const midpoint = rect.top + rect.height / 2;
+                  setDropGap(e.clientY < midpoint ? i : i + 1);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (dragIndex === undefined || dropGap === undefined) {
+                    endDrag();
+                    return;
+                  }
+                  const moved = ordered[dragIndex];
+                  if (moved?.id !== undefined) {
+                    const target = dropGap > dragIndex ? dropGap - 1 : dropGap;
+                    onMove(moved.id, target);
+                  }
+                  endDrag();
+                }}
+              >
                 <button
                   type="button"
                   {...stylex.props(styles.rowMain, current && styles.rowMainCurrent)}
@@ -198,9 +263,7 @@ export function StepsRail({ currentStepId, onSelectStep, onMove, onAddStep }: Pr
                   onClick={() => step.id !== undefined && onSelectStep(step.id)}
                 >
                   <span {...stylex.props(styles.number)}>{i + 1}</span>
-                  <span {...stylex.props(styles.name, current && styles.nameCurrent)}>
-                    {resolveDraftLocalizedText(step.label, contentLocale, baseLocale) || step.key || t("steps.unnamedStep")}
-                  </span>
+                  <span {...stylex.props(styles.name, current && styles.nameCurrent)}>{label}</span>
                   {issues.count > 0 && (
                     <span
                       {...stylex.props(styles.badge, issues.blocker ? styles.badgeBlocker : styles.badgeAdvisory)}
@@ -212,21 +275,17 @@ export function StepsRail({ currentStepId, onSelectStep, onMove, onAddStep }: Pr
                 </button>
                 <button
                   type="button"
-                  {...stylex.props(styles.move)}
-                  aria-label={t("stepsRail.moveEarlier")}
-                  disabled={step.id === undefined || earlier === undefined}
-                  onClick={() => step.id !== undefined && earlier !== undefined && onMove(step.id, i - 1)}
+                  {...stylex.props(styles.grip)}
+                  aria-label={t("stepsRail.dragHandle").replace("{step label}", label)}
+                  draggable={!gripDisabled}
+                  disabled={gripDisabled}
+                  onDragStart={(e) => {
+                    e.dataTransfer.effectAllowed = "move";
+                    setDragIndex(i);
+                  }}
+                  onDragEnd={endDrag}
                 >
-                  <ChevronUp size={18} strokeWidth={1.75} aria-hidden="true" />
-                </button>
-                <button
-                  type="button"
-                  {...stylex.props(styles.move)}
-                  aria-label={t("stepsRail.moveLater")}
-                  disabled={step.id === undefined || later === undefined}
-                  onClick={() => step.id !== undefined && later !== undefined && onMove(step.id, i + 1)}
-                >
-                  <ChevronDown size={18} strokeWidth={1.75} aria-hidden="true" />
+                  <GripVertical size={18} strokeWidth={1.75} aria-hidden="true" />
                 </button>
               </li>
             );
