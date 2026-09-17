@@ -230,11 +230,10 @@ interface EditScreenProps {
   tab?: ProcessTab;
   stepId?: string;
   token: string;
-  /** The calling actor's own id and roles, for the Access tab's own
-   * add/delete gating (`studio-app`'s Access-surface requirement). Nothing
-   * else on this screen reads either. */
+  /** The calling actor's own roles, for the Access tab's own add/delete
+   * gating (`studio-app`'s Access-surface requirement). Nothing else on
+   * this screen reads it. */
   roles: readonly string[];
-  actorId: string;
   /** Cross-area navigation, threaded down to `ProcessHeaderBar`'s "Manage
    * assignment groups for this process" link (design.md: "Threading `go`
    * down to the link"). `token`, `navigate`, and `onUnauthorized` already
@@ -255,7 +254,6 @@ interface ProcessSurfaceProps {
   stepId?: string;
   token: string;
   roles: readonly string[];
-  actorId: string;
   go: (href: string, opts?: NavigateOptions) => void;
   initialRevision: number;
   initialLayout: Record<string, unknown>;
@@ -305,7 +303,7 @@ function focusTabButton(tab: ProcessTab): void {
  * component state, the data sources panel fetched its list keys on mount, and
  * the field matrix holds its selected cell.
  */
-function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, actorId, go, initialRevision, initialLayout, loadedBaseVersion, loadedCanPublish, navigate, onUnauthorized, onDirtyChange }: ProcessSurfaceProps) {
+function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, initialRevision, initialLayout, loadedBaseVersion, loadedCanPublish, navigate, onUnauthorized, onDirtyChange }: ProcessSurfaceProps) {
   const { draft, mutate, validation, replace, contentLocale } = useDraft();
   const baseLocale = draft.baseLocale ?? "en";
   const [saveState, setSaveState] = useState<DraftSaveState>(() => initialSaveState(initialRevision, initialLayout));
@@ -1013,7 +1011,7 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, acto
           )}
           {tabPanel(
             "access",
-            <AccessPanel processId={processId} token={token} actorId={actorId} roles={roles} onUnauthorized={onUnauthorized} />,
+            <AccessPanel processId={processId} token={token} roles={roles} onUnauthorized={onUnauthorized} />,
           )}
         </div>
       )}
@@ -1032,7 +1030,7 @@ type EditLoadState =
   | { kind: "error"; message: string }
   | { kind: "loaded"; record: DraftRecord };
 
-export function EditScreen({ processId, formStepId, tab, stepId, token, roles, actorId, go, navigate, onUnauthorized, onDirtyChange }: EditScreenProps) {
+export function EditScreen({ processId, formStepId, tab, stepId, token, roles, go, navigate, onUnauthorized, onDirtyChange }: EditScreenProps) {
   const [state, setState] = useState<EditLoadState>({ kind: "loading" });
   const fail = useFail(onUnauthorized, (e) => setState({ kind: "error", message: describeCaughtError(e) }));
 
@@ -1097,7 +1095,6 @@ export function EditScreen({ processId, formStepId, tab, stepId, token, roles, a
         stepId={stepId}
         token={token}
         roles={roles}
-        actorId={actorId}
         go={go}
         initialRevision={state.record.revision}
         initialLayout={state.record.layout}

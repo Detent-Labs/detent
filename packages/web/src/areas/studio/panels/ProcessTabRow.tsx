@@ -283,7 +283,7 @@ export function focusScrollsRow<T>(windowBlurred: T | null, button: T, visible: 
  * exception for a tab set carrying many tabs in one line that scrolls
  * sideways. This row is the one tab set of that shape in the browser
  * packages. The whole row is one stop in the page's tab order: the focused
- * tab carries `tabindex="0"` and the other nine `tabindex="-1"`. The left and
+ * tab carries `tabindex="0"` and the other ten `tabindex="-1"`. The left and
  * right arrow keys move focus, wrapping at the row's ends, and Enter or Space
  * opens the focused tab. Eleven plain stops would cost a keyboard user eleven Tab
  * presses to cross the row. Every other tab set keeps the plain-button model.

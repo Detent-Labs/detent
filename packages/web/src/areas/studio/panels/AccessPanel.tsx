@@ -4,7 +4,7 @@
  * already needs Developer-list-or-admin standing, per the edit screen's own
  * gate (`process-drafts`) — this panel adds no visibility gate of its own. It
  * only decides which lists offer add/delete controls, from the actor's own
- * standing on the loaded lists (or `ADMIN_ROLE`).
+ * standing (`getMyProcessAccess`, group- and role-aware) or `ADMIN_ROLE`.
  *
  * Fetches on mount and again after every add/delete — no optimistic local
  * mutation, since this surface carries no latency pressure (design.md).
@@ -13,11 +13,11 @@ import { useEffect, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { t } from "../catalog.js";
-import { addAccessPrincipal, deleteAccessPrincipal, getProcessAccess } from "../api/client.js";
+import { addAccessPrincipal, deleteAccessPrincipal, getMyProcessAccess, getProcessAccess } from "../api/client.js";
 import { describeCaughtError } from "../errors.js";
 import { useFail } from "../../../shell/useFail.js";
 import { accessControls } from "./accessLogic.js";
-import type { AccessKind, ProcessAccessLists } from "../api/types.js";
+import type { AccessKind, MyProcessAccess, ProcessAccessLists } from "../api/types.js";
 
 /**
  * The `.studio-empty` and `.studio-error-banner*` shapes, both from
@@ -121,7 +121,12 @@ function AccessListEditor({
   emptyText: string;
   values: string[];
   editable: boolean;
-  onAdd: (principal: string) => void;
+  /** Resolves `true` once the write has landed and the panel has refetched,
+   * `false` on a failure the panel's own write-error banner already reports
+   * (`runWrite` below never rejects). The draft input clears on `true` only,
+   * so a failed add — e.g. a race where the actor's own standing changed
+   * underneath them — leaves the typed principal in place to retry. */
+  onAdd: (principal: string) => Promise<boolean>;
   onDelete: (principal: string) => void;
 }) {
   const [draft, setDraft] = useState("");
@@ -153,8 +158,10 @@ function AccessListEditor({
           onSubmit={(e) => {
             e.preventDefault();
             const value = draft.trim();
-            if (value) onAdd(value);
-            setDraft("");
+            if (!value) return;
+            onAdd(value).then((succeeded) => {
+              if (succeeded) setDraft("");
+            });
           }}
         >
           <input
@@ -176,20 +183,16 @@ function AccessListEditor({
 type LoadState =
   | { kind: "loading" }
   | { kind: "error"; message: string }
-  | { kind: "loaded"; lists: ProcessAccessLists };
+  | { kind: "loaded"; lists: ProcessAccessLists; myAccess: MyProcessAccess };
 
 interface AccessPanelProps {
   processId: string;
   token: string;
-  /** The calling actor's own id and roles, to decide which lists offer
-   * controls (`isDeveloper`/`isOwner` below) — read from the loaded lists,
-   * not from a server-computed flag. */
-  actorId: string;
   roles: readonly string[];
   onUnauthorized: () => void;
 }
 
-export function AccessPanel({ processId, token, actorId, roles, onUnauthorized }: AccessPanelProps) {
+export function AccessPanel({ processId, token, roles, onUnauthorized }: AccessPanelProps) {
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [writeError, setWriteError] = useState<string | null>(null);
   // Bumped after every successful add/delete, so the load effect below
@@ -201,9 +204,9 @@ export function AccessPanel({ processId, token, actorId, roles, onUnauthorized }
   useEffect(() => {
     let cancelled = false;
     setState({ kind: "loading" });
-    getProcessAccess(processId, token)
-      .then((lists) => {
-        if (!cancelled) setState({ kind: "loaded", lists });
+    Promise.all([getProcessAccess(processId, token), getMyProcessAccess(token)])
+      .then(([lists, myAccess]) => {
+        if (!cancelled) setState({ kind: "loaded", lists, myAccess });
       })
       .catch((e: unknown) => {
         if (!cancelled) failLoad(e);
@@ -214,11 +217,21 @@ export function AccessPanel({ processId, token, actorId, roles, onUnauthorized }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [processId, token, reloadKey]);
 
-  const runWrite = (action: () => Promise<unknown>) => {
+  // Resolves `true` once the write lands and the reload key bumps, `false`
+  // on a failure `failWrite` already reported (through the banner below, or
+  // through `onUnauthorized`) — never rejects, so a caller can branch on
+  // success with a plain `.then()` and no `.catch` of its own.
+  const runWrite = (action: () => Promise<unknown>): Promise<boolean> => {
     setWriteError(null);
-    action()
-      .then(() => setReloadKey((k) => k + 1))
-      .catch(failWrite);
+    return action()
+      .then(() => {
+        setReloadKey((k) => k + 1);
+        return true;
+      })
+      .catch((e: unknown) => {
+        failWrite(e);
+        return false;
+      });
   };
 
   const onAdd = (kind: AccessKind, principal: string) => runWrite(() => addAccessPrincipal(processId, kind, principal, token));
@@ -234,7 +247,7 @@ export function AccessPanel({ processId, token, actorId, roles, onUnauthorized }
     );
   }
 
-  const { developerEditable, ownerEditable, readerEditable } = accessControls(state.lists, actorId, roles);
+  const { developerEditable, ownerEditable, readerEditable } = accessControls(state.myAccess, processId, roles);
 
   return (
     <div>

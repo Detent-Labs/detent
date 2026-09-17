@@ -166,7 +166,6 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
               stepId={route.stepId}
               token={session.token}
               roles={session.roles}
-              actorId={session.actorId}
               go={go}
               navigate={guardedNavigate}
               onUnauthorized={onUnauthorized}
