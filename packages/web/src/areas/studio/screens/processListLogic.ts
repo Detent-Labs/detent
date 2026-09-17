@@ -152,6 +152,18 @@ export function createInFlightGuard(onHeldChange: (held: ReadonlySet<string>) =>
   };
 }
 
+/**
+ * Narrows `rows` to the processIds the actor's own Developer or Owner
+ * list names, unnarrowed for `ADMIN_ROLE` (studio-app: "The process list
+ * shows draft and published state per process"). `access` is the
+ * response `getMyProcessAccess` returns.
+ */
+export function narrowToAccessible(rows: ProcessRow[], access: { developer: string[]; owner: string[] }, isAdmin: boolean): ProcessRow[] {
+  if (isAdmin) return rows;
+  const accessible = new Set([...access.developer, ...access.owner]);
+  return rows.filter((row) => accessible.has(row.processId));
+}
+
 export function deriveProcessRows(processes: ProcessSummary[], drafts: DraftSummary[]): ProcessRow[] {
   const rows = new Map<string, ProcessRow>();
 

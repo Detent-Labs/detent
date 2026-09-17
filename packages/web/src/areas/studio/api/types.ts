@@ -43,6 +43,12 @@ export interface DraftSummary {
   updatedAt: string;
 }
 
+/** Mirrors src/http/studio-routes.ts::handleGetMyProcessAccess — the calling actor's own Developer- and Owner-listed process ids. */
+export interface MyProcessAccess {
+  developer: string[];
+  owner: string[];
+}
+
 /**
  * Mirrors src/engine/definitions.ts::PublishFinding — a reported (not
  * rejected) reference `"instance.query"`'s or `instance.transition`'s

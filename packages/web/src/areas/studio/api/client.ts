@@ -11,6 +11,7 @@ import type {
   TemplateSummary,
   TemplateRecord,
   StudioDataList,
+  MyProcessAccess,
 } from "./types.js";
 import { AppClientError, createInstance, getInstanceRecord, getJson, request, submitPath } from "../../../api/client.js";
 
@@ -28,6 +29,10 @@ export function listVersions(processId: string, token: string): Promise<VersionS
 
 export function listDrafts(token: string): Promise<DraftSummary[]> {
   return getJson("/drafts", token);
+}
+
+export function getMyProcessAccess(token: string): Promise<MyProcessAccess> {
+  return getJson("/processes/access/mine", token);
 }
 
 /** `undefined` for a process with no draft (404), never thrown — a missing draft is an expected, not exceptional, shape for this call. */
