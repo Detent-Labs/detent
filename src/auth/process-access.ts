@@ -21,7 +21,7 @@
 import type { SQL } from "bun";
 import { sql } from "../engine/store.js";
 import { getGroupsForMember } from "./groups.js";
-import { DEVELOPER_ROLE, AUTHOR_ROLE, OWNER_ROLE } from "./authorize.js";
+import { DEVELOPER_ROLE, AUTHOR_ROLE, OWNER_ROLE, ADMIN_ROLE, AuthorizationError } from "./authorize.js";
 import type { Actor } from "../cel/eval.js";
 import type { ProcessId } from "../schema/definition.js";
 
@@ -50,4 +50,45 @@ export async function matchesAccessList(actor: Actor, processId: ProcessId, kind
 
   if (kind === "reader") return true;
   return REQUIRED_ROLES[kind].some((role) => actor.roles.includes(role));
+}
+
+/**
+ * The write gate for `addAccessPrincipal`/`deleteAccessPrincipal`, identical
+ * for both. `ADMIN_ROLE` always passes. Otherwise the list that GATES the
+ * write is not always the list the write TARGETS: a Developer-list match
+ * gates a write to either the Developer or the Owner list, while only an
+ * Owner-list match gates a write to the Reader list — a Developer who is not
+ * also an Owner does not pass this check for a Reader-list write.
+ */
+async function requireWriteAccess(actor: Actor, processId: ProcessId, kind: AccessKind, db: SQL): Promise<void> {
+  if (actor.roles.includes(ADMIN_ROLE)) return;
+  const gate: AccessKind = kind === "reader" ? "owner" : "developer";
+  if (await matchesAccessList(actor, processId, gate, db)) return;
+  throw new AuthorizationError(`actor '${actor.id}' may not write to the '${kind}' access list of process '${processId}'`);
+}
+
+/**
+ * Adds `principal` to process `processId`'s `kind` list, after
+ * `requireWriteAccess` passes. Idempotent: adding an entry already present
+ * succeeds and changes nothing (`ON CONFLICT DO NOTHING` against the table's
+ * `(process_id, kind, principal)` primary key).
+ */
+export async function addAccessPrincipal(actor: Actor, processId: ProcessId, kind: AccessKind, principal: string, db: SQL = sql): Promise<void> {
+  await requireWriteAccess(actor, processId, kind, db);
+  await db`
+    INSERT INTO process_access_roles (process_id, kind, principal) VALUES (${processId}, ${kind}, ${principal})
+    ON CONFLICT DO NOTHING
+  `;
+}
+
+/**
+ * Deletes `principal` from process `processId`'s `kind` list, after
+ * `requireWriteAccess` passes. Idempotent: deleting an absent entry succeeds
+ * and changes nothing.
+ */
+export async function deleteAccessPrincipal(actor: Actor, processId: ProcessId, kind: AccessKind, principal: string, db: SQL = sql): Promise<void> {
+  await requireWriteAccess(actor, processId, kind, db);
+  await db`
+    DELETE FROM process_access_roles WHERE process_id = ${processId} AND kind = ${kind} AND principal = ${principal}
+  `;
 }
