@@ -582,8 +582,6 @@ export const en = {
   "stepsRail.label": "Steps",
   "stepsRail.issueMark": "open issues",
   "stepsRail.issueMarkOne": "open issue",
-  "stepsRail.moveEarlier": "Move earlier",
-  "stepsRail.moveLater": "Move later",
   "stepsRail.dragHandle": "Reorder {step label}",
   "stepsRail.movedAnnouncement": "{step label} moved to position {position}",
   "stepsRail.addLegend": "Add",
