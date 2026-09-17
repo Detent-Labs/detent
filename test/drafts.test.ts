@@ -9,8 +9,11 @@ import { sql, initSchema } from "../src/engine/store.js";
 import { publishBody } from "../src/engine/definitions.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import { getDraft, saveDraft, listDrafts, deleteDraft, markDraftPublished, DraftConflictError } from "../src/engine/drafts.js";
+import { matchesAccessList } from "../src/auth/process-access.js";
+import { CREATE_ROLE, DEVELOPER_ROLE } from "../src/auth/authorize.js";
 import { RequestShapeError } from "../src/errors.js";
 import type { ProcessBody, ProcessId } from "../src/schema/definition.js";
+import type { Actor } from "../src/cel/eval.js";
 
 const DB = !!process.env.DATABASE_URL;
 const reg = createRegistry();
@@ -50,7 +53,7 @@ beforeAll(async () => {
   if (DB) await initSchema();
 });
 beforeEach(async () => {
-  if (DB) await sql`TRUNCATE drafts, definitions`;
+  if (DB) await sql`TRUNCATE drafts, definitions, process_access_roles`;
 });
 
 /** `.rejects` on a promise running Bun.sql queries can wedge the pool under bun:test; await-then-catch instead. */
@@ -97,6 +100,41 @@ test.skipIf(!DB)("a stale save raises DraftConflictError and leaves the row byte
   expect(stored?.revision).toBe(1);
   expect((stored?.body as { label: { en: string } }).label.en).toBe("v2");
   expect(stored?.updatedBy).toBe("user_a");
+});
+
+// ============================================================
+// process creation writes the creator onto the Developer list (process-access-roles)
+// ============================================================
+
+test.skipIf(!DB)("the creator lands on the Developer list at process creation", async () => {
+  const processId = pid();
+  const actor: Actor = { id: "user_creator", roles: [CREATE_ROLE, DEVELOPER_ROLE] };
+
+  await saveDraft(processId, { body: invalidBody("v1"), layout: {}, revision: 0, updatedBy: actor.id }, sql);
+
+  expect(await matchesAccessList(actor, processId, "developer", sql)).toBe(true);
+});
+
+test.skipIf(!DB)("a forced failure on the access-list insert leaves neither the draft nor the access-list row behind", async () => {
+  // Same technique as events.test.ts's "a failed creation persists neither the
+  // instance nor its events": a temporary CHECK constraint makes the second
+  // write of the transaction unwritable, so the failure lands after the draft
+  // insert already ran, and only the rollback proves the two writes are atomic.
+  const processId = pid();
+  await sql`ALTER TABLE process_access_roles ADD CONSTRAINT tmp_no_developer CHECK (kind <> 'developer')`;
+  let raised: unknown;
+  try {
+    await saveDraft(processId, { body: invalidBody("v1"), layout: {}, revision: 0, updatedBy: "user_creator" }, sql);
+  } catch (e) {
+    raised = e;
+  } finally {
+    await sql`ALTER TABLE process_access_roles DROP CONSTRAINT tmp_no_developer`;
+  }
+  expect(raised).toBeInstanceOf(Error);
+
+  expect(await getDraft(processId, sql)).toBeUndefined();
+  const rows = (await sql`SELECT 1 FROM process_access_roles WHERE process_id = ${processId}`) as unknown[];
+  expect(rows.length).toBe(0);
 });
 
 test.skipIf(!DB)("a structurally invalid body saves and reads back unchanged", async () => {
