@@ -265,15 +265,28 @@ capability for the scoped `migrate` grant that governs it.
 
 ### Requirement: The process list shows draft and published state per process
 
-The `/processes` screen SHALL list one row per process reachable to the
-developer, combining `GET /processes` and `GET /drafts`. Each row SHALL show
-whether a draft exists and, if so, who last saved it and when, and the latest
-published version with its `definitionHash`. A process with a draft but no
-published version and a process with published versions but no draft SHALL
-both render correctly.
+The `/processes` screen SHALL list one row per process on the actor's own
+Developer or Owner list, per the `process-access-roles` capability. An actor
+holding `ADMIN_ROLE` SHALL see every process instead.
 
+`GET /processes` and `GET /drafts` SHALL stay unfiltered. The participant's
+Start-a-process screen and the operator's pickers read them too, and both
+need the full list. The `/processes` screen SHALL instead read the actor's
+own Developer- and Owner-listed process ids. It SHALL narrow its combined
+rows to that set in the browser.
+
+<!-- antislop: allow synonym-rotation -->
+<!-- "render" (paint a row) and "surface" (the named Access panel below) name different concepts. -->
+Each row SHALL render whether a draft exists. Where one does, the row SHALL
+render who last saved it and when. The row SHALL also render the latest
+published version with its `definitionHash`. A process with a draft but no
+published version SHALL render correctly. A process with published versions
+but no draft SHALL also render correctly.
+
+<!-- antislop: allow synonym-rotation -->
+<!-- "Discard" names the existing toolbar control. "delete" names removing a list entry in the Access surface below. -->
 Actions SHALL be: create a new process, open a process for editing, and
-discard its draft. Discarding SHALL require a confirmation and SHALL call
+discard its draft. Discarding SHALL need a confirmation and SHALL call
 `DELETE /drafts/:processId`, leaving published versions untouched.
 
 #### Scenario: A never-published process appears
@@ -290,9 +303,23 @@ discard its draft. Discarding SHALL require a confirmation and SHALL call
 
 #### Scenario: Discarding removes only the draft
 
-- **WHEN** discard is confirmed for a process with published versions
+- **WHEN** an author confirms discard for a process with published versions
 - **THEN** the draft disappears from the list and the published version and
   hash still render
+
+#### Scenario: A process outside the actor's lists stays hidden
+
+- **WHEN** an actor holds `system:developer`
+- **AND** the actor is on process A's Developer list but not process B's
+- **AND** both processes have published versions
+- **THEN** the list shows process A's row
+- **AND** the list omits process B's row
+
+#### Scenario: An admin sees every process
+
+- **WHEN** an actor holding `ADMIN_ROLE` opens `/processes`
+- **THEN** the list shows every process, regardless of that actor's own
+  Developer or Owner lists
 
 ### Requirement: Creating a new process mints a prefixed id client-side
 
@@ -302,6 +329,11 @@ entity kind. That path generates `${prefix}_${crypto.randomUUID()}` and
 parses it through the contract's own branded id schema. Creating SHALL then
 write the row with a `PUT /drafts/:processId` at `revision = 0`. There SHALL
 be no separate create-then-save round trip and no server-side id allocation.
+
+The `/processes` screen SHALL offer the create-new-process action only to an
+actor holding `CREATE_ROLE`. This is a presentational check alone. The
+`PUT /drafts/:processId` call it issues carries the authoritative check, per
+`process-drafts`.
 
 Creating SHALL first offer a choice of starting body. The empty choice SHALL
 seed the body the studio seeds today. The template choice SHALL seed the body
@@ -313,7 +345,7 @@ template is no published version.
 
 #### Scenario: A new process is one round trip
 
-- **WHEN** an author creates a new process
+- **WHEN** an author holding `CREATE_ROLE` creates a new process
 - **THEN** the browser issues exactly one `PUT /drafts/:processId`, with
   `revision` 0, and the process id carries the `proc_` prefix
 
@@ -326,7 +358,7 @@ template is no published version.
 
 - **WHEN** an author creates a new process from a template
 - **THEN** the draft holds that template's body and layout
-- **AND** the draft carries no base version
+- **AND** the draft has no base version
 
 #### Scenario: An author with no readable template still creates a process
 
@@ -334,6 +366,10 @@ template is no published version.
 - **THEN** the picker offers the empty choice and states that no template
   exists
 
+#### Scenario: The screen hides the create action without the create role
+
+- **WHEN** an actor holds `system:developer` but not `CREATE_ROLE`
+- **THEN** the `/processes` screen offers no create-new-process action
 ### Requirement: Creating a draft for a published process starts from the latest published version
 
 Creating a draft from the process list SHALL seed the draft body from the
@@ -483,13 +519,14 @@ the draft. `PUT /drafts/:processId` saves it and carries the revision the load
 call returned.
 
 The screen's layout SHALL be one tabbed process surface. The
-`studio-process-tabs` capability states the tab row and its ten tabs. The canvas
-stands on the Canvas tab. A steps rail and a step page stand on the Steps tab,
-and the `studio-step-page` capability states both.
+`studio-process-tabs` capability states the tab row and its eleven tabs. The
+canvas stands on the Canvas tab. A steps rail and a step page stand on the
+Steps tab, and the `studio-step-page` capability states both.
 
 Seven tabs carry a process-wide subject. They are Fields, Data sources, Paths,
-Forms, Field matrix, Contract and Changes. Checks takes the tenth tab. Each tab
-stays reachable whether or not the author has picked a step.
+Forms, Field matrix, Contract and Changes. Checks takes the tenth tab. Access
+takes the eleventh. Each tab stays reachable whether or not the author has
+picked a step.
 
 The process header's `⋮` overflow menu SHALL carry `baseLocale`. This capability
 requires an author to declare a non-English base locale without leaving the
@@ -593,10 +630,10 @@ version number and `definitionHash`.
 <!-- antislop: allow synonym-rotation -->
 ### Requirement: The panels screen is a routed sub-state of the edit screen
 
-The ten tabs SHALL sit on a routed surface, not behind a dialog. The path SHALL
-read `/processes/:id/edit/:tab`. Here `:tab` is one of `canvas`, `steps`,
-`fields`, `dataSources`, `paths`, `forms`, `matrix`, `contract`, `changes` or
-`checks`.
+The eleven tabs SHALL sit on a routed surface, not behind a dialog. The path
+SHALL read `/processes/:id/edit/:tab`. Here `:tab` is one of `canvas`,
+`steps`, `fields`, `dataSources`, `paths`, `forms`, `matrix`, `contract`,
+`changes`, `checks` or `access`.
 
 That path SHALL be a sub-state of the `edit` route. It rides as an optional field
 on the same route object, the shape `formStepId` already takes. The
@@ -4229,7 +4266,7 @@ announce nothing.
 Every studio-area screen that is not the process surface SHALL center its
 content in a column capped at 80rem. This covers Processes, Templates,
 Tools, Versions, the Player, and the rest. The process surface itself,
-the edit screen's ten-tab body, has no cap of its own. It is exempt from
+the edit screen's eleven-tab body, has no cap of its own. It is exempt from
 this requirement, per its existing, unchanged layout.
 
 #### Scenario: A wide viewport still keeps a bare studio screen's column capped
@@ -4244,3 +4281,49 @@ this requirement, per its existing, unchanged layout.
 - **WHEN** a developer opens the process surface on any viewport width
 - **THEN** its tab row and body fill the viewport width, unaffected by this
   requirement
+
+### Requirement: A process's Access surface manages its Developer, Owner and Reader lists
+
+A process's edit screen SHALL offer an Access surface to an actor listed as
+its Developer or its Owner. That listing follows the `process-access-roles`
+capability. The surface SHALL render that process's Developer, Owner and
+Reader lists, each as users and groups.
+
+Reaching the edit screen at all still needs `requireAuthoring` and that
+process's Developer list, or `ADMIN_ROLE`, per `process-drafts`. An Owner
+holding neither cannot open this screen, so cannot reach this surface
+either. `process-access-roles`'s own deferred non-studio surface is what
+such an Owner needs instead.
+
+A Developer SHALL add and delete entries on the Developer list and on the
+Owner list from this surface. An Owner SHALL add and delete entries on the
+Reader list from this surface. Neither role SHALL see a control for the
+other's list. The server enforces every write authoritatively, per
+`process-access-roles`.
+
+An actor reaching the edit screen through `ADMIN_ROLE` alone SHALL also
+reach the Access surface. It SHALL offer every control this requirement
+names, regardless of that actor's own Developer or Owner entry.
+
+#### Scenario: A Developer manages Developer and Owner entries
+
+- **WHEN** an actor listed as a process's Developer opens its Access surface
+- **THEN** the surface offers adding and deleting entries on the Developer
+  list and on the Owner list
+
+#### Scenario: An Owner manages the Reader list
+
+- **WHEN** an actor listed as a process's Owner opens its Access surface
+- **THEN** the surface offers adding and deleting entries on the Reader list
+
+#### Scenario: A Developer holding no Owner entry sees no Reader control
+
+- **WHEN** an actor listed as a process's Developer, but not its Owner,
+  opens its Access surface
+- **THEN** the surface offers no control over the Reader list
+
+#### Scenario: An admin reaches the Access surface unconditionally
+
+- **WHEN** an actor holding `ADMIN_ROLE`, with no Developer or Owner entry
+  of their own, opens a process's Access surface
+- **THEN** the surface offers every control this requirement names

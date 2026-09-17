@@ -4486,7 +4486,7 @@ meets `scope=started` should infer no new permission tier from it.
 
   The row component `ProcessTabRow.tsx` renders a `tablist` of buttons. The
   whole row is one tab stop, on `spa-accessibility`'s roving-tabindex
-  pattern: the focused tab carries `tabindex="0"` and the other nine
+  pattern: the focused tab carries `tabindex="0"` and the other ten
   `tabindex="-1"`, and the arrow keys move focus without opening a tab. It
   still takes a `jsonOpen` prop, read-only, to suppress every tab's
   `aria-selected` while the JSON surface stands open. The header bar's `⋮`

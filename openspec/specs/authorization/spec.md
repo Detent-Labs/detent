@@ -24,7 +24,7 @@ resulting `403` surfaces over HTTP.
 
 ### Requirement: Reserved role constants gate process-admin operations
 
-The engine SHALL define eight reserved role strings in `src/auth/authorize.ts`:
+The engine SHALL define ten reserved role strings in `src/auth/authorize.ts`:
 
 - `PUBLISH_ROLE = "system:publish"`
 - `CANCEL_ANY_ROLE = "system:cancel-any"`
@@ -34,6 +34,8 @@ The engine SHALL define eight reserved role strings in `src/auth/authorize.ts`:
 - `DATALISTS_ROLE = "system:datalists"`
 - `TEMPLATES_ROLE = "system:templates"`
 - `AUTHOR_ROLE = "system:author"`
+- `CREATE_ROLE = "system:create"`
+- `OWNER_ROLE = "system:owner"`
 
 These SHALL be the only roles this capability defines. No role hierarchy,
 wildcard or general permission model SHALL exist. In particular no one of them
@@ -45,6 +47,11 @@ assigns for `Step.assignment`, such as `"finance-approver"`. Nothing enforces
 the prefix structurally, since `Actor.roles` and `auth_users.roles` stay plain
 `string[]`.
 
+`CREATE_ROLE` gates creating a brand-new process, alongside `DEVELOPER_ROLE`
+or `AUTHOR_ROLE`. The `process-drafts` capability states that rule. `OWNER_ROLE`
+is the eligibility rule for a process's Owner list. The `process-access-roles`
+capability states that rule. Neither role reaches any other gated operation.
+
 #### Scenario: The module exports the reserved role constants
 
 - **WHEN** a reader inspects `src/auth/authorize.ts` for its exports
@@ -52,8 +59,9 @@ the prefix structurally, since `Actor.roles` and `auth_users.roles` stay plain
   `CANCEL_ANY_ROLE` with value `"system:cancel-any"`, `ADMIN_ROLE` with value
   `"system:admin"`, `DEVELOPER_ROLE` with value `"system:developer"`,
   `REPORTS_ROLE` with value `"system:reports"`, `DATALISTS_ROLE` with value
-  `"system:datalists"`, `TEMPLATES_ROLE` with value `"system:templates"` and
-  `AUTHOR_ROLE` with value `"system:author"`
+  `"system:datalists"`, `TEMPLATES_ROLE` with value `"system:templates"`,
+  `AUTHOR_ROLE` with value `"system:author"`, `CREATE_ROLE` with value
+  `"system:create"` and `OWNER_ROLE` with value `"system:owner"`
 
 #### Scenario: The admin role implies nothing
 
@@ -109,6 +117,33 @@ the prefix structurally, since `Actor.roles` and `auth_users.roles` stay plain
   `requireRole(actor, TEMPLATES_ROLE)`
 - **THEN** it throws `AuthorizationError` in each case
 
+#### Scenario: The create role implies nothing
+
+- **WHEN** `requireRole(actor, ADMIN_ROLE)` or `requireRole(actor,
+  DEVELOPER_ROLE)` runs for an actor whose `roles` is exactly
+  `["system:create"]`
+- **THEN** it throws `AuthorizationError` in each case
+
+#### Scenario: No other reserved role implies the create role
+
+- **WHEN** `requireRole(actor, CREATE_ROLE)` runs for an actor whose `roles`
+  is exactly `["system:admin"]`, exactly `["system:developer"]` or exactly
+  `["system:author"]`
+- **THEN** it throws `AuthorizationError` in each case
+
+#### Scenario: The owner role implies nothing
+
+- **WHEN** `requireRole(actor, ADMIN_ROLE)` or `requireRole(actor,
+  DEVELOPER_ROLE)` runs for an actor whose `roles` is exactly
+  `["system:owner"]`
+- **THEN** it throws `AuthorizationError` in each case
+
+#### Scenario: No other reserved role implies the owner role
+
+- **WHEN** `requireRole(actor, OWNER_ROLE)` runs for an actor whose `roles`
+  is exactly `["system:admin"]`, exactly `["system:developer"]` or exactly
+  `["system:author"]`
+- **THEN** it throws `AuthorizationError` in each case
 ### Requirement: requireRole throws a distinct error when the actor lacks the role
 
 The engine SHALL expose `requireRole(actor: Actor, role: string): void` in
@@ -174,8 +209,8 @@ on their own process and nothing else. Writing a grant of `"visibility"` over
 that process admits exactly that actor. No code changes, and no role string
 carries a scope.
 
-`can` SHALL answer true where either of two tests passes. It SHALL run them in
-this order:
+`can` SHALL answer true where any of `permission`'s own tests passes. Every
+permission runs these two tests, in this order:
 
 1. **The global role.** `actor.roles` holds the mapped reserved role. This test
    SHALL run first and SHALL short-circuit. Where it passes, `can` SHALL read
@@ -184,15 +219,24 @@ this order:
    equals `permission`, its role appears in `actor.roles`, and its scope
    resolves to `processId`.
 
+`"read"` alone SHALL run one further test, third in order:
+
+3. **The process's Reader list.** The `process-access-roles` capability's
+   Reader list for `processId` names a principal. A principal is the
+   actor's id, or one of the actor's groups. This test SHALL run only for
+   `"read"`. It SHALL NOT run for `"publish"`, `"cancel"`, `"migrate"` or
+   `"visibility"`.
+
 The engine SHALL NOT read a scope out of a role string. A role string is a
 principal the identity provider names. The grant rows are the one place a
 scope lives. The engine therefore treats `system:publish@proc_…` in
 `actor.roles` as a role like any other. It matches no grant unless an operator
 writes a row naming that exact string.
 
-`can` SHALL answer false where both fail. It SHALL NOT throw on an
-unresolvable `processId`. A caller may pass a value naming no stored process.
-The publish route reads its target out of an unvalidated request body.
+`can` SHALL answer false where every one of `permission`'s tests fails. It
+SHALL NOT throw on an unresolvable `processId`. A caller may pass a value
+naming no stored process. The publish route reads its target out of an
+unvalidated request body.
 
 `processId` therefore changes the answer. Two calls differing only in
 `processId` MAY disagree. They SHALL disagree where a grant names one of the
@@ -230,12 +274,13 @@ Every operation whose target is not one process SHALL keep the gate it has:
 - the four draft routes call `requireAuthoring`, the two-role helper in
   `src/http/studio-routes.ts`, and the template reads call `requireStudioRead`
 
-A draft carries its `proc_` id from its first save, since `drafts.process_id`
-is the table's key and `PUT /drafts/:processId` names it. The four draft routes
-are therefore scopeable, and this change leaves them global on purpose. A
-draft-scoped `"author"` permission is a later change, and it moves those four
-call sites and the drafts list. `requireRole` SHALL stay exported and SHALL
-stay synchronous.
+A draft carries its `proc_` id from its first save. `drafts.process_id` is
+the table's key, and `PUT /drafts/:processId` names it. The
+`process-access-roles` capability's Developer list scopes the four draft
+routes and the drafts list instead. That list works alongside this seam's
+`Permission` value, not through it. A grant in this seam names a role. A
+Developer list names an actor or a group, so the two mechanisms stay
+separate. `requireRole` SHALL stay exported and SHALL stay synchronous.
 
 #### Scenario: The module exports the permission seam
 
@@ -301,6 +346,8 @@ stay synchronous.
   process A
 - **THEN** it answers false
 
+<!-- antislop: allow negation-habit -->
+<!-- title matches the archived requirement's scenario exactly, per OpenSpec's MODIFIED-block rule. -->
 #### Scenario: A role string carries no scope
 
 - **WHEN** `can(actor, "publish", processId, db)` runs for an actor whose
@@ -336,6 +383,7 @@ stay synchronous.
 
 - **WHEN** an actor calls any of the ten gated operations, over a store
   holding no grant row
+- **AND** the process carries an empty Reader list
 - **THEN** the operation admits the actors it admitted before this change
 - **AND** it refuses the actors it refused before this change
 
@@ -353,6 +401,19 @@ stay synchronous.
 - **THEN** `"visibility"` answers true for process A
 - **AND** `"visibility"` answers false for process B
 
+#### Scenario: A process's Reader list satisfies the read permission
+
+- **WHEN** `can(actor, "read", processId, db)` runs for an actor whose id
+  or group appears on that process's Reader list
+- **AND** the store has no matching `"read"` grant
+- **AND** the actor has no reserved role
+- **THEN** it answers true
+
+#### Scenario: A Reader-list match satisfies no other permission
+
+- **WHEN** `can(actor, "cancel", processId, db)` runs for that same actor
+  and process
+- **THEN** it answers false
 ### Requirement: A grant scope carries the plugin envelope
 
 A grant's scope SHALL take the `{ type, config }` shape the definition contract

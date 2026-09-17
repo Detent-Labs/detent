@@ -11,9 +11,9 @@ screen. No authoring job crosses a screen boundary any more.
 ### Requirement: The process surface carries one tab row
 
 A draft SHALL open on one surface. That surface SHALL carry a tab row above
-its body. The row SHALL hold ten tabs in authoring order. Those are Canvas,
-Steps, Fields, Data sources, Paths, Forms, Field matrix, Contract, Changes and
-Checks.
+its body. The row SHALL hold eleven tabs in authoring order. Those are
+Canvas, Steps, Fields, Data sources, Paths, Forms, Field matrix, Contract,
+Changes, Checks and Access.
 
 The body SHALL carry exactly one tab at a time. No index rail SHALL stand
 beside the body.
@@ -21,7 +21,7 @@ beside the body.
 #### Scenario: A draft opens on the Canvas tab
 
 - **WHEN** an author opens a draft from the process list
-- **THEN** the tab row holds ten tabs
+- **THEN** the tab row holds eleven tabs
 - **AND** the Canvas tab is the open one
 
 #### Scenario: The surface carries no index rail
@@ -313,14 +313,14 @@ The tab row SHALL be a tab set as `spa-accessibility` already states it. It
 SHALL group its tabs in a `tablist`. Each tab SHALL be a button carrying the
 tab role. The open tab SHALL carry `aria-selected`.
 
-The row carries ten tabs in one line that scrolls sideways rather than
+The row carries eleven tabs in one line that scrolls sideways rather than
 wrapping. It SHALL follow `spa-accessibility`'s roving-tabindex pattern for
 a tab set of that shape. An ordinary tab set instead follows the
 plain-button pattern.
 
 The row SHALL be one stop in the page's tab order. Its trailing edge is the
 last tab, so no control beside the tabs takes a stop of its own. Exactly one
-tab SHALL carry `tabindex="0"`, and the other nine `tabindex="-1"`. That one
+tab SHALL carry `tabindex="0"`, and the other ten `tabindex="-1"`. That one
 is the open tab until an arrow key moves focus, and the focused tab
 afterwards. Opening a tab SHALL bring focus and selection back together.
 
@@ -330,7 +330,7 @@ past the first SHALL wrap focus to the last. An arrow key SHALL move focus
 alone. It SHALL NOT open the newly focused tab.
 
 Enter or Space SHALL open the focused tab. The open tab's body SHALL stand
-open, and the other nine SHALL hide.
+open, and the other ten SHALL hide.
 
 #### Scenario: The row is one tab stop
 
@@ -351,7 +351,7 @@ open, and the other nine SHALL hide.
 
 #### Scenario: Arrow-key focus wraps at the row's ends
 
-- **WHEN** an author focuses the Checks tab, the row's last, and presses the
+- **WHEN** an author focuses the Access tab, the row's last, and presses the
   right arrow key
 - **THEN** focus moves to the Canvas tab, the row's first
 
@@ -359,7 +359,7 @@ open, and the other nine SHALL hide.
 
 - **WHEN** a screen reader reaches the tab row
 - **THEN** the open tab reports `aria-selected`
-- **AND** the nine hidden bodies leave the accessibility tree
+- **AND** the ten hidden bodies leave the accessibility tree
 
 ### Requirement: The open tab stands whole in the tab row's view
 

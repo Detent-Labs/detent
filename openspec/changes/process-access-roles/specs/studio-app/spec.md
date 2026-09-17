@@ -108,6 +108,229 @@ template is no published version.
 - **WHEN** an actor holds `system:developer` but not `CREATE_ROLE`
 - **THEN** the `/processes` screen offers no create-new-process action
 
+### Requirement: Editing is a canvas-primary surface, with the process-wide views on a routed screen
+
+The `/processes/:id/edit` screen SHALL carry over the editor's Draft model
+(`draft/`), UI-chrome i18n, and live validation. It SHALL also carry over the
+structural panels (`panels/`). These panels are steps, paths, timers, actions,
+subprocess spec, view editor, field catalog, data sources, and contract.
+
+The draft routes replace file-based persistence. `GET /drafts/:processId` loads
+the draft. `PUT /drafts/:processId` saves it and carries the revision the load
+call returned.
+
+The screen's layout SHALL be one tabbed process surface. The
+`studio-process-tabs` capability states the tab row and its eleven tabs. The
+canvas stands on the Canvas tab. A steps rail and a step page stand on the
+Steps tab, and the `studio-step-page` capability states both.
+
+Seven tabs carry a process-wide subject. They are Fields, Data sources, Paths,
+Forms, Field matrix, Contract and Changes. Checks takes the tenth tab. Access
+takes the eleventh. Each tab stays reachable whether or not the author has
+picked a step.
+
+The process header's `⋮` overflow menu SHALL carry `baseLocale`. This capability
+requires an author to declare a non-English base locale without leaving the
+process surface. No tab SHALL hold that control.
+
+The tab row SHALL belong to the Structure surface alone. The surface SHALL stand
+no tab while the JSON surface is open. Four tabs write the draft body, and the
+`studio-json-view` capability requires that no draft-body-writing control stays
+reachable there.
+
+This requirement governs where the surface mounts each panel, and how an author
+reaches it. What each panel validates, writes, or persists stays the same.
+
+Every inline missing-translation warning SHALL survive the move. Six
+`LocalizedTextInput` sites carry one.
+
+- the process label, which stays on the screen
+- a step's label and description, which sit in the step page's masthead
+- a field's label and description, and a field option's label, which sit in the
+  Fields tab
+
+Live validation SHALL remain exactly what it is today. It runs the engine's own
+publish-time chain in the browser and reports issues in place. It SHALL NOT block
+saving, since a work-in-progress draft is normally invalid.
+
+The step page's masthead SHALL carry one issue count for the open step as a
+whole. That count SHALL cover the step's own issues, and the issues of its paths,
+timers and actions. Here `resolveLoc` returns the deepest entity it finds. A
+guard's issue therefore names the path rather than the step. A count over the step's own
+id alone would read zero on such a step.
+
+Each section heading on the step page SHALL carry its own count. It counts the
+issues `resolveLoc` resolves to an entity that section holds. A path's issue
+counts at the paths section, and a timer's at the time-limit section. An issue
+`resolveLoc` resolves to the step itself counts on the masthead alone. The
+`studio-step-page` capability states the section register those counts sit in.
+
+A tab SHALL carry one issue count for its own subject. Every count SHALL take the
+same visual tone. The rest of the studio area already takes that tone for issues.
+
+The studio's area nav SHALL offer a **Publish** action (see the `studio-publish`
+capability). It calls `POST /drafts/:processId/publish` against the currently
+persisted draft rather than the in-browser draft state. When local changes remain
+unsaved, the action SHALL prompt the author to save first. It must not publish
+stale or ahead-of-server content. On success, the studio SHALL confirm the new
+version number and `definitionHash`.
+
+#### Scenario: A draft round-trips through the panels
+
+- **WHEN** the author loads a draft, adds a step through the panels, saves
+  the draft, and reloads it
+- **THEN** the panels carry the new step identically
+
+#### Scenario: A draft round-trips through the canvas
+
+- **WHEN** the author loads a draft, repositions a step, connects it to
+  another step, then saves and reloads it
+- **THEN** the Canvas tab draws the new position and path identically
+
+#### Scenario: An invalid draft is still saveable
+
+- **WHEN** live validation reports issues for the current draft
+- **THEN** the surface prints the issues, keeps the save action available,
+  and the save succeeds
+
+#### Scenario: A Structure-surface link opens the panels screen
+
+- **WHEN** the author picks one of the seven process-wide tabs
+- **THEN** the surface opens that tab, and the address bar carries that
+  tab's own path
+
+#### Scenario: A link opens the panels screen with no step selected
+
+- **WHEN** the author picks one of those tabs before selecting any step
+- **THEN** the surface still opens that tab
+
+#### Scenario: The JSON surface renders no link into the panels screen
+
+- **WHEN** the author opens the JSON surface from the overflow menu
+- **THEN** the tab row stands away, and no control on screen reaches a tab
+
+#### Scenario: A path's issue counts on the Paths head
+
+- **WHEN** a step's path carries a failing guard
+- **THEN** the step page's paths section reads a count of one, and the
+  masthead's count also reads one
+
+#### Scenario: Publishing with unsaved changes prompts a save first
+
+- **WHEN** the author picks Publish in the area nav while local changes
+  remain unsaved
+- **THEN** the studio prompts the author to save before publishing, and does
+  not call `POST /drafts/:processId/publish` until the save completes
+
+#### Scenario: The screen confirms a successful publish
+
+- **WHEN** `POST /drafts/:processId/publish` succeeds
+- **THEN** the studio prints the returned version number and `definitionHash`
+
+<!-- The heading repeats the live spec's wording verbatim, so a delta can match it. -->
+<!-- antislop: allow synonym-rotation -->
+
+### Requirement: The panels screen is a routed sub-state of the edit screen
+
+The eleven tabs SHALL sit on a routed surface rather than behind a dialog.
+The path SHALL read `/processes/:id/edit/:tab`. Here `:tab` is one of `canvas`,
+`steps`, `fields`, `dataSources`, `paths`, `forms`, `matrix`, `contract`,
+`changes`, `checks` or `access`.
+
+That path SHALL be a sub-state of the `edit` route. It rides as an optional field
+on the same route object, the shape `formStepId` already takes. The
+`studio-form-editor` capability routes its own screen that way.
+
+An unrecognized `:tab` SHALL fall back to the Canvas tab. The routing table
+already answers an unrecognized path with the process list, and this is that rule
+one level down.
+
+The surface SHALL stand the tab row above one body. The body SHALL hold the open
+tab alone. No rail of tab names SHALL stand beside it. The rail's one-line
+summary SHALL stand in the studio's area nav rather than at the surface's
+bottom edge.
+See the `studio-checks-rail` capability for what the rail carries there.
+
+A tab SHALL fill the body. The tab row above it SHALL keep every other tab one
+click away. The surface therefore does not need a control back to the canvas.
+
+A step target SHALL ride on the `edit` route at its own path segment,
+`/processes/:id/edit/step/:stepId`, ranked after the `tab` and `formStepId`
+matches.
+
+<!-- "Show on the canvas" repeats the control's own name, so the word stays. -->
+<!-- antislop: allow synonym-rotation -->
+Choosing a "Show on the canvas" control SHALL open the Canvas tab with that step
+preselected. The Canvas tab SHALL read the target on every change rather than
+only once at mount. Reaching it from another tab therefore still selects the
+step.
+
+Once read, the surface SHALL replace that history entry with the plain `edit`
+route. It SHALL NOT leave the step target addressable. The browser's Back control
+therefore still returns to the tab the navigation came from, per
+`unified-shell`'s navigation requirement.
+
+The body SHALL fill the height the header rows and the tab row leave. It SHALL
+stop above the floor the surface uses. A taller window therefore carries a taller
+body, and no empty band sits below it.
+
+#### Scenario: The columns fill a tall window
+
+- **WHEN** the author opens a tab on a window taller than the floor
+- **THEN** the body reaches the surface's bottom edge
+- **AND** no empty band sits below it
+
+#### Scenario: A short window holds the floor
+
+- **WHEN** the author opens a tab on a window shorter than the floor
+- **THEN** the body holds that floor and the page scrolls
+
+#### Scenario: The screen stands no checks column
+
+- **WHEN** the author opens a tab
+- **THEN** the open tab fills the body
+- **AND** the checks summary stands in the area nav, in no column of its own
+
+#### Scenario: A view has its own address
+
+- **WHEN** the author opens the Data sources tab
+- **THEN** the address bar reads that tab's path, and loading that path
+  directly opens the same tab
+
+#### Scenario: The Changes and Paths views have addresses too
+
+- **WHEN** the author opens the Changes tab
+- **THEN** the address bar reads `/processes/:id/edit/changes`, and loading
+  it directly opens the same tab
+
+#### Scenario: A reload keeps the open view
+
+- **WHEN** the author reloads the browser on the Contract tab
+- **THEN** the surface reopens on the Contract tab instead of Canvas
+
+<!-- The scenario name repeats the live spec's wording verbatim, so a delta can match it. -->
+<!-- antislop: allow synonym-rotation -->
+#### Scenario: Back leaves the screen rather than the process
+
+- **WHEN** the author reaches the Fields tab from the Canvas tab and presses
+  the browser's Back control
+- **THEN** the Canvas tab returns, and the draft keeps every edit
+
+#### Scenario: Show on the canvas preselects a step
+
+- **WHEN** the author picks "Show on the canvas" on a used-in row of the
+  Fields tab
+- **THEN** the Canvas tab opens and selects the step that row named
+
+#### Scenario: An unknown view falls back to the canvas
+
+- **WHEN** the author loads `/processes/:id/edit/nonsense`
+- **THEN** the Canvas tab opens, and the surface reports no issue
+
+<!-- The heading repeats the live spec's wording verbatim, so a delta can match it. -->
+
+<!-- antislop: allow synonym-rotation -->
+
 ## ADDED Requirements
 
 ### Requirement: A process's Access surface manages its Developer, Owner and Reader lists
