@@ -7,7 +7,7 @@ export const PANEL_VIEWS: PanelView[] = ["fields", "dataSources", "contract", "m
 
 const isPanelView = (v: string): v is PanelView => (PANEL_VIEWS as string[]).includes(v);
 
-/** The process surface's ten tabs, in authoring order (`studio-process-tabs`).
+/** The process surface's eleven tabs, in authoring order (`studio-process-tabs`).
  * The route type names them, so routing owns the list the same way it owns
  * `PanelView`. */
 export type ProcessTab =
@@ -20,7 +20,8 @@ export type ProcessTab =
   | "matrix"
   | "contract"
   | "changes"
-  | "checks";
+  | "checks"
+  | "access";
 
 export const PROCESS_TABS: ProcessTab[] = [
   "canvas",
@@ -33,6 +34,7 @@ export const PROCESS_TABS: ProcessTab[] = [
   "contract",
   "changes",
   "checks",
+  "access",
 ];
 
 /** The tab an address naming none opens, and the tab an unknown name falls

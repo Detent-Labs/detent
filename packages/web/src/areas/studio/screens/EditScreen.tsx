@@ -17,6 +17,7 @@ import { FieldMatrixPanel } from "../panels/FieldMatrixPanel.js";
 import { ChangesView } from "../panels/ChangesView.js";
 import { PathsView } from "../panels/PathsView.js";
 import { FormsTab } from "../panels/FormsTab.js";
+import { AccessPanel } from "../panels/AccessPanel.js";
 import { stepEntityIds } from "../draft/panel-rail.js";
 import { seedLocalizedText } from "../draft/localized-text";
 import { getDraft, listProcesses } from "../api/client.js";
@@ -173,7 +174,7 @@ const styles = stylex.create({
   // A tab body. It fills the height the header rows and the tab row leave and
   // scrolls inside itself, above the floor its own content declares.
   //
-  // All ten bodies stay mounted and nine hide, so a body keeps its half-typed
+  // All eleven bodies stay mounted and ten hide, so a body keeps its half-typed
   // values across a tab switch. `hidden` alone would lose against this
   // compiled `display`, since an author sheet beats the UA one, so the hidden
   // state picks its own named style from the same flag the element carries.
@@ -229,6 +230,11 @@ interface EditScreenProps {
   tab?: ProcessTab;
   stepId?: string;
   token: string;
+  /** The calling actor's own id and roles, for the Access tab's own
+   * add/delete gating (`studio-app`'s Access-surface requirement). Nothing
+   * else on this screen reads either. */
+  roles: readonly string[];
+  actorId: string;
   /** Cross-area navigation, threaded down to `ProcessHeaderBar`'s "Manage
    * assignment groups for this process" link (design.md: "Threading `go`
    * down to the link"). `token`, `navigate`, and `onUnauthorized` already
@@ -248,6 +254,8 @@ interface ProcessSurfaceProps {
   tab?: ProcessTab;
   stepId?: string;
   token: string;
+  roles: readonly string[];
+  actorId: string;
   go: (href: string, opts?: NavigateOptions) => void;
   initialRevision: number;
   initialLayout: Record<string, unknown>;
@@ -292,12 +300,12 @@ function focusTabButton(tab: ProcessTab): void {
  * `useDraftToolbarActions` (below) is the one remaining direct consumer of
  * `DraftToolbarProps`; `DraftToolbar` itself no longer mounts here.
  *
- * All ten tab bodies stay mounted and nine hide. A body keeps its half-typed
+ * All eleven tab bodies stay mounted and ten hide. A body keeps its half-typed
  * values across a tab switch: the contract panel holds an outcome name in
  * component state, the data sources panel fetched its list keys on mount, and
  * the field matrix holds its selected cell.
  */
-function ProcessSurface({ processId, formStepId, tab, stepId, token, go, initialRevision, initialLayout, loadedBaseVersion, loadedCanPublish, navigate, onUnauthorized, onDirtyChange }: ProcessSurfaceProps) {
+function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, actorId, go, initialRevision, initialLayout, loadedBaseVersion, loadedCanPublish, navigate, onUnauthorized, onDirtyChange }: ProcessSurfaceProps) {
   const { draft, mutate, validation, replace, contentLocale } = useDraft();
   const baseLocale = draft.baseLocale ?? "en";
   const [saveState, setSaveState] = useState<DraftSaveState>(() => initialSaveState(initialRevision, initialLayout));
@@ -795,7 +803,7 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, go, initial
   const processLabel =
     resolveDraftLocalizedText(draft.label, contentLocale, baseLocale) ?? t("headerBar.unnamedProcess");
 
-  /** One tab body. Every one of the ten renders; nine hide. `hidden` is the
+  /** One tab body. Every one of the eleven renders; ten hide. `hidden` is the
    * mechanism, so a hidden body leaves both the tab order and the
    * accessibility tree while keeping its own state. */
   const tabPanel = (target: ProcessTab, body: ReactNode) => {
@@ -872,7 +880,7 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, go, initial
           />
           {/* The JSON surface stands in place of every tab body, never beside
               one: no draft-body-writing control may stay reachable while it is
-              open (`studio-json-view`). The ten bodies below stay mounted and
+              open (`studio-json-view`). The eleven bodies below stay mounted and
               hidden, and a `hidden` subtree reaches neither the tab order nor
               the accessibility tree. */}
           {jsonOpen && <JsonView draft={draft} onApply={replace} />}
@@ -1003,6 +1011,10 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, go, initial
               onOpenIssue={(issue) => openTabFromRow(tabForIssue(issue.entityType))}
             />,
           )}
+          {tabPanel(
+            "access",
+            <AccessPanel processId={processId} token={token} actorId={actorId} roles={roles} onUnauthorized={onUnauthorized} />,
+          )}
         </div>
       )}
     </main>
@@ -1020,7 +1032,7 @@ type EditLoadState =
   | { kind: "error"; message: string }
   | { kind: "loaded"; record: DraftRecord };
 
-export function EditScreen({ processId, formStepId, tab, stepId, token, go, navigate, onUnauthorized, onDirtyChange }: EditScreenProps) {
+export function EditScreen({ processId, formStepId, tab, stepId, token, roles, actorId, go, navigate, onUnauthorized, onDirtyChange }: EditScreenProps) {
   const [state, setState] = useState<EditLoadState>({ kind: "loading" });
   const fail = useFail(onUnauthorized, (e) => setState({ kind: "error", message: describeCaughtError(e) }));
 
@@ -1084,6 +1096,8 @@ export function EditScreen({ processId, formStepId, tab, stepId, token, go, navi
         tab={tab}
         stepId={stepId}
         token={token}
+        roles={roles}
+        actorId={actorId}
         go={go}
         initialRevision={state.record.revision}
         initialLayout={state.record.layout}

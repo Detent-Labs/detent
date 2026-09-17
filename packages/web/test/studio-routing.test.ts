@@ -79,7 +79,7 @@ describe("the open tab's sub-state of the edit route", () => {
     }
   });
 
-  it("holds ten tabs, in authoring order", () => {
+  it("holds eleven tabs, in authoring order", () => {
     expect(PROCESS_TABS).toEqual([
       "canvas",
       "steps",
@@ -91,6 +91,7 @@ describe("the open tab's sub-state of the edit route", () => {
       "contract",
       "changes",
       "checks",
+      "access",
     ]);
   });
 

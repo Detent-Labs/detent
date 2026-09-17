@@ -12,6 +12,8 @@ import type {
   TemplateRecord,
   StudioDataList,
   MyProcessAccess,
+  AccessKind,
+  ProcessAccessLists,
 } from "./types.js";
 import { AppClientError, createInstance, getInstanceRecord, getJson, request, submitPath } from "../../../api/client.js";
 
@@ -33,6 +35,39 @@ export function listDrafts(token: string): Promise<DraftSummary[]> {
 
 export function getMyProcessAccess(token: string): Promise<MyProcessAccess> {
   return getJson("/processes/access/mine", token);
+}
+
+/** The three access lists one process holds (`studio-app`'s Access surface). */
+export function getProcessAccess(processId: string, token: string): Promise<ProcessAccessLists> {
+  return getJson(`/processes/${encodeURIComponent(processId)}/access`, token);
+}
+
+export async function addAccessPrincipal(
+  processId: string,
+  kind: AccessKind,
+  principal: string,
+  token: string,
+): Promise<{ kind: AccessKind; principal: string }> {
+  const res = await request(`/processes/${encodeURIComponent(processId)}/access`, token, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ kind, principal }),
+  });
+  return (await res.json()) as { kind: AccessKind; principal: string };
+}
+
+export async function deleteAccessPrincipal(
+  processId: string,
+  kind: AccessKind,
+  principal: string,
+  token: string,
+): Promise<{ kind: AccessKind; principal: string }> {
+  const res = await request(`/processes/${encodeURIComponent(processId)}/access`, token, {
+    method: "DELETE",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ kind, principal }),
+  });
+  return (await res.json()) as { kind: AccessKind; principal: string };
 }
 
 /** `undefined` for a process with no draft (404), never thrown — a missing draft is an expected, not exceptional, shape for this call. */
