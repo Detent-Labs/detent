@@ -36,9 +36,9 @@ const styles = stylex.create({
     margin: 0,
     padding: 0,
   },
-  // One rail row holds three controls: the step itself and its two reorder
-  // controls. The wrapper carries the ledger hairline the single button
-  // carried in the register, so the three still read as one row.
+  // One rail row holds two controls: the step itself and its drag grip.
+  // The wrapper carries the ledger hairline the single button carried in
+  // the register, so the two still read as one row.
   row: {
     display: "flex",
     alignItems: "stretch",
