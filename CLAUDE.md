@@ -349,6 +349,12 @@ after a substantial change lands.
 
 ## Conventions
 - TypeScript strict, ESM.
+- **`tmp/` is shared across every worktree, so keep scratch files out of it.**
+  Orca links one `tmp/` into each worktree it creates. Two agents that both
+  write `tmp/t.log` read each other's result, which is the silent-green defect
+  class again. Scratch goes in the session scratchpad. `tmp/` holds only what
+  the worktrees share: the deploy stack, `Detent Design Language.dc.html`, and
+  the task brief a new worktree reads at `tmp/briefs/<change-name>.md`.
 - A deliberate shortcut in `src/` or `packages/` carries a `ponytail:` comment
   naming the shortcut, its ceiling and the upgrade entry point. The roll-up is
   `git grep -n 'ponytail:' -- src packages`; no ledger file and no gate back
