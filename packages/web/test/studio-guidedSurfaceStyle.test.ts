@@ -183,6 +183,58 @@ describe("what StyleX drops", () => {
   });
 });
 
+describe("the path row's label leads key, both stacked, and the target select is styled", () => {
+  const FILE = "src/areas/studio/panels/PathsPanel.tsx";
+
+  it("renders the label field before the key field, both in the masthead's stacked pattern", () => {
+    const source = stripComments(read(FILE));
+
+    const labelIndex = source.indexOf("fieldLabelText)}>label</span>");
+    const keyIndex = source.indexOf("fieldLabelText)}>key</span>");
+
+    expect(labelIndex).toBeGreaterThan(-1);
+    expect(keyIndex).toBeGreaterThan(-1);
+    expect(labelIndex).toBeLessThan(keyIndex);
+  });
+
+  it("gives the key field's control the mono treatment the masthead gives a step's own key", () => {
+    const source = stripComments(read(FILE));
+
+    const keyIndex = source.indexOf("fieldLabelText)}>key</span>");
+    const keyFieldBlock = source.slice(keyIndex, source.indexOf("</label>", keyIndex));
+
+    expect(keyFieldBlock).toMatch(/styles\.monoInput/);
+  });
+
+  it("drops the select's own chevron in favor of a decorative one, layered over the trailing edge", () => {
+    const source = stripComments(read(FILE));
+
+    const selectBlock = styleBlock(source, "select");
+    expect(selectBlock).toMatch(/appearance: "none"/);
+
+    const iconBlock = styleBlock(source, "selectIcon");
+    expect(iconBlock).toMatch(/position: "absolute"/);
+    expect(iconBlock).toMatch(/color: colors\.textMuted/);
+    expect(iconBlock).toMatch(/pointerEvents: "none"/);
+  });
+
+  it("wraps both target selects — the path row's and the add-path selector's — in the studio select pattern", () => {
+    const source = stripComments(read(FILE));
+
+    // `styles\.select\)` alone, not `styles.selectWrap)`/`styles.selectIcon)`:
+    // the closing paren right after "select" picks out only the bare style.
+    const selectWrapCount = [...source.matchAll(/stylex\.props\(styles\.selectWrap\)/g)].length;
+    const selectCount = [...source.matchAll(/stylex\.props\(styles\.select\)/g)].length;
+    const iconCount = [...source.matchAll(/stylex\.props\(styles\.selectIcon\)/g)].length;
+    const chevronCount = [...source.matchAll(/<ChevronDown size=\{18\} strokeWidth=\{1\.75\} aria-hidden="true" \/>/g)].length;
+
+    expect(selectWrapCount).toBe(2);
+    expect(selectCount).toBe(2);
+    expect(iconCount).toBe(2);
+    expect(chevronCount).toBe(2);
+  });
+});
+
 describe("the design language's own numbers", () => {
   it("takes every gap off the 4-point scale", () => {
     for (const file of GUIDED) {

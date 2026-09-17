@@ -166,6 +166,11 @@ label sits beside the control, 8px apart, so the row keeps one control's
 height. The canvas bar's group name is one such field. Every other field
 keeps its label above.
 
+A `<select>` keeps the same stacked label. It drops its UA chevron with
+`appearance: none`. A decorative Lucide `ChevronDown` sits over its trailing
+edge in slate instead. The icon takes `pointer-events: none`, so a click
+still reaches the control underneath.
+
 **Error, emptiness, waiting.** A failed request shows its error where the
 data would normally sit. It never shows as a toast, and an empty result
 never stands in for an error. An empty state says so in words. It never

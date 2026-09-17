@@ -122,6 +122,12 @@ components:
     typography: "{typography.body}"
     rounded: "{rounded.md}"
     padding: "8px"
+  select:
+    backgroundColor: "{colors.paper-50}"
+    textColor: "{colors.ink-900}"
+    typography: "{typography.body}"
+    rounded: "{rounded.md}"
+    padding: "8px 32px 8px 8px"
   stamp-open:
     backgroundColor: "transparent"
     textColor: "{colors.stamp-600}"
@@ -577,6 +583,9 @@ stamp. The steps rail and the form card carry it.
 - The label takes 11px uppercase at 0.1em, in slate.
 - The control takes a 1px hairline border, the paper ground, 8px padding and
   14px text. The border is the field; no fill stands behind it.
+- A `<select>` keeps that same border, ground and padding. It drops the UA
+  chevron with `appearance: none`. A decorative Lucide chevron sits over its
+  trailing edge in slate.
 - **Focus:** the border turns accent and the 2px ring sits on top at 0 offset.
 - A required marker prints in the accent. On the ledger ground it prints in
   Accent on Muted.

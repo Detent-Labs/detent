@@ -26,6 +26,15 @@
         ],
         "createdAt": "2026-09-13T03:47:07.034Z",
         "reason": "The translation badge beside the label input is a muted meta badge. DESIGN.md's Timeline sets its meta line at 0.8rem in slate, and the badge follows that precedent."
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "0.8rem",
+        "files": [
+          "packages/web/src/areas/studio/panels/PathsPanel.tsx"
+        ],
+        "createdAt": "2026-09-17T17:05:16.411Z",
+        "reason": "monoInput copied verbatim from StepPage.tsx's existing mono-face declaration for the key field (design.md, studio-path-row-field-order task brief)"
       }
     ]
   }
