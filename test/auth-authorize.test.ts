@@ -24,6 +24,8 @@ import {
   DATALISTS_ROLE,
   TEMPLATES_ROLE,
   AUTHOR_ROLE,
+  CREATE_ROLE,
+  OWNER_ROLE,
   type Permission,
 } from "../src/auth/authorize.js";
 import * as authorize from "../src/auth/authorize.js";
@@ -42,6 +44,8 @@ test("the reserved role constants carry their documented literal values", () => 
   expect(DATALISTS_ROLE).toBe("system:datalists");
   expect(TEMPLATES_ROLE).toBe("system:templates");
   expect(AUTHOR_ROLE).toBe("system:author");
+  expect(CREATE_ROLE).toBe("system:create");
+  expect(OWNER_ROLE).toBe("system:owner");
 });
 
 test("no authorization registry/plugin envelope exists alongside the fixed role checks", () => {
@@ -55,8 +59,10 @@ test("no authorization registry/plugin envelope exists alongside the fixed role 
     "AUTHOR_ROLE",
     "AuthorizationError",
     "CANCEL_ANY_ROLE",
+    "CREATE_ROLE",
     "DATALISTS_ROLE",
     "DEVELOPER_ROLE",
+    "OWNER_ROLE",
     "PUBLISH_ROLE",
     "REPORTS_ROLE",
     "TEMPLATES_ROLE",
@@ -121,6 +127,28 @@ test("the author role implies nothing", () => {
 test("no other reserved role implies the author role", () => {
   for (const held of [ADMIN_ROLE, DEVELOPER_ROLE, PUBLISH_ROLE, CANCEL_ANY_ROLE, REPORTS_ROLE, DATALISTS_ROLE, TEMPLATES_ROLE]) {
     expect(() => requireRole({ id: "user_1", roles: [held] }, AUTHOR_ROLE)).toThrow(AuthorizationError);
+  }
+});
+
+test("the create role implies nothing", () => {
+  expect(() => requireRole({ id: "user_1", roles: [CREATE_ROLE] }, ADMIN_ROLE)).toThrow(AuthorizationError);
+  expect(() => requireRole({ id: "user_1", roles: [CREATE_ROLE] }, DEVELOPER_ROLE)).toThrow(AuthorizationError);
+});
+
+test("no other reserved role implies the create role", () => {
+  for (const held of [ADMIN_ROLE, DEVELOPER_ROLE, AUTHOR_ROLE]) {
+    expect(() => requireRole({ id: "user_1", roles: [held] }, CREATE_ROLE)).toThrow(AuthorizationError);
+  }
+});
+
+test("the owner role implies nothing", () => {
+  expect(() => requireRole({ id: "user_1", roles: [OWNER_ROLE] }, ADMIN_ROLE)).toThrow(AuthorizationError);
+  expect(() => requireRole({ id: "user_1", roles: [OWNER_ROLE] }, DEVELOPER_ROLE)).toThrow(AuthorizationError);
+});
+
+test("no other reserved role implies the owner role", () => {
+  for (const held of [ADMIN_ROLE, DEVELOPER_ROLE, AUTHOR_ROLE]) {
+    expect(() => requireRole({ id: "user_1", roles: [held] }, OWNER_ROLE)).toThrow(AuthorizationError);
   }
 });
 
