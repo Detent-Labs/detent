@@ -58,6 +58,13 @@ const styles = stylex.create({
     display: "block",
   },
   select: {
+    // `selectWrap` stretches to the flex column's full width (its own
+    // `<label>` parent is a flex column, and a flex item stretches on the
+    // cross axis by default), but a bare `<select>` sizes to its option
+    // text unless told otherwise. Without this, the select's own box stays
+    // content-width while `selectIcon` sits at the wrapper's trailing edge,
+    // landing well past the select's own right border.
+    width: "100%",
     appearance: "none",
     paddingInlineEnd: space.s8,
   },

@@ -5150,3 +5150,22 @@ errors.
 This stays manual because it is a padding-alignment judgment. A `bun:test`
 run cannot observe whether a nested row's padding lines up with its parent
 group's row.
+
+### The path row's field order and the target select's chevron (`studio-path-row-field-order`)
+
+Open Studio, a draft of `credit_check`, the Steps tab. Select the `Decide`
+step. It carries two automatic paths. Read its "Path to" section.
+
+Pass: each path row shows `label` above `key` above `to`. `key` renders in
+the mono face. The `to` select shows a slate chevron in place of the
+browser's own dropdown arrow. That chevron sits flush against the select's
+own trailing edge.
+
+This walk caught a defect no rendered-string test can see. `selectWrap`
+stretches to the flex column's full width. A bare `<select>` sizes to its
+own option text instead. The select stayed narrow while its wrapper
+stretched. The chevron then sat well past the select's own right border, over
+empty space. `PathsPanel.tsx`'s `select` style now declares `width: "100%"`.
+`studio-guidedSurfaceStyle.test.ts` cannot see this. Every suite in
+`packages/web/test/` assumes no DOM, so nothing there reads a resolved width
+or position.
