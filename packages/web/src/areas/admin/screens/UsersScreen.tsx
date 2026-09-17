@@ -38,7 +38,7 @@ const NEW_USER_ROW = "new-user";
 const ROLES_PLACEHOLDER = "finance:approver, system:admin";
 
 /**
- * The eight reserved roles, spelled the way `src/auth/authorize.ts` exports
+ * The ten reserved roles, spelled the way `src/auth/authorize.ts` exports
  * them. Hardcoded here as the area's other screens hardcode theirs
  * (`root.tsx`, `routing.ts`): no route serves the list, and a role string is
  * otherwise free.
@@ -52,6 +52,8 @@ const RESERVED_ROLES = [
   "system:reports",
   "system:datalists",
   "system:templates",
+  "system:create",
+  "system:owner",
 ];
 
 /** `app.css`'s screen/controls/table/editor/role rules, as StyleX.
