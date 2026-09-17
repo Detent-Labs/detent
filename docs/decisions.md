@@ -1655,7 +1655,7 @@ recorded rather than fixed. The RAIL tags are local to this section.
   critique of `authoring-command-ink-advisory-role` measured it on
   2026-09-14. The IT Offboarding draft's first path had a condition row.
   - The "Only when" fieldset keeps the default `min-inline-size: min-content`
-    (`panels/PathsPanel.tsx:234`). The row's field select takes its longest
+    (`panels/PathsPanel.tsx:290`). The row's field select takes its longest
     option's width, 647px (`panels/shared/ConditionBuilder.tsx:194`). The
     fieldset then ends at x=1028, past the Path to section's edge at x=863.
   - The On exit section covers the row's last 107px, its remove control
@@ -1663,7 +1663,7 @@ recorded rather than fixed. The RAIL tags are local to this section.
   - Risk (Medium): a pointer cannot reach the row's remove control at 1280px,
     and the dashed box runs under another section.
 - **STEP-2: the guard's label wraps the whole condition builder.** One
-  `<label>` holds the guard text and the builder (`panels/PathsPanel.tsx:246`).
+  `<label>` holds the guard text and the builder (`panels/PathsPanel.tsx:302`).
   - Before a row exists, "+ Add row" is that label's first labelable control
     (`panels/shared/ConditionBuilder.tsx:161`). Measured 2026-09-14, a click on
     the label's own text added a row. The button's accessible name then reads
