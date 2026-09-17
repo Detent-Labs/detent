@@ -1,5 +1,6 @@
 import { useState } from "react";
 import * as stylex from "@stylexjs/stylex";
+import { ChevronDown } from "lucide-react";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
 import type { Path, PathTrigger, Step, StepId } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
@@ -31,6 +32,43 @@ const styles = stylex.create({
   pathRowSelected: {
     boxShadow: `inset 3px 0 0 ${colors.accent}`,
     borderColor: colors.accent,
+  },
+  // Copied from `StepPage.tsx`'s masthead rather than imported: compiled
+  // StyleX styles stay beside their own module (design.md).
+  fieldLabel: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s1,
+    fontSize: "0.9rem",
+  },
+  fieldLabelText: {
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: "0.1em",
+    color: colors.textMuted,
+  },
+  monoInput: {
+    fontFamily: fonts.mono,
+    fontSize: "0.8rem",
+  },
+  // The studio select: a native `<select>` with its UA chevron dropped in
+  // favor of a decorative `ChevronDown` layered over the trailing edge.
+  selectWrap: {
+    position: "relative",
+    display: "block",
+  },
+  select: {
+    appearance: "none",
+    paddingInlineEnd: space.s8,
+  },
+  selectIcon: {
+    position: "absolute",
+    insetInlineEnd: space.s2,
+    insetBlock: 0,
+    display: "flex",
+    alignItems: "center",
+    color: colors.textMuted,
+    pointerEvents: "none",
   },
   // The same shorthand StyleX drops on the step page's own picker: a
   // `<fieldset>` keeps the UA's `2px groove` when it goes, so the longhand
@@ -174,33 +212,44 @@ export function PathsPanel({
           {...stylex.props(styles.pathRow, path.id !== undefined && path.id === selectedPathId && styles.pathRowSelected)}
           key={path.id ?? index}
         >
-          <label>
-            key
-            <input type="text" value={path.key ?? ""} onChange={(e) => updatePath(index, { key: e.target.value })} />
-          </label>
-          <label>
-            label
+          <label {...stylex.props(styles.fieldLabel)}>
+            <span {...stylex.props(styles.fieldLabelText)}>label</span>
             <input
               type="text"
               value={path.label ?? ""}
               onChange={(e) => updatePath(index, { label: e.target.value })}
             />
           </label>
-          <label>
-            to
-            <select
-              value={path.to ?? ""}
-              onChange={(e) => updatePath(index, { to: e.target.value as StepId })}
-            >
-              <option value="" disabled>
-                {t("paths.selectTargetStep")}
-              </option>
-              {steps.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.key ?? s.id}
+          <label {...stylex.props(styles.fieldLabel)}>
+            <span {...stylex.props(styles.fieldLabelText)}>key</span>
+            <input
+              type="text"
+              {...stylex.props(styles.monoInput)}
+              value={path.key ?? ""}
+              onChange={(e) => updatePath(index, { key: e.target.value })}
+            />
+          </label>
+          <label {...stylex.props(styles.fieldLabel)}>
+            <span {...stylex.props(styles.fieldLabelText)}>to</span>
+            <span {...stylex.props(styles.selectWrap)}>
+              <select
+                {...stylex.props(styles.select)}
+                value={path.to ?? ""}
+                onChange={(e) => updatePath(index, { to: e.target.value as StepId })}
+              >
+                <option value="" disabled>
+                  {t("paths.selectTargetStep")}
                 </option>
-              ))}
-            </select>
+                {steps.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.key ?? s.id}
+                  </option>
+                ))}
+              </select>
+              <span {...stylex.props(styles.selectIcon)}>
+                <ChevronDown size={18} strokeWidth={1.75} aria-hidden="true" />
+              </span>
+            </span>
           </label>
 
           {/* "triggered by": a two-option restyle of the existing `trigger`
@@ -271,18 +320,23 @@ export function PathsPanel({
           </button>
         </div>
       ))}
-      <label>
-        {t("paths.newPathTargetLabel")}
-        <select value={newPathTarget} onChange={(e) => setNewPathTarget(e.target.value)}>
-          <option value="" disabled>
-            {t("paths.selectTargetStep")}
-          </option>
-          {steps.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.key ?? s.id}
+      <label {...stylex.props(styles.fieldLabel)}>
+        <span {...stylex.props(styles.fieldLabelText)}>{t("paths.newPathTargetLabel")}</span>
+        <span {...stylex.props(styles.selectWrap)}>
+          <select {...stylex.props(styles.select)} value={newPathTarget} onChange={(e) => setNewPathTarget(e.target.value)}>
+            <option value="" disabled>
+              {t("paths.selectTargetStep")}
             </option>
-          ))}
-        </select>
+            {steps.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.key ?? s.id}
+              </option>
+            ))}
+          </select>
+          <span {...stylex.props(styles.selectIcon)}>
+            <ChevronDown size={18} strokeWidth={1.75} aria-hidden="true" />
+          </span>
+        </span>
       </label>
       <button type="button" className="btn btn-secondary" onClick={addPath} disabled={steps.length === 0 || terminal || !newPathTarget}>
         {t("paths.addPath")}
