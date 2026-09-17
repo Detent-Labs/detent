@@ -5242,10 +5242,10 @@ The rail's own `<nav aria-label="Steps">` holds a visually hidden
 stays on that step's own grip after the move. The row keeps its React key
 across the reorder, so the button stays the same DOM node.
 
-Repeat at the far end. `Alt+ArrowDown` on the last row leaves the step in
-place, and the announcement stays the same. `Alt+ArrowUp` on the last row
-moves the step up one position, with a fresh announcement naming its new
-position.
+Repeat at the far end. Press `Alt+ArrowDown` on the last row: the step
+stays in place, and the announcement stays the same. Press `Alt+ArrowUp` on
+the last row: the step moves up one position, with a fresh announcement
+naming its new position.
 
 Read the actual `workflow.steps` order back after each move. The rendered
 numbers alone do not prove the array itself changed. Open the `⋮` menu's
