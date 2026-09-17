@@ -43,22 +43,39 @@ test.skipIf(!DB)("GET /processes/:processId/access with no resolvable credential
   expect(res.status).toBe(401);
 });
 
-test.skipIf(!DB)("GET /processes/:processId/access returns all three lists, any resolved actor admitted", async () => {
+test.skipIf(!DB)("GET /processes/:processId/access returns all three lists to a Developer-listed actor", async () => {
   const processId = pid();
   await addToList(processId, "developer", "user_dev");
   await addToList(processId, "owner", "user_owner");
   await addToList(processId, "reader", "user_reader");
 
-  const res = await fetch(authedReq(`http://x/processes/${processId}/access`, "GET", bystander));
+  const developerActor: Actor = { id: "user_dev", roles: [DEVELOPER_ROLE] };
+  const res = await fetch(authedReq(`http://x/processes/${processId}/access`, "GET", developerActor));
   expect(res.status).toBe(200);
   const body = (await res.json()) as { developer: string[]; owner: string[]; reader: string[] };
   expect(body).toEqual({ developer: ["user_dev"], owner: ["user_owner"], reader: ["user_reader"] });
 });
 
 test.skipIf(!DB)("GET /processes/:processId/access for a process with no rows returns three empty lists", async () => {
-  const res = await fetch(authedReq(`http://x/processes/${pid()}/access`, "GET", bystander));
+  const admin: Actor = { id: "user_admin", roles: [ADMIN_ROLE] };
+  const res = await fetch(authedReq(`http://x/processes/${pid()}/access`, "GET", admin));
   expect(res.status).toBe(200);
   expect(await res.json()).toEqual({ developer: [], owner: [], reader: [] });
+});
+
+test.skipIf(!DB)("GET /processes/:processId/access refuses an actor with no relationship to the process", async () => {
+  const processId = pid();
+  await addToList(processId, "owner", "user_owner");
+  const res = await fetch(authedReq(`http://x/processes/${processId}/access`, "GET", bystander));
+  expect(res.status).toBe(403);
+});
+
+test.skipIf(!DB)("GET /processes/:processId/access refuses an Owner-listed actor who is not also Developer-listed", async () => {
+  const processId = pid();
+  const ownerOnly: Actor = { id: "user_owner_only", roles: [OWNER_ROLE] };
+  await addToList(processId, "owner", "user_owner_only");
+  const res = await fetch(authedReq(`http://x/processes/${processId}/access`, "GET", ownerOnly));
+  expect(res.status).toBe(403);
 });
 
 // ============================================================
