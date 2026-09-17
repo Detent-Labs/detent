@@ -217,6 +217,19 @@ const styles = stylex.create({
     display: { default: "block", [NARROW]: "none" },
     backgroundColor: colors.border,
   },
+  // LABEL carries prose that can run up to 40% longer in German; KEY carries
+  // a short slug. LABEL gets the wider column.
+  labelKeyRow: {
+    display: "grid",
+    gridTemplateColumns: { default: "minmax(0, 2fr) minmax(0, 1fr)", [NARROW]: "minmax(0, 1fr)" },
+    columnGap: space.s4,
+    rowGap: space.s2,
+  },
+  labelKeyColumn: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s2,
+  },
   // The 2px divider between sections down each column, the structural rule.
   section: {
     paddingBlock: space.s3,
@@ -719,26 +732,30 @@ export function StepPage({
           </button>
         </div>
 
-        <label {...stylex.props(styles.fieldLabel)}>
-          <span {...stylex.props(styles.fieldLabelText)}>{t("stepSections.labelField")}</span>
-          <LocalizedTextInput value={step.label} onChange={updateStepLabel} />
-        </label>
-        {/* Sibling of the label, never nested inside it: a <label> takes
-            phrasing content, and the design language keeps a field's own
-            messages beside the label. */}
-        {missingTranslationWarning(step.label, contentLocale, draft.baseLocale) && (
-          <p {...stylex.props(styles.warning)}>{missingTranslationWarning(step.label, contentLocale, draft.baseLocale)}</p>
-        )}
+        <div {...stylex.props(styles.labelKeyRow)}>
+          <div {...stylex.props(styles.labelKeyColumn)}>
+            <label {...stylex.props(styles.fieldLabel)}>
+              <span {...stylex.props(styles.fieldLabelText)}>{t("stepSections.labelField")}</span>
+              <LocalizedTextInput value={step.label} onChange={updateStepLabel} />
+            </label>
+            {/* Sibling of the label, never nested inside it: a <label> takes
+                phrasing content, and the design language keeps a field's own
+                messages beside the label. */}
+            {missingTranslationWarning(step.label, contentLocale, draft.baseLocale) && (
+              <p {...stylex.props(styles.warning)}>{missingTranslationWarning(step.label, contentLocale, draft.baseLocale)}</p>
+            )}
+          </div>
 
-        <label {...stylex.props(styles.fieldLabel)}>
-          <span {...stylex.props(styles.fieldLabelText)}>{t("stepSections.keyField")}</span>
-          <input
-            type="text"
-            {...stylex.props(styles.monoInput)}
-            value={step.key ?? ""}
-            onChange={(e) => updateStep({ key: e.target.value })}
-          />
-        </label>
+          <label {...stylex.props(styles.fieldLabel)}>
+            <span {...stylex.props(styles.fieldLabelText)}>{t("stepSections.keyField")}</span>
+            <input
+              type="text"
+              {...stylex.props(styles.monoInput)}
+              value={step.key ?? ""}
+              onChange={(e) => updateStep({ key: e.target.value })}
+            />
+          </label>
+        </div>
 
         <label {...stylex.props(styles.fieldLabel)}>
           <span {...stylex.props(styles.fieldLabelText)}>{t("stepSections.descriptionField")}</span>

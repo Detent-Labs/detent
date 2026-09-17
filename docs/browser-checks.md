@@ -3751,6 +3751,46 @@ each on its own fresh draft.
    own "Discard draft" does not work, so do not use it here. See the
    `docs/decisions.md` entry DRAFT-1.
 
+### Step page masthead Label and Key row (`step-page-label-key-side-by-side`)
+
+Source: `step-page-label-key-side-by-side` tasks 3.1 to 3.3.
+
+The step page masthead displays a step's LABEL and KEY fields. They now render
+side by side in one row, with LABEL's column visibly wider than KEY's, instead
+of stacked vertically. At narrow viewports (under 64rem), the row collapses to
+LABEL above KEY, each in its own full-width row. A missing-translation warning
+under LABEL remains scoped to LABEL's column.
+
+A compiled StyleX class name is never citable by name
+(`.claude/rules/design-language.md`). No `bun:test` assertion can see this
+grid's layout, so this check lands here.
+
+Build the production bundle and open it on the engine's own port. Seed the
+database, then sign in as `demo-superuser@example.test`, password
+`seed-demo-password`. In the Processes list, find `it_offboarding` and choose
+"Create draft". Studio opens the draft at `/studio/processes/<id>/edit`. On the
+Steps tab, open the "Submit the Exit Notification" step (key `exit_notification`)
+on the step page at `/studio/processes/<id>/edit/steps/<step-id>`.
+
+1. Resize the window to 1440px wide. Pass: the LABEL and KEY fields render in
+   one row side by side. LABEL's column is noticeably wider than KEY's column.
+   The step's label and key appear as one visual identity block.
+
+2. Resize the window to 500px wide, well under the 64rem narrow breakpoint.
+   Pass: the LABEL field and its warning now stack vertically as two full-width
+   rows, one above the other. KEY follows below, in its own row.
+
+3. Open the header bar's `⋮` menu, type `de` into the "add locale" textbox,
+   and choose "+ add locale". That click both adds `de` and selects it as the
+   content locale, which drives the missing-translation state. Scroll to see
+   the LABEL field. Pass: the missing-translation warning appears below
+   LABEL's own column, contained within LABEL's space only. The warning does
+   not span beneath KEY's column.
+
+Go back to the process list and choose "Discard" on the `it_offboarding` row,
+then accept the browser's confirm. Pass: that row reads an em dash under Draft,
+with "Create draft" back beside "Versions".
+
 ### The Forms tab card miniature (`forms-tab-form-strip`)
 
 Source: `forms-tab-form-strip` tasks 3.5 and 3.6, `forms-tab-card-clarity`
