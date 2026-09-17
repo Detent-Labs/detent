@@ -161,3 +161,17 @@ test.skipIf(!DB)("an admin edits the Reader list unconditionally", async () => {
   await addAccessPrincipal(admin, processId, "reader", "user_reader", sql);
   expect(await listPrincipals(processId, "reader")).toContain("user_reader");
 });
+
+test.skipIf(!DB)("a Developer entry succeeds ahead of the role", async () => {
+  const processId = pid();
+  const admin: Actor = { id: "user_admin", roles: [ADMIN_ROLE] };
+  const targetId = "user_without_role";
+
+  // Add entry for a user who lacks developer/author roles
+  await addAccessPrincipal(admin, processId, "developer", targetId, sql);
+  expect(await listPrincipals(processId, "developer")).toContain(targetId);
+
+  // User without the required role does not match the list
+  const targetActor: Actor = { id: targetId, roles: [] };
+  expect(await matchesAccessList(targetActor, processId, "developer")).toBe(false);
+});
