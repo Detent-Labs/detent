@@ -1,5 +1,6 @@
 import * as stylex from "@stylexjs/stylex";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { useState } from "react";
+import { GripVertical } from "lucide-react";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { t } from "../catalog.js";
 import { useDraft } from "../draft/store.js";
@@ -35,9 +36,9 @@ const styles = stylex.create({
     margin: 0,
     padding: 0,
   },
-  // One rail row holds three controls: the step itself and its two reorder
-  // controls. The wrapper carries the ledger hairline the single button
-  // carried in the register, so the three still read as one row.
+  // One rail row holds two controls: the step itself and its drag grip.
+  // The wrapper carries the ledger hairline the single button carried in
+  // the register, so the two still read as one row.
   row: {
     display: "flex",
     alignItems: "stretch",
@@ -102,18 +103,55 @@ const styles = stylex.create({
   badgeAdvisory: {
     color: colors.textMuted,
   },
-  move: {
+  // The drag handle, at the row's trailing edge, in the chevrons' old
+  // position. Padding gives it a 24x24 CSS pixel hit area independent of the
+  // 18px icon inside it (`spa-accessibility`'s pointer-target minimum).
+  grip: {
     display: "flex",
     alignItems: "center",
+    justifyContent: "center",
     flex: "none",
+    minWidth: 24,
+    minHeight: 24,
     backgroundColor: { default: "transparent", ":hover": colors.surfaceMuted },
     color: { default: colors.textMuted, ":disabled": colors.textMuted },
     borderWidth: 0,
-    paddingBlock: 0,
+    paddingBlock: space.s1,
     paddingInline: space.s1,
     font: "inherit",
     opacity: { default: 1, ":disabled": 0.45 },
-    cursor: { default: "pointer", ":disabled": "not-allowed" },
+    cursor: { default: "grab", ":disabled": "not-allowed" },
+  },
+  // The dragged row: "this row is momentarily not where it belongs"
+  // (design.md), the same 45% opacity a disabled control already uses. No
+  // shadow, no radius, no lift.
+  rowDragging: {
+    opacity: 0.45,
+  },
+  // The drop-position indicator: the same `boxShadow` mechanism
+  // `rowMainCurrent` uses for its own 3px mark, turned horizontal. It marks
+  // the gap immediately before this row.
+  rowDropBefore: {
+    boxShadow: `inset 0 3px 0 0 ${colors.accent}`,
+  },
+  // The same mark, on this row's trailing edge, for the one gap after the
+  // last row.
+  rowDropAfter: {
+    boxShadow: `inset 0 -3px 0 0 ${colors.accent}`,
+  },
+  // The keyboard move's live region. Off screen, never `display: none`: a
+  // hidden region is announced by no engine. `EntityTabs.tsx`'s own
+  // move-announcer style is the precedent for this exact pattern.
+  visuallyHidden: {
+    position: "absolute",
+    width: 1,
+    height: 1,
+    margin: -1,
+    padding: 0,
+    overflow: "hidden",
+    clipPath: "inset(50%)",
+    whiteSpace: "nowrap",
+    borderWidth: 0,
   },
   // The foot: the three add controls. The 2px divider is the structural rule
   // between the steps above and the controls below.
@@ -155,10 +193,9 @@ interface Props {
    * and this rail cannot disagree about which step is current. */
   currentStepId: string | undefined;
   onSelectStep: (stepId: string) => void;
-  /** Swaps two steps in the draft's own `workflow.steps` order. The rail
-   * hands the row's step and the neighbour it trades places with, so the
-   * caller needs no index of its own. */
-  onReorder: (stepId: string, neighbourId: string) => void;
+  /** Moves one step to a target index in the draft's own `workflow.steps` order. The rail
+   * hands the row's step id and the target index. */
+  onMove: (stepId: string, toIndex: number) => void;
   onAddStep: (kind: StepKind) => void;
 }
 
@@ -172,11 +209,26 @@ interface Props {
  * `workflow.steps` order back, which is what the canvas's Up/Down traversal
  * and the serialized definition both read.
  */
-export function StepsRail({ currentStepId, onSelectStep, onReorder, onAddStep }: Props) {
+export function StepsRail({ currentStepId, onSelectStep, onMove, onAddStep }: Props) {
   const { draft, validation, contentLocale } = useDraft();
   const baseLocale = draft.baseLocale ?? "en";
   const ordered = draft.workflow?.steps ?? [];
   const footHeadingId = "studio-steps-rail-add";
+  // The row index currently picked up, and the nearest drop gap (0..ordered.length,
+  // a gap index counted in the array's own numbering: gap `i` sits immediately
+  // before row `i`, and gap `ordered.length` sits after the last row).
+  const [dragIndex, setDragIndex] = useState<number | undefined>(undefined);
+  const [dropGap, setDropGap] = useState<number | undefined>(undefined);
+  const dragging = dragIndex !== undefined;
+  // The keyboard move's own announcement. The mouse-drag path never touches
+  // this: the delta spec's live-region assertion covers the keyboard
+  // scenario alone.
+  const [announcement, setAnnouncement] = useState("");
+
+  const endDrag = () => {
+    setDragIndex(undefined);
+    setDropGap(undefined);
+  };
 
   return (
     <nav {...stylex.props(styles.rail)} aria-label={t("stepsRail.label")}>
@@ -187,10 +239,40 @@ export function StepsRail({ currentStepId, onSelectStep, onReorder, onAddStep }:
           {ordered.map((step, i) => {
             const issues = railRowIssues(validation.issues, step);
             const current = step.id !== undefined && step.id === currentStepId;
-            const earlier = ordered[i - 1]?.id;
-            const later = ordered[i + 1]?.id;
+            const label = resolveDraftLocalizedText(step.label, contentLocale, baseLocale) || step.key || t("steps.unnamedStep");
+            const gripDisabled = step.id === undefined || ordered.length <= 1;
+            const dropBefore = dragging && dropGap === i;
+            const dropAfter = dragging && dropGap === ordered.length && i === ordered.length - 1;
             return (
-              <li key={step.id ?? `unsaved-${i}`} {...stylex.props(styles.row)}>
+              <li
+                key={step.id ?? `unsaved-${i}`}
+                {...stylex.props(
+                  styles.row,
+                  i === dragIndex && styles.rowDragging,
+                  dropBefore && styles.rowDropBefore,
+                  dropAfter && styles.rowDropAfter,
+                )}
+                onDragOver={(e) => {
+                  if (!dragging) return;
+                  e.preventDefault();
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const midpoint = rect.top + rect.height / 2;
+                  setDropGap(e.clientY < midpoint ? i : i + 1);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (dragIndex === undefined || dropGap === undefined) {
+                    endDrag();
+                    return;
+                  }
+                  const moved = ordered[dragIndex];
+                  if (moved?.id !== undefined) {
+                    const target = dropGap > dragIndex ? dropGap - 1 : dropGap;
+                    onMove(moved.id, target);
+                  }
+                  endDrag();
+                }}
+              >
                 <button
                   type="button"
                   {...stylex.props(styles.rowMain, current && styles.rowMainCurrent)}
@@ -199,9 +281,7 @@ export function StepsRail({ currentStepId, onSelectStep, onReorder, onAddStep }:
                   onClick={() => step.id !== undefined && onSelectStep(step.id)}
                 >
                   <span {...stylex.props(styles.number)}>{i + 1}</span>
-                  <span {...stylex.props(styles.name, current && styles.nameCurrent)}>
-                    {resolveDraftLocalizedText(step.label, contentLocale, baseLocale) || step.key || t("steps.unnamedStep")}
-                  </span>
+                  <span {...stylex.props(styles.name, current && styles.nameCurrent)}>{label}</span>
                   {issues.count > 0 && (
                     <span
                       {...stylex.props(styles.badge, issues.blocker ? styles.badgeBlocker : styles.badgeAdvisory)}
@@ -213,27 +293,43 @@ export function StepsRail({ currentStepId, onSelectStep, onReorder, onAddStep }:
                 </button>
                 <button
                   type="button"
-                  {...stylex.props(styles.move)}
-                  aria-label={t("stepsRail.moveEarlier")}
-                  disabled={step.id === undefined || earlier === undefined}
-                  onClick={() => step.id !== undefined && earlier !== undefined && onReorder(step.id, earlier)}
+                  {...stylex.props(styles.grip)}
+                  aria-label={t("stepsRail.dragHandle").replace("{step label}", label)}
+                  draggable={!gripDisabled}
+                  disabled={gripDisabled}
+                  onDragStart={(e) => {
+                    e.dataTransfer.effectAllowed = "move";
+                    // Firefox refuses to fire `drop` on the target at all
+                    // when `dragstart` sets no payload. The move itself
+                    // reads only React state, so the payload's content
+                    // carries nothing.
+                    e.dataTransfer.setData("text/plain", "");
+                    setDragIndex(i);
+                  }}
+                  onDragEnd={endDrag}
+                  onKeyDown={(e) => {
+                    if (!e.altKey || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
+                    e.preventDefault();
+                    if (step.id === undefined) return;
+                    const target = Math.max(0, Math.min(i + (e.key === "ArrowUp" ? -1 : 1), ordered.length - 1));
+                    if (target === i) return;
+                    setAnnouncement(t("stepsRail.movedAnnouncement").replace("{step label}", label).replace("{position}", String(target + 1)));
+                    onMove(step.id, target);
+                  }}
                 >
-                  <ChevronUp size={18} strokeWidth={1.75} aria-hidden="true" />
-                </button>
-                <button
-                  type="button"
-                  {...stylex.props(styles.move)}
-                  aria-label={t("stepsRail.moveLater")}
-                  disabled={step.id === undefined || later === undefined}
-                  onClick={() => step.id !== undefined && later !== undefined && onReorder(step.id, later)}
-                >
-                  <ChevronDown size={18} strokeWidth={1.75} aria-hidden="true" />
+                  <GripVertical size={18} strokeWidth={1.75} aria-hidden="true" />
                 </button>
               </li>
             );
           })}
         </ol>
       )}
+      {/* The keyboard move's announcement. Polite, and mounted always: a live
+        * region added to the DOM at the same moment its text arrives is
+        * announced by no engine reliably. */}
+      <p {...stylex.props(styles.visuallyHidden)} role="status" aria-live="polite">
+        {announcement}
+      </p>
       <section {...stylex.props(styles.foot)} aria-labelledby={footHeadingId}>
         <h2 {...stylex.props(styles.footHeading)} id={footHeadingId}>
           {t("stepsRail.addLegend")}

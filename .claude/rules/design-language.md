@@ -147,6 +147,17 @@ The steps rail in `StepsRail.tsx` adds two columns. A mono number leads, and
 the check badge closes. That badge is a 2px box around a mono count. It
 prints in refusal for a blocker, and in slate for an advisory result.
 
+A grip sits at the row's trailing edge, in the chevrons' old position: a
+`GripVertical` icon at the standard 18px and 1.75 stroke. It disables when the
+rail holds only one step, since there is nothing to reorder. Dragging a row
+drops it to 45% opacity, the same value a disabled control already uses. No
+shadow, no radius and no lift join it: the five rules above still hold while
+a row moves. A drop-position indicator sits between two rows as a `boxShadow`
+line, never a `border`. That is the same mechanism the current-row mark
+already uses for its own 3px accent line. Alt+ArrowUp and Alt+ArrowDown on
+the grip move the row by keyboard, the accessibility-mandated alternative to
+the drag.
+
 **The warning callout.** Refusal text sits beside a 3px rule, and the rule
 reads the advisory role.
 

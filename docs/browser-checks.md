@@ -3697,7 +3697,7 @@ Discard every draft the walk created before you finish.
 ### Steps rail rows without a summary line (`steps-rail-rows-drop-summary-line`)
 
 Each rail row dropped its grey summary line under the label. A row now
-shows a number, a label and its move controls. No `bun:test` assertion sees
+shows a number, a label and its drag grip. No `bun:test` assertion sees
 a row's visual layout, so this check lands here.
 
 Build the production bundle and open it on the engine's own port. Seed the
@@ -3709,8 +3709,8 @@ draft". Studio opens the draft at
 `/studio/processes/<id>/edit`. Choose the Steps tab, at
 `/studio/processes/<id>/edit/steps`. Resize the window to 1440px wide.
 
-Pass: each row shows its number, label, "Move earlier" and "Move later",
-with no summary line under it.
+Pass: each row shows its number, label and grip, with no summary line
+under it.
 
 In the rail's foot, under "Add", choose "Add a call to another process".
 Pass: the new row's issue badge sits at its trailing edge, showing a
@@ -3723,7 +3723,7 @@ Pass: the label wraps inside its rail row instead of overflowing it.
 
 Narrow the window to 420px wide. Pass: the rail stands above the step page,
 capped at 20rem tall, and scrolls inside that cap. Every row still shows
-its number, label and move controls, and none show a summary line.
+its number, label and grip, and none show a summary line.
 
 Go back to the process list and choose "Discard" on the `it_offboarding` row.
 Accept the browser's confirm. That leaves no draft behind. The header bar's own
@@ -3741,10 +3741,10 @@ each on its own fresh draft.
 1. Resize the window to the target width. Pass: the rail's first three rows
    read "Submit the Exit Notification", "Execute the Immediate Lock" and
    "Review the Exit Notification". That is the draft's own order.
-2. Choose "Move earlier" on the third row, "Review the Exit Notification".
-   Pass: the rail now reads "Submit the Exit Notification", "Review the
-   Exit Notification" and "Execute the Immediate Lock". Rows two and three
-   traded places.
+2. Focus the third row's grip, "Review the Exit Notification", and press
+   `Alt+ArrowUp`. Pass: the rail now reads "Submit the Exit Notification",
+   "Review the Exit Notification" and "Execute the Immediate Lock". Rows two
+   and three traded places.
 3. Go back to the process list and choose "Discard" on the `it_offboarding`
    row, then accept the browser's confirm. Pass: that row reads an em dash
    under Draft, with "Create draft" back beside "Versions". The header bar's
@@ -5210,3 +5210,80 @@ empty space. `PathsPanel.tsx`'s `select` style now declares `width: "100%"`.
 `studio-guidedSurfaceStyle.test.ts` cannot see this. Every suite in
 `packages/web/test/` assumes no DOM, so nothing there reads a resolved width
 or position.
+
+### The steps rail's drag-and-drop and keyboard reorder (`studio-steps-rail-drag-reorder`)
+
+Open Studio, a draft carrying ten or more steps. The seeded `it_offboarding`
+process has twelve. Open its Steps tab.
+
+Drag a row's trailing grip onto the upper half of a row several positions
+away. Pass: the dragged step lands right before that row. Every row between
+the two shifts by one, and the numbers renumber from 1.
+
+Drag a row onto the lower half of the last row. Pass: the dragged step
+lands after every other row, in the last position. Drag a row onto the
+upper half of the first row. Pass: the dragged step lands in the first
+position.
+
+During a drag, the dragged row's opacity drops to 0.45. A drop gap marks the
+top edge of the row right after it, with a `boxShadow` accent line. Aiming
+between rows four and five marks row five's top edge. The last gap, after
+the final row, has no next row to carry that mark. There the line falls
+back to the last row's own bottom edge.
+
+Read the mark off `getComputedStyle` on the row it lands on. A snapshot
+shows no class name for the mark. After the drop, the dragged row's opacity
+returns to `1`.
+
+Tab to a row's grip, or click it, then press `Alt+ArrowUp` on the first
+row. Pass: the step stays in place. The live region keeps the text it held
+before the press: empty, on a fresh load. Press `Alt+ArrowDown` on that
+same row. Pass: the step moves down one position.
+
+The rail's own `<nav aria-label="Steps">` holds a visually hidden
+`role="status"` region. It now reads `"<label> moved to position <n>"`
+(`stepsRail.movedAnnouncement`), naming the step's new position. Focus
+stays on that step's own grip after the move. The row keeps its React key
+across the reorder, so the button stays the same DOM node.
+
+Repeat at the far end. Press `Alt+ArrowDown` on the last row: the step
+stays in place, and the announcement stays the same. Press `Alt+ArrowUp` on
+the last row: the step moves up one position, with a fresh announcement
+naming its new position.
+
+Read the actual `workflow.steps` order back after each move. The rendered
+numbers alone do not prove the array itself changed. Open the `⋮` menu's
+Views group, then "Open the JSON surface". Read the `workflow.steps`
+array's `key` order from the "Draft body (JSON)" textarea. "Leave the JSON
+surface" returns to the Steps tab and keeps the rail's state.
+
+This check needed two drag-simulation techniques. `playwright-cli`'s own
+`drag` command, a real `elementHandle.dragTo`, reproduced the drop-before
+behavior for a drop in the rail's middle. Its `targetPosition` option once
+moved the wrong row when aimed at a pixel near a row's bottom edge.
+`dragTo` scrolls the target into view after the initial mousedown, which
+shifts the layout mid-gesture.
+
+Dropping at the last gap needed a hand-dispatched
+`dragstart`/`dragover`/`drop`/`dragend` sequence instead. Real
+`DragEvent`s carry a `DataTransfer` and fire from `page.evaluate`. Each
+call waits a frame so React's `dragIndex` state commits before the next
+event reads it. Firing all four in one synchronous tick left the
+component's `dragging` check reading its old value from before
+`dragstart`. The whole move attempt then failed silently. The check
+confirmed each mechanism against a live, working case before trusting it
+for the assertions above.
+
+`/impeccable critique` found one finding tagged P0. The grip's accessible
+name, `stepsRail.dragHandle` ("Reorder {step label}"), told a
+screen-reader user a step could move, but never said how. Native HTML5
+drag gives a screen-reader user no way to operate it. The keyboard path
+was that user's only route, and the accessible name never named it. The
+catalog string now reads "Reorder {step label}. Alt+Up or Alt+Down moves
+it."
+
+`/impeccable audit`'s detector pass, `impeccable detect --json` against
+this file, returned zero findings. Its browser-evidence pass measured the
+grip's contrast at about 5.8:1 against its row background, past WCAG's
+3:1 non-text minimum. It measured the grip's hit target at about 26 by
+39.5 CSS pixels. Both already met the bar, so neither needed a change.

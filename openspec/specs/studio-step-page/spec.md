@@ -28,8 +28,9 @@ mark which step the page holds.
 The rail SHALL list every step of the draft, in the order `workflow.steps`
 holds them. No walk over the paths SHALL decide where a row stands.
 
-A row's number SHALL name the step's place in that order. Moving a row earlier
-or later SHALL move it in the rail and in the draft together.
+A row's number SHALL name the step's place in that order. Dragging a row to
+any position in the list SHALL move it there. That move SHALL land in the
+rail and in the draft together.
 
 Each row SHALL carry a number and the step's label. A row SHALL have no summary
 line under the label. That holds for every step kind: a task step, a call to
@@ -43,9 +44,18 @@ fields its form carries, the process it calls and its outcome.
 
 #### Scenario: A move control moves its own row
 
-- **WHEN** an author presses Move earlier on the rail's third row
+- **WHEN** an author drags the rail's fourth row and drops it between the
+  first and second row
 - **THEN** that row stands second
-- **AND** the row that stood second stands third
+- **AND** the rows that stood first through third each move one place later
+
+#### Scenario: A keyboard move relocates the focused row
+
+- **WHEN** an author focuses the rail's third row's grip and issues the
+  move-later command
+- **THEN** that row stands fourth
+- **AND** keyboard focus stays on the moved row's grip
+- **AND** a live region announces the row's label and its new position
 
 #### Scenario: A task row names no assignment and no field count
 
@@ -78,17 +88,23 @@ where any of those issues blocks a publish.
 
 ### Requirement: The rail reorders steps and adds new ones
 
-Each rail row SHALL carry a control to move the step earlier and one to move
-it later. The first row SHALL refuse the earlier control. The last row SHALL
-refuse the later control.
+Each rail row SHALL carry a grip that drags it to any position in the list.
+A drop SHALL move that step to the dropped position in the draft. Each row SHALL also
+answer a move-earlier and a move-later command from the keyboard whenever
+an author focuses its grip.
+`spa-accessibility` already requires this: a list offering a drag move
+answers that same move from the keyboard, in the list itself. The first row
+SHALL refuse the move-earlier command. The last row SHALL refuse the
+move-later command.
 
 The rail's foot SHALL carry three controls that add a step, a call to another
 process, and an end.
 
 #### Scenario: The first row cannot move earlier
 
-- **WHEN** an author reads the first rail row
-- **THEN** its move-earlier control refuses the press
+- **WHEN** an author, with the rail's first row's grip focused, issues the
+  move-earlier command
+- **THEN** the row stays first
 
 #### Scenario: The foot adds an end step
 
