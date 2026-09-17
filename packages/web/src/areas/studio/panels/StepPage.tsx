@@ -206,16 +206,6 @@ const styles = stylex.create({
     columnGap: space.s4,
     alignItems: "stretch",
   },
-  labelKeyRow: {
-    display: "grid",
-    gridTemplateColumns: { default: "minmax(0, 2fr) minmax(0, 1fr)", [NARROW]: "minmax(0, 1fr)" },
-    columnGap: space.s4,
-  },
-  labelKeyColumn: {
-    display: "flex",
-    flexDirection: "column",
-    gap: space.s2,
-  },
   column: {
     display: "flex",
     flexDirection: "column",
@@ -226,6 +216,19 @@ const styles = stylex.create({
   gutter: {
     display: { default: "block", [NARROW]: "none" },
     backgroundColor: colors.border,
+  },
+  // LABEL carries prose that can run up to 40% longer in German; KEY carries
+  // a short slug. LABEL gets the wider column.
+  labelKeyRow: {
+    display: "grid",
+    gridTemplateColumns: { default: "minmax(0, 2fr) minmax(0, 1fr)", [NARROW]: "minmax(0, 1fr)" },
+    columnGap: space.s4,
+    rowGap: space.s2,
+  },
+  labelKeyColumn: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s2,
   },
   // The 2px divider between sections down each column, the structural rule.
   section: {

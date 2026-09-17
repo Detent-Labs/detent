@@ -3753,11 +3753,17 @@ each on its own fresh draft.
 
 ### Step page masthead Label and Key row (`step-page-label-key-side-by-side`)
 
+Source: `step-page-label-key-side-by-side` tasks 3.1 to 3.3.
+
 The step page masthead displays a step's LABEL and KEY fields. They now render
 side by side in one row, with LABEL's column visibly wider than KEY's, instead
 of stacked vertically. At narrow viewports (under 64rem), the row collapses to
 LABEL above KEY, each in its own full-width row. A missing-translation warning
 under LABEL remains scoped to LABEL's column.
+
+A compiled StyleX class name is never citable by name
+(`.claude/rules/design-language.md`). No `bun:test` assertion can see this
+grid's layout, so this check lands here.
 
 Build the production bundle and open it on the engine's own port. Seed the
 database, then sign in as `demo-superuser@example.test`, password
@@ -3770,7 +3776,7 @@ on the step page at `/studio/processes/<id>/edit/steps/<step-id>`.
    one row side by side. LABEL's column is noticeably wider than KEY's column.
    The step's label and key appear as one visual identity block.
 
-2. Resize the window to 500px wide, just under the 64rem narrow breakpoint.
+2. Resize the window to 500px wide, well under the 64rem narrow breakpoint.
    Pass: the LABEL field and its warning now stack vertically as two full-width
    rows, one above the other. KEY follows below, in its own row.
 
