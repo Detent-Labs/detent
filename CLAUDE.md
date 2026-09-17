@@ -132,6 +132,10 @@ whole-branch review at the end. Every other phase stays OpenSpec's — propose,
 review, verify, archive. The skill's final review is not one of the four checks
 below and replaces none of them.
 
+Finish verify → sync → archive before reaching for
+`superpowers:finishing-a-development-branch`'s merge/PR menu. That skill
+doesn't know this repo's archive step belongs before a push.
+
 Four project facts the dispatch must carry, because the skill cannot know them:
 - **The brief is thin.** A `tasks.md` checkbox line is not a task brief. Hand
   each implementer the task text plus the change's `design.md` and its delta
@@ -147,6 +151,9 @@ Four project facts the dispatch must carry, because the skill cannot know them:
   never a ruling.
 - **The controller owns the branch.** Create the worktree or branch before
   Task 1. No subagent calls `EnterWorktree` — one call re-pins every sibling.
+- **`tasks.md`'s headings don't match the skill's `task-brief` script.**
+  OpenSpec's `## N. <group>` format isn't `### Task N`, so the script finds
+  nothing. Cut per-group briefs by hand with `awk` on `## N.` instead.
 
 ## Verification (the gate before "done")
 Call a change done only after all four checks pass. Report what each one
@@ -156,6 +163,10 @@ printed, not that you ran it.
   `test:tz`, the reporting logic test under `TZ=Europe/Zurich`. Both rules under
   Conventions apply. A green without the variable is not evidence. A single-file
   rerun is not the signal.
+- When writing a `tasks.md` Verification task, keep `bun test` (and any
+  other phrase `scripts/openspec-review-check.ts` string-matches) on one
+  unwrapped line. A Markdown line wrap silently defeats the match and
+  reports a false Critical.
 - The antislop linter, on every Markdown file the change touched. Run the same
   check the push gate runs, over the same range: `sh scripts/gates/range.sh <
   /dev/null | sh scripts/gates/prose.sh`. The empty-range fallback to
@@ -446,6 +457,12 @@ after a substantial change lands.
 - **Never use `git stash`, not for mutation testing and not otherwise.** The
   agents share this tree. A stash nobody else expects hides work that was never
   committed. Commit to a branch instead.
+- **Keep a local merge into `main` a fast-forward.** A post-commit hook
+  rewrites `VERSION` on every commit; a stray uncommitted bump (or another
+  session's staged file in the shared checkout) blocks a real three-way
+  merge but never a fast-forward. Before merging: add no commit of your own
+  to `main` first, and `git checkout -- VERSION` to discard its local bump
+  instead of committing it — that keeps `main` at the true merge-base.
 - **A history rewrite states its branch list first.** Before `git filter-branch`
   or `git filter-repo`, print `git branch -a` and name the refs the rewrite will
   touch. Exclude every backup branch explicitly, or the rewrite takes the backup
