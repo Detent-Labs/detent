@@ -147,7 +147,7 @@ The steps rail in `StepsRail.tsx` adds two columns. A mono number leads, and
 the check badge closes. That badge is a 2px box around a mono count. It
 prints in refusal for a blocker, and in slate for an advisory result.
 
-A grip closes each row instead, in the check badge's old trailing position: a
+A grip sits at the row's trailing edge, in the chevrons' old position: a
 `GripVertical` icon at the standard 18px and 1.75 stroke. It disables when the
 rail holds only one step, since there is nothing to reorder. Dragging a row
 drops it to 45% opacity, the same value a disabled control already uses. No
