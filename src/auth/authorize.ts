@@ -54,9 +54,9 @@ export const TEMPLATES_ROLE = "system:templates";
  * publishing still separately requires `PUBLISH_ROLE`.
  */
 export const AUTHOR_ROLE = "system:author";
-/** Reserved for future use in process-access role lists. Implies nothing else. */
+/** Alongside `DEVELOPER_ROLE`/`AUTHOR_ROLE`, gates `PUT /drafts/:processId` for a processId with no draft and no published version (process-drafts). Implies nothing else. */
 export const CREATE_ROLE = "system:create";
-/** Reserved for future use in process-access role lists. Implies nothing else. */
+/** `process-access.ts::REQUIRED_ROLES.owner` — the role an Owner-list match additionally needs, beside identity or group membership. Implies nothing else. */
 export const OWNER_ROLE = "system:owner";
 
 /** The resolved Actor lacks a role an operation requires. Distinct from ActorResolutionError (no valid identity at all). */

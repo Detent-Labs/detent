@@ -12,6 +12,8 @@ info:
     `migration-plans/*`, `reporting/*`, `templates/*`,
     the two `processes/{processId}/versions/{version}` studio reads (the
     version body and the orphan-key scan),
+    the four `processes/{processId}/access` and `processes/access/mine`
+    Developer/Owner/Reader-list routes (process-access-roles),
     and `registry`, which serve the operator, developer and process-owner
     areas of `packages/web`
     frontends directly, not a customer integration. Each exclusion is named

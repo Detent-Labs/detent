@@ -133,6 +133,32 @@ Redaction now deletes an instance's visibility rows, and the scheduled
 `DATA_RETENTION_DAYS` sweep redacts in bulk. Every instance that sweep touches
 leaves its participants' lists at once, with no notice to them.
 
+## The process-access-roles rollout migration
+
+Run once, after deploying the engine that first carries
+`process_access_roles`, and before that deploy's draft routes start
+refusing an unlisted developer:
+
+```
+bun run scripts/backfill-process-access-roles.ts
+```
+
+Every account holding `system:developer` or `system:author` joins one
+Developer list. That list belongs to every process that already carries a
+draft or a published version. Skipping this step locks every such account
+out of every process it did not itself write. That lockout starts once
+the deploy's draft-route gate goes live.
+
+It is idempotent. A second run adds nothing a first run already covered,
+and an interrupted run is safe to repeat.
+
+The script reads standing from `auth_users.roles` alone. A deployment may
+instead resolve roles from each caller's own JWT, with no local account
+row per actor. Such a deployment gets zero inserts from this script.
+Nobody exists in `auth_users` for it to read. It needs its own seed of
+`process_access_roles` before the same deploy's gate goes live. That seed
+derives from whatever directory issues those tokens.
+
 ## The proxy rule
 
 A proxy in front of the engine must overwrite `X-Forwarded-For`. It must not

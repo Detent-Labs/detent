@@ -175,9 +175,9 @@ permission runs these two tests, in this order:
 
 3. **The process's Reader list.** The `process-access-roles` capability's
    Reader list for `processId` names a principal. A principal is the
-   actor's id, one of the actor's roles, or one of the actor's groups. This
-   test SHALL run only for `"read"`. It SHALL NOT run for `"publish"`,
-   `"cancel"`, `"migrate"` or `"visibility"`.
+   actor's id, or one of the actor's groups. This test SHALL run only for
+   `"read"`. It SHALL NOT run for `"publish"`, `"cancel"`, `"migrate"` or
+   `"visibility"`.
 
 The engine SHALL NOT read a scope out of a role string. A role string is a
 principal the identity provider names. The grant rows are the one place a
@@ -355,8 +355,8 @@ separate. `requireRole` SHALL stay exported and SHALL stay synchronous.
 
 #### Scenario: A process's Reader list satisfies the read permission
 
-- **WHEN** `can(actor, "read", processId, db)` runs for an actor whose id,
-  role or group appears on that process's Reader list
+- **WHEN** `can(actor, "read", processId, db)` runs for an actor whose id
+  or group appears on that process's Reader list
 - **AND** the store has no matching `"read"` grant
 - **AND** the actor has no reserved role
 - **THEN** it answers true
