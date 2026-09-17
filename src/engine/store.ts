@@ -575,6 +575,17 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   // "Reports visible to me" (`listMyReports`) matches the caller's own id,
   // roles and group ids against `principal`, filtered by `list`.
   await db`CREATE INDEX IF NOT EXISTS report_principals_principal_list_idx ON report_principals (principal, list)`;
+  // Process access roles: per-process developer/owner/reader principal lists.
+  // Keyed by (process_id, kind, principal), with kind in ('developer', 'owner',
+  // 'reader'). Each principal is a user_xxx or group_xxx id. No foreign key to
+  // definitions or drafts — a process id can have access-roles rows before either
+  // table carries it.
+  await db`CREATE TABLE IF NOT EXISTS process_access_roles (
+    process_id text NOT NULL,
+    kind       text NOT NULL CHECK (kind IN ('developer', 'owner', 'reader')),
+    principal  text NOT NULL,
+    PRIMARY KEY (process_id, kind, principal)
+  )`;
 
   await initInstanceAudit(db);
 }
