@@ -66,7 +66,8 @@ state and `aria-controls` naming the element it discloses.
 The studio's step cards carried this defect: a click-handling `<div>` header
 no keyboard could open. The rail in `StepsRail.tsx` replaced those cards. Its
 rows are buttons that open a step page, and the current row carries
-`aria-current`. Its two chevrons reorder a step. No row in the rail expands.
+`aria-current`. A grip at each row's trailing edge drags the step, and
+answers `Alt+ArrowUp`/`Alt+ArrowDown`. No row in the rail expands.
 
 The step page stands every section open, so no section heading discloses
 anything. Two disclosures remain on the step page, and both read "Developer
