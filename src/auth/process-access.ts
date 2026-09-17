@@ -92,3 +92,41 @@ export async function deleteAccessPrincipal(actor: Actor, processId: ProcessId, 
     DELETE FROM process_access_roles WHERE process_id = ${processId} AND kind = ${kind} AND principal = ${principal}
   `;
 }
+
+/**
+ * The three raw lists `processId` holds, one array of `principal` values per
+ * `kind`. A listing, not a match test: unlike `matchesAccessList`, this
+ * applies no group resolution and no role filter — it is exactly what the
+ * Access surface renders, in one query rather than three.
+ */
+export async function getAccessLists(processId: ProcessId, db: SQL = sql): Promise<Record<AccessKind, string[]>> {
+  const rows = (await db`
+    SELECT kind, principal FROM process_access_roles WHERE process_id = ${processId} ORDER BY kind, principal
+  `) as { kind: AccessKind; principal: string }[];
+  const lists: Record<AccessKind, string[]> = { developer: [], owner: [], reader: [] };
+  for (const row of rows) lists[row.kind].push(row.principal);
+  return lists;
+}
+
+/**
+ * The reverse direction of `matchesAccessList`: given one actor, every
+ * `processId` whose `kind` list that actor matches, by the same rule
+ * `matchesAccessList` applies per process — the actor's identity (own id or
+ * a group from `getGroupsForMember`) present on the list, AND the role that
+ * `kind` requires (`REQUIRED_ROLES`). `kind` excludes `"reader"`: a Reader
+ * match needs no role, but nothing today needs "every process I can read".
+ *
+ * An actor lacking the required role matches no process at all, checked
+ * before the query runs — the same short-circuit `requireWriteAccess`'s
+ * `ADMIN_ROLE` check is not, but `matchesAccessList`'s own role gate is.
+ */
+export async function processesMatchingAccessList(actor: Actor, kind: Exclude<AccessKind, "reader">, db: SQL = sql): Promise<ProcessId[]> {
+  if (!REQUIRED_ROLES[kind].some((role) => actor.roles.includes(role))) return [];
+  const identity = [actor.id, ...(await getGroupsForMember(actor.id, db))];
+  const rows = (await db`
+    SELECT DISTINCT process_id AS "processId" FROM process_access_roles
+    WHERE kind = ${kind} AND principal = ANY(${db.array(identity, "TEXT")})
+    ORDER BY process_id
+  `) as { processId: ProcessId }[];
+  return rows.map((r) => r.processId);
+}

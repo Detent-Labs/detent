@@ -15,6 +15,12 @@
  *   process now reaches this permission too, beside the `DEVELOPER_ROLE`
  *   global role; the three routes name one process, so they ask through the
  *   seam (`src/auth/authorize.ts`).
+ *
+ * The four `/processes/*` access-list routes (process-access-roles) take no
+ * gate of their own: the two reads admit any resolved actor (the Access
+ * surface decides what to render for the viewer), and each write's
+ * authorization runs inside `addAccessPrincipal`/`deleteAccessPrincipal`
+ * themselves (`src/auth/process-access.ts`), not as a separate check here.
  */
 import type { SQL } from "bun";
 import { withTransaction } from "../engine/store.js";
@@ -35,9 +41,11 @@ import { describeConfigSchema, type ConfigFieldDescriptor } from "../engine/conf
 import type { ZodTypeAny } from "zod";
 import type { ActorResolver } from "../auth/resolve.js";
 import { requireRole, requirePermission, can, AuthorizationError, DEVELOPER_ROLE, TEMPLATES_ROLE, AUTHOR_ROLE } from "../auth/authorize.js";
-import { notFound, type HttpResult } from "./errors.js";
+import { addAccessPrincipal, deleteAccessPrincipal, getAccessLists, processesMatchingAccessList, type AccessKind } from "../auth/process-access.js";
+import { notFound, RequestShapeError, type HttpResult } from "./errors.js";
 import { route, readJson, parseVersion } from "./routes.js";
 import type { ProcessId, ProcessBody, MigrationSpec, Instance } from "../schema/definition.js";
+import { z } from "zod";
 
 /**
  * Either authoring role admits. The whole no-code authoring surface takes it:
@@ -364,5 +372,71 @@ export async function handleDeleteTemplate(templateKey: string, req: Request, re
     const removed = await deleteTemplate(templateKey, db);
     if (!removed) return notFound(`no template: ${templateKey}`);
     return { status: 204, body: null };
+  });
+}
+
+/** `{kind, principal}`, the whole body `PUT`/`DELETE /processes/:processId/access` share. Strict: an unknown `kind` or a non-string/empty `principal` fails to parse, so a malformed body never reaches `addAccessPrincipal`/`deleteAccessPrincipal`. */
+const accessWriteBodySchema = z.object({
+  kind: z.enum(["developer", "owner", "reader"]),
+  principal: z.string().trim().min(1),
+});
+
+function parseAccessBody(body: unknown): { kind: AccessKind; principal: string } {
+  const parsed = accessWriteBodySchema.safeParse(body);
+  if (!parsed.success) {
+    throw new RequestShapeError(`access entry is invalid: ${parsed.error.issues.map((i) => `${i.path.join(".") || "body"}: ${i.message}`).join("; ")}`);
+  }
+  return parsed.data;
+}
+
+/**
+ * The three access lists one process holds, raw `principal` values per
+ * `kind` (process-access-roles). No gate beyond a resolved actor: this is a
+ * listing, not a permission check, and the Access surface itself decides
+ * what an unmanageable list looks like for a viewer with no relevant role.
+ */
+export async function handleGetProcessAccess(processId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, () => {}, async () => {
+    return { status: 200, body: await getAccessLists(processId as ProcessId, db) };
+  });
+}
+
+/**
+ * Adds `principal` to process `processId`'s `kind` list. The route itself
+ * gates nothing: `addAccessPrincipal` throws `AuthorizationError` (mapped to
+ * 403 by `errors.ts`) when the resolved actor may not write that list.
+ * Idempotent, matching `addAccessPrincipal`'s own `ON CONFLICT DO NOTHING`.
+ */
+export async function handleWriteProcessAccess(processId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, () => {}, async (actor) => {
+    const { kind, principal } = parseAccessBody(await readJson(req));
+    await addAccessPrincipal(actor, processId as ProcessId, kind, principal, db);
+    return { status: 200, body: { kind, principal } };
+  });
+}
+
+/** Same shape and same ungated route as `handleWriteProcessAccess`, calling `deleteAccessPrincipal` instead. Idempotent: deleting an absent entry still returns 200. */
+export async function handleDeleteProcessAccess(processId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, () => {}, async (actor) => {
+    const { kind, principal } = parseAccessBody(await readJson(req));
+    await deleteAccessPrincipal(actor, processId as ProcessId, kind, principal, db);
+    return { status: 200, body: { kind, principal } };
+  });
+}
+
+/**
+ * The calling actor's own Developer- and Owner-listed process ids
+ * (process-access-roles), for the studio's process list to narrow by
+ * (Task 6.1). `ADMIN_ROLE` gets no special case: this answers "which
+ * processes am I listed on", not "which can an admin reach" — the studio
+ * frontend is what skips calling this route for an admin.
+ */
+export async function handleGetMyProcessAccess(req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, () => {}, async (actor) => {
+    const [developer, owner] = await Promise.all([
+      processesMatchingAccessList(actor, "developer", db),
+      processesMatchingAccessList(actor, "owner", db),
+    ]);
+    return { status: 200, body: { developer, owner } };
   });
 }

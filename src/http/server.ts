@@ -117,6 +117,10 @@ import {
   handleGetTemplate,
   handleSaveTemplate,
   handleDeleteTemplate,
+  handleGetProcessAccess,
+  handleWriteProcessAccess,
+  handleDeleteProcessAccess,
+  handleGetMyProcessAccess,
 } from "./studio-routes.js";
 import { handleMetrics } from "./metrics.js";
 import { notFound, type HttpResult, type HttpBinaryResult } from "./errors.js";
@@ -728,6 +732,19 @@ export function createServer(
       handler: (p, req, _c, db) => handleGetOrphanKeys(p[0]!, p[1]!, req, resolver, db) },
     { method: "GET", segments: seg("/processes/:processId/versions/:version"),
       handler: (p, req, _c, db) => handleGetVersionBody(p[0]!, p[1]!, req, resolver, db) },
+    // Literal /processes/access/mine sits beside the parameterized
+    // /processes/:processId/access below: they never collide (`match`
+    // compares segment-by-segment, and their third segments — "mine" vs the
+    // literal "access" — always differ), but this order reads the way the
+    // table's existing orphan-keys/versions pair does.
+    { method: "GET", segments: seg("/processes/access/mine"),
+      handler: (_p, req, _c, db) => handleGetMyProcessAccess(req, resolver, db) },
+    { method: "GET", segments: seg("/processes/:processId/access"),
+      handler: (p, req, _c, db) => handleGetProcessAccess(p[0]!, req, resolver, db) },
+    { method: "PUT", segments: seg("/processes/:processId/access"),
+      handler: (p, req, _c, db) => handleWriteProcessAccess(p[0]!, req, resolver, db) },
+    { method: "DELETE", segments: seg("/processes/:processId/access"),
+      handler: (p, req, _c, db) => handleDeleteProcessAccess(p[0]!, req, resolver, db) },
     { method: "GET", segments: seg("/migration-plans/:processId/:fromVersion/:toVersion"),
       handler: (p, req, _c, db) => handleGetMigrationPlan(p[0]!, p[1]!, p[2]!, req, resolver, db) },
     { method: "PUT", segments: seg("/migration-plans/:processId/:fromVersion/:toVersion"),
