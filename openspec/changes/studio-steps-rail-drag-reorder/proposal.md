@@ -21,7 +21,8 @@ dropping it at a new position becomes the only pointer route.
   a drag move must answer that same move from the keyboard, in the list
   itself. The moving row keeps focus across the move, and a live region
   announces the result. This change supplies that pattern for the steps
-  rail. `spa-accessibility`'s own requirement text does not change.
+  rail. `spa-accessibility`'s SHALL wording and scenarios do not change; one
+  descriptive sentence naming the removed chevrons does.
 - Add a drop-position indicator and a dragged-row style, reusing
   `design-language.md`'s existing hairline/selection-mark vocabulary (2px
   open mark, 3px current mark) rather than inventing new visual language.
@@ -42,6 +43,13 @@ dropping it at a new position becomes the only pointer route.
   move controls changes. It now describes drag-and-drop reorder to an
   arbitrary position, with a keyboard-operable equivalent, replacing the two
   always-adjacent chevron controls.
+- `spa-accessibility`: a one-sentence description-text fix on "A disclosure
+  is a button that carries its expanded state". Its prose named the rail's
+  two chevrons as the steps rail's reorder mechanism; that sentence now names
+  the grip instead. The requirement's own SHALL wording and its three
+  scenarios keep their exact text. This is not a behavior change. It
+  corrects one stale sentence describing the old UI to match this change's
+  removal of the chevrons.
 
 ## Impact
 
