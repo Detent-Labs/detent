@@ -130,6 +130,38 @@ test.skipIf(!DB)("GET /drafts with system:developer succeeds", async () => {
   expect(body.map((d) => d.processId)).toContain(processId);
 });
 
+test.skipIf(!DB)("the drafts list narrows to the actor's own processes", async () => {
+  const processIdA = pid();
+  const processIdB = pid();
+  const developerB: Actor = { id: "user_dev_b", roles: [DEVELOPER_ROLE, CREATE_ROLE] };
+  // PUT's creation branch appends the creator to that process's own Developer list (src/engine/drafts.ts), so `developer` lands on A's list and `developerB` on B's, each excluded from the other.
+  await fetch(authedReq(`http://x/drafts/${processIdA}`, "PUT", developer, { body: authoredBody("a"), layout: {}, revision: 0 }));
+  await fetch(authedReq(`http://x/drafts/${processIdB}`, "PUT", developerB, { body: authoredBody("b"), layout: {}, revision: 0 }));
+
+  const res = await fetch(authedReq("http://x/drafts", "GET", developer));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { processId: string }[];
+  const ids = body.map((d) => d.processId);
+  expect(ids).toContain(processIdA);
+  expect(ids).not.toContain(processIdB);
+});
+
+test.skipIf(!DB)("an admin sees every draft in the list", async () => {
+  const processIdA = pid();
+  const processIdB = pid();
+  const developerB: Actor = { id: "user_dev_b2", roles: [DEVELOPER_ROLE, CREATE_ROLE] };
+  await fetch(authedReq(`http://x/drafts/${processIdA}`, "PUT", developer, { body: authoredBody("a"), layout: {}, revision: 0 }));
+  await fetch(authedReq(`http://x/drafts/${processIdB}`, "PUT", developerB, { body: authoredBody("b"), layout: {}, revision: 0 }));
+
+  const admin: Actor = { id: "user_admin_drafts", roles: [ADMIN_ROLE] };
+  const res = await fetch(authedReq("http://x/drafts", "GET", admin));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { processId: string }[];
+  const ids = body.map((d) => d.processId);
+  expect(ids).toContain(processIdA);
+  expect(ids).toContain(processIdB);
+});
+
 // ============================================================
 // GET /drafts/:processId
 // ============================================================

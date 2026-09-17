@@ -108,10 +108,31 @@ async function requireDeveloperListOrAdmin(actor: Actor, processId: ProcessId, d
   throw new AuthorizationError(`actor '${actor.id}' is not on process '${processId}''s Developer list`);
 }
 
+/**
+ * Narrowed to the actor's own Developer-listed processes
+ * (process-access-roles) — `ADMIN_ROLE` sees every draft, same split as
+ * `requireDeveloperListOrAdmin` above. `ADMIN_ROLE` bypasses `requireAuthoring`
+ * at the gate too, the same carve-out `handleGetDraft`/`handleSaveDraft`
+ * already apply on their "existing draft" branch: an admin-only actor (no
+ * `DEVELOPER_ROLE`/`AUTHOR_ROLE`) still must reach this list. One query for
+ * the actor's Developer-listed process ids via `processesMatchingAccessList`,
+ * not one `matchesAccessList` call per draft.
+ */
 export async function handleListDrafts(req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
-  return route(req, resolver, db, requireAuthoring, async () => {
-    return { status: 200, body: await listDrafts(db) };
-  });
+  return route(
+    req,
+    resolver,
+    db,
+    (actor) => {
+      if (!actor.roles.includes(ADMIN_ROLE)) requireAuthoring(actor);
+    },
+    async (actor) => {
+      const all = await listDrafts(db);
+      if (actor.roles.includes(ADMIN_ROLE)) return { status: 200, body: all };
+      const developerProcessIds = new Set(await processesMatchingAccessList(actor, "developer", db));
+      return { status: 200, body: all.filter((d) => developerProcessIds.has(d.processId)) };
+    },
+  );
 }
 
 export async function handleGetDraft(processId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
