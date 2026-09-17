@@ -281,6 +281,11 @@ export function StepsRail({ currentStepId, onSelectStep, onMove, onAddStep }: Pr
                   disabled={gripDisabled}
                   onDragStart={(e) => {
                     e.dataTransfer.effectAllowed = "move";
+                    // Firefox refuses to fire `drop` on the target at all
+                    // when `dragstart` sets no payload. The move itself
+                    // reads only React state, so the payload's content
+                    // carries nothing.
+                    e.dataTransfer.setData("text/plain", "");
                     setDragIndex(i);
                   }}
                   onDragEnd={endDrag}
