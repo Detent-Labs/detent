@@ -5157,9 +5157,10 @@ Open Studio, a draft of `credit_check`, the Steps tab. Select the `Decide`
 step. It carries two automatic paths. Read its "Path to" section.
 
 Pass: each path row shows `label` above `key` above `to`. `key` renders in
-the mono face. The `to` select shows a slate chevron in place of the
-browser's own dropdown arrow. That chevron sits flush against the select's
-own trailing edge.
+the mono face. The path row's `to` select shows a slate chevron in place of
+the browser's own dropdown arrow. The "add path" target selector below the
+path list shows the same chevron. Both sit flush against their select's own
+trailing edge.
 
 This walk caught a defect no rendered-string test can see. `selectWrap`
 stretches to the flex column's full width. A bare `<select>` sizes to its

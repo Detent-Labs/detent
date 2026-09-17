@@ -59,5 +59,9 @@ step) select as visually off. That select is a plain, unstyled native
   new lines shift both. `docs/browser-checks.md` gets a new entry for
   the select's chevron.
 
+- `.impeccable/config.json`: one narrow `ignore-value` entry silencing the
+  `design-system-font-size` detector rule for `PathsPanel.tsx`'s copied
+  `monoInput` value (mirrors an existing precedent entry).
+
 - No engine, schema, or API changes. No new dependency: `lucide-react` is
   already a project dependency and already used for other studio chevrons.

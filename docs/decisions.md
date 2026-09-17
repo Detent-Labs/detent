@@ -2179,6 +2179,21 @@ gap outside that change's own scope. The CLAIM tag is local to this section.
   target's candidacy. `loadInstanceForActor` admits that target only as the
   test instance's own starter or a `system:admin` holder.
 
+## Open from the studio-path-row-field-order final review (needs its own OpenSpec change)
+
+The final whole-branch review for `studio-path-row-field-order` (2026-09-17)
+found one gap outside that change's own scope.
+
+- **The path row's `label`/`key`/`to` field captions are literal text.**
+  `PathsPanel.tsx`'s `fieldLabelText`-styled `<span>`s read the bare words
+  `label` (`panels/PathsPanel.tsx:223`), `key` (`:231`) and `to` (`:240`).
+  They skip the catalog. Every other string this file renders calls `t()`,
+  among them `t("paths.selectTargetStep")`, `t("paths.newPathTargetLabel")`,
+  `t("paths.triggeredByLabel")`, `t("paths.removePath")` and
+  `t("paths.addPath")`. The three captions predate `studio-path-row-field-order`,
+  which only re-wrapped the existing bare text into styled spans; they are
+  now more visible as prominent field labels instead of small inline text.
+
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 
 Each entry below names a cut somebody proposed, the reason a reviewer refused
