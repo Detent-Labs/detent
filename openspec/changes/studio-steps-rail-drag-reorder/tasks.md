@@ -50,6 +50,15 @@
   Verify a static-markup test confirms it carries
   `disabled`/`aria-disabled` there, the same way the existing lone-step
   chevron test does today.
+- [ ] 2.6 Fix `packages/web/test/studio-stepsRail.test.tsx`'s "The steps
+  rail's reorder controls" describe block, which task 2.1 breaks by
+  removing the chevrons it asserts against. Replace its
+  `aria-label="Move earlier"`/`"Move later"` assertions with assertions
+  against the grip's `stepsRail.dragHandle` aria-label and its
+  `disabled`/`aria-disabled` state at the first row, the last row, and the
+  lone-step case (task 2.5's case). This lands in the same task as 2.1,
+  2.2 and 2.5, since a task boundary between them would leave `bun test`
+  red for this file. Verify `bun test` for this file passes.
 
 ## 3. Keyboard fallback
 
@@ -81,41 +90,31 @@
   for the new column set (grip replaces the chevron column) and the dragged
   row/drop-indicator states, per `design.md`'s Decisions.
 
-## 5. Existing test coverage
+## 5. Spec sync
 
-- [ ] 5.1 Fix `packages/web/test/studio-stepsRail.test.tsx`: rename the
-  `render()` helper's `onReorder` prop to `onMove`. Replace the "The steps
-  rail's reorder controls" describe block's `aria-label="Move
-  earlier"`/`"Move later"` assertions with assertions against the grip's
-  `stepsRail.dragHandle` aria-label and its `disabled`/`aria-disabled`
-  state at the first row, the last row, and the lone-step case. Verify
-  `bun test` for this file passes.
-
-## 6. Spec sync
-
-- [ ] 6.1 Confirm `openspec/changes/studio-steps-rail-drag-reorder/specs/studio-step-page/spec.md`
+- [ ] 5.1 Confirm `openspec/changes/studio-steps-rail-drag-reorder/specs/studio-step-page/spec.md`
   matches the shipped behavior exactly, scenario text included. Fix any
   drift found while implementing tasks 1-3.
 
-## 7. Browser check
+## 6. Browser check
 
-- [ ] 7.1 Add an entry to `docs/browser-checks.md`, naming this change.
+- [ ] 6.1 Add an entry to `docs/browser-checks.md`, naming this change.
   Cover dragging a row to a non-adjacent position, and to the first and
   last position. Cover moving a row with the keyboard fallback at both
   list ends, including that the boundary refuses the move. Cover the
   live-region announcement's actual text after each move type.
-- [ ] 7.2 Build `packages/web` and run that new entry against a real
+- [ ] 6.2 Build `packages/web` and run that new entry against a real
   browser. Verify by observing the resulting `workflow.steps` order
   (Developer view JSON) after each move.
-- [ ] 7.3 Run `/impeccable critique` and `/impeccable audit` against the
+- [ ] 6.3 Run `/impeccable critique` and `/impeccable audit` against the
   Steps tab route. Resolve any material finding they report.
 
-## 8. Verification
+## 7. Verification
 
-- [ ] 8.1 Run `bun run typecheck` and verify it reports no errors.
-- [ ] 8.2 Run `bun run build` and verify it completes without error.
-- [ ] 8.3 Run the full `bun test` suite with `DATABASE_URL` set and verify every test passes with no silent skip.
-- [ ] 8.4 Run the antislop and whitespace push gates over the pushed range
+- [ ] 7.1 Run `bun run typecheck` and verify it reports no errors.
+- [ ] 7.2 Run `bun run build` and verify it completes without error.
+- [ ] 7.3 Run the full `bun test` suite with `DATABASE_URL` set and verify every test passes with no silent skip.
+- [ ] 7.4 Run the antislop and whitespace push gates over the pushed range
   (`sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` and
   the same piped to `whitespace.sh`). Verify both pass on every Markdown
   file this change touched.
