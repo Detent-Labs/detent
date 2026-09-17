@@ -3,14 +3,14 @@
 <!-- antislop: allow sentence-length -->
 <!-- Known linter miscount: the quoted generic type signature's own commas
      read as clause breaks, inflating the count around one code span. -->
-- [ ] 1.1 Add a pure, exported `moveTo<T>(list: T[], from: number, to:
+- [x] 1.1 Add a pure, exported `moveTo<T>(list: T[], from: number, to:
   number): T[]` to `packages/web/src/areas/studio/draft/list-ops.ts`. Put
   it beside the existing `removeAt`/`updateAt`. Clamp `to` into `[0,
   list.length - 1]`. Verify a unit test moves an item from index 0 to
   index 3, and from index 3 to index 0. Verify a second test confirms a
   move-earlier at index 0, and a move-later at the last index, are both
   no-ops.
-- [ ] 1.2 Replace `EditScreen.tsx`'s `onReorderStep(stepId, neighbourId)`
+- [x] 1.2 Replace `EditScreen.tsx`'s `onReorderStep(stepId, neighbourId)`
   adjacent-swap handler with `onMoveStep(stepId: string, toIndex: number)`,
   calling `moveTo` and reassigning `d.workflow.steps` inside the `mutate`
   recipe. In the same task, change `StepsRail`'s `Props` to carry
@@ -21,10 +21,10 @@
 
 ## 2. Drag interaction
 
-- [ ] 2.1 Remove the `ChevronUp`/`ChevronDown` buttons, the `move` style,
+- [x] 2.1 Remove the `ChevronUp`/`ChevronDown` buttons, the `move` style,
   and their column from `StepsRail.tsx`. Verify the rail renders with no
   chevron controls.
-- [ ] 2.2 Add a `stepsRail.dragHandle` key to
+- [x] 2.2 Add a `stepsRail.dragHandle` key to
   `packages/web/src/i18n/catalogs/studio.ts` (e.g. "Reorder {step
   label}"). Add a `GripVertical` drag handle (18px, 1.75 stroke) at each
   row's trailing edge, carrying `draggable="true"`, `dragstart`/`dragend`
@@ -33,7 +33,7 @@
   Render it as a sibling of the row's own `<button>`. It must be a
   sibling, and never a descendant. Verify a static-markup test confirms
   the grip sits outside the row's own button element.
-- [ ] 2.3 Track `dragover` on the row list to compute the nearest drop
+- [x] 2.3 Track `dragover` on the row list to compute the nearest drop
   position. Render a drop-indicator rule between the two rows nearest the
   pointer, using `boxShadow`. That is the same mechanism `rowMainCurrent`
   uses for its own 3px mark. Use `boxShadow` and never a `borderWidth`, per
@@ -43,14 +43,14 @@
   that same test's other two checks. This behavior needs the browser check
   (task 6) to verify: a `renderToStaticMarkup` test cannot dispatch
   `dragover`.
-- [ ] 2.4 Style the dragged row at 45% opacity for the duration of the drag,
-  with no shadow, no radius and no lift. Call `onMove` on `drop` with the
+- [x] 2.4 Style the dragged row at 45% opacity for the duration of the drag.
+  Add no shadow, no radius and no lift. Call `onMove` on `drop` with the
   computed target index. This needs the browser check (task 6) to verify.
-- [ ] 2.5 Disable the drag handle when the rail holds exactly one step.
+- [x] 2.5 Disable the drag handle when the rail holds exactly one step.
   Verify a static-markup test confirms it carries
   `disabled`/`aria-disabled` there, the same way the existing lone-step
   chevron test does today.
-- [ ] 2.6 Fix `packages/web/test/studio-stepsRail.test.tsx`'s "The steps
+- [x] 2.6 Fix `packages/web/test/studio-stepsRail.test.tsx`'s "The steps
   rail's reorder controls" describe block, which task 2.1 breaks by
   removing the chevrons it asserts against. Replace its
   `aria-label="Move earlier"`/`"Move later"` assertions with assertions
@@ -62,15 +62,15 @@
 
 ## 3. Keyboard fallback
 
-- [ ] 3.1 Add a `keydown` handler on the grip answering `Alt+ArrowUp` and
+- [x] 3.1 Add a `keydown` handler on the grip answering `Alt+ArrowUp` and
   `Alt+ArrowDown`, calling the same `onMove` handler with `currentIndex - 1`
   / `currentIndex + 1`. No separate boundary-refusal logic belongs here:
   `moveTo`'s own clamping, from task 1.1, already makes the boundary a
   no-op. This needs the browser check (task 6) to verify the key dispatch
   itself. The boundary math is already covered by task 1.1's unit test.
-- [ ] 3.2 Keep keyboard focus on the moved row's grip after a keyboard
+- [x] 3.2 Keep keyboard focus on the moved row's grip after a keyboard
   move. This needs the browser check (task 6) to verify.
-- [ ] 3.3 Add a `stepsRail.movedAnnouncement` catalog key (a template
+- [x] 3.3 Add a `stepsRail.movedAnnouncement` catalog key (a template
   naming a step label and its new position) to
   `packages/web/src/i18n/catalogs/studio.ts`. Add a visually-hidden
   `aria-live="polite"` region to the rail using that key, naming the moved
@@ -81,40 +81,40 @@
 
 ## 4. Catalog and docs
 
-- [ ] 4.1 Remove `stepsRail.moveEarlier`/`stepsRail.moveLater` from
+- [x] 4.1 Remove `stepsRail.moveEarlier`/`stepsRail.moveLater` from
   `packages/web/src/i18n/catalogs/studio.ts` — task 2.1 already removed
   their last consumers. Verify `bun run typecheck` reports no unresolved
   catalog key.
-- [ ] 4.2 Change the "steps rail" passage in
+- [x] 4.2 Change the "steps rail" passage in
   `.claude/rules/design-language.md` and `tmp/Detent Design Language.dc.html`
   for the new column set (grip replaces the chevron column) and the dragged
   row/drop-indicator states, per `design.md`'s Decisions.
 
 ## 5. Spec sync
 
-- [ ] 5.1 Confirm `openspec/changes/studio-steps-rail-drag-reorder/specs/studio-step-page/spec.md`
+- [x] 5.1 Confirm `openspec/changes/studio-steps-rail-drag-reorder/specs/studio-step-page/spec.md`
   matches the shipped behavior exactly, scenario text included. Fix any
   drift found while implementing tasks 1-3.
 
 ## 6. Browser check
 
-- [ ] 6.1 Add an entry to `docs/browser-checks.md`, naming this change.
+- [x] 6.1 Add an entry to `docs/browser-checks.md`, naming this change.
   Cover dragging a row to a non-adjacent position, and to the first and
   last position. Cover moving a row with the keyboard fallback at both
   list ends, including that the boundary refuses the move. Cover the
   live-region announcement's actual text after each move type.
-- [ ] 6.2 Build `packages/web` and run that new entry against a real
+- [x] 6.2 Build `packages/web` and run that new entry against a real
   browser. Verify by observing the resulting `workflow.steps` order
   (Developer view JSON) after each move.
-- [ ] 6.3 Run `/impeccable critique` and `/impeccable audit` against the
+- [x] 6.3 Run `/impeccable critique` and `/impeccable audit` against the
   Steps tab route. Resolve any material finding they report.
 
 ## 7. Verification
 
-- [ ] 7.1 Run `bun run typecheck` and verify it reports no errors.
-- [ ] 7.2 Run `bun run build` and verify it completes without error.
-- [ ] 7.3 Run the full `bun test` suite with `DATABASE_URL` set and verify every test passes with no silent skip.
-- [ ] 7.4 Run the antislop and whitespace push gates over the pushed range
+- [x] 7.1 Run `bun run typecheck` and verify it reports no errors.
+- [x] 7.2 Run `bun run build` and verify it completes without error.
+- [x] 7.3 Run the full `bun test` suite with `DATABASE_URL` set and verify every test passes with no silent skip.
+- [x] 7.4 Run the antislop and whitespace push gates over the pushed range
   (`sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` and
   the same piped to `whitespace.sh`). Verify both pass on every Markdown
   file this change touched.
