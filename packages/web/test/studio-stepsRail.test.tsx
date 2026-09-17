@@ -249,9 +249,9 @@ describe("The steps rail's reorder controls", () => {
     const grips = buttonTags(render()).filter((b) => b.includes('aria-label="Reorder '));
 
     expect(grips).toHaveLength(3);
-    expect(grips[0]).toContain('aria-label="Reorder Intake"');
-    expect(grips[1]).toContain('aria-label="Reorder Credit check"');
-    expect(grips[2]).toContain('aria-label="Reorder Done"');
+    expect(grips[0]).toContain('aria-label="Reorder Intake. Alt+Up or Alt+Down moves it."');
+    expect(grips[1]).toContain('aria-label="Reorder Credit check. Alt+Up or Alt+Down moves it."');
+    expect(grips[2]).toContain('aria-label="Reorder Done. Alt+Up or Alt+Down moves it."');
   });
 
   it("enables every drag handle when the rail holds more than one step", () => {

@@ -582,7 +582,7 @@ export const en = {
   "stepsRail.label": "Steps",
   "stepsRail.issueMark": "open issues",
   "stepsRail.issueMarkOne": "open issue",
-  "stepsRail.dragHandle": "Reorder {step label}",
+  "stepsRail.dragHandle": "Reorder {step label}. Alt+Up or Alt+Down moves it.",
   "stepsRail.movedAnnouncement": "{step label} moved to position {position}",
   "stepsRail.addLegend": "Add",
   "stepsRail.addStep": "Add a step",

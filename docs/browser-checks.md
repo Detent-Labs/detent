@@ -5210,3 +5210,76 @@ empty space. `PathsPanel.tsx`'s `select` style now declares `width: "100%"`.
 `studio-guidedSurfaceStyle.test.ts` cannot see this. Every suite in
 `packages/web/test/` assumes no DOM, so nothing there reads a resolved width
 or position.
+
+### The steps rail's drag-and-drop and keyboard reorder (`studio-steps-rail-drag-reorder`)
+
+Open Studio, a draft carrying ten or more steps. The seeded `it_offboarding`
+process has twelve. Open its Steps tab.
+
+Drag a row's trailing grip onto the upper half of a row several positions
+away. Pass: the dragged step lands right before that row. Every row between
+the two shifts by one, and the numbers renumber from 1.
+
+Drag a row onto the lower half of the last row. Pass: the dragged step
+lands after every other row, in the last position. Drag a row onto the
+upper half of the first row. Pass: the dragged step lands in the first
+position.
+
+During a drag, the dragged row's opacity drops to 0.45. The row under the
+pointer draws a `boxShadow` accent line on the edge nearest the drop gap.
+Dropping before it marks the top edge. Dropping after it marks the bottom
+edge. Read both off `getComputedStyle`, since a snapshot shows no class
+name for either. After the drop, the dragged row's opacity returns to `1`.
+
+Tab to a row's grip, or click it, then press `Alt+ArrowUp` on the first
+row. Pass: the step stays in place. The live region keeps the text it held
+before the press: empty, on a fresh load. Press `Alt+ArrowDown` on that
+same row. Pass: the step moves down one position.
+
+The rail's own `<nav aria-label="Steps">` holds a visually hidden
+`role="status"` region. It now reads `"<label> moved to position <n>"`
+(`stepsRail.movedAnnouncement`), naming the step's new position. Focus
+stays on that step's own grip after the move. The row keeps its React key
+across the reorder, so the button stays the same DOM node.
+
+Repeat at the far end. `Alt+ArrowDown` on the last row leaves the step in
+place, and the announcement stays the same. `Alt+ArrowUp` on the last row
+moves the step up one position, with a fresh announcement naming its new
+position.
+
+Read the actual `workflow.steps` order back after each move. The rendered
+numbers alone do not prove the array itself changed. Open the `⋮` menu's
+Views group, then "Open the JSON surface". Read the `workflow.steps`
+array's `key` order from the "Draft body (JSON)" textarea. "Leave the JSON
+surface" returns to the Steps tab and keeps the rail's state.
+
+This check needed two drag-simulation techniques. `playwright-cli`'s own
+`drag` command, a real `elementHandle.dragTo`, reproduced the drop-before
+behavior for a drop in the rail's middle. Its `targetPosition` option once
+moved the wrong row when aimed at a pixel near a row's bottom edge.
+`dragTo` scrolls the target into view after the initial mousedown, which
+shifts the layout mid-gesture.
+
+Dropping at the last gap needed a hand-dispatched
+`dragstart`/`dragover`/`drop`/`dragend` sequence instead. Real
+`DragEvent`s carry a `DataTransfer` and fire from `page.evaluate`. Each
+call waits a frame so React's `dragIndex` state commits before the next
+event reads it. Firing all four in one synchronous tick left the
+component's `dragging` check reading its old value from before
+`dragstart`. The whole move attempt then failed silently. The check
+confirmed each mechanism against a live, working case before trusting it
+for the assertions above.
+
+`/impeccable critique` found one finding tagged P0. The grip's accessible
+name, `stepsRail.dragHandle` ("Reorder {step label}"), told a
+screen-reader user a step could move, but never said how. Native HTML5
+drag gives a screen-reader user no way to operate it. The keyboard path
+was that user's only route, and the accessible name never named it. The
+catalog string now reads "Reorder {step label}. Alt+Up or Alt+Down moves
+it."
+
+`/impeccable audit`'s detector pass, `impeccable detect --json` against
+this file, returned zero findings. Its browser-evidence pass measured the
+grip's contrast at about 5.8:1 against its row background, past WCAG's
+3:1 non-text minimum. It measured the grip's hit target at about 26 by
+39.5 CSS pixels. Both already met the bar, so neither needed a change.
