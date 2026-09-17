@@ -53,8 +53,8 @@ fields its form carries, the process it calls and its outcome.
 
 ### Requirement: The rail reorders steps and adds new ones
 
-Each rail row SHALL be draggable to any position in the list. A drop SHALL
-move that step to the dropped position in the draft. Each row SHALL also
+Each rail row SHALL carry a grip that drags it to any position in the list.
+A drop SHALL move that step to the dropped position in the draft. Each row SHALL also
 answer a move-earlier and a move-later command from the keyboard whenever
 an author focuses its grip.
 `spa-accessibility` already requires this: a list offering a drag move

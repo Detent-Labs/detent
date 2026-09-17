@@ -634,7 +634,9 @@ own.
 - **Current row:** the current mark. The steps rail also washes the row to the
   ledger surface and sets the name at 800.
 - **Steps rail:** a mono tabular number in slate leads each row. The check
-  badge closes it.
+  badge, then a drag grip, close it. Dragging a row drops it to 45%
+  opacity, with a `boxShadow` line marking the drop gap. Alt+ArrowUp and
+  Alt+ArrowDown on the grip move the row by keyboard.
 - **Entity rail:** a child field indents 24px.
 - **Checks rail:** a 1px hairline box with 12px padding. A 1px hairline
   separates its groups, and all clear prints in a 2px ink box.

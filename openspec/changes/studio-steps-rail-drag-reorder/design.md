@@ -45,7 +45,7 @@ language.
   `dragstart`/`dragend` handlers. It uses `GripVertical` from `lucide-react`
   at 18px with a 1.75 stroke, the icon rule already in force. It has no
   visible label. Its `aria-label` is `stepsRail.dragHandle`, read as, for
-  example, "Reorder Credit check".
+  example, "Reorder Credit check. Alt+Up or Alt+Down moves it."
 - **Dragged-row state.** The five design-language rules forbid a shadow, a
   lift and a radius. The dragged row drops to 45% opacity instead, the same
   value the design language already uses for a disabled control. Here it

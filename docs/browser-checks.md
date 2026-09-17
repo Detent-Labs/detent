@@ -3697,7 +3697,7 @@ Discard every draft the walk created before you finish.
 ### Steps rail rows without a summary line (`steps-rail-rows-drop-summary-line`)
 
 Each rail row dropped its grey summary line under the label. A row now
-shows a number, a label and its move controls. No `bun:test` assertion sees
+shows a number, a label and its drag grip. No `bun:test` assertion sees
 a row's visual layout, so this check lands here.
 
 Build the production bundle and open it on the engine's own port. Seed the
@@ -3709,8 +3709,8 @@ draft". Studio opens the draft at
 `/studio/processes/<id>/edit`. Choose the Steps tab, at
 `/studio/processes/<id>/edit/steps`. Resize the window to 1440px wide.
 
-Pass: each row shows its number, label, "Move earlier" and "Move later",
-with no summary line under it.
+Pass: each row shows its number, label and grip, with no summary line
+under it.
 
 In the rail's foot, under "Add", choose "Add a call to another process".
 Pass: the new row's issue badge sits at its trailing edge, showing a
@@ -3723,7 +3723,7 @@ Pass: the label wraps inside its rail row instead of overflowing it.
 
 Narrow the window to 420px wide. Pass: the rail stands above the step page,
 capped at 20rem tall, and scrolls inside that cap. Every row still shows
-its number, label and move controls, and none show a summary line.
+its number, label and grip, and none show a summary line.
 
 Go back to the process list and choose "Discard" on the `it_offboarding` row.
 Accept the browser's confirm. That leaves no draft behind. The header bar's own
@@ -3741,10 +3741,10 @@ each on its own fresh draft.
 1. Resize the window to the target width. Pass: the rail's first three rows
    read "Submit the Exit Notification", "Execute the Immediate Lock" and
    "Review the Exit Notification". That is the draft's own order.
-2. Choose "Move earlier" on the third row, "Review the Exit Notification".
-   Pass: the rail now reads "Submit the Exit Notification", "Review the
-   Exit Notification" and "Execute the Immediate Lock". Rows two and three
-   traded places.
+2. Focus the third row's grip, "Review the Exit Notification", and press
+   `Alt+ArrowUp`. Pass: the rail now reads "Submit the Exit Notification",
+   "Review the Exit Notification" and "Execute the Immediate Lock". Rows two
+   and three traded places.
 3. Go back to the process list and choose "Discard" on the `it_offboarding`
    row, then accept the browser's confirm. Pass: that row reads an em dash
    under Draft, with "Create draft" back beside "Versions". The header bar's
@@ -5225,11 +5225,15 @@ lands after every other row, in the last position. Drag a row onto the
 upper half of the first row. Pass: the dragged step lands in the first
 position.
 
-During a drag, the dragged row's opacity drops to 0.45. The row under the
-pointer draws a `boxShadow` accent line on the edge nearest the drop gap.
-Dropping before it marks the top edge. Dropping after it marks the bottom
-edge. Read both off `getComputedStyle`, since a snapshot shows no class
-name for either. After the drop, the dragged row's opacity returns to `1`.
+During a drag, the dragged row's opacity drops to 0.45. A drop gap marks the
+top edge of the row right after it, with a `boxShadow` accent line. Aiming
+between rows four and five marks row five's top edge. The last gap, after
+the final row, has no next row to carry that mark. There the line falls
+back to the last row's own bottom edge.
+
+Read the mark off `getComputedStyle` on the row it lands on. A snapshot
+shows no class name for the mark. After the drop, the dragged row's opacity
+returns to `1`.
 
 Tab to a row's grip, or click it, then press `Alt+ArrowUp` on the first
 row. Pass: the step stays in place. The live region keeps the text it held

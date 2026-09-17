@@ -1547,18 +1547,23 @@ They are `steps-rail-rows-drop-summary-line` on the Studio Steps tab,
 rest. Every item below sits outside the change that found it, and each was
 recorded rather than fixed. The RAIL tags are local to this section.
 
-- **RAIL-2: a move control is 26px wide.** The button pads an 18px icon by
-  4px on each side, in the `move` style of `StepsRail.tsx`. Its height
-  follows the row. Risk (Low): that width clears the 24px minimum target and
-  misses the 44px enhanced one.
+- **RAIL-2: the reorder control is 26px wide.** `studio-steps-rail-drag-reorder`
+  replaced the move buttons with one drag grip, in the `grip` style of
+  `StepsRail.tsx`. That style pads an 18px icon by 4px on each side, the
+  same sum the old `move` style used, and its declared 24px `minWidth`/
+  `minHeight` floor never binds against that larger sum. Risk (Low), carried
+  over unchanged: that width clears the 24px minimum target and misses the
+  44px enhanced one.
 - **RAIL-3: the rail clips its own focus ring.** The rail scrolls on its
   block axis, and a scroll container on one axis clips the other. The shell
   draws a 2px ring at a 2px offset, in `global.css`. Risk (Low): the ring's
   leading edge falls outside the rail's box and disappears.
-- **RAIL-4: a move control names no step.** Each one carries the icon alone,
-  labelled "Move earlier" or "Move later". Every row repeats that pair.
-  Risk (Low): a screen reader reads one identical pair per row, and
-  `design-language.md` asks a label to sit beside an icon.
+- **RAIL-4 (resolved by `studio-steps-rail-drag-reorder`): a move control
+  named no step.** Each one carried the icon alone, labelled "Move earlier"
+  or "Move later", and every row repeated that pair. The grip that replaced
+  both now carries an `aria-label` naming the step
+  (`stepsRail.dragHandle`: "Reorder {step label}. Alt+Up or Alt+Down moves
+  it."), so a screen reader reads a distinct name per row.
 - **RAIL-5: the issue badge marks severity by colour alone.** A blocker takes
   the refusal ink and an advisory the muted ink, in `StepsRail.tsx`. The
   label behind the count omits the severity. Risk (Medium): colour is the
