@@ -32,7 +32,7 @@ import * as authorize from "../src/auth/authorize.js";
 
 beforeAll(initDb);
 beforeEach(async () => {
-  if (DB) await sql`TRUNCATE permission_grants`;
+  if (DB) await sql`TRUNCATE permission_grants, process_access_roles`;
 });
 
 test("the reserved role constants carry their documented literal values", () => {
@@ -175,6 +175,10 @@ const writeGrant = async (role: string, permission: Permission, processId: Proce
   await sql`INSERT INTO permission_grants (role, permission, scope) VALUES (${role}, ${permission}, ${{ type: "process", config: { processId } }})`;
 };
 
+const addReader = async (processId: ProcessId, principal: string): Promise<void> => {
+  await sql`INSERT INTO process_access_roles (process_id, kind, principal) VALUES (${processId}, 'reader', ${principal})`;
+};
+
 test.skipIf(!DB)("each permission answers true for the role it maps to", async () => {
   expect(await can({ id: "user_1", roles: [PUBLISH_ROLE] }, "publish", PID_A, sql)).toBe(true);
   expect(await can({ id: "user_1", roles: [CANCEL_ANY_ROLE] }, "cancel", PID_A, sql)).toBe(true);
@@ -200,6 +204,27 @@ test.skipIf(!DB)("a read grant admits one process and refuses another", async ()
   const actor = { id: "user_1", roles: ["hr-reporting"] };
   expect(await can(actor, "read", PID_A, sql)).toBe(true);
   expect(await can(actor, "read", PID_B, sql)).toBe(false);
+});
+
+test.skipIf(!DB)("an actor missing the read role answers false over a store holding no grant and an empty Reader list", async () => {
+  // Regression for "An installation with no grants keeps today's answers",
+  // amended by process-access-roles: an empty Reader list changes nothing.
+  expect(await can({ id: "user_1", roles: ["employee"] }, "read", PID_A, sql)).toBe(false);
+});
+
+test.skipIf(!DB)("a process's Reader list satisfies the read permission", async () => {
+  const actor = { id: "user_reader", roles: [] };
+  await addReader(PID_A, actor.id);
+  expect(await can(actor, "read", PID_A, sql)).toBe(true);
+});
+
+test.skipIf(!DB)("a Reader-list match satisfies no other permission", async () => {
+  const actor = { id: "user_reader", roles: [] };
+  await addReader(PID_A, actor.id);
+  expect(await can(actor, "cancel", PID_A, sql)).toBe(false);
+  expect(await can(actor, "publish", PID_A, sql)).toBe(false);
+  expect(await can(actor, "migrate", PID_A, sql)).toBe(false);
+  expect(await can(actor, "visibility", PID_A, sql)).toBe(false);
 });
 
 test.skipIf(!DB)("no permission implies another", async () => {

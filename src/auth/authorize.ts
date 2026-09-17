@@ -14,11 +14,12 @@
  * moves this module alone. Still not an extension point: four fixed
  * permissions in a module-private map, no registry, nothing configurable.
  *
- * `can` runs two tests: the global role, then a stored grant.
- * `src/auth/grants.ts` holds the grant store and its SQL; this module
- * imports `hasGrant` alone and stays SQL-free itself. Both `can` and
- * `requirePermission` are therefore `async` and take the caller's `SQL`
- * handle.
+ * `can` runs two tests: the global role, then a stored grant. `"read"` runs a
+ * third, the process's Reader list (`matchesAccessList` in
+ * `src/auth/process-access.ts`). `src/auth/grants.ts` holds the grant store
+ * and its SQL; this module imports `hasGrant` alone and stays SQL-free
+ * itself. Both `can` and `requirePermission` are therefore `async` and take
+ * the caller's `SQL` handle.
  */
 import type { SQL } from "bun";
 import type { Actor } from "../cel/eval.js";
@@ -108,20 +109,31 @@ const PERMISSION_ROLE: Record<Permission, string> = {
 };
 
 /**
- * May `actor` perform `permission` on the process `processId` names? Two
- * tests, in order. The global role is array membership on `actor.roles` and
- * short-circuits before any query, so an installation that writes no grant
- * pays nothing and a global-role holder pays nothing either. A stored grant
- * is the one round trip this function ever spends, and only on a call that
- * would otherwise be refused.
+ * May `actor` perform `permission` on the process `processId` names? The
+ * global role is array membership on `actor.roles` and short-circuits before
+ * any query, so an installation that writes no grant pays nothing and a
+ * global-role holder pays nothing either. A stored grant is the next test,
+ * one round trip, run only on a call the global role did not already admit.
+ * `"read"` alone runs a third test after that, the process's Reader list —
+ * skipped for every other permission.
  *
  * Callers must not assume `processId` names a process the store already
  * holds — the publish route reads it straight out of an unvalidated request
- * body, and `hasGrant` answers false rather than throwing over such an id.
+ * body, and `hasGrant`/`matchesAccessList` answer false rather than throwing
+ * over such an id.
  */
 export async function can(actor: Actor, permission: Permission, processId: ProcessId, db: SQL): Promise<boolean> {
   if (actor.roles.includes(PERMISSION_ROLE[permission])) return true;
-  return hasGrant(actor.roles, permission, processId, db);
+  if (await hasGrant(actor.roles, permission, processId, db)) return true;
+  if (permission !== "read") return false;
+  // Deliberately a dynamic import, not a static one: `process-access.ts`
+  // dereferences this module's role constants at its own top level, so a
+  // static import here closes a circular import where whichever module
+  // loads first throws on the other's not-yet-initialized `const` exports.
+  // A dynamic import defers the load past both modules' top-level
+  // evaluation, so by the time `can` runs the cycle has already settled.
+  const { matchesAccessList } = await import("./process-access.js");
+  return matchesAccessList(actor, processId, "reader", db);
 }
 
 /** `can` in the throwing shape `requireRole` already gave every HTTP gate. */
