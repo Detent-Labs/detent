@@ -16,6 +16,11 @@ import type { ConfigFieldDescriptor } from "../api/types.js";
 type DraftPath = DraftOf<Path>;
 type DraftStep = DraftOf<Step>;
 
+/** The width below which two columns are too narrow. The page falls to one,
+ * and the gutter rule goes with the second column. The steps rail turns at
+ * this same width (design.md). */
+const NARROW = "@media (max-width: 64rem)";
+
 const styles = stylex.create({
   pathsPanel: {
     display: "flex",
@@ -50,6 +55,16 @@ const styles = stylex.create({
   monoInput: {
     fontFamily: fonts.mono,
     fontSize: "0.8rem",
+  },
+  // Copied from `StepPage.tsx`'s masthead rather than imported: compiled
+  // StyleX styles stay beside their own module (design.md). LABEL carries
+  // prose that can run up to 40% longer in German; KEY carries a short slug.
+  // LABEL gets the wider column.
+  labelKeyRow: {
+    display: "grid",
+    gridTemplateColumns: { default: "minmax(0, 2fr) minmax(0, 1fr)", [NARROW]: "minmax(0, 1fr)" },
+    columnGap: space.s4,
+    rowGap: space.s2,
   },
   // The studio select: a native `<select>` with its UA chevron dropped in
   // favor of a decorative `ChevronDown` layered over the trailing edge.
@@ -219,23 +234,25 @@ export function PathsPanel({
           {...stylex.props(styles.pathRow, path.id !== undefined && path.id === selectedPathId && styles.pathRowSelected)}
           key={path.id ?? index}
         >
-          <label {...stylex.props(styles.fieldLabel)}>
-            <span {...stylex.props(styles.fieldLabelText)}>label</span>
-            <input
-              type="text"
-              value={path.label ?? ""}
-              onChange={(e) => updatePath(index, { label: e.target.value })}
-            />
-          </label>
-          <label {...stylex.props(styles.fieldLabel)}>
-            <span {...stylex.props(styles.fieldLabelText)}>key</span>
-            <input
-              type="text"
-              {...stylex.props(styles.monoInput)}
-              value={path.key ?? ""}
-              onChange={(e) => updatePath(index, { key: e.target.value })}
-            />
-          </label>
+          <div {...stylex.props(styles.labelKeyRow)}>
+            <label {...stylex.props(styles.fieldLabel)}>
+              <span {...stylex.props(styles.fieldLabelText)}>label</span>
+              <input
+                type="text"
+                value={path.label ?? ""}
+                onChange={(e) => updatePath(index, { label: e.target.value })}
+              />
+            </label>
+            <label {...stylex.props(styles.fieldLabel)}>
+              <span {...stylex.props(styles.fieldLabelText)}>key</span>
+              <input
+                type="text"
+                {...stylex.props(styles.monoInput)}
+                value={path.key ?? ""}
+                onChange={(e) => updatePath(index, { key: e.target.value })}
+              />
+            </label>
+          </div>
           <label {...stylex.props(styles.fieldLabel)}>
             <span {...stylex.props(styles.fieldLabelText)}>to</span>
             <span {...stylex.props(styles.selectWrap)}>
