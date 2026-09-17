@@ -117,6 +117,12 @@ its Developer or its Owner. That listing follows the `process-access-roles`
 capability. The surface SHALL render that process's Developer, Owner and
 Reader lists, each as users and groups.
 
+Reaching the edit screen at all still needs `requireAuthoring` and that
+process's Developer list, or `ADMIN_ROLE`, per `process-drafts`. An Owner
+holding neither cannot open this screen, so cannot reach this surface
+either. `process-access-roles`'s own deferred non-studio surface is what
+such an Owner needs instead.
+
 A Developer SHALL add and delete entries on the Developer list and on the
 Owner list from this surface. An Owner SHALL add and delete entries on the
 Reader list from this surface. Neither role SHALL see a control for the

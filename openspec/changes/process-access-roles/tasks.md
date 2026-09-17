@@ -24,6 +24,20 @@
       entry in the same write as the draft insert. Verify: the "The
       creator lands on the Developer list" scenario passes, and a forced
       failure between the two writes leaves neither behind.
+- [ ] 1.6 Expose Task 1.3's add/delete and Task 1.2's match over HTTP in
+      `src/http/studio-routes.ts`, dispatched in `src/http/server.ts`:
+      `GET /processes/:processId/access` (the three lists, for the Access
+      surface to render), `PUT /processes/:processId/access` and
+      `DELETE /processes/:processId/access` (body `{ kind, principal }`,
+      idempotent, mirroring `handleWritePermissionGrant`/
+      `handleRevokePermissionGrant`'s shape), and
+      `GET /processes/access/mine` (the calling actor's own Developer- and
+      Owner-listed process ids, for Task 6.1). Every write route gates per
+      Task 1.3's rules; the two reads need only a resolved actor. Studio
+      reaches the engine exclusively over HTTP (`studio-app`'s own
+      boundary rule), so these routes are what Tasks 6.1 and 6.4 call.
+      Verify: `bun test` covers an authorization test per route, over the
+      same scenarios Task 1.3 covers at the engine layer.
 
 ## 2. Rollout migration
 
@@ -71,9 +85,9 @@
 
 ## 6. Studio UI
 
-- [ ] 6.1 Add a read that returns the actor's own Developer- and
-      Owner-listed process ids, for the Studio frontend to intersect with
-      `GET /processes` and `GET /drafts`. Verify: an integration test (or
+- [ ] 6.1 Add a studio API client call for `GET /processes/access/mine`
+      (Task 1.6), for the Studio frontend to intersect with `GET
+      /processes` and `GET /drafts`. Verify: an integration test (or
       manual check) confirms the read returns only the calling actor's own
       lists.
 - [ ] 6.2 Narrow the `/processes` screen's combined rows to that set in
@@ -86,7 +100,8 @@
       `studio-app/spec.md`.
 - [ ] 6.4 Build the Access surface on a process's edit screen: Developer,
       Owner and Reader lists, with add/delete controls gated per role as
-      `studio-app/spec.md`'s new Access-surface requirement states.
+      `studio-app/spec.md`'s new Access-surface requirement states, calling
+      Task 1.6's `GET`/`PUT`/`DELETE /processes/:processId/access` routes.
       Verify: its four scenarios pass, via a component test or a manual
       browser check with `/impeccable critique`/`audit` on the new screen.
 
