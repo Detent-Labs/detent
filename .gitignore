@@ -28,6 +28,8 @@ coverage/
 .DS_Store
 Thumbs.db
 
+.claude/commands
+
 # Claude Code (personal, per-machine)
 .claude/settings.json
 .claude/settings.local.json
