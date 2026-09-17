@@ -27,7 +27,15 @@
  */
 import type { SQL } from "bun";
 import { withTransaction } from "../engine/store.js";
-import { getDraft, saveDraft, listDrafts, deleteDraft, markDraftPublished, type Draft } from "../engine/drafts.js";
+import {
+  getDraft,
+  saveDraft,
+  listDrafts,
+  deleteDraft,
+  markDraftPublished,
+  hasNoDraftAndNoPublishedVersion,
+  type Draft,
+} from "../engine/drafts.js";
 import { createProcessInstance } from "../runtime/api.js";
 import { getTemplate, listTemplates, saveTemplate, deleteTemplate } from "../engine/templates.js";
 import { publishBody, createDefinitionStore } from "../engine/definitions.js";
@@ -43,7 +51,7 @@ import { createDefaultAssignmentRegistry } from "../engine/assignment-strategies
 import { describeConfigSchema, type ConfigFieldDescriptor } from "../engine/config-descriptor.js";
 import type { ZodTypeAny } from "zod";
 import type { ActorResolver } from "../auth/resolve.js";
-import { requireRole, requirePermission, can, AuthorizationError, DEVELOPER_ROLE, TEMPLATES_ROLE, AUTHOR_ROLE, ADMIN_ROLE } from "../auth/authorize.js";
+import { requireRole, requirePermission, can, AuthorizationError, DEVELOPER_ROLE, TEMPLATES_ROLE, AUTHOR_ROLE, ADMIN_ROLE, CREATE_ROLE } from "../auth/authorize.js";
 import { addAccessPrincipal, deleteAccessPrincipal, getAccessLists, processesMatchingAccessList, matchesAccessList, type AccessKind } from "../auth/process-access.js";
 import { notFound, RequestShapeError, type HttpResult } from "./errors.js";
 import { route, readJson, parseVersion } from "./routes.js";
@@ -103,22 +111,35 @@ export async function handleGetDraft(processId: string, req: Request, resolver: 
 }
 
 export async function handleSaveDraft(processId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
-  return route(req, resolver, db, requireAuthoring, async (actor) => {
-    const parsed = (await readJson(req)) as { body?: unknown; layout?: unknown; revision?: unknown; baseVersion?: unknown };
-    const saved = await saveDraft(
-      processId as ProcessId,
-      {
-        body: parsed.body,
-        layout: parsed.layout,
-        revision: parsed.revision as number,
-        updatedBy: actor.id,
-        // `undefined` and an absent key are the same thing here: leave the stored base alone.
-        baseVersion: parsed.baseVersion as number | undefined,
-      },
-      db,
-    );
-    return { status: 200, body: saved };
-  });
+  return route(
+    req,
+    resolver,
+    db,
+    async (actor) => {
+      requireAuthoring(actor);
+      if (await hasNoDraftAndNoPublishedVersion(processId as ProcessId, db)) {
+        if (!actor.roles.includes(CREATE_ROLE)) {
+          throw new AuthorizationError(`actor '${actor.id}' lacks required role '${CREATE_ROLE}' to create process '${processId}'`);
+        }
+      }
+    },
+    async (actor) => {
+      const parsed = (await readJson(req)) as { body?: unknown; layout?: unknown; revision?: unknown; baseVersion?: unknown };
+      const saved = await saveDraft(
+        processId as ProcessId,
+        {
+          body: parsed.body,
+          layout: parsed.layout,
+          revision: parsed.revision as number,
+          updatedBy: actor.id,
+          // `undefined` and an absent key are the same thing here: leave the stored base alone.
+          baseVersion: parsed.baseVersion as number | undefined,
+        },
+        db,
+      );
+      return { status: 200, body: saved };
+    },
+  );
 }
 
 export async function handleDeleteDraft(processId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {

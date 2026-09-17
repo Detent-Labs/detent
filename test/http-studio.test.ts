@@ -14,7 +14,8 @@ import { INSTANCE_QUERY_DATA_SOURCE_TYPE, createInstanceQueryDataSourceHandlerDe
 import { migrateInstances } from "../src/engine/migration.js";
 import { createServer } from "../src/http/server.js";
 import { devHeaderResolver } from "../src/auth/resolve.js";
-import { DEVELOPER_ROLE, PUBLISH_ROLE, TEMPLATES_ROLE, ADMIN_ROLE, REPORTS_ROLE, AUTHOR_ROLE, DATALISTS_ROLE } from "../src/auth/authorize.js";
+import { DEVELOPER_ROLE, PUBLISH_ROLE, TEMPLATES_ROLE, ADMIN_ROLE, REPORTS_ROLE, AUTHOR_ROLE, DATALISTS_ROLE, CREATE_ROLE } from "../src/auth/authorize.js";
+import { matchesAccessList } from "../src/auth/process-access.js";
 import type { Actor } from "../src/cel/eval.js";
 import type { ProcessId, ProcessBody } from "../src/schema/definition.js";
 
@@ -31,15 +32,16 @@ beforeEach(async () => {
   if (DB) await clearInstanceAudit();
 });
 
-const developer: Actor = { id: "user_dev", roles: [DEVELOPER_ROLE] };
+const developer: Actor = { id: "user_dev", roles: [DEVELOPER_ROLE, CREATE_ROLE] };
 const bystander: Actor = { id: "user_bystander", roles: [] };
-const publisher: Actor = { id: "user_publisher", roles: [DEVELOPER_ROLE, PUBLISH_ROLE] };
+const publisher: Actor = { id: "user_publisher", roles: [DEVELOPER_ROLE, PUBLISH_ROLE, CREATE_ROLE] };
 const publishOnly: Actor = { id: "user_publish_only", roles: [PUBLISH_ROLE] };
 const curator: Actor = { id: "user_curator", roles: [TEMPLATES_ROLE] };
-const author: Actor = { id: "user_author", roles: [AUTHOR_ROLE] };
-const authorPublisher: Actor = { id: "user_author_publisher", roles: [AUTHOR_ROLE, PUBLISH_ROLE] };
-const financeAuthor: Actor = { id: "user_finance_author", roles: [AUTHOR_ROLE, "finance-authors"] };
+const author: Actor = { id: "user_author", roles: [AUTHOR_ROLE, CREATE_ROLE] };
+const authorPublisher: Actor = { id: "user_author_publisher", roles: [AUTHOR_ROLE, PUBLISH_ROLE, CREATE_ROLE] };
+const financeAuthor: Actor = { id: "user_finance_author", roles: [AUTHOR_ROLE, "finance-authors", CREATE_ROLE] };
 const financeGrantOnly: Actor = { id: "user_finance_grant_only", roles: ["finance-authors"] };
+const developerNoCreate: Actor = { id: "user_dev_no_create", roles: [DEVELOPER_ROLE] };
 
 /** Writes a `"publish"` grant directly, bypassing the admin route — that route's own behavior is covered in `test/http-admin.test.ts`. */
 const grantPublish = async (role: string, processId: string): Promise<void> => {
@@ -289,6 +291,31 @@ test.skipIf(!DB)("a stale-revision PUT maps to 409 and leaves the stored row unc
   const stored = (await sql`SELECT body, revision FROM drafts WHERE process_id = ${processId}`) as { body: { label: { en: string } }; revision: number }[];
   expect(stored[0]!.revision).toBe(1);
   expect(stored[0]!.body.label.en).toBe("v2");
+});
+
+test.skipIf(!DB)("a developer holding CREATE_ROLE creates a new process", async () => {
+  const processId = pid();
+  const res = await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: authoredBody("v1"), layout: {}, revision: 0 }));
+  expect(res.status).toBe(200);
+
+  expect(await matchesAccessList(developer, processId as ProcessId, "developer", sql)).toBe(true);
+});
+
+test.skipIf(!DB)("an author holding CREATE_ROLE creates a new process", async () => {
+  const processId = pid();
+  const res = await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", author, { body: authoredBody("v1"), layout: {}, revision: 0 }));
+  expect(res.status).toBe(200);
+
+  expect(await matchesAccessList(author, processId as ProcessId, "developer", sql)).toBe(true);
+});
+
+test.skipIf(!DB)("the engine refuses process creation without the create role", async () => {
+  const processId = pid();
+  const res = await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developerNoCreate, { body: authoredBody("v1"), layout: {}, revision: 0 }));
+  expect(res.status).toBe(403);
+
+  const rows = (await sql`SELECT 1 FROM drafts WHERE process_id = ${processId}`) as unknown[];
+  expect(rows.length).toBe(0);
 });
 
 // ============================================================
