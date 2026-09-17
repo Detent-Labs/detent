@@ -155,10 +155,9 @@ interface Props {
    * and this rail cannot disagree about which step is current. */
   currentStepId: string | undefined;
   onSelectStep: (stepId: string) => void;
-  /** Swaps two steps in the draft's own `workflow.steps` order. The rail
-   * hands the row's step and the neighbour it trades places with, so the
-   * caller needs no index of its own. */
-  onReorder: (stepId: string, neighbourId: string) => void;
+  /** Moves one step to a target index in the draft's own `workflow.steps` order. The rail
+   * hands the row's step id and the target index. */
+  onMove: (stepId: string, toIndex: number) => void;
   onAddStep: (kind: StepKind) => void;
 }
 
@@ -172,7 +171,7 @@ interface Props {
  * `workflow.steps` order back, which is what the canvas's Up/Down traversal
  * and the serialized definition both read.
  */
-export function StepsRail({ currentStepId, onSelectStep, onReorder, onAddStep }: Props) {
+export function StepsRail({ currentStepId, onSelectStep, onMove, onAddStep }: Props) {
   const { draft, validation, contentLocale } = useDraft();
   const baseLocale = draft.baseLocale ?? "en";
   const ordered = draft.workflow?.steps ?? [];
@@ -216,7 +215,7 @@ export function StepsRail({ currentStepId, onSelectStep, onReorder, onAddStep }:
                   {...stylex.props(styles.move)}
                   aria-label={t("stepsRail.moveEarlier")}
                   disabled={step.id === undefined || earlier === undefined}
-                  onClick={() => step.id !== undefined && earlier !== undefined && onReorder(step.id, earlier)}
+                  onClick={() => step.id !== undefined && earlier !== undefined && onMove(step.id, i - 1)}
                 >
                   <ChevronUp size={18} strokeWidth={1.75} aria-hidden="true" />
                 </button>
@@ -225,7 +224,7 @@ export function StepsRail({ currentStepId, onSelectStep, onReorder, onAddStep }:
                   {...stylex.props(styles.move)}
                   aria-label={t("stepsRail.moveLater")}
                   disabled={step.id === undefined || later === undefined}
-                  onClick={() => step.id !== undefined && later !== undefined && onReorder(step.id, later)}
+                  onClick={() => step.id !== undefined && later !== undefined && onMove(step.id, i + 1)}
                 >
                   <ChevronDown size={18} strokeWidth={1.75} aria-hidden="true" />
                 </button>

@@ -46,6 +46,7 @@ import { drawnPositions, isPoint, type LayoutStep } from "../canvas/layout.js";
 import { newStep, type StepKind } from "../draft/createStep.js";
 import { addToDraftArray } from "../draft/draft-array-crud.js";
 import { insertOnPath } from "../draft/insertOnPath.js";
+import { moveTo } from "../draft/list-ops.js";
 import { JsonView } from "../panels/JsonView.js";
 import { describeCaughtError } from "../errors.js";
 import { useFail } from "../../../shell/useFail.js";
@@ -439,7 +440,7 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
   // Position is not body — it lives in `saveState.layout` (round-tripped
   // opaquely by DraftToolbar's save call already), never in the Draft
   // model's `mutate()` (design.md: the two are separate existing surfaces).
-  const onMoveStep = (stepId: string, point: Point) => {
+  const onMoveCanvasPosition = (stepId: string, point: Point) => {
     setSaveState((s) => ({ ...s, layout: { ...s.layout, [stepId]: point } }));
   };
 
@@ -531,18 +532,17 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
     };
   };
 
-  /** The rail's reorder control. It trades two steps' places in the draft's
-   * own `workflow.steps` order — the swap moves the step in that order,
+  /** The rail's reorder control. It moves one step to a target index in the draft's
+   * own `workflow.steps` order — the move changes the step's position in that order,
    * which is what the rail, the canvas traversal and the serialized
    * definition all read. */
-  const onReorderStep = (stepId: string, neighbourId: string) => {
+  const onMoveStep = (stepId: string, toIndex: number) => {
     mutate((d) => {
       const list = d.workflow?.steps;
       if (!list) return;
       const from = list.findIndex((s) => s.id === stepId);
-      const to = list.findIndex((s) => s.id === neighbourId);
-      if (from < 0 || to < 0) return;
-      [list[from], list[to]] = [list[to], list[from]];
+      if (from < 0) return;
+      if (d.workflow) d.workflow.steps = moveTo(list, from, toIndex);
     });
   };
 
@@ -682,7 +682,7 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
 
     appendStep(created);
     if (created.id) {
-      onMoveStep(created.id, point);
+      onMoveCanvasPosition(created.id, point);
       onSelectStep(created.id);
     }
   };
@@ -713,7 +713,7 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
     const created = newStep(kind, seedLocalizedText(contentLocale));
     appendStep(created);
     if (created.id) {
-      onMoveStep(created.id, point);
+      onMoveCanvasPosition(created.id, point);
       onSelectStep(created.id);
     }
   };
@@ -904,7 +904,7 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
               <div id={CANVAS_BODY_ID} {...stylex.props(styles.canvasRegion)}>
                 <CanvasView
                   layout={saveState.layout}
-                  onMoveStep={onMoveStep}
+                  onMoveStep={onMoveCanvasPosition}
                   onArrange={onArrange}
                   selectedStepIds={selectedStepIds}
                   onSelectStep={onSelectStep}
@@ -932,7 +932,7 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
               <StepsRail
                 currentStepId={pageStepId}
                 onSelectStep={(target) => onSelectStep(target)}
-                onReorder={onReorderStep}
+                onMove={onMoveStep}
                 onAddStep={onAddStep}
               />
               <StepPage

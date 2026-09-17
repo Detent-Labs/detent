@@ -125,7 +125,7 @@ function render(over: { current?: string; issues?: EditorIssue[]; draft?: Draft 
       <StepsRail
         currentStepId={over.current}
         onSelectStep={() => {}}
-        onReorder={() => {}}
+        onMove={() => {}}
         onAddStep={() => {}}
       />
     </DraftContext.Provider>,
