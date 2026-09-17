@@ -130,3 +130,56 @@ test.skipIf(!DB)("running the CLI with DATABASE_URL unset fails immediately, nam
   expect(exitCode).not.toBe(0);
   expect(stderr).toContain("DATABASE_URL");
 });
+
+test.skipIf(!DB)("process_access_roles table exists after initSchema with correct columns", async () => {
+  await initSchema(sql);
+
+  // Verify table exists and has the expected columns
+  const columns = (await sql`
+    SELECT column_name, data_type, is_nullable, column_default
+    FROM information_schema.columns
+    WHERE table_name = 'process_access_roles'
+    ORDER BY ordinal_position
+  `) as Array<{
+    column_name: string;
+    data_type: string;
+    is_nullable: string;
+    column_default: string | null;
+  }>;
+
+  expect(columns).toHaveLength(3);
+
+  // Verify column names and types
+  const columnsByName = Object.fromEntries(columns.map((col) => [col.column_name, col]));
+
+  expect(columnsByName.process_id).toBeDefined();
+  expect(columnsByName.process_id.data_type).toBe("text");
+  expect(columnsByName.process_id.is_nullable).toBe("NO");
+
+  expect(columnsByName.kind).toBeDefined();
+  expect(columnsByName.kind.data_type).toBe("text");
+  expect(columnsByName.kind.is_nullable).toBe("NO");
+
+  expect(columnsByName.principal).toBeDefined();
+  expect(columnsByName.principal.data_type).toBe("text");
+  expect(columnsByName.principal.is_nullable).toBe("NO");
+
+  // Verify primary key constraint
+  const pkConstraint = (await sql`
+    SELECT constraint_name, constraint_type
+    FROM information_schema.table_constraints
+    WHERE table_name = 'process_access_roles' AND constraint_type = 'PRIMARY KEY'
+  `) as Array<{ constraint_name: string; constraint_type: string }>;
+
+  expect(pkConstraint).toHaveLength(1);
+  expect(pkConstraint[0].constraint_name).toBe("process_access_roles_pkey");
+
+  // Verify CHECK constraint on kind column
+  const checkConstraint = (await sql`
+    SELECT constraint_name
+    FROM information_schema.table_constraints
+    WHERE table_name = 'process_access_roles' AND constraint_type = 'CHECK'
+  `) as Array<{ constraint_name: string }>;
+
+  expect(checkConstraint.length).toBeGreaterThan(0);
+});

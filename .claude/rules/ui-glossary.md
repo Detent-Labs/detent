@@ -52,14 +52,14 @@ nav, the header bar, the tab row, then one tab body.
 | process surface | the one screen a draft opens on: the tab row and the body under it | `screens/EditScreen.tsx` |
 | screen nav | the row above the header bar. It holds Back to processes and nothing else | `screens/EditScreen.tsx` |
 | header bar | the process-identity row: name, key, revision, dirty/saved state, Save, Discard draft, Publish, the `⋮` menu | `panels/ProcessHeaderBar.tsx` |
-| tab row | the row of ten tabs over the body | `panels/ProcessTabRow.tsx` |
+| tab row | the row of eleven tabs over the body | `panels/ProcessTabRow.tsx` |
 | edge fade | the fade at an edge of the tab row with more tabs past it | `panels/ProcessTabRow.tsx` |
-| tab | one of the ten. The authoring order runs Canvas, Steps, Fields, Data sources, Paths, Forms, Field matrix, Contract, Changes and Checks | `routing.ts` |
-| structure surface | the ten tab bodies together, the JSON surface's one alternative | `EditScreen.tsx`, its `structureActive` prop |
+| tab | one of the eleven. The authoring order runs Canvas, Steps, Fields, Data sources, Paths, Forms, Field matrix, Contract, Changes, Checks and Access | `routing.ts` |
+| structure surface | the eleven tab bodies together, the JSON surface's one alternative | `EditScreen.tsx`, its `structureActive` prop |
 | JSON surface | the raw definition view, the structure surface's one alternative | `panels/JsonView.tsx` |
 
 The open tab stands in the address, at `/studio/processes/:id/edit/:tab`. All
-ten bodies stay mounted at once, and `hidden` shows one. A body keeps its own
+eleven bodies stay mounted at once, and `hidden` shows one. A body keeps its own
 half-typed state across a switch: an outcome name, a selected field.
 Unmounting on every switch would lose that state.
 
@@ -108,7 +108,7 @@ word *masthead* survives on the step page, and nowhere else.
 
 The process surface replaced the panels screen too. Six words went with it:
 *panels screen*, *panels screen header*, *index rail*, *open view*, *surface
-toggle* and *rail sublist*. Say *tab* for one of the ten. Say *entity rail*
+toggle* and *rail sublist*. Say *tab* for one of the eleven. Say *entity rail*
 for the row list the Fields and Data sources tabs keep.
 
 *Inspector* retired ahead of both, with the inspector column. The step page is
@@ -124,7 +124,7 @@ field catalog's own editor. It stands apart from the register tab, the shell's
 own header label. It stands apart from a tab on the tab row as well. All three
 are tab patterns, and each keeps its own name.
 
-**tab row** still names one thing only: the process surface's row of ten
+**tab row** still names one thing only: the process surface's row of eleven
 (`panels/ProcessTabRow.tsx`). The strip above the form canvas is the *form tab
 strip*. The participant meets that same strip inside `FieldForm`, drawn from
 the same `view.tabs`, and it takes the same name.

@@ -322,7 +322,7 @@ focused tab. Enter or Space still activates it.
 This is the WAI-ARIA tabs pattern's roving-tabindex variant. It exists for
 a row wide enough to need it. One plain Tab stop per tab would cost a
 keyboard user many presses to cross such a row. This governs
-`studio-process-tabs`' own ten-tab row, the one tab set of this shape in
+`studio-process-tabs`' own eleven-tab row, the one tab set of this shape in
 the browser packages today. A future tab set that takes this route
 SHALL follow this same pattern rather than inventing a second one. Every
 other tab set keeps the plain-button pattern.

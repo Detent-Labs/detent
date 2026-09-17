@@ -3,6 +3,7 @@ import { authoredProcessBody } from "workflow-engine/schema";
 import {
   createInFlightGuard,
   deriveProcessRows,
+  narrowToAccessible,
   seedVersionFor,
   seededDraftInput,
   templateDraftInput,
@@ -306,5 +307,35 @@ describe("createInFlightGuard", () => {
     expect(sets[0]!.has("p1")).toBe(true);
     expect(sets[1]!.has("p1")).toBe(false);
     expect(sets[0]).not.toBe(sets[1]);
+  });
+});
+
+describe("narrowToAccessible", () => {
+  const processA: ProcessSummary = { processId: "proc_a", version: 1, definitionHash: "hash_a", key: "a", label: { en: "A" }, baseLocale: "en" };
+  const processB: ProcessSummary = { processId: "proc_b", version: 1, definitionHash: "hash_b", key: "b", label: { en: "B" }, baseLocale: "en" };
+
+  // studio-app spec, "A process outside the actor's lists stays hidden": an
+  // actor on process A's Developer list but not process B's, both published.
+  it("shows a process on the actor's Developer list and hides one that isn't", () => {
+    const rows = deriveProcessRows([processA, processB], []);
+    const narrowed = narrowToAccessible(rows, { developer: ["proc_a"], owner: [] }, false);
+
+    expect(narrowed.map((r) => r.processId)).toEqual(["proc_a"]);
+  });
+
+  it("shows a process on the actor's Owner list the same way", () => {
+    const rows = deriveProcessRows([processA, processB], []);
+    const narrowed = narrowToAccessible(rows, { developer: [], owner: ["proc_a"] }, false);
+
+    expect(narrowed.map((r) => r.processId)).toEqual(["proc_a"]);
+  });
+
+  // studio-app spec, "An admin sees every process": unnarrowed regardless of
+  // the access lists' own content, including empty lists.
+  it("returns every row unfiltered for an admin, regardless of the access lists", () => {
+    const rows = deriveProcessRows([processA, processB], []);
+    const narrowed = narrowToAccessible(rows, { developer: [], owner: [] }, true);
+
+    expect(narrowed).toEqual(rows);
   });
 });

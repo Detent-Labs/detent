@@ -31,6 +31,9 @@ export interface TabCountDraft {
  * against the base version needs a fetch no draft-only expression can make.
  * `undefined` there means that fetch has not landed, so the tab prints
  * nothing rather than a zero it cannot yet stand behind.
+ *
+ * Access holds three lists rather than one total, the same reason Contract
+ * reports none.
  */
 export function processTabCounts(
   draft: TabCountDraft,
@@ -49,6 +52,7 @@ export function processTabCounts(
     contract: undefined,
     changes: changesCount,
     checks: issues.length,
+    access: undefined,
   };
 }
 

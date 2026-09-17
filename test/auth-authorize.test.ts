@@ -24,13 +24,15 @@ import {
   DATALISTS_ROLE,
   TEMPLATES_ROLE,
   AUTHOR_ROLE,
+  CREATE_ROLE,
+  OWNER_ROLE,
   type Permission,
 } from "../src/auth/authorize.js";
 import * as authorize from "../src/auth/authorize.js";
 
 beforeAll(initDb);
 beforeEach(async () => {
-  if (DB) await sql`TRUNCATE permission_grants`;
+  if (DB) await sql`TRUNCATE permission_grants, process_access_roles`;
 });
 
 test("the reserved role constants carry their documented literal values", () => {
@@ -42,6 +44,8 @@ test("the reserved role constants carry their documented literal values", () => 
   expect(DATALISTS_ROLE).toBe("system:datalists");
   expect(TEMPLATES_ROLE).toBe("system:templates");
   expect(AUTHOR_ROLE).toBe("system:author");
+  expect(CREATE_ROLE).toBe("system:create");
+  expect(OWNER_ROLE).toBe("system:owner");
 });
 
 test("no authorization registry/plugin envelope exists alongside the fixed role checks", () => {
@@ -55,8 +59,10 @@ test("no authorization registry/plugin envelope exists alongside the fixed role 
     "AUTHOR_ROLE",
     "AuthorizationError",
     "CANCEL_ANY_ROLE",
+    "CREATE_ROLE",
     "DATALISTS_ROLE",
     "DEVELOPER_ROLE",
+    "OWNER_ROLE",
     "PUBLISH_ROLE",
     "REPORTS_ROLE",
     "TEMPLATES_ROLE",
@@ -124,6 +130,28 @@ test("no other reserved role implies the author role", () => {
   }
 });
 
+test("the create role implies nothing", () => {
+  expect(() => requireRole({ id: "user_1", roles: [CREATE_ROLE] }, ADMIN_ROLE)).toThrow(AuthorizationError);
+  expect(() => requireRole({ id: "user_1", roles: [CREATE_ROLE] }, DEVELOPER_ROLE)).toThrow(AuthorizationError);
+});
+
+test("no other reserved role implies the create role", () => {
+  for (const held of [ADMIN_ROLE, DEVELOPER_ROLE, AUTHOR_ROLE]) {
+    expect(() => requireRole({ id: "user_1", roles: [held] }, CREATE_ROLE)).toThrow(AuthorizationError);
+  }
+});
+
+test("the owner role implies nothing", () => {
+  expect(() => requireRole({ id: "user_1", roles: [OWNER_ROLE] }, ADMIN_ROLE)).toThrow(AuthorizationError);
+  expect(() => requireRole({ id: "user_1", roles: [OWNER_ROLE] }, DEVELOPER_ROLE)).toThrow(AuthorizationError);
+});
+
+test("no other reserved role implies the owner role", () => {
+  for (const held of [ADMIN_ROLE, DEVELOPER_ROLE, AUTHOR_ROLE]) {
+    expect(() => requireRole({ id: "user_1", roles: [held] }, OWNER_ROLE)).toThrow(AuthorizationError);
+  }
+});
+
 test("an actor carrying the required role passes", () => {
   expect(() => requireRole({ id: "user_1", roles: [PUBLISH_ROLE] }, PUBLISH_ROLE)).not.toThrow();
 });
@@ -145,6 +173,10 @@ const PID_B = "proc_seam_b" as ProcessId;
 
 const writeGrant = async (role: string, permission: Permission, processId: ProcessId): Promise<void> => {
   await sql`INSERT INTO permission_grants (role, permission, scope) VALUES (${role}, ${permission}, ${{ type: "process", config: { processId } }})`;
+};
+
+const addReader = async (processId: ProcessId, principal: string): Promise<void> => {
+  await sql`INSERT INTO process_access_roles (process_id, kind, principal) VALUES (${processId}, 'reader', ${principal})`;
 };
 
 test.skipIf(!DB)("each permission answers true for the role it maps to", async () => {
@@ -172,6 +204,27 @@ test.skipIf(!DB)("a read grant admits one process and refuses another", async ()
   const actor = { id: "user_1", roles: ["hr-reporting"] };
   expect(await can(actor, "read", PID_A, sql)).toBe(true);
   expect(await can(actor, "read", PID_B, sql)).toBe(false);
+});
+
+test.skipIf(!DB)("an actor missing the read role answers false over a store holding no grant and an empty Reader list", async () => {
+  // Regression for "An installation with no grants keeps today's answers",
+  // amended by process-access-roles: an empty Reader list changes nothing.
+  expect(await can({ id: "user_1", roles: ["employee"] }, "read", PID_A, sql)).toBe(false);
+});
+
+test.skipIf(!DB)("a process's Reader list satisfies the read permission", async () => {
+  const actor = { id: "user_reader", roles: [] };
+  await addReader(PID_A, actor.id);
+  expect(await can(actor, "read", PID_A, sql)).toBe(true);
+});
+
+test.skipIf(!DB)("a Reader-list match satisfies no other permission", async () => {
+  const actor = { id: "user_reader", roles: [] };
+  await addReader(PID_A, actor.id);
+  expect(await can(actor, "cancel", PID_A, sql)).toBe(false);
+  expect(await can(actor, "publish", PID_A, sql)).toBe(false);
+  expect(await can(actor, "migrate", PID_A, sql)).toBe(false);
+  expect(await can(actor, "visibility", PID_A, sql)).toBe(false);
 });
 
 test.skipIf(!DB)("no permission implies another", async () => {

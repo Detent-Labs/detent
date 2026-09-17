@@ -8,7 +8,7 @@
  * zero affected rows reported as a conflict, never merged.
  */
 import type { SQL } from "bun";
-import { sql } from "./store.js";
+import { sql, withTransaction } from "./store.js";
 import type { ProcessId } from "../schema/definition.js";
 import { RequestShapeError } from "../errors.js";
 
@@ -162,6 +162,37 @@ export async function getDraft(processId: ProcessId, db: SQL = sql): Promise<Dra
 }
 
 /**
+ * Adds `principal` to the new process's Developer list, in the same
+ * transaction as the draft insert that creates the process
+ * (process-access-roles, "Process creation writes the creator onto the
+ * Developer list"). Ungated, unlike `addAccessPrincipal`: the actor creating
+ * a fresh process cannot pass a write-access check against a Developer list
+ * that does not exist yet, so this follows `appendInstancePrincipals`'s style
+ * — a direct, idempotent append against the transaction handle already in
+ * hand, rather than the gated function.
+ */
+async function appendCreatorAsDeveloper(tx: SQL, processId: ProcessId, principal: string): Promise<void> {
+  await tx`
+    INSERT INTO process_access_roles (process_id, kind, principal) VALUES (${processId}, 'developer', ${principal})
+    ON CONFLICT DO NOTHING
+  `;
+}
+
+/**
+ * True exactly when processId has no draft and no published version — the
+ * spec's own definition of process creation (process-drafts: "no existing
+ * draft and no published version"). Exported so a caller checking whether a
+ * PUT /drafts/:processId is a genuine creation checks this identical
+ * condition, not a second, driftable copy of it.
+ */
+export async function hasNoDraftAndNoPublishedVersion(processId: ProcessId, db: SQL = sql): Promise<boolean> {
+  const drafted = (await db`SELECT 1 FROM drafts WHERE process_id = ${processId} LIMIT 1`) as unknown[];
+  if (drafted.length > 0) return false;
+  const published = (await db`SELECT 1 FROM definitions WHERE process_id = ${processId} LIMIT 1`) as unknown[];
+  return published.length === 0;
+}
+
+/**
  * `revision === 0` with no existing row is a create (`INSERT`); everything
  * else — including `revision === 0` against an already-created row — is the
  * conditional `UPDATE`. A racing create that loses the primary-key insert
@@ -177,14 +208,18 @@ export async function saveDraft(processId: ProcessId, input: SaveDraftInput, db:
   if (revision === 0) {
     const existing = (await db`SELECT 1 FROM drafts WHERE process_id = ${processId} LIMIT 1`) as unknown[];
     if (existing.length === 0) {
-      const inserted = (await db`
-        INSERT INTO drafts (process_id, body, layout, revision, base_version, updated_by, updated_at)
-        VALUES (${processId}, ${body}, ${layout}, 0, ${base}::integer, ${updatedBy}, now())
-        ON CONFLICT (process_id) DO NOTHING
-        RETURNING process_id, body, layout, revision, base_version, updated_by, updated_at
-      ` as unknown) as DraftRow[];
-      if (inserted[0]) return toDraft(inserted[0]);
-      throw new DraftConflictError(processId);
+      return withTransaction(db, async (tx) => {
+        const isCreation = await hasNoDraftAndNoPublishedVersion(processId, tx);
+        const inserted = (await tx`
+          INSERT INTO drafts (process_id, body, layout, revision, base_version, updated_by, updated_at)
+          VALUES (${processId}, ${body}, ${layout}, 0, ${base}::integer, ${updatedBy}, now())
+          ON CONFLICT (process_id) DO NOTHING
+          RETURNING process_id, body, layout, revision, base_version, updated_by, updated_at
+        ` as unknown) as DraftRow[];
+        if (!inserted[0]) throw new DraftConflictError(processId);
+        if (isCreation) await appendCreatorAsDeveloper(tx, processId, updatedBy);
+        return toDraft(inserted[0]);
+      });
     }
   }
 

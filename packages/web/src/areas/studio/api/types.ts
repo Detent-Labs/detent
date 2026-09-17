@@ -43,6 +43,22 @@ export interface DraftSummary {
   updatedAt: string;
 }
 
+/** Mirrors src/auth/process-access.ts::AccessKind. */
+export type AccessKind = "developer" | "owner" | "reader";
+
+/** Mirrors src/auth/process-access.ts::getAccessLists — the raw three lists a process holds. */
+export interface ProcessAccessLists {
+  developer: string[];
+  owner: string[];
+  reader: string[];
+}
+
+/** Mirrors src/http/studio-routes.ts::handleGetMyProcessAccess — the calling actor's own Developer- and Owner-listed process ids. */
+export interface MyProcessAccess {
+  developer: string[];
+  owner: string[];
+}
+
 /**
  * Mirrors src/engine/definitions.ts::PublishFinding — a reported (not
  * rejected) reference `"instance.query"`'s or `instance.transition`'s

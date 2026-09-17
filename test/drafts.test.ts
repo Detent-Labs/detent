@@ -9,8 +9,11 @@ import { sql, initSchema } from "../src/engine/store.js";
 import { publishBody } from "../src/engine/definitions.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import { getDraft, saveDraft, listDrafts, deleteDraft, markDraftPublished, DraftConflictError } from "../src/engine/drafts.js";
+import { matchesAccessList } from "../src/auth/process-access.js";
+import { CREATE_ROLE, DEVELOPER_ROLE } from "../src/auth/authorize.js";
 import { RequestShapeError } from "../src/errors.js";
 import type { ProcessBody, ProcessId } from "../src/schema/definition.js";
+import type { Actor } from "../src/cel/eval.js";
 
 const DB = !!process.env.DATABASE_URL;
 const reg = createRegistry();
@@ -50,7 +53,7 @@ beforeAll(async () => {
   if (DB) await initSchema();
 });
 beforeEach(async () => {
-  if (DB) await sql`TRUNCATE drafts, definitions`;
+  if (DB) await sql`TRUNCATE drafts, definitions, process_access_roles`;
 });
 
 /** `.rejects` on a promise running Bun.sql queries can wedge the pool under bun:test; await-then-catch instead. */
@@ -97,6 +100,63 @@ test.skipIf(!DB)("a stale save raises DraftConflictError and leaves the row byte
   expect(stored?.revision).toBe(1);
   expect((stored?.body as { label: { en: string } }).label.en).toBe("v2");
   expect(stored?.updatedBy).toBe("user_a");
+});
+
+// ============================================================
+// process creation writes the creator onto the Developer list (process-access-roles)
+// ============================================================
+
+test.skipIf(!DB)("the creator lands on the Developer list at process creation", async () => {
+  const processId = pid();
+  const actor: Actor = { id: "user_creator", roles: [CREATE_ROLE, DEVELOPER_ROLE] };
+
+  await saveDraft(processId, { body: invalidBody("v1"), layout: {}, revision: 0, updatedBy: actor.id }, sql);
+
+  expect(await matchesAccessList(actor, processId, "developer", sql)).toBe(true);
+});
+
+test.skipIf(!DB)("a forced failure on the access-list insert leaves neither the draft nor the access-list row behind", async () => {
+  // Same technique as events.test.ts's atomicity tests: force a failure
+  // after the draft insert already ran, so only the rollback proves the two
+  // writes are atomic. The CHECK targets this test's own processId only, so
+  // it cannot block a concurrent test's or session's unrelated 'developer'
+  // insert against the shared database.
+  const processId = pid();
+  await sql.unsafe(
+    `ALTER TABLE process_access_roles ADD CONSTRAINT tmp_no_developer_for_test CHECK (NOT (process_id = '${processId}' AND kind = 'developer'))`,
+  );
+  let raised: unknown;
+  try {
+    await saveDraft(processId, { body: invalidBody("v1"), layout: {}, revision: 0, updatedBy: "user_creator" }, sql);
+  } catch (e) {
+    raised = e;
+  } finally {
+    await sql`ALTER TABLE process_access_roles DROP CONSTRAINT tmp_no_developer_for_test`;
+  }
+  expect(raised).toBeInstanceOf(Error);
+
+  expect(await getDraft(processId, sql)).toBeUndefined();
+  const rows = (await sql`SELECT 1 FROM process_access_roles WHERE process_id = ${processId}`) as unknown[];
+  expect(rows.length).toBe(0);
+});
+
+test.skipIf(!DB)("recreating a deleted draft for a published process does not add the recreator to the Developer list", async () => {
+  const processId = pid();
+  await saveDraft(processId, { body: invalidBody("v1"), layout: {}, revision: 0, updatedBy: "user_creator" }, sql);
+  await publishBody(processId, validBody("published"), reg, dataSourceReg, sql);
+  await deleteDraft(processId, sql);
+
+  await saveDraft(processId, { body: invalidBody("v2"), layout: {}, revision: 0, updatedBy: "user_recreator" }, sql);
+
+  const recreatorRow = (await sql`
+    SELECT 1 FROM process_access_roles WHERE process_id = ${processId} AND kind = 'developer' AND principal = 'user_recreator'
+  `) as unknown[];
+  expect(recreatorRow.length).toBe(0);
+
+  const creatorRow = (await sql`
+    SELECT 1 FROM process_access_roles WHERE process_id = ${processId} AND kind = 'developer' AND principal = 'user_creator'
+  `) as unknown[];
+  expect(creatorRow.length).toBe(1);
 });
 
 test.skipIf(!DB)("a structurally invalid body saves and reads back unchanged", async () => {

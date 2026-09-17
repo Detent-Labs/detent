@@ -157,7 +157,7 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
       {!may(required) && <MissingRole roles={required} />}
       {may(required) && (
         <>
-          {route.name === "processes" && <ProcessesScreen token={session.token} navigate={navigate} onUnauthorized={onUnauthorized} />}
+          {route.name === "processes" && <ProcessesScreen token={session.token} roles={session.roles} navigate={navigate} onUnauthorized={onUnauthorized} />}
           {route.name === "edit" && (
             <EditScreen
               processId={route.processId}
@@ -165,6 +165,7 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
               tab={route.tab}
               stepId={route.stepId}
               token={session.token}
+              roles={session.roles}
               go={go}
               navigate={guardedNavigate}
               onUnauthorized={onUnauthorized}

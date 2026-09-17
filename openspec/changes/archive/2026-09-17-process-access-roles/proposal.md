@@ -21,8 +21,10 @@ Today any `system:developer` or `system:author` holder reaches every process dra
 
 ### Modified Capabilities
 - `authorization`: two new reserved roles, `system:create` and `system:owner`. `can(actor, "read", processId, db)` gains a third, additive test against the process's Reader list.
-- `process-drafts`: the four draft routes change their gate. Today they need `DEVELOPER_ROLE` or `AUTHOR_ROLE` alone. Now they also need the actor on that process's Developer list, or `ADMIN_ROLE`. Creating the first draft for a new process also needs `system:create`. `listDrafts`/`GET /drafts` narrows to the actor's own Developer-listed processes. `system:admin` still sees all.
+- `process-drafts`: the four draft routes change their gate. Today they need `DEVELOPER_ROLE` or `AUTHOR_ROLE` alone. Reaching an existing process now also needs the actor on its own Developer list. An admin bypasses both checks and reaches every existing process alone. Creating the first draft for a new process also needs `system:create`, and that requirement applies to an admin too. The `listDrafts`/`GET /drafts` route narrows to the actor's own Developer-listed processes, and `system:admin` still sees all there too.
 - `studio-app`: a new Access surface manages a process's Developer/Owner/Reader lists. A Developer or an Owner on that process can reach it. The process list narrows to the processes that list the actor as Developer or Owner. `system:admin` still sees all.
+- `studio-process-tabs`: the tab row gains an eleventh tab, Access, last in authoring order.
+- `spa-accessibility`: the roving-tabindex example it cites now names an eleven-tab row instead of a ten-tab one.
 
 ## Impact
 

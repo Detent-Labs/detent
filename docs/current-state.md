@@ -1388,8 +1388,10 @@ Stage-by-stage status is in `ROADMAP.md`.
   names `ADMIN_ROLE`, gating the `scope=all` instance listing below rather
   than a fresh role of its own.
 
-  `can` answers true on either of two tests, in order. The first is the global
-  role: array membership, no query. The second is a stored grant.
+  `can` answers true on any of up to three tests, in order. The first is the
+  global role: array membership, no query. The second is a stored grant.
+  `"read"` alone runs a third: the process's Reader list, per
+  `process-access.ts::matchesAccessList`.
   `src/auth/grants.ts` holds the `permission_grants` table's SQL: `hasGrant`,
   `listGrants`, `writeGrant`, `revokeGrant` and the strict write-path
   `grantSchema`. `authorize.ts` itself stays SQL-free. A grant's scope takes
@@ -4484,7 +4486,7 @@ meets `scope=started` should infer no new permission tier from it.
 
   The row component `ProcessTabRow.tsx` renders a `tablist` of buttons. The
   whole row is one tab stop, on `spa-accessibility`'s roving-tabindex
-  pattern: the focused tab carries `tabindex="0"` and the other nine
+  pattern: the focused tab carries `tabindex="0"` and the other ten
   `tabindex="-1"`, and the arrow keys move focus without opening a tab. It
   still takes a `jsonOpen` prop, read-only, to suppress every tab's
   `aria-selected` while the JSON surface stands open. The header bar's `⋮`

@@ -5,6 +5,7 @@ import { layout, colors, fonts, space, shadow } from "form-ui/tokens.stylex";
 import {
   listProcesses,
   listDrafts,
+  getMyProcessAccess,
   saveDraft,
   deleteDraft,
   getVersionBody,
@@ -15,6 +16,7 @@ import {
 import {
   createInFlightGuard,
   deriveProcessRows,
+  narrowToAccessible,
   seedVersionFor,
   seededDraftInput,
   templateDraftInput,
@@ -183,8 +185,15 @@ const styles = stylex.create({
   },
 });
 
+// Matches the local-constant convention `areas/admin/root.tsx` and
+// `areas/studio/root.tsx` already use — this codebase does not share one
+// exported role-constant module across areas.
+const ADMIN_ROLE = "system:admin";
+const CREATE_ROLE = "system:create";
+
 interface ProcessesScreenProps {
   token: string;
+  roles: readonly string[];
   navigate: (route: Route) => void;
   onUnauthorized: () => void;
 }
@@ -323,7 +332,9 @@ function StartPickerDialog({ templates, onCancel, onPick }: StartPickerDialogPro
   );
 }
 
-export function ProcessesScreen({ token, navigate, onUnauthorized }: ProcessesScreenProps) {
+export function ProcessesScreen({ token, roles, navigate, onUnauthorized }: ProcessesScreenProps) {
+  const isAdmin = roles.includes(ADMIN_ROLE);
+  const canCreate = roles.includes(CREATE_ROLE);
   const [rows, setRows] = useState<ProcessRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
@@ -351,14 +362,14 @@ export function ProcessesScreen({ token, navigate, onUnauthorized }: ProcessesSc
     setLoading(true);
     setError(undefined);
     try {
-      const [processes, drafts] = await Promise.all([listProcesses(token), listDrafts(token)]);
-      setRows(deriveProcessRows(processes, drafts));
+      const [processes, drafts, access] = await Promise.all([listProcesses(token), listDrafts(token), getMyProcessAccess(token)]);
+      setRows(narrowToAccessible(deriveProcessRows(processes, drafts), access, isAdmin));
     } catch (err) {
       fail(err);
     } finally {
       setLoading(false);
     }
-  }, [token, fail]);
+  }, [token, fail, isAdmin]);
 
   useEffect(() => {
     void load();
@@ -506,9 +517,11 @@ export function ProcessesScreen({ token, navigate, onUnauthorized }: ProcessesSc
     <main {...stylex.props(styles.screen)}>
       {picking && <StartPickerDialog templates={templates} onCancel={() => setPicking(false)} onPick={(key) => void startProcess(key)} />}
       <div {...stylex.props(styles.controls)}>
-        <button type="button" className="btn btn-primary" onClick={() => void newProcess()}>
-          + New process
-        </button>
+        {canCreate && (
+          <button type="button" className="btn btn-primary" onClick={() => void newProcess()}>
+            + New process
+          </button>
+        )}
         <label {...stylex.props(styles.fileLabel)} htmlFor="promotion-import">
           <Upload size={18} strokeWidth={1.75} aria-hidden="true" />
           Import a promoted version

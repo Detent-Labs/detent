@@ -272,10 +272,10 @@ packages/web/              the ONE browser package (React + Vite). One build, on
   src/areas/admin/          operator: instances, merged record, outbox,
                             timers, users, migrations, groups, data lists,
                             UI strings
-  src/areas/studio/         developer: drafts, the process surface's ten tabs
-                            (canvas, with its selection-driven inspector;
+  src/areas/studio/         developer: drafts, the process surface's eleven
+                            tabs (canvas, with its selection-driven inspector;
                             steps, fields, data sources, paths, forms,
-                            field matrix, contract, changes, checks),
+                            field matrix, contract, changes, checks, access),
                             form editor, JSON surface, publish, versions+diff,
                             migration-plan authoring, Templates, Tools, Player
   src/areas/reporting/      process owner: cycle time, bottlenecks, SLA,

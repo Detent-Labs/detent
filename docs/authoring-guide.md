@@ -871,10 +871,13 @@ process.
 Studio's own area nav carries **Save**, **Discard draft** and **Publish**.
 Those three stand there whatever you have open.
 
-A draft opens on one screen. A tab row over the body holds ten tabs, and the
-chapters below follow their order. Those are Canvas, Steps, Fields, Data
-sources, Paths, Forms, Field matrix, Contract, Changes and Checks. Checks
-reads as a plain count, like any other tab, until something blocks a
+A draft opens on one screen. A tab row over the body holds eleven tabs.
+These ten are this guide's chapters: Canvas, Steps, Fields, Data sources,
+Paths, Forms, Field matrix, Contract, Changes and Checks. The eleventh,
+Access, manages who holds standing on the process, a `process-access-roles`
+concern outside what this guide teaches.
+
+Checks reads as a plain count, like any other tab, until something blocks a
 publish. Then the count itself turns red. Open the tab to see what Studio
 found.
 

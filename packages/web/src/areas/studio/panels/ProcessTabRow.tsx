@@ -21,6 +21,7 @@ const TAB_LABEL: Record<ProcessTab, CatalogKey> = {
   contract: "tabs.contract",
   changes: "tabs.changes",
   checks: "tabs.checks",
+  access: "tabs.access",
 };
 
 /** Forced colors promise system contrast for every visible letter, and a fade
@@ -29,7 +30,7 @@ const TAB_LABEL: Record<ProcessTab, CatalogKey> = {
 const FORCED_COLORS = "@media (forced-colors: active)";
 
 const styles = stylex.create({
-  // The row scrolls sideways rather than wrapping: ten tabs overflow a narrow
+  // The row scrolls sideways rather than wrapping: eleven tabs overflow a narrow
   // window, and a second line would move the body down a row on every resize
   // (design.md Risks). The 2px divider under it is the structural rule between
   // the row and the body.
@@ -275,16 +276,16 @@ export function focusScrollsRow<T>(windowBlurred: T | null, button: T, visible: 
 }
 
 /**
- * The process surface's tab row (`studio-process-tabs`). Ten tabs in
+ * The process surface's tab row (`studio-process-tabs`). Eleven tabs in
  * authoring order, and nothing else — the trailing edge is the last tab.
  *
  * The keyboard model is roving-tabindex, per `spa-accessibility`'s own named
  * exception for a tab set carrying many tabs in one line that scrolls
  * sideways. This row is the one tab set of that shape in the browser
  * packages. The whole row is one stop in the page's tab order: the focused
- * tab carries `tabindex="0"` and the other nine `tabindex="-1"`. The left and
+ * tab carries `tabindex="0"` and the other ten `tabindex="-1"`. The left and
  * right arrow keys move focus, wrapping at the row's ends, and Enter or Space
- * opens the focused tab. Ten plain stops would cost a keyboard user ten Tab
+ * opens the focused tab. Eleven plain stops would cost a keyboard user eleven Tab
  * presses to cross the row. Every other tab set keeps the plain-button model.
  */
 export function ProcessTabRow({ open, counts, checksBlocked, onOpen, jsonOpen }: Props) {
@@ -321,7 +322,7 @@ export function ProcessTabRow({ open, counts, checksBlocked, onOpen, jsonOpen }:
     openRests.current = openTabRests(rowRef.current, button);
   }, [open]);
 
-  // One observer over the row and its ten buttons. A window resize moves the
+  // One observer over the row and its eleven buttons. A window resize moves the
   // row's width, and a count's digits move a button's. The callback writes
   // the band the fade mask sizes its gradient to, and recomputes the fade.
   // A row width change scrolls the open tab back into view. A button width

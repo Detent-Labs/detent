@@ -8,11 +8,14 @@ See `proposal.md` for the motivation. Three existing pieces matter here.
 `permission_grants` row. A grant names a role string. It cannot name an
 individual user or group.
 
-`src/engine/instance-principals.ts` (`instance-visibility-set`) already
-stores per-instance principal sets. Each entry is a `user_xxx` or
-`group_xxx` id. A match resolves against the actor's own id and live group
-membership, via `getGroupsForMember`. This change reuses that pattern at
-the process level.
+The `instance_principals` table (`src/engine/store.ts`, the
+`instance-visibility-set`/`persistence` capabilities) already stores
+per-instance principal sets, appended via `appendInstancePrincipals`. Each
+entry is a `user_xxx` or `group_xxx` id. A match resolves against the
+actor's own id and live group membership, via `getGroupsForMember`
+(`src/auth/groups.ts`) and `expandGroupPrincipals`/`buildVisibleRowSet`
+(`src/runtime/api.ts`). This change reuses that pattern at the process
+level.
 
 `src/engine/drafts.ts` and `src/http/studio-routes.ts` gate the four draft
 routes on `DEVELOPER_ROLE`/`AUTHOR_ROLE` alone, with no per-process
@@ -107,6 +110,38 @@ draft or a published version. This runs once. It is not an ongoing rule.
 After rollout, a process's Developer list changes like any other list. A
 newly created `system:developer` account does not retroactively join every
 process.
+
+**The Access surface is an eleventh tab, placed last after Checks.** It
+reuses the reporting area's `ShareEditor`/`PrincipalList` pattern. Its
+content never enters `ProcessBody` or `definitionHash`. The other ten tabs
+differ there. It sits apart from them, away from Contract. It takes the
+Contract tab's shape: one panel, no entity rail. The process holds exactly
+three fixed lists.
+
+Each of the three sections (Developer, Owner, Reader) reuses
+`PrincipalList`'s render shape. `ShareEditor.tsx` already uses it for a
+report's `viewers` and `editors`. A row shows the raw
+`user_xxx`/`group_xxx` id in monospace, marked `translate="no"`. Each row
+carries a Remove button. An inline add-by-id form sits below the list.
+
+A section the viewing actor cannot manage renders read-only. It hides the
+Remove button and the add form. That is the same shape `PrincipalList`
+already gives the owner's own locked `editors` entry. An admin sees every
+control on every section, per the requirement's own scenario.
+
+An empty section states "No developers listed yet," with the matching word
+for Owner and Reader. These lists gate real access. An author must know
+whether a list is empty.
+
+Deleting a principal does not need a confirmation dialog. `PrincipalList`'s
+own Remove button already skips one. A list entry is easy to re-add.
+
+Alternative considered: resolving principal ids to readable names before
+listing them. Rejected for this version. `ShareEditor` makes the same
+choice today. The Risks section below already accepts this same opacity
+for the Reader list. A raw id is what every other principal list in this
+codebase shows today. Readable names are a separate, cross-cutting
+improvement. This change does not gate on it.
 
 ## Risks / Trade-offs
 

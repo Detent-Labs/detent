@@ -11,7 +11,7 @@ import { tabStops } from "./studio-fieldMatrixTabStops.test.js";
  * The tab row follows `spa-accessibility`'s roving-tabindex pattern, its
  * named exception for a tab set carrying many tabs in one line that scrolls
  * sideways: a `tablist` of buttons with `aria-selected` on the open one, one
- * `tabindex="0"` among ten, and arrow keys that move focus without opening.
+ * `tabindex="0"` among eleven, and arrow keys that move focus without opening.
  *
  * `development-toolchain`'s split rule decides what lands here. The roles,
  * the states, the counts and the per-tab `tabindex` are all properties of the
@@ -62,20 +62,20 @@ function buttonTags(html: string): string[] {
   return html.match(/<button[^>]*>/g) ?? [];
 }
 
-describe("The tab row's ten tabs", () => {
+describe("The tab row's eleven tabs", () => {
   it("groups them in a tablist", () => {
     expect(render()).toContain('role="tablist"');
   });
 
-  it("renders one button carrying the tab role per tab, and no eleventh", () => {
+  it("renders one button carrying the tab role per tab, and no twelfth", () => {
     const tabs = buttonTags(render()).filter((b) => b.includes('role="tab"'));
 
-    expect(tabs).toHaveLength(10);
+    expect(tabs).toHaveLength(11);
   });
 
   it("names each tab in authoring order", () => {
     const html = render();
-    const order = ["Canvas", "Steps", "Fields", "Data sources", "Paths", "Forms", "Field matrix", "Contract", "Changes", "Checks"];
+    const order = ["Canvas", "Steps", "Fields", "Data sources", "Paths", "Forms", "Field matrix", "Contract", "Changes", "Checks", "Access"];
     let cursor = -1;
 
     for (const name of order) {
@@ -87,27 +87,27 @@ describe("The tab row's ten tabs", () => {
 });
 
 describe("The tab row's keyboard model", () => {
-  it("gives the open tab the roving stop and takes the other nine out", () => {
+  it("gives the open tab the roving stop and takes the other ten out", () => {
     const html = render({ open: "paths" });
 
     expect(html.match(/tabindex="0"/g) ?? []).toHaveLength(1);
-    expect(html.match(/tabindex="-1"/g) ?? []).toHaveLength(9);
+    expect(html.match(/tabindex="-1"/g) ?? []).toHaveLength(10);
     expect(buttonTags(html).find((b) => b.includes(`id="${tabDomId("paths")}"`))).toContain('tabindex="0"');
   });
 
   it("stands one tab stop for the whole row", () => {
-    // The row's trailing edge is the last tab, so nothing beside the ten
-    // takes a stop of its own. Ten plain stops is what this replaces.
+    // The row's trailing edge is the last tab, so nothing beside the eleven
+    // takes a stop of its own. Eleven plain stops is what this replaces.
     expect(tabStops(render())).toBe(1);
   });
 
-  it("would count ten stops for the plain-button markup this replaces", () => {
+  it("would count eleven stops for the plain-button markup this replaces", () => {
     // The violating input, kept as markup rather than as a reverted branch:
     // the retired model gave every tab its own stop, so the assertion above
     // passes on the roving model alone.
     const plain = PROCESS_TABS.map((tab) => `<button role="tab" id="${tabDomId(tab)}">${tab}</button>`).join("");
 
-    expect(tabStops(plain)).toBe(10);
+    expect(tabStops(plain)).toBe(11);
   });
 
   it("marks the open tab selected, and only that one", () => {

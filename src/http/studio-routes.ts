@@ -6,8 +6,14 @@
  *
  * Each handler resolves the actor, then applies one of three gates before any
  * read or write:
- * - `requireAuthoring` (author OR developer) on the four draft routes, the
- *   publish route (beside `PUBLISH_ROLE`) and `GET /registry`.
+ * - `requireAuthoring` (author OR developer) on `GET /drafts`, the publish
+ *   route (beside `PUBLISH_ROLE`) and `GET /registry`. `GET`/`PUT`/`DELETE
+ *   /drafts/:processId` take it too, but only for a processId with neither a
+ *   draft nor a published version yet — `PUT` additionally needs
+ *   `CREATE_ROLE` there. Once one exists, those three instead need
+ *   `requireDeveloperListOrAdmin`: `ADMIN_ROLE` bypasses `requireAuthoring`
+ *   entirely there (matching `GET /processes/:processId/access` below), any
+ *   other actor still needs both.
  * - `requireStudioRead` (those two OR templates) on the two template reads and
  *   the published version body.
  * - `await requirePermission(actor, "migrate", processId, db)` alone on the
@@ -15,10 +21,27 @@
  *   process now reaches this permission too, beside the `DEVELOPER_ROLE`
  *   global role; the three routes name one process, so they ask through the
  *   seam (`src/auth/authorize.ts`).
+ *
+ * The four `/processes/*` access-list routes (process-access-roles): the two
+ * writes take no gate of their own — authorization runs inside
+ * `addAccessPrincipal`/`deleteAccessPrincipal` themselves
+ * (`src/auth/process-access.ts`), not as a separate check here.
+ * `GET .../access/mine` is ungated too, since it only ever returns the
+ * calling actor's own lists. `GET /processes/:processId/access` alone gates
+ * itself here — `ADMIN_ROLE` or that process's own Developer list, matching
+ * the Studio edit screen it feeds.
  */
 import type { SQL } from "bun";
 import { withTransaction } from "../engine/store.js";
-import { getDraft, saveDraft, listDrafts, deleteDraft, markDraftPublished, type Draft } from "../engine/drafts.js";
+import {
+  getDraft,
+  saveDraft,
+  listDrafts,
+  deleteDraft,
+  markDraftPublished,
+  hasNoDraftAndNoPublishedVersion,
+  type Draft,
+} from "../engine/drafts.js";
 import { createProcessInstance } from "../runtime/api.js";
 import { getTemplate, listTemplates, saveTemplate, deleteTemplate } from "../engine/templates.js";
 import { publishBody, createDefinitionStore } from "../engine/definitions.js";
@@ -33,11 +56,14 @@ import {
 import { createDefaultAssignmentRegistry } from "../engine/assignment-strategies.js";
 import { describeConfigSchema, type ConfigFieldDescriptor } from "../engine/config-descriptor.js";
 import type { ZodTypeAny } from "zod";
+import type { Actor } from "../cel/eval.js";
 import type { ActorResolver } from "../auth/resolve.js";
-import { requireRole, requirePermission, can, AuthorizationError, DEVELOPER_ROLE, TEMPLATES_ROLE, AUTHOR_ROLE } from "../auth/authorize.js";
-import { notFound, type HttpResult } from "./errors.js";
+import { requireRole, requirePermission, can, AuthorizationError, DEVELOPER_ROLE, TEMPLATES_ROLE, AUTHOR_ROLE, ADMIN_ROLE, CREATE_ROLE } from "../auth/authorize.js";
+import { addAccessPrincipal, deleteAccessPrincipal, getAccessLists, processesMatchingAccessList, matchesAccessList, type AccessKind } from "../auth/process-access.js";
+import { notFound, RequestShapeError, type HttpResult } from "./errors.js";
 import { route, readJson, parseVersion } from "./routes.js";
 import type { ProcessId, ProcessBody, MigrationSpec, Instance } from "../schema/definition.js";
+import { z } from "zod";
 
 /**
  * Either authoring role admits. The whole no-code authoring surface takes it:
@@ -69,53 +95,135 @@ function requireStudioRead(actor: { id: string; roles: readonly string[] }): voi
   );
 }
 
+/**
+ * `ADMIN_ROLE`, or a match on that process's own Developer list
+ * (process-access-roles). Gates `GET`/`PUT`/`DELETE /drafts/:processId`
+ * for a process that already has a draft or a published version — the
+ * complement of Task 4.1's `CREATE_ROLE` check on the branch where
+ * neither exists yet.
+ */
+async function requireDeveloperListOrAdmin(actor: Actor, processId: ProcessId, db: SQL): Promise<void> {
+  if (actor.roles.includes(ADMIN_ROLE)) return;
+  if (await matchesAccessList(actor, processId, "developer", db)) return;
+  throw new AuthorizationError(`actor '${actor.id}' is not on process '${processId}''s Developer list`);
+}
+
+/**
+ * Narrowed to the actor's own Developer-listed processes
+ * (process-access-roles) — `ADMIN_ROLE` sees every draft, same split as
+ * `requireDeveloperListOrAdmin` above. `ADMIN_ROLE` bypasses `requireAuthoring`
+ * at the gate too, the same carve-out `handleGetDraft`/`handleSaveDraft`
+ * already apply on their "existing draft" branch: an admin-only actor (no
+ * `DEVELOPER_ROLE`/`AUTHOR_ROLE`) still must reach this list. One query for
+ * the actor's Developer-listed process ids via `processesMatchingAccessList`,
+ * not one `matchesAccessList` call per draft.
+ */
 export async function handleListDrafts(req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
-  return route(req, resolver, db, requireAuthoring, async () => {
-    return { status: 200, body: await listDrafts(db) };
-  });
+  return route(
+    req,
+    resolver,
+    db,
+    (actor) => {
+      if (!actor.roles.includes(ADMIN_ROLE)) requireAuthoring(actor);
+    },
+    async (actor) => {
+      const all = await listDrafts(db);
+      if (actor.roles.includes(ADMIN_ROLE)) return { status: 200, body: all };
+      const developerProcessIds = new Set(await processesMatchingAccessList(actor, "developer", db));
+      return { status: 200, body: all.filter((d) => developerProcessIds.has(d.processId)) };
+    },
+  );
 }
 
 export async function handleGetDraft(processId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
-  return route(req, resolver, db, requireAuthoring, async (actor) => {
-    const draft = await getDraft(processId as ProcessId, db);
-    if (!draft) return notFound(`no draft: ${processId}`);
-    const canPlanMigration = await can(actor, "migrate", processId as ProcessId, db);
-    // The same predicate `handlePublishDraft` enforces, reported rather than
-    // enforced: the studio reads it to decide whether to offer Publish at all
-    // (process-drafts). Neither authoring role implies the publish permission,
-    // and a scoped grant reaches it without either role, so a role check on the
-    // client would answer wrong in both directions.
-    const canPublish = await can(actor, "publish", processId as ProcessId, db);
-    const body: Draft & { canPlanMigration: boolean; canPublish: boolean } = { ...draft, canPlanMigration, canPublish };
-    return { status: 200, body };
-  });
+  return route(
+    req,
+    resolver,
+    db,
+    async (actor) => {
+      if (await hasNoDraftAndNoPublishedVersion(processId as ProcessId, db)) {
+        requireAuthoring(actor);
+      } else {
+        if (!actor.roles.includes(ADMIN_ROLE)) {
+          requireAuthoring(actor);
+        }
+        await requireDeveloperListOrAdmin(actor, processId as ProcessId, db);
+      }
+    },
+    async (actor) => {
+      const draft = await getDraft(processId as ProcessId, db);
+      if (!draft) return notFound(`no draft: ${processId}`);
+      const canPlanMigration = await can(actor, "migrate", processId as ProcessId, db);
+      // The same predicate `handlePublishDraft` enforces, reported rather than
+      // enforced: the studio reads it to decide whether to offer Publish at all
+      // (process-drafts). Neither authoring role implies the publish permission,
+      // and a scoped grant reaches it without either role, so a role check on the
+      // client would answer wrong in both directions.
+      const canPublish = await can(actor, "publish", processId as ProcessId, db);
+      const body: Draft & { canPlanMigration: boolean; canPublish: boolean } = { ...draft, canPlanMigration, canPublish };
+      return { status: 200, body };
+    },
+  );
 }
 
 export async function handleSaveDraft(processId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
-  return route(req, resolver, db, requireAuthoring, async (actor) => {
-    const parsed = (await readJson(req)) as { body?: unknown; layout?: unknown; revision?: unknown; baseVersion?: unknown };
-    const saved = await saveDraft(
-      processId as ProcessId,
-      {
-        body: parsed.body,
-        layout: parsed.layout,
-        revision: parsed.revision as number,
-        updatedBy: actor.id,
-        // `undefined` and an absent key are the same thing here: leave the stored base alone.
-        baseVersion: parsed.baseVersion as number | undefined,
-      },
-      db,
-    );
-    return { status: 200, body: saved };
-  });
+  return route(
+    req,
+    resolver,
+    db,
+    async (actor) => {
+      if (await hasNoDraftAndNoPublishedVersion(processId as ProcessId, db)) {
+        requireAuthoring(actor);
+        if (!actor.roles.includes(CREATE_ROLE)) {
+          throw new AuthorizationError(`actor '${actor.id}' lacks required role '${CREATE_ROLE}' to create process '${processId}'`);
+        }
+      } else {
+        if (!actor.roles.includes(ADMIN_ROLE)) {
+          requireAuthoring(actor);
+        }
+        await requireDeveloperListOrAdmin(actor, processId as ProcessId, db);
+      }
+    },
+    async (actor) => {
+      const parsed = (await readJson(req)) as { body?: unknown; layout?: unknown; revision?: unknown; baseVersion?: unknown };
+      const saved = await saveDraft(
+        processId as ProcessId,
+        {
+          body: parsed.body,
+          layout: parsed.layout,
+          revision: parsed.revision as number,
+          updatedBy: actor.id,
+          // `undefined` and an absent key are the same thing here: leave the stored base alone.
+          baseVersion: parsed.baseVersion as number | undefined,
+        },
+        db,
+      );
+      return { status: 200, body: saved };
+    },
+  );
 }
 
 export async function handleDeleteDraft(processId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
-  return route(req, resolver, db, requireAuthoring, async () => {
-    const removed = await deleteDraft(processId as ProcessId, db);
-    if (!removed) return notFound(`no draft: ${processId}`);
-    return { status: 204, body: null };
-  });
+  return route(
+    req,
+    resolver,
+    db,
+    async (actor) => {
+      if (await hasNoDraftAndNoPublishedVersion(processId as ProcessId, db)) {
+        requireAuthoring(actor);
+      } else {
+        if (!actor.roles.includes(ADMIN_ROLE)) {
+          requireAuthoring(actor);
+        }
+        await requireDeveloperListOrAdmin(actor, processId as ProcessId, db);
+      }
+    },
+    async () => {
+      const removed = await deleteDraft(processId as ProcessId, db);
+      if (!removed) return notFound(`no draft: ${processId}`);
+      return { status: 204, body: null };
+    },
+  );
 }
 
 /**
@@ -364,5 +472,83 @@ export async function handleDeleteTemplate(templateKey: string, req: Request, re
     const removed = await deleteTemplate(templateKey, db);
     if (!removed) return notFound(`no template: ${templateKey}`);
     return { status: 204, body: null };
+  });
+}
+
+/** `{kind, principal}`, the whole body `PUT`/`DELETE /processes/:processId/access` share. Strict: an unknown `kind` or a non-string/empty `principal` fails to parse, so a malformed body never reaches `addAccessPrincipal`/`deleteAccessPrincipal`. */
+const accessWriteBodySchema = z.object({
+  kind: z.enum(["developer", "owner", "reader"]),
+  principal: z.string().trim().min(1),
+});
+
+function parseAccessBody(body: unknown): { kind: AccessKind; principal: string } {
+  const parsed = accessWriteBodySchema.safeParse(body);
+  if (!parsed.success) {
+    throw new RequestShapeError(`access entry is invalid: ${parsed.error.issues.map((i) => `${i.path.join(".") || "body"}: ${i.message}`).join("; ")}`);
+  }
+  return parsed.data;
+}
+
+/**
+ * The three access lists one process holds, raw `principal` values per
+ * `kind` (process-access-roles). Gated to `ADMIN_ROLE` or that process's
+ * own Developer list — the same standing the Studio edit screen this
+ * route feeds already requires to open at all (studio-app,
+ * process-drafts). Narrower than this route's first cut, which admitted
+ * any resolved actor.
+ */
+export async function handleGetProcessAccess(processId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(
+    req,
+    resolver,
+    db,
+    async (actor) => {
+      if (actor.roles.includes(ADMIN_ROLE)) return;
+      if (await matchesAccessList(actor, processId as ProcessId, "developer", db)) return;
+      throw new AuthorizationError(`actor '${actor.id}' may not read process '${processId}''s access lists`);
+    },
+    async () => {
+      return { status: 200, body: await getAccessLists(processId as ProcessId, db) };
+    },
+  );
+}
+
+/**
+ * Adds `principal` to process `processId`'s `kind` list. The route itself
+ * gates nothing: `addAccessPrincipal` throws `AuthorizationError` (mapped to
+ * 403 by `errors.ts`) when the resolved actor may not write that list.
+ * Idempotent, matching `addAccessPrincipal`'s own `ON CONFLICT DO NOTHING`.
+ */
+export async function handleWriteProcessAccess(processId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, () => {}, async (actor) => {
+    const { kind, principal } = parseAccessBody(await readJson(req));
+    await addAccessPrincipal(actor, processId as ProcessId, kind, principal, db);
+    return { status: 200, body: { kind, principal } };
+  });
+}
+
+/** Same shape and same ungated route as `handleWriteProcessAccess`, calling `deleteAccessPrincipal` instead. Idempotent: deleting an absent entry still returns 200. */
+export async function handleDeleteProcessAccess(processId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, () => {}, async (actor) => {
+    const { kind, principal } = parseAccessBody(await readJson(req));
+    await deleteAccessPrincipal(actor, processId as ProcessId, kind, principal, db);
+    return { status: 200, body: { kind, principal } };
+  });
+}
+
+/**
+ * The calling actor's own Developer- and Owner-listed process ids
+ * (process-access-roles), for the studio's process list to narrow by
+ * (Task 6.1). `ADMIN_ROLE` gets no special case: this answers "which
+ * processes am I listed on", not "which can an admin reach" — the studio
+ * frontend is what skips calling this route for an admin.
+ */
+export async function handleGetMyProcessAccess(req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, () => {}, async (actor) => {
+    const [developer, owner] = await Promise.all([
+      processesMatchingAccessList(actor, "developer", db),
+      processesMatchingAccessList(actor, "owner", db),
+    ]);
+    return { status: 200, body: { developer, owner } };
   });
 }

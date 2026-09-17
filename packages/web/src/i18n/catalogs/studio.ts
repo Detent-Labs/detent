@@ -403,6 +403,7 @@ export const en = {
   "tabs.contract": "Contract",
   "tabs.changes": "Changes",
   "tabs.checks": "Checks",
+  "tabs.access": "Access",
   // Visually-hidden text appended to the Checks tab's count when it carries
   // the blocker color, so the state reaches a screen reader too — color
   // alone conveys nothing there (`studio-process-tabs`).
@@ -959,6 +960,19 @@ export const en = {
   "migrationForm.removeRow": "Remove",
   "migrationForm.noRows": "No rows yet.",
   "migrationForm.unresolved": "(not in this version)",
+
+  // The Access surface: a process's Developer, Owner and Reader lists
+  // (`studio-app`'s Access-surface requirement).
+  "access.loading": "Loading…",
+  "access.developerLabel": "Developer",
+  "access.ownerLabel": "Owner",
+  "access.readerLabel": "Reader",
+  "access.developerEmpty": "No developers listed yet.",
+  "access.ownerEmpty": "No owners listed yet.",
+  "access.readerEmpty": "No readers listed yet.",
+  "access.addPlaceholder": "user_xxx or group_xxx",
+  "access.add": "Add",
+  "access.remove": "Remove",
 
   "error.retry": "Retry",
   "error.failed": "Failed",

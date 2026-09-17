@@ -1064,6 +1064,19 @@ stage-by-stage status.
   guarded is gone, not merely unchecked.
 
 ## Decided, not yet built (each needs its own OpenSpec change)
+- **A non-studio surface for a pure Owner, and write-time eligibility
+  validation on a list entry.** `process-access-roles` (shipped) named
+  both as Non-Goals rather than open questions. Each needs its own
+  separate change. A `system:owner` holder with no studio access has no
+  screen today: the Access surface sits inside Studio, and reaching
+  Studio at all still needs `requireAuthoring`. Such an Owner needs a
+  dedicated, non-studio surface to manage a Reader list. Separately,
+  `addAccessPrincipal` writes a principal onto a list with no check that
+  the principal can use it: adding a plain user id to the Developer list
+  does not confirm that user holds `DEVELOPER_ROLE`, the same
+  read-time-filter-only pattern a group's own membership already
+  follows. `test/process-access.test.ts` pins this choice as intended,
+  a deliberate design point the tests confirm.
 - **Archivo as the written face.** The Type section of
   `.claude/rules/design-language.md` names Archivo. `tokens.css` sets both
   `--font-heading` and `--font-body` to `system-ui, sans-serif`, and neither an
