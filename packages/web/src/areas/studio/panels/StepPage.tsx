@@ -206,6 +206,16 @@ const styles = stylex.create({
     columnGap: space.s4,
     alignItems: "stretch",
   },
+  labelKeyRow: {
+    display: "grid",
+    gridTemplateColumns: { default: "minmax(0, 2fr) minmax(0, 1fr)", [NARROW]: "minmax(0, 1fr)" },
+    columnGap: space.s4,
+  },
+  labelKeyColumn: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s2,
+  },
   column: {
     display: "flex",
     flexDirection: "column",
@@ -719,26 +729,30 @@ export function StepPage({
           </button>
         </div>
 
-        <label {...stylex.props(styles.fieldLabel)}>
-          <span {...stylex.props(styles.fieldLabelText)}>{t("stepSections.labelField")}</span>
-          <LocalizedTextInput value={step.label} onChange={updateStepLabel} />
-        </label>
-        {/* Sibling of the label, never nested inside it: a <label> takes
-            phrasing content, and the design language keeps a field's own
-            messages beside the label. */}
-        {missingTranslationWarning(step.label, contentLocale, draft.baseLocale) && (
-          <p {...stylex.props(styles.warning)}>{missingTranslationWarning(step.label, contentLocale, draft.baseLocale)}</p>
-        )}
+        <div {...stylex.props(styles.labelKeyRow)}>
+          <div {...stylex.props(styles.labelKeyColumn)}>
+            <label {...stylex.props(styles.fieldLabel)}>
+              <span {...stylex.props(styles.fieldLabelText)}>{t("stepSections.labelField")}</span>
+              <LocalizedTextInput value={step.label} onChange={updateStepLabel} />
+            </label>
+            {/* Sibling of the label, never nested inside it: a <label> takes
+                phrasing content, and the design language keeps a field's own
+                messages beside the label. */}
+            {missingTranslationWarning(step.label, contentLocale, draft.baseLocale) && (
+              <p {...stylex.props(styles.warning)}>{missingTranslationWarning(step.label, contentLocale, draft.baseLocale)}</p>
+            )}
+          </div>
 
-        <label {...stylex.props(styles.fieldLabel)}>
-          <span {...stylex.props(styles.fieldLabelText)}>{t("stepSections.keyField")}</span>
-          <input
-            type="text"
-            {...stylex.props(styles.monoInput)}
-            value={step.key ?? ""}
-            onChange={(e) => updateStep({ key: e.target.value })}
-          />
-        </label>
+          <label {...stylex.props(styles.fieldLabel)}>
+            <span {...stylex.props(styles.fieldLabelText)}>{t("stepSections.keyField")}</span>
+            <input
+              type="text"
+              {...stylex.props(styles.monoInput)}
+              value={step.key ?? ""}
+              onChange={(e) => updateStep({ key: e.target.value })}
+            />
+          </label>
+        </div>
 
         <label {...stylex.props(styles.fieldLabel)}>
           <span {...stylex.props(styles.fieldLabelText)}>{t("stepSections.descriptionField")}</span>
