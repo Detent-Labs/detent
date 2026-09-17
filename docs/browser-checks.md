@@ -3774,10 +3774,12 @@ on the step page at `/studio/processes/<id>/edit/steps/<step-id>`.
    Pass: the LABEL field and its warning now stack vertically as two full-width
    rows, one above the other. KEY follows below, in its own row.
 
-3. In the browser or OS settings, switch to a locale for which the step's label
-   has no translation defined. Scroll to see the LABEL field. Pass: the
-   missing-translation warning appears below LABEL's own column, contained
-   within LABEL's space only. The warning does not span beneath KEY's column.
+3. Open the header bar's `⋮` menu, type `de` into the "add locale" textbox,
+   and choose "+ add locale". That click both adds `de` and selects it as the
+   content locale, which drives the missing-translation state. Scroll to see
+   the LABEL field. Pass: the missing-translation warning appears below
+   LABEL's own column, contained within LABEL's space only. The warning does
+   not span beneath KEY's column.
 
 Go back to the process list and choose "Discard" on the `it_offboarding` row,
 then accept the browser's confirm. Pass: that row reads an em dash under Draft,
