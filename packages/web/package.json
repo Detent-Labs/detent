@@ -18,7 +18,7 @@
     "react": "^19",
     "react-dom": "^19",
     "workflow-engine": "file:../..",
-    "zod": "4.5.4"
+    "zod": "4.6.2"
   },
   "devDependencies": {
     "@stylexjs/unplugin": "0.19.0",
