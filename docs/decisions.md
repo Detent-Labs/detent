@@ -1435,14 +1435,11 @@ nothing else tracks them.
   (`.github/dependabot.yml`). Risk: a committed credential or a code-level
   pattern reaches `main` unflagged. CodeQL is free for a public repository and
   adds one job.
-- **CQ-1: 81 dead `eslint-disable` directives, and no linter.** The repository
-  tracks no ESLint, Prettier or Biome configuration, so every directive
-  suppresses nothing. `src/schema/compile.ts` holds 53 of the 81 and fourteen
-  other files hold the rest; the review counted ten, all of them in that same
-  file. Sixty-six name `@typescript-eslint/no-explicit-any`, thirteen name
-  `react-hooks/exhaustive-deps`, and two name one rule each. Risk: the
-  comments imply a tool that never runs. Delete them, or adopt a linter and
-  give `bun run check` the style gate it lacks.
+- **CQ-1 (resolved by `add-ci-audit-and-linter`): 81 dead `eslint-disable`
+  directives, and no linter.** oxlint 1.85.0 now runs in `bun run check`,
+  pinned as a dev dependency. The original count of 81 undercounted the
+  total. oxlint found 92 dead directive lines, and all 92 are deleted.
+  `--report-unused-disable-directives` fails the script on any new one.
 - **ARCH-1: `src/runtime/api.ts` has grown to 2,673 lines.** The review
   measured 1,384 on 2026-08-18, itself up from 1,269 the pass before. It is
   still the largest source file in the repository. Next come
@@ -1520,11 +1517,10 @@ each entry carries the anchor that holds today. All nine stay open.
   listing exported symbols by hand. Risk (Low): a rename in one place leaves the
   other wrong, and no gate covers either. The review's fix is to name where
   a list lives instead of restating it.
-- **DEP-2: the CI workflow runs no `bun audit` step.**
-  `grep -rn "bun audit" .github/` returns nothing. Dependabot already covers
-  version drift, and the review judges the pair unlikely to earn its
-  maintenance. Risk (Informational): an advisory Dependabot misses waits for the next manual
-  look. Recorded so the next audit skips re-deriving it.
+- **DEP-2 (resolved by `add-ci-audit-and-linter`): the CI workflow runs no
+  `bun audit` step.** The `check` job now runs `bun audit
+  --audit-level=high` right after `bun install`. A high or critical
+  advisory fails the job. Dependabot still covers version drift alone.
 - **PERF-1: fixed 500 ms polling per tenant.** `src/engine/host.ts:326`
   runs `pollForever` for the outbox drain on a 500 ms loop wrapped in
   `eachTenant`, with the resolution and timer sweeps beside it at `:327` and

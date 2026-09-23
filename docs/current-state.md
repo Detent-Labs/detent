@@ -2536,11 +2536,11 @@ Stage-by-stage status is in `ROADMAP.md`.
 
 - CI, local (`.githooks/pre-push`, `add-ci-and-dependency-hygiene`;
   `worktree-isolation` names the per-checkout project): a `pre-push`
-  hook. It runs `bun run check` (typecheck, then the production build,
-  then `bun test`) through `docker compose exec` in the dev container. The
-  hook sources `scripts/worktree-env.sh` first. It then execs into the
-  pushing checkout's own derived Compose project, never a shared one. A
-  non-zero exit blocks the push. Running there
+  hook. It runs `bun run check` (lint, then typecheck, then the
+  production build, then `bun test`) through `docker compose exec` in
+  the dev container. The hook sources `scripts/worktree-env.sh` first.
+  It then execs into the pushing checkout's own derived Compose project,
+  never a shared one. A non-zero exit blocks the push. Running there
   closes the finding's real hazard: the container's environment already
   carries `DATABASE_URL`. So the 500+ database-backed test sites that make
   up most of the suite cannot skip silently and report a meaningless green.
@@ -2551,6 +2551,11 @@ Stage-by-stage status is in `ROADMAP.md`.
   infrastructure. It runs on every push and every pull request. This
   reverses a decision the local gate above once recorded, on purpose.
   GitHub-hosted runners are free for a public repository.
+
+- CI, dependency audit (`.github/workflows/check.yml`,
+  `add-ci-audit-and-linter`): the `check` job runs `bun audit
+  --audit-level=high` against the lockfile, right after `bun install`. A
+  high or critical advisory fails the job. A moderate or low one does not.
 
 - A self-hosted alternative, tried first in the same change, needed a
   runner and a persistent service. It also needed the organization to
