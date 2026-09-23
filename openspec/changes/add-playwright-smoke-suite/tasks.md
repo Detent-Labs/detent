@@ -25,9 +25,9 @@
 
 ## 5. Documentation
 
-- [ ] 5.1 Remove the covered steps from `docs/browser-checks.md` per design D6. Add the pointer to `bun run e2e` under "Before you start". Verify: every removed step maps to an assertion in an `e2e/*.e2e.ts` file.
-- [ ] 5.2 Add a short "Smoke suite" section to `README.md`: the install command and `bun run e2e`. In `CLAUDE.md`'s Verification section, change the sentence that names the split rule to name three homes. Verify: `rg -n 'bun run e2e' README.md docs/browser-checks.md` finds both files.
-- [ ] 5.3 Check `docs/current-state.md` for a tooling passage that lists the root scripts or the test layout. If one exists, add `bun run e2e` and `e2e/` there.
+- [x] 5.1 Remove the covered steps from `docs/browser-checks.md` per design D6. Add the pointer to `bun run e2e` under "Before you start". Verify: every removed step maps to an assertion in an `e2e/*.e2e.ts` file.
+- [x] 5.2 Add a short "Smoke suite" section to `README.md`: the install command and `bun run e2e`. In `CLAUDE.md`'s Verification section, change the sentence that names the split rule to name three homes. Verify: `rg -n 'bun run e2e' README.md docs/browser-checks.md` finds both files.
+- [x] 5.3 Check `docs/current-state.md` for a tooling passage that lists the root scripts or the test layout. If one exists, add `bun run e2e` and `e2e/` there.
 
 ## 6. Verification
 
