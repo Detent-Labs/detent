@@ -45,7 +45,7 @@ so each group ends with a green `bun run typecheck`.
 
 ## 8. Verification
 
-- [ ] 8.1 Run `bun run typecheck` and then `bun run build`. Verify: both exit 0.
-- [ ] 8.2 Run the FULL `bun test` suite with `DATABASE_URL` set in the devcontainer. Pipe its output through `sh scripts/gates/silent-green.sh`. Verify: zero failures and a pass from that gate.
-- [ ] 8.3 Confirm that no test file changed. Verify: `git diff --stat <base>..HEAD -- test` prints nothing.
-- [ ] 8.4 Run the prose and whitespace gates on the host over the pushed range. Verify: `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` and the same pipe into `whitespace.sh` both exit 0.
+- [x] 8.1 Run `bun run typecheck` and then `bun run build`. Verify: both exit 0.
+- [x] 8.2 Run the FULL `bun test` suite with `DATABASE_URL` set in the devcontainer. Pipe its output through `sh scripts/gates/silent-green.sh`. Verify: zero failures and a pass from that gate.
+- [x] 8.3 Confirm that no test file changed. Verify: `git diff --stat <base>..HEAD -- test` prints nothing.
+- [x] 8.4 Run the prose and whitespace gates on the host over the pushed range. Verify: `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` and the same pipe into `whitespace.sh` both exit 0.
