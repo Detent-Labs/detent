@@ -158,8 +158,11 @@ async function startEngine(e2eUrl: string, jwtSecret: string): Promise<EngineHan
     stderr: "pipe",
   });
 
+  // Both pumps run detached from the caller: the port is learned by polling
+  // `text` below, not by awaiting either one. They keep draining for the
+  // engine's whole life so a later log line never blocks on a full pipe.
   let text = "";
-  const pump = (async () => {
+  void (async () => {
     const decoder = new TextDecoder();
     for await (const chunk of proc.stdout) {
       const decoded = decoder.decode(chunk);
@@ -167,12 +170,10 @@ async function startEngine(e2eUrl: string, jwtSecret: string): Promise<EngineHan
       process.stdout.write(decoded);
     }
   })();
-  const pumpStderr = (async () => {
+  void (async () => {
     const decoder = new TextDecoder();
     for await (const chunk of proc.stderr) process.stderr.write(decoder.decode(chunk));
   })();
-  void pump;
-  void pumpStderr;
 
   const deadline = Date.now() + ENGINE_STARTUP_DEADLINE_MS;
   while (Date.now() < deadline) {
