@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from
 import * as stylex from "@stylexjs/stylex";
 import { colors, focus, fonts, space } from "form-ui/tokens.stylex";
 import { t, type CatalogKey } from "../catalog.js";
+import { focusVisible } from "../focusScroll.js";
 import { PROCESS_TABS, type ProcessTab } from "../routing.js";
 
 /** The tab button's own element id, and the id of the body it controls. Both
@@ -273,16 +274,6 @@ function openTabRests(row: HTMLElement | null, button: HTMLElement | null): bool
  */
 export function widthMoved(was: number | undefined, width: number): boolean {
   return was !== width;
-}
-
-/** True for a keyboard focus. An engine that cannot parse `:focus-visible`
- * reads false, so its pointer presses never scroll. */
-function focusVisible(element: Element): boolean {
-  try {
-    return element.matches(":focus-visible");
-  } catch {
-    return false;
-  }
 }
 
 /**

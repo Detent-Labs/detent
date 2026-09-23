@@ -82,6 +82,20 @@ at either end. The canvas bar and the form tab strip scroll sideways, so
 both take `scrollPaddingInline: focus.reach`. Task 5.2's sweep found 29
 clipped rings on the Steps and Fields tabs this way, and none after the fix.
 
+**Keyboard focus scrolls a partly visible control.** Chrome scrolls on
+Tab only for a control wholly outside its box. A partly visible control
+stays put, and its ring clips at the edge. The helper
+`scrollKeyboardFocusIntoView` in `focusScroll.ts` fixes that. It calls
+`scrollIntoView` with `nearest` on both axes, at once. That call moves every
+scroll box around the control and honors each box's scroll padding.
+
+One `onFocusCapture` on each surface root therefore covers every box inside
+it. The two roots are the tab body and the form editor's
+page. Only a focus that matches `:focus-visible` scrolls, so a pointer press
+never moves its control. A target inside an `<svg>` scrolls nothing: the
+canvas pans its own nodes. The tab row keeps its own handler, and it reads
+the same `focusVisible` helper.
+
 **The open tab's mark moves to a pseudo-element.** Today `tabSelected` in
 `ProcessTabRow.tsx` draws the mark as `inset 0 -2px 0` on the tab. That
 rule sits flush on the row's 2px divider. A 4px bottom pad on the row would

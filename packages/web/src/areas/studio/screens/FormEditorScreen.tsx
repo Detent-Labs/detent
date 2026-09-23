@@ -54,6 +54,7 @@ import { flattenRailFields } from "../draft/panel-rail";
 import { fieldKindIcon, fieldKindWord } from "../draft/field-type-labels";
 import { FormPreview } from "../panels/FormPreview";
 import { FormTabStrip, formTabDomId, formTabPanelDomId } from "../panels/FormTabStrip";
+import { scrollKeyboardFocusIntoView } from "../focusScroll.js";
 
 type DraftStep = DraftOf<Step>;
 type DraftView = DraftOf<View>;
@@ -1321,7 +1322,7 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
   const selectedRow = selected !== undefined ? rows[selected] : undefined;
 
   return (
-    <div {...stylex.props(styles.formEditorPage)}>
+    <div onFocusCapture={scrollKeyboardFocusIntoView} {...stylex.props(styles.formEditorPage)}>
       <header {...stylex.props(styles.formEditorHeader)}>
         <button type="button" className="btn btn-ghost" {...stylex.props(styles.studioBack)} onClick={onBack}>
           {t("formEditor.back")}

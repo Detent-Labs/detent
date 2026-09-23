@@ -51,6 +51,7 @@ import { JsonView } from "../panels/JsonView.js";
 import { describeCaughtError } from "../errors.js";
 import { useFail } from "../../../shell/useFail.js";
 import { FormEditorScreen } from "./FormEditorScreen.js";
+import { scrollKeyboardFocusIntoView } from "../focusScroll.js";
 import { resolveDraftLocalizedText } from "../draft/localized-text";
 import type { NavigateOptions } from "../../../shell/routing.js";
 
@@ -817,6 +818,7 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
         role="tabpanel"
         aria-labelledby={tabDomId(target)}
         hidden={hide}
+        onFocusCapture={scrollKeyboardFocusIntoView}
         {...stylex.props(styles.tabBody, hide && styles.tabBodyHidden)}
       >
         {body}

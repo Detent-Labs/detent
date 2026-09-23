@@ -1606,6 +1606,14 @@ recorded rather than fixed. The RAIL tags are local to this section.
 - **No key takes a selected step out of the draft.** Delete and Backspace on a
   selected node do nothing (`canvas/CanvasView.tsx`). A removal needs the
   pointer, or a Tab back to the canvas bar's own control.
+- **CANVAS-1: at 400px the canvas clips the Arrange ring by 2px.** The
+  canvas's own toolbar sits 8px inside the canvas, in one row that never
+  wraps (`canvas/CanvasView.tsx:79`). The canvas clips at its padding edge,
+  with `overflow: hidden` (`:69`). Measured 2026-09-24 at 400x800: Fit to
+  view, Rounded corners and Arrange fill the row, and Arrange's ring runs
+  2px past the right edge. The canvas scrolls nothing, so the scroll-box
+  rule of `studio-focus-ring-clipping` does not reach it. Risk (Low): the
+  ring loses 2px on one side and still meets WCAG 2.4.7.
 - **A field's border reads 1.32:1 in light and 1.64:1 in dark.** The 1px
   hairline sits at `packages/web/src/shell/global.css:68`. WCAG 1.4.11 asks 3:1
   of a boundary that identifies a control. `DESIGN.md`'s Inputs / Fields entry
