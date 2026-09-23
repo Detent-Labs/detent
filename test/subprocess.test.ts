@@ -7,12 +7,12 @@
  */
 import { test, expect, beforeAll } from "bun:test";
 import { sql, initSchema, createInstance, withTransaction } from "../src/engine/store.js";
-import { startInstance, cancelInstance, selectAutomaticPath, executeAutomaticTransition } from "../src/engine/transition.js";
+import { startInstance, cancelInstance, selectAutomaticPath, executeAutomaticTransition, SPAWN_ACTION_TYPE } from "../src/engine/transition.js";
 import { publishBody, createDefinitionStore } from "../src/engine/definitions.js";
 import { registerSubprocessHandlers } from "../src/engine/subprocess.js";
 import { cancelInstance as apiCancelInstance } from "../src/runtime/api.js";
 import { CANCEL_ANY_ROLE } from "../src/auth/authorize.js";
-import { createAssignmentRegistry, type AssignmentRegistry } from "../src/engine/registry.js";
+import { createAssignmentRegistry, type AssignmentRegistry, type HandlerContext } from "../src/engine/registry.js";
 import { drainOutbox } from "../src/engine/outbox.js";
 import { drainResolutions } from "../src/engine/resolution.js";
 import { subprocessChildId } from "../src/engine/idempotency.js";
@@ -1718,4 +1718,98 @@ test.skipIf(!DB)("a test instance's subprocess step fails gracefully even when t
   expect(parent.currentStepId as string).toBe("step_p_sub");
   await drainAll(registry);
   expect(await countChildren(parent.instanceId)).toBe(0);
+});
+
+// --- spawn depth cap: a runtime backstop for a cycle publish did not catch ----
+
+// A neutral filler body for the ancestor chain below: a manual wait-state, so
+// creating each row arms no timer and enqueues no spawn of its own. Not
+// published — createInstance accepts any parsed ProcessBody, the same way the
+// draft-test-instance tests above feed it one.
+const depthFillerBody = (): ProcessBody => processBody.parse(waitingChildBody());
+
+// Seeds a chain of `hops` instances directly (no real spawns), each linked to
+// the last via `parent`. Instance 0 is top-level (depth 0); instance `hops-1`
+// sits at depth `hops-1`. Returns the last instance's id, the one a caller
+// links its own test subject to for a parent at depth `hops`.
+async function seedAncestorChain(processId: Instance["processId"], hops: number): Promise<string> {
+  const body = depthFillerBody();
+  let prevId: string | undefined;
+  for (let i = 0; i < hops; i++) {
+    const anc = await createInstance(
+      body,
+      { processId, version: -1, ...(prevId ? { parent: { instanceId: prevId, stepId: "step_w_wait" as Instance["currentStepId"] } } : {}) },
+      sql,
+    );
+    prevId = anc.instanceId;
+  }
+  return prevId!;
+}
+
+// Invokes core.spawnSubprocess directly, bypassing the outbox, so a refused
+// spawn's thrown Error is observable — drainOutbox catches it and folds it
+// into the outbox row's `last_error` instead of surfacing it to the caller.
+function spawnCtx(instanceId: string, subprocessStepId: string, parentSeq: number, actionId: string): HandlerContext {
+  return {
+    action: { id: actionId, type: SPAWN_ACTION_TYPE, config: { subprocessStepId, parentSeq } } as unknown as HandlerContext["action"],
+    config: { subprocessStepId, parentSeq },
+    idempotencyKey: actionId,
+    instanceId,
+    db: sql,
+  };
+}
+
+test.skipIf(!DB)("spawn refuses a child once the parent's own nesting depth reaches the cap, creating no child", async () => {
+  const { registry } = engineRegistry();
+  const cv = await publishBody(CHILD_PID, childBody(), emptyRegistry, dataSourceReg);
+  const pv = await publishBody(PARENT_PID, parentBody(cv.version), emptyRegistry, dataSourceReg);
+  const AV_PID = "proc_depth_ancestor_at_cap" as Instance["processId"];
+
+  // 16 hops above the test parent puts the parent itself at depth 16.
+  const topAncestorId = await seedAncestorChain(AV_PID, 16);
+  const parent = await createInstance(
+    pv.definition,
+    { processId: PARENT_PID, version: pv.version, parent: { instanceId: topAncestorId, stepId: "step_w_wait" as Instance["currentStepId"] } },
+    sql,
+  );
+  await seedField(parent.instanceId, "field_p_amount", 500);
+
+  const handler = registry.get(SPAWN_ACTION_TYPE)!.handler;
+  let err: unknown;
+  try {
+    await handler(spawnCtx(parent.instanceId, "step_p_sub", parent.transitionSeq, "action_spawn_depth_cap"));
+  } catch (e) {
+    err = e;
+  }
+  expect(err).toBeInstanceOf(Error);
+  expect((err as Error).message).toContain("step_p_sub"); // names the subprocess step
+  expect((err as Error).message).toContain("16"); // names the depth limit
+
+  const childId = subprocessChildId(parent.instanceId, parent.transitionSeq, "step_p_sub");
+  expect(await loadInstance(childId)).toBeUndefined();
+});
+
+test.skipIf(!DB)("a spawn below the depth cap proceeds, creating the child linked to the parent as usual", async () => {
+  const { registry } = engineRegistry();
+  const cv = await publishBody(CHILD_PID, childBody(), emptyRegistry, dataSourceReg);
+  const pv = await publishBody(PARENT_PID, parentBody(cv.version), emptyRegistry, dataSourceReg);
+  const AV_PID = "proc_depth_ancestor_below_cap" as Instance["processId"];
+
+  // 15 hops above the test parent puts the parent itself at depth 15 — one
+  // below the cap, so the spawn proceeds and the child lands at depth 16.
+  const topAncestorId = await seedAncestorChain(AV_PID, 15);
+  const parent = await createInstance(
+    pv.definition,
+    { processId: PARENT_PID, version: pv.version, parent: { instanceId: topAncestorId, stepId: "step_w_wait" as Instance["currentStepId"] } },
+    sql,
+  );
+  await seedField(parent.instanceId, "field_p_amount", 500);
+
+  const handler = registry.get(SPAWN_ACTION_TYPE)!.handler;
+  await handler(spawnCtx(parent.instanceId, "step_p_sub", parent.transitionSeq, "action_spawn_depth_below_cap"));
+
+  const childId = subprocessChildId(parent.instanceId, parent.transitionSeq, "step_p_sub");
+  const child = await loadInstance(childId);
+  expect(child).toBeDefined();
+  expect(child!.parent?.instanceId).toBe(parent.instanceId); // linked to the parent as usual
 });

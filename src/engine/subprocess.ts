@@ -50,6 +50,11 @@ import {
 } from "./registry.js";
 import { SPAWN_ACTION_TYPE, RETURN_ACTION_TYPE } from "./transition.js";
 
+// Runtime backstop for a subprocess cycle the publish-time check (definitions.ts)
+// did not catch (design.md D2). A parent already this many hops from a
+// top-level instance refuses to spawn another child.
+const MAX_SUBPROCESS_DEPTH = 16;
+
 /** core.spawnSubprocess handler. Registered by `registerSubprocessHandlers` below, its only caller. */
 function makeSpawnHandler(
   db: SQL,
@@ -89,6 +94,25 @@ function makeSpawnHandler(
       // resolvable published version (see design.md's subprocess-step risk).
       if (parent.kind === "test") {
         throw new Error(`spawn: a test instance may not spawn a subprocess child (step '${subprocessStepId}')`);
+      }
+
+      // Spawn depth cap: count the parent's own nesting depth by following
+      // `parent` links upward, stopping as soon as it reaches the cap so the
+      // walk costs at most MAX_SUBPROCESS_DEPTH row reads. A top-level instance
+      // has depth 0; a missing ancestor row ends the count at the depth reached
+      // so far.
+      let depth = 0;
+      let link = parent.parent;
+      while (link) {
+        depth++;
+        if (depth >= MAX_SUBPROCESS_DEPTH) break;
+        const ancestor = await loadInstance(db, link.instanceId);
+        link = ancestor?.parent;
+      }
+      if (depth >= MAX_SUBPROCESS_DEPTH) {
+        throw new Error(
+          `spawn: parent nesting depth ${depth} reaches the maximum of ${MAX_SUBPROCESS_DEPTH} (step '${subprocessStepId}')`,
+        );
       }
 
       // Resolve the child body + version per versionBinding.
