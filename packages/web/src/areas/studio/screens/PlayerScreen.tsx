@@ -265,7 +265,6 @@ export function PlayerScreen({ processId, token, navigate, onUnauthorized }: Pla
     // opening nobody saw.
     const fieldCount = nextTab === undefined ? 0 : tabIssueFieldCount(view.fields, nextTab, issuesByField);
     setTabSwitch((prev) => tabSwitchState(prev, view.fields, view.tabs ?? [], activeTab, nextTab, fieldCount));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [validationIssues, view]);
 
   const doCreate = () =>

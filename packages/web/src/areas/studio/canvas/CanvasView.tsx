@@ -648,13 +648,11 @@ export function CanvasView({
       panzoom.destroy();
       panzoomRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Neither computation reads pointer/drag state, so without memoization
   // both re-run on every pointer-move event during a drag for nothing.
   // Keyed on their actual inputs only.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const drawn = useMemo(() => drawnPositions(steps as LayoutStep[], initialStepId, layout), [steps, initialStepId, layout]);
   // The origin here answers a lookup miss, not the resolution's own last
   // resort, which `drawnPositions` already applies. A selection or a group can
@@ -663,7 +661,6 @@ export function CanvasView({
 
   const nodePositions: NodePosition[] = useMemo(
     () => steps.filter((s) => s.id).map((s) => ({ id: s.id as string, ...positionOf(s.id as string) })),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [steps, initialStepId, layout],
   );
 
@@ -775,7 +772,6 @@ export function CanvasView({
     if (!svg || renaming) return;
     if (svg.tabIndex === 0 || svg.querySelector('[tabindex="0"]')) return;
     setFocus(entryFocus(steps, groups, initialStepId));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [steps, groups, hidden, renaming]);
 
   // The rename's `<foreignObject>` unmounts on commit and on cancel, and focus
@@ -790,7 +786,6 @@ export function CanvasView({
     const stepId = renamedStepId.current;
     renamedStepId.current = null;
     if (stepId) elementFor({ kind: "step", stepId })?.focus();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [renaming]);
 
   const toSvgPoint = (e: { clientX: number; clientY: number }): Point => {
@@ -817,7 +812,6 @@ export function CanvasView({
     if (hasFitOnLoad.current || nodePositions.length === 0 || !visible) return;
     hasFitOnLoad.current = true;
     fitToView();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodePositions, visible]);
 
   // Pointer capture keeps a fast drag tracking even if the pointer leaves
@@ -1290,7 +1284,6 @@ export function CanvasView({
         {isRenaming ? (
           <foreignObject x={6} y={19} width={NODE_WIDTH - 12} height={22} className="panzoom-exclude">
             <input
-              // eslint-disable-next-line jsx-a11y/no-autofocus
               autoFocus
               aria-label={t("stepSections.renameLabel")}
               {...stylex.props(styles.renameInput)}

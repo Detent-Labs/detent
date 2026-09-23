@@ -24,7 +24,7 @@ export function resolveDraftLocalizedText(
  * every keystroke, extracted so it's directly testable without simulating
  * a DOM change event. */
 export function mergeLocalizedTextEntry(value: DraftLocalizedText, locale: string, text: string): DraftLocalizedText {
-  return { ...(value ?? {}), [locale]: text };
+  return { ...value, [locale]: text };
 }
 
 /** Every `LocalizedText` position in a Draft, visited once: the process

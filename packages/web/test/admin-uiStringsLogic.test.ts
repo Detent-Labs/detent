@@ -34,7 +34,7 @@ describe("rowsFor", () => {
   it("lists every builtin key in sorted order, with its builtin value", () => {
     const rows = rowsFor("shell", "en", {});
     expect(rows.length).toBeGreaterThan(0);
-    expect(rows.map((r) => r.key)).toEqual([...rows.map((r) => r.key)].sort());
+    expect(rows.map((r) => r.key)).toEqual(rows.map((r) => r.key).sort());
     expect(rows.find((r) => r.key === "login.title")).toEqual({ key: "login.title", builtin: "Log in", stored: "" });
   });
 

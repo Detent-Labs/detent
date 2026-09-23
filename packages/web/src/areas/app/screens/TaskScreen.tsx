@@ -291,7 +291,6 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
       await loadComments();
       await loadAttachments();
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [instanceId]);
 
   // Built once per render and read from both the tab-switch effect below and
@@ -333,7 +332,6 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
     // opening nobody saw.
     const fieldCount = nextTab === undefined ? 0 : tabIssueFieldCount(view.fields, nextTab, issuesByField);
     setTabSwitch((prev) => tabSwitchState(prev, view.fields, view.tabs ?? [], activeTab, nextTab, fieldCount));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [validationIssues, view]);
 
   // Claim, release and delegate all change `assignment`, which is what the

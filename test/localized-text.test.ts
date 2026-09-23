@@ -21,7 +21,7 @@ const bodyWith = (overrides: Record<string, unknown> = {}) => ({
 
 describe("authored-content-localization: baseLocale entry required", () => {
   it("rejects a process body missing baseLocale", () => {
-    const { baseLocale, ...rest } = bodyWith();
+    const { baseLocale: _baseLocale, ...rest } = bodyWith();
     expect(processBody.safeParse(rest).success).toBe(false);
   });
 

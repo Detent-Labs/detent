@@ -30,14 +30,12 @@ import {
 import { compileProcessBody, CompileValidationError } from "../src/schema/compile.js";
 import { celType, checkAgainstFields } from "../src/cel/check.js";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const fld = (over: any): FieldDef => ({ id: "field_x", key: "x", label: { en: "X" }, ...over }) as FieldDef;
 
 /** The pair `formatMatches` takes: `format` required, unlike `FieldDef`'s. */
 const ff = (type: BaseFieldType, format: FieldFormat) => ({ type, format });
 
 /** A minimal, otherwise-clean two-step body carrying one catalog field. */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const bodyWith = (field: any): any => ({
   key: "p",
   label: { en: "P" },
@@ -58,7 +56,6 @@ const bodyWith = (field: any): any => ({
   },
 });
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const rejects = (body: any): CompileValidationError => {
   try {
     compileProcessBody(body as ProcessBody);
@@ -459,7 +456,6 @@ describe("compile: a literal default faces the format", () => {
 // ============================================================
 
 describe("compile: columnMapping's type rule", () => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mappingBody = (type: string): any => {
     const b = bodyWith({
       id: "field_pick",

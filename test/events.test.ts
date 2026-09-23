@@ -182,7 +182,7 @@ describe("InstanceEvent", () => {
   });
 
   it("rejects a missing version", () => {
-    const { version, ...rest } = fired();
+    const { version: _version, ...rest } = fired();
     expect(instanceEvent.safeParse(rest).success).toBe(false);
   });
 
@@ -239,7 +239,6 @@ const reminder = (id: string, actionId: string) => ({ id, duration: "PT1H", onFi
 const createFrom = (body: ProcessBody, data: Record<string, unknown> = {}, version = 1) =>
   createInstance(body, { processId: "proc_1" as Instance["processId"], version, data: data as Instance["data"] });
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const readInst = async (id: string): Promise<any> => {
   const r = (await sql`SELECT body FROM instances WHERE instance_id = ${id}`) as { body: unknown }[];
   return typeof r[0].body === "string" ? JSON.parse(r[0].body as string) : r[0].body;

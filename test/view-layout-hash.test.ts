@@ -89,14 +89,12 @@ describe("view layout keys do not move definitionHash", () => {
   it("keeps a body that declares the keys distinct from one that does not", () => {
     // A body that SETS either key is a different body and hashes differently.
     // That is correct: it reaches a hash only through a new published version.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const raw = bodyOf("expense-approval.json") as any;
     const bare = processBody.parse(raw);
     const laid = processBody.parse({
       ...raw,
       workflow: {
         ...raw.workflow,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         steps: raw.workflow.steps.map((s: any) => (s.view ? { ...s, view: { ...s.view, columns: 2 } } : s)),
       },
     });
@@ -104,7 +102,6 @@ describe("view layout keys do not move definitionHash", () => {
   });
 
   it("an untabbed body's definitionHash stays put; declaring tabs is a different body", () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const raw = bodyOf("expense-approval.json") as any;
     const bare = processBody.parse(raw);
     expect(definitionHash(bare)).toBe(PRE_CHANGE_HASHES["expense-approval.json"]);
@@ -113,7 +110,6 @@ describe("view layout keys do not move definitionHash", () => {
     // view, satisfying rule 3 of the "view's tabs and its entries form one
     // hierarchy" requirement, and leave every other step untouched.
     let tabbed = false;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const steps = raw.workflow.steps.map((s: any) => {
       if (tabbed || !s.view) return s;
       tabbed = true;
@@ -122,7 +118,6 @@ describe("view layout keys do not move definitionHash", () => {
         view: {
           ...s.view,
           tabs: [{ key: "all", label: { [raw.baseLocale]: "All" } }],
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           fields: s.view.fields.map((f: any) => (f.group ? f : { ...f, tab: "all" })),
         },
       };

@@ -15,7 +15,7 @@ import * as authorize from "../src/auth/authorize.js";
 const RESERVED_ROLES: string[] = Object.values(authorize).flatMap((v) => (typeof v === "string" && v.startsWith("system:") ? [v as string] : []));
 
 test("every reserved role has exactly one demo user", () => {
-  expect([...DEMO_USERS.map((u) => u.role)].sort()).toEqual([...RESERVED_ROLES].sort());
+  expect(DEMO_USERS.map((u) => u.role).sort()).toEqual([...RESERVED_ROLES].sort());
 });
 
 test("the reports role is among them", () => {

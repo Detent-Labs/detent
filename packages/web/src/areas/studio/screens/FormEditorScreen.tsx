@@ -901,7 +901,7 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
 
   const setRows = (next: DraftViewEntry[]) => {
     if (next === rows) return;
-    writeView({ ...(step.view ?? {}), fields: next });
+    writeView({ ...step.view, fields: next });
   };
 
   const setColumns = (next: 1 | 2) => {
