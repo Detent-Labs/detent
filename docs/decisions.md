@@ -2,10 +2,10 @@
 # Decisions: open questions and deferrals
 
 Forward-looking counterpart to `docs/current-state.md`, which describes what
-exists. This file records what was decided and not yet built, what still
-needs a decision, the reasoning behind decisions that have since shipped,
-and the open findings of the 2026-08-18 code review. `ROADMAP.md` carries
-stage-by-stage status.
+exists. This file records what was decided and not yet built, what was
+accepted as a risk with nothing to build, what still needs a decision, the
+reasoning behind decisions that have since shipped, and the open findings of
+the 2026-08-18 code review. `ROADMAP.md` carries stage-by-stage status.
 
 ## Open questions (still need a decision before building the relevant part)
 - The formal expression context is pinned (`src/cel/check.ts`): `instance`
@@ -1367,22 +1367,6 @@ stage-by-stage status.
     need the edit screen's fixed frame. A touch audience would reopen both.
   - This entry does not decide FORMS-18 in the Forms tab audits section. A
     200% zoom on a desktop window is no phone width.
-
-## Open from the 2026-08-18 code review (each needs its own OpenSpec change)
-
-All ten items on the Prioritized Action List of
-[`openspec/changes/archive/2026-08-18-code-review-record/CODE_REVIEW.md`](../openspec/changes/archive/2026-08-18-code-review-record/CODE_REVIEW.md)
-are open. Each was re-checked against the tree on 2026-09-09. That review
-holds the reasoning and the recommended fix. This section records that
-nothing else tracks them.
-
-- **SEC-1: the subprocess and chaining graph has no cycle check.** Publish-time
-  validation resolves each child and checks every `inputMapping` target
-  (`src/engine/definitions.ts:468`). No walk over the reference graph runs.
-  `validateProcessChaining` (`src/engine/definitions.ts:531`) repeats the
-  shape, and the spawn handler (`src/engine/subprocess.ts:53`) counts no hops.
-  Risk: a published reference cycle spawns instances until storage fills. The
-  oldest of the ten, and the only one the review rates High.
 - **SEC-2: no password floor on any write path.** `requireNonBlank` is the
   whole check on `POST /admin/users/:userId/password`
   (`src/http/admin-routes.ts:253`), and the route comment states the position
@@ -1391,6 +1375,12 @@ nothing else tracks them.
   password reaches storage for an account that may hold `system:admin`. The
   review recommends a length-only floor in `src/auth/users.ts`, shared by both
   routes and the CLI.
+
+  Decided 2026-09-23 (change `decide-security-findings-before-1-0`): build
+  before 1.0. Shape: a length-only floor of 15 characters in
+  `src/auth/users.ts`, on every write path. NIST SP 800-63B sets 15 for a
+  password-only factor and forbids composition rules. Follow-up change:
+  `password-floor-and-self-rotation`.
 - **SEC-3: an account cannot rotate its own password.** `PATCH /account/me`
   accepts `displayName` and `locale` alone
   (`src/http/account-routes.ts:31`), and the file exposes two handlers,
@@ -1398,6 +1388,76 @@ nothing else tracks them.
   write runs through `system:admin` or the recovery CLI. Risk: a holder who
   suspects their password is exposed must ask an operator, who then knows the
   new value. It shares SEC-2's validator, so one change covers both.
+
+  Decided 2026-09-23 (change `decide-security-findings-before-1-0`): build
+  before 1.0. Shape: `PATCH /account/me` takes the current and the new
+  password. The account screen gets a field for it. Follow-up change:
+  `password-floor-and-self-rotation`, shared with SEC-2.
+- **SEC-5: login rate limiting is per-process and in-memory.** Both windows
+  are `Map`s in process memory (`src/auth/login.ts:54` and `:61`), marked
+  `ponytail:` at `src/auth/login.ts:49`. That marker is the whole record: it
+  states the shortcut, its ceiling and its upgrade path, and no ledger file
+  and no push gate stand behind it. Risk: two replicas double every
+  threshold, and a restart clears both windows. The review names the
+  constraint a Postgres replacement must keep: one statement doing the check
+  and the increment together. A tenant may run more than one engine process
+  today; the runbook's "Running more than one engine process" section names
+  the login limiter as the process-local exception.
+
+  Decided 2026-09-23 (change `decide-security-findings-before-1-0`): build
+  before 1.0. Shape: one table. One statement checks and increments
+  together. Follow-up change: `postgres-login-rate-limit`.
+- **SEC-6: no ceiling on an instance's total attachment bytes.**
+  `MAX_ATTACHMENT_BYTES` bounds one upload, 5 MiB by default
+  (`src/http/routes.ts:99`, enforced at `:359`). `uploadAttachment`
+  (`src/runtime/api.ts:2695`) inserts the row without an aggregate. Risk: one
+  credentialed actor can grow an instance's stored bytes without bound. The
+  review puts this storage bound ahead of a general rate limit: one aggregate
+  query at the existing enforcement point.
+
+  Decided 2026-09-23 (change `decide-security-findings-before-1-0`): build
+  before 1.0. Shape: a new variable `MAX_INSTANCE_ATTACHMENT_BYTES`. One
+  `SUM` inside `uploadAttachment`'s transaction, under the instance row
+  lock, so two concurrent uploads cannot both pass. Over the limit answers
+  the same status as the per-file limit, 400 today (`RequestShapeError`,
+  `src/http/routes.ts:359`, mapped at `src/http/errors.ts:90`). Follow-up
+  change: `instance-attachment-byte-ceiling`.
+- **SEC-9: a role reduction waits for the issued token to expire.**
+  `src/auth/jwt.ts:115-124` checks `isActiveAccount` on every locally issued
+  token and reads roles from the token's own claim, and the comment there
+  points at the `admin-user-management` spec. Disabling an account ends its
+  session at the next request, while removing one role leaves the old set
+  effective until expiry, up to eight hours. Risk (Low): an operator who
+  revokes `system:admin` from an account that stays active waits for that
+  expiry. The zero-code method is to disable the account and re-enable it:
+  the next request rejects the old token, and the next login issues the
+  reduced set. That method sits in no operator document today.
+
+  Decided 2026-09-23 (change `decide-security-findings-before-1-0`): build
+  before 1.0. Shape: for a token this engine issued, the per-request
+  account read returns the roles too and replaces the token's claim; a
+  token from an external issuer keeps its own. This reverses the
+  `admin-user-management` rule "A role change does not reach an
+  already-issued token." Follow-up change: `live-roles-for-local-tokens`.
+- **`initSchema` takes no lock at startup.** `initSchema`
+  (`src/engine/store.ts:76`) runs its `CREATE ... IF NOT EXISTS` statements
+  with no lock, and the server calls it at startup
+  (`src/http/server.ts:893`). Two processes that start together against a
+  new or upgraded schema can race on those statements. One process that
+  finishes startup first leaves the others no table to add. The runbook's
+  "Running more than one engine process" section names the workaround
+  today: start one process first, then start the rest only after it
+  reports ready.
+
+  Decided 2026-09-23 (change `decide-security-findings-before-1-0`): build
+  before 1.0. Shape: an advisory lock around `initSchema`, which retires
+  that runbook rule.
+
+## Accepted risks (decided, nothing to build)
+
+The owner accepted each finding below on 2026-09-23, with a reason and no
+build.
+
 - **SEC-4: the session token lives in `localStorage`.** `browserStorage` reads
   the global at `packages/web/src/shell/session.ts:39`, `loadSession` reads
   the key at `:44`, and `persistSession` writes it at `:65`. Risk: any script
@@ -1405,24 +1465,69 @@ nothing else tracks them.
   decision rather than a defect: keep `localStorage` and record why, or move
   to a `Secure; HttpOnly; SameSite=Strict` cookie and pay a CSRF token on
   every mutating route. Either outcome belongs in an OpenSpec change.
-- **SEC-5: login rate limiting is per-process and in-memory.** Both windows
-  are `Map`s in process memory (`src/auth/login.ts:54` and `:61`), marked
-  `ponytail:` at `src/auth/login.ts:49`. That marker is the whole record: it
-  states the shortcut, its ceiling and its upgrade path, and no ledger file
-  and no push gate stand behind it. Risk: two replicas double every
-  threshold, and a restart clears both windows. The review names the constraint a Postgres
-  replacement must keep: one statement doing the check and the increment
-  together. The 2026-08-18 code review asks for the single-process assumption
-  in `docs/runbooks/deployment.md` until the fix lands. That runbook stays
-  silent on it, and the `deployment-runbook` capability governs the file, so
-  that sentence needs a delta of its own.
-- **SEC-6: no ceiling on an instance's total attachment bytes.**
-  `MAX_ATTACHMENT_BYTES` bounds one upload, 5 MiB by default
-  (`src/http/routes.ts:99`, enforced at `:359`). `uploadAttachment`
-  (`src/runtime/api.ts:2583`) inserts the row without an aggregate. Risk: one
-  credentialed actor can grow an instance's stored bytes without bound. The
-  review puts this storage bound ahead of a general rate limit: one aggregate
-  query at the existing enforcement point.
+
+  Accepted 2026-09-23 (change `decide-security-findings-before-1-0`): the
+  built `index.html` sets `script-src 'self'` (`packages/web/csp.ts:23`),
+  which stops an injected script from running at all. A bearer header is
+  immune to CSRF. An integration authenticates with a bearer token anyway,
+  so a cookie would add a second authentication path. That path needs a
+  CSRF token on every mutating route, and `CORS_ALLOWED_ORIGINS` loses the
+  `*` value. A script that gets past the CSP can call the API as the user
+  in either design.
+- **SEC-8: attachment `contentType` is caller-supplied and echoed on
+  download.** The upload schema at `src/http/routes.ts:111` constrains it to
+  `MIME_TOKEN_PAIR` (`:108`), and the download handler at `:394` returns it
+  as `Content-Type` through `toBinaryResponse` (`src/http/server.ts:200`).
+  Every binary response carries `X-Content-Type-Options: nosniff`,
+  `BINARY_ROUTES` gives this route `Content-Disposition: attachment`, and
+  the CSP sets `object-src 'none'`, so a stored `text/html` downloads rather
+  than renders. Risk (Low): a later change that drops one of those layers turns a
+  stored file into rendered content. The review's optional fix is an
+  allowlist of upload types in place of the shape regex.
+
+  Accepted 2026-09-23 (change `decide-security-findings-before-1-0`): three
+  layers stop a stored file from rendering, starting with the download
+  route's own bearer-header requirement, so a plain link cannot open it.
+  The API response carries `X-Content-Type-Options: nosniff` and
+  `Content-Disposition: attachment` (`src/http/server.ts:200-212`), guarded
+  by `test/http-disposition.test.ts`. The SPA fetches the file and saves it
+  through `<a download>`
+  (`packages/web/src/areas/app/screens/TaskScreen.tsx:404-410`), and its own
+  CSP does not reach the download response; an allowlist would turn each
+  new file type into a configuration change instead. Residual risk: the
+  saved blob carries the caller's type and the app's origin, and a later
+  inline preview of it would render stored HTML there and reopen SEC-8.
+- **SEC-10: development defaults.**
+  `.devcontainer/docker-compose.yml` sets `ALLOW_INSECURE_DEV_AUTH: "1"` at
+  `:47` and `POSTGRES_PASSWORD: postgres` at `:92`. Both serve a disposable
+  local stack, the server prints `AUTH DISABLED` at startup
+  (`src/http/server.ts:406`) whenever the first applies, and the production
+  image in `docker/engine.Dockerfile` inherits neither. Risk (Informational): a stack
+  started from the compose file outside the devcontainer runs with auth
+  disabled. The review recorded it for completeness and recommends nothing.
+
+  Accepted 2026-09-23 (change `decide-security-findings-before-1-0`): the
+  production image inherits neither default. The server's startup print
+  names whichever one applies.
+
+## Open from the 2026-08-18 code review (each needs its own OpenSpec change)
+
+<!-- antislop: allow trailing-negation -->
+<!-- "Decided, not yet built" quotes an existing section heading verbatim. -->
+Five items on the Prioritized Action List of
+[`openspec/changes/archive/2026-08-18-code-review-record/CODE_REVIEW.md`](../openspec/changes/archive/2026-08-18-code-review-record/CODE_REVIEW.md)
+are open. Each was re-checked against the tree on 2026-09-09. That review
+holds the reasoning and the recommended fix. The owner decided the other
+five on 2026-09-23. See "Decided, not yet built" and "Accepted risks"
+above. This section records that nothing else tracks the five still open.
+
+- **SEC-1: the subprocess and chaining graph has no cycle check.** Publish-time
+  validation resolves each child and checks every `inputMapping` target
+  (`src/engine/definitions.ts:468`). No walk over the reference graph runs.
+  `validateProcessChaining` (`src/engine/definitions.ts:531`) repeats the
+  shape, and the spawn handler (`src/engine/subprocess.ts:53`) counts no hops.
+  Risk: a published reference cycle spawns instances until storage fills. The
+  oldest of the ten, and the only one the review rates High.
 - **TEST-1: nothing asserts that every route refuses an uncredentialed
   request.** Each handler carries its own `requireRole` or `requirePermission`
   call, and the route table holds 86 entries (`src/http/server.ts:554`). No
@@ -1464,9 +1569,13 @@ nothing else tracks them.
   trusts the smaller number and misses three checks. The 2026-09-09 documentation
   audit found it; the next change inside that file carries the fix.
 
-The nine findings below never reached the list above. Seven are Low and two
-are Informational. Each was re-checked against the tree on 2026-09-10, and
-each entry carries the anchor that holds today. All nine stay open.
+<!-- antislop: allow trailing-negation -->
+<!-- "Decided, not yet built" quotes an existing section heading verbatim. -->
+The six findings below never reached the list above. Five are Low and one
+is Informational. Each was re-checked against the tree on 2026-09-10, and
+each entry carries the anchor that holds today. The owner decided SEC-8,
+SEC-9 and SEC-10 on 2026-09-23. See "Decided, not yet built" and "Accepted
+risks" above. All six stay open.
 
 - **SEC-7: CEL evaluation has no wall-clock bound.** `evaluate`
   runs inside `try`/`catch` at `src/cel/eval.ts:129` and `:166`, so a raise
@@ -1476,37 +1585,6 @@ each entry carries the anchor that holds today. All nine stay open.
   transaction's locks for the whole evaluation. Authoring needs
   `system:developer` or `system:author`, so this is defense in depth. The
   review prefers a publish-time complexity bound over a runtime timer.
-- **SEC-8: attachment `contentType` is caller-supplied and echoed on
-  download.** The upload schema at `src/http/routes.ts:111` constrains it to
-  `MIME_TOKEN_PAIR` (`:108`), and the download handler at `:394` returns it
-  as `Content-Type` through `toBinaryResponse` (`src/http/server.ts:196`).
-  Every binary response carries `X-Content-Type-Options: nosniff`,
-  `BINARY_ROUTES` gives this route `Content-Disposition: attachment`, and
-  the CSP sets `object-src 'none'`, so a stored `text/html` downloads rather
-  than renders. Risk (Low): a later change that drops one of those layers turns a
-  stored file into rendered content. The review's optional fix is an
-  allowlist of upload types in place of the shape regex.
-- **SEC-9: a role reduction waits for the issued token to expire.**
-  `src/auth/jwt.ts:115-124` checks `isActiveAccount` on every locally issued
-  token and reads roles from the token's own claim, and the comment there
-  points at the `admin-user-management` spec. Disabling an account ends its
-  session at the next request, while removing one role leaves the old set
-  effective until expiry, up to eight hours. Risk (Low): an operator who revokes
-  `system:admin` from an account that stays active waits for that expiry.
-  The zero-code method is to disable the account and re-enable it: the next
-  request rejects the old token, and the next login issues the reduced set.
-  That method sits in no operator document today. The alternative is a
-  `rolesVersion` claim compared by `isActiveAccount`, a schema change that
-  needs its own OpenSpec change; `grep -rl rolesVersion src openspec/specs`
-  prints nothing.
-- **SEC-10: development defaults.**
-  `.devcontainer/docker-compose.yml` sets `ALLOW_INSECURE_DEV_AUTH: "1"` at
-  `:47` and `POSTGRES_PASSWORD: postgres` at `:92`. Both serve a disposable
-  local stack, the server prints `AUTH DISABLED` at startup
-  (`src/http/server.ts:403`) whenever the first applies, and the production
-  image in `docker/engine.Dockerfile` inherits neither. Risk (Informational): a stack
-  started from the compose file outside the devcontainer runs with auth
-  disabled. The review recorded it for completeness and recommends nothing.
 - **ARCH-2: `BINARY_ROUTES` is a hand-kept ledger.** The
   list sits at `src/http/server.ts:268`, and `test/http-disposition.test.ts`
   drives every declared entry. TEST-1 above covers the review's second
