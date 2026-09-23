@@ -138,6 +138,9 @@ async function runOpenspecValidate(name: string, findings: Finding[]): Promise<v
   try {
     const proc = Bun.spawn(["openspec", "validate", name, "--strict", "--json"], {
       cwd: REPO_ROOT,
+      // The CLI's telemetry flush stalls about 9.5 s on every other run in the
+      // devcontainer, past the test suite's 5 s per-test timeout.
+      env: { ...process.env, OPENSPEC_TELEMETRY: "0" },
       stdout: "pipe",
       stderr: "pipe",
     });
