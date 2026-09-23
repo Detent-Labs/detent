@@ -1573,8 +1573,8 @@ above. This section records that nothing else tracks the five still open.
 <!-- "Decided, not yet built" quotes an existing section heading verbatim. -->
 The six findings below never reached the list above. Five are Low and one
 is Informational. Each was re-checked against the tree on 2026-09-10, and
-each entry carries the anchor that holds today. The owner decided SEC-8,
-SEC-9 and SEC-10 on 2026-09-23. See "Decided, not yet built" and "Accepted
+each entry carries the anchor that holds today. The owner decided the
+other three on 2026-09-23. See "Decided, not yet built" and "Accepted
 risks" above. All six stay open.
 
 - **SEC-7: CEL evaluation has no wall-clock bound.** `evaluate`
