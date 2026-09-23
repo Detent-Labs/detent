@@ -21,7 +21,7 @@
 
 ## 4. CI
 
-- [ ] 4.1 Add the `e2e` job to `.github/workflows/check.yml` per design D5. Verify: the pull request's checks list `e2e` beside `check`, and it runs green. Read the job log for the four flow names.
+- [x] 4.1 Add the `e2e` job to `.github/workflows/check.yml` per design D5. Verify: the pull request's checks list `e2e` beside `check`, and it runs green. Read the job log for the four flow names.
 
 ## 5. Documentation
 
