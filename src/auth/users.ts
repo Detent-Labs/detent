@@ -412,7 +412,7 @@ export async function emailsForUserIds(userIds: string[], db: SQL = sql): Promis
  * caller detects one.
  *
  * The empty set short-circuits without touching the database. Read by
- * `resolveFields`' person-field option resolution (`src/runtime/api.ts`).
+ * `resolveFields`' person-field option resolution (`src/runtime/fields.ts`).
  */
 export async function displayNamesForUserIds(userIds: string[], db: SQL = sql): Promise<Map<string, string>> {
   if (userIds.length === 0) return new Map();

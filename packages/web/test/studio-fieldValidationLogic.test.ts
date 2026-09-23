@@ -6,7 +6,7 @@ import {
   type ValidationKey,
 } from "../src/areas/studio/panels/shared/fieldValidationLogic.js";
 
-// This table mirrors `checkConstraints` in `src/runtime/api.ts`, which
+// This table mirrors `checkConstraints` in `src/runtime/fields.ts`, which
 // branches on the submitted value's JavaScript runtime type rather than the
 // field's declared type.
 describe("offeredKeys", () => {

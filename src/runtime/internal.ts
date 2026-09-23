@@ -22,9 +22,11 @@ export type Page<T> = { items: T[]; cursor?: string };
 export const DEFAULT_LIST_LIMIT = 50;
 /**
  * Exported so `http/routes.ts` clamps to the same bound at the boundary. The
- * `Math.min` calls below stay, so a caller that reaches this layer directly is
- * still bounded. `engine/admin-queries.ts` declares its own pair for the
- * routes it serves; the numbers agree today by coincidence, not by contract.
+ * `Math.min` calls in `queries.ts`, `record.ts`, `comments.ts` and
+ * `attachments.ts` clamp against it, so a caller that reaches this layer
+ * directly is still bounded. `engine/admin-queries.ts` declares its own pair
+ * for the routes it serves; the numbers agree today by coincidence, not by
+ * contract.
  */
 export const MAX_LIST_LIMIT = 200;
 export const DEFAULT_RECORD_LIMIT = 100;
@@ -32,12 +34,14 @@ export const MAX_RECORD_LIMIT = 500;
 
 /**
  * The hasMore/slice/last-row/encodeCursor tail shared by every
- * keyset-paginated read in this module (`listInstances`, `getInstanceRecord`,
- * `listComments`, `listAttachments`). Takes the raw rows overfetched via
- * `LIMIT limit + 1` and a row-to-cursor-tuple mapper, and returns the sliced
- * page, whether more remain, and the next cursor. Does not map rows to
- * items — every call site's mapping is applied to `pageRows` separately,
- * since the four are not uniform (`listInstances`'s is `async` and filters
+ * keyset-paginated read under `src/runtime/` (`listInstances` in
+ * `queries.ts`, `getInstanceRecord` in `record.ts`, `listComments` in
+ * `comments.ts`, `listAttachments` in `attachments.ts`). Takes the raw rows
+ * overfetched via `LIMIT limit + 1` and a row-to-cursor-tuple mapper, and
+ * returns the sliced page, whether more remain, and the next cursor. Does
+ * not map rows to items — every call site's mapping is applied to
+ * `pageRows` separately, since the four are not uniform (`listInstances`'s
+ * is `async` and filters
  * out `undefined` results, which a single `toItem` parameter here could not
  * express without forcing every other caller through `await`). See
  * design.md.

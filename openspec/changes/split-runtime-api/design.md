@@ -68,7 +68,8 @@ implementer records that base with `git rev-parse HEAD` before the first move.
 
 Estimated sizes: `queries.ts` about 650 lines, `fields.ts` about 560,
 `reports.ts` about 480, `instances.ts` about 450. The rest stay under 150
-each.
+each. Actual sizes after the split: `queries.ts` 651, `fields.ts` 600,
+`reports.ts` 476, `instances.ts` 471.
 
 A range starts at a declaration's first line. The doc comment above a
 declaration moves with it. Sometimes that comment sits inside the range of
@@ -167,7 +168,8 @@ directly.
   exists today: `api.ts` imports `engine/definitions.ts`, which imports
   `engine/instance-query-source.ts`, which imports `queryInstances` from
   `api.ts`. After the split the cycle runs through the barrel and
-  `internal.ts`. It stays safe while no module reads an imported binding at
+  `internal.ts`, or through the barrel and `reports.ts`, which also imports
+  `engine/definitions.js`. It stays safe while no module reads an imported binding at
   top level. Each of the four top-level `extends` in `src/runtime/` names the global
   `Error`. A class must not extend a class from a sibling module. Every test
   file loads the barrel, so the full `bun test` run shows a load-order error.

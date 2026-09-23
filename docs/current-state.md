@@ -1707,7 +1707,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   supplies the expected value" pattern `transitionSeq` already establishes; a
   first save at `revision = 0` for a process with no row is an `INSERT`, and a
   lost create race or a stale `revision` both raise `DraftConflictError`
-  (its own class, distinct from `runtime/api.ts::ConcurrencyConflict`, which
+  (its own class, distinct from `engine/transition.ts::ConcurrencyConflict`, which
   means an instance `transitionSeq` mismatch to every existing client) — never
   merged. `src/http/studio-routes.ts` exposes `GET /drafts`,
   `GET /drafts/:processId` (404 when absent), `PUT /drafts/:processId` and
