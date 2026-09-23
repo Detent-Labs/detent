@@ -27,7 +27,7 @@ so each group ends with a green `bun run typecheck`.
 
 ## 5. Record, visibility, comments and attachments
 
-- [ ] 5.1 Create `record.ts`, `visibility.ts`, `comments.ts` and `attachments.ts` under `src/runtime/` with the declarations in their D1 rows. Verify: `bun run typecheck` passes.
+- [x] 5.1 Create `record.ts`, `visibility.ts`, `comments.ts` and `attachments.ts` under `src/runtime/` with the declarations in their D1 rows. Verify: `bun run typecheck` passes.
 
 ## 6. The barrel
 
