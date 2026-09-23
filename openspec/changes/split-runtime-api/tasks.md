@@ -31,10 +31,10 @@ so each group ends with a green `bun run typecheck`.
 
 ## 6. The barrel
 
-- [ ] 6.1 Reduce `src/runtime/api.ts` to the barrel of D2: the reworded header comment, the existing re-export block, and explicit `export { … } from` and `export type { … } from` lists. Verify: `api.ts` has no `function` keyword and `bun run typecheck` passes.
-- [ ] 6.2 Run D3's after-check. Verify: both `diff` commands against the `-before.txt` files print nothing.
-- [ ] 6.3 Check the structural rules from the design's Risks section. Verify: `grep -rn 'new WeakMap' src/runtime` prints two lines in two files, and `grep -rln 'from "./api.js"' src/runtime` prints nothing.
-- [ ] 6.4 Check sizes. Verify: `wc -l src/runtime/*.ts` shows no file above 700 lines.
+- [x] 6.1 Reduce `src/runtime/api.ts` to the barrel of D2: the reworded header comment, the existing re-export block, and explicit `export { … } from` and `export type { … } from` lists. Verify: `api.ts` has no `function` keyword and `bun run typecheck` passes.
+- [x] 6.2 Run D3's after-check. Verify: both `diff` commands against the `-before.txt` files print nothing.
+- [x] 6.3 Check the structural rules from the design's Risks section. Verify: `grep -rn 'new WeakMap' src/runtime` prints two lines in two files, and `grep -rln 'from "./api.js"' src/runtime` prints nothing.
+- [x] 6.4 Check sizes. Verify: `wc -l src/runtime/*.ts` shows no file above 700 lines.
 
 ## 7. Docs sweep
 

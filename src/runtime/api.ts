@@ -5,7 +5,9 @@
  * triggering a manual path. Not a transport: plain async TS functions.
  *
  * Callers never touch `ProcessBody` directly — only `processId`/`instanceId`.
- * This module resolves bodies internally via its own `createDefinitionStore`.
+ * This file is the layer's one import surface: it re-exports the sibling
+ * modules under `src/runtime/`. Callers import from here, never from a
+ * sibling module directly.
  */
 
 import { PinMismatch } from "../engine/store.js";
