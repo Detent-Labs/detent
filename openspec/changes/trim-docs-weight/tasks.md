@@ -2,11 +2,11 @@
 
 ## 1. Move the shipped reasoning out of decisions.md
 
-- [ ] 1.1 Create `docs/decisions-archive.md` with the same `allow-file` line as `docs/decisions.md`, a heading and a one-paragraph opening (design D4). Verify: the file's first line matches line 1 of `docs/decisions.md`.
-- [ ] 1.2 Move lines 243 to 1065 of `docs/decisions.md` into it word for word. Verify: with the directive lines stripped, `diff` against `git show HEAD:docs/decisions.md | sed -n 243,1065p` prints nothing.
-- [ ] 1.3 Add a targeted directive with a reason above each of the 12 residual findings in the new file (design D4). Verify: the antislop linter reports no finding for `docs/decisions-archive.md`.
-- [ ] 1.4 Rewrite the opening paragraph of `docs/decisions.md`. It lists what the file holds and links `docs/decisions-archive.md`. It also states that a change which builds a decided entry moves that entry to the archive. Verify: the link resolves.
-- [ ] 1.5 Re-point `docs/roadmap-history.md:1777`, `:1829` and `:1882` to `docs/decisions-archive.md`. Verify: a grep of the three lines names the new file.
+- [x] 1.1 Create `docs/decisions-archive.md` with the same `allow-file` line as `docs/decisions.md`, a heading and a one-paragraph opening (design D4). Verify: the file's first line matches line 1 of `docs/decisions.md`.
+- [x] 1.2 Move lines 243 to 1065 of `docs/decisions.md` into it word for word. Verify: with the directive lines stripped, `diff` against `git show HEAD:docs/decisions.md | sed -n 243,1065p` prints nothing.
+- [x] 1.3 Add a targeted directive with a reason above each of the 12 residual findings in the new file (design D4). Verify: the antislop linter reports no finding for `docs/decisions-archive.md`.
+- [x] 1.4 Rewrite the opening paragraph of `docs/decisions.md`. It lists what the file holds and links `docs/decisions-archive.md`. It also states that a change which builds a decided entry moves that entry to the archive. Verify: the link resolves.
+- [x] 1.5 Re-point `docs/roadmap-history.md:1777`, `:1829` and `:1882` to `docs/decisions-archive.md`. Verify: a grep of the three lines names the new file.
 
 ## 2. Replace current-state.md with the index
 
