@@ -170,9 +170,20 @@ const styles = stylex.create({
   chevron: {
     flex: "none",
   },
+  // Below 40rem, `openCommandFlush` pulls the open command's button back by
+  // `space.s1 + 1px`, `.btn-ghost`'s inline padding plus `.btn`'s border,
+  // so its text stands flush with the property names below. That same pull
+  // carries the button's own focus ring past the tab body's own padding,
+  // which otherwise grants every control in this box the ring's reach
+  // (`EditScreen.tsx`'s `tabBody`). This padding restores that reach for
+  // the pulled-back button by exactly the amount the pull removes, moving
+  // the property names over by the same amount so the two stay flush.
   body: {
     paddingBlockEnd: space.s3,
-    paddingInlineStart: { default: `calc(5.5rem + ${space.s4})`, "@media (max-width: 40rem)": 0 },
+    paddingInlineStart: {
+      default: `calc(5.5rem + ${space.s4})`,
+      "@media (max-width: 40rem)": `calc(${space.s1} + 1px)`,
+    },
   },
   // Name, before, arrow, after. Each value column takes its widest value up to
   // the 68-character measure, so a short before sits beside its after instead
