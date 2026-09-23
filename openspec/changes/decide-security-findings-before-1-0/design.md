@@ -57,7 +57,7 @@ process that finishes startup first leaves the others no table to add.
 | SEC-3 | Build | `password-floor-and-self-rotation` | `PATCH /account/me` takes the current and the new password. The account screen gets a field for it. |
 | SEC-4 | Accept | none | See below. |
 | SEC-5 | Build | `postgres-login-rate-limit` | One table. One statement checks and increments together. |
-| SEC-6 | Build | `instance-attachment-byte-ceiling` | A new variable `MAX_INSTANCE_ATTACHMENT_BYTES`. One `SUM` inside `uploadAttachment`'s transaction, under the instance row lock, so two concurrent uploads cannot both pass. Over the limit answers 413, like the per-file limit in `src/http/routes.ts`. |
+| SEC-6 | Build | `instance-attachment-byte-ceiling` | A new variable `MAX_INSTANCE_ATTACHMENT_BYTES`. One `SUM` inside `uploadAttachment`'s transaction, under the instance row lock, so two concurrent uploads cannot both pass. Over the limit answers the status the per-file limit answers today: 400, `RequestShapeError` (`src/http/routes.ts:359`). |
 | SEC-8 | Accept | none | See below. |
 | SEC-9 | Build | `live-roles-for-local-tokens` | For a token this engine issued, the per-request account read returns the roles too. They replace the token's claim. A token from an external issuer keeps its claim. |
 | SEC-10 | Accept | none | See below. |
