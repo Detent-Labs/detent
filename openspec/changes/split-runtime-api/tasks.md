@@ -17,8 +17,8 @@ so each group ends with a green `bun run typecheck`.
 
 ## 3. Instance lifecycle and claims
 
-- [ ] 3.1 Create `src/runtime/instances.ts` with the declarations in D1's `instances.ts` row. Verify: `bun run typecheck` passes.
-- [ ] 3.2 Create `src/runtime/claims.ts` with the declarations in D1's `claims.ts` row. Verify: `bun run typecheck` passes.
+- [x] 3.1 Create `src/runtime/instances.ts` with the declarations in D1's `instances.ts` row. Verify: `bun run typecheck` passes.
+- [x] 3.2 Create `src/runtime/claims.ts` with the declarations in D1's `claims.ts` row. Verify: `bun run typecheck` passes.
 
 ## 4. Queries and reports
 
