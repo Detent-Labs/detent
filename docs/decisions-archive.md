@@ -2,8 +2,9 @@
 # Decisions archive: reasoning behind shipped work
 
 Historical counterpart to `docs/decisions.md`, which records what still
-needs a decision, what is decided but not yet built, and the open findings
-of past code reviews and design audits. This file holds the reasoning
+needs a decision, what is decided but not yet built, the open findings
+of past code reviews and design audits, and refused simplifications. This
+file holds the reasoning
 behind a decision once the change that builds it ships, moved here word
 for word from `docs/decisions.md`. `docs/current-state.md` describes the
 system that resulted; this file explains why it took that shape.

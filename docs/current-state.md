@@ -188,9 +188,11 @@ read it. A template is a starting body for a new draft.
 ## Reporting engine
 
 The reporting queries compute cycle time, bottlenecks and SLA figures. A saved
-report reads one process's instances as a table of field values.
+report reads one process's instances as a table of field values. The
+Runtime API Layer creates and runs saved reports.
 
-- Paths: `src/engine/reporting.ts`, `src/http/reporting-routes.ts`
+- Paths: `src/engine/reporting.ts`, `src/http/reporting-routes.ts`,
+  `src/runtime/api.ts`
 - Specs: `reporting-analytics-api`, `reporting-data-tables`,
   `instance-data-tables`, `instance-data-query`
 

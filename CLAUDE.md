@@ -305,8 +305,9 @@ packages/form-ui/          shared step-form renderer (source-only, no build step
 - `docs/current-state.md` — per-subsystem index: what each part of the tree
   does, its paths, and the spec capabilities that own its rules. It names no
   exported symbol, so a rename elsewhere leaves every entry correct.
-- `docs/decisions.md` — open questions, what is decided but not yet built, and
-  every open code-review finding under its own heading.
+- `docs/decisions.md` — open questions, what is decided but not yet built,
+  every open code-review finding under its own heading, and refused
+  simplifications.
   `openspec/changes/archive/2026-08-18-code-review-record/` — the four dated reviews.
 - `docs/decisions-archive.md` — the reasoning behind a decision once it ships,
   moved out of `docs/decisions.md` word for word.

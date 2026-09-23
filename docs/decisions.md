@@ -243,6 +243,9 @@ stage-by-stage status.
   untracked under `tmp/`. `scripts/thirdparty.ts` does not generate the
   container tables. Either the pin gets a tracked source or the row says
   where it comes from.
+- Whether actor identities in the audit log (`actorId` in `history_entries`,
+  claims, comments) are ever redactable is undecided.
+  `docs/decisions-archive.md`'s Instance audit log entry records the reasoning.
 
 ## Decided, not yet built (each needs its own OpenSpec change)
 - **A non-studio surface for a pure Owner, and write-time eligibility
