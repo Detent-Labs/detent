@@ -50,5 +50,6 @@ test("a publish adds a version", async ({ page }) => {
   await page.getByRole("button", { name: "More actions" }).click();
   await page.getByRole("button", { name: "Versions", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Versions" })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "v1", exact: true })).toBeVisible();
   await expect(page.getByRole("cell", { name: "v2", exact: true })).toBeVisible();
 });

@@ -2678,6 +2678,8 @@ duration rule's fill still sets its width through a literal inline
 `background-color` and the rule's `border-bottom` match `app.css`'s
 pre-migration values.
 
+Throughout: zero console errors on any of the four screens.
+
 ### Studio, non-canvas: form editor, panels, dialogs (`stylex-phase-3-studio`)
 
 Source: `stylex-phase-3-studio` task 10.1. Every studio screen outside
