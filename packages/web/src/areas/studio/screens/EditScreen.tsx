@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import * as stylex from "@stylexjs/stylex";
-import { layout, colors, fonts, space } from "form-ui/tokens.stylex";
+import { layout, colors, focus, fonts, space } from "form-ui/tokens.stylex";
 import { DraftProvider, useDraft } from "../draft/store.js";
 import { draftFields } from "../draft/fields.js";
 import type { Draft } from "../draft/types.js";
@@ -189,6 +189,9 @@ const styles = stylex.create({
     // Contains the change list's hidden "Before:"/"After:" text; a
     // positioned container clips and scrolls it instead of the page.
     position: "relative",
+    // Room for the focus ring: a scroll box clips at its padding edge
+    // (`studio-focus-ring-clipping`, CHANGES-2).
+    padding: focus.reach,
   },
   tabBodyHidden: {
     display: "none",

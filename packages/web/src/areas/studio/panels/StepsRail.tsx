@@ -1,7 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
 import { useState } from "react";
 import { GripVertical } from "lucide-react";
-import { colors, fonts, space } from "form-ui/tokens.stylex";
+import { colors, focus, fonts, space } from "form-ui/tokens.stylex";
 import { t } from "../catalog.js";
 import { useDraft } from "../draft/store.js";
 import { resolveDraftLocalizedText } from "../draft/localized-text.js";
@@ -30,6 +30,10 @@ const styles = stylex.create({
     // the rows inside it. Below it the rail stands over the step page instead
     // of beside it, where no row bounds anything, so it caps itself.
     maxHeight: { default: "none", [NARROW]: "20rem" },
+    // Room for the focus ring: a scroll box clips at its padding edge, and
+    // the first row's ring would otherwise lose its top (`studio-focus-ring-
+    // clipping`, RAIL-3).
+    padding: focus.reach,
   },
   list: {
     listStyle: "none",

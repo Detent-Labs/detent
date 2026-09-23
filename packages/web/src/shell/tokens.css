@@ -109,6 +109,13 @@
   --layout-cap-narrow: 61rem;
   --layout-cap-wide: 80rem;
 
+  /* The focus ring's own geometry. `global.css`'s `:focus-visible` rule
+     reads the first two directly. A scroll box pads itself by the third so
+     the ring never clips at the box's own edge (`studio-focus-ring-clipping`). */
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+  --focus-ring-reach: calc(var(--focus-ring-width) + var(--focus-ring-offset));
+
   /* Native form controls and scrollbars follow the OS/browser dark chrome
      only when this is declared — background/color alone on an <input> or
      <select> doesn't reach a <select>'s own dropdown popup. Was previously
