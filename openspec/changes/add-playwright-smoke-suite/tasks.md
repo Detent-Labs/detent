@@ -2,14 +2,14 @@
 
 ## 1. Dependency and configuration
 
-- [ ] 1.1 Add `@playwright/test` to the root `devDependencies`. Run `bun install` in the devcontainer. Then run `bun run scripts/thirdparty.ts --write`. Verify: `THIRDPARTY.md` gains the row, and `sh scripts/gates/lockfile.sh` passes.
-- [ ] 1.2 Write `playwright.config.ts` per design D2. Add `test-results/`, `playwright-report/` and `e2e/.auth/` to `.gitignore`. Add `e2e` and `playwright.config.ts` to the root `tsconfig.json` include list. Verify: `bun run typecheck` passes.
+- [x] 1.1 Add `@playwright/test` to the root `devDependencies`. Run `bun install` in the devcontainer. Then run `bun run scripts/thirdparty.ts --write`. Verify: `THIRDPARTY.md` gains the row, and `sh scripts/gates/lockfile.sh` passes.
+- [x] 1.2 Write `playwright.config.ts` per design D2. Add `test-results/`, `playwright-report/` and `e2e/.auth/` to `.gitignore`. Add `e2e` and `playwright.config.ts` to the root `tsconfig.json` include list. Verify: `bun run typecheck` passes.
 - [ ] 1.3 Verify that `bun test` collects no file under `e2e/`. Read the file list the run prints, and name the check in the ledger.
 
 ## 2. The run script
 
-- [ ] 2.1 Write `scripts/e2e.ts` per design D1, steps 1 to 3 and 6 to 8. Add the root script `"e2e": "bun run scripts/e2e.ts"`. Verify: the script exits non-zero and names `DATABASE_URL` when that variable is unset. A run without `packages/web/dist` names `bun run build`.
-- [ ] 2.2 Add the account and the draft per design D3, as step 5 of the script. Verify: after a run, the `_e2e` database holds the account and the draft. The development database keeps its row count in `definitions` and `auth_users`.
+- [x] 2.1 Write `scripts/e2e.ts` per design D1, steps 1 to 3 and 6 to 8. Add the root script `"e2e": "bun run scripts/e2e.ts"`. Verify: the script exits non-zero and names `DATABASE_URL` when that variable is unset. A run without `packages/web/dist` names `bun run build`.
+- [x] 2.2 Add the account and the draft per design D3, as step 5 of the script. Verify: after a run, the `_e2e` database holds the account and the draft. The development database keeps its row count in `definitions` and `auth_users`.
 - [ ] 2.3 Verify the cleanup path. Run the suite with one flow forced to fail. Then confirm that no `src/http/server.ts` process stays alive in the container.
 
 ## 3. The four flows
