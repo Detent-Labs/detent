@@ -419,7 +419,7 @@ export function parentGroupKeyById(fields: FieldDef[]): Map<FieldId, string> {
 
 /**
  * Expected JS shape per BaseFieldType. Shared by the submission validator
- * (`src/runtime/fields.ts`, a participant's value) and the outbox writeback check
+ * (`src/runtime/api.ts`, a participant's value) and the outbox writeback check
  * (`src/engine/outbox.ts`, a handler's `Action.output` value) — one type rule
  * for "does this value match this field's declared type", not a copy per
  * caller. Exhaustive over BaseFieldType: a future member missing here is a
