@@ -110,6 +110,7 @@ jobs:
   # typecheck/build/test feedback `check` gives (design D5).
   e2e:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
 

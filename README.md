@@ -152,6 +152,9 @@ devcontainer sets the third one (`.devcontainer/docker-compose.yml`). That one
 belongs nowhere else. `docs/runbooks/deployment.md` gives all three with their
 defaults, and every other variable too.
 
+Changes go through OpenSpec (`openspec/`) — propose → specs/tasks → implement →
+verify → archive. See `CLAUDE.md` for the full contract rules and invariants.
+
 ### Smoke suite
 
 `bun run e2e` drives four flows through a browser, against the production
@@ -170,9 +173,6 @@ bun run e2e
 ```
 
 CI runs the same suite in a job of its own, beside `check`.
-
-Changes go through OpenSpec (`openspec/`) — propose → specs/tasks → implement →
-verify → archive. See `CLAUDE.md` for the full contract rules and invariants.
 
 ## Deploy
 

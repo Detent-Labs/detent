@@ -131,6 +131,12 @@ interface EngineHandle {
   port: number;
 }
 
+// Tracks the live engine child, if any, so a signal can find and stop it —
+// see `installSignalHandlers` below. `startEngine` sets this the moment the
+// child spawns, not once it resolves, and clears it on every failure path;
+// `main`'s own `finally` clears it once `stopEngine` returns there.
+let runningEngine: EngineHandle | undefined;
+
 /** The port from `log.info("HTTP server listening", { port })` (src/log.ts, src/http/server.ts:903), or `undefined` while that line has not arrived yet. Parses each line as JSON rather than matching a number out of free text — the design's own risk note names this as the one place the server's log format matters. */
 function boundPort(text: string): number | undefined {
   for (const line of text.split("\n")) {
@@ -158,40 +164,77 @@ async function startEngine(e2eUrl: string, jwtSecret: string): Promise<EngineHan
     stderr: "pipe",
   });
 
+  // Tracked from the moment the child exists, not once this function returns
+  // with a known port: a signal handled while the port poll below is still
+  // running must still find something to kill. `port` here is a placeholder
+  // `main` never reads — `runningEngine` is replaced by the real handle
+  // (with its real port) on every return path below.
+  runningEngine = { proc, port: -1 };
+
   // Both pumps run detached from the caller: the port is learned by polling
-  // `text` below, not by awaiting either one. They keep draining for the
-  // engine's whole life so a later log line never blocks on a full pipe.
-  let text = "";
+  // `stdoutText` below, not by awaiting either one. They keep draining for
+  // the engine's whole life so a later log line never blocks on a full pipe.
+  // A fatal startup error goes to stderr (`console.error`), never through
+  // `src/log.ts`'s JSON lines, so a failure report needs both buffers, not
+  // just the one `boundPort` reads.
+  let stdoutText = "";
+  let stderrText = "";
   void (async () => {
     const decoder = new TextDecoder();
     for await (const chunk of proc.stdout) {
       const decoded = decoder.decode(chunk);
-      text += decoded;
+      stdoutText += decoded;
       process.stdout.write(decoded);
     }
   })();
   void (async () => {
     const decoder = new TextDecoder();
-    for await (const chunk of proc.stderr) process.stderr.write(decoder.decode(chunk));
+    for await (const chunk of proc.stderr) {
+      const decoded = decoder.decode(chunk);
+      stderrText += decoded;
+      process.stderr.write(decoded);
+    }
   })();
+
+  const describeFailure = () => `last stdout line: ${lastLineOf(stdoutText)}; last stderr line: ${lastLineOf(stderrText)}`;
 
   const deadline = Date.now() + ENGINE_STARTUP_DEADLINE_MS;
   while (Date.now() < deadline) {
     if (proc.exitCode !== null) {
-      throw new Error(`engine exited during startup with code ${proc.exitCode}; last line: ${lastLineOf(text)}`);
+      runningEngine = undefined;
+      throw new Error(`engine exited during startup with code ${proc.exitCode}; ${describeFailure()}`);
     }
-    const port = boundPort(text);
-    if (port !== undefined) return { proc, port };
+    const port = boundPort(stdoutText);
+    if (port !== undefined) {
+      runningEngine = { proc, port };
+      return runningEngine;
+    }
     await Bun.sleep(50);
   }
   proc.kill("SIGKILL");
-  throw new Error(`engine did not log "HTTP server listening" within ${ENGINE_STARTUP_DEADLINE_MS}ms; last line: ${lastLineOf(text)}`);
+  runningEngine = undefined;
+  throw new Error(`engine did not log "HTTP server listening" within ${ENGINE_STARTUP_DEADLINE_MS}ms; ${describeFailure()}`);
 }
 
-/** Stops the engine gracefully (SIGTERM), the same signal a deployment sends, then waits for it to exit. */
+/** How long the engine gets to exit after SIGTERM before `stopEngine` escalates to SIGKILL. */
+const ENGINE_SHUTDOWN_DEADLINE_MS = 10_000;
+
+/**
+ * Stops the engine gracefully (SIGTERM), the same signal a deployment sends,
+ * then waits for it to exit. Escalates to SIGKILL after
+ * `ENGINE_SHUTDOWN_DEADLINE_MS`: an engine wedged mid-shutdown must not hang
+ * the whole run, since this runs from a `finally` on every path out.
+ */
 async function stopEngine(engine: EngineHandle): Promise<void> {
   engine.proc.kill("SIGTERM");
-  await engine.proc.exited;
+  const exited = await Promise.race([
+    engine.proc.exited.then(() => true),
+    Bun.sleep(ENGINE_SHUTDOWN_DEADLINE_MS).then(() => false),
+  ]);
+  if (!exited) {
+    engine.proc.kill("SIGKILL");
+    await engine.proc.exited;
+  }
 }
 
 async function runPlaywright(baseUrl: string, password: string, extraArgs: string[]): Promise<number> {
@@ -201,6 +244,29 @@ async function runPlaywright(baseUrl: string, password: string, extraArgs: strin
     stderr: "inherit",
   });
   return proc.exited;
+}
+
+let shuttingDownOnSignal = false;
+
+/**
+ * A killed script must not leave the engine running (development-toolchain:
+ * every path out stops it). `main`'s own `finally` covers a normal exit or a
+ * thrown error; this covers the operator hitting Ctrl-C or CI killing the
+ * job. The conventional exit codes (128 + signal number) let a caller tell a
+ * deliberate interruption from `main`'s own non-zero returns.
+ */
+function installSignalHandlers(): void {
+  const handle = (signal: "SIGINT" | "SIGTERM", code: number): void => {
+    if (shuttingDownOnSignal) return;
+    shuttingDownOnSignal = true;
+    void (async () => {
+      console.log(`Received ${signal}, stopping the engine...`);
+      if (runningEngine) await stopEngine(runningEngine);
+      process.exit(code);
+    })();
+  };
+  process.on("SIGINT", () => handle("SIGINT", 130));
+  process.on("SIGTERM", () => handle("SIGTERM", 143));
 }
 
 async function main(): Promise<number> {
@@ -231,6 +297,8 @@ async function main(): Promise<number> {
 
   console.log("Starting the engine...");
   const jwtSecret = randomBytes(48).toString("base64");
+  // startEngine tracks the child in `runningEngine` from the moment it
+  // spawns, not only once this await returns — see its own comment.
   const engine = await startEngine(e2eUrl, jwtSecret);
   console.log(`Engine listening on 127.0.0.1:${engine.port}`);
 
@@ -240,8 +308,11 @@ async function main(): Promise<number> {
   } finally {
     console.log("Stopping the engine...");
     await stopEngine(engine);
+    runningEngine = undefined;
   }
 }
+
+installSignalHandlers();
 
 main()
   .then((code) => process.exit(code))
