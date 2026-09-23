@@ -41,8 +41,10 @@ const styles = stylex.create({
     // Room for the focus ring on the inline axis: the bar scrolls
     // horizontally, and a scroll box clips at its padding edge on both axes
     // (`studio-focus-ring-clipping`). The block axis already clears the
-    // ring's reach through `space.s2`.
+    // ring's reach through `space.s2`. The scroll padding keeps that room
+    // when a focus scroll stops short of either end.
     paddingInline: focus.reach,
+    scrollPaddingInline: focus.reach,
     borderBottomWidth: 1,
     borderBottomStyle: "solid",
     borderBottomColor: colors.border,

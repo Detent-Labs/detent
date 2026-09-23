@@ -26,15 +26,16 @@ const styles = stylex.create({
   // offset needs: `overflowX` resolves `overflow-y` to `auto` as well, and a
   // ring drawn outside the padding box would clip. The row also scrolls on
   // its own declared axis, inline, which clips the same way at its edges;
-  // `focus.reach` covers that side (`studio-focus-ring-clipping`), while the
-  // block side keeps its existing `space.s1`, already equal to the reach.
+  // `focus.reach` pads both axes (`studio-focus-ring-clipping`). The scroll
+  // padding keeps that room when a focus scroll stops short of either end.
   row: {
     display: "flex",
     alignItems: "stretch",
     flexWrap: "nowrap",
     gap: space.s1,
-    paddingBlock: space.s1,
+    paddingBlock: focus.reach,
     paddingInline: focus.reach,
+    scrollPaddingInline: focus.reach,
     overflowX: "auto",
     overscrollBehavior: "contain",
     borderBottomWidth: 2,

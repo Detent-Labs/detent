@@ -78,8 +78,9 @@ end of a scroll box. A focus scroll between the ends aligns the control flush
 with the box's edge, so the ring clips again. The steps rail, both Fields tab
 boxes and the tab body therefore also take `scrollPadding: focus.reach`. The
 step page takes `scrollPaddingBlock: focus.reach`: its sections already pad
-at either end. Task 5.2's sweep found 29 clipped rings this way, and none
-after the fix.
+at either end. The canvas bar and the form tab strip scroll sideways, so
+both take `scrollPaddingInline: focus.reach`. Task 5.2's sweep found 29
+clipped rings on the Steps and Fields tabs this way, and none after the fix.
 
 **The open tab's mark moves to a pseudo-element.** Today `tabSelected` in
 `ProcessTabRow.tsx` draws the mark as `inset 0 -2px 0` on the tab. That

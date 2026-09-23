@@ -1591,7 +1591,7 @@ recorded rather than fixed. The RAIL tags are local to this section.
   Risk (Informational): a long label wraps on a wide screen and fits on a
   narrow one.
 - **A canvas removal drops keyboard focus, and nothing announces it.**
-  `deleteSelection` (`packages/web/src/areas/studio/screens/EditScreen.tsx:558`)
+  `deleteSelection` (`packages/web/src/areas/studio/screens/EditScreen.tsx:569`)
   clears the selection. The pressed control unmounts with it, so focus lands on
   `<body>` and the next Tab reaches Fit to view. Remove steps behaved this way
   before Remove step joined it. Risk: a keyboard or screen-reader user loses
@@ -1600,7 +1600,7 @@ recorded rather than fixed. The RAIL tags are local to this section.
   `packages/web/src/areas/studio/canvas/CanvasView.tsx:770` already reassigns,
   and announces the removal in a polite live region.
 - **The canvas bar's caret menu ignores the arrow keys.** The panel carries
-  `role="menu"` (`packages/web/src/areas/studio/canvas/CanvasBar.tsx:360`), and
+  `role="menu"` (`packages/web/src/areas/studio/canvas/CanvasBar.tsx:372`), and
   ArrowDown leaves focus on its trigger. Risk: a screen reader announces a menu
   whose keys answer nothing (WCAG 4.1.2).
 - **No key takes a selected step out of the draft.** Delete and Backspace on a
@@ -1640,7 +1640,7 @@ recorded rather than fixed. The RAIL tags are local to this section.
   same class. Both read 4.53:1 at rest, 3.90:1 hovered and 3.45:1 pressed, in
   light.
 - **Remove step and the field catalog's Remove field trigger have no
-  destructive treatment.** `packages/web/src/areas/studio/panels/StepPage.tsx:610`
+  destructive treatment.** `packages/web/src/areas/studio/panels/StepPage.tsx:734`
   renders `btn btn-secondary` and commits at once.
   `packages/web/src/areas/studio/panels/FieldCatalogPanel.tsx:926` renders
   `btn btn-ghost` and opens `RemoveFieldDialog` instead. `DESIGN.md` asks that
@@ -1688,7 +1688,7 @@ recorded rather than fixed. The RAIL tags are local to this section.
     without the visible words (WCAG 2.5.3 and 1.3.1).
 - **STEP-3: three literal sizes sit off the type ramp.** The detector flagged
   them on 2026-09-14. The step page's `hint` sets written text at 0.8rem
-  (`panels/StepPage.tsx:143`). A condition row's remove glyph sets 1.1rem
+  (`panels/StepPage.tsx:147`). A condition row's remove glyph sets 1.1rem
   (`panels/shared/ConditionBuilder.tsx:53`). The header bar's name sets 1rem,
   where the Headline role asks 1.25rem (`panels/ProcessHeaderBar.tsx:34`).
   - Four more flags on the step page mark mono machine values at 0.8rem.
@@ -1722,17 +1722,17 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
 `panels/`, `draft/` and `screens/` start at `packages/web/src/areas/studio/`.
 
 - **FIELDS-3: below 64rem a short window leaves the editor a strip.** The
-  rail stacks above the editor, capped at 20rem (`panels/EntityTabs.tsx:71`).
+  rail stacks above the editor, capped at 20rem (`panels/EntityTabs.tsx:76`).
   Measured 2026-09-13: the editor pane stands 105px tall at 900x720, and 18px
   at 420x720 with its heading cut off. No 2px rule separates the two scroll
-  regions: the rail drops its right-hand border there (`:68`). Risk (Medium):
+  regions: the rail drops its right-hand border there (`:73`). Risk (Medium):
   the rail keeps its 20rem and the editor gets what remains.
 - **FIELDS-4 (resolved by `studio-focus-ring-clipping`): the entity rail and
   the editor pane clip the focus ring.** This
   is RAIL-3 on the Fields tab. The shell's 2px ring at a 2px offset
   (`packages/web/src/shell/global.css:37`) loses its edge against both scroll
-  boxes (`panels/EntityTabs.tsx:60`, `:72`). On the chosen entry the ring and
-  the 3px current mark (`:104`) share one accent. Risk (Low): the ring still
+  boxes (`panels/EntityTabs.tsx:60`, `:77`). On the chosen entry the ring and
+  the 3px current mark (`:114`) share one accent. Risk (Low): the ring still
   meets WCAG 2.4.7.
 - **FIELDS-5: the Validation disclosure takes its count as its name.** Its
   `<summary>` prints `({carried.length})` alone
@@ -1744,7 +1744,7 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   arrow keys and no filter. Its landmark is a `nav` named "Editors"
   (`panelsScreen.railLabel`, `packages/web/src/i18n/catalogs/studio.ts:463`).
   An entry's check badge reads "1 issues" for one check
-  (`panels/EntityTabs.tsx:302`), from the key `panelsScreen.issueMark`
+  (`panels/EntityTabs.tsx:312`), from the key `panelsScreen.issueMark`
   (`packages/web/src/i18n/catalogs/studio.ts:466`). Risk (Low): a keyboard
   user presses Tab up to 52 times to cross the rail.
 - **FIELDS-7: the Fields tab's headings and checks lack structure.** The
@@ -1765,7 +1765,7 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   removal left then, and a JSON-view edit can still write today — showed
   `view ref does not resolve: field_0fb5a2c4-0022-…`, an id the author can no
   longer look up. Adding an empty field raises the banner at
-  `screens/EditScreen.tsx:823` before the author types. The banner reads
+  `screens/EditScreen.tsx:834` before the author types. The banner reads
   `Draft is not yet structurally valid — CEL, registry, duration, and cross-process checks are held back until it is (see the Zod issues below)`,
   and it pushes the page down 35px at 1400px and 99px at 900px. The messages
   come from `src/schema/definition.ts:990`, `src/schema/compile.ts:629` and
@@ -1819,8 +1819,8 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   field or on the process. The fix touches `src/`.
 - **FIELDS-12: the Checks tab opens the Fields tab without the field.** A
   check row calls `openTabFromRow(tabForIssue(issue.entityType))`
-  (`screens/EditScreen.tsx:1003`). That function takes a tab alone (`:759`),
-  and `FieldsTab` accepts no selected field (`:950`). The spec
+  (`screens/EditScreen.tsx:1014`). That function takes a tab alone (`:770`),
+  and `FieldsTab` accepts no selected field (`:961`). The spec
   `studio-process-tabs` asks for that field to open selected
   (`openspec/specs/studio-process-tabs/spec.md:209`). Risk (Medium): the
   author lands on the Fields tab and must find the field in the entity rail.
@@ -1833,22 +1833,22 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   depth. Risk (Low): the glossary teaches a word for a UI that is gone.
 - **FIELDS-14: `FieldsTab` walks the field tree once per rail entry.** Each
   call of `FieldsTab` walks the whole tree twice, in `flattenRailFields` and
-  `flattenDraftFields` (`panels/EntityTabs.tsx:343`, `:344`). Each rail entry
-  then walks it once more through `parentIdOf` (`:585`,
+  `flattenDraftFields` (`panels/EntityTabs.tsx:353`, `:354`). Each rail entry
+  then walks it once more through `parentIdOf` (`:595`,
   `panels/fieldCatalogLogic.ts:252`), top-level entries included. Each entry
   also scans the whole check list for its badge count
-  (`panels/EntityTabs.tsx:575`, `draft/panel-rail.ts:104`). For N entries
+  (`panels/EntityTabs.tsx:585`, `draft/panel-rail.ts:104`). For N entries
   that makes N + 2 tree walks and N scans of the check list. Risk
   (Informational): the cost grows with the square of the catalog's size and
   stays harmless at 51 entries.
 - **FIELDS-15: a step or data source removal reuses its own button for the
   next entity.** `panels/DataSourcesPanel.tsx`'s `DataSourceRow` (`:161`) and
-  `screens/EditScreen.tsx`'s `<StepPage>` (`:932`) render with no `key`,
+  `screens/EditScreen.tsx`'s `<StepPage>` (`:943`) render with no `key`,
   unlike the Fields tab's own `FieldEditor`, keyed by the field's id
   (`panels/FieldCatalogPanel.tsx:1162`). A press on "Remove data source" or
   "Remove this step" therefore keeps its own button element in the DOM.
-  `removeDataSource` (`panels/EntityTabs.tsx:682`) and `onRemoveStep`
-  (`screens/EditScreen.tsx:546`) each pick a neighbour, and the same button
+  `removeDataSource` (`panels/EntityTabs.tsx:692`) and `onRemoveStep`
+  (`screens/EditScreen.tsx:557`) each pick a neighbour, and the same button
   then renders that neighbour's own remove control. This is a code reading;
   no browser run has confirmed it. Risk (Medium): a second Enter or Space
   removes a neighbour with no separate confirmation.
@@ -1904,7 +1904,7 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   `panels/ChangeList.tsx`, `panels/ChangesView.tsx` and
   `screens/VersionsScreen.tsx`. The other 42 pass a string, in 10 files. Six
   calls split across lines, and two lines carry two calls each:
-  `EntityTabs.tsx`'s move sentences (`:546`, `:547`). The grep
+  `EntityTabs.tsx`'s move sentences (`:556`, `:557`). The grep
   `git grep -n '\.replace("{' -- packages/web/src` therefore matches 46 lines.
 
   Two helpers build the placeholder in a template literal, which that grep
@@ -1914,9 +1914,9 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   function. Risk (Low): one replacer function closes every site that still
   passes a string: `.replace("{field}", () => label)`.
 - **FIELDS-20: a second identical move announces nothing.** `moveField`
-  (`panels/EntityTabs.tsx:526`) writes its sentence straight into the shared
-  live region (`:544`), a pattern that predates this change. `removeField`
-  (`:500`) empties the region first and writes on the next animation frame
+  (`panels/EntityTabs.tsx:536`) writes its sentence straight into the shared
+  live region (`:554`), a pattern that predates this change. `removeField`
+  (`:510`) empties the region first and writes on the next animation frame
   instead. That step matters when one removal sentence repeats, since two
   different sentences announce without it. Two unnamed fields moved into the
   same group, one after another, still produce one sentence twice: the live
@@ -1972,7 +1972,7 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   1440x900: Remove field `[344, 802, 101×37]`, "+ Add field"
   `[344, 839, 109×37]`, 0px apart; `panels/FieldCatalogPanel.tsx:279-285`
   draws the 2px rule above Remove field only. A field with no reach leaves
-  on one press (`panels/EntityTabs.tsx:472-475`), and a freshly added field
+  on one press (`panels/EntityTabs.tsx:482-485`), and a freshly added field
   always has no reach. A double click removes a field, then opens the
   neighbour field's Data source select. Risk (Medium): a press meant for
   "+ Add field" can remove the field just configured, with no undo.
@@ -1997,7 +1997,7 @@ tags are local to this section; paths under `panels/` and `screens/` start at
 
 - **CHANGES-2 (resolved by `studio-focus-ring-clipping`): every tab body
   clips the edge of a focus ring.** The tab body
-  scrolls and sets no inline padding (`screens/EditScreen.tsx:180`). The
+  scrolls and sets no inline padding (`screens/EditScreen.tsx:182`). The
   shell's 2px ring at a 2px offset (`packages/web/src/shell/global.css:37`)
   loses its edge against either side of that box. On the Changes tab it cuts
   the Expand all command's right edge, and at 400px the open command's left
@@ -2118,13 +2118,19 @@ only the marks the miniature draws. The required count stands beside it.
   classes and no `btn`. Its ground reads `rgb(240, 240, 240)` in light and
   `rgb(107, 107, 107)` in dark, the browser's own button face. The form
   editor's pressed column option loses its box and weight the same way.
-  - The sites are `screens/EditScreen.tsx:819`, `:1052` and `:1068`, and
+  - The sites are `screens/EditScreen.tsx:830`, `:1067` and `:1083`, and
     `screens/FormEditorScreen.tsx:1234`, `:1298` and `:1314`. The rest sit at
     `screens/VersionsScreen.tsx:263`, `screens/ToolsScreen.tsx:189`,
     `screens/PlayerScreen.tsx:336` and `screens/MigrationPlanScreen.tsx:281`.
   - Risk (Medium): the back link draws a gray box on every dark studio
     screen. The unpressed column option looks pressed. The fix joins the
     literal classes into the spread, as the strip's `ghost` helper does.
+- **FORMS-20: at 400px the form editor squeezes its canvas to 118px.** The
+  field list keeps its column beside the canvas
+  (`screens/FormEditorScreen.tsx`). Measured 2026-09-24 at 400x800 on
+  "Submit the Exit Notification": the canvas pane scrolls 70px sideways. The
+  form tab strip inside it stands 86px wide and shows about one tab. Risk (Medium): an author on a narrow window edits a form through a
+  slot 118px wide.
 
 ## Open from the authoring-command-ink-advisory-role review (one OpenSpec change per screen)
 
@@ -2135,7 +2141,7 @@ tags are local to this section. Paths under `panels/` and `screens/` start at
 
 - **TONE-1: the missing-translation message takes two looks.** The step page
   draws `missingTranslationWarning` beside a 2px refusal rule, its `warning`
-  block (`panels/StepPage.tsx:130`). Three other sites draw the same message
+  block (`panels/StepPage.tsx:134`). Three other sites draw the same message
   beside the 3px advisory rule. Those are the header bar's `warning` block
   (`panels/ProcessHeaderBar.tsx:62`) and the field catalog's `studioWarning`
   (`panels/FieldCatalogPanel.tsx:327`). The form editor's `studioWarning`
