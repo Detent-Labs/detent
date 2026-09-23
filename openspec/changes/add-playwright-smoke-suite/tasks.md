@@ -4,20 +4,20 @@
 
 - [x] 1.1 Add `@playwright/test` to the root `devDependencies`. Run `bun install` in the devcontainer. Then run `bun run scripts/thirdparty.ts --write`. Verify: `THIRDPARTY.md` gains the row, and `sh scripts/gates/lockfile.sh` passes.
 - [x] 1.2 Write `playwright.config.ts` per design D2. Add `test-results/`, `playwright-report/` and `e2e/.auth/` to `.gitignore`. Add `e2e` and `playwright.config.ts` to the root `tsconfig.json` include list. Verify: `bun run typecheck` passes.
-- [ ] 1.3 Verify that `bun test` collects no file under `e2e/`. Read the file list the run prints, and name the check in the ledger.
+- [x] 1.3 Verify that `bun test` collects no file under `e2e/`. Read the file list the run prints, and name the check in the ledger.
 
 ## 2. The run script
 
 - [x] 2.1 Write `scripts/e2e.ts` per design D1, steps 1 to 3 and 6 to 8. Add the root script `"e2e": "bun run scripts/e2e.ts"`. Verify: the script exits non-zero and names `DATABASE_URL` when that variable is unset. A run without `packages/web/dist` names `bun run build`.
 - [x] 2.2 Add the account and the draft per design D3, as step 5 of the script. Verify: after a run, the `_e2e` database holds the account and the draft. The development database keeps its row count in `definitions` and `auth_users`.
-- [ ] 2.3 Verify the cleanup path. Run the suite with one flow forced to fail. Then confirm that no `src/http/server.ts` process stays alive in the container.
+- [x] 2.3 Verify the cleanup path. Run the suite with one flow forced to fail. Then confirm that no `src/http/server.ts` process stays alive in the container.
 
 ## 3. The four flows
 
-- [ ] 3.1 Write the `setup` project and `e2e/areas.e2e.ts` per design D4, the **areas** flow. Verify: it passes, and it fails when the flow expects "Something went wrong." to render.
-- [ ] 3.2 Write `e2e/task.e2e.ts` per design D4, the **task** flow. Verify: it passes. On a throwaway commit, remove the navigation to My tasks after a submit in `TaskScreen.tsx`. See the flow fail by name. Undo that commit with `git revert`.
-- [ ] 3.3 Write `e2e/cancel.e2e.ts` per design D4, the **cancel** flow. Verify: it passes. On a throwaway commit, make `InstancesScreen.tsx` keep its first loaded list across a remount. See the flow fail by name, then `git revert` the commit.
-- [ ] 3.4 Write `e2e/publish.e2e.ts` per design D4, the **publish refusal** flow first and the **publish** flow second. Verify: both pass. On a throwaway commit, render the refusal in the header banner instead of in the dialog. See the refusal flow fail by name, then `git revert` the commit.
+- [x] 3.1 Write the `setup` project and `e2e/areas.e2e.ts` per design D4, the **areas** flow. Verify: it passes, and it fails when the flow expects "Something went wrong." to render.
+- [x] 3.2 Write `e2e/task.e2e.ts` per design D4, the **task** flow. Verify: it passes. On a throwaway commit, remove the navigation to My tasks after a submit in `TaskScreen.tsx`. See the flow fail by name. Undo that commit with `git revert`.
+- [x] 3.3 Write `e2e/cancel.e2e.ts` per design D4, the **cancel** flow. Verify: it passes. On a throwaway commit, make `InstancesScreen.tsx` keep its first loaded list across a remount. See the flow fail by name, then `git revert` the commit.
+- [x] 3.4 Write `e2e/publish.e2e.ts` per design D4, the **publish refusal** flow first and the **publish** flow second. Verify: both pass. On a throwaway commit, render the refusal in the header banner instead of in the dialog. See the refusal flow fail by name, then `git revert` the commit.
 
 ## 4. CI
 
