@@ -1063,6 +1063,29 @@ stage-by-stage status.
   across areas the way a hand-written one could, so the risk the test
   guarded is gone, not merely unchecked.
 
+- **Subprocess cycles and unbounded CEL cost: SEC-1 and SEC-7 closed.** The
+  change `add-publish-cycle-check-and-cel-deadline` shipped 2026-09-23. The
+  owner ruled three points that day. A publish-time check and a runtime
+  depth cap both stay, each backing the other. A process that calls itself
+  is a cycle, and publish rejects it. CEL gets structural limits fixed at
+  authoring time, never a runtime timer.
+
+  Publish now rejects a body that reaches its own `processId` through
+  subprocess references, comparing process ids rather than versions. This
+  closes SEC-1. A `process.start` chain stays outside the check. It is
+  fire-and-forget. A loop there is a legitimate pattern, such as a yearly
+  renewal that starts next year's instance.
+
+  The spawn handler also refuses a child once its parent already sits 16
+  levels deep. That is a runtime backstop for a cycle the publish check
+  missed.
+
+  Every checked CEL site now holds a structural bound. It caps AST nodes at
+  2,000 and parse depth at 64. It nests at most two comprehension macros.
+  This closes SEC-7. The bound catches a nested-comprehension guard at
+  publish, before it ever runs. Evaluation itself keeps no wall-clock bound,
+  exactly as the owner ruled.
+
 ## Decided, not yet built (each needs its own OpenSpec change)
 - **A non-studio surface for a pure Owner, and write-time eligibility
   validation on a list entry.** `process-access-roles` (shipped) named
@@ -1370,19 +1393,14 @@ stage-by-stage status.
 
 ## Open from the 2026-08-18 code review (each needs its own OpenSpec change)
 
-All ten items on the Prioritized Action List of
+Nine of the ten items on the Prioritized Action List of
 [`openspec/changes/archive/2026-08-18-code-review-record/CODE_REVIEW.md`](../openspec/changes/archive/2026-08-18-code-review-record/CODE_REVIEW.md)
-are open. Each was re-checked against the tree on 2026-09-09. That review
+are open. SEC-1, the tenth, closed 2026-09-23 as
+`add-publish-cycle-check-and-cel-deadline`; see "Decided and built" above.
+Each open item was re-checked against the tree on 2026-09-09. That review
 holds the reasoning and the recommended fix. This section records that
 nothing else tracks them.
 
-- **SEC-1: the subprocess and chaining graph has no cycle check.** Publish-time
-  validation resolves each child and checks every `inputMapping` target
-  (`src/engine/definitions.ts:468`). No walk over the reference graph runs.
-  `validateProcessChaining` (`src/engine/definitions.ts:531`) repeats the
-  shape, and the spawn handler (`src/engine/subprocess.ts:53`) counts no hops.
-  Risk: a published reference cycle spawns instances until storage fills. The
-  oldest of the ten, and the only one the review rates High.
 - **SEC-2: no password floor on any write path.** `requireNonBlank` is the
   whole check on `POST /admin/users/:userId/password`
   (`src/http/admin-routes.ts:253`), and the route comment states the position
@@ -1464,18 +1482,12 @@ nothing else tracks them.
   trusts the smaller number and misses three checks. The 2026-09-09 documentation
   audit found it; the next change inside that file carries the fix.
 
-The nine findings below never reached the list above. Seven are Low and two
-are Informational. Each was re-checked against the tree on 2026-09-10, and
-each entry carries the anchor that holds today. All nine stay open.
+The eight findings below never reached the list above. Six are Low and two
+are Informational. SEC-7, once Low, closed 2026-09-23 as
+`add-publish-cycle-check-and-cel-deadline`; see "Decided and built" above.
+Each open item was re-checked against the tree on 2026-09-10, and each entry
+carries the anchor that holds today. All eight stay open.
 
-- **SEC-7: CEL evaluation has no wall-clock bound.** `evaluate`
-  runs inside `try`/`catch` at `src/cel/eval.ts:129` and `:166`, so a raise
-  reads as no match while time stays unbounded. `MAX_EXPRESSION_LENGTH` at
-  `src/schema/compile.ts:156` caps source at 4,000 characters, a bound on
-  length rather than on cost. Risk (Low): a deeply nested comprehension holds its
-  transaction's locks for the whole evaluation. Authoring needs
-  `system:developer` or `system:author`, so this is defense in depth. The
-  review prefers a publish-time complexity bound over a runtime timer.
 - **SEC-8: attachment `contentType` is caller-supplied and echoed on
   download.** The upload schema at `src/http/routes.ts:111` constrains it to
   `MIME_TOKEN_PAIR` (`:108`), and the download handler at `:394` returns it

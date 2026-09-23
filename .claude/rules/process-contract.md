@@ -244,12 +244,23 @@ placement as the other two — after the hash-hit no-op return, so an
 already-published body's re-publish stays a no-op even after a referenced
 group's scope narrows underneath it (`group-scope-validation`).
 
-`publishBody` awaits six DB-resolving checks in all, in this order:
-`validateCrossProcess`, `validateProcessChaining`, `validateGroupScope`,
-`validateInstanceQueryReferences`, `validateInstanceTransitionReferences`,
-`validateCrossProcessReadGrant`. The two `instance*References` checks also
-return the `PublishFinding`s the publish result carries.
-`validateCrossProcessReadGrant` is skipped when the caller passes no actor.
+`publishBody` awaits seven DB-resolving checks in all, in this order:
+`validateCrossProcess`, `validateSubprocessCycle`, `validateProcessChaining`,
+`validateGroupScope`, `validateInstanceQueryReferences`,
+`validateInstanceTransitionReferences`, `validateCrossProcessReadGrant`. The
+two `instance*References` checks also return the `PublishFinding`s the
+publish result carries. `validateCrossProcessReadGrant` is skipped when the
+caller passes no actor.
+
+The new check, `validateSubprocessCycle`, walks the subprocess steps of the
+published body and of each child they reach. Each reference resolves the
+way `validateCrossProcess` resolves it. It throws
+`CrossProcessValidationError` when the walk reaches the published
+`processId` again, at any version. The message names the chain, for example
+`subprocess cycle: A → B → A`. The comparison ignores version: a pinned
+reference to an earlier, non-calling version of the same process still
+closes a cycle. A `process.start` action takes no part in the walk, since it
+is fire-and-forget rather than a wait-state reference.
 
 **Runtime record (the audit backbone).** The instance carries assignment/claim
 state and persisted timer firings. Each HistoryEntry is append-only and records

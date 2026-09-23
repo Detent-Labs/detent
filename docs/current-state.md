@@ -268,8 +268,9 @@ Stage-by-stage status is in `ROADMAP.md`.
 
   `publishBody` calls `validateStructure` first. It hashes and no-ops on a
   hit. It then calls `validateReferences` with its own live registries
-  attached. It still calls `validateCrossProcess`/`validateProcessChaining`
-  directly after that. Both of those stay async and DB-resolving, outside the
+  attached. It still calls
+  `validateCrossProcess`/`validateSubprocessCycle`/`validateProcessChaining`
+  directly after that. All three stay async and DB-resolving, outside the
   module, in their existing position.
 
   `src/engine/registry.ts` gained `RegistryDescription` and
