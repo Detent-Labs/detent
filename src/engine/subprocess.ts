@@ -98,9 +98,10 @@ function makeSpawnHandler(
 
       // Spawn depth cap: count the parent's own nesting depth by following
       // `parent` links upward, stopping as soon as it reaches the cap so the
-      // walk costs at most MAX_SUBPROCESS_DEPTH row reads. A top-level instance
-      // has depth 0; a missing ancestor row ends the count at the depth reached
-      // so far.
+      // walk costs at most MAX_SUBPROCESS_DEPTH - 1 row reads: the parent
+      // itself is already loaded, so the loop only reads ancestors above it.
+      // A top-level instance has depth 0; a missing ancestor row ends the
+      // count at the depth reached so far.
       let depth = 0;
       let link = parent.parent;
       while (link) {

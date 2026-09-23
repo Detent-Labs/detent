@@ -176,6 +176,9 @@ function forbiddenTimeCall(node: unknown): string | null {
   return null;
 }
 
+const COMPREHENSIONS = new Set(["all", "exists", "exists_one", "map", "filter"]);
+const MAX_COMPREHENSION_NESTING = 2;
+
 /**
  * Nested comprehensions multiply evaluation cost (n, n², n³ over an n-row list),
  * so at most two may nest. The parsed tree keeps a macro in source form: an
@@ -183,9 +186,6 @@ function forbiddenTimeCall(node: unknown): string | null {
  * sit inside it; its receiver is evaluated outside and keeps the outer depth.
  * Returns an issue message when a third comprehension opens inside two others.
  */
-const COMPREHENSIONS = new Set(["all", "exists", "exists_one", "map", "filter"]);
-const MAX_COMPREHENSION_NESTING = 2;
-
 function comprehensionTooDeep(node: unknown, depth = 0): string | null {
   if (!node || typeof node !== "object") return null;
   const n = node as { op?: string; args?: unknown };

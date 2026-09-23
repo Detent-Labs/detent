@@ -652,6 +652,25 @@ test("accepts two nested comprehensions at a guard", () => {
   expect(validateProcessBody(body({ fields: listFields, steps: [guardStep(src)] }))).toEqual([]);
 });
 
+// A comprehension's receiver is evaluated outside the macro and keeps the
+// outer depth (see comprehensionTooDeep's doc comment). Here the outer `all`
+// opens depth 1, and its argument `map(...).exists(...)` opens depth 2 at
+// `exists` — still within the limit. If the receiver `map(...)` were instead
+// walked at `exists`'s depth+1 (3), this would wrongly reject.
+test("accepts a comprehension in a receiver, which keeps the outer depth", () => {
+  const src = "data.items.all(a, data.items.map(b, b).exists(c, a == c))";
+  expect(validateProcessBody(body({ fields: listFields, steps: [guardStep(src)] }))).toEqual([]);
+});
+
+// A probe against the pinned library found the boundary: 62 wrapping parens
+// around this comparison still checks, 63 exceeds maxDepth (64) — the
+// comparison's own nodes (member access, literal, operator) already use up
+// depth before any paren is added.
+test("accepts 62 levels of parentheses at a guard, one below the depth limit", () => {
+  const src = `${"(".repeat(62)}data.amount > 1.0${")".repeat(62)}`;
+  expect(validateProcessBody(body({ steps: [guardStep(src)] }))).toEqual([]);
+});
+
 test("rejects 65 levels of parentheses at a guard with the depth limit", () => {
   const src = `${"(".repeat(65)}data.amount > 1.0${")".repeat(65)}`;
   const issues = validateProcessBody(body({ steps: [guardStep(src)] }));

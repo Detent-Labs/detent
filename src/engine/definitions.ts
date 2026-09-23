@@ -705,9 +705,10 @@ export async function publishBody(
 
   // Then subprocess wiring and process-chaining targets, against the
   // (immutable, already-validated) published processes they reference.
-  // Nothing above this point has persisted. One store instance serves both
-  // checks, so a process referenced by both a subprocess step and a
-  // process.start action resolves from one cache, not two.
+  // Nothing above this point has persisted. One store instance serves every
+  // check below, so a process referenced by a subprocess step, a
+  // process.start action, or an instance query/transition target resolves
+  // from one cache, not several.
   const definitionStore = createDefinitionStore(db);
   await validateCrossProcess(body, definitionStore);
   await validateSubprocessCycle(processId, body, definitionStore);

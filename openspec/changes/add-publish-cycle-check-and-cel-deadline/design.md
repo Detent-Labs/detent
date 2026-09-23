@@ -87,9 +87,11 @@ handler throws an `Error` that names the step and the cap. A test instance's
 refused spawn takes this same path. The outbox retries it, dead-letters it, and
 the parent stays parked where an operator sees it.
 
-The walk costs at most 16 row reads, once per spawn. A missing ancestor row
-ends the count at the depth reached so far. A redelivery that finds
-the child already created skips the walk, as it skips creation.
+The walk costs at most MAX_SUBPROCESS_DEPTH - 1 (15) row reads, once per
+spawn. The parent itself is already loaded before the walk starts, so the
+loop only reads ancestors above it. A missing ancestor row ends the count at
+the depth reached so far. A redelivery that finds the child already created
+skips the walk, as it skips creation.
 
 Alternative considered: a `depth` field on `Instance`, written at spawn. It
 saves the reads. But it changes the instance schema for a backstop that fires

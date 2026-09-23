@@ -252,7 +252,7 @@ two `instance*References` checks also return the `PublishFinding`s the
 publish result carries. `validateCrossProcessReadGrant` is skipped when the
 caller passes no actor.
 
-The new check, `validateSubprocessCycle`, walks the subprocess steps of the
+The cycle check, `validateSubprocessCycle`, walks the subprocess steps of the
 published body and of each child they reach. Each reference resolves the
 way `validateCrossProcess` resolves it. It throws
 `CrossProcessValidationError` when the walk reaches the published

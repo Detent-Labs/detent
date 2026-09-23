@@ -15,8 +15,9 @@ import { contractHash } from "../src/schema/hash.js";
 import type { ProcessBody, ProcessId } from "../src/schema/definition.js";
 
 const DB = !!process.env.DATABASE_URL;
-// Fixture bodies in this file declare no actions, so an empty registry is
-// sufficient for every publishBody call here.
+// Most fixture bodies in this file declare no actions, so an empty registry is
+// sufficient for every publishBody call except the process.start loop test
+// below, which builds its own full registry.
 const reg = createRegistry();
 const dataSourceReg = createDataSourceRegistry();
 const CHILD = "proc_cpv_child" as ProcessId;
