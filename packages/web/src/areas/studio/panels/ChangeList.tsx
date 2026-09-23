@@ -27,6 +27,13 @@ import {
 } from "../draft/changeSet.js";
 import type { DiffEntry } from "../screens/versionDiffLogic.js";
 
+// The open command's button pulls back by this sum so its text stands flush
+// with the property names: `.btn-ghost`'s inline padding (`space.s1`) plus
+// `.btn`'s 1px border. `openCommandFlush` and `body`'s narrow-width padding
+// both read this one constant, so the pull-back and its restore cannot drift
+// apart.
+const OPEN_COMMAND_PULL_BACK = `${space.s1} + 1px`;
+
 const styles = stylex.create({
   headingLine: {
     display: "flex",
@@ -171,18 +178,16 @@ const styles = stylex.create({
     flex: "none",
   },
   // Below 40rem, `openCommandFlush` pulls the open command's button back by
-  // `space.s1 + 1px`, `.btn-ghost`'s inline padding plus `.btn`'s border,
-  // so its text stands flush with the property names below. That same pull
-  // carries the button's own focus ring past the tab body's own padding,
-  // which otherwise grants every control in this box the ring's reach
-  // (`EditScreen.tsx`'s `tabBody`). This padding restores that reach for
-  // the pulled-back button by exactly the amount the pull removes, moving
-  // the property names over by the same amount so the two stay flush.
+  // `OPEN_COMMAND_PULL_BACK`, past the tab body's own padding, which
+  // otherwise grants every control in this box the ring's reach
+  // (`EditScreen.tsx`'s `tabBody`). This padding restores that same amount
+  // for the pulled-back button, moving the property names over by it too so
+  // the two stay flush.
   body: {
     paddingBlockEnd: space.s3,
     paddingInlineStart: {
       default: `calc(5.5rem + ${space.s4})`,
-      "@media (max-width: 40rem)": `calc(${space.s1} + 1px)`,
+      "@media (max-width: 40rem)": `calc(${OPEN_COMMAND_PULL_BACK})`,
     },
   },
   // Name, before, arrow, after. Each value column takes its widest value up to
@@ -242,10 +247,10 @@ const styles = stylex.create({
     marginBlockStart: space.s2,
   },
   // `.btn-ghost`'s inline padding and `.btn`'s 1px border would set the open
-  // command's text right of the property names. This command alone pulls back
-  // by both, so its text stands flush left.
+  // command's text right of the property names. This command alone pulls
+  // back by `OPEN_COMMAND_PULL_BACK`, so its text stands flush left.
   openCommandFlush: {
-    marginInlineStart: `calc(-1 * (${space.s1} + 1px))`,
+    marginInlineStart: `calc(-1 * (${OPEN_COMMAND_PULL_BACK}))`,
   },
   developer: {
     marginBlockStart: space.s2,
