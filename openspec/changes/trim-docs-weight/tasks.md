@@ -10,10 +10,10 @@
 
 ## 2. Replace current-state.md with the index
 
-- [ ] 2.1 Record the short SHA of the last commit that touched `docs/current-state.md` with `git log -1 --format=%h -- docs/current-state.md`. Verify: `git show <sha>:docs/current-state.md` prints 5095 lines.
-- [ ] 2.2 Write the new `docs/current-state.md` per design D2 and D3, one `##` heading per subsystem, about 300 lines. Its opening paragraph sends a reader who needs symbol detail to the knowledge graph, the code and `docs/openapi.yaml`. Verify: `wc -l` reports 350 lines or fewer.
-- [ ] 2.3 Check each path the index names. Verify: a loop over every backticked path in the file finds each one with `ls`.
-- [ ] 2.4 Check that the index names no exported symbol. Verify: list every backticked token that is not a path, a capability name, a role or a route. Each remaining token must match no `export` in `src/` or `packages/`.
+- [x] 2.1 Record the short SHA of the last commit that touched `docs/current-state.md` with `git log -1 --format=%h -- docs/current-state.md`. Verify: `git show <sha>:docs/current-state.md` prints 5095 lines.
+- [x] 2.2 Write the new `docs/current-state.md` per design D2 and D3, one `##` heading per subsystem, about 300 lines. Its opening paragraph sends a reader who needs symbol detail to the knowledge graph, the code and `docs/openapi.yaml`. Verify: `wc -l` reports 350 lines or fewer.
+- [x] 2.3 Check each path the index names. Verify: a loop over every backticked path in the file finds each one with `ls`.
+- [x] 2.4 Check that the index names no exported symbol. Verify: list every backticked token that is not a path, a capability name, a role or a route. Each remaining token must match no `export` in `src/` or `packages/`.
 
 ## 3. Re-point and close the citations
 
