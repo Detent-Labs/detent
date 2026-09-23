@@ -61,8 +61,10 @@ const styles = stylex.create({
     overscrollBehavior: "contain",
     minWidth: 0,
     // Room for the focus ring: a scroll box clips at its padding edge
-    // (`studio-focus-ring-clipping`, FIELDS-4).
+    // (`studio-focus-ring-clipping`, FIELDS-4). The scroll padding keeps
+    // that room when a focus scroll stops short of either end.
     padding: focus.reach,
+    scrollPadding: focus.reach,
   },
   // Below the breakpoint the rail gives up its column, so its right edge no
   // longer separates anything. The cap keeps a long list from taking the whole
@@ -79,8 +81,10 @@ const styles = stylex.create({
     // clips and scrolls them instead of the page.
     position: "relative",
     // Room for the focus ring: a scroll box clips at its padding edge
-    // (`studio-focus-ring-clipping`, FIELDS-4).
+    // (`studio-focus-ring-clipping`, FIELDS-4). The scroll padding keeps
+    // that room when a focus scroll stops short of either end.
     padding: focus.reach,
+    scrollPadding: focus.reach,
   },
   railList: {
     listStyle: "none",

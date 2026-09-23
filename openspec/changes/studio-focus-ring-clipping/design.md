@@ -73,6 +73,14 @@ sides at once. A block scroller also clips its first row's top ring edge. The ta
 row loses nothing by a 4px inline gap either. One shape at every site is
 easier to check than four.
 
+**Scroll padding keeps the gap mid-scroll.** Padding helps only at either
+end of a scroll box. A focus scroll between the ends aligns the control flush
+with the box's edge, so the ring clips again. The steps rail, both Fields tab
+boxes and the tab body therefore also take `scrollPadding: focus.reach`. The
+step page takes `scrollPaddingBlock: focus.reach`: its sections already pad
+at either end. Task 5.2's sweep found 29 clipped rings this way, and none
+after the fix.
+
 **The open tab's mark moves to a pseudo-element.** Today `tabSelected` in
 `ProcessTabRow.tsx` draws the mark as `inset 0 -2px 0` on the tab. That
 rule sits flush on the row's 2px divider. A 4px bottom pad on the row would

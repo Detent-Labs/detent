@@ -32,8 +32,11 @@ const styles = stylex.create({
     maxHeight: { default: "none", [NARROW]: "20rem" },
     // Room for the focus ring: a scroll box clips at its padding edge, and
     // the first row's ring would otherwise lose its top (`studio-focus-ring-
-    // clipping`, RAIL-3).
+    // clipping`, RAIL-3). The scroll padding keeps that room when a focus
+    // scroll stops mid-list, which would otherwise align a row flush with
+    // the edge.
     padding: focus.reach,
+    scrollPadding: focus.reach,
   },
   list: {
     listStyle: "none",

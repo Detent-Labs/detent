@@ -1572,6 +1572,13 @@ recorded rather than fixed. The RAIL tags are local to this section.
 - **RAIL-6: the desktop rail is narrower than the phone rail.** The Steps tab
   gives the rail 18rem beside the step page, in `EditScreen.tsx`. Below 64rem
   the rail takes the full width and caps its height at 20rem.
+- **RAIL-7: below 64rem the Steps tab nests three scroll boxes.** The rail
+  stands over the step page, and the step page scrolls on its own
+  (`panels/StepPage.tsx:35`). The tab body scrolls around both. Measured
+  2026-09-24 at 400x800: the tab body scrolls 161px and the rail 352px. The
+  step page scrolls 2698px inside a box 244px tall. Risk (Medium): a wheel
+  or a swipe moves whichever box sits under it, and the step page shows
+  244px at a time.
 - **DRAFT-1 (behaviour bug, own OpenSpec change): the header bar's Discard
   draft does nothing.** Choose it on a
   draft's process surface, then choose the dialog's own Discard draft: the
@@ -1687,6 +1694,20 @@ recorded rather than fixed. The RAIL tags are local to this section.
   - Four more flags on the step page mark mono machine values at 0.8rem.
     The Hierarchy in `DESIGN.md` allows that size for them.
   - Risk (Low): type drifts outside the roles `DESIGN.md` names.
+- **STEP-4: four action lists take a JSON key as their legend.** The step
+  page passes `"onEntry"`, `"onExit"` and `"onCancel"` as literal labels
+  (`panels/StepPage.tsx:519`, `:636`, `:644`). The Paths section passes
+  `"onPath"` the same way (`panels/PathsPanel.tsx:332`). Each prints in the
+  written face, under a section heading that already reads "On entry" or
+  "On exit". None of the four comes from the studio catalog. Risk (Low): the
+  author reads a machine key in the prose face, and a UI-string override
+  cannot reach it.
+- **STEP-5: a step's description takes a one-line input.** The masthead's
+  description uses `LocalizedTextInput` (`panels/StepPage.tsx:766`), which
+  renders an `<input>`. Measured 2026-09-24 at 1300x900, IT Offboarding's
+  first step holds an 857-character description. The 944px input shows
+  about a sixth of it. Risk (Low): the author edits a paragraph through a
+  slot one line tall.
 
 ## Open from the 2026-09-13 Fields tab audits (one OpenSpec change per screen)
 
@@ -1958,6 +1979,12 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
 
   Name the fix: separate the two commands, with spacing and a rule between
   them, or move Remove field into the field's own heading row.
+- **FIELDS-25: the effect half prints one step list twice.** "Only ask this
+  when" and "Ask for this" each open with "Writes to:" and the full step list
+  (`panels/FieldCatalogPanel.tsx:976`, `:1013`). Measured 2026-09-24 at
+  1300x900 on the group "Personal details": each list names all 12 steps and
+  wraps to five lines. Risk (Low): each zone's own control sits below five
+  lines of the same names.
 
 ## Open from the 2026-09-13 Changes tab audit (one OpenSpec change per screen)
 

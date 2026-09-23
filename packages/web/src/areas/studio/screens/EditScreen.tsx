@@ -190,8 +190,10 @@ const styles = stylex.create({
     // positioned container clips and scrolls it instead of the page.
     position: "relative",
     // Room for the focus ring: a scroll box clips at its padding edge
-    // (`studio-focus-ring-clipping`, CHANGES-2).
+    // (`studio-focus-ring-clipping`, CHANGES-2). The scroll padding keeps
+    // that room when a focus scroll stops short of either end.
     padding: focus.reach,
+    scrollPadding: focus.reach,
   },
   tabBodyHidden: {
     display: "none",

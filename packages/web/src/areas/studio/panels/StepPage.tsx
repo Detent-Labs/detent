@@ -1,6 +1,6 @@
 import { useState } from "react";
 import * as stylex from "@stylexjs/stylex";
-import { colors, fonts, space } from "form-ui/tokens.stylex";
+import { colors, focus, fonts, space } from "form-ui/tokens.stylex";
 import type { Step } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
 import type { DraftField } from "../draft/fields";
@@ -41,6 +41,10 @@ const styles = stylex.create({
     overscrollBehavior: "contain",
     paddingBlock: 0,
     paddingInline: space.s3,
+    // The masthead's and the Developer view's own padding clear the focus
+    // ring at either end. Mid-scroll, a focus scroll would align a control
+    // flush with the edge and clip its ring (`studio-focus-ring-clipping`).
+    scrollPaddingBlock: focus.reach,
   },
   empty: {
     color: colors.textMuted,
