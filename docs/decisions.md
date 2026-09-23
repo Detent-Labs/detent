@@ -1370,11 +1370,11 @@ stage-by-stage status.
 
 ## Open from the 2026-08-18 code review (each needs its own OpenSpec change)
 
-All ten items on the Prioritized Action List of
+Nine of the ten items on the Prioritized Action List of
 [`openspec/changes/archive/2026-08-18-code-review-record/CODE_REVIEW.md`](../openspec/changes/archive/2026-08-18-code-review-record/CODE_REVIEW.md)
-are open. Each was re-checked against the tree on 2026-09-09. That review
-holds the reasoning and the recommended fix. This section records that
-nothing else tracks them.
+are open. CQ-1 is resolved. Each was re-checked against the tree on 2026-09-09.
+That review holds the reasoning and the recommended fix. This section records
+that nothing else tracks them.
 
 - **SEC-1: the subprocess and chaining graph has no cycle check.** Publish-time
   validation resolves each child and checks every `inputMapping` target
@@ -1462,8 +1462,9 @@ nothing else tracks them.
   audit found it; the next change inside that file carries the fix.
 
 The nine findings below never reached the list above. Seven are Low and two
-are Informational. Each was re-checked against the tree on 2026-09-10, and
-each entry carries the anchor that holds today. All nine stay open.
+were Informational; DEP-2 is now resolved. Each was re-checked against the
+tree on 2026-09-10, and each entry carries the anchor that holds today.
+Eight stay open, seven Low and one Informational.
 
 - **SEC-7: CEL evaluation has no wall-clock bound.** `evaluate`
   runs inside `try`/`catch` at `src/cel/eval.ts:129` and `:166`, so a raise
