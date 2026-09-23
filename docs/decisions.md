@@ -1538,7 +1538,7 @@ each entry carries the anchor that holds today. All nine stay open.
   from one actor issues one grant query each. The review calls it documented
   and correctly bounded, and recommends nothing.
 
-## Open from the 2026-09-11 design audits (each needs its own OpenSpec change)
+## Open from the 2026-09-11 design audits (one OpenSpec change per screen)
 
 Three changes ran `/impeccable critique` and `/impeccable audit` on 2026-09-11.
 They are `steps-rail-rows-drop-summary-line` on the Studio Steps tab,
@@ -1554,7 +1554,8 @@ recorded rather than fixed. The RAIL tags are local to this section.
   `minHeight` floor never binds against that larger sum. Risk (Low), carried
   over unchanged: that width clears the 24px minimum target and misses the
   44px enhanced one.
-- **RAIL-3: the rail clips its own focus ring.** The rail scrolls on its
+- **RAIL-3 (resolved by `studio-focus-ring-clipping`): the rail clips its own
+  focus ring.** The rail scrolls on its
   block axis, and a scroll container on one axis clips the other. The shell
   draws a 2px ring at a 2px offset, in `global.css`. Risk (Low): the ring's
   leading edge falls outside the rail's box and disappears.
@@ -1686,7 +1687,7 @@ recorded rather than fixed. The RAIL tags are local to this section.
     The Hierarchy in `DESIGN.md` allows that size for them.
   - Risk (Low): type drifts outside the roles `DESIGN.md` names.
 
-## Open from the 2026-09-13 Fields tab audits (each needs its own OpenSpec change)
+## Open from the 2026-09-13 Fields tab audits (one OpenSpec change per screen)
 
 The change `group-child-own-editor` ran a final code review, browser walks,
 `/impeccable critique` and `/impeccable audit` on the Studio Fields tab on
@@ -1704,7 +1705,8 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   at 420x720 with its heading cut off. No 2px rule separates the two scroll
   regions: the rail drops its right-hand border there (`:68`). Risk (Medium):
   the rail keeps its 20rem and the editor gets what remains.
-- **FIELDS-4: the entity rail and the editor pane clip the focus ring.** This
+- **FIELDS-4 (resolved by `studio-focus-ring-clipping`): the entity rail and
+  the editor pane clip the focus ring.** This
   is RAIL-3 on the Fields tab. The shell's 2px ring at a 2px offset
   (`packages/web/src/shell/global.css:37`) loses its edge against both scroll
   boxes (`panels/EntityTabs.tsx:60`, `:72`). On the chosen entry the ring and
@@ -1956,7 +1958,7 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   Name the fix: separate the two commands, with spacing and a rule between
   them, or move Remove field into the field's own heading row.
 
-## Open from the 2026-09-13 Changes tab audit (each needs its own OpenSpec change)
+## Open from the 2026-09-13 Changes tab audit (one OpenSpec change per screen)
 
 The change `changes-tab-entity-change-list` ran browser walks,
 `/impeccable critique`, `/impeccable audit` and `web-design-guidelines` on
@@ -1965,7 +1967,8 @@ below predates that change or belongs to another component. The `CHANGES-n`
 tags are local to this section; paths under `panels/` and `screens/` start at
 `packages/web/src/areas/studio/`.
 
-- **CHANGES-2: every tab body clips the edge of a focus ring.** The tab body
+- **CHANGES-2 (resolved by `studio-focus-ring-clipping`): every tab body
+  clips the edge of a focus ring.** The tab body
   scrolls and sets no inline padding (`screens/EditScreen.tsx:180`). The
   shell's 2px ring at a 2px offset (`packages/web/src/shell/global.css:37`)
   loses its edge against either side of that box. On the Changes tab it cuts
@@ -2014,7 +2017,7 @@ tags are local to this section; paths under `panels/` and `screens/` start at
   sideways. Risk (Medium): a participant on a phone scrolls sideways to reach
   Save and Discard case.
 
-## Open from the field-matrix-fill-height browser check (each needs its own OpenSpec change)
+## Open from the field-matrix-fill-height browser check (one OpenSpec change per screen)
 
 The browser check for `field-matrix-fill-height` found two pre-existing
 defects. That check is task group 3 in the change's archived `tasks.md`, and
@@ -2058,7 +2061,7 @@ by that change. The MATRIX tags are local to this section.
   - Risk (Low): a sideways scroll briefly shows a cell's content through a
     sticky header.
 
-## Open from the 2026-09-13 Forms tab audits (each needs its own OpenSpec change)
+## Open from the 2026-09-13 Forms tab audits (one OpenSpec change per screen)
 
 The change `forms-tab-form-strip` (PR #109) ran a final code review, a browser
 check, `/impeccable critique` and `/impeccable audit` on the Studio Forms tab
@@ -2095,7 +2098,7 @@ only the marks the miniature draws. The required count stands beside it.
     screen. The unpressed column option looks pressed. The fix joins the
     literal classes into the spread, as the strip's `ghost` helper does.
 
-## Open from the authoring-command-ink-advisory-role review (each needs its own OpenSpec change)
+## Open from the authoring-command-ink-advisory-role review (one OpenSpec change per screen)
 
 The change `authoring-command-ink-advisory-role` ran its review on 2026-09-13,
 and this section records what that review found outside the change. The TONE
@@ -2126,7 +2129,7 @@ tags are local to this section. Paths under `panels/` and `screens/` start at
     in dark. Shape, place and the callout's own sentence still tell the marks
     apart.
 
-## Open from the studio-narrow-widths review (each needs its own OpenSpec change)
+## Open from the studio-narrow-widths review (one OpenSpec change per screen)
 
 The first review of `studio-narrow-widths` measured the shell header on a
 replica in Chrome 152, on 2026-09-13. That change wraps the header and keeps
@@ -2150,7 +2153,8 @@ Paths under `panels/` and `screens/` start at `packages/web/src/areas/studio/`.
     headers. The owner picks its look on a mockup first.
   - Risk (Low): an actor in a narrow window scrolls the page sideways to
     reach a nav button.
-- **ROW-1: the tab row clips a tab's focus ring at its top and bottom.** The
+- **ROW-1 (resolved by `studio-focus-ring-clipping`): the tab row clips a
+  tab's focus ring at its top and bottom.** The
   row scrolls sideways (`panels/ProcessTabRow.tsx:42`), so it clips outside
   its padding box. Measured at 400px, the Forms tab's ring ran from y=288 to
   335.5. The row's padding box ran from 292 to 332. Both sides of the ring
@@ -2184,7 +2188,7 @@ gap outside that change's own scope. The CLAIM tag is local to this section.
   target's candidacy. `loadInstanceForActor` admits that target only as the
   test instance's own starter or a `system:admin` holder.
 
-## Open from the studio-path-row-field-order final review (needs its own OpenSpec change)
+## Open from the studio-path-row-field-order final review (one OpenSpec change per screen)
 
 The final whole-branch review for `studio-path-row-field-order` (2026-09-17)
 found one gap outside that change's own scope.

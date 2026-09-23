@@ -27,8 +27,10 @@ The owner confirmed this brief in the 2026-09-23 `/impeccable shape` round.
   included.
 - **Direction:** keep the ring exactly as DESIGN.md states it: 2px accent at a
   2px offset. Give each scroll box room for the ring. Do not inset the ring.
-- **Consequence:** content in a padded box moves 4px inward. The rail's right
-  divider, the tab row's bottom divider and the edge fade keep their place.
+- **Consequence:** content in a padded box moves 4px inward. The tab row
+  sizes to its own content. Its block padding makes the row 8px taller and
+  the tab body 8px shorter. The rail's right divider and the edge fade stay
+  where they were.
 - **Untouched:** the field ring at 0 offset, the grid cell ring at -2px and the
   canvas's drawn indicator.
 
@@ -87,6 +89,13 @@ row, so it moves inward with the row.
 **Sweep the remaining studio boxes in the browser.** Tab through
 `ChecksRail`, `FormsTab`, `FormTabStrip`, `StepPage`, `CanvasBar` and
 `FormEditorScreen`. Pad each one that clips the same way.
+
+Outcome: the canvas bar's `bar` and the form tab strip's `row` clipped and
+now pad by `focus.reach`. The change list's `body` held the "Open …" row
+command's pull-back at 400px; its own `paddingInlineStart` now restores
+that room. The remaining four boxes, `ChecksRail`, `FormsTab`, `StepPage`
+and `FormEditorScreen`, already padded past the ring's reach at both
+widths.
 
 ## Risks / Trade-offs
 

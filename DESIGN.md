@@ -491,7 +491,8 @@ mono face and the stamp, never from the control itself.
   pointer.
 - **Disabled:** 45% opacity and `cursor: not-allowed`.
 - **Focus:** a 2px accent outline at 2px offset, on every focusable thing. A
-  field draws it at 0 offset, and a grid cell at -2px.
+  field draws it at 0 offset, and a grid cell at -2px. A scroll box pads by
+  the ring's reach, its width plus its offset, so the ring shows in full.
 - A label sits flush left in any button wider than its own text.
 
 A row of secondary commands in the studio takes the authoring command. A
