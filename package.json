@@ -24,7 +24,8 @@
     "build": "bun run --filter './packages/*' build",
     "test": "bun test",
     "test:tz": "TZ=Europe/Zurich bun test packages/web/test/reporting-reportingLogic.test.ts",
-    "check": "bun run typecheck && bun run build && bun test && bun run test:tz",
+    "lint": "oxlint --deny-warnings --report-unused-disable-directives src packages test scripts",
+    "check": "bun run lint && bun run typecheck && bun run build && bun test && bun run test:tz",
     "serve": "bun run src/http/server.ts",
     "seed": "bun run scripts/seed.ts",
     "backfill-process-access-roles": "bun run scripts/backfill-process-access-roles.ts",
@@ -35,6 +36,7 @@
   },
   "devDependencies": {
     "@types/bun": "^1.3.14",
+    "oxlint": "1.85.0",
     "typescript": "7.0.2"
   },
   "dependencies": {
