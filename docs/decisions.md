@@ -225,15 +225,17 @@ stage-by-stage status.
   supplies the options, and not to the field that binds to that source. A
   change that builds one starts at the data source, never at `FieldDef`. S4
   of the record archived beside `field-model-type-format-control` states it.
-- `docs/current-state.md:482` says the Runtime API Layer "has no
+- `docs/current-state.md:482` said the Runtime API Layer "has no
   assignment/claim enforcement". `requireSubmitAuthority` in
   `src/runtime/api.ts:1294` enforces both today, called from
-  `submitAndTransition` and its sibling at `:1354` and `:1389`. The line is
-  wrong as a statement of the present. Fixing it settles a question the
-  document has never answered: whether it describes the tree as it stands,
+  `submitAndTransition` and its sibling at `:1354` and `:1389`. The line was
+  wrong as a statement of the present. Fixing it settled a question the
+  document had never answered: whether it describes the tree as it stands,
   or collects dated stage records that stay true of their stage. Several
   other passages read as stage records. The 2026-09-09 audit deferred the
-  fix on that ground, and no change owns it yet.
+  fix on that ground. The change `trim-docs-weight` closes it. It replaces
+  `docs/current-state.md` with a per-subsystem index that names no stale
+  symbol claim and describes the tree as it stands.
 - `THIRDPARTY.md:36` lists `postgres:16` as the deployment's database image,
   and `:44` repeats "the deployment pins 16". No tracked file states that
   pin: the devcontainer compose runs `postgres:latest`, the deployment
@@ -361,7 +363,7 @@ stage-by-stage status.
   applied the `read` permission piece above: `src/auth/authorize.ts:78`'s
   `Permission` type now admits `read`, mapped to `ADMIN_ROLE`.
 - **CEL-readable data-source results.** Runtime option-list resolution for
-  `field.dataSource` is DONE (see `docs/current-state.md`) — but `src/cel/check.ts`
+  `field.dataSource` is DONE (see `openspec/specs/data-source-resolution/`) — but `src/cel/check.ts`
   still registers a data source at no site (guards/output/transforms), so a CEL
   reference to one remains a publish error (`unknown variable`). Widening that is
   a separate, more consequential decision (an unresolvable reference there could
@@ -378,7 +380,7 @@ stage-by-stage status.
   CEL evaluates names a data source.
 - **A data-source type whose resolution leaves the database.** Three types now
   ship: `"static"`, `"db.list"` and `"instance.query"` (see
-  `docs/current-state.md`). `"db.list"` reads two engine-owned tables;
+  `openspec/specs/data-source-resolution/`). `"db.list"` reads two engine-owned tables;
   `"instance.query"` reads another process's instances through
   `queryInstances`. None leaves the engine's own Postgres, so none exercises
   a resolution deadline of its own — both reading types inherit the `Bun.sql`
@@ -393,7 +395,7 @@ stage-by-stage status.
   `auth_users.manager_user_id`, `"org.group-members"`, reading the
   `groups` store, and `"org.actor-from-field"`, reading the instance's own
   `data` and, for a `group_` value, that same store (see
-  `docs/current-state.md`). None leaves the engine's own
+  `openspec/specs/assignment-strategy-registry/`). None leaves the engine's own
   Postgres, so none exercises a network failure mode.
   The resolution deadline (`ASSIGNMENT_RESOLUTION_TIMEOUT_MS`, default 5000),
   the failure classification and the `assignment.unresolved` event all exist
@@ -695,10 +697,14 @@ each entry carries the anchor that holds today. All nine stay open.
 - **CQ-2: doc comments duplicate facts held elsewhere.** The header of
   `src/auth/authorize.ts` states which role admits which route at `:28-44`,
   while the route table in `src/http/server.ts` and each handler's own check
-  are where that is true. `docs/current-state.md` repeats the shape by
-  listing exported symbols by hand. Risk (Low): a rename in one place leaves the
-  other wrong, and no gate covers either. The review's fix is to name where
-  a list lives instead of restating it.
+  are where that is true. Risk (Low): a rename in `src/http/server.ts` leaves
+  the header wrong, and no gate covers it. The review's fix is to name where
+  the route table lives instead of restating it.
+
+  The `docs/current-state.md` half of this finding is closed. It used to
+  repeat the same shape by listing exported symbols by hand. The change
+  `trim-docs-weight` closes it: the file is now an index that names no
+  exported symbol, so a rename breaks nothing there.
 - **DEP-2: the CI workflow runs no `bun audit` step.**
   `grep -rn "bun audit" .github/` returns nothing. Dependabot already covers
   version drift, and the review judges the pair unlikely to earn its

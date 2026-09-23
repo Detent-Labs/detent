@@ -302,18 +302,14 @@ packages/form-ui/          shared step-form renderer (source-only, no build step
 - `.claude/rules/authoring-invariants.md` — what the validation layer enforces.
 - `.claude/rules/ui-glossary.md` — the one word for each part of the UI, and the
   domain term each rendering word maps to.
-- `docs/current-state.md` — per-subsystem descriptive counterpart to this
-  file. It names exported symbols by hand, in prose, so a rename elsewhere
-  leaves a passage silently wrong. Before editing a passage that names a
-  specific symbol, confirm it still exists: `search_graph` for the symbol,
-  or `detect_changes` scoped to the file, rather than trusting the prose.
-  This is a manual habit, not a gate — a grep-based staleness detector was
-  tried here and rejected for a 76-of-786 false-positive rate (see the
-  "Four defect classes" passage above), and the graph query above stays
-  advisory for the same reason.
+- `docs/current-state.md` — per-subsystem index: what each part of the tree
+  does, its paths, and the spec capabilities that own its rules. It names no
+  exported symbol, so a rename elsewhere leaves every entry correct.
 - `docs/decisions.md` — open questions, what is decided but not yet built, and
   every open code-review finding under its own heading.
   `openspec/changes/archive/2026-08-18-code-review-record/` — the four dated reviews.
+- `docs/decisions-archive.md` — the reasoning behind a decision once it ships,
+  moved out of `docs/decisions.md` word for word.
 - `docs/authoring-guide.md` — teaches the definition contract to process authors.
 - `ROADMAP.md` — stage-by-stage status (DONE / NOT STARTED). Open stages in
   full; one table row per finished stage.

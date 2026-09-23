@@ -17,10 +17,10 @@
 
 ## 3. Re-point and close the citations
 
-- [ ] 3.1 Rewrite the `docs/current-state.md` entry in the list of other documents in `CLAUDE.md` without the symbol-confirming advice. Add `docs/decisions-archive.md` beside `docs/decisions.md`. Verify: a grep of `CLAUDE.md` finds both files.
-- [ ] 3.2 Close the `docs/decisions.md` entry that cites `docs/current-state.md:482` and the current-state part of CQ-2 (design D5). Verify: both entries state what closed them.
-- [ ] 3.3 Re-point the three data-source and assignment citations in `docs/decisions.md` to their spec capabilities (design D6). Verify: `grep -n current-state docs/decisions.md` prints only the opening paragraph and the two entries task 3.2 closed.
-- [ ] 3.4 Re-point `docs/browser-checks.md:135` to `packages/web/src/areas/studio/canvas/CanvasView.tsx`. Verify: a grep of the file finds no `current-state` citation there.
+- [x] 3.1 Rewrite the `docs/current-state.md` entry in the list of other documents in `CLAUDE.md` without the symbol-confirming advice. Add `docs/decisions-archive.md` beside `docs/decisions.md`. Verify: a grep of `CLAUDE.md` finds both files.
+- [x] 3.2 Close the `docs/decisions.md` entry that cites `docs/current-state.md:482` and the current-state part of CQ-2 (design D5). Verify: both entries state what closed them.
+- [x] 3.3 Re-point the three data-source and assignment citations in `docs/decisions.md` to their spec capabilities (design D6). Verify: `grep -n current-state docs/decisions.md` prints only the opening paragraph and the two entries task 3.2 closed.
+- [x] 3.4 Re-point `docs/browser-checks.md:135` to `packages/web/src/areas/studio/canvas/CanvasView.tsx`. Verify: a grep of the file finds no `current-state` citation there.
 
 ## 4. Verification
 
