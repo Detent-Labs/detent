@@ -98,6 +98,12 @@ function contractFieldSchema(fields: FieldDef[], ids: readonly string[] | undefi
   return out;
 }
 
+// Structural bound on every checked expression. A parse past either cap makes
+// `env.check` return `valid: false` ("Exceeded maxDepth (64)" /
+// "Exceeded maxAstNodes (2000)"); the top level counts toward the depth.
+const MAX_AST_NODES = 2000;
+const MAX_DEPTH = 64;
+
 /**
  * Build the type environment for a scope. Scope is expressed by which namespaces
  * are registered: `result` exists only in an Action.output mapping, `child` only
@@ -124,7 +130,7 @@ function buildEnv(
   fields: FieldDef[],
   opts: { result: boolean; child: boolean; actor: boolean; childDataSchema?: Record<string, string> },
 ): Environment {
-  const env = new Environment({ unlistedVariablesAreDyn: false });
+  const env = new Environment({ unlistedVariablesAreDyn: false, limits: { maxAstNodes: MAX_AST_NODES, maxDepth: MAX_DEPTH } });
   if (opts.result) {
     env.registerVariable("result", "dyn");
     return env;
@@ -164,6 +170,40 @@ function forbiddenTimeCall(node: unknown): string | null {
     const kids = Array.isArray(a) ? a : [a];
     for (const k of kids) {
       const f = forbiddenTimeCall(k);
+      if (f) return f;
+    }
+  }
+  return null;
+}
+
+/**
+ * Nested comprehensions multiply evaluation cost (n, n², n³ over an n-row list),
+ * so at most two may nest. The parsed tree keeps a macro in source form: an
+ * `{op:"rcall", args:[name, receiver, [...]]}` node. Only the macro's arguments
+ * sit inside it; its receiver is evaluated outside and keeps the outer depth.
+ * Returns an issue message when a third comprehension opens inside two others.
+ */
+const COMPREHENSIONS = new Set(["all", "exists", "exists_one", "map", "filter"]);
+const MAX_COMPREHENSION_NESTING = 2;
+
+function comprehensionTooDeep(node: unknown, depth = 0): string | null {
+  if (!node || typeof node !== "object") return null;
+  const n = node as { op?: string; args?: unknown };
+  const args = Array.isArray(n.args) ? n.args : [];
+  if (n.op === "rcall" && typeof args[0] === "string" && COMPREHENSIONS.has(args[0])) {
+    if (depth + 1 > MAX_COMPREHENSION_NESTING)
+      return `comprehension nesting limit exceeded: at most ${MAX_COMPREHENSION_NESTING} of all/exists/exists_one/map/filter may nest`;
+    const inner = Array.isArray(args[2]) ? args[2] : [];
+    for (const k of inner) {
+      const f = comprehensionTooDeep(k, depth + 1);
+      if (f) return f;
+    }
+    return comprehensionTooDeep(args[1], depth);
+  }
+  for (const a of args) {
+    const kids = Array.isArray(a) ? a : [a];
+    for (const k of kids) {
+      const f = comprehensionTooDeep(k, depth);
       if (f) return f;
     }
   }
@@ -270,8 +310,11 @@ export interface CelIssue {
 function checkSite(env: Environment, site: { src: string; loc: string; expect?: string }): CelIssue | undefined {
   // Forbidden time constructors first (env.check would accept the pure ones).
   try {
-    const bad = forbiddenTimeCall(parse(site.src).ast);
+    const ast = parse(site.src).ast;
+    const bad = forbiddenTimeCall(ast);
     if (bad) return { loc: site.loc, src: site.src, message: `time function not allowed: ${bad}() (time lives only in timers)` };
+    const nested = comprehensionTooDeep(ast);
+    if (nested) return { loc: site.loc, src: site.src, message: nested };
   } catch {
     // parse failure is reported by the type-check below
   }
@@ -429,9 +472,15 @@ export function validateMigrationSpec(spec: MigrationSpec, fromBody: ProcessBody
     }
     const expect = celType(targetField);
     try {
-      const bad = forbiddenTimeCall(parse(expr.src).ast);
+      const ast = parse(expr.src).ast;
+      const bad = forbiddenTimeCall(ast);
       if (bad) {
         issues.push({ loc, src: expr.src, message: `time function not allowed: ${bad}() (time lives only in timers)` });
+        continue;
+      }
+      const nested = comprehensionTooDeep(ast);
+      if (nested) {
+        issues.push({ loc, src: expr.src, message: nested });
         continue;
       }
     } catch {

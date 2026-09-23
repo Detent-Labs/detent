@@ -632,3 +632,49 @@ test("&& chains left-associatively, and || binds looser than &&", () => {
 test("ACTOR_SCHEMA declares id and roles", () => {
   expect(ACTOR_SCHEMA).toEqual({ id: "string", roles: "list<string>" });
 });
+
+// ---- structural bound (cel-expressions delta) --------------------------------
+// Every checked site rejects an expression past a fixed structural bound: at most
+// two nested comprehensions, a parse depth of 64 and 2,000 AST nodes.
+const listFields = [field("items", "list")];
+const GUARD_LOC = "steps[0].paths[0].guard";
+
+test("rejects three nested comprehensions at a guard", () => {
+  const src = "data.items.all(a, data.items.all(b, data.items.all(c, a == b && b == c)))";
+  const issues = validateProcessBody(body({ fields: listFields, steps: [guardStep(src)] }));
+  expect(issues.length).toBe(1);
+  expect(issues[0].loc).toBe(GUARD_LOC);
+  expect(issues[0].message).toContain("comprehension nesting limit");
+});
+
+test("accepts two nested comprehensions at a guard", () => {
+  const src = "data.items.all(a, data.items.exists(b, a == b))";
+  expect(validateProcessBody(body({ fields: listFields, steps: [guardStep(src)] }))).toEqual([]);
+});
+
+test("rejects 65 levels of parentheses at a guard with the depth limit", () => {
+  const src = `${"(".repeat(65)}data.amount > 1.0${")".repeat(65)}`;
+  const issues = validateProcessBody(body({ steps: [guardStep(src)] }));
+  expect(issues.length).toBe(1);
+  expect(issues[0].loc).toBe(GUARD_LOC);
+  expect(issues[0].message).toContain("Exceeded maxDepth (64)");
+});
+
+test("rejects a guard over 2,000 AST nodes with the node limit", () => {
+  const list = `size([${Array(900).fill("1").join(",")}])`;
+  const src = `${list} + ${list} + ${list} > 0`;
+  const issues = validateProcessBody(body({ steps: [guardStep(src)] }));
+  expect(issues.length).toBe(1);
+  expect(issues[0].loc).toBe(GUARD_LOC);
+  expect(issues[0].message).toContain("Exceeded maxAstNodes (2000)");
+});
+
+test("rejects a migration transform with three nested comprehensions", () => {
+  const from = migBody([{ key: "items", type: "list" }]);
+  const to = migBody([{ key: "ok", type: "boolean" }]);
+  const src = "data.items.exists(a, data.items.map(b, b).filter(c, data.items.all(d, c == d)).size() > 0)";
+  const issues = validateMigrationSpec(spec({ field_ok: cel(src) }), from, to);
+  expect(issues.length).toBe(1);
+  expect(issues[0].loc).toBe("migration.transforms.field_ok");
+  expect(issues[0].message).toContain("comprehension nesting limit");
+});
