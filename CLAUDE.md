@@ -183,8 +183,9 @@ printed, not that you ran it.
 - A real browser, for any UI change. Green tests do not see an error dialog
   rendered behind a modal, a stale result row, or an `/admin/*` route
   collision. All three shipped past a green suite here. `docs/browser-checks.md`
-  holds what stays manual; `development-toolchain`'s split rule decides
-  whether a new check lands there or ships as a `bun:test` assertion instead.
+  holds what stays manual; `development-toolchain`'s split rule now decides
+  among three homes: a `bun:test` assertion, an `e2e/` smoke flow, or a
+  checklist entry here.
 
 ## Enforced mechanically. Do not re-litigate these.
 

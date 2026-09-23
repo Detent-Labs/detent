@@ -71,6 +71,9 @@ Measured in `instance-query-data-source`. A stale server answered a publish
 with no `findings` key. A fresh one, right after, answered the identical
 request with the finding a fresh publish-time check now computes.
 
+**Run `bun run e2e` too.** It drives four flows across all four areas from a
+clean database. Run it before working through the checklist by hand.
+
 ## Checklist
 
 ### Worktree dev-server hot reload
@@ -1493,10 +1496,10 @@ contract. Create its draft from the process list. On the Contract tab, tick
 Steps tab, open the Issued end step and choose `issued` as its outcome. Save,
 and publish version 2.
 
-Open the Versions screen. Pass: the table lists both versions. Mark version 1
-as side A and version 2 as side B, then choose Diff selected. Pass: a waiting
-line stands while both bodies load, then the change list replaces it. The
-heading reads "Version 2 compared with version 1". Side A stays the before
+Open the Versions screen. Mark version 1 as side A and version 2 as side B,
+then choose Diff selected. Pass: a waiting line stands while both bodies
+load, then the change list replaces it. The heading reads "Version 2
+compared with version 1". Side A stays the before
 side, whichever column marks it.
 
 Pass: no row names the cancel-sink step or its `cancelled` outcome. Publishing
@@ -2401,8 +2404,8 @@ Save item beside it while a save runs. A screen reader reads the reason with
 the control, through `aria-describedby`.
 
 Now sign in as an account holding `system:publish` and open the same draft.
-Choose Publish. Pass: a modal dialog opens. It names the process, the process
-id, the revision and the next version. It states that a published version can
+Choose Publish. Pass: the dialog names the process, the process id, the
+revision and the next version. It also states that a published version can
 never change.
 
 Press Escape. Pass: the dialog closes and no request goes out. Choose Publish
@@ -2410,8 +2413,7 @@ again and click the backdrop outside the dialog. Pass: the dialog stays put,
 which is what a native modal does.
 
 Tab through the open dialog. Pass: focus cycles inside it and never reaches
-the header bar behind. Confirm. Pass: the dialog closes and the header's
-published stamp names the version the engine assigned.
+the header bar behind. Confirm.
 
 Edit the label and choose Publish again. Pass: the dialog says that publishing
 saves the unsaved changes first. Confirm. Pass: one `PUT` then one `POST`, and
@@ -2675,8 +2677,6 @@ duration rule's fill still sets its width through a literal inline
 `style`, not a compiled value (design.md D5). The fill's computed
 `background-color` and the rule's `border-bottom` match `app.css`'s
 pre-migration values.
-
-Throughout: zero console errors on any of the four screens.
 
 ### Studio, non-canvas: form editor, panels, dialogs (`stylex-phase-3-studio`)
 
@@ -5100,10 +5100,9 @@ offers no area switch, and `/admin` states the account has no access there.
 `system:cancel-any` does not reach the admin UI on its own. From that same
 session, reusing its own bearer token the way `api/client.ts::request` sends
 it, POST the blocked instance's `/cancel` route directly. Pass: it still
-returns 200, and the instance's status flips to `cancelled`. Confirm the
-stamp in the admin Instances list too, under an account holding
-`system:admin`. A plain `GET` of that instance can 403 for the same actor
-right up until the moment it cancels. Read authorization and cancel
+returns 200, and the instance's status flips to `cancelled`. A plain `GET` of
+that instance can 403 for the same actor right up until the moment it
+cancels. Read authorization and cancel
 authorization are separate checks.
 
 `test/runtime-api.test.ts` and `test/http.test.ts` already cover
