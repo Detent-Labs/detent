@@ -159,6 +159,23 @@ Nobody exists in `auth_users` for it to read. It needs its own seed of
 `process_access_roles` before the same deploy's gate goes live. That seed
 derives from whatever directory issues those tokens.
 
+## Running more than one engine process
+
+A tenant may run more than one engine process against one database. One
+piece of state stays local to each process: the login rate-limit windows.
+They are two `Map`s, one keyed by email and one by caller address. A
+second process keeps its own windows, so each added process raises the
+effective login threshold. A restart clears that process's windows.
+
+Start one process before the others, on a new database and after an
+upgrade that changes the schema. Start the rest only after the first one
+reports ready. Readiness is what `GET /readyz` reports. The startup
+schema step takes no lock. Two processes that run it together can fail.
+
+A change that adds process-local state adds its entry here in the same
+commit. A change that moves such state into the database removes the
+entry here.
+
 ## The proxy rule
 
 A proxy in front of the engine must overwrite `X-Forwarded-For`. It must not
@@ -215,7 +232,7 @@ then opens no control-plane connection. It builds one schema from
 `DATABASE_URL`, and runs every request and every worker tick against it. That
 is the deployment shape this runbook describes everywhere above.
 
-Set it to serve many tenants from one process. Each tenant gets a database of
+Set it to serve many tenants from the same deployment. Each tenant gets a database of
 its own. The control plane holds nothing but the list of them: `id`, `key`,
 `name` and `database_url`. No table anywhere gains a tenant column, and no
 query gains a tenant filter. Isolation comes from the connection, so a
@@ -238,7 +255,7 @@ issuer, which `AUTH_ISSUERS` already maps.
 
 The login request itself carries no token yet. It takes its tenant from the
 host it arrived on, reading `acme` from `acme.example.com`. Point each tenant's
-host at the same process.
+host at the same deployment.
 
 Two answers are worth telling apart in a log. An unknown tenant reads 401, the
 answer a bad token gets, so nobody learns your tenant list by probing. A known
