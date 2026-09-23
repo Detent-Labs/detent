@@ -22,8 +22,8 @@ so each group ends with a green `bun run typecheck`.
 
 ## 4. Queries and reports
 
-- [ ] 4.1 Create `src/runtime/queries.ts` with the declarations in D1's `queries.ts` row. Verify: `bun run typecheck` passes.
-- [ ] 4.2 Create `src/runtime/reports.ts` with the declarations in D1's `reports.ts` row. Verify: `bun run typecheck` passes.
+- [x] 4.1 Create `src/runtime/queries.ts` with the declarations in D1's `queries.ts` row. Verify: `bun run typecheck` passes.
+- [x] 4.2 Create `src/runtime/reports.ts` with the declarations in D1's `reports.ts` row. Verify: `bun run typecheck` passes.
 
 ## 5. Record, visibility, comments and attachments
 
