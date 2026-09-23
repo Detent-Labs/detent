@@ -31,8 +31,8 @@
 
 ## 6. Verification
 
-- [ ] 6.1 In the devcontainer with `DATABASE_URL` set, run `bun run check`. It runs `bun run typecheck`, `bun run build`, the full `bun test` suite and `test:tz`. Pipe the output through `sh scripts/gates/silent-green.sh`, and report what each step printed.
-- [ ] 6.2 In the devcontainer, run `bun run e2e` twice in a row. Report the flow count and the pass count of each run.
-- [ ] 6.3 On the host, run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` and report its output.
-- [ ] 6.4 On the host, run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh` and report its output.
-- [ ] 6.5 This change touches no screen, so it does not need a manual browser check. The CI run of task 4.1 is the browser evidence.
+- [x] 6.1 In the devcontainer with `DATABASE_URL` set, run `bun run check`. It runs `bun run typecheck`, `bun run build`, the full `bun test` suite and `test:tz`. Pipe the output through `sh scripts/gates/silent-green.sh`, and report what each step printed.
+- [x] 6.2 In the devcontainer, run `bun run e2e` twice in a row. Report the flow count and the pass count of each run.
+- [x] 6.3 On the host, run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` and report its output.
+- [x] 6.4 On the host, run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh` and report its output.
+- [x] 6.5 This change touches no screen, so it does not need a manual browser check. The CI run of task 4.1 is the browser evidence.
