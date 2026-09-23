@@ -38,10 +38,10 @@ so each group ends with a green `bun run typecheck`.
 
 ## 7. Docs sweep
 
-- [ ] 7.1 Add D4's sentence to the Purpose section of `openspec/specs/runtime-api/spec.md`. Verify: `openspec validate --specs --strict` passes for `runtime-api`.
-- [ ] 7.2 Repoint the symbol citations in `docs/current-state.md` per D5. Verify: `grep -n 'api\.ts::' docs/current-state.md` prints nothing.
-- [ ] 7.3 Repoint the line and symbol citations in `docs/decisions.md` per D5. Mark ARCH-1 resolved. Verify: `grep -nE 'runtime/api\.ts:[0-9]' docs/decisions.md` prints nothing.
-- [ ] 7.4 Update the `src/runtime/` layout entry in `CLAUDE.md` per D5. Update each present-tense citation in `README.md`, `ROADMAP.md` and `docs/roadmap-history.md` the same way. Verify: each edited line names a file that exists.
+- [x] 7.1 Add D4's sentence to the Purpose section of `openspec/specs/runtime-api/spec.md`. Verify: `openspec validate --specs --strict` passes for `runtime-api`.
+- [x] 7.2 Repoint the symbol citations in `docs/current-state.md` per D5. Verify: `grep -n 'api\.ts::' docs/current-state.md` prints nothing.
+- [x] 7.3 Repoint the line and symbol citations in `docs/decisions.md` per D5. Mark ARCH-1 resolved. Verify: `grep -nE 'runtime/api\.ts:[0-9]' docs/decisions.md` prints nothing.
+- [x] 7.4 Update the `src/runtime/` layout entry in `CLAUDE.md` per D5. Update each present-tense citation in `README.md`, `ROADMAP.md` and `docs/roadmap-history.md` the same way. Verify: each edited line names a file that exists.
 
 ## 8. Verification
 

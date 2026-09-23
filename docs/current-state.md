@@ -173,7 +173,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   schemas reject a forged config on shape, even if a future path ever
   produced one.
 
-  Two related fixes ride along. `src/runtime/api.ts::checkConstraints` skips
+  Two related fixes ride along. `src/runtime/fields.ts::checkConstraints` skips
   `pattern` after a `minLength`/`maxLength` violation. It runs `pattern` only
   on a value that passed both. `WeakMap<ProcessBody, Map<string, RegExp>>`
   caches the compiled `RegExp` per immutable published body. This replaces
@@ -481,7 +481,9 @@ Stage-by-stage status is in `ROADMAP.md`.
   resolution either, since every function takes an explicit `actor: Actor`,
   trusted as given. It has no assignment/claim enforcement, since
   `AssignmentState` is declared in the schema but unenforced everywhere,
-  matching engine behavior.
+  matching engine behavior. `src/runtime/api.ts` is a barrel. It re-exports
+  ten sibling modules: internal, fields, instances, claims, queries,
+  reports, record, visibility, comments and attachments.
 
   `createProcessInstance` first seeds the field catalog's own `default`
   values into any slot `opts.data` left open, in catalog order. A `Literal`
@@ -754,7 +756,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   unclaimed) at step entry via `registry.ts::resolveStepAssignment`, called by
   the step-entry CALLER — `commitTransition`, `createSeededInstance`
   (`seeded-create.ts`, shared by the subprocess spawn handler and
-  `process.start`), `startInstance`, `api.ts::createProcessInstance` — never
+  `process.start`), `startInstance`, `instances.ts::createProcessInstance` — never
   by `planStepEntry`
   (pure and synchronous, it takes the resolved set as a required
   `StepEntryOpts.assignment` field) and never by `createInstance`
@@ -1078,7 +1080,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   below), which `publishBody` calls after the hash-hit no-op return — so an
   identical re-publish of a body that predates a registered/tightened type
   stays a no-op. `resolveFields`
-  (`src/runtime/api.ts`) is now async and takes a `registry: DataSourceRegistry`
+  (`src/runtime/fields.ts`) is now async and takes a `registry: DataSourceRegistry`
   parameter: a `dataSource`-bound field's options are resolved via the
   registry, once per view field with no cross-field memoization (fields on
   the same step sharing a data source each trigger their own resolve call).
@@ -1111,7 +1113,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   naming the reading instance's own process excludes that instance. The
   constant `MAX_INSTANCE_QUERY_OPTIONS` bounds the result at 200; a read past
   the bound raises rather than truncating.
-- A person field's own option list (`src/runtime/api.ts::resolvePersonOptions`,
+- A person field's own option list (`src/runtime/fields.ts::resolvePersonOptions`,
   `test/data-source-resolution.test.ts`). A `format: "person"` field declaring
   neither `options` nor `dataSource` reads the body's own `allowedGroups`
   instead. That branch sits in `resolveFields` beside the `dataSource` one,
@@ -1153,7 +1155,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   ahead of its existing single-object-member fallback. A `kind`-carrying
   union member now matches by its literal value first.
 
-  `resolveFields` (`src/runtime/api.ts`) now emits `ResolvedViewEntry[]`
+  `resolveFields` (`src/runtime/fields.ts`) now emits `ResolvedViewEntry[]`
   (`ResolvedViewField | ResolvedViewNote`). A note resolves its own
   `visible` through `resolveFlag`, exactly as a field does. A false result
   drops it from the array. `isResolvedViewField` is the wire-level twin of
@@ -1355,7 +1357,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   shape check, since the gate names the target process and the body carries
   it, still before `publishBody`, so no store, registry or CEL check runs
   for a caller without the role) and
-  `POST /instances/:id/cancel` (`runtime/api.ts::cancelInstance`, checked
+  `POST /instances/:id/cancel` (`runtime/instances.ts::cancelInstance`, checked
   before the target instance is loaded — a caller without the role is
   rejected whether or not the instance exists). `requireRole(actor, role)`
   throws a distinct `AuthorizationError`, mapped by `mapError` to `403`
@@ -2272,7 +2274,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   `pattern` and `rule`. Previously only reachable through the JSON view.
 
   `offeredKeys` is a literal table over the field's declared type. It mirrors
-  `checkConstraints` (`src/runtime/api.ts::checkConstraints`). That function branches on the
+  `checkConstraints` (`src/runtime/fields.ts::checkConstraints`). That function branches on the
   submitted value's JavaScript runtime type, not the declared one.
 
   `file` and a plugin (custom) type offer every key. `typeMatches`
@@ -2440,7 +2442,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   own compiled StyleX styles.
 
   Showing the merged record beside Player needed an authorization change,
-  not just a new route: `getInstanceRecord` (`src/runtime/api.ts`) gained an
+  not just a new route: `getInstanceRecord` (`src/runtime/record.ts`) gained an
   `actor` parameter and a second, additive access path mirroring
   `cancelInstance`'s existing starter bypass for `system:cancel-any` —
   `ADMIN_ROLE` tried first (no instance load needed, this query never joins
@@ -2528,7 +2530,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   the variable set, which ~30 test files rely on. `initSchema` gained two
   indexes beside their siblings. `history_entries_instance_idx
   (instance_id, transition_seq)` mirrors the index `instance_events`
-  already had; `outbox.ts::appendOutcome` and `api.ts::getInstanceRecord`
+  already had; `outbox.ts::appendOutcome` and `record.ts::getInstanceRecord`
   read it. `instances_parent_idx ((body->'parent'->>'instanceId'))` is a
   B-tree expression index; `transition.ts::sweepCancelledChildren` and
   `migration.ts::migrateOne` read it. Both close a sequential-scan gap the
@@ -3338,7 +3340,7 @@ Stage-by-stage status is in `ROADMAP.md`.
   Two routes outside the studio prefix widen with it, because studio screens
   call them. `GET /admin/data-lists` fills the `"db.list"` picker
   (`admin-routes.ts::requireDataListRead`). And `getInstanceRecord`'s starter
-  fallback (`src/runtime/api.ts`) now admits either authoring role for an
+  fallback (`src/runtime/record.ts`) now admits either authoring role for an
   instance that actor started. The Player renders that record beside the form.
 
   Neither data list write moves, and the starter condition still bounds the
@@ -4674,7 +4676,7 @@ the claimant, the starter or an admin. A plain upsert is therefore enough. The
 module exports `getInstanceDraft`, `saveInstanceDraft` and
 `deleteInstanceDraft`.
 
-The runtime wrapper `saveInstanceDraft` (`src/runtime/api.ts`) backs
+The runtime wrapper `saveInstanceDraft` (`src/runtime/instances.ts`) backs
 `PUT /instances/:instanceId/draft`. It reads the instance unlocked, with no
 `FOR UPDATE`, since the draft carries no OCC token. It shares
 `requireSubmitAuthority` with `submitAndTransition`, so the two predicates
@@ -4820,7 +4822,7 @@ generic "empty".
 A new `report_principals` join table holds a report's mixed
 id/role/group principal list, a different shape from
 `permission_grants`' single-grantee-per-row table. Execution reuses
-`buildInstanceWhere`/`buildDataWhere` (`src/runtime/api.ts`, exported for
+`buildInstanceWhere`/`buildDataWhere` (`src/runtime/queries.ts`, exported for
 this purpose) instead of duplicating `queryInstances`'s predicate.
 
 Authorization stacks two checks. The read enforces the process-scoped
@@ -5021,7 +5023,7 @@ entry names one through its own `tab`. Both are layout, the way `columns` and
 together sit in `definition.ts`'s `view` superRefine. The file
 `.claude/rules/authoring-invariants.md` lists them.
 
-The route `getInstanceView` (`src/runtime/api.ts`) reports `tabs` beside
+The route `getInstanceView` (`src/runtime/instances.ts`) reports `tabs` beside
 `columns`, in declaration order. A view declaring none reports an empty array.
 Each label stays unresolved, as `LocalizedText`, and the browser applies the
 locale. The type is `ResolvedViewTab`, exported there beside
@@ -5070,7 +5072,7 @@ in `src/schema/definition.ts`. The object and each of its two keys,
 key is schema-enforced against the other, so every combination parses.
 
 Resolution is a plain per-key fallback. The exported `resolveCollaboration`,
-in `src/runtime/api.ts`, checks the step's own key, then the process
+in `src/runtime/internal.ts`, checks the step's own key, then the process
 default, and resolves `true` otherwise. Three call sites share it:
 `postComment`, `uploadAttachment` and `getInstanceView`.
 

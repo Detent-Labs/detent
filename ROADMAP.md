@@ -251,7 +251,7 @@ Specs: `development-toolchain`, `devcontainer-preflight`, `worktree-isolation`,
     catalog field's own carries, plus `validationMode`: `"merge"` (the
     default) overlays the step's keys on the catalog's, `"replace"` drops
     the catalog's whole. `validateSubmissionData`
-    (`src/runtime/api.ts::effectiveValidation`) resolves the two per field
+    (`src/runtime/fields.ts::effectiveValidation`) resolves the two per field
     per step, at the point of the submission check, not in `resolveFields`:
     the override never reaches `ResolvedViewField`, so it never reaches
     `GET /instances/:id`. Publish compiles a step-level `pattern` and

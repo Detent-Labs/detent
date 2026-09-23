@@ -8,7 +8,10 @@ server) calls to run an instance without touching engine internals —
 `createProcessInstance`, `getInstanceView`, `submitAndTransition`,
 `claimStep`, `releaseClaim`. It is a library boundary, not a transport
 (`src/runtime/api.ts`): plain async TS functions, resolving `ProcessBody`
-internally so callers only ever touch `processId`/`instanceId`. Every
+internally so callers only ever touch `processId`/`instanceId`.
+`src/runtime/api.ts` is the layer's one import surface over sibling modules
+in `src/runtime/`. A spec citation of `src/runtime/api.ts` names the layer
+as a whole. Every
 function takes an explicit `actor: Actor`, trusted as given — actor
 resolution from an untrusted credential is the `actor-resolution`
 capability's concern, not this one's. `submitAndTransition` enforces a

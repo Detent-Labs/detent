@@ -225,8 +225,8 @@ stage-by-stage status.
   of the record archived beside `field-model-type-format-control` states it.
 - `docs/current-state.md:482` says the Runtime API Layer "has no
   assignment/claim enforcement". `requireSubmitAuthority` in
-  `src/runtime/api.ts:1294` enforces both today, called from
-  `submitAndTransition` and its sibling at `:1354` and `:1389`. The line is
+  `src/runtime/instances.ts:273` enforces both today, called from
+  `submitAndTransition` and its sibling at `:333` and `:368`. The line is
   wrong as a statement of the present. Fixing it settles a question the
   document has never answered: whether it describes the tree as it stands,
   or collects dated stage records that stay true of their stage. Several
@@ -459,7 +459,7 @@ stage-by-stage status.
     composes nothing.
   - The read this handler needs exists already in most respects, built for a
     different consumer since this entry was written. `instance-data-query`'s
-    `queryInstances` (`src/runtime/api.ts:1868`, shipped 2026-08-27 as
+    `queryInstances` (`src/runtime/queries.ts:613`, shipped 2026-08-27 as
     `instance-query-core`, now archived) filters instances by `processId`,
     `status`, `currentStepId`, `startedBy`, `claimedBy`, `excludeInstanceId`,
     `createdAfter`/`createdBefore` and a `dataWhere` list of field/operator/
@@ -949,7 +949,7 @@ stage-by-stage status.
   `field-catalog-redesign` shipped no editor for it and no runtime reader,
   since building one before the engine read the value would have shipped UI
   with no visible effect. `field-catalog-editor-rework` landed both:
-  `createProcessInstance` (`src/runtime/api.ts`) fills a field's still-open
+  `createProcessInstance` (`src/runtime/instances.ts`) fills a field's still-open
   slot from its catalog `default` — a `Literal` directly, an `Expression`
   through `src/cel/eval.ts::evalFieldMap` over the same stub `Instance` the
   seeding-in-progress `data` builds — before `validateSubmissionData` runs.
@@ -1419,7 +1419,7 @@ nothing else tracks them.
 - **SEC-6: no ceiling on an instance's total attachment bytes.**
   `MAX_ATTACHMENT_BYTES` bounds one upload, 5 MiB by default
   (`src/http/routes.ts:99`, enforced at `:359`). `uploadAttachment`
-  (`src/runtime/api.ts:2583`) inserts the row without an aggregate. Risk: one
+  (`src/runtime/attachments.ts:44`) inserts the row without an aggregate. Risk: one
   credentialed actor can grow an instance's stored bytes without bound. The
   review puts this storage bound ahead of a general rate limit: one aggregate
   query at the existing enforcement point.
@@ -1443,7 +1443,8 @@ nothing else tracks them.
   `react-hooks/exhaustive-deps`, and two name one rule each. Risk: the
   comments imply a tool that never runs. Delete them, or adopt a linter and
   give `bun run check` the style gate it lacks.
-- **ARCH-1: `src/runtime/api.ts` has grown to 2,673 lines.** The review
+- **ARCH-1 (resolved by `split-runtime-api`): `src/runtime/api.ts` has grown
+  to 2,673 lines.** The review
   measured 1,384 on 2026-08-18, itself up from 1,269 the pass before. It is
   still the largest source file in the repository. Next come
   `packages/web/src/areas/studio/canvas/CanvasView.tsx` (1,791),
@@ -1453,7 +1454,8 @@ nothing else tracks them.
   `test/http.test.ts` holds 2,562. Risk: a reviewer reading one operation
   carries the whole file, and two agents editing it contend. The review's fix
   is a split into sibling modules re-exported from `api.ts`, so no import site
-  changes.
+  changes. `api.ts` is now a 117-line barrel; `src/runtime/queries.ts`, the
+  new largest module, holds 651 lines.
 - **Not from that review: `src/schema/compile.ts:1218` miscounts its own
   list.** The doc comment on `structuralIssues` names five checks that read
   the body duck-typed, then calls the remainder four. The list returns twelve
@@ -2173,7 +2175,7 @@ The design review for `test-instance-claim-bypass` (2026-09-14) surfaced one
 gap outside that change's own scope. The CLAIM tag is local to this section.
 
 - **CLAIM-1: a candidate can claim a test instance it cannot open.** The
-  function `loadInstanceForActor` (`src/runtime/api.ts`) refuses a
+  function `loadInstanceForActor` (`src/runtime/internal.ts`) refuses a
   non-administrative candidate who did not start a test instance. The
   function `claimStep` (`src/engine/transition.ts`) admits any eligible
   candidate regardless. Both `authorization` and `instance-visibility-set`
@@ -2403,7 +2405,7 @@ audit of 2026-09-10.
     are genuine delegates and stay a finding.
     [`src/cel/eval.ts`, the four functions named]
 38. **Finding 34, dedupe the two pagination helper sets.** Rejected 2026-08-16
-    as a whole. The comments above `MAX_LIST_LIMIT` in `src/runtime/api.ts`
+    as a whole. The comments above `MAX_LIST_LIMIT` in `src/runtime/internal.ts`
     and in `src/engine/admin-queries.ts` both call the duplication deliberate.
     The first reads "the numbers agree today by coincidence, not by contract."
     Only `Page<T>` is an unexplained duplicate, and it stays a possible future
@@ -2444,7 +2446,7 @@ audit of 2026-09-10.
     Rejected 2026-08-16. `HistoryEntry` reaches `packages/web` through the
     `./schema` entry. Of the three types named, `VersionSummary` lives in
     `src/engine/definitions.ts` and `InstanceRecordElement` in
-    `src/runtime/api.ts`, files that map does not publish, and
+    `src/runtime/record.ts`, files that map does not publish, and
     `InstanceRecordPage` has no engine declaration at all. Widening the engine
     package's public surface is an engine decision, and a `packages/web`
     refactor does not get to make it. The three moved to
