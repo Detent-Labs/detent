@@ -1,6 +1,6 @@
 import { useId, useRef, useState, type ToggleEvent } from "react";
 import * as stylex from "@stylexjs/stylex";
-import { colors, fonts, space } from "form-ui/tokens.stylex";
+import { colors, focus, fonts, space } from "form-ui/tokens.stylex";
 import { ChevronDown } from "lucide-react";
 import { t } from "../catalog.js";
 import { newStepNote, newStepPhrase } from "../draft/guided-labels.js";
@@ -38,7 +38,11 @@ const styles = stylex.create({
     gap: space.s3,
     flexShrink: 0,
     paddingBlock: space.s2,
-    paddingInline: 0,
+    // Room for the focus ring on the inline axis: the bar scrolls
+    // horizontally, and a scroll box clips at its padding edge on both axes
+    // (`studio-focus-ring-clipping`). The block axis already clears the
+    // ring's reach through `space.s2`.
+    paddingInline: focus.reach,
     borderBottomWidth: 1,
     borderBottomStyle: "solid",
     borderBottomColor: colors.border,
