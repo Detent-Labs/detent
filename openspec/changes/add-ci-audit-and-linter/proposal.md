@@ -4,7 +4,7 @@
 
 Two review findings in `docs/decisions.md` stay open. DEP-2: CI runs no
 dependency audit, so an advisory that Dependabot misses waits for a manual
-look. CQ-1: the repository runs no linter. It still carries 86
+look. CQ-1: the repository runs no linter. It still carries 92
 `eslint-disable` directives in its code, and each one suppresses nothing.
 
 On 2026-09-23 the owner asked for both as one change, "CI um zwei Zeilen
@@ -19,7 +19,7 @@ erweitern".
 - The CI `check` job runs `bun audit --audit-level=high` in the
   devcontainer. A high or critical advisory fails the job. An advisory with
   no fix gets an `--ignore <id>` with a comment that states the reason.
-- The 86 dead directives go. The 27 warnings oxlint 1.85.0 reports on
+- The 92 dead directives go. The 27 warnings oxlint 1.85.0 reports on
   today's tree get fixed, so the linter lands green.
 - `oxlint` becomes a pinned root dev dependency. `THIRDPARTY.md` gets
   regenerated.

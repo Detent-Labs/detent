@@ -10,10 +10,9 @@ this tree.
   test scripts` finishes in about one second. It reports 119 findings. Of
   those, 92 name an `eslint-disable` directive that suppresses nothing. The
   other 27 are warnings.
-- `git grep` finds 86 directive comments in code. Some comments name more
-  than one rule, so oxlint counts 92 directives in them. Seven more hits sit
-  in Markdown (`docs/decisions.md` and archived review records). Those are
-  prose about the directives and stay.
+- `git grep` finds 92 directive lines in code, one per oxlint finding. Seven
+  more hits sit in Markdown (`docs/decisions.md` and archived review
+  records). Those are prose about the directives and stay.
 - The 27 warnings split into five rules: 12
   `unicorn/no-useless-fallback-in-spread`, 8 `no-unsafe-optional-chaining`,
   3 `unicorn/no-useless-spread`, 2 `unicorn/prefer-string-starts-ends-with`,

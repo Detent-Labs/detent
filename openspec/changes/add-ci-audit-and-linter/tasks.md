@@ -19,7 +19,7 @@
 ## 4. Update the prose that names the check steps
 
 - [ ] 4.1 Add `lint` as the first step wherever prose lists what `bun run check` runs. The sites are `CLAUDE.md` (Verification), `README.md:109`, `README.md:125`, the CI-local entry in `docs/current-state.md` and the `.githooks/pre-push` header comment at line 7. Confirm with `git grep -n 'bun run check' -- CLAUDE.md README.md docs/current-state.md .githooks`.
-- [ ] 4.2 Mark CQ-1 and DEP-2 in `docs/decisions.md` resolved per design D9. State the measured count of 86 directives. Leave DEP-1 open. Confirm that `git diff` shows no line of the DEP-1 entry.
+- [ ] 4.2 Mark CQ-1 and DEP-2 in `docs/decisions.md` resolved per design D9. State the measured count of 92 directives. Leave DEP-1 open. Confirm that `git diff` shows no line of the DEP-1 entry.
 - [ ] 4.3 Name the audit step where prose lists what CI runs: `ROADMAP.md:27` and the CI-hosted entry in `docs/current-state.md`. Confirm with `git grep -n 'audit' -- ROADMAP.md docs/current-state.md`.
 
 ## 5. Verification
