@@ -172,6 +172,11 @@ upgrade that changes the schema. Start the rest only after the first one
 reports ready. Readiness is what `GET /readyz` reports. The startup
 schema step takes no lock. Two processes that run it together can fail.
 
+In SaaS mode, with `TENANT_CONTROL_PLANE_URL` set, the server builds no
+schema at startup (`src/http/server.ts:893`). The provisioning command
+builds each tenant's schema instead. The startup rule above therefore
+covers a single-tenant start.
+
 A change that adds process-local state adds its entry here in the same
 commit. A change that moves such state into the database removes the
 entry here.

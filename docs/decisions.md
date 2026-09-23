@@ -1429,9 +1429,14 @@ the 2026-08-18 code review. `ROADMAP.md` carries stage-by-stage status.
   session at the next request, while removing one role leaves the old set
   effective until expiry, up to eight hours. Risk (Low): an operator who
   revokes `system:admin` from an account that stays active waits for that
-  expiry. The zero-code method is to disable the account and re-enable it:
-  the next request rejects the old token, and the next login issues the
-  reduced set. That method sits in no operator document today.
+  expiry.
+
+  The per-request check, `isActiveUser` (`src/auth/users.ts:115`), reads
+  only the account's `disabled` flag. Re-enabling the account therefore
+  revives the old token with its old roles. The zero-code method is to keep the account disabled
+  until its last issued token expires, up to eight hours, and then re-enable
+  it. The next login issues the reduced set. That method sits in no operator
+  document today.
 
   Decided 2026-09-23 (change `decide-security-findings-before-1-0`): build
   before 1.0. Shape: for a token this engine issued, the per-request
@@ -1467,21 +1472,29 @@ build.
   every mutating route. Either outcome belongs in an OpenSpec change.
 
   Accepted 2026-09-23 (change `decide-security-findings-before-1-0`): the
-  built `index.html` sets `script-src 'self'` (`packages/web/csp.ts:23`),
-  which stops an injected script from running at all. A bearer header is
-  immune to CSRF. An integration authenticates with a bearer token anyway,
-  so a cookie would add a second authentication path. That path needs a
-  CSRF token on every mutating route, and `CORS_ALLOWED_ORIGINS` loses the
-  `*` value. A script that gets past the CSP can call the API as the user
-  in either design.
+  built `index.html` sets `script-src 'self'` (`packages/web/csp.ts:23`).
+  That blocks inline script and script from another origin. It does not
+  block script that the app's own origin serves, such as a compromised
+  bundled dependency.
+
+  A bearer header is immune to CSRF. An integration authenticates with a
+  bearer token anyway, so a cookie would add a second authentication path.
+  That path needs a CSRF token on every mutating route. CORS would then run
+  in credentials mode, and `CORS_ALLOWED_ORIGINS` loses the `*` value.
+
+  A script that runs on the origin can read the token from `localStorage`
+  and send it away. The attacker can then replay it from anywhere until it
+  expires, up to eight hours (`TOKEN_LIFETIME_HOURS`,
+  `src/auth/login.ts:21`). An `HttpOnly` cookie would stop that theft. It
+  would still let such a script misuse the open session. The owner accepted
+  this residual risk on 2026-09-23.
 - **SEC-8: attachment `contentType` is caller-supplied and echoed on
   download.** The upload schema at `src/http/routes.ts:111` constrains it to
   `MIME_TOKEN_PAIR` (`:108`), and the download handler at `:394` returns it
   as `Content-Type` through `toBinaryResponse` (`src/http/server.ts:200`).
-  Every binary response carries `X-Content-Type-Options: nosniff`,
-  `BINARY_ROUTES` gives this route `Content-Disposition: attachment`, and
-  the CSP sets `object-src 'none'`, so a stored `text/html` downloads rather
-  than renders. Risk (Low): a later change that drops one of those layers turns a
+  Every binary response carries `X-Content-Type-Options: nosniff`, and
+  `BINARY_ROUTES` gives this route `Content-Disposition: attachment`, so a
+  stored `text/html` downloads rather than renders. Risk (Low): a later change that drops one of those layers turns a
   stored file into rendered content. The review's optional fix is an
   allowlist of upload types in place of the shape regex.
 
@@ -1492,9 +1505,10 @@ build.
   `Content-Disposition: attachment` (`src/http/server.ts:200-212`), guarded
   by `test/http-disposition.test.ts`. The SPA fetches the file and saves it
   through `<a download>`
-  (`packages/web/src/areas/app/screens/TaskScreen.tsx:404-410`), and its own
-  CSP does not reach the download response; an allowlist would turn each
-  new file type into a configuration change instead. Residual risk: the
+  (`packages/web/src/areas/app/screens/TaskScreen.tsx:404-412`) and revokes
+  the blob URL right after the click. The SPA's own CSP does not reach the
+  download response. An allowlist would turn each new file type into a
+  configuration change instead. Residual risk: the
   saved blob carries the caller's type and the app's origin, and a later
   inline preview of it would render stored HTML there and reopen SEC-8.
 - **SEC-10: development defaults.**
@@ -1507,8 +1521,9 @@ build.
   disabled. The review recorded it for completeness and recommends nothing.
 
   Accepted 2026-09-23 (change `decide-security-findings-before-1-0`): the
-  production image inherits neither default. The server's startup print
-  names whichever one applies.
+  production image inherits neither default. The server prints
+  `AUTH DISABLED` at startup whenever the first one applies. Nothing reports
+  the second.
 
 ## Open from the 2026-08-18 code review (each needs its own OpenSpec change)
 

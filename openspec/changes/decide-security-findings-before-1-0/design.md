@@ -14,10 +14,12 @@ engine already supports a second process everywhere but one place:
 - The outbox drain and the assignment re-resolution claim rows with
   `FOR UPDATE SKIP LOCKED` (`src/engine/outbox.ts:201`,
   `src/engine/resolution.ts:68`).
-- The timer drain reads due rows without a lock. `fireTimer` then re-checks
-  the timer under the instance row's own guard
-  (`src/engine/transition.ts:893-896`). A second process firing the same row
-  matches nothing.
+- The timer drain reads due rows without a lock. A reminder timer's write
+  checks the observed sequence and the fired flag
+  (`src/engine/transition.ts:893-896`). A transition timer goes through
+  `commitTransition`'s optimistic-concurrency predicate (`:889`). There the
+  losing process throws `ConcurrencyConflict`, which the drain catches and
+  logs (`src/engine/timers.ts:84-91`). Either way the timer fires once.
 - `/metrics` reads the database on every scrape (`src/http/metrics.ts`).
 - The module-level caches hold published bodies, which are immutable, and
   JWKS sets.
@@ -67,19 +69,28 @@ SEC-2 and SEC-3 share one change, because SEC-3 needs SEC-2's check.
 **Why each accepted finding stays.**
 
 - SEC-4: the built `index.html` sets `script-src 'self'`
-  (`packages/web/csp.ts:23`), which stops an
-  injected script from running at all. A bearer header is immune to CSRF. An
-  integration authenticates with a bearer token anyway, so a cookie would add
-  a second authentication path. That path needs a CSRF token on every
-  mutating route, and `CORS_ALLOWED_ORIGINS` loses the `*` value. A script
-  that gets past the CSP can call the API as the user in both designs.
+  (`packages/web/csp.ts:23`). That blocks inline script and script from
+  another origin. It does not block script that the app's own origin
+  serves, such as a compromised bundled dependency.
+
+  A bearer header is immune to CSRF. An integration authenticates with a
+  bearer token anyway, so a cookie would add a second authentication path.
+  That path needs a CSRF token on every mutating route. CORS would then run
+  in credentials mode, and `CORS_ALLOWED_ORIGINS` loses the `*` value.
+
+  A script that runs on the origin can read the token from `localStorage`
+  and send it away. The attacker can then replay it from anywhere until it
+  expires, up to eight hours (`TOKEN_LIFETIME_HOURS`,
+  `src/auth/login.ts:21`). An `HttpOnly` cookie would stop that theft. It
+  would still let such a script misuse the open session. The owner accepted
+  this residual risk on 2026-09-23.
 - SEC-8: three layers stop a stored file from rendering. The download route
   needs a bearer header, so a plain link cannot open the file. The API
   response carries `X-Content-Type-Options: nosniff` and
   `Content-Disposition: attachment` (`src/http/server.ts:200-212`), and
   `test/http-disposition.test.ts` guards the disposition. The SPA fetches the
   file and saves it through `<a download>`
-  (`packages/web/src/areas/app/screens/TaskScreen.tsx:404-410`). The SPA's
+  (`packages/web/src/areas/app/screens/TaskScreen.tsx:404-412`). The SPA's
   own CSP does not reach the download response. An allowlist would turn each
   new file type into a configuration change. The residual risk sits in the
   SPA: the saved blob carries the caller's type and the app's origin. A later
@@ -107,8 +118,8 @@ declare it.
 **The startup rule stays a runbook rule for now.** An advisory lock around
 `initSchema` would retire it. That is code, and this change writes none.
 `docs/decisions.md` records the lock under "Decided, not yet built". The
-multi-tenant section of the runbook says "the same process" twice. Both
-places now read "the same deployment".
+multi-tenant section of the runbook said "from one process" and "the same
+process". Both places now read "the same deployment".
 
 **The runbook section sits before "The proxy rule".** Both sections describe
 the login limiter's counts. A reader then meets them together.
