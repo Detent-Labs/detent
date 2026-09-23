@@ -24,8 +24,8 @@
 
 ## 4. Verification
 
-- [ ] 4.1 Run `bun run typecheck` in the devcontainer. Record its output.
-- [ ] 4.2 Run the full `bun test` with `DATABASE_URL` set in the devcontainer, and pipe the output through `sh scripts/gates/silent-green.sh`. Record the pass, skip and fail counts.
-- [ ] 4.3 On the host, run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`. Record its output.
-- [ ] 4.4 On the host, run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh`. Record its output.
-- [ ] 4.5 Run `openspec validate trim-docs-weight --strict`. Record its output.
+- [x] 4.1 Run `bun run typecheck` in the devcontainer. Record its output.
+- [x] 4.2 Run the full `bun test` with `DATABASE_URL` set in the devcontainer, and pipe the output through `sh scripts/gates/silent-green.sh`. Record the pass, skip and fail counts.
+- [x] 4.3 On the host, run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`. Record its output.
+- [x] 4.4 On the host, run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh`. Record its output.
+- [x] 4.5 Run `openspec validate trim-docs-weight --strict`. Record its output.
