@@ -28,4 +28,4 @@
 - [x] 5.2 Run `bun run check` in the devcontainer with `DATABASE_URL` set. It runs lint, typecheck, build, the full `bun test` and `test:tz`. Capture the output in a scratchpad file outside `tmp/`. Run `sh scripts/gates/silent-green.sh` on that file. Record its verdict.
 - [x] 5.3 On the host, run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` and `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh`, and record what each printed.
 - [x] 5.4 Run `sh scripts/gates/lockfile.sh` and `sh scripts/gates/machine-paths.sh`. Record what each printed.
-- [ ] 5.5 After the push, confirm that the CI `check` job ran the audit step and that the step passed. Read the step log. The job badge covers every step at once.
+- [x] 5.5 After the push, confirm that the CI `check` job ran the audit step and that the step passed. Read the step log. The job badge covers every step at once.
