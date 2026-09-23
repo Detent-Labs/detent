@@ -7,13 +7,13 @@ so each group ends with a green `bun run typecheck`.
 
 ## 1. Baseline
 
-- [ ] 1.1 Record the base commit with `git rev-parse HEAD` in the ledger under `.superpowers/sdd/split-runtime-api/`. Verify: the ledger file names the SHA.
-- [ ] 1.2 Write `values-before.txt` and `types-before.txt` as `design.md` D3 describes. Verify: both files exist and are not empty.
+- [x] 1.1 Record the base commit with `git rev-parse HEAD` in the ledger under `.superpowers/sdd/split-runtime-api/`. Verify: the ledger file names the SHA.
+- [x] 1.2 Write `values-before.txt` and `types-before.txt` as `design.md` D3 describes. Verify: both files exist and are not empty.
 
 ## 2. Shared internals and field resolution
 
-- [ ] 2.1 Create `src/runtime/internal.ts` with the declarations in D1's `internal.ts` row. Verify: `bun run typecheck` passes.
-- [ ] 2.2 Create `src/runtime/fields.ts` with the declarations in D1's `fields.ts` row. Verify: `bun run typecheck` passes.
+- [x] 2.1 Create `src/runtime/internal.ts` with the declarations in D1's `internal.ts` row. Verify: `bun run typecheck` passes.
+- [x] 2.2 Create `src/runtime/fields.ts` with the declarations in D1's `fields.ts` row. Verify: `bun run typecheck` passes.
 
 ## 3. Instance lifecycle and claims
 
