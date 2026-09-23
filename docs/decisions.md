@@ -1572,7 +1572,8 @@ recorded rather than fixed. The RAIL tags are local to this section.
 - **RAIL-6: the desktop rail is narrower than the phone rail.** The Steps tab
   gives the rail 18rem beside the step page, in `EditScreen.tsx`. Below 64rem
   the rail takes the full width and caps its height at 20rem.
-- **DRAFT-1: the header bar's Discard draft does nothing.** Choose it on a
+- **DRAFT-1 (behaviour bug, own OpenSpec change): the header bar's Discard
+  draft does nothing.** Choose it on a
   draft's process surface, then choose the dialog's own Discard draft: the
   dialog stays open, the draft survives, and the process list still lists it.
   The console reports no error. Measured 2026-09-12 at 1440px and at 420px,

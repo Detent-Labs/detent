@@ -93,9 +93,11 @@ row, so it moves inward with the row.
 Outcome: the canvas bar's `bar` and the form tab strip's `row` clipped and
 now pad by `focus.reach`. The change list's `body` held the "Open …" row
 command's pull-back at 400px; its own `paddingInlineStart` now restores
-that room. The remaining four boxes, `ChecksRail`, `FormsTab`, `StepPage`
-and `FormEditorScreen`, already padded past the ring's reach at both
-widths.
+that room. Three boxes, `ChecksRail`, `FormsTab` and `FormEditorScreen`,
+already pad past the ring's reach on their own. The step page's own
+`page` box sets no block padding. Its first and last controls still clear
+the ring, through the masthead's own padding and the developer section's
+own padding.
 
 ## Risks / Trade-offs
 

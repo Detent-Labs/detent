@@ -5322,6 +5322,8 @@ fix for RAIL-3 and FIELDS-4. The form tab strip's row, `FormTabStrip.tsx`'s
 The change list's row (`ChangeList.tsx`'s `body`) pulled its ring past the
 Changes tab body's left edge at 400px. Its own `openCommandFlush` negative
 margin pulled the "Open …" text 5px past that edge. The row's own
-`paddingInlineStart` now restores that room below 40rem. The remaining
-four boxes, `ChecksRail`, `FormsTab`, `StepPage` and `FormEditorScreen`,
-already padded past the ring's reach.
+`paddingInlineStart` now restores that room below 40rem. Three boxes,
+`ChecksRail`, `FormsTab` and `FormEditorScreen`, already pad past the
+ring's reach on their own. The step page's own `page` box sets no block
+padding. Its first and last controls still clear the ring, through the
+masthead's own padding and the developer section's own padding.
