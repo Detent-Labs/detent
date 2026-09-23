@@ -6,7 +6,7 @@
 entry says what the subsystem does, which directories and files hold it, and
 which spec capabilities own its rules.
 
-The map SHALL NOT name an exported function, type, class or constant. A rename
+The map SHALL NOT name an exported symbol: a callable, type, class or constant. A rename
 of such a symbol then leaves the map correct. A reader who needs symbol detail
 goes to the knowledge graph, the code or `docs/openapi.yaml`. The map SHALL
 say so in its opening paragraph.
@@ -18,7 +18,7 @@ say so in its opening paragraph.
 
 #### Scenario: A reader looks for symbol detail
 
-- **WHEN** a reader opens `docs/current-state.md` for a function's behavior
+- **WHEN** a reader opens `docs/current-state.md` for one symbol's behavior
 - **THEN** the opening paragraph sends the reader to the knowledge graph, the
   code or `docs/openapi.yaml`
 
