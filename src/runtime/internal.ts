@@ -216,4 +216,3 @@ export class CollaborationDisabledError extends Error {
     this.name = "CollaborationDisabledError";
   }
 }
-

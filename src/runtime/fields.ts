@@ -598,4 +598,3 @@ export async function validateSubmissionData(
   // call already resolved, instead of resolving the step a second time.
   return resolved;
 }
-
