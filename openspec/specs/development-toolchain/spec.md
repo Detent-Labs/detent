@@ -1148,8 +1148,8 @@ then cannot change the lint result on a commit.
 
 #### Scenario: A lint warning fails the script
 
-- **WHEN** a file under `src`, `packages`, `test` or `scripts` holds code the
-  linter reports as a warning
+- **WHEN** a file under `src`, `packages`, `test`, `scripts` or `e2e`, or
+  `playwright.config.ts`, holds code the linter reports as a warning
 - **THEN** `bun run lint` exits non-zero and names the file, line and rule
 
 #### Scenario: A dead directive fails the script

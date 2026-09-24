@@ -24,7 +24,7 @@
     "build": "bun run --filter './packages/*' build",
     "test": "bun test",
     "test:tz": "TZ=Europe/Zurich bun test packages/web/test/reporting-reportingLogic.test.ts",
-    "lint": "oxlint --deny-warnings --report-unused-disable-directives src packages test scripts",
+    "lint": "oxlint --deny-warnings --report-unused-disable-directives src packages test scripts e2e playwright.config.ts",
     "check": "bun run lint && bun run typecheck && bun run build && bun test && bun run test:tz",
     "serve": "bun run src/http/server.ts",
     "seed": "bun run scripts/seed.ts",
