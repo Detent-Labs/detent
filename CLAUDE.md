@@ -257,8 +257,9 @@ tsconfig.json              strict; NodeNext ESM; covers src + test
 src/schema/definition.ts   Zod schemas = the definition contract; TS types via z.infer; invariants included
 src/engine/                executor: instance store, outbox, transitions, timers, subprocess, drafts,
                             definitions, migration, admin queries
-src/runtime/api.ts         Runtime API Layer: instance create/view/submit, claims, cancel, queries,
-                            reports, visibility, comments, attachments
+src/runtime/               Runtime API Layer: api.ts barrel, plus internal, fields,
+                            instances, claims, queries, reports, record, visibility,
+                            comments, attachments
 src/http/                  REST/JSON wrapper over Bun.serve; one route file
                             per surface (routes.ts, admin-routes.ts,
                             studio-routes.ts, reporting-routes.ts,

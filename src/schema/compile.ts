@@ -1097,7 +1097,7 @@ function checkViewGroupReferences(body: ProcessBody): CompileIssue[] {
 // ============================================================
 
 /** A `FieldDef.default` counts as a writer only when literal — mirrors
- * `applyFieldDefaults`' own `asExpression` (src/runtime/api.ts): an
+ * `applyFieldDefaults`' own `asExpression` (src/runtime/fields.ts): an
  * Expression-shaped object (`{lang: "cel", ...}`) may raise at creation and
  * leave the field unwritten, so only a non-CEL value counts. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

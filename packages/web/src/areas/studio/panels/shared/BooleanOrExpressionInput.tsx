@@ -9,7 +9,7 @@ interface Props {
   /** Which of the three view flags this control edits. The checkbox's
    * `checked` state reads the engine's resolved default for an absent key,
    * not `value === true` — an absent `visible` renders ticked, matching
-   * `resolveFields` (`src/runtime/api.ts`). */
+   * `resolveFields` (`src/runtime/fields.ts`). */
   flagKey: FlagKey;
   /** The step this override sits on, for the condition builder's `child.*` operands. */
   stepId?: string;
