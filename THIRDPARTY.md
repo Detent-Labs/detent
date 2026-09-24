@@ -56,6 +56,7 @@ Declared directly in a `package.json` (root or a `packages/*` workspace).
 | `@dagrejs/dagre` | 3.1.1 | MIT |
 | `@marcbachmann/cel-js` | 8.0.0 | MIT |
 | `@panzoom/panzoom` | 4.6.2 | MIT |
+| `@playwright/test` | 1.63.0 | Apache-2.0 |
 | `@stylexjs/stylex` | 0.19.0 | MIT |
 | `@stylexjs/unplugin` | 0.19.0 | MIT |
 | `@types/bun` | 1.3.14 | MIT |
