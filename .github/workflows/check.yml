@@ -104,3 +104,50 @@ jobs:
 
       # No teardown step: the runner VM is destroyed after the job either
       # way, unlike the persistent self-hosted host this design first used.
+
+  # The Playwright smoke suite (browser-smoke-suite), inside the devcontainer
+  # like `check`. No `needs:`, so a slow browser install never delays the
+  # typecheck/build/test feedback `check` gives (design D5).
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Start the devcontainer stack
+        run: |
+          . scripts/worktree-env.sh
+          docker compose -f .devcontainer/docker-compose.yml up -d --wait
+
+      - name: bun install
+        run: |
+          . scripts/worktree-env.sh
+          docker compose -f .devcontainer/docker-compose.yml exec -T -w /workspace app bun install
+
+      # A `docker compose exec` runs as root in this container, so the
+      # browser's system libraries install with no `sudo` (design D5).
+      - name: Install the Playwright browser
+        run: |
+          . scripts/worktree-env.sh
+          docker compose -f .devcontainer/docker-compose.yml exec -T -w /workspace app \
+            bunx playwright install --with-deps chromium
+
+      - name: bun run build
+        run: |
+          . scripts/worktree-env.sh
+          docker compose -f .devcontainer/docker-compose.yml exec -T -w /workspace app bun run build
+
+      - name: bun run e2e
+        run: |
+          . scripts/worktree-env.sh
+          docker compose -f .devcontainer/docker-compose.yml exec -T -w /workspace app bun run e2e
+
+      # test-results/ lands under the bind-mounted /workspace (docker-compose.yml),
+      # so a failed flow's trace reaches the host path this action reads.
+      - name: Upload the failed run's traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-results
+          path: test-results/
+          if-no-files-found: ignore

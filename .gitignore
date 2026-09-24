@@ -20,6 +20,9 @@ yarn-error.log*
 # Test / coverage
 coverage/
 .playwright-cli/
+test-results/
+playwright-report/
+e2e/.auth/
 
 # Editor / OS
 .vscode/*

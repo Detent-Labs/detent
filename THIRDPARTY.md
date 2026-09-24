@@ -56,6 +56,7 @@ Declared directly in a `package.json` (root or a `packages/*` workspace).
 | `@dagrejs/dagre` | 3.1.1 | MIT |
 | `@marcbachmann/cel-js` | 8.0.0 | MIT |
 | `@panzoom/panzoom` | 4.6.2 | MIT |
+| `@playwright/test` | 1.63.0 | Apache-2.0 |
 | `@stylexjs/stylex` | 0.19.0 | MIT |
 | `@stylexjs/unplugin` | 0.19.0 | MIT |
 | `@types/bun` | 1.3.14 | MIT |
@@ -63,12 +64,12 @@ Declared directly in a `package.json` (root or a `packages/*` workspace).
 | `@types/react-dom` | 19.2.4 | MIT |
 | `@vitejs/plugin-react` | 6.0.5 | MIT |
 | `jose` | 6.2.4 | MIT |
-| `lucide-react` | 1.40.0 | ISC |
+| `lucide-react` | 1.45.0 | ISC |
 | `react` | 19.2.8, 18.3.1 | MIT |
 | `react-dom` | 19.2.8, 18.3.1 | MIT |
 | `typescript` | 7.0.2 | Apache-2.0 |
 | `vite` | 8.2.1 | MIT |
-| `zod` | 4.5.4 | MIT |
+| `zod` | 4.6.2 | MIT |
 
 `react` and `react-dom` resolve twice. `packages/web` declares `^19` and
 gets 19.2.8. `packages/form-ui` declares `^18` as a peer range and keeps
