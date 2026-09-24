@@ -70,6 +70,12 @@ that sequence, over one `walkFieldsIndexed` pass
   path would let an actor advance the parent while the child still runs. All
   three are Zod refinements in `definition.ts`'s `step` superRefine, beside the
   path-trigger checks.
+- A published body must not reach its own `processId` through subprocess
+  references. Publish rejects a direct self-reference and any longer chain a
+  new version would close. The comparison uses process ids and ignores
+  version. A `process.start` chain is exempt, since it is fire-and-forget
+  rather than a wait-state reference. The `publishBody` check for this is
+  `validateSubprocessCycle`; see `process-contract.md`.
 - `unmappableStep` present iff `onUnmappable === "route-to-step"`; migration
   maps reference valid ids.
 - `migrationSpec.fieldMap` is injective. Two sources targeting one field
@@ -83,6 +89,11 @@ that sequence, over one `walkFieldsIndexed` pass
 - Every CEL Expression parses and type-checks against the field catalog. The
   CEL step below enforces this one, not definition.ts, since it needs the CEL
   library.
+- Every checked CEL Expression also stays under a structural bound. It holds
+  at most 2,000 AST nodes and a parse depth of at most 64. It nests at most
+  two comprehension macros (`all`, `exists`, `exists_one`, `map`, `filter`).
+  The CEL step below enforces this too, at the same site as the type check.
+  It reports a violation as a located CEL issue.
 - No action anywhere in the body carries a `type` with the reserved `core.`
   prefix. The compile pass checks this on BOTH compile branches
   (`compile.ts::checkReservedActionPrefix`). The cancel-sink id/key/outcome

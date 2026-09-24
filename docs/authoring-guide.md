@@ -694,6 +694,17 @@ fields and emits the CEL. So this section tells you what the text means, not
 what you must type. The text input is still there behind `Edit as CEL`, and a
 guard you write by hand opens in the builder afterwards.
 
+Every CEL expression, including a guard, stays under a structural bound. It
+holds at most 2,000 AST nodes and a parse depth of at most 64. It nests at
+most two comprehension macros (`all`, `exists`, `exists_one`, `map`,
+`filter`) inside one another.
+
+A third nested comprehension multiplies cost. One loop over an n-row list
+costs n steps; two nested loops cost n²; three cost n³. Publishing rejects
+an expression that crosses any of the three limits. The studio's live
+validation flags the same violation. Evaluation itself runs exactly as
+before, without a separate timer.
+
 ### Action
 
 Something the engine does, written as a handler reference: a type and a
@@ -845,6 +856,20 @@ another process from the current one's data. It does not wait for it: no
 wait-state, no outcome, no contract. Use it when one process's end step
 should start an unrelated process, not call one and park for its
 result.
+
+A subprocess reference must not form a cycle. A process may not call
+itself, directly or through other processes it calls. Publishing rejects a
+body that would close such a cycle, whichever version closes it.
+
+A `process.start` chain is exempt. It is fire-and-forget. A loop there
+causes no runaway, because `process.start` is not a subprocess reference.
+The cycle check does not follow it. A yearly renewal that starts next
+year's instance is one legitimate loop.
+
+A subprocess spawn also has a hard depth limit. An instance nested 16
+subprocess levels deep refuses to spawn another child. The spawn fails
+where an operator can see it. The limit is a backstop: the publish-time
+check above should already prevent a cycle from forming.
 
 ## Building a process
 

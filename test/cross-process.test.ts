@@ -8,14 +8,16 @@ import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { readFileSync } from "node:fs";
 import { sql, initSchema } from "../src/engine/store.js";
 import { publishBody, CrossProcessValidationError, CelValidationError } from "../src/engine/definitions.js";
-import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
+import { createRegistry, createDataSourceRegistry, PROCESS_START_ACTION_TYPE } from "../src/engine/registry.js";
+import { createDefaultRegistry } from "../src/engine/host.js";
 import { compileProcessBody } from "../src/schema/compile.js";
 import { contractHash } from "../src/schema/hash.js";
 import type { ProcessBody, ProcessId } from "../src/schema/definition.js";
 
 const DB = !!process.env.DATABASE_URL;
-// Fixture bodies in this file declare no actions, so an empty registry is
-// sufficient for every publishBody call here.
+// Most fixture bodies in this file declare no actions, so an empty registry is
+// sufficient for every publishBody call except the process.start loop test
+// below, which builds its own full registry.
 const reg = createRegistry();
 const dataSourceReg = createDataSourceRegistry();
 const CHILD = "proc_cpv_child" as ProcessId;
@@ -192,4 +194,92 @@ test.skipIf(!DB)("the shipped subprocess examples still publish under the tighte
   expect(c.version).toBe(1);
   const p = await publishBody("proc_loan" as ProcessId, parent, reg, dataSourceReg);
   expect(p.version).toBe(1);
+});
+
+// --- subprocess cycle check -----------------------------------------------------
+
+const CYC_A = "proc_cyc_a" as ProcessId;
+const CYC_B = "proc_cyc_b" as ProcessId;
+const CYC_C = "proc_cyc_c" as ProcessId;
+
+// Contracted node: optionally waits on a subprocess `sub`, optionally starts
+// `startTarget` via process.start on entry. Every node shares one contract, so
+// one contractRef resolves any of them latest-at-spawn.
+const node = (key: string, sub?: Record<string, unknown>, startTarget?: ProcessId): ProcessBody =>
+  ({
+    key, label: { en: key }, baseLocale: "en",
+    contract: { inputFields: ["field_amount"], outputFields: ["field_amount"], outcomes: ["approved"] },
+    fields: [{ id: "field_amount", key: "amount", label: { en: "Amount" }, type: "number" }],
+    workflow: {
+      initialStep: "step_entry",
+      steps: [
+        { id: "step_entry", key: "entry", label: { en: "Entry" }, type: "task",
+          ...(startTarget ? { onEntry: [{ id: "action_start", type: PROCESS_START_ACTION_TYPE, config: { processId: startTarget, inputMapping: {} } }] } : {}),
+          paths: sub
+            ? [{ id: "path_sub", key: "sub", label: "Sub", to: "step_sub", trigger: "automatic" }]
+            : [{ id: "path_done", key: "done", label: "Done", to: "step_done", trigger: "manual" }] },
+        ...(sub
+          ? [{ id: "step_sub", key: "sub", label: { en: "Sub" }, type: "subprocess", subprocess: sub,
+              paths: [{ id: "path_sub_done", key: "sub_done", label: "Sub Done", to: "step_done", trigger: "automatic", priority: 1, guard: cel('child.outcome == "approved"') }] }]
+          : []),
+        { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true, outcome: "approved" },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+const nodeRef = () => contractHash(compileProcessBody(node("ref")).contract!);
+const subPinned = (processId: ProcessId, version: number) => ({
+  processId, versionBinding: "pinned", pinnedVersion: version,
+  inputMapping: { field_amount: cel("data.amount") }, outputMapping: {},
+});
+const subLatest = (processId: ProcessId) => ({
+  processId, versionBinding: "latest-at-spawn", contractRef: nodeRef(),
+  inputMapping: { field_amount: cel("data.amount") }, outputMapping: {},
+});
+
+async function expectCycleReject(p: Promise<unknown>, chain: string): Promise<void> {
+  let err: unknown;
+  try {
+    await p;
+  } catch (e) {
+    err = e;
+  }
+  expect(err).toBeInstanceOf(CrossProcessValidationError);
+  expect((err as Error).message).toBe(`subprocess cycle: ${chain}`);
+}
+
+test.skipIf(!DB)("publish rejects a process that references itself as a subprocess", async () => {
+  const a1 = await publishBody(CYC_A, node("a"), reg, dataSourceReg);
+  await expectCycleReject(publishBody(CYC_A, node("a", subPinned(CYC_A, a1.version)), reg, dataSourceReg), `${CYC_A} → ${CYC_A}`);
+  expect(await parentCount(CYC_A)).toBe(1);
+});
+
+test.skipIf(!DB)("publish rejects the version that closes a two-process cycle", async () => {
+  await publishBody(CYC_A, node("a"), reg, dataSourceReg);
+  await publishBody(CYC_B, node("b", subLatest(CYC_A)), reg, dataSourceReg);
+  await expectCycleReject(publishBody(CYC_A, node("a", subLatest(CYC_B)), reg, dataSourceReg), `${CYC_A} → ${CYC_B} → ${CYC_A}`);
+  expect(await parentCount(CYC_A)).toBe(1);
+});
+
+test.skipIf(!DB)("publish rejects a pinned reference to an earlier version of the same process", async () => {
+  const a1 = await publishBody(CYC_A, node("a"), reg, dataSourceReg);
+  const b1 = await publishBody(CYC_B, node("b", subPinned(CYC_A, a1.version)), reg, dataSourceReg);
+  await expectCycleReject(publishBody(CYC_A, node("a", subPinned(CYC_B, b1.version)), reg, dataSourceReg), `${CYC_A} → ${CYC_B} → ${CYC_A}`);
+  expect(await parentCount(CYC_A)).toBe(1);
+});
+
+test.skipIf(!DB)("an acyclic subprocess chain publishes", async () => {
+  const c = await publishBody(CYC_C, node("c"), reg, dataSourceReg);
+  const b = await publishBody(CYC_B, node("b", subPinned(CYC_C, c.version)), reg, dataSourceReg);
+  const a = await publishBody(CYC_A, node("a", subLatest(CYC_B)), reg, dataSourceReg);
+  expect([c.version, b.version, a.version]).toEqual([1, 1, 1]);
+});
+
+test.skipIf(!DB)("a process.start loop publishes", async () => {
+  const fullReg = createDefaultRegistry();
+  // B must be published before A can start it; B v2 then closes the loop.
+  await publishBody(CYC_B, node("b"), fullReg, dataSourceReg);
+  const a = await publishBody(CYC_A, node("a", undefined, CYC_B), fullReg, dataSourceReg);
+  const b2 = await publishBody(CYC_B, node("b", undefined, CYC_A), fullReg, dataSourceReg);
+  expect([a.version, b2.version]).toEqual([1, 2]);
 });
