@@ -293,6 +293,16 @@ suite uses its own database.
 - Specs: `development-toolchain`, `push-gate-checks`,
   `devcontainer-preflight`, `worktree-isolation`
 
+## Browser smoke suite
+
+A Playwright suite drives four flows against the production web build. It
+runs as `bun run e2e`, and a separate CI job runs it beside the checks. The
+engine it starts uses a database of its own.
+
+- Paths: `e2e/`, `playwright.config.ts`, `scripts/e2e.ts`,
+  `.github/workflows/check.yml`
+- Specs: `browser-smoke-suite`, `development-toolchain`
+
 ## Deployment
 
 Two images serve the engine and the frontend. The runbooks cover

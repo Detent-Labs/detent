@@ -841,8 +841,8 @@ recorded rather than fixed. The RAIL tags are local to this section.
   measurement read 56.9s on the seeded `purchase_requisition` v3. Another
   watched eight `GET /drafts/<id>` polls answer 404 over 7.5s. The button
   disables for that whole wait, but nothing signals how much longer it runs.
-- **Two browser-check entries name retired UI.** `docs/browser-checks.md:894`
-  and `:923` still name the configuration pane and the ribbon bar.
+- **Two browser-check entries name retired UI.** `docs/browser-checks.md:897`
+  and `:926` still name the configuration pane and the ribbon bar.
   `.claude/rules/ui-glossary.md` retired both words with the process surface.
 - **STEP-1: at 1280px a condition row runs under the next section.** The
   critique of `authoring-command-ink-advisory-role` measured it on

@@ -184,7 +184,8 @@ printed, not that you ran it.
   rendered behind a modal, a stale result row, or an `/admin/*` route
   collision. All three shipped past a green suite here. `docs/browser-checks.md`
   holds what stays manual; `development-toolchain`'s split rule decides
-  whether a new check lands there or ships as a `bun:test` assertion instead.
+  among three homes: a `bun:test` assertion, an `e2e/` smoke flow, or a
+  checklist entry here.
 
 ## Enforced mechanically. Do not re-litigate these.
 
