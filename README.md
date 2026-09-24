@@ -151,8 +151,28 @@ one of `AUTH_JWT_SECRET`, `AUTH_ISSUERS` or `ALLOW_INSECURE_DEV_AUTH=1`. The
 devcontainer sets the third one (`.devcontainer/docker-compose.yml`). That one
 belongs nowhere else. `docs/runbooks/deployment.md` gives all three with their
 defaults, and every other variable too.
+
 Changes go through OpenSpec (`openspec/`) — propose → specs/tasks → implement →
 verify → archive. See `CLAUDE.md` for the full contract rules and invariants.
+
+### Smoke suite
+
+`bun run e2e` drives four flows through a browser, against the production
+build and a database of its own (`_e2e`). Install the browser once per
+container:
+
+```bash
+bunx playwright install --with-deps chromium
+```
+
+Then build the bundle and run the suite:
+
+```bash
+bun run build
+bun run e2e
+```
+
+CI runs the same suite in a job of its own, beside `check`.
 
 ## Deploy
 

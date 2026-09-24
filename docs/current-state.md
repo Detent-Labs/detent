@@ -2550,7 +2550,8 @@ Stage-by-stage status is in `ROADMAP.md`.
 
 - CI, hosted (`.github/workflows/check.yml`, `add-ci-workflow`): the same
   host gates, and the same `bun run check`, now also run on GitHub's own
-  infrastructure. It runs on every push and every pull request. This
+  infrastructure. It runs on every push and every pull request. A separate
+  `e2e` job runs `bun run e2e` beside it, with no `needs:` between them. This
   reverses a decision the local gate above once recorded, on purpose.
   GitHub-hosted runners are free for a public repository.
 
