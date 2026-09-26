@@ -815,6 +815,16 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
         role="tabpanel"
         aria-labelledby={tabDomId(target)}
         hidden={hide}
+        // ponytail: a window refocus dispatches `focus` to the element that
+        // already holds it, with no fresh `pointerdown`/`keydown` first, so
+        // `lastInputModality` (`focusScroll.ts`) still reads whatever the
+        // last real interaction set. Ceiling: refocusing the window after a
+        // KEYBOARD interaction still re-runs this handler and can jump a
+        // hand-scrolled, partly hidden control back into view; refocusing
+        // after a POINTER interaction is unaffected, since the flag still
+        // reads "pointer" and the handler already skips it. Upgrade:
+        // `ProcessTabRow.tsx`'s own `windowBlurred` guard
+        // (`focusScrollsRow`), lifted onto this shared handler.
         onFocusCapture={scrollKeyboardFocusIntoView}
         {...stylex.props(styles.tabBody, hide && styles.tabBodyHidden)}
       >
