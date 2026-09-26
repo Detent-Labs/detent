@@ -1,6 +1,6 @@
 import { useState } from "react";
 import * as stylex from "@stylexjs/stylex";
-import { colors, fonts, space } from "form-ui/tokens.stylex";
+import { colors, focus, fonts, space } from "form-ui/tokens.stylex";
 import type { Step } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
 import type { DraftField } from "../draft/fields";
@@ -39,8 +39,18 @@ const styles = stylex.create({
     minHeight: 0,
     overflowY: "auto",
     overscrollBehavior: "contain",
+    // The box sets no block padding of its own: the masthead's and the
+    // Developer view's own padding clear the ring at either end instead
+    // (`studio-focus-ring-clipping`, design.md's Outcome). Adding a block
+    // padding here would stack on top of theirs and move content that
+    // already clears the ring. `space.s3` (12px) on the inline axis already
+    // clears the reach; `max()` keeps that value while reading `focus.reach`,
+    // so the two move together if the reach ever grows.
     paddingBlock: 0,
-    paddingInline: space.s3,
+    paddingInline: `max(${space.s3}, ${focus.reach})`,
+    // Mid-scroll, a focus scroll would align a control flush with the edge
+    // and clip its ring.
+    scrollPaddingBlock: focus.reach,
   },
   empty: {
     color: colors.textMuted,
@@ -53,7 +63,11 @@ const styles = stylex.create({
     display: "flex",
     flexDirection: "column",
     gap: space.s2,
-    paddingBlock: space.s3,
+    // Only the top edge faces the page box's own top edge; the bottom edge
+    // sits against the divider below, not that edge, and keeps the literal
+    // token.
+    paddingBlockStart: `max(${space.s3}, ${focus.reach})`,
+    paddingBlockEnd: space.s3,
     borderBottomWidth: 2,
     borderBottomStyle: "solid",
     borderBottomColor: colors.divider,
@@ -286,7 +300,11 @@ const styles = stylex.create({
     paddingBlock: space.s3,
   },
   developer: {
-    paddingBlock: space.s3,
+    // Only the bottom edge faces the page box's own bottom edge; the top
+    // edge sits against the divider above, not that edge, and keeps the
+    // literal token.
+    paddingBlockStart: space.s3,
+    paddingBlockEnd: `max(${space.s3}, ${focus.reach})`,
     borderTopWidth: 2,
     borderTopStyle: "solid",
     borderTopColor: colors.divider,

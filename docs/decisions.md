@@ -805,7 +805,7 @@ four Low ones stay open.
   from one actor issues one grant query each. The review calls it documented
   and correctly bounded, and recommends nothing.
 
-## Open from the 2026-09-11 design audits (each needs its own OpenSpec change)
+## Open from the 2026-09-11 design audits (one OpenSpec change per screen)
 
 Three changes ran `/impeccable critique` and `/impeccable audit` on 2026-09-11.
 They are `steps-rail-rows-drop-summary-line` on the Studio Steps tab,
@@ -821,7 +821,8 @@ recorded rather than fixed. The RAIL tags are local to this section.
   `minHeight` floor never binds against that larger sum. Risk (Low), carried
   over unchanged: that width clears the 24px minimum target and misses the
   44px enhanced one.
-- **RAIL-3: the rail clips its own focus ring.** The rail scrolls on its
+- **RAIL-3 (resolved by `studio-focus-ring-clipping`): the rail clips its own
+  focus ring.** The rail scrolls on its
   block axis, and a scroll container on one axis clips the other. The shell
   draws a 2px ring at a 2px offset, in `global.css`. Risk (Low): the ring's
   leading edge falls outside the rail's box and disappears.
@@ -838,7 +839,15 @@ recorded rather than fixed. The RAIL tags are local to this section.
 - **RAIL-6: the desktop rail is narrower than the phone rail.** The Steps tab
   gives the rail 18rem beside the step page, in `EditScreen.tsx`. Below 64rem
   the rail takes the full width and caps its height at 20rem.
-- **DRAFT-1: the header bar's Discard draft does nothing.** Choose it on a
+- **RAIL-7: below 64rem the Steps tab nests three scroll boxes.** The rail
+  stands over the step page, and the step page scrolls on its own
+  (`panels/StepPage.tsx:35`). The tab body scrolls around both. Measured
+  2026-09-24 at 400x800: the tab body scrolls 161px and the rail 352px. The
+  step page scrolls 2698px inside a box 244px tall. Risk (Medium): a wheel
+  or a swipe moves whichever box sits under it, and the step page shows
+  244px at a time.
+- **DRAFT-1 (behaviour bug, own OpenSpec change): the header bar's Discard
+  draft does nothing.** Choose it on a
   draft's process surface, then choose the dialog's own Discard draft: the
   dialog stays open, the draft survives, and the process list still lists it.
   The console reports no error. Measured 2026-09-12 at 1440px and at 420px,
@@ -849,27 +858,35 @@ recorded rather than fixed. The RAIL tags are local to this section.
   Risk (Informational): a long label wraps on a wide screen and fits on a
   narrow one.
 - **A canvas removal drops keyboard focus, and nothing announces it.**
-  `deleteSelection` (`packages/web/src/areas/studio/screens/EditScreen.tsx:558`)
+  `deleteSelection` (`packages/web/src/areas/studio/screens/EditScreen.tsx:568`)
   clears the selection. The pressed control unmounts with it, so focus lands on
   `<body>` and the next Tab reaches Fit to view. Remove steps behaved this way
   before Remove step joined it. Risk: a keyboard or screen-reader user loses
   their place after every removal (WCAG 2.4.3, and 4.1.3 for the silence). The
   fix moves focus to the canvas's own tab stop, which
-  `packages/web/src/areas/studio/canvas/CanvasView.tsx:770` already reassigns,
+  `packages/web/src/areas/studio/canvas/CanvasView.tsx:767` already reassigns,
   and announces the removal in a polite live region.
 - **The canvas bar's caret menu ignores the arrow keys.** The panel carries
-  `role="menu"` (`packages/web/src/areas/studio/canvas/CanvasBar.tsx:360`), and
+  `role="menu"` (`packages/web/src/areas/studio/canvas/CanvasBar.tsx:376`), and
   ArrowDown leaves focus on its trigger. Risk: a screen reader announces a menu
   whose keys answer nothing (WCAG 4.1.2).
 - **No key takes a selected step out of the draft.** Delete and Backspace on a
   selected node do nothing (`canvas/CanvasView.tsx`). A removal needs the
   pointer, or a Tab back to the canvas bar's own control.
+- **CANVAS-1: at 400px the canvas clips the Arrange ring by 2px.** The
+  canvas's own toolbar sits 8px inside the canvas, in one row that never
+  wraps (`canvas/CanvasView.tsx:79`). The canvas clips at its padding edge,
+  with `overflow: hidden` (`:69`). Measured 2026-09-24 at 400x800: Fit to
+  view, Rounded corners and Arrange fill the row, and Arrange's ring runs
+  2px past the right edge. The canvas scrolls nothing, so the scroll-box
+  rule of `studio-focus-ring-clipping` does not reach it. Risk (Low): the
+  ring loses 2px on one side and still meets WCAG 2.4.7.
 - **A field's border reads 1.32:1 in light and 1.64:1 in dark.** The 1px
-  hairline sits at `packages/web/src/shell/global.css:68`. WCAG 1.4.11 asks 3:1
+  hairline sits at `packages/web/src/shell/global.css:70`. WCAG 1.4.11 asks 3:1
   of a boundary that identifies a control. `DESIGN.md`'s Inputs / Fields entry
   sets that hairline, so the call belongs to the design language.
 - **Every `.btn` stands 36 to 37px tall, under the 44px touch target.** Its
-  padding sits at `packages/web/src/shell/tokens.css:139`. The studio serves a
+  padding sits at `packages/web/src/shell/tokens.css:158`. The studio serves a
   desktop audience, so this one waits on a touch one.
 - **`createStep.ts` calls the canvas add controls "the palette".** The retired
   word sits at `packages/web/src/areas/studio/draft/createStep.ts:8` and `:15`.
@@ -898,7 +915,7 @@ recorded rather than fixed. The RAIL tags are local to this section.
   same class. Both read 4.53:1 at rest, 3.90:1 hovered and 3.45:1 pressed, in
   light.
 - **Remove step and the field catalog's Remove field trigger have no
-  destructive treatment.** `packages/web/src/areas/studio/panels/StepPage.tsx:610`
+  destructive treatment.** `packages/web/src/areas/studio/panels/StepPage.tsx:740`
   renders `btn btn-secondary` and commits at once.
   `packages/web/src/areas/studio/panels/FieldCatalogPanel.tsx:926` renders
   `btn btn-ghost` and opens `RemoveFieldDialog` instead. `DESIGN.md` asks that
@@ -946,14 +963,28 @@ recorded rather than fixed. The RAIL tags are local to this section.
     without the visible words (WCAG 2.5.3 and 1.3.1).
 - **STEP-3: three literal sizes sit off the type ramp.** The detector flagged
   them on 2026-09-14. The step page's `hint` sets written text at 0.8rem
-  (`panels/StepPage.tsx:143`). A condition row's remove glyph sets 1.1rem
+  (`panels/StepPage.tsx:153`). A condition row's remove glyph sets 1.1rem
   (`panels/shared/ConditionBuilder.tsx:53`). The header bar's name sets 1rem,
   where the Headline role asks 1.25rem (`panels/ProcessHeaderBar.tsx:34`).
   - Four more flags on the step page mark mono machine values at 0.8rem.
     The Hierarchy in `DESIGN.md` allows that size for them.
   - Risk (Low): type drifts outside the roles `DESIGN.md` names.
+- **STEP-4: four action lists take a JSON key as their legend.** The step
+  page passes `"onEntry"`, `"onExit"` and `"onCancel"` as literal labels
+  (`panels/StepPage.tsx:525`, `:642`, `:650`). The Paths section passes
+  `"onPath"` the same way (`panels/PathsPanel.tsx:332`). Each prints in the
+  written face, under a section heading that already reads "On entry" or
+  "On exit". None of the four comes from the studio catalog. Risk (Low): the
+  author reads a machine key in the prose face, and a UI-string override
+  cannot reach it.
+- **STEP-5: a step's description takes a one-line input.** The masthead's
+  description uses `LocalizedTextInput` (`panels/StepPage.tsx:772`), which
+  renders an `<input>`. Measured 2026-09-24 at 1300x900, IT Offboarding's
+  first step holds an 857-character description. The 944px input shows
+  about a sixth of it. Risk (Low): the author edits a paragraph through a
+  slot one line tall.
 
-## Open from the 2026-09-13 Fields tab audits (each needs its own OpenSpec change)
+## Open from the 2026-09-13 Fields tab audits (one OpenSpec change per screen)
 
 The change `group-child-own-editor` ran a final code review, browser walks,
 `/impeccable critique` and `/impeccable audit` on the Studio Fields tab on
@@ -966,16 +997,20 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
 `panels/`, `draft/` and `screens/` start at `packages/web/src/areas/studio/`.
 
 - **FIELDS-3: below 64rem a short window leaves the editor a strip.** The
-  rail stacks above the editor, capped at 20rem (`panels/EntityTabs.tsx:71`).
+  rail stacks above the editor, capped at 20rem (`panels/EntityTabs.tsx:76`).
   Measured 2026-09-13: the editor pane stands 105px tall at 900x720, and 18px
-  at 420x720 with its heading cut off. No 2px rule separates the two scroll
-  regions: the rail drops its right-hand border there (`:68`). Risk (Medium):
-  the rail keeps its 20rem and the editor gets what remains.
-- **FIELDS-4: the entity rail and the editor pane clip the focus ring.** This
+  at 420x720 with its heading cut off. Measured 2026-09-26 at 400x800, "+ Add
+  field" raises the FIELDS-8 banner, and the pane shrinks to 8px. The new
+  label input and its ring, 42px, then clip at both edges. No 2px rule
+  separates the two scroll regions: the rail drops its right-hand border
+  there (`:73`). Risk (Medium): the rail keeps its 20rem and the editor gets
+  what remains.
+- **FIELDS-4 (resolved by `studio-focus-ring-clipping`): the entity rail and
+  the editor pane clip the focus ring.** This
   is RAIL-3 on the Fields tab. The shell's 2px ring at a 2px offset
   (`packages/web/src/shell/global.css:37`) loses its edge against both scroll
-  boxes (`panels/EntityTabs.tsx:60`, `:72`). On the chosen entry the ring and
-  the 3px current mark (`:104`) share one accent. Risk (Low): the ring still
+  boxes (`panels/EntityTabs.tsx:60`, `:77`). On the chosen entry the ring and
+  the 3px current mark (`:114`) share one accent. Risk (Low): the ring still
   meets WCAG 2.4.7.
 - **FIELDS-5: the Validation disclosure takes its count as its name.** Its
   `<summary>` prints `({carried.length})` alone
@@ -987,7 +1022,7 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   arrow keys and no filter. Its landmark is a `nav` named "Editors"
   (`panelsScreen.railLabel`, `packages/web/src/i18n/catalogs/studio.ts:463`).
   An entry's check badge reads "1 issues" for one check
-  (`panels/EntityTabs.tsx:302`), from the key `panelsScreen.issueMark`
+  (`panels/EntityTabs.tsx:312`), from the key `panelsScreen.issueMark`
   (`packages/web/src/i18n/catalogs/studio.ts:466`). Risk (Low): a keyboard
   user presses Tab up to 52 times to cross the rail.
 - **FIELDS-7: the Fields tab's headings and checks lack structure.** The
@@ -1008,7 +1043,7 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   removal left then, and a JSON-view edit can still write today — showed
   `view ref does not resolve: field_0fb5a2c4-0022-…`, an id the author can no
   longer look up. Adding an empty field raises the banner at
-  `screens/EditScreen.tsx:823` before the author types. The banner reads
+  `screens/EditScreen.tsx:843` before the author types. The banner reads
   `Draft is not yet structurally valid — CEL, registry, duration, and cross-process checks are held back until it is (see the Zod issues below)`,
   and it pushes the page down 35px at 1400px and 99px at 900px. The messages
   come from `src/schema/definition.ts:990`, `src/schema/compile.ts:629` and
@@ -1048,7 +1083,7 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   800 in ink (`panels/FieldCatalogPanel.tsx:254`), and none takes the Title
   role (`DESIGN.md:327`). The Remove field button
   (`panels/FieldCatalogPanel.tsx:926`) is an accent ghost
-  (`packages/web/src/shell/tokens.css:211`), and its text starts 5px right of
+  (`packages/web/src/shell/tokens.css:221`), and its text starts 5px right of
   the column's flush-left edge. Risk (Low): the field editor sets type outside
   the roles `DESIGN.md` names.
 - **FIELDS-11: a nested plugin-typed field's length check lands on another field.**
@@ -1062,8 +1097,8 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   field or on the process. The fix touches `src/`.
 - **FIELDS-12: the Checks tab opens the Fields tab without the field.** A
   check row calls `openTabFromRow(tabForIssue(issue.entityType))`
-  (`screens/EditScreen.tsx:1003`). That function takes a tab alone (`:759`),
-  and `FieldsTab` accepts no selected field (`:950`). The spec
+  (`screens/EditScreen.tsx:1023`). That function takes a tab alone (`:769`),
+  and `FieldsTab` accepts no selected field (`:970`). The spec
   `studio-process-tabs` asks for that field to open selected
   (`openspec/specs/studio-process-tabs/spec.md:209`). Risk (Medium): the
   author lands on the Fields tab and must find the field in the entity rail.
@@ -1076,22 +1111,22 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   depth. Risk (Low): the glossary teaches a word for a UI that is gone.
 - **FIELDS-14: `FieldsTab` walks the field tree once per rail entry.** Each
   call of `FieldsTab` walks the whole tree twice, in `flattenRailFields` and
-  `flattenDraftFields` (`panels/EntityTabs.tsx:343`, `:344`). Each rail entry
-  then walks it once more through `parentIdOf` (`:585`,
+  `flattenDraftFields` (`panels/EntityTabs.tsx:353`, `:354`). Each rail entry
+  then walks it once more through `parentIdOf` (`:595`,
   `panels/fieldCatalogLogic.ts:252`), top-level entries included. Each entry
   also scans the whole check list for its badge count
-  (`panels/EntityTabs.tsx:575`, `draft/panel-rail.ts:104`). For N entries
+  (`panels/EntityTabs.tsx:585`, `draft/panel-rail.ts:104`). For N entries
   that makes N + 2 tree walks and N scans of the check list. Risk
   (Informational): the cost grows with the square of the catalog's size and
   stays harmless at 51 entries.
 - **FIELDS-15: a step or data source removal reuses its own button for the
   next entity.** `panels/DataSourcesPanel.tsx`'s `DataSourceRow` (`:161`) and
-  `screens/EditScreen.tsx`'s `<StepPage>` (`:932`) render with no `key`,
+  `screens/EditScreen.tsx`'s `<StepPage>` (`:952`) render with no `key`,
   unlike the Fields tab's own `FieldEditor`, keyed by the field's id
   (`panels/FieldCatalogPanel.tsx:1162`). A press on "Remove data source" or
   "Remove this step" therefore keeps its own button element in the DOM.
-  `removeDataSource` (`panels/EntityTabs.tsx:682`) and `onRemoveStep`
-  (`screens/EditScreen.tsx:546`) each pick a neighbour, and the same button
+  `removeDataSource` (`panels/EntityTabs.tsx:692`) and `onRemoveStep`
+  (`screens/EditScreen.tsx:556`) each pick a neighbour, and the same button
   then renders that neighbour's own remove control. This is a code reading;
   no browser run has confirmed it. Risk (Medium): a second Enter or Space
   removes a neighbour with no separate confirmation.
@@ -1147,7 +1182,7 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   `panels/ChangeList.tsx`, `panels/ChangesView.tsx` and
   `screens/VersionsScreen.tsx`. The other 42 pass a string, in 10 files. Six
   calls split across lines, and two lines carry two calls each:
-  `EntityTabs.tsx`'s move sentences (`:546`, `:547`). The grep
+  `EntityTabs.tsx`'s move sentences (`:556`, `:557`). The grep
   `git grep -n '\.replace("{' -- packages/web/src` therefore matches 46 lines.
 
   Two helpers build the placeholder in a template literal, which that grep
@@ -1157,9 +1192,9 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   function. Risk (Low): one replacer function closes every site that still
   passes a string: `.replace("{field}", () => label)`.
 - **FIELDS-20: a second identical move announces nothing.** `moveField`
-  (`panels/EntityTabs.tsx:526`) writes its sentence straight into the shared
-  live region (`:544`), a pattern that predates this change. `removeField`
-  (`:500`) empties the region first and writes on the next animation frame
+  (`panels/EntityTabs.tsx:536`) writes its sentence straight into the shared
+  live region (`:554`), a pattern that predates this change. `removeField`
+  (`:510`) empties the region first and writes on the next animation frame
   instead. That step matters when one removal sentence repeats, since two
   different sentences announce without it. Two unnamed fields moved into the
   same group, one after another, still produce one sentence twice: the live
@@ -1215,15 +1250,21 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   1440x900: Remove field `[344, 802, 101×37]`, "+ Add field"
   `[344, 839, 109×37]`, 0px apart; `panels/FieldCatalogPanel.tsx:279-285`
   draws the 2px rule above Remove field only. A field with no reach leaves
-  on one press (`panels/EntityTabs.tsx:472-475`), and a freshly added field
+  on one press (`panels/EntityTabs.tsx:482-485`), and a freshly added field
   always has no reach. A double click removes a field, then opens the
   neighbour field's Data source select. Risk (Medium): a press meant for
   "+ Add field" can remove the field just configured, with no undo.
 
   Name the fix: separate the two commands, with spacing and a rule between
   them, or move Remove field into the field's own heading row.
+- **FIELDS-25: the effect half prints one step list twice.** "Only ask this
+  when" and "Ask for this" each open with "Writes to:" and the full step list
+  (`panels/FieldCatalogPanel.tsx:976`, `:1013`). Measured 2026-09-24 at
+  1300x900 on the group "Personal details": each list names all 12 steps and
+  wraps to five lines. Risk (Low): each zone's own control sits below five
+  lines of the same names.
 
-## Open from the 2026-09-13 Changes tab audit (each needs its own OpenSpec change)
+## Open from the 2026-09-13 Changes tab audit (one OpenSpec change per screen)
 
 The change `changes-tab-entity-change-list` ran browser walks,
 `/impeccable critique`, `/impeccable audit` and `web-design-guidelines` on
@@ -1232,8 +1273,9 @@ below predates that change or belongs to another component. The `CHANGES-n`
 tags are local to this section; paths under `panels/` and `screens/` start at
 `packages/web/src/areas/studio/`.
 
-- **CHANGES-2: every tab body clips the edge of a focus ring.** The tab body
-  scrolls and sets no inline padding (`screens/EditScreen.tsx:180`). The
+- **CHANGES-2 (resolved by `studio-focus-ring-clipping`): every tab body
+  clips the edge of a focus ring.** The tab body
+  scrolls and sets no inline padding (`screens/EditScreen.tsx:183`). The
   shell's 2px ring at a 2px offset (`packages/web/src/shell/global.css:37`)
   loses its edge against either side of that box. On the Changes tab it cuts
   the Expand all command's right edge, and at 400px the open command's left
@@ -1281,7 +1323,7 @@ tags are local to this section; paths under `panels/` and `screens/` start at
   sideways. Risk (Medium): a participant on a phone scrolls sideways to reach
   Save and Discard case.
 
-## Open from the field-matrix-fill-height browser check (each needs its own OpenSpec change)
+## Open from the field-matrix-fill-height browser check (one OpenSpec change per screen)
 
 The browser check for `field-matrix-fill-height` found two pre-existing
 defects. That check is task group 3 in the change's archived `tasks.md`, and
@@ -1325,7 +1367,7 @@ by that change. The MATRIX tags are local to this section.
   - Risk (Low): a sideways scroll briefly shows a cell's content through a
     sticky header.
 
-## Open from the 2026-09-13 Forms tab audits (each needs its own OpenSpec change)
+## Open from the 2026-09-13 Forms tab audits (one OpenSpec change per screen)
 
 The change `forms-tab-form-strip` (PR #109) ran a final code review, a browser
 check, `/impeccable critique` and `/impeccable audit` on the Studio Forms tab
@@ -1354,15 +1396,32 @@ only the marks the miniature draws. The required count stands beside it.
   classes and no `btn`. Its ground reads `rgb(240, 240, 240)` in light and
   `rgb(107, 107, 107)` in dark, the browser's own button face. The form
   editor's pressed column option loses its box and weight the same way.
-  - The sites are `screens/EditScreen.tsx:819`, `:1052` and `:1068`, and
-    `screens/FormEditorScreen.tsx:1234`, `:1298` and `:1314`. The rest sit at
+  - The sites are `screens/EditScreen.tsx:839`, `:1076` and `:1092`, and
+    `screens/FormEditorScreen.tsx:1339`, `:1409` and `:1425-1426`. The rest sit at
     `screens/VersionsScreen.tsx:263`, `screens/ToolsScreen.tsx:189`,
-    `screens/PlayerScreen.tsx:336` and `screens/MigrationPlanScreen.tsx:281`.
+    `screens/PlayerScreen.tsx:335` and `screens/MigrationPlanScreen.tsx:281`.
   - Risk (Medium): the back link draws a gray box on every dark studio
     screen. The unpressed column option looks pressed. The fix joins the
     literal classes into the spread, as the strip's `ghost` helper does.
+- **FORMS-20: at 400px the form editor squeezes its canvas to 118px.** The
+  field list keeps its column beside the canvas
+  (`screens/FormEditorScreen.tsx`). Measured 2026-09-24 at 400x800 on
+  "Submit the Exit Notification": the canvas pane scrolls 70px sideways. The
+  form tab strip inside it stands 86px wide and shows about one tab. Risk (Medium): an author on a narrow window edits a form through a
+  slot 118px wide.
+- **FORMS-21: the form tab strip's open-tab mark sits clear of its own
+  divider.** `FormTabStrip.tsx`'s `tabSelected` draws an inset shadow, `inset
+  0 -2px 0` in the accent (`:80-83`). The strip's own `row` pads its block
+  axis by `focus.reach`, 4px (`:36`, `studio-focus-ring-clipping`), so the
+  mark sits 4px clear of the row's 2px bottom divider (`:41-43`) rather than
+  flush on it. `studio-focus-ring-clipping` moved the process tab row's own
+  open-tab mark to a `::after` bar flush on its divider (`ROW-1`), so the
+  studio's two tab strips now draw the open-tab mark two different ways.
+  This is a code reading; no browser run has confirmed it. Risk (Low): an
+  author sees one selection mark on the tab row and a different one on the
+  form tab strip below it.
 
-## Open from the authoring-command-ink-advisory-role review (each needs its own OpenSpec change)
+## Open from the authoring-command-ink-advisory-role review (one OpenSpec change per screen)
 
 The change `authoring-command-ink-advisory-role` ran its review on 2026-09-13,
 and this section records what that review found outside the change. The TONE
@@ -1371,13 +1430,13 @@ tags are local to this section. Paths under `panels/` and `screens/` start at
 
 - **TONE-1: the missing-translation message takes two looks.** The step page
   draws `missingTranslationWarning` beside a 2px refusal rule, its `warning`
-  block (`panels/StepPage.tsx:130`). Three other sites draw the same message
+  block (`panels/StepPage.tsx:140`). Three other sites draw the same message
   beside the 3px advisory rule. Those are the header bar's `warning` block
   (`panels/ProcessHeaderBar.tsx:62`) and the field catalog's `studioWarning`
   (`panels/FieldCatalogPanel.tsx:327`). The form editor's `studioWarning`
-  (`screens/FormEditorScreen.tsx:118`) is the third.
+  (`screens/FormEditorScreen.tsx:122`) is the third.
   - Two more 3px rules mix refusal at 55%. The checks rail draws one in
-    `checksGroupHeldBack` (`panels/ChecksRail.tsx:46`). The timers panel draws
+    `checksGroupHeldBack` (`panels/ChecksRail.tsx:52`). The timers panel draws
     the other in `refusal` (`panels/TimersPanel.tsx:54`).
   - Risk (Low): an author meets one message in two tones on one process
     surface, so the tone stops telling a warning from a refusal.
@@ -1393,7 +1452,7 @@ tags are local to this section. Paths under `panels/` and `screens/` start at
     in dark. Shape, place and the callout's own sentence still tell the marks
     apart.
 
-## Open from the studio-narrow-widths review (each needs its own OpenSpec change)
+## Open from the studio-narrow-widths review (one OpenSpec change per screen)
 
 The first review of `studio-narrow-widths` measured the shell header on a
 replica in Chrome 152, on 2026-09-13. That change wraps the header and keeps
@@ -1417,8 +1476,9 @@ Paths under `panels/` and `screens/` start at `packages/web/src/areas/studio/`.
     headers. The owner picks its look on a mockup first.
   - Risk (Low): an actor in a narrow window scrolls the page sideways to
     reach a nav button.
-- **ROW-1: the tab row clips a tab's focus ring at its top and bottom.** The
-  row scrolls sideways (`panels/ProcessTabRow.tsx:42`), so it clips outside
+- **ROW-1 (resolved by `studio-focus-ring-clipping`): the tab row clips a
+  tab's focus ring at its top and bottom.** The
+  row scrolls sideways (`panels/ProcessTabRow.tsx:44`), so it clips outside
   its padding box. Measured at 400px, the Forms tab's ring ran from y=288 to
   335.5. The row's padding box ran from 292 to 332. Both sides of the ring
   stay, 32px clear of the edge fade. This is CHANGES-2 on the tab row. Risk
@@ -1429,7 +1489,7 @@ Paths under `panels/` and `screens/` start at `packages/web/src/areas/studio/`.
   screen reader announces an untitled process on every draft (WCAG 4.1.2).
 - **KEYS-1: the form editor still wraps a long key above 80rem.** Three
   columns leave the canvas 619px at 1300px
-  (`screens/FormEditorScreen.tsx:168`). On "Submit the Exit Notification", 10
+  (`screens/FormEditorScreen.tsx:169`). On "Submit the Exit Notification", 10
   of 59 canvas keys took two lines there. The last one wrapped at 1381px.
   Risk (Low): an author reads a long key broken mid-word from 1281px to
   about 1390px.
@@ -1451,7 +1511,7 @@ gap outside that change's own scope. The CLAIM tag is local to this section.
   target's candidacy. `loadInstanceForActor` admits that target only as the
   test instance's own starter or a `system:admin` holder.
 
-## Open from the studio-path-row-field-order final review (needs its own OpenSpec change)
+## Open from the studio-path-row-field-order final review (one OpenSpec change per screen)
 
 The final whole-branch review for `studio-path-row-field-order` (2026-09-17)
 found one gap outside that change's own scope.

@@ -1,7 +1,7 @@
 import { useState, type KeyboardEvent } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { nextTabIndex } from "form-ui";
-import { colors, fonts, space } from "form-ui/tokens.stylex";
+import { colors, focus, fonts, space } from "form-ui/tokens.stylex";
 import { t } from "../catalog.js";
 import { mergeLocalizedTextEntry, resolveDraftLocalizedText, type DraftLocalizedText } from "../draft/localized-text";
 import type { DraftViewTab } from "../draft/view-layout";
@@ -24,13 +24,18 @@ const styles = stylex.create({
   // where it sits. Nothing wraps now, so no command can strand alone on a
   // line either. The 4px block padding is the room the 2px focus ring at 2px
   // offset needs: `overflowX` resolves `overflow-y` to `auto` as well, and a
-  // ring drawn outside the padding box would clip.
+  // ring drawn outside the padding box would clip. The row also scrolls on
+  // its own declared axis, inline, which clips the same way at its edges;
+  // `focus.reach` pads both axes (`studio-focus-ring-clipping`). The scroll
+  // padding keeps that room when a focus scroll stops short of either end.
   row: {
     display: "flex",
     alignItems: "stretch",
     flexWrap: "nowrap",
     gap: space.s1,
-    paddingBlock: space.s1,
+    paddingBlock: focus.reach,
+    paddingInline: focus.reach,
+    scrollPaddingInline: focus.reach,
     overflowX: "auto",
     overscrollBehavior: "contain",
     borderBottomWidth: 2,

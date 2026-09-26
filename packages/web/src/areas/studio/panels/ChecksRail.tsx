@@ -1,5 +1,5 @@
 import * as stylex from "@stylexjs/stylex";
-import { colors, space } from "form-ui/tokens.stylex";
+import { colors, focus, space } from "form-ui/tokens.stylex";
 import { t } from "../catalog.js";
 import { issueSourceLabel } from "./shared/IssueList";
 import { allChecksClear, groupChecksBySource } from "../draft/checksRail";
@@ -7,13 +7,19 @@ import type { EditorIssue } from "../draft/issues";
 import type { ValidationResult } from "../draft/validation";
 
 const styles = stylex.create({
+  // `space.s3` (12px) already clears the ring's 4px reach at either end, but
+  // a literal token drifts from the reach if either ever changes on its own
+  // (`studio-focus-ring-clipping`, I-3). `max()` keeps today's value while
+  // reading `focus.reach`, so the two move together. The scroll padding
+  // keeps that same room mid-scroll, where the static padding cannot reach.
   checksRail: {
     minWidth: 0,
     overflowY: "auto",
     borderWidth: 1,
     borderStyle: "solid",
     borderColor: colors.border,
-    padding: space.s3,
+    padding: `max(${space.s3}, ${focus.reach})`,
+    scrollPadding: focus.reach,
   },
   // `.studio-checks-rail h2`: a descendant selector on a bare `<h2>`.
   checksRailHeading: {

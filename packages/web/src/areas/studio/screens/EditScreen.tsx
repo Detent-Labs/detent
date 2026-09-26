@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import * as stylex from "@stylexjs/stylex";
-import { layout, colors, fonts, space } from "form-ui/tokens.stylex";
+import { layout, colors, focus, fonts, space } from "form-ui/tokens.stylex";
 import { DraftProvider, useDraft } from "../draft/store.js";
 import { draftFields } from "../draft/fields.js";
 import type { Draft } from "../draft/types.js";
@@ -51,6 +51,7 @@ import { JsonView } from "../panels/JsonView.js";
 import { describeCaughtError } from "../errors.js";
 import { useFail } from "../../../shell/useFail.js";
 import { FormEditorScreen } from "./FormEditorScreen.js";
+import { scrollKeyboardFocusIntoView } from "../focusScroll.js";
 import { resolveDraftLocalizedText } from "../draft/localized-text";
 import type { NavigateOptions } from "../../../shell/routing.js";
 
@@ -189,6 +190,11 @@ const styles = stylex.create({
     // Contains the change list's hidden "Before:"/"After:" text; a
     // positioned container clips and scrolls it instead of the page.
     position: "relative",
+    // Room for the focus ring: a scroll box clips at its padding edge
+    // (`studio-focus-ring-clipping`, CHANGES-2). The scroll padding keeps
+    // that room when a focus scroll stops short of either end.
+    padding: focus.reach,
+    scrollPadding: focus.reach,
   },
   tabBodyHidden: {
     display: "none",
@@ -809,6 +815,18 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
         role="tabpanel"
         aria-labelledby={tabDomId(target)}
         hidden={hide}
+        // ponytail: a window refocus dispatches `focus` to the element that
+        // already holds it, with no fresh `pointerdown`/`keydown` first, so
+        // `lastInputModality` (`focusScroll.ts`) still reads whatever the
+        // last real interaction set. Ceiling: refocusing the window after a
+        // KEYBOARD interaction still re-runs this handler and can jump a
+        // hand-scrolled, partly hidden control back into view. Leaving by
+        // Alt+Tab hits this too: its Alt keydown flips the flag to
+        // "keyboard" before the refocus fires, even when the control was
+        // last reached by a POINTER interaction. Upgrade:
+        // `ProcessTabRow.tsx`'s own `windowBlurred` guard
+        // (`focusScrollsRow`), lifted onto this shared handler.
+        onFocusCapture={scrollKeyboardFocusIntoView}
         {...stylex.props(styles.tabBody, hide && styles.tabBodyHidden)}
       >
         {body}

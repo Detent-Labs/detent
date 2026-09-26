@@ -1,7 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import * as stylex from "@stylexjs/stylex";
-import { colors, fonts, space } from "form-ui/tokens.stylex";
+import { colors, focus, fonts, space } from "form-ui/tokens.stylex";
 import { t, type CatalogKey } from "../catalog.js";
+import { focusVisible } from "../focusScroll.js";
 import { PROCESS_TABS, type ProcessTab } from "../routing.js";
 
 /** The tab button's own element id, and the id of the body it controls. Both
@@ -49,6 +50,12 @@ const styles = stylex.create({
     // positioned container clips and scrolls it instead of the page. It also
     // makes each button's `offsetLeft` read against the row's content.
     position: "relative",
+    // Room for the focus ring on the block axis: the row scrolls only on the
+    // inline axis, but a scroll box still clips at its padding edge on both
+    // (`studio-focus-ring-clipping`, ROW-1). `offsetLeft` and `scrollLeft`
+    // read against the row's own padding edge already, so `tabRestsInView`
+    // and `openTabRests` below need no change for this.
+    padding: focus.reach,
     // `scrollTabIntoRow` stops 32px clear of each edge the row can still
     // scroll past, outside the 24px fade and the tab's 4px focus ring.
     // `tabRestsInView` reads this value back off the computed style.
@@ -101,9 +108,24 @@ const styles = stylex.create({
   // The open tab, from a JS-computed check reading the same `aria-selected`
   // the button already carries. The written face holds two weights and no
   // third, so the mark is the accent rule under the tab plus weight 800.
+  // The rule draws as a `::after` bar rather than an inset `boxShadow`: the
+  // row's own padding (above) holds the ring's reach clear of the tab, and a
+  // `boxShadow` cannot draw outside the tab's own box into that padding. The
+  // bar sits `focus.reach` below the tab's bottom edge, which lands it flush
+  // on the row's own bottom divider, inside the row's padding box, so the
+  // row's `overflow` never clips it (`studio-focus-ring-clipping`, ROW-1).
   tabSelected: {
+    position: "relative",
     fontWeight: 800,
-    boxShadow: `inset 0 -2px 0 ${colors.accent}`,
+    "::after": {
+      content: '""',
+      position: "absolute",
+      left: 0,
+      right: 0,
+      bottom: `calc(${focus.reach} * -1)`,
+      height: 2,
+      backgroundColor: colors.accent,
+    },
   },
   tabCount: {
     fontFamily: fonts.mono,
@@ -252,16 +274,6 @@ function openTabRests(row: HTMLElement | null, button: HTMLElement | null): bool
  */
 export function widthMoved(was: number | undefined, width: number): boolean {
   return was !== width;
-}
-
-/** True for a keyboard focus. An engine that cannot parse `:focus-visible`
- * reads false, so its pointer presses never scroll. */
-function focusVisible(element: Element): boolean {
-  try {
-    return element.matches(":focus-visible");
-  } catch {
-    return false;
-  }
 }
 
 /**

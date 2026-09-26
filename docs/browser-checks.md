@@ -5288,3 +5288,69 @@ this file, returned zero findings. Its browser-evidence pass measured the
 grip's contrast at about 5.8:1 against its row background, past WCAG's
 3:1 non-text minimum. It measured the grip's hit target at about 26 by
 39.5 CSS pixels. Both already met the bar, so neither needed a change.
+
+### Studio scroll boxes show the whole focus ring (`studio-focus-ring-clipping`)
+
+Open Studio, a draft of `it_offboarding`. Work through the Steps tab, the
+Fields tab and the Changes tab. Then narrow the window to 400px for the tab
+row check.
+
+Tab to the Steps rail's first row. Pass: the ring's left and top edges sit
+flush on the rail's own edges. Open the Fields tab and tab to the entity
+rail's first entry, then into the editor pane's first control. Pass: both
+rings sit fully inside their own box.
+
+Open the Changes tab and tab to the Expand/Collapse all command. Pass: its
+ring's right edge sits inside the tab body. These are the four boxes
+design.md's own table names: `StepsRail.tsx`'s `rail`, `EntityTabs.tsx`'s
+`rail` and `editor`, and `EditScreen.tsx`'s `tabBody`. Each now pads by
+`focus.reach`, the token sum of the ring's 2px width and its 2px offset.
+
+Narrow the window to 400px. Tab to the open process tab in
+`ProcessTabRow.tsx`'s row. Pass: the ring's top and bottom edges sit inside
+the row's own padding box. The open tab's mark moved from an inset shadow
+to a 2px accent bar on a `::after` pseudo-element. It sits flush on the
+row's own bottom divider.
+
+The sweep tabbed through six more studio boxes at 1300px and 400px. It
+covered `ChecksRail`, `FormsTab`, `FormTabStrip`, `StepPage`, `CanvasBar`
+and `FormEditorScreen`. Three sites needed a fix beyond the four boxes
+above. The canvas bar's row, `CanvasBar.tsx`'s `bar`, clipped "Add step" on
+its left edge. Its inline padding now reaches `focus.reach`, matching the
+fix for RAIL-3 and FIELDS-4. The form tab strip's row, `FormTabStrip.tsx`'s
+`row`, clipped "Add a tab" on its right edge and took the same fix.
+
+The change list's row (`ChangeList.tsx`'s `body`) pulled its ring past the
+Changes tab body's left edge at 400px. Its own `openCommandFlush` negative
+margin pulled the "Open …" text 5px past that edge. The row's own
+`paddingInlineStart` now restores that room below 40rem. Three boxes,
+`ChecksRail`, `FormsTab` and `FormEditorScreen`, already pad past the
+ring's reach on their own. The step page's own `page` box sets no block
+padding. Its first and last controls still clear the ring, through the
+masthead's own padding and the developer section's own padding.
+
+Scroll the Checks tab's rail or the Forms tab's grid partway. Stop so
+one control sits half hidden at the scroll box's near edge. Tab onto
+it. Pass: the box scrolls that control fully into view. Its ring then
+shows in full, clear of the edge it stopped at.
+
+Mouse-click that same half-hidden control instead, before it scrolls
+into view. Pass: nothing scrolls. The box stays exactly where the
+click left it. The clicked field itself may still show a ring. The
+helper `focusScroll.ts` tracks the last input modality. It skips the
+scroll after a pointer press.
+
+Open the form editor and scroll the browser window partway down. The
+canvas's own box, `formCanvasRegion`, sets no height, so the page
+scrolls in its place. Stop so one control sits half hidden at the
+window's bottom edge. Tab onto it. Pass: the window scrolls that
+control fully into view, its ring clear of the viewport edge.
+
+Mouse-click that same half-hidden control instead. Pass: nothing
+scrolls, the same as the boxes above.
+
+This is a manual check because it measures the ring against a real
+clip box, across widths. An e2e flow cannot make that measurement;
+only a live render, at a real width, shows the clearance. The source
+scan test covers only the static half, that the style itself declares
+the room.

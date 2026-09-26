@@ -1,6 +1,6 @@
 import { useId, useRef, useState, type ToggleEvent } from "react";
 import * as stylex from "@stylexjs/stylex";
-import { colors, fonts, space } from "form-ui/tokens.stylex";
+import { colors, focus, fonts, space } from "form-ui/tokens.stylex";
 import { ChevronDown } from "lucide-react";
 import { t } from "../catalog.js";
 import { newStepNote, newStepPhrase } from "../draft/guided-labels.js";
@@ -37,8 +37,18 @@ const styles = stylex.create({
     flexWrap: "nowrap",
     gap: space.s3,
     flexShrink: 0,
-    paddingBlock: space.s2,
-    paddingInline: 0,
+    // `space.s2` (8px) already clears the ring's 4px reach, but a literal
+    // token drifts from the reach if either ever changes on its own
+    // (`studio-focus-ring-clipping`, I-3). `max()` keeps today's value while
+    // reading `focus.reach`, so the two move together.
+    paddingBlock: `max(${space.s2}, ${focus.reach})`,
+    // Room for the focus ring on the inline axis: the bar scrolls
+    // horizontally, and a scroll box clips at its padding edge on both axes
+    // (`studio-focus-ring-clipping`). The block axis above already clears
+    // the ring's reach. The scroll padding keeps that room when a focus
+    // scroll stops short of either end.
+    paddingInline: focus.reach,
+    scrollPaddingInline: focus.reach,
     borderBottomWidth: 1,
     borderBottomStyle: "solid",
     borderBottomColor: colors.border,

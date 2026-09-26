@@ -12,7 +12,10 @@ import * as stylex from "@stylexjs/stylex";
  * semantic aliases) into one group, mirroring how `accent600`/`accent700`
  * already sat beside the semantic names before this move. `fonts`, `space`,
  * `radius`, `shadow` and `layout` mirror `tokens.css`'s remaining sections
- * one for one. 46 variables total, matching `tokens.css`'s own count.
+ * one for one. `focus` holds one alias, `reach`, over `tokens.css`'s three
+ * ring tokens: `global.css`'s `:focus-visible` rule reads the other two,
+ * `--focus-ring-width` and `--focus-ring-offset`, directly, so this group
+ * stays a partial mirror. 47 variables total against `tokens.css`'s 49.
  */
 export const colors = stylex.defineVars({
   // primitives
@@ -69,6 +72,13 @@ export const radius = stylex.defineVars({
   sm: "var(--radius-sm)",
   md: "var(--radius-md)",
   lg: "var(--radius-lg)",
+});
+
+// The room a scroll box gives its ring so the box's own padding edge never
+// clips it. `global.css`'s `:focus-visible` rule draws the ring itself, from
+// the width and offset tokens this alias sums.
+export const focus = stylex.defineVars({
+  reach: "var(--focus-ring-reach)",
 });
 
 export const shadow = stylex.defineVars({
