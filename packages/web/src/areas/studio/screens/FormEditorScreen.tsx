@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type DragEvent, type ReactNode } from "react";
 import * as stylex from "@stylexjs/stylex";
-import { colors, fonts, space } from "form-ui/tokens.stylex";
+import { colors, focus, fonts, space } from "form-ui/tokens.stylex";
 import type { FieldId, Step, View, ViewNote } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
 import type { DraftField } from "../draft/fields";
@@ -241,11 +241,17 @@ const styles = stylex.create({
     marginBlock: space.s2,
     marginInline: space.s3,
   },
+  // `space.s3`/`s4` already clear the ring's 4px reach at either end, but a
+  // literal token drifts from the reach if either ever changes on its own
+  // (`studio-focus-ring-clipping`, I-3). `max()` keeps today's value while
+  // reading `focus.reach`, so the two move together. The scroll padding
+  // keeps that same room mid-scroll, where the static padding cannot reach.
   formCanvasRegion: {
     overflowY: "auto",
     overscrollBehavior: "contain",
-    paddingBlock: space.s3,
-    paddingInline: space.s4,
+    paddingBlock: `max(${space.s3}, ${focus.reach})`,
+    paddingInline: `max(${space.s4}, ${focus.reach})`,
+    scrollPadding: focus.reach,
     minWidth: 0,
   },
   formColumns: {
@@ -1322,6 +1328,12 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
   const selectedRow = selected !== undefined ? rows[selected] : undefined;
 
   return (
+    // ponytail: same shortcut as `EditScreen.tsx`'s tab body, and the same
+    // ceiling: a window refocus after a keyboard interaction still re-runs
+    // this handler, since `lastInputModality` (`focusScroll.ts`) still
+    // reads "keyboard" with no fresh keypress. A refocus after a pointer
+    // interaction is unaffected. Upgrade: `ProcessTabRow.tsx`'s own
+    // `windowBlurred` guard (`focusScrollsRow`).
     <div onFocusCapture={scrollKeyboardFocusIntoView} {...stylex.props(styles.formEditorPage)}>
       <header {...stylex.props(styles.formEditorHeader)}>
         <button type="button" className="btn btn-ghost" {...stylex.props(styles.studioBack)} onClick={onBack}>

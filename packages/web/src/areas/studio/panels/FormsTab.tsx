@@ -1,6 +1,6 @@
 import { useId } from "react";
 import * as stylex from "@stylexjs/stylex";
-import { colors, fonts, space } from "form-ui/tokens.stylex";
+import { colors, focus, fonts, space } from "form-ui/tokens.stylex";
 import { t } from "../catalog.js";
 import { useDraft } from "../draft/store.js";
 import { FORMS_LEGEND, formCardRows, type FormCardRow, type MiniatureEntry } from "./formCardRows.js";
@@ -58,17 +58,24 @@ const styles = stylex.create({
     gap: space.s3,
     listStyle: "none",
     margin: 0,
-    paddingBlock: space.s3,
-    paddingInline: space.s3,
+    // `space.s3` (12px) already clears the ring's 4px reach at either end,
+    // but a literal token drifts from the reach if either ever changes on
+    // its own (`studio-focus-ring-clipping`, I-3). `max()` keeps today's
+    // value while reading `focus.reach`, so the two move together.
+    paddingBlock: `max(${space.s3}, ${focus.reach})`,
+    paddingInline: `max(${space.s3}, ${focus.reach})`,
     // Stretch, not start: a row of plates that ends at different heights puts
     // its open controls on different lines, and alignment is what organizes
     // this page (`design-language.md`). The foot row takes the slack.
     alignItems: "stretch",
     // The grid scrolls, not the tab body, so the legend above it stays in
     // view. A scroll container's automatic minimum height is zero, so the
-    // grid shrinks to the height the legend leaves.
+    // grid shrinks to the height the legend leaves. The scroll padding keeps
+    // the ring's room mid-scroll, where the static padding above cannot
+    // reach.
     overflowY: "auto",
     overscrollBehavior: "contain",
+    scrollPadding: focus.reach,
   },
   // A bordered ledger plate, not a floating card: a 1px hairline, zero radius,
   // no shadow at rest and none on hover. Nothing on this surface floats

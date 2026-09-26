@@ -39,11 +39,17 @@ const styles = stylex.create({
     minHeight: 0,
     overflowY: "auto",
     overscrollBehavior: "contain",
+    // The box sets no block padding of its own: the masthead's and the
+    // Developer view's own padding clear the ring at either end instead
+    // (`studio-focus-ring-clipping`, design.md's Outcome). Adding a block
+    // padding here would stack on top of theirs and move content that
+    // already clears the ring. `space.s3` (12px) on the inline axis already
+    // clears the reach; `max()` keeps that value while reading `focus.reach`,
+    // so the two move together if the reach ever grows.
     paddingBlock: 0,
-    paddingInline: space.s3,
-    // The masthead's and the Developer view's own padding clear the focus
-    // ring at either end. Mid-scroll, a focus scroll would align a control
-    // flush with the edge and clip its ring (`studio-focus-ring-clipping`).
+    paddingInline: `max(${space.s3}, ${focus.reach})`,
+    // Mid-scroll, a focus scroll would align a control flush with the edge
+    // and clip its ring.
     scrollPaddingBlock: focus.reach,
   },
   empty: {
