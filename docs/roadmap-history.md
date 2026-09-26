@@ -1128,18 +1128,18 @@ as it stands.
     holds. What is missing is the list.
     `Instance.startedBy` is optional in the contract
     (`src/schema/definition.ts`) and `createProcessInstance` writes the
-    calling actor's id into it (`src/runtime/api.ts::createProcessInstance`).
+    calling actor's id into it (`src/runtime/instances.ts::createProcessInstance`).
     A subprocess spawn passes `startedBy: undefined` on purpose
     (`src/engine/subprocess.ts`), since a child instance has no human starter.
-    `loadInstanceForActor` (`src/runtime/api.ts::loadInstanceForActor`)
+    `loadInstanceForActor` (`src/runtime/internal.ts::loadInstanceForActor`)
     already admits a
     non-admin caller who is the starter, the current claimant, or an eligible
     candidate on the current step. So the starter reads the instance view for
     the whole run, including after the step moves to somebody else. Two other
     rules key on the same field: only the starter or an admin cancels an
-    instance (`api.ts::cancelInstance`), and a step carrying no assignment
+    instance (`instances.ts::cancelInstance`), and a step carrying no assignment
     accepts a submission from the starter or an admin alone
-    (`api.ts::submitAndTransition`).
+    (`instances.ts::submitAndTransition`).
     The gap is discovery. `GET /instances` carries a `startedBy` filter
     (`src/http/routes.ts::handleListInstances`), but `parseScope` defaults to
     `scope=all`,
@@ -1450,7 +1450,7 @@ as it stands.
     that field costs six visits today.
 
     First, `visible` is not a peer of the other two flags. `resolveFields`
-    (`src/runtime/api.ts:441`) applies it as a `continue`: a field that fails it
+    (`src/runtime/fields.ts:251`) applies it as a `continue`: a field that fails it
     leaves the loop and never reaches the returned list, while `required` and
     `readonly` become properties of a field that stayed. `ResolvedViewField`
     shows the split. It carries those two and never carries `visible`. A cell of

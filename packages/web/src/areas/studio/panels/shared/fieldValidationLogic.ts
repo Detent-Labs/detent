@@ -20,7 +20,7 @@ const LIST_KEYS: ValidationKey[] = ["minLength", "maxLength", "rule"];
 const RULE_ONLY: ValidationKey[] = ["rule"];
 
 /**
- * Mirrors `checkConstraints` (`src/runtime/api.ts:503`), which branches on
+ * Mirrors `checkConstraints` (`src/runtime/fields.ts:468`), which branches on
  * the submitted value's JavaScript runtime type, not the declared one.
  * `typeMatches` (`src/schema/definition.ts`) treats `file` and a plugin
  * (custom) type as opaque — neither fixes the submitted value's JavaScript

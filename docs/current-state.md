@@ -107,7 +107,7 @@ This layer is the one place where the HTTP routes and the tests start, view,
 submit and query instances. It also handles claims, cancellation, comments,
 attachments and form drafts.
 
-- Paths: `src/runtime/api.ts`, `src/pagination.ts`,
+- Paths: `src/runtime/` (`api.ts` is a barrel over its siblings), `src/pagination.ts`,
   `src/engine/instance-drafts.ts`, `src/engine/seeded-create.ts`
 - Specs: `runtime-api`, `instance-creation`, `instance-query`,
   `instance-visibility-set`, `instance-form-drafts`, `draft-test-instances`,
@@ -192,7 +192,7 @@ report reads one process's instances as a table of field values. The
 Runtime API Layer creates and runs saved reports.
 
 - Paths: `src/engine/reporting.ts`, `src/http/reporting-routes.ts`,
-  `src/runtime/api.ts`
+  `src/runtime/reports.ts`
 - Specs: `reporting-analytics-api`, `reporting-data-tables`,
   `instance-data-tables`, `instance-data-query`
 

@@ -161,7 +161,7 @@ export async function getGroupScopes(groupIds: string[], db: SQL = sql): Promise
  * Batch-by-ids name lookup, mirroring `getGroupScopes`'s shape over the same
  * id set. A missing key in the returned map is how a caller detects a
  * nonexistent group id — read by `resolveFields`' person-field option
- * resolution (`src/runtime/api.ts`), which keeps the id itself as the label
+ * resolution (`src/runtime/fields.ts`), which keeps the id itself as the label
  * for one, so a stale `allowedGroups` entry stays visible.
  */
 export async function groupNamesForIds(groupIds: string[], db: SQL = sql): Promise<Map<string, string>> {
@@ -175,7 +175,7 @@ export async function groupNamesForIds(groupIds: string[], db: SQL = sql): Promi
  * `EXISTS` scan of `definitions` matching `src/http/admin-routes.ts::
  * referencingProcesses`'s shape (task 1.7). Uses the `@>` containment
  * operator, the one existing precedent for this exact check
- * (`src/runtime/api.ts`'s `candidates @> to_jsonb(...)`), rather than the
+ * (`src/runtime/queries.ts`'s `candidates @> to_jsonb(...)`), rather than the
  * unprecedented `?` existence operator. An absent or empty `allowedGroups`
  * array yields no match, the same as a plain string array.
  */
