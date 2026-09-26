@@ -317,9 +317,9 @@ package is `packages/form-ui`, and the workspace filter skips it.
 ### Requirement: Every push runs the toolchain's checks against a real database
 
 The repository SHALL carry a `pre-push` hook, under a committed hooks
-directory. It SHALL run four things before a push leaves the machine. Those
-are the repo-wide typecheck, the production build, the full test suite, and the
-mechanical gates `push-gate-checks` specifies.
+directory. It SHALL run five things before a push leaves the machine. Those
+are the linter, the repo-wide typecheck, the production build, the full test
+suite, and the mechanical gates `push-gate-checks` specifies.
 
 The repository SHALL enable that hook itself. A `prepare` script in the root
 `package.json` SHALL point `core.hooksPath` at the committed hooks directory,
@@ -331,7 +331,7 @@ The script SHALL succeed where no git repository exists, and where `git` is
 absent. The production image builds from a copied tree with no `.git`
 directory, and its `bun install` must not fail on this.
 
-The script SHALL decide by asking `git` for the repository, not by testing the
+The script SHALL ask `git` for the repository. It SHALL NOT test the
 filesystem for a `.git` directory. In a linked worktree `.git` is a file
 holding a pointer, so a directory test answers false inside a real repository.
 This repository works in such worktrees.
@@ -340,7 +340,7 @@ This repository works in such worktrees.
 `post-commit` beside `pre-push`. The script SHALL print what it wrote, so an
 install that arms both says so.
 
-The hook SHALL run the checks **inside the devcontainer**, not on the host.
+The hook SHALL run the checks **inside the devcontainer**. It SHALL NOT run them on the host.
 That placement is what makes the checks meaningful. The gates that need only git
 and a shell are the exception. They run on the host, before the container starts,
 as `push-gate-checks` specifies.
@@ -378,11 +378,12 @@ passes both. The build requirement above records the measurement.
 
 A gate that rejects a push SHALL block that push. The terms are those of a
 failing typecheck or a failing suite. The hook has one bypass, `--no-verify`.
-That flag disables every check at once, not the one a contributor means to skip.
+That flag disables every check at once. A contributor cannot skip one check alone.
 
-The repository SHALL NOT carry a hosted-CI workflow for this purpose. The
-owner does not want a hosted service executing this repository. A workflow
-file that never runs reads as coverage it does not provide.
+The repository SHALL carry one hosted-CI workflow, on GitHub-hosted runners.
+It SHALL run the same checks and gates the hook runs, on every push and
+every pull request. CI SHALL NOT replace the hook. The hook stops an error
+before it leaves the machine, and CI catches a push that bypassed the hook.
 
 #### Scenario: A fresh clone gains the gate from its first install
 
@@ -399,7 +400,7 @@ file that never runs reads as coverage it does not provide.
 
 #### Scenario: An install with no git repository still succeeds
 
-- **WHEN** `bun install` runs against a copied tree that holds no `.git`
+- **WHEN** `bun install` runs against a copied tree that has no `.git`
   directory, as the production image build does
 - **THEN** the install succeeds, and the missing hooks configuration fails
   nothing
@@ -413,13 +414,13 @@ file that never runs reads as coverage it does not provide.
 
 #### Scenario: A push runs the mechanical gates
 
-- **WHEN** a push is attempted with the devcontainer up
+- **WHEN** a contributor pushes with the devcontainer up
 - **THEN** the hook also runs the gates `push-gate-checks` specifies, and the
   push proceeds only when every one of them passes
 
 #### Scenario: A stopped devcontainer blocks the push
 
-- **WHEN** a push is attempted while the devcontainer is not running
+- **WHEN** a contributor pushes while the devcontainer is not running
 - **THEN** the preflight `core` profile fails, names the command that starts
   the devcontainer, and runs no check on the host
 
@@ -428,6 +429,20 @@ file that never runs reads as coverage it does not provide.
 - **WHEN** the hook runs its preflight step before the suite
 - **THEN** no HTTP server runs during the suite, so the outbox poller claims
   none of the rows the suite drives
+
+#### Scenario: A lint finding blocks the push
+
+- **WHEN** a change adds code the linter flags, or a disable directive that
+  suppresses nothing
+- **THEN** the lint step fails and the push does not proceed
+
+#### Scenario: CI runs the hook's checks
+
+- **WHEN** a commit reaches GitHub through a push or a pull request
+- **THEN** the hosted workflow runs the linter, the typecheck, the build, the
+  full suite with `DATABASE_URL` set, and the mechanical gates
+- **AND** a gate whose tool the runner lacks prints a named skip, as the prose
+  gate does
 
 #### Scenario: A type error blocks the push
 
@@ -1159,3 +1174,72 @@ through that preload.
 - **WHEN** a preload's transform would match a path under the root `src/`
   or `test/`
 - **THEN** review rejects the change before merge
+
+### Requirement: A linter checks the code and its suppressions
+
+The root `package.json` SHALL carry a `lint` script. It SHALL lint the
+engine, both frontend packages, the tests and the scripts. Any finding SHALL
+fail it, a warning included.
+
+The linter SHALL report a disable directive that suppresses nothing, and that
+report SHALL fail the script too. A directive for a tool that never runs
+tells the reader a check exists where none does.
+
+`bun run check` SHALL run `lint` before the typecheck. The linter needs no
+build and no database, so it fails fastest.
+
+The linter SHALL be a pinned dev dependency. A new release on the registry
+then cannot change the lint result on a commit.
+
+#### Scenario: A lint warning fails the script
+
+- **WHEN** a file under `src`, `packages`, `test`, `scripts` or `e2e`, or
+  `playwright.config.ts`, holds code the linter reports as a warning
+- **THEN** `bun run lint` exits non-zero and names the file, line and rule
+
+#### Scenario: A dead directive fails the script
+
+- **WHEN** a file carries a disable directive and the line it covers draws no
+  finding
+- **THEN** `bun run lint` exits non-zero and names the directive's file and
+  line
+
+#### Scenario: The check runs the linter first
+
+- **WHEN** `bun run check` runs on a tree with a lint finding
+- **THEN** it stops at the lint step, before the typecheck starts
+
+### Requirement: CI audits the dependency tree
+
+The hosted CI workflow SHALL run `bun audit` against the committed lockfile
+on every push and every pull request. An advisory of high or critical
+severity SHALL fail the job. A low or moderate advisory SHALL NOT fail it.
+
+The workflow SHALL excuse an advisory with no fixed release by its id, one
+id at a time. The workflow file SHALL carry a comment at the excuse that names the
+advisory and says why no fix applies. A blanket severity raise SHALL NOT
+stand in for an excuse.
+
+The audit SHALL run in CI and not in the pre-push hook. It needs the
+registry, and a push must not fail because the network does.
+
+#### Scenario: A high advisory fails CI
+
+- **WHEN** the lockfile resolves a package with a high or critical advisory
+- **THEN** the CI audit step fails and names the package and the advisory
+
+#### Scenario: A moderate advisory passes CI
+
+- **WHEN** the lockfile resolves a package whose worst advisory is moderate
+- **THEN** the CI audit step passes
+
+#### Scenario: An excused advisory passes CI
+
+- **WHEN** a high advisory has no fixed release
+- **AND** the workflow excuses its id, with a comment that states the reason
+- **THEN** the CI audit step passes
+
+#### Scenario: A push offline still runs its checks
+
+- **WHEN** a contributor pushes with no route to the package registry
+- **THEN** the pre-push hook runs no audit, and its checks decide the push

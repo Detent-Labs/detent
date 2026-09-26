@@ -40,7 +40,6 @@ const transitionTimer = { id: "timer_t1", duration: "PT1H", onFire: { targetPath
 const reminderTimer = { id: "timer_r1", duration: "PT1H", onFire: { actions: [act("action_rem", "notify")] } };
 
 const createFrom = (body: ProcessBody) => createInstance(body, { processId: "proc_1" as Instance["processId"], version: 1 });
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const readInst = async (id: string): Promise<any> => {
   const r = (await sql`SELECT body FROM instances WHERE instance_id = ${id}`) as { body: unknown }[];
   return typeof r[0].body === "string" ? JSON.parse(r[0].body as string) : r[0].body;
@@ -61,7 +60,6 @@ const historyCauses = async (id: string): Promise<string[]> => {
 // The instance's runtime events, ordered as the record defines: by `at`, then
 // insertion (the id tiebreak is stable, not chronological — several events written
 // in one commit share an `at`).
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const eventsOf = async (id: string): Promise<any[]> => {
   const r = (await sql`SELECT event FROM instance_events WHERE instance_id = ${id} ORDER BY event->>'at', id`) as { event: unknown }[];
   return r.map((row) => (typeof row.event === "string" ? JSON.parse(row.event as string) : row.event));

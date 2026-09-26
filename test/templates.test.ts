@@ -70,7 +70,7 @@ test.skipIf(!DB)("a body no schema accepts is stored as authored", async () => {
   // One step with no exit: publish would reject this body, a template must not.
   await saveTemplate(k, { body: invalidBody("unpublishable"), layout: {}, createdBy: "user_a" }, sql);
   const read = await getTemplate(k, sql);
-  expect((read?.body as { workflow: { steps: unknown[] } }).workflow.steps).toHaveLength(1);
+  expect((read!.body as { workflow: { steps: unknown[] } }).workflow.steps).toHaveLength(1);
 });
 
 test.skipIf(!DB)("a get for an unknown key returns undefined", async () => {
@@ -87,7 +87,7 @@ test.skipIf(!DB)("a second save under one key replaces the first and leaves one 
   await saveTemplate(k, { body: invalidBody("second"), layout: {}, createdBy: "user_b" }, sql);
 
   const read = await getTemplate(k, sql);
-  expect((read?.body as { label: { en: string } }).label.en).toBe("second");
+  expect((read!.body as { label: { en: string } }).label.en).toBe("second");
   expect(read?.createdBy).toBe("user_b");
 
   const rows = (await sql`SELECT template_key FROM templates WHERE template_key = ${k}`) as unknown[];

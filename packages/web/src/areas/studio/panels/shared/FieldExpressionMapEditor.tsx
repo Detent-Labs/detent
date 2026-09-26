@@ -26,7 +26,7 @@ export function FieldExpressionMapEditor({
   const entries = Object.entries(mapping ?? {});
 
   const setEntry = (fieldId: string, expr: DraftOf<Expression> | undefined) => {
-    const next = { ...(mapping ?? {}) };
+    const next = { ...mapping };
     if (expr === undefined) delete next[fieldId as FieldId];
     else next[fieldId as FieldId] = expr;
     onChange(next);
@@ -43,7 +43,7 @@ export function FieldExpressionMapEditor({
   // those would each read the same pre-change `mapping` closure and the
   // delete would be lost, duplicating the row under both field ids.
   const moveEntry = (oldFieldId: string, newFieldId: string, expr: DraftOf<Expression> | undefined) => {
-    const next = { ...(mapping ?? {}) };
+    const next = { ...mapping };
     delete next[oldFieldId as FieldId];
     if (expr !== undefined) next[newFieldId as FieldId] = expr;
     onChange(next);

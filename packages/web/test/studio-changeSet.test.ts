@@ -35,7 +35,6 @@ import { t } from "../src/areas/studio/catalog.js";
 
 // Fixtures are plain JSON, mutated per case. `any` keeps the mutations short;
 // `describeChanges` takes `unknown` on both sides.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Body = any;
 
 function base(): Body {
@@ -926,7 +925,6 @@ describe("describeChanges: word coverage", () => {
   /** `fieldDef` is a `z.lazy`; its getter hands back the object schema. Zod 4
    * keeps `.shape` on a refined object, so no other unwrap is needed. */
   function declaredKeys(schema: unknown): string[] {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let s: any = schema;
     while (s?._zod?.def?.type === "lazy") s = s._zod.def.getter();
     return Object.keys(s?.shape ?? {});

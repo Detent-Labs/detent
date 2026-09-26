@@ -377,7 +377,7 @@ export async function applyStepEntry(tx: SQL, plan: StepEntryPlan, extraFields?:
   // take the plan's value — and rehydrate reads the body. The patch is written
   // *alongside* the plan's fields, never over them.
   const patch = {
-    ...(extraFields ?? {}),
+    ...extraFields,
     currentStepId: next.currentStepId,
     currentStepEnteredAt: next.currentStepEnteredAt,
     transitionSeq: next.transitionSeq,

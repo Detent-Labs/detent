@@ -108,7 +108,7 @@ export async function request(path: string, token: string | undefined, init?: Re
   try {
     res = await fetch(`${API_BASE}${path}`, {
       ...init,
-      headers: { ...(init?.headers ?? {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      headers: { ...init?.headers, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     });
   } catch (err) {
     throw new AppClientError({ type: "network", message: err instanceof Error ? err.message : String(err) });

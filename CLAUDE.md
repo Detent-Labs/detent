@@ -159,7 +159,7 @@ Four project facts the dispatch must carry, because the skill cannot know them:
 Call a change done only after all four checks pass. Report what each one
 printed, not that you ran it.
 - `bun run typecheck`, then `bun run build`, then the **full** `bun test` with
-  `DATABASE_URL` set. `bun run check` runs the three in that order, then
+  `DATABASE_URL` set. `bun run check` runs `lint`, then the three, then
   `test:tz`, the reporting logic test under `TZ=Europe/Zurich`. Both rules under
   Conventions apply. A green without the variable is not evidence. A single-file
   rerun is not the signal.

@@ -27,7 +27,8 @@ describe("canDiff", () => {
   });
 
   it("re-selecting a side replaces it", () => {
-    expect({ ...{ a: 1 }, a: 3 }).toEqual({ a: 3 });
+    const base = { a: 1 };
+    expect({ ...base, a: 3 }).toEqual({ a: 3 });
   });
 });
 

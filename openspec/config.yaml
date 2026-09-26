@@ -33,10 +33,11 @@ context: |
   Change the schema deliberately, never as a side effect of another task.
 
   Stack: TypeScript strict, ESM. Bun is the runtime, package manager (`bun
-  install`), and test runner (`bun test`); typecheck via `tsc --noEmit`. Datastore
-  is PostgreSQL, accessed via Bun's native `Bun.sql`. Tooling runs in the
-  devcontainer (Node 22 base + Bun, plus a Postgres service tracking the latest
-  release).
+  install`), and test runner (`bun test`); typecheck via `tsc --noEmit`.
+  `bun run check` runs `lint` (oxlint) first, then typecheck, build and test.
+  Datastore is PostgreSQL, accessed via Bun's native `Bun.sql`. Tooling runs in
+  the devcontainer (Node 22 base + Bun, plus a Postgres service tracking the
+  latest release).
 
   Process: spec-driven via OpenSpec. Every non-trivial change goes through an
   OpenSpec change (propose -> specs/tasks -> implement -> verify -> archive),
