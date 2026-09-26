@@ -21,7 +21,6 @@ import { compileProcessBody } from "../src/schema/compile.js";
 
 /** A minimal, otherwise-clean two-step body carrying one catalog field, the
  * same shape test/field-format-control.test.ts uses for the same pass. */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const bodyWith = (field: any): any => ({
   key: "p",
   label: { en: "P" },
@@ -46,7 +45,6 @@ const bodyWith = (field: any): any => ({
  * which is exactly what the studio's kind picker writes. */
 function fieldForKind(name: FieldKindName) {
   const kind = FIELD_KINDS[name];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const field: any = { id: "field_x", key: "x", label: { en: "X" }, type: kind.type };
   if (kind.format !== undefined) field.format = kind.format;
   if (kind.control !== undefined) field.control = kind.control;

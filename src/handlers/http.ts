@@ -102,7 +102,7 @@ const CONTENT_TYPE_HEADER = "Content-Type";
 
 /** Merge engine-computed headers on top of the author's, per the design's precedence rules. */
 function buildHeaders(config: z.infer<typeof httpConfigSchema>, idempotencyKey: string): Record<string, string> {
-  const headers: Record<string, string> = { ...(config.headers ?? {}) };
+  const headers: Record<string, string> = { ...config.headers };
   headers[IDEMPOTENCY_HEADER] = idempotencyKey;
   if (config.body !== undefined && !Object.keys(headers).some((k) => k.toLowerCase() === CONTENT_TYPE_HEADER.toLowerCase())) {
     headers[CONTENT_TYPE_HEADER] = "application/json";

@@ -172,7 +172,6 @@ const isPlainObject = (v: unknown): v is Record<string, unknown> =>
 // the v3 ZodEffects branch this loop carried is gone with it. ----
 
 function unwrapSchema(schema: z.ZodTypeAny): z.ZodTypeAny {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let s: any = schema;
   while (s?._zod?.def) {
     const t = s._zod.def.type;
@@ -191,29 +190,23 @@ function unwrapSchema(schema: z.ZodTypeAny): z.ZodTypeAny {
 // authored body, on both compile branches. ----
 
 interface ActionSite {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   action: any;
   loc: string;
 }
 
 /** Every action across all five positions (onEntry, onExit, onCancel, each
  * path's onPath, each timer's onFire.actions), duck-typed over a raw body. */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function collectActionSites(body: any): ActionSite[] {
   const sites: ActionSite[] = [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const push = (actions: any[] | undefined, loc: string) => {
     (actions ?? []).forEach((a, i) => sites.push({ action: a, loc: `${loc}[${i}]` }));
   };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (body?.workflow?.steps ?? []).forEach((s: any, si: number) => {
     const sloc = `steps[${si}]`;
     push(s?.onEntry, `${sloc}.onEntry`);
     push(s?.onExit, `${sloc}.onExit`);
     push(s?.onCancel, `${sloc}.onCancel`);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (s?.paths ?? []).forEach((p: any, pi: number) => push(p?.onPath, `${sloc}.paths[${pi}].onPath`));
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (s?.timers ?? []).forEach((t: any, ti: number) => push(t?.onFire?.actions, `${sloc}.timers[${ti}].onFire.actions`));
   });
   return sites;
@@ -223,10 +216,8 @@ function collectActionSites(body: any): ActionSite[] {
  * location path (`fields[0].fields[2]`), mirroring src/cel/check.ts's own
  * field walk. Duck-typed: does not require the input to already validate. */
 function walkFieldsIndexed(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   fields: any[] | undefined,
   loc: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   visit: (f: any, loc: string) => void,
 ): void {
   (fields ?? []).forEach((f, i) => {
@@ -262,7 +253,6 @@ function checkReservedActionPrefix(body: ProcessBody): CompileIssue[] {
 // its own fixed shape (an Expression).
 // ============================================================
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function checkKnownKeys(value: any, known: Set<string>, loc: string, issues: CompileIssue[]): void {
   if (!isPlainObject(value)) return;
   for (const key of Object.keys(value)) {
@@ -317,14 +307,11 @@ const LEAF_TYPES = new Set([
  * changes nothing elsewhere (`FieldDef.default`'s `Expression` member has no
  * `kind` key of its own).
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function unionObjectMatch(options: any[], value: Record<string, unknown>): z.ZodTypeAny | undefined {
   const unwrapped = options.map((m) => unwrapSchema(m));
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const typeOf = (m: any): string | undefined => m?._zod?.def?.type;
   const objectMembers = unwrapped.filter((m) => typeOf(m) === "object");
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const shapeOf = (m: any): Record<string, unknown> | undefined => m?.shape;
   const kindMembers = objectMembers.filter((m) => {
     const shape = shapeOf(m);
@@ -334,7 +321,6 @@ function unionObjectMatch(options: any[], value: Record<string, unknown>): z.Zod
     const noKindMembers = objectMembers.filter((m) => !kindMembers.includes(m));
     if (noKindMembers.length !== 1) return undefined;
     if (typeof value.kind === "string") {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const match = kindMembers.find((m) => (shapeOf(m)!.kind as any)._zod.def.values.includes(value.kind));
       if (match) return match;
     }
@@ -380,7 +366,6 @@ function unionObjectMatch(options: any[], value: Record<string, unknown>): z.Zod
  */
 function walkSchema(schema: z.ZodTypeAny, value: unknown, loc: string, issues: CompileIssue[]): void {
   const s = unwrapSchema(schema);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const def = (s as any)?._zod?.def;
   if (!def) return;
 
@@ -406,7 +391,6 @@ function walkSchema(schema: z.ZodTypeAny, value: unknown, loc: string, issues: C
     }
     case "union": {
       if (!isPlainObject(value)) return;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const match = unionObjectMatch(def.options as any[], value as Record<string, unknown>);
       if (match) walkSchema(match, value, loc, issues);
       return;
@@ -436,7 +420,6 @@ function checkUnknownKeys(body: unknown): CompileIssue[] {
 // `validation.pattern`, so a single over-long pattern is reported once.
 // ============================================================
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function checkPatterns(f: any, floc: string, issues: CompileIssue[]): void {
   const pattern = f?.validation?.pattern;
   if (typeof pattern !== "string") return;
@@ -446,7 +429,6 @@ function checkPatterns(f: any, floc: string, issues: CompileIssue[]): void {
     return; // do not also attempt to compile an oversized pattern
   }
   try {
-    // eslint-disable-next-line no-new
     new RegExp(pattern);
   } catch {
     issues.push({ loc, value: pattern, message: "pattern does not compile as a JavaScript RegExp" });
@@ -461,7 +443,6 @@ function checkPatterns(f: any, floc: string, issues: CompileIssue[]): void {
 
 function checkIdResolution(body: ProcessBody): CompileIssue[] {
   const issues: CompileIssue[] = [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const allFields = collectFieldsDeep((body.fields ?? []) as any);
   const fieldIds = new Set(allFields.map((f) => f.id as string));
 
@@ -537,7 +518,6 @@ function checkGroupReference(body: ProcessBody): CompileIssue[] {
 
 function checkActorFromFieldReference(body: ProcessBody): CompileIssue[] {
   const issues: CompileIssue[] = [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fieldsById = new Map(collectFieldsDeep((body.fields ?? []) as any).map((f: any) => [String(f.id), f]));
 
   body.workflow.steps.forEach((s, si) => {
@@ -573,7 +553,6 @@ function checkActorFromFieldReference(body: ProcessBody): CompileIssue[] {
  * body written before this key existed carries a `columnMapping`, so an
  * identical re-publish cannot newly fail.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function checkColumnMapping(f: any, floc: string, fieldsById: Map<string, any>, issues: CompileIssue[]): void {
   const mapping = f?.columnMapping;
   if (!isPlainObject(mapping)) return;
@@ -622,7 +601,6 @@ function checkColumnMapping(f: any, floc: string, fieldsById: Map<string, any>, 
  * catalog already treats keys as lowercase slugs. */
 const FIELD_KEY_FORMAT = /^[a-z_][a-z0-9_]*$/;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function checkFieldKeyFormat(f: any, floc: string, issues: CompileIssue[]): void {
   const key = f?.key;
   if (typeof key !== "string" || !FIELD_KEY_FORMAT.test(key)) {
@@ -630,9 +608,7 @@ function checkFieldKeyFormat(f: any, floc: string, issues: CompileIssue[]): void
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function checkFieldExpressionLength(f: any, floc: string, issues: CompileIssue[]): void {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const checkExpr = (v: any, loc: string) => {
     if (v && typeof v === "object" && v.lang === "cel" && typeof v.src === "string" && v.src.length > MAX_EXPRESSION_LENGTH) {
       issues.push({ loc, value: v.src, message: `expression source exceeds the ${MAX_EXPRESSION_LENGTH}-character bound` });
@@ -657,7 +633,6 @@ function checkFieldExpressionLength(f: any, floc: string, issues: CompileIssue[]
  * An `Expression` default is skipped. The CEL layer types that one, and that
  * layer reads no format.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function checkFieldFormatControl(f: any, floc: string, issues: CompileIssue[]): void {
   const allowed = typeof f?.type === "string" ? ALLOWED_BY_TYPE[f.type as BaseFieldType] : undefined;
 
@@ -694,11 +669,9 @@ function checkFieldFormatControl(f: any, floc: string, issues: CompileIssue[]): 
  * target that can name any field in the process, not only the one under walk. */
 function checkFieldTree(body: ProcessBody): CompileIssue[] {
   const issues: CompileIssue[] = [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const allFields = collectFieldsDeep((body.fields ?? []) as any);
   const fieldsById = new Map(allFields.map((f) => [f.id as string, f]));
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   walkFieldsIndexed(body.fields as any, "fields", (f, floc) => {
     checkPatterns(f, floc, issues);
     checkColumnMapping(f, floc, fieldsById, issues);
@@ -736,7 +709,6 @@ interface PluginTypeSite {
  * assignment.strategy.type, and a plugin-typed field's `type.type`. */
 function collectPluginTypeSites(body: ProcessBody): PluginTypeSite[] {
   const sites: PluginTypeSite[] = [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const pushType = (obj: any, loc: string) => {
     if (obj && typeof obj.type === "string") sites.push({ value: obj.type, loc: `${loc}.type` });
   };
@@ -747,7 +719,6 @@ function collectPluginTypeSites(body: ProcessBody): PluginTypeSite[] {
     const sloc = `steps[${si}]`;
     if (s.assignment?.strategy) pushType(s.assignment.strategy, `${sloc}.assignment.strategy`);
   });
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   collectFieldsDeep((body.fields ?? []) as any).forEach((f: any, i: number) => {
     if (f.type && typeof f.type === "object") pushType(f.type, `fields[${i}].type`);
   });
@@ -769,15 +740,12 @@ interface ExpressionSite {
  * `{src, loc}` for a length bound. */
 function collectExpressionSites(body: ProcessBody): ExpressionSite[] {
   const sites: ExpressionSite[] = [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const asExpr = (v: any): { src: string } | undefined =>
     v && typeof v === "object" && v.lang === "cel" && typeof v.src === "string" ? v : undefined;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const push = (v: any, loc: string) => {
     const e = asExpr(v);
     if (e) sites.push({ src: e.src, loc });
   };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const pushOutputs = (actions: any[] | undefined, loc: string) => {
     (actions ?? []).forEach((a, i) => {
       Object.entries(a?.output ?? {}).forEach(([fid, e]) => push(e, `${loc}[${i}].output.${fid}`));
@@ -890,7 +858,6 @@ function checkTechnicalFields(body: ProcessBody): CompileIssue[] {
   const issues: CompileIssue[] = [];
   const technicalIds = new Set<string>();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   walkFieldsIndexed(body.fields as any, "fields", (f) => {
     if (f?.technical !== true) return;
     if (typeof f?.id !== "string") return;
@@ -904,7 +871,6 @@ function checkTechnicalFields(body: ProcessBody): CompileIssue[] {
     }
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (body.workflow?.steps ?? []).forEach((s: any, si: number) => {
     (s?.view?.fields ?? []).forEach((vf: any, vi: number) => {
       if (typeof vf?.ref !== "string" || !technicalIds.has(vf.ref)) return;
@@ -939,7 +905,6 @@ function checkTechnicalFields(body: ProcessBody): CompileIssue[] {
 function checkRedactableFields(body: ProcessBody): CompileIssue[] {
   const issues: CompileIssue[] = [];
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   walkFieldsIndexed(body.fields as any, "fields", (f) => {
     if (f?.redactable !== true) return;
     if (typeof f?.id !== "string") return;
@@ -993,19 +958,15 @@ function checkViewGroupReferences(body: ProcessBody): CompileIssue[] {
   const issues: CompileIssue[] = [];
   const groupIdByKey = new Map<string, string>();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   walkFieldsIndexed(body.fields as any, "fields", (f) => {
     if (f?.type !== "group") return;
     if (typeof f?.key !== "string" || typeof f?.id !== "string") return;
     groupIdByKey.set(f.key, f.id);
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const parentKeyById = parentGroupKeyById((body.fields ?? []) as any);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (body.workflow?.steps ?? []).forEach((s: any, si: number) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const entries: any[] = s?.view?.fields ?? [];
     const refs = new Set(entries.filter((e) => typeof e?.ref === "string").map((e) => e.ref as string));
     entries.forEach((vf, vi) => {
@@ -1100,12 +1061,10 @@ function checkViewGroupReferences(body: ProcessBody): CompileIssue[] {
  * `applyFieldDefaults`' own `asExpression` (src/runtime/api.ts): an
  * Expression-shaped object (`{lang: "cel", ...}`) may raise at creation and
  * leave the field unwritten, so only a non-CEL value counts. */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function isLiteralDefault(v: any): boolean {
   return !(v && typeof v === "object" && !Array.isArray(v) && v.lang === "cel");
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function stepHasManualPath(s: any): boolean {
   return (s?.paths ?? []).some((p: any) => p?.trigger === "manual");
 }
@@ -1121,12 +1080,10 @@ function stepHasManualPath(s: any): boolean {
  * too, so this cannot be one body-wide set the way most of this module's
  * other collectors are.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function computeWriterSet(body: any, ownStepIndex: number, dom: Map<string, Set<string>>): Set<string> {
   const written = new Set<string>();
   const steps = body?.workflow?.steps ?? [];
   const ownStepId = steps[ownStepIndex]?.id;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fields = collectFieldsDeep((body?.fields ?? []) as any);
   const fieldsById = new Map(fields.map((f) => [f.id as string, f]));
 
@@ -1140,13 +1097,11 @@ function computeWriterSet(body: any, ownStepIndex: number, dom: Map<string, Set<
   // resubmits. subprocess.outputMapping carries no own-step exclusion: it
   // commits at the subprocess step's own spawn/return, not gated by a
   // participant submission the way an action output is.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   steps.forEach((s: any, si: number) => {
     const own = si === ownStepIndex;
     const dominatesOwn = own || dominates(dom, s?.id, ownStepId);
     if (!dominatesOwn) return;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const addOutputs = (actions: any[] | undefined) => {
       (actions ?? []).forEach((a) => Object.keys(a?.output ?? {}).forEach((fid) => written.add(fid)));
     };
@@ -1154,10 +1109,8 @@ function computeWriterSet(body: any, ownStepIndex: number, dom: Map<string, Set<
     if (!own) {
       addOutputs(s?.onExit);
       addOutputs(s?.onCancel);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (s?.paths ?? []).forEach((p: any) => addOutputs(p?.onPath));
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (s?.timers ?? []).forEach((t: any) => {
       if (own && typeof t?.onFire?.targetPath !== "string") return;
       addOutputs(t?.onFire?.actions);
@@ -1171,9 +1124,7 @@ function computeWriterSet(body: any, ownStepIndex: number, dom: Map<string, Set<
   // dominates it. Also tracks, per field, which step indices carry such an
   // entry (regardless of dominance), for the columnMapping rule below.
   const editableSteps = new Map<string, Set<number>>();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   steps.forEach((s: any, si: number) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (s?.view?.fields ?? []).forEach((vf: any) => {
       if (typeof vf?.ref !== "string") return;
       if (fieldsById.get(vf.ref)?.type === "group") return;
@@ -1185,7 +1136,6 @@ function computeWriterSet(body: any, ownStepIndex: number, dom: Map<string, Set<
   });
 
   // contract.inputFields (1.4), body-wide.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (body?.contract?.inputFields ?? []).forEach((fid: any) => {
     if (typeof fid === "string") written.add(fid);
   });
@@ -1221,9 +1171,7 @@ function computeWriterSet(body: any, ownStepIndex: number, dom: Map<string, Set<
 
 function checkUnsatisfiableRequiredReadonly(body: ProcessBody): CompileIssue[] {
   const issues: CompileIssue[] = [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const anyBody = body as any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fields = collectFieldsDeep((anyBody.fields ?? []) as any);
   const fieldsById = new Map(fields.map((f) => [f.id as string, f]));
   const technicalIds = new Set<string>();
@@ -1232,11 +1180,9 @@ function checkUnsatisfiableRequiredReadonly(body: ProcessBody): CompileIssue[] {
   });
   const dom = computeDominatorSets(anyBody.workflow?.steps, anyBody.workflow?.initialStep);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (anyBody.workflow?.steps ?? []).forEach((s: any, si: number) => {
     if (!stepHasManualPath(s)) return;
     const writerSet = computeWriterSet(anyBody, si, dom);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (s?.view?.fields ?? []).forEach((vf: any, vi: number) => {
       if (typeof vf?.ref !== "string") return;
       if (vf.required !== true || vf.readonly !== true) return;

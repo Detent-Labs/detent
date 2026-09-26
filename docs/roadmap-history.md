@@ -1774,7 +1774,7 @@ as it stands.
     owner could read instance data through three time-based views (cycle time,
     bottleneck, SLA) or by opening one instance at a time. Neither answers
     "list every onboarding from the last twelve months with these three fields
-    as columns". `docs/decisions.md` settled the design on 2026-08-25 and
+    as columns". `docs/decisions-archive.md` settled the design on 2026-08-25 and
     named two prerequisites, a process-scoped `read` permission and a shared
     query core; both shipped on 2026-08-27.
 
@@ -1826,7 +1826,7 @@ as it stands.
     `instance-transition-action`. Stage 51's reading half was decorative on
     its own. Nothing moved the picked device's instance off the shelf step, so
     the option list never shrank and the next participant saw the same laptop
-    again. `docs/decisions.md` calls this "The missing half" and had already
+    again. `docs/decisions-archive.md` calls this "The missing half" and had already
     recorded that the transition action ships; only its packaging stayed open.
 
     A fourth author-visible handler, `instance.transition`, joins
@@ -1879,7 +1879,7 @@ as it stands.
     `typeof value === "string"` and stopped there. Every new widget cost a
     member in `baseFieldType`, a row in `JS_TYPE`, a case in `celType`, an
     entry in `FIELD_TYPE_LABELS` and a branch in `FieldForm`. That price is
-    why `docs/decisions.md` had turned down a "Long text" type.
+    why `docs/decisions-archive.md` had turned down a "Long text" type.
 
     `FieldDef.type` shrinks to six value forms (`string`, `number`, `boolean`,
     `list`, `file`, `group`), each mapping to exactly one CEL type and one JS

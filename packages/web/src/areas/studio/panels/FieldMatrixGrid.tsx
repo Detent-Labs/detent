@@ -610,7 +610,6 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
     // Enter.
     const cell = cellRefs.current.get(cellKey(focus.row, focus.col));
     cell?.querySelector<HTMLElement>("input, button")?.focus();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activated]);
 
   const writeFlag = (stepIndex: number, fieldId: string, key: FlagKey, next: BoolOrExpr) => {

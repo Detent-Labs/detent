@@ -172,7 +172,6 @@ export function ReportBuilderScreen({
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft?.processId, draft?.status, draft?.createdAfter, draft?.createdBefore, draft?.dataWhere, token]);
 
   if (loadError) return <ErrorNote error={loadError} locale={locale} />;

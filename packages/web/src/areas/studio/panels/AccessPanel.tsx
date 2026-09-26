@@ -214,7 +214,6 @@ export function AccessPanel({ processId, token, roles, onUnauthorized }: AccessP
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [processId, token, reloadKey]);
 
   // Resolves `true` once the write lands and the reload key bumps, `false`

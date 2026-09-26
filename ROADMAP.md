@@ -25,8 +25,9 @@ this repository is public.
 every push. A non-zero exit blocks the push.
 
 `.github/workflows/check.yml` runs the same checks again, plus a
-`pull_request` run for a fork's PR. Not a numbered stage: it gates every
-stage below instead of adding a capability.
+`pull_request` run for a fork's PR, plus a dependency audit. Not a
+numbered stage: it gates every stage below instead of adding a
+capability.
 
 A preflight now runs first. It names which of six ordered devcontainer
 preconditions is missing, instead of the push failing on a symptom.

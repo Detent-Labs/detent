@@ -106,7 +106,7 @@ bun install
 DATABASE_URL=postgres://postgres:postgres@db:5432/workflow_engine bun test   # bun:test suites
 bun run typecheck                                                            # tsc --noEmit (Bun does not typecheck)
 bun run build                                                                # vite build, the frontend's production bundle
-bun run check                                                                # typecheck, build, the suite, then the timezone test
+bun run check                                                                # lint, typecheck, build, the suite, then the timezone test
 ```
 
 Set `DATABASE_URL`. The database-backed suites carry `test.skipIf(!DATABASE_URL)`
@@ -122,8 +122,8 @@ infrastructure, on every push and every pull request. GitHub hosts it
 for free, since this repository is public.
 
 `.githooks/pre-push` still runs locally, first. It runs `bun run check`
-in the dev container. The typecheck, the build, and the suite must all
-pass. Only then does the push proceed.
+in the dev container. The lint, the typecheck, the build, and the suite
+must all pass. Only then does the push proceed.
 
 The `bun install` above arms it: the root
 `prepare` script runs `scripts/enable-hooks.sh`, which points
@@ -151,8 +151,28 @@ one of `AUTH_JWT_SECRET`, `AUTH_ISSUERS` or `ALLOW_INSECURE_DEV_AUTH=1`. The
 devcontainer sets the third one (`.devcontainer/docker-compose.yml`). That one
 belongs nowhere else. `docs/runbooks/deployment.md` gives all three with their
 defaults, and every other variable too.
+
 Changes go through OpenSpec (`openspec/`) — propose → specs/tasks → implement →
 verify → archive. See `CLAUDE.md` for the full contract rules and invariants.
+
+### Smoke suite
+
+`bun run e2e` drives four flows through a browser, against the production
+build and a database of its own (`_e2e`). Install the browser once per
+container:
+
+```bash
+bunx playwright install --with-deps chromium
+```
+
+Then build the bundle and run the suite:
+
+```bash
+bun run build
+bun run e2e
+```
+
+CI runs the same suite in a job of its own, beside `check`.
 
 ## Deploy
 

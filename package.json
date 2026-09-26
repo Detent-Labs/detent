@@ -24,9 +24,11 @@
     "build": "bun run --filter './packages/*' build",
     "test": "bun test",
     "test:tz": "TZ=Europe/Zurich bun test packages/web/test/reporting-reportingLogic.test.ts",
-    "check": "bun run typecheck && bun run build && bun test && bun run test:tz",
+    "lint": "oxlint --deny-warnings --report-unused-disable-directives src packages test scripts e2e playwright.config.ts",
+    "check": "bun run lint && bun run typecheck && bun run build && bun test && bun run test:tz",
     "serve": "bun run src/http/server.ts",
     "seed": "bun run scripts/seed.ts",
+    "e2e": "bun run scripts/e2e.ts",
     "backfill-process-access-roles": "bun run scripts/backfill-process-access-roles.ts",
     "thirdparty": "bun run scripts/thirdparty.ts",
     "openspec:review-check": "bun run scripts/openspec-review-check.ts",
@@ -34,7 +36,9 @@
     "openspec:task-status": "bun run scripts/openspec-task-status.ts"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@types/bun": "^1.3.14",
+    "oxlint": "1.85.0",
     "typescript": "7.0.2"
   },
   "dependencies": {

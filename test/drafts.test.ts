@@ -86,7 +86,7 @@ test.skipIf(!DB)("a save at the matching revision persists body and layout and i
 
   const fetched = await getDraft(processId, sql);
   expect(fetched?.revision).toBe(1);
-  expect((fetched?.body as { label: { en: string } }).label.en).toBe("v2");
+  expect((fetched!.body as { label: { en: string } }).label.en).toBe("v2");
 });
 
 test.skipIf(!DB)("a stale save raises DraftConflictError and leaves the row byte-identical", async () => {
@@ -98,7 +98,7 @@ test.skipIf(!DB)("a stale save raises DraftConflictError and leaves the row byte
 
   const stored = await getDraft(processId, sql);
   expect(stored?.revision).toBe(1);
-  expect((stored?.body as { label: { en: string } }).label.en).toBe("v2");
+  expect((stored!.body as { label: { en: string } }).label.en).toBe("v2");
   expect(stored?.updatedBy).toBe("user_a");
 });
 
@@ -218,7 +218,7 @@ test.skipIf(!DB)("markDraftPublished stamps base_version without changing revisi
   const stored = await getDraft(processId, sql);
   expect(stored?.baseVersion).toBe(3);
   expect(stored?.revision).toBe(1);
-  expect((stored?.body as { label: { en: string } }).label.en).toBe("v2");
+  expect((stored!.body as { label: { en: string } }).label.en).toBe("v2");
 });
 
 test.skipIf(!DB)("a second markDraftPublished replaces the earlier base_version", async () => {
@@ -258,7 +258,7 @@ test.skipIf(!DB)("an envelope violation on an existing draft leaves the stored r
   await expectRejects(saveDraft(processId, { body: [], layout: {}, revision: 0, updatedBy: "user_b" } as never, sql), RequestShapeError);
   const stored = await getDraft(processId, sql);
   expect(stored?.revision).toBe(0);
-  expect((stored?.body as { label: { en: string } }).label.en).toBe("v1");
+  expect((stored!.body as { label: { en: string } }).label.en).toBe("v1");
 });
 
 // harden-publish-validation: the envelope check also bounds the serialized
@@ -276,7 +276,7 @@ test.skipIf(!DB)("saveDraft rejects an over-size body/layout pair and leaves any
   );
   const stored = await getDraft(processId, sql);
   expect(stored?.revision).toBe(0);
-  expect((stored?.body as { label: { en: string } }).label.en).toBe("v1");
+  expect((stored!.body as { label: { en: string } }).label.en).toBe("v1");
 });
 
 test.skipIf(!DB)("saveDraft accepts a draft of the size a real process definition reaches", async () => {
@@ -372,7 +372,7 @@ test.skipIf(!DB)("a malformed baseVersion is refused and leaves the stored draft
   const stored = await getDraft(processId, sql);
   expect(stored?.revision).toBe(0);
   expect(stored?.baseVersion).toBe(1);
-  expect((stored?.body as { label: { en: string } }).label.en).toBe("v1");
+  expect((stored!.body as { label: { en: string } }).label.en).toBe("v1");
 });
 
 test.skipIf(!DB)("publishing still stamps its own base version over a seeded one", async () => {
