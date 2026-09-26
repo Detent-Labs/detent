@@ -55,6 +55,12 @@
 - [ ] 5.2 Run `/impeccable critique` and `/impeccable audit` on the Steps,
   Fields and Changes tabs. Fix each finding the two reports list, or
   record it in `docs/decisions.md`.
+- [ ] 5.3 Add `packages/web/test/studio-scrollBoxRingRoom.test.ts`, a static
+  source scan over `packages/web/src/areas/studio/**` that fails unless
+  every `overflow`/`overflowX`/`overflowY: "auto"` style also reads
+  `focus.reach` in a padding key and a scroll-padding key, or is named in
+  a short exempt list with a reason checked against the source. Verify
+  `bun test` runs it and it passes with no exempt entry unverified.
 
 ## 6. Verification
 
