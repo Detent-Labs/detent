@@ -1065,7 +1065,7 @@ async function updateAssignment(
  * On a test instance, a claim also admits the instance's own `startedBy`
  * actor and any `system:admin` holder, beside an eligible candidate —
  * the same two actors the single-instance read rule admits
- * (`runtime/api.ts::loadInstanceForActor`). An ordinary (`"published"`)
+ * (`runtime/internal.ts::loadInstanceForActor`). An ordinary (`"published"`)
  * instance admits no actor outside `isEligibleCandidate` (draft-test-instances).
  */
 export async function claimStep(instanceId: string, actor: Actor, db: SQL = sql): Promise<Instance> {

@@ -162,7 +162,7 @@ export function previewViewFields(
  * preview (`studio-form-editor`: "A live participant preview stands beside
  * the form canvas").
  *
- * Mirrors `src/runtime/api.ts`'s own `resolveFields` entry for entry: one
+ * Mirrors `src/runtime/fields.ts`'s own `resolveFields` entry for entry: one
  * resolved entry per view entry, in the view's order, with a group field's
  * children left where the view places them rather than expanded here. A
  * literal `visible: false` drops the entry, since a participant never meets

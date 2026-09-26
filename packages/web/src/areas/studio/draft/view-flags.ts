@@ -10,7 +10,7 @@ import type { BoolOrExpr } from "../panels/shared/overrideMode";
 export type FlagKey = "visible" | "required" | "readonly";
 
 /** The engine's own three defaults for an absent view-flag key.
- * `resolveFields` (`src/runtime/api.ts`) reads a missing `visible` as true and
+ * `resolveFields` (`src/runtime/fields.ts`) reads a missing `visible` as true and
  * a missing `required`/`readonly` as false — the same call that turns a view
  * entry into what a participant sees. */
 export const FLAG_DEFAULT: Record<FlagKey, boolean> = {
