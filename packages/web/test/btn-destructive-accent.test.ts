@@ -31,8 +31,8 @@ const TOKENS_CSS = new URL("../src/shell/tokens.css", import.meta.url).pathname;
 const SRC = new URL("../src/", import.meta.url).pathname;
 
 // Matches the selector prefix, not one exact opener: a grouped selector line
-// ending in "," and any pseudo-class or attribute after .btn-secondary both count as a rule that
-// must precede .btn-destructive.
+// ending in "," and any pseudo-class or attribute after .btn-secondary both
+// count as a rule that must precede .btn-destructive.
 const SECONDARY_OPENER = /^\.btn-secondary\b[^{]*[{,]\s*$/;
 
 const HOVER_AND_PRESS = /^\.btn-destructive:hover,\s*\.btn-destructive:active\s*\{([^}]*)\}/m;
