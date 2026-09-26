@@ -820,9 +820,10 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
         // `lastInputModality` (`focusScroll.ts`) still reads whatever the
         // last real interaction set. Ceiling: refocusing the window after a
         // KEYBOARD interaction still re-runs this handler and can jump a
-        // hand-scrolled, partly hidden control back into view; refocusing
-        // after a POINTER interaction is unaffected, since the flag still
-        // reads "pointer" and the handler already skips it. Upgrade:
+        // hand-scrolled, partly hidden control back into view. Leaving by
+        // Alt+Tab hits this too: its Alt keydown flips the flag to
+        // "keyboard" before the refocus fires, even when the control was
+        // last reached by a POINTER interaction. Upgrade:
         // `ProcessTabRow.tsx`'s own `windowBlurred` guard
         // (`focusScrollsRow`), lifted onto this shared handler.
         onFocusCapture={scrollKeyboardFocusIntoView}

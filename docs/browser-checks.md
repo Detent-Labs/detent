@@ -5329,14 +5329,28 @@ ring's reach on their own. The step page's own `page` box sets no block
 padding. Its first and last controls still clear the ring, through the
 masthead's own padding and the developer section's own padding.
 
-Scroll the Checks tab's rail, the Forms tab's grid or the form editor's
-canvas partway. Stop so one control sits half hidden at the scroll
-box's near edge. Tab onto it. Pass: the box scrolls that control fully
-into view. Its ring then shows in full, clear of the edge it stopped
-at.
+Scroll the Checks tab's rail or the Forms tab's grid partway. Stop so
+one control sits half hidden at the scroll box's near edge. Tab onto
+it. Pass: the box scrolls that control fully into view. Its ring then
+shows in full, clear of the edge it stopped at.
 
 Mouse-click that same half-hidden control instead, before it scrolls
-into view. Pass: nothing scrolls. The box stays exactly where the click
-left it. The clicked field itself may still show a ring. The helper
-`focusScroll.ts` tracks the last input modality. It skips the scroll
-after a pointer press.
+into view. Pass: nothing scrolls. The box stays exactly where the
+click left it. The clicked field itself may still show a ring. The
+helper `focusScroll.ts` tracks the last input modality. It skips the
+scroll after a pointer press.
+
+Open the form editor and scroll the browser window partway down. The
+canvas's own box, `formCanvasRegion`, sets no height, so the page
+scrolls in its place. Stop so one control sits half hidden at the
+window's bottom edge. Tab onto it. Pass: the window scrolls that
+control fully into view, its ring clear of the viewport edge.
+
+Mouse-click that same half-hidden control instead. Pass: nothing
+scrolls, the same as the boxes above.
+
+This is a manual check because it measures the ring against a real
+clip box, across widths. An e2e flow cannot make that measurement;
+only a live render, at a real width, shows the clearance. The source
+scan test covers only the static half, that the style itself declares
+the room.

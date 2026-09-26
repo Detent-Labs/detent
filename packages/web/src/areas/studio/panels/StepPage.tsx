@@ -63,7 +63,11 @@ const styles = stylex.create({
     display: "flex",
     flexDirection: "column",
     gap: space.s2,
-    paddingBlock: space.s3,
+    // Only the top edge faces the page box's own top edge; the bottom edge
+    // sits against the divider below, not that edge, and keeps the literal
+    // token.
+    paddingBlockStart: `max(${space.s3}, ${focus.reach})`,
+    paddingBlockEnd: space.s3,
     borderBottomWidth: 2,
     borderBottomStyle: "solid",
     borderBottomColor: colors.divider,
@@ -296,7 +300,11 @@ const styles = stylex.create({
     paddingBlock: space.s3,
   },
   developer: {
-    paddingBlock: space.s3,
+    // Only the bottom edge faces the page box's own bottom edge; the top
+    // edge sits against the divider above, not that edge, and keeps the
+    // literal token.
+    paddingBlockStart: space.s3,
+    paddingBlockEnd: `max(${space.s3}, ${focus.reach})`,
     borderTopWidth: 2,
     borderTopStyle: "solid",
     borderTopColor: colors.divider,

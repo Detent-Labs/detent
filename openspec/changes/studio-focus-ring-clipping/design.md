@@ -135,13 +135,22 @@ row, so it moves inward with the row.
 guards the shorthand ban.** `studio-scrollBoxRingRoom.test.ts` walks every
 `stylex.create` style under `packages/web/src/areas/studio/**`. It checks
 each style that sets `overflow`/`overflowX`/`overflowY` to `"auto"` or
-`"scroll"`. It fails unless that same style reads `focus.reach`. That
-gap key is a padding key or a `scrollPadding` key, either one directly
-or inside a `max(…)`. Two named exemptions cover the two boxes the
-Context section above already found clear. `FieldMatrixGrid.tsx`'s
-`matrixScroll` draws its own ring inset at -2px on each cell.
-`ChangeList.tsx`'s `developerBox` has no focusable element at all. No
-bun:test harness mounts a DOM, so the test cannot measure a ring. It can
+`"scroll"`. It fails unless that same style reads `focus.reach` in a
+padding key and in a `scrollPadding` key. Either key may read it
+directly, or inside a `max(…)`.
+
+Three named exemptions cover boxes that do not need such a pair. Two are
+boxes the Context section above already found clear. `FieldMatrixGrid.tsx`'s
+`matrixScroll` draws its own ring inset at -2px on each cell, so the box
+does not need a gap. `ChangeList.tsx`'s `developerBox` renders only
+plain-text JSON entries with no focusable element, so no ring can ever
+clip there. The third, `ProcessTabRow.tsx`'s `row`, keeps 32px clear of
+each edge on its own scroll (`scrollPaddingInline: space.s8`). That is
+more than the ring's 4px reach, so the row does not need
+`scrollPadding: focus.reach`. Its `padding: focus.reach` already covers
+the static ring room.
+
+No bun:test harness mounts a DOM, so the test cannot measure a ring. It can
 only catch a box that quietly loses the padding declaration itself.
 
 Outcome: the canvas bar's `bar` and the form tab strip's `row` clipped.

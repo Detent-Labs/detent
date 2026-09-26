@@ -1331,9 +1331,10 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
     // ponytail: same shortcut as `EditScreen.tsx`'s tab body, and the same
     // ceiling: a window refocus after a keyboard interaction still re-runs
     // this handler, since `lastInputModality` (`focusScroll.ts`) still
-    // reads "keyboard" with no fresh keypress. A refocus after a pointer
-    // interaction is unaffected. Upgrade: `ProcessTabRow.tsx`'s own
-    // `windowBlurred` guard (`focusScrollsRow`).
+    // reads "keyboard" with no fresh keypress. Leaving by Alt+Tab hits a
+    // pointer-focused control too: its Alt keydown sets the flag to
+    // "keyboard" before the refocus fires. Upgrade: `ProcessTabRow.tsx`'s
+    // own `windowBlurred` guard (`focusScrollsRow`).
     <div onFocusCapture={scrollKeyboardFocusIntoView} {...stylex.props(styles.formEditorPage)}>
       <header {...stylex.props(styles.formEditorHeader)}>
         <button type="button" className="btn btn-ghost" {...stylex.props(styles.studioBack)} onClick={onBack}>
