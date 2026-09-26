@@ -91,10 +91,28 @@ scroll box around the control and honors each box's scroll padding.
 
 One `onFocusCapture` on each surface root therefore covers every box inside
 it. The two roots are the tab body and the form editor's
-page. Only a focus that matches `:focus-visible` scrolls, so a pointer press
-never moves its control. A target inside an `<svg>` scrolls nothing: the
-canvas pans its own nodes. The tab row keeps its own handler, and it reads
-the same `focusVisible` helper.
+page. A target inside an `<svg>` scrolls nothing: the canvas pans its own
+nodes. The tab row keeps its own handler, and it reads the same
+`focusVisible` helper.
+
+**A pointer focus on a text field matches `:focus-visible` too.** The
+handler therefore also tracks the last input modality. Chrome and
+Firefox match `:focus-visible` on a pointer focus of any field that
+takes keyboard input. A text `<input>`, a `<textarea>` and a
+contenteditable all count.
+
+The studio's tab bodies and form editor hold mostly such fields. On its
+own, `:focus-visible` cannot tell such a mousedown from a Tab-key
+arrival. This flag is what disambiguates: `focusScroll.ts` keeps one
+module-level value, `"pointer"` or `"keyboard"`. A capture-phase
+`pointerdown` listener sets it to `"pointer"`. A capture-phase `keydown`
+listener sets it to `"keyboard"`. Both install once, at module load, and
+skip where no DOM exists.
+
+The helper `scrollKeyboardFocusIntoView` scrolls only when the flag
+reads `"keyboard"` and the target also matches `:focus-visible`. A
+click on a text field therefore never moves it before `mouseup`. A
+Tab-key arrival still scrolls every control, fields included.
 
 **The open tab's mark moves to a pseudo-element.** Today `tabSelected` in
 `ProcessTabRow.tsx` draws the mark as `inset 0 -2px 0` on the tab. That
@@ -113,14 +131,44 @@ row, so it moves inward with the row.
 `ChecksRail`, `FormsTab`, `FormTabStrip`, `StepPage`, `CanvasBar` and
 `FormEditorScreen`. Pad each one that clips the same way.
 
-Outcome: the canvas bar's `bar` and the form tab strip's `row` clipped and
-now pad by `focus.reach`. The change list's `body` held the "Open …" row
-command's pull-back at 400px; its own `paddingInlineStart` now restores
-that room. Three boxes, `ChecksRail`, `FormsTab` and `FormEditorScreen`,
-already pad past the ring's reach on their own. The step page's own
-`page` box sets no block padding. Its first and last controls still clear
-the ring, through the masthead's own padding and the developer section's
-own padding.
+**A static source scan guards the padding, the way `stylex-shorthand.test.ts`
+guards the shorthand ban.** `studio-scrollBoxRingRoom.test.ts` walks every
+`stylex.create` style under `packages/web/src/areas/studio/**`. It checks
+each style that sets `overflow`/`overflowX`/`overflowY` to `"auto"` or
+`"scroll"`. It fails unless that same style reads `focus.reach`. That
+gap key is a padding key or a `scrollPadding` key, either one directly
+or inside a `max(…)`. Two named exemptions cover the two boxes the
+Context section above already found clear. `FieldMatrixGrid.tsx`'s
+`matrixScroll` draws its own ring inset at -2px on each cell.
+`ChangeList.tsx`'s `developerBox` has no focusable element at all. No
+bun:test harness mounts a DOM, so the test cannot measure a ring. It can
+only catch a box that quietly loses the padding declaration itself.
+
+Outcome: the canvas bar's `bar` and the form tab strip's `row` clipped.
+Each now pads by `focus.reach` on the inline axis, the one each scrolls
+on.
+
+Five more boxes already padded past the ring's reach on their own, on
+the axis that matters. Each used a literal `space.sN` token instead.
+That token would drift from the reach if either value ever changed
+alone. Each now reads `max(space.sN, focus.reach)` instead. The value
+stays exactly what it is today. It still follows the reach if the reach
+ever grows.
+
+The five are `CanvasBar`'s `bar` on its block axis, `ChecksRail`, and
+`FormsTab`'s `grid`. The other two are `FormEditorScreen`'s
+`formCanvasRegion` and `StepPage`'s `page` on its inline axis.
+`ChecksRail`, `FormsTab` and `FormEditorScreen` also gained
+`scrollPadding: focus.reach`. The sweep found this only after the fact:
+each one clipped mid-scroll, the same defect the four boxes in the
+table above had at the start.
+
+The change list's `body` held the "Open …" row command's pull-back at
+400px. Its own `paddingInlineStart` now restores that room. The step
+page's own `page` box still sets no block padding of its own. Its first
+and last controls still clear the ring all the same. The masthead's own
+padding and the developer section's own padding do that.
+`scrollPaddingBlock: focus.reach` covers it mid-scroll.
 
 ## Risks / Trade-offs
 
