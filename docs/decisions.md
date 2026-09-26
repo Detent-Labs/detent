@@ -1615,11 +1615,11 @@ recorded rather than fixed. The RAIL tags are local to this section.
   rule of `studio-focus-ring-clipping` does not reach it. Risk (Low): the
   ring loses 2px on one side and still meets WCAG 2.4.7.
 - **A field's border reads 1.32:1 in light and 1.64:1 in dark.** The 1px
-  hairline sits at `packages/web/src/shell/global.css:68`. WCAG 1.4.11 asks 3:1
+  hairline sits at `packages/web/src/shell/global.css:70`. WCAG 1.4.11 asks 3:1
   of a boundary that identifies a control. `DESIGN.md`'s Inputs / Fields entry
   sets that hairline, so the call belongs to the design language.
 - **Every `.btn` stands 36 to 37px tall, under the 44px touch target.** Its
-  padding sits at `packages/web/src/shell/tokens.css:139`. The studio serves a
+  padding sits at `packages/web/src/shell/tokens.css:158`. The studio serves a
   desktop audience, so this one waits on a touch one.
 - **`createStep.ts` calls the canvas add controls "the palette".** The retired
   word sits at `packages/web/src/areas/studio/draft/createStep.ts:8` and `:15`.
@@ -1732,9 +1732,12 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
 - **FIELDS-3: below 64rem a short window leaves the editor a strip.** The
   rail stacks above the editor, capped at 20rem (`panels/EntityTabs.tsx:76`).
   Measured 2026-09-13: the editor pane stands 105px tall at 900x720, and 18px
-  at 420x720 with its heading cut off. No 2px rule separates the two scroll
-  regions: the rail drops its right-hand border there (`:73`). Risk (Medium):
-  the rail keeps its 20rem and the editor gets what remains.
+  at 420x720 with its heading cut off. Measured 2026-09-26 at 400x800, "+ Add
+  field" raises the FIELDS-8 banner, and the pane shrinks to 8px. The new
+  label input and its ring, 42px, then clip at both edges. No 2px rule
+  separates the two scroll regions: the rail drops its right-hand border
+  there (`:73`). Risk (Medium): the rail keeps its 20rem and the editor gets
+  what remains.
 - **FIELDS-4 (resolved by `studio-focus-ring-clipping`): the entity rail and
   the editor pane clip the focus ring.** This
   is RAIL-3 on the Fields tab. The shell's 2px ring at a 2px offset
@@ -1813,7 +1816,7 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   800 in ink (`panels/FieldCatalogPanel.tsx:254`), and none takes the Title
   role (`DESIGN.md:327`). The Remove field button
   (`panels/FieldCatalogPanel.tsx:926`) is an accent ghost
-  (`packages/web/src/shell/tokens.css:211`), and its text starts 5px right of
+  (`packages/web/src/shell/tokens.css:221`), and its text starts 5px right of
   the column's flush-left edge. Risk (Low): the field editor sets type outside
   the roles `DESIGN.md` names.
 - **FIELDS-11: a nested plugin-typed field's length check lands on another field.**
@@ -2127,7 +2130,7 @@ only the marks the miniature draws. The required count stands beside it.
   `rgb(107, 107, 107)` in dark, the browser's own button face. The form
   editor's pressed column option loses its box and weight the same way.
   - The sites are `screens/EditScreen.tsx:832`, `:1069` and `:1085`, and
-    `screens/FormEditorScreen.tsx:1235`, `:1299` and `:1315`. The rest sit at
+    `screens/FormEditorScreen.tsx:1327`, `:1397` and `:1413-1414`. The rest sit at
     `screens/VersionsScreen.tsx:263`, `screens/ToolsScreen.tsx:189`,
     `screens/PlayerScreen.tsx:336` and `screens/MigrationPlanScreen.tsx:281`.
   - Risk (Medium): the back link draws a gray box on every dark studio
@@ -2153,7 +2156,7 @@ tags are local to this section. Paths under `panels/` and `screens/` start at
   beside the 3px advisory rule. Those are the header bar's `warning` block
   (`panels/ProcessHeaderBar.tsx:62`) and the field catalog's `studioWarning`
   (`panels/FieldCatalogPanel.tsx:327`). The form editor's `studioWarning`
-  (`screens/FormEditorScreen.tsx:119`) is the third.
+  (`screens/FormEditorScreen.tsx:122`) is the third.
   - Two more 3px rules mix refusal at 55%. The checks rail draws one in
     `checksGroupHeldBack` (`panels/ChecksRail.tsx:46`). The timers panel draws
     the other in `refusal` (`panels/TimersPanel.tsx:54`).
@@ -2197,7 +2200,7 @@ Paths under `panels/` and `screens/` start at `packages/web/src/areas/studio/`.
     reach a nav button.
 - **ROW-1 (resolved by `studio-focus-ring-clipping`): the tab row clips a
   tab's focus ring at its top and bottom.** The
-  row scrolls sideways (`panels/ProcessTabRow.tsx:43`), so it clips outside
+  row scrolls sideways (`panels/ProcessTabRow.tsx:44`), so it clips outside
   its padding box. Measured at 400px, the Forms tab's ring ran from y=288 to
   335.5. The row's padding box ran from 292 to 332. Both sides of the ring
   stay, 32px clear of the edge fade. This is CHANGES-2 on the tab row. Risk
