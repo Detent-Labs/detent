@@ -5328,3 +5328,15 @@ margin pulled the "Open …" text 5px past that edge. The row's own
 ring's reach on their own. The step page's own `page` box sets no block
 padding. Its first and last controls still clear the ring, through the
 masthead's own padding and the developer section's own padding.
+
+Scroll the Checks tab's rail, the Forms tab's grid or the form editor's
+canvas partway. Stop so one control sits half hidden at the scroll
+box's near edge. Tab onto it. Pass: the box scrolls that control fully
+into view. Its ring then shows in full, clear of the edge it stopped
+at.
+
+Mouse-click that same half-hidden control instead, before it scrolls
+into view. Pass: nothing scrolls. The box stays exactly where the click
+left it. The clicked field itself may still show a ring. The helper
+`focusScroll.ts` tracks the last input modality. It skips the scroll
+after a pointer press.
