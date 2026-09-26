@@ -856,16 +856,16 @@ recorded rather than fixed. The RAIL tags are local to this section.
   Risk (Informational): a long label wraps on a wide screen and fits on a
   narrow one.
 - **A canvas removal drops keyboard focus, and nothing announces it.**
-  `deleteSelection` (`packages/web/src/areas/studio/screens/EditScreen.tsx:570`)
+  `deleteSelection` (`packages/web/src/areas/studio/screens/EditScreen.tsx:568`)
   clears the selection. The pressed control unmounts with it, so focus lands on
   `<body>` and the next Tab reaches Fit to view. Remove steps behaved this way
   before Remove step joined it. Risk: a keyboard or screen-reader user loses
   their place after every removal (WCAG 2.4.3, and 4.1.3 for the silence). The
   fix moves focus to the canvas's own tab stop, which
-  `packages/web/src/areas/studio/canvas/CanvasView.tsx:770` already reassigns,
+  `packages/web/src/areas/studio/canvas/CanvasView.tsx:767` already reassigns,
   and announces the removal in a polite live region.
 - **The canvas bar's caret menu ignores the arrow keys.** The panel carries
-  `role="menu"` (`packages/web/src/areas/studio/canvas/CanvasBar.tsx:372`), and
+  `role="menu"` (`packages/web/src/areas/studio/canvas/CanvasBar.tsx:376`), and
   ArrowDown leaves focus on its trigger. Risk: a screen reader announces a menu
   whose keys answer nothing (WCAG 4.1.2).
 - **No key takes a selected step out of the draft.** Delete and Backspace on a
@@ -913,7 +913,7 @@ recorded rather than fixed. The RAIL tags are local to this section.
   same class. Both read 4.53:1 at rest, 3.90:1 hovered and 3.45:1 pressed, in
   light.
 - **Remove step and the field catalog's Remove field trigger have no
-  destructive treatment.** `packages/web/src/areas/studio/panels/StepPage.tsx:734`
+  destructive treatment.** `packages/web/src/areas/studio/panels/StepPage.tsx:740`
   renders `btn btn-secondary` and commits at once.
   `packages/web/src/areas/studio/panels/FieldCatalogPanel.tsx:926` renders
   `btn btn-ghost` and opens `RemoveFieldDialog` instead. `DESIGN.md` asks that
@@ -961,7 +961,7 @@ recorded rather than fixed. The RAIL tags are local to this section.
     without the visible words (WCAG 2.5.3 and 1.3.1).
 - **STEP-3: three literal sizes sit off the type ramp.** The detector flagged
   them on 2026-09-14. The step page's `hint` sets written text at 0.8rem
-  (`panels/StepPage.tsx:147`). A condition row's remove glyph sets 1.1rem
+  (`panels/StepPage.tsx:153`). A condition row's remove glyph sets 1.1rem
   (`panels/shared/ConditionBuilder.tsx:53`). The header bar's name sets 1rem,
   where the Headline role asks 1.25rem (`panels/ProcessHeaderBar.tsx:34`).
   - Four more flags on the step page mark mono machine values at 0.8rem.
@@ -969,14 +969,14 @@ recorded rather than fixed. The RAIL tags are local to this section.
   - Risk (Low): type drifts outside the roles `DESIGN.md` names.
 - **STEP-4: four action lists take a JSON key as their legend.** The step
   page passes `"onEntry"`, `"onExit"` and `"onCancel"` as literal labels
-  (`panels/StepPage.tsx:519`, `:636`, `:644`). The Paths section passes
+  (`panels/StepPage.tsx:525`, `:642`, `:650`). The Paths section passes
   `"onPath"` the same way (`panels/PathsPanel.tsx:332`). Each prints in the
   written face, under a section heading that already reads "On entry" or
   "On exit". None of the four comes from the studio catalog. Risk (Low): the
   author reads a machine key in the prose face, and a UI-string override
   cannot reach it.
 - **STEP-5: a step's description takes a one-line input.** The masthead's
-  description uses `LocalizedTextInput` (`panels/StepPage.tsx:766`), which
+  description uses `LocalizedTextInput` (`panels/StepPage.tsx:772`), which
   renders an `<input>`. Measured 2026-09-24 at 1300x900, IT Offboarding's
   first step holds an 857-character description. The 944px input shows
   about a sixth of it. Risk (Low): the author edits a paragraph through a
@@ -1041,7 +1041,7 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   removal left then, and a JSON-view edit can still write today — showed
   `view ref does not resolve: field_0fb5a2c4-0022-…`, an id the author can no
   longer look up. Adding an empty field raises the banner at
-  `screens/EditScreen.tsx:836` before the author types. The banner reads
+  `screens/EditScreen.tsx:843` before the author types. The banner reads
   `Draft is not yet structurally valid — CEL, registry, duration, and cross-process checks are held back until it is (see the Zod issues below)`,
   and it pushes the page down 35px at 1400px and 99px at 900px. The messages
   come from `src/schema/definition.ts:990`, `src/schema/compile.ts:629` and
@@ -1095,8 +1095,8 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   field or on the process. The fix touches `src/`.
 - **FIELDS-12: the Checks tab opens the Fields tab without the field.** A
   check row calls `openTabFromRow(tabForIssue(issue.entityType))`
-  (`screens/EditScreen.tsx:1016`). That function takes a tab alone (`:771`),
-  and `FieldsTab` accepts no selected field (`:963`). The spec
+  (`screens/EditScreen.tsx:1023`). That function takes a tab alone (`:769`),
+  and `FieldsTab` accepts no selected field (`:970`). The spec
   `studio-process-tabs` asks for that field to open selected
   (`openspec/specs/studio-process-tabs/spec.md:209`). Risk (Medium): the
   author lands on the Fields tab and must find the field in the entity rail.
@@ -1119,12 +1119,12 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   stays harmless at 51 entries.
 - **FIELDS-15: a step or data source removal reuses its own button for the
   next entity.** `panels/DataSourcesPanel.tsx`'s `DataSourceRow` (`:161`) and
-  `screens/EditScreen.tsx`'s `<StepPage>` (`:945`) render with no `key`,
+  `screens/EditScreen.tsx`'s `<StepPage>` (`:952`) render with no `key`,
   unlike the Fields tab's own `FieldEditor`, keyed by the field's id
   (`panels/FieldCatalogPanel.tsx:1162`). A press on "Remove data source" or
   "Remove this step" therefore keeps its own button element in the DOM.
   `removeDataSource` (`panels/EntityTabs.tsx:692`) and `onRemoveStep`
-  (`screens/EditScreen.tsx:558`) each pick a neighbour, and the same button
+  (`screens/EditScreen.tsx:556`) each pick a neighbour, and the same button
   then renders that neighbour's own remove control. This is a code reading;
   no browser run has confirmed it. Risk (Medium): a second Enter or Space
   removes a neighbour with no separate confirmation.
@@ -1394,10 +1394,10 @@ only the marks the miniature draws. The required count stands beside it.
   classes and no `btn`. Its ground reads `rgb(240, 240, 240)` in light and
   `rgb(107, 107, 107)` in dark, the browser's own button face. The form
   editor's pressed column option loses its box and weight the same way.
-  - The sites are `screens/EditScreen.tsx:832`, `:1069` and `:1085`, and
-    `screens/FormEditorScreen.tsx:1327`, `:1397` and `:1413-1414`. The rest sit at
+  - The sites are `screens/EditScreen.tsx:839`, `:1076` and `:1092`, and
+    `screens/FormEditorScreen.tsx:1339`, `:1409` and `:1425-1426`. The rest sit at
     `screens/VersionsScreen.tsx:263`, `screens/ToolsScreen.tsx:189`,
-    `screens/PlayerScreen.tsx:336` and `screens/MigrationPlanScreen.tsx:281`.
+    `screens/PlayerScreen.tsx:335` and `screens/MigrationPlanScreen.tsx:281`.
   - Risk (Medium): the back link draws a gray box on every dark studio
     screen. The unpressed column option looks pressed. The fix joins the
     literal classes into the spread, as the strip's `ghost` helper does.
@@ -1407,6 +1407,17 @@ only the marks the miniature draws. The required count stands beside it.
   "Submit the Exit Notification": the canvas pane scrolls 70px sideways. The
   form tab strip inside it stands 86px wide and shows about one tab. Risk (Medium): an author on a narrow window edits a form through a
   slot 118px wide.
+- **FORMS-21: the form tab strip's open-tab mark sits clear of its own
+  divider.** `FormTabStrip.tsx`'s `tabSelected` draws an inset shadow, `inset
+  0 -2px 0` in the accent (`:80-83`). The strip's own `row` pads its block
+  axis by `focus.reach`, 4px (`:36`, `studio-focus-ring-clipping`), so the
+  mark sits 4px clear of the row's 2px bottom divider (`:41-43`) rather than
+  flush on it. `studio-focus-ring-clipping` moved the process tab row's own
+  open-tab mark to a `::after` bar flush on its divider (`ROW-1`), so the
+  studio's two tab strips now draw the open-tab mark two different ways.
+  This is a code reading; no browser run has confirmed it. Risk (Low): an
+  author sees one selection mark on the tab row and a different one on the
+  form tab strip below it.
 
 ## Open from the authoring-command-ink-advisory-role review (one OpenSpec change per screen)
 
@@ -1417,13 +1428,13 @@ tags are local to this section. Paths under `panels/` and `screens/` start at
 
 - **TONE-1: the missing-translation message takes two looks.** The step page
   draws `missingTranslationWarning` beside a 2px refusal rule, its `warning`
-  block (`panels/StepPage.tsx:134`). Three other sites draw the same message
+  block (`panels/StepPage.tsx:140`). Three other sites draw the same message
   beside the 3px advisory rule. Those are the header bar's `warning` block
   (`panels/ProcessHeaderBar.tsx:62`) and the field catalog's `studioWarning`
   (`panels/FieldCatalogPanel.tsx:327`). The form editor's `studioWarning`
   (`screens/FormEditorScreen.tsx:122`) is the third.
   - Two more 3px rules mix refusal at 55%. The checks rail draws one in
-    `checksGroupHeldBack` (`panels/ChecksRail.tsx:46`). The timers panel draws
+    `checksGroupHeldBack` (`panels/ChecksRail.tsx:52`). The timers panel draws
     the other in `refusal` (`panels/TimersPanel.tsx:54`).
   - Risk (Low): an author meets one message in two tones on one process
     surface, so the tone stops telling a warning from a refusal.
