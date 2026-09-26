@@ -855,3 +855,26 @@ system that resulted; this file explains why it took that shape.
   its own class-collision test: a compiled StyleX class cannot collide
   across areas the way a hand-written one could, so the risk the test
   guarded is gone, not merely unchecked.
+
+- **Subprocess cycles and unbounded CEL cost: SEC-1 and SEC-7 closed.** The
+  change `add-publish-cycle-check-and-cel-deadline` shipped 2026-09-23. The
+  owner ruled three points that day. A publish-time check and a runtime
+  depth cap both stay, each backing the other. A process that calls itself
+  is a cycle, and publish rejects it. CEL gets structural limits fixed at
+  authoring time, never a runtime timer.
+
+  Publish now rejects a body that reaches its own `processId` through
+  subprocess references, comparing process ids rather than versions. This
+  closes SEC-1. A `process.start` chain stays outside the check. It is
+  fire-and-forget. A loop there is a legitimate pattern, such as a yearly
+  renewal that starts next year's instance.
+
+  The spawn handler also refuses a child once its parent already sits 16
+  levels deep. That is a runtime backstop for a cycle the publish check
+  missed.
+
+  Every checked CEL site now holds a structural bound. It caps AST nodes at
+  2,000 and parse depth at 64. It nests at most two comprehension macros.
+  This closes SEC-7. The bound catches a nested-comprehension guard at
+  publish, before it ever runs. Evaluation itself keeps no wall-clock bound,
+  exactly as the owner ruled.

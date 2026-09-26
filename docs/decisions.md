@@ -713,20 +713,15 @@ build.
 
 <!-- antislop: allow trailing-negation -->
 <!-- "Decided, not yet built" quotes an existing section heading verbatim. -->
-Four items on the Prioritized Action List of
+Three items on the Prioritized Action List of
 [`openspec/changes/archive/2026-08-18-code-review-record/CODE_REVIEW.md`](../openspec/changes/archive/2026-08-18-code-review-record/CODE_REVIEW.md)
-are open, and CQ-1 is resolved. Each was re-checked against the tree on
-2026-09-09. That review holds the reasoning and the recommended fix. The
-owner decided the other five on 2026-09-23. See "Decided, not yet built"
-and "Accepted risks" above. This section records that nothing else tracks the four still open.
+are open, and CQ-1 is resolved. SEC-1 closed 2026-09-23 as
+`add-publish-cycle-check-and-cel-deadline`; see `docs/decisions-archive.md`.
+Each was re-checked against the tree on 2026-09-09. That review holds the
+reasoning and the recommended fix. The owner decided the other five on
+2026-09-23. See "Decided, not yet built" and "Accepted risks" above. This
+section records that nothing else tracks the three still open.
 
-- **SEC-1: the subprocess and chaining graph has no cycle check.** Publish-time
-  validation resolves each child and checks every `inputMapping` target
-  (`src/engine/definitions.ts:468`). No walk over the reference graph runs.
-  `validateProcessChaining` (`src/engine/definitions.ts:531`) repeats the
-  shape, and the spawn handler (`src/engine/subprocess.ts:53`) counts no hops.
-  Risk: a published reference cycle spawns instances until storage fills. The
-  oldest of the ten, and the only one the review rates High.
 - **TEST-1: nothing asserts that every route refuses an uncredentialed
   request.** Each handler carries its own `requireRole` or `requirePermission`
   call, and the route table holds 86 entries (`src/http/server.ts:554`). No
@@ -767,20 +762,13 @@ and "Accepted risks" above. This section records that nothing else tracks the fo
 
 <!-- antislop: allow trailing-negation -->
 <!-- "Decided, not yet built" quotes an existing section heading verbatim. -->
-The six findings below never reached the list above. Five are Low and one
-was Informational, DEP-2, now resolved. Each was re-checked against the
-tree on 2026-09-10, and each entry carries the anchor that holds today. The owner decided the
-other three on 2026-09-23. See "Decided, not yet built" and "Accepted
-risks" above. The five Low ones stay open.
-
-- **SEC-7: CEL evaluation has no wall-clock bound.** `evaluate`
-  runs inside `try`/`catch` at `src/cel/eval.ts:129` and `:166`, so a raise
-  reads as no match while time stays unbounded. `MAX_EXPRESSION_LENGTH` at
-  `src/schema/compile.ts:156` caps source at 4,000 characters, a bound on
-  length rather than on cost. Risk (Low): a deeply nested comprehension holds its
-  transaction's locks for the whole evaluation. Authoring needs
-  `system:developer` or `system:author`, so this is defense in depth. The
-  review prefers a publish-time complexity bound over a runtime timer.
+The five findings below never reached the list above. Four are Low and one
+was Informational, DEP-2, now resolved. SEC-7 closed 2026-09-23 as
+`add-publish-cycle-check-and-cel-deadline`; see `docs/decisions-archive.md`.
+Each was re-checked against the tree on 2026-09-10, and each entry carries
+the anchor that holds today. The owner decided the other three on
+2026-09-23. See "Decided, not yet built" and "Accepted risks" above. The
+four Low ones stay open.
 - **ARCH-2: `BINARY_ROUTES` is a hand-kept ledger.** The
   list sits at `src/http/server.ts:268`, and `test/http-disposition.test.ts`
   drives every declared entry. TEST-1 above covers the review's second
