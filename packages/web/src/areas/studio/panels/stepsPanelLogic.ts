@@ -58,7 +58,7 @@ export function nextCollaborationOverride(
   key: keyof Collaboration,
   next: boolean | undefined,
 ): Collaboration | undefined {
-  const patched = { ...(current ?? {}) };
+  const patched = { ...current };
   if (next === undefined) {
     delete patched[key];
   } else {

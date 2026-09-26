@@ -514,6 +514,38 @@ async function validateCrossProcess(
 }
 
 /**
+ * Publish-time subprocess cycle check: a depth-first walk from `body`'s
+ * subprocess steps through every child they reach, resolved as
+ * `validateCrossProcess` resolves them. Reaching `processId` again, at any
+ * version, is a cycle; the error names the chain of process ids. A grandchild
+ * that no longer resolves is skipped. `process.start` actions are not followed.
+ */
+async function validateSubprocessCycle(
+  processId: ProcessId,
+  body: ProcessBody,
+  resolvers: { resolveBody: ResolveBody; resolveLatestByContract: ResolveLatestByContract },
+): Promise<void> {
+  const visited = new Set<string>();
+  const walk = async (b: ProcessBody, chain: string[]): Promise<void> => {
+    for (const { subprocess: spec } of b.workflow.steps) {
+      if (!spec) continue;
+      const next = [...chain, spec.processId];
+      if (spec.processId === processId) throw new CrossProcessValidationError(`subprocess cycle: ${next.join(" → ")}`);
+      const child =
+        spec.versionBinding === "pinned"
+          ? { version: spec.pinnedVersion!, body: await resolvers.resolveBody(spec.processId, spec.pinnedVersion!) }
+          : await resolvers.resolveLatestByContract(spec.processId, spec.contractRef!);
+      if (!child?.body) continue;
+      const key = `${spec.processId}@${child.version}`;
+      if (visited.has(key)) continue;
+      visited.add(key);
+      await walk(child.body, next);
+    }
+  };
+  await walk(body, [processId]);
+}
+
+/**
  * Publish-time process-chaining check: every `process.start` action must
  * reference a resolvable process, and map only into that process's declared
  * fields. Unlike the subprocess check above, no `contract` is required — a
@@ -673,11 +705,13 @@ export async function publishBody(
 
   // Then subprocess wiring and process-chaining targets, against the
   // (immutable, already-validated) published processes they reference.
-  // Nothing above this point has persisted. One store instance serves both
-  // checks, so a process referenced by both a subprocess step and a
-  // process.start action resolves from one cache, not two.
+  // Nothing above this point has persisted. One store instance serves every
+  // check below, so a process referenced by a subprocess step, a
+  // process.start action, or an instance query/transition target resolves
+  // from one cache, not several.
   const definitionStore = createDefinitionStore(db);
   await validateCrossProcess(body, definitionStore);
+  await validateSubprocessCycle(processId, body, definitionStore);
   await validateProcessChaining(body, definitionStore);
   await validateGroupScope(body, processId, db);
   const findings = [

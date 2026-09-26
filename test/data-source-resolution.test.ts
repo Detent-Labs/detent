@@ -471,7 +471,6 @@ test.skipIf(!DB)("a person field declaring a dataSource still resolves through t
   const dsReg = createDataSourceRegistry();
   dsReg.set("static", { resolve: async (ctx) => (ctx.config as { options: typeof COUNTRY_OPTIONS }).options });
   const { groupId } = await seedGroup("Finance", ["p5@example.com"]);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const body = personBody([groupId], { dataSource: "ds_people" }) as any;
   body.dataSources = [{ id: "ds_people", key: "people", type: "static", config: { options: COUNTRY_OPTIONS } }];
   await publishBody(PERSON_PID, body as ProcessBody, reg, dsReg);
@@ -556,7 +555,6 @@ test.skipIf(!DB)("the same default on a field the initial view does NOT show cre
   // person field, so no membership check runs there (design.md Decision 8).
   const { groupId } = await seedGroup("Finance", ["pc@example.com"]);
   const outsider = await createUser("pd@example.com", "pw", []);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const body = personBody([groupId]) as any;
   body.fields[2].default = outsider.userId; // field_hidden, absent from step_a's view
   const dsReg = createDefaultDataSourceRegistry();

@@ -106,7 +106,7 @@ bun install
 DATABASE_URL=postgres://postgres:postgres@db:5432/workflow_engine bun test   # bun:test suites
 bun run typecheck                                                            # tsc --noEmit (Bun does not typecheck)
 bun run build                                                                # vite build, the frontend's production bundle
-bun run check                                                                # typecheck, build, the suite, then the timezone test
+bun run check                                                                # lint, typecheck, build, the suite, then the timezone test
 ```
 
 Set `DATABASE_URL`. The database-backed suites carry `test.skipIf(!DATABASE_URL)`
@@ -122,8 +122,8 @@ infrastructure, on every push and every pull request. GitHub hosts it
 for free, since this repository is public.
 
 `.githooks/pre-push` still runs locally, first. It runs `bun run check`
-in the dev container. The typecheck, the build, and the suite must all
-pass. Only then does the push proceed.
+in the dev container. The lint, the typecheck, the build, and the suite
+must all pass. Only then does the push proceed.
 
 The `bun install` above arms it: the root
 `prepare` script runs `scripts/enable-hooks.sh`, which points

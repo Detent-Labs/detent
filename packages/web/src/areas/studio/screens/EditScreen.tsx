@@ -375,7 +375,6 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
   useEffect(() => {
     onDirtyChange?.(dirtyNow);
     return () => onDirtyChange?.(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dirtyNow]);
 
   // The canvas-wide edge style shares the `layout` blob with node positions.
@@ -427,7 +426,7 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
 
   const onWaypointsChange = (pathId: string, points: Point[]) => {
     setSaveState((s) => {
-      const next = { ...((s.layout.waypoints as Record<string, Point[]> | undefined) ?? {}) };
+      const next = { ...(s.layout.waypoints as Record<string, Point[]> | undefined) };
       // An empty list leaves no key behind: a path with no waypoints reads
       // identically whether the key is absent or empty, and the absent form
       // keeps a reset from growing the blob.
@@ -483,7 +482,6 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
     if (stepId === undefined) return;
     onSelectStep(steps.some((s) => s.id === stepId) ? stepId : undefined);
     navigate({ name: "edit", processId }, { replace: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stepId]);
 
   // The whole set at once: a shift-click's toggle and a marquee's release. A
@@ -600,7 +598,7 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
    * than two separate `setSaveState` calls. */
   const onInsertLayoutWrite = (stepId: string, point: Point, splitPathId: string) => {
     setSaveState((s) => {
-      const nextWaypoints = { ...((s.layout.waypoints as Record<string, Point[]> | undefined) ?? {}) };
+      const nextWaypoints = { ...(s.layout.waypoints as Record<string, Point[]> | undefined) };
       delete nextWaypoints[splitPathId];
       return { ...s, layout: { ...s.layout, [stepId]: point, waypoints: nextWaypoints } };
     });
@@ -776,7 +774,6 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
   useEffect(() => {
     if (pendingTabFocus === openTab) focusTabButton(openTab);
     setPendingTabFocus(undefined);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openTab]);
   // What the Checks tab narrows to, resolved from the step the badge named.
   // A step the draft no longer holds narrows nothing: the filter drops rather

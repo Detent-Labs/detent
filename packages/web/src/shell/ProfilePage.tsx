@@ -122,7 +122,6 @@ export function ProfilePage({ token, locale, onSaved, onUnauthorized }: ProfileP
     };
     // `locale` seeds the picker only for an account that never chose one, and a
     // language change mid-page must not refetch and discard a typed name.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, failLoad]);
 
   const submit = async (current: ProfileEdits) => {
