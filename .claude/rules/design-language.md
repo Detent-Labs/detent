@@ -122,8 +122,10 @@ button wider than its text. A disabled action drops to 45% opacity.
 
 Focus always shows as a 2px accent ring at 2px offset. A field draws it at 0
 offset, and a grid cell at -2px. A scroll box pads by the ring's reach, its
-width plus its offset, so the ring shows in full. A destructive action stays
-outlined in the accent and never turns red.
+width plus its offset, so the ring shows in full. It also sets that same
+reach as its scroll padding. A focus scroll mid-box therefore stops with
+the ring's full reach still clear of the box edge. A destructive action
+stays outlined in the accent and never turns red.
 
 A row of secondary commands in the studio takes the authoring command: a
 ghost button in slate, mono at 11px. So does a form card's single open

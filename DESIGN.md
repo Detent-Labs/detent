@@ -493,6 +493,9 @@ mono face and the stamp, never from the control itself.
 - **Focus:** a 2px accent outline at 2px offset, on every focusable thing. A
   field draws it at 0 offset, and a grid cell at -2px. A scroll box pads by
   the ring's reach, its width plus its offset, so the ring shows in full.
+  It also sets that same reach as its scroll padding. A focus scroll
+  mid-box therefore stops with the ring's full reach still clear of the
+  box edge.
 - A label sits flush left in any button wider than its own text.
 
 A row of secondary commands in the studio takes the authoring command. A
