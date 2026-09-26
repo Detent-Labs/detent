@@ -237,7 +237,7 @@ export function PluginEnvelopeEditor({
   const useGeneratedForm = !useCustomEditor && descriptorList !== undefined && !showRawJson;
 
   const setConfigField = (key: string, fieldValue: unknown) => {
-    const config = { ...((value?.config as Record<string, unknown> | undefined) ?? {}), [key]: fieldValue };
+    const config = { ...(value?.config as Record<string, unknown> | undefined), [key]: fieldValue };
     onChange({ ...value, type: currentType, config });
     setConfigText(JSON.stringify(config, null, 2));
   };

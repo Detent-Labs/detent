@@ -106,7 +106,6 @@ export function DraftProvider({ children, initial, token }: { children: ReactNod
       setLoadedChainingTargets(syncLoadedTargets(currentSites, chainingBodyCache.current));
     });
     setLoadedChainingTargets(syncLoadedTargets(sites, chainingBodyCache.current));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft, token]);
 
   const usedLocales = useMemo(() => collectUsedLocales(draft), [draft]);

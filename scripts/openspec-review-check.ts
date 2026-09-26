@@ -136,10 +136,11 @@ function checkDesign(designText: string, findings: Finding[]): void {
 
 async function runOpenspecValidate(name: string, findings: Finding[]): Promise<void> {
   try {
+    // Telemetry off: outside CI the CLI posts to edge.openspec.dev, and a slow
+    // DNS answer keeps the process alive past test/openspec-review-check.test.ts's
+    // 5 s timeout. CI already disables it through the CI variable.
     const proc = Bun.spawn(["openspec", "validate", name, "--strict", "--json"], {
       cwd: REPO_ROOT,
-      // The CLI's telemetry flush stalls about 9.5 s on every other run in the
-      // devcontainer, past the test suite's 5 s per-test timeout.
       env: { ...process.env, OPENSPEC_TELEMETRY: "0" },
       stdout: "pipe",
       stderr: "pipe",

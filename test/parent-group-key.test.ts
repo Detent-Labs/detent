@@ -9,7 +9,6 @@
 import { describe, it, expect } from "bun:test";
 import { parentGroupKeyById, type FieldDef, type FieldId } from "../src/schema/definition.js";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const fld = (over: any): FieldDef => ({ label: { en: "X" }, type: "string", ...over }) as FieldDef;
 
 describe("parentGroupKeyById", () => {

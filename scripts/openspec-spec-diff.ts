@@ -58,7 +58,7 @@ function extractRenames(specText: string): Map<string, string> {
   let from: string | null = null;
   for (const line of specText.split("\n")) {
     if (/^## RENAMED Requirements\s*$/.test(line)) { inBlock = true; from = null; continue; }
-    if (/^## /.test(line)) { inBlock = false; continue; }
+    if (line.startsWith("## ")) { inBlock = false; continue; }
     if (!inBlock) continue;
     const fromMatch = line.match(/^-\s*FROM:\s*`?### Requirement: (.+?)`?\s*$/);
     if (fromMatch) { from = normalizeHeading(fromMatch[1]); continue; }
@@ -76,7 +76,7 @@ export function extractRequirements(specText: string): RequirementEntry[] {
   for (let i = 0; i < lines.length; i++) {
     const kindMatch = lines[i].match(/^## (ADDED|MODIFIED|REMOVED) Requirements\s*$/);
     if (kindMatch) { kind = kindMatch[1] as RequirementEntry["kind"]; continue; }
-    if (/^## /.test(lines[i]) && !kindMatch) kind = null;
+    if (lines[i].startsWith("## ") && !kindMatch) kind = null;
     const reqMatch = lines[i].match(/^### Requirement: (.+)$/);
     if (reqMatch && kind) {
       const title = normalizeHeading(reqMatch[1]);

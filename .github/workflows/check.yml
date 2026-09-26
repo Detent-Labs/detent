@@ -84,6 +84,17 @@ jobs:
           . scripts/worktree-env.sh
           docker compose -f .devcontainer/docker-compose.yml exec -T -w /workspace app bun install
 
+      # bun audit needs the registry. `check` runs in the pre-push hook, and
+      # a push must not fail when the registry is down. That is why this
+      # step stays in CI and out of `bun run check`. To excuse an advisory
+      # with no fixed release, add `--ignore=GHSA-...` here, one id at a
+      # time, with a comment naming the package and the reason. None is
+      # excused today.
+      - name: bun audit
+        run: |
+          . scripts/worktree-env.sh
+          docker compose -f .devcontainer/docker-compose.yml exec -T -w /workspace app bun audit --audit-level=high
+
       # No pipe into tee: `cmd | tee` returns tee's exit status, not bun's,
       # the same reason .githooks/pre-push captures this way.
       - name: bun run check

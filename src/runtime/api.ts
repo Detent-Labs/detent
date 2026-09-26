@@ -1402,7 +1402,7 @@ export async function submitAndTransition(
     // operator's data, not theirs. Before the commit, so a guard on the
     // outgoing path reads the mapped value.
     const mapped = applyColumnMapping(resolved, submitted, new Map(collectFieldsDeep(body.fields).map((f) => [f.id as string, f])));
-    const patch = Object.keys(mapped.writes).length > 0 ? { ...(data ?? {}), ...mapped.writes } : data;
+    const patch = Object.keys(mapped.writes).length > 0 ? { ...data, ...mapped.writes } : data;
     // The drops share the seq the entry lands on, the way
     // `assignment.unresolved` already does for an event accompanying a hop.
     const events = droppedAttributeEvents(mapped.dropped, instance.instanceId, instance.version, instance.transitionSeq + 1);

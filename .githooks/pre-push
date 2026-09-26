@@ -4,8 +4,8 @@
 #   1. the host gates      — need only git and a shell, so a stopped container
 #                            still reports them, and they cost milliseconds
 #   2. the preflight       — refuses the push when the devcontainer is down
-#   3. the container gates — `bun run check` (typecheck, then the full suite)
-#                            plus the two gates that need Bun
+#   3. the container gates — `bun run check` (lint, then typecheck, then the
+#                            full suite) plus the two gates that need Bun
 #
 # Stage 3 runs INSIDE the devcontainer, never on the host — see CLAUDE.md's
 # Conventions. DATABASE_URL is already set there, so the DB-backed suites run
