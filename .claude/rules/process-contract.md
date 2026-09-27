@@ -5,315 +5,342 @@ paths:
   - "src/cel/**"
   - "src/runtime/**"
   - "src/handlers/**"
+  - "src/validate.ts"
   - "packages/web/src/areas/studio/**"
+  - "packages/form-ui/**"
   - "openspec/**"
   - "examples/**"
   - "docs/authoring-guide.md"
 ---
 
-<!-- antislop: allow-file em-dash passive-voice sentence-length run-ons -->
 # The definition contract: load-bearing rules
 
-JSON is the one artifact; the Zod schemas (with TS types derived via z.infer)
-are the definition contract. All of the following are facts the engine and
-studio must uphold, not open questions. The root `CLAUDE.md` carries the short
-form. `contract` alone names the `ProcessContract` a subprocess declares, the
-subject of the "Subprocesses" section below, never this document's subject.
+JSON is the one artifact. The Zod schemas, with TS types derived via
+`z.infer`, are the definition contract. `CLAUDE.md`'s "The definition
+contract in brief" states the short form of every section below. This
+file gives the full version. The word `contract` alone names the
+`ProcessContract` a subprocess declares. That is the subject of the
+"Subprocesses" section below, never this document's own subject.
 
-**Identity.** Every entity has an opaque `id` (UUIDv4 with a type prefix, e.g.
-`step_...`, lowercase, immutable) which is the SOLE reference anchor. `key` is a
-human-readable slug that references nothing and may change. `label` is display
-text. Cross-references and persisted instance state use `id` only. Ids are unique
-per entity kind per process. Runtime ids (instance `inst_`, history `hist_`, event
-`evt_`) are minted by the engine via `crypto.randomUUID()` — UUIDv4, not v7. The
-id schemas enforce the prefix only, not the UUID form. UUIDv7 was the original
-intent (lexically time-sortable ids would let history and events order without
-reading `at`); nothing depends on that ordering today, so it stays v4 until
-something does. Do not restate v7 as a current fact. Because only the prefix is
-enforced, the two subprocess examples deliberately use readable ids
-(`proc_credit_check`, `step_...`) for legibility — that is a documentation
-convenience, not the authoring convention; `expense-approval.json` shows the real
+**Identity.** Every entity has an opaque `id`: UUIDv4 with a type prefix
+(for example `step_...`), lowercase, and immutable. The `key` is a
+human-readable slug that may change. It has two readers. CEL reads a
+field as `data.<key>`. A view entry's `group` names a group field's
+`key`, and its `tab` names a key in the same view's `tabs`. The `label`
+is display text. Stored references and persisted instance state use
+`id` only. Ids are unique per entity kind per process.
+
+The engine mints runtime ids (instance `inst_`, history `hist_`, event
+`evt_`) via `crypto.randomUUID()`, which produces UUIDv4. The id schema
+checks only the prefix, so nothing constrains the UUID version
+underneath. Because the schema checks only the prefix, the two
+subprocess examples deliberately use readable ids (`proc_credit_check`,
+`step_...`) for legibility. That is a documentation convenience rather
+than the authoring convention. See `expense-approval.json` for the real
 one.
 
-**Hashing / versioning.** `definitionHash` is the JCS (canonical JSON) hash of
-`ProcessBody` only; the versioned wrapper is not hashed, so identical bodies get
-identical hashes and an identical re-publish is a no-op. Published versions are
-immutable. Instances pin `{ processId, version, definitionHash }` and rehydrate
-against exactly that frozen body. A version cannot be deleted while an instance
-references it. Migration is explicit (pin-by-default); it applies as one rule to
-all instances on a version, never per-instance editing.
+**Hashing / versioning.** `CLAUDE.md`'s brief states `definitionHash`,
+immutability, and the instance pin. See it for the short form. The JCS
+hash covers `ProcessBody` only. Hashing skips the versioned wrapper, so
+identical bodies get identical hashes and a re-publish of one is a no-op.
+An instance rehydrates against exactly the frozen body its pin names.
+Nothing deletes a published version.
 
-**Expressions.** All conditions are CEL, carried as `{ lang: "cel", src }`. CEL
-is pure, total, and has no `now()`; time lives only in timers. Guards read the
-frozen context: `data`, `instance`, `actor`, plus `child.outcome`/`child.data`
-inside a subprocess step. A declared data source is not a readable CEL namespace —
-a CEL reference to one is a publish error (the engine resolves none). One extra namespace,
-`result` (a handler's structured return), is scoped ONLY to an Action.output
-mapping and is never visible to guards. Use ONE CEL library for both the studio
-(parse) and the engine (evaluate) so there is no semantic drift.
+A new optional `ProcessBody` key always uses `.optional()` instead of
+`.default()`. The `canonicalize()` function drops an undefined key, so an
+older body keeps its `definitionHash`. That rule does not reach a record
+outside `ProcessBody`; the instance `kind` field, for example, still
+defaults. Migration is explicit and pin-by-default: one rule applies to
+every instance on a version, with no per-instance editing. A migration's
+`transforms` entries read `data` from the source catalog and `instance`
+only, and the environment withholds `result`, `child`, data sources, and
+`actor`.
 
-A guard is total: a runtime error is not a match, not a throw. The most
-common cause is a field the instance has not written yet. The path is not
-taken (the wait-state idiom). `@marcbachmann/cel-js` pins an exact version in
-`package.json` (no caret). An evaluation-semantics change in the library
-must not silently reroute or park an already-published, immutable body. An
-upgrade is a deliberate, reviewed commit that re-runs `test/cel.test.ts`,
-never an incidental `bun update`.
+**Expressions.** `CLAUDE.md`'s brief covers CEL's shape, purity, and total
+evaluation. This section states where each namespace is visible. Guards
+read the frozen context: `data`, `instance`, `actor`, plus
+`child.outcome`/`child.data` inside a subprocess step. A declared data
+source is not a readable CEL namespace. A CEL reference to one is a
+publish error, since the engine resolves none. One extra namespace,
+`result` (a handler's structured return), is scoped only to an
+`Action.output` mapping and stays invisible to guards. Use one CEL
+library for both the studio (parse) and the engine (evaluate), so the two
+cannot drift apart on semantics.
 
-A subprocess `inputMapping`/`outputMapping` entry now agrees with that rule
-instead of contradicting it. A raising entry leaves its target unwritten. It
-does not fail the spawn or the return (see "Runtime record" below,
-`mapping.entry-dropped`). `Action.output`'s own map is the one exception, on
-purpose: it reads only `result`. A raise there means the handler's return
-does not match the action's contract. That is worth failing loudly on, not
-an unset optional field.
+A raising guard means no match. It is never a throw, a park, or an error
+surfaced to a participant. The most common cause is a field the instance
+has not written yet. The instance then waits at that path, the wait-state
+idiom, since nothing matched.
 
-**Data vs presentation.** Fields are defined once in a process-wide catalog.
-Each step carries a flat `view` whose entries either reference a catalog
-field, overriding its per-step presentation (visible / required / readonly /
-span / tab / validation / validationMode), or stand alone as a note (`text`,
-plus visible / span / group / tab — no field underneath, so no required,
-readonly or validation). A field entry's `group` is not a per-step override:
-it must repeat the catalog's own parent group, or stay empty for a field the
-catalog holds at the top level. There is no `order` key; the array position
-is the order, and
-`FieldForm.tsx` renders in declaration order. The instance
-payload is a flat object keyed by `fieldId`, stable across the whole
-lifecycle. Requiredness lives only in the view, never in the catalog.
-`FieldDef.technical` refines that rule rather than breaching it: it is a
-catalog-level fact that forces `required: false, readonly: true` on every
-step, and a view entry naming a technical field may declare neither key at
-all. Ordinary, per-step requiredness stays exactly where it was.
+The library `@marcbachmann/cel-js` pins an exact version in
+`package.json`, with no caret. An upgrade is a deliberate, reviewed
+commit that re-runs `test/cel.test.ts`. An evaluation-semantics change in
+the library must not silently reroute or park an already-published,
+immutable body.
 
-**Redaction marker.** `FieldDef.redactable` marks a field's historical values
-eligible for erasure. The instance audit log's redaction path clears a
-redactable field across its whole history and leaves every other field
-untouched. Nothing else reads the flag: not a CEL type-check, not view
-resolution, not another publish-time rule. A `redactable` field must not be
-`type: "group"`, a write-path check (`compile.ts::checkRedactableFields`).
-`redactable` and `technical` are independent. A declared `redactable: false`
-is a key in the canonical JSON, distinct from an absent key.
+A subprocess `inputMapping`/`outputMapping` entry follows the same
+total-evaluation rule. A raising entry leaves its target field unwritten.
+It does not fail the spawn or the return; see "Runtime record" below,
+`mapping.entry-dropped`. The `Action.output` map is the one exception: it
+reads only `result`. A raise there means the handler's return does not
+match the action's contract. That fails loudly rather than leaving an
+optional field unset.
 
-**Field semantics.** A `FieldDef` declares `type`, the value form. It may add
-`format` (the semantics over that form) and `control` (the input widget).
-`definition.ts::ALLOWED_BY_TYPE` is the one table of allowed pairs per type.
-The publish-time check reads it (`compile.ts::checkFieldFormatControl`), the
-one reader in `src/`. A plugin envelope has no row there, so a plugin-typed
-field may declare neither key. `format` is read at runtime too, by
-`typeMatches` and by `celType`; `control` is read by the form renderer and by
-three studio files, which size a canvas card row, label a field kind and
-detect a kind change.
+**Data vs presentation.** The catalog defines each field once,
+process-wide. Each step carries a flat `view`. Its entries either
+reference a catalog field or stand alone as a note. A field entry
+overrides the field's per-step presentation: visible, required,
+readonly, span, tab, validation, or validationMode.
+
+The discriminant is `kind`. A note carries `kind: "note"` and adds
+`text`, plus visible / span / group / tab. A note has no field
+underneath. It takes no required, readonly, or validation key. A field
+entry has no `kind` at all (`definition.ts:727-755`).
+
+A field entry's `group` is not a per-step override. It must repeat the
+catalog's own parent group. A field the catalog holds at the top level
+leaves `group` empty.
+
+There is no `order` key; the array position is the order, and
+`FieldForm.tsx` renders in declaration order. The instance payload is a
+flat object keyed by `fieldId`, stable across the whole lifecycle.
+Requiredness lives only in the view, never in the catalog. The
+`FieldDef.technical` flag refines that rule rather than breaching it: it
+forces `required: false, readonly: true` on every step. A view entry
+naming a technical field may declare neither key at all. Ordinary,
+per-step requiredness stays exactly where it was.
+
+**Redaction marker.** `FieldDef.redactable` marks a field's historical
+values eligible for erasure. The instance audit log's redaction path
+clears a redactable field across its whole history and leaves every
+other field untouched. No other reader looks at the flag: not a CEL
+type-check, not view resolution, and not another publish-time rule. A
+`redactable` field must not be `type: "group"`, enforced as a write-path
+check (`compile.ts::checkRedactableFields`). `redactable` and
+`technical` are independent. A declared `redactable: false` is a key in
+the canonical JSON, distinct from an absent key.
+
+**Field semantics.** A `FieldDef` declares `type`, the value form. It may
+add `format` (the semantics over that form) and `control` (the input
+widget). The table `definition.ts::ALLOWED_BY_TYPE` lists every allowed
+pair per type. The publish-time check reads it
+(`compile.ts::checkFieldFormatControl`), the one reader of that table in
+`src/`. A plugin envelope has no row there, so a plugin-typed field may
+declare neither key.
+
+The key `format` has readers beyond the publish check: `typeMatches`,
+`celType`, and `src/runtime/fields.ts` (person options). The
+`org.actor-from-field` check in `compile.ts` reads it too. The key
+`control` has three readers: the form renderer, `definition.ts::fieldKindOf`,
+and several studio files. Those studio files size a canvas card row,
+label a field kind, and detect a kind change.
 
 The studio has no format picker and no control picker. Its kind picker
-(`FieldCatalogPanel.tsx::KindPicker`) writes whole `{type, format, control}`
-triples from `definition.ts::FIELD_KINDS`, a curated sixteen of the
-twenty-five combinations `ALLOWED_BY_TYPE` admits.
+(`FieldCatalogPanel.tsx::KindPicker`) writes whole `{type, format,
+control}` triples from `definition.ts::FIELD_KINDS`. That table curates
+sixteen of the twenty-five combinations `ALLOWED_BY_TYPE` admits.
 
-`FieldDef.columnMapping` maps a data source column key onto another catalog
-field. The engine resolves the picked option, checks the attribute against the
-target's declared type, and writes a match. Its bounds live in
+The field `FieldDef.columnMapping` maps a data source column key onto
+another catalog field. The engine resolves the picked option and checks
+the attribute against the target's declared type. Its bounds live in
 `compile.ts::checkColumnMapping`. The field needs a `dataSource` and
-`type: "string"`, and each key matches the field-key grammar and length bound.
-Each target resolves, and is neither a group nor the mapping field itself; no
-two keys name one target. Publishing reads no data list, so a key naming no
-declared column publishes and writes nothing at runtime.
+`type: "string"`. Each key matches the field-key grammar and length
+bound. Each target resolves, and is neither a group nor the mapping
+field itself.
 
-**View layout.** `View.columns` and `ViewField.span` are layout only, each `1`
-or `2`, absent meaning 1. Neither reaches a guard, a CEL context or a
-submission check. The renderer clamps a span to `min(span, columns)`. A span
-wider than the grid draws narrow, never a publish error. Both keys are optional
-unions in `definition.ts`, which also deserializes stored bodies, so a body
-written before them keeps its `definitionHash`.
+No two keys name one target. Publishing reads no data list, so a key
+naming no declared column publishes and writes nothing at runtime. A
+mismatch between the resolved value and the target field's declared type
+makes the engine drop it. The submission still succeeds, and
+`datasource.attribute-dropped` records the drop.
 
-`View.tabs` and an entry's own `tab` are layout the same way. `tabs` is an
-ordered array of `{ key, label }`; an entry's `tab` names one member's `key`,
-exactly as `group` already names a group field's `key`. Neither reaches a
-guard, a CEL context or a submission check, and a required field on any tab
-stays required. Both are optional, so a body written before them keeps its
-`definitionHash`. Five rules in `definition.ts`'s `view` superRefine hold the
-tab/field/group hierarchy together — see `authoring-invariants.md`.
+**View layout.** `View.columns` and `ViewField.span` are layout only,
+each `1` or `2`, absent meaning 1. Neither reaches a guard, a CEL context
+or a submission check. The renderer clamps a span to
+`min(span, columns)`. A span wider than the grid draws narrow, a
+rendering rule rather than a publish error. Both keys are optional, per
+the hash-stability rule under "Hashing / versioning" above.
 
-**View validation override.** A `ViewField` may override the catalog field's
-`validation`, the same shape `FieldDef.validation` carries. `validationMode`
-says how the two combine. `"merge"`, the default when `validation` is present,
-overlays the step's keys on the catalog's. `"replace"` drops the catalog value
-whole. A `validationMode` without `validation`, and a `validation` with no key
-set, both fail to parse — two Zod refinements on `viewField` itself.
+The keys `View.tabs` and an entry's own `tab` are layout the same way.
+`tabs` is an ordered array of `{ key, label }`. An entry's `tab` names
+one member's `key`, exactly as `group` already names a group field's
+`key`. Neither reaches a guard, a CEL context or a submission check, and
+a required field stays required on every tab. Both keys are optional,
+per the same hash-stability rule. Five rules in `definition.ts`'s `view`
+superRefine hold the tab/field/group hierarchy together; see
+`authoring-invariants.md`.
+
+**View validation override.** A `ViewField` may override the catalog
+field's `validation`, the same shape `FieldDef.validation` carries.
+`validationMode` says how the two combine. `"merge"`, the default when
+`validation` is present, overlays the step's keys on the catalog's.
+`"replace"` drops the catalog value whole. A `validationMode` without
+`validation`, and a `validation` with no key set, both fail to parse: two
+Zod refinements on `viewField` itself.
 
 **Actions and triggers.** Actions are declarative handler references
-(`{ type, config }`), never inline code. Triggers are ordered: onExit(source),
-then onPath, then onEntry(target). State is committed first, side effects
-dispatched after via a transactional outbox (at-least-once). Idempotency +
-at-least-once = effectively-once; the default idempotency key is a deterministic
-(UUIDv5) hash of instanceId + transitionSeq + actionId. `transitionSeq` is
-monotonic per instance and doubles as the optimistic-concurrency token. Action
-results are written back into `data` via `Action.output` (keyed by target
-FieldId, value CEL over `result`); the handler returns, the engine writes.
-Timers are first-class on the step; fire time is computed at entry and persisted.
-A timer-forced transition bypasses its target path's guard.
+(`{ type, config }`), never inline code. Triggers run in order:
+`onExit(source)`, then `onPath`, then `onEntry(target)`. `CLAUDE.md`'s
+brief states the commit-then-dispatch outbox order; see it for the short
+form. The default idempotency key is a deterministic UUIDv5 hash of
+`instanceId + transitionSeq + actionId`. The `transitionSeq` counter is
+monotonic per instance and doubles as the optimistic-concurrency token.
 
-Before an `Action.output` value lands in `data`, the outbox checks it against
-the target field's declared type — the same rule a participant's own
-submission faces. A mismatching entry is dropped, not written, and named in
-the `ActionOutcome`'s `droppedTargets`. The delivery still counts as
-succeeded, since the side effect already happened. Delivery itself is
-bounded by the outbox's own deadline, derived from its claim lease, no
-matter what the handler does. One hung delivery cannot stop the worker.
+Action results write back into `data` via `Action.output`, keyed by
+target `FieldId` and valued by a CEL expression over `result`. The
+handler returns. The engine performs the write. Timers are first-class
+on the step; the engine computes fire time at entry and persists it. A
+timer-forced transition bypasses its target path's guard.
 
-**Paths.** A path has `trigger: manual | automatic` and an optional `guard`.
-A step's paths must be all-manual or all-automatic, never mixed. Among two or
-more automatic paths, `priority` is required and unique (lower evaluated first,
-first matching guard wins). A guardless automatic path is the default/else and
-must have the highest priority; a wait-state has no default (no match = wait,
-bounded by a timer). Gated side effects are modeled as a visible wait-state with
-result-driven automatic paths, not hidden transaction semantics. `Path.key`
-must be non-empty after trimming, and `Path.label` is required and must be
-non-empty after trimming, for a path of either trigger kind. `Path.key` stays
-format-free, exempt from the CEL-identifier grammar `FieldDef.key` carries —
-nothing reads a path key as a CEL variable. `Path.label` is a plain,
-non-localized string, but it is rendered to a process participant:
-`PathButtons.tsx` uses it as a manual path's submit-button text.
+The flag `ActionOutcome.suppressed` marks a delivery whose whole
+writeback the engine withheld. The instance was not running, or had
+migrated, by the time the action's result arrived. Before an
+`Action.output` value lands in `data`, the outbox separately checks each
+entry against its target field's declared type, the same rule a
+participant's own submission faces. The outbox drops a mismatching entry
+rather than writing it, and names it in the `ActionOutcome`'s
+`droppedTargets`. The delivery still counts as succeeded, since the side
+effect already happened. The outbox's own deadline, derived from its
+claim lease, bounds delivery itself, whatever the handler does. One hung
+delivery cannot stop the worker.
 
-**Subprocesses.** Call-and-return via a `subprocess` step (a wait-state). A
-process used as a subprocess declares a `ProcessContract` (input fields, output
-fields, and an enumerated set of `outcomes`). Terminal steps bind to an
-`outcome`; callers guard on `child.outcome`, never on the child's internal step
-id or key. Default binding is `latest-at-spawn` pinned by `contractRef` (a hash
-of the child contract the parent validated against): a contract change starts a
-new signature, so existing callers keep the newest matching child and do not
-silently adopt the change. This pins the interface while the implementation
-floats.
+**Paths.** A path has `trigger: manual | automatic` and an optional
+`guard`. `authoring-invariants.md` states the all-manual-or-all-automatic
+rule and the priority-uniqueness rule; this section states only their
+runtime meaning. Among automatic paths, the lowest `priority` evaluates
+first, and the first matching guard wins. A wait-state has no default:
+no match means the instance waits, bounded by a timer. A gated side
+effect takes the shape of a visible wait-state with result-driven
+automatic paths, instead of hidden transaction semantics.
 
-**Extensibility.** Custom actions, guards, data sources, assignment strategies,
-and field types are plugins behind a uniform envelope `{ type, config }`. The
-core validates only the envelope; each plugin ships its own JSON Schema.
-`Step.assignment.strategy.type` resolves through its own `AssignmentRegistry`
-(`registry.ts`), a third sibling beside the action `Registry` and the
-`DataSourceRegistry`; `"static"` is a registered entry there — the type an
-author gets by default; `org.manager-of-starter`, `org.group-members` and
-`org.actor-from-field` also ship — not a literal any engine code compares
-against. An entry declares a candidate resolver
-(`(ctx) => Promise<string[]>`, async even for `static`, over the narrow context
-`{ config, stepId, instance: { id, startedBy, data }, db }`) and may declare a
-config schema. `db` is the instance's OWN database, and it is required: under
-multi-tenancy a handle bound when the registry was built would resolve every
-tenant's manager against one directory. The same rule holds for a handler
-(`HandlerContext.db`) and a data source (`DataSourceContext.db`). The
-registry maps `type -> { config schema }` (`registry.ts`,
-`HandlerDef.configSchema`) and is validated at PUBLISH time: `publishBody`
-calls `validateReferences` (`src/validate.ts`), which resolves every action's
-`type` against a supplied `RegistryDescription` via `resolveType`, and, when
-the caller supplies a live registry (only `publishBody` does), parses the
-action's `config` against the handler's declared `configSchema` via
-`checkConfigOnly` (both in `src/engine/registry-check.ts`) — an unknown type
-or a schema-violating config is a publish error (`RegistryValidationError`,
-carrying every located issue), never a runtime one. Every action position is
-covered — `onEntry`, `onExit`, `onCancel`, each path's `onPath`, each timer's
-`onFire.actions` — the same five positions the CEL check visits.
-`validateReferences` is invoked **before** CEL and cross-process validation,
-on the compiled body, after the hash-hit no-op return — same placement rule
-as the other publish-time checks, so a body published before a handler was
-registered (or before its `configSchema` tightened) is not retroactively
-rejected on identical re-publish. `checkActionRegistry` still exists,
-exported with its existing `(body, registry)` signature, as the combined
-wrapper over both halves for a caller wanting one call — `publishBody` no
-longer calls it directly. A handler with no declared `configSchema` accepts
-any `config` (opt-in strictness). The reserved `core.` prefix
-(`SPAWN_ACTION_TYPE`/`RETURN_ACTION_TYPE`) is exempt from the
-registry-resolution check — those types are dispatched internally by
-`subprocess.ts`, never through this author-facing registry, and are
-separately rejected in *authored* bodies by the existing Zod refinement in
-`authoredProcessBody`. That exemption does not extend to an assignment
-strategy: no internal dispatch reaches one, so a `core.` type there is an
-unknown type like any other. `checkAssignmentRegistry` and
-`checkDataSourceRegistry` are the matching combined wrappers, each still
-exported with its own existing signature; `publishBody` reaches the same
-verdicts indirectly, through `validateReferences`'s own `resolveType`/
-`checkConfigOnly` calls against each dimension's own registry, at the same
-placement, throwing `AssignmentRegistryValidationError` /
-`DataSourceRegistryValidationError`. Data sources are never
-inlined; fields bind to them by id and options resolve at runtime.
+The key `Path.key` must be non-empty after trimming, for either trigger
+kind. The label `Path.label` must also be non-empty after trimming. The
+key stays format-free, unlike `FieldDef.key`'s CEL-identifier grammar:
+nothing reads a path key as a CEL variable. The label is plain and
+non-localized. A participant still sees it, though: `PathButtons.tsx`
+uses it as a manual path's submit-button text.
 
-`org.group-members`, one of the three org-aware assignment strategies, adds a
-third, DB-resolving publish-time check beside `validateCrossProcess` and
-`validateProcessChaining`: for every entry in the body's own `allowedGroups`,
-`publishBody` confirms a group with that id exists in the `groups` store
-(`src/auth/groups.ts`) and that its scope permits the publishing process,
-throwing `GroupScopeValidationError` on any violation. It runs at the same
-placement as the other two — after the hash-hit no-op return, so an
-already-published body's re-publish stays a no-op even after a referenced
-group's scope narrows underneath it (`group-scope-validation`).
+**Cancellation.** `cancellable` is a flag on both the body and the step
+(`definition.ts:920`, `:989`). A cancellation synthesizes a hidden cancel
+path. Its `onPath` actions are the step's own `onCancel` actions. The
+engine skips the step's `onExit` for this transition. `authoredProcessBody`
+reserves the cancel-sink id, key, and outcome for the engine alone. The
+`cancellation` spec covers the rest.
 
-`publishBody` awaits seven DB-resolving checks in all, in this order:
-`validateCrossProcess`, `validateSubprocessCycle`, `validateProcessChaining`,
-`validateGroupScope`, `validateInstanceQueryReferences`,
-`validateInstanceTransitionReferences`, `validateCrossProcessReadGrant`. The
-two `instance*References` checks also return the `PublishFinding`s the
-publish result carries. `validateCrossProcessReadGrant` is skipped when the
-caller passes no actor.
+**Collaboration.** `comments` and `attachments` are flags on both the
+body and the step. A step's own entry wins over the process's entry.
+The process's entry wins over the default, `true` (`definition.ts:821-830`).
 
-The cycle check, `validateSubprocessCycle`, walks the subprocess steps of the
-published body and of each child they reach. Each reference resolves the
-way `validateCrossProcess` resolves it. It throws
+**Subprocesses.** Call-and-return happens through a `subprocess` step,
+itself a wait-state. A process used as a subprocess declares a
+`ProcessContract`: input fields, output fields, and an enumerated set of
+`outcomes`. Terminal steps bind to an `outcome`. Callers guard on
+`child.outcome`, never on the child's internal step id or key. The field
+`SubprocessSpec.versionBinding` is required, `latest-at-spawn` or
+`pinned`, with no default; the studio editor preselects `pinned`.
+
+A `latest-at-spawn` binding pins by `contractRef`, a hash of the child
+contract the parent validated against. A contract change starts a new
+signature. Existing callers keep the newest matching child instead of
+silently adopting the change. This pins the interface while the
+implementation floats. A spawn refuses a child once the parent's own
+nesting depth reaches 16 (`MAX_SUBPROCESS_DEPTH`,
+`src/engine/subprocess.ts`). The cap backs up `validateSubprocessCycle`.
+
+**Extensibility.** A field's own `type` may also be a `{ type, config }`
+envelope, but no registry resolves it (`definition.ts:344`). A guard is
+never a plugin envelope; it stays CEL-only.
+
+Custom actions, data sources and assignment strategies are plugins
+behind one envelope, `{ type, config }`. Three
+registries resolve them: the action `Registry`, the `AssignmentRegistry`,
+and the `DataSourceRegistry` (`registry.ts`). No action type is exempt
+from registry resolution, `core.` included. The two internal subprocess
+handlers register their own `configSchema` (`src/engine/subprocess.ts`).
+A candidate resolver, a handler, and a data source each take a `db`
+handle scoped to the instance's own tenant. A handle bound once at
+registry-build time would resolve every tenant against one directory.
+
+The function `publishBody` calls `validateReferences`
+(`src/validate.ts`), which checks every action's `type` and `config` at
+five positions: `onEntry`, `onExit`, `onCancel`, each path's `onPath`,
+and each timer's `onFire.actions`. It resolves assignment strategies and
+data sources the same way. The check runs after the hash-hit no-op
+return. A body published before the handler's registration stays valid
+on an identical re-publish. It throws the results in a fixed
+order: action registry, assignment registry, data source registry, then
+CEL (`definitions.ts:688-704`). The class
+`DataSourceRegistryValidationError` also carries
+`checkInstanceQueryValueFromField`'s issues.
+
+An unresolved type or a schema-violating config throws one error class
+per registry: `RegistryValidationError`, `AssignmentRegistryValidationError`,
+or `DataSourceRegistryValidationError`, each carrying every located
+error. A handler with no declared `configSchema` accepts any `config`.
+An assignment strategy's own `configSchema` is a Zod schema too
+(`registry.ts:68`); the studio descriptor converts it to JSON Schema
+(`src/engine/config-descriptor.ts`). A field binds a data source by its
+id, never inline, and its options resolve at runtime, never at publish.
+
+The strategy `org.group-members`, one of three org-aware assignment
+strategies, adds one of the seven DB-resolving publish-time checks
+listed below. For every entry in
+the body's own `allowedGroups`, `publishBody` confirms a group with that
+id exists in the `groups` store (`src/auth/groups.ts`). It also confirms
+the group's scope permits the publishing process. A violation throws
+`GroupScopeValidationError`. It runs at the same placement as the other
+two, after the hash-hit no-op return. An already-published body's
+re-publish stays a no-op even after a referenced group's scope narrows
+underneath it (`group-scope-validation`).
+
+The function `publishBody` awaits seven DB-resolving checks in all, in
+this order: `validateCrossProcess`, `validateSubprocessCycle`,
+`validateProcessChaining`, `validateGroupScope`,
+`validateInstanceQueryReferences`, `validateInstanceTransitionReferences`,
+`validateCrossProcessReadGrant`. The two `instance*References` checks
+also return the `PublishFinding`s the publish result carries. The check
+`validateCrossProcessReadGrant` runs only when the caller supplies an
+actor.
+
+The cycle check, `validateSubprocessCycle`, walks the subprocess steps
+of the published body and of each child they reach. Each reference
+resolves the way `validateCrossProcess` resolves it. It throws
 `CrossProcessValidationError` when the walk reaches the published
-`processId` again, at any version. The message names the chain, for example
-`subprocess cycle: A → B → A`. The comparison ignores version: a pinned
-reference to an earlier, non-calling version of the same process still
-closes a cycle. A `process.start` action takes no part in the walk, since it
-is fire-and-forget rather than a wait-state reference.
+`processId` again, at any version. The message names the chain, for
+example `subprocess cycle: A -> B -> A`. The comparison ignores version:
+a pinned reference to an earlier, non-calling version of the same
+process still closes a cycle. A `process.start` action takes no part in
+the walk, since it is fire-and-forget rather than a wait-state
+reference.
 
-**Runtime record (the audit backbone).** The instance carries assignment/claim
-state and persisted timer firings. Each HistoryEntry is append-only and records
-the definition `version` active at that entry (so step/path ids resolve after a
-migration), the cause (user / timer / automatic / migration), and per-action
-`ActionOutcome` including the actually-resolved handler build. These runtime
-facts are not reconstructable later, so they are recorded from v1.
+**Runtime record (the audit backbone).** The instance carries
+assignment/claim state and persisted timer firings. Each `HistoryEntry`
+is append-only. It records the definition `version` active at that
+entry, so step/path ids resolve after a migration. It also records the
+cause (`user`, `timer`, `automatic`, `migration`, or `cancel`) and
+per-action `ActionOutcome`s, including the actually-resolved handler
+build. Nobody can reconstruct these runtime facts later, so the engine
+records them from v1.
 
-A HistoryEntry is transition-shaped — `toStepId` is required — so events that carry
-no step change get a sibling record, `InstanceEvent` (append-only, `evt_` ids): a
-discriminated union over `kind` with a kind-specific payload, carrying the instance,
-the `version` and the `transitionSeq` **in force**. An event never advances the
-sequence, so several may share one and share it with a transition; they order by
-`at`. Twelve kinds exist — `timer.fired` (a reminder fired: actions enqueued, no
-transition), `timer.unarmed` (a declared timer produced no `fireAt` at entry, with
-the reason), `migration.skipped` (an instance left on its source version, with the
-reason), `subprocess.spawn-enqueued` (creation at a subprocess initial step
-enqueued its spawn: actions enqueued, no transition),
-`subprocess.outcome-unmatched` (a child returned an outcome no path on the parent's
-subprocess step matched, so the parent stays parked),
-`migration.transform-dropped` (a migration `transforms` entry raised, or its result
-could not be made JSON-safe, so its target field went unwritten; the `version` it
-carries is the TARGET version, since the `fieldId` it names is declared there),
-`assignment.claimed` (an actor claimed an unclaimed, assignment-bearing step;
-payload `{actorId}`), `assignment.released` (the claimant released their
-claim on the current step; payload `{actorId}`), `assignment.delegated` (the
-claimant delegated their claim to a named target actor, who does not join
-`assignment.candidates`; payload `{fromActorId, toActorId}`), `instance.faulted` (an
-automatic cascade re-entered a step it already entered and was parked `faulted`;
-payload `{stepId, reason}`, `stepId` the repeated step), and `mapping.entry-dropped`
-(an `inputMapping`/`outputMapping` entry raised, or its result could not be made
-JSON-safe, so its target field went unwritten; payload `{fieldId, direction,
-reason}`, `direction` `"input"` or `"output"`; a subprocess spawn or return
-records it on the PARENT, and a `process.start` action records it on the ACTING
-instance, since in each case that is whose context the mapping evaluated, in the
-same transaction as the spawn's, the return's, or the chain-start's own commit),
-and `assignment.unresolved` (a step entry
-resolved its declared assignment to no candidate, because the resolver raised,
-exceeded its deadline, or answered empty; payload `{stepId, reason}`, reason one
-of `resolver-raised`/`timed-out`/`no-candidates`; resolution is total, so the
-entry committed with empty candidates, and the event lands in that same
-transaction). The latter six are not
-transition-shaped either — no step change, so no HistoryEntry and no
-`transitionSeq` advance, the same reasoning as `migration.skipped`; the flip and
-the event for `instance.faulted` commit in one transaction, guarded by the same
-OCC predicate, so a `faulted` instance cannot exist without its event.
-Kinds are added additively; the record shape is settled. A kind that enqueues
-actions carries their `ActionOutcome`s — `timer.fired` and
-`subprocess.spawn-enqueued` do, the other ten enqueue nothing and so must not
-invite a reader to expect outcomes.
+A `HistoryEntry` is transition-shaped: it always carries a `toStepId`.
+An event that has no step change instead gets a sibling record,
+`InstanceEvent` (append-only, `evt_` ids). It is a discriminated union
+over `kind`, defined in `definition.ts`'s `instanceEvent` (15 kinds
+today). The `runtime-events` spec documents each one.
 
-An `ActionOutcome` attaches to the record that **enqueued** the action, carried on the
-outbox row rather than derived from `(instanceId, transitionSeq)`. That derivation is
-exact for a transition and wrong for an event: a reminder's outcomes would join the
-preceding transition's entry, and on a step an instance was created on — sequence 0,
-no entry exists — the update would match no row and discard the outcome silently.
+Four invariants hold across every kind. An event never advances
+`transitionSeq`. Several may share one seq, and events order by `at`.
+Only `timer.fired` and `subprocess.spawn-enqueued` enqueue actions and
+carry `ActionOutcome`s; every other kind carries none. The kind
+`instance.faulted` commits with the instance's status flip in one
+transaction, under one OCC predicate, so a `faulted` instance cannot
+exist without its event. A new kind adds to the union, and the record
+shape stays as it is.
+
+An `ActionOutcome` attaches to the record that enqueued the action. The
+outbox row carries it instead of deriving it from
+`(instanceId, transitionSeq)`. That derivation is exact for a transition
+and wrong for an event. A reminder's outcomes would join the preceding
+transition's entry instead of its own record. Creation enters at
+sequence 0, where no entry exists yet. A derived write there would match
+no row and discard the outcome silently.

@@ -314,9 +314,13 @@ wants those.
 value there falls back to showing the instance's own id. So does a source
 instance holding a non-scalar value there, such as a `list` or a `group`.
 
+<!-- antislop: allow synonym-rotation -->
+<!-- Why: "surface" here names the raw JSON editing screen
+     (`.claude/rules/ui-glossary.md`'s "JSON surface"), not a rotated
+     synonym for the picker label the paragraph above "shows". -->
 The studio form draws `stepIds`, `labelFieldId`, a comparison's target field,
 and an attribute's target field from the target process's own published
-catalog. An author picks these, never types them. The raw JSON view stays
+catalog. An author picks these, never types them. The raw JSON surface stays
 reachable for anything the form does not cover.
 
 An option's `value` is always the source instance's id, never a business key.
@@ -360,8 +364,8 @@ the mismatched pairing outright rather than let it fail at runtime.
 ```
 
 An author writes the column key here by hand, the same as a `db.list`
-column. It never comes from the source field's own `key`. A `key` is a
-mutable slug that references nothing. See Columns on a data list, below, for
+column. It never comes from the source field's own `key`. A field `key` is a
+mutable slug. See Columns on a data list, below, for
 the mapping rules themselves. They apply the same way whichever data source
 type fills the columns.
 
@@ -1123,7 +1127,7 @@ Press **Publish**. Studio verifies the whole body first. It refuses anything
 that breaks a rule. Four examples:
 
 - a guard that does not parse
-- an unreachable outcome
+- an outcome no end step binds
 - an unknown action type
 - a step with no exit
 

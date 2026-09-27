@@ -10,7 +10,7 @@ context: |
   `packages/web` reaches it only over the HTTP wrapper and the exports map.
   Keep that boundary. Direction: no-code and low-code process authoring.
   No-code is the target for what the builders cover, and low-code is what
-  stays underneath permanently — the JSON view, the CEL input and
+  stays underneath permanently — the JSON surface, the CEL input and
   hand-authored bodies stay first-class. Every authoring surface produces the
   same JSON definition as today, so none of them relaxes a contract rule.
 
@@ -21,9 +21,11 @@ context: |
 
   The contract is one artifact: the serialized JSON process definition.
   src/schema/definition.ts IS the contract — Zod schemas with TS types via
-  z.infer, so validation and types cannot drift. Identity is an opaque,
-  type-prefixed, immutable `id` (the sole reference anchor); `key` is a mutable
-  slug that references nothing; `label` is display text. All conditions are CEL
+  z.infer, so validation and types cannot drift. The opaque `id` anchors
+  every stored reference and all persisted instance state. A `key` is a slug
+  with two readers. CEL reads a field as `data.<key>`. A view entry's `group`
+  names a group field's `key`, and its `tab` names a key in the same view's
+  `tabs`. A `label` is display text. All conditions are CEL
   ({ lang: "cel", src }): pure, total, no now(). Authoring-time invariants are Zod
   refinements or write-path checks in src/schema/compile.ts — placement follows
   two criteria: an invariant a hand-written body must not bypass belongs on the
@@ -54,9 +56,9 @@ context: |
   imports from another area — only upward into `shell/`, `api/`, `i18n/`.
   The studio area is Process Studio, the developer's product: server-persisted
   drafts (the `drafts` table, optimistic concurrency on a `revision` column),
-  one tabbed process surface holding ten tabs (canvas, steps, fields, data
-  sources, paths, forms, field matrix, contract, changes, checks), a routed
-  form editor, a replacing JSON surface, publish, published versions
+  one tabbed process surface holding eleven tabs (canvas, steps, fields, data
+  sources, paths, forms, field matrix, contract, changes, checks, access), a
+  routed form editor, a replacing JSON surface, publish, published versions
   compared as a change list, migration-plan authoring, a
   registry/CEL-scratchpad Tools screen, a Player beside the merged instance
   record, and a Templates screen

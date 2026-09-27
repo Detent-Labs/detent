@@ -668,7 +668,7 @@ export const en = {
   "headerBar.versions": "Versions",
   "headerBar.player": "Player",
   // The process-wide collaboration defaults (`studio-process-tabs`): two
-  // checkboxes in the header bar's inline-editable cluster, after baseLocale.
+  // checkboxes in the header bar's `⋮` menu, after baseLocale.
   // The legend names the pair for a screen reader; it renders visually
   // hidden, so it carries no length pressure against the compact row.
   "headerBar.collaborationLegend": "Collaboration",

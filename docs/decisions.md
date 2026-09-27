@@ -246,6 +246,12 @@ word. `ROADMAP.md` carries stage-by-stage status.
 - Whether actor identities in the audit log (`actorId` in `history_entries`,
   claims, comments) are ever redactable is undecided.
   `docs/decisions-archive.md`'s Instance audit log entry records the reasoning.
+- A subprocess-callable child's fields should stay inside its own
+  `inputFields`. `.claude/rules/authoring-invariants.md` once stated that
+  rule, but the code does not enforce it. Three sites read `inputFields`:
+  `src/engine/definitions.ts:501-505`, `src/schema/compile.ts:466-468` and
+  `:1139`. Live specs stay silent on the rule too. Building it takes its own
+  definition contract change.
 
 ## Decided, not yet built (each needs its own OpenSpec change)
 - **A non-studio surface for a pure Owner, and write-time eligibility
@@ -267,16 +273,15 @@ word. `ROADMAP.md` carries stage-by-stage status.
   `@font-face` rule nor a font link exists anywhere in `packages/web`, so the
   reader's OS supplies the face today and it differs per platform. The
   two-weight rule holds either way: 800 for a heading and a button label, 400
-  for everything else, nothing between. Deferred 2026-09-02 — we do not need
-  Archivo yet. When it lands, self-host the woff2: the build-time CSP is
-  `default-src 'self'` with no `font-src`
+  for everything else, nothing between. Ten sites already break that rule
+  with an off-spec weight; this file's own entry below names each one.
+  Deferred 2026-09-02 — we do not need Archivo yet. When it lands, self-host
+  the woff2: the build-time CSP is `default-src 'self'` with no `font-src`
   (`packages/web/vite.config.ts:26`), so a self-hosted file needs no CSP change
   and no `frontend-security-headers` delta, while a Google Fonts link would
   need `style-src` and `font-src` additions plus that delta. It changes the
   type of every screen in all four areas, so it needs its own OpenSpec change,
-  a browser check, and a `DESIGN.md` refresh. The studio area's `app.css`
-  reasons from the two weights in a comment; that comment now names the
-  written face rather than Archivo.
+  a browser check, and a `DESIGN.md` refresh.
 - **Process-scoped permissions: the filter, the draft scope, and the
   `permissions` booleans.** A design pass on 2026-08-15 settled the shape;
   `ROADMAP.md` stage 40 carries it in full. The seam shipped 2026-08-15 as
@@ -521,6 +526,24 @@ word. `ROADMAP.md` carries stage-by-stage status.
   rewording untouched prose would exceed the delta and put new text under the
   prose ratchet. A sweep of the stale word wants its own change, together
   with the six requirements that still say "edit rail".
+- **Retired UI words still sit in live specs and in the studio catalog.**
+  `openspec/specs/studio-app/spec.md:631` and
+  `openspec/specs/studio-canvas/spec.md:1080`, `:2972` and `:3020` still
+  read "panels screen", "ribbon", "bench", "steps register", "configuration
+  pane" and "inspector". `studio-canvas/spec.md:2078` names an "edit rail"
+  and a `canvas/EditRail.tsx` that no longer exists.
+
+  Two dead catalog keys, `ribbon.expand` and `ribbon.collapse`, sit at
+  `packages/web/src/i18n/catalogs/studio.ts:754-755`. One displayed string
+  says "finding" where the rest of the UI says "issue" (`studio.ts:488`). A
+  spec sweep and a catalog cleanup each want their own OpenSpec change.
+- **The glossary and the live spec name the Access tab differently.**
+  `.claude/rules/ui-glossary.md` names it "Access tab", over
+  `panels/AccessPanel.tsx`. `openspec/specs/studio-app/spec.md:4285`,
+  `:4287` and `:4305` say "Access surface" instead, and so does the catalog
+  comment at `packages/web/src/i18n/catalogs/studio.ts:964`. This change
+  leaves the spec and the comment as they stand. A spec sweep to match the
+  glossary wants its own OpenSpec change.
 - **Five literal `#726e6e` sites want the new `colors.dormant` role.**
   `changes-tab-entity-change-list` gave the dormant tone a token,
   `--color-dormant` in `tokens.css` and `colors.dormant` in
@@ -537,6 +560,27 @@ word. `ROADMAP.md` carries stage-by-stage status.
   hover wash, `rgb(234, 233, 233)`, it reads 4.16:1. Every register row that
   carries a dormant stamp and washes on hover shares that gap. `DESIGN.md`
   pins `#726e6e`, so retuning the tone is a design change of its own.
+- **Two more components read a primitive directly instead of a role.**
+  `packages/form-ui/src/FieldForm.tsx:204-205` sets a tab's issue stamp
+  with `colors.refusal700` and `colors.paper50`, both primitives.
+  `packages/web/src/areas/studio/canvas/CanvasView.tsx:303` and `:313` set
+  the terminal/initial stamp circle and its text with `colors.neutral900`,
+  also a primitive. Neither site moved in a design change yet. Each is
+  separate from the `#726e6e` entry above.
+- **Ten sites set an off-spec weight on the written face.**
+  `.claude/rules/design-language.md` allows only 800 and 400 there. Three
+  sites set 500:
+  `packages/web/src/areas/reporting/screens/BottleneckScreen.tsx:39`,
+  `CycleTimeScreen.tsx:69` and `SlaScreen.tsx:40`. Four table headers set
+  600: `BottleneckScreen.tsx:35`, `CycleTimeScreen.tsx:65`,
+  `SlaScreen.tsx:36` and `ReportTable.tsx:57`.
+
+  Two picker labels set 600: `ProcessPickerScreen.tsx:54` and
+  `ReportsListScreen.tsx:65`. So does
+  `packages/web/src/areas/studio/screens/MigrationPlanScreen.tsx:108`
+  (`surfaceToggleTabSelected`). None moved in a design change yet; a later
+  UI change would fix all ten. The `#726e6e` entry above tracks the same
+  kind of drift.
 - **The studio stays a desktop tool at phone width.** The owner decided
   this on 2026-09-13, as pick G2 of `studio-narrow-widths`. This entry
   replaces FORMS-15.
@@ -1102,13 +1146,15 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   `studio-process-tabs` asks for that field to open selected
   (`openspec/specs/studio-process-tabs/spec.md:209`). Risk (Medium): the
   author lands on the Fields tab and must find the field in the entity rail.
-- **FIELDS-13: the glossary names a tab set that no longer exists.** Its
-  "field tabs" row sits at `.claude/rules/ui-glossary.md:87`. It defines the
-  Field / Values / Rules tab set for the one selected top-level field. A
-  paragraph at `:122` repeats that definition. The field editor has two halves
-  and no tab set (`panels/FieldCatalogPanel.tsx:608`,
+- **FIELDS-13 (narrowed): two `docs/browser-checks.md` passages still walk
+  a Values tab.** `.claude/rules/ui-glossary.md` already dropped the "field
+  tabs" row this finding once named, since the field editor now has two
+  halves and no tab set (`panels/FieldCatalogPanel.tsx:608`,
   `openspec/specs/studio-app/spec.md:2564`), and it edits a field at any
-  depth. Risk (Low): the glossary teaches a word for a UI that is gone.
+  depth. `docs/browser-checks.md:1881-1889` and `:2369` still describe a
+  Values tab that does not exist. Risk (Low): a browser check walks a
+  control that is not there. The next change that touches this screen must
+  rewrite both passages.
 - **FIELDS-14: `FieldsTab` walks the field tree once per rail entry.** Each
   call of `FieldsTab` walks the whole tree twice, in `flattenRailFields` and
   `flattenDraftFields` (`panels/EntityTabs.tsx:353`, `:354`). Each rail entry

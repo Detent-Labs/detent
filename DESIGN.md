@@ -587,9 +587,10 @@ stamp. The steps rail and the form card carry it.
 - The label takes 11px uppercase at 0.1em, in slate.
 - The control takes a 1px hairline border, the paper ground, 8px padding and
   14px text. The border is the field; no fill stands behind it.
-- A `<select>` keeps that same border, ground and padding. It drops the UA
-  chevron with `appearance: none`. A decorative Lucide chevron sits over its
-  trailing edge in slate.
+- The studio select (`panels/PathsPanel.tsx`) keeps that same border, ground
+  and padding. It drops the UA chevron with `appearance: none`. A decorative
+  Lucide chevron sits over its trailing edge in slate. Every other `<select>`
+  keeps its own UA chevron.
 - **Focus:** the border turns accent and the 2px ring sits on top at 0 offset.
 - A required marker prints in the accent. On the ledger ground it prints in
   Accent on Muted.
@@ -791,5 +792,5 @@ design change.
   one.
 - **Don't** size a control from its English label.
 - **Don't** turn a state into a class name.
-- **Don't** add a literal class outside the `.btn` family. Declare a compiled
-  style.
+- **Don't** add a literal class outside the `tokens.css` family, the shell
+  frame and the three `web-styling` exceptions. Declare a compiled style.

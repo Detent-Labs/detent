@@ -92,6 +92,21 @@ describe("groupChecksBySource", () => {
     expect(groups.find((g) => g.source === "duration")!.heldBack).toBe(true);
   });
 
+  it("a Zod-invalid draft with a structural issue shows that issue and holds the rest back", () => {
+    const groups = groupChecksBySource(
+      validation({
+        zodValid: false,
+        issues: [{ entityType: "field", entityId: "field_x", message: "bad key", source: "structural", loc: "" }],
+      }),
+    );
+    const structural = groups.find((g) => g.source === "structural")!;
+    expect(structural.heldBack).toBe(false);
+    expect(structural.issues).toHaveLength(1);
+    for (const source of ["cel", "registry", "duration", "view"] as const) {
+      expect(groups.find((g) => g.source === source)!.heldBack).toBe(true);
+    }
+  });
+
   it("a Zod-valid, duration-failing draft holds structural, CEL and registry back, but not duration", () => {
     const groups = groupChecksBySource(
       validation({

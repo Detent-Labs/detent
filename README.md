@@ -20,8 +20,8 @@ integration drives a process with no browser at all.
 No-code and low-code process authoring shipped (`ROADMAP.md` stage 27). An
 analyst builds a process through forms and a canvas, typing no CEL and no JSON.
 The builders cover plugin config, conditions, migration plans, templates and
-form layout. Low-code stays underneath, permanently. The JSON view and the CEL
-text input remain first-class for a developer.
+form layout. Low-code stays underneath, permanently. The JSON surface and the
+CEL text input remain first-class for a developer.
 
 The paradigm is a **state-based finite-state machine**: Steps (states) connected
 by explicit Paths (transitions). This is *not* BPMN token flow.
@@ -36,8 +36,9 @@ A serialized JSON process definition is the one artifact three roles share:
 
 `src/schema/definition.ts` is that contract, expressed as Zod schemas with TS
 types derived via `z.infer` so validation and types cannot drift. Ids are opaque
-(`step_<uuid>`) and are the sole reference anchor; `key`/`label` reference
-nothing. Bodies are hashed with JCS (canonical JSON); published versions are
+(`step_<uuid>`) and anchor every stored reference. A `key` is a slug with two
+readers: CEL `data.<key>`, and a view entry's `group`/`tab`. A `label` is
+display text. Bodies are hashed with JCS (canonical JSON); published versions are
 immutable and instances pin `{ processId, version, definitionHash }`.
 
 All conditions are CEL (`{ lang: "cel", src }`) — pure, total, no `now()`.

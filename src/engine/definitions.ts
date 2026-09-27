@@ -616,7 +616,7 @@ export async function publishBody(
   // on the target process".
   actor?: Actor,
 ): Promise<PublishResult> {
-  // Structure first: the Zod gate, duration and the nine structural checks,
+  // Structure first: the Zod gate, duration and the twelve structural checks,
   // via the module both this function and the studio's live validation
   // share (src/validate.ts). Reconstructed from the result rather than
   // re-running compileProcessBody, at the same precedence it has today:
