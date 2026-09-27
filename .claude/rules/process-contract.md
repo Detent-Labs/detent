@@ -288,10 +288,10 @@ listed below. For every entry in
 the body's own `allowedGroups`, `publishBody` confirms a group with that
 id exists in the `groups` store (`src/auth/groups.ts`). It also confirms
 the group's scope permits the publishing process. A violation throws
-`GroupScopeValidationError`. It runs at the same placement as the other
-two, after the hash-hit no-op return. An already-published body's
-re-publish stays a no-op even after a referenced group's scope narrows
-underneath it (`group-scope-validation`).
+`GroupScopeValidationError`. Like `validateCrossProcess` and
+`validateProcessChaining`, it runs after the hash-hit no-op return. An
+already-published body's re-publish stays a no-op even after a
+referenced group's scope narrows underneath it (`group-scope-validation`).
 
 The function `publishBody` awaits seven DB-resolving checks in all, in
 this order: `validateCrossProcess`, `validateSubprocessCycle`,
