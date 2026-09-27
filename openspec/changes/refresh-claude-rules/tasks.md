@@ -11,11 +11,11 @@
 
 ## 2. authoring-invariants.md
 
-- [ ] 2.1 Fix AI items 1-9 per design.md; grep finds no "CEL step below"
-- [ ] 2.2 Add AI gaps 1-9 per design.md; grep finds "time function not allowed"
-- [ ] 2.3 Apply AI trims 1-6; each fact trim 5 removes still appears in PC
-- [ ] 2.4 Add `src/validate.ts` to the `paths:` list
-- [ ] 2.5 Drop the `allow-file` directive per D6; antislop check on the file exits 0
+- [x] 2.1 Fix AI items 1-9 per design.md; grep finds no "CEL step below"
+- [x] 2.2 Add AI gaps 1-9 per design.md; grep finds "time function not allowed"
+- [x] 2.3 Apply AI trims 1-6; each fact trim 5 removes still appears in PC
+- [x] 2.4 Add `src/validate.ts` to the `paths:` list
+- [x] 2.5 Drop the `allow-file` directive per D6; antislop check on the file exits 0
 
 ## 3. design-language.md
 
