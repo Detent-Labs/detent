@@ -25,8 +25,15 @@ version it was last published from (`base_version`, see `process-drafts`).
 that `(processId, version)` pair. That is the same representation
 `resolveBody` already resolves for engine use. Its sibling
 `GET /processes/:processId/versions` returns metadata only and
-requires no specific role. A `(processId, version)` pair with no published
+does not need a specific role. A `(processId, version)` pair with no published
 row SHALL answer 404.
+
+A published version number is 1 or higher. A version below 1 names no
+published row, so the route SHALL answer 404 for it. This holds for every
+actor the route admits, whatever other role that actor holds. It also holds
+where a draft snapshot stores a
+body under that number. A draft snapshot SHALL NOT be readable through this
+route.
 
 #### Scenario: Fetching a published version returns its compiled body
 
@@ -53,6 +60,21 @@ row SHALL answer 404.
 - **THEN** the engine rejects the request
 - **AND** that same actor still reads
   `GET /processes/:processId/versions` for metadata
+
+#### Scenario: A curator cannot read a draft snapshot
+
+- **WHEN** a Play has stored a draft snapshot for a process under version -1
+- **AND** an actor holding only `system:templates` requests
+  `GET /processes/:processId/versions/-1`
+- **THEN** the response is 404
+- **AND** the response does not contain any part of the draft body
+
+#### Scenario: A developer outside the Developer list cannot read a draft snapshot
+
+- **WHEN** a Play has stored a draft snapshot for a process under version -1
+- **AND** an actor holding `system:developer` who is not on that process's
+  Developer list requests `GET /processes/:processId/versions/-1`
+- **THEN** the response is 404
 
 ### Requirement: The Studio Versions screen lists published versions and diffs two selected representations
 
