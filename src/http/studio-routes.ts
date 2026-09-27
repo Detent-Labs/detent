@@ -326,10 +326,15 @@ export async function handlePublishDraft(
  * and unable to obtain one — a browser walk caught exactly that. A published
  * body is the one every participant already runs, so it is the safe half of
  * the pair to widen. A draft stays closed to the curator.
+ *
+ * A draft snapshot never reads through this route. A published version is 1
+ * or higher, so a version below 1 answers 404 before the store read, for
+ * every actor the route admits.
  */
 export async function handleGetVersionBody(processId: string, versionRaw: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
   return route(req, resolver, db, requireStudioRead, async () => {
     const version = parseVersion(versionRaw, "version");
+    if (version < 1) return notFound(`no published version ${version} for ${processId}`);
     const body = await createDefinitionStore(db).resolveBody(processId as ProcessId, version);
     if (!body) return notFound(`no published version ${version} for ${processId}`);
     return { status: 200, body };
