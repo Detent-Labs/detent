@@ -99,8 +99,8 @@ function requireStudioRead(actor: { id: string; roles: readonly string[] }): voi
  * `ADMIN_ROLE`, or a match on that process's own Developer list
  * (process-access-roles). Gates `GET`/`PUT`/`DELETE /drafts/:processId` and
  * `POST /drafts/:processId/instances` for a process that already has a
- * draft or a published version — the complement of Task 4.1's
- * `CREATE_ROLE` check on the branch where neither exists yet.
+ * draft or a published version. On the branch where neither exists yet,
+ * `PUT` alone additionally checks `CREATE_ROLE`.
  */
 async function requireDeveloperListOrAdmin(actor: Actor, processId: ProcessId, db: SQL): Promise<void> {
   if (actor.roles.includes(ADMIN_ROLE)) return;
@@ -232,7 +232,7 @@ export async function handleDeleteDraft(processId: string, req: Request, resolve
  * required. Gated exactly like `handleGetDraft`: an actor needs an
  * authoring role plus a place on the process's Developer list, or
  * `ADMIN_ROLE` alone, once the process has a draft or a published version.
- * For a process with neither, `requireAuthoring` runs alone — a role-gated
+ * For a process with neither, `requireAuthoring` runs alone. A role-gated
  * route, not a flag on the public instance-creation route, is the
  * server-enforced boundary design.md's "the real bypass risk" decision
  * requires (see `POST /processes/:processId/instances`, which the app

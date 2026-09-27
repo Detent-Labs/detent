@@ -621,6 +621,24 @@ test.skipIf(!DB)("POST /drafts/:processId/instances succeeds for an admin not on
   expect(body.kind).toBe("test");
 });
 
+test.skipIf(!DB)("POST /drafts/:processId/instances refuses an unlisted author once the process is published with no draft", async () => {
+  const processId = pid();
+  await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("v1"), layout: {}, revision: 0 }));
+  await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", publisher));
+  // deleteDraft only removes the drafts row (src/engine/drafts.ts), leaving the published
+  // `definitions` row in place, so the process now has a published version and no draft.
+  await fetch(authedReq(`http://x/drafts/${processId}`, "DELETE", developer));
+
+  const authorUnlisted: Actor = { id: "user_author_unlisted_pub", roles: [AUTHOR_ROLE] };
+  const res = await fetch(authedReq(`http://x/drafts/${processId}/instances`, "POST", authorUnlisted, {}));
+  expect(res.status).toBe(403);
+  const errBody = (await res.json()) as { error: { type: string } };
+  expect(errBody.error.type).toBe("authorization");
+
+  const rows = (await sql`SELECT count(*)::int AS n FROM instances WHERE body->>'processId' = ${processId}`) as { n: number }[];
+  expect(rows[0]!.n).toBe(0);
+});
+
 // ============================================================
 // GET /processes/:processId/versions/:version
 // ============================================================
