@@ -46,10 +46,11 @@ row in the rail opens the tab that owns its subject, per the
 
 ### Requirement: The rail reflects the held-back state of a structurally invalid draft
 
-Per `authoring-invariants`, duration checks do not run until the draft
-passes Zod validation. CEL and registry checks do not run until the
-draft also compiles. The field `dimensions.structural` reads `"ran"`
-both when the six structural checks pass cleanly and when they run and
+`validateStructure` (`src/validate.ts`) reports the duration and structural
+dimensions as not run when the Zod parse fails and the compile pass raised
+no duration or structural issue. CEL and registry checks do not run until the
+draft compiles. The field `dimensions.structural` reads `"ran"`
+both when the structural checks pass cleanly and when they run and
 raise a structural issue. That field alone cannot tell the two states
 apart.
 
@@ -60,7 +61,7 @@ It SHALL show the duration group as held back whenever
 `validation.zodValid` is false. It SHALL NOT show a held-back group as
 empty or passing.
 
-The registry group covers three checks, not one. Those checks read the action
+The registry group covers three checks. Those checks read the action
 types, the assignment strategy types and the data source types a body names.
 Each check splits into a type-resolution half and a config-validation half.
 
@@ -78,7 +79,7 @@ distinct from the config-validation half's own held-back state below. It
 clears once the fetch resolves for the session. The config-validation
 half's held-back state does not clear.
 
-The studio holds no live registry schema, so it cannot validate a plugin
+The studio has no live registry schema, so it cannot validate a plugin
 config. The registry group SHALL report its config-validation half as held
 back in every draft state the studio can reach. A held-back config-validation
 half is not itself an issue. That check still runs at publish time on the
@@ -98,7 +99,7 @@ same way the subprocess step's own fieldset already shows an unloaded child.
 
 The structural group's own held-back state does not follow from
 `zodValid` alone. `compileProcessBody` (`src/schema/compile.ts`) runs
-duration validation before the six structural checks, and raises on the
+duration validation before the structural checks, and raises on the
 first duration issue without ever reaching them. A Zod-valid draft that
 fails duration validation therefore never runs its structural checks
 for that load, whatever `validation.zodValid` reports.
@@ -116,9 +117,17 @@ three needs a compiled body.
 #### Scenario: A Zod-invalid draft shows every group held back
 
 - **WHEN** the loaded draft is not Zod-valid
+- **AND** the compile pass raised no structural issue
 - **THEN** the checks rail shows the structural, CEL, registry, duration
   and view groups as held back
 - **AND** it shows none of them as empty or passing
+
+#### Scenario: A Zod-invalid draft with a structural issue shows that issue
+
+- **WHEN** the loaded draft is not Zod-valid
+- **AND** the compile pass raised a structural issue
+- **THEN** the checks rail shows the structural group's actual issues
+- **AND** it shows the CEL, registry, duration and view groups as held back
 
 #### Scenario: A Zod-valid draft with a duration issue holds the structural group back too
 
@@ -127,8 +136,9 @@ three needs a compiled body.
   run
 - **THEN** the checks rail shows the duration group's actual issues
 - **AND** the checks rail shows the structural, CEL, and registry groups
-  as held back, not as empty or passing
-- **AND** the view group runs, since it needs no compiled body
+  as held back
+- **AND** it shows none of those three as empty or passing
+- **AND** the view group runs, since it does not need a compiled body
 
 #### Scenario: A Zod-valid, uncompilable draft holds back CEL and registry only
 
@@ -176,7 +186,7 @@ three needs a compiled body.
 - **WHEN** the loaded draft compiles, and carries a `process.start` action
 - **AND** the studio has not loaded that action's target process body
 - **THEN** `chainingSiteStatus` reports that action's site as not checked
-- **AND** the CEL group's own issue list carries no entry for that site
+- **AND** the CEL group's own issue list has no entry for that site
 - **AND** the group never presents that site as a clear pass
 - **AND** a visible control beside that action shows the not-checked state
 
