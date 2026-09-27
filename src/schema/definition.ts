@@ -437,7 +437,7 @@ const JS_TYPE: Record<BaseFieldType, string> = {
 /**
  * The one table of allowed `format` and `control` members per value form.
  * Read by the publish-time check (`compile.ts::checkFieldFormatControl`),
- * which rejects any pair absent from it, and by the studio's two pickers.
+ * which rejects any pair absent from it.
  * Exhaustive over BaseFieldType for the reason `JS_TYPE` is: a future member
  * missing here is a compile error.
  *

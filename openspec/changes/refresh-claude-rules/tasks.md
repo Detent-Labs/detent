@@ -2,12 +2,12 @@
 
 ## 1. process-contract.md
 
-- [ ] 1.1 Fix PC items 1-11 per design.md; grep finds no "Twelve kinds" or "Default binding"
-- [ ] 1.2 Add PC gaps 1-8 per design.md; grep finds `cancellable`, `collaboration`, `MAX_SUBPROCESS_DEPTH`
-- [ ] 1.3 Apply PC trims 1-6; each trimmed fact still appears in its target file
-- [ ] 1.4 Add `src/validate.ts` and `packages/form-ui/**` to the `paths:` list
-- [ ] 1.5 Drop the `allow-file` directive per D6; antislop check on the file exits 0
-- [ ] 1.6 Drop the "two pickers" clause in `src/schema/definition.ts`; grep confirms it is gone
+- [x] 1.1 Fix PC items 1-11 per design.md; grep finds no "Twelve kinds" or "Default binding"
+- [x] 1.2 Add PC gaps 1-8 per design.md; grep finds `cancellable`, `collaboration`, `MAX_SUBPROCESS_DEPTH`
+- [x] 1.3 Apply PC trims 1-6; each trimmed fact still appears in its target file
+- [x] 1.4 Add `src/validate.ts` and `packages/form-ui/**` to the `paths:` list
+- [x] 1.5 Drop the `allow-file` directive per D6; antislop check on the file exits 0
+- [x] 1.6 Drop the "two pickers" clause in `src/schema/definition.ts`; grep confirms it is gone
 
 ## 2. authoring-invariants.md
 
