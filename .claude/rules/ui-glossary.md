@@ -2,26 +2,20 @@
 paths:
   - "packages/web/**"
   - "packages/form-ui/**"
+  - "openspec/**"
+  - "docs/browser-checks.md"
+  - "DESIGN.md"
 ---
 
 # UI glossary: one word per thing
 
-Each term below has one word. Never reach for a synonym. `CLAUDE.md` already
-applies this rule to *operator* and *surface*. Antislop's `synonym-rotation`
-check enforces it in prose.
-
-Two audiences read this. A person pointing at the screen needs section 1. A
-person naming what the screen shows needs section 2. The words differ. The
-pairs that go wrong span both sections, so both live in one file.
+Each term below has one word. Never reach for a synonym. `CLAUDE.md` and
+`PRODUCT.md` already apply this rule to *operator* and *surface*. Antislop's
+`synonym-rotation` check enforces it in prose.
 
 ## 1. Chrome: the parts of the screen
 
-"Chrome" is the general UI term for an application's fixed frame. It names
-the persistent controls around the content rather than the content itself. A menu
-bar, a toolbar, a scrollbar are chrome; the document inside them is not.
-The term predates the Google Chrome browser. That browser took its name from
-this term, because it deliberately shows almost none of it. In this
-codebase, "chrome" names the one header every area shares.
+In this codebase, "chrome" names the one header every area shares.
 
 ### The shell
 
@@ -36,11 +30,8 @@ whichever area is open and renders the same header around it every time.
 | account group | the identity span and the account menu trigger, right-aligned in the header | `Chrome.tsx` |
 | account menu | the popover the account group opens: profile, language, area switch, logout | `Chrome.tsx` |
 
-The area switch lives inside the account menu rather than as a persistent tab row.
-The switcher filters the current area out of the actor's permitted set. An
-actor permitted only one area gets an empty set from that filter. The
-switcher then renders nothing, so that actor sees no trace of the other
-three areas.
+The area switch lives inside the account menu; `design-language.md`'s
+register-tab entry states how it filters the actor's own permitted set.
 
 ### The process surface
 
@@ -55,7 +46,7 @@ nav, the header bar, the tab row, then one tab body.
 | tab row | the row of eleven tabs over the body | `panels/ProcessTabRow.tsx` |
 | edge fade | the fade at an edge of the tab row with more tabs past it | `panels/ProcessTabRow.tsx` |
 | tab | one of the eleven. The authoring order runs Canvas, Steps, Fields, Data sources, Paths, Forms, Field matrix, Contract, Changes, Checks and Access | `routing.ts` |
-| structure surface | the eleven tab bodies together, the JSON surface's one alternative | `EditScreen.tsx`, its `structureActive` prop |
+| structure surface | the eleven tab bodies together, the JSON surface's one alternative | `EditScreen.tsx`; gated by `structureActive`, a prop of `panels/ProcessHeaderBar.tsx` |
 | JSON surface | the raw definition view, the structure surface's one alternative | `panels/JsonView.tsx` |
 
 The open tab stands in the address, at `/studio/processes/:id/edit/:tab`. All
@@ -63,9 +54,18 @@ eleven bodies stay mounted at once, and `hidden` shows one. A body keeps its own
 half-typed state across a switch: an outcome name, a selected field.
 Unmounting on every switch would lose that state.
 
-Save, Discard draft and Publish stand in the header bar, right-aligned ahead
-of the `⋮` menu. `panels/ProcessHeaderBar.tsx` renders them there. The Views
-group in that menu holds the JSON surface, Versions and Player.
+Save, Discard draft and Publish stand in the header bar's trailing cluster,
+ahead of the `⋮` menu. `panels/ProcessHeaderBar.tsx` renders them there. The
+*draft toolbar* retired: `DraftToolbar.tsx` no longer mounts, and only its
+`useDraftToolbarActions` hook survives.
+
+The header bar also carries the content-locale badge, inline and always
+visible. The `⋮` menu holds two groups. "Process, saved with the draft"
+carries key, baseLocale and Cancellable. It also carries the Collaboration
+checkboxes, the add-locale control and the link to manage assignment
+groups. "Views" carries the JSON surface, Versions and Player. The badge
+shows *content locale*, the authored text; the account menu's own switcher
+shows *language*, the UI locale.
 
 The studio's area nav has no draft control. Checks stands as a tab, on the
 tab row below. Its own count carries the severity color, and no other
@@ -78,13 +78,13 @@ Every other term below belongs to one tab.
 | canvas | the graph surface an author draws a process on | `canvas/CanvasView.tsx` |
 | canvas bar | the row between the tab row and canvas: add controls, a reachability report, and selection controls | `canvas/CanvasBar.tsx` |
 | steps rail | the Steps tab's left column: one numbered row per step, in the draft's own order | `panels/StepsRail.tsx` |
+| grip | the steps rail's own drag control, trailing each row | `panels/StepsRail.tsx` (`GripVertical`) |
 | step page | the Steps tab's wide right column, open on the one selected step | `panels/StepPage.tsx` |
 | masthead | the step page's top zone. It holds the step number, the kind phrase, the name, the key, the description, and the issues no section claims | `panels/StepPage.tsx` |
 | section | one subject group on the step page, standing open in one of two columns | `panels/sectionsFor.ts` |
-| Developer view | a disclosure over the raw JSON behind a step page or a change-list row. It stands closed on open | `panels/StepPage.tsx`, `panels/ChangeList.tsx` |
+| Developer view | a disclosure over raw JSON or CEL. The step page and the change-list row each hold one. So does a field's own editor, the form editor, and a condition or rule input. It stands closed on open | `panels/StepPage.tsx`, `panels/ChangeList.tsx`, `panels/FieldCatalogPanel.tsx`, `screens/FormEditorScreen.tsx`, `panels/shared/ConditionInput.tsx`, `panels/shared/RuleInput.tsx` |
 | entity rail | the Fields and Data sources tabs' own left column: one row per entity | `panels/EntityTabs.tsx` |
 | field catalog | the Fields tab's editor over the process's field definitions | `panels/FieldCatalogPanel.tsx` |
-| field tabs | the Field / Values / Rules tab set inside the field catalog's editor, for the one selected top-level field | `panels/FieldCatalogPanel.tsx`, `FieldEditor` |
 | data sources | the Data sources tab's editor over the process's data source definitions | `panels/DataSourcesPanel.tsx` |
 | contract | the Contract tab, over the process's `ProcessContract`: input fields, output fields, outcomes | `panels/ContractPanel.tsx` |
 | field matrix | the Field matrix tab's grid of every field against every step | `panels/FieldMatrixPanel.tsx`, `panels/FieldMatrixGrid.tsx` |
@@ -92,13 +92,25 @@ Every other term below belongs to one tab.
 | change list | the folded register of entity rows the Changes tab and the Versions screen both draw over `describeChanges`'s output | `panels/ChangeList.tsx` |
 | paths | the Paths tab, listing every path in the process, one row each | `panels/PathsView.tsx`, `panels/pathRows.ts` |
 | Forms tab | the tab holding one card per step that declares a view, with a legend above the cards | `panels/FormsTab.tsx` |
-| form card | one bordered plate on the Forms tab. It carries a kicker, a heading, a count and a miniature | `panels/formCardRows.ts` |
+| form card | one bordered plate on the Forms tab. It carries a kicker, a heading, a count and a miniature | `panels/FormsTab.tsx` (`FormCard`), row data in `panels/formCardRows.ts` |
+| form editor | the screen a step's own form opens on: the palette, the form canvas and the form preview | `screens/FormEditorScreen.tsx` |
+| form canvas | the drop target where an author arranges a step's view entries into groups and tabs. Bare *canvas* names only the graph surface above | `screens/FormEditorScreen.tsx` |
 | form preview | the form editor's trailing pane, under the canvas at 80rem and below, mounting the renderer a participant meets | `panels/FormPreview.tsx` |
 | form tab strip | the row of a step form's own tabs, above the form canvas | `panels/FormTabStrip.tsx` |
 | checks rail | the validation issue list, grouped by check | `panels/ChecksRail.tsx` |
+| Access tab | the process's Developer, Owner and Reader access lists | `panels/AccessPanel.tsx` |
 
 The word *section* also names a form's group, on the form editor's palette and
 the Forms tab's legend. The table's row names the step page's subject group.
+
+*issue* is the word for one validation result, whatever check raised it
+(`draft/issues.ts`'s `EditorIssue`, rendered by `panels/shared/IssueList.tsx`).
+
+The word **Developer** names three things here. `PRODUCT.md` calls the
+studio's own audience "process author", the word to use instead. A
+process's own `developer` access role is the Access tab's top standing,
+beside `owner` and `reader`. The Developer view above is a third, unrelated
+meaning.
 
 The tab row replaced the ribbon over the bench. Seven words went with it:
 *ribbon*, *ribbon bar*, *bench*, *steps register*, *configuration pane*,
@@ -119,15 +131,10 @@ the form editor's own field list (`screens/FormEditorScreen.tsx`), whose
 `draft/mintField.ts` export is still named `PALETTE_FIELD_KINDS`. Say
 *palette* only for that list.
 
-**field tabs** names one thing only: the Field / Values / Rules set inside the
-field catalog's own editor. It stands apart from the register tab, the shell's
-own header label. It stands apart from a tab on the tab row as well. All three
-are tab patterns, and each keeps its own name.
-
-**tab row** still names one thing only: the process surface's row of eleven
-(`panels/ProcessTabRow.tsx`). The strip above the form canvas is the *form tab
-strip*. The participant meets that same strip inside `FieldForm`, drawn from
-the same `view.tabs`, and it takes the same name.
+The participant meets the form tab strip inside `FieldForm`, drawn from the
+same `view.tabs`, and it takes the same name. A code identifier stays out of
+scope for this glossary's rules. In `packages/form-ui/src/FieldForm.tsx:399`,
+`styles.tabRow` names a compiled style, code the rule above never reaches.
 
 The step page has no tab row of its own. Its two columns of open sections
 take the place of one.
@@ -141,9 +148,11 @@ behavior. Neither takes keyboard or pointer interaction, and a screen reader
 skips both.
 
 The field matrix splits into two components: a bare grid and a wrapper. The
-bare grid, `FieldMatrixGrid`, holds the headers, the cells and the keyboard
-model. The wrapper, `FieldMatrixPanel`, adds the toolbar, the legend and the
-bulk badges. Only the wrapper mounts the bare grid.
+bare grid, `FieldMatrixGrid`, holds the headers, the cells, the keyboard
+model and the bulk badges. The wrapper, `FieldMatrixPanel`, adds the toolbar
+and the legend, and turns the badges on through the grid's `showBulkBadges`
+prop (`FieldMatrixGrid.tsx:485`, `:505`). Only the wrapper mounts the bare
+grid.
 
 ### The player
 
@@ -167,24 +176,34 @@ detail shows, from one shared function: `describeRecordElement`.
 The form preview mounts that same `FieldForm`. So the form editor, the player
 and the Task screen all draw one renderer.
 
-**rail** names a class of component rather than one component. A rail is a
-fixed-width column beside a screen's main content, scrolled on its own. It
-holds a register list, or a validation list. Three rails exist.
+### Outside the process surface
 
-The checks rail holds the validation issue list. The steps rail holds the
-numbered step list, on the Steps tab. The entity rail holds the row list, on
-the Fields tab and on the Data sources tab.
+Five studio screens sit outside the process surface: the process list
+(`screens/ProcessesScreen.tsx`), Versions (`screens/VersionsScreen.tsx`), the
+migration plan screen (`screens/MigrationPlanScreen.tsx`), Tools
+(`screens/ToolsScreen.tsx`) and Templates (`screens/TemplatesScreen.tsx`).
+The app area's Task screen (`app/screens/TaskScreen.tsx`) is the
+participant's one-task screen. The admin area's instance detail
+(`admin/screens/InstanceScreen.tsx`) is the operator's one-instance screen.
+
+The profile page (`shell/ProfilePage.tsx`) belongs to no area. The account
+menu opens it regardless of which area is active.
+
+**rail** names a class of component rather than one component. A rail is a
+column that holds a register list or a validation list, and scrolls on its
+own. The steps rail and the entity rail sit beside a tab's own main content.
+The checks rail is the exception: it fills the whole Checks tab, with no
+main content beside it (`screens/EditScreen.tsx:1015-1025`).
 
 **rail** alone names none of the three. Say *checks rail*, *steps rail* or
 *entity rail*, every time.
 
-**panel** alone names nothing either. The step page hosts panel components,
-one per section body.
+**panel** alone names nothing either. A `*Panel` component serves as one
+section body on the step page, or as a whole tab's own body elsewhere
+(`FieldCatalogPanel.tsx`, `DataSourcesPanel.tsx`, `ContractPanel.tsx`,
+`FieldMatrixPanel.tsx`).
 
 **dock** names nothing here any more, as a verb or as a noun. Nothing docks.
-The checks rail takes one form: the Checks tab stands the full grouped list.
-The Checks tab's own count carries the severity color; no other control
-duplicates it.
 
 ## 2. Domain terms as the UI shows them
 
@@ -197,6 +216,11 @@ word internally, and that word stays inside the layer.
 | Step | step | `node` (canvas geometry) | never *node* outside `canvas/` |
 | Path | path | `edge` (canvas geometry) | never *edge* outside `canvas/` |
 | Expression | CEL | `CelNode` (the parsed AST) | *CEL* names the source text |
+
+These rules bind UI text, docs, specs, commit messages and conversation. A
+code identifier stays out of scope: `EdgeStyle` in
+`studio/screens/EditScreen.tsx:41` and the key `stepsRail.dragHandle` are
+code, and the rule above does not reach them.
 
 `canvas/geometry.ts` measures rectangles and knows nothing about steps.
 `NODE_WIDTH` is the honest name for a width. The canvas renders a step as a
@@ -226,4 +250,5 @@ This file links. It does not repeat. A term defined twice drifts.
   `.claude/rules/design-language.md`.
 - `id`, `key`, `label`, `definitionHash`, guard, outcome, trigger:
   `.claude/rules/process-contract.md`.
-- Operator, surface, area, participant, process owner: `CLAUDE.md`.
+- Operator, surface, area, participant, process owner: `CLAUDE.md` and
+  `PRODUCT.md`.

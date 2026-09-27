@@ -29,11 +29,11 @@
 
 ## 4. ui-glossary.md
 
-- [ ] 4.1 Fix UG items 1-8 per design.md; grep finds no "field tabs"
-- [ ] 4.2 Add UG gaps 1-10, the Access tab row included; grep finds "Access tab"
-- [ ] 4.3 Apply UG trims 1-6; each trimmed fact still appears in its target file
-- [ ] 4.4 Add `openspec/**`, `docs/browser-checks.md` and `DESIGN.md` to `paths:`
-- [ ] 4.5 Run antislop check on the file; it exits 0
+- [x] 4.1 Fix UG items 1-8 per design.md; grep finds no "field tabs"
+- [x] 4.2 Add UG gaps 1-10, the Access tab row included; grep finds "Access tab"
+- [x] 4.3 Apply UG trims 1-6; each trimmed fact still appears in its target file
+- [x] 4.4 Add `openspec/**`, `docs/browser-checks.md` and `DESIGN.md` to `paths:`
+- [x] 4.5 Run antislop check on the file; it exits 0
 
 ## 5. Repeated claims elsewhere
 
