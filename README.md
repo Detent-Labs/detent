@@ -36,8 +36,9 @@ A serialized JSON process definition is the one artifact three roles share:
 
 `src/schema/definition.ts` is that contract, expressed as Zod schemas with TS
 types derived via `z.infer` so validation and types cannot drift. Ids are opaque
-(`step_<uuid>`) and are the sole reference anchor; `key`/`label` reference
-nothing. Bodies are hashed with JCS (canonical JSON); published versions are
+(`step_<uuid>`) and anchor every stored reference. A `key` is a slug with two
+readers: CEL `data.<key>`, and a view entry's `group`/`tab`. A `label` is
+display text. Bodies are hashed with JCS (canonical JSON); published versions are
 immutable and instances pin `{ processId, version, definitionHash }`.
 
 All conditions are CEL (`{ lang: "cel", src }`) — pure, total, no `now()`.

@@ -24,9 +24,11 @@ file gives the full version. The word `contract` alone names the
 
 **Identity.** Every entity has an opaque `id`: UUIDv4 with a type prefix
 (for example `step_...`), lowercase, and immutable. The `key` is a
-human-readable slug that references nothing and may change. The `label`
-is display text. Cross-references and persisted instance state use `id`
-only. Ids are unique per entity kind per process.
+human-readable slug that may change. It has two readers. CEL reads a
+field as `data.<key>`. A view entry's `group` names a group field's
+`key`, and its `tab` names a key in the same view's `tabs`. The `label`
+is display text. Stored references and persisted instance state use
+`id` only. Ids are unique per entity kind per process.
 
 The engine mints runtime ids (instance `inst_`, history `hist_`, event
 `evt_`) via `crypto.randomUUID()`, which produces UUIDv4. The id schema
@@ -281,8 +283,8 @@ An assignment strategy's own `configSchema` is a Zod schema too
 id, never inline, and its options resolve at runtime, never at publish.
 
 The strategy `org.group-members`, one of three org-aware assignment
-strategies, adds a third DB-resolving publish-time check beside
-`validateCrossProcess` and `validateProcessChaining`. For every entry in
+strategies, adds one of the seven DB-resolving publish-time checks
+listed below. For every entry in
 the body's own `allowedGroups`, `publishBody` confirms a group with that
 id exists in the `groups` store (`src/auth/groups.ts`). It also confirms
 the group's scope permits the publishing process. A violation throws

@@ -9,7 +9,7 @@ paths:
 
 `DESIGN.md` holds the token and value authority. `tmp/Detent Design
 Language.dc.html` is an untracked visual reference that may lag it. Its
-stamp swatch still shows `#ec3013`, the color `tokens.css:18-25` replaced
+stamp swatch still shows `#ec3013`, the color `tokens.css:26` replaced
 with `#d42b11`. This file states the prose rules. Its facts must match
 `DESIGN.md`.
 

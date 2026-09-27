@@ -214,7 +214,7 @@ Trims:
 
 Wrong or stale:
 
-1. DL:9-11, the source. `DESIGN.md` is the token and value authority. `tmp/Detent Design Language.dc.html` is an untracked visual reference that may lag. Its stamp swatch still shows `#ec3013`, which `tokens.css:18-25` replaced with `#d42b11`.
+1. DL:9-11, the source. `DESIGN.md` is the token and value authority. `tmp/Detent Design Language.dc.html` is an untracked visual reference that may lag. Its stamp swatch still shows `#ec3013`, which `tokens.css:26` replaced with `#d42b11`.
 2. DL:32. `Unclaimed` and `Booked` are no color roles. Name real ones: `--color-accent`, `--color-text-muted`, `--color-dormant`.
 3. DL:49-53. State the weights per D2, in these words: "The written face takes two weights, 800 and 400. Mono takes 600 on a stamp and on the check badge. A machine value in running text takes the size around it. `docs/decisions.md` lists ten off-spec sites, and none is precedent."
 4. DL:36-38 and DL:209-211. Keep the rule. Add one line: known violations exist, `docs/decisions.md` tracks them, and none is precedent. The sites: five `#726e6e` stamps, `form-ui/src/FieldForm.tsx:204-205` (`colors.refusal700`, `colors.paper50`) and `studio/canvas/CanvasView.tsx:303`, `:313` (`colors.neutral900`).
@@ -268,8 +268,8 @@ Gaps to add:
 1. The Access tab row, per D3.
 2. "Developer" names three things: the studio audience, a per-process access role and the Developer view. `PRODUCT.md` calls the audience "process author". Fix the use of each.
 3. *grip* for the steps rail's drag control.
-4. The header bar row gains the content-locale badge. It also gains the add-locale control. *Content locale* names authored text. *Language* names the account menu's UI locale.
-5. The `⋮` menu has two groups: "Process, saved with the draft" (Cancellable, assignment groups) and "Views". The Collaboration checkboxes sit in the header bar's inline cluster, and not in the menu (`i18n/catalogs/studio.ts:662-676`). The review placed them in the menu, which is wrong.
+4. The header bar row gains the content-locale badge. The `⋮` menu gains the add-locale control. *Content locale* names authored text. *Language* names the account menu's UI locale.
+5. The `⋮` menu has two groups: "Process, saved with the draft" (Cancellable, assignment groups) and "Views". The Collaboration checkboxes sit inside the `⋮` menu's first group (`panels/ProcessHeaderBar.tsx:881`, `:959`).
 6. Rows for *form editor* and *form canvas*. Bare *canvas* names only the graph.
 7. *issue* is the word for one validation item.
 8. Rows for the studio screens outside the process surface: process list (`ProcessesScreen.tsx`), Versions, migration plan, Tools, Templates. Rows for Task screen (`app/screens/TaskScreen.tsx`) and instance detail (`admin/screens/InstanceScreen.tsx`).

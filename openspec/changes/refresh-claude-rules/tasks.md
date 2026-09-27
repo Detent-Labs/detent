@@ -60,10 +60,10 @@
 
 ## 7. Verification
 
-- [ ] 7.1 Run `bun run typecheck` in the devcontainer; it exits 0
-- [ ] 7.2 Run `bun run build` in the devcontainer; it exits 0
-- [ ] 7.3 Run the full `bun test` with `DATABASE_URL` set inside the devcontainer; pipe it through `scripts/gates/silent-green.sh`
-- [ ] 7.4 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` on the host; it exits 0
-- [ ] 7.5 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh` on the host; it exits 0
-- [ ] 7.6 Run `OPENSPEC_TELEMETRY=0 openspec validate refresh-claude-rules --strict`; it reports valid
-- [ ] 7.7 The `studio-checks-rail` delta does not need code; it lands at sync or archive
+- [x] 7.1 Run `bun run typecheck` in the devcontainer; it exits 0
+- [x] 7.2 Run `bun run build` in the devcontainer; it exits 0
+- [x] 7.3 Run the full `bun test` with `DATABASE_URL` set inside the devcontainer; pipe it through `scripts/gates/silent-green.sh`
+- [x] 7.4 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` on the host; it exits 0
+- [x] 7.5 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh` on the host; it exits 0
+- [x] 7.6 Run `OPENSPEC_TELEMETRY=0 openspec validate refresh-claude-rules --strict`; it reports valid
+- [x] 7.7 The `studio-checks-rail` delta does not need code; it lands at sync or archive

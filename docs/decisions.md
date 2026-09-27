@@ -560,6 +560,13 @@ word. `ROADMAP.md` carries stage-by-stage status.
   hover wash, `rgb(234, 233, 233)`, it reads 4.16:1. Every register row that
   carries a dormant stamp and washes on hover shares that gap. `DESIGN.md`
   pins `#726e6e`, so retuning the tone is a design change of its own.
+- **Two more components read a primitive directly instead of a role.**
+  `packages/form-ui/src/FieldForm.tsx:204-205` sets a tab's issue stamp
+  with `colors.refusal700` and `colors.paper50`, both primitives.
+  `packages/web/src/areas/studio/canvas/CanvasView.tsx:303` and `:313` set
+  the terminal/initial stamp circle and its text with `colors.neutral900`,
+  also a primitive. Neither site moved in a design change yet. Each is
+  separate from the `#726e6e` entry above.
 - **Ten sites set an off-spec weight on the written face.**
   `.claude/rules/design-language.md` allows only 800 and 400 there. Three
   sites set 500:
