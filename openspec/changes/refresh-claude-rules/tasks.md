@@ -67,3 +67,4 @@
 - [x] 7.5 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh` on the host; it exits 0
 - [x] 7.6 Run `OPENSPEC_TELEMETRY=0 openspec validate refresh-claude-rules --strict`; it reports valid
 - [x] 7.7 The `studio-checks-rail` delta does not need code; it lands at sync or archive
+- [x] 7.8 Pin the new Zod-invalid scenario in `studio-checksRail.test.ts`
