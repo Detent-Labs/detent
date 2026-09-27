@@ -18,13 +18,13 @@ with no browser at all. Do not let a UI concern leak into `src/`.
 Direction: no-code and low-code process authoring (`ROADMAP.md` stage 27, DONE
 a–f). The two words name two things. No-code is the target for what the
 builders cover: an author types no CEL and no JSON. Low-code is what stays
-underneath permanently: the JSON view, the CEL input and hand-authored bodies
+underneath permanently: the JSON surface, the CEL input and hand-authored bodies
 stay first-class.
 
 The builders cover the canvas, the form editor, plugin config, path guards and
 view overrides, migration plans and templates. Three sites keep a raw input on
 purpose: a timer deadline must infer to `string`, an `Action.output` value reads
-`result` alone, and the JSON view is the escape hatch for what no builder
+`result` alone, and the JSON surface is the escape hatch for what no builder
 expresses. That direction relaxes none of the definition contract rules. Every
 authoring surface produces the same JSON definition.
 
@@ -61,11 +61,13 @@ rests on it. And the mechanical gates below stay non-negotiable.
 ## The definition contract in brief
 Full detail in `.claude/rules/process-contract.md` and
 `.claude/rules/authoring-invariants.md`. Those load automatically when you touch
-`src/schema`, `src/engine`, `src/cel`, the studio area, `examples/` or
-`openspec/`. Read them before proposing any change to the JSON definition. The
-short form, true in every session:
-- The opaque `id` is the SOLE reference anchor. `key` is a slug that references
-  nothing; `label` is display text.
+`src/schema`, `src/engine`, `src/cel`, `src/validate.ts`, the studio area,
+`examples/` or `openspec/`. Read them before proposing any change to the JSON
+definition. The short form, true in every session:
+- The opaque `id` anchors every stored reference and all persisted instance
+  state. A `key` is a slug with two readers. CEL reads a field as
+  `data.<key>`. A view entry's `group` names a group field's `key`, and its
+  `tab` names a key in the same view's `tabs`. A `label` is display text.
 - `definitionHash` is the JCS hash of `ProcessBody` only. Published versions are
   immutable; instances pin `{processId, version, definitionHash}`.
 - All conditions are CEL, `{ lang: "cel", src }`. CEL is pure and total, has no
@@ -108,7 +110,7 @@ writes its delta against the capability spec of the area it touches:
 `areas/reporting/`, `unified-shell` for shell, login, routing and chrome,
 `form-ui` for the renderer. Studio work goes to the specific capability —
 `studio-canvas`, `studio-json-view`, `studio-form-editor`, `studio-publish` and
-the rest — and `studio-app` keeps the frame, navigation and drafts list.
+the rest — and `studio-app` keeps the frame, navigation and process list.
 `spa-accessibility`, `ui-string-overrides` and `authored-content-localization`
 cut across all of them. A screen that needs new data adds the API-side spec too,
 `instance-query` or `admin-operations-api` for example.
@@ -286,11 +288,11 @@ packages/web/              the ONE browser package (React + Vite). One build, on
                             timers, users, migrations, groups, data lists,
                             UI strings
   src/areas/studio/         developer: drafts, the process surface's eleven
-                            tabs (canvas, with its selection-driven inspector;
-                            steps, fields, data sources, paths, forms,
-                            field matrix, contract, changes, checks, access),
-                            form editor, JSON surface, publish, versions+diff,
-                            migration-plan authoring, Templates, Tools, Player
+                            tabs (canvas, steps, fields, data sources, paths,
+                            forms, field matrix, contract, changes, checks,
+                            access), form editor, JSON surface, publish,
+                            versions+diff, migration-plan authoring,
+                            Templates, Tools, Player
   src/areas/reporting/      process owner: cycle time, bottlenecks, SLA,
                             saved reports (builder, preview, CSV, sharing)
 packages/form-ui/          shared step-form renderer (source-only, no build step); consumed by both
@@ -393,12 +395,11 @@ after a substantial change lands.
     `vercel-composition-patterns`) — do not default to plain React/CSS choices.
     Prefer semantic HTML5 elements (`<nav>`, `<main>`, `<button>`,
     `<dialog>`, ...) over generic `<div>`/`<span>` soup.
-  - Three files carry the visual language and change together. `DESIGN.md`
-    holds the tokens the detector reads. `.claude/rules/design-language.md`
-    carries the prose rules (color roles, type, spacing, component states,
-    class naming) and loads automatically for `packages/web/**` and
-    `packages/form-ui/**`. `tmp/Detent Design Language.dc.html` is the full
-    reference, with swatches and type specimens.
+  - The token and value authority is `DESIGN.md`. The prose rules live in
+    `.claude/rules/design-language.md`, which loads for `packages/web/**`,
+    `packages/form-ui/**` and `DESIGN.md`. The file `tmp/Detent Design
+    Language.dc.html` is an untracked visual reference that may lag the
+    other two.
 - Bun is the runtime, package manager, and test runner. Use `bun`, not npm/pnpm:
   `bun install`, `bun test`. Typechecking stays with `tsc --noEmit` (`bun run
   typecheck`) — Bun does not typecheck. `BUN_VERSION` in

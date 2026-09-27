@@ -11,7 +11,7 @@ web
 Detent serves four audiences. Two of them are primary and rank equally.
 
 The process author builds definitions in the studio area. They work on a
-canvas, in a form editor, and in the JSON view. They need the artifact they
+canvas, in a form editor, and in the JSON surface. They need the artifact they
 draw to be the artifact that runs.
 
 The participant completes tasks and approvals in the app area. They see one
@@ -48,8 +48,8 @@ claim all four without rebuilding itself.
   at a named state a person can point at.
 - No-code and low-code both stay permanent. The builders cover the canvas,
   the form editor, plugin config, path guards and view overrides. Migration
-  plans and templates have builders too. The JSON view and the CEL input stay
-  first-class beside them.
+  plans and templates have builders too. The JSON surface and the CEL input
+  stay first-class beside them.
 - The engine's correctness promises are the product. A published version is
   immutable. An instance pins `{processId, version, definitionHash}`. CEL is
   pure and total. State commits before any side effect dispatches.
@@ -95,10 +95,11 @@ contract` names the whole JSON definition, while `contract` alone names the
 The product name is Detent. The repository is public, under
 AGPL-3.0-or-later.
 
-Three files carry the visual language, and all three bind. `DESIGN.md`
-holds the tokens and the component rules. The distilled rule set lives in
-`.claude/rules/design-language.md`. The full reference with swatches and
-specimens lives in `tmp/Detent Design Language.dc.html`.
+The token and value authority is `DESIGN.md`. The prose rules live in
+`.claude/rules/design-language.md`, which loads for `packages/web/**`,
+`packages/form-ui/**` and `DESIGN.md`. The file `tmp/Detent Design
+Language.dc.html` is an untracked visual reference that may lag the other
+two.
 
 The shell, app, admin and reporting areas ship in English and German. The
 studio ships in English only. Each area keeps its own catalog.

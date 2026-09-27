@@ -37,16 +37,16 @@
 
 ## 5. Repeated claims elsewhere
 
-- [ ] 5.1 Apply the `CLAUDE.md` rows of design.md's table; grep finds no "inspector"
-- [ ] 5.2 Apply the `PRODUCT.md` and `README.md` rows; grep finds no "JSON view" there
-- [ ] 5.3 Apply the `openspec/config.yaml` rows; grep finds no "ten tabs" and no "JSON view"
-- [ ] 5.4 Apply the three `docs/authoring-guide.md` rows; grep finds no "unreachable outcome"
-- [ ] 5.5 Apply the `docs/current-state.md:252` row; grep finds no "inspector" there
-- [ ] 5.6 Fix the structural-check count in `src/validate.ts`, `definitions.ts`, `compile.ts` and `validation.ts`
-- [ ] 5.7 Run design.md's count grep; it finds nothing
-- [ ] 5.8 Fix the three `checksRail.ts` comments; grep finds no "six structural" and no "same order" there
-- [ ] 5.9 Run the design.md "Inbound citations" sweep; re-point `FormEditorScreen.tsx:476` at `DESIGN.md`
-- [ ] 5.10 Run antislop check on each touched Markdown file; no new finding
+- [x] 5.1 Apply the `CLAUDE.md` rows of design.md's table; grep finds no "inspector"
+- [x] 5.2 Apply the `PRODUCT.md` and `README.md` rows; grep finds no "JSON view" there
+- [x] 5.3 Apply the `openspec/config.yaml` rows; grep finds no "ten tabs" and no "JSON view"
+- [x] 5.4 Apply the three `docs/authoring-guide.md` rows; grep finds no "unreachable outcome"
+- [x] 5.5 Apply the `docs/current-state.md:252` row; grep finds no "inspector" there
+- [x] 5.6 Fix the structural-check count in `src/validate.ts`, `definitions.ts`, `compile.ts` and `validation.ts`
+- [x] 5.7 Run design.md's count grep; it finds nothing
+- [x] 5.8 Fix the three `checksRail.ts` comments; grep finds no "six structural" and no "same order" there
+- [x] 5.9 Run the design.md "Inbound citations" sweep; re-point `FormEditorScreen.tsx:476` at `DESIGN.md`
+- [x] 5.10 Run antislop check on each touched Markdown file; no new finding
 
 ## 6. docs/decisions.md
 

@@ -20,8 +20,8 @@ integration drives a process with no browser at all.
 No-code and low-code process authoring shipped (`ROADMAP.md` stage 27). An
 analyst builds a process through forms and a canvas, typing no CEL and no JSON.
 The builders cover plugin config, conditions, migration plans, templates and
-form layout. Low-code stays underneath, permanently. The JSON view and the CEL
-text input remain first-class for a developer.
+form layout. Low-code stays underneath, permanently. The JSON surface and the
+CEL text input remain first-class for a developer.
 
 The paradigm is a **state-based finite-state machine**: Steps (states) connected
 by explicit Paths (transitions). This is *not* BPMN token flow.

@@ -1210,7 +1210,7 @@ function checkUnsatisfiableRequiredReadonly(body: ProcessBody): CompileIssue[] {
  * `checkTechnicalFields`, `checkViewGroupReferences` and
  * `checkUnsatisfiableRequiredReadonly` operate on
  * the body duck-typed (it has not yet been Zod-parsed at this point); the
- * remaining four operate on the `ProcessBody`-typed parameter, which is a lie
+ * remaining seven operate on the `ProcessBody`-typed parameter, which is a lie
  * at this exact call site for the same reason — the type is honest again
  * only after `authoredProcessBody.parse`/the early return's `safeParse`
  * succeed.

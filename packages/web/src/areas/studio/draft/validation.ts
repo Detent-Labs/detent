@@ -61,8 +61,8 @@ const EMPTY_REGISTRY_DESCRIPTION: RegistryDescription = { actionTypes: [], assig
  * `validateReferences`, `src/validate.ts`), plus two studio-owned passes,
  * `checkViewFlags` and `checkUnwrittenTechnicalFields`.
  *
- * `validateStructure` runs unconditionally: it owns the Zod gate, duration
- * and the seven structural checks, in that fixed order, and produces the
+ * `validateStructure` runs unconditionally: it owns duration, the twelve
+ * structural checks and the Zod gate, in that order, and produces the
  * compiled body every check below needs. `checkViewFlags`/
  * `checkUnwrittenTechnicalFields` run once the draft is Zod-valid — never
  * gated on a compiled body existing, so they still report when duration or

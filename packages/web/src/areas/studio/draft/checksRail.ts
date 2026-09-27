@@ -1,10 +1,11 @@
 import type { EditorIssue, IssueSource } from "./issues";
 import type { ValidationResult } from "./validation";
 
-/** Group display order: the same order `authoring-invariants.md` runs its
- * checks in — zod first (everything else is held back without it), then the
- * write-path checks in `compileProcessBody`'s own sequence, then `view`
- * last: the studio's own findings, not an engine validator. */
+/** Group display order, which is no run order. Zod comes first, since every
+ * other group holds back without it. The four engine groups follow, and
+ * view comes last as the studio's own findings. The run order differs:
+ * `compileProcessBody` runs durations before the structural checks.
+ * Likewise, `validateReferences` runs registry before CEL. */
 export const CHECK_SOURCES: IssueSource[] = ["zod", "structural", "cel", "registry", "duration", "view"];
 
 export interface CheckGroup {
@@ -30,12 +31,13 @@ export interface CheckGroup {
  * "Duration and structural checks keep running before the Zod gate"
  * section):
  * - `zod` never holds back — it is the first check and always runs.
- * - `structural` holds back on `dimensions.structural !== "ran"` — a
- *   duration failure, or a Zod-invalid draft, stops `compileProcessBody`
- *   before it ever reaches the structural checks.
+ * - `structural` holds back on `dimensions.structural !== "ran"`. A
+ *   duration failure stops `compileProcessBody` before the structural
+ *   checks. A Zod-invalid draft whose compile pass raised nothing reports
+ *   `structural` as `not-run` (`src/validate.ts:134`).
  * - `cel`/`registry` hold back when `dimensions.structural !== "ran"`, OR
  *   the structural group's own issue list is non-empty — `dimensions.structural`
- *   alone reads "ran" both when the six structural checks pass cleanly and
+ *   alone reads "ran" both when the twelve structural checks pass cleanly and
  *   when they run and raise a `CompileValidationError`, so the issue-list
  *   check is what tells "compiled cleanly" apart from "ran and failed."
  *   `registry` additionally holds back when `dimensions.actionType !==

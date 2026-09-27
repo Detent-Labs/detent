@@ -473,9 +473,10 @@ const styles = stylex.create({
     width: "100%",
     padding: 0,
   },
-  // The Title role (`design-language.md`: 800 weight, 0.85rem, uppercase,
-  // 0.08em tracking, slate) — the same rule `global.css`'s bare `h2` already
-  // draws, read here from tokens instead of a hand-written selector.
+  // The Title role (`DESIGN.md`'s Hierarchy section: 800 weight, 0.85rem,
+  // uppercase, 0.08em tracking, slate) — the same rule `global.css`'s bare
+  // `h2` already draws, read here from tokens instead of a hand-written
+  // selector.
   formGroupLegendName: {
     display: "flex",
     alignItems: "baseline",

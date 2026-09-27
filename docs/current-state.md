@@ -249,7 +249,8 @@ screens plan migrations and export a version to another environment.
 ## Process Studio: canvas
 
 The canvas draws steps and paths on a grid. An author can select, group,
-arrange and connect steps there. A selection opens the inspector beside it.
+arrange and connect steps there. A click on a step selects it on the canvas.
+Enter on a focused step opens it on the Steps tab's step page.
 
 - Paths: `packages/web/src/areas/studio/canvas/`
 - Specs: `studio-canvas`
