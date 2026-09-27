@@ -275,9 +275,8 @@ word. `ROADMAP.md` carries stage-by-stage status.
   two-weight rule holds either way: 800 for a heading and a button label, 400
   for everything else, nothing between. Ten sites already break that rule
   with an off-spec weight; this file's own entry below names each one.
-  Deferred 2026-09-02 — we do not need
-  Archivo yet. When it lands, self-host the woff2: the build-time CSP is
-  `default-src 'self'` with no `font-src`
+  Deferred 2026-09-02 — we do not need Archivo yet. When it lands, self-host
+  the woff2: the build-time CSP is `default-src 'self'` with no `font-src`
   (`packages/web/vite.config.ts:26`), so a self-hosted file needs no CSP change
   and no `frontend-security-headers` delta, while a Google Fonts link would
   need `style-src` and `font-src` additions plus that delta. It changes the
@@ -530,9 +529,9 @@ word. `ROADMAP.md` carries stage-by-stage status.
 - **Retired UI words still sit in live specs and in the studio catalog.**
   `openspec/specs/studio-app/spec.md:631` and
   `openspec/specs/studio-canvas/spec.md:1080`, `:2972` and `:3020` still
-  read "panels screen", "ribbon", "configuration pane", "inspector" and
-  "bench". `studio-canvas/spec.md:2078` names an "edit rail" and a
-  `canvas/EditRail.tsx` that no longer exists.
+  read "panels screen", "ribbon", "bench", "steps register", "configuration
+  pane" and "inspector". `studio-canvas/spec.md:2078` names an "edit rail"
+  and a `canvas/EditRail.tsx` that no longer exists.
 
   Two dead catalog keys, `ribbon.expand` and `ribbon.collapse`, sit at
   `packages/web/src/i18n/catalogs/studio.ts:754-755`. One displayed string
@@ -1146,8 +1145,9 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   halves and no tab set (`panels/FieldCatalogPanel.tsx:608`,
   `openspec/specs/studio-app/spec.md:2564`), and it edits a field at any
   depth. `docs/browser-checks.md:1881-1889` and `:2369` still describe a
-  Values tab that does not exist. The next change that touches this screen
-  must rewrite both passages.
+  Values tab that does not exist. Risk (Low): a browser check walks a
+  control that is not there. The next change that touches this screen must
+  rewrite both passages.
 - **FIELDS-14: `FieldsTab` walks the field tree once per rail entry.** Each
   call of `FieldsTab` walks the whole tree twice, in `flattenRailFields` and
   `flattenDraftFields` (`panels/EntityTabs.tsx:353`, `:354`). Each rail entry
