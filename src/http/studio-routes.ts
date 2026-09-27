@@ -8,12 +8,12 @@
  * read or write:
  * - `requireAuthoring` (author OR developer) on `GET /drafts`, the publish
  *   route (beside `PUBLISH_ROLE`) and `GET /registry`. `GET`/`PUT`/`DELETE
- *   /drafts/:processId` take it too, but only for a processId with neither a
- *   draft nor a published version yet — `PUT` additionally needs
- *   `CREATE_ROLE` there. Once one exists, those three instead need
- *   `requireDeveloperListOrAdmin`: `ADMIN_ROLE` bypasses `requireAuthoring`
- *   entirely there (matching `GET /processes/:processId/access` below), any
- *   other actor still needs both.
+ *   /drafts/:processId` and `POST /drafts/:processId/instances` take it too,
+ *   but only for a processId with neither a draft nor a published version
+ *   yet — `PUT` additionally needs `CREATE_ROLE` there. Once one exists,
+ *   those four instead need `requireDeveloperListOrAdmin`: `ADMIN_ROLE`
+ *   bypasses `requireAuthoring` entirely there (matching `GET
+ *   /processes/:processId/access` below), any other actor still needs both.
  * - `requireStudioRead` (those two OR templates) on the two template reads and
  *   the published version body.
  * - `await requirePermission(actor, "migrate", processId, db)` alone on the
@@ -97,10 +97,10 @@ function requireStudioRead(actor: { id: string; roles: readonly string[] }): voi
 
 /**
  * `ADMIN_ROLE`, or a match on that process's own Developer list
- * (process-access-roles). Gates `GET`/`PUT`/`DELETE /drafts/:processId`
- * for a process that already has a draft or a published version — the
- * complement of Task 4.1's `CREATE_ROLE` check on the branch where
- * neither exists yet.
+ * (process-access-roles). Gates `GET`/`PUT`/`DELETE /drafts/:processId` and
+ * `POST /drafts/:processId/instances` for a process that already has a
+ * draft or a published version — the complement of Task 4.1's
+ * `CREATE_ROLE` check on the branch where neither exists yet.
  */
 async function requireDeveloperListOrAdmin(actor: Actor, processId: ProcessId, db: SQL): Promise<void> {
   if (actor.roles.includes(ADMIN_ROLE)) return;
