@@ -971,6 +971,37 @@ test.skipIf(!DB)("a curator reads a published version's body, the one source a t
   expect(((await res.json()) as { label: { en: string } }).label.en).toBe("Seedable");
 });
 
+test.skipIf(!DB)("a curator cannot read a draft snapshot", async () => {
+  const processId = pid();
+  await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("Sealed"), layout: {}, revision: 0 }));
+
+  const instanceRes = await fetch(authedReq(`http://x/drafts/${processId}/instances`, "POST", developer, {}));
+  expect(instanceRes.status).toBe(201);
+
+  const snapshotRows = (await sql`SELECT version FROM draft_snapshots WHERE process_id = ${processId} AND version = -1`) as { version: number }[];
+  expect(snapshotRows).toHaveLength(1);
+
+  const res = await fetch(authedReq(`http://x/processes/${processId}/versions/-1`, "GET", curator));
+  expect(res.status).toBe(404);
+  expect(await res.text()).not.toContain("Sealed");
+});
+
+test.skipIf(!DB)("a developer outside the Developer list cannot read a draft snapshot", async () => {
+  const processId = pid();
+  await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("Sealed"), layout: {}, revision: 0 }));
+
+  const instanceRes = await fetch(authedReq(`http://x/drafts/${processId}/instances`, "POST", developer, {}));
+  expect(instanceRes.status).toBe(201);
+
+  const snapshotRows = (await sql`SELECT version FROM draft_snapshots WHERE process_id = ${processId} AND version = -1`) as { version: number }[];
+  expect(snapshotRows).toHaveLength(1);
+
+  const unlisted: Actor = { id: "user_unlisted_dev", roles: [DEVELOPER_ROLE] };
+  const res = await fetch(authedReq(`http://x/processes/${processId}/versions/-1`, "GET", unlisted));
+  expect(res.status).toBe(404);
+  expect(await res.text()).not.toContain("Sealed");
+});
+
 test.skipIf(!DB)("a curator reaches no draft, no publish, no admin route and no reporting route", async () => {
   const processId = pid();
   expect((await fetch(authedReq("http://x/drafts", "GET", curator))).status).toBe(403);
