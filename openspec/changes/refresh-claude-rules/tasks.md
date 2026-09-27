@@ -50,13 +50,13 @@
 
 ## 6. docs/decisions.md
 
-- [ ] 6.1 Add the Open-questions entry for the subprocess-child rule (D1)
-- [ ] 6.2 Add the off-spec weight entry (3 at 500, 7 at 600) beside `#726e6e` (D2)
-- [ ] 6.3 Add the "Access surface" wording entry (D3)
-- [ ] 6.4 Add the retired-words entry for specs and catalog keys, `studio-canvas` edit rail included (D4)
-- [ ] 6.5 Narrow FIELDS-13 to the `docs/browser-checks.md` lines (D7)
-- [ ] 6.6 In the Archivo entry, name the ten sites and drop the `app.css` sentence
-- [ ] 6.7 Run antislop check on `docs/decisions.md`; no new finding
+- [x] 6.1 Add the Open-questions entry for the subprocess-child rule (D1)
+- [x] 6.2 Add the off-spec weight entry (3 at 500, 7 at 600) beside `#726e6e` (D2)
+- [x] 6.3 Add the "Access surface" wording entry (D3)
+- [x] 6.4 Add the retired-words entry for specs and catalog keys, `studio-canvas` edit rail included (D4)
+- [x] 6.5 Narrow FIELDS-13 to the `docs/browser-checks.md` lines (D7)
+- [x] 6.6 In the Archivo entry, name the ten sites and drop the `app.css` sentence
+- [x] 6.7 Run antislop check on `docs/decisions.md`; no new finding
 
 ## 7. Verification
 
