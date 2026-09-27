@@ -229,12 +229,15 @@ export async function handleDeleteDraft(processId: string, req: Request, resolve
 /**
  * draft-test-instances: creates a real, running instance from the process's
  * CURRENT draft body instead of a published version — no published version
- * required. `requireAuthoring`, the same gate as the other four draft
- * routes: a role-gated route, not a flag on the public instance-creation
- * route, is the server-enforced boundary design.md's "the real bypass risk"
- * decision requires (see `POST /processes/:processId/instances`, which the
- * app area's own calling code — not a role — is what stops a participant
- * from using today).
+ * required. Gated exactly like `handleGetDraft`: an actor needs an
+ * authoring role plus a place on the process's Developer list, or
+ * `ADMIN_ROLE` alone, once the process has a draft or a published version.
+ * For a process with neither, `requireAuthoring` runs alone — a role-gated
+ * route, not a flag on the public instance-creation route, is the
+ * server-enforced boundary design.md's "the real bypass risk" decision
+ * requires (see `POST /processes/:processId/instances`, which the app
+ * area's own calling code — not a role — is what stops a participant from
+ * using today).
  *
  * Checks `getDraft` itself, exactly like `handleGetDraft`, rather than
  * letting `createProcessInstance`'s own internal `NotFoundError` reach
@@ -252,20 +255,35 @@ export async function handleCreateTestInstance(
   db: SQL,
   assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
 ): Promise<HttpResult> {
-  return route(req, resolver, db, requireAuthoring, async (actor) => {
-    const draft = await getDraft(processId as ProcessId, db);
-    if (!draft) return notFound(`no draft: ${processId}`);
-    const parsed = (await readJson(req)) as { data?: unknown };
-    const created = await createProcessInstance(
-      processId as ProcessId,
-      actor,
-      dataSourceRegistry,
-      { fromDraft: true, data: parsed.data as Instance["data"] | undefined },
-      db,
-      assignmentRegistry,
-    );
-    return { status: 201, body: created };
-  });
+  return route(
+    req,
+    resolver,
+    db,
+    async (actor) => {
+      if (await hasNoDraftAndNoPublishedVersion(processId as ProcessId, db)) {
+        requireAuthoring(actor);
+      } else {
+        if (!actor.roles.includes(ADMIN_ROLE)) {
+          requireAuthoring(actor);
+        }
+        await requireDeveloperListOrAdmin(actor, processId as ProcessId, db);
+      }
+    },
+    async (actor) => {
+      const draft = await getDraft(processId as ProcessId, db);
+      if (!draft) return notFound(`no draft: ${processId}`);
+      const parsed = (await readJson(req)) as { data?: unknown };
+      const created = await createProcessInstance(
+        processId as ProcessId,
+        actor,
+        dataSourceRegistry,
+        { fromDraft: true, data: parsed.data as Instance["data"] | undefined },
+        db,
+        assignmentRegistry,
+      );
+      return { status: 201, body: created };
+    },
+  );
 }
 
 /**
