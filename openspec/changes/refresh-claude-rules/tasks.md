@@ -19,13 +19,13 @@
 
 ## 3. design-language.md
 
-- [ ] 3.1 Fix DL items 1-10 per design.md; grep finds no "Booked" or "3d 04h"
-- [ ] 3.2 Scope `DESIGN.md:590-592` and `:794` per DL items 6 and 11
-- [ ] 3.3 Add DL gaps 1-8; grep finds `accent-on-muted`, `layout-cap-narrow` and "flagged-cell ring"
-- [ ] 3.4 Apply DL trims 1-8; each trimmed fact still appears in `DESIGN.md`
-- [ ] 3.5 Drop "chevrons' old position" in `StepsRail.tsx:113`; grep confirms it is gone
-- [ ] 3.6 Add `DESIGN.md` to the `paths:` list
-- [ ] 3.7 Run antislop check on the rule file and on `DESIGN.md`; no new finding
+- [x] 3.1 Fix DL items 1-10 per design.md; grep finds no "Booked" or "3d 04h"
+- [x] 3.2 Scope `DESIGN.md:590-592` and `:794` per DL items 6 and 11
+- [x] 3.3 Add DL gaps 1-8; grep finds `accent-on-muted`, `layout-cap-narrow` and "flagged-cell ring"
+- [x] 3.4 Apply DL trims 1-8; each trimmed fact still appears in `DESIGN.md`
+- [x] 3.5 Drop "chevrons' old position" in `StepsRail.tsx:113`; grep confirms it is gone
+- [x] 3.6 Add `DESIGN.md` to the `paths:` list
+- [x] 3.7 Run antislop check on the rule file and on `DESIGN.md`; no new finding
 
 ## 4. ui-glossary.md
 

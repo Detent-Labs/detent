@@ -110,9 +110,9 @@ const styles = stylex.create({
   badgeAdvisory: {
     color: colors.textMuted,
   },
-  // The drag handle, at the row's trailing edge, in the chevrons' old
-  // position. Padding gives it a 24x24 CSS pixel hit area independent of the
-  // 18px icon inside it (`spa-accessibility`'s pointer-target minimum).
+  // The drag handle, at the row's trailing edge. Padding gives it a 24x24
+  // CSS pixel hit area independent of the 18px icon inside it
+  // (`spa-accessibility`'s pointer-target minimum).
   grip: {
     display: "flex",
     alignItems: "center",
