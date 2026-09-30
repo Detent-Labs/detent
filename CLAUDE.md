@@ -404,8 +404,9 @@ after a substantial change lands.
   `bun install`, `bun test`. Typechecking stays with `tsc --noEmit` (`bun run
   typecheck`) — Bun does not typecheck. `BUN_VERSION` in
   `.devcontainer/Dockerfile` pins the version. All tooling (Bun, tsc, tests, dev
-  server, lint, and Claude Code itself) runs inside the dev container, never on
-  the host: host runs caused a Bun version drift past the Dockerfile pin, and a
+  server, lint) runs inside the dev container, never on the host. Claude Code
+  itself may run on the host and reach the container through `docker compose
+  exec`. Host runs caused a Bun version drift past the Dockerfile pin, and a
   stray host-side Vite process answering `localhost:5173` beside the
   container's.
   - Running commands inside the devcontainer without the `devcontainer` CLI
