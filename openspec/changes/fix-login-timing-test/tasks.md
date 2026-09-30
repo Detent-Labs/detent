@@ -7,6 +7,6 @@
 
 ## 2. Verification
 
-- [ ] 2.1 Run `bun run typecheck` in the devcontainer. Verify that it exits 0.
-- [ ] 2.2 Run the full `bun test` suite with `DATABASE_URL` set three times through `scripts/test-gated.sh`. Verify 0 fail in each run.
-- [ ] 2.3 Run the prose gate and the whitespace gate on the host, each fed by `range.sh`. Verify that both exit 0.
+- [x] 2.1 Run `bun run typecheck` in the devcontainer. Verify that it exits 0.
+- [x] 2.2 Run the full `bun test` suite with `DATABASE_URL` set three times through `scripts/test-gated.sh`. Verify 0 fail in each run.
+- [x] 2.3 Run the prose gate and the whitespace gate on the host, each fed by `range.sh`. Verify that both exit 0.
