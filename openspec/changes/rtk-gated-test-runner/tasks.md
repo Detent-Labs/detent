@@ -2,11 +2,11 @@
 
 ## 1. Runner
 
-- [ ] 1.1 Add `scripts/test-gated.sh` as design.md describes. Verify that `git ls-files --eol scripts/test-gated.sh` reports `i/lf` after staging.
-- [ ] 1.2 Add the three runner cases design.md names to `test/gates.test.ts`. Verify that each case fails when the runner drops its gate call.
-- [ ] 1.3 Run the host call from design.md. Verify three exit codes: 0 for the full suite, 1 with `env -u DATABASE_URL` before `sh`, and 1 for a red test file.
-- [ ] 1.4 Place the red test file with `docker cp` from the session scratchpad into the container's `/root`. Delete it after the run.
-- [ ] 1.5 Read the red run's output. Verify that it keeps each failing test's name, its diff and its stack lines.
+- [x] 1.1 Add `scripts/test-gated.sh` as design.md describes. Verify that `git ls-files --eol scripts/test-gated.sh` reports `i/lf` after staging.
+- [x] 1.2 Add the three runner cases design.md names to `test/gates.test.ts`. Verify that each case fails when the runner drops its gate call.
+- [x] 1.3 Run the host call from design.md. Verify three exit codes: 0 for the full suite, 1 with `env -u DATABASE_URL` before `sh`, and 1 for a red test file.
+- [x] 1.4 Place the red test file with `docker cp` from the session scratchpad into the container's `/root`. Delete it after the run.
+- [x] 1.5 Read the red run's output. Verify that it keeps each failing test's name, its diff and its stack lines.
 
 ## 2. Documentation
 
