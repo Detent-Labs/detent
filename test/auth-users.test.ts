@@ -72,14 +72,18 @@ test.skipIf(!DB)("an unknown email takes comparable time to a known one with the
     return performance.now() - start;
   };
 
-  const knownWrong = await time(() => verifyLogin("timing@example.com", "wrong-password"));
-  const unknown = await time(() => verifyLogin("nobody-timing@example.com", "wrong-password"));
-
-  // Before this fix, an unknown email skipped Bun.password.verify entirely and
-  // returned roughly two orders of magnitude faster (about 1/100 the duration).
-  // A 1/2 bound is a wide margin that separates the two behaviors without
-  // depending on machine speed — do not tighten it, or this becomes a flaky test.
-  expect(unknown).toBeGreaterThan(knownWrong / 2);
+  // Load only adds time to a call, so the fastest of five samples per path
+  // estimates that path's own cost. Alternating the paths exposes both to the
+  // same bursts of load. A path that skips Bun.password.verify returns in about
+  // 1 ms, far below half of the ~50 ms argon2id cost, so a 1/2 bound separates
+  // the two behaviors without depending on machine speed. Do not tighten it.
+  const knownWrong: number[] = [];
+  const unknown: number[] = [];
+  for (let i = 0; i < 5; i++) {
+    knownWrong.push(await time(() => verifyLogin("timing@example.com", "wrong-password")));
+    unknown.push(await time(() => verifyLogin("nobody-timing@example.com", "wrong-password")));
+  }
+  expect(Math.min(...unknown)).toBeGreaterThan(Math.min(...knownWrong) / 2);
 });
 
 test.skipIf(!DB)("no plaintext password is stored", async () => {
