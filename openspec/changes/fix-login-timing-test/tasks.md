@@ -2,8 +2,8 @@
 
 ## 1. Timing test
 
-- [ ] 1.1 Rewrite the timing test in `test/auth-users.test.ts` as design.md describes. Keep its name and its one-half bound.
-- [ ] 1.2 On a copy outside the working tree, make `verifyLogin` return before `verify` on a missing row. Verify that the rewritten test fails against that copy.
+- [x] 1.1 Rewrite the timing test in `test/auth-users.test.ts` as design.md describes. Keep its name and its one-half bound.
+- [x] 1.2 On a copy outside the working tree, make `verifyLogin` return before `verify` on a missing row. Verify that the rewritten test fails against that copy.
 
 ## 2. Verification
 
