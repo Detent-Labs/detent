@@ -432,11 +432,27 @@ after a substantial change lands.
   skip count, not just the pass count. Outside the devcontainer, point it at
   the major the compose file's `postgres:latest` currently resolves to, with
   the compose credentials. Don't just remember to check by
-  eye: `scripts/gates/silent-green.sh` already reads exactly this, from any
-  captured test output, not only a pushed `bun run check` log. Pipe a run
-  through it to get the same DATABASE_URL-unset and skip-floor checks the push
-  gate runs, before pushing instead of at push time:
-  `bun test 2>&1 | tee /tmp/t.log; sh scripts/gates/silent-green.sh /tmp/t.log`.
+  eye: `scripts/test-gated.sh` runs the command, prints its full output, and
+  then runs `scripts/gates/silent-green.sh` over that output. It gives the
+  same DATABASE_URL-unset and skip-floor checks the push gate runs, before
+  pushing instead of at push time. From the host, in one call:
+  `. scripts/worktree-env.sh && MSYS_NO_PATHCONV=1 rtk test docker compose -f .devcontainer/docker-compose.yml exec -T -w /workspace app sh scripts/test-gated.sh bun test`.
+- **The host call filters through rtk.** It runs on the host and stays
+  optional, since the runner also works without it. Inside the devcontainer,
+  run `sh scripts/test-gated.sh bun test`. The exit code is the suite's, or 1
+  when the gate rejects the run. Measured on 2026-09-30
+  with rtk 0.50.0 and 4997 tests: a green run prints 6 lines and 87
+  characters, against 5581 lines and 523110 characters raw. A red run keeps
+  each failing test's name, its diff and its stack lines.
+- **Exit 1 with `0 fail` means the gate rejected the run.** The filter hides
+  the rejection text. The last line names the full log under `rtk/tee/`, and
+  that log holds the rejection.
+- **Three traps in the host call.** Keep `bun test` as literal words at the
+  end of the call. `rtk test` picks its filter from them, and without them a
+  red run loses every name and diff. Never pass `sh -c '...'` to `rtk test`.
+  It splits the script at spaces, so `rtk test sh -c 'exit 3'` prints nothing
+  and exits 0. It does not forward stdin either. Do not use `rtk err` for
+  tests, because it cuts object diffs short.
 - **A full-suite run is the reliable signal; a single-file rerun is not.** The DB
   suites share one database and truncate in `beforeEach`, so back-to-back runs of
   one file contend and fail spuriously. Read a verdict off a *named* test
