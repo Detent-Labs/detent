@@ -16,6 +16,6 @@
 
 ## 3. Verification
 
-- [ ] 3.1 Run `bun run typecheck` and `bun run build` in the devcontainer. Verify that both exit 0.
-- [ ] 3.2 Run the full `bun test` suite with `DATABASE_URL` set in the devcontainer. Verify 0 fail and a skip count at or below the floor.
-- [ ] 3.3 Run the prose gate and the whitespace gate on the host, each fed by `range.sh`. Verify that both exit 0.
+- [x] 3.1 Run `bun run typecheck` and `bun run build` in the devcontainer. Verify that both exit 0.
+- [x] 3.2 Run the full `bun test` suite with `DATABASE_URL` set in the devcontainer. Verify 0 fail and a skip count at or below the floor.
+- [x] 3.3 Run the prose gate and the whitespace gate on the host, each fed by `range.sh`. Verify that both exit 0.
