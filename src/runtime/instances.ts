@@ -31,7 +31,16 @@ import type {
   InstanceEvent,
 } from "../schema/definition.js";
 import { createDefaultAssignmentRegistry, resolveStepAssignment, type DataSourceRegistry, type AssignmentRegistry } from "../engine/registry.js";
-import { getStore, parseInstance, loadInstanceForRead, loadInstanceForActor, findStep, resolveCollaboration } from "./internal.js";
+import {
+  getStore,
+  parseInstance,
+  loadInstanceForRead,
+  loadInstanceForActor,
+  findStep,
+  resolveCollaboration,
+  toWriteResult,
+  type InstanceWriteResult,
+} from "./internal.js";
 import {
   resolveFields,
   resolveAvailablePaths,
@@ -415,7 +424,13 @@ async function canActorCancelInstance(actor: Actor, instance: Instance, body: Pr
  * `getInstanceView` does. Delegation to `engine/transition.ts::cancelInstance`
  * for the actual semantics — skip onExit, enqueue `[onCancel, sink.onEntry]`,
  * one cancel `HistoryEntry`, cascade to running children. A non-running
- * instance is returned unchanged, matching the engine's own no-op there.
+ * instance is left unchanged, matching the engine's own no-op there, and the
+ * call still answers its write result. The engine call runs either way, so a
+ * pending child sweep resumes.
+ *
+ * Answers the write result (`toWriteResult`), never the instance. Cancel
+ * authority is not read authority: a `system:cancel-any` holder, a grant
+ * holder and a starter a revocation names all cancel without a read right.
  *
  * Two independent tests admit a caller (`src/auth/authorize.ts`). The
  * load-free one is `CANCEL_ANY_ROLE`, checked before the instance is loaded —
@@ -438,7 +453,7 @@ async function canActorCancelInstance(actor: Actor, instance: Instance, body: Pr
  * participant-cancellable can never strand a running instance no one is able
  * to cancel.
  */
-export async function cancelInstance(instanceId: InstanceId, actor: Actor, db: SQL = sql): Promise<Instance> {
+export async function cancelInstance(instanceId: InstanceId, actor: Actor, db: SQL = sql): Promise<InstanceWriteResult> {
   // Fast, load-free path: a system:cancel-any caller is authorized before any
   // instance lookup, exactly as before this function also accepted a case's
   // own starter.
@@ -446,7 +461,7 @@ export async function cancelInstance(instanceId: InstanceId, actor: Actor, db: S
     requireRole(actor, CANCEL_ANY_ROLE);
     const { instance, body } = await loadInstanceForRead(instanceId, db);
     const store = getStore(db);
-    return engineCancelInstance(instance, body, actor, db, store.resolveBody);
+    return toWriteResult(await engineCancelInstance(instance, body, actor, db, store.resolveBody));
   } catch (err) {
     if (!(err instanceof AuthorizationError)) throw err;
   }
@@ -467,5 +482,5 @@ export async function cancelInstance(instanceId: InstanceId, actor: Actor, db: S
     throw new AuthorizationError(`actor '${actor.id}' may not cancel instance '${instanceId}'`);
   }
   const store = getStore(db);
-  return engineCancelInstance(instance, body, actor, db, store.resolveBody);
+  return toWriteResult(await engineCancelInstance(instance, body, actor, db, store.resolveBody));
 }

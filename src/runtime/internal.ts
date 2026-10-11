@@ -15,9 +15,40 @@ import { actorPrincipals } from "../auth/groups.js";
 import { NotFoundError } from "../errors.js";
 import { encodeCursor, decodeCursor } from "../pagination.js";
 import { instance as instanceSchema } from "../schema/definition.js";
-import type { Instance, ProcessBody, Step, InstanceId } from "../schema/definition.js";
+import type { Instance, ProcessBody, Step, InstanceId, AssignmentState } from "../schema/definition.js";
 
 export type Page<T> = { items: T[]; cursor?: string };
+
+/**
+ * What a write call answers: the facts the call changed, never the instance.
+ * `cancelInstance`, `claimStep`, `releaseClaim` and `delegateClaim` authorize
+ * an actor to change an instance, not to read it, so none of them may hand
+ * back `data`, `startedBy` or any other member a read would refuse.
+ * `assignment` is present only while the instance runs and holds one.
+ */
+export type InstanceWriteResult = {
+  instanceId: InstanceId;
+  status: Instance["status"];
+  transitionSeq: number;
+  assignment?: AssignmentState;
+};
+
+/**
+ * Narrow an engine `Instance` to its write result. Copies each member by name
+ * and never spreads the instance, so a member added to `Instance` later
+ * cannot reach a caller. The stored assignment is often an explicit `null`,
+ * and a finished instance can still carry a terminal step's assignment;
+ * neither reaches the result.
+ */
+export function toWriteResult(instance: Instance): InstanceWriteResult {
+  const result: InstanceWriteResult = {
+    instanceId: instance.instanceId,
+    status: instance.status,
+    transitionSeq: instance.transitionSeq,
+  };
+  if (instance.status === "running" && instance.assignment) result.assignment = instance.assignment;
+  return result;
+}
 
 export const DEFAULT_LIST_LIMIT = 50;
 /**

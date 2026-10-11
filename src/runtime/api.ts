@@ -46,7 +46,7 @@ export {
   resolveCollaboration,
   CollaborationDisabledError,
 } from "./internal.js";
-export type { Page } from "./internal.js";
+export type { Page, InstanceWriteResult } from "./internal.js";
 export {
   isResolvedViewField,
   SubmissionValidationError,
