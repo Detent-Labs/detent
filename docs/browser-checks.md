@@ -1713,6 +1713,96 @@ session. `studio-draftToolbarState.test.ts` pins that exact bug at the unit
 level. Here the real save/conflict/reload sequence drives it in a browser
 instead.
 
+### Unsaved draft: every exit asks first, and a 401 keeps the work (`guard-unsaved-studio-draft`)
+
+Source: `guard-unsaved-studio-draft` task 4.1.
+
+No `bun:test` assertion can click a menu, hold a drag or read a native dialog.
+Run these seven checks in a real browser. Open the production bundle on the
+engine's own port. Sign in as `demo-superuser@example.test`, password
+`seed-demo-password`. In the Processes list, choose "Create draft" on the row
+`it_offboarding`.
+
+Each check opens `/studio/processes/<id>/edit` for that draft, unless it names
+another route. A native dialog blocks automation. Accept or dismiss each one
+on purpose.
+
+**1. The groups link.** Open `/studio/processes/<id>/edit`. On the Fields tab,
+change a field's label and do not save. Pass: the header bar reads "Unsaved
+changes".
+
+Open the `⋮` menu and choose "Manage assignment groups for this process".
+Pass: the browser's native prompt `Leave this draft? Unsaved edits will be lost.`
+appears. Cancel keeps the screen and the new label. OK navigates to
+`/admin/groups?processId=<id>`.
+
+Save the draft, return to it and choose the same link. Pass: the header bar
+reads "Saved", and the link navigates to the same address with no prompt.
+
+**2. The account menu.** Change a label again and do not save. Open the
+account menu, "Account" in the header. Choose each of three entries in turn:
+an entry under "Go to", "Your profile" and "Log out". Pass: each one raises
+the same native prompt. Cancel keeps the draft, and the menu stays closed.
+
+Repeat on a saved draft. Pass: none of the three prompts. The area switch
+leaves for the other area, the profile entry opens `/profile` and "Log out"
+returns to `/login`.
+
+**3. A layout-only change.** Open `/studio/processes/<id>/edit` on the
+Canvas tab. Drag one step to a new position and change nothing else. Pass: the
+header bar reads "Unsaved changes".
+
+Choose "Back to processes". Pass: the native prompt appears. Cancel it.
+
+Press Save. Pass: the header bar reads "Saved". Choose "Back to processes"
+again. Pass: the browser navigates to the process list at `/studio` with no
+prompt.
+
+**4. A drag during a slow save.** Delay the answer of `PUT /drafts/:id` by a
+few seconds. A playwright route that waits before it fulfills does this. Change
+a label and press Save. Before the answer arrives, drag a step to a new
+position.
+
+Pass: after the answer, the step stays at the new position. The header bar
+still reads "Unsaved changes", because the layout moved during the request.
+
+**5. Tab close and reload.** Change a label and do not save. Reload the tab.
+Pass: the browser's own leave prompt appears. Automation must accept or
+dismiss the `beforeunload` dialog.
+
+Save, then reload again. Pass: no prompt appears. The prompt text belongs to
+the browser, so the check reads only whether the dialog fires.
+
+**6. A 401 on save.** Change a label and do not save. Make the save answer
+401: a playwright route that fulfills `PUT /drafts/:id` with status 401 does
+this. Press Save. Pass: the login screen appears.
+
+Unroute the answer and log in again as `demo-superuser@example.test`. Open the
+same draft. Pass: a notice reads "Your session ended while this draft had
+unsaved changes. Detent kept them in this browser tab." It offers "Restore
+unsaved changes" and "Discard them".
+
+Choose "Restore unsaved changes". Pass: the label returns, and the header bar
+reads "Unsaved changes". The notice is gone.
+
+Make the save answer 401 again and press Save. Log in and open the draft
+once more. Choose "Discard them". Pass: the notice goes, and the draft shows
+the saved label.
+
+Repeat the 401, then log in as another seeded account on the same tab. Open the
+same draft. Pass: no notice appears. The stored copy belongs to the first
+actor.
+
+**7. Discard draft after a drag.** Drag a step on the Canvas tab. Choose
+"Discard draft" in the header bar. The application's own dialog,
+"Discard this draft", opens. Confirm it. Pass: no native browser prompt
+appears, and the screen returns to the process list.
+
+Two checks stay manual-only and sit outside the seven. The restore notice
+shares one line with its message and both buttons on wide screens. It stacks
+below 40rem. Focus lands on the open tab after either button. Only a live
+render at a real width shows the first. Only a keyboard pass shows the second.
+
 ### Selecting a path shows the source step's Paths section with the row highlighted
 
 Source: `redesign-step-inspector`, `studio-step-bench`.

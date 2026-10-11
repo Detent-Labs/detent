@@ -4,8 +4,9 @@
 
 The developer's frontend, the studio area of `packages/web`: a workspace package mirroring
 the app area of `packages/web`'s shape (React 18, Vite 6, own build/typecheck, a hand-written
-History-API routing hook, `session.ts` for the JWT under its own storage
-key), reusing the existing login mechanism, with a role-aware shell, a
+History-API routing hook, the shell's one session as the `unified-shell`
+capability states it, and the unsaved-draft copy in `sessionStorage` as the
+area's only browser storage), reusing the existing login mechanism, with a role-aware shell, a
 process list merging published and draft state, and the panel editing
 surface (originally carried over from `packages/editor`, now deleted, and
 independent of it since) wired to the draft routes instead of
