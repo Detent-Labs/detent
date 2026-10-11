@@ -28,7 +28,9 @@ describe("RestoreNotice", () => {
     const buttons = [...html.matchAll(/<button type="button" class="([^"]*)"[^>]*>([^<]*)<\/button>/g)];
     expect(buttons.map((b) => b[2])).toEqual([escaped(t("restoreNotice.restore")), escaped(t("restoreNotice.discard"))]);
     expect(buttons[0]![1]).toContain("btn-secondary");
-    expect(buttons[1]![1]).toContain("btn-destructive");
+    expect(buttons[0]![1]).not.toContain("btn-destructive");
+    // The destructive outline rides on the secondary control (`btn-destructive-accent.test.ts`).
+    expect(buttons[1]![1]).toContain("btn-secondary btn-destructive");
   });
 
   it("carries all four catalog strings, the replace prompt included", () => {

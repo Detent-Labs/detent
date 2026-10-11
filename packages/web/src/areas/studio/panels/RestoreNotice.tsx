@@ -47,7 +47,7 @@ export function RestoreNotice({ onRestore, onDiscard }: RestoreNoticeProps) {
         <button type="button" className="btn btn-secondary" onClick={onRestore}>
           {t("restoreNotice.restore")}
         </button>
-        <button type="button" className="btn btn-destructive" onClick={onDiscard}>
+        <button type="button" className="btn btn-secondary btn-destructive" onClick={onDiscard}>
           {t("restoreNotice.discard")}
         </button>
       </div>
