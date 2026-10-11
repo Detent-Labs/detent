@@ -2,8 +2,8 @@
 
 ## 1. Shared groundwork
 
-- [ ] 1.1 Move `PROCESS_START_ACTION_TYPE` to `src/schema/definition.ts`, beside `RESERVED_ACTION_PREFIX`. Re-export it from `src/engine/registry.ts`. Verify `bun run typecheck` passes with every importer unchanged.
-- [ ] 1.2 Add `astProblem(ast)` to `src/cel/check.ts`. It returns the time-function or nesting message. `checkSite` and `validateMigrationSpec` both call it. Verify the CEL and migration tests still pass with the same messages.
+- [x] 1.1 Move `PROCESS_START_ACTION_TYPE` to `src/schema/definition.ts`, beside `RESERVED_ACTION_PREFIX`. Re-export it from `src/engine/registry.ts`. Verify `bun run typecheck` passes with every importer unchanged.
+- [x] 1.2 Add `astProblem(ast)` to `src/cel/check.ts`. It returns the time-function or nesting message. `checkSite` and `validateMigrationSpec` both call it. Verify the CEL and migration tests still pass with the same messages.
 
 ## 2. Conditions infer to bool (A-4)
 

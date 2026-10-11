@@ -237,6 +237,9 @@ export const RESERVED_CANCEL_OUTCOME = "cancelled";
 // enqueue internal actions without colliding with a plugin handler type.
 export const RESERVED_ACTION_PREFIX = "core.";
 
+// The `process.start` action type, homed here because src/schema/ may not import src/engine/.
+export const PROCESS_START_ACTION_TYPE = "process.start";
+
 // ============================================================
 // Fields: central catalog, referenced by steps.
 // ============================================================

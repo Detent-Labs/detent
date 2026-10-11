@@ -80,13 +80,15 @@ export const SPAWN_ACTION_TYPE = "core.spawnSubprocess";
 export const RETURN_ACTION_TYPE = "core.returnSubprocess";
 
 /**
- * The `process.start` action type, homed here for the same reason as the
- * pair above. `handlers/process-start.ts` imports `createDefinitionStore`
- * from `engine/definitions.ts`, and `definitions.ts` needs this constant for
- * its own publish-time check, so defining it in the handler file would cycle
- * back through `definitions.ts`.
+ * The `process.start` action type. The constant lives in `schema/definition.ts`,
+ * because nothing in `src/schema/` imports `src/engine/` and the compile pass
+ * needs it. This module re-exports it, so every engine importer keeps its path.
+ * `handlers/process-start.ts` imports `createDefinitionStore` from
+ * `engine/definitions.ts`, and `definitions.ts` needs this constant for its own
+ * publish-time check, so defining it in the handler file would cycle back
+ * through `definitions.ts`.
  */
-export const PROCESS_START_ACTION_TYPE = "process.start";
+export { PROCESS_START_ACTION_TYPE } from "../schema/definition.js";
 
 /**
  * The `instance.transition` action type, homed here for the same reason as

@@ -210,6 +210,18 @@ function comprehensionTooDeep(node: unknown, depth = 0): string | null {
   return null;
 }
 
+/**
+ * The first AST-level problem in a parsed expression, or null: a banned time
+ * function, then a comprehension nest past the limit. `checkSite` and
+ * `validateMigrationSpec` both call it, so a rule added here reaches every
+ * checked site.
+ */
+function astProblem(ast: unknown): string | null {
+  const bad = forbiddenTimeCall(ast);
+  if (bad) return `time function not allowed: ${bad}() (time lives only in timers)`;
+  return comprehensionTooDeep(ast);
+}
+
 interface Site {
   src: string;
   loc: string;
@@ -310,11 +322,8 @@ export interface CelIssue {
 function checkSite(env: Environment, site: { src: string; loc: string; expect?: string }): CelIssue | undefined {
   // Forbidden time constructors first (env.check would accept the pure ones).
   try {
-    const ast = parse(site.src).ast;
-    const bad = forbiddenTimeCall(ast);
-    if (bad) return { loc: site.loc, src: site.src, message: `time function not allowed: ${bad}() (time lives only in timers)` };
-    const nested = comprehensionTooDeep(ast);
-    if (nested) return { loc: site.loc, src: site.src, message: nested };
+    const problem = astProblem(parse(site.src).ast);
+    if (problem) return { loc: site.loc, src: site.src, message: problem };
   } catch {
     // parse failure is reported by the type-check below
   }
@@ -472,15 +481,9 @@ export function validateMigrationSpec(spec: MigrationSpec, fromBody: ProcessBody
     }
     const expect = celType(targetField);
     try {
-      const ast = parse(expr.src).ast;
-      const bad = forbiddenTimeCall(ast);
-      if (bad) {
-        issues.push({ loc, src: expr.src, message: `time function not allowed: ${bad}() (time lives only in timers)` });
-        continue;
-      }
-      const nested = comprehensionTooDeep(ast);
-      if (nested) {
-        issues.push({ loc, src: expr.src, message: nested });
+      const problem = astProblem(parse(expr.src).ast);
+      if (problem) {
+        issues.push({ loc, src: expr.src, message: problem });
         continue;
       }
     } catch {
