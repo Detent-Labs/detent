@@ -332,6 +332,43 @@ describe("submit and draft save report a non-running instance to readers only", 
     const draft = await rejection(saveInstanceDraft(inst.instanceId, {}, candidate, sql));
     expect(draft).toBeInstanceOf(InstanceNotRunningError);
   });
+
+  // docs/decisions.md CLAIM-1: a candidate can claim a test instance, but only its starter can open it.
+  test.skipIf(!DB)("a candidate who claimed a test instance it cannot open loses a double submit with AuthorizationError, not InstanceNotRunningError", async () => {
+    const published = await publishBody(PID, assignedBody(), reg, dataSourceReg);
+    const submit = (id: InstanceId) => submitAndTransition(id, "path_ab" as PathId, {}, candidate, dataSourceReg);
+    /** Two concurrent submits by the claimant: one wins and completes the instance, the other is the loser this returns. */
+    const loserOfDoubleSubmit = async (id: InstanceId): Promise<unknown> => {
+      const outcomes = await Promise.allSettled([submit(id), submit(id)]);
+      expect(outcomes.filter((o) => o.status === "fulfilled")).toHaveLength(1);
+      const rejected = outcomes.filter((o): o is PromiseRejectedResult => o.status === "rejected");
+      expect(rejected).toHaveLength(1);
+      return rejected[0]!.reason;
+    };
+
+    // Control: on an ordinary instance the claimant is a reader, so the loser learns the status.
+    const ordinary = await startAssignedBy(starter);
+    await claimStep(ordinary, candidate);
+    const ordinaryLoser = await loserOfDoubleSubmit(ordinary);
+    expect(ordinaryLoser).toBeInstanceOf(InstanceNotRunningError);
+    expect((ordinaryLoser as InstanceNotRunningError).status).toBe("completed");
+
+    const testInstance = await createInstance(published.definition, {
+      processId: PID,
+      version: published.version,
+      kind: "test",
+      startedBy: starter.id,
+      assignment: { candidates: ["approver", candidate.id] },
+    });
+    // Pins the fixture: the candidate is not the test instance's starter, so the read rule refuses it.
+    expect(await rejection(loadInstanceForActor(testInstance.instanceId, candidate, sql))).toBeInstanceOf(AuthorizationError);
+    await claimStep(testInstance.instanceId, candidate);
+
+    const loser = await loserOfDoubleSubmit(testInstance.instanceId);
+    expect(loser).toBeInstanceOf(AuthorizationError);
+    expect(loser).not.toBeInstanceOf(InstanceNotRunningError);
+    expect((loser as AuthorizationError).message).toBe(`actor '${candidate.id}' may not submit instance '${testInstance.instanceId}'`);
+  });
 });
 
 describe("a starter whom a revocation names", () => {
@@ -386,6 +423,31 @@ describe("a starter whom a revocation names", () => {
 
     const result = await cancelInstance(id, starter);
     expect(result.status).toBe("cancelled");
+  });
+
+  test.skipIf(!DB)("of a test instance keeps cancel authority, where the same starter of a finished ordinary instance is refused", async () => {
+    const published = await publishBody(PLAIN_PID, plainBody(), reg, dataSourceReg);
+    const testInstance = await createInstance(published.definition, {
+      processId: PLAIN_PID,
+      version: published.version,
+      kind: "test",
+      startedBy: starter.id,
+    });
+    await revokeVisibility(testInstance.instanceId, starter.id, operator, sql);
+
+    const cancelled = await cancelInstance(testInstance.instanceId, starter);
+    expect(cancelled.status).toBe("cancelled");
+    // The test-instance rule precedes the denial test, so the finished test instance still answers its starter.
+    const again = await cancelInstance(testInstance.instanceId, starter);
+    expect(again.status).toBe("cancelled");
+
+    // Control: the same revocation on a finished ordinary instance refuses its starter.
+    const ordinary = await startPlain();
+    await cancelInstance(ordinary, starter);
+    await revokeVisibility(ordinary, starter.id, operator, sql);
+    const refused = await rejection(cancelInstance(ordinary, starter));
+    expect(refused).toBeInstanceOf(AuthorizationError);
+    expect((refused as AuthorizationError).message).toMatch(/may not read instance/);
   });
 });
 
@@ -558,6 +620,12 @@ describe("the started scope honors a revocation", () => {
 describe("the record read honors a revocation on its starter branch", () => {
   const recordRefusal = (actor: Actor, id: string) => `actor '${actor.id}' may not read the record of instance '${id}'`;
 
+  /** The `visibility.changed` revocations of `actor` in a record page. Revoking writes one event into the record. */
+  const revocationsOf = (page: Awaited<ReturnType<typeof getInstanceRecord>>, actor: Actor) =>
+    page.items.filter(
+      (el) => el.kind === "event" && el.event.kind === "visibility.changed" && el.event.payload.op === "revoked" && el.event.payload.actorId === actor.id,
+    );
+
   for (const role of [AUTHOR_ROLE, DEVELOPER_ROLE]) {
     const writer: Actor = { id: `user_writer_${role.replace("system:", "")}`, roles: [role] };
 
@@ -594,7 +662,9 @@ describe("the record read honors a revocation on its starter branch", () => {
     const id = await startAssignedBy(assignedAuthor);
     await revokeVisibility(id, assignedAuthor.id, operator, sql);
 
-    await getInstanceRecord(id, assignedAuthor, {}, sql);
+    // The page carries the revocation event itself, so a pass here is a read that returned the record.
+    const page = await getInstanceRecord(id, assignedAuthor, {}, sql);
+    expect(revocationsOf(page, assignedAuthor)).toHaveLength(1);
   });
 
   test.skipIf(!DB)("a test instance's starter reads the record, revoked or not", async () => {
@@ -607,9 +677,12 @@ describe("the record read honors a revocation on its starter branch", () => {
       startedBy: writer.id,
     });
 
-    await getInstanceRecord(testInstance.instanceId, writer, {}, sql);
+    // Baseline: the starter reads the record before the revocation, which has not landed in it yet.
+    const before = await getInstanceRecord(testInstance.instanceId, writer, {}, sql);
+    expect(revocationsOf(before, writer)).toHaveLength(0);
     await revokeVisibility(testInstance.instanceId, writer.id, operator, sql);
     // The test-instance rule precedes the denial test, so a revocation does not close the Player.
-    await getInstanceRecord(testInstance.instanceId, writer, {}, sql);
+    const after = await getInstanceRecord(testInstance.instanceId, writer, {}, sql);
+    expect(revocationsOf(after, writer)).toHaveLength(1);
   });
 });

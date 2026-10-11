@@ -1036,7 +1036,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "403":
-          description: The actor holds neither `system:admin` nor a `visibility` grant over this instance's process, or the instance does not exist.
+          description: The actor holds neither `system:admin` nor a `visibility` grant over this instance's process, or the instance does not exist, or the pinned version of the instance has no published definition body.
           content:
             application/json:
               schema:
@@ -1084,7 +1084,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "403":
-          description: The actor holds neither `system:admin` nor a `visibility` grant over this instance's process, or the instance does not exist.
+          description: The actor holds neither `system:admin` nor a `visibility` grant over this instance's process, or the instance does not exist, or the pinned version of the instance has no published definition body.
           content:
             application/json:
               schema:
@@ -1132,7 +1132,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "403":
-          description: The actor holds neither `system:admin` nor a `visibility` grant over this instance's process, or the instance does not exist.
+          description: The actor holds neither `system:admin` nor a `visibility` grant over this instance's process, or the instance does not exist, or the pinned version of the instance has no published definition body.
           content:
             application/json:
               schema:
@@ -1482,7 +1482,7 @@ components:
         change an instance, not to read it. The body therefore carries none of
         the `Instance` members a read would refuse, `data` and `startedBy`
         among them. A caller that needs the instance reads it through
-        `getInstanceView`.
+        `GET /instances/{instanceId}`.
       properties:
         instanceId:
           type: string

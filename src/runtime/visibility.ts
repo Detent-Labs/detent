@@ -30,11 +30,12 @@ export type VisibilityOp = "revoked" | "restored" | "granted";
  * with no code change and no scope inside a role string.
  *
  * Loading the instance first is deliberate: the permission names a process,
- * and only the instance knows which one. An instance id that resolves to
- * nothing therefore raises the same `AuthorizationError`, with the same
- * message text, as a caller with no standing on a known instance, so the
- * refusal does not say whether the id exists. Any other load failure
- * propagates unchanged.
+ * and only the instance knows which one. An id that resolves to nothing
+ * therefore raises the same `AuthorizationError`, with the same message text,
+ * as a caller with no standing on a known instance, so the refusal does not
+ * say whether the id exists. Either `NotFoundError` from `loadInstanceForRead`
+ * folds into that refusal: a missing instance row, and a pinned version with
+ * no published body. Any other load failure propagates unchanged.
  *
  * Revoke and grant then check the target against the local account directory,
  * after the permission test so a caller with no standing learns nothing about

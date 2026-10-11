@@ -237,24 +237,25 @@ later submission answers success forever.
 The concurrent case is the same mistake with a race in front of it. Of two
 submissions to the same instance, the loser's data vanishes once the winner's
 transition leaves the step. Without the check, the loser hears that it
-succeeded. With the check, the loser receives `InstanceNotRunningError` if the
-instance no longer runs. Otherwise the loser meets one of the ordinary errors:
-a claim error, a validation error or a guard refusal. No outcome keeps the
-loser's data, because the instance has left the step the data belonged to.
+succeeded. With the check, a loser who may read the instance receives
+`InstanceNotRunningError` if the instance no longer runs. Any other loser meets
+an ordinary error: a claim error, a validation error, a guard refusal or
+`AuthorizationError`. No outcome keeps the loser's data, because the instance
+has left the step the data belonged to.
 
 <!-- antislop: allow passive-voice - the scenario title must match the live spec verbatim, or archive drops it -->
 #### Scenario: A submission to a cancelled instance is rejected
 
-- **WHEN** the instance starter calls `submitAndTransition` on an instance
-  whose status is `cancelled`
+- **WHEN** the instance starter, whom no revocation names, calls
+  `submitAndTransition` on an instance whose status is `cancelled`
 - **THEN** it throws `InstanceNotRunningError` naming that status, and writes
   no data
 
 <!-- antislop: allow passive-voice - the scenario title must match the live spec verbatim, or archive drops it -->
 #### Scenario: A submission to a faulted instance is rejected every time
 
-- **WHEN** the automatic cascade's loop guard parks an instance as `faulted`
-  and the starter retries a submission against it
+- **WHEN** the cascade's loop guard parks an instance as `faulted` and the
+  starter, whom no revocation names, retries a submission
 - **THEN** each retry throws `InstanceNotRunningError` rather than
   answering success
 
@@ -282,8 +283,8 @@ loser's data, because the instance has left the step the data belonged to.
 
 #### Scenario: Of two concurrent submissions, the loser learns it lost
 
-- **WHEN** two `submitAndTransition` calls target the same instance
-  concurrently and the winner's transition leaves the instance non-running
+- **WHEN** two `submitAndTransition` calls by a caller who may read the
+  instance race, and the winner's transition leaves it non-running
 - **THEN** exactly one fulfils and the other rejects with
   `InstanceNotRunningError`, rather than both fulfilling
 

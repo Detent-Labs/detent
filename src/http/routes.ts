@@ -504,9 +504,10 @@ export async function handleListInstances(req: Request, resolver: ActorResolver,
         version: versionRaw !== null ? parseVersion(versionRaw, "version") : undefined,
         status: parseStatuses(url),
         currentStepId: (url.searchParams.get("currentStepId") as StepId) ?? undefined,
-        // scope=started applies no assignment predicate of its own. An explicit
-        // assignedTo still narrows conjunctively, and reaches nothing outside
-        // what this caller started.
+        // scope=started applies no assignment predicate of its own; the
+        // revocation term set in `notRevokedFor` below is its one narrowing
+        // beyond the starter. An explicit assignedTo still narrows
+        // conjunctively, and reaches nothing outside what this caller started.
         startedBy: scope === "started" ? actor.id : startedBy,
         claimedBy: url.searchParams.get("claimedBy") ?? undefined,
         assignedTo: scope === "mine" ? actor.id : assignedTo,

@@ -134,8 +134,9 @@ export type InstanceListFilter = {
   // layer for scope=started and never for an administrator, whom a revocation
   // never reaches; `principals` is `[actor.id, ...actor.roles]`, the set
   // `isEligibleCandidate` tests on the direct read. Absent compiles to `TRUE`.
-  // Deliberately not a member of `InstanceQueryFilter`: reports and the
-  // `instance.query` data source narrow through `visibleTo` alone.
+  // Deliberately not a member of `InstanceQueryFilter`: reports narrow
+  // through `visibleTo` alone, and the `instance.query` data source applies
+  // no visibility narrowing.
   notRevokedFor?: { actorId: string; principals: string[] };
 };
 

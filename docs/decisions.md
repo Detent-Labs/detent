@@ -1564,7 +1564,7 @@ gap outside that change's own scope. The CLAIM tag is local to this section.
 
 ## Open from close-instance-reads-on-write-paths (needs its own OpenSpec change)
 
-The design for `close-instance-reads-on-write-paths` (2026-10-11) left two
+The design for `close-instance-reads-on-write-paths` (2026-10-11) left three
 gaps outside that change's own scope. The tags WRITE and SUBMIT are local to
 this section.
 
@@ -1594,6 +1594,22 @@ this section.
   cancel or assignment-less submit succeeds. The same call on a finished
   instance answers 403. The pair of answers tells the caller whether the
   instance runs. It never tells the caller the status.
+
+  A revoked starter's refused cancel carries one of two texts. The text says
+  "may not read" when the instance has finished. It says "may not cancel" when
+  the running step is not cancellable. The refusal text therefore separates
+  those two cases.
+- **WRITE-2: a terminal step's leftover assignment still counts as live.** The
+  function `liveAssignmentFragment` (`src/runtime/queries.ts`) and the function
+  `loadInstanceForActor` (`src/runtime/internal.ts`) do not check the instance
+  status. The function `toWriteResult` filters on a running instance, because a
+  completed instance can keep an assignment. A revoked starter who is a
+  candidate in a completed instance's leftover assignment therefore keeps the
+  started-scope row and the record read.
+
+  This predates `close-instance-reads-on-write-paths`. The direct read and
+  `scope=visible` behave the same. That change spreads the behavior to the
+  started scope and the record read. It makes no fix.
 - **SUBMIT-1: the submit route's body goes to a writer who may not read.** The
   route `POST /instances/:id/submit` answers the full `Instance`. On
   2026-10-11 the owner ruled that body out of scope for
@@ -1705,7 +1721,8 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   receive the runtime's development error page, the JWT check fixes no
   algorithm list and does not need `exp` from external issuers, and a bad
   cursor, a saved report with an invalid date and a claim on an unknown
-  instance each return 500. Anchors: `src/auth/login.ts`, `src/auth/jwt.ts`,
+  instance each return 500. The unknown-id answer must be the opaque 403,
+  never a 404, as WRITE-1 states. Anchors: `src/auth/login.ts`, `src/auth/jwt.ts`,
   `src/pagination.ts`.
 - **`harden-studio-json-surface` (E1-1, E1-5, E1-13; medium)**: The JSON
   surface refuses every apply once `collaboration` is set, a nested shape

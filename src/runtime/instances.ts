@@ -450,6 +450,12 @@ async function canActorCancelInstance(actor: Actor, instance: Instance, body: Pr
   // so this predicate must defer to that rather than gate it. The no-op
   // still answers the instance's status, so the starter must be a reader:
   // a revocation that names them throws the read AuthorizationError here.
+  //
+  // ponytail: `instance.status` comes from an unlocked read, taken before the
+  // engine cancel. A revoked starter whose cancel races a finish reads as
+  // running here, skips the read check, then gets the no-op write result of an
+  // instance that finished a moment earlier. Upgrade entry point: take the
+  // instance row lock before this check.
   if (instance.status !== "running") {
     await loadInstanceForActor(instance.instanceId, actor, db);
     return true;

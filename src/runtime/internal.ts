@@ -243,7 +243,10 @@ export async function loadInstanceForActor(instanceId: InstanceId, actor: Actor,
  * admits (instance-visibility-set, "A write call reveals a finished instance
  * only to a reader"). A refused load throws `refusal` in its place, which the
  * caller builds to match the text a running instance gives that same caller.
- * Any other load failure propagates unchanged.
+ * Any other load failure propagates unchanged. For an administrator,
+ * `loadInstanceForActor` lets every instance through, so the call can still
+ * surface `NotFoundError` or a pin mismatch when the store is corrupt; that
+ * original error is thrown.
  *
  * Call it outside any transaction: the extra read must not wait on a row lock
  * the failed write still holds.
