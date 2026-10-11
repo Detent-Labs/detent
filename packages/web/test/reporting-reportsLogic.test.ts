@@ -161,14 +161,14 @@ test("an emptied range keeps the row's number type and value", () => {
 });
 
 test("a loaded comparison on a field no response named keeps its number type when its value clears", () => {
-  const seeded = seedTypes("proc_1", [{ fieldId: "field_amount", operator: "eq", value: 7 }]);
+  const seeded = seedTypes(undefined, "proc_1", [{ fieldId: "field_amount", operator: "eq", value: 7 }]);
   expect(valueTypeFor(typesFor(seeded, "proc_1"), "field_amount", 7)).toBe("number");
   // The owner clears the input or types `7a`: the value is undefined, and the control stays a number input.
   expect(valueTypeFor(typesFor(seeded, "proc_1"), "field_amount", undefined)).toBe("number");
 });
 
 test("seedTypes skips a value without a type, and the first comparison on a field wins", () => {
-  const seeded = seedTypes("proc_1", [
+  const seeded = seedTypes(undefined, "proc_1", [
     { fieldId: "field_a", operator: "eq", value: undefined },
     { fieldId: "field_b", operator: "eq", value: true },
     { fieldId: "field_b", operator: "eq", value: "x" },
@@ -177,8 +177,37 @@ test("seedTypes skips a value without a type, and the first comparison on a fiel
   expect(seeded.types.get("field_b")).toBe("boolean");
 });
 
+test("seedTypes keeps every field the held map already names", () => {
+  // A new report's first response named both fields; a save then loads the report into the same screen.
+  const held = typesAfterResponse(undefined, "proc_1", [
+    { fieldId: "field_amount", versions: [1], type: "number" },
+    { fieldId: "field_total", versions: [1], type: "number" },
+  ]);
+  const seeded = seedTypes(held, "proc_1", [{ fieldId: "field_amount", operator: "eq", value: 500 }]);
+  expect(seeded.types.get("field_total")).toBe("number");
+  expect(seeded.types.get("field_amount")).toBe("number");
+});
+
+test("seedTypes never overwrites an entry a response wrote", () => {
+  const held = typesAfterResponse(undefined, "proc_1", [{ fieldId: "field_amount", versions: [1], type: "string" }]);
+  const seeded = seedTypes(held, "proc_1", [{ fieldId: "field_amount", operator: "eq", value: 7 }]);
+  expect(seeded.types.get("field_amount")).toBe("string");
+});
+
+test("seedTypes into another process's map starts fresh", () => {
+  const held = typesAfterResponse(undefined, "proc_2", [{ fieldId: "field_total", versions: [1], type: "number" }]);
+  const seeded = seedTypes(held, "proc_1", [{ fieldId: "field_amount", operator: "eq", value: 7 }]);
+  expect(seeded.processId).toBe("proc_1");
+  expect(seeded.types.has("field_total")).toBe(false);
+  expect(seeded.types.get("field_amount")).toBe("number");
+});
+
+test("seedTypes reads an in list's type from its first member", () => {
+  expect(seedTypes(undefined, "proc_1", [{ fieldId: "field_amount", operator: "in", value: [1, 2] }]).types.get("field_amount")).toBe("number");
+});
+
 test("a column response overwrites a seeded type", () => {
-  const seeded = seedTypes("proc_1", [{ fieldId: "field_amount", operator: "eq", value: 7 }]);
+  const seeded = seedTypes(undefined, "proc_1", [{ fieldId: "field_amount", operator: "eq", value: 7 }]);
   const after = typesAfterResponse(seeded, "proc_1", [{ fieldId: "field_amount", versions: [1], type: "string" }]);
   expect(valueTypeFor(typesFor(after, "proc_1"), "field_amount", undefined)).toBe("string");
 });

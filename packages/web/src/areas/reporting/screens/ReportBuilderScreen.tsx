@@ -137,7 +137,7 @@ export function ReportBuilderScreen({
         if (cancelled) return;
         const loaded = draftFromReport(report);
         setDraft(loaded);
-        setHeldTypes(seedTypes(loaded.processId, loaded.dataWhere));
+        setHeldTypes((prev) => seedTypes(prev, loaded.processId, loaded.dataWhere));
         setOwner(report.owner);
         setProcessLabel(report.processId);
       })

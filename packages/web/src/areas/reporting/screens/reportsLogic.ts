@@ -114,12 +114,14 @@ export type ProcessTypes = { processId: string; types: RememberedTypes };
 export const NO_TYPES: RememberedTypes = new Map();
 
 /**
- * The map a loaded report starts with: each comparison's field maps to its
- * value's type. A cleared or half-typed value then keeps its row's type
- * until a response names the field and overwrites the entry.
+ * `prev` with each loaded comparison's field mapped to its value's type, for
+ * a field the map lacks. A cleared or half-typed value then keeps its row's
+ * type until a response names the field and overwrites the entry. A seed
+ * never overwrites an entry a response wrote. Another process's map is
+ * dropped.
  */
-export function seedTypes(processId: string, comparisons: readonly DataComparison[]): ProcessTypes {
-  const types = new Map<string, string | undefined>();
+export function seedTypes(prev: ProcessTypes | undefined, processId: string, comparisons: readonly DataComparison[]): ProcessTypes {
+  const types = new Map(prev?.processId === processId ? prev.types : NO_TYPES);
   for (const c of comparisons) {
     const type = valueTypeOf(c.value);
     if (type !== undefined && !types.has(c.fieldId)) types.set(c.fieldId, type);
