@@ -71,7 +71,7 @@ Measured in `instance-query-data-source`. A stale server answered a publish
 with no `findings` key. A fresh one, right after, answered the identical
 request with the finding a fresh publish-time check now computes.
 
-**Run `bun run e2e` too.** It drives four flows across all four areas from a
+**Run `bun run e2e` too.** It drives five flows across all four areas from a
 clean database. Run it before working through the checklist by hand.
 
 ## Checklist
