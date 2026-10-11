@@ -190,6 +190,7 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
               roles={session.roles}
               go={guardedGo}
               navigate={guardedNavigate}
+              actorId={session.actorId}
               onUnauthorized={onUnauthorized}
               onDirtyChange={(d) => {
                 dirtyRef.current = d;

@@ -28,9 +28,9 @@ export interface DraftToolbarProps {
   savedLayout: Record<string, unknown>;
   onSavedLayoutChange: (layout: Record<string, unknown>) => void;
   /** Fired only from `doSave()`'s success branch — never from `reload()`'s
-   * conflict-recovery branch, which calls `onSavedBodyChange` alone. A mere
-   * reload is not a save, and must not advance `EditorArea`'s
-   * `lastSavedAt`. */
+   * conflict-recovery branch, which calls `onSavedBodyChange` and
+   * `onSavedLayoutChange` alone. A mere reload is not a save, and must not
+   * advance `EditorArea`'s `lastSavedAt`. */
   onSaved?: () => void;
   publishResult: PublishResult | null;
   onPublishResult: (result: PublishResult | null) => void;

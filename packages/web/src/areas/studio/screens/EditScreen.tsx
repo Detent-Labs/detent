@@ -18,6 +18,8 @@ import { ChangesView } from "../panels/ChangesView.js";
 import { PathsView } from "../panels/PathsView.js";
 import { FormsTab } from "../panels/FormsTab.js";
 import { AccessPanel } from "../panels/AccessPanel.js";
+import { RestoreNotice } from "../panels/RestoreNotice.js";
+import { clearStash, readRestorable, stashDraft, tabStorage } from "../draft/draftStash.js";
 import { stepEntityIds } from "../draft/panel-rail.js";
 import { seedLocalizedText } from "../draft/localized-text";
 import { getDraft, listProcesses } from "../api/client.js";
@@ -247,6 +249,9 @@ interface EditScreenProps {
    * take the same shape through this chain. */
   go: (href: string, opts?: NavigateOptions) => void;
   navigate: (route: Route, opts?: NavigateOptions) => void;
+  /** The signed-in actor. The stash of unsaved work a 401 leaves behind is
+   * keyed by it, so a second actor on the same tab never sees it. */
+  actorId: string;
   onUnauthorized: () => void;
   /** Reports the open draft's dirty state upward, so `root.tsx` can guard
    * navigation away from it (design.md: "Report dirtiness upward through one
@@ -279,6 +284,7 @@ interface ProcessSurfaceProps {
    * with `toEqual`. */
   loadedCanPublish: boolean;
   navigate: (route: Route, opts?: NavigateOptions) => void;
+  actorId: string;
   onUnauthorized: () => void;
   onDirtyChange?: (dirty: boolean) => void;
 }
@@ -310,7 +316,7 @@ function focusTabButton(tab: ProcessTab): void {
  * component state, the data sources panel fetched its list keys on mount, and
  * the field matrix holds its selected cell.
  */
-function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, initialRevision, initialLayout, loadedBaseVersion, loadedCanPublish, navigate, onUnauthorized, onDirtyChange }: ProcessSurfaceProps) {
+function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, initialRevision, initialLayout, loadedBaseVersion, loadedCanPublish, navigate, actorId, onUnauthorized, onDirtyChange }: ProcessSurfaceProps) {
   const { draft, mutate, validation, replace, contentLocale } = useDraft();
   const baseLocale = draft.baseLocale ?? "en";
   const [saveState, setSaveState] = useState<DraftSaveState>(() => initialSaveState(initialRevision, initialLayout));
@@ -357,7 +363,9 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
   // they live moves up one level, the same way saveState already works.
   const [savedBody, setSavedBody] = useState<Draft>(() => structuredClone(draft));
   // The layout of the last save, beside `savedBody`. The unsaved state reads
-  // both (`isDraftDirty`).
+  // both (`isDraftDirty`). Every layout writer below builds a new object
+  // rather than mutating `saveState.layout`, which this value and
+  // `applySaveResult`'s identity check both rely on.
   const [savedLayout, setSavedLayout] = useState(initialLayout);
   const [publishResult, setPublishResult] = useState<PublishResult | null>(null);
   // `loadedBaseVersion` cannot move: `EditScreen.load` depends on
@@ -385,6 +393,38 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
     onDirtyChange?.(dirtyNow);
     return () => onDirtyChange?.(false);
   }, [dirtyNow]);
+
+  // A 401 ends the session and unmounts this screen. A dirty draft writes
+  // its stash first, so the same actor can restore the work on the next
+  // visit (`studio-app`). Every consumer reads this through `useFail`, which
+  // holds it in a ref, so a new identity on each render re-runs no effect.
+  const stashOnUnauthorized = () => {
+    if (dirtyNow) stashDraft(tabStorage(), actorId, processId, { body: draft, layout: saveState.layout, revision: saveState.revision });
+    onUnauthorized();
+  };
+  // The stash a past 401 left for this actor and process, read once on
+  // mount against the loaded record. The initializer clears a stash equal to
+  // that record; a second run in development clears nothing more.
+  const [stash, setStash] = useState(() => readRestorable(tabStorage(), actorId, processId, { body: draft, layout: saveState.layout }));
+  const dropStash = () => {
+    clearStash(tabStorage(), actorId, processId);
+    setStash(undefined);
+  };
+  // The stored revision stays, so a save over a draft that moved since
+  // answers 409 and the conflict banner appears. `savedBody` and
+  // `savedLayout` keep the loaded record, so the restored draft reads dirty.
+  const restoreStash = () => {
+    if (stash === undefined) return;
+    if (dirtyNow && !confirm(t("restoreNotice.replaceConfirm"))) return;
+    replace(stash.body);
+    setSaveState((s) => ({ ...s, revision: stash.revision, layout: stash.layout }));
+    dropStash();
+    focusTabButton(openTab);
+  };
+  const discardStash = () => {
+    dropStash();
+    focusTabButton(openTab);
+  };
 
   // The canvas-wide edge style shares the `layout` blob with node positions.
   // No collision is possible: every step id carries a `step_` prefix, and
@@ -739,14 +779,21 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
     onSavedBodyChange: (body: Draft) => setSavedBody(structuredClone(body)),
     savedLayout,
     onSavedLayoutChange: setSavedLayout,
-    onSaved: () => setLastSavedAt(new Date()),
+    // A successful save and a discarded draft each make the stash stale. A
+    // discarded draft restarts its revision at 0, so a stale stash could
+    // later restore over a new draft that reached the same revision.
+    onSaved: () => {
+      setLastSavedAt(new Date());
+      dropStash();
+    },
     publishResult,
     onPublishResult: setPublishResult,
     onDiscarded: () => {
+      dropStash();
       onDirtyChange?.(false);
       navigate({ name: "processes" });
     },
-    onUnauthorized,
+    onUnauthorized: stashOnUnauthorized,
     onCanPublishChange: setReloadedCanPublish,
   });
 
@@ -873,6 +920,7 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
         onVersions={() => navigate({ name: "versions", processId })}
         onPlayer={() => navigate({ name: "play", processId })}
       />
+      {stash && <RestoreNotice onRestore={restoreStash} onDiscard={discardStash} />}
       {formStepId !== undefined ? (
         formStep ? (
           <FormEditorScreen
@@ -1031,7 +1079,7 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
           )}
           {tabPanel(
             "access",
-            <AccessPanel processId={processId} token={token} roles={roles} onUnauthorized={onUnauthorized} />,
+            <AccessPanel processId={processId} token={token} roles={roles} onUnauthorized={stashOnUnauthorized} />,
           )}
         </div>
       )}
@@ -1050,7 +1098,7 @@ type EditLoadState =
   | { kind: "error"; message: string }
   | { kind: "loaded"; record: DraftRecord };
 
-export function EditScreen({ processId, formStepId, tab, stepId, token, roles, go, navigate, onUnauthorized, onDirtyChange }: EditScreenProps) {
+export function EditScreen({ processId, formStepId, tab, stepId, token, roles, go, navigate, actorId, onUnauthorized, onDirtyChange }: EditScreenProps) {
   const [state, setState] = useState<EditLoadState>({ kind: "loading" });
   const fail = useFail(onUnauthorized, (e) => setState({ kind: "error", message: describeCaughtError(e) }));
 
@@ -1121,6 +1169,7 @@ export function EditScreen({ processId, formStepId, tab, stepId, token, roles, g
         loadedBaseVersion={state.record.baseVersion}
         loadedCanPublish={state.record.canPublish}
         navigate={navigate}
+        actorId={actorId}
         onUnauthorized={onUnauthorized}
         onDirtyChange={onDirtyChange}
       />
