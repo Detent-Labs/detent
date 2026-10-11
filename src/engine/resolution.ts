@@ -101,9 +101,9 @@ export async function drainResolutions(
         throw new Error(`resolveBody returned a body not matching instance pin: ${inst.instanceId}`);
       // Re-drive automatic evaluation. A no-op on a manual/terminal step, a
       // subprocess step or a still-unmatched wait-state; a matching guard
-      // transitions to rest. OCC on
-      // transitionSeq makes a concurrent transition safe (this one loses and
-      // stays claimed for the lease to reclaim).
+      // transitions to rest. OCC on transitionSeq makes a concurrent
+      // transition safe (this one loses and stays claimed for the lease to
+      // reclaim).
       await resolveAutomatic(inst, body, SYSTEM_ACTOR, db, assignmentRegistry);
     } catch (e) {
       // Log before continuing: the drain returns normally, so the tick
