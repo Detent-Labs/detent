@@ -21,9 +21,9 @@
 
 ## 3. The home-path gate matches four more spellings (G-8)
 
-- [ ] 3.1 Replace the pattern in `machine-paths.sh` with the four expressions of design D6. Keep the container-user denylist. Verify that `sh scripts/gates/machine-paths.sh` exits 0 on the tree.
-- [ ] 3.2 Add one case per spelling to `test/gates.test.ts`. Assemble each fixture from parts at run time. Add a case for the container path and a case for the audit record's regex text. Add a positive control.
-- [ ] 3.3 Prove the new cases fail on the old script, with the recipe of task 1.6. Record which cases fail.
+- [x] 3.1 Replace the pattern in `machine-paths.sh` with the four expressions of design D6. Keep the container-user denylist. Verify that `sh scripts/gates/machine-paths.sh` exits 0 on the tree.
+- [x] 3.2 Add one case per spelling to `test/gates.test.ts`. Assemble each fixture from parts at run time. Add a case for the container path and a case for the audit record's regex text. Add a positive control.
+- [x] 3.3 Prove the new cases fail on the old script, with the recipe of task 1.6. Record which cases fail.
 
 ## 4. The workflow and Dependabot (G-1, G-11, G-6)
 

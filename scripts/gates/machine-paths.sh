@@ -2,7 +2,20 @@
 # Gate rule: no-machine-paths
 #
 # Rejects a tracked file that holds an absolute path into a user's home
-# directory, on Windows or on Unix.
+# directory, in any of four spellings:
+#
+#   - a Windows drive path, with `Users` in either letter case, whose
+#     separators are slashes, single backslashes or the doubled backslashes of a
+#     JSON string;
+#   - the Git Bash and WSL form, where the drive letter is a path segment;
+#   - the macOS form, /Users/<name>, with an exact `Users`;
+#   - the Linux form, /home/<name>/.
+#
+# The pattern stays case-sensitive. Only the drive forms spell `Users` in both
+# cases. A lowercase /users/ appears in routes, so the macOS form would flag
+# them if it ignored case. The macOS form also needs a name character after
+# `Users/` and no name character before the slash, so the regex text `/Users/[^/]+`
+# and a relative src/Users/ directory raise no finding.
 #
 # Commit e152f9c removed two of them. One sat in a skill file and carried the
 # Windows account name. The other sat in thirteen shell examples in a plan
@@ -25,7 +38,11 @@ set -e
 . "$(dirname "$0")/_lib.sh"
 
 RULE=no-machine-paths
-PATTERN='[A-Za-z]:[\/]Users[\/][A-Za-z0-9_]+|/home/[a-z][a-z0-9_-]*/'
+DRIVE='[A-Za-z]:[\\/]{1,2}[Uu][Ss][Ee][Rr][Ss][\\/]{1,2}[A-Za-z0-9_]+'
+GIT_BASH='/[A-Za-z]/[Uu][Ss][Ee][Rr][Ss]/[A-Za-z0-9_]+'
+MACOS='(^|[^A-Za-z0-9_.])/Users/[A-Za-z0-9_]+'
+LINUX='/home/[a-z][a-z0-9_-]*/'
+PATTERN="$DRIVE|$GIT_BASH|$MACOS|$LINUX"
 CONTAINER_USERS='node|root'
 
 hits=$(

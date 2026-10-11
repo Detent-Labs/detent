@@ -152,6 +152,7 @@ test("the runner keeps the command's own exit code when the gate also rejects", 
 const RANGE = resolve(import.meta.dir, "../scripts/gates/range.sh");
 const PROSE = resolve(import.meta.dir, "../scripts/gates/prose.sh");
 const WHITESPACE = GATE;
+const MACHINE_PATHS = resolve(import.meta.dir, "../scripts/gates/machine-paths.sh");
 
 // A sha no repository holds, and the hash git gives the empty tree.
 const MISSING_SHA = "deadbeef".repeat(5);
@@ -514,4 +515,111 @@ test("the pass floor reads the largest pass count of the run", async () => {
 
   expect(exitCode).toBe(0);
   expect(stderr).toBe("");
+});
+
+/**
+ * `openspec/changes/close-ci-gate-gaps`: the home-path gate runs `git grep` over
+ * every tracked file, this one included. A literal home-directory path in the
+ * code below would fail the gate on this repository, so each fixture path is
+ * joined from parts at run time. The cases that must pass are built the same
+ * way where a literal could match.
+ *
+ * Each case commits one file to a temporary repository and runs the gate there.
+ * A finding names the rule and the file with its line number. The gate prints
+ * the matched line through `echo`, which some shells give backslash escapes, so
+ * the cases do not assert on the line text.
+ */
+const USER = "alice";
+const DOC = "docs/setup.md";
+
+type GateResult = Awaited<ReturnType<typeof run>>;
+
+async function scanPaths(
+  files: Record<string, string>,
+  check: (result: GateResult) => void,
+): Promise<void> {
+  await withRepo(async (repo) => {
+    await repo.commit(files);
+    check(await repo.gate(MACHINE_PATHS));
+  });
+}
+
+function expectFinding(result: GateResult, file = DOC) {
+  expect(result.exitCode).toBe(1);
+  expect(result.stderr).toContain("no-machine-paths");
+  expect(result.stderr).toContain(`${file}:1:`);
+}
+
+function expectNoFinding(result: GateResult) {
+  expect(result.exitCode).toBe(0);
+  expect(result.stdout).toBe("");
+  expect(result.stderr).toBe("");
+}
+
+const REJECTED_SPELLINGS: Array<[name: string, path: string]> = [
+  ["a Git Bash path", ["", "c", "Users", USER, "work"].join("/")],
+  ["a macOS path", ["", "Users", USER, "work"].join("/")],
+  ["a lowercase drive path", ["C:", "users", USER, "work"].join("/")],
+  // Each backslash doubled, as a JSON string holds a Windows path.
+  ["a JSON-escaped Windows path", ["C:", "Users", USER, "work"].join("\\\\")],
+  // Positive controls: forms the pattern matched before the widening.
+  ["a single-backslash drive path (control)", ["C:", "Users", USER, "work"].join("\\")],
+  ["a Linux home path (control)", ["", "home", USER, "work"].join("/")],
+];
+
+for (const [name, path] of REJECTED_SPELLINGS) {
+  test(`the home-path gate rejects ${name}`, async () => {
+    await scanPaths({ [DOC]: `cd ${path}\n` }, (result) => expectFinding(result));
+  });
+}
+
+test("the home-path gate rejects a macOS path that opens a line", async () => {
+  // The `^` branch of the macOS expression: no character stands before the slash.
+  const path = ["", "Users", USER, "work"].join("/");
+  await scanPaths({ [DOC]: `${path}\n` }, (result) => expectFinding(result));
+});
+
+test("the home-path gate rejects a machine path beside a container path", async () => {
+  // Control: the denylist neutralizes the container path alone, not the line.
+  const container = ["", "home", "node", ".claude"].join("/");
+  const machine = ["", "home", USER, "src"].join("/");
+  await scanPaths({ [DOC]: `mount ${container} and work in ${machine}\n` }, (result) =>
+    expectFinding(result),
+  );
+});
+
+test("the home-path gate passes a container path", async () => {
+  const container = ["", "home", "node", ".claude"].join("/");
+  await scanPaths({ ".devcontainer/devcontainer.json": `"target": "${container}"\n` }, expectNoFinding);
+});
+
+test("the home-path gate passes the audit record's regex text for the macOS form", async () => {
+  // The line as audit-record/reports/G.md:101 holds it. The macOS expression
+  // needs a name character after `Users/`, and the record has `[` there.
+  const line =
+    "- Suggestion: Extend the pattern with `/[a-zA-Z]/[Uu]sers/[^/]+`, " +
+    "`(^|[^A-Za-z])/Users/[^/]+` and `[\\\\]{1,2}[Uu]sers[\\\\]{1,2}`. Ignore case.";
+  await scanPaths({ "reports/G.md": `${line}\n` }, expectNoFinding);
+});
+
+test("the home-path gate passes a lowercase users route", async () => {
+  // Lowercase /users/ names a route. Only the drive forms ignore case.
+  await scanPaths({ "docs/api.md": 'router.get("/users/me", handler);\n' }, expectNoFinding);
+});
+
+test("the home-path gate passes a relative Users directory", async () => {
+  // A name character or a dot before the slash makes the path relative.
+  const text = ["packages", "web", "src", "Users", "List.tsx"].join("/") + "\n" +
+    ["..", "Users", "List"].join("/") + "\n";
+  await scanPaths({ "docs/layout.md": text }, expectNoFinding);
+});
+
+test("the home-path gate reads tracked files only", async () => {
+  // Control: the spec lets an untracked file carry a machine path.
+  const path = ["", "Users", USER, "work"].join("/");
+  await withRepo(async (repo) => {
+    await repo.commit({ "README.md": "clean\n" });
+    await writeFile(join(repo.dir, "local-notes.md"), `cd ${path}\n`);
+    expectNoFinding(await repo.gate(MACHINE_PATHS));
+  });
 });
