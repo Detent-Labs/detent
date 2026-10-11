@@ -18,9 +18,10 @@
  * (aliased `collectFullActionSites`) from `../engine/registry-check.js` and
  * `PROCESS_START_ACTION_TYPE` from `../engine/registry.js` to find every
  * `process.start` action site, and `collectFieldsDeep` from
- * `../schema/definition.js` to build a target's accepted field-id set. None
- * of `registry-check.ts`, `registry.ts` or `schema/definition.ts` imports
- * back from this file.
+ * `../schema/definition.js` to build a target's accepted field-id set.
+ * `collect()` below reads the same `process.start` action sites from
+ * `registry-check.ts` for their mapping values. None of `registry-check.ts`,
+ * `registry.ts` or `schema/definition.ts` imports back from this file.
  *
  * `astProblem` is the other: it needs `MAX_PATTERN_LENGTH` from
  * `../schema/compile.js` for the `matches` pattern bound. `compile.ts` does
@@ -358,6 +359,23 @@ function collect(body: ProcessBody): Site[] {
       );
     }
   });
+
+  // A process.start mapping value is evaluated at delivery over `data`, `instance`
+  // and `actor` (`createSeededInstance`), so it takes neither `result` nor `child`
+  // and no expected type. The studio runs this with no registry, so `config` is
+  // unvalidated: read `inputMapping` only from a plain object and skip any entry
+  // that is not a CEL expression.
+  // ponytail: only process.start reads CEL from its config. A second handler that
+  // does needs a per-handler hook on HandlerDef that names its CEL sites and scope.
+  for (const { action, loc } of collectFullActionSites(body)) {
+    if (action.type !== PROCESS_START_ACTION_TYPE) continue;
+    const mapping = (action.config as { inputMapping?: unknown } | null | undefined)?.inputMapping;
+    if (!mapping || typeof mapping !== "object" || Array.isArray(mapping)) continue;
+    for (const [key, v] of Object.entries(mapping)) {
+      const e = asExpr(v);
+      if (e && typeof e.src === "string") push(e, `${loc}.config.inputMapping.${key}`, false, false);
+    }
+  }
 
   return sites;
 }

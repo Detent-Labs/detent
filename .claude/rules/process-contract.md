@@ -101,6 +101,13 @@ reads only `result`. A raise there means the handler's return does not
 match the action's contract. That fails loudly rather than leaving an
 optional field unset.
 
+A `process.start` action's `config.inputMapping` entry follows the same
+total-evaluation rule, and a raising entry leaves its target unwritten. The
+engine evaluates it over `data`, `instance` and `actor`, with no `result` and
+no `child`. Publish checks each value like a guard: it parses, type-checks,
+bans time functions and bounds structure and length. Only that one key of a
+plugin `config` holds CEL.
+
 **Data vs presentation.** The catalog defines each field once,
 process-wide. Each step carries a flat `view`. Its entries either
 reference a catalog field or stand alone as a note. A field entry

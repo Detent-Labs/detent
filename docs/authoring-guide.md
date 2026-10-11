@@ -876,6 +876,12 @@ wait-state, no outcome, no contract. Use it when one process's end step
 should start an unrelated process, not call one and park for its
 result.
 
+The mapping values of a `process.start` action are CEL over the current
+instance's data. They read `data`, `instance` and `actor`. Here `actor` is
+the system actor, because no person starts the chained instance. Publish
+checks each value like a guard: it parses the source and checks the types.
+It bans time functions and bounds the nesting, the node count and the length.
+
 A subprocess reference must not form a cycle. A process may not call
 itself, directly or through other processes it calls. Publishing rejects a
 body that would close such a cycle, whichever version closes it.

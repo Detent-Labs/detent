@@ -964,3 +964,144 @@ test("rejects a negated time function with the time-function message", () => {
   expect(issues[0].loc).toBe(GUARD_LOC);
   expect(issues[0].message).toContain("time function not allowed");
 });
+
+// ---- process.start mapping values (process-chaining delta) -------------------
+// A process.start action's config.inputMapping values are CEL, evaluated at
+// delivery over `data`, `instance` and `actor`. Only that known key is a checked
+// site; the studio runs this check with an unvalidated `config`, so a malformed
+// one must not throw.
+const startFields = [...typedFields, field("items", "list")];
+const startAction = (config: unknown, type = "process.start") => ({ id: "action_chain", type, config });
+const startStep = (action: unknown) => ({
+  id: "step_a",
+  key: "a",
+  label: { en: "A" },
+  type: "task",
+  onEntry: [action],
+  paths: [{ id: "path_a", key: "pa", label: "Pa", to: "step_b", trigger: "manual" }],
+});
+const startMapping = (mapping: unknown) => startStep(startAction({ processId: "proc_target", inputMapping: mapping }));
+const startIssues = (mapping: unknown) => validateProcessBody(body({ fields: startFields, steps: [startMapping(mapping)] }));
+const MAP_LOC = "steps[0].onEntry[0].config.inputMapping.field_t_amount";
+
+test("rejects an unknown field reference in a process.start mapping value", () => {
+  const issues = startIssues({ field_t_amount: cel("data.missing") });
+  expect(issues.length).toBe(1);
+  expect(issues[0].loc).toBe(MAP_LOC);
+  expect(msgs(issues).toLowerCase()).toContain("missing");
+});
+
+test("rejects a time function in a process.start mapping value", () => {
+  const issues = startIssues({ field_t_amount: cel('timestamp("2020-01-01T00:00:00Z")') });
+  expect(issues.length).toBe(1);
+  expect(issues[0].loc).toBe(MAP_LOC);
+  expect(issues[0].message).toContain("time function not allowed");
+});
+
+test("rejects three nested comprehensions in a process.start mapping value", () => {
+  const issues = startIssues({ field_t_amount: cel("data.items.all(a, data.items.all(b, data.items.all(c, a == b && b == c)))") });
+  expect(issues.length).toBe(1);
+  expect(issues[0].loc).toBe(MAP_LOC);
+  expect(issues[0].message).toContain("comprehension nesting limit");
+});
+
+test("rejects a bad matches pattern in a process.start mapping value", () => {
+  const issues = startIssues({ field_t_amount: cel('data.note.matches("(")') });
+  expect(issues.length).toBe(1);
+  expect(issues[0].loc).toBe(MAP_LOC);
+  expect(issues[0].message).toContain("does not compile as a JavaScript RegExp");
+});
+
+test("rejects result and child.outcome in a process.start mapping value", () => {
+  for (const [src, word] of [["result", "result"], ["child.outcome", "child"]] as const) {
+    const issues = startIssues({ field_t_amount: cel(src) });
+    expect(issues.length).toBe(1);
+    expect(issues[0].loc).toBe(MAP_LOC);
+    expect(issues[0].message.toLowerCase()).toContain(word);
+  }
+});
+
+test("accepts a well-typed process.start mapping value whatever type it infers to", () => {
+  expect(startIssues({ field_t_amount: cel("data.amount * 2.0") })).toEqual([]);
+  expect(startIssues({ field_t_note: cel("data.note") })).toEqual([]);
+  expect(startIssues({ field_t_who: cel("actor.id + instance.id") })).toEqual([]);
+});
+
+test("checks every entry of a process.start mapping, each at its own key", () => {
+  const issues = startIssues({ field_ok: cel("data.amount"), field_bad: cel("data.missing"), field_worse: cel("result") });
+  expect(issues.map((i) => i.loc).sort()).toEqual([
+    "steps[0].onEntry[0].config.inputMapping.field_bad",
+    "steps[0].onEntry[0].config.inputMapping.field_worse",
+  ]);
+});
+
+test("a process.start action at a path and at a timer is a checked site too", () => {
+  const action = startAction({ processId: "proc_target", inputMapping: { field_t_amount: cel("data.missing") } });
+  const onPath = {
+    id: "step_a", key: "a", label: { en: "A" }, type: "task",
+    paths: [{ id: "path_a", key: "pa", label: "Pa", to: "step_b", trigger: "manual", onPath: [action] }],
+  };
+  const onFire = {
+    id: "step_a", key: "a", label: { en: "A" }, type: "task",
+    paths: [{ id: "path_a", key: "pa", label: "Pa", to: "step_b", trigger: "manual" }],
+    timers: [{ id: "timer_a", duration: "PT1H", onFire: { actions: [action] } }],
+  };
+  expect(validateProcessBody(body({ fields: startFields, steps: [onPath] })).map((i) => i.loc)).toEqual([
+    "steps[0].paths[0].onPath[0].config.inputMapping.field_t_amount",
+  ]);
+  expect(validateProcessBody(body({ fields: startFields, steps: [onFire] })).map((i) => i.loc)).toEqual([
+    "steps[0].timers[0].onFire.actions[0].config.inputMapping.field_t_amount",
+  ]);
+});
+
+test("reads no other plugin config for CEL", () => {
+  const bad = cel("data.missing");
+  // Another action type, even with the same key shape.
+  const http = startStep(startAction({ processId: "proc_target", inputMapping: { field_t_amount: bad }, nested: { value: bad } }, "http.request"));
+  expect(validateProcessBody(body({ fields: startFields, steps: [http] }))).toEqual([]);
+  // Another key of a process.start config.
+  const other = startStep(startAction({ processId: "proc_target", inputMapping: {}, extra: bad, nested: { value: bad } }));
+  expect(validateProcessBody(body({ fields: startFields, steps: [other] }))).toEqual([]);
+});
+
+test("a malformed process.start config is skipped without a throw", () => {
+  const configs: unknown[] = [
+    undefined,
+    null,
+    "text",
+    42,
+    [],
+    {},
+    { processId: "proc_target" },
+    { processId: "proc_target", inputMapping: "text" },
+    { processId: "proc_target", inputMapping: 42 },
+    { processId: "proc_target", inputMapping: null },
+    { processId: "proc_target", inputMapping: [cel("data.missing")] },
+  ];
+  for (const config of configs) {
+    const step = startStep(startAction(config));
+    expect(() => validateProcessBody(body({ fields: startFields, steps: [step] }))).not.toThrow();
+    expect(validateProcessBody(body({ fields: startFields, steps: [step] }))).toEqual([]);
+  }
+});
+
+test("a process.start mapping entry that is not a CEL expression is skipped", () => {
+  const entries: unknown[] = [
+    null,
+    "data.missing",
+    42,
+    true,
+    [],
+    {},
+    { lang: "json", src: "data.missing" },
+    { lang: "cel" },
+    { lang: "cel", src: 7 },
+  ];
+  for (const entry of entries) {
+    expect(() => startIssues({ field_t_amount: entry })).not.toThrow();
+    expect(startIssues({ field_t_amount: entry })).toEqual([]);
+  }
+  // A skipped entry does not hide its sibling.
+  const issues = startIssues({ field_skip: null, field_t_amount: cel("data.missing") });
+  expect(issues.map((i) => i.loc)).toEqual([MAP_LOC]);
+});

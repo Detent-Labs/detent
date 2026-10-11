@@ -26,14 +26,14 @@
 
 ## 4. Checked mapping values for process.start (A-1)
 
-- [ ] 4.1 Add the `process.start` mapping sites to `collect()` in `src/cel/check.ts`. Read `config.inputMapping` only when it is a plain object. Skip entries that are not CEL expressions.
-- [ ] 4.2 Add the `ponytail:` comment from the design above that code. Add one line to the file header about the dependency on `registry-check.ts`. Verify `git grep -n 'ponytail:' -- src` lists the new comment.
-- [ ] 4.3 Add tests in `test/cel.test.ts` for the scenarios of "A process.start mapping value is a checked CEL site". Skip the length and studio scenarios. Add a case where another action type holds a CEL-shaped `config` value that stays unread. Add a malformed `config` case that must not throw. Verify each rejecting case fails on the old code.
-- [ ] 4.4 Add the mapping values to `collectExpressionSites` in `src/schema/compile.ts`, through `collectActionSites`. Read `config.inputMapping` only when it is a plain object, because this pass runs before Zod. Verify with a test in `test/compile-validation.test.ts`: an over-long value fails at its entry.
-- [ ] 4.5 Add a DB-backed test in `test/process-chaining.test.ts`. `publishBody` rejects a mapping with `timestamp()` and one with three nested `all()` calls. Verify both fail on the old code.
-- [ ] 4.6 Run `bun install` in the devcontainer, because `packages/web` reads a copy of the engine package. Add a case to `packages/web/test/studio-draftValidationLogic.test.ts`. A draft whose mapping calls `timestamp()` yields a CEL issue. Verify the issue names the mapping entry.
-- [ ] 4.7 Add the mapping bullet to `.claude/rules/authoring-invariants.md`. Extend the subprocess-mapping paragraph of `.claude/rules/process-contract.md` with the `process.start` rule. Verify with a grep for `process.start` in the new text.
-- [ ] 4.8 Teach the rule in the `process.start` paragraph of the Contract section in `docs/authoring-guide.md`. Verify the antislop linter reports nothing new on the file.
+- [x] 4.1 Add the `process.start` mapping sites to `collect()` in `src/cel/check.ts`. Read `config.inputMapping` only when it is a plain object. Skip entries that are not CEL expressions.
+- [x] 4.2 Add the `ponytail:` comment from the design above that code. Add one line to the file header about the dependency on `registry-check.ts`. Verify `git grep -n 'ponytail:' -- src` lists the new comment.
+- [x] 4.3 Add tests in `test/cel.test.ts` for the scenarios of "A process.start mapping value is a checked CEL site". Skip the length and studio scenarios. Add a case where another action type holds a CEL-shaped `config` value that stays unread. Add a malformed `config` case that must not throw. Verify each rejecting case fails on the old code.
+- [x] 4.4 Add the mapping values to `collectExpressionSites` in `src/schema/compile.ts`, through `collectActionSites`. Read `config.inputMapping` only when it is a plain object, because this pass runs before Zod. Verify with a test in `test/compile-validation.test.ts`: an over-long value fails at its entry.
+- [x] 4.5 Add a DB-backed test in `test/process-chaining.test.ts`. `publishBody` rejects a mapping with `timestamp()` and one with three nested `all()` calls. Verify both fail on the old code.
+- [x] 4.6 Run `bun install` in the devcontainer, because `packages/web` reads a copy of the engine package. Add a case to `packages/web/test/studio-draftValidationLogic.test.ts`. A draft whose mapping calls `timestamp()` yields a CEL issue. Verify the issue names the mapping entry.
+- [x] 4.7 Add the mapping bullet to `.claude/rules/authoring-invariants.md`. Extend the subprocess-mapping paragraph of `.claude/rules/process-contract.md` with the `process.start` rule. Verify with a grep for `process.start` in the new text.
+- [x] 4.8 Teach the rule in the `process.start` paragraph of the Contract section in `docs/authoring-guide.md`. Verify the antislop linter reports nothing new on the file.
 
 ## 5. Records
 

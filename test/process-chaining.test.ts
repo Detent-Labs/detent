@@ -9,7 +9,7 @@
 import { test, expect, beforeAll } from "bun:test";
 import { sql, initSchema, createInstance } from "../src/engine/store.js";
 import { startInstance, commitManualTransition, cancelInstance } from "../src/engine/transition.js";
-import { publishBody, createDefinitionStore, CrossProcessValidationError } from "../src/engine/definitions.js";
+import { publishBody, createDefinitionStore, CrossProcessValidationError, CelValidationError } from "../src/engine/definitions.js";
 import { createDefaultRegistry } from "../src/engine/host.js";
 import { createDataSourceRegistry, RETURN_ACTION_TYPE, type Registry as Reg } from "../src/engine/registry.js";
 import { drainOutbox, deliver, MAX_ATTEMPTS, type ClaimedRow } from "../src/engine/outbox.js";
@@ -339,6 +339,41 @@ test.skipIf(!DB)("a process.start action mapping into an undeclared target field
       dataSourceReg,
     ),
   ).rejects.toBeInstanceOf(CrossProcessValidationError);
+});
+
+// A mapping value is CEL the outbox worker evaluates at delivery, so publish
+// checks it like a guard. The CEL check throws before the cross-process check.
+test.skipIf(!DB)("publish rejects a process.start mapping value with a time function or three nested comprehensions", async () => {
+  const registry = createDefaultRegistry();
+  const tv = await publishBody("proc_pc_target9" as Instance["processId"], targetBody(), registry, dataSourceReg);
+  const withItems = (mapping: Record<string, unknown>): ProcessBody => {
+    const b = actorBody(tv.processId, mapping);
+    b.fields.push({ id: "field_a_items", key: "items", label: { en: "Items" }, type: "list" } as unknown as ProcessBody["fields"][number]);
+    return b;
+  };
+  const nested = "data.items.all(a, data.items.all(b, data.items.all(c, a == b && b == c)))";
+  const cases: [string, string, string][] = [
+    ["proc_pc_actor9a", 'timestamp("2020-01-01T00:00:00Z")', "time function not allowed"],
+    ["proc_pc_actor9b", nested, "comprehension nesting limit"],
+    ["proc_pc_actor9c", "data.missing", "missing"],
+  ];
+  for (const [pid, src, word] of cases) {
+    const err = await publishBody(pid as Instance["processId"], withItems({ field_t_amount: cel(src) }), registry, dataSourceReg).then(
+      () => undefined,
+      (e: unknown) => e,
+    );
+    expect(err).toBeInstanceOf(CelValidationError);
+    const issues = (err as CelValidationError).issues;
+    expect(issues.map((i) => i.loc)).toEqual(["steps[1].onEntry[0].config.inputMapping.field_t_amount"]);
+    expect(issues[0]!.message).toContain(word);
+  }
+});
+
+test.skipIf(!DB)("publish accepts a well-typed process.start mapping value", async () => {
+  const registry = createDefaultRegistry();
+  const tv = await publishBody("proc_pc_target10" as Instance["processId"], targetBody(), registry, dataSourceReg);
+  const av = await publishBody("proc_pc_actor10" as Instance["processId"], actorBody(tv.processId, { field_t_amount: cel("data.amount * 2.0") }), registry, dataSourceReg);
+  expect(av.version).toBeGreaterThan(0);
 });
 
 test.skipIf(!DB)("a process.start delivery that keeps failing dead-letters, and the acting instance is unaffected", async () => {

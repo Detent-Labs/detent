@@ -142,6 +142,14 @@ its placement.
   The check lives on the publish path, in `src/cel/check.ts` behind
   `validateReferences`. A migration transform meets it too, at plan
   registration.
+- A `process.start` action's `config.inputMapping` value is a checked CEL
+  site. It reads `data`, `instance` and `actor`, with no `result` and no
+  `child`, because the delivery supplies nothing else. It meets the
+  time-function ban and the structural bound, and it declares no expected
+  type. Only that key counts, and the check reads no other action `config`
+  for CEL. The CEL checks live on the publish path, in `src/cel/check.ts`
+  behind `validateReferences`. The length bound lives in the compile pass
+  (`compile.ts::checkLengthBounds`), before the hash-hit return.
 - No action anywhere in the body carries a `type` with the reserved `core.`
   prefix. The compile pass checks this on both compile branches
   (`compile.ts::checkReservedActionPrefix`). The cancel-sink id/key/outcome
