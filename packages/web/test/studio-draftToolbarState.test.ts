@@ -133,18 +133,22 @@ describe("DraftToolbar's savedBody transition (draftToolbarState.ts)", () => {
 describe("DraftToolbar's onSaved callback (design.md: onSaved vs the savedBody wrapper)", () => {
   it("a successful save advances savedBody and fires onSaved once", () => {
     let savedBody = structuredClone({ key: "p" });
+    let savedLayout: Record<string, unknown> = { step_a: { x: 0, y: 0 } };
     let onSavedCount = 0;
 
     // doSave()'s success branch:
     // `if (result) { onSavedBodyChange(draft); onSavedLayoutChange(result.layout); onSaved?.(); }`
     const draft = { key: "p", description: { en: "saved" } };
-    const result = { revision: 2, layout: {} };
+    const result = { revision: 2, layout: { step_a: { x: 40, y: 0 } } };
+    expect(isLayoutDirty(result.layout, savedLayout)).toBe(true);
     if (result) {
       savedBody = structuredClone(draft);
+      savedLayout = result.layout;
       onSavedCount++;
     }
 
     expect(isDirty(draft, savedBody)).toBe(false);
+    expect(isLayoutDirty(result.layout, savedLayout)).toBe(false);
     expect(onSavedCount).toBe(1);
   });
 

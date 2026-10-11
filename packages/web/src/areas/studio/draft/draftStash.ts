@@ -47,7 +47,7 @@ export function clearStash(storage: StashStorage, actorId: string, processId: st
   try {
     storage?.removeItem(stashKey(actorId, processId));
   } catch {
-    // A storage that refuses the removal holds nothing this tab can read back.
+    // The removal is lost. Where `getItem` throws too, `readRestorable` returns nothing.
   }
 }
 
