@@ -502,11 +502,14 @@ paths:
         - $ref: "#/components/parameters/instanceId"
       responses:
         "200":
-          description: OK
+          description: >-
+            The write result: the instance's `status` and `transitionSeq`, and
+            the step's assignment with the new claim. It carries no `data` and
+            no `startedBy`.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Instance"
+                $ref: "#/components/schemas/InstanceWriteResult"
         "401":
           description: No actor could be resolved from the request.
           content:
@@ -539,11 +542,14 @@ paths:
         - $ref: "#/components/parameters/instanceId"
       responses:
         "200":
-          description: OK
+          description: >-
+            The write result: the instance's `status` and `transitionSeq`, and
+            the step's assignment with the claim cleared. It carries no `data`
+            and no `startedBy`.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Instance"
+                $ref: "#/components/schemas/InstanceWriteResult"
         "401":
           description: No actor could be resolved from the request.
           content:
@@ -582,11 +588,14 @@ paths:
               $ref: "#/components/schemas/DelegateRequest"
       responses:
         "200":
-          description: OK
+          description: >-
+            The write result: the instance's `status` and `transitionSeq`, and
+            the step's assignment with the delegate as claimant. It carries no
+            `data` and no `startedBy`.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Instance"
+                $ref: "#/components/schemas/InstanceWriteResult"
         "400":
           description: Request body is not valid JSON, or is missing `toActorId`.
           content:
@@ -881,16 +890,22 @@ paths:
       summary: Cancel a running instance
       description: >-
         Requires the `system:cancel-any` role, or that the actor started
-        the instance (`startedBy === actor.id`).
+        the instance (`startedBy === actor.id`). Cancel authority is not read
+        authority, so the body is the write result and never the instance.
       parameters:
         - $ref: "#/components/parameters/instanceId"
       responses:
         "200":
-          description: OK. A no-op (still 200) on an instance that is not running.
+          description: >-
+            The write result: `instanceId`, `status` and `transitionSeq`. It
+            carries no `data`, no `startedBy` and no `assignment`, since the
+            instance no longer runs. Cancelling an instance that is not running
+            changes nothing and still answers 200, with that instance's current
+            `status`.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Instance"
+                $ref: "#/components/schemas/InstanceWriteResult"
         "401":
           description: No actor could be resolved from the request.
           content:
@@ -1414,6 +1429,32 @@ components:
           type: string
           format: date-time
       required: [instanceId, processId, version, definitionHash, currentStepId, transitionSeq, data, status, startedAt]
+
+    InstanceWriteResult:
+      type: object
+      description: >-
+        What a write route answers: the facts the call changed, never the
+        instance. Claim, release, delegate and cancel authorize an actor to
+        change an instance, not to read it. The body therefore carries none of
+        the `Instance` members a read would refuse, `data` and `startedBy`
+        among them. A caller that needs the instance reads it through
+        `getInstanceView`.
+      properties:
+        instanceId:
+          type: string
+        status:
+          $ref: "#/components/schemas/InstanceStatus"
+        transitionSeq:
+          type: integer
+        assignment:
+          type: object
+          description: >-
+            The current step's assignment. Present only while `status` is
+            `running` and the step holds one. Absent otherwise, never `null`.
+          allOf:
+            - $ref: "#/components/schemas/AssignmentState"
+      required: [instanceId, status, transitionSeq]
+      additionalProperties: false
 
     ResolvedViewField:
       type: object

@@ -11,7 +11,7 @@
  */
 import { readFileSync } from "node:fs";
 import { test, expect, beforeAll, beforeEach, spyOn } from "bun:test";
-import { sql } from "../src/engine/store.js";
+import { sql, createInstance } from "../src/engine/store.js";
 import { DB, initDb, authHeaders, authedReq } from "./helpers/http-fixture.js";
 import { clearInstanceAudit } from "./audit-cleanup.js";
 import { publishBody, createDefinitionStore } from "../src/engine/definitions.js";
@@ -26,7 +26,7 @@ import { parseMaxAttachmentBytes, parseLimit } from "../src/http/routes.js";
 import { MAX_LIST_LIMIT, MAX_RECORD_LIMIT } from "../src/runtime/api.js";
 import { devHeaderResolver, type ActorResolver } from "../src/auth/resolve.js";
 import { PUBLISH_ROLE, CANCEL_ANY_ROLE, ADMIN_ROLE, DEVELOPER_ROLE, type Permission } from "../src/auth/authorize.js";
-import type { ProcessBody, ProcessId } from "../src/schema/definition.js";
+import type { FieldId, ProcessBody, ProcessId } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
 
 const cel = (src: string) => ({ lang: "cel", src });
@@ -235,6 +235,32 @@ const assignedBody = (): ProcessBody =>
     },
   }) as unknown as ProcessBody;
 
+/** simpleBody, but the terminal step_b declares an assignment: a completed instance still stores it, so cancel's write result must drop it. */
+const terminalAssignedBody = (): ProcessBody =>
+  ({
+    key: "terminal_assigned_body",
+    label: { en: "Terminal Assigned Body" },
+    baseLocale: "en",
+    fields: [{ id: "field_amount", key: "amount", label: { en: "Amount" }, type: "number" }],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        {
+          id: "step_a",
+          key: "a",
+          label: { en: "A" },
+          type: "task",
+          view: { fields: [{ ref: "field_amount", required: true }] },
+          paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }],
+        },
+        {
+          id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true,
+          assignment: { strategy: { type: "static", config: { candidates: ["approver", "user_1"] } } },
+        },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
 const pid = (n: string) => n as ProcessId;
 
 /** Writes a process-scoped grant directly, bypassing the admin route — that route's own behavior is covered in `test/http-admin.test.ts`. */
@@ -263,6 +289,18 @@ const bystander: Actor = { id: "user_bystander", roles: [] };
 const developer: Actor = { id: "user_developer", roles: [DEVELOPER_ROLE] };
 /** PUBLISH_ROLE alone, no ADMIN_ROLE — passes the route's own publish gate but holds no read grant on any process, for instance.query's publish-time read-grant check. */
 const publisherNoRead: Actor = { id: "user_publisher_no_read", roles: [PUBLISH_ROLE] };
+/** system:cancel-any alone: no ADMIN_ROLE, and in these tests never the instance's starter, so it holds no read right. */
+const cancelAnyOnly: Actor = { id: "user_cancel_any_only", roles: [CANCEL_ANY_ROLE] };
+
+/** The write routes' whole key set (runtime-api "A write call answers a write result, never the instance"). */
+const WRITE_RESULT_KEYS = ["assignment", "instanceId", "status", "transitionSeq"];
+
+/** A claim, release, delegate or cancel 200 body carries write-result members only, and neither `data` nor `startedBy`, the two `Instance` members a read rule guards. */
+const expectWriteResultBody = (body: object): void => {
+  for (const key of Object.keys(body)) expect(WRITE_RESULT_KEYS).toContain(key);
+  expect(body).not.toHaveProperty("data");
+  expect(body).not.toHaveProperty("startedBy");
+};
 
 // ============================================================
 // Happy path per route
@@ -1026,6 +1064,79 @@ test.skipIf(!DB)("POST /instances/:instanceId/delegate with a missing toActorId 
   expect(res.status).toBe(400);
   const body = (await res.json()) as { error: { type: string } };
   expect(body.error.type).toBe("request-shape");
+});
+
+// --- Write result: claim, release and delegate answer no instance data ---------
+
+test.skipIf(!DB)("POST /instances/:instanceId/claim answers the write result: the new claim, no data, no startedBy", async () => {
+  const PID = pid("proc_http_claim_write_result");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/claim`, "POST", user1));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { instanceId: string; status: string; assignment?: { claimedBy?: string } };
+  expectWriteResultBody(body);
+  expect(body.instanceId).toBe(created.instanceId);
+  expect(body.status).toBe("running");
+  expect(body.assignment?.claimedBy).toBe("user_1");
+});
+
+test.skipIf(!DB)("POST /instances/:instanceId/release answers the write result: the cleared claim, no data, no startedBy", async () => {
+  const PID = pid("proc_http_release_write_result");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  await fetch(authedReq(`http://x/instances/${created.instanceId}/claim`, "POST", user1));
+
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/release`, "POST", user1));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { instanceId: string; status: string; assignment?: { candidates: string[]; claimedBy?: string } };
+  expectWriteResultBody(body);
+  expect(body.instanceId).toBe(created.instanceId);
+  expect(body.status).toBe("running");
+  expect(body.assignment?.candidates).toEqual(["approver", "user_1"]);
+  expect(body.assignment?.claimedBy).toBeUndefined();
+});
+
+test.skipIf(!DB)("POST /instances/:instanceId/delegate answers the write result: the new claimant, no data, no startedBy", async () => {
+  const PID = pid("proc_http_delegate_write_result");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  await fetch(authedReq(`http://x/instances/${created.instanceId}/claim`, "POST", user1));
+
+  const res = await fetch(jsonReq(`http://x/instances/${created.instanceId}/delegate`, "POST", user1, { toActorId: "outsider" }));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { instanceId: string; status: string; assignment?: { claimedBy?: string } };
+  expectWriteResultBody(body);
+  expect(body.instanceId).toBe(created.instanceId);
+  expect(body.status).toBe("running");
+  expect(body.assignment?.claimedBy).toBe("outsider");
+});
+
+// CLAIM-1 (docs/decisions.md, "Open from test-instance-claim-bypass"): a
+// candidate who did not start a test instance can claim its step, although
+// `loadInstanceForActor` refuses that candidate a read. This test pins the
+// response shape only: the claim answers the new assignment and no `data`. It
+// takes no position on the admission itself, which CLAIM-1 leaves open.
+test.skipIf(!DB)("POST /instances/:instanceId/claim by a candidate who did not start a test instance answers the new assignment and no data", async () => {
+  const PID = pid("proc_http_claim_test_instance");
+  const v = await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const testInst = await createInstance(v.definition, {
+    processId: PID,
+    version: v.version,
+    kind: "test",
+    startedBy: "user_test_starter",
+    data: { ["field_secret" as FieldId]: "keep-out" },
+    assignment: { candidates: ["approver", "user_1"] },
+  });
+
+  const res = await fetch(authedReq(`http://x/instances/${testInst.instanceId}/claim`, "POST", user1));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { instanceId: string; status: string; assignment?: { candidates: string[]; claimedBy?: string } };
+  expectWriteResultBody(body);
+  expect(body.instanceId).toBe(testInst.instanceId);
+  expect(body.assignment?.claimedBy).toBe("user_1");
+  expect(body.assignment?.candidates).toEqual(["approver", "user_1"]);
 });
 
 // ============================================================
@@ -2075,6 +2186,92 @@ test.skipIf(!DB)("POST /instances/:instanceId/cancel with no resolvable credenti
 
   const view = (await (await fetch(authedReq(`http://x/instances/${created.instanceId}`, "GET", user1))).json()) as { status: string };
   expect(view.status).toBe("running");
+});
+
+// --- Write result: cancel answers no instance data ------------------------------
+
+test.skipIf(!DB)("POST /instances/:instanceId/cancel by a cancel-any holder answers the write result: status cancelled, no data, no startedBy", async () => {
+  const PID = pid("proc_http_cancel_write_result");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1, { data: { field_amount: 7 } }))).json()) as { instanceId: string };
+
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/cancel`, "POST", cancelAnyOnly));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as Record<string, unknown>;
+  expectWriteResultBody(body);
+  // A cancelled instance runs no step, so no assignment shows either.
+  expect(Object.keys(body).sort()).toEqual(["instanceId", "status", "transitionSeq"]);
+  expect(body.instanceId).toBe(created.instanceId);
+  expect(body.status).toBe("cancelled");
+  expect(body.transitionSeq).toBe(1);
+});
+
+test.skipIf(!DB)("POST /instances/:instanceId/cancel by the starter answers the same write result", async () => {
+  const PID = pid("proc_http_cancel_write_result_starter");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1, { data: { field_amount: 7 } }))).json()) as { instanceId: string };
+
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/cancel`, "POST", user1));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as Record<string, unknown>;
+  expectWriteResultBody(body);
+  expect(Object.keys(body).sort()).toEqual(["instanceId", "status", "transitionSeq"]);
+  expect(body.status).toBe("cancelled");
+});
+
+/**
+ * Runs `body` to completion as `user1`, then has `cancelAnyOnly` cancel it. The
+ * holder neither started the instance nor holds ADMIN_ROLE, so it may not read
+ * the instance. Returns the cancel response body and the completing submit's
+ * Instance, after checking the cancel left the instance as it was.
+ */
+const cancelCompletedAsCancelAny = async (
+  processId: string,
+  body: ProcessBody,
+): Promise<{ result: Record<string, unknown>; completed: { status: string; transitionSeq: number; assignment?: { candidates: string[] } | null } }> => {
+  await publishBody(pid(processId), body, reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${processId}/instances`, "POST", user1, { data: { field_amount: 7 } }))).json()) as { instanceId: string };
+  const submitted = await fetch(jsonReq(`http://x/instances/${created.instanceId}/submit`, "POST", user1, { pathId: "path_ab", data: { field_amount: 10 } }));
+  expect(submitted.status).toBe(200);
+  const completed = (await submitted.json()) as { status: string; transitionSeq: number; assignment?: { candidates: string[] } | null };
+  expect(completed.status).toBe("completed");
+
+  const recordItems = async (): Promise<unknown[]> =>
+    ((await (await fetch(authedReq(`http://x/instances/${created.instanceId}/record`, "GET", admin))).json()) as { items: unknown[] }).items;
+  const recordBefore = await recordItems();
+
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/cancel`, "POST", cancelAnyOnly));
+  expect(res.status).toBe(200);
+  const result = (await res.json()) as Record<string, unknown>;
+  expect(result.instanceId).toBe(created.instanceId);
+
+  // The cancel is a no-op: same history, same status.
+  expect(await recordItems()).toEqual(recordBefore);
+  const view = (await (await fetch(authedReq(`http://x/instances/${created.instanceId}`, "GET", user1))).json()) as { status: string };
+  expect(view.status).toBe("completed");
+  return { result, completed };
+};
+
+test.skipIf(!DB)("POST /instances/:instanceId/cancel by a cancel-any holder who may not read a completed instance answers 200 with its status, no data and no assignment", async () => {
+  const { result, completed } = await cancelCompletedAsCancelAny("proc_http_cancel_completed", simpleBody());
+  // Pins the fixture: the completed instance stores no assignment.
+  expect(completed.assignment ?? null).toBeNull();
+
+  expectWriteResultBody(result);
+  expect(Object.keys(result).sort()).toEqual(["instanceId", "status", "transitionSeq"]);
+  expect(result.status).toBe("completed");
+  expect(result.transitionSeq).toBe(completed.transitionSeq);
+});
+
+test.skipIf(!DB)("POST /instances/:instanceId/cancel on a completed instance drops the terminal step's stored assignment", async () => {
+  const { result, completed } = await cancelCompletedAsCancelAny("proc_http_cancel_completed_assigned", terminalAssignedBody());
+  // Pins the fixture: here the completed instance does store candidates, so the
+  // result's lack of `assignment` is the running-only rule, not an empty value.
+  expect(completed.assignment?.candidates).toEqual(["approver", "user_1"]);
+
+  expectWriteResultBody(result);
+  expect(result).not.toHaveProperty("assignment");
+  expect(result.status).toBe("completed");
 });
 
 // ============================================================
