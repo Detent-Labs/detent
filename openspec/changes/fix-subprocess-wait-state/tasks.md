@@ -17,11 +17,11 @@
 
 ## 2. The cascade parks at a subprocess step (B-1)
 
-- [ ] 2.1 Make `resolveAutomatic` return at a step of type `subprocess`, before it selects a path. Verify with the R1 test below.
-- [ ] 2.2 Add the R1 test to `test/subprocess.test.ts`, with a guardless default as the second path. Verify that the parent stays parked, the child exists, and `approved` takes the approved path.
-- [ ] 2.3 Add a test that an outcome matching no guarded path takes the guardless default. Verify with the `rejected` outcome.
-- [ ] 2.4 Add tests for a subprocess initial step with a guardless default, and for a guard over parent data alone. Verify that both parents stay parked until the child returns.
-- [ ] 2.5 Edit the doc comments of `resolveAutomatic` and `selectAutomaticPath`. Verify that they name the subprocess exception.
+- [x] 2.1 Make `resolveAutomatic` return at a step of type `subprocess`, before it selects a path. Verify with the R1 test below.
+- [x] 2.2 Add the R1 test to `test/subprocess.test.ts`, with a guardless default as the second path. Verify that the parent stays parked, the child exists, and `approved` takes the approved path.
+- [x] 2.3 Add a test that an outcome matching no guarded path takes the guardless default. Verify with the `rejected` outcome.
+- [x] 2.4 Add tests for a subprocess initial step with a guardless default, and for a guard over parent data alone. Verify that both parents stay parked until the child returns.
+- [x] 2.5 Edit the doc comments of `resolveAutomatic` and `selectAutomaticPath`. Verify that they name the subprocess exception.
 
 ## 3. Spawn and return check the awaited child (B-2)
 
