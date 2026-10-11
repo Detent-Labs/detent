@@ -12,9 +12,9 @@
 
 ## 3. Publish check (engine)
 
-- [ ] 3.1 Collect each compared literal in `validateInstanceQueryReferences` and reject one that no live version admits through `typeMatches`. Verify `test/instance-query-cross-process.test.ts` covers every `cross-process-validation` scenario.
-- [ ] 3.2 Add the invariant to `.claude/rules/authoring-invariants.md`, and to `.claude/rules/process-contract.md` where it lists the DB-resolving checks. Verify both files name the check and its placement.
-- [ ] 3.3 Explain the rule in `docs/authoring-guide.md` in the `instance.query` comparison section. Verify the guide states the same rule as the delta spec.
+- [x] 3.1 Collect each compared literal in `validateInstanceQueryReferences` and reject one that no live version admits through `typeMatches`. Verify `test/instance-query-cross-process.test.ts` covers every `cross-process-validation` scenario.
+- [x] 3.2 Add the invariant to `.claude/rules/authoring-invariants.md`, and to `.claude/rules/process-contract.md` where it lists the DB-resolving checks. Verify both files name the check and its placement.
+- [x] 3.3 Explain the rule in `docs/authoring-guide.md` in the `instance.query` comparison section. Verify the guide states the same rule as the delta spec.
 
 ## 4. Studio form, catalog and attribute rows
 
