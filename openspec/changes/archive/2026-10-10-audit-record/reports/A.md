@@ -99,7 +99,7 @@ also read these targeted ranges: `src/engine/definitions.ts:540-720`,
   builds exactly such a "lookalike" sink. Its assertion
   `expect(publishedProcessBody.safeParse(b).success).toBe(true)` (`:152`)
   shows that the branch accepts it. The test checks only the `core.` ban. The
-  audit did not run it end to end. See the repro below.
+  audit did not run the effect end to end. See the repro below.
 - Counter-evidence sought: the check `structuralIssues`
   (`compile.ts:1218-1233`) has no check of the sink shape. Neither
   `validateReferences` nor the seven DB checks in `publishBody`
@@ -162,8 +162,8 @@ also read these targeted ranges: `src/engine/definitions.ts:540-720`,
     type applies only at the deadline (`src/cel/check.ts:269,327`). Publish
     accepts the body.
   - At runtime `evaluate` returns a string. The function `evalGuard` compares
-    `=== true` (`src/cel/eval.ts:166`) and returns `false`. The path never
-    fires, and every instance parks silently.
+    `=== true` (`src/cel/eval.ts:166`) and returns `false`. The path is never
+    taken, and every instance parks silently.
   - The same holds for `validation.rule` (`src/runtime/fields.ts:552,583`).
     An expression that is not `bool` rejects every submission with
     `rule-failed`.
@@ -225,7 +225,7 @@ also read these targeted ranges: `src/engine/definitions.ts:540-720`,
   4. The key `pinnedVersion` appears exactly for `pinned`, and `contractRef`
      for `latest-at-spawn` (`definition.ts:847-854`).
   5. A contracted terminal step needs an outcome (`definition.ts:1110`).
-     Some terminal step binds every declared outcome
+     Every declared outcome has a terminal step
      (`definition.ts:1116-1119`).
   6. Length bounds for `Plugin.type`, duration, `FieldDef.key` and
      `columnMapping` keys
@@ -286,14 +286,14 @@ also read these targeted ranges: `src/engine/definitions.ts:540-720`,
 
 - Case:
   - An author sets `execution: "blocking"` and expects the transition to wait
-    for the result. Or the author sets an own `idempotencyKey`.
+    for the result. Or the author sets a custom `idempotencyKey`.
   - Both keys stand in the schema (`src/schema/definition.ts:623,625`). They
     enter the hash and pass every publish check.
   - A `git grep` finds no reader of `.execution` in `src`. The outbox rows
     always get the derived key
     `idempotencyKey(instanceId, nextSeq, a.id)` (`src/engine/transition.ts:261`).
   - The action runs async with the default key, and the author never learns
-    it.
+    of it.
 - Location: `src/schema/definition.ts:200,623,625`,
   `src/engine/transition.ts:261`
 - Severity: low (`CLAUDE.md` calls `blocking` "reserved but not built". The
@@ -371,7 +371,7 @@ also read these targeted ranges: `src/engine/definitions.ts:540-720`,
 - Path rules: the check `checkPathTriggerConsistency`
   (`definition.ts:884-908`) runs in the `step` superRefine (`:952`). An
   automatic path does not need a priority, which matches the rule. Equal priorities:
-  `:898`. A default below the highest priority: `:901-905`. The runtime sorts
+  `:898`. A default that is not at the highest priority: `:901-905`. The runtime sorts
   in ascending order (`transition.ts:764-769`), which fits. No gap.
 - Plugins at publish: the check `validateReferences`
   (`src/validate.ts:196-241`) resolves actions at five positions, assignment
