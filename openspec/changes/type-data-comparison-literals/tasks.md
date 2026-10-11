@@ -26,10 +26,10 @@
 
 ## 5. Report builder
 
-- [ ] 5.1 Add `type` to the web `ColumnChoice`. Drop incomplete comparisons in `draftToInput`. Add the remembered-type helpers. Verify `reporting-reportsLogic.test.ts` covers incomplete cases and remembered types.
-- [ ] 5.2 Add `createDebouncer` and a thin hook, and key the column request on the complete query. Verify a fake-timer test shows one call after five rapid changes, and none for the first request.
-- [ ] 5.3 Rework `ComparisonRow`: typed control, `in` list text, incomplete mark, reason callout, remembered field types. Verify a static-markup test covers each state.
-- [ ] 5.4 Add English and German strings and a `docs/browser-checks.md` entry for the builder. Verify `i18n-catalog-parity.test.ts` passes.
+- [x] 5.1 Add `type` to the web `ColumnChoice`. Drop incomplete comparisons in `draftToInput`. Add the remembered-type helpers. Verify `reporting-reportsLogic.test.ts` covers incomplete cases and remembered types.
+- [x] 5.2 Add `createDebouncer` and a thin hook, and key the column request on the complete query. Verify a fake-timer test shows one call after five rapid changes, and none for the first request.
+- [x] 5.3 Rework `ComparisonRow`: typed control, `in` list text, incomplete mark, reason callout, remembered field types. Verify a static-markup test covers each state.
+- [x] 5.4 Add English and German strings and a `docs/browser-checks.md` entry for the builder. Verify `i18n-catalog-parity.test.ts` passes.
 
 ## 6. Verification
 
