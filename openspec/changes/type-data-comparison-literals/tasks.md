@@ -6,9 +6,9 @@
 
 ## 2. Column choice type (engine)
 
-- [ ] 2.1 Make `resolveVersionCoverage` return the declared base type per field and version, and update `fieldCell` and `mergeCell`. Verify the `executeReport` tests stay green.
-- [ ] 2.2 Add optional `type` to `ColumnChoice`, read from the newest declaring version. Verify `test/reports.test.ts` covers the three `instance-data-tables` scenarios.
-- [ ] 2.3 Assert `type` in the `POST /reporting/reports/columns` response. Verify `test/http-reporting-reports.test.ts` reads it.
+- [x] 2.1 Make `resolveVersionCoverage` return the declared base type per field and version, and update `fieldCell` and `mergeCell`. Verify the `executeReport` tests stay green.
+- [x] 2.2 Add optional `type` to `ColumnChoice`, read from the newest declaring version. Verify `test/reports.test.ts` covers the three `instance-data-tables` scenarios.
+- [x] 2.3 Assert `type` in the `POST /reporting/reports/columns` response. Verify `test/http-reporting-reports.test.ts` reads it.
 
 ## 3. Publish check (engine)
 
