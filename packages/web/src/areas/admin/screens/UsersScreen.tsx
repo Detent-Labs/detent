@@ -4,6 +4,7 @@ import { layout, colors, fonts, space } from "form-ui/tokens.stylex";
 import { listUsers, createUser, disableUser, enableUser, setUserRoles, setUserManager, setUserPassword } from "../api/client.js";
 import type { UserSummary } from "../api/types.js";
 import { useRefresh } from "../useRefresh.js";
+import { DIRECTORY_FOCUS_INTERVAL_MS } from "../refreshLogic.js";
 import { describeCaughtError } from "../errors.js";
 import { useFail } from "../../../shell/useFail.js";
 import { ErrorBanner } from "../../../shell/ErrorBanner.js";
@@ -227,7 +228,7 @@ export function UsersScreen({ token, locale, onUnauthorized }: UsersScreenProps)
   const [newEmail, setNewEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newRoles, setNewRoles] = useState("");
-  const { reloadToken, refresh } = useRefresh();
+  const { reloadToken, refresh } = useRefresh({ minFocusIntervalMs: DIRECTORY_FOCUS_INTERVAL_MS });
   const fail = useFail(onUnauthorized, (err) => setError(describeCaughtError(err, locale)));
 
   const editingRoles = (userId: string) => editing?.userId === userId && editing.field === "roles";
