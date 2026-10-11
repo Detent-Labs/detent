@@ -1,0 +1,18 @@
+# The number of tests `bun run check` must pass before the no-silent-green gate
+# accepts a run. The gate reads the last bare integer in this file and ignores
+# every line that is not one. It compares that number with the largest `pass`
+# count in the run, because `bun run check` prints one summary for `bun test`
+# and one for `test:tz`.
+#
+# A run that passes far fewer tests than the suite holds proves less than it
+# looks. A subset run, a crashed run and a suite that lost its files all land
+# below this number.
+#
+# Lower this only in the same commit as the change that deletes tests on
+# purpose, and add a row below naming what the decrease covers. A growing suite
+# leaves the number stale-low, which only loosens the margin. Nothing forces a
+# raise.
+#
+# Measured 2026-10-11, at 64c08161: 5206 pass, 1 skip, 0 fail, `Ran 5207 tests
+# across 269 files`, plus 20 pass in test:tz.
+5206

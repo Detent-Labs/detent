@@ -11,13 +11,13 @@
 
 ## 2. The silent-green gate reads the whole summary (G-7)
 
-- [ ] 2.1 Rewrite the summary reading in `silent-green.sh` per design D5. Add `todo` lines to the skip count. Reject a run with no `pass` line, no `Ran` line, or counts that miss the total. Use POSIX `awk` only, since mawk and gawk both run it. The runner cases in `test/gates.test.ts` stay red until task 2.5.
-- [ ] 2.2 Create `scripts/gates/pass-floor.txt` in the format of `skip-floor.txt`, with the value from design D5. Add the pass-floor check to the gate, with one `read_floor` function for both floor files. State in the floor file how to lower it.
-- [ ] 2.3 Name the todo rule in the header of `skip-floor.txt`. Verify that the file still ends with the integer 1.
-- [ ] 2.4 Make `test-gated.sh` keep a failing command's exit code per design D10. Say in its header that a subset run fails the pass floor and belongs to `bun test <path>`.
-- [ ] 2.5 Give the three runner cases in `test/gates.test.ts` a fake run with a full summary. The counts must add up and sit above the pass floor. Add a case where a fake command exits 3 and prints no summary. Verify that the runner exits 3 and that the cases still pass.
-- [ ] 2.6 Add one case per new scenario of the silent-green requirement. Cover a todo test at the floor and a missing `pass` line. Cover a missing `Ran` line and a renamed skip line. Cover a count below the pass floor and a green run.
-- [ ] 2.7 Prove the new cases fail on the old script, with the recipe of task 1.6. Copy `pass-floor.txt` into the scratch directory too. Record which cases fail.
+- [x] 2.1 Rewrite the summary reading in `silent-green.sh` per design D5. Add `todo` lines to the skip count. Reject a run with no `pass` line, no `Ran` line, or counts that miss the total. Use POSIX `awk` only, since mawk and gawk both run it. The runner cases in `test/gates.test.ts` stay red until task 2.5.
+- [x] 2.2 Create `scripts/gates/pass-floor.txt` in the format of `skip-floor.txt`, with the value from design D5. Add the pass-floor check to the gate, with one `read_floor` function for both floor files. State in the floor file how to lower it.
+- [x] 2.3 Name the todo rule in the header of `skip-floor.txt`. Verify that the file still ends with the integer 1.
+- [x] 2.4 Make `test-gated.sh` keep a failing command's exit code per design D10. Say in its header that a subset run fails the pass floor and belongs to `bun test <path>`.
+- [x] 2.5 Give the three runner cases in `test/gates.test.ts` a fake run with a full summary. The counts must add up and sit above the pass floor. Add a case where a fake command exits 3 and prints no summary. Verify that the runner exits 3 and that the cases still pass.
+- [x] 2.6 Add one case per new scenario of the silent-green requirement. Cover a todo test at the floor and a missing `pass` line. Cover a missing `Ran` line and a renamed skip line. Cover a count below the pass floor and a green run.
+- [x] 2.7 Prove the new cases fail on the old script, with the recipe of task 1.6. Copy `pass-floor.txt` into the scratch directory too. Record which cases fail.
 
 ## 3. The home-path gate matches four more spellings (G-8)
 
