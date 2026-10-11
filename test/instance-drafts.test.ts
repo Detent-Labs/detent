@@ -19,7 +19,7 @@ import {
   InstanceNotRunningError,
 } from "../src/runtime/api.js";
 import { RequestShapeError, NotFoundError } from "../src/errors.js";
-import { AuthorizationError } from "../src/auth/authorize.js";
+import { AuthorizationError, ADMIN_ROLE } from "../src/auth/authorize.js";
 import type { ProcessBody, ProcessId, InstanceId, StepId } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
 import { clearInstanceAudit } from "./audit-cleanup.js";
@@ -209,8 +209,13 @@ test.skipIf(!DB)("saveInstanceDraft: a non-running instance is refused with Inst
   expect(await getInstanceDraft(created.instanceId, sql)).toBeUndefined();
 });
 
-test.skipIf(!DB)("saveInstanceDraft: an unknown instance raises NotFoundError", async () => {
-  await expectRejects(saveInstanceDraft("inst_missing" as InstanceId, {}, actor, sql), NotFoundError);
+test.skipIf(!DB)("saveInstanceDraft: an unknown instance is refused with AuthorizationError for a caller without ADMIN_ROLE", async () => {
+  await expectRejects(saveInstanceDraft("inst_missing" as InstanceId, {}, actor, sql), AuthorizationError);
+});
+
+test.skipIf(!DB)("saveInstanceDraft: an unknown instance still raises NotFoundError for an ADMIN_ROLE holder", async () => {
+  const administrator: Actor = { id: "user_admin", roles: [ADMIN_ROLE] };
+  await expectRejects(saveInstanceDraft("inst_missing" as InstanceId, {}, administrator, sql), NotFoundError);
 });
 
 test.skipIf(!DB)("getInstanceView returns the matching draft, with its data and metadata", async () => {

@@ -415,13 +415,21 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "403":
-          description: The actor is not the claimant, or not an eligible candidate on an unclaimed step.
+          description: >-
+            The actor is not the claimant, or not an eligible candidate on an
+            unclaimed step. Type `authorization` also answers an instance that
+            does not exist, and a non-running instance the actor may not read.
+            Its message does not tell these cases apart.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "409":
-          description: The named path's guard refused the transition, the instance is not running, or a concurrent write lost the optimistic-concurrency race.
+          description: >-
+            The named path's guard refused the transition, a concurrent write
+            lost the optimistic-concurrency race, or the instance is not
+            running and the actor may read it. An actor who may not read a
+            non-running instance gets the 403 above, not this response.
           content:
             application/json:
               schema:
@@ -471,19 +479,30 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "403":
-          description: The actor is not the claimant, or on an unassigned step is neither the starter nor a `system:admin` holder.
+          description: >-
+            The actor is not the claimant, or on an unassigned step is neither
+            the starter nor a `system:admin` holder. Type `authorization` also
+            answers an instance that does not exist when the actor lacks
+            `system:admin`, and a non-running instance the actor may not read.
+            Its message does not tell these cases apart.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "409":
-          description: The instance is not running.
+          description: >-
+            The instance is not running and the actor may read it. An actor who
+            may not read a non-running instance gets the 403 above, not this
+            response.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "500":
-          description: The instance does not exist. Also covers any unrecognized server-side failure.
+          description: >-
+            The instance does not exist and the caller holds `system:admin`.
+            Any other caller gets the 403 above for a missing instance. Also
+            covers any unrecognized server-side failure.
           content:
             application/json:
               schema:
@@ -913,7 +932,11 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "403":
-          description: The actor holds neither `system:cancel-any` nor starter status on this instance.
+          description: >-
+            The actor holds neither `system:cancel-any` nor starter status on
+            this instance. A starter whom a revocation names, with no live
+            assignment on the instance, also gets this response once the
+            instance has finished: the 200 above would tell them its status.
           content:
             application/json:
               schema:
@@ -1454,7 +1477,6 @@ components:
           allOf:
             - $ref: "#/components/schemas/AssignmentState"
       required: [instanceId, status, transitionSeq]
-      additionalProperties: false
 
     ResolvedViewField:
       type: object

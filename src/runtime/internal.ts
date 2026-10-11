@@ -12,7 +12,7 @@ import { isEligibleCandidate } from "../engine/transition.js";
 import type { Actor } from "../cel/eval.js";
 import { ADMIN_ROLE, AuthorizationError } from "../auth/authorize.js";
 import { actorPrincipals } from "../auth/groups.js";
-import { NotFoundError } from "../errors.js";
+import { NotFoundError, type InstanceNotRunningError } from "../errors.js";
 import { encodeCursor, decodeCursor } from "../pagination.js";
 import { instance as instanceSchema } from "../schema/definition.js";
 import type { Instance, ProcessBody, Step, InstanceId, AssignmentState } from "../schema/definition.js";
@@ -234,6 +234,28 @@ export async function loadInstanceForActor(instanceId: InstanceId, actor: Actor,
     throw new AuthorizationError(`actor '${actor.id}' may not read instance '${instanceId}'`);
   }
   return { instance, body };
+}
+
+/**
+ * Report a non-running instance to a caller who may read it, and refuse
+ * everyone else. A write call has authority over an instance without a right
+ * to read it, so `err.status` reaches only a caller that `loadInstanceForActor`
+ * admits (instance-visibility-set, "A write call reveals a finished instance
+ * only to a reader"). A refused load throws `refusal` in its place, which the
+ * caller builds to match the text a running instance gives that same caller.
+ * Any other load failure propagates unchanged.
+ *
+ * Call it outside any transaction: the extra read must not wait on a row lock
+ * the failed write still holds.
+ */
+export async function throwToReader(err: InstanceNotRunningError, actor: Actor, refusal: AuthorizationError, db: SQL): Promise<never> {
+  try {
+    await loadInstanceForActor(err.instanceId as InstanceId, actor, db);
+  } catch (loadErr) {
+    if (loadErr instanceof AuthorizationError) throw refusal;
+    throw loadErr;
+  }
+  throw err;
 }
 
 /**

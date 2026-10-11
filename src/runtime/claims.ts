@@ -54,10 +54,9 @@ export async function releaseClaim(instanceId: InstanceId, actor: Actor, db: SQL
  * actor. Delegation to the engine implementation — see
  * `engine/transition.ts::delegateClaim`. Same non-running detection as
  * `claimStep`/`releaseClaim`, for the same reason, and the same write result.
- * `toActorId` is still not
- * checked against `assignment.candidates`: the contract permits delegating
- * outside the candidate set, and the `assignment.delegated` event records
- * exactly that.
+ * `toActorId` is still not checked against `assignment.candidates`: the
+ * contract permits delegating outside the candidate set, and the
+ * `assignment.delegated` event records exactly that.
  *
  * It IS checked against the local account directory, but only where the
  * delegating actor's own id resolves there. The engine cannot ask whether a
