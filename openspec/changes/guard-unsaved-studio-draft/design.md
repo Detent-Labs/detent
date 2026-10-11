@@ -140,9 +140,9 @@ newer draft that reached the same revision number.
 <!-- antislop: allow synonym-rotation -->
 <!-- Discard them and Discard draft are two studio controls with different effects. -->
 `RestoreNotice` follows the warning callout of `DESIGN.md`: refusal text beside
-a 3px advisory rule, with 8px before the text. It has `role="status"` and three
-catalog strings. The studio `t(key)` takes no values, so the message names no
-time. The button reads "Discard them", the wording of the owner ruling of 2026-10-11.
+a 3px advisory rule, with 8px before the text. It has `role="status"` and four
+catalog strings: the message, the two buttons and the replace prompt. The studio
+`t(key)` takes no values, so the message names no time. The button reads "Discard them", the wording of the owner ruling of 2026-10-11.
 
 The notice sits between the header bar and the tab row, as a sibling of the
 error banner. The message and both buttons share a line on wide screens and

@@ -18,9 +18,9 @@
 <!-- Discard them and Discard draft are two controls; the process surface is a glossary term. -->
 - [ ] 3.1 Add `draft/draftStash.ts` with `stashDraft`, `readRestorable` and `clearStash`. Each takes a storage argument. Test a round trip, a second actor, a malformed value, a throwing storage, and an equal stash that `readRestorable` clears, in `studio-draftStash.test.ts`.
 - [ ] 3.2 Pass the actor id from `StudioArea` through `EditScreen` to `ProcessSurface`. Wrap `onUnauthorized` there. The wrapper writes the stash of a dirty draft before it calls the callback of the shell. Verify `bun run typecheck` passes.
-- [ ] 3.3 Add `panels/RestoreNotice.tsx` and its three strings in `i18n/catalogs/studio.ts`. Style it as the warning callout with compiled styles. Show it under the header bar when `readRestorable` returns a stash. Verify `bun run typecheck` passes.
+- [ ] 3.3 Add `panels/RestoreNotice.tsx` and its four strings in `i18n/catalogs/studio.ts`. Style it as the warning callout with compiled styles. Show it under the header bar when `readRestorable` returns a stash. Verify `bun run typecheck` passes.
 - [ ] 3.4 Wire the two buttons. Restore replaces the draft and sets the stored revision and layout. It asks with `confirm` first when the draft is dirty. "Discard them", a successful save and the Discard draft action clear the stash. After either button focus moves to the open tab. Verify the browser check in 5.4.
-- [ ] 3.5 Test the notice in `studio-restoreNotice.test.tsx` with static markup: both buttons, `role="status"` and the three catalog strings. Verify the file passes.
+- [ ] 3.5 Test the notice in `studio-restoreNotice.test.tsx` with static markup: both buttons, `role="status"` and the four catalog strings. Verify the file passes.
 - [ ] 3.6 Add a "restore notice" row to the process surface table in `.claude/rules/ui-glossary.md`. Verify the term appears once in the file.
 
 ## 4. Records

@@ -53,7 +53,7 @@ None.
   `screens/draftSaveLogic.ts`, `screens/draftToolbarState.ts` and
   `panels/DraftToolbar.tsx`. Two new files join them: `draft/draftStash.ts`
   and `panels/RestoreNotice.tsx`.
-- `packages/web/src/i18n/catalogs/studio.ts`: three strings for the notice.
+- `packages/web/src/i18n/catalogs/studio.ts`: four strings for the notice.
 - `packages/web/test/`: tests for the dirty helpers, the save logic, the stash,
   the notice and the leave guard.
 - `docs/browser-checks.md`: the manual checks. `.claude/rules/ui-glossary.md`:
