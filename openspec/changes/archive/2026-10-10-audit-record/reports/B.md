@@ -183,9 +183,10 @@ State: HEAD `5f41cd8a`, read only. Read in full: `store.ts`, `transition.ts`,
 ### B-5: A row whose `tx2` always fails gets delivered again forever and never reaches dead-letter
 
 - Case: an `http.request` with `output: {field_note: "result.note"}` receives
-  `{"note": "a\u0000b"}` from the external system.
+  a result from the external system. Its `note` value holds a character that
+  the `jsonb` type rejects.
   - The handler succeeds, and `tx2` writes `(${[val]}::jsonb)`. Postgres
-    rejects `\u0000` in `jsonb` (assumed, repro R4).
+    refuses to store that value in the `jsonb` column (assumed, repro R4).
   - The `tx2` throws, and the row catch leaves the row `claimed`. After 30 s
     the next pass claims it again (`attempts` +1). It runs the handler again,
     forever.
@@ -202,8 +203,7 @@ State: HEAD `5f41cd8a`, read only. Read in full: `store.ts`, `transition.ts`,
   `src/engine/outbox.ts:317`.
 - Severity: medium. The trigger is unusual. The effect: external side effects
   repeat without bound every 30 s.
-- Evidence: confirmed for the control flow, assumed for the `\u0000` trigger
-  (R4).
+- Evidence: confirmed for the control flow, assumed for the trigger (R4).
 - Counter-evidence sought: the claim query (`outbox.ts:195-204`, no
   `attempts` filter). In `admin-queries.ts`, requeue and discard apply only to
   `dead-letter`. The spec scenario `transactional-outbox/spec.md:118-123`
@@ -529,10 +529,10 @@ State: HEAD `5f41cd8a`, read only. Read in full: `store.ts`, `transition.ts`,
   `assignment.candidates` holds the members. Assumed: `[]` and an
   `assignment.unresolved` with `no-candidates`.
 - R4 (B-5):
-  - A registry handler that returns `{note: "a\u0000b"}`. An action with
-    `output: {<string field>: "result.note"}`.
-  - Call `drainOutbox(sql, reg, deliver, 50)` three times, each more than
-    50 ms apart.
+  - A registry handler returns a `note` value that the `jsonb` type rejects.
+    An action maps `result.note` into a string field.
+  - The test drains the outbox three times with a short lease, with a pause
+    longer than the lease between runs.
   - Assumed: the row stays `claimed`, and `attempts` climbs past
     `MAX_ATTEMPTS`. The handler runs each time. The row never reaches
     `dead-letter`.

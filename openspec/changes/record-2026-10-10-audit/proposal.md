@@ -35,7 +35,8 @@ when it archives. Without the index, no change knows which finding it owns.
 - The German originals stay in the untracked `tmp/` directory.
 - Nine findings concern security. The record keeps their case narrative and
   their quoted check output. It drops the literal attack payloads. Their index
-  entries state the risk in one sentence and give no trigger recipe.
+  entries state the risk in one sentence and give no trigger recipe. The same
+  cut covers four more unfixed findings: B-5, C-4, C-7 and D-6.
 
 This change fixes no finding. Each fix needs its own OpenSpec change.
 

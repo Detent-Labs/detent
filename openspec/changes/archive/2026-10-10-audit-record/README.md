@@ -95,7 +95,7 @@ the line citations of other entries.
 
 ## Rulings that shaped the work
 
-Twelve rulings shaped the work.
+Thirteen rulings shaped the work.
 
 ### Owner rulings of 2026-10-10
 
@@ -125,7 +125,7 @@ Twelve rulings shaped the work.
    Its report and agent reports are in English. An index in
    `docs/decisions.md` joins it. The change `record-2026-10-10-audit` carries
    both. The ruling left one question open: how the translation passes the
-   prose gate. Ruling 11 answers it.
+   prose gate. Ruling 12 answers it.
 
 ### Owner ruling of 2026-10-11, on security
 
@@ -135,13 +135,20 @@ Twelve rulings shaped the work.
     states each of the nine in one factual risk sentence with no trigger
     recipe.
 
+### Coordinator ruling of 2026-10-11, on payloads
+
+11. The cut of ruling 10 extends to four more unfixed findings: B-5, C-4
+    (with D-2), C-7 and D-6. The record keeps their case narrative, mechanism,
+    locations and quoted check output. It drops the literal values and the
+    step-by-step sequences.
+
 ### Coordinator rulings of 2026-10-11
 
-11. On the prose gate: each translator wrote clean English first and repaired
+12. On the prose gate: each translator wrote clean English first and repaired
     what the linter reported. A targeted `antislop` directive with a reason
     covers only a quote, a table or a finding id that the linter flags. No
     file in the record carries a file-wide directive.
-12. On the originals: the record holds English only. The German originals are
+13. On the originals: the record holds English only. The German originals are
     not part of the record.
 
 ## What the record leaves out
@@ -149,5 +156,6 @@ Twelve rulings shaped the work.
 - The German originals.
 - The fix plan and the per-change briefs. They steer the fix run, and the
   index keeps the map from finding to change.
-- The attack payloads of the nine security findings.
+- The attack payloads of the nine security findings and of the four findings
+  in ruling 11.
 - The raw check logs. The checks table above quotes the lines that matter.

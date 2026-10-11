@@ -247,7 +247,7 @@ None.
 - **A-3** Publish does not compile CEL `matches()` with an author's regex. An invalid pattern parks silently, and a backtracking one blocks the event loop: `src/cel/check.ts:161`, cel-js `lib/functions.js:356-362`. Reproduced (`matches("(")` → `{"ok":true}`; `^(a+)+$`: `n=20` 4 ms, `n=24` 74 ms, `n=26` 287 ms). New. OpenSpec change.
 - **A-4** Guards, view flags and `validation.rule` may return a non-bool. The guard `data.status` parks every instance silently: `src/cel/check.ts:256-283`, `src/cel/eval.ts:166`. Reproduced (`checkAgainstFields("data.s")` → ok, `evalGuard` → false). New, and the spec `cel-expressions:381-385` defines it this way. OpenSpec change.
 - **B-4** The outbox lease starts at the batch claim, but the deadline runs per row. A second process claims rows again. The tx2 CAS has no claim marker, so it can overwrite a foreign success: `src/engine/outbox.ts:195-204`, `:236-238`, `:250-252`, `:335-352`. Mechanism confirmed, consequences assumed (a repro with two workers is missing). New.
-- **B-5** If tx2 fails for good (for example `\u0000` in the writeback), the row stays `claimed`. The worker redelivers it every 30 s and never moves it to the dead letters: `src/engine/outbox.ts:334`, `:355-362`. Control flow confirmed, trigger assumed. The ARCH-1 fix is incomplete.
+- **B-5** A writeback can make tx2 fail for good. One trigger is a value the database refuses to store in a `jsonb` column. The row then stays `claimed`. The worker redelivers it every 30 s and never moves it to the dead letters: `src/engine/outbox.ts:334`, `:355-362`. Control flow confirmed, trigger assumed. The ARCH-1 fix is incomplete.
 - **B-6** The column `resolve_state` stays `pending` after a cascade ends. The resolution claim scans a growing set every 500 ms: `src/engine/transition.ts:396`, `src/engine/resolution.ts:61-71`. Confirmed, scale assumed (EXPLAIN missing). New.
 - **B-7** With `DATA_RETENTION_DAYS` set, the retention sweep reads every unredacted instance through `body->>'status'` every 500 ms: `src/engine/retention.ts:97-106`, `store.ts:284-287`. Confirmed, scale assumed. New.
 - **B-8** The worker ticks run serially per tenant. One tenant's hanging `http.request` target blocks the outbox of every tenant: `src/engine/host.ts:315-326`. Confirmed. New.
@@ -359,7 +359,7 @@ None.
 - **F-12** The shell does not reconcile the session between tabs. A second tab can restore a session after a logout: `shell/App.tsx:80-121`, `session.ts:64-70`.
 - **F-13** Before its first screen, the app waits for `/ui-strings` without a time limit: `main.tsx:16-27`, `i18n/overrides.ts:43-54`.
 - **F-14** The tab announcement expands `$` patterns in the label. This is the form-ui site of FIELDS-19: `packages/form-ui/src/tabs.ts:175-182`.
-- **F-15** Dead exports and parameters (`api/client.ts`, `fieldLabel`, `PathButtons.style` and others): list in `reports/F.md`.
+- **F-15** Dead exports and parameters (`reporting/api/client.ts`, `fieldLabel`, `PathButtons.style` and others): list in `reports/F.md`.
 - **F-16** The package form-ui declares React `^18` as a peer, while the consumer uses React 19: `packages/form-ui/package.json`.
 - **F-17** The migrations screen has neither a refresh button nor a focus refetch, and the spec requires both: `admin/screens/MigrationsScreen.tsx`.
 - **F-18** The Users and Groups screens load the whole directory on every focus: `UsersScreen.tsx:257-283`, `GroupsScreen.tsx:198-236`.

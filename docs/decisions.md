@@ -1617,9 +1617,10 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   `packages/web/src/areas/studio/screens/EditScreen.tsx`.
 - **`type-data-comparison-literals` (E2-2, E2-9, E2-16, F-5; high)**: The
   `instance.query` form and the report builder send every comparison value as
-  a string, the report builder offers no way to type the operator `in`, the
-  query form's attribute rows lose focus on each keystroke, and a failed
-  catalog fetch marks every reference as stale. Anchors:
+  a string, the report builder offers no way to type a list for the
+  comparison `in`, the query form's attribute rows lose focus on each
+  keystroke, and a failed catalog fetch marks every reference as stale.
+  Anchors:
   `packages/web/src/areas/studio/panels/shared/InstanceQueryForm.tsx`,
   `packages/web/src/areas/reporting/screens/ReportBuilderScreen.tsx`,
   `packages/web/src/areas/studio/panels/shared/useTargetProcessCatalog.ts`.

