@@ -2445,6 +2445,61 @@ options match a real published catalog. This walk caught the labelFieldId
 picker's stale mark polluting its own accessible name. The fix moves the
 mark outside the `<label>`, in `InstanceQueryForm.tsx`.
 
+### The instance.query form writes typed literals
+
+Source: `type-data-comparison-literals` tasks 4.1-4.5.
+
+Publish a target process with a number field `priority`, a boolean field and
+a string field. Open the Data sources tab of a second draft. Add an
+`instance.query` data source there. Pick the target process.
+
+#### Typing keeps focus
+
+Add an attribute row and type `cost_center` without a click between keys.
+Pass: the key input keeps focus after each character. Add a comparison on
+`priority` and type `12`. Pass: the value input keeps focus too.
+
+#### A number reaches the JSON view as a number
+
+Keep `=` and type `1` on `priority`. Open the JSON surface. Pass: the
+comparison holds `"value": 1` without quotes.
+
+Type `abc` instead. Pass: the input keeps `abc`, and the row says the value is
+not a number. The JSON then holds neither `value` nor `valueFromField`.
+
+Pick the boolean field. Pass: a Yes/No choice replaces the text input, and Yes
+writes `true`.
+
+#### The in list
+
+Switch the operator to `in`. Pass: the right-side choice offers the literal
+alone, and a hint names the comma. Type `1, 2`. Pass: the JSON holds `[1, 2]`.
+
+On the string field, type `a,b`. Pass: the input shows `a,b`, and the JSON
+holds `["a", "b"]`.
+
+#### The error row
+
+Stop the engine, or block `GET /processes/:id/versions` in the browser's
+network tools. Pick the target again. Pass: one error row stands under the
+process picker. The form marks no reference stale.
+
+Restore the route and pick another process. Pass: the error row disappears.
+
+#### The duplicate mark
+
+Add a second attribute row and type `cost_center` again. Pass: the later row
+shows the duplicate callout and keeps its text. The JSON keeps the earlier
+row's entry.
+
+Leave a row's key empty and press "+ Add attribute". Pass: a second row
+appears. Change `attributes` in the JSON surface and return to the form. Pass:
+the rows show the new attributes.
+
+`studio-instanceQueryForm.test.tsx` draws each catalog state through a static
+render. Such a render runs no event handler, so it cannot see focus or a
+committed keystroke.
+
 ### The instance.transition action's config form (`instance-transition-action`)
 
 Source: `instance-transition-action` tasks 4.1 and 7.5.
