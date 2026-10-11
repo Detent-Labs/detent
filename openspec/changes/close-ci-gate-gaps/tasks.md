@@ -27,12 +27,12 @@
 
 ## 4. The workflow and Dependabot (G-1, G-11, G-6)
 
-- [ ] 4.1 Change `.github/workflows/check.yml` per design D1 and D7. The `check` job gets `frozen-lockfile` as its first install. It loses the later step of that name. The `e2e` job installs with `--frozen-lockfile`. Add the permissions block, `persist-credentials: false` on all three checkouts, and a sha pin with a release comment on all four `uses` lines.
-- [ ] 4.2 Reword the comments in `check.yml` that describe the old install order. Verify with `git grep -n "bun install" .github/workflows/check.yml` that no plain install remains.
-- [ ] 4.3 Change the three `npm` entries in `.github/dependabot.yml` to `bun` per design D4. Keep the `github-actions` entry.
-- [ ] 4.4 Add the workflow and Dependabot cases to `test/gates.test.ts` per design D7 and D4. Parse with `Bun.YAML.parse`. Read the raw `uses` lines for the sha and release comment. Check the step order in the `check` job. Feed each rule a rejecting fixture, and check that the real files pass.
-- [ ] 4.5 Prove the new cases fail on the old files, with the recipe of task 1.6. Copy the old workflow and Dependabot file under `.github/` in the scratch directory. Record which cases fail.
-- [ ] 4.6 Show the G-1 mechanism on a scratch copy of the manifests and `bun.lock` inside the container. Change one version in `packages/web/package.json`. Verify that a plain `bun install` rewrites `bun.lock` and exits 0. Verify that `bun install --frozen-lockfile` on a fresh copy exits non-zero.
+- [x] 4.1 Change `.github/workflows/check.yml` per design D1 and D7. The `check` job gets `frozen-lockfile` as its first install. It loses the later step of that name. The `e2e` job installs with `--frozen-lockfile`. Add the permissions block, `persist-credentials: false` on all three checkouts, and a sha pin with a release comment on all four `uses` lines.
+- [x] 4.2 Reword the comments in `check.yml` that describe the old install order. Verify with `git grep -n "bun install" .github/workflows/check.yml` that no plain install remains.
+- [x] 4.3 Change the three `npm` entries in `.github/dependabot.yml` to `bun` per design D4. Keep the `github-actions` entry.
+- [x] 4.4 Add the workflow and Dependabot cases to `test/gates.test.ts` per design D7 and D4. Parse with `Bun.YAML.parse`. Read the raw `uses` lines for the sha and release comment. Check the step order in the `check` job. Feed each rule a rejecting fixture, and check that the real files pass.
+- [x] 4.5 Prove the new cases fail on the old files, with the recipe of task 1.6. Copy the old workflow and Dependabot file under `.github/` in the scratch directory. Record which cases fail.
+- [x] 4.6 Show the G-1 mechanism on a scratch copy of the manifests and `bun.lock` inside the container. Change one version in `packages/web/package.json`. Verify that a plain `bun install` rewrites `bun.lock` and exits 0. Verify that `bun install --frozen-lockfile` on a fresh copy exits non-zero.
 
 ## 5. The probe role's password (G-12)
 

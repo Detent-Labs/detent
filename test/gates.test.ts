@@ -645,3 +645,333 @@ test("the home-path gate reads tracked files only", async () => {
     expectNoFinding(await repo.gate(MACHINE_PATHS));
   });
 });
+
+/**
+ * `openspec/changes/close-ci-gate-gaps`: the hosted workflow and the Dependabot
+ * file are data a test can read. `workflowProblems` and `dependabotProblems`
+ * return one message per broken rule, so the real files return an empty list
+ * and each rejecting fixture returns the message of the rule it breaks.
+ *
+ * `Bun.YAML.parse` drops comments, so the sha pins and their release comments
+ * come from the raw text in a second pass. That pass also counts the `uses`
+ * lines against the parse, so a line the pattern cannot see fails the count
+ * instead of passing unread.
+ */
+const WORKFLOW = resolve(import.meta.dir, "../.github/workflows/check.yml");
+const DEPENDABOT = resolve(import.meta.dir, "../.github/dependabot.yml");
+
+type Step = { name?: string; uses?: string; run?: string; with?: Record<string, unknown> };
+type Job = { permissions?: unknown; steps?: Step[] };
+type Workflow = { permissions?: unknown; jobs?: Record<string, Job> };
+type Update = { "package-ecosystem"?: string; directory?: string };
+type Dependabot = { updates: Update[] };
+
+const READ_ONLY = JSON.stringify({ contents: "read" });
+const BUN_DIRECTORIES = ["/", "/packages/form-ui", "/packages/web"];
+
+function workflowProblems(workflow: Workflow, raw: string): string[] {
+  const problems: string[] = [];
+  if (JSON.stringify(workflow.permissions) !== READ_ONLY) {
+    problems.push("top-level permissions must be exactly contents: read");
+  }
+
+  let parsedUses = 0;
+  for (const [jobName, job] of Object.entries(workflow.jobs ?? {})) {
+    if (job.permissions !== undefined && JSON.stringify(job.permissions) !== READ_ONLY) {
+      problems.push(`job ${jobName} sets permissions beyond contents: read`);
+    }
+    for (const step of job.steps ?? []) {
+      const label = `${jobName}: ${step.name ?? step.uses?.split("@")[0]}`;
+      if (step.uses !== undefined) parsedUses++;
+      const keepsToken = step.with?.["persist-credentials"] !== false;
+      if (step.uses?.startsWith("actions/checkout@") && keepsToken) {
+        problems.push(`${label} must set persist-credentials: false`);
+      }
+      const run = step.run ?? "";
+      if (/\bbun install\b/.test(run) && !run.includes("--frozen-lockfile")) {
+        problems.push(`${label} runs bun install without --frozen-lockfile`);
+      }
+    }
+  }
+
+  // The gate is the check job's first install, so it must precede both steps
+  // that read the lockfile or the install it leaves behind.
+  const steps = workflow.jobs?.check?.steps ?? [];
+  const indexOf = (name: string) => steps.findIndex((step) => step.name === name);
+  const gate = indexOf("frozen-lockfile");
+  if (gate < 0) {
+    problems.push("check: no step named frozen-lockfile");
+  } else {
+    if (!steps[gate].run?.includes("scripts/gates/lockfile.sh")) {
+      problems.push("check: frozen-lockfile must run scripts/gates/lockfile.sh");
+    }
+    for (const later of ["bun audit", "bun run check"]) {
+      const at = indexOf(later);
+      if (at < 0) problems.push(`check: no step named ${later}`);
+      else if (gate > at) problems.push(`check: frozen-lockfile must come before ${later}`);
+    }
+  }
+
+  const usesLines = raw.split(/\r?\n/).filter((line) => /^\s*(- )?uses:/.test(line));
+  for (const line of usesLines) {
+    if (!/@[0-9a-f]{40} # v\d+(\.\d+)*$/.test(line)) {
+      problems.push(`a uses line needs a 40-character sha and a release comment: ${line.trim()}`);
+    }
+  }
+  if (usesLines.length !== parsedUses) {
+    problems.push(`the raw text holds ${usesLines.length} uses lines, the parse ${parsedUses}`);
+  }
+  return problems;
+}
+
+function dependabotProblems(config: Dependabot): string[] {
+  const problems: string[] = [];
+  const updates = config.updates ?? [];
+  for (const update of updates) {
+    if (update["package-ecosystem"] === "npm") {
+      problems.push(`the npm ecosystem for ${update.directory}`);
+    }
+  }
+  for (const directory of BUN_DIRECTORIES) {
+    const found = updates.some(
+      (update) => update["package-ecosystem"] === "bun" && update.directory === directory,
+    );
+    if (!found) problems.push(`no bun entry for ${directory}`);
+  }
+  if (!updates.some((update) => update["package-ecosystem"] === "github-actions")) {
+    problems.push("no github-actions entry");
+  }
+  return problems;
+}
+
+async function readWorkflow() {
+  const raw = await Bun.file(WORKFLOW).text();
+  return { workflow: Bun.YAML.parse(raw) as Workflow, raw };
+}
+
+async function readDependabot() {
+  return Bun.YAML.parse(await Bun.file(DEPENDABOT).text()) as Dependabot;
+}
+
+/** The named job with its steps, which the fixtures below mutate in place. */
+function jobOf(workflow: Workflow, name: string): Job & { steps: Step[] } {
+  const job = workflow.jobs?.[name];
+  if (!job?.steps) throw new Error(`the workflow has no ${name} job`);
+  return job as Job & { steps: Step[] };
+}
+
+/** The step whose name is given, which a fixture reads or edits in place. */
+function stepOf(workflow: Workflow, jobName: string, stepName: string): Step {
+  const step = jobOf(workflow, jobName).steps.find((s) => s.name === stepName);
+  if (!step) throw new Error(`the ${jobName} job has no ${stepName} step`);
+  return step;
+}
+
+/** The step that installs, which is the one `run` mentioning bun install. */
+function installStep(workflow: Workflow, jobName: string): Step {
+  const step = jobOf(workflow, jobName).steps.find((s) => s.run?.includes("bun install"));
+  if (!step) throw new Error(`the ${jobName} job has no install step`);
+  return step;
+}
+
+function moveStepAfter(workflow: Workflow, name: string, after: string) {
+  const { steps } = jobOf(workflow, "check");
+  const [step] = steps.splice(
+    steps.findIndex((s) => s.name === name),
+    1,
+  );
+  steps.splice(steps.findIndex((s) => s.name === after) + 1, 0, step);
+}
+
+/** Each expected text appears in the problem at its index, and no problem is extra. */
+function expectProblems(actual: string[], expected: string[]) {
+  expect(actual).toEqual(expected.map((text) => expect.stringContaining(text)));
+}
+
+test("the real workflow breaks none of the workflow rules", async () => {
+  const { workflow, raw } = await readWorkflow();
+  expect(workflowProblems(workflow, raw)).toEqual([]);
+});
+
+const PLAIN_INSTALL = "docker compose exec -T -w /workspace app bun install";
+
+const WORKFLOW_FIXTURES: [string, (workflow: Workflow) => void, string[]][] = [
+  [
+    "a workflow with no permissions block",
+    (w) => {
+      delete w.permissions;
+    },
+    ["top-level permissions must be exactly contents: read"],
+  ],
+  [
+    "a wider top-level permission",
+    (w) => {
+      w.permissions = { contents: "write" };
+    },
+    ["top-level permissions must be exactly contents: read"],
+  ],
+  [
+    "a job that adds a permission",
+    (w) => {
+      jobOf(w, "e2e").permissions = { contents: "read", issues: "write" };
+    },
+    ["job e2e sets permissions beyond contents: read"],
+  ],
+  [
+    "a checkout with no with block",
+    (w) => {
+      delete jobOf(w, "e2e").steps[0].with;
+    },
+    ["e2e: actions/checkout must set persist-credentials: false"],
+  ],
+  [
+    "a checkout that keeps the token",
+    (w) => {
+      const checkout = jobOf(w, "host-gates").steps[0];
+      checkout.with = { ...checkout.with, "persist-credentials": true };
+    },
+    ["host-gates: actions/checkout must set persist-credentials: false"],
+  ],
+  [
+    "a plain install in the e2e job",
+    (w) => {
+      const step = installStep(w, "e2e");
+      step.name = "bun install";
+      step.run = PLAIN_INSTALL;
+    },
+    ["e2e: bun install runs bun install without --frozen-lockfile"],
+  ],
+  [
+    "a plain install ahead of the gate in the check job",
+    (w) => {
+      jobOf(w, "check").steps.splice(1, 0, { name: "bun install", run: PLAIN_INSTALL });
+    },
+    ["check: bun install runs bun install without --frozen-lockfile"],
+  ],
+  [
+    "the gate after bun audit",
+    (w) => moveStepAfter(w, "frozen-lockfile", "bun audit"),
+    ["check: frozen-lockfile must come before bun audit"],
+  ],
+  [
+    "the gate after bun run check",
+    (w) => moveStepAfter(w, "frozen-lockfile", "bun run check"),
+    [
+      "check: frozen-lockfile must come before bun audit",
+      "check: frozen-lockfile must come before bun run check",
+    ],
+  ],
+  [
+    "a check job with no gate step",
+    (w) => {
+      const { steps } = jobOf(w, "check");
+      steps.splice(
+        steps.findIndex((s) => s.name === "frozen-lockfile"),
+        1,
+      );
+    },
+    ["check: no step named frozen-lockfile"],
+  ],
+  [
+    "a gate step that runs something else",
+    (w) => {
+      stepOf(w, "check", "frozen-lockfile").run = "true";
+    },
+    ["check: frozen-lockfile must run scripts/gates/lockfile.sh"],
+  ],
+  [
+    "a check job with no audit step",
+    (w) => {
+      const { steps } = jobOf(w, "check");
+      steps.splice(
+        steps.findIndex((s) => s.name === "bun audit"),
+        1,
+      );
+    },
+    ["check: no step named bun audit"],
+  ],
+  [
+    "a uses step the raw pass cannot see",
+    (w) => {
+      jobOf(w, "e2e").steps.push({ name: "extra", uses: "example/action@v1" });
+    },
+    [" uses lines, the parse "],
+  ],
+];
+
+for (const [name, mutate, expected] of WORKFLOW_FIXTURES) {
+  test(`the workflow rules reject ${name}`, async () => {
+    const { workflow, raw } = await readWorkflow();
+    mutate(workflow);
+    expectProblems(workflowProblems(workflow, raw), expected);
+  });
+}
+
+// The raw pass: each fixture edits the first uses line, which is a checkout.
+const RAW_FIXTURES: [string, (raw: string) => string][] = [
+  ["a tag in place of a sha", (raw) => raw.replace(/@[0-9a-f]{40} # v\S+/, "@v7")],
+  ["a sha with no release comment", (raw) => raw.replace(/(@[0-9a-f]{40}) # v\S+/, "$1")],
+  ["a sha one character short", (raw) => raw.replace(/@[0-9a-f]{40}/, `@${"a".repeat(39)}`)],
+  ["a comment that names no release", (raw) => raw.replace(/ # v\S+/, " # latest")],
+];
+
+for (const [name, mutate] of RAW_FIXTURES) {
+  test(`the workflow rules reject ${name}`, async () => {
+    const { workflow, raw } = await readWorkflow();
+    const edited = mutate(raw);
+    expect(edited).not.toBe(raw);
+    expectProblems(workflowProblems(workflow, edited), [
+      "a uses line needs a 40-character sha and a release comment: - uses: actions/checkout@",
+    ]);
+  });
+}
+
+test("the real Dependabot file breaks none of the Dependabot rules", async () => {
+  expect(dependabotProblems(await readDependabot())).toEqual([]);
+});
+
+const DEPENDABOT_FIXTURES: [string, (config: Dependabot) => void, string[]][] = [
+  [
+    "an npm entry in place of the root bun entry",
+    (c) => {
+      c.updates[0]["package-ecosystem"] = "npm";
+    },
+    ["the npm ecosystem for /", "no bun entry for /"],
+  ],
+  [
+    "an npm entry beside the bun entries",
+    (c) => {
+      c.updates.push({ "package-ecosystem": "npm", directory: "/docs" });
+    },
+    ["the npm ecosystem for /docs"],
+  ],
+  [
+    "no entry for packages/form-ui",
+    (c) => {
+      c.updates = c.updates.filter((u) => u.directory !== "/packages/form-ui");
+    },
+    ["no bun entry for /packages/form-ui"],
+  ],
+  [
+    "no entry for packages/web",
+    (c) => {
+      c.updates = c.updates.filter((u) => u.directory !== "/packages/web");
+    },
+    ["no bun entry for /packages/web"],
+  ],
+  [
+    "no github-actions entry",
+    (c) => {
+      c.updates = c.updates.filter((u) => u["package-ecosystem"] !== "github-actions");
+    },
+    ["no github-actions entry"],
+  ],
+];
+
+for (const [name, mutate, expected] of DEPENDABOT_FIXTURES) {
+  test(`the Dependabot rules reject ${name}`, async () => {
+    const config = await readDependabot();
+    mutate(config);
+    expectProblems(dependabotProblems(config), expected);
+  });
+}
