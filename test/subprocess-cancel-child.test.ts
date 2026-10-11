@@ -1,10 +1,12 @@
 /**
- * The child a parked parent awaits (`Instance.awaitedChild`) and the third
+ * The child a parked parent awaits (`Instance.awaitedChild`), the third
  * engine-internal handler, `core.cancelSubprocessChild`, which cancels that
- * child once a commit leaves the subprocess step. Every parent here is built
- * through the engine (startInstance, the spawn handler, drainOutbox); the
- * handler is invoked directly where a test needs its thrown error, since
- * drainOutbox folds a throw into the row's `last_error`. DB cases skip when
+ * child once a commit leaves the subprocess step, and the spawn and return
+ * gates that act only for the awaited child. Every parent here is built
+ * through the engine (startInstance, fireTimer, the spawn handler,
+ * drainOutbox); a handler is invoked directly where a test needs its thrown
+ * error or a fixed delivery order, since drainOutbox folds a throw into the
+ * row's `last_error`. DB cases skip when
  * DATABASE_URL is unset. Like test/subprocess.test.ts, this file truncates
  * nothing and publishes each case under its own process ids.
  */
@@ -14,8 +16,10 @@ import {
   startInstance,
   cancelInstance,
   executeManualTransition,
+  fireTimer,
   ConcurrencyConflict,
   CANCEL_CHILD_ACTION_TYPE,
+  SPAWN_ACTION_TYPE,
 } from "../src/engine/transition.js";
 import { publishBody, createDefinitionStore } from "../src/engine/definitions.js";
 import { registerSubprocessHandlers } from "../src/engine/subprocess.js";
@@ -90,6 +94,56 @@ const callerBody = (key: string, childPid: string, childVersion: number, guarded
           paths: guardedOutcomes.map((o, n) => autoPath(`path_${o}`, `step_${o}`, n + 1, `child.outcome == "${o}"`)) },
         { id: "step_approved", key: "approved", label: { en: "Approved" }, type: "task", terminal: true, outcome: "approved" },
         { id: "step_rejected", key: "rejected", label: { en: "Rejected" }, type: "task", terminal: true, outcome: "rejected" },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+// entry (automatic) -> a subprocess step whose timer forces the parent onto a
+// manual retry step, which leads back: two visits of one subprocess step. A
+// `cancelled` outcome has its own path, so a stale return that got through
+// would move the parent.
+const reentryCallerBody = (key: string, childPid: string, childVersion: number): ProcessBody =>
+  ({
+    key, baseLocale: "en", label: { en: key },
+    fields: [{ id: "field_seen", key: "seen", label: { en: "Seen" }, type: "string" }],
+    workflow: {
+      initialStep: "step_entry",
+      steps: [
+        { id: "step_entry", key: "entry", label: { en: "Entry" }, type: "task", paths: [autoPath("path_sub", "step_sub")] },
+        { id: "step_sub", key: "sub", label: { en: "Sub" }, type: "subprocess",
+          subprocess: { processId: childPid, versionBinding: "pinned", pinnedVersion: childVersion, inputMapping: {}, outputMapping: { field_seen: cel("child.outcome") } },
+          timers: [{ id: "timer_sub", duration: "PT1H", onFire: { targetPath: "path_timeout" } }],
+          paths: [
+            autoPath("path_done", "step_done", 1, 'child.outcome == "done"'),
+            autoPath("path_child_cancelled", "step_child_cancelled", 2, 'child.outcome == "cancelled"'),
+            autoPath("path_timeout", "step_retry", 3, "false"),
+          ] },
+        { id: "step_retry", key: "retry", label: { en: "Retry" }, type: "task", paths: [manualPath("path_again", "step_sub")] },
+        { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true },
+        { id: "step_child_cancelled", key: "child_cancelled", label: { en: "Child cancelled" }, type: "task", terminal: true },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+// entry -> a subprocess step over a child that ends at once -> a second
+// subprocess step over a waiting child. The second step's guardless default
+// would fire on entry if the cascade did not park there.
+const twoSubCallerBody = (key: string, firstPid: string, firstVersion: number, secondPid: string, secondVersion: number): ProcessBody =>
+  ({
+    key, baseLocale: "en", label: { en: key },
+    fields: [],
+    workflow: {
+      initialStep: "step_entry",
+      steps: [
+        { id: "step_entry", key: "entry", label: { en: "Entry" }, type: "task", paths: [autoPath("path_sub", "step_sub")] },
+        { id: "step_sub", key: "sub", label: { en: "Sub" }, type: "subprocess",
+          subprocess: { processId: firstPid, versionBinding: "pinned", pinnedVersion: firstVersion, inputMapping: {}, outputMapping: {} },
+          paths: [autoPath("path_next", "step_sub2", 1, 'child.outcome == "approved"'), autoPath("path_end", "step_end", 2)] },
+        { id: "step_sub2", key: "sub2", label: { en: "Sub 2" }, type: "subprocess",
+          subprocess: { processId: secondPid, versionBinding: "pinned", pinnedVersion: secondVersion, inputMapping: {}, outputMapping: {} },
+          paths: [autoPath("path_done2", "step_end", 1, 'child.outcome == "done"'), autoPath("path_default2", "step_default", 2)] },
+        { id: "step_end", key: "end", label: { en: "End" }, type: "task", terminal: true },
+        { id: "step_default", key: "default", label: { en: "Default" }, type: "task", terminal: true },
       ],
     },
   }) as unknown as ProcessBody;
@@ -411,4 +465,170 @@ test.skipIf(!DB)("an unmatched return clears the awaited child while the parent 
   expect((stored!.data as Record<string, unknown>).field_seen).toBe("rejected"); // the writeback landed
   expect(stored!.awaitedChild).toBeNull();
   expect(await cancelRowsOf(parent.instanceId)).toHaveLength(0);
+});
+
+test.skipIf(!DB)("a return whose first hop lands on a second subprocess step parks there awaiting the second child", async () => {
+  const F_PID = "proc_cc_two_sub_f" as Instance["processId"];
+  const W_PID = "proc_cc_two_sub_w" as Instance["processId"];
+  const P_PID = "proc_cc_two_sub_p" as Instance["processId"];
+  const fv = await publishBody(F_PID, fixedChildBody("approved"), publishRegistry, dataSourceReg);
+  const wv = await publishBody(W_PID, waitingChildBody(), publishRegistry, dataSourceReg);
+  const pv = await publishBody(P_PID, twoSubCallerBody("cc_two_sub_p", F_PID, fv.version, W_PID, wv.version), publishRegistry, dataSourceReg);
+  const { registry } = engineRegistry();
+  const parent = await startInstance(pv.definition, { processId: P_PID, version: pv.version }, actor);
+  await drainAll(registry); // first spawn -> child ends -> return -> first hop onto step_sub2 -> second spawn
+
+  const secondChild = subprocessChildId(parent.instanceId, 2, "step_sub2");
+  const stored = await loadInstance(parent.instanceId);
+  expect(stored!.currentStepId as string).toBe("step_sub2"); // the guardless default did not fire
+  expect(stored!.transitionSeq).toBe(2);
+  expect(stored!.awaitedChild as string).toBe(secondChild);
+  expect(await outboxActionIds(parent.instanceId)).toContain("action_spawn_step_sub2");
+  expect(await cancelRowsOf(parent.instanceId)).toHaveLength(0);
+  const child = await loadInstance(secondChild);
+  expect(child!.status).toBe("running");
+  expect(child!.parent?.stepId as string).toBe("step_sub2");
+});
+
+// --- DB: the spawn and the return act only for the awaited child (B-2) -------------
+
+const countChildren = async (parentId: string): Promise<number> =>
+  Number(((await sql`SELECT count(*) AS n FROM instances WHERE body->'parent'->>'instanceId' = ${parentId}`) as { n: number }[])[0]!.n);
+// The statuses of one instance's outbox rows for one action id, by sequence.
+const rowStatuses = async (instanceId: string, actionId: string): Promise<string[]> =>
+  ((await sql`SELECT status FROM outbox WHERE instance_id = ${instanceId} AND action_id = ${actionId} ORDER BY transition_seq`) as
+    { status: string }[]).map((r) => r.status);
+
+function spawnCtx(parentId: string, parentSeq: number): HandlerContext {
+  const config = { subprocessStepId: "step_sub", parentSeq };
+  return {
+    action: { id: "action_spawn_step_sub", type: SPAWN_ACTION_TYPE, config } as unknown as HandlerContext["action"],
+    config,
+    idempotencyKey: `test-spawn-${parentId}-${parentSeq}`,
+    instanceId: parentId,
+    db: sql,
+  };
+}
+const spawnHandler = (registry: Reg) => registry.get(SPAWN_ACTION_TYPE)!.handler;
+
+/** A parent on its first visit of the re-entry body's subprocess step, its spawn still queued. */
+async function reentryParent(tag: string) {
+  const W_PID = `proc_cc_${tag}_w` as Instance["processId"];
+  const P_PID = `proc_cc_${tag}_p` as Instance["processId"];
+  const wv = await publishBody(W_PID, waitingChildBody(), publishRegistry, dataSourceReg);
+  const pv = await publishBody(P_PID, reentryCallerBody(`cc_${tag}_p`, W_PID, wv.version), publishRegistry, dataSourceReg);
+  const { registry } = engineRegistry();
+  const parent = await startInstance(pv.definition, { processId: P_PID, version: pv.version }, actor);
+  const firstChild = subprocessChildId(parent.instanceId, 1, "step_sub");
+  expect(parent.awaitedChild as string).toBe(firstChild);
+  // The timer forces the parent off the subprocess step onto the retry step.
+  const leave = async () => fireTimer((await loadInstance(parent.instanceId))!, "timer_sub", pv.definition);
+  // The retry step's manual path enters the subprocess step again.
+  const reenter = async () => executeManualTransition((await loadInstance(parent.instanceId))!, "path_again", pv.definition, actor);
+  return { wv, pv, registry, parent, firstChild, leave, reenter };
+}
+
+test.skipIf(!DB)("a queued spawn whose parent left the step by a timer creates no child", async () => {
+  const { registry, parent, firstChild, leave } = await reentryParent("gate_left");
+  const left = await leave();
+  expect(left.currentStepId as string).toBe("step_retry");
+  expect(left.awaitedChild).toBeNull();
+
+  await drainAll(registry); // the queued spawn, then the leaving cancel
+  expect(await loadInstance(firstChild)).toBeUndefined();
+  expect(await countChildren(parent.instanceId)).toBe(0);
+  expect(await rowStatuses(parent.instanceId, "action_spawn_step_sub")).toEqual(["delivered"]); // a success, not a failure
+});
+
+test.skipIf(!DB)("after a re-entry the first visit's spawn creates no child and the second visit's creates one", async () => {
+  const { registry, parent, firstChild, leave, reenter } = await reentryParent("gate_reentry");
+  await leave();
+  const back = await reenter();
+  const secondChild = subprocessChildId(parent.instanceId, 3, "step_sub");
+  expect(back.currentStepId as string).toBe("step_sub");
+  expect(back.awaitedChild as string).toBe(secondChild);
+
+  await drainAll(registry); // both visits' spawns and the first visit's cancel
+  expect(await loadInstance(firstChild)).toBeUndefined();
+  expect((await loadInstance(secondChild))!.status).toBe("running");
+  expect(await countChildren(parent.instanceId)).toBe(1);
+  expect(await rowStatuses(parent.instanceId, "action_spawn_step_sub")).toEqual(["delivered", "delivered"]); // seq 1, seq 3
+  expect((await loadInstance(parent.instanceId))!.awaitedChild as string).toBe(secondChild);
+});
+
+test.skipIf(!DB)("a cancel delivered before the spawn does nothing, and the spawn then creates no child", async () => {
+  const { registry, parent, firstChild, leave } = await reentryParent("gate_cancel_first");
+  await leave();
+
+  // The leaving cancel arrives first: the child does not exist yet.
+  const before = await snapshot();
+  expect(await cancelHandler(registry)(cancelCtx(parent.instanceId, firstChild))).toEqual({});
+  expect(await snapshot()).toEqual(before);
+  // The queued spawn arrives second, for a parent that no longer awaits the child.
+  expect(await spawnHandler(registry)(spawnCtx(parent.instanceId, 1))).toEqual({});
+  expect(await loadInstance(firstChild)).toBeUndefined();
+
+  await drainAll(registry); // the real rows, in whatever order
+  expect(await countChildren(parent.instanceId)).toBe(0);
+});
+
+test.skipIf(!DB)("a stale return from the first visit's child changes nothing, and the second child's return drives the parent", async () => {
+  const { wv, registry, parent, firstChild, leave, reenter } = await reentryParent("gate_stale_return");
+  await drainAll(registry); // the first visit's child is spawned and waits
+  expect((await loadInstance(firstChild))!.status).toBe("running");
+  await leave();
+  await reenter(); // the parent awaits the second visit's child before the cancel lands
+  const secondChild = subprocessChildId(parent.instanceId, 3, "step_sub");
+
+  // The leaving cancel ends the first child, whose cancel sink enqueues a
+  // return with outcome `cancelled`; both visits share the child's step link.
+  await drainAll(registry);
+  expect((await loadInstance(firstChild))!.status).toBe("cancelled");
+  expect(await rowStatuses(firstChild, `action_return_${firstChild}`)).toEqual(["delivered"]); // a no-op, not a failure
+  let stored = await loadInstance(parent.instanceId);
+  expect(stored!.currentStepId as string).toBe("step_sub");
+  expect(stored!.transitionSeq).toBe(3);
+  expect(stored!.awaitedChild as string).toBe(secondChild);
+  expect((stored!.data as Record<string, unknown>).field_seen).toBeUndefined(); // no writeback
+  expect((await sql`SELECT 1 FROM instance_events WHERE instance_id = ${parent.instanceId} AND kind = 'subprocess.outcome-unmatched'`) as unknown[]).toHaveLength(0);
+
+  // The second child finishes; its own return drives the parent.
+  await executeManualTransition((await loadInstance(secondChild))!, "path_w_done", wv.definition, actor);
+  await drainAll(registry);
+  stored = await loadInstance(parent.instanceId);
+  expect(stored!.status).toBe("completed");
+  expect(stored!.currentStepId as string).toBe("step_done");
+  expect((stored!.data as Record<string, unknown>).field_seen).toBe("done");
+  expect(stored!.awaitedChild).toBeNull();
+});
+
+test.skipIf(!DB)("the backstop cancels a child whose parent left the step after the spawn's check", async () => {
+  const W_PID = "proc_cc_gate_backstop_w" as Instance["processId"];
+  const P_PID = "proc_cc_gate_backstop_p" as Instance["processId"];
+  const wv = await publishBody(W_PID, waitingChildBody(), publishRegistry, dataSourceReg);
+  const pv = await publishBody(P_PID, reentryCallerBody("cc_gate_backstop_p", W_PID, wv.version), publishRegistry, dataSourceReg);
+  const parent = await startInstance(pv.definition, { processId: P_PID, version: pv.version }, actor);
+  const childId = subprocessChildId(parent.instanceId, 1, "step_sub");
+
+  // The spawn resolves the child body after its awaited-child check and before
+  // it creates the child: the parent's timer fires in that window.
+  let armed = true;
+  const { registry: racing } = engineRegistry((real) => async (pid, ver) => {
+    if (armed && pid === W_PID) {
+      armed = false;
+      await fireTimer((await loadInstance(parent.instanceId))!, "timer_sub", pv.definition);
+    }
+    return real(pid, ver);
+  });
+
+  expect(await spawnHandler(racing)(spawnCtx(parent.instanceId, 1))).toEqual({});
+  expect(armed).toBe(false);
+  const stored = await loadInstance(parent.instanceId);
+  expect(stored!.status).toBe("running"); // the parent is still running: only the awaited-child test catches this
+  expect(stored!.currentStepId as string).toBe("step_retry");
+  expect(stored!.awaitedChild).toBeNull();
+  expect((await loadInstance(childId))!.status).toBe("cancelled");
+
+  await drainAll(racing); // the real spawn and cancel rows find nothing left to do
+  expect((await loadInstance(childId))!.status).toBe("cancelled");
 });

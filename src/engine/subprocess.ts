@@ -7,9 +7,10 @@
  * spawn (core.spawnSubprocess), enqueued when a parent enters a subprocess step:
  *   resolve the child body per `versionBinding`, seed it from `inputMapping`, and
  *   create the linked child (idempotent on a deterministic child id — a parent no
- *   longer running when the child does not yet exist is skipped). Driving the
- *   child to rest and the cancel/spawn race backstop (self-cancelling a child left
- *   running under a since-cancelled parent) run on every delivery, not only the
+ *   longer running, or no longer awaiting that id, when the child does not yet
+ *   exist is skipped). Driving the child to rest and the cancel/spawn race
+ *   backstop (self-cancelling a child left running under a parent that was
+ *   cancelled or left the step) run on every delivery, not only the
  *   one that created the row: a redelivery that finds the child already created
  *   still performs both, so a crash between creation and either one is completed
  *   by the next delivery instead of stranding the child.
@@ -19,7 +20,8 @@
  *   `child.data`, write it into the parent's data, then advance the parent off the
  *   wait-state. The first hop's guard reads the `child` namespace, so the path is
  *   selected here with child in context and committed directly; the rest runs to
- *   rest normally. Only a parent still parked at the subprocess step is advanced.
+ *   rest normally. Only a parent that still awaits this child, parked at the
+ *   subprocess step, is advanced.
  *   Which step that is comes from the child's own `parent` link read at delivery,
  *   and the check, the writeback, and the advance are one transaction holding the
  *   parent row — both are required, and neither alone is sufficient. See the
@@ -87,6 +89,9 @@ function makeSpawnHandler(
     } else {
       const parent = await loadInstance(db, parentId);
       if (!parent || parent.status !== "running") return {}; // parent gone/cancelled while queued
+      // The parent left this step visit while the spawn was queued (a timer, a
+      // migration, a re-entry that awaits a newer child): nothing to create.
+      if (parent.awaitedChild !== childId) return {};
 
       const parentBody = await resolveBody(parent.processId, parent.version);
       if (!parentBody) throw new Error(`spawn: parent body unresolved: ${parent.processId}@${parent.version}`);
@@ -156,13 +161,13 @@ function makeSpawnHandler(
     // (terminal, or parked at a non-automatic/wait-state step) makes this a no-op.
     await resolveAutomatic(child, childBody, SYSTEM_ACTOR, db, assignmentRegistry);
 
-    // Cancel/spawn race backstop: if the parent was cancelled after our status
-    // check — or, on redelivery, before an earlier delivery reached this point —
-    // its cascade may have queried children before this child existed or before
-    // this check ran. Self-cancel the still-running child so nothing is orphaned.
-    // Unconditional for the same reason as the drive-to-rest above.
+    // Cancel/spawn race backstop: if the parent was cancelled or left the step
+    // after our checks — or, on redelivery, before an earlier delivery reached
+    // this point — its cascade or its leaving cancel may have looked for the
+    // child before it existed. Self-cancel the still-running child so nothing
+    // is orphaned. Unconditional for the same reason as the drive-to-rest above.
     const parentNow = await loadInstance(db, parentId);
-    if (parentNow && parentNow.status !== "running") {
+    if (parentNow && (parentNow.status !== "running" || parentNow.awaitedChild !== childId)) {
       const childNow = await loadInstance(db, childId);
       if (childNow && childNow.status === "running") await cancelInstance(childNow, childBody, SYSTEM_ACTOR, db, resolveBody);
     }
@@ -203,6 +208,17 @@ export function makeReturnHandler(
       if (rows.length === 0) return null;
       const parent = parseInstance(rows[0].body);
       if (parent.status !== "running") return null;
+      // The parent awaits another child, or none: it left the step visit this
+      // child belongs to. Two visits to one step share the child's `parent`
+      // link, so only this id tells a stale return (a child the leaving cancel
+      // ended, returning `cancelled`) from the awaited one. A no-op, not a failure.
+      // ponytail: no backfill. A parent parked on a subprocess step before
+      // `awaitedChild` existed reads undefined, so its child's return is
+      // dropped here. Ceiling: pre-1.0 with nothing deployed; a development
+      // database with such a parent needs a reseed or a manual `awaitedChild`
+      // write. Upgrade: a one-time backfill setting `awaitedChild` from each
+      // running child's `parent` link.
+      if (parent.awaitedChild !== childId) return null;
 
       // The child row is the authority on which step spawned it — only the child
       // knows that. Resolving the parent's current step and assuming it is the
@@ -212,7 +228,9 @@ export function makeReturnHandler(
       if (!childInst?.parent) return null; // child gone, or no link: nothing to return to
       const parentStepId = childInst.parent.stepId;
       // Under the lock this is a fact, not a possibly-stale reading: the parent
-      // legitimately moved on (an authored path, a cancel). A no-op, not a failure.
+      // moved on. A no-op, not a failure. Defense in depth behind the
+      // `awaitedChild` check, since every engine commit that leaves the step
+      // clears that field.
       if (parent.currentStepId !== parentStepId) return null;
 
       const parentBody = await resolveBody(parent.processId, parent.version);
