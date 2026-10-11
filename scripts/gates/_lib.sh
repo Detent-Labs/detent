@@ -19,6 +19,9 @@
 # Two primitives rather than one combined `fail_rule`, because the gates reject
 # in different shapes. `whitespace.sh` and `prose.sh` set a flag, keep checking
 # and exit later. `silent-green.sh` rejects at three separate points.
+#
+# `bad_range` is the third: the two gates that read a pushed range share the
+# wording for a range git cannot diff.
 
 # reject <rule> — the header a gate prints before its findings.
 reject() {
@@ -28,4 +31,20 @@ reject() {
 # The last line a rejecting gate prints, after its repair command.
 no_verify_note() {
   echo "To push without the gates, pass --no-verify. That disables every gate." >&2
+}
+
+# bad_range <rule> <range> <stderr-file> — a range git cannot diff. The gate
+# stops here and exits 1. A swallowed failure would read as "nothing to check",
+# which is a green that never looked. <stderr-file> holds git's own message.
+#
+# Call it from the gate's own shell, never from a command substitution: the
+# exit would end the substitution's subshell and the gate would carry on.
+bad_range() {
+  reject "$1"
+  echo "  git cannot diff the range '$2':" >&2
+  sed 's/^/    /' < "$3" >&2
+  echo "Repair: fetch the commits the range names, then push again:" >&2
+  echo "  git fetch origin" >&2
+  no_verify_note
+  exit 1
 }

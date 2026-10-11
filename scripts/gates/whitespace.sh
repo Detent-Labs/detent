@@ -27,12 +27,22 @@ fail=0
 
 files=$(mktemp)
 eol=$(mktemp)
-trap 'rm -f "$files" "$eol"' EXIT
+diff_err=$(mktemp)
+trap 'rm -f "$files" "$eol" "$diff_err"' EXIT
 
+# A range git cannot diff stops the gate. `git diff --check` exits 2 on a
+# whitespace finding (measured), so 0, 1 and 2 are normal and the findings go to
+# stdout. Any other status, 128 for a revision git does not hold, is
+# `bad_range`: a swallowed status would read as "no text file changed".
 while IFS= read -r range; do
   [ -n "$range" ] || continue
 
-  check=$(git diff --check "$range" 2>/dev/null) || true
+  rc=0
+  check=$(git diff --check "$range" 2>"$diff_err") || rc=$?
+  case "$rc" in
+    0|1|2) ;;
+    *) bad_range "$RULE" "$range" "$diff_err" ;;
+  esac
   if [ -n "$check" ]; then
     if [ "$fail" -eq 0 ]; then
       reject "$RULE"
@@ -41,7 +51,12 @@ while IFS= read -r range; do
     fail=1
   fi
 
-  git diff --name-only --diff-filter=d "$range" 2>/dev/null >> "$files" || true
+  rc=0
+  git diff --name-only --diff-filter=d "$range" 2>"$diff_err" >> "$files" || rc=$?
+  case "$rc" in
+    0|1|2) ;;
+    *) bad_range "$RULE" "$range" "$diff_err" ;;
+  esac
 done
 
 sort -u "$files" -o "$files"

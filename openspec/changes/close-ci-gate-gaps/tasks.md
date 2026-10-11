@@ -2,12 +2,12 @@
 
 ## 1. A range git cannot read stops the gates (G-2)
 
-- [ ] 1.1 Add `bad_range` to `scripts/gates/_lib.sh` per design D3. Verify that `sh -n scripts/gates/_lib.sh` exits 0.
-- [ ] 1.2 Make `range.sh` fall back per design D2. Verify with a host repro: an unreachable remote sha prints the range since `origin/main`, and stderr names the sha.
-- [ ] 1.3 Make `whitespace.sh` read the status of both `git diff` calls per design D3. Verify with a host repro: a range from a made-up sha exits 1 and prints git's message.
-- [ ] 1.4 Make `prose.sh` write its diff to a temp file and loop over the file per design D3. Verify with the same host repro: exit 1, and git's message appears.
-- [ ] 1.5 Add the temp-repository helper of design D9 to `test/gates.test.ts`. Add one case per scenario of the two ADDED requirements in the `push-gate-checks` delta. Add a case where the fallback range lies inside main and the gate says it has nothing to check. Add a positive control: a trailing space in a valid range still rejects.
-- [ ] 1.6 Prove each new case fails on the old scripts. Copy the old scripts with `git show origin/main:<path>` into a scratch directory. Add the new test file. Copy the directory into the container at `/tmp/mut` with `docker compose cp`. Run `bun test /tmp/mut/test/gates.test.ts` there. Record which cases fail.
+- [x] 1.1 Add `bad_range` to `scripts/gates/_lib.sh` per design D3. Verify that `sh -n scripts/gates/_lib.sh` exits 0.
+- [x] 1.2 Make `range.sh` fall back per design D2. Verify with a host repro: an unreachable remote sha prints the range since `origin/main`, and stderr names the sha.
+- [x] 1.3 Make `whitespace.sh` read the status of both `git diff` calls per design D3. Verify with a host repro: a range from a made-up sha exits 1 and prints git's message.
+- [x] 1.4 Make `prose.sh` write its diff to a temp file and loop over the file per design D3. Verify with the same host repro: exit 1, and git's message appears.
+- [x] 1.5 Add the temp-repository helper of design D9 to `test/gates.test.ts`. Add one case per scenario of the two ADDED requirements in the `push-gate-checks` delta. Add a case where the fallback range lies inside main and the gate says it has nothing to check. Add a positive control: a trailing space in a valid range still rejects.
+- [x] 1.6 Prove each new case fails on the old scripts. Copy the old scripts with `git show origin/main:<path>` into a scratch directory. Add the new test file. Copy the directory into the container at `/tmp/mut` with `docker compose cp`. Run `bun test /tmp/mut/test/gates.test.ts` there. Record which cases fail.
 
 ## 2. The silent-green gate reads the whole summary (G-7)
 
