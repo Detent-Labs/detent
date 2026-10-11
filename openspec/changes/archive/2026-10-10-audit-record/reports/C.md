@@ -1,6 +1,6 @@
 # Area C: Runtime API and tenants
 
-As of HEAD `5f41cd8a`. Read: `src/runtime/*.ts` (all eleven files in full),
+State: HEAD `5f41cd8a`. Read: `src/runtime/*.ts` (all eleven files in full),
 `src/tenancy/*.ts` (all four) and `src/pagination.ts`. Also read: the call
 sites in `src/http/server.ts`, `src/http/routes.ts`,
 `src/http/reporting-routes.ts`, `src/auth/jwt.ts`, `src/auth/login.ts` and
@@ -139,8 +139,8 @@ sites in `src/http/server.ts`, `src/http/routes.ts`,
   states the number 50 for reports.
 - Known: new
 - Suggestion: on `truncated`, the CSV gets a closing row or a header note.
-  Document the report's limit. The report passes `MAX_LIST_LIMIT` explicitly.
-  OpenSpec change (`reporting-data-tables`).
+  Document the report's limit. Have the report pass `MAX_LIST_LIMIT`
+  explicitly. OpenSpec change (`reporting-data-tables`).
 
 ### C-6: The report builder's date filter drops the last day
 - Case: a process owner in Zurich picks the range 1.10.2026 to 31.10.2026 in
@@ -287,8 +287,10 @@ sites in `src/http/server.ts`, `src/http/routes.ts`,
 - Case: the account `bob` stands in `editors` on the report of `alice`. He
   sends `PATCH {owner: "bob", editors: ["bob"]}`. The function `updateReport`
   checks only whether the new owner is in the new editor list
-  (`reports.ts:166-168`). It applies the patch, so `alice` loses all access. The spec rejects a change whose `editors` lacks the owner. It also
-  rejects an owner who is not "already in editors".
+  (`reports.ts:166-168`). It applies the patch, so `alice` loses all access.
+  The spec requires `updateReport` to reject a patch that removes the owner
+  from `editors`. It must also reject a patch that sets an owner who is not
+  "already in editors".
 - Location: `src/runtime/reports.ts:159-182`; spec
   `openspec/specs/instance-data-tables/spec.md:40-45`
 - Severity: low (editors may delete the report anyway,
@@ -369,8 +371,7 @@ sites in `src/http/server.ts`, `src/http/routes.ts`,
 ### C-19: The reporting aggregates load the whole range into memory, history twice
 - Case: a request
   `GET /reporting/processes/:id/cycle-time?from=1970-01-01&to=2100-01-01`
-  arrives.
-  The function `parseRange` does not bound the span
+  arrives. The function `parseRange` does not bound the span
   (`reporting-routes.ts:100-110`). The function `selectInRange` loads every
   instance body with `data` (`reporting.ts:96-105`). The function
   `historyByInstance` loads every history row, with an `ANY(ids)` list over
@@ -486,8 +487,9 @@ sites in `src/http/server.ts`, `src/http/routes.ts`,
 ## Not checked
 
 - LSP references: the LSP tool aborted with this message:
-  `TypeScript 7.0.2 … provides no tsserver.js`. As a substitute, `git grep -w` over all source and test
-  directories checked the dead exports.
+  `TypeScript 7.0.2 … provides no tsserver.js`. As a substitute,
+  `git grep -w` over all source and test directories checked the dead
+  exports.
 - The site `src/engine/store.ts:964-965` (`tx.unsafe` with `engineRole`) lies
   outside area C. This audit did not trace it.
 - In SaaS mode, `/metrics` and `/readyz` run against `processDb`
@@ -496,5 +498,5 @@ sites in `src/http/server.ts`, `src/http/routes.ts`,
 - The data source `instance.query` has no actor filter. Per the owner ruling
   (aggregate views stay unfiltered), this audit does not rate it as a
   finding.
-- This audit read the runtime behavior (Bun pools, Excel evaluation) and did
-  not run it. See the repro proposals.
+- This audit did not execute the runtime behavior (Bun pools, Excel
+  evaluation). It read only the code. See the repro proposals.
