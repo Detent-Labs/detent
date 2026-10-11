@@ -29,6 +29,9 @@ when nothing skips.
   because a linked worktree's `.git` points outside the mount. A test can still
   build its own repository under a temp directory.
 - Bun 1.3.11 has `Bun.YAML.parse`, so a test can read the workflow file as data.
+  That parse drops comments, so a test reads the `uses` lines as raw text too.
+- `awk` is mawk 1.3.4 in the devcontainer and gawk 5.4 in Git Bash on the host.
+  `silent-green.sh` runs under both, and under the CI runner's `awk`.
 - GitHub's Dependabot reference lists `bun` as a supported ecosystem for
   version and security updates, from Bun 1.1.39. The devcontainer pins 1.3.11.
 - The tag `v7` of `actions/checkout` resolves to
@@ -95,8 +98,9 @@ and 2 are normal, and 2 is a finding. Any other status calls `bad_range`. The
 
 `prose.sh` ran its diff inside a pipeline, where a shell reads only the last
 command's status. It now writes the diff to a temp file and loops over the file.
-`bad_range` lives in `_lib.sh` beside `reject`. It prints the rule, the range and
-git's stderr, then exits 1. Both gates share it, so the wording cannot drift.
+`bad_range` lives in `_lib.sh` beside `reject`. It calls `reject` for the header,
+then prints the range, git's stderr and a repair line. It ends with
+`no_verify_note` and exits 1. Both gates share it, so the wording cannot drift.
 
 **D4. Dependabot gets the bun ecosystem (G-6).** The three `npm` entries become
 `bun` entries with the same directories and schedule. The `github-actions` entry
@@ -119,10 +123,14 @@ the captured run does four jobs.
 - It counts the `Ran` lines. The gate rejects a run with none, or with no
   `pass` line, as unreadable.
 
+The `awk` program uses POSIX features only. It has no interval expression, no
+`gensub` and no array form of `match`, so mawk and gawk read it alike.
+
 A new tracked file `scripts/gates/pass-floor.txt` holds the pass floor in the
-format of `skip-floor.txt`: the last bare integer wins. It starts at 5206, the
-count measured at 64c08161. A deletion of tests lowers it in the same commit. A
-growing suite leaves it stale-low, which only loosens the margin.
+format of `skip-floor.txt`: the last bare integer wins. One `read_floor`
+function in `silent-green.sh` reads both files. The pass floor starts at 5206,
+the count measured at 64c08161. A deletion of tests lowers it in the same
+commit. A growing suite leaves it stale-low, which only loosens the margin.
 
 *Alternative:* demand exactly two summaries. A hand run through
 `test-gated.sh` has one, so that rule would reject it. The sum check and the
@@ -161,9 +169,13 @@ token, because the host gates run only local git commands. Both actions pin to
 the shas above, each with a `# v7.0.x` comment. The `github-actions` entry in
 `dependabot.yml` already bumps SHA pins together with that comment.
 
-A test parses the workflow with `Bun.YAML.parse` and rejects a missing
-`permissions` block, a checkout without `persist-credentials: false`, a `uses`
-reference that is not a 40-character sha, and a plain `bun install`.
+A test parses the workflow with `Bun.YAML.parse`. It rejects a missing
+`permissions` block, a checkout without `persist-credentials: false`, and an
+install without `--frozen-lockfile`. It also rejects a `check` job where the
+`frozen-lockfile` step comes after the `bun audit` step or the `bun run check`
+step. A second pass reads the raw lines, because the parse drops comments. It
+rejects a `uses` line that does not end in a 40-character sha and a `# v`
+release comment.
 
 **D8. The probe role gets a random password per run (G-12).** The preload
 creates the role without a password. It then runs `ALTER ROLE ... LOGIN PASSWORD`
@@ -194,7 +206,8 @@ and sit above the pass floor, since the gate now reads them.
 **D10. The runner keeps a failing command's exit code.** `test-gated.sh` sets its
 exit status to 1 whenever the gate rejects. A crashed Bun that printed no
 summary would now hide its own code, such as 132. The runner sets 1 only when the
-command itself exited 0.
+command itself exited 0. A test runs a fake command that exits 3 and prints no
+summary, and expects exit status 3.
 
 ## Risks / Trade-offs
 
@@ -207,6 +220,8 @@ command itself exited 0.
   mechanical. The gate's message names the file.
 - [`ALTER ROLE ... PASSWORD` can reach the server log when `log_statement` is on]
   → The compose database does not set it. The value stops working at the next run.
+- [Dependabot may write a lockfile under `packages/*`] → The root frozen install
+  ignores it. The first Dependabot pull request shows whether it happens.
 - [A SHA pin ages] → Dependabot bumps it with the comment, as it bumps a tag.
 - [A force-push to `main` in CI gets an empty fallback range] → Branch
   protection owns that case. The gate reports that it checked nothing.

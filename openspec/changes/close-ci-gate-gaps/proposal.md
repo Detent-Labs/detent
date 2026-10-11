@@ -83,8 +83,9 @@ None.
   `scripts/test-gated.sh`.
 - `test/preload-db.ts`, `test/instance-audit-privileges.test.ts`,
   `test/gates.test.ts`.
-- `CLAUDE.md` (the gate table row of `no-silent-green`), `README.md` and
-  `docs/current-state.md` where they list what CI and the gates run.
+- `CLAUDE.md` (the gate table row of `no-silent-green`), `README.md`,
+  `ROADMAP.md` and `docs/current-state.md` where they list what CI and the
+  gates run.
 - `docs/decisions.md`: the audit index entry of this change goes.
 - No runtime behavior of the engine or the browser UI changes.
 - The Dependabot switch is provable only on the first Dependabot run after the
