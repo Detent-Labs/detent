@@ -23,8 +23,8 @@ The suppressed migration SHALL also carry the parent's `awaitedChild` over
 unchanged while the target step is still a subprocess step. The sequence advanced.
 The carried value is the only record that the existing child is still awaited. A
 kept step id whose target is another step type leaves the subprocess step. That
-migration clears the field and enqueues the cancellation (see "A relocation off a
-subprocess step whose spawn is still queued commits").
+migration clears the field. It enqueues the cancellation when the field still names
+a child (see "A relocation off a subprocess step whose spawn is still queued commits").
 
 A migration that relocates the instance onto a subprocess step it was not on SHALL
 spawn normally: that is a genuine entry.

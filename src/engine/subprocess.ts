@@ -215,7 +215,8 @@ export function makeReturnHandler(
       // ponytail: no backfill. A parent parked on a subprocess step before
       // `awaitedChild` existed reads undefined, so its child's return is
       // dropped here. The spawn gate and the widened backstop treat such a
-      // parent as having left the step too. Ceiling: pre-1.0 with nothing
+      // parent as having left the step too, and a leaving commit plans no
+      // cancel row for it. Ceiling: pre-1.0 with nothing
       // deployed; a development database with such a parent needs a reseed or
       // a manual `awaitedChild` write. Upgrade: a one-time backfill setting
       // `awaitedChild` from each running child's `parent` link.

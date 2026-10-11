@@ -430,7 +430,9 @@ async function migrateOne(
     // the commit clears awaitedChild, so the late spawn creates nothing. The gate stays
     // off spawn rows, since a dead-lettered spawn would pin the parent. A settled child
     // (terminal, outbox drained) is inert: its return is delivered and the cancel
-    // cascade keys on parent.instanceId + status, never stepId.
+    // cascade keys on parent.instanceId + status, never stepId. The query keys on
+    // the step, not on awaitedChild: a child of an earlier visit with an
+    // undelivered cancel row still defers, which is the safe direction.
     if (stepChanged || targetStep.type !== "subprocess") {
       const srcStep = fromBody.workflow.steps.find((s) => (s.id as string) === srcStepId);
       if (srcStep?.subprocess) {

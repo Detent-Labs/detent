@@ -45,6 +45,8 @@ only the current mechanics the design must respect.
   cannot fault, because the cascade returns on landing. The gap covers only
   an instance that faulted before this change.
 - No backfill for an instance parked on a subprocess step before this change.
+  Its field reads undefined, so the return drops and the spawn gate and
+  backstop treat it as having left. A leaving commit cancels nothing for it.
   The pre-1.0 stage allows that. See Migration Plan.
 - No change to what makes a child live, to the `child-in-flight` reason, or to
   queued spawn rows. D5 changes only when the gate runs.
