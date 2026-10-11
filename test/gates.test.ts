@@ -525,9 +525,9 @@ test("the pass floor reads the largest pass count of the run", async () => {
  * way where a literal could match.
  *
  * Each case commits one file to a temporary repository and runs the gate there.
- * A finding names the rule and the file with its line number. The gate prints
- * the matched line through `echo`, which some shells give backslash escapes, so
- * the cases do not assert on the line text.
+ * A finding names the rule and the file with its line number. Most cases assert
+ * on that alone. One case also asserts on the printed line text, because `echo`
+ * gives backslash escapes to some shells and garbled the backslash forms.
  */
 const USER = "alice";
 const DOC = "docs/setup.md";
@@ -572,6 +572,25 @@ for (const [name, path] of REJECTED_SPELLINGS) {
     await scanPaths({ [DOC]: `cd ${path}\n` }, (result) => expectFinding(result));
   });
 }
+
+test("the home-path gate prints a backslash path as written and lists every finding", async () => {
+  // `\cache` is an escape that stops `echo` under dash, the shell of the
+  // devcontainer and of CI. Printed through `echo`, the first finding would end
+  // the output and hide the second. The gate prints through `printf` instead.
+  const backslashPath = ["C:", "Users", USER, "cache", "x"].join("\\");
+  const otherPath = ["", "home", USER, "work"].join("/");
+  const files = {
+    "docs/a-backslash.md": `cd ${backslashPath}\n`,
+    "docs/b-other.md": `cd ${otherPath}\n`,
+  };
+  await scanPaths(files, (result) => {
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain("docs/a-backslash.md:1:");
+    expect(result.stderr).toContain(backslashPath);
+    expect(result.stderr).toContain("docs/b-other.md:1:");
+    expect(result.stderr).toContain(otherPath);
+  });
+});
 
 test("the home-path gate rejects a macOS path that opens a line", async () => {
   // The `^` branch of the macOS expression: no character stands before the slash.

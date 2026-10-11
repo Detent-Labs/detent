@@ -55,7 +55,7 @@ hits=$(
 if [ -n "$hits" ]; then
   reject "$RULE"
   echo "  these tracked files carry an absolute home-directory path:" >&2
-  echo "$hits" | sed 's/^/    /' >&2
+  printf '%s\n' "$hits" | sed 's/^/    /' >&2
   echo "Replace each one with a \$HOME-relative path, an environment variable," >&2
   echo "or a repository-relative path, then commit the result." >&2
   no_verify_note
