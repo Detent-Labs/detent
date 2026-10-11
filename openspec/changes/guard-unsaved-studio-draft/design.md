@@ -150,10 +150,12 @@ the fourth, the replace prompt. The studio
 `t(key)` takes no values, so the message names no time. The button reads "Discard them", the wording of the owner ruling of 2026-10-11.
 
 The notice sits between the header bar and the tab row, as a sibling of the
-error banner. The message and both buttons share a line on wide screens and
-stack below 40rem. "Restore unsaved changes" is a secondary button. "Discard them" is the destructive
-outline. Publish keeps the one filled action. After
-either button the notice unmounts, and focus moves to the open tab.
+error banner. The message and both buttons share a row on wide screens. The
+message keeps the 68-character measure, and the notice stacks below 40rem.
+"Restore unsaved changes" is a secondary button, "Discard them" the destructive
+outline, and Publish keeps the one filled action. After either button the
+notice unmounts, and focus moves to the open tab. A form editor has no tab row,
+so the notice waits while one is open.
 
 **The shell stays as it is.** `Chrome` already calls three handlers that its
 area passes. The `unified-shell` spec gets one requirement that lets an area

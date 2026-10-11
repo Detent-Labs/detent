@@ -924,7 +924,9 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
         onVersions={() => navigate({ name: "versions", processId })}
         onPlayer={() => navigate({ name: "play", processId })}
       />
-      {stash && <RestoreNotice onRestore={restoreStash} onDiscard={discardStash} disabled={requestRunning} />}
+      {/* Either button moves focus to the open tab, so the notice waits while a
+          form editor, which has no tab row, is open. */}
+      {formStepId === undefined && stash && <RestoreNotice onRestore={restoreStash} onDiscard={discardStash} disabled={requestRunning} />}
       {formStepId !== undefined ? (
         formStep ? (
           <FormEditorScreen
