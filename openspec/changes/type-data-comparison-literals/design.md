@@ -32,12 +32,14 @@ Three facts shape the approach:
 
 ### 1. One pure parse module in `shell/`
 
-`packages/web/src/shell/literalValue.ts` holds four functions. Both areas import it. It uses no DOM, so a plain `bun:test` file covers it.
+`packages/web/src/shell/literalValue.ts` holds six functions. Both areas import it. It uses no DOM, so a plain `bun:test` file covers it.
 
 - `literalType(fieldType)` returns `"number"`, `"boolean"` or `"string"`. Every other declared type, and an absent type, returns `"string"`. A plugin-typed field accepts any literal at publish, and a string is the only literal the old form wrote. Nothing regresses.
 - `parseLiteral` returns the parsed value. A failed parse returns a reason. The reason is `empty`, `not-number` or `not-boolean`. A string parses unless it is empty. A string keeps its spaces.
 - `parseLiteralList` splits on commas, trims each member and skips an empty one. It succeeds when at least one member remains and every member parses.
 - `literalText(value)` returns the text for a stored value. A list joins with a comma and a space.
+- `valueTypeOf(value)` returns the value type of a stored value. A row uses it when the field type is unknown.
+- `sameLiteral(a, b)` compares two stored values. The reseed guard of decision 2 uses it.
 
 The number grammar is `^-?\d+(\.\d+)?$` with a finite result. It rejects an exponent, a hex digit and a thousands separator. The same text then means the same number in both locales. A number past 2^53 loses precision. That ceiling carries a `ponytail:` comment.
 
@@ -45,7 +47,9 @@ Rejected: `<input type="number">`. A browser localizes its decimal separator and
 
 ### 2. A row keeps its text, and the parent keeps the parsed value
 
-A row component holds `text` in state. Each keystroke parses the text and calls `onChange` with the parsed value, or with `undefined` when the text is incomplete. While it draws, the row adopts `literalText(value)` when `parse(text)` differs from the `value` prop. That one rule covers a raw JSON change, a removed sibling row and a cleared value after a field change. The adoption guard compares values, so it cannot loop.
+A row component holds `text` and the last `value` prop it saw in state. Each keystroke parses the text and calls `onChange` with the parsed value, or with `undefined` when the text is incomplete. While it draws, the row compares the `value` prop with the remembered one. If they differ, the row remembers the new prop. If the parsed text also differs from the prop, the row adopts `literalText(value)`.
+
+That rule covers a raw JSON change, a removed sibling row and a cleared value after a field change. It cannot loop, because the memory updates before the next draw. Take a stored value of the wrong type, such as `"5"` on a number field. The row adopts its text once, then stays quiet. A guard that compared the parsed text with the prop on every draw would loop there.
 
 Today's code binds the input to `JSON.stringify(value)`. That binding makes the next comma nest the list in F-5. Rejected: lift the text state into the screen. It adds a second structure keyed by row, and that structure needs row ids too.
 

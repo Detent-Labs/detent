@@ -2,7 +2,7 @@
 
 ## 1. Shared literal parsing
 
-- [ ] 1.1 Add `packages/web/src/shell/literalValue.ts` per design decision 1. Verify `packages/web/test/shell-literalValue.test.ts` covers numbers, booleans, strings, lists, empty text and bad members.
+- [x] 1.1 Add `packages/web/src/shell/literalValue.ts` per design decision 1. Verify `packages/web/test/shell-literalValue.test.ts` covers numbers, booleans, strings, lists, empty text and bad members.
 
 ## 2. Column choice type (engine)
 
