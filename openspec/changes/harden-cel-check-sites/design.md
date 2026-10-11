@@ -112,6 +112,18 @@ receiver, [pattern]]}`. The call form is `{op: "call", args: ["matches",
 A `matches` call with a missing argument falls through to the type check,
 which already rejects the arity.
 
+The tree walk must visit every child. A unary operator (`!`, `-`) keeps its
+single operand node in `args`. Other operators keep an array there. The existing walkers for the time-function ban
+and the nesting limit skipped that shape. An expression such as
+`!data.items.all(a, data.items.all(b, data.items.all(c, true)))` passed
+publish with three nested comprehensions. One shared child enumerator now
+serves all three walkers. The base requirement "The authoring-time check
+bounds an expression's structure" already demands the fix.
+
+The cel-js 8.0.0 library has no overload for the call form `matches(s, "p")`.
+Its type check refuses that form, whatever the pattern. The rule still covers
+the form, so a library upgrade cannot open the hole.
+
 At publish, the 4,000-character expression bound caps a literal first, because
 it equals `MAX_PATTERN_LENGTH`. The pattern bound still matters for a migration
 transform, which has no expression bound, and for the scratchpad.

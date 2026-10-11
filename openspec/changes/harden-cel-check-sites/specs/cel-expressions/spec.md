@@ -79,6 +79,11 @@ compile raises on every evaluation. A guard reads a raise as `false`.
 - **WHEN** a guard reads `data.items.all(i, i.matches("("))`
 - **THEN** publish fails with a CEL issue at that guard
 
+#### Scenario: Publish finds a call under a unary operator
+
+- **WHEN** a guard reads `!data.s.matches("(")`
+- **THEN** publish fails with a CEL issue at that guard, naming the pattern
+
 #### Scenario: A migration transform meets the same rule
 
 - **WHEN** a migration plan's transform reads `data.s.matches(data.p)`
