@@ -163,7 +163,7 @@ export function MigrationsScreen({ token, locale, onUnauthorized }: MigrationsSc
             ))}
           </select>
         </label>
-        <button type="button" className="btn btn-secondary" onClick={refresh}>
+        <button type="button" className="btn btn-secondary" onClick={() => { setError(undefined); refresh(); }}>
           {t(locale, "common.refresh")}
         </button>
         <button type="button" className="btn btn-primary" onClick={() => void run()} disabled={!canRun || running}>
