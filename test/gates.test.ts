@@ -590,7 +590,8 @@ test("the home-path gate rejects a machine path beside a container path", async 
 
 test("the home-path gate passes a container path", async () => {
   const container = ["", "home", "node", ".claude"].join("/");
-  await scanPaths({ ".devcontainer/devcontainer.json": `"target": "${container}"\n` }, expectNoFinding);
+  const file = ".devcontainer/devcontainer.json";
+  await scanPaths({ [file]: `"target": "${container}"\n` }, expectNoFinding);
 });
 
 test("the home-path gate passes the audit record's regex text for the macOS form", async () => {
@@ -609,9 +610,11 @@ test("the home-path gate passes a lowercase users route", async () => {
 
 test("the home-path gate passes a relative Users directory", async () => {
   // A name character or a dot before the slash makes the path relative.
-  const text = ["packages", "web", "src", "Users", "List.tsx"].join("/") + "\n" +
-    ["..", "Users", "List"].join("/") + "\n";
-  await scanPaths({ "docs/layout.md": text }, expectNoFinding);
+  const lines = [
+    ["packages", "web", "src", "Users", "List.tsx"].join("/"),
+    ["..", "Users", "List"].join("/"),
+  ];
+  await scanPaths({ "docs/layout.md": lines.join("\n") + "\n" }, expectNoFinding);
 });
 
 test("the home-path gate reads tracked files only", async () => {

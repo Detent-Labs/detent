@@ -14,10 +14,10 @@
 # The pattern stays case-sensitive. Only the drive forms spell `Users` in both
 # cases. A lowercase /users/ appears in routes, so the macOS form would flag
 # them if it ignored case. The macOS form also needs a name character after
-# `Users/` and no name character before the slash, so the regex text `/Users/[^/]+`
-# and a relative src/Users/ directory raise no finding.
+# `Users/` and no name character before the slash. The regex text
+# `/Users/[^/]+` and a relative src/Users/ directory raise no finding.
 #
-# Commit e152f9c removed two of them. One sat in a skill file and carried the
+# Commit e152f9c removed two such paths. One sat in a skill file and carried the
 # Windows account name. The other sat in thirteen shell examples in a plan
 # document. A path of that shape works on one machine and on no other, and it
 # discloses the account name to everyone who clones the repository.
