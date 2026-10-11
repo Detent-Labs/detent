@@ -451,11 +451,13 @@ async function canActorCancelInstance(actor: Actor, instance: Instance, body: Pr
   // still answers the instance's status, so the starter must be a reader:
   // a revocation that names them throws the read AuthorizationError here.
   //
-  // ponytail: `instance.status` comes from an unlocked read, taken before the
-  // engine cancel. A revoked starter whose cancel races a finish reads as
-  // running here, skips the read check, then gets the no-op write result of an
-  // instance that finished a moment earlier. Upgrade entry point: take the
-  // instance row lock before this check.
+  // ponytail: `instance.status` comes from an unlocked read, and the engine
+  // cancel receives that same snapshot. A finish between the read and the
+  // engine commit loses the `transition_seq` guard, so the caller sees
+  // `ConcurrencyConflict` (409) rather than a refusal. A fault flip bumps no
+  // seq, so the cancel can still commit over a freshly faulted instance; the
+  // starter was entitled to cancel when the snapshot was read. Upgrade entry
+  // point: take the instance row lock before this check.
   if (instance.status !== "running") {
     await loadInstanceForActor(instance.instanceId, actor, db);
     return true;
