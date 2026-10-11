@@ -48,20 +48,19 @@ None.
 
 - **Case:** Two ways lead to the same read.
   - First way: an account with only the cancel-any role (`system:cancel-any`)
-    cancels a completed instance it never took part in. The function
-    `cancelInstance` takes the fast path (`requireRole(actor, CANCEL_ANY_ROLE)`).
-    It loads the instance through `loadInstanceForRead`, with no visibility
-    check.
-  - The function `engineCancelInstance` returns a non-running instance
-    unchanged. The handler `handleCancel` then answers 200 with `data`,
-    `assignment` and `startedBy`. The route `GET /instances/:id` would answer
-    403, since `read` depends on `ADMIN_ROLE`.
-  - Second way: the starter after a visibility revoke. An admin revokes the
-    starter's view through `POST /instances/:id/visibility/revoke`. The `GET`
-    route then answers 403 to her. The cancel route answers 200 with all field
-    values.
-  - The function `canActorCancelInstance` returns `true` for the starter of a
-    non-running instance.
+    cancels a completed instance it never took part in.
+    - The function `cancelInstance` takes the fast path
+      (`requireRole(actor, CANCEL_ANY_ROLE)`). It loads the instance through
+      `loadInstanceForRead`, with no visibility check.
+    - The function `engineCancelInstance` returns a non-running instance
+      unchanged. The handler `handleCancel` then answers 200 with `data`,
+      `assignment` and `startedBy`. The route `GET /instances/:id` would
+      answer 403, since `read` depends on `ADMIN_ROLE`.
+  - Second way: the starter whose visibility an admin revoked can still cancel
+    through `POST /instances/:id/cancel`. The cancel response carries the full
+    instance data that the read route refuses her. The function
+    `canActorCancelInstance` returns `true` for the starter of a non-running
+    instance.
 - **Mechanism:** The write path answers with the full read body. The no-op
   branch for non-running instances turns it into a read with no side effect.
 - **Location:** `src/runtime/instances.ts:399-411`, `:441-471`;
@@ -168,7 +167,7 @@ None.
 - **Known:** new. No test combines the two handlers with an `org.*` strategy.
 - **Suggestion:** The type `HandlerContext` carries the assignment registry
   from `host.ts`. The static factory gets the name
-  `createStaticAssignmentRegistry`. That touches no contract topic. Per
+  `createStaticAssignmentRegistry`. That touches no definition contract topic. Per
   `CLAUDE.md` it is still a change, because it touches several files.
 
 ### F-1: A focus refetch discards input in the data list editor and the UI strings editor
@@ -260,13 +259,13 @@ None.
 - **C-7** The login lockout counts per e-mail across all tenants. A success in tenant A resets the window for tenant B: `src/auth/login.ts:54`, `:145-155`. Confirmed. Partly known: SEC-5 (`decisions.md:624`).
 - **C-8** In SaaS mode, a token from an external IdP never finds its tenant. The code uses `iss` as the key, and `KEY_PATTERN` forbids `:` and `/`. Locations: `src/auth/jwt.ts:33-45`, `src/http/server.ts:452-459`, `src/tenancy/provision.ts:17`. Confirmed (fails closed). New. OpenSpec change.
 - **C-19** The reporting aggregates load the whole period with its history into memory, the history twice. The span has no bound: `src/engine/reporting.ts:96-122`, `:261`, `:400`; `reporting-routes.ts:100-110`. Confirmed. Partly known: `decisions.md:30`.
-- **D-1** The route `POST /auth/login` throws past `mapError`. Without `NODE_ENV`, Bun returns its development error page with the error message embedded: `src/auth/login.ts:117-175`, `src/http/server.ts:840`, `:901`; `docker/engine.Dockerfile`. Reproduced: an invalid byte in the login input raises a `PostgresError`. The error page has 67 KB of `text/html`, with the message embedded as base64. With `development:false`, the response has 21 bytes. Related to ERR-3.
+- **D-1** The route `POST /auth/login` throws past `mapError`. Without `NODE_ENV`, Bun returns its development error page with the error message embedded: `src/auth/login.ts:117-175`, `src/http/server.ts:840`, `:901`; `docker/engine.Dockerfile`. Reproduced: the login input raises a database encoding error (SQLSTATE 22021). The error page has 67 KB of `text/html`, with the message embedded as base64. With `development:false`, the response has 21 bytes. Related to ERR-3.
 - **D-3** The handler `instance.transition` drives a foreign instance as `SYSTEM_ACTOR`. A participant types the id of that instance into a free text field: `src/handlers/instance-transition.ts:62-143`, `src/engine/definitions.ts:401-406`. Confirmed. New. OpenSpec change.
 - **E1-1** The list `KNOWN_KEYS` lacks `collaboration`. The JSON surface refuses every apply once an author ticks "Comments": `packages/web/src/areas/studio/draft/load-guard.ts:19`. Reproduced (`checkDraftShape({collaboration})` → "unrecognized top-level field"). I downgraded it from high: the error is visible, and the author loses no data. A workaround exists.
 - **E1-3** A 401 on save logs the author out and discards the unsaved draft (token lifetime 8 h): `studio/root.tsx:171`, `panels/DraftToolbar.tsx:102-111`, `shell/App.tsx:80-84`. Confirmed. I downgraded it, because the case needs an expired token.
 - **E1-4** Layout changes (positions, groups, path style) do not count as unsaved, and a navigation discards them: `studio/screens/EditScreen.tsx:380`, `draftToolbarState.ts:10-12`. Confirmed. New.
 - **E1-5** A nested shape error in the JSON surface (`"steps": {}`) passes the guard and crashes the studio area: `draft/load-guard.ts:53-60`, `EditScreen.tsx:509-523`. Code path confirmed. I did not run it in a browser. New.
-- **E2-1** A manual path keeps a guard after a trigger switch, though the step page no longer lists it. At runtime the guard hides the button: `panels/PathsPanel.tsx:288`, `:306`; `src/runtime/fields.ts:292-296`. Confirmed. I downgraded it from high, because the Paths tab and the JSON both contain the guard. New, with a spec contradiction (`studio-app:1257` against `studio-condition-builder:416`).
+- **E2-1** A manual path keeps a guard after a trigger switch, though the step page no longer lists it. At runtime the guard hides the button: `panels/PathsPanel.tsx:288`, `:306`; `src/runtime/fields.ts:292-296`. Confirmed. I downgraded it from high, because the guard stays visible in the Paths tab and in the JSON. New, with a spec contradiction (`studio-app:1257` against `studio-condition-builder:416`).
 - **E2-3** A subprocess `inputMapping` offers the parent's fields as keys, and publish then refuses them: `panels/SubprocessSpecEditor.tsx:108-115`. Confirmed. New.
 - **E2-4** The subprocess editor shows "pinned" but never writes `versionBinding`. The editor does not prefill the mappings: `panels/SubprocessSpecEditor.tsx:44-90`. Confirmed. New.
 - **E2-5** A switch of the step kind leaves `subprocess`, `outcome` and `paths` behind with no control: `draft/performedBy.ts:19-32`. Confirmed. New.
@@ -360,7 +359,7 @@ None.
 - **F-12** The shell does not reconcile the session between tabs. A second tab can restore a session after a logout: `shell/App.tsx:80-121`, `session.ts:64-70`.
 - **F-13** Before its first screen, the app waits for `/ui-strings` without a time limit: `main.tsx:16-27`, `i18n/overrides.ts:43-54`.
 - **F-14** The tab announcement expands `$` patterns in the label. This is the form-ui site of FIELDS-19: `packages/form-ui/src/tabs.ts:175-182`.
-- **F-15** Dead exports and parameters (the reporting area's `api/` module, `fieldLabel`, `PathButtons.style` and others): list in `reports/F.md`.
+- **F-15** Dead exports and parameters (`api/client.ts`, `fieldLabel`, `PathButtons.style` and others): list in `reports/F.md`.
 - **F-16** The package form-ui declares React `^18` as a peer, while the consumer uses React 19: `packages/form-ui/package.json`.
 - **F-17** The migrations screen has neither a refresh button nor a focus refetch, and the spec requires both: `admin/screens/MigrationsScreen.tsx`.
 - **F-18** The Users and Groups screens load the whole directory on every focus: `UsersScreen.tsx:257-283`, `GroupsScreen.tsx:198-236`.
@@ -370,7 +369,7 @@ None.
 - **G-4** The hash guard covers 3 of 9 examples. Today `it-offboarding.json` and `it-onboarding.json` carry a stale `definitionHash` (reproduced). I downgraded it, because `scripts/seed.ts:119` computes the hash itself.
 - **G-6** Dependabot runs as `npm` and never updates `bun.lock`: `.github/dependabot.yml:3-11`.
 - **G-7** The gate `silent-green.sh` misses `test.todo`, a changed output format and a shrinking test count: `scripts/gates/silent-green.sh:55-66`.
-- **G-8** The gate `machine-paths.sh` does not detect `/c/Users/…`, macOS paths or JSON-escaped paths: `scripts/gates/machine-paths.sh:28`.
+- **G-8** The gate `machine-paths.sh` does not detect the Git Bash form of a home path, macOS paths or JSON-escaped paths: `scripts/gates/machine-paths.sh:28`.
 - **G-9** The round-trip test for `strip-compiled` names 6 of 9 examples. All 9 pass today (reproduced): `test/strip-compiled.test.ts:13-20`.
 - **G-10** Three tests assert only what the response is not, or nothing at all: `test/http-body-size.test.ts:28-40`, `migration.test.ts:239-246`, `openapi-exclusions.test.ts:19-22`.
 - **G-11** The workflow sets no `permissions`, and the token sits in the bind-mounted `.git`: `.github/workflows/check.yml:20-27`.
@@ -456,7 +455,7 @@ the record.
 
 - Agent reports: `reports/A.md` to `reports/H.md`, `reports/E1.md` and
   `reports/E2.md`. Each finding appears there under the same number, with the
-  full sequence, mechanism, counter-evidence and repro proposal. That text is
+  case narrative, mechanism, counter-evidence and repro proposal. That text is
   the template for the tasks of a plan.
 - Coordinator cross-checks: `verify-ledger.md`. It holds the quoted repro
   output and the reason for each regrading.

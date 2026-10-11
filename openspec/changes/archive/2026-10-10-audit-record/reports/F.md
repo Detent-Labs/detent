@@ -43,7 +43,7 @@ State: HEAD `5f41cd8a`. The audit read the code only. It ran no build, no test a
 ### F-3: `form-ui` and the engine disagree about cleared fields
 
 - Case:
-  - (a), number: An optional `number` field, for example `amount`, already holds 120. The value comes from a catalog `default`, an earlier step or an action output. The participant clears the field. The handler `onChange` returns `undefined`, and `filterToEditable` keeps the key with `undefined`. The call `JSON.stringify` drops the key, and the engine merges the patch over the data. The field `amount` stays 120: the engine ignores the clearing without a message.
+  - (a), number: An optional `number` field, for example `amount`, already holds 120. The value comes from a catalog `default`, an earlier step or an action output. The participant clears the field. The handler `onChange` returns `undefined`, and `filterToEditable` keeps the key with `undefined`. The call `JSON.stringify` drops the key, and the engine merges the patch over the data. The field `amount` stays 120, and the clearing disappears without a message.
   - (b), format or choice: An optional field with `format: "date"`/`"email"` or a choice field (for example `booking_status`) gets a value. The participant then clears it or sets it to the empty option. The form sends `""`. The engine reports `type-mismatch` ("expected date") or `invalid-option`. The participant can no longer clear an optional field this way. The submission stays stuck until a reload.
   - (c), side note for the runtime area: A required text field, typed and then cleared, sends `""`. The required check counts only `undefined` as missing and lets `""` pass.
   - (d): A `datetime` value with a zone (`...Z`, `+02:00`, which the engine allows) does not fit `<input type="datetime-local">`. The field shows empty, also when it is readonly.
@@ -68,7 +68,7 @@ State: HEAD `5f41cd8a`. The audit read the code only. It ran no build, no test a
 
 - Case:
   - In the builder, add a comparison, choose the comparison "in" and type `a`. The handler `onChange` stores `["a"]`. The input then shows its `JSON.stringify`, so `["a"]`. The next character `,` yields `['["a"]', ""]`, shown as nested JSON. Nobody can type a list.
-  - Second, the comparisons `eq` and `ne` always send a string. For `amount` (number), `eq 500` builds the condition `data @> {"amount":"500"}` and never matches. The comparison `ne 500` matches every row, also the one with 500.
+  - Second, the comparisons `eq` and `ne` always send a string. For `amount` (number), `eq 500` builds the condition `data @> {"amount":"500"}` and never matches. The comparison `ne 500` matches every row, also the rows with 500.
   - Third, every keystroke in a comparison fires a new `POST /reporting/reports/columns`. The effect depends on `draft?.dataWhere`.
 - Location: `packages/web/src/areas/reporting/screens/ReportBuilderScreen.tsx:31`, `:384-390`, `:161-175`; type without a field type `packages/web/src/areas/reporting/api/types.ts:76`; server comparison `src/runtime/queries.ts:318-326`
 - Severity: medium
@@ -77,9 +77,9 @@ State: HEAD `5f41cd8a`. The audit read the code only. It ran no build, no test a
 - Known: new
 - Suggestion: Keep the raw text apart from the value and split it only on send. Deliver the field type in `ColumnChoice` and convert the value by it. This is an API change (spec `reporting-data-tables`).
 
-### F-6: Report builder date filter computes in UTC and excludes the "Bis" day
+### F-6: Report builder date filter computes in UTC and excludes the "Bis" ("To") day
 
-- Case: A process owner in Europe/Zurich picks "Von 01.10.2026" and "Bis 10.10.2026" in the builder. The builder sends `createdAfter 2026-10-01T00:00:00.000Z` and `createdBefore 2026-10-10T00:00:00.000Z`. The server filters `created_at >= ... AND created_at <= ...`. The result misses cases from 10.10. at 02:00 local time and later. It also misses cases from 01.10. before 02:00. The three views of the same area use the same labels (`range.from`/`range.to`) and count the whole local day.
+- Case: A process owner in Europe/Zurich picks "Von 01.10.2026" ("From") and "Bis 10.10.2026" ("To") in the builder. The builder sends `createdAfter 2026-10-01T00:00:00.000Z` and `createdBefore 2026-10-10T00:00:00.000Z`. The server filters `created_at >= ... AND created_at <= ...`. The result misses cases from 10.10. at 02:00 local time and later. It also misses cases from 01.10. before 02:00. The three views of the same area use the same labels (`range.from`/`range.to`) and count the whole local day.
 - Location: `packages/web/src/areas/reporting/screens/ReportBuilderScreen.tsx:273-288`; `src/runtime/queries.ts:296-297`; correct pattern `reportingLogic.ts:59-66`; rule for the views `openspec/specs/reporting-app/spec.md:115-122`
 - Severity: medium
 - Evidence: confirmed (code).
@@ -206,7 +206,7 @@ State: HEAD `5f41cd8a`. The audit read the code only. It ran no build, no test a
 - XSS, raw HTML: `packages/web` (without studio) and `packages/form-ui` have no `dangerouslySetInnerHTML`, `innerHTML`, `outerHTML`, `insertAdjacentHTML`, `eval` or `new Function` (`git grep` empty). Authored content (labels, notes, options, tab labels) goes out as JSX text: `FieldForm.tsx:417`, `:467`, `:496`, `:546-552`. Comment text: `TaskScreen.tsx:585`. The dependencies have no Markdown renderer (`packages/web/package.json`, `packages/form-ui/package.json`).
 - The attributes `href`/`src` from data: no `<a href>`, `<img>`, `<iframe>`, `window.open` or `location.href` from data (`git grep`). The app fetches attachments and CSV as a Blob and saves them through `download`, never inline: `TaskScreen.tsx:402-411`, `ReportBuilderScreen.tsx:221-236`. This matches SEC-8 (`decisions.md:719`).
 - CSP: the meta tag sets `script-src 'self'`, `object-src 'none'`, `base-uri 'none'` in the build only (`packages/web/csp.ts:19-37`, included at `vite.config.ts:52`). Headers: `frame-ancestors 'none'`, `nosniff`, `X-Frame-Options DENY` (`src/http/static.ts:39-44`, `docker/nginx.conf:23-26`).
-- Token storage: only the key `web.session` (`session.ts:16`, `:64-70`). SEC-4 accepts it, so this audit does not report it again.
+- Token storage: only the key `web.session` (`session.ts:16`, `:64-70`). SEC-4 records it as accepted, so this audit does not report it again.
 - Logout clears the browser state: it deletes the key, empties the state and shows the login (`App.tsx:80-84`). The language choice stays on purpose (`localeSync.ts:7-10`).
 - A 401 in app, admin and shell: `useFail` (`useFail.ts:17-27`) in every app and admin screen. The `TaskScreen` has its own ladder with `is401` (`TaskScreen.tsx:233-236`). So does the `ProfilePage` (`ProfilePage.tsx:105-106`). Exception: reporting, F-4.
 - Headless boundary: the area reaches the engine only through `workflow-engine/<exports map entry>` and HTTP. No relative path leaves `packages/web` or `packages/form-ui` (`git grep` for 4+ `../` empty). The package `form-ui` imports only `workflow-engine/schema` (`types.ts:1`, `locale.ts:1`, `FieldForm.tsx:2`, `issue-messages.ts:1`).
@@ -233,7 +233,7 @@ State: HEAD `5f41cd8a`. The audit read the code only. It ran no build, no test a
    - (d) Show a readonly `datetime` field with the value `2026-10-10T12:00:00Z`. The input stays empty.
 4. F-4: Set an invalid token with the role `system:reports` in `localStorage["web.session"]` and open `/reporting`. The spec expects the login screen. Per the finding, the error note appears.
 5. F-5: Open the builder, add a comparison, choose the comparison "in" and type `a,b`. Read the input content. Also run `eq` on `amount` with an existing amount and open the preview. Per the finding, expect 0 rows.
-6. F-6: Run a browser with `TZ=Europe/Zurich` and set "Bis" in the builder. Read the request body of `POST /reporting/reports/preview`. The value `createdBefore` ends in `T00:00:00.000Z` of the chosen day (UTC).
+6. F-6: Run a browser with `TZ=Europe/Zurich` and set "Bis" ("To") in the builder. Read the request body of `POST /reporting/reports/preview`. The value `createdBefore` ends in `T00:00:00.000Z` of the chosen day (UTC).
 7. F-7: Use `playwright-cli route` to delay the first response to `/admin/instances?*processId=proc_expens*` by 2 s. Then finish typing `proc_expense` and read the final state of the table.
 
 ## Not checked

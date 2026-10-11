@@ -44,10 +44,9 @@
   287 ms (exponential). Severity medium.
 - A-4 reproduced: `checkAgainstFields("data.s") -> {"ok":true}`;
   `evalGuard -> false`. Severity medium.
-- D-1 reproduced: a `SELECT` with an e-mail value that holds an invalid byte
-  raises a `PostgresError`. The message reads
-  `invalid byte sequence for encoding "UTF8"`, and the login handler lets it
-  escape the error mapper. The container leaves `NODE_ENV` undefined, since
+- D-1 reproduced: a `SELECT` with the login e-mail value raises a
+  `PostgresError`, a database encoding error (SQLSTATE 22021). The login
+  handler lets it escape the error mapper. The container leaves `NODE_ENV` undefined, since
   `engine.Dockerfile` sets none. With no `error` handler, `Bun.serve` answers
   500 `text/html` at 67 KB, with the message embedded as base64 (found after
   decoding). With `development:false` it answers 500 `text/plain` at 21
@@ -89,7 +88,7 @@
   trigger. At `:306` the guard editor appears only for an automatic path. The
   file `fields.ts:292-296` filters manual paths by guard, and
   `transition.ts:543` raises `GuardRefused`. Severity medium: the Paths tab
-  and the JSON both contain the guard, and the body stays valid. Agent: high.
+  and the JSON both show the guard, and the body stays valid. Agent: high.
 - E2-2 confirmed and reproduced. The form sets `value: e.target.value`
   (`InstanceQueryForm.tsx:253`). The query in `queries.ts:319-326` matches
   jsonb by exact type. SQL: `{"field_n":5} @> "5" -> false`,

@@ -156,7 +156,7 @@ State: HEAD `5f41cd8a`, read only. Read in full: `store.ts`, `transition.ts`,
     `attempts` to the old value of A and sets `claimed_at = NULL`.
   - The later success `tx2` of B then finds `pending`. It discards the
     writeback of B with its outcome ("already delivered by a peer").
-  - When A reaches the limit, A sets `dead-letter`, though B delivered with
+  - If A reaches the limit, A sets `dead-letter`, though B delivered with
     success. The writeback of B is then lost for good.
 - Location: `src/engine/outbox.ts:195-204` (lease from the claim), `:236-238`
   (deadline from the row start). Also `:250-252`, `:335-337`, `:350-352` (CAS
@@ -236,7 +236,7 @@ State: HEAD `5f41cd8a`, read only. Read in full: `store.ts`, `transition.ts`,
 - Evidence: confirmed for the flags, assumed for the scale (R6).
 - Counter-evidence sought: all writers of `resolve_state`. A git grep finds
   only the four sites above. The spec `automatic-transitions/spec.md:77-80`
-  does not mark, and it does not clear.
+  does not mark, but it does not clear either.
 - Known: new. PERF-1 concerns the fixed interval. It does not concern this
   set.
 - Suggestion: write `ELSE 'idle'` instead of `ELSE resolve_state` for results
@@ -395,7 +395,7 @@ State: HEAD `5f41cd8a`, read only. Read in full: `store.ts`, `transition.ts`,
 ### B-15: Simplification: backward migrations in `initSchema` and duplicate queries in reporting
 
 - Case: before 1.0, with no deployment (`CLAUDE.md`: "nothing deployed to
-  preserve"), every start runs retrofits for old databases.
+  preserve"), every start runs retrofits for old databases. For example:
   - The statement
     `UPDATE outbox SET field_version = ... WHERE field_version IS NULL` scans
     the whole outbox with no index.
@@ -462,7 +462,7 @@ State: HEAD `5f41cd8a`, read only. Read in full: `store.ts`, `transition.ts`,
   - The engine rewrites the outbox rows under the lock (`:456-465`) and
     reconciles the timers (`:474`).
   - The data comes from the locked snapshot (`:468`). The engine deletes the
-    form draft (`:536`). The writeback version fold sits at
+    form draft (`:536`). The writeback version check sits at
     `outbox.ts:316-321`.
   - Gap at the pending spawn: B-2.
 - Half-committed state: the return writeback and the advance share one
