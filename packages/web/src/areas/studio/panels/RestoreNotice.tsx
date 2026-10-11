@@ -5,8 +5,9 @@ import { t } from "../catalog.js";
 const NARROW = "@media (max-width: 40rem)";
 
 /** The warning callout of `DESIGN.md`: refusal text beside a 3px rule in the
- * advisory role, 8px before the text. The message and the buttons share a
- * line on a wide screen and stack below 40rem. */
+ * advisory role, 8px before the text. The message and the buttons share a row
+ * on a wide screen and stack below 40rem. The message keeps the 68ch measure,
+ * so its text wraps inside the row. */
 const styles = stylex.create({
   notice: {
     display: "flex",

@@ -1875,10 +1875,11 @@ Unroute the answer and log in as `demo-superuser@example.test`. Open the same
 draft. Pass: no notice appears. Read `Object.keys(sessionStorage)` in the page.
 Pass: no key starts with `studio.draftStash`.
 
-Two checks stay manual-only and sit outside the eight. The restore notice
-shares one line with its message and both buttons on wide screens. It stacks
-below 40rem. Focus lands on the open tab after either button. Only a live
-render at a real width shows the first. Only a keyboard pass shows the second.
+Two checks stay manual-only and sit outside the eight. On wide screens the
+notice puts its message and both buttons in one row. The message wraps at the
+68-character measure and the notice stacks below 40rem. Focus lands on the open
+tab after either button. Only a live render at a real width shows the first.
+Only a keyboard pass shows the second.
 
 ### Selecting a path shows the source step's Paths section with the row highlighted
 
