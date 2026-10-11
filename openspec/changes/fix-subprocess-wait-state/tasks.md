@@ -71,9 +71,9 @@
 
 ## 9. Verification
 
-- [ ] 9.1 Run `bun run typecheck`, then `bun run build`, inside the devcontainer. Record the printed result in the run report.
-- [ ] 9.2 Run `sh scripts/test-gated.sh bun test` in the container with `OPENSPEC_TELEMETRY=0`. The container sets `DATABASE_URL`. Record the pass, fail and skip counts.
-- [ ] 9.3 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` on the host. Record the printed result.
-- [ ] 9.4 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh` on the host. Record the printed result.
-- [ ] 9.5 Browser check on the production build: open a draft with a subprocess step in the form editor. Verify that the view-override picker lists no `child` operand and the path guard picker does.
-- [ ] 9.6 Run `/impeccable critique` and `/impeccable audit` on the form editor route. Record the findings. Fix the findings that the diff caused.
+- [x] 9.1 Run `bun run typecheck`, then `bun run build`, inside the devcontainer. Record the printed result in the run report.
+- [x] 9.2 Run `sh scripts/test-gated.sh bun test` in the container with `OPENSPEC_TELEMETRY=0`. The container sets `DATABASE_URL`. Record the pass, fail and skip counts.
+- [x] 9.3 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` on the host. Record the printed result.
+- [x] 9.4 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh` on the host. Record the printed result.
+- [x] 9.5 Browser check on the production build: open a draft with a subprocess step in the form editor. Verify that the view-override picker lists no `child` operand and the path guard picker does.
+- [x] 9.6 Run `/impeccable critique` and `/impeccable audit` on the form editor route. Record the findings. Fix the findings that the diff caused.
