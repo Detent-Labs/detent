@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { layout, colors, fonts, space } from "form-ui/tokens.stylex";
 import { getDataList, updateDataList, putDataListValues, deleteDataList } from "../api/client.js";
@@ -7,12 +7,16 @@ import { useRefresh } from "../useRefresh.js";
 import { describeCaughtError } from "../errors.js";
 import { useFail } from "../../../shell/useFail.js";
 import { ErrorBanner } from "../../../shell/ErrorBanner.js";
+import { createLatestGate } from "../../../shell/latestGate.js";
+import { ServerCopyNote } from "../ServerCopyNote.js";
+import { absorbServerCopy, serverCopyChanged, type ServerCopies } from "./serverCopy.js";
 import {
   attributesToInputs,
   badNumberAttributes,
   droppedColumns,
   mappingProcesses,
   readLabel,
+  sameDataList,
   toPayload,
   validateColumns,
   validateValues,
@@ -203,7 +207,10 @@ interface DataListScreenProps {
  * declaration. The order on screen is the order the two depend on.
  */
 export function DataListScreen({ listKey, token, locale, navigate, onUnauthorized }: DataListScreenProps) {
-  const [detail, setDetail] = useState<DataListDetail | undefined>(undefined);
+  const [copies, setCopies] = useState<ServerCopies<DataListDetail> | undefined>(undefined);
+  const copiesRef = useRef<ServerCopies<DataListDetail> | undefined>(undefined);
+  /** The newest server copy. The inputs may still hold edits made over an older one. */
+  const detail = copies?.latest;
   const [label, setLabel] = useState("");
   const [description, setDescription] = useState("");
   const [columns, setColumns] = useState<ColumnRow[]>([]);
@@ -212,51 +219,85 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
+  /** Unsaved input. `load` reads the ref when an answer arrives; the state drives the callout. */
+  const dirtyRef = useRef(false);
+  const [dirty, setDirty] = useState(false);
+  const [gate] = useState(createLatestGate);
   const { reloadToken, refresh } = useRefresh();
   const fail = useFail(onUnauthorized, (err) => setError(describeCaughtError(err, locale)));
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(undefined);
-    try {
-      const next = await getDataList(listKey, token);
-      setDetail(next);
-      setLabel(next.label);
-      setDescription(next.description ?? "");
-      setColumns(next.columns.map((c) => ({ ...c })));
-      setRows(
-        next.values.map((v) => ({
-          value: v.value,
-          label: readLabel(v.label, locale),
-          attributes: attributesToInputs(v.attributes, next.columns),
-          retired: !v.active,
-        })),
-      );
-    } catch (err) {
-      fail(err);
-    } finally {
-      setLoading(false);
-    }
-  }, [listKey, token, locale, fail]);
+  const touch = () => {
+    dirtyRef.current = true;
+    setDirty(true);
+    setSaved(false);
+  };
 
+  /**
+   * Fetches the list and stores it as the newest server copy. It refills the
+   * inputs only on the first load, without unsaved input, or when `reseed`
+   * asks for it. Only the newest call writes, so a focus load that started
+   * before a save never overwrites the copy the save produced.
+   */
+  const load = useCallback(
+    async (reseed = false) => {
+      const isCurrent = gate.next();
+      setLoading(true);
+      setError(undefined);
+      try {
+        const next = await getDataList(listKey, token);
+        if (!isCurrent()) return;
+        const { copies: nextCopies, reseed: doReseed } = absorbServerCopy(copiesRef.current, next, dirtyRef.current && !reseed);
+        copiesRef.current = nextCopies;
+        setCopies(nextCopies);
+        if (doReseed) {
+          setLabel(next.label);
+          setDescription(next.description ?? "");
+          setColumns(next.columns.map((c) => ({ ...c })));
+          setRows(
+            next.values.map((v) => ({
+              value: v.value,
+              label: readLabel(v.label, locale),
+              attributes: attributesToInputs(v.attributes, next.columns),
+              retired: !v.active,
+            })),
+          );
+          dirtyRef.current = false;
+          setDirty(false);
+        }
+      } catch (err) {
+        if (isCurrent()) fail(err);
+      } finally {
+        if (isCurrent()) setLoading(false);
+      }
+    },
+    [listKey, token, locale, fail, gate],
+  );
+
+  // A new `load` identity means a new list, token or locale. Each forces a
+  // reseed: edits made on another list, or labels typed under another locale,
+  // must not carry over. A bare `reloadToken` bump (focus, Refresh) keeps the
+  // operator's unsaved input.
+  const lastLoad = useRef(load);
   useEffect(() => {
-    void load();
+    const reseed = lastLoad.current !== load;
+    lastLoad.current = load;
+    void load(reseed);
   }, [load, reloadToken]);
 
   const problems = [...validateColumns(columns, locale), ...validateValues(rows, locale), ...badNumberAttributes(rows, columns, locale)];
 
   const patch = (index: number, change: Partial<ValueRow>) => {
-    setSaved(false);
+    touch();
     setRows((prev) => prev.map((row, i) => (i === index ? { ...row, ...change } : row)));
   };
 
   const patchAttribute = (index: number, key: string, value: string) => {
-    setSaved(false);
+    touch();
     setRows((prev) => prev.map((row, i) => (i === index ? { ...row, attributes: { ...row.attributes, [key]: value } } : row)));
   };
 
   const patchColumn = (index: number, change: Partial<ColumnRow>) => {
-    setSaved(false);
+    touch();
     setColumns((prev) => prev.map((column, i) => (i === index ? { ...column, ...change } : column)));
   };
 
@@ -284,7 +325,8 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
       await updateDataList(listKey, label.trim(), description.trim() === "" ? null : description.trim(), token, columns);
       await putDataListValues(listKey, toPayload(rows, locale, existingLabels, columns), token);
       setSaved(true);
-      refresh();
+      // A forced reseed: the inputs switch once, to the copy the save produced.
+      await load(true);
     } catch (err) {
       fail(err);
     } finally {
@@ -317,6 +359,11 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
 
       {detail && (
         <>
+          <ServerCopyNote
+            message={dirty && serverCopyChanged(copies, sameDataList) ? t(locale, "dataList.serverChanged") : undefined}
+            discardLabel={t(locale, "dataList.discardAndReload")}
+            onDiscard={() => void load(true)}
+          />
           <div {...stylex.props(styles.controls)}>
             <label {...stylex.props(styles.field)}>
               {t(locale, "dataList.name")}
@@ -325,7 +372,7 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
                 value={label}
                 onChange={(e) => {
                   setLabel(e.target.value);
-                  setSaved(false);
+                  touch();
                 }}
               />
             </label>
@@ -336,7 +383,7 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
                 value={description}
                 onChange={(e) => {
                   setDescription(e.target.value);
-                  setSaved(false);
+                  touch();
                 }}
               />
             </label>
@@ -396,7 +443,7 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
                         type="button"
                         className="btn btn-secondary"
                         onClick={() => {
-                          setSaved(false);
+                          touch();
                           setColumns((prev) => prev.filter((_, j) => j !== i));
                         }}
                       >
@@ -414,7 +461,7 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
               type="button"
               className="btn btn-secondary"
               onClick={() => {
-                setSaved(false);
+                touch();
                 setColumns((prev) => [...prev, { key: "", label: "", type: "string" }]);
               }}
             >
@@ -526,7 +573,7 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
               type="button"
               className="btn btn-secondary"
               onClick={() => {
-                setSaved(false);
+                touch();
                 setRows((prev) => [...prev, { value: "", label: "", attributes: {}, retired: false }]);
               }}
             >
