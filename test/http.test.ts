@@ -1622,6 +1622,111 @@ test.skipIf(!DB)("a starter whom a revocation names gets 403 authorization on ca
   expect(((await after.json()) as { error: { type: string } }).error.type).toBe("authorization");
 });
 
+// --- Visibility routes: a known account, and an unknown instance ----------------
+
+/**
+ * `auth_users` sits outside this file's TRUNCATE, so most tests run with an
+ * empty directory and the visibility target check never runs. A test that
+ * needs a directory populates it here and clears it again.
+ */
+async function withDirectory(userIds: string[], fn: () => Promise<void>): Promise<void> {
+  for (const id of userIds) {
+    await sql`INSERT INTO auth_users (user_id, email, password_hash) VALUES (${id}, ${`${id}@visibility-http.example.com`}, ${"x"})`;
+  }
+  try {
+    await fn();
+  } finally {
+    await sql`DELETE FROM auth_users WHERE user_id = ANY(${sql.array(userIds, "TEXT")})`;
+  }
+}
+
+/** A published instance started by user1. */
+async function startedBy1(processId: string): Promise<string> {
+  await publishBody(pid(processId), simpleBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${processId}/instances`, "POST", user1))).json()) as { instanceId: string };
+  return created.instanceId;
+}
+
+const visibilityPost = (instanceId: string, route: "revoke" | "restore" | "grant", actor: Actor, actorId: string) =>
+  fetch(jsonReq(`http://x/instances/${instanceId}/visibility/${route}`, "POST", actor, { actorId }));
+
+const deniedCount = async (instanceId: string, actorId: string): Promise<number> => {
+  const rows = (await sql`SELECT count(*) AS n FROM instance_principals_denied
+    WHERE instance_id = ${instanceId} AND actor_id = ${actorId}`) as { n: string }[];
+  return Number(rows[0]!.n);
+};
+
+test.skipIf(!DB)("POST /instances/:instanceId/visibility/revoke and /grant naming an unknown account map to 422 unknown-actor", async () => {
+  const id = await startedBy1("proc_http_visibility_422");
+  await withDirectory([admin.id, "alice_m"], async () => {
+    for (const route of ["revoke", "grant"] as const) {
+      const res = await visibilityPost(id, route, admin, "alice.m");
+      expect(res.status).toBe(422);
+      const body = (await res.json()) as { error: { type: string; message: string } };
+      expect(body.error.type).toBe("unknown-actor");
+      expect(body.error.message).toContain("alice.m"); // names the target, so an administrator sees which id was wrong
+    }
+    expect(await deniedCount(id, "alice.m")).toBe(0);
+    // A known account goes through, so the 422 is about the name alone.
+    expect((await visibilityPost(id, "revoke", admin, "alice_m")).status).toBe(204);
+  });
+});
+
+test.skipIf(!DB)("POST /instances/:instanceId/visibility/restore of an unknown account is 204", async () => {
+  const id = await startedBy1("proc_http_visibility_restore");
+  await withDirectory([admin.id], async () => {
+    const res = await visibilityPost(id, "restore", admin, "alice.m");
+    expect(res.status).toBe(204);
+  });
+});
+
+test.skipIf(!DB)("an administrator with no directory entry revokes any target name over HTTP", async () => {
+  const id = await startedBy1("proc_http_visibility_external");
+  // The directory holds user1 only, as a local account beside an external identity provider.
+  await withDirectory([user1.id], async () => {
+    const res = await visibilityPost(id, "revoke", admin, "alice.m");
+    expect(res.status).toBe(204);
+    expect(await deniedCount(id, "alice.m")).toBe(1);
+  });
+});
+
+test.skipIf(!DB)("a caller without standing gets 403 authorization on revoke and grant, never 422, even for an unknown account", async () => {
+  const id = await startedBy1("proc_http_visibility_403_target");
+  // The bystander resolves in the directory, so a target check that ran before
+  // the permission test would answer 422 here.
+  await withDirectory([bystander.id], async () => {
+    for (const route of ["revoke", "grant"] as const) {
+      const res = await visibilityPost(id, route, bystander, "alice.m");
+      expect(res.status).toBe(403);
+      expect(((await res.json()) as { error: { type: string } }).error.type).toBe("authorization");
+    }
+  });
+});
+
+test.skipIf(!DB)("an unknown instance id gets 403 authorization on all three visibility routes, with the body a known instance gives a caller without standing", async () => {
+  const known = await startedBy1("proc_http_visibility_unknown_instance");
+  const missing = "inst_does_not_exist";
+  // The full body, with each call's own instance id replaced by a placeholder.
+  const bodyText = async (res: Response, instanceId: string): Promise<string> => (await res.text()).replaceAll(instanceId, "<instance>");
+  for (const route of ["revoke", "restore", "grant"] as const) {
+    const forKnown = await visibilityPost(known, route, bystander, user1.id);
+    const forMissing = await visibilityPost(missing, route, bystander, user1.id);
+    expect(forKnown.status).toBe(403);
+    expect(forMissing.status).toBe(403);
+    const knownText = await bodyText(forKnown, known);
+    const missingText = await bodyText(forMissing, missing);
+    expect(missingText).toBe(knownText);
+    expect(JSON.parse(missingText)).toEqual({
+      error: { type: "authorization", message: "actor 'user_bystander' may not change visibility of instance '<instance>'" },
+    });
+
+    // An administrator who mistypes the id gets the same refusal, not a 500.
+    const forAdmin = await visibilityPost(missing, route, admin, user1.id);
+    expect(forAdmin.status).toBe(403);
+    expect(((await forAdmin.json()) as { error: { type: string } }).error.type).toBe("authorization");
+  }
+});
+
 test.skipIf(!DB)("submitting an unclaimed assigned step maps to 403 not-claimed", async () => {
   const PID = pid("proc_http_submit_403a");
   await publishBody(PID, assignedBody(), reg, dataSourceReg);

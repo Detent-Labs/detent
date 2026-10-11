@@ -7,7 +7,9 @@ import type { SQL } from "bun";
 import { sql, withTransaction, newInstanceEventId, appendInstanceEvent, appendInstancePrincipals } from "../engine/store.js";
 import type { Actor } from "../cel/eval.js";
 import { can, AuthorizationError } from "../auth/authorize.js";
-import type { InstanceId, InstanceEvent } from "../schema/definition.js";
+import { knownUserIds } from "../auth/users.js";
+import { NotFoundError, UnknownActorError } from "../errors.js";
+import type { Instance, InstanceId, InstanceEvent } from "../schema/definition.js";
 import { loadInstanceForRead } from "./internal.js";
 
 // ============================================================
@@ -28,9 +30,19 @@ export type VisibilityOp = "revoked" | "restored" | "granted";
  * with no code change and no scope inside a role string.
  *
  * Loading the instance first is deliberate: the permission names a process,
- * and only the instance knows which one. A caller with no standing therefore
- * learns nothing an unauthorized read would not already tell them, since the
- * load itself is unauthenticated and the refusal follows it.
+ * and only the instance knows which one. An instance id that resolves to
+ * nothing therefore raises the same `AuthorizationError`, with the same
+ * message text, as a caller with no standing on a known instance, so the
+ * refusal does not say whether the id exists. Any other load failure
+ * propagates unchanged.
+ *
+ * Revoke and grant then check the target against the local account directory,
+ * after the permission test so a caller with no standing learns nothing about
+ * which accounts exist. The check runs only where the acting administrator's
+ * own id resolves in that directory (the rule `delegateClaim` applies to its
+ * target), so a deployment on an external identity provider skips it. Restore
+ * skips it too: an account that left the directory after a revocation must
+ * stay restorable.
  */
 async function changeVisibility(
   instanceId: InstanceId,
@@ -39,9 +51,18 @@ async function changeVisibility(
   op: VisibilityOp,
   db: SQL,
 ): Promise<void> {
-  const { instance } = await loadInstanceForRead(instanceId, db);
-  if (!(await can(actor, "visibility", instance.processId, db))) {
-    throw new AuthorizationError(`actor '${actor.id}' may not change visibility of instance '${instanceId}'`);
+  const refusal = () => new AuthorizationError(`actor '${actor.id}' may not change visibility of instance '${instanceId}'`);
+  let instance: Instance;
+  try {
+    ({ instance } = await loadInstanceForRead(instanceId, db));
+  } catch (err) {
+    if (err instanceof NotFoundError) throw refusal();
+    throw err;
+  }
+  if (!(await can(actor, "visibility", instance.processId, db))) throw refusal();
+  if (op !== "restored") {
+    const known = await knownUserIds([actor.id, targetActorId], db);
+    if (known.has(actor.id) && !known.has(targetActorId)) throw new UnknownActorError(targetActorId);
   }
   await withTransaction(db, async (tx) => {
     if (op === "revoked") {

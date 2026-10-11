@@ -1036,13 +1036,16 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "403":
-          description: The actor holds neither `system:admin` nor a `visibility` grant over this instance's process.
+          description: The actor holds neither `system:admin` nor a `visibility` grant over this instance's process, or the instance does not exist.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
-        "500":
-          description: The instance does not exist, or its pinned version has no published body. Also covers any unrecognized server-side failure.
+        "422":
+          description: >-
+            `actorId` names no account in the deployment's local directory.
+            Checked only where the acting administrator's own id resolves
+            there; an externally issued identity skips the check.
           content:
             application/json:
               schema:
@@ -1081,13 +1084,16 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "403":
-          description: The actor holds neither `system:admin` nor a `visibility` grant over this instance's process.
+          description: The actor holds neither `system:admin` nor a `visibility` grant over this instance's process, or the instance does not exist.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
-        "500":
-          description: The instance does not exist, or its pinned version has no published body. Also covers any unrecognized server-side failure.
+        "422":
+          description: >-
+            `actorId` names no account in the deployment's local directory.
+            Checked only where the acting administrator's own id resolves
+            there; an externally issued identity skips the check.
           content:
             application/json:
               schema:
@@ -1126,13 +1132,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "403":
-          description: The actor holds neither `system:admin` nor a `visibility` grant over this instance's process.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorEnvelope"
-        "500":
-          description: The instance does not exist, or its pinned version has no published body. Also covers any unrecognized server-side failure.
+          description: The actor holds neither `system:admin` nor a `visibility` grant over this instance's process, or the instance does not exist.
           content:
             application/json:
               schema:
