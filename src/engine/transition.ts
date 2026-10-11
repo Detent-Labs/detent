@@ -32,10 +32,11 @@ import {
   makeAssignmentUnresolvedEvent,
   setAuditAttribution,
 } from "./store.js";
-import { idempotencyKey } from "./idempotency.js";
+import { idempotencyKey, subprocessChildId } from "./idempotency.js";
 import {
   SPAWN_ACTION_TYPE,
   RETURN_ACTION_TYPE,
+  CANCEL_CHILD_ACTION_TYPE,
   createDefaultAssignmentRegistry,
   outboxActorsOf,
   resolveStepAssignment,
@@ -54,7 +55,13 @@ import { log } from "../log.js";
  * too — this module imports store.ts, so homing them here would cycle). Existing
  * importers name them from here unchanged.
  */
-export { SPAWN_ACTION_TYPE, RETURN_ACTION_TYPE } from "./registry.js";
+export { SPAWN_ACTION_TYPE, RETURN_ACTION_TYPE, CANCEL_CHILD_ACTION_TYPE } from "./registry.js";
+
+/**
+ * The action id of the row a commit leaving a subprocess step enqueues. Fixed:
+ * the idempotency key adds the commit's sequence, so it is unique per commit.
+ */
+export const CANCEL_CHILD_ACTION_ID = "action_cancel_awaited_child";
 
 /** Resolve an instance's frozen body from its pin. Injected (see resolution.ts ResolveBody). */
 type ResolveBodyFn = (processId: string, version: number) => Promise<ProcessBody | undefined> | ProcessBody | undefined;
@@ -122,7 +129,9 @@ export type OutboxRow = {
  * rows are unconstructible. The rest default to today's behaviour:
  *
  * - `status`: derived (`target.terminal ? "completed" : instance.status`) unless
- *   overridden. Only a cancellation overrides it.
+ *   overridden. Only a cancellation overrides it, and a `"cancelled"` override
+ *   enqueues no cancel row for the awaited child: the cancel sweep of running
+ *   children covers it.
  * - `timers`: a pre-computed armed set, replacing the `armStepTimers` call
  *   against the target step. A supplied set produces no drops of the planner's
  *   own — see `events`.
@@ -131,7 +140,10 @@ export type OutboxRow = {
  * - `suppressSpawn`: omit the `core.spawnSubprocess` enqueue, for a commit
  *   re-entering the step the instance is already parked on (an unsuppressed
  *   re-entry advances the sequence and derives a *different* deterministic
- *   child id, creating a duplicate child). Never inferred from
+ *   child id, so it would cancel the live child as a left visit and spawn a
+ *   replacement). A suppressed entry onto a subprocess step carries
+ *   `instance.awaitedChild` over; onto any other step type it clears it and
+ *   cancels that child. Never inferred from
  *   `target.id === instance.currentStepId`: a genuine self-loop must spawn, and
  *   only the caller knows which this is.
  * - `events`: additional events appended to the plan's event list, so a caller
@@ -189,11 +201,16 @@ export type StepEntryPlan = {
  * outside the planner instead.
  *
  * Every consequence of entering `target` is derived here from `target` alone
- * (status, the armed set, the subprocess spawn, the subprocess return) — never
- * re-implemented by a caller — except the five explicit overrides above, which
- * exist because a synthesized caller sometimes has to vary exactly one of them,
- * and `opts.assignment`, which the caller resolves because a resolver is
- * asynchronous and this function is not.
+ * (status, the armed set, the subprocess spawn, the subprocess return, the
+ * child the entered step awaits) — never re-implemented by a caller — except
+ * the five explicit overrides above, which exist because a synthesized caller
+ * sometimes has to vary exactly one of them, and `opts.assignment`, which the
+ * caller resolves because a resolver is asynchronous and this function is not.
+ *
+ * One consequence depends on the step left instead: when `instance.awaitedChild`
+ * is set and differs from the value computed for `target`, the commit leaves
+ * that child, and the plan enqueues its cancellation. The check reads the
+ * instance's field only and never looks the left step up in `body`.
  */
 export function planStepEntry(
   instance: Instance,
@@ -228,7 +245,17 @@ export function planStepEntry(
   // which deliberately leaves it untouched. No resolver runs here — the planner
   // stays pure and synchronous.
   const assignment = isCarry(opts.assignment) ? instance.assignment : opts.assignment;
-  const next: Instance = { ...entering, timers: armed, assignment };
+  // The child the entered step awaits: the id the spawn below derives, from the
+  // same `nextSeq`. A suppressed spawn creates no new child, so the parked
+  // child stays the awaited one (an identity migration). Any other step awaits
+  // nothing.
+  const awaitedChild: Instance["awaitedChild"] =
+    target.type !== "subprocess"
+      ? null
+      : opts.suppressSpawn
+        ? (instance.awaitedChild ?? null)
+        : (subprocessChildId(instance.instanceId, nextSeq, target.id) as NonNullable<Instance["awaitedChild"]>);
+  const next: Instance = { ...entering, timers: armed, assignment, awaitedChild };
   // Timers the target step declared that arming could not compute a fireAt for
   // (empty when a caller supplied its own armed set). Written in the commit, so
   // a dropped timer cannot be recorded without its entry nor an entry land
@@ -264,6 +291,23 @@ export function planStepEntry(
     actionId: a.id,
     action: a,
   }));
+  // Leaving the awaited child: a timer exit, a migration relocation, or an
+  // unsuppressed re-entry of the same step. The row cancels that child post-
+  // commit (runs its onCancel, cascades to its own children), durably and
+  // at-least-once. A cancel commit leaves the child to the sweep of running
+  // children instead. A return commit reaches here with the field already
+  // cleared by its writeback, so it enqueues nothing.
+  const left = instance.awaitedChild;
+  if (left && left !== awaitedChild && opts.status !== "cancelled") {
+    const cancel = { id: CANCEL_CHILD_ACTION_ID, type: CANCEL_CHILD_ACTION_TYPE, config: { childId: left } };
+    outbox.push({
+      idempotencyKey: idempotencyKey(instance.instanceId, nextSeq, cancel.id),
+      instanceId: instance.instanceId,
+      transitionSeq: nextSeq,
+      actionId: cancel.id,
+      action: cancel,
+    });
+  }
   // Subprocess spawn: entering a subprocess step enqueues a spawn action,
   // dispatched post-commit by the internal handler (child-body resolution +
   // inputMapping + linked child creation). Idempotent via the deterministic
@@ -314,11 +358,13 @@ export function planStepEntry(
 /**
  * Write a planned step entry inside the caller's transaction — never its own.
  * `extraFields` is merged into the instance row alongside the plan's own
- * {currentStepId, transitionSeq, status, timers}, under the same
- * optimistic-concurrency predicate: applying from a stale sequence writes none
- * of it. The ordinary path writes only those four fields plus `resolve_state`;
- * a caller that must also rewrite the instance's pin or payload supplies them
- * here rather than issuing a second statement.
+ * {currentStepId, currentStepEnteredAt, transitionSeq, status, timers,
+ * assignment, awaitedChild}, under the same optimistic-concurrency predicate:
+ * applying from a stale sequence writes none of it. The ordinary path writes
+ * only those seven body fields plus the sequence and scheduling columns,
+ * `resolve_state` and `cancel_sweep_state`; a caller that must also rewrite the
+ * instance's pin or payload supplies them here rather than issuing a second
+ * statement.
  *
  * Every commit landing the instance on a `running` step also durably marks it
  * `resolve_state = 'pending'`, in the same statement as the commit. The
@@ -371,7 +417,7 @@ export function planStepEntry(
 export async function applyStepEntry(tx: SQL, plan: StepEntryPlan, extraFields?: Record<string, unknown>): Promise<Instance> {
   const { instance: next, entry, events, outbox, nextTimerAt } = plan;
   const prevSeq = entry.transitionSeq - 1;
-  // extraFields first: the plan's four fields win a key collision. A caller that
+  // extraFields first: the plan's own fields win a key collision. A caller that
   // patches `transitionSeq` would otherwise write a body sequence disagreeing with
   // the promoted `transition_seq` column and the OCC predicate below, both of which
   // take the plan's value — and rehydrate reads the body. The patch is written
@@ -388,6 +434,9 @@ export async function applyStepEntry(tx: SQL, plan: StepEntryPlan, extraFields?:
     // leave whatever the source step's assignment carried in place instead of
     // clearing it.
     assignment: next.assignment ?? null,
+    // Explicit null for the same reason: a commit leaving a subprocess step
+    // must clear the child it awaited, not keep the source step's value.
+    awaitedChild: next.awaitedChild ?? null,
   };
   const updated = (await tx`UPDATE instances
     SET body = body || ${patch}::jsonb,
