@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { layout, colors, fonts, space } from "form-ui/tokens.stylex";
 import {
@@ -15,9 +15,16 @@ import {
   draftToInput,
   emptyDraft,
   isValidReportName,
+  rememberTypes,
+  syncRowIds,
+  withoutRowId,
+  withRowId,
+  type RememberedTypes,
   type ReportDraft,
 } from "./reportsLogic.js";
 import { describeCaughtError } from "./reportingLogic.js";
+import { useSettledKey } from "./debounce.js";
+import { ComparisonRow } from "./ComparisonRow.js";
 import { ColumnEditor } from "./ColumnEditor.js";
 import { ShareEditor } from "./ShareEditor.js";
 import { ReportTable } from "./ReportTable.js";
@@ -25,10 +32,12 @@ import { ProcessPickerScreen } from "./ProcessPickerScreen.js";
 import { EmptyState, ErrorNote, WaitingNote } from "../components.js";
 import { t } from "../catalog.js";
 import type { UiLocale } from "../../../i18n/locale.js";
-import type { ClientError, ColumnChoice, DataComparison, ReportExecutionResult } from "../api/types.js";
+import type { ClientError, ColumnChoice, ReportExecutionResult, ReportQuery } from "../api/types.js";
 
 const STATUSES = ["running", "completed", "cancelled", "faulted"] as const;
-const OPERATORS = ["eq", "ne", "in"] as const;
+/** The quiet time after the last filter change before the column request goes out. */
+const COLUMN_REQUEST_WAIT_MS = 300;
+const NO_TYPES: RememberedTypes = new Map();
 
 /** `app.css`'s screen/controls/scope/comparison rules, as StyleX. The
  * status checkboxes below keep their own literal inline layout style
@@ -86,28 +95,6 @@ const styles = stylex.create({
     letterSpacing: "0.08em",
     color: colors.textMuted,
   },
-  comparisonRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: space.s2,
-    flexWrap: "wrap",
-    paddingBlock: space.s2,
-    paddingInline: 0,
-    borderBottomWidth: 1,
-    borderBottomStyle: "solid",
-    borderBottomColor: colors.border,
-  },
-  srOnly: {
-    position: "absolute",
-    width: 1,
-    height: 1,
-    padding: 0,
-    margin: -1,
-    overflow: "hidden",
-    clip: "rect(0, 0, 0, 0)",
-    whiteSpace: "nowrap",
-    borderWidth: 0,
-  },
 });
 
 export function ReportBuilderScreen({
@@ -157,14 +144,24 @@ export function ReportBuilderScreen({
 
   // Column choices track the process and the query axes that bound which
   // versions are in range — a status/date-range/comparison change can add or
-  // drop a version, which can add or drop a field from the union.
+  // drop a version, which can add or drop a field from the union. The key is
+  // the complete query, so an incomplete comparison sends nothing, and it
+  // settles 300 ms after the last change. A new process settles at once.
+  const columnKey = draft ? JSON.stringify([draft.processId, draftToInput(draft).query]) : undefined;
+  const settledKey = useSettledKey(draft?.processId, columnKey, COLUMN_REQUEST_WAIT_MS);
+  // Every field type any response named, per process: a comparison that
+  // empties the range keeps its own field's type.
+  const typesRef = useRef<{ processId: string; types: RememberedTypes } | undefined>(undefined);
   useEffect(() => {
-    if (!draft?.processId) return;
+    if (!settledKey) return;
     let cancelled = false;
-    const { query } = draftToInput(draft);
-    fetchReportColumnChoices(draft.processId, query, token)
+    const [processId, query] = JSON.parse(settledKey) as [string, ReportQuery];
+    fetchReportColumnChoices(processId, query, token)
       .then((next) => {
-        if (!cancelled) setChoices(next);
+        if (cancelled) return;
+        const known = typesRef.current?.processId === processId ? typesRef.current.types : NO_TYPES;
+        typesRef.current = { processId, types: rememberTypes(known, next) };
+        setChoices(next);
       })
       .catch(() => {
         if (!cancelled) setChoices([]);
@@ -172,7 +169,15 @@ export function ReportBuilderScreen({
     return () => {
       cancelled = true;
     };
-  }, [draft?.processId, draft?.status, draft?.createdAfter, draft?.createdBefore, draft?.dataWhere, token]);
+  }, [settledKey, token]);
+
+  // One key per comparison row, so a removal never hands one row's text to
+  // the next (`reportsLogic.ts::syncRowIds`).
+  const [rowIds, setRowIds] = useState<string[]>([]);
+  const comparisonCount = draft?.dataWhere.length ?? 0;
+  const syncedIds = syncRowIds(rowIds, comparisonCount);
+  if (syncedIds) setRowIds(syncedIds);
+  const comparisonIds = syncedIds ?? rowIds;
 
   if (loadError) return <ErrorNote error={loadError} locale={locale} />;
   if (reportId && !draft) return <WaitingNote locale={locale} />;
@@ -191,6 +196,8 @@ export function ReportBuilderScreen({
   }
 
   const versionsInRange = allVersionsInRange(choices);
+  // Written only together with `setChoices`, so this draw sees the types of the choices it draws.
+  const types = typesRef.current?.processId === draft.processId ? typesRef.current.types : NO_TYPES;
 
   const runPreview = () => {
     setPreviewLoading(true);
@@ -292,20 +299,25 @@ export function ReportBuilderScreen({
         {draft.dataWhere.length === 0 && <p {...stylex.props(styles.empty)}>{t(locale, "builder.dataWhereEmpty")}</p>}
         {draft.dataWhere.map((cmp, i) => (
           <ComparisonRow
-            key={i}
+            key={comparisonIds[i]}
             comparison={cmp}
             choices={choices}
+            types={types}
             onChange={(next) => setDraft({ ...draft, dataWhere: draft.dataWhere.map((c, j) => (j === i ? next : c)) })}
-            onRemove={() => setDraft({ ...draft, dataWhere: draft.dataWhere.filter((_, j) => j !== i) })}
+            onRemove={() => {
+              setRowIds(withoutRowId(comparisonIds, i));
+              setDraft({ ...draft, dataWhere: draft.dataWhere.filter((_, j) => j !== i) });
+            }}
             locale={locale}
           />
         ))}
         <button
           type="button"
           className="btn btn-secondary"
-          onClick={() =>
-            setDraft({ ...draft, dataWhere: [...draft.dataWhere, { fieldId: choices[0]?.fieldId ?? "", operator: "eq", value: "" }] })
-          }
+          onClick={() => {
+            setRowIds(withRowId(comparisonIds));
+            setDraft({ ...draft, dataWhere: [...draft.dataWhere, { fieldId: choices[0]?.fieldId ?? "", operator: "eq", value: undefined }] });
+          }}
           disabled={choices.length === 0}
         >
           {t(locale, "builder.addComparison")}
@@ -347,52 +359,5 @@ export function ReportBuilderScreen({
       {downloadError && <ErrorNote error={downloadError} locale={locale} />}
       {preview && (draft.columns.length === 0 ? <EmptyState>{t(locale, "builder.columnsEmpty")}</EmptyState> : <ReportTable result={preview} locale={locale} />)}
     </main>
-  );
-}
-
-function ComparisonRow({
-  comparison,
-  choices,
-  onChange,
-  onRemove,
-  locale,
-}: {
-  comparison: DataComparison;
-  choices: ColumnChoice[];
-  onChange: (next: DataComparison) => void;
-  onRemove: () => void;
-  locale: UiLocale;
-}) {
-  return (
-    <div {...stylex.props(styles.comparisonRow)}>
-      <select value={comparison.fieldId} onChange={(e) => onChange({ ...comparison, fieldId: e.target.value })}>
-        {choices.map((c) => (
-          <option key={c.fieldId} value={c.fieldId}>
-            {c.fieldId}
-          </option>
-        ))}
-      </select>
-      <select value={comparison.operator} onChange={(e) => onChange({ ...comparison, operator: e.target.value as DataComparison["operator"] })}>
-        {OPERATORS.map((op) => (
-          <option key={op} value={op}>
-            {t(locale, `builder.op.${op}`)}
-          </option>
-        ))}
-      </select>
-      <label>
-        <span {...stylex.props(styles.srOnly)}>{t(locale, "builder.comparisonValue")}</span>
-        <input
-          type="text"
-          value={typeof comparison.value === "string" ? comparison.value : JSON.stringify(comparison.value)}
-          onChange={(e) =>
-            onChange({ ...comparison, value: comparison.operator === "in" ? e.target.value.split(",").map((s) => s.trim()) : e.target.value })
-          }
-        />
-      </label>
-      {comparison.operator === "in" && <span {...stylex.props(styles.scope)}>{t(locale, "builder.comparisonValueHint")}</span>}
-      <button type="button" className="btn btn-secondary" onClick={onRemove}>
-        {t(locale, "builder.removeComparison")}
-      </button>
-    </div>
   );
 }

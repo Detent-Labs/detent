@@ -2500,6 +2500,56 @@ the rows show the new attributes.
 render. Such a render runs no event handler, so it cannot see focus or a
 committed keystroke.
 
+### The report builder writes typed comparison values
+
+Source: `type-data-comparison-literals` tasks 5.1-5.4.
+
+Publish a process with a number field `amount`, a boolean field and a string
+field. Start instances that hold `amount` 500 and other values. Open
+`/reporting/reports`, choose "New report" and pick that process. Keep the
+network tools open on the `POST /reporting/reports/columns` and
+`POST /reporting/reports/preview` requests.
+
+#### A number compares as a number
+
+Add a column for `amount`. Add a comparison on `amount`, keep "is" and type
+`500`. Press "Preview table". Pass: the request body holds `"value": 500`
+without quotes. The table shows the instances with 500 alone. Switch to "is
+not". Pass: those instances leave the table.
+
+#### The in list
+
+Switch the operator to "is one of". Pass: the hint names the comma. Type
+`500, 7`. Pass: the input keeps `500, 7`, and the preview body holds
+`[500, 7]`. On the string field, type `a,b`. Pass: the input shows `a,b`.
+
+#### The boolean choice
+
+Pick the boolean field. Pass: a Yes/No choice replaces the text input, with
+an empty choice first. Choose Yes. Pass: the preview body holds `true`.
+
+#### The incomplete row
+
+Add a comparison and leave its value empty. Pass: the row takes a dashed
+bottom border and shows no message. Press "Preview table". Pass: the preview
+request body omits that comparison. Type `abc` on `amount`. Pass: the input
+keeps `abc`, the row says the value is not a number, and the next preview
+omits the row.
+
+Type `abc` in a number row, add a second row, then remove the first row.
+Pass: the second row's input is empty.
+
+#### One column request per pause
+
+Clear the comparisons. Add a comparison on `amount` and type `12345` without
+a pause. Pass: the network tools list one column request after the last key.
+Pick another process from a fresh "New report". Pass: its first column
+request goes out at once.
+
+`reporting-comparisonRow.test.tsx` draws each row state through a static
+render, and `reporting-debounce.test.ts` drives the wait with a fake timer.
+Neither sees a real request body or a real keystroke.
+
 ### The instance.transition action's config form (`instance-transition-action`)
 
 Source: `instance-transition-action` tasks 4.1 and 7.5.

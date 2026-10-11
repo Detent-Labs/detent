@@ -4,8 +4,20 @@
  * components stay thin.
  */
 import type { ColumnChoice, DataComparison, MergeReportCell, Report, ReportCell, ReportColumn } from "../api/types.js";
-import { t } from "../catalog.js";
+import { t, type CatalogKey } from "../catalog.js";
 import type { UiLocale } from "../../../i18n/locale.js";
+import {
+  literalText,
+  literalType,
+  parseLiteral,
+  parseLiteralList,
+  sameLiteral,
+  valueTypeOf,
+  type LiteralValue,
+  type ParseFailure,
+  type Parsed,
+  type ValueType,
+} from "../../../shell/literalValue.js";
 
 export type ReportDraft = {
   processId: string;
@@ -37,8 +49,12 @@ export function draftFromReport(report: Report): ReportDraft {
   };
 }
 
-/** The wire shape `createReport`/`updateReport`/`previewReport` accept — `undefined` for every axis left unset rather than an empty value the server would treat as a real filter. */
+/**
+ * The wire shape `createReport`/`updateReport`/`previewReport` accept — `undefined` for every axis left unset rather than an empty value the server would treat as a real filter.
+ * An incomplete comparison stays out, so a preview, a save and a column request never filter on it.
+ */
 export function draftToInput(draft: ReportDraft) {
+  const dataWhere = draft.dataWhere.filter((c) => !comparisonIncomplete(c));
   return {
     processId: draft.processId,
     name: draft.name.trim(),
@@ -46,7 +62,7 @@ export function draftToInput(draft: ReportDraft) {
       status: draft.status.length > 0 ? draft.status : undefined,
       createdAfter: draft.createdAfter || undefined,
       createdBefore: draft.createdBefore || undefined,
-      dataWhere: draft.dataWhere.length > 0 ? draft.dataWhere : undefined,
+      dataWhere: dataWhere.length > 0 ? dataWhere : undefined,
     },
     columns: draft.columns,
     viewers: draft.viewers,
@@ -56,6 +72,124 @@ export function draftToInput(draft: ReportDraft) {
 
 export function isValidReportName(name: string): boolean {
   return name.trim().length > 0;
+}
+
+// ------------------------------------------------------------ comparisons
+//
+// The comparison row writes a value of the compared field's declared type,
+// because the engine compares `jsonb` by type and `"500"` never equals `500`
+// (`reporting-data-tables`). The row-text rules duplicate the studio's
+// `areas/studio/panels/shared/comparisonRow.ts` on purpose: an area never
+// imports another area.
+
+export type Operator = DataComparison["operator"];
+
+/** A comparison the builder has no value for yet. `null` is a value. */
+export function comparisonIncomplete(comparison: DataComparison): boolean {
+  return comparison.value === undefined;
+}
+
+/** Field id to the declared type the last response named for it. A field named without a type maps to `undefined`. */
+export type RememberedTypes = ReadonlyMap<string, string | undefined>;
+
+/**
+ * Adds every field `choices` names to `types`, in a new map. A field the
+ * response no longer names keeps its entry, so a comparison that empties the
+ * range stays editable.
+ */
+export function rememberTypes(types: RememberedTypes, choices: readonly ColumnChoice[]): RememberedTypes {
+  const next = new Map(types);
+  for (const c of choices) next.set(c.fieldId, c.type);
+  return next;
+}
+
+/** A remembered field takes its declared type's value type. A field never named follows its value, and otherwise takes text. */
+export function valueTypeFor(types: RememberedTypes, fieldId: string, value: unknown): ValueType {
+  if (types.has(fieldId)) return literalType(types.get(fieldId));
+  return valueTypeOf(value) ?? "string";
+}
+
+/** A new compared field keeps the value when both fields take the same value type, and clears it otherwise. */
+export function switchComparisonField(comparison: DataComparison, fieldId: string, types: RememberedTypes): DataComparison {
+  const before = valueTypeFor(types, comparison.fieldId, comparison.value);
+  const after = valueTypeFor(types, fieldId, undefined);
+  return { ...comparison, fieldId, value: before === after ? comparison.value : undefined };
+}
+
+/** A switch into or out of `in` clears the value: a list never fits a scalar comparison. A switch between `eq` and `ne` keeps it. */
+export function switchComparisonOperator(comparison: DataComparison, operator: Operator): DataComparison {
+  const crossesList = (comparison.operator === "in") !== (operator === "in");
+  return { ...comparison, operator, value: crossesList ? undefined : comparison.value };
+}
+
+/** A list for `in`, one literal otherwise. */
+export function parseComparisonText(text: string, type: ValueType, operator: Operator): Parsed<LiteralValue | LiteralValue[]> {
+  return operator === "in" ? parseLiteralList(text, type) : parseLiteral(text, type);
+}
+
+/** The catalog key of the reason a row prints, or `undefined` for empty text, which only dashes the row. */
+export function reasonKey(reason: ParseFailure): CatalogKey | undefined {
+  if (reason === "not-number") return "builder.notNumber";
+  if (reason === "not-boolean") return "builder.notBoolean";
+  return undefined;
+}
+
+/** The boolean select's choice for a stored value. Anything but a boolean shows the empty choice. */
+export function booleanChoice(value: unknown): "true" | "false" | "" {
+  return value === true ? "true" : value === false ? "false" : "";
+}
+
+export function valueFromChoice(choice: string): boolean | undefined {
+  return choice === "true" ? true : choice === "false" ? false : undefined;
+}
+
+/** A row's own text, and the last `value` prop it drew with. */
+export interface TextState {
+  text: string;
+  seen: unknown;
+}
+
+export function initialTextState(value: unknown): TextState {
+  return { text: literalText(value), seen: value };
+}
+
+/**
+ * The text a row draws for `value` (design.md decision 2). The row reacts
+ * only when `value` differs from the prop it last saw: it remembers the new
+ * prop and keeps its text when that text parses to it. Text that does not
+ * parse stands for `undefined`. Otherwise the row adopts `literalText(value)`.
+ * An unchanged prop returns `state` itself, so a render-time update cannot
+ * loop, even on a stored value of the wrong type.
+ */
+export function reconcileText(state: TextState, value: unknown, type: ValueType, operator: Operator): TextState {
+  if (sameLiteral(value, state.seen)) return state;
+  const parsed = parseComparisonText(state.text, type, operator);
+  const text = sameLiteral(parsed.ok ? parsed.value : undefined, value) ? state.text : literalText(value);
+  return { text, seen: value };
+}
+
+export type RowId = string;
+
+function nextRowId(): RowId {
+  return `row_${crypto.randomUUID()}`;
+}
+
+/**
+ * Fresh React keys for `count` comparison rows, or `undefined` while
+ * `rowIds` already holds one per row. A keyed row keeps its own text when an
+ * earlier row is removed. A loaded report changes the count and mints new
+ * keys, so every row redraws from its stored value.
+ */
+export function syncRowIds(rowIds: readonly RowId[], count: number): RowId[] | undefined {
+  return rowIds.length === count ? undefined : Array.from({ length: count }, () => nextRowId());
+}
+
+export function withRowId(rowIds: readonly RowId[]): RowId[] {
+  return [...rowIds, nextRowId()];
+}
+
+export function withoutRowId(rowIds: readonly RowId[], index: number): RowId[] {
+  return rowIds.filter((_, i) => i !== index);
 }
 
 // ------------------------------------------------------------ columns
