@@ -25,12 +25,12 @@
 
 ## 3. Spawn and return check the awaited child (B-2)
 
-- [ ] 3.1 Make the spawn return an empty result unless `parent.awaitedChild` equals the derived id (design D4). Verify that the test-instance check and the depth check still run for an awaiting parent.
-- [ ] 3.2 Widen the post-create backstop to cancel a running child whose parent no longer awaits it. Verify with a test where the parent leaves between the gate and the backstop.
-- [ ] 3.3 Make the return do nothing unless `parent.awaitedChild` equals the returning child's id. Keep the `currentStepId` check. Verify that C3's late return changes nothing after C4 starts.
-- [ ] 3.4 Add a `ponytail:` comment at the return gate naming the no-backfill ceiling. Verify with `git grep -n 'ponytail:' -- src`.
-- [ ] 3.5 Rework the tests that use the raw SQL helpers `moveTo` and `relinkChild`, and the direct `spawnCtx` tests. Set `awaitedChild` with the helper where a scenario needs a parent that awaits. Verify that each keeps its scenario and passes.
-- [ ] 3.6 Add tests for a queued spawn whose parent left, and for a first-visit spawn after a re-entry. Add a test for a cancel row that arrives before the spawn. Verify that no child exists for the left visit.
+- [x] 3.1 Make the spawn return an empty result unless `parent.awaitedChild` equals the derived id (design D4). Verify that the test-instance check and the depth check still run for an awaiting parent.
+- [x] 3.2 Widen the post-create backstop to cancel a running child whose parent no longer awaits it. Verify with a test where the parent leaves between the gate and the backstop.
+- [x] 3.3 Make the return do nothing unless `parent.awaitedChild` equals the returning child's id. Keep the `currentStepId` check. Verify that C3's late return changes nothing after C4 starts.
+- [x] 3.4 Add a `ponytail:` comment at the return gate naming the no-backfill ceiling. Verify with `git grep -n 'ponytail:' -- src`.
+- [x] 3.5 Rework the tests that use the raw SQL helpers `moveTo` and `relinkChild`, and the direct `spawnCtx` tests. Set `awaitedChild` with the helper where a scenario needs a parent that awaits. Verify that each keeps its scenario and passes.
+- [x] 3.6 Add tests for a queued spawn whose parent left, and for a first-visit spawn after a re-entry. Add a test for a cancel row that arrives before the spawn. Verify that no child exists for the left visit.
 
 ## 4. The leaving commit cancels the child (B-2)
 
