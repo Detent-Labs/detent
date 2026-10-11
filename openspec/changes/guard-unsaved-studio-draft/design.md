@@ -132,8 +132,8 @@ conflict banner then appears. Nothing gets overwritten silently.
 
 <!-- antislop: allow synonym-rotation -->
 <!-- Discard them and Discard draft are two studio controls with different effects. -->
-Three events clear the stash: "Discard them", a successful save and the Discard
-draft action. The last one matters. A discarded draft restarts its revision
+Four events clear the stash: a restore, "Discard them", a successful save and
+the Discard draft action. The last one matters. A discarded draft restarts its revision
 count at 0. A stale stash with a high revision could otherwise restore over a
 newer draft that reached the same revision number.
 

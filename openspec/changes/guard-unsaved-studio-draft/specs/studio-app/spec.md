@@ -77,7 +77,7 @@ session requirement states, even when the write fails.
 #### Scenario: A clean draft stores nothing
 
 - **WHEN** a request from a draft with no unsaved change answers 401
-- **THEN** nothing exists in storage for that process
+- **THEN** the studio writes nothing to storage
 
 #### Scenario: A failed write does not stop the logout
 
@@ -91,9 +91,10 @@ session requirement states, even when the write fails.
 <!-- Discard draft names a studio control; the copy is a different object. -->
 When the same actor reopens a draft with a differing copy, a notice SHALL offer
 two controls. "Restore unsaved changes" puts the stored body and layout in the
-editor and keeps the stored revision. "Discard them" deletes the copy. A restore
-over newer unsaved changes SHALL ask for confirmation first. A successful save
-or a discard of the draft SHALL delete the copy.
+editor, keeps the stored revision and deletes the copy. "Discard them" deletes
+the copy too. A restore over newer unsaved changes SHALL ask for confirmation
+first. A successful save or a
+discard of the draft SHALL delete the copy.
 
 #### Scenario: The same actor can restore after logging in again
 
@@ -124,6 +125,11 @@ or a discard of the draft SHALL delete the copy.
 
 - **WHEN** a different actor logs in on the same tab and opens that draft
 - **THEN** no notice appears
+
+#### Scenario: Restoring deletes the copy
+
+- **WHEN** the developer chooses "Restore unsaved changes"
+- **THEN** no copy remains for that actor and process
 
 #### Scenario: Choosing "Discard them" deletes the copy
 
