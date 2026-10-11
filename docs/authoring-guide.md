@@ -230,6 +230,8 @@ the browser. A negative `amount` waits until the participant sends the form.
 
 `rule` is a CEL expression. It sees the same data every guard sees, so it can
 compare a field against another: `data.amount <= data.approved_amount`.
+A rule must infer to `bool`. Publishing rejects `data.status` alone and
+accepts `data.status == "ok"`.
 
 A step can override any of these per field. See View, below.
 
@@ -552,6 +554,9 @@ too. Only a literal `true` on both flags trips the rule. A hidden entry
 (`visible: false`) publishes as well, since the engine never resolves
 `required` or `readonly` for a field nobody sees.
 
+A `visible`, `required` or `readonly` expression must infer to `bool`.
+Publishing rejects `data.amount` alone and accepts `data.amount > 1000.0`.
+
 A step can also override a field's validation, in one of two modes. The
 default mode is `merge`. It keeps every catalog bound the step does not name,
 and replaces only the ones it does. The `replace` mode drops the catalog's
@@ -684,6 +689,9 @@ and the engine tries the lowest number first.
 The example gives `book` two automatic paths. `booked` has priority 1 and the
 guard `data.booking_status == 'booked'`. `booking-failed` has priority 2 and
 the guard `data.booking_status == 'failed'`.
+
+A guard must infer to `bool`. Publishing rejects `data.booking_status` alone
+and accepts `data.booking_status == 'booked'`.
 
 A guard never throws. A guard that fails, because a field holds no value yet,
 is not a match. If no automatic path matches, the process waits on the step.

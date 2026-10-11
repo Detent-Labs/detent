@@ -7,14 +7,14 @@
 
 ## 2. Conditions infer to bool (A-4)
 
-- [ ] 2.1 Pass `expect: "bool"` in `collect()` for the guard, the three view flags and both `validation.rule` sites. Verify with new cases in `test/cel.test.ts` for each scenario of "A condition site infers to bool".
-- [ ] 2.2 Cover in those cases a string guard, a `child.outcome` guard, an `int` flag and a `string` rule. Cover a `bool` and a `dyn` condition that pass. Verify each rejecting case names `expected bool`.
-- [ ] 2.3 Add one test that `processBody` still parses a body whose guard reads `data.status` alone. Verify it passes, because the rule lives on the publish path.
-- [ ] 2.4 Change the test "the deadline result-type expectation does not leak into other sites" in `test/cel.test.ts`. Its comment claims that every other site accepts any type. Make it assert that a numeric `Action.output` and a `string` mapping value still pass. Verify it passes.
-- [ ] 2.5 Repair every fixture and test body that publishes a non-bool condition. Read each test name that the full suite reports red. Verify no red test mentions `expected bool` afterwards.
-- [ ] 2.6 Confirm a test compiles each file under `examples/` and runs `validateProcessBody` on it. `test/cel.test.ts` does so for three files only. Add a test that covers all of them. Verify it passes.
-- [ ] 2.7 Add the `bool` rule to the "Every CEL Expression parses" bullets in `.claude/rules/authoring-invariants.md`. Add it to the Expressions section of `.claude/rules/process-contract.md`. Verify with a grep for the new sentence in both files.
-- [ ] 2.8 Teach the rule in `docs/authoring-guide.md`: the Path, View and Validation sections each gain one sentence and one comparison example. Verify the antislop linter reports nothing new on the file.
+- [x] 2.1 Pass `expect: "bool"` in `collect()` for the guard, the three view flags and both `validation.rule` sites. Verify with new cases in `test/cel.test.ts` for each scenario of "A condition site infers to bool".
+- [x] 2.2 Cover in those cases a string guard, a `child.outcome` guard, an `int` flag and a `string` rule. Cover a `bool` and a `dyn` condition that pass. Verify each rejecting case names `expected bool`.
+- [x] 2.3 Add one test that `processBody` still parses a body whose guard reads `data.status` alone. Verify it passes, because the rule lives on the publish path.
+- [x] 2.4 Change the test "the deadline result-type expectation does not leak into other sites" in `test/cel.test.ts`. Its comment claims that every other site accepts any type. Make it assert that a numeric `Action.output` and a `string` mapping value still pass. Verify it passes.
+- [x] 2.5 Repair every fixture and test body that publishes a non-bool condition. Read each test name that the full suite reports red. Verify no red test mentions `expected bool` afterwards.
+- [x] 2.6 Confirm a test compiles each file under `examples/` and runs `validateProcessBody` on it. `test/cel.test.ts` does so for three files only. Add a test that covers all of them. Verify it passes.
+- [x] 2.7 Add the `bool` rule to the "Every CEL Expression parses" bullets in `.claude/rules/authoring-invariants.md`. Add it to the Expressions section of `.claude/rules/process-contract.md`. Verify with a grep for the new sentence in both files.
+- [x] 2.8 Teach the rule in `docs/authoring-guide.md`: the Path, View and Validation sections each gain one sentence and one comparison example. Verify the antislop linter reports nothing new on the file.
 
 ## 3. Literal patterns for matches (A-3)
 

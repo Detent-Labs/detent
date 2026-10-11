@@ -129,6 +129,12 @@ its placement.
   with the message "time function not allowed" (`src/cel/check.ts:161`,
   `:315`).
 - A timer `deadline` must infer to `string` (`check.ts:260-269`).
+- A path `guard`, a `validation.rule` and a view flag (`visible`, `required`
+  or `readonly`) must infer to `bool`. A `dyn` result passes. The engine acts
+  on a condition only when it is `true`. Any other type parks the path or
+  rejects the submission without a message. The check lives on the publish
+  path, in `src/cel/check.ts` behind `validateReferences`. A refinement in
+  `definition.ts` would strand the instances pinned to a published body.
 - No action anywhere in the body carries a `type` with the reserved `core.`
   prefix. The compile pass checks this on both compile branches
   (`compile.ts::checkReservedActionPrefix`). The cancel-sink id/key/outcome

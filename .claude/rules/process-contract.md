@@ -72,6 +72,13 @@ surfaced to a participant. The most common cause is a field the instance
 has not written yet. The instance then waits at that path, the wait-state
 idiom, since nothing matched.
 
+A guard, a `validation.rule` and a view flag (`visible`, `required`,
+`readonly`) must infer to `bool`. A `dyn` result passes. The engine acts on
+a condition only when it is `true`. Any other type parks the path or
+rejects the submission without a message. Publish checks this in
+`src/cel/check.ts`, not in the schema, so a body published earlier keeps
+running.
+
 The library `@marcbachmann/cel-js` pins an exact version in
 `package.json`, with no caret. An upgrade is a deliberate, reviewed
 commit that re-runs `test/cel.test.ts`. An evaluation-semantics change in

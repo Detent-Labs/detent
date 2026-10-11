@@ -250,7 +250,7 @@ function collect(body: ProcessBody): Site[] {
   // Process-wide catalog: validation.rule + default. No step, so no result/child.
   const walkFields = (fs: FieldDef[], loc: string) => {
     fs.forEach((f, i) => {
-      push(f.validation?.rule, `${loc}[${i}].validation.rule`, false, false);
+      push(f.validation?.rule, `${loc}[${i}].validation.rule`, false, false, "bool");
       push(asExpr(f.default), `${loc}[${i}].default`, false, false);
       if (f.fields) walkFields(f.fields, `${loc}[${i}].fields`);
     });
@@ -266,7 +266,9 @@ function collect(body: ProcessBody): Site[] {
     // the same evalOutput path, so they are a checked site like any other.
     outputs(s.onCancel, `${sloc}.onCancel`);
     (s.paths ?? []).forEach((p, pi) => {
-      push(p.guard, `${sloc}.paths[${pi}].guard`, false, child);
+      // A guard, a view flag and a validation rule take effect only when they
+      // yield `true`, so each expects `bool`; any other type is a publish error.
+      push(p.guard, `${sloc}.paths[${pi}].guard`, false, child, "bool");
       outputs(p.onPath, `${sloc}.paths[${pi}].onPath`);
     });
     (s.timers ?? []).forEach((t, ti) => {
@@ -282,15 +284,15 @@ function collect(body: ProcessBody): Site[] {
       outputs(t.onFire.actions, `${sloc}.timers[${ti}].onFire`);
     });
     (s.view?.fields ?? []).forEach((vf, vi) => {
-      push(asExpr(vf.visible), `${sloc}.view.fields[${vi}].visible`, false, child);
+      push(asExpr(vf.visible), `${sloc}.view.fields[${vi}].visible`, false, child, "bool");
       if (isViewField(vf)) {
-        push(asExpr(vf.required), `${sloc}.view.fields[${vi}].required`, false, child);
-        push(asExpr(vf.readonly), `${sloc}.view.fields[${vi}].readonly`, false, child);
+        push(asExpr(vf.required), `${sloc}.view.fields[${vi}].required`, false, child, "bool");
+        push(asExpr(vf.readonly), `${sloc}.view.fields[${vi}].readonly`, false, child, "bool");
         // Unlike the two flags above, this runs during submission against
         // buildGuardContext(body, mergedInstance, actor), which registers no
         // `child` on any step type — so this site takes `child: false` always,
         // not `child` from the enclosing step.
-        push(vf.validation?.rule, `${sloc}.view.fields[${vi}].validation.rule`, false, false);
+        push(vf.validation?.rule, `${sloc}.view.fields[${vi}].validation.rule`, false, false, "bool");
       }
     });
     if (s.subprocess) {

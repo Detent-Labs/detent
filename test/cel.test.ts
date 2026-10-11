@@ -1,9 +1,9 @@
 import { test, expect } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { validateProcessBody, validateMigrationSpec, checkSubprocessChildRefs, parseExpression, parseAst, checkAgainstFields, celType, ACTOR_SCHEMA, type CelIssue } from "../src/cel/check.js";
 import { evalTransforms } from "../src/cel/eval.js";
 import { compileProcessBody } from "../src/schema/compile.js";
-import { instance as instanceSchema, baseFieldType, type ProcessBody, type MigrationSpec, type Instance, type FieldDef } from "../src/schema/definition.js";
+import { instance as instanceSchema, baseFieldType, processBody, type ProcessBody, type MigrationSpec, type Instance, type FieldDef } from "../src/schema/definition.js";
 
 // Minimal ProcessBody builders. validateProcessBody reads only fields /
 // dataSources / workflow.steps, so these cast loosely on purpose — the full
@@ -308,16 +308,22 @@ test("a data source is not visible to a guard either (withheld from every site)"
   expect(issues[0]!.message.toLowerCase()).toContain("unknown variable: users");
 });
 
-// The expectation is scoped to the deadline site only: every other site stays
-// unconstrained, so non-string results elsewhere must still pass.
+// Each expectation is scoped to its own sites: the deadline expects `string`, the
+// condition sites expect `bool`, and an Action.output or subprocess mapping value
+// carries no expectation. A number and a string there must still pass.
 test("the deadline result-type expectation does not leak into other sites", () => {
   const step = {
     id: "step_a",
     key: "a",
     label: { en: "A" },
-    type: "task",
+    type: "subprocess",
     // Action.output writeback: a double, not a string.
-    onEntry: [{ id: "action_a", type: "http", config: {}, output: { field_amount: { lang: "cel", src: "result.total" } } }],
+    onEntry: [{ id: "action_a", type: "http", config: {}, output: { field_amount: { lang: "cel", src: "1.5" } } }],
+    // Subprocess mappings: a string, not a bool.
+    subprocess: {
+      inputMapping: { field_note: { lang: "cel", src: "data.note" } },
+      outputMapping: { field_note: { lang: "cel", src: "child.outcome" } },
+    },
     // View flags: booleans.
     view: {
       fields: [
@@ -337,6 +343,12 @@ test("the deadline result-type expectation does not leak into other sites", () =
     timers: [{ id: "timer_a", deadline: { lang: "cel", src: "data.due_at" }, onFire: { actions: [] } }],
   };
   expect(validateProcessBody(body({ fields: typedFields, steps: [step] }))).toEqual([]);
+
+  // Control: the same body with a string guard fails at the guard alone, so the
+  // sites are collected together and each keeps its own expectation.
+  const control = { ...step, paths: [{ ...step.paths[0]!, guard: { lang: "cel", src: "data.note" } }] };
+  const issues = validateProcessBody(body({ fields: typedFields, steps: [control] }));
+  expect(issues.map((i) => i.loc)).toEqual(["steps[0].paths[0].guard"]);
 });
 
 // 5.6 no wall-clock access: now() and the pure time constructors are all blocked
@@ -353,14 +365,124 @@ test("accepts a well-typed guard", () => {
   expect(validateProcessBody(body({ steps: [guardStep("data.booking_status == 'booked'")] }))).toEqual([]);
 });
 
+// A condition site infers to bool. The engine acts on a guard, a view flag or a
+// validation rule only when it evaluates to `true`; any other type parks the path
+// or rejects the submission without a message, so the mistake is a publish error.
+const condFields = [...typedFields, field("status", "string"), field("count", "number", "integer")];
+const condIssues = (steps: unknown[]) => validateProcessBody(body({ fields: condFields, steps }));
+const viewStep = (entry: Record<string, unknown>) => ({
+  id: "step_a",
+  key: "a",
+  label: { en: "A" },
+  type: "task",
+  terminal: true,
+  view: { fields: [entry] },
+});
+
+test("rejects a string-typed guard, on an automatic and on a manual path", () => {
+  const automatic = condIssues([guardStep("data.status")]);
+  expect(automatic.map((i) => i.loc)).toEqual(["steps[0].paths[0].guard"]);
+  expect(automatic[0]!.message).toBe("expected bool, got string");
+
+  const manual = guardStep("data.status");
+  const manualPath = { ...manual.paths[0]!, trigger: "manual" };
+  const issues = condIssues([{ ...manual, paths: [manualPath] }]);
+  expect(issues.map((i) => i.loc)).toEqual(["steps[0].paths[0].guard"]);
+  expect(issues[0]!.message).toBe("expected bool, got string");
+});
+
+test("rejects a guard that reads child.outcome alone on a subprocess step", () => {
+  const issues = condIssues([guardStep("child.outcome", "subprocess")]);
+  expect(issues.map((i) => i.loc)).toEqual(["steps[0].paths[0].guard"]);
+  expect(issues[0]!.message).toBe("expected bool, got string");
+});
+
+test("rejects an int-typed visible, required and readonly flag", () => {
+  for (const flag of ["visible", "required", "readonly"]) {
+    const issues = condIssues([viewStep({ ref: "field_amount", [flag]: cel("data.count") })]);
+    expect(issues.map((i) => i.loc)).toEqual([`steps[0].view.fields[0].${flag}`]);
+    expect(issues[0]!.message).toBe("expected bool, got int");
+  }
+});
+
+test("rejects an int-typed visible flag on a note", () => {
+  const note = { kind: "note", text: { en: "n" }, visible: cel("data.count") };
+  const issues = condIssues([viewStep(note)]);
+  expect(issues.map((i) => i.loc)).toEqual(["steps[0].view.fields[0].visible"]);
+  expect(issues[0]!.message).toBe("expected bool, got int");
+});
+
+test("rejects a string-typed validation.rule, in the catalog and on a step", () => {
+  const withRule = { ...field("amount", "number"), validation: { rule: cel("data.status") } };
+  const catalog = validateProcessBody(body({ fields: [withRule, field("status", "string")], steps: [] }));
+  expect(catalog.map((i) => i.loc)).toEqual(["fields[0].validation.rule"]);
+  expect(catalog[0]!.message).toBe("expected bool, got string");
+
+  const step = condIssues([ruleStep("data.status")]);
+  expect(step.map((i) => i.loc)).toEqual(["steps[0].view.fields[0].validation.rule"]);
+  expect(step[0]!.message).toBe("expected bool, got string");
+});
+
+test("accepts a bool-typed condition at every site", () => {
+  expect(condIssues([guardStep('data.status == "ok"')])).toEqual([]);
+  expect(condIssues([guardStep("data.approved")])).toEqual([]);
+  expect(condIssues([guardStep("child.outcome == 'ok'", "subprocess")])).toEqual([]);
+  for (const flag of ["visible", "required", "readonly"]) {
+    expect(condIssues([viewStep({ ref: "field_amount", [flag]: cel("data.approved") })])).toEqual([]);
+  }
+  expect(condIssues([ruleStep('data.status == "ok"')])).toEqual([]);
+  const withRule = { ...field("amount", "number"), validation: { rule: cel("data.amount > 0.0") } };
+  expect(validateProcessBody(body({ fields: [withRule], steps: [] }))).toEqual([]);
+});
+
+test("accepts a dyn-typed condition at every site", () => {
+  expect(condIssues([guardStep("data.receipt")])).toEqual([]);
+  for (const flag of ["visible", "required", "readonly"]) {
+    expect(condIssues([viewStep({ ref: "field_amount", [flag]: cel("data.receipt") })])).toEqual([]);
+  }
+  expect(condIssues([ruleStep("data.receipt")])).toEqual([]);
+  const withRule = { ...field("amount", "number"), validation: { rule: cel("data.receipt") } };
+  expect(validateProcessBody(body({ fields: [withRule, field("receipt", "file")], steps: [] }))).toEqual([]);
+});
+
+// The rule runs on the publish path (check.ts behind validateReferences), not in the
+// Zod schema: a body published before the rule keeps reading, and its pinned
+// instances keep running.
+test("processBody still parses a body whose guard reads data.status alone", () => {
+  const stored = {
+    key: "legacy",
+    label: { en: "Legacy" },
+    baseLocale: "en",
+    fields: [{ id: "field_status", key: "status", label: { en: "Status" }, type: "string" }],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        {
+          id: "step_a",
+          key: "a",
+          label: { en: "A" },
+          type: "task",
+          paths: [
+            { id: "path_go", key: "go", label: "Go", to: "step_b", trigger: "automatic", priority: 1, guard: cel("data.status") },
+          ],
+        },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
+      ],
+    },
+  };
+  expect(() => processBody.parse(stored)).not.toThrow();
+});
+
 // Every shipped example must survive the check, since publish now enforces it —
 // an example that cannot be published is not an example. Checked against the
 // COMPILED body, which is what publishBody hands to validateProcessBody.
-test.each([
-  "expense-approval.json",
-  "subprocess-credit-check-child.json",
-  "subprocess-loan-parent.json",
-])("accepts the real %s example", (name) => {
+const exampleFiles = readdirSync(new URL("../examples/", import.meta.url)).filter((f) => f.endsWith(".json"));
+
+test("examples/ holds the shipped example files", () => {
+  expect(exampleFiles.length).toBeGreaterThanOrEqual(9);
+});
+
+test.each(exampleFiles)("accepts the real %s example", (name) => {
   const json = JSON.parse(readFileSync(new URL(`../examples/${name}`, import.meta.url), "utf8"));
   const authored = (json.definition ?? json) as ProcessBody;
   expect(validateProcessBody(compileProcessBody(authored))).toEqual([]);
@@ -431,7 +553,8 @@ test("checkAgainstFields rejects a syntax error the same way validateProcessBody
 
 // ---- migration transforms (cel-expressions delta) ----------------------------
 // A transform's identifiers resolve against the SOURCE catalog; its result type is
-// checked against the TARGET field it writes. cel(...) shortens an expression.
+// checked against the TARGET field it writes. cel(...) shortens an expression, and
+// the condition-site tests above call it as well.
 const cel = (src: string) => ({ lang: "cel", src });
 const migBody = (fields: { key: string; type: string | object }[], dataSources?: any[]): ProcessBody =>
   ({
