@@ -37,8 +37,8 @@
 
 ## 5. Records
 
-- [ ] 5.1 Delete the `harden-cel-check-sites` entry from the audit index in `docs/decisions.md`. Verify a grep finds no such entry and the neighbors stay.
-- [ ] 5.2 Delete the `process.start` sentences from FIELDS-17 and FIELDS-22 in `docs/decisions.md`. FIELDS-17 keeps its `valueFromField` and `instanceIdField` part. Verify the antislop linter reports nothing new.
+- [x] 5.1 Delete the `harden-cel-check-sites` entry from the audit index in `docs/decisions.md`. Verify a grep finds no such entry and the neighbors stay.
+- [x] 5.2 Delete the `process.start` sentences from FIELDS-17 and FIELDS-22 in `docs/decisions.md`. FIELDS-17 keeps its `valueFromField` and `instanceIdField` part. Verify the antislop linter reports nothing new.
 
 ## 6. Verification
 
