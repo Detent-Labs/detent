@@ -20,8 +20,11 @@ visit that owns the live child. It would cancel that child and spawn a replaceme
 Idempotency protects redelivery of one commit, not a second commit onto one step.
 
 The suppressed migration SHALL also carry the parent's `awaitedChild` over
-unchanged. The sequence advanced. The carried value is the only record that the
-existing child is still awaited.
+unchanged while the target step is still a subprocess step. The sequence advanced.
+The carried value is the only record that the existing child is still awaited. A
+kept step id whose target is another step type leaves the subprocess step. That
+migration clears the field and enqueues the cancellation (see "A relocation off a
+subprocess step whose spawn is still queued commits").
 
 A migration that relocates the instance onto a subprocess step it was not on SHALL
 spawn normally: that is a genuine entry.
@@ -43,6 +46,65 @@ spawn normally: that is a genuine entry.
 - **WHEN** an instance is relocated onto a subprocess step it was not previously on
 - **THEN** the spawn is enqueued and a linked child is created
 
+### Requirement: A relocation off a subprocess step with a live child is deferred
+
+A migration that vacates a **subprocess-typed** source step SHALL check whether
+that step has a live linked child, and SHALL skip the instance when one exists rather than commit the
+relocation. A migration vacates the step when the step id changes, and when a kept id's target
+is another step type. A child is **live** when its `status` is `running`, OR when it holds any undelivered outbox
+row — a terminal child whose `core.returnSubprocess` return has not yet delivered. The skip is
+transient: the instance keeps its pin and step, is recorded as a `migration.skipped` event with the
+`child-in-flight` reason, and is migrated by a later invocation once the child settles.
+
+The engine SHALL NOT repoint a child's `parent.stepId` under migration. Repointing a live child
+misdirects its pending return: relocating onto another subprocess step lets the old child's return
+drive the parent off the new step under that step's `outputMapping` — orphaning the genuinely-spawned
+new child — while relocating onto a non-subprocess step makes the return dead-letter (`return: not a
+subprocess step`), orphaning the child forever. Declining is chosen over reconciling, consistent with
+the in-flight-actions gate: a pending return is keyed to the enqueuing version's step and contract, so
+re-pointing it is a snapshot-versus-live race preserving a result a later invocation delivers anyway.
+
+A settled child — terminal with every outbox row delivered, including the parked-forever
+`outcome-unmatched` case — SHALL NOT block the migration and SHALL NOT have its link repointed. A
+settled child's `parent.stepId` is inert: `core.returnSubprocess` no longer fires for it, and the only
+other reader, `cancelInstance`'s cascade sweep, keys on `parent.instanceId` and `status = 'running'`,
+never on `parent.stepId`.
+
+#### Scenario: A running child blocks the parent's relocation
+
+- **WHEN** a parent parked at a subprocess step with a running child is relocated to a different step
+- **THEN** the instance is not migrated, keeps its pin and step, and is recorded as skipped with the
+  `child-in-flight` reason
+
+#### Scenario: A kept step id with a new step type defers while the child runs
+
+- **WHEN** the plan keeps the step id of a parked subprocess step but the target
+  version declares it as another step type, and the child is running
+- **THEN** the instance is skipped with the `child-in-flight` reason
+- **AND** the migration cancels nothing
+
+#### Scenario: A terminal child with an undelivered return blocks the relocation
+
+- **WHEN** the child has reached a terminal step but its `core.returnSubprocess` row is not yet
+  delivered, and the parent is relocated to a different step
+- **THEN** the instance is skipped with the `child-in-flight` reason, and the child's link is unchanged
+
+#### Scenario: A settled child does not block the relocation and is not repointed
+
+- **WHEN** the parent is relocated off a subprocess step whose child is terminal with all outbox rows
+  delivered
+- **THEN** the instance migrates normally and the child's `parent.stepId` is left unchanged
+
+#### Scenario: A later invocation migrates the parent once the child settles
+
+- **WHEN** the blocking child settles and the migration is invoked again
+- **THEN** the parent migrates normally
+
+#### Scenario: A relocation off a non-subprocess step is unaffected
+
+- **WHEN** an instance not on a subprocess step is relocated
+- **THEN** the live-child gate does not apply and the migration proceeds
+
 ## ADDED Requirements
 
 ### Requirement: A relocation off a subprocess step whose spawn is still queued commits
@@ -54,12 +116,11 @@ lease, does not block it. A live-claimed row still defers the migration as
 parent's `awaitedChild` and enqueues the cancellation of that child. The queued
 spawn then finds the parent no longer awaiting its child and creates nothing.
 
-The live-child gate applies whenever the parent leaves a subprocess step. That
-covers a changed step id and a kept id whose step is no longer a subprocess
-step. A live child defers the migration with the `child-in-flight` reason, and a
-migration SHALL NOT cancel a running child. The gate SHALL NOT widen to an
-undelivered spawn row. A dead-lettered spawn would then block the migration of
-the parent an operator wants to move.
+The live-child gate (see "A relocation off a subprocess step with a live child is
+deferred") still defers the migration while a child is live, and a migration SHALL
+NOT cancel a running child. The gate SHALL NOT widen to an undelivered spawn row.
+A dead-lettered spawn would then block the migration of the parent an operator
+wants to move.
 
 #### Scenario: A queued spawn does not block the relocation
 
@@ -78,9 +139,8 @@ the parent an operator wants to move.
   relocated off the step
 - **THEN** the instance is skipped with the `child-in-flight` reason, as before
 
-#### Scenario: A kept step id with a new step type defers while the child runs
+#### Scenario: A type flip with a settled child clears the awaited child
 
 - **WHEN** the plan keeps the step id of a parked subprocess step but the target
-  version declares it as another step type, and the child is running
-- **THEN** the instance is skipped with the `child-in-flight` reason
-- **AND** the migration cancels nothing
+  version declares it as another step type, and the child is settled
+- **THEN** the instance migrates and its `awaitedChild` is cleared

@@ -105,8 +105,9 @@ None.
   definition. No new publish rule.
 - Rules and docs: `.claude/rules/process-contract.md`,
   `.claude/rules/authoring-invariants.md`, `docs/authoring-guide.md`,
-  `README.md`, and `docs/decisions.md`. The commit that archives this change
-  deletes its entry from the audit index.
+  `README.md`, `docs/decisions.md`, and the Purpose of
+  `openspec/specs/automatic-transitions/spec.md`. The commit that archives
+  this change deletes its entry from the audit index.
 - Tests: `test/subprocess.test.ts` (reworked raw-SQL helpers, new cases for
   R1 and R2), `test/migration.test.ts`, `test/transition.test.ts`,
   `test/registry-check.test.ts`, `test/cel.test.ts`, and

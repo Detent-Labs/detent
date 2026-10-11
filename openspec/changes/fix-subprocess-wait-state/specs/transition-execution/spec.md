@@ -19,9 +19,12 @@ Every consequence of committing a transition onto a step SHALL apply to a
 synthesized transition identically to an authored one, because each is a function of
 the step being **entered** rather than of how it was entered: the instance's
 resulting `status`, the subprocess spawn, the subprocess return, the child a
-subprocess step awaits and the cancellation of the child a commit leaves, the
-enqueue of the supplied actions, the appended `HistoryEntry`, the armed timer set,
-and the scheduling column.
+subprocess step awaits, the enqueue of the supplied actions, the appended
+`HistoryEntry`, the armed timer set, and the scheduling column.
+
+The cancellation of the child a commit leaves depends on the step **left**, not on
+the step entered. A timer-forced or migration transition enqueues it. A synthesized
+cancel commit omits it, because the sweep of running children covers it.
 
 This is scoped to transitions. Instance creation is a separate step-entry path that
 does not route through the shared commit and therefore does not inherit these
@@ -50,8 +53,8 @@ parent parked on a subprocess step with no child.
 - **THEN** the synthesized transition is rejected as a concurrency conflict and leaves no partial write
 
 #### Scenario: A synthesized transition off a subprocess step cancels its child
-- **WHEN** a synthesized transition leaves a subprocess step whose parent awaits a child
-- **THEN** the commit clears the awaited child and enqueues the child's cancellation, exactly as an authored transition does
+- **WHEN** a timer-forced or migration transition leaves a subprocess step whose parent awaits a child
+- **THEN** the commit clears the awaited child and enqueues the child's cancellation
 
 #### Scenario: A cancel commit enqueues no leaving cancellation
 - **WHEN** a cancellation commits the parked parent onto the cancel sink
@@ -72,8 +75,9 @@ behaviour:
 - the **definition version recorded** on the `HistoryEntry` and on any `timer.unarmed`
   events, defaulting to the instance's version.
 - **suppression of the subprocess spawn**, for a commit re-entering the step the
-  instance is already parked on. A suppressed spawn also carries the awaited child
-  over, so the live child stays the one the parent waits for.
+  instance is already parked on. A suppressed spawn onto a subprocess target also
+  carries the awaited child over, so the live child stays the one the parent waits
+  for. A suppressed spawn onto another step type clears it.
 - **additional events** to append in the commit transaction. A caller supplying its own
   timer set produces no drops of the planner's own but may have computed drops while
   deriving that set; without this channel it could only record them by mutating the

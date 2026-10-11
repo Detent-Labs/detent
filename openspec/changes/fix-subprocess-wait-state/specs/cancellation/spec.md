@@ -24,10 +24,13 @@ admin outbox.
 
 The cancellation SHALL act on the child's status as follows. A `running` child is
 cancelled. A `cancelled` child resumes any sweep of its own running children that
-an earlier call left incomplete. A missing child, a `completed` or `faulted`
-child, and a child that names another instance as its parent get no action. A
-conflict with the child's own concurrent commit SHALL retry through the outbox.
-An unresolvable child body and an incomplete sweep SHALL retry too.
+an earlier call left incomplete. These get no action: a missing child, a
+`completed` or `faulted` child, a child with no `parent` link, and a child that
+names another instance as its parent.
+
+The child's own `cancellable` flag never blocks the cancellation, as for the
+sweep. A conflict with the child's own concurrent commit SHALL retry through the
+outbox. An unresolvable child body and an incomplete sweep SHALL retry too.
 
 A cancel commit of the parent itself SHALL NOT enqueue this row. The existing
 sweep of running children covers it.
@@ -67,7 +70,8 @@ child, so the return SHALL be a no-op.
 - **WHEN** the awaited child is already `cancelled`, and its own sweep left a
   grandchild running
 - **THEN** the cancellation cancels that grandchild
-- **AND** the delivery retries until the child's sweep completes
+- **AND** the delivery succeeds once `cancel_sweep_state` is `done`, and throws
+  while it stays `pending`
 
 #### Scenario: A child that finished before the cancel is left alone
 

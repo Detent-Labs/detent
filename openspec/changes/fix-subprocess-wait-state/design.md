@@ -46,8 +46,8 @@ only the current mechanics the design must respect.
   an instance that faulted before this change.
 - No backfill for an instance parked on a subprocess step before this change.
   The pre-1.0 stage allows that. See Migration Plan.
-- No change to the live-child gate. A migration still defers while a child is
-  live.
+- No change to what makes a child live, to the `child-in-flight` reason, or to
+  queued spawn rows. D5 changes only when the gate runs.
 - No change to `resolve_state` marking. A subprocess target keeps its
   `pending` mark, and the worker clears it with a cheap pass.
 - No new event kind. A return or spawn that finds the parent moved on stays a
@@ -180,8 +180,9 @@ The cancel row then never reaches a running child.
 
 An identity migration of a subprocess step still skips the gate.
 
-The gate does not widen to a queued spawn row. A dead-lettered spawn would
-then block the parent an operator wants to move.
+The ruling refused the widening to a queued spawn row. A dead-lettered spawn
+would then block the parent an operator wants to move. The condition above
+serves the ruling's second clause, "a migration cancels nothing".
 
 The reverse flip is out of scope. A plan can keep a step id and turn a task
 step into a subprocess step. The migration then suppresses the spawn as an
