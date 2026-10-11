@@ -5,9 +5,10 @@
 A path guard, a `validation.rule` and a view flag SHALL infer to `bool` at
 publish. The view flags are `visible`, `required` and `readonly`. A `dyn`
 result stays admissible. The engine acts on a result
-only when it is `true`. Any other type parks the path or rejects the
-submission without a message. The check runs on the publish path, as the other
-CEL checks do.
+only when it is `true`. Any other type counts as false without a message. A
+guard then parks the path, and a rule rejects the submission.
+
+The check runs on the publish path, as the other CEL checks do.
 
 #### Scenario: Publish rejects a string-typed guard
 
@@ -18,6 +19,11 @@ CEL checks do.
 
 - **WHEN** a subprocess step's path guard reads `child.outcome` alone
 - **THEN** publish fails with a CEL issue at that guard, naming `expected bool, got string`
+
+#### Scenario: Publish rejects a typed child output used alone as a guard
+
+- **WHEN** a subprocess step's path guard reads `child.data.amount` alone, and the resolved child's contract types `amount` as a `number`
+- **THEN** the cross-process check reports a CEL issue at that guard, naming `expected bool, got double`
 
 #### Scenario: Publish rejects a non-bool view flag
 

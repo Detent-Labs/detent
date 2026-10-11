@@ -87,11 +87,15 @@ import from the engine would invert the layering.
 **3. `bool` reuses the existing `expect` plumbing.** The guard, the three view
 flags and both `validation.rule` sites pass `expect: "bool"`. Those two sites
 are the catalog rule and the step rule. `checkSite` already accepts `dyn` and
-words the failure `expected bool, got string`.
+words the issue as `expected bool, got string`.
 
-`checkSubprocessChildRefs` stays as it is. The first pass already reports a
-non-bool guard, so a second report at the same location would duplicate it.
-The migration transform keeps its own expectation, the target field's type.
+`checkSubprocessChildRefs` carries the expectation on its guard too. The first
+pass types `child.data` as `dyn`, so it accepts a guard that reads a typed child
+output alone, such as `child.data.amount`. The second pass types that output,
+so it must demand `bool`. A string guard on a subprocess step then draws the
+same issue from both passes. The function `validateReferences` drops an issue
+that repeats the location and message of one it holds. The migration transform keeps its own
+expectation: the target field's type.
 
 **4. One AST helper replaces two copies, and `matches` joins it.** A new
 `astProblem(ast)` returns the first message among the time-function ban, the
