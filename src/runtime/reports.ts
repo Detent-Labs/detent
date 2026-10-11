@@ -13,7 +13,7 @@ import type { Actor } from "../cel/eval.js";
 import { ADMIN_ROLE, AuthorizationError, can } from "../auth/authorize.js";
 import { actorPrincipals, getGroupMembers } from "../auth/groups.js";
 import { leafFields } from "../schema/definition.js";
-import type { FieldId, InstanceId, InstanceStatus, Literal, ProcessId } from "../schema/definition.js";
+import type { BaseFieldType, FieldId, InstanceId, InstanceStatus, Literal, ProcessId } from "../schema/definition.js";
 import { buildDataWhere, buildInstanceWhere, queryInstances } from "./queries.js";
 import type { DataComparison, InstanceDataItem, InstanceQueryFilter, InstanceWhereFilter } from "./queries.js";
 
@@ -238,18 +238,23 @@ export async function listMyReports(actor: Actor, db: SQL = sql): Promise<Report
 // Report execution
 // ------------------------------------------------------------
 
-export type ColumnChoice = { fieldId: FieldId; versions: number[] };
+/** `type` is the declared base type of the field's newest declaring version; a plugin-typed field has none. */
+export type ColumnChoice = { fieldId: FieldId; versions: number[]; type?: BaseFieldType };
+
+/** A version's declared field ids, each with its base type. A plugin envelope has no base type, so it maps to `undefined`. */
+type DeclaredFields = Map<FieldId, BaseFieldType | undefined>;
 
 /**
  * Every field id declared by a version of `processId` that has at least one
  * in-range instance, keyed by that version — the per-version half of the
  * column-choice union below, and the same per-instance lookup
  * `executeReport`'s cell-state computation needs to tell "no value" from
- * "not in this version" apart. Built from `leafFields`: a `type: "group"`
- * container carries no value of its own, so offering one as a column choice
- * would only ever render empty.
+ * "not in this version" apart. Each id carries its declared base type for
+ * the column choice. Built from `leafFields`: a `type: "group"` container
+ * carries no value of its own, so offering one as a column choice would
+ * only ever render empty.
  */
-async function resolveVersionCoverage(processId: ProcessId, query: ReportQuery, db: SQL): Promise<Map<number, Set<FieldId>>> {
+async function resolveVersionCoverage(processId: ProcessId, query: ReportQuery, db: SQL): Promise<Map<number, DeclaredFields>> {
   const filter: InstanceWhereFilter = {
     processId,
     status: query.status,
@@ -262,29 +267,38 @@ async function resolveVersionCoverage(processId: ProcessId, query: ReportQuery, 
   `) as { version: number }[];
 
   const store = createDefinitionStore(db);
-  const coverage = new Map<number, Set<FieldId>>();
+  const coverage = new Map<number, DeclaredFields>();
   for (const { version } of rows) {
     const body = await store.resolveBody(processId, version);
     // A version that no longer resolves contributes no fields — the same
     // "resolves to nothing" treatment a dangling reference gets elsewhere.
     if (!body) continue;
-    coverage.set(version, new Set(leafFields(body.fields).map((f) => f.id)));
+    coverage.set(
+      version,
+      new Map(leafFields(body.fields).map((f): [FieldId, BaseFieldType | undefined] => [f.id, typeof f.type === "string" ? f.type : undefined])),
+    );
   }
   return coverage;
 }
 
-/** The union of every in-range version's field catalog, each field tagged with which versions declare it — the choices a report builder offers. */
+/**
+ * The union of every in-range version's field catalog, each field tagged with which versions declare it and
+ * the base type its newest declaring version gives it — the choices a report builder offers.
+ */
 export async function resolveReportColumnChoices(processId: ProcessId, query: ReportQuery, db: SQL = sql): Promise<ColumnChoice[]> {
   const coverage = await resolveVersionCoverage(processId, query, db);
-  const byField = new Map<FieldId, Set<number>>();
-  for (const [version, fieldIds] of coverage) {
-    for (const fieldId of fieldIds) {
-      const versions = byField.get(fieldId);
-      if (versions) versions.add(version);
-      else byField.set(fieldId, new Set([version]));
+  const byField = new Map<FieldId, { versions: number[]; type: BaseFieldType | undefined }>();
+  // Ascending, so each field's `versions` come out sorted and the last version to declare it sets its type.
+  for (const [version, declared] of [...coverage].sort(([a], [b]) => a - b)) {
+    for (const [fieldId, type] of declared) {
+      const entry = byField.get(fieldId);
+      if (entry) {
+        entry.versions.push(version);
+        entry.type = type;
+      } else byField.set(fieldId, { versions: [version], type });
     }
   }
-  return [...byField.entries()].map(([fieldId, versions]) => ({ fieldId, versions: [...versions].sort((a, b) => a - b) }));
+  return [...byField].map(([fieldId, { versions, type }]) => (type ? { fieldId, versions, type } : { fieldId, versions }));
 }
 
 /** Same check every draft/saved-report read applies: an actor with no `read` grant on the target process sees no real data, from a preview or a saved execution alike. */
@@ -317,7 +331,7 @@ function emptyResultColumn(c: ReportColumn): ReportResultColumn {
  * `redactable` flag. Otherwise: not declared by the instance's own pinned
  * version's catalog, or declared but never written.
  */
-function fieldCell(item: InstanceDataItem, fieldId: FieldId, declared: Set<FieldId> | undefined): ReportCell {
+function fieldCell(item: InstanceDataItem, fieldId: FieldId, declared: DeclaredFields | undefined): ReportCell {
   if (item.redactedAt) return { kind: "redacted" };
   if (!declared?.has(fieldId)) return { kind: "not-in-version" };
   const value = item.data[fieldId];
@@ -333,7 +347,7 @@ function fieldCell(item: InstanceDataItem, fieldId: FieldId, declared: Set<Field
  * `no-value`, not a `value` of `""`, so an empty merge cell reads the same
  * distinct way a direct field's empty cell does.
  */
-function mergeCell(item: InstanceDataItem, fieldIds: FieldId[], declared: Set<FieldId> | undefined): MergeReportCell {
+function mergeCell(item: InstanceDataItem, fieldIds: FieldId[], declared: DeclaredFields | undefined): MergeReportCell {
   if (item.redactedAt) return { kind: "redacted" };
   const values = fieldIds
     .filter((id) => declared?.has(id))

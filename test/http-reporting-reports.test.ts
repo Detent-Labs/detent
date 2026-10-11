@@ -178,8 +178,9 @@ test.skipIf(!DB)("POST /reporting/reports/columns returns column choices, empty 
 
   const withRead = await fetch(req("http://x/reporting/reports/columns", adminReports, "POST", { processId: P }));
   expect(withRead.status).toBe(200);
-  const withReadBody = (await withRead.json()) as { choices: { fieldId: string }[] };
+  const withReadBody = (await withRead.json()) as { choices: { fieldId: string; type?: string }[] };
   expect(withReadBody.choices.map((c) => c.fieldId)).toContain("field_x");
+  expect(withReadBody.choices.find((c) => c.fieldId === "field_x")?.type).toBe("string");
 
   const noRead = await fetch(req("http://x/reporting/reports/columns", owner, "POST", { processId: P }));
   expect(((await noRead.json()) as { choices: unknown[] }).choices).toEqual([]);
