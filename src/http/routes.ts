@@ -504,9 +504,11 @@ export async function handleListInstances(req: Request, resolver: ActorResolver,
         version: versionRaw !== null ? parseVersion(versionRaw, "version") : undefined,
         status: parseStatuses(url),
         currentStepId: (url.searchParams.get("currentStepId") as StepId) ?? undefined,
-        // scope=started applies no assignment predicate of its own. An explicit
-        // assignedTo still narrows conjunctively, and reaches nothing outside
-        // what this caller started.
+        // scope=started applies no assignment predicate of its own. Beyond the
+        // starter it narrows by the test-instance exclusion `includeTestInstances`
+        // sets below, and by the revocation term `notRevokedFor` sets. An
+        // explicit assignedTo still narrows conjunctively, and reaches nothing
+        // outside what this caller started.
         startedBy: scope === "started" ? actor.id : startedBy,
         claimedBy: url.searchParams.get("claimedBy") ?? undefined,
         assignedTo: scope === "mine" ? actor.id : assignedTo,
@@ -536,6 +538,16 @@ export async function handleListInstances(req: Request, resolver: ActorResolver,
         // scope=mine's assignedTo already follows. `actorPrincipals` is the
         // one resolver the direct read and report sharing use too.
         visibleTo: scope === "visible" ? { actorId: actor.id, principals: await actorPrincipals(actor, db) } : undefined,
+        // instance-visibility-set: scope=started withholds an instance from a
+        // starter a revocation names, unless a live assignment overrides it.
+        // An administrator skips the term, because the direct read never
+        // refuses that role. The principals are the actor id and roles, the
+        // set `isEligibleCandidate` tests on the direct read, so this scope
+        // pays no group lookup.
+        notRevokedFor:
+          scope === "started" && !actor.roles.includes(ADMIN_ROLE)
+            ? { actorId: actor.id, principals: [actor.id, ...actor.roles] }
+            : undefined,
       };
       const limit = parseLimit(url, MAX_LIST_LIMIT);
       const cursor = url.searchParams.get("cursor") ?? undefined;

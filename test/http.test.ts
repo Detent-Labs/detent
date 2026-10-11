@@ -11,7 +11,7 @@
  */
 import { readFileSync } from "node:fs";
 import { test, expect, beforeAll, beforeEach, spyOn } from "bun:test";
-import { sql } from "../src/engine/store.js";
+import { sql, createInstance } from "../src/engine/store.js";
 import { DB, initDb, authHeaders, authedReq } from "./helpers/http-fixture.js";
 import { clearInstanceAudit } from "./audit-cleanup.js";
 import { publishBody, createDefinitionStore } from "../src/engine/definitions.js";
@@ -23,10 +23,10 @@ import { ConcurrencyConflict } from "../src/engine/transition.js";
 import { createServer } from "../src/http/server.js";
 import { mapError } from "../src/http/errors.js";
 import { parseMaxAttachmentBytes, parseLimit } from "../src/http/routes.js";
-import { MAX_LIST_LIMIT, MAX_RECORD_LIMIT } from "../src/runtime/api.js";
+import { MAX_LIST_LIMIT, MAX_RECORD_LIMIT, revokeVisibility, restoreVisibility } from "../src/runtime/api.js";
 import { devHeaderResolver, type ActorResolver } from "../src/auth/resolve.js";
 import { PUBLISH_ROLE, CANCEL_ANY_ROLE, ADMIN_ROLE, DEVELOPER_ROLE, type Permission } from "../src/auth/authorize.js";
-import type { ProcessBody, ProcessId } from "../src/schema/definition.js";
+import type { FieldId, InstanceId, ProcessBody, ProcessId } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
 
 const cel = (src: string) => ({ lang: "cel", src });
@@ -235,6 +235,32 @@ const assignedBody = (): ProcessBody =>
     },
   }) as unknown as ProcessBody;
 
+/** simpleBody, but the terminal step_b declares an assignment: a completed instance still stores it, so cancel's write result must drop it. */
+const terminalAssignedBody = (): ProcessBody =>
+  ({
+    key: "terminal_assigned_body",
+    label: { en: "Terminal Assigned Body" },
+    baseLocale: "en",
+    fields: [{ id: "field_amount", key: "amount", label: { en: "Amount" }, type: "number" }],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        {
+          id: "step_a",
+          key: "a",
+          label: { en: "A" },
+          type: "task",
+          view: { fields: [{ ref: "field_amount", required: true }] },
+          paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }],
+        },
+        {
+          id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true,
+          assignment: { strategy: { type: "static", config: { candidates: ["approver", "user_1"] } } },
+        },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
 const pid = (n: string) => n as ProcessId;
 
 /** Writes a process-scoped grant directly, bypassing the admin route — that route's own behavior is covered in `test/http-admin.test.ts`. */
@@ -263,6 +289,18 @@ const bystander: Actor = { id: "user_bystander", roles: [] };
 const developer: Actor = { id: "user_developer", roles: [DEVELOPER_ROLE] };
 /** PUBLISH_ROLE alone, no ADMIN_ROLE — passes the route's own publish gate but holds no read grant on any process, for instance.query's publish-time read-grant check. */
 const publisherNoRead: Actor = { id: "user_publisher_no_read", roles: [PUBLISH_ROLE] };
+/** system:cancel-any alone: no ADMIN_ROLE, and in these tests never the instance's starter, so it holds no read right. */
+const cancelAnyOnly: Actor = { id: "user_cancel_any_only", roles: [CANCEL_ANY_ROLE] };
+
+/** The write routes' whole key set (runtime-api "A write call answers a write result, never the instance"). */
+const WRITE_RESULT_KEYS = ["assignment", "instanceId", "status", "transitionSeq"];
+
+/** A claim, release, delegate or cancel 200 body carries write-result members only, and neither `data` nor `startedBy`, the two `Instance` members a read rule guards. */
+const expectWriteResultBody = (body: object): void => {
+  for (const key of Object.keys(body)) expect(WRITE_RESULT_KEYS).toContain(key);
+  expect(body).not.toHaveProperty("data");
+  expect(body).not.toHaveProperty("startedBy");
+};
 
 // ============================================================
 // Happy path per route
@@ -433,11 +471,28 @@ test.skipIf(!DB)("PUT /instances/:instanceId/draft on a non-running instance is 
   expect(body.error.type).toBe("instance-not-running");
 });
 
-test.skipIf(!DB)("PUT /instances/:instanceId/draft on an unknown instance maps to 500, not 404", async () => {
+test.skipIf(!DB)("PUT /instances/:instanceId/draft on an unknown instance is 403 authorization for a non-administrator", async () => {
   const res = await fetch(jsonReq("http://x/instances/inst_does_not_exist/draft", "PUT", user1, { data: {} }));
+  expect(res.status).toBe(403);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("authorization");
+});
+
+test.skipIf(!DB)("PUT /instances/:instanceId/draft on an unknown instance stays 500 for an administrator, who may read any instance", async () => {
+  const res = await fetch(jsonReq("http://x/instances/inst_does_not_exist/draft", "PUT", admin, { data: {} }));
   expect(res.status).toBe(500);
   const body = (await res.json()) as { error: { type: string } };
   expect(body.error.type).toBe("internal");
+});
+
+test.skipIf(!DB)("POST /instances/:instanceId/submit on an unknown instance is 403 authorization for a non-administrator and 500 for an administrator", async () => {
+  const stranger = await fetch(jsonReq("http://x/instances/inst_does_not_exist/submit", "POST", user1, { pathId: "path_ab", data: {} }));
+  expect(stranger.status).toBe(403);
+  expect(((await stranger.json()) as { error: { type: string } }).error.type).toBe("authorization");
+
+  const administrator = await fetch(jsonReq("http://x/instances/inst_does_not_exist/submit", "POST", admin, { pathId: "path_ab", data: {} }));
+  expect(administrator.status).toBe(500);
+  expect(((await administrator.json()) as { error: { type: string } }).error.type).toBe("internal");
 });
 
 test.skipIf(!DB)("GET /instances/:instanceId on a non-running (completed) instance still resolves, with no available paths", async () => {
@@ -1028,6 +1083,79 @@ test.skipIf(!DB)("POST /instances/:instanceId/delegate with a missing toActorId 
   expect(body.error.type).toBe("request-shape");
 });
 
+// --- Write result: claim, release and delegate answer no instance data ---------
+
+test.skipIf(!DB)("POST /instances/:instanceId/claim answers the write result: the new claim, no data, no startedBy", async () => {
+  const PID = pid("proc_http_claim_write_result");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/claim`, "POST", user1));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { instanceId: string; status: string; assignment?: { claimedBy?: string } };
+  expectWriteResultBody(body);
+  expect(body.instanceId).toBe(created.instanceId);
+  expect(body.status).toBe("running");
+  expect(body.assignment?.claimedBy).toBe("user_1");
+});
+
+test.skipIf(!DB)("POST /instances/:instanceId/release answers the write result: the cleared claim, no data, no startedBy", async () => {
+  const PID = pid("proc_http_release_write_result");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  await fetch(authedReq(`http://x/instances/${created.instanceId}/claim`, "POST", user1));
+
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/release`, "POST", user1));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { instanceId: string; status: string; assignment?: { candidates: string[]; claimedBy?: string } };
+  expectWriteResultBody(body);
+  expect(body.instanceId).toBe(created.instanceId);
+  expect(body.status).toBe("running");
+  expect(body.assignment?.candidates).toEqual(["approver", "user_1"]);
+  expect(body.assignment?.claimedBy).toBeUndefined();
+});
+
+test.skipIf(!DB)("POST /instances/:instanceId/delegate answers the write result: the new claimant, no data, no startedBy", async () => {
+  const PID = pid("proc_http_delegate_write_result");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  await fetch(authedReq(`http://x/instances/${created.instanceId}/claim`, "POST", user1));
+
+  const res = await fetch(jsonReq(`http://x/instances/${created.instanceId}/delegate`, "POST", user1, { toActorId: "outsider" }));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { instanceId: string; status: string; assignment?: { claimedBy?: string } };
+  expectWriteResultBody(body);
+  expect(body.instanceId).toBe(created.instanceId);
+  expect(body.status).toBe("running");
+  expect(body.assignment?.claimedBy).toBe("outsider");
+});
+
+// CLAIM-1 (docs/decisions.md, "Open from test-instance-claim-bypass"): a
+// candidate who did not start a test instance can claim its step, although
+// `loadInstanceForActor` refuses that candidate a read. This test pins the
+// response shape only: the claim answers the new assignment and no `data`. It
+// takes no position on the admission itself, which CLAIM-1 leaves open.
+test.skipIf(!DB)("POST /instances/:instanceId/claim by a candidate who did not start a test instance answers the new assignment and no data", async () => {
+  const PID = pid("proc_http_claim_test_instance");
+  const v = await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const testInst = await createInstance(v.definition, {
+    processId: PID,
+    version: v.version,
+    kind: "test",
+    startedBy: "user_test_starter",
+    data: { ["field_secret" as FieldId]: "keep-out" },
+    assignment: { candidates: ["approver", "user_1"] },
+  });
+
+  const res = await fetch(authedReq(`http://x/instances/${testInst.instanceId}/claim`, "POST", user1));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { instanceId: string; status: string; assignment?: { candidates: string[]; claimedBy?: string } };
+  expectWriteResultBody(body);
+  expect(body.instanceId).toBe(testInst.instanceId);
+  expect(body.assignment?.claimedBy).toBe("user_1");
+  expect(body.assignment?.candidates).toEqual(["approver", "user_1"]);
+});
+
 // ============================================================
 // Comment routes
 // ============================================================
@@ -1420,6 +1548,185 @@ test.skipIf(!DB)("delegating a claim on a cancelled instance maps to 409 instanc
   expect(body.error.type).toBe("instance-not-running");
 });
 
+// A write call tells a caller that an instance is not running only when that
+// caller may read it (instance-visibility-set, "A write call reveals a finished
+// instance only to a reader"). `bystander` is neither starter nor administrator.
+
+test.skipIf(!DB)("submitting to a cancelled instance as a caller who may not read it maps to 403 authorization, not 409", async () => {
+  const PID = pid("proc_http_submit_cancelled_stranger");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  await fetch(authedReq(`http://x/instances/${created.instanceId}/cancel`, "POST", admin));
+
+  const res = await fetch(
+    jsonReq(`http://x/instances/${created.instanceId}/submit`, "POST", bystander, { pathId: "path_ab", data: { field_amount: 10 } }),
+  );
+  expect(res.status).toBe(403);
+  const body = (await res.json()) as { error: { type: string; message: string } };
+  expect(body.error.type).toBe("authorization");
+  // The refusal carries no status word, or the 403 would leak what the 409 did.
+  expect(body.error.message).not.toContain("cancelled");
+  expect(body.error.message).not.toContain("running");
+});
+
+test.skipIf(!DB)("saving a draft on a cancelled instance as a caller who may not read it maps to 403 authorization, not 409", async () => {
+  const PID = pid("proc_http_draft_cancelled_stranger");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  await fetch(authedReq(`http://x/instances/${created.instanceId}/cancel`, "POST", admin));
+
+  const res = await fetch(jsonReq(`http://x/instances/${created.instanceId}/draft`, "PUT", bystander, { data: {} }));
+  expect(res.status).toBe(403);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("authorization");
+});
+
+test.skipIf(!DB)("a starter whom a revocation names gets 403 authorization on submit and draft save once the instance has completed", async () => {
+  const PID = pid("proc_http_revoked_starter_finished");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  const submit = () => fetch(jsonReq(`http://x/instances/${created.instanceId}/submit`, "POST", user1, { pathId: "path_ab", data: { field_amount: 10 } }));
+  expect((await submit()).status).toBe(200);
+
+  // Baseline: before the revocation the starter reads the instance and gets the 409.
+  const draftBefore = await fetch(jsonReq(`http://x/instances/${created.instanceId}/draft`, "PUT", user1, { data: {} }));
+  expect(draftBefore.status).toBe(409);
+  expect((await submit()).status).toBe(409);
+
+  await revokeVisibility(created.instanceId as InstanceId, user1.id, admin, sql);
+
+  const submitAfter = await submit();
+  expect(submitAfter.status).toBe(403);
+  expect(((await submitAfter.json()) as { error: { type: string } }).error.type).toBe("authorization");
+  const draftAfter = await fetch(jsonReq(`http://x/instances/${created.instanceId}/draft`, "PUT", user1, { data: {} }));
+  expect(draftAfter.status).toBe(403);
+  expect(((await draftAfter.json()) as { error: { type: string } }).error.type).toBe("authorization");
+});
+
+test.skipIf(!DB)("a starter whom a revocation names gets 403 authorization on cancelling a completed instance", async () => {
+  const PID = pid("proc_http_revoked_starter_cancel");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+  const submitted = await fetch(jsonReq(`http://x/instances/${created.instanceId}/submit`, "POST", user1, { pathId: "path_ab", data: { field_amount: 10 } }));
+  expect(submitted.status).toBe(200);
+
+  // Baseline: a reader starter's re-cancel on a finished instance is the idempotent 200.
+  const before = await fetch(authedReq(`http://x/instances/${created.instanceId}/cancel`, "POST", user1));
+  expect(before.status).toBe(200);
+  expect(((await before.json()) as { status: string }).status).toBe("completed");
+
+  await revokeVisibility(created.instanceId as InstanceId, user1.id, admin, sql);
+
+  const after = await fetch(authedReq(`http://x/instances/${created.instanceId}/cancel`, "POST", user1));
+  expect(after.status).toBe(403);
+  expect(((await after.json()) as { error: { type: string } }).error.type).toBe("authorization");
+});
+
+// --- Visibility routes: a known account, and an unknown instance ----------------
+
+/**
+ * `auth_users` sits outside this file's TRUNCATE, so most tests run with an
+ * empty directory and the visibility target check never runs. A test that
+ * needs a directory populates it here and clears it again.
+ */
+async function withDirectory(userIds: string[], fn: () => Promise<void>): Promise<void> {
+  for (const id of userIds) {
+    await sql`INSERT INTO auth_users (user_id, email, password_hash) VALUES (${id}, ${`${id}@visibility-http.example.com`}, ${"x"})`;
+  }
+  try {
+    await fn();
+  } finally {
+    await sql`DELETE FROM auth_users WHERE user_id = ANY(${sql.array(userIds, "TEXT")})`;
+  }
+}
+
+/** A published instance started by user1. */
+async function startedBy1(processId: string): Promise<string> {
+  await publishBody(pid(processId), simpleBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${processId}/instances`, "POST", user1))).json()) as { instanceId: string };
+  return created.instanceId;
+}
+
+const visibilityPost = (instanceId: string, route: "revoke" | "restore" | "grant", actor: Actor, actorId: string) =>
+  fetch(jsonReq(`http://x/instances/${instanceId}/visibility/${route}`, "POST", actor, { actorId }));
+
+const deniedCount = async (instanceId: string, actorId: string): Promise<number> => {
+  const rows = (await sql`SELECT count(*) AS n FROM instance_principals_denied
+    WHERE instance_id = ${instanceId} AND actor_id = ${actorId}`) as { n: string }[];
+  return Number(rows[0]!.n);
+};
+
+test.skipIf(!DB)("POST /instances/:instanceId/visibility/revoke and /grant naming an unknown account map to 422 unknown-actor", async () => {
+  const id = await startedBy1("proc_http_visibility_422");
+  await withDirectory([admin.id, "alice_m"], async () => {
+    for (const route of ["revoke", "grant"] as const) {
+      const res = await visibilityPost(id, route, admin, "alice.m");
+      expect(res.status).toBe(422);
+      const body = (await res.json()) as { error: { type: string; message: string } };
+      expect(body.error.type).toBe("unknown-actor");
+      expect(body.error.message).toContain("alice.m"); // names the target, so an administrator sees which id was wrong
+    }
+    expect(await deniedCount(id, "alice.m")).toBe(0);
+    // A known account goes through, so the 422 is about the name alone.
+    expect((await visibilityPost(id, "revoke", admin, "alice_m")).status).toBe(204);
+  });
+});
+
+test.skipIf(!DB)("POST /instances/:instanceId/visibility/restore of an unknown account is 204", async () => {
+  const id = await startedBy1("proc_http_visibility_restore");
+  await withDirectory([admin.id], async () => {
+    const res = await visibilityPost(id, "restore", admin, "alice.m");
+    expect(res.status).toBe(204);
+  });
+});
+
+test.skipIf(!DB)("an administrator with no directory entry revokes any target name over HTTP", async () => {
+  const id = await startedBy1("proc_http_visibility_external");
+  // The directory holds user1 only, as a local account beside an external identity provider.
+  await withDirectory([user1.id], async () => {
+    const res = await visibilityPost(id, "revoke", admin, "alice.m");
+    expect(res.status).toBe(204);
+    expect(await deniedCount(id, "alice.m")).toBe(1);
+  });
+});
+
+test.skipIf(!DB)("a caller without standing gets 403 authorization on revoke and grant, never 422, even for an unknown account", async () => {
+  const id = await startedBy1("proc_http_visibility_403_target");
+  // The bystander resolves in the directory, so a target check that ran before
+  // the permission test would answer 422 here.
+  await withDirectory([bystander.id], async () => {
+    for (const route of ["revoke", "grant"] as const) {
+      const res = await visibilityPost(id, route, bystander, "alice.m");
+      expect(res.status).toBe(403);
+      expect(((await res.json()) as { error: { type: string } }).error.type).toBe("authorization");
+    }
+  });
+});
+
+test.skipIf(!DB)("an unknown instance id gets 403 authorization on all three visibility routes, with the body a known instance gives a caller without standing", async () => {
+  const known = await startedBy1("proc_http_visibility_unknown_instance");
+  const missing = "inst_does_not_exist";
+  // The full body, with each call's own instance id replaced by a placeholder.
+  const bodyText = async (res: Response, instanceId: string): Promise<string> => (await res.text()).replaceAll(instanceId, "<instance>");
+  for (const route of ["revoke", "restore", "grant"] as const) {
+    const forKnown = await visibilityPost(known, route, bystander, user1.id);
+    const forMissing = await visibilityPost(missing, route, bystander, user1.id);
+    expect(forKnown.status).toBe(403);
+    expect(forMissing.status).toBe(403);
+    const knownText = await bodyText(forKnown, known);
+    const missingText = await bodyText(forMissing, missing);
+    expect(missingText).toBe(knownText);
+    expect(JSON.parse(missingText)).toEqual({
+      error: { type: "authorization", message: "actor 'user_bystander' may not change visibility of instance '<instance>'" },
+    });
+
+    // An administrator who mistypes the id gets the same refusal, not a 500.
+    const forAdmin = await visibilityPost(missing, route, admin, user1.id);
+    expect(forAdmin.status).toBe(403);
+    expect(((await forAdmin.json()) as { error: { type: string } }).error.type).toBe("authorization");
+  }
+});
+
 test.skipIf(!DB)("submitting an unclaimed assigned step maps to 403 not-claimed", async () => {
   const PID = pid("proc_http_submit_403a");
   await publishBody(PID, assignedBody(), reg, dataSourceReg);
@@ -1635,6 +1942,60 @@ test.skipIf(!DB)("GET /instances?scope=started carries a finished case", async (
   const page = (await res.json()) as { items: { instanceId: string; status: string }[] };
   const row = page.items.find((i) => i.instanceId === created.instanceId);
   expect(row?.status).toBe("cancelled");
+});
+
+// instance-visibility-set, "A revocation holds on the started scope". The
+// administrator exemption lives in handleListInstances, so only a request
+// observes it; the Runtime API Layer tests state the filter directly.
+
+const startedIds = async (actor: Actor): Promise<string[]> => {
+  const res = await fetch(authedReq(`http://x/instances?scope=started`, "GET", actor));
+  expect(res.status).toBe(200);
+  return ((await res.json()) as { items: { instanceId: string }[] }).items.map((i) => i.instanceId);
+};
+
+const startAs = async (processId: ProcessId, actor: Actor): Promise<string> =>
+  ((await (await fetch(jsonReq(`http://x/processes/${processId}/instances`, "POST", actor))).json()) as { instanceId: string }).instanceId;
+
+test.skipIf(!DB)("GET /instances?scope=started withholds a case a revocation names, and keeps the starter's others", async () => {
+  const PID = pid("proc_http_scope_started_revoked");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+  const revoked = await startAs(PID, user1);
+  const kept = await startAs(PID, user1);
+  expect(new Set(await startedIds(user1))).toEqual(new Set([revoked, kept]));
+
+  await revokeVisibility(revoked as InstanceId, user1.id, admin, sql);
+
+  expect(await startedIds(user1)).toEqual([kept]);
+
+  await restoreVisibility(revoked as InstanceId, user1.id, admin, sql);
+  expect(new Set(await startedIds(user1))).toEqual(new Set([revoked, kept]));
+});
+
+test.skipIf(!DB)("GET /instances?scope=started lets an administrator keep a case a revocation names", async () => {
+  const PID = pid("proc_http_scope_started_revoked_admin");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+  const adminCase = await startAs(PID, admin);
+  const userCase = await startAs(PID, user1);
+  await revokeVisibility(adminCase as InstanceId, admin.id, admin, sql);
+  await revokeVisibility(userCase as InstanceId, user1.id, admin, sql);
+
+  // The control: the same revocation withholds the row from a caller without ADMIN_ROLE.
+  expect(await startedIds(user1)).toEqual([]);
+  // The administrator holds ADMIN_ROLE, which a revocation never reaches on the direct read.
+  expect(await startedIds(admin)).toEqual([adminCase]);
+});
+
+test.skipIf(!DB)("GET /instances?scope=started keeps a revoked case whose unclaimed step names the caller's role", async () => {
+  // "approver" is a candidate through the caller's role, not its id. The handler hands the
+  // filter [actor.id, ...actor.roles]; an id-only set would lose this row.
+  const PID = pid("proc_http_scope_started_revoked_role");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const approverStarter: Actor = { id: "user_approver_starter", roles: ["approver"] };
+  const candidateCase = await startAs(PID, approverStarter);
+  await revokeVisibility(candidateCase as InstanceId, approverStarter.id, admin, sql);
+
+  expect(await startedIds(approverStarter)).toEqual([candidateCase]);
 });
 
 test.skipIf(!DB)("GET /instances?scope=started&startedBy=<id> is a 400 request error", async () => {
@@ -2012,6 +2373,23 @@ test.skipIf(!DB)("GET /instances/:instanceId/record is refused for a developer w
   expect(res.status).toBe(403);
 });
 
+test.skipIf(!DB)("GET /instances/:instanceId/record is 403 authorization for a developer starter whom a revocation names, and 200 once restored", async () => {
+  const PID = pid("proc_http_record_developer_revoked");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", developer))).json()) as { instanceId: string };
+  await fetch(jsonReq(`http://x/instances/${created.instanceId}/submit`, "POST", developer, { pathId: "path_ab", data: { field_amount: 10 } }));
+  const read = () => fetch(authedReq(`http://x/instances/${created.instanceId}/record`, "GET", developer));
+  expect((await read()).status).toBe(200);
+
+  await revokeVisibility(created.instanceId as InstanceId, developer.id, admin, sql);
+  const refused = await read();
+  expect(refused.status).toBe(403);
+  expect(((await refused.json()) as { error: { type: string } }).error.type).toBe("authorization");
+
+  await restoreVisibility(created.instanceId as InstanceId, developer.id, admin, sql);
+  expect((await read()).status).toBe(200);
+});
+
 test.skipIf(!DB)("GET /instances/:instanceId/record with no resolvable credential is 401, whether or not the instance exists", async () => {
   const res = await fetch(new Request("http://x/instances/inst_does_not_exist/record"));
   expect(res.status).toBe(401);
@@ -2075,6 +2453,97 @@ test.skipIf(!DB)("POST /instances/:instanceId/cancel with no resolvable credenti
 
   const view = (await (await fetch(authedReq(`http://x/instances/${created.instanceId}`, "GET", user1))).json()) as { status: string };
   expect(view.status).toBe("running");
+});
+
+// --- Write result: cancel answers no instance data ------------------------------
+
+test.skipIf(!DB)("POST /instances/:instanceId/cancel by a cancel-any holder answers the write result: status cancelled, no data, no startedBy", async () => {
+  const PID = pid("proc_http_cancel_write_result");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1, { data: { field_amount: 7 } }))).json()) as { instanceId: string };
+
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/cancel`, "POST", cancelAnyOnly));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as Record<string, unknown>;
+  expectWriteResultBody(body);
+  // A cancelled instance runs no step, so no assignment shows either.
+  expect(Object.keys(body).sort()).toEqual(["instanceId", "status", "transitionSeq"]);
+  expect(body.instanceId).toBe(created.instanceId);
+  expect(body.status).toBe("cancelled");
+  expect(body.transitionSeq).toBe(1);
+});
+
+test.skipIf(!DB)("POST /instances/:instanceId/cancel by the starter answers the same write result", async () => {
+  const PID = pid("proc_http_cancel_write_result_starter");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1, { data: { field_amount: 7 } }))).json()) as { instanceId: string };
+
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/cancel`, "POST", user1));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as Record<string, unknown>;
+  expectWriteResultBody(body);
+  expect(Object.keys(body).sort()).toEqual(["instanceId", "status", "transitionSeq"]);
+  expect(body.status).toBe("cancelled");
+});
+
+/**
+ * Runs `body` to completion as `user1`, then has `cancelAnyOnly` cancel it. The
+ * holder neither started the instance nor holds ADMIN_ROLE, so it may not read
+ * the instance. Returns the cancel response body and the completing submit's
+ * Instance, after checking the cancel left the instance as it was.
+ */
+const cancelCompletedAsCancelAny = async (
+  processId: string,
+  body: ProcessBody,
+): Promise<{ result: Record<string, unknown>; completed: { status: string; transitionSeq: number; assignment?: { candidates: string[] } | null } }> => {
+  await publishBody(pid(processId), body, reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${processId}/instances`, "POST", user1, { data: { field_amount: 7 } }))).json()) as { instanceId: string };
+  const submitted = await fetch(jsonReq(`http://x/instances/${created.instanceId}/submit`, "POST", user1, { pathId: "path_ab", data: { field_amount: 10 } }));
+  expect(submitted.status).toBe(200);
+  const completed = (await submitted.json()) as { status: string; transitionSeq: number; assignment?: { candidates: string[] } | null };
+  expect(completed.status).toBe("completed");
+
+  // Pins the premise: the holder may not read this instance, so the cancel's
+  // 200 below is a write result handed to a caller a read would refuse.
+  const read = await fetch(authedReq(`http://x/instances/${created.instanceId}`, "GET", cancelAnyOnly));
+  expect(read.status).toBe(403);
+
+  const recordItems = async (): Promise<unknown[]> =>
+    ((await (await fetch(authedReq(`http://x/instances/${created.instanceId}/record`, "GET", admin))).json()) as { items: unknown[] }).items;
+  const recordBefore = await recordItems();
+
+  const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/cancel`, "POST", cancelAnyOnly));
+  expect(res.status).toBe(200);
+  const result = (await res.json()) as Record<string, unknown>;
+  expect(result.instanceId).toBe(created.instanceId);
+
+  // The cancel is a no-op: same history, same status.
+  expect(await recordItems()).toEqual(recordBefore);
+  const view = (await (await fetch(authedReq(`http://x/instances/${created.instanceId}`, "GET", user1))).json()) as { status: string };
+  expect(view.status).toBe("completed");
+  return { result, completed };
+};
+
+test.skipIf(!DB)("POST /instances/:instanceId/cancel by a cancel-any holder who may not read a completed instance answers 200 with its status, no data and no assignment", async () => {
+  const { result, completed } = await cancelCompletedAsCancelAny("proc_http_cancel_completed", simpleBody());
+  // Pins the fixture: the completed instance stores no assignment.
+  expect(completed.assignment ?? null).toBeNull();
+
+  expectWriteResultBody(result);
+  expect(Object.keys(result).sort()).toEqual(["instanceId", "status", "transitionSeq"]);
+  expect(result.status).toBe("completed");
+  expect(result.transitionSeq).toBe(completed.transitionSeq);
+});
+
+test.skipIf(!DB)("POST /instances/:instanceId/cancel on a completed instance drops the terminal step's stored assignment", async () => {
+  const { result, completed } = await cancelCompletedAsCancelAny("proc_http_cancel_completed_assigned", terminalAssignedBody());
+  // Pins the fixture: here the completed instance does store candidates, so the
+  // result's lack of `assignment` is the running-only rule, not an empty value.
+  expect(completed.assignment?.candidates).toEqual(["approver", "user_1"]);
+
+  expectWriteResultBody(result);
+  expect(result).not.toHaveProperty("assignment");
+  expect(result.status).toBe("completed");
 });
 
 // ============================================================

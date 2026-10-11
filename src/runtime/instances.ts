@@ -31,7 +31,17 @@ import type {
   InstanceEvent,
 } from "../schema/definition.js";
 import { createDefaultAssignmentRegistry, resolveStepAssignment, type DataSourceRegistry, type AssignmentRegistry } from "../engine/registry.js";
-import { getStore, parseInstance, loadInstanceForRead, loadInstanceForActor, findStep, resolveCollaboration } from "./internal.js";
+import {
+  getStore,
+  parseInstance,
+  loadInstanceForRead,
+  loadInstanceForActor,
+  throwToReader,
+  findStep,
+  resolveCollaboration,
+  toWriteResult,
+  type InstanceWriteResult,
+} from "./internal.js";
 import {
   resolveFields,
   resolveAvailablePaths,
@@ -264,11 +274,32 @@ export async function getInstanceView(instanceId: InstanceId, actor: Actor, regi
 }
 
 /**
+ * The one refusal a submit or form-draft save gives a caller without standing.
+ * A running instance with no assignment, a finished instance (`throwToReader`)
+ * and an unknown id (`unknownInstanceError`) all throw it, so the text names
+ * the instance id and nothing else.
+ */
+function submitRefusal(actor: Actor, instanceId: InstanceId): AuthorizationError {
+  return new AuthorizationError(`actor '${actor.id}' may not submit instance '${instanceId}'`);
+}
+
+/**
+ * What `submitAndTransition` and `saveInstanceDraft` throw for an id that
+ * resolves to nothing. An `ADMIN_ROLE` holder may read any instance, so the
+ * not-found answer tells that caller nothing new. Everyone else gets the
+ * submit refusal.
+ */
+function unknownInstanceError(actor: Actor, instanceId: InstanceId): Error {
+  return actor.roles.includes(ADMIN_ROLE) ? new NotFoundError(`instance not found: ${instanceId}`) : submitRefusal(actor, instanceId);
+}
+
+/**
  * Shared submit-authorization predicate, extracted so `submitAndTransition`
  * and `saveInstanceDraft` cannot drift. On a step with an assignment, only
  * the current claimant may act. On a step without one, the instance starter
  * or an `ADMIN_ROLE` holder may act. Throws `InstanceNotRunningError` first,
- * ahead of either authorization branch.
+ * ahead of either authorization branch. Both callers hand that error to
+ * `throwToReader`, so only a caller who may read the instance sees it.
  */
 function requireSubmitAuthority(instance: Instance, actor: Actor, instanceId: InstanceId): void {
   if (instance.status !== "running") throw new InstanceNotRunningError(instance.instanceId, instance.status);
@@ -276,7 +307,7 @@ function requireSubmitAuthority(instance: Instance, actor: Actor, instanceId: In
     if (instance.assignment.claimedBy === undefined) throw new NotClaimedError(instanceId);
     if (instance.assignment.claimedBy !== actor.id) throw new NotClaimantError(instanceId, actor.id);
   } else if (instance.startedBy !== actor.id && !actor.roles.includes(ADMIN_ROLE)) {
-    throw new AuthorizationError(`actor '${actor.id}' may not submit instance '${instanceId}'`);
+    throw submitRefusal(actor, instanceId);
   }
 }
 
@@ -309,43 +340,52 @@ export async function submitAndTransition(
   const store = getStore(db);
   const submitted = data as Record<string, Literal>;
 
-  const committed = await withTransaction(db, async (tx) => {
-    const rows = (await tx`SELECT body FROM instances WHERE instance_id = ${instanceId} FOR UPDATE`) as { body: unknown }[];
-    if (rows.length === 0) throw new NotFoundError(`instance not found: ${instanceId}`);
-    const instance = parseInstance(rows[0].body);
+  let committed: Instance;
+  try {
+    committed = await withTransaction(db, async (tx) => {
+      const rows = (await tx`SELECT body FROM instances WHERE instance_id = ${instanceId} FOR UPDATE`) as { body: unknown }[];
+      if (rows.length === 0) throw unknownInstanceError(actor, instanceId);
+      const instance = parseInstance(rows[0].body);
 
-    // Exact, not optimistic: checked right after the locked read, before any
-    // further work (body resolution, claim enforcement, validation). A
-    // cancelled/completed/faulted instance answers InstanceNotRunningError
-    // instead of silently discarding the submission and reporting success —
-    // see runtime-api spec "An operation targeting a non-running instance is
-    // rejected at the boundary". The engine-level no-op in
-    // commitManualTransition stays, for internal idempotent re-entry.
-    if (instance.status !== "running") throw new InstanceNotRunningError(instance.instanceId, instance.status);
+      // Exact, not optimistic: checked right after the locked read, before any
+      // further work (body resolution, claim enforcement, validation). A
+      // cancelled/completed/faulted instance answers InstanceNotRunningError
+      // instead of silently discarding the submission and reporting success —
+      // see runtime-api spec "An operation targeting a non-running instance is
+      // rejected at the boundary". The engine-level no-op in
+      // commitManualTransition stays, for internal idempotent re-entry.
+      if (instance.status !== "running") throw new InstanceNotRunningError(instance.instanceId, instance.status);
 
-    const body = await store.resolveBody(instance.processId, instance.version);
-    if (!body) throw new NotFoundError(`no published body for process ${instance.processId} version ${instance.version}`);
-    const gotHash = definitionHash(body);
-    if (gotHash !== instance.definitionHash) throw new PinMismatch(instance.instanceId, instance.definitionHash, gotHash);
+      const body = await store.resolveBody(instance.processId, instance.version);
+      if (!body) throw new NotFoundError(`no published body for process ${instance.processId} version ${instance.version}`);
+      const gotHash = definitionHash(body);
+      if (gotHash !== instance.definitionHash) throw new PinMismatch(instance.instanceId, instance.definitionHash, gotHash);
 
-    const step = findStep(body, instance.currentStepId as string);
+      const step = findStep(body, instance.currentStepId as string);
 
-    requireSubmitAuthority(instance, actor, instanceId);
+      requireSubmitAuthority(instance, actor, instanceId);
 
-    const resolved = await validateSubmissionData(body, step, instance, actor, submitted, registry, tx);
+      const resolved = await validateSubmissionData(body, step, instance, actor, submitted, registry, tx);
 
-    // After validation, never inside it: a `SubmissionValidationError` blames a
-    // field on the participant's form, and a mismatching attribute is the
-    // operator's data, not theirs. Before the commit, so a guard on the
-    // outgoing path reads the mapped value.
-    const mapped = applyColumnMapping(resolved, submitted, new Map(collectFieldsDeep(body.fields).map((f) => [f.id as string, f])));
-    const patch = Object.keys(mapped.writes).length > 0 ? { ...data, ...mapped.writes } : data;
-    // The drops share the seq the entry lands on, the way
-    // `assignment.unresolved` already does for an event accompanying a hop.
-    const events = droppedAttributeEvents(mapped.dropped, instance.instanceId, instance.version, instance.transitionSeq + 1);
+      // After validation, never inside it: a `SubmissionValidationError` blames a
+      // field on the participant's form, and a mismatching attribute is the
+      // operator's data, not theirs. Before the commit, so a guard on the
+      // outgoing path reads the mapped value.
+      const mapped = applyColumnMapping(resolved, submitted, new Map(collectFieldsDeep(body.fields).map((f) => [f.id as string, f])));
+      const patch = Object.keys(mapped.writes).length > 0 ? { ...data, ...mapped.writes } : data;
+      // The drops share the seq the entry lands on, the way
+      // `assignment.unresolved` already does for an event accompanying a hop.
+      const events = droppedAttributeEvents(mapped.dropped, instance.instanceId, instance.version, instance.transitionSeq + 1);
 
-    return commitManualTransition(instance, pathId, body, actor, tx, patch, assignmentRegistry, events);
-  });
+      return commitManualTransition(instance, pathId, body, actor, tx, patch, assignmentRegistry, events);
+    });
+  } catch (err) {
+    // The transaction has rolled back, so the read below waits on no row lock.
+    // Only a reader learns the status; everyone else gets the refusal a running
+    // instance gives them (instance-visibility-set).
+    if (err instanceof InstanceNotRunningError) await throwToReader(err, actor, submitRefusal(actor, instanceId), db);
+    throw err;
+  }
 
   const body = await store.resolveBody(committed.processId, committed.version);
   if (!body) throw new NotFoundError(`no published body for process ${committed.processId} version ${committed.version}`);
@@ -358,14 +398,20 @@ export async function submitAndTransition(
  * `submitAndTransition` — since the draft is a single-writer scratchpad with
  * no OCC token of its own (see design.md's accepted concurrent-transition
  * race). Shares `requireSubmitAuthority` with `submitAndTransition`, so the
- * two predicates cannot drift. `step_id` is derived from the instance's
- * current step, never accepted from the caller.
+ * two predicates cannot drift, and the same reader rule: only a caller who may
+ * read a non-running instance learns its status. `step_id` is derived from the
+ * instance's current step, never accepted from the caller.
  */
 export async function saveInstanceDraft(instanceId: InstanceId, data: unknown, actor: Actor, db: SQL = sql): Promise<InstanceDraft> {
   const rows = (await db`SELECT body FROM instances WHERE instance_id = ${instanceId}`) as { body: unknown }[];
-  if (rows.length === 0) throw new NotFoundError(`instance not found: ${instanceId}`);
+  if (rows.length === 0) throw unknownInstanceError(actor, instanceId);
   const instance = parseInstance(rows[0].body);
-  requireSubmitAuthority(instance, actor, instanceId);
+  try {
+    requireSubmitAuthority(instance, actor, instanceId);
+  } catch (err) {
+    if (err instanceof InstanceNotRunningError) await throwToReader(err, actor, submitRefusal(actor, instanceId), db);
+    throw err;
+  }
   return engineSaveInstanceDraft(instanceId, instance.currentStepId, data, actor.id, db);
 }
 
@@ -401,8 +447,21 @@ async function canActorCancelInstance(actor: Actor, instance: Instance, body: Pr
   if (instance.startedBy !== actor.id) return false;
   // The fields govern a running instance only (specs/cancellation/spec.md);
   // the engine's own cancel primitive already no-ops on a non-running one,
-  // so this predicate must defer to that rather than gate it.
-  if (instance.status !== "running") return true;
+  // so this predicate must defer to that rather than gate it. The no-op
+  // still answers the instance's status, so the starter must be a reader:
+  // a revocation that names them throws the read AuthorizationError here.
+  //
+  // ponytail: `instance.status` comes from an unlocked read, and the engine
+  // cancel receives that same snapshot. A finish between the read and the
+  // engine commit loses the `transition_seq` guard, so the caller sees
+  // `ConcurrencyConflict` (409) rather than a refusal. A fault flip bumps no
+  // seq, so the cancel can still commit over a freshly faulted instance; the
+  // starter was entitled to cancel when the snapshot was read. Upgrade entry
+  // point: take the instance row lock before this check.
+  if (instance.status !== "running") {
+    await loadInstanceForActor(instance.instanceId, actor, db);
+    return true;
+  }
   // findStep can throw on a body/step mismatch — safe only because the
   // starter and status checks above already ran, so only a starter of a
   // known, running instance reaches here.
@@ -415,7 +474,16 @@ async function canActorCancelInstance(actor: Actor, instance: Instance, body: Pr
  * `getInstanceView` does. Delegation to `engine/transition.ts::cancelInstance`
  * for the actual semantics — skip onExit, enqueue `[onCancel, sink.onEntry]`,
  * one cancel `HistoryEntry`, cascade to running children. A non-running
- * instance is returned unchanged, matching the engine's own no-op there.
+ * instance is left unchanged, matching the engine's own no-op there, and the
+ * call still answers its write result. The engine call runs either way, so a
+ * pending child sweep resumes.
+ *
+ * Answers the write result (`toWriteResult`), never the instance. Cancel
+ * authority is not read authority: a `system:cancel-any` holder, a grant
+ * holder and a starter a revocation names all cancel a running instance
+ * without a read right. On a non-running instance the answer is its status, so
+ * the starter path requires a read right there (`canActorCancelInstance`);
+ * the role and grant holders keep their authority.
  *
  * Two independent tests admit a caller (`src/auth/authorize.ts`). The
  * load-free one is `CANCEL_ANY_ROLE`, checked before the instance is loaded —
@@ -438,17 +506,19 @@ async function canActorCancelInstance(actor: Actor, instance: Instance, body: Pr
  * participant-cancellable can never strand a running instance no one is able
  * to cancel.
  */
-export async function cancelInstance(instanceId: InstanceId, actor: Actor, db: SQL = sql): Promise<Instance> {
+export async function cancelInstance(instanceId: InstanceId, actor: Actor, db: SQL = sql): Promise<InstanceWriteResult> {
   // Fast, load-free path: a system:cancel-any caller is authorized before any
   // instance lookup, exactly as before this function also accepted a case's
   // own starter.
+  let loadedAsRoleHolder: { instance: Instance; body: ProcessBody } | undefined;
   try {
     requireRole(actor, CANCEL_ANY_ROLE);
-    const { instance, body } = await loadInstanceForRead(instanceId, db);
-    const store = getStore(db);
-    return engineCancelInstance(instance, body, actor, db, store.resolveBody);
+    loadedAsRoleHolder = await loadInstanceForRead(instanceId, db);
   } catch (err) {
     if (!(err instanceof AuthorizationError)) throw err;
+  }
+  if (loadedAsRoleHolder) {
+    return toWriteResult(await engineCancelInstance(loadedAsRoleHolder.instance, loadedAsRoleHolder.body, actor, db, getStore(db).resolveBody));
   }
   // Role-less path: authorizing requires loading the instance to check
   // startedBy. A caller lacking the role must learn nothing about the
@@ -467,5 +537,5 @@ export async function cancelInstance(instanceId: InstanceId, actor: Actor, db: S
     throw new AuthorizationError(`actor '${actor.id}' may not cancel instance '${instanceId}'`);
   }
   const store = getStore(db);
-  return engineCancelInstance(instance, body, actor, db, store.resolveBody);
+  return toWriteResult(await engineCancelInstance(instance, body, actor, db, store.resolveBody));
 }

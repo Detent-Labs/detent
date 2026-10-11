@@ -22,7 +22,7 @@ import {
   NotClaimantError,
   UnknownDelegateError,
 } from "../engine/transition.js";
-import { NotFoundError, InstanceNotRunningError } from "../errors.js";
+import { NotFoundError, InstanceNotRunningError, UnknownActorError } from "../errors.js";
 import type { InstanceDraft } from "../engine/instance-drafts.js";
 
 export {
@@ -38,6 +38,7 @@ export {
   UnknownDelegateError,
   NotFoundError,
   InstanceNotRunningError,
+  UnknownActorError,
 };
 export type { InstanceDraft };
 export {
@@ -46,7 +47,7 @@ export {
   resolveCollaboration,
   CollaborationDisabledError,
 } from "./internal.js";
-export type { Page } from "./internal.js";
+export type { Page, InstanceWriteResult } from "./internal.js";
 export {
   isResolvedViewField,
   SubmissionValidationError,

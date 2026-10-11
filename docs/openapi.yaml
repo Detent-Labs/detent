@@ -247,7 +247,12 @@ paths:
       description: >-
         `scope=mine` is open to any authenticated actor and is derived
         from that actor's id/roles. `scope=started` is open to any
-        authenticated actor too, and is derived from that actor's id.
+        authenticated actor too, and is derived from that actor's id. It
+        lists the instances that actor started, except one that a
+        visibility revocation names the actor for. A revoked starter keeps
+        that instance while they hold the claim on its current step, or are
+        a candidate on its current step and nobody holds the claim. A
+        `system:admin` holder keeps every instance they started.
         `scope=all`, and an omitted `scope` alike, require the
         `system:admin` role.
       parameters:
@@ -415,13 +420,22 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "403":
-          description: The actor is not the claimant, or not an eligible candidate on an unclaimed step.
+          description: >-
+            The actor is not the claimant, or not an eligible candidate on an
+            unclaimed step. Type `authorization` also answers an instance that
+            does not exist when the actor lacks `system:admin`, and a
+            non-running instance the actor may not read. Its message does not
+            tell these cases apart.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "409":
-          description: The named path's guard refused the transition, the instance is not running, or a concurrent write lost the optimistic-concurrency race.
+          description: >-
+            The named path's guard refused the transition, a concurrent write
+            lost the optimistic-concurrency race, or the instance is not
+            running and the actor may read it. An actor who may not read a
+            non-running instance gets the 403 above, not this response.
           content:
             application/json:
               schema:
@@ -432,6 +446,15 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/IssuesErrorEnvelope"
+        "500":
+          description: >-
+            The instance does not exist and the caller holds `system:admin`.
+            Any other caller gets the 403 above for a missing instance. Also
+            covers any unrecognized server-side failure.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
 
   /instances/{instanceId}/draft:
     put:
@@ -471,19 +494,30 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "403":
-          description: The actor is not the claimant, or on an unassigned step is neither the starter nor a `system:admin` holder.
+          description: >-
+            The actor is not the claimant, or on an unassigned step is neither
+            the starter nor a `system:admin` holder. Type `authorization` also
+            answers an instance that does not exist when the actor lacks
+            `system:admin`, and a non-running instance the actor may not read.
+            Its message does not tell these cases apart.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "409":
-          description: The instance is not running.
+          description: >-
+            The instance is not running and the actor may read it. An actor who
+            may not read a non-running instance gets the 403 above, not this
+            response.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "500":
-          description: The instance does not exist. Also covers any unrecognized server-side failure.
+          description: >-
+            The instance does not exist and the caller holds `system:admin`.
+            Any other caller gets the 403 above for a missing instance. Also
+            covers any unrecognized server-side failure.
           content:
             application/json:
               schema:
@@ -502,11 +536,14 @@ paths:
         - $ref: "#/components/parameters/instanceId"
       responses:
         "200":
-          description: OK
+          description: >-
+            The write result: the instance's `status` and `transitionSeq`, and
+            the step's assignment with the new claim. It carries no `data` and
+            no `startedBy`.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Instance"
+                $ref: "#/components/schemas/InstanceWriteResult"
         "401":
           description: No actor could be resolved from the request.
           content:
@@ -539,11 +576,14 @@ paths:
         - $ref: "#/components/parameters/instanceId"
       responses:
         "200":
-          description: OK
+          description: >-
+            The write result: the instance's `status` and `transitionSeq`, and
+            the step's assignment with the claim cleared. It carries no `data`
+            and no `startedBy`.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Instance"
+                $ref: "#/components/schemas/InstanceWriteResult"
         "401":
           description: No actor could be resolved from the request.
           content:
@@ -582,11 +622,14 @@ paths:
               $ref: "#/components/schemas/DelegateRequest"
       responses:
         "200":
-          description: OK
+          description: >-
+            The write result: the instance's `status` and `transitionSeq`, and
+            the step's assignment with the delegate as claimant. It carries no
+            `data` and no `startedBy`.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Instance"
+                $ref: "#/components/schemas/InstanceWriteResult"
         "400":
           description: Request body is not valid JSON, or is missing `toActorId`.
           content:
@@ -881,16 +924,22 @@ paths:
       summary: Cancel a running instance
       description: >-
         Requires the `system:cancel-any` role, or that the actor started
-        the instance (`startedBy === actor.id`).
+        the instance (`startedBy === actor.id`). Cancel authority is not read
+        authority, so the body is the write result and never the instance.
       parameters:
         - $ref: "#/components/parameters/instanceId"
       responses:
         "200":
-          description: OK. A no-op (still 200) on an instance that is not running.
+          description: >-
+            The write result: `instanceId`, `status` and `transitionSeq`. It
+            carries no `data`, no `startedBy` and no `assignment`, since the
+            instance no longer runs. Cancelling an instance that is not running
+            changes nothing and still answers 200, with that instance's current
+            `status`.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Instance"
+                $ref: "#/components/schemas/InstanceWriteResult"
         "401":
           description: No actor could be resolved from the request.
           content:
@@ -898,7 +947,11 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "403":
-          description: The actor holds neither `system:cancel-any` nor starter status on this instance.
+          description: >-
+            The actor holds neither `system:cancel-any` nor starter status on
+            this instance. A starter whom a revocation names, with no live
+            assignment on the instance, also gets this response once the
+            instance has finished: the 200 above would tell them its status.
           content:
             application/json:
               schema:
@@ -913,7 +966,9 @@ paths:
         Requires the `system:admin` role, or `system:developer` or
         `system:author` together with `startedBy === actor.id` (an author
         may read the record of an instance their own Player session
-        created).
+        created). A visibility revocation that names the starter withdraws
+        this read unless the starter holds a live assignment on the
+        instance; a test instance's starter keeps it.
       parameters:
         - $ref: "#/components/parameters/instanceId"
         - $ref: "#/components/parameters/limit"
@@ -938,7 +993,11 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "403":
-          description: The actor holds neither `system:admin` nor `system:developer` or `system:author` plus starter status on this instance.
+          description: >-
+            The actor holds neither `system:admin` nor `system:developer` or
+            `system:author` plus starter status on this instance. The same
+            answer covers an actor who started the instance when a visibility
+            revocation names them and they hold no live assignment on it.
           content:
             application/json:
               schema:
@@ -977,13 +1036,16 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "403":
-          description: The actor holds neither `system:admin` nor a `visibility` grant over this instance's process.
+          description: The actor holds neither `system:admin` nor a `visibility` grant over this instance's process, or the instance does not exist, or the pinned version of the instance has no published definition body.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
-        "500":
-          description: The instance does not exist, or its pinned version has no published body. Also covers any unrecognized server-side failure.
+        "422":
+          description: >-
+            `actorId` names no account in the deployment's local directory.
+            Checked only where the acting administrator's own id resolves
+            there; an externally issued identity skips the check.
           content:
             application/json:
               schema:
@@ -1022,13 +1084,16 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "403":
-          description: The actor holds neither `system:admin` nor a `visibility` grant over this instance's process.
+          description: The actor holds neither `system:admin` nor a `visibility` grant over this instance's process, or the instance does not exist, or the pinned version of the instance has no published definition body.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
-        "500":
-          description: The instance does not exist, or its pinned version has no published body. Also covers any unrecognized server-side failure.
+        "422":
+          description: >-
+            `actorId` names no account in the deployment's local directory.
+            Checked only where the acting administrator's own id resolves
+            there; an externally issued identity skips the check.
           content:
             application/json:
               schema:
@@ -1067,13 +1132,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "403":
-          description: The actor holds neither `system:admin` nor a `visibility` grant over this instance's process.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorEnvelope"
-        "500":
-          description: The instance does not exist, or its pinned version has no published body. Also covers any unrecognized server-side failure.
+          description: The actor holds neither `system:admin` nor a `visibility` grant over this instance's process, or the instance does not exist, or the pinned version of the instance has no published definition body.
           content:
             application/json:
               schema:
@@ -1414,6 +1473,31 @@ components:
           type: string
           format: date-time
       required: [instanceId, processId, version, definitionHash, currentStepId, transitionSeq, data, status, startedAt]
+
+    InstanceWriteResult:
+      type: object
+      description: >-
+        What a write route answers: the facts the call changed, never the
+        instance. Claim, release, delegate and cancel authorize an actor to
+        change an instance, not to read it. The body therefore carries none of
+        the `Instance` members a read would refuse, `data` and `startedBy`
+        among them. A caller that needs the instance reads it through
+        `GET /instances/{instanceId}`.
+      properties:
+        instanceId:
+          type: string
+        status:
+          $ref: "#/components/schemas/InstanceStatus"
+        transitionSeq:
+          type: integer
+        assignment:
+          type: object
+          description: >-
+            The current step's assignment. Present only while `status` is
+            `running` and the step holds one. Absent otherwise, never `null`.
+          allOf:
+            - $ref: "#/components/schemas/AssignmentState"
+      required: [instanceId, status, transitionSeq]
 
     ResolvedViewField:
       type: object
