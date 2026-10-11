@@ -206,14 +206,14 @@ test("rejects child.* in a step-level validation.rule on a subprocess step", () 
   expect(msgs(issues).toLowerCase()).toContain("child");
 });
 
-// The flags resolve while the form renders, against buildGuardContext, which
+// The flags resolve at render and at submission, against buildGuardContext, which
 // registers no `child`: the parked parent has no child result yet. A flag that
 // read it would always evaluate to false, so each is an unknown reference.
-const flagStep = (entry: Record<string, unknown>, type: "task" | "subprocess" = "subprocess") => ({
+const flagStep = (entry: Record<string, unknown>) => ({
   id: "step_a",
   key: "a",
   label: { en: "A" },
-  type,
+  type: "subprocess",
   terminal: true,
   view: { fields: [entry] },
 });

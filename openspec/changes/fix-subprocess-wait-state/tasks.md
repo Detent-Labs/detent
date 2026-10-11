@@ -48,9 +48,9 @@
 
 ## 6. View flags get no child (A-5, engine side)
 
-- [ ] 6.1 Pass `child: false` for `visible`, `required` and `readonly` in `collect` in `src/cel/check.ts`. Edit its comments. Verify that a flag reading `child.outcome` fails to publish.
-- [ ] 6.2 Add `test/cel.test.ts` cases for all three flags and for a note entry's `visible`. Verify that each fails with an unknown-reference finding.
-- [ ] 6.3 Edit the `test/cel.test.ts` comment near line 199 that says the flags admit `child`. Verify with `git grep -n "visible/required/readonly" -- test src`.
+- [x] 6.1 Pass `child: false` for `visible`, `required` and `readonly` in `collect` in `src/cel/check.ts`. Edit its comments. Verify that a flag reading `child.outcome` fails to publish.
+- [x] 6.2 Add `test/cel.test.ts` cases for all three flags and for a note entry's `visible`. Verify that each fails with an unknown-reference finding.
+- [x] 6.3 Edit the `test/cel.test.ts` comment near line 199 that says the flags admit `child`. Verify with `git grep -n "visible/required/readonly" -- test src`.
 
 ## 7. Studio condition builder (A-5, web side)
 

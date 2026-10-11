@@ -214,7 +214,7 @@ interface Site {
   src: string;
   loc: string;
   result: boolean; // Action.output mapping context (result visible)
-  child: boolean; // inside a subprocess step (child.* visible)
+  child: boolean; // subprocess path guard or outputMapping (child.* visible)
   expect?: string; // required inferred result type; unconstrained when absent
 }
 
@@ -270,10 +270,11 @@ function collect(body: ProcessBody): Site[] {
       outputs(t.onFire.actions, `${sloc}.timers[${ti}].onFire`);
     });
     // Every view site takes `child: false`, on a subprocess step too. The flags
-    // resolve while the form renders, and `validation.rule` during submission.
-    // Both run against buildGuardContext(body, instance, actor), which registers
-    // no `child` on any step type: the step parks while the child runs, and a
-    // `child.*` reference would be unbound there and always evaluate to false.
+    // resolve in resolveFields (render and submission), and `validation.rule`
+    // during submission. Both run against buildGuardContext(body, instance,
+    // actor), which registers no `child` on any step type: the step parks while
+    // the child runs, and a `child.*` reference would be unbound there and
+    // always evaluate to false.
     (s.view?.fields ?? []).forEach((vf, vi) => {
       push(asExpr(vf.visible), `${sloc}.view.fields[${vi}].visible`, false, false);
       if (isViewField(vf)) {
