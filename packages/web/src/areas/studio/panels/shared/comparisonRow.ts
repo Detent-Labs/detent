@@ -10,6 +10,7 @@ import {
   type ValueType,
 } from "../../../../shell/literalValue.js";
 import type { CatalogKey } from "../../catalog.js";
+import { nextRowId, type RowId } from "../../screens/migrationPlanLogic.js";
 import type { TargetRef } from "./useTargetProcessCatalog.js";
 
 /**
@@ -134,4 +135,18 @@ export function reconcileText(state: TextState, value: unknown, type: ValueType 
   const parsed = parseComparisonText(state.text, type, operator);
   const text = sameLiteral(parsed.ok ? parsed.value : undefined, value) ? state.text : literalText(value);
   return { text, seen: value };
+}
+
+/**
+ * Fresh React keys for `count` comparison rows, or `undefined` while
+ * `rowIds` already holds one per row. A keyed row keeps its own text when an
+ * earlier row is removed. A count change from outside the form, such as a raw
+ * JSON change, mints new keys and redraws every row from the config.
+ */
+export function syncRowIds(rowIds: readonly RowId[], count: number): RowId[] | undefined {
+  return rowIds.length === count ? undefined : Array.from({ length: count }, () => nextRowId());
+}
+
+export function withoutRowId(rowIds: readonly RowId[], index: number): RowId[] {
+  return rowIds.filter((_, i) => i !== index);
 }

@@ -11,8 +11,11 @@ import {
   switchField,
   switchOperator,
   switchRightSide,
+  syncRowIds,
   valueFromChoice,
+  withoutRowId,
   withValue,
+  type TextState,
   type WhereEntry,
 } from "../src/areas/studio/panels/shared/comparisonRow.js";
 import type { TargetRef } from "../src/areas/studio/panels/shared/useTargetProcessCatalog.js";
@@ -205,5 +208,41 @@ describe("reconcileText: the row keeps its text, the parent keeps the parsed val
   it("parses as text while the type is unknown", () => {
     const state = { text: "", seen: undefined as unknown };
     expect(reconcileText(state, 5, undefined, "eq")).toEqual({ text: "5", seen: 5 });
+  });
+});
+
+describe("comparison row keys", () => {
+  it("keeps the keys while they match the row count, and mints one per row otherwise", () => {
+    const ids = ["row_a", "row_b"];
+    expect(syncRowIds(ids, 2)).toBeUndefined();
+    const fresh = syncRowIds(ids, 3)!;
+    expect(fresh).toHaveLength(3);
+    expect(new Set(fresh).size).toBe(3);
+    expect(syncRowIds([], 0)).toBeUndefined();
+  });
+
+  it("keeps the next row's own text when an earlier row with unparsed text is removed", () => {
+    // Row 0 holds `abc` on a number field, so its value is undefined. Row 1
+    // has no value either. Each row's text lives under its key.
+    const ids = ["row_a", "row_b"];
+    const texts = new Map<string, TextState>([
+      ["row_a", { text: "abc", seen: undefined }],
+      ["row_b", { text: "", seen: undefined }],
+    ]);
+    const where: WhereEntry[] = [
+      { fieldId: "field_priority", operator: "eq" },
+      { fieldId: "field_priority", operator: "eq" },
+    ];
+
+    const nextIds = withoutRowId(ids, 0);
+    const nextWhere = where.filter((_, i) => i !== 0);
+    expect(syncRowIds(nextIds, nextWhere.length)).toBeUndefined();
+
+    // The surviving row draws under its own key, so it reconciles its own
+    // text. An index key would hand it row 0's `abc`, and `undefined` against
+    // `undefined` would keep that text.
+    expect(nextIds).toEqual(["row_b"]);
+    const drawn = reconcileText(texts.get(nextIds[0]!)!, nextWhere[0]!.value, "number", "eq");
+    expect(drawn.text).toBe("");
   });
 });

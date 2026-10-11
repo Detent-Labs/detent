@@ -6,7 +6,7 @@ import { t } from "../../catalog.js";
 import { listProcesses } from "../../api/client.js";
 import { useFetchOnce } from "./useFetchOnce.js";
 import { useTargetProcessCatalog, type TargetProcessCatalog, type TargetRef } from "./useTargetProcessCatalog.js";
-import { attributeRecord, duplicateRowIds, recordFromRows, reseedRows, rowsFromRecord, sameRecord, type AttributeRow } from "./attributeRows.js";
+import { attributeRecord, attributesToCommit, duplicateRowIds, reseedRows, rowsFromRecord, type AttributeRow } from "./attributeRows.js";
 import { nextRowId } from "../../screens/migrationPlanLogic.js";
 import {
   booleanChoice,
@@ -20,7 +20,9 @@ import {
   switchField,
   switchOperator,
   switchRightSide,
+  syncRowIds,
   valueFromChoice,
+  withoutRowId,
   withValue,
   type Operator,
   type RightSide,
@@ -183,9 +185,22 @@ export function InstanceQueryFormView({ processes, catalog, catalogError, config
     onChange(withoutStatuses);
   };
 
+  // One key per comparison row, so a removal never hands one row's text to
+  // the next (`comparisonRow.ts::syncRowIds`).
+  const [rowIds, setRowIds] = useState(() => where.map(() => nextRowId()));
+  const syncedIds = syncRowIds(rowIds, where.length);
+  if (syncedIds) setRowIds(syncedIds);
+  const whereIds = syncedIds ?? rowIds;
+
   const replaceWhere = (i: number, next: WhereEntry) => set({ where: where.map((w, idx) => (idx === i ? next : w)) });
-  const addWhere = () => set({ where: [...where, { operator: "eq" as const }] });
-  const removeWhere = (i: number) => set({ where: where.filter((_, idx) => idx !== i) });
+  const addWhere = () => {
+    setRowIds([...whereIds, nextRowId()]);
+    set({ where: [...where, { operator: "eq" as const }] });
+  };
+  const removeWhere = (i: number) => {
+    setRowIds(withoutRowId(whereIds, i));
+    set({ where: where.filter((_, idx) => idx !== i) });
+  };
 
   const statusesFieldset = (
     <fieldset {...stylex.props(styles.instanceQueryFormFieldset)}>
@@ -252,12 +267,18 @@ export function InstanceQueryFormView({ processes, catalog, catalogError, config
             </label>
             <StaleMark id={labelFieldId} known={knownFieldIds?.has(labelFieldId)} />
           </div>
+        </>
+      )}
 
+      {/* Drawn on a catalog error too, so the stored comparisons and
+          attributes stay in sight. Their literal controls then refuse input. */}
+      {processId && (
+        <>
           <fieldset {...stylex.props(styles.instanceQueryFormFieldset)}>
             <legend {...stylex.props(styles.instanceQueryFormLegend)}>{t("instanceQuery.comparisons")}</legend>
             {where.map((w, i) => (
               <ComparisonRow
-                key={i}
+                key={whereIds[i]}
                 entry={w}
                 fields={catalog?.fields}
                 ownFields={ownFields}
@@ -434,8 +455,8 @@ function AttributeRows({ attributes, fieldOptions, knownFieldIds, onCommit }: At
 
   const update = (next: AttributeRow[]) => {
     setRows(next);
-    const record = recordFromRows(next);
-    if (!sameRecord(record, attributeRecord(attributes))) onCommit(record);
+    const record = attributesToCommit(next, attributes);
+    if (record) onCommit(record);
   };
   const patchRow = (rowId: string, patch: Partial<AttributeRow>) => update(drawn.map((r) => (r.rowId === rowId ? { ...r, ...patch } : r)));
 

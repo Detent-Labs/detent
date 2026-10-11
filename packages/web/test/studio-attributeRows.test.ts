@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
   attributeRecord,
+  attributesToCommit,
   duplicateRowIds,
   recordFromRows,
   reseedRows,
@@ -82,5 +83,23 @@ describe("reseedRows", () => {
   it("mints a distinct row id per row", () => {
     const rows = rowsFromRecord({ a: "field_a", b: "field_b" });
     expect(new Set(rows.map((r) => r.rowId)).size).toBe(2);
+  });
+});
+
+describe("attributesToCommit", () => {
+  it("commits nothing when the add control appends a row while a key is empty", () => {
+    const config = { region: "field_a" };
+    const rows = [row("r1", "region", "field_a"), row("r2", "", "")];
+    expect(attributesToCommit([...rows, row("r3", "", "")], config)).toBeUndefined();
+  });
+
+  it("commits the record once a typed key changes it", () => {
+    const rows = [row("r1", "region", "field_a"), row("r2", "cost_center", "field_b")];
+    expect(attributesToCommit(rows, { region: "field_a" })).toEqual({ region: "field_a", cost_center: "field_b" });
+  });
+
+  it("commits nothing when a duplicate key repeats an earlier row", () => {
+    const rows = [row("r1", "region", "field_a"), row("r2", "region", "field_b")];
+    expect(attributesToCommit(rows, { region: "field_a" })).toBeUndefined();
   });
 });

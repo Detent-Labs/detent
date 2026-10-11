@@ -49,6 +49,12 @@ export function sameRecord(a: Record<string, string>, b: Record<string, string>)
   return keys.length === Object.keys(b).length && keys.every((key) => Object.hasOwn(b, key) && a[key] === b[key]);
 }
 
+/** The record to commit after an edit to `rows`, or `undefined` when the config already holds it. */
+export function attributesToCommit(rows: readonly AttributeRow[], attributes: unknown): Record<string, string> | undefined {
+  const record = recordFromRows(rows);
+  return sameRecord(record, attributeRecord(attributes)) ? undefined : record;
+}
+
 /**
  * New rows when `attributes` no longer matches what the rows commit, for
  * example after a raw JSON change or a switch to another data source.

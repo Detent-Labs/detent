@@ -1,4 +1,6 @@
 import { describe, expect, it } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { InstanceQueryFormView } from "../src/areas/studio/panels/shared/InstanceQueryForm.js";
 import type { TargetProcessCatalog, TargetRef } from "../src/areas/studio/panels/shared/useTargetProcessCatalog.js";
@@ -58,11 +60,15 @@ describe("the catalog states", () => {
     expect(literalControl(html)).toContain("disabled");
   });
 
-  it("shows one error row and marks no reference stale when the fetch failed", () => {
+  it("shows one error row, keeps the stored rows in sight, refuses literal input and marks nothing stale when the fetch failed", () => {
     const html = render(REFERENCES, undefined, true);
     expect(html.split(CATALOG_ERROR).length - 1).toBe(1);
     expect(html).not.toContain(STALE);
-    expect(html).not.toContain('aria-label="comparison value"');
+    expect(literalControl(html)).toContain("disabled");
+    expect(html).toContain('value="cost_center"');
+    // The error row takes the place of the steps fieldset and the label picker.
+    expect(html).not.toContain("<legend class=\"instanceQueryFormLegend\">steps</legend>");
+    expect(html).not.toContain("label field");
   });
 
   it("marks each reference the loaded catalog lacks, and refuses literal input for the missing field", () => {
@@ -134,7 +140,14 @@ describe("an in comparison", () => {
 });
 
 describe("the incomplete row", () => {
-  it("draws a row without a value differently from a complete one", () => {
+  it("defines the incomplete row as a dashed bottom border in the advisory role", () => {
+    const source = readFileSync(join(import.meta.dir, "../src/areas/studio/panels/shared/InstanceQueryForm.tsx"), "utf8");
+    const block = source.match(/instanceQueryFormRowIncomplete: \{([^}]*)\}/)![1];
+    expect(block).toMatch(/borderBottomStyle: "dashed"/);
+    expect(block).toMatch(/borderBottomColor: colors\.advisory/);
+  });
+
+  it("gives a row without a value the incomplete style, and a complete row none", () => {
     const html = render(
       {
         where: [
@@ -145,8 +158,8 @@ describe("the incomplete row", () => {
       CATALOG,
     );
     const rowClasses = [...html.matchAll(/<div class="([^"]+)"><select aria-label="compared field"/g)].map((m) => m[1]);
-    expect(rowClasses).toHaveLength(2);
-    expect(rowClasses[0]).not.toBe(rowClasses[1]);
+    // The test preload's StyleX stub renders each style's own key as its class.
+    expect(rowClasses).toEqual(["instanceQueryFormRow", "instanceQueryFormRow instanceQueryFormRowIncomplete"]);
   });
 });
 

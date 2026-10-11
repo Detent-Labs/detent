@@ -98,23 +98,37 @@ export function mergeVersionBodies(versions: readonly { version: number; body: u
  * form shows one error row and marks no reference stale.
  */
 export function useTargetProcessCatalog(token: string, targetProcessId: string | undefined): TargetCatalogState {
-  const [result, setResult] = useState<TargetCatalogState>(LOADING);
+  const [result, setResult] = useState<CatalogResult>({ forId: undefined, state: LOADING });
 
   useEffect(() => {
-    setResult(LOADING);
     if (!targetProcessId) return;
     let live = true;
     (async () => {
       const versions = await listVersions(targetProcessId, token);
       const bodies = await Promise.all(versions.map(async (v) => ({ version: v.version, body: await getVersionBody(targetProcessId, v.version, token) })));
-      if (live) setResult({ catalog: mergeVersionBodies(bodies), error: false });
+      if (live) setResult({ forId: targetProcessId, state: { catalog: mergeVersionBodies(bodies), error: false } });
     })().catch(() => {
-      if (live) setResult({ catalog: undefined, error: true });
+      if (live) setResult({ forId: targetProcessId, state: { catalog: undefined, error: true } });
     });
     return () => {
       live = false;
     };
   }, [token, targetProcessId]);
 
-  return result;
+  return catalogStateFor(result, targetProcessId);
+}
+
+/** A fetched state and the process it belongs to. */
+export interface CatalogResult {
+  forId: string | undefined;
+  state: TargetCatalogState;
+}
+
+/**
+ * The state to draw for `targetProcessId`. A result fetched for another
+ * process reads as loading, so a switch never shows the previous process's
+ * error row or catalog, not even for the frame before the new fetch starts.
+ */
+export function catalogStateFor(result: CatalogResult, targetProcessId: string | undefined): TargetCatalogState {
+  return targetProcessId && result.forId === targetProcessId ? result.state : LOADING;
 }

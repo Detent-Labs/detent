@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { fieldsToRefs, mergeVersionBodies } from "../src/areas/studio/panels/shared/useTargetProcessCatalog.js";
+import { catalogStateFor, fieldsToRefs, mergeVersionBodies } from "../src/areas/studio/panels/shared/useTargetProcessCatalog.js";
 
 /**
  * `studio-plugin-config-form`: the form reads a compared field's declared type
@@ -64,5 +64,24 @@ describe("mergeVersionBodies", () => {
     };
     const catalog = mergeVersionBodies([v3, v2, v1]);
     expect(catalog.fields).toEqual([{ id: "field_p", key: "priority", label: "Priority" }]);
+  });
+});
+
+describe("catalogStateFor", () => {
+  const loaded = { catalog: { steps: [], fields: [] }, error: false };
+  const failed = { catalog: undefined, error: true };
+
+  it("returns the result fetched for the current process", () => {
+    expect(catalogStateFor({ forId: "proc_a", state: loaded }, "proc_a")).toBe(loaded);
+    expect(catalogStateFor({ forId: "proc_a", state: failed }, "proc_a")).toBe(failed);
+  });
+
+  it("reads as loading after a switch, before the new process's fetch ends", () => {
+    expect(catalogStateFor({ forId: "proc_a", state: failed }, "proc_b")).toEqual({ catalog: undefined, error: false });
+    expect(catalogStateFor({ forId: "proc_a", state: loaded }, "proc_b")).toEqual({ catalog: undefined, error: false });
+  });
+
+  it("reads as loading when no process is picked", () => {
+    expect(catalogStateFor({ forId: undefined, state: failed }, undefined)).toEqual({ catalog: undefined, error: false });
   });
 });
