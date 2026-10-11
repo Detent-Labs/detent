@@ -158,7 +158,7 @@ verify → archive. See `CLAUDE.md` for the full contract rules and invariants.
 
 ### Smoke suite
 
-`bun run e2e` drives four flows through a browser, against the production
+`bun run e2e` drives five flows through a browser, against the production
 build and a database of its own (`_e2e`). Install the browser once per
 container:
 

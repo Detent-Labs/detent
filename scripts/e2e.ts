@@ -96,7 +96,7 @@ async function runSeed(e2eUrl: string): Promise<void> {
 }
 
 /**
- * Design D3: one account holding every role the four flows need, and one
+ * Design D3: one account holding every role the flows need, and one
  * draft of Laptop Inventory whose body differs from the published v1 in its
  * process label only. Calls `createUser` and `saveDraft` directly, the way
  * `scripts/seed.ts` calls `publishBody` directly.

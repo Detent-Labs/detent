@@ -254,6 +254,9 @@ export const en = {
   "dataList.problemColumnLabel": "Column '{key}' needs a heading.",
   "dataList.problemColumnDuplicate": "Column '{key}' appears more than once.",
   "dataList.problemAttributeNumber": "'{value}' is not a number, and column '{key}' holds numbers.",
+  "dataList.serverChanged":
+    "The server copy changed while you were editing. Your edits are kept. Saving replaces the server values with yours.",
+  "dataList.discardAndReload": "Discard my edits and load the server copy",
   "uiStrings.title": "UI strings",
   "uiStrings.area": "Area",
   "uiStrings.locale": "Locale",
@@ -264,6 +267,9 @@ export const en = {
   "uiStrings.overrideAria": "Override for {key}",
   "uiStrings.unsaved": "{n} unsaved",
   "uiStrings.note": "Clearing an input removes the override, and the shipped wording applies again. Everyone sees a change on their next page load.",
+  "uiStrings.serverChanged":
+    "The server copy changed while you were editing. Your edits are kept. Saving overwrites the stored wording of the keys you edited.",
+  "uiStrings.discardAndReload": "Discard my edits and load the server copy",
   "error.authorization": "You don't have permission to do that.",
   "error.actorResolution": "Your session could not be resolved. Sign in again.",
   "error.requestShape": "That request was malformed.",
@@ -520,6 +526,9 @@ export const de: Record<keyof typeof en, string> = {
   "dataList.problemColumnLabel": "Spalte '{key}' braucht eine Überschrift.",
   "dataList.problemColumnDuplicate": "Spalte '{key}' kommt mehr als einmal vor.",
   "dataList.problemAttributeNumber": "'{value}' ist keine Zahl, und Spalte '{key}' führt Zahlen.",
+  "dataList.serverChanged":
+    "Die Fassung auf dem Server hat sich während Ihrer Bearbeitung geändert. Ihre Änderungen bleiben erhalten. Beim Speichern ersetzen Ihre Werte die Werte auf dem Server.",
+  "dataList.discardAndReload": "Meine Änderungen verwerfen und die Fassung vom Server laden",
   "uiStrings.title": "Oberflächentexte",
   "uiStrings.area": "Bereich",
   "uiStrings.locale": "Sprache",
@@ -531,6 +540,9 @@ export const de: Record<keyof typeof en, string> = {
   "uiStrings.unsaved": "{n} ungespeichert",
   "uiStrings.note":
     "Ein geleertes Feld entfernt den Ersatztext, und der ausgelieferte Text gilt wieder. Alle sehen eine Änderung beim nächsten Laden der Seite.",
+  "uiStrings.serverChanged":
+    "Die Fassung auf dem Server hat sich während Ihrer Bearbeitung geändert. Ihre Änderungen bleiben erhalten. Beim Speichern überschreiben Sie den gespeicherten Ersatztext der Schlüssel, die Sie bearbeitet haben.",
+  "uiStrings.discardAndReload": "Meine Änderungen verwerfen und die Fassung vom Server laden",
   "error.authorization": "Das dürfen Sie nicht.",
   "error.actorResolution": "Ihre Sitzung konnte nicht aufgelöst werden. Melden Sie sich erneut an.",
   "error.requestShape": "Diese Anfrage war fehlerhaft.",

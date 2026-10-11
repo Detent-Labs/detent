@@ -5,6 +5,7 @@ import { listProcesses, listVersions, runMigration } from "../api/client.js";
 import type { ProcessSummary, VersionSummary, MigrationResult } from "../api/types.js";
 import { describeCaughtError } from "../errors.js";
 import { useFail } from "../../../shell/useFail.js";
+import { useRefresh } from "../useRefresh.js";
 import { ErrorBanner } from "../../../shell/ErrorBanner.js";
 import { labelText } from "./instancesLogic.js";
 import { parseVersionInput, buildRunConfirmation, migrationBuckets } from "./migrationsLogic.js";
@@ -76,22 +77,34 @@ export function MigrationsScreen({ token, locale, onUnauthorized }: MigrationsSc
   const [error, setError] = useState<string | undefined>(undefined);
   const [result, setResult] = useState<MigrationResult | undefined>(undefined);
   const fail = useFail(onUnauthorized, (err) => setError(describeCaughtError(err, locale)));
+  const { reloadToken, refresh } = useRefresh();
 
   useEffect(() => {
+    let cancelled = false;
     listProcesses(token)
-      .then(setProcesses)
-      .catch(fail);
-  }, [token, fail]);
+      .then((list) => { if (!cancelled) setProcesses(list); })
+      .catch((err: unknown) => { if (!cancelled) fail(err); });
+    return () => { cancelled = true; };
+  }, [token, fail, reloadToken]);
 
+  // The reset is keyed on `processId` alone, apart from the version fetch:
+  // a reload refetches the list and must keep `fromVersion` and `toVersion`.
+  // Clearing `versions` here also stops the old process's list showing while
+  // the new one loads.
   useEffect(() => {
     setVersions([]);
     setFromVersion("");
     setToVersion("");
+  }, [processId]);
+
+  useEffect(() => {
     if (!processId) return;
+    let cancelled = false;
     listVersions(processId, token)
-      .then(setVersions)
-      .catch(fail);
-  }, [processId, token, fail]);
+      .then((list) => { if (!cancelled) setVersions(list); })
+      .catch((err: unknown) => { if (!cancelled) fail(err); });
+    return () => { cancelled = true; };
+  }, [processId, token, fail, reloadToken]);
 
   const from = parseVersionInput(fromVersion);
   const to = parseVersionInput(toVersion);
@@ -150,6 +163,9 @@ export function MigrationsScreen({ token, locale, onUnauthorized }: MigrationsSc
             ))}
           </select>
         </label>
+        <button type="button" className="btn btn-secondary" onClick={() => { setError(undefined); refresh(); }}>
+          {t(locale, "common.refresh")}
+        </button>
         <button type="button" className="btn btn-primary" onClick={() => void run()} disabled={!canRun || running}>
           {t(locale, "migrations.run")}
         </button>
