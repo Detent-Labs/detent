@@ -1601,12 +1601,6 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   and write routes reveal whether an instance id exists. Anchors:
   `src/runtime/instances.ts`, `src/runtime/claims.ts`,
   `src/runtime/visibility.ts`.
-- **`guard-unsaved-studio-draft` (E1-2, E1-3, E1-4; high)**: The groups link,
-  the account menu and a 401 on save leave or discard an unsaved draft
-  without a prompt, and layout edits do not count as unsaved. Anchors:
-  `packages/web/src/areas/studio/root.tsx`,
-  `packages/web/src/areas/studio/panels/ProcessHeaderBar.tsx`,
-  `packages/web/src/areas/studio/screens/EditScreen.tsx`.
 - **`type-data-comparison-literals` (E2-2, E2-9, E2-16, F-5; high)**: The
   `instance.query` form and the report builder send every comparison value as
   a string, the report builder offers no way to type a list for the

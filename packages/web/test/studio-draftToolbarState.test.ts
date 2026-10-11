@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { isDirty, publishAvailability, nextVersionLabel } from "../src/areas/studio/screens/draftToolbarState.js";
+import { isDirty, isLayoutDirty, isDraftDirty, publishAvailability, nextVersionLabel } from "../src/areas/studio/screens/draftToolbarState.js";
+import { applyReload, applySaveResult, initialSaveState } from "../src/areas/studio/screens/draftSaveLogic.js";
 import type { Draft } from "../src/areas/studio/draft/types.js";
 
 /**
@@ -55,6 +56,39 @@ describe("DraftToolbar's savedBody transition (draftToolbarState.ts)", () => {
     void locallyEdited; // documents the discarded edit; not otherwise asserted on
   });
 
+  it("layout dragged -> conflict (409) -> reload: the reloaded draft reads clean, layout included", () => {
+    const body: Draft = { key: "p" };
+    const storedLayout = { step_a: { x: 0, y: 0 } };
+    let savedLayout: Record<string, unknown> = storedLayout;
+    let saveState = initialSaveState(3, storedLayout);
+
+    // A step drag writes a new layout object into the save state.
+    saveState = { ...saveState, layout: { ...saveState.layout, step_a: { x: 40, y: 0 } } };
+    expect(isDraftDirty(body, structuredClone(body), saveState.layout, savedLayout)).toBe(true);
+
+    // The save answers 409: `applySaveResult` keeps the dragged layout, and
+    // doSave's `if (result)` branch leaves `savedLayout` alone.
+    const sentLayout = saveState.layout;
+    saveState = applySaveResult(saveState, undefined, sentLayout);
+    expect(saveState.conflict).toBe(true);
+    expect(isDraftDirty(body, structuredClone(body), saveState.layout, savedLayout)).toBe(true);
+
+    // reload(): `applyReload`, then `onSavedLayoutChange(record.layout)`. The
+    // stored layout is someone else's, neither the dragged nor the first one.
+    const record = { revision: 4, layout: { step_b: { y: 0, x: 8 }, step_a: { y: 0, x: 0 } } };
+    saveState = applyReload(record);
+    savedLayout = record.layout;
+    expect(isDraftDirty(body, structuredClone(body), saveState.layout, savedLayout)).toBe(false);
+  });
+
+  it("a layout-only difference reads dirty, so Publish saves first", () => {
+    // runPublish's gate: `isDraftDirty(draft, savedBody, saveState.layout, savedLayout)`.
+    const body: Draft = { key: "p" };
+    const savedLayout = { step_a: { x: 0, y: 0 } };
+    const layout = { ...savedLayout, waypoints: { path_a: [{ x: 4, y: 4 }] } };
+    expect(isDraftDirty(body, structuredClone(body), layout, savedLayout)).toBe(true);
+  });
+
   it("reload -> edit -> publish: editing after a reload is dirty again, so the fix does not turn the gate off permanently", () => {
     const serverBody: Draft = { key: "expense-approval", label: { en: "Expense approval" } };
     let savedBody = structuredClone(serverBody);
@@ -99,17 +133,25 @@ describe("DraftToolbar's savedBody transition (draftToolbarState.ts)", () => {
 describe("DraftToolbar's onSaved callback (design.md: onSaved vs the savedBody wrapper)", () => {
   it("a successful save advances savedBody and fires onSaved once", () => {
     let savedBody = structuredClone({ key: "p" });
+    let savedLayout: Record<string, unknown> = { step_a: { x: 0, y: 0 } };
     let onSavedCount = 0;
 
-    // doSave()'s success branch: `if (result) { onSavedBodyChange(draft); onSaved?.(); }`
+    // doSave()'s success branch:
+    // `if (result) { onSavedBodyChange(draft); onSavedLayoutChange(result.layout); onSaved?.(); }`
     const draft = { key: "p", description: { en: "saved" } };
-    const result = { revision: 2, layout: {} };
+    // The layout the save sent, and the answer: the same layout in the key
+    // order the database returns.
+    const sentLayout = { step_a: { x: 40, y: 0 } };
+    const result = { revision: 2, layout: { step_a: { y: 0, x: 40 } } };
+    expect(isLayoutDirty(sentLayout, savedLayout)).toBe(true);
     if (result) {
       savedBody = structuredClone(draft);
+      savedLayout = result.layout;
       onSavedCount++;
     }
 
     expect(isDirty(draft, savedBody)).toBe(false);
+    expect(isLayoutDirty(sentLayout, savedLayout)).toBe(false);
     expect(onSavedCount).toBe(1);
   });
 
@@ -130,8 +172,9 @@ describe("DraftToolbar's onSaved callback (design.md: onSaved vs the savedBody w
     let savedBody = structuredClone({ key: "p" });
     let onSavedCount = 0;
 
-    // reload()'s conflict-recovery branch: `onSavedBodyChange(body);` alone —
-    // no `onSaved?.()` call sits beside it.
+    // reload()'s conflict-recovery branch: `onSavedBodyChange(body);` and
+    // `onSavedLayoutChange(record.layout);` — no `onSaved?.()` call sits
+    // beside them.
     const serverBody = { key: "p", description: { en: "someone else's" } };
     savedBody = structuredClone(serverBody);
 
@@ -162,6 +205,60 @@ describe("isDirty", () => {
     const a = { workflow: { steps: [{ id: "step_a" }] } };
     const b = { workflow: { steps: [{ id: "step_b" }] } };
     expect(isDirty(a, b)).toBe(true);
+  });
+});
+
+/**
+ * A stored layout comes back in the key order of the database, so the compare
+ * cannot read `JSON.stringify` order as a difference. The draft counts as
+ * unsaved when the body or the layout differs from the last save.
+ */
+describe("isLayoutDirty and isDraftDirty (a layout change counts as unsaved)", () => {
+  const body: Draft = { key: "p" };
+  const layout = { step_a: { x: 1, y: 2 }, canvasEdgeStyle: "step" };
+
+  it("isLayoutDirty is false for equal layouts in another key order", () => {
+    const reordered = { canvasEdgeStyle: "step", step_a: { y: 2, x: 1 } };
+    expect(isLayoutDirty(layout, reordered)).toBe(false);
+  });
+
+  it("isLayoutDirty is true when a coordinate moved", () => {
+    expect(isLayoutDirty({ ...layout, step_a: { x: 1, y: 3 } }, layout)).toBe(true);
+  });
+
+  it("isLayoutDirty is true when a key was added", () => {
+    expect(isLayoutDirty({ ...layout, step_b: { x: 0, y: 0 } }, layout)).toBe(true);
+  });
+
+  it("isLayoutDirty is true when a key was removed", () => {
+    expect(isLayoutDirty({ step_a: { x: 1, y: 2 } }, layout)).toBe(true);
+  });
+
+  it("isLayoutDirty reads array order: a reordered waypoint list differs", () => {
+    const a = { waypoints: { path_a: [{ x: 0, y: 0 }, { x: 8, y: 8 }] } };
+    const b = { waypoints: { path_a: [{ x: 8, y: 8 }, { x: 0, y: 0 }] } };
+    expect(isLayoutDirty(a, b)).toBe(true);
+    expect(isLayoutDirty(a, structuredClone(a))).toBe(false);
+  });
+
+  it("isLayoutDirty reads a key holding undefined as an absent key", () => {
+    expect(isLayoutDirty({ ...layout, canvasEdgeStyle: undefined }, { step_a: { x: 1, y: 2 } })).toBe(false);
+  });
+
+  it("isDraftDirty is false when body and layout both equal the last save", () => {
+    expect(isDraftDirty(body, structuredClone(body), layout, { canvasEdgeStyle: "step", step_a: { y: 2, x: 1 } })).toBe(false);
+  });
+
+  it("isDraftDirty is true for a layout-only difference", () => {
+    expect(isDraftDirty(body, structuredClone(body), { ...layout, step_a: { x: 9, y: 2 } }, layout)).toBe(true);
+  });
+
+  it("isDraftDirty is true for a body-only difference", () => {
+    expect(isDraftDirty({ key: "q" }, body, layout, layout)).toBe(true);
+  });
+
+  it("isDraftDirty is true when both differ", () => {
+    expect(isDraftDirty({ key: "q" }, body, { ...layout, step_a: { x: 9, y: 2 } }, layout)).toBe(true);
   });
 });
 

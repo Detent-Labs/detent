@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, type Dispatch, type SetStateAction } from "react";
 import { useDraft } from "../draft/store.js";
 import { saveDraft, getDraft, deleteDraft, publishDraft } from "../api/client.js";
 import { applySaveResult, applyReload, type DraftSaveState } from "../screens/draftSaveLogic.js";
-import { isDirty } from "../screens/draftToolbarState.js";
+import { isDraftDirty } from "../screens/draftToolbarState.js";
 import { describeCaughtError } from "../errors.js";
 import { useFail } from "../../../shell/useFail.js";
 import type { Draft } from "../draft/types.js";
@@ -12,18 +12,25 @@ export interface DraftToolbarProps {
   processId: string;
   token: string;
   saveState: DraftSaveState;
-  onSaveState: (next: DraftSaveState) => void;
+  /** The `setState` signature, so a save applies its answer to the state as it
+   * stands when the answer arrives, not to the state the request started from. */
+  onSaveState: Dispatch<SetStateAction<DraftSaveState>>;
   /** The body last known to be persisted, and its setter — lifted into
    * `EditorArea` (design.md: "the header bar reads lifted DraftToolbar
-   * state") so the new process-identity header bar can read `isDirty`
-   * too. `DraftToolbar` still computes both; only where they live moved up
+   * state") so the header bar can read `dirtyNow`, built from `isDraftDirty`.
+   * `DraftToolbar` still computes both; only where they live moved up
    * one level, mirroring how `saveState`/`onSaveState` already work. */
   savedBody: Draft;
   onSavedBodyChange: (body: Draft) => void;
+  /** The layout last known to be persisted, beside `savedBody`. A save and a
+   * reload advance it. Publish saves first when the body or the layout differs
+   * from these two. */
+  savedLayout: Record<string, unknown>;
+  onSavedLayoutChange: (layout: Record<string, unknown>) => void;
   /** Fired only from `doSave()`'s success branch — never from `reload()`'s
-   * conflict-recovery branch, which calls `onSavedBodyChange` alone. A mere
-   * reload is not a save, and must not advance `EditorArea`'s
-   * `lastSavedAt`. */
+   * conflict-recovery branch, which calls `onSavedBodyChange` and
+   * `onSavedLayoutChange` alone. A mere reload is not a save, and must not
+   * advance `EditorArea`'s `lastSavedAt`. */
   onSaved?: () => void;
   publishResult: PublishResult | null;
   onPublishResult: (result: PublishResult | null) => void;
@@ -88,6 +95,8 @@ export function useDraftToolbarActions({
   onSaveState,
   savedBody,
   onSavedBodyChange,
+  savedLayout,
+  onSavedLayoutChange,
   onSaved,
   onPublishResult,
   onDiscarded,
@@ -114,12 +123,14 @@ export function useDraftToolbarActions({
   const doSave = async (): Promise<boolean> => {
     setSaving(true);
     try {
-      const result = await saveDraft(processId, { body: draft, layout: saveState.layout, revision: saveState.revision }, token);
+      const sentLayout = saveState.layout;
+      const result = await saveDraft(processId, { body: draft, layout: sentLayout, revision: saveState.revision }, token);
       if (result) {
         onSavedBodyChange(draft);
+        onSavedLayoutChange(result.layout);
         onSaved?.();
       }
-      onSaveState(applySaveResult(saveState, result));
+      onSaveState((current) => applySaveResult(current, result, sentLayout));
       return result !== undefined;
     } finally {
       setSaving(false);
@@ -163,7 +174,7 @@ export function useDraftToolbarActions({
    */
   const runPublish = () =>
     withUnauthorized(async () => {
-      if (isDirty(draft, savedBody) && !(await doSave())) {
+      if (isDraftDirty(draft, savedBody, saveState.layout, savedLayout) && !(await doSave())) {
         setPendingDialog(null);
         return;
       }
@@ -189,6 +200,9 @@ export function useDraftToolbarActions({
       // offers, so it has to clear a stale report too.
       onCanPublishChange?.(record.canPublish);
       onSaveState(applyReload({ revision: record.revision, layout: record.layout }));
+      // The layout is part of the same coincidence: the reloaded layout is both
+      // the current and the saved one.
+      onSavedLayoutChange(record.layout);
     });
 
   /**

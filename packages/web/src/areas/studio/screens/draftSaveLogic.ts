@@ -17,10 +17,24 @@ export function initialSaveState(revision: number, layout: Record<string, unknow
   return { revision, layout, conflict: false };
 }
 
-/** A save's server response: `undefined` means the API layer saw a 409. */
-export function applySaveResult(state: DraftSaveState, result: { revision: number; layout: Record<string, unknown> } | undefined): DraftSaveState {
-  if (result === undefined) return { ...state, conflict: true };
-  return { revision: result.revision, layout: result.layout, conflict: false };
+/**
+ * A save's server response: `undefined` means the API layer saw a 409, which
+ * leaves the current layout as it is. A success adopts the answer's revision,
+ * and its layout only while `current.layout` is still the object the request
+ * sent. Every layout edit builds a new object, so identity means no edit ran
+ * during the request.
+ */
+export function applySaveResult(
+  current: DraftSaveState,
+  result: { revision: number; layout: Record<string, unknown> } | undefined,
+  sentLayout: Record<string, unknown>,
+): DraftSaveState {
+  if (result === undefined) return { ...current, conflict: true };
+  return {
+    revision: result.revision,
+    layout: current.layout === sentLayout ? result.layout : current.layout,
+    conflict: false,
+  };
 }
 
 /** Reloading after a conflict adopts the stored revision/layout and clears the conflict, regardless of the state it started from. */
