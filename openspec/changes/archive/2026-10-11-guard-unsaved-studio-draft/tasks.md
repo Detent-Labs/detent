@@ -35,4 +35,4 @@
 - [x] 5.1 Run `bun run typecheck` and `bun run build`. Verify both exit 0.
 - [x] 5.2 Run the full `bun test` with DATABASE_URL set, through `scripts/test-gated.sh`. Verify zero failures and a skip count at or under the floor.
 - [x] 5.3 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` and the same with `whitespace.sh`. Verify both exit 0.
-- [ ] 5.4 Check the production build in a real browser. Verify that every exit prompts on an unsaved draft and none prompts on a clean one. Verify the 401 restore works end to end. Run `/impeccable critique` and `/impeccable audit` on the notice.
+- [x] 5.4 Check the production build in a real browser. Verify that every exit prompts on an unsaved draft and none prompts on a clean one. Verify the 401 restore works end to end. Run `/impeccable critique` and `/impeccable audit` on the notice.
