@@ -67,8 +67,7 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
   // Whether the open draft carries unsaved changes, reported up from
   // `ProcessSurface` via `EditScreen`'s `onDirtyChange` prop. A ref, not
   // `useState`: nothing here renders differently based on dirtiness, it is
-  // read only inside a click handler (design.md: "Report dirtiness upward
-  // through one callback prop into a ref").
+  // read only inside event handlers.
   const dirtyRef = useRef(false);
   // The studio's area nav reserves no element for a draft control any more.
   // Save, Discard draft and Publish render directly in the header bar, inside
@@ -78,14 +77,37 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
     if (route.name !== "edit") dirtyRef.current = false;
   }, [route.name]);
 
-  // Guards every navigation away from an open, unsaved draft behind one
-  // confirmation (design.md: "Guard `navigate` once, at the point `root.tsx`
-  // hands it downward"). `dest`, not `route`, so the parameter does not
-  // shadow the outer `route` above.
+  // The one prompt for leaving an open, unsaved draft. A clean draft, or any
+  // screen but the edit screen, leaves `dirtyRef` false and asks nothing.
+  const confirmLeave = () => !dirtyRef.current || confirm(t("app.leaveDraftConfirm"));
+
+  // Each exit from the draft goes through `confirmLeave`: in-area navigation,
+  // an href leaving the area, and the account menu's logout. `dest`, not
+  // `route`, so the parameter does not shadow the outer `route` above.
+  // `onUnauthorized` stays raw: a dead session asks nothing.
   const guardedNavigate = (dest: Route, opts?: NavigateOptions) => {
-    if (dirtyRef.current && dest.name !== "edit" && !confirm(t("app.leaveDraftConfirm"))) return;
+    if (dest.name !== "edit" && !confirmLeave()) return;
     navigate(dest, opts);
   };
+  const guardedGo = (href: string, opts?: NavigateOptions) => {
+    if (!confirmLeave()) return;
+    go(href, opts);
+  };
+  const guardedLogout = () => {
+    if (!confirmLeave()) return;
+    onLogout();
+  };
+
+  // The browser words this prompt. Modern browsers need `preventDefault()` to
+  // raise it. It fires for tab close, reload and a new address, never for a
+  // step between entries of the page, which raises `popstate` instead.
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (dirtyRef.current) e.preventDefault();
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, []);
 
   // `matchRoute` falls back to the process list, which a curator holding only
   // `system:templates` cannot read. Move them to the screen they can, rather
@@ -149,9 +171,9 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
       session={session}
       locale={locale}
       onLocaleChange={onLocaleChange}
-      onLogout={onLogout}
-      onGoToArea={(a) => go(`/${a}`)}
-      onGoToProfile={() => go(PROFILE_PATH)}
+      onLogout={guardedLogout}
+      onGoToArea={(a) => guardedGo(`/${a}`)}
+      onGoToProfile={() => guardedGo(PROFILE_PATH)}
       nav={nav}
     >
       {!may(required) && <MissingRole roles={required} />}
@@ -166,7 +188,7 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
               stepId={route.stepId}
               token={session.token}
               roles={session.roles}
-              go={go}
+              go={guardedGo}
               navigate={guardedNavigate}
               onUnauthorized={onUnauthorized}
               onDirtyChange={(d) => {
