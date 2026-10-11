@@ -1572,6 +1572,230 @@ found one gap outside that change's own scope.
   which only re-wrapped the existing bare text into styled spans; they are
   now more visible as prominent field labels instead of small inline text.
 
+## Open from the 2026-10-10 audit (one OpenSpec change each)
+
+The audit of 2026-10-10 sits in
+[`AUDIT.md`](../openspec/changes/archive/2026-10-10-audit-record/AUDIT.md),
+with one report per area under
+[`reports/`](../openspec/changes/archive/2026-10-10-audit-record/reports/).
+Each finding keeps its full text under the same id in `AUDIT.md` and in
+`reports/<area>.md`. Every line number in the record is a historical anchor
+of `5f41cd8a`. Each fix change deletes its own entries in the commit that
+archives it, and `sweep-docs-drift-2026-10` re-points the line citations of
+other entries. C-4 merges D-2, and C-6 merges F-6.
+
+- **`fix-subprocess-wait-state` (B-1, B-2, A-5; high)**: A guardless path
+  leaves a subprocess step before any child exists, a timer exit leaves the
+  child running, and publish checks view flags against a `child` the runtime
+  never supplies. Anchors: `src/engine/transition.ts`,
+  `src/engine/subprocess.ts`, `src/cel/check.ts`.
+- **`fix-handler-assignment-registry` (B-3, B-14; high)**: The handlers
+  `process.start` and `instance.transition` resolve assignments with the
+  static strategy alone, through a second function named
+  `createDefaultAssignmentRegistry`. Anchors:
+  `src/handlers/process-start.ts`, `src/handlers/instance-transition.ts`,
+  `src/engine/assignment-strategies.ts`.
+- **`close-instance-reads-on-write-paths` (C-1, C-2, C-3, C-16, D-7; high)**:
+  Cancel and claim return instance data to a caller who lacks the read right,
+  a visibility revoke leaves some reads open and accepts an unknown account,
+  and write routes reveal whether an instance id exists. Anchors:
+  `src/runtime/instances.ts`, `src/runtime/claims.ts`,
+  `src/runtime/visibility.ts`.
+- **`keep-admin-edits-on-refresh` (F-1, F-7, F-17, F-18; high)**: A focus
+  refetch discards unsaved input in the data list and UI strings editors,
+  stale responses overwrite newer ones in the admin lists, the migrations
+  screen has no refresh control, and the Users and Groups screens reload the
+  whole directory on every focus. Anchors:
+  `packages/web/src/areas/admin/useRefresh.ts`,
+  `packages/web/src/shell/usePagedList.ts`,
+  `packages/web/src/areas/admin/screens/MigrationsScreen.tsx`.
+- **`guard-unsaved-studio-draft` (E1-2, E1-3, E1-4; high)**: The groups link,
+  the account menu and a 401 on save leave or discard an unsaved draft
+  without a prompt, and layout edits do not count as unsaved. Anchors:
+  `packages/web/src/areas/studio/root.tsx`,
+  `packages/web/src/areas/studio/panels/ProcessHeaderBar.tsx`,
+  `packages/web/src/areas/studio/screens/EditScreen.tsx`.
+- **`type-data-comparison-literals` (E2-2, E2-9, E2-16, F-5; high)**: The
+  `instance.query` form and the report builder send every comparison value as
+  a string, the query form's attribute rows lose focus on each keystroke, and
+  a failed catalog fetch marks every reference as stale. Anchors:
+  `packages/web/src/areas/studio/panels/shared/InstanceQueryForm.tsx`,
+  `packages/web/src/areas/reporting/screens/ReportBuilderScreen.tsx`,
+  `packages/web/src/areas/studio/panels/shared/useTargetProcessCatalog.ts`.
+- **`harden-cel-check-sites` (A-1, A-3, A-4; medium)**: CEL in a
+  `process.start` input mapping skips every publish check, publish never
+  compiles a `matches()` regex, and publish accepts a guard, view flag or
+  `validation.rule` whose type is not `bool`. Anchors: `src/cel/check.ts`,
+  `src/cel/eval.ts`, `src/handlers/process-start.ts`.
+- **`tighten-publish-contract-checks` (A-2, A-8; medium)**: The idempotent
+  compile branch accepts a hand-written cancel sink of any shape, and publish
+  stores `Action.execution` and `Action.idempotencyKey`, which nothing reads.
+  Anchors: `src/schema/compile.ts`, `src/schema/definition.ts`,
+  `src/engine/transition.ts`.
+- **`bind-instance-transition-target` (D-3; medium)**: The
+  `instance.transition` handler drives a target instance with system rights,
+  and participant data decides which instance that is. Anchors:
+  `src/handlers/instance-transition.ts`, `src/engine/definitions.ts`.
+- **`secret-references-in-action-config` (G-5; medium)**: Credentials for
+  `http.request` sit in plain text in the immutable definition and in every
+  outbox row. Anchors: `src/handlers/http.ts`, `src/engine/transition.ts`,
+  `src/engine/admin-queries.ts`.
+- **`fix-outbox-lease-and-dead-letter` (B-4, B-5, B-12; medium)**: The outbox
+  lease covers the whole batch while the deadline covers one row, a row whose
+  writeback always fails never reaches the dead letters, and the retry
+  backoff and `maxAttempts` have no bound. Anchors: `src/engine/outbox.ts`,
+  `src/schema/definition.ts`.
+- **`bound-worker-scan-costs` (B-6, B-7, B-8, B-11; medium)**: The claim scan
+  and the retention sweep grow with every instance ever run, one tenant's
+  hung target stops the outbox for all tenants, and the admin outbox list has
+  no index for its sort order. Anchors: `src/engine/resolution.ts`,
+  `src/engine/retention.ts`, `src/engine/host.ts`.
+- **`harden-reporting-export-and-queries` (C-4 (= D-2), C-5, C-13, C-19;
+  medium)**: The CSV export does not neutralize formulas, report and CSV stop
+  at 50 rows without saying so, an editor can displace a report's owner, and
+  the aggregates load the whole range into memory. Anchors:
+  `src/runtime/reports.ts`, `src/engine/reporting.ts`,
+  `src/http/reporting-routes.ts`.
+- **`harden-tenancy-provisioning` (C-8, C-9, C-14, C-15; medium)**: In SaaS
+  mode a token from an external identity provider never resolves to its
+  tenant, tenant pools open more than once and never close, two tenants can
+  share one database, and the provisioning connection drops its URL
+  parameters. Anchors: `src/auth/jwt.ts`, `src/tenancy/provision.ts`,
+  `src/tenancy/connections.ts`.
+- **`harden-http-error-surface` (D-1, D-8, C-10, C-11, C-17; medium)**: An
+  error in the login route escapes `mapError`, so an anonymous caller can
+  receive the runtime's development error page, the JWT check fixes no
+  algorithm list and does not need `exp` from external issuers, and a bad
+  cursor, a saved report with an invalid date and a claim on an unknown
+  instance each return 500. Anchors: `src/auth/login.ts`, `src/auth/jwt.ts`,
+  `src/pagination.ts`.
+- **`harden-studio-json-surface` (E1-1, E1-5, E1-13; medium)**: The JSON
+  surface refuses every apply once `collaboration` is set, a nested shape
+  mismatch passes its guard and crashes the studio area, and the guard tests
+  stay green when a schema key is missing. Anchors:
+  `packages/web/src/areas/studio/draft/load-guard.ts`,
+  `packages/web/src/areas/studio/screens/EditScreen.tsx`,
+  `packages/web/test/studio-load-guard.test.ts`.
+- **`fix-condition-and-path-builders` (E2-1, E2-6, E2-10, E2-14, E2-17;
+  medium)**: A manual path keeps a hidden guard that hides its button at
+  runtime, "+ Add row" deletes diverging visibility overrides, the condition
+  builder cannot read back integer or negative literals, a boolean value
+  field shows "No" on an empty row, and "Add path" always creates a manual
+  path. Anchors: `packages/web/src/areas/studio/panels/PathsPanel.tsx`,
+  `packages/web/src/areas/studio/panels/FieldCatalogPanel.tsx`,
+  `packages/web/src/areas/studio/panels/shared/conditionLogic.ts`.
+- **`fix-subprocess-step-editor` (E2-3, E2-4, E2-5, E2-12, E2-18; medium)**:
+  The subprocess editor offers parent fields as `inputMapping` keys and shows
+  "pinned" without writing it, a step kind switch leaves keys behind, the
+  mapping editor overwrites or drops rows, and the contract panel stores an
+  outcome untrimmed. Anchors:
+  `packages/web/src/areas/studio/panels/SubprocessSpecEditor.tsx`,
+  `packages/web/src/areas/studio/panels/shared/FieldExpressionMapEditor.tsx`,
+  `packages/web/src/areas/studio/draft/performedBy.ts`.
+- **`sync-studio-editor-state` (E2-8, E2-13, E2-15, E1-7; medium)**: Stale
+  JSON text in the plugin editor lands in another entity, a cleared deadline
+  leaves a timer with no input, a removed data source leaves field
+  references dangling, and each keystroke in a `process.start` process id
+  fires a `GET /processes`. Anchors:
+  `packages/web/src/areas/studio/panels/shared/PluginEnvelopeEditor.tsx`,
+  `packages/web/src/areas/studio/panels/TimersPanel.tsx`,
+  `packages/web/src/areas/studio/draft/chainingFetch.ts`.
+- **`guard-field-key-renames` (E2-7; medium)**: A label change renames the
+  field key, and the CEL expressions that read the old key keep it. Anchors:
+  `packages/web/src/areas/studio/panels/FieldCatalogPanel.tsx`,
+  `packages/web/src/areas/studio/panels/fieldCatalogLogic.ts`,
+  `packages/web/src/areas/studio/draft/deriveKey.ts`.
+- **`cut-studio-render-cost` (E2-11, E1-6, K-1; medium)**: Hidden tabs
+  recompute on every keystroke, the canvas reparses every guard on each
+  pointer move, and the studio chunk exceeds the 500 kB warning threshold of
+  Vite. Anchors: `packages/web/src/areas/studio/panels/FieldMatrixGrid.tsx`,
+  `packages/web/src/areas/studio/canvas/CanvasView.tsx`,
+  `packages/web/vite.config.ts`.
+- **`fix-form-ui-empty-values` (F-3, F-8, F-14, F-16; medium)**: The package
+  form-ui and the engine disagree on cleared fields, the form accepts input
+  when no path is available, the tab announcement expands `$` patterns from
+  the label, and form-ui declares React 18 as its peer while the consumer
+  uses React 19. Anchors: `packages/form-ui/src/FieldForm.tsx`,
+  `packages/form-ui/src/tabs.ts`, `packages/form-ui/package.json`.
+- **`fix-admin-instance-and-outbox-screens` (F-2, F-9, F-10; medium)**: The
+  instance header shows an expired claim and a stale `transitionSeq`, the
+  header reports no armed timer once 201 timers run, and the outbox discards
+  a row without a confirmation. Anchors:
+  `packages/web/src/areas/admin/screens/InstanceScreen.tsx`,
+  `packages/web/src/areas/admin/screens/OutboxScreen.tsx`,
+  `src/engine/admin-queries.ts`.
+- **`fix-reporting-builder-ui` (C-6 (= F-6), F-4, F-11; medium)**: The date
+  filter of the report builder computes in UTC and drops the last day, the
+  reporting area does not end the session on a 401, and a failed column
+  choice appears as an empty choice. Anchors:
+  `packages/web/src/areas/reporting/screens/ReportBuilderScreen.tsx`,
+  `packages/web/src/areas/reporting/root.tsx`,
+  `packages/web/src/areas/reporting/screens/ColumnEditor.tsx`.
+- **`close-ci-gate-gaps` (G-1, G-2, G-6, G-7, G-8, G-11, G-12; medium)**: The
+  CI lockfile gate checks a lockfile that `bun install` rewrote first, two
+  gates pass when `git diff` fails, Dependabot never updates `bun.lock`, the
+  gates `silent-green.sh` and `machine-paths.sh` miss known cases, the
+  workflow sets no `permissions`, and the test preload leaves a cluster-wide
+  login role with a fixed password. Anchors: `.github/workflows/check.yml`,
+  `scripts/gates/range.sh`, `test/preload-db.ts`.
+- **`widen-test-guards` (G-3, G-4, G-9, G-10, A-6; medium)**: The index guard
+  in `migration.test.ts` checks an empty barrel, the example hash and
+  round-trip tests cover a subset of the examples, three tests assert only
+  what a response is not, and seven invariants have no rejecting test.
+  Anchors: `test/migration.test.ts`, `test/view-layout-hash.test.ts`,
+  `test/strip-compiled.test.ts`.
+- **`fix-studio-screen-races` (E1-8, E1-9, E1-10; low)**: Late responses
+  overwrite a newer selection in the player and in Tools, the migration plan
+  drops a duplicate mapping without a message, and "Create" on the Templates
+  screen overwrites a template with the same key. Anchors:
+  `packages/web/src/areas/studio/screens/PlayerScreen.tsx`,
+  `packages/web/src/areas/studio/screens/migrationPlanLogic.ts`,
+  `packages/web/src/areas/studio/screens/TemplatesScreen.tsx`.
+- **`harden-shell-session-and-routing` (F-12, F-13, E1-11; low)**: Tabs do not
+  share the session, so a stale tab can restore a logged-out session, the
+  first page load waits on `/ui-strings` with no time limit, and a malformed
+  percent escape in the address crashes the studio area. Anchors:
+  `packages/web/src/shell/App.tsx`, `packages/web/src/main.tsx`,
+  `packages/web/src/areas/studio/routing.ts`.
+- **`batch-notification-recipients` (D-4, D-6; low)**: The
+  `notification.email` handler mails an unbounded group in one
+  all-or-nothing send, and the code never checks an account's email as an
+  address. Anchors: `src/handlers/notification-email.ts`,
+  `src/http/admin-routes.ts`, `src/auth/users.ts`.
+- **`tidy-engine-internals` (B-9, B-15, B-16, C-12; low)**: Some readers skip
+  the pin hash check, `initSchema` carries backward migrations, reporting
+  queries the history twice, one `tx.unsafe` call inserts an unquoted
+  identifier, and the definition cache keeps every draft snapshot until a
+  restart. Anchors: `src/engine/timers.ts`, `src/engine/store.ts`,
+  `src/engine/definitions.ts`.
+- **`catalog-studio-literal-strings` (E2-19; low)**: Visible studio text sits
+  as literals in the code instead of in the catalog. Anchors:
+  `packages/web/src/areas/studio/panels/TimersPanel.tsx`,
+  `packages/web/src/areas/studio/panels/SubprocessSpecEditor.tsx`,
+  `packages/web/src/areas/studio/panels/shared/PluginEnvelopeEditor.tsx`.
+- **`remove-dead-exports` (B-14, C-18, D-10, E1-12, E2-20, F-15; low)**:
+  Exports in the engine, tenancy, handlers, studio, reporting and form-ui
+  have no importer, and some functions and arguments have no caller.
+  Anchors: `src/engine/assignment-strategies.ts`, `src/tenancy/store.ts`,
+  `packages/web/src/areas/reporting/api/client.ts`.
+- **`fix-openapi-auth-descriptions` (H-1, H-2, H-3; low)**: The file
+  `docs/openapi.yaml` describes `GET /instances` in part, lets a candidate
+  without a claim submit, and states other auth rules that lag the code.
+  Anchors: `docs/openapi.yaml`, `src/http/routes.ts`,
+  `src/runtime/internal.ts`.
+- **`sweep-docs-drift-2026-10` (H-4, H-5, H-6, H-7, H-8, H-9, H-10, H-11,
+  H-12, A-7, A-9, B-10, B-13, D-9, G-13; medium)**: The authoring guide
+  promises that a group change reaches a waiting step, and the guide,
+  `ROADMAP.md`, `README.md`, `CLAUDE.md`, two specs, line anchors in this
+  file and several code comments state stale facts. Anchors:
+  `docs/authoring-guide.md`, `ROADMAP.md`, `src/auth/authorize.ts`.
+- **`decide-developer-list-on-publish` (D-5; low)**: The Developer access list
+  has no effect on the two publish routes. Anchors:
+  `src/http/studio-routes.ts`, `src/http/routes.ts`.
+- **`postgres-login-rate-limit` (C-7; medium)**: The login lockout counts per
+  email across all tenants, so a success in one tenant resets the window in
+  another. Anchors: `src/auth/login.ts`.
+
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 
 Each entry below names a cut somebody proposed, the reason a reviewer refused
