@@ -826,7 +826,7 @@ test("rejects a migration transform with three nested comprehensions", () => {
 // forms and anywhere in the tree. Both callers run the AST rules inside an
 // empty catch, so a pattern that fails to compile must come back as a message.
 // A swallowed throw would let the bad pattern through and fail these tests.
-const matchFields = [field("s", "string"), field("p", "string"), field("items", "list")];
+const matchFields = [field("s", "string"), field("p", "string"), field("b", "boolean"), field("items", "list")];
 const matchIssues = (src: string) => validateProcessBody(body({ fields: matchFields, steps: [guardStep(src)] }));
 const NO_COMPILE = "does not compile as a JavaScript RegExp";
 
@@ -919,4 +919,48 @@ test("checkAgainstFields applies the matches rule to a scratchpad expression", (
   expect(bad.ok).toBe(false);
   if (!bad.ok) expect(bad.message).toContain(NO_COMPILE);
   expect(checkAgainstFields('data.s.matches("^[a-z]+$")', fields)).toEqual({ ok: true });
+});
+
+// ---- unary operators ---------------------------------------------------------
+// A unary operator (`!`, `-`) keeps its single operand as a node in `args`, not
+// in an array. Every AST rule must still walk it.
+test("finds a matches call under a negation", () => {
+  const bad = matchIssues('!data.s.matches("(")');
+  expect(bad.length).toBe(1);
+  expect(bad[0].loc).toBe(GUARD_LOC);
+  expect(bad[0].message).toContain(NO_COMPILE);
+  const nonLiteral = matchIssues("!data.s.matches(data.p)");
+  expect(nonLiteral.length).toBe(1);
+  expect(nonLiteral[0].message).toContain("matches() needs a string literal as its pattern");
+});
+
+test("finds a matches call under a double negation, a negated group and a negated operand", () => {
+  expect(matchIssues('!!data.s.matches("(")')[0]?.message).toContain(NO_COMPILE);
+  expect(matchIssues('!(data.b || data.s.matches("("))')[0]?.message).toContain(NO_COMPILE);
+  expect(matchIssues("data.b && !data.s.matches(data.p)")[0]?.message).toContain("string literal");
+});
+
+test("finds a matches call under a unary minus around a ternary", () => {
+  const issues = matchIssues('-(data.s.matches("(") ? 1 : 2) == -1');
+  expect(issues.length).toBe(1);
+  expect(issues[0].message).toContain(NO_COMPILE);
+});
+
+test("accepts a negated valid pattern and a negated two-deep comprehension", () => {
+  expect(matchIssues('!data.s.matches("^[a-z]+$")')).toEqual([]);
+  expect(matchIssues("!data.items.all(a, data.items.exists(b, a == b))")).toEqual([]);
+});
+
+test("rejects a negated three-deep comprehension with the nesting limit", () => {
+  const issues = matchIssues("!data.items.all(a, data.items.all(b, data.items.all(c, true)))");
+  expect(issues.length).toBe(1);
+  expect(issues[0].loc).toBe(GUARD_LOC);
+  expect(issues[0].message).toContain("comprehension nesting limit");
+});
+
+test("rejects a negated time function with the time-function message", () => {
+  const issues = matchIssues('!(timestamp("2020-01-01T00:00:00Z") > timestamp("2019-01-01T00:00:00Z"))');
+  expect(issues.length).toBe(1);
+  expect(issues[0].loc).toBe(GUARD_LOC);
+  expect(issues[0].message).toContain("time function not allowed");
 });

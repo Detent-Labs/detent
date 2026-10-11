@@ -156,6 +156,19 @@ function buildEnv(
 }
 
 /**
+ * The child nodes of a parsed AST node, for the three walks below. `args` is an
+ * array for most operators, and one level of nested array (a call's argument
+ * list, a map entry) is flattened. A unary operator (`!`, `-`) holds its single
+ * operand as a node in `args`, so a walk that reads `args` as an array alone
+ * skips everything under a negation.
+ */
+function astChildren(node: unknown): unknown[] {
+  const args = (node as { args?: unknown }).args;
+  const list = Array.isArray(args) ? args : args && typeof args === "object" ? [args] : [];
+  return list.flatMap((a) => (Array.isArray(a) ? a : [a]));
+}
+
+/**
  * Time constructors are forbidden anywhere in an expression: CEL is pure/total
  * with no wall-clock, and time-based transitions live only in timers. `now()`
  * (non-deterministic) and the pure constructors `timestamp()`/`duration()` are
@@ -170,13 +183,9 @@ function forbiddenTimeCall(node: unknown): string | null {
   const n = node as { op?: string; args?: unknown };
   if (n.op === "call" && Array.isArray(n.args) && typeof n.args[0] === "string" && FORBIDDEN_FUNCS.has(n.args[0]))
     return n.args[0];
-  const args = Array.isArray(n.args) ? n.args : [];
-  for (const a of args) {
-    const kids = Array.isArray(a) ? a : [a];
-    for (const k of kids) {
-      const f = forbiddenTimeCall(k);
-      if (f) return f;
-    }
+  for (const k of astChildren(n)) {
+    const f = forbiddenTimeCall(k);
+    if (f) return f;
   }
   return null;
 }
@@ -205,12 +214,9 @@ function comprehensionTooDeep(node: unknown, depth = 0): string | null {
     }
     return comprehensionTooDeep(args[1], depth);
   }
-  for (const a of args) {
-    const kids = Array.isArray(a) ? a : [a];
-    for (const k of kids) {
-      const f = comprehensionTooDeep(k, depth);
-      if (f) return f;
-    }
+  for (const k of astChildren(n)) {
+    const f = comprehensionTooDeep(k, depth);
+    if (f) return f;
   }
   return null;
 }
@@ -250,12 +256,9 @@ function matchesProblem(node: unknown): string | null {
     const bad = pattern === undefined ? null : patternProblem(pattern);
     if (bad) return bad;
   }
-  for (const a of args) {
-    const kids = Array.isArray(a) ? a : [a];
-    for (const k of kids) {
-      const f = matchesProblem(k);
-      if (f) return f;
-    }
+  for (const k of astChildren(n)) {
+    const f = matchesProblem(k);
+    if (f) return f;
   }
   return null;
 }
