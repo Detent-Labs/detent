@@ -48,21 +48,29 @@ async function ensureDatabase(testUrl: string): Promise<void> {
     // append-only guarantee against a role no grant exempts (design.md "Redaction
     // is its own definer function"). Runs unconditionally, even on a database
     // that already existed, so a `_test` database predating this change still
-    // gets the role. Outlives the suite by design — a role is cluster-scoped,
-    // and nothing here drops it.
+    // gets the role. The role outlives the suite by design — it is
+    // cluster-scoped, and nothing here drops it. Its password does not: each run
+    // replaces it with a fresh random one and hands it to the suite through
+    // DETENT_AUDIT_PROBE_PASSWORD, so no fixed credential stands in the cluster.
     try {
       await admin`
         DO $$ BEGIN
-          CREATE ROLE detent_audit_probe LOGIN PASSWORD 'probe';
+          CREATE ROLE detent_audit_probe LOGIN;
         EXCEPTION WHEN duplicate_object THEN NULL;
         END $$
       `;
+      // A UUID holds only hex digits and hyphens, so it needs no quoting.
+      const password = crypto.randomUUID();
+      await admin.unsafe(`ALTER ROLE detent_audit_probe LOGIN PASSWORD '${password}'`);
       await admin.unsafe(`GRANT CONNECT ON DATABASE "${name}" TO detent_audit_probe`);
+      process.env.DETENT_AUDIT_PROBE_PASSWORD = password;
     } catch (e) {
       // A maintenance role without CREATEROLE raises 42501 whether or not the
       // role is already there — an uncaught throw here would take down every
-      // suite. test/instance-audit-privileges.test.ts guards on the probe
-      // role's absence with test.skipIf, the way the DB suites guard on !DB.
+      // suite. The variable then stays unset, and
+      // test/instance-audit-privileges.test.ts guards on it with test.skipIf,
+      // the way the DB suites guard on !DB.
+      delete process.env.DETENT_AUDIT_PROBE_PASSWORD;
       console.log(`[test] skipped detent_audit_probe setup: ${e instanceof Error ? e.message : String(e)}`);
     }
   } finally {

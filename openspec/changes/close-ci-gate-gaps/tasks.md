@@ -36,9 +36,9 @@
 
 ## 5. The probe role's password (G-12)
 
-- [ ] 5.1 Change `test/preload-db.ts` per design D8. Create the role without a password, set a random one with `ALTER ROLE`, and export it as `DETENT_AUDIT_PROBE_PASSWORD`. Reword the comment that says the role outlives the suite: the role stays, its password does not.
-- [ ] 5.2 Make `test/instance-audit-privileges.test.ts` read the variable. The suite skips when the variable is unset. Fix the header comment.
-- [ ] 5.3 Add the refusal case of the `development-toolchain` delta: a connection as the probe role with the password `probe` fails. Verify that the case passes in the full suite and is not skipped.
+- [x] 5.1 Change `test/preload-db.ts` per design D8. Create the role without a password, set a random one with `ALTER ROLE`, and export it as `DETENT_AUDIT_PROBE_PASSWORD`. Reword the comment that says the role outlives the suite: the role stays, its password does not.
+- [x] 5.2 Make `test/instance-audit-privileges.test.ts` read the variable. The suite skips when the variable is unset. Fix the header comment.
+- [x] 5.3 Add the refusal case of the `development-toolchain` delta: a connection as the probe role with the password `probe` fails. Verify that the case passes in the full suite and is not skipped.
 
 ## 6. Prose that names the gates
 
