@@ -1496,7 +1496,9 @@ test.skipIf(!DB)("subprocess: a kept step id with a new step type defers while t
   expect((await loadInstance(childId))!.status).toBe("running");
 
   // The plan keeps the id of the parked subprocess step; the target declares a task step.
+  const logSpy = spyOn(console, "log").mockImplementation(() => {}); // appendSkip's warn line
   const res = await migrateInstances(p, 1, 2, sql);
+  logSpy.mockRestore();
   expect(res.skipped).toEqual([parentId]);
   expect(res.migrated).toEqual([]);
   expect((await skipEventsOf(parentId)).map((e) => e.payload.reason)).toEqual(["child-in-flight"]);
@@ -1562,7 +1564,9 @@ test.skipIf(!DB)("subprocess: a running child defers the relocation while a pend
   expect(await spawnRowStatuses(withSpawnQueued.parentId)).toEqual(["pending"]);
 
   // One invocation over both: the gate must tell a running child from a queued spawn.
+  const logSpy = spyOn(console, "log").mockImplementation(() => {}); // appendSkip's warn line
   const res = await migrateInstances(p, 1, 2, sql);
+  logSpy.mockRestore();
   expect(res.skipped).toEqual([withChild.parentId]);
   expect(res.migrated).toEqual([withSpawnQueued.parentId]);
   expect((await skipEventsOf(withChild.parentId)).map((e) => e.payload.reason)).toEqual(["child-in-flight"]);

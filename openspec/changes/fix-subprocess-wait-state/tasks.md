@@ -40,11 +40,11 @@
 
 ## 5. Migration
 
-- [ ] 5.1 Widen the live-child gate in `src/engine/migration.ts` to `stepChanged || targetStep.type !== "subprocess"`. Verify that a kept step id with a new type defers while a child runs.
-- [ ] 5.2 Add a migration test for a relocation off a subprocess step while its spawn row is pending. Verify the instance migrates, no skip event exists, and the late spawn creates no child. Add a type flip with a settled child, which stores a null `awaitedChild`.
-- [ ] 5.3 Add a test that a running child still defers the relocation. Verify the `child-in-flight` reason. The test pins the gate against widening to spawn rows.
-- [ ] 5.4 Add a test that an identity migration keeps `awaitedChild`. Verify that the existing child's return then drives the parent off the step.
-- [ ] 5.5 Edit the comments in `src/engine/migration.ts` that describe a stale child return. Verify that they match the `instance-migration` delta.
+- [x] 5.1 Widen the live-child gate in `src/engine/migration.ts` to `stepChanged || targetStep.type !== "subprocess"`. Verify that a kept step id with a new type defers while a child runs.
+- [x] 5.2 Add a migration test for a relocation off a subprocess step while its spawn row is pending. Verify the instance migrates, no skip event exists, and the late spawn creates no child. Add a type flip with a settled child, which stores a null `awaitedChild`.
+- [x] 5.3 Add a test that a running child still defers the relocation. Verify the `child-in-flight` reason. The test pins the gate against widening to spawn rows.
+- [x] 5.4 Add a test that an identity migration keeps `awaitedChild`. Verify that the existing child's return then drives the parent off the step.
+- [x] 5.5 Edit the comments in `src/engine/migration.ts` that describe a stale child return. Verify that they match the `instance-migration` delta.
 
 ## 6. View flags get no child (A-5, engine side)
 

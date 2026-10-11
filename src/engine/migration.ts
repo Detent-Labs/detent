@@ -422,10 +422,10 @@ async function migrateOne(
 
     // 5.7b live-child gate: a migration that vacates a subprocess-typed step must not
     // commit while that step has a live linked child. It vacates the step when the id
-    // changes, and when a kept id's target is another step type. A migration cancels no
-    // child, and a live child's return is keyed to this step and contract (re-pointing
-    // it onto another subprocess step would misdirect it to the wrong child), so the
-    // instance is deferred — kept on its pin, recorded, migrated by a later invocation
+    // changes, and when a kept id's target is another step type. A migration never
+    // cancels a running child. A live child's return is keyed to this step and contract
+    // (re-pointing it onto another subprocess step would misdirect it to the wrong
+    // child), so the instance is deferred — kept on its pin, recorded, migrated by a later invocation
     // once the child settles. A queued spawn row is not a live child and does not defer:
     // the commit clears awaitedChild, so the late spawn creates nothing. The gate stays
     // off spawn rows, since a dead-lettered spawn would pin the parent. A settled child
@@ -501,11 +501,13 @@ async function migrateOne(
     }));
 
     // 5.10/5.11 compose the shared seam. onExit never runs; onEntry only on a genuine
-    // relocation; spawn suppressed on an identity step (else a parked parent gains a
-    // second child), which carries awaitedChild so the existing child's return still
-    // drives the parent. A commit off a subprocess step clears awaitedChild and
-    // enqueues the cancel of that child. status, the subprocess spawn/return and the
-    // HistoryEntry are all derived by the seam — never reimplemented here.
+    // relocation; spawn suppressed on a kept step id (else a parked parent gains a
+    // second child). While the target is a subprocess step, the suppression carries
+    // awaitedChild, so the existing child's return still drives the parent. A commit
+    // off a subprocess step, including a kept id whose target is another type, clears
+    // awaitedChild and enqueues the cancel of that child. status, the subprocess
+    // spawn/return and the HistoryEntry are all derived by the seam — never
+    // reimplemented here.
     const actions = stepChanged ? (targetStep.onEntry ?? []) : [];
     const plan = planStepEntry(
       inst,
