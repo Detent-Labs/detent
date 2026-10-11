@@ -1,3 +1,5 @@
+import { canonicalize } from "workflow-engine/schema/canonical-json";
+
 /**
  * Whether the currently-open draft differs from the last body successfully
  * saved to the server, checked structurally, since neither side carries a
@@ -9,6 +11,29 @@
  */
 export function isDirty(current: unknown, savedSnapshot: unknown): boolean {
   return JSON.stringify(current) !== JSON.stringify(savedSnapshot);
+}
+
+/**
+ * Whether the canvas layout differs from the last saved one. A stored layout
+ * comes back in the key order of the database, so this compares the canonical
+ * form: `JSON.stringify` would call two equal layouts different.
+ */
+export function isLayoutDirty(layout: Record<string, unknown>, savedLayout: Record<string, unknown>): boolean {
+  return canonicalize(layout) !== canonicalize(savedLayout);
+}
+
+/**
+ * The one definition of an unsaved draft: the body or the layout differs from
+ * the last save. The header bar, the leave prompts and the Publish dialog all
+ * read it.
+ */
+export function isDraftDirty(
+  body: unknown,
+  savedBody: unknown,
+  layout: Record<string, unknown>,
+  savedLayout: Record<string, unknown>,
+): boolean {
+  return isDirty(body, savedBody) || isLayoutDirty(layout, savedLayout);
 }
 
 /** What the Publish control renders, resolved from the loaded draft's own

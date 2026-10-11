@@ -27,7 +27,7 @@ import { DEFAULT_TAB, type ProcessTab, type Route } from "../routing.js";
 import { formEditorReturnTab, processTabCounts, tabForChangeGroup, tabForIssue } from "../draft/process-tabs.js";
 import { checksDotState, groupChecksBySource } from "../draft/checksRail.js";
 import { initialSaveState, type DraftSaveState } from "./draftSaveLogic.js";
-import { isDirty } from "./draftToolbarState.js";
+import { isDraftDirty } from "./draftToolbarState.js";
 import { CanvasView } from "../canvas/CanvasView.js";
 import { CanvasBar } from "../canvas/CanvasBar.js";
 import { reachableStepIds } from "../draft/registerOrder.js";
@@ -356,6 +356,9 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
   // DraftToolbar state") — DraftToolbar still computes both; only where
   // they live moves up one level, the same way saveState already works.
   const [savedBody, setSavedBody] = useState<Draft>(() => structuredClone(draft));
+  // The layout of the last save, beside `savedBody`. The unsaved state reads
+  // both (`isDraftDirty`).
+  const [savedLayout, setSavedLayout] = useState(initialLayout);
   const [publishResult, setPublishResult] = useState<PublishResult | null>(null);
   // `loadedBaseVersion` cannot move: `EditScreen.load` depends on
   // processId/token/onUnauthorized alone, and neither the publish path nor
@@ -377,7 +380,7 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
   // "Report dirtiness upward through one callback prop into a ref"). The
   // cleanup fires on unmount AND on every dependency change, so a route
   // change away from `edit` can never leave a stale `true` behind.
-  const dirtyNow = isDirty(draft, savedBody);
+  const dirtyNow = isDraftDirty(draft, savedBody, saveState.layout, savedLayout);
   useEffect(() => {
     onDirtyChange?.(dirtyNow);
     return () => onDirtyChange?.(false);
@@ -734,6 +737,8 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
     onSaveState: setSaveState,
     savedBody,
     onSavedBodyChange: (body: Draft) => setSavedBody(structuredClone(body)),
+    savedLayout,
+    onSavedLayoutChange: setSavedLayout,
     onSaved: () => setLastSavedAt(new Date()),
     publishResult,
     onPublishResult: setPublishResult,

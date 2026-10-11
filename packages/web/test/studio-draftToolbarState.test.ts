@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { isDirty, publishAvailability, nextVersionLabel } from "../src/areas/studio/screens/draftToolbarState.js";
+import { isDirty, isLayoutDirty, isDraftDirty, publishAvailability, nextVersionLabel } from "../src/areas/studio/screens/draftToolbarState.js";
 import type { Draft } from "../src/areas/studio/draft/types.js";
 
 /**
@@ -162,6 +162,45 @@ describe("isDirty", () => {
     const a = { workflow: { steps: [{ id: "step_a" }] } };
     const b = { workflow: { steps: [{ id: "step_b" }] } };
     expect(isDirty(a, b)).toBe(true);
+  });
+});
+
+/**
+ * A stored layout comes back in the key order of the database, so the compare
+ * cannot read `JSON.stringify` order as a difference. The draft counts as
+ * unsaved when the body or the layout differs from the last save.
+ */
+describe("isLayoutDirty and isDraftDirty (a layout change counts as unsaved)", () => {
+  const body: Draft = { key: "p" };
+  const layout = { step_a: { x: 1, y: 2 }, canvasEdgeStyle: "step" };
+
+  it("isLayoutDirty is false for equal layouts in another key order", () => {
+    const reordered = { canvasEdgeStyle: "step", step_a: { y: 2, x: 1 } };
+    expect(isLayoutDirty(layout, reordered)).toBe(false);
+  });
+
+  it("isLayoutDirty is true when a coordinate moved", () => {
+    expect(isLayoutDirty({ ...layout, step_a: { x: 1, y: 3 } }, layout)).toBe(true);
+  });
+
+  it("isLayoutDirty is true when a key was added", () => {
+    expect(isLayoutDirty({ ...layout, step_b: { x: 0, y: 0 } }, layout)).toBe(true);
+  });
+
+  it("isDraftDirty is false when body and layout both equal the last save", () => {
+    expect(isDraftDirty(body, structuredClone(body), layout, { canvasEdgeStyle: "step", step_a: { y: 2, x: 1 } })).toBe(false);
+  });
+
+  it("isDraftDirty is true for a layout-only difference", () => {
+    expect(isDraftDirty(body, structuredClone(body), { ...layout, step_a: { x: 9, y: 2 } }, layout)).toBe(true);
+  });
+
+  it("isDraftDirty is true for a body-only difference", () => {
+    expect(isDraftDirty({ key: "q" }, body, layout, layout)).toBe(true);
+  });
+
+  it("isDraftDirty is true when both differ", () => {
+    expect(isDraftDirty({ key: "q" }, body, { ...layout, step_a: { x: 9, y: 2 } }, layout)).toBe(true);
   });
 });
 
