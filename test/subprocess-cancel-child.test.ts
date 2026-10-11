@@ -79,8 +79,9 @@ const fixedChildBody = (outcome: "approved" | "rejected"): ProcessBody =>
 
 // entry (automatic) -> subprocess step -> terminal outcomes. Contracted, so it
 // can itself be a child. The subprocess step's guards read `child`, so the
-// cascade parks the parent there until the return.
-const callerBody = (key: string, childPid: string, childVersion: number, guardedOutcomes: string[] = ["approved", "rejected"]): ProcessBody =>
+// cascade parks the parent there until the return. `subOver` adds keys to the
+// subprocess step, an `onCancel` list for one.
+const callerBody = (key: string, childPid: string, childVersion: number, guardedOutcomes: string[] = ["approved", "rejected"], subOver: Record<string, unknown> = {}): ProcessBody =>
   ({
     key, baseLocale: "en", label: { en: key },
     contract: { outcomes: ["approved", "rejected"] },
@@ -89,7 +90,7 @@ const callerBody = (key: string, childPid: string, childVersion: number, guarded
       initialStep: "step_entry",
       steps: [
         { id: "step_entry", key: "entry", label: { en: "Entry" }, type: "task", paths: [autoPath("path_sub", "step_sub")] },
-        { id: "step_sub", key: "sub", label: { en: "Sub" }, type: "subprocess",
+        { id: "step_sub", key: "sub", label: { en: "Sub" }, type: "subprocess", ...subOver,
           subprocess: { processId: childPid, versionBinding: "pinned", pinnedVersion: childVersion, inputMapping: {}, outputMapping: { field_seen: cel("child.outcome") } },
           paths: guardedOutcomes.map((o, n) => autoPath(`path_${o}`, `step_${o}`, n + 1, `child.outcome == "${o}"`)) },
         { id: "step_approved", key: "approved", label: { en: "Approved" }, type: "task", terminal: true, outcome: "approved" },
@@ -119,6 +120,31 @@ const reentryCallerBody = (key: string, childPid: string, childVersion: number):
             autoPath("path_timeout", "step_retry", 3, "false"),
           ] },
         { id: "step_retry", key: "retry", label: { en: "Retry" }, type: "task", paths: [manualPath("path_again", "step_sub")] },
+        { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true },
+        { id: "step_child_cancelled", key: "child_cancelled", label: { en: "Child cancelled" }, type: "task", terminal: true },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+// entry (automatic) -> a subprocess step whose timer path leads straight back to
+// the same step: one commit leaves a visit and starts the next. A `cancelled`
+// outcome has its own path, as in reentryCallerBody.
+const selfLoopCallerBody = (key: string, childPid: string, childVersion: number): ProcessBody =>
+  ({
+    key, baseLocale: "en", label: { en: key },
+    fields: [{ id: "field_seen", key: "seen", label: { en: "Seen" }, type: "string" }],
+    workflow: {
+      initialStep: "step_entry",
+      steps: [
+        { id: "step_entry", key: "entry", label: { en: "Entry" }, type: "task", paths: [autoPath("path_sub", "step_sub")] },
+        { id: "step_sub", key: "sub", label: { en: "Sub" }, type: "subprocess",
+          subprocess: { processId: childPid, versionBinding: "pinned", pinnedVersion: childVersion, inputMapping: {}, outputMapping: { field_seen: cel("child.outcome") } },
+          timers: [{ id: "timer_sub", duration: "PT1H", onFire: { targetPath: "path_again" } }],
+          paths: [
+            autoPath("path_done", "step_done", 1, 'child.outcome == "done"'),
+            autoPath("path_child_cancelled", "step_child_cancelled", 2, 'child.outcome == "cancelled"'),
+            autoPath("path_again", "step_sub", 3, "false"),
+          ] },
         { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true },
         { id: "step_child_cancelled", key: "child_cancelled", label: { en: "Child cancelled" }, type: "task", terminal: true },
       ],
@@ -630,5 +656,128 @@ test.skipIf(!DB)("the backstop cancels a child whose parent left the step after 
   expect((await loadInstance(childId))!.status).toBe("cancelled");
 
   await drainAll(racing); // the real spawn and cancel rows find nothing left to do
+  expect((await loadInstance(childId))!.status).toBe("cancelled");
+});
+
+// --- DB: the leaving commit cancels the child (B-2) ----------------------------------
+
+// The child ids that one instance's cancel rows name, by sequence.
+const cancelRowTargets = async (instanceId: string): Promise<string[]> =>
+  ((await sql`SELECT action->'config'->>'childId' AS child_id FROM outbox WHERE instance_id = ${instanceId} AND action->>'type' = ${CANCEL_CHILD_ACTION_TYPE} ORDER BY transition_seq`) as
+    { child_id: string }[]).map((r) => r.child_id);
+// The instance row as the engine stores it: sequence, body, resolve state.
+const instanceRow = async (id: string): Promise<unknown> =>
+  JSON.parse(JSON.stringify(await sql`SELECT transition_seq, body, resolve_state FROM instances WHERE instance_id = ${id}`));
+
+test.skipIf(!DB)("a timer exit cancels the child waiting on a manual task and runs its onCancel actions", async () => {
+  const { registry, parent, firstChild, leave } = await reentryParent("exit_manual");
+  await drainAll(registry); // the spawn creates the child, which parks at its manual step
+  expect((await loadInstance(firstChild))!.status).toBe("running");
+  expect(await outboxActionIds(firstChild)).not.toContain("action_w_on_cancel");
+
+  const left = await leave();
+  expect(left.currentStepId as string).toBe("step_retry");
+  expect(left.awaitedChild).toBeNull();
+  expect(await cancelRowTargets(parent.instanceId)).toEqual([firstChild]); // enqueued by the leaving commit
+  expect((await loadInstance(firstChild))!.status).toBe("running"); // cancelled after the commit, not inside it
+
+  await drainAll(registry);
+  expect((await loadInstance(firstChild))!.status).toBe("cancelled");
+  expect(await cancelSweepState(firstChild)).toBe("done");
+  expect(await rowStatuses(firstChild, "action_w_on_cancel")).toEqual(["delivered"]);
+  expect(await rowStatuses(parent.instanceId, "action_cancel_awaited_child")).toEqual(["delivered"]);
+  // The child's cancel sink returned `cancelled` to a parent that no longer awaits it.
+  const stored = await loadInstance(parent.instanceId);
+  expect(stored!.status).toBe("running");
+  expect(stored!.currentStepId as string).toBe("step_retry");
+  expect(stored!.transitionSeq).toBe(2);
+  expect((stored!.data as Record<string, unknown>).field_seen).toBeUndefined();
+});
+
+test.skipIf(!DB)("a timer exit cancels the child's own running child as well", async () => {
+  const W_PID = "proc_cc_exit_chain_w" as Instance["processId"];
+  const M_PID = "proc_cc_exit_chain_m" as Instance["processId"];
+  const P_PID = "proc_cc_exit_chain_p" as Instance["processId"];
+  const wv = await publishBody(W_PID, waitingChildBody(), publishRegistry, dataSourceReg);
+  // The middle child parks on a subprocess step of its own, which declares an onCancel action.
+  const middle = callerBody("cc_exit_chain_m", W_PID, wv.version, undefined, { onCancel: [{ id: "action_m_on_cancel", type: "test.noop", config: {} }] });
+  const mv = await publishBody(M_PID, middle, publishRegistry, dataSourceReg);
+  const pv = await publishBody(P_PID, reentryCallerBody("cc_exit_chain_p", M_PID, mv.version), publishRegistry, dataSourceReg);
+  const { registry } = engineRegistry();
+  const parent = await startInstance(pv.definition, { processId: P_PID, version: pv.version }, actor);
+  await drainAll(registry); // spawns the middle child, which spawns the waiting grandchild
+  const mId = subprocessChildId(parent.instanceId, 1, "step_sub");
+  const wId = subprocessChildId(mId, 1, "step_sub");
+  expect((await loadInstance(mId))!.status).toBe("running");
+  expect((await loadInstance(wId))!.status).toBe("running");
+
+  await fireTimer((await loadInstance(parent.instanceId))!, "timer_sub", pv.definition);
+  await drainAll(registry);
+  expect((await loadInstance(mId))!.status).toBe("cancelled");
+  expect((await loadInstance(wId))!.status).toBe("cancelled");
+  expect(await cancelSweepState(mId)).toBe("done");
+  expect(await rowStatuses(mId, "action_m_on_cancel")).toEqual(["delivered"]);
+  expect(await rowStatuses(wId, "action_w_on_cancel")).toEqual(["delivered"]);
+  const stored = await loadInstance(parent.instanceId);
+  expect(stored!.status).toBe("running");
+  expect(stored!.currentStepId as string).toBe("step_retry");
+});
+
+test.skipIf(!DB)("a timer path back to the same step cancels the first child, spawns a second, and the first child's return changes nothing", async () => {
+  const W_PID = "proc_cc_selfloop_w" as Instance["processId"];
+  const P_PID = "proc_cc_selfloop_p" as Instance["processId"];
+  const wv = await publishBody(W_PID, waitingChildBody(), publishRegistry, dataSourceReg);
+  const pv = await publishBody(P_PID, selfLoopCallerBody("cc_selfloop_p", W_PID, wv.version), publishRegistry, dataSourceReg);
+  const { registry } = engineRegistry();
+  const parent = await startInstance(pv.definition, { processId: P_PID, version: pv.version }, actor);
+  const firstChild = subprocessChildId(parent.instanceId, 1, "step_sub");
+  const secondChild = subprocessChildId(parent.instanceId, 2, "step_sub");
+  await drainAll(registry);
+  expect((await loadInstance(firstChild))!.status).toBe("running");
+
+  // One commit leaves the first visit and starts the second.
+  const again = await fireTimer((await loadInstance(parent.instanceId))!, "timer_sub", pv.definition);
+  expect(again.currentStepId as string).toBe("step_sub");
+  expect(again.transitionSeq).toBe(2);
+  expect(again.awaitedChild as string).toBe(secondChild);
+  expect(await cancelRowTargets(parent.instanceId)).toEqual([firstChild]); // names the first visit's child only
+
+  const parentBefore = await instanceRow(parent.instanceId);
+  await drainAll(registry); // the second spawn, the first child's cancel, and the `cancelled` return that follows
+  const first = await loadInstance(firstChild);
+  expect(first!.status).toBe("cancelled");
+  expect(first!.parent?.instanceId as string).toBe(parent.instanceId);
+  expect(await rowStatuses(firstChild, "action_w_on_cancel")).toEqual(["delivered"]);
+  expect((await loadInstance(secondChild))!.status).toBe("running");
+  expect(await countChildren(parent.instanceId)).toBe(2); // the cancelled first child and the running second
+  // The first child's return was delivered as a no-op: the parent row is exactly as the second entry left it.
+  expect(await rowStatuses(firstChild, `action_return_${firstChild}`)).toEqual(["delivered"]);
+  expect(await instanceRow(parent.instanceId)).toEqual(parentBefore);
+  expect((await sql`SELECT 1 FROM instance_events WHERE instance_id = ${parent.instanceId} AND kind = 'subprocess.outcome-unmatched'`) as unknown[]).toHaveLength(0);
+  const stored = await loadInstance(parent.instanceId);
+  expect(stored!.status).toBe("running");
+  expect(stored!.awaitedChild as string).toBe(secondChild);
+  expect((stored!.data as Record<string, unknown>).field_seen).toBeUndefined();
+});
+
+test.skipIf(!DB)("a parent cancel enqueues no leaving row, and the sweep cancels the running child", async () => {
+  const { pv, registry, parent, childId } = await parkedOverWaitingChild("parent_cancel");
+  expect((await loadInstance(childId))!.status).toBe("running");
+  const { resolveBody } = engineRegistry();
+
+  await cancelInstance((await loadInstance(parent.instanceId))!, pv.definition, actor, sql, resolveBody);
+  // The cancel commit leaves the subprocess step and clears the awaited child, but plans no cancel row.
+  const stored = await loadInstance(parent.instanceId);
+  expect(stored!.status).toBe("cancelled");
+  expect(stored!.awaitedChild).toBeNull();
+  expect(await cancelRowTargets(parent.instanceId)).toEqual([]);
+  // The sweep already cancelled the child, before any outbox row was delivered.
+  expect((await loadInstance(childId))!.status).toBe("cancelled");
+  expect(await cancelSweepState(parent.instanceId)).toBe("done");
+  expect(await outboxActionIds(childId)).toContain("action_w_on_cancel");
+
+  await drainAll(registry); // the child's `cancelled` return finds a cancelled parent
+  expect(await cancelRowTargets(parent.instanceId)).toEqual([]);
+  expect((await loadInstance(parent.instanceId))!.status).toBe("cancelled");
   expect((await loadInstance(childId))!.status).toBe("cancelled");
 });
