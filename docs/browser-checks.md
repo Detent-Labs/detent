@@ -869,7 +869,8 @@ look, and German. It needs the `products` list from the table-shaped entry
 above, and a second browser context logged in as the same account.
 
 Open Operations, then Data lists, then `products`. Add two value rows and give
-each a value key and a label. Rename one column heading. Do not save. Then simulate the window switch:
+each a value key and a label. Rename one column heading. Do not save. Then
+simulate the window switch:
 
 ```sh
 playwright-cli -s=<worktree-name> run-code "async page => { await page.evaluate(() => window.dispatchEvent(new Event('focus'))) }"
@@ -890,8 +891,9 @@ input stays and that saving replaces the server values. One button follows,
 Read the callout's look. Pass: it is a 3px advisory rule beside text in the
 refusal color. It is flat and has no radius. Nothing animates.
 
-Press the button. Pass: the inputs show the server copy, and the callout is
-gone.
+Press the button with the keyboard. Pass: the inputs show the server copy, and
+the callout is gone. The next Tab lands on the first control after the callout,
+not on the header.
 
 Type again, repeat the changed-copy step, then press Save. Pass: the save
 lands, the callout is gone, and the inputs show the saved copy.
