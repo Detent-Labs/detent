@@ -5,12 +5,12 @@ The delta spec holds the scenarios. Every group lands its own tests.
 
 ## 1. The newest-answer gate
 
-- [ ] 1.1 Add `packages/web/src/shell/latestGate.ts` with `createLatestGate()`.
+- [x] 1.1 Add `packages/web/src/shell/latestGate.ts` with `createLatestGate()`.
       `next()` starts a generation and returns its `isCurrent()`. `current()`
       returns the running generation's `isCurrent()`. Verify:
       `packages/web/test/shell-latestGate.test.ts` shows an older generation
       turns stale after `next()`, and `current()` never turns one stale.
-- [ ] 1.2 Rewrite `usePagedList` on the gate. `load` and `reset` call `next()`,
+- [x] 1.2 Rewrite `usePagedList` on the gate. `load` and `reset` call `next()`,
       and `loadMore` calls `current()`. Only a current request writes `items`,
       `cursor` and `error`, and clears `loading`. `reset` also sets `loading`
       to false. `fetchPage` receives `isCurrent` as a second argument. Hold the
@@ -18,7 +18,7 @@ The delta spec holds the scenarios. Every group lands its own tests.
       keep their identities. Verify: `bun run typecheck` passes, and the seven
       existing callers compile unchanged. In the browser walk, a `reset` during
       "Load more" re-enables the button.
-- [ ] 1.3 Guard the screens' own effects. `OutboxScreen` sets its counts only
+- [x] 1.3 Guard the screens' own effects. `OutboxScreen` sets its counts only
       while `isCurrent()` holds. `InstancesScreen` and `OutboxScreen` call
       `fail(err)` only while it holds. Verify: the code shows no
       `setCounts` or `fail` call outside the guard, and the browser walk in
@@ -26,16 +26,16 @@ The delta spec holds the scenarios. Every group lands its own tests.
 
 ## 2. The focus throttle
 
-- [ ] 2.1 Add `packages/web/src/areas/admin/refreshLogic.ts` with
+- [x] 2.1 Add `packages/web/src/areas/admin/refreshLogic.ts` with
       `focusRefetchDue(lastAt, now, minMs)` and the constant
       `DIRECTORY_FOCUS_INTERVAL_MS` of 30000. Verify:
       `packages/web/test/admin-refreshLogic.test.ts` covers 0 ms, 29999 ms,
       30000 ms and a minimum of 0.
-- [ ] 2.2 Give `useRefresh` the option `minFocusIntervalMs`. A ref holds the
+- [x] 2.2 Give `useRefresh` the option `minFocusIntervalMs`. A ref holds the
       time of the last request. Opening the screen, `refresh()` and a focus
       refetch stamp it. `refresh()` never consults the interval. Verify:
       `bun run typecheck` passes, and the other callers pass no option.
-- [ ] 2.3 Pass `DIRECTORY_FOCUS_INTERVAL_MS` from `UsersScreen` and
+- [x] 2.3 Pass `DIRECTORY_FOCUS_INTERVAL_MS` from `UsersScreen` and
       `GroupsScreen`. Verify: `git grep -n minFocusIntervalMs` lists exactly
       those two screens and `useRefresh.ts`.
 
