@@ -13,7 +13,7 @@
  * expressions that reference them live in the same immutable ProcessBody, so a
  * key rename is a same-artifact rewrite — internally consistent per version.
  *
- * `checkProcessChainingTarget` below is the one deliberate exception to "no
+ * `checkProcessChainingTarget` below is a deliberate exception to "no
  * dependency but the CEL library and definition.ts": it needs `collect`
  * (aliased `collectFullActionSites`) from `../engine/registry-check.js` and
  * `PROCESS_START_ACTION_TYPE` from `../engine/registry.js` to find every
@@ -21,6 +21,10 @@
  * `../schema/definition.js` to build a target's accepted field-id set. None
  * of `registry-check.ts`, `registry.ts` or `schema/definition.ts` imports
  * back from this file.
+ *
+ * `astProblem` is the other: it needs `MAX_PATTERN_LENGTH` from
+ * `../schema/compile.js` for the `matches` pattern bound. `compile.ts` does
+ * not import this file.
  */
 
 import { Environment, parse, serialize } from "@marcbachmann/cel-js";
@@ -29,6 +33,7 @@ import { leafFields, collectFieldsDeep, isViewField } from "../schema/definition
 import type { ProcessBody, FieldDef, Expression, MigrationSpec } from "../schema/definition.js";
 import { collect as collectFullActionSites } from "../engine/registry-check.js";
 import { PROCESS_START_ACTION_TYPE } from "../engine/registry.js";
+import { MAX_PATTERN_LENGTH } from "../schema/compile.js";
 
 // The formal expression context. instance/actor shapes are pinned here.
 // ponytail: minimal shapes, widen when a real guard needs more.
@@ -211,15 +216,61 @@ function comprehensionTooDeep(node: unknown, depth = 0): string | null {
 }
 
 /**
+ * The message for a `matches` pattern node that is not a string literal that
+ * compiles, or null. Both callers wrap `astProblem` in an empty `catch`, so the
+ * `new RegExp` failure is caught here and returned: a throw would be swallowed
+ * and the bad pattern would pass.
+ */
+function patternProblem(pattern: unknown): string | null {
+  const p = pattern as { op?: string; args?: unknown } | null;
+  if (!p || typeof p !== "object" || p.op !== "value" || typeof p.args !== "string")
+    return "matches() needs a string literal as its pattern";
+  if (p.args.length > MAX_PATTERN_LENGTH) return `matches() pattern exceeds the ${MAX_PATTERN_LENGTH}-character bound`;
+  try {
+    new RegExp(p.args);
+  } catch {
+    return "matches() pattern does not compile as a JavaScript RegExp";
+  }
+  return null;
+}
+
+/**
+ * The first `matches` call in the tree whose pattern fails `patternProblem`, or
+ * null. The receiver form is `{op:"rcall", args:["matches", receiver, [pattern]]}`
+ * and the call form is `{op:"call", args:["matches", [subject, pattern]]}`. A call
+ * with no pattern argument is left to the type check, which rejects the arity.
+ */
+function matchesProblem(node: unknown): string | null {
+  if (!node || typeof node !== "object") return null;
+  const n = node as { op?: string; args?: unknown };
+  const args = Array.isArray(n.args) ? n.args : [];
+  if (args[0] === "matches" && (n.op === "rcall" || n.op === "call")) {
+    const given = args[n.op === "rcall" ? 2 : 1];
+    const pattern = Array.isArray(given) ? given[n.op === "rcall" ? 0 : 1] : undefined;
+    const bad = pattern === undefined ? null : patternProblem(pattern);
+    if (bad) return bad;
+  }
+  for (const a of args) {
+    const kids = Array.isArray(a) ? a : [a];
+    for (const k of kids) {
+      const f = matchesProblem(k);
+      if (f) return f;
+    }
+  }
+  return null;
+}
+
+/**
  * The first AST-level problem in a parsed expression, or null: a banned time
- * function, then a comprehension nest past the limit. `checkSite` and
+ * function, then a comprehension nest past the limit, then a `matches` call
+ * whose pattern is not a compiling literal. `checkSite` and
  * `validateMigrationSpec` both call it, so a rule added here reaches every
  * checked site.
  */
 function astProblem(ast: unknown): string | null {
   const bad = forbiddenTimeCall(ast);
   if (bad) return `time function not allowed: ${bad}() (time lives only in timers)`;
-  return comprehensionTooDeep(ast);
+  return comprehensionTooDeep(ast) ?? matchesProblem(ast);
 }
 
 interface Site {

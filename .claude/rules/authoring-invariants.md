@@ -135,6 +135,13 @@ its placement.
   rejects the submission without a message. The check lives on the publish
   path, in `src/cel/check.ts` behind `validateReferences`. A refinement in
   `definition.ts` would strand the instances pinned to a published body.
+- A `matches` call takes a string literal as its pattern, in both forms:
+  `s.matches("p")` and `matches(s, "p")`. The literal compiles as a JavaScript
+  `RegExp` and stays under the declared length bound. A pattern that does not
+  compile raises on every evaluation, and a guard reads a raise as `false`.
+  The check lives on the publish path, in `src/cel/check.ts` behind
+  `validateReferences`. A migration transform meets it too, at plan
+  registration.
 - No action anywhere in the body carries a `type` with the reserved `core.`
   prefix. The compile pass checks this on both compile branches
   (`compile.ts::checkReservedActionPrefix`). The cancel-sink id/key/outcome

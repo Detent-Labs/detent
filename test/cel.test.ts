@@ -2,7 +2,7 @@ import { test, expect } from "bun:test";
 import { readFileSync, readdirSync } from "node:fs";
 import { validateProcessBody, validateMigrationSpec, checkSubprocessChildRefs, parseExpression, parseAst, checkAgainstFields, celType, ACTOR_SCHEMA, type CelIssue } from "../src/cel/check.js";
 import { evalTransforms } from "../src/cel/eval.js";
-import { compileProcessBody } from "../src/schema/compile.js";
+import { compileProcessBody, MAX_PATTERN_LENGTH } from "../src/schema/compile.js";
 import { instance as instanceSchema, baseFieldType, processBody, type ProcessBody, type MigrationSpec, type Instance, type FieldDef } from "../src/schema/definition.js";
 
 // Minimal ProcessBody builders. validateProcessBody reads only fields /
@@ -819,4 +819,104 @@ test("rejects a migration transform with three nested comprehensions", () => {
   expect(issues.length).toBe(1);
   expect(issues[0].loc).toBe("migration.transforms.field_ok");
   expect(issues[0].message).toContain("comprehension nesting limit");
+});
+
+// ---- matches pattern (cel-expressions delta) ---------------------------------
+// A matches call takes a string-literal pattern that compiles, in both call
+// forms and anywhere in the tree. Both callers run the AST rules inside an
+// empty catch, so a pattern that fails to compile must come back as a message.
+// A swallowed throw would let the bad pattern through and fail these tests.
+const matchFields = [field("s", "string"), field("p", "string"), field("items", "list")];
+const matchIssues = (src: string) => validateProcessBody(body({ fields: matchFields, steps: [guardStep(src)] }));
+const NO_COMPILE = "does not compile as a JavaScript RegExp";
+
+test("rejects an uncompilable literal pattern in the receiver form", () => {
+  const issues = matchIssues('data.s.matches("(")');
+  expect(issues.length).toBe(1);
+  expect(issues[0].loc).toBe(GUARD_LOC);
+  expect(issues[0].message).toContain(NO_COMPILE);
+});
+
+test("rejects an uncompilable literal pattern in the call form", () => {
+  const issues = matchIssues('matches(data.s, "(")');
+  expect(issues.length).toBe(1);
+  expect(issues[0].loc).toBe(GUARD_LOC);
+  expect(issues[0].message).toContain(NO_COMPILE);
+});
+
+test("rejects a pattern that is a field reference or a concatenation", () => {
+  for (const src of ["data.s.matches(data.p)", 'data.s.matches("a" + "b")', "matches(data.s, data.p)"]) {
+    const issues = matchIssues(src);
+    expect(issues.length).toBe(1);
+    expect(issues[0].loc).toBe(GUARD_LOC);
+    expect(issues[0].message).toContain("matches() needs a string literal as its pattern");
+  }
+});
+
+test("finds a bad matches call inside a comprehension body", () => {
+  const issues = matchIssues('data.items.all(i, i.matches("("))');
+  expect(issues.length).toBe(1);
+  expect(issues[0].loc).toBe(GUARD_LOC);
+  expect(issues[0].message).toContain(NO_COMPILE);
+});
+
+test("finds a bad matches call inside another call's receiver", () => {
+  const issues = matchIssues('string(data.s.matches("(")).size() > 0');
+  expect(issues.length).toBe(1);
+  expect(issues[0].message).toContain(NO_COMPILE);
+});
+
+test("accepts a valid literal pattern", () => {
+  expect(matchIssues('data.s.matches("^[a-z]+$")')).toEqual([]);
+});
+
+// The helper reads the decoded string. `"^[a-z]+\\d$"` holds a backslash and a d.
+// `"\\("` decodes to a backslash and a paren, which compiles; the raw source text
+// `\\(` would not.
+test("compiles the decoded string, not the raw source text", () => {
+  expect(matchIssues('data.s.matches("^[a-z]+\\\\d$")')).toEqual([]);
+  expect(matchIssues('data.s.matches("\\\\(")')).toEqual([]);
+});
+
+test("a matches call with a missing argument falls through to the type check", () => {
+  const issues = matchIssues("data.s.matches()");
+  expect(issues.length).toBe(1);
+  expect(issues[0].message).not.toContain("string literal");
+  expect(issues[0].message).not.toContain(NO_COMPILE);
+});
+
+test("reports an over-long literal pattern at a migration transform", () => {
+  const from = migBody([{ key: "s", type: "string" }]);
+  const to = migBody([{ key: "ok", type: "boolean" }]);
+  const issues = validateMigrationSpec(spec({ field_ok: cel(`data.s.matches("${"a".repeat(MAX_PATTERN_LENGTH + 1)}")`) }), from, to);
+  expect(issues.length).toBe(1);
+  expect(issues[0].loc).toBe("migration.transforms.field_ok");
+  expect(issues[0].message).toContain(`${MAX_PATTERN_LENGTH}-character bound`);
+});
+
+test("accepts a literal pattern at exactly the length bound", () => {
+  const from = migBody([{ key: "s", type: "string" }]);
+  const to = migBody([{ key: "ok", type: "boolean" }]);
+  const src = `data.s.matches("${"a".repeat(MAX_PATTERN_LENGTH)}")`;
+  expect(validateMigrationSpec(spec({ field_ok: cel(src) }), from, to)).toEqual([]);
+});
+
+test("a migration transform meets the same literal-pattern rule", () => {
+  const from = migBody([{ key: "s", type: "string" }, { key: "p", type: "string" }]);
+  const to = migBody([{ key: "ok", type: "boolean" }]);
+  const nonLiteral = validateMigrationSpec(spec({ field_ok: cel("data.s.matches(data.p)") }), from, to);
+  expect(nonLiteral.length).toBe(1);
+  expect(nonLiteral[0].loc).toBe("migration.transforms.field_ok");
+  expect(nonLiteral[0].message).toContain("matches() needs a string literal as its pattern");
+  const broken = validateMigrationSpec(spec({ field_ok: cel('data.s.matches("(")') }), from, to);
+  expect(broken.length).toBe(1);
+  expect(broken[0].message).toContain(NO_COMPILE);
+});
+
+test("checkAgainstFields applies the matches rule to a scratchpad expression", () => {
+  const fields = [fieldDef("s", "string")];
+  const bad = checkAgainstFields('data.s.matches("(")', fields);
+  expect(bad.ok).toBe(false);
+  if (!bad.ok) expect(bad.message).toContain(NO_COMPILE);
+  expect(checkAgainstFields('data.s.matches("^[a-z]+$")', fields)).toEqual({ ok: true });
 });

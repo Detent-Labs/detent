@@ -79,6 +79,14 @@ rejects the submission without a message. Publish checks this in
 `src/cel/check.ts`, not in the schema, so a body published earlier keeps
 running.
 
+A `matches` call takes a string literal as its pattern, never a field value
+or a built string. The literal must compile as a JavaScript `RegExp` and
+stay under the declared length bound. A pattern that does not compile raises
+on every evaluation, which a guard reads as no match. A literal that compiles
+can still backtrack on a long participant string. The length bound does not
+stop that, as with `validation.pattern`. Publish checks the rule in
+`src/cel/check.ts`, and a migration transform meets it at plan registration.
+
 The library `@marcbachmann/cel-js` pins an exact version in
 `package.json`, with no caret. An upgrade is a deliberate, reviewed
 commit that re-runs `test/cel.test.ts`. An evaluation-semantics change in

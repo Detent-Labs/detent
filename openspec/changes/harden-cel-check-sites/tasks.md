@@ -18,11 +18,11 @@
 
 ## 3. Literal patterns for matches (A-3)
 
-- [ ] 3.1 Add the `matches` rule to `astProblem`, for both call forms. Import `MAX_PATTERN_LENGTH` from `src/schema/compile.ts`. Verify `git grep -n "cel/check" -- src/schema` prints nothing, so `compile.ts` never imports `check.ts`.
-- [ ] 3.2 Add tests in `test/cel.test.ts` for each scenario of "A matches call takes a string-literal pattern that compiles". Include the call form and a call nested in a comprehension. Test the over-long literal through `validateMigrationSpec`, because publish caps the literal first. Verify each rejecting case fails on the old code.
-- [ ] 3.3 Add a `validateMigrationSpec` case with a non-literal pattern in `test/cel.test.ts`. Add a `checkAgainstFields` case where `data.s.matches("(")` returns `ok: false`. Verify both pass.
-- [ ] 3.4 Add the `matches` bullet to `.claude/rules/authoring-invariants.md` and one paragraph to `.claude/rules/process-contract.md`. Verify with a grep for `matches` in both files.
-- [ ] 3.5 Teach the rule in `docs/authoring-guide.md`. State that the length bound does not stop backtracking, as for `pattern`. Verify the antislop linter reports nothing new on the file.
+- [x] 3.1 Add the `matches` rule to `astProblem`, for both call forms. Import `MAX_PATTERN_LENGTH` from `src/schema/compile.ts`. Verify `git grep -n "cel/check" -- src/schema` prints nothing, so `compile.ts` never imports `check.ts`.
+- [x] 3.2 Add tests in `test/cel.test.ts` for each scenario of "A matches call takes a string-literal pattern that compiles". Include the call form and a call nested in a comprehension. Test the over-long literal through `validateMigrationSpec`, because publish caps the literal first. Verify each rejecting case fails on the old code.
+- [x] 3.3 Add a `validateMigrationSpec` case with a non-literal pattern in `test/cel.test.ts`. Add a `checkAgainstFields` case where `data.s.matches("(")` returns `ok: false`. Verify both pass.
+- [x] 3.4 Add the `matches` bullet to `.claude/rules/authoring-invariants.md` and one paragraph to `.claude/rules/process-contract.md`. Verify with a grep for `matches` in both files.
+- [x] 3.5 Teach the rule in `docs/authoring-guide.md`. State that the length bound does not stop backtracking, as for `pattern`. Verify the antislop linter reports nothing new on the file.
 
 ## 4. Checked mapping values for process.start (A-1)
 
