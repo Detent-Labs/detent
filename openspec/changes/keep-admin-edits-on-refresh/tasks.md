@@ -108,10 +108,10 @@ The delta spec holds the scenarios. Every group lands its own tests.
 
 ## 7. The index and the walk
 
-- [ ] 7.1 Delete the `keep-admin-edits-on-refresh` entry from the audit index
+- [x] 7.1 Delete the `keep-admin-edits-on-refresh` entry from the audit index
       in `docs/decisions.md`. Verify: `git grep -n keep-admin-edits-on-refresh
       docs/decisions.md` finds nothing.
-- [ ] 7.2 Run the browser walk on the production build. Cover F-1 on both
+- [x] 7.2 Run the browser walk on the production build. Cover F-1 on both
       screens, F-7 with a delayed first answer (`playwright-cli route`), F-17
       and F-18. Run `/impeccable critique` and `/impeccable audit` against
       `/admin/data-lists/<key>`. Verify: the run record prints each step's
@@ -119,6 +119,6 @@ The delta spec holds the scenarios. Every group lands its own tests.
 
 ## 8. Verification
 
-- [ ] 8.1 Run `bun run lint`, then `bun run typecheck`, then `bun run build`, then the full `bun test` with `DATABASE_URL` set. Verify: all four exit 0 with 0 failures and a skip count at the floor.
+- [x] 8.1 Run `bun run lint`, then `bun run typecheck`, then `bun run build`, then the full `bun test` with `DATABASE_URL` set. Verify: all four exit 0 with 0 failures and a skip count at the floor.
 - [ ] 8.2 Run the antislop linter on every Markdown file the change touched. Verify: `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` exits 0.
 - [ ] 8.3 Run the whitespace gate. Verify: `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh` exits 0.

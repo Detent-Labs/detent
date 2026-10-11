@@ -892,8 +892,7 @@ Read the callout's look. Pass: it is a 3px advisory rule beside text in the
 refusal color. It is flat and has no radius. Nothing animates.
 
 Press the button with the keyboard. Pass: the inputs show the server copy, and
-the callout is gone. The next Tab lands on the first control after the callout,
-not on the header.
+the callout is gone. The next Tab lands on the first control after the callout.
 
 Type again, repeat the changed-copy step, then press Save. Pass: the save
 lands, the callout is gone, and the inputs show the saved copy.
