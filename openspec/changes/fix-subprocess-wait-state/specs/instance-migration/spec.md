@@ -48,15 +48,18 @@ spawn normally: that is a genuine entry.
 ### Requirement: A relocation off a subprocess step whose spawn is still queued commits
 
 A migration that relocates a parent off a subprocess step SHALL commit when the
-step has no live child. A spawn row that is still undelivered does not block it.
-The relocation is a commit that leaves the step. It clears the parent's
-`awaitedChild` and enqueues the cancellation of that child. The queued spawn
-then finds the parent no longer awaiting its child and creates nothing.
+step has no live child. A spawn row that is `pending`, or `claimed` with an expired
+lease, does not block it. A live-claimed row still defers the migration as
+`pending-actions`. The relocation is a commit that leaves the step. It clears the
+parent's `awaitedChild` and enqueues the cancellation of that child. The queued
+spawn then finds the parent no longer awaiting its child and creates nothing.
 
-The live-child gate stays as it is. A live child still defers the migration with
-the `child-in-flight` reason, and a migration SHALL NOT cancel a running child.
-The gate SHALL NOT widen to an undelivered spawn row. A dead-lettered spawn
-would then block the migration of the parent an operator wants to move.
+The live-child gate applies whenever the parent leaves a subprocess step. That
+covers a changed step id and a kept id whose step is no longer a subprocess
+step. A live child defers the migration with the `child-in-flight` reason, and a
+migration SHALL NOT cancel a running child. The gate SHALL NOT widen to an
+undelivered spawn row. A dead-lettered spawn would then block the migration of
+the parent an operator wants to move.
 
 #### Scenario: A queued spawn does not block the relocation
 
@@ -74,3 +77,10 @@ would then block the migration of the parent an operator wants to move.
 - **WHEN** the spawn was delivered and its child is running, and the parent is
   relocated off the step
 - **THEN** the instance is skipped with the `child-in-flight` reason, as before
+
+#### Scenario: A kept step id with a new step type defers while the child runs
+
+- **WHEN** the plan keeps the step id of a parked subprocess step but the target
+  version declares it as another step type, and the child is running
+- **THEN** the instance is skipped with the `child-in-flight` reason
+- **AND** the migration cancels nothing

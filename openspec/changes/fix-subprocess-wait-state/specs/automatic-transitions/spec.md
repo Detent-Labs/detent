@@ -142,3 +142,15 @@ simply stops moving.
   worker's pass
 - **THEN** the worker's re-evaluation is a no-op and the instance's state is
   unchanged
+
+### Requirement: An all-automatic step with no matching path is a wait-state
+
+When an instance enters an all-automatic step and no path's guard holds and there
+is no guardless default, the engine SHALL NOT transition; the instance SHALL
+remain on that step (a wait-state, bounded elsewhere by a timer). This is distinct
+from a step that always resolves via its default. A subprocess step is the one
+exception: it waits for its child even when it carries a default.
+
+#### Scenario: No guard matches and no default exists
+- **WHEN** an entered all-automatic step has only guarded paths and none of their guards hold
+- **THEN** the instance stays on that step and its `currentStepId` is unchanged

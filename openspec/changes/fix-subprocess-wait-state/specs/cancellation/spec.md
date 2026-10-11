@@ -8,19 +8,26 @@
 ### Requirement: Leaving a subprocess step cancels the awaited child
 
 A commit that moves a parent off a subprocess step SHALL cancel the child the
-parent awaited. The child's own return is the one exception. Three routes
-trigger the rule: a timer exit, a migration relocation, and a re-entry of the
-same step. The cancellation SHALL run the
-child's `onCancel` actions. It SHALL cascade to the child's own running
-children, as any other cancellation does.
+parent awaited. The child's own return and the parent's own cancellation are the
+two exceptions. Two routes trigger the rule: a timer exit and a migration
+relocation. A timer path that leads back to the same step is a re-entry. It
+cancels the first visit's child the same way.
+
+The cancellation SHALL run the child's `onCancel` actions. It SHALL cascade to
+the child's own running children, as any other cancellation does.
 
 The leaving commit SHALL enqueue the cancellation as an engine-internal outbox
 row, in the same transaction. The row is durable and at-least-once. A crash
-between the commit and the delivery SHALL NOT leave the child running.
+between the commit and the delivery SHALL NOT leave the child running. A row
+that exhausts its attempts dead-letters, and the operator retries it from the
+admin outbox.
 
-The cancellation SHALL do nothing in three cases. The child does not exist, the
-child is not running, or the child names another instance as its parent. A
+The cancellation SHALL act on the child's status as follows. A `running` child is
+cancelled. A `cancelled` child resumes any sweep of its own running children that
+an earlier call left incomplete. A missing child, a `completed` or `faulted`
+child, and a child that names another instance as its parent get no action. A
 conflict with the child's own concurrent commit SHALL retry through the outbox.
+An unresolvable child body and an incomplete sweep SHALL retry too.
 
 A cancel commit of the parent itself SHALL NOT enqueue this row. The existing
 sweep of running children covers it.
@@ -54,6 +61,13 @@ child, so the return SHALL be a no-op.
 - **WHEN** a timer moves the parent off the step before the spawn is delivered,
   and the cancellation arrives first
 - **THEN** the cancellation does nothing, and the spawn then creates no child
+
+#### Scenario: A retry resumes an incomplete sweep
+
+- **WHEN** the awaited child is already `cancelled`, and its own sweep left a
+  grandchild running
+- **THEN** the cancellation cancels that grandchild
+- **AND** the delivery retries until the child's sweep completes
 
 #### Scenario: A child that finished before the cancel is left alone
 

@@ -132,3 +132,46 @@ genuine is the caller's knowledge, so the decision is the caller's.
 - **THEN** the timers are armed from the target step, the recorded version is the
   instance's, the spawn is enqueued for a subprocess target, and only the planner's own
   events are written
+
+### Requirement: The applier writes a caller-supplied field patch
+
+The execution step SHALL accept an optional field patch and write it to the instance
+row alongside its own fields, under the same optimistic-concurrency predicate. The
+ordinary path writes only the step, its entry time, the sequence, the status, the
+timers, the assignment and the awaited child; a caller that must also rewrite the
+instance's pin or payload supplies those here rather than issuing a second statement.
+
+The patch SHALL NOT override the fields the plan itself writes. A patch that set the
+sequence would leave the instance body disagreeing with the promoted sequence column
+and with the concurrency predicate, both of which take the plan's value, and the body
+is what rehydration reads.
+
+A caller patching the instance's `data` SHALL hold the instance row across its read
+and its commit. The concurrency predicate does not protect `data`: a post-commit
+action writeback modifies a single field without advancing or checking
+`transitionSeq`, so a wholesale `data` patch computed from an earlier read erases such
+a writeback silently and the predicate still matches. Row-level locking by the caller
+is the only thing that closes this.
+
+#### Scenario: A supplied patch is written with the commit
+
+- **WHEN** a step entry is applied with a field patch
+- **THEN** those fields are written in the same statement as the step advance, under
+  the same concurrency predicate
+
+#### Scenario: A patch does not weaken the concurrency predicate
+
+- **WHEN** a step entry with a field patch is applied from a stale sequence
+- **THEN** it is rejected as a concurrency conflict and none of the patch is written
+
+#### Scenario: A patch colliding with the plan's own fields does not win
+
+- **WHEN** a step entry is applied with a patch naming a field the plan also writes
+- **THEN** the plan's value is persisted, and the instance body and the promoted
+  sequence column agree
+
+#### Scenario: No patch writes exactly the fields written before
+
+- **WHEN** a step entry is applied with no patch
+- **THEN** the instance row's step, entry time, sequence, status, timers, assignment,
+  awaited child and scheduling column are written, and no other field is touched

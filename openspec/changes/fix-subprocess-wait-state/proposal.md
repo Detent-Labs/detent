@@ -50,6 +50,9 @@ evaluates view flags with no `child`, so the field is always hidden.
   `visible`, `required` and `readonly` with no `child`, as it already does
   for `validation.rule`. The studio condition builder offers `child` operands
   at path guards only. The three view-override sites lose them.
+- **Migration gate.** The live-child gate runs whenever a parent leaves a
+  subprocess step. Today it runs only when the step id changes. A plan that
+  keeps the id and flips the step type would cancel a running child.
 - **Registry.** The engine-internal `core.*` handlers grow from two to three.
   The reserved prefix already covers the new type.
 - **BREAKING.** A guard that held at subprocess entry without reading `child`
@@ -92,19 +95,22 @@ None.
 - Code: `src/engine/transition.ts` (cascade, `planStepEntry`,
   `applyStepEntry`), `src/engine/subprocess.ts` (spawn gate, backstop, return
   gate and writeback, new handler), `src/engine/store.ts` (`createInstance`),
-  `src/engine/registry.ts` (new constant), `src/engine/host.ts` (registration
-  check), `src/schema/definition.ts` (instance schema), `src/cel/check.ts`
-  (view flags), and `packages/web` (`BooleanOrExpressionInput`,
-  `FormEditorScreen`, and the condition-builder tests).
+  `src/engine/registry.ts` (new constant), `src/engine/registry-check.ts`
+  (comment), `src/engine/migration.ts` (gate condition and comments),
+  `src/schema/definition.ts` (instance schema), `src/cel/check.ts` (view
+  flags), and `packages/web` (`BooleanOrExpressionInput`, `FormEditorScreen`,
+  `ConditionInput`, `conditionLogic`). `src/engine/host.ts` already registers
+  the handlers per tenant, so it needs a check only.
 - No change to `ProcessBody`, `Step`, `definitionHash` or any published
   definition. No new publish rule.
 - Rules and docs: `.claude/rules/process-contract.md`,
-  `.claude/rules/authoring-invariants.md`, `docs/authoring-guide.md`, and
-  `docs/decisions.md`. The commit that archives this change deletes its entry
-  from the audit index.
+  `.claude/rules/authoring-invariants.md`, `docs/authoring-guide.md`,
+  `README.md`, and `docs/decisions.md`. The commit that archives this change
+  deletes its entry from the audit index.
 - Tests: `test/subprocess.test.ts` (reworked raw-SQL helpers, new cases for
   R1 and R2), `test/migration.test.ts`, `test/transition.test.ts`,
-  `test/cel.test.ts`.
+  `test/registry-check.test.ts`, `test/cel.test.ts`, and
+  `packages/web/test/studio-formEditor-strip.test.tsx`.
 - UI: this change removes operands from one picker. It needs a browser check
   on the production build, plus `/impeccable critique` and `/impeccable audit`
   on the changed screen.

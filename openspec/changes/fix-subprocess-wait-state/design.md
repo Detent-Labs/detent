@@ -41,9 +41,9 @@ only the current mechanics the design must respect.
 
 **Non-Goals:**
 
-- A faulted parent keeps its running child. `markFaulted` does not leave the
-  step. The audit did not report it, and a fault has no clean cancel meaning.
-  The run report names it.
+- A faulted parent keeps its running child. After D1 a new subprocess visit
+  cannot fault, because the cascade returns on landing. The gap covers only
+  an instance that faulted before this change.
 - No backfill for an instance parked on a subprocess step before this change.
   The pre-1.0 stage allows that. See Migration Plan.
 - No change to the live-child gate. A migration still defers while a child is
@@ -114,14 +114,20 @@ Two cases add no row. A cancel commit (`opts.status === "cancelled"`) leaves
 the work to the existing sweep. A return commit has already cleared
 `awaitedChild` in its writeback, because the child is terminal.
 
-The handler loads the child. It does nothing when the child is missing, is not
-running, or names another instance as its parent. Otherwise it resolves the
-child's body and calls `cancelInstance`. `onCancel` runs and nested children
-cascade. A `ConcurrencyConflict` propagates, and the outbox retries. Each retry
-reloads the child and sees the new state.
+The handler loads the child. It does nothing when the child is missing, is
+`completed` or `faulted`, or names another instance as its parent. For a
+`running` or a `cancelled` child it resolves the child's body and calls
+`cancelInstance`. That call cancels a running child, runs `onCancel` and
+sweeps nested children. On a `cancelled` child it resumes a sweep that an
+earlier call left `pending`. Afterwards the handler reads
+`cancel_sweep_state` and throws while it stays `pending`, so the outbox
+retries. An unresolvable child body throws too. A `ConcurrencyConflict`
+propagates. Each retry reloads the child and sees the new state.
 
 The row is durable and at-least-once. A crash between the leaving commit and
-the cancel still cancels the child.
+the cancel still cancels the child. The action takes the default retry
+limit. A row that exhausts it dead-letters, and the operator retries it from
+the admin outbox. D3 states that ceiling instead of raising the limit.
 
 Rejected: cancel inline after the commit, as the parent sweep does. The sweep
 resumes through `cancel_sweep_state` when someone cancels the parent again. A
@@ -144,7 +150,9 @@ closes the window between the gate and the insert.
 The return handler, after the status check under the parent lock, returns
 without effect unless `parent.awaitedChild` equals the returning child's id.
 The existing `currentStepId` comparison stays. The check for a linked step
-that is not a subprocess step still needs it.
+that is not a subprocess step still needs it. That check is now defense in
+depth. The engine writes `awaitedChild` only on a subprocess step. A parent
+that awaits this child on another step would need a hand-edited row.
 
 The return's writeback `UPDATE` also sets `awaitedChild` to `null`. The parent
 then has no awaited child while it waits out an unmatched outcome. A second
@@ -161,10 +169,24 @@ shared seam adds the cancel row. A spawn still in the queue finds the parent no
 longer awaiting its child. It creates nothing. The cancel finds no child and
 does nothing.
 
-The live-child gate stays as it is. A live child still defers the migration
-with `child-in-flight`, so a migration never cancels a running child. The gate
-does not widen to a queued spawn row. A dead-lettered spawn would then block
-the parent an operator wants to move.
+The live-child gate still defers a migration with `child-in-flight` while a
+child is live. A migration therefore never cancels a running child.
+
+One condition widens. The gate runs today only when the step id changes (`if
+(stepChanged)` in `migration.ts`). A plan can keep a step id and flip the step
+from `subprocess` to another type. That also leaves the subprocess step. The
+gate now runs whenever the source is a subprocess step and the target is not.
+The cancel row then never reaches a running child.
+
+An identity migration of a subprocess step still skips the gate.
+
+The gate does not widen to a queued spawn row. A dead-lettered spawn would
+then block the parent an operator wants to move.
+
+The reverse flip is out of scope. A plan can keep a step id and turn a task
+step into a subprocess step. The migration then suppresses the spawn as an
+identity migration. The parent parks with no child. The flaw predates this
+change. The run report names it.
 
 An identity migration (spawn suppressed) carries `awaitedChild`. The return of
 the existing child then still matches after the sequence advanced.
@@ -176,10 +198,13 @@ and `readonly`, as it already does for `validation.rule`. The runtime stays as
 it is, because `resolveFields` never supplied `child`.
 
 The studio condition builder offers `child` operands from the `stepId` prop of
-`ConditionInput`. The three view-override sites reach it through
-`BooleanOrExpressionInput`. Those sites drop the `stepId` prop. The path-guard
-site in `PathsPanel` keeps it. The field-level row in `FieldCatalogPanel`
-already withholds `child.*`.
+`ConditionInput`. The view-override sites reach it through
+`BooleanOrExpressionInput` and `OverrideField` in `FormEditorScreen`. There
+are four sites. A field entry has `visible`, `required` and `readonly`. A note
+entry has `visible`. All four drop the `stepId` prop, and so do the strip
+components and their callers that only forward it. The path-guard site in
+`PathsPanel` keeps it. The field-level row in `FieldCatalogPanel` already
+withholds `child.*`.
 
 `/impeccable shape` has nothing to decide, because the change only removes
 operands. The browser check and the `critique` and `audit` passes
@@ -196,6 +221,9 @@ still run on the changed screen, as the coordinator ruled.
   new name takes its place. The first requirement of that spec cites the old
   name, so it changes as well. At sync, move the successor to the removed
   requirement's place and run `git grep` for the old name.
+- The Purpose paragraph of `automatic-transitions` lists the resting steps. A
+  delta cannot reach a Purpose, so the apply phase edits it in the live spec
+  (task 8.6).
 
 ## Risks / Trade-offs
 
@@ -221,6 +249,13 @@ still run on the changed screen, as the coordinator ruled.
   left.
 - **The cancel handler ends a child that an operator might want.** → The owner
   ruled it. A child belongs to one step visit.
+- **One-way door: `awaitedChild` is a scalar.** Only the hard v1 boundaries
+  "no fan-out" and "no multi-instance steps" need it undone. A later change
+  that lifts them replaces the scalar with a set. Old rows read as a set of
+  one. The cancel row type persists in outbox rows and history, so it stays
+  readable. No open stage in `ROADMAP.md` touches subprocesses.
+- **A cancel row can dead-letter.** → The child keeps running until the
+  operator retries the row from the admin outbox.
 
 ## Migration Plan
 

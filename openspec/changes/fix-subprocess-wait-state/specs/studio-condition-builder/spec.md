@@ -74,7 +74,7 @@ It SHALL also offer `child.data.<key>`, over the child contract's
 `outputFields` alone. The authoring check types `child.data` against those
 fields, so a key outside them would author a publish error.
 
-The three view overrides on that step (`visible`, `required` and `readonly`)
+The view overrides on that step (`visible`, `required` and `readonly`)
 SHALL NOT offer these operands. The authoring check withholds `child` there,
 because the runtime resolves a view flag with no child in scope.
 
@@ -90,8 +90,9 @@ value at the path guard. No `child.data.<key>` operand SHALL appear then.
 
 #### Scenario: A view override on a subprocess step offers no child operand
 
-- **WHEN** a developer opens the `visible`, `required` or `readonly` override of
-  a view field on that same subprocess step
+- **WHEN** a developer opens a view field's `visible`, `required` or `readonly`
+  override on that same subprocess step
+- **OR** the developer opens a note's `visible` override
 - **THEN** the picker offers neither `child.outcome` nor `child.data.<key>`
 
 #### Scenario: Only the contract's output fields appear

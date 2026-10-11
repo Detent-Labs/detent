@@ -97,8 +97,10 @@ step would have that step's `outputMapping` applied to this child's result.
 
 The two outcomes SHALL remain distinguishable and keep their existing behaviour: a
 parent whose current step differs from the child's linked step has moved on, and the
-return is a silent no-op that stays delivered; a parent parked at the linked step
-where that step is not a subprocess step is a contradiction and SHALL fail loudly.
+return is a silent no-op that stays delivered; a parent that awaits this child and
+sits at the linked step, where that step is not a subprocess step, is a contradiction
+and SHALL fail loudly. The engine writes `awaitedChild` only on a subprocess step, so
+this branch is defense in depth.
 
 A child carrying no `parent` link SHALL be a no-op rather than a failure, matching
 the treatment of a child that cannot be loaded.
@@ -144,8 +146,8 @@ waiting on its bounding timer.
 
 #### Scenario: A parent parked at a non-subprocess step fails loudly
 
-- **WHEN** a return is delivered for a parent whose current step matches the child's
-  linked step but is not a subprocess step
+- **WHEN** a return is delivered for a parent whose `awaitedChild` names this child
+  and whose current step matches the child's linked step but is not a subprocess step
 - **THEN** the return fails rather than returning silently
 
 #### Scenario: A child with no parent link is a no-op
