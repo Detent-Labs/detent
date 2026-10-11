@@ -107,9 +107,9 @@ const MAX_DEPTH = 64;
 /**
  * Build the type environment for a scope. Scope is expressed by which namespaces
  * are registered: `result` exists only in an Action.output mapping, `child` only
- * inside a subprocess step. Unregistered references are check-time errors
- * (unlistedVariablesAreDyn: false), so guard-forbidden `result`/`child`/`now()`
- * fail for free.
+ * in a subprocess step's path guards and outputMapping. Unregistered references
+ * are check-time errors (unlistedVariablesAreDyn: false), so guard-forbidden
+ * `result`/`child`/`now()` fail for free.
  *
  * A declared data source is registered at no site: the engine resolves data sources
  * nowhere (no guard/output/transform context carries one), so a CEL reference to one
@@ -269,15 +269,16 @@ function collect(body: ProcessBody): Site[] {
       push(t.deadline, `${sloc}.timers[${ti}].deadline`, false, false, "string");
       outputs(t.onFire.actions, `${sloc}.timers[${ti}].onFire`);
     });
+    // Every view site takes `child: false`, on a subprocess step too. The flags
+    // resolve while the form renders, and `validation.rule` during submission.
+    // Both run against buildGuardContext(body, instance, actor), which registers
+    // no `child` on any step type: the step parks while the child runs, and a
+    // `child.*` reference would be unbound there and always evaluate to false.
     (s.view?.fields ?? []).forEach((vf, vi) => {
-      push(asExpr(vf.visible), `${sloc}.view.fields[${vi}].visible`, false, child);
+      push(asExpr(vf.visible), `${sloc}.view.fields[${vi}].visible`, false, false);
       if (isViewField(vf)) {
-        push(asExpr(vf.required), `${sloc}.view.fields[${vi}].required`, false, child);
-        push(asExpr(vf.readonly), `${sloc}.view.fields[${vi}].readonly`, false, child);
-        // Unlike the two flags above, this runs during submission against
-        // buildGuardContext(body, mergedInstance, actor), which registers no
-        // `child` on any step type — so this site takes `child: false` always,
-        // not `child` from the enclosing step.
+        push(asExpr(vf.required), `${sloc}.view.fields[${vi}].required`, false, false);
+        push(asExpr(vf.readonly), `${sloc}.view.fields[${vi}].readonly`, false, false);
         push(vf.validation?.rule, `${sloc}.view.fields[${vi}].validation.rule`, false, false);
       }
     });
