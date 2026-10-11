@@ -77,11 +77,11 @@ The delta spec holds the scenarios. Every group lands its own tests.
 
 ## 5. The UI-strings editor keeps its input
 
-- [ ] 5.1 Add `sameOverrides(a, b, area, locale)` to `uiStringsLogic.ts`.
+- [x] 5.1 Add `sameOverrides(a, b, area, locale)` to `uiStringsLogic.ts`.
       Verify: `packages/web/test/admin-uiStringsLogic.test.ts` covers an equal
       slice, a changed key, an added key, a removed key and a change in another
       area, which must not count.
-- [ ] 5.2 Wire `UiStringsScreen` the same way. The rows read `latest`. A
+- [x] 5.2 Wire `UiStringsScreen` the same way. The rows read `latest`. A
       dirty flag, set in the input handler and cleared with `drafts`, drives
       the callout. `pendingWrites` still drives Save. `save()` awaits
       `load(true)`, which clears `drafts` and the flag in one step. Render the
@@ -91,7 +91,7 @@ The delta spec holds the scenarios. Every group lands its own tests.
 
 ## 6. The browser checks
 
-- [ ] 6.1 Add `e2e/admin-edits.e2e.ts` with two tests. The first opens
+- [x] 6.1 Add `e2e/admin-edits.e2e.ts` with two tests. The first opens
       `/admin/ui-strings`, types into the first override input, dispatches
       `focus` on the window, and asserts the input keeps the text. The second
       covers F-18: on `/admin/users`, a `focus` event 1 second after the load
@@ -101,7 +101,7 @@ The delta spec holds the scenarios. Every group lands its own tests.
       `bun run lint` cover the file, and the CI smoke job passes both tests.
       The devcontainer has no Playwright browser, so `bun run e2e` cannot run
       there.
-- [ ] 6.2 Add the data-list focus walk to `docs/browser-checks.md`, with the
+- [x] 6.2 Add the data-list focus walk to `docs/browser-checks.md`, with the
       `Source:` line the other entries carry. Cover the kept input, the callout
       in EN and DE, the discard button and the Save path. Verify: the entry
       names a pass condition for each step.
