@@ -15,11 +15,11 @@
 ## 3. A 401 keeps the unsaved work for a restore (E1-3)
 
 <!-- antislop: allow synonym-rotation -->
-<!-- Delete them and Discard draft are two controls; the process surface is a glossary term. -->
+<!-- Discard them and Discard draft are two controls; the process surface is a glossary term. -->
 - [ ] 3.1 Add `draft/draftStash.ts` with `stashDraft`, `readRestorable` and `clearStash`. Each takes a storage argument. Test a round trip, a second actor, a malformed value, a throwing storage, and an equal stash that `readRestorable` clears, in `studio-draftStash.test.ts`.
 - [ ] 3.2 Pass the actor id from `StudioArea` through `EditScreen` to `ProcessSurface`. Wrap `onUnauthorized` there. The wrapper writes the stash of a dirty draft before it calls the callback of the shell. Verify `bun run typecheck` passes.
 - [ ] 3.3 Add `panels/RestoreNotice.tsx` and its three strings in `i18n/catalogs/studio.ts`. Style it as the warning callout with compiled styles. Show it under the header bar when `readRestorable` returns a stash. Verify `bun run typecheck` passes.
-- [ ] 3.4 Wire the two buttons. Restore replaces the draft and sets the stored revision and layout. It asks with `confirm` first when the draft is dirty. "Delete them", a successful save and the Discard draft action clear the stash. After either button focus moves to the open tab. Verify the browser check in 5.4.
+- [ ] 3.4 Wire the two buttons. Restore replaces the draft and sets the stored revision and layout. It asks with `confirm` first when the draft is dirty. "Discard them", a successful save and the Discard draft action clear the stash. After either button focus moves to the open tab. Verify the browser check in 5.4.
 - [ ] 3.5 Test the notice in `studio-restoreNotice.test.tsx` with static markup: both buttons, `role="status"` and the three catalog strings. Verify the file passes.
 - [ ] 3.6 Add a "restore notice" row to the process surface table in `.claude/rules/ui-glossary.md`. Verify the term appears once in the file.
 
@@ -27,7 +27,7 @@
 
 - [ ] 4.1 Add the manual checks to `docs/browser-checks.md` under the studio. Cover the groups link, each account menu exit and a layout-only change. Cover a drag during a slow save and a tab close. Cover a 401 on save with a restore. Cover a Discard draft after a drag, with no native prompt. Verify each check names its route and its pass condition.
 - [ ] 4.2 Reword the clause on the session key in the Purpose paragraph of `openspec/specs/studio-app/spec.md`. It still names `session.ts` and a key of its own. Verify with the prose gate that the file count does not rise.
-- [ ] 4.3 Delete the `guard-unsaved-studio-draft` entry from the audit index in `docs/decisions.md`. Verify with `git grep guard-unsaved-studio-draft docs/decisions.md` that nothing remains.
+- [ ] 4.3 Strike the `guard-unsaved-studio-draft` entry from the audit index in `docs/decisions.md`. Verify with `git grep guard-unsaved-studio-draft docs/decisions.md` that nothing remains.
 
 ## 5. Verification
 

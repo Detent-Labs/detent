@@ -91,14 +91,14 @@ session requirement states, even when the write fails.
 <!-- Discard draft names a studio control; the copy is a different object. -->
 When the same actor reopens a draft with a differing copy, a notice SHALL offer
 two controls. "Restore unsaved changes" puts the stored body and layout in the
-editor and keeps the stored revision. "Delete them" deletes the copy. A restore
+editor and keeps the stored revision. "Discard them" deletes the copy. A restore
 over newer unsaved changes SHALL ask for confirmation first. A successful save
 or a discard of the draft SHALL delete the copy.
 
 #### Scenario: The same actor can restore after logging in again
 
 - **WHEN** the actor logs in again and opens the draft that has a copy
-- **THEN** a notice offers "Restore unsaved changes" and "Delete them"
+- **THEN** a notice offers "Restore unsaved changes" and "Discard them"
 - **AND** restoring puts the stored body and layout in the editor
 - **AND** the header bar prints the dirty indicator
 
@@ -125,9 +125,9 @@ or a discard of the draft SHALL delete the copy.
 - **WHEN** a different actor logs in on the same tab and opens that draft
 - **THEN** no notice appears
 
-#### Scenario: Choosing "Delete them" deletes the copy
+#### Scenario: Choosing "Discard them" deletes the copy
 
-- **WHEN** the developer chooses "Delete them"
+- **WHEN** the developer chooses "Discard them"
 - **THEN** the notice closes
 - **AND** a later visit to that draft shows no notice
 

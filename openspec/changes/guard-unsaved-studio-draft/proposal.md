@@ -28,7 +28,7 @@ audit of 2026-10-10 found all three (E1-2, E1-3, E1-4).
 - A 401 on an unsaved draft keeps body, layout and revision in
   `sessionStorage`, keyed by actor and process. The logout then runs as today.
   When that actor reopens that draft, a notice offers "Restore unsaved
-  changes" and "Delete them". Restore keeps the stored revision. A draft saved
+  changes" and "Discard them". Restore keeps the stored revision. A draft saved
   elsewhere meanwhile then ends in the existing conflict banner.
 
 ## Capabilities

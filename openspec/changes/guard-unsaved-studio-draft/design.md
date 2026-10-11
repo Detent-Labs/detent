@@ -131,24 +131,23 @@ restored draft saved against a moved server revision answers 409. The existing
 conflict banner then appears. Nothing gets overwritten silently.
 
 <!-- antislop: allow synonym-rotation -->
-<!-- Discard draft and Delete them are two studio controls with different effects. -->
-Three events clear the stash: "Delete them", a successful save and the Discard
+<!-- Discard them and Discard draft are two studio controls with different effects. -->
+Three events clear the stash: "Discard them", a successful save and the Discard
 draft action. The last one matters. A discarded draft restarts its revision
 count at 0. A stale stash with a high revision could otherwise restore over a
 newer draft that reached the same revision number.
 
 <!-- antislop: allow synonym-rotation -->
-<!-- Discard draft and Delete them are two studio controls with different effects. -->
+<!-- Discard them and Discard draft are two studio controls with different effects. -->
 `RestoreNotice` follows the warning callout of `DESIGN.md`: refusal text beside
 a 3px advisory rule, with 8px before the text. It has `role="status"` and three
 catalog strings. The studio `t(key)` takes no values, so the message names no
-time. The button reads "Delete them" and not "Discard them", because the Discard
-draft button already deletes the server draft.
+time. The button reads "Discard them", the wording of the owner ruling of 2026-10-11.
 
 The notice sits between the header bar and the tab row, as a sibling of the
 error banner. The message and both buttons share a line on wide screens and
-stack below 40rem. "Restore unsaved changes" is a secondary button. "Delete
-them" is the destructive outline. Publish keeps the one filled action. After
+stack below 40rem. "Restore unsaved changes" is a secondary button. "Discard them" is the destructive
+outline. Publish keeps the one filled action. After
 either button the notice unmounts, and focus moves to the open tab.
 
 **The shell stays as it is.** `Chrome` already calls three handlers that its
@@ -173,6 +172,9 @@ menu requirement. The three exit scenarios then allow the confirmation.
   same. `canonicalize` compares keys. The header bar
   reads "Unsaved changes" until the next save. The cost is one extra prompt.
   A normalizer would need a new default entry for each new layout key.
+- **Two controls start with Discard.** → "Discard them" clears the stored copy. The other control
+  acts on the draft on the server. The message of the notice names its object,
+  and the ruling fixed the wording. The browser check looks at both together.
 - **A stash outlives a draft that someone else deleted.** → Only a deletion from
   another session reaches it. The tab keeps the stash until it closes. A restore
   still answers 409 when the revision differs.
