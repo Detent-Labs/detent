@@ -325,6 +325,10 @@ export function DataListScreen({ listKey, token, locale, navigate, onUnauthorize
       await updateDataList(listKey, label.trim(), description.trim() === "" ? null : description.trim(), token, columns);
       await putDataListValues(listKey, toPayload(rows, locale, existingLabels, columns), token);
       setSaved(true);
+      // The server now holds the input, so it is no longer unsaved, even if
+      // the reload below fails.
+      dirtyRef.current = false;
+      setDirty(false);
       // A forced reseed: the inputs switch once, to the copy the save produced.
       await load(true);
     } catch (err) {
