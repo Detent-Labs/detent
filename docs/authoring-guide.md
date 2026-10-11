@@ -354,6 +354,24 @@ never pairs with `valueFromField`. It always resolves to a scalar field, and
 a scalar field can never satisfy a membership comparison. The config rejects
 the mismatched pairing outright rather than let it fail at runtime.
 
+A literal must have the type its compared field declares. A `number` field
+takes `5` and rejects the string `"5"`. A `boolean` field takes `true` and
+rejects `"true"`. The engine compares stored values by type. Under `eq`, a
+literal of another type matches nothing. Under `ne`, every instance that holds
+the field matches.
+
+Publish rejects a comparison when no live version of the target admits its
+literal. For `in`, the check reads each list member. A version admits a literal
+when it declares the field. The literal must also pass the type check a
+participant's submission faces. That check includes `format`, so `"foo"` fails
+on an `email` field.
+
+One admitting live version is enough, so a field retyped between two live
+versions stays publishable. A `null` literal is exempt. So is a
+`valueFromField` entry, which has no literal. A plugin-typed field admits any
+literal. The check reads only the versions of the target that hold a running
+instance.
+
 `attributes` copies more than the label onto the option, for a
 `columnMapping` to pick up:
 
