@@ -212,8 +212,8 @@ rule and the priority-uniqueness rule; this section states only their
 runtime meaning. Among automatic paths, the lowest `priority` evaluates
 first, and the first matching guard wins. A wait-state has no default:
 no match means the instance waits, bounded by a timer. A subprocess step
-is the exception; see "Subprocesses" below. A gated side
-effect takes the shape of a visible wait-state with result-driven
+differs: it may carry a default, and its paths run after the return. A
+gated side effect takes the shape of a visible wait-state with result-driven
 automatic paths, instead of hidden transaction semantics.
 
 The key `Path.key` must be non-empty after trimming, for either trigger
@@ -272,9 +272,10 @@ return applies only when `awaitedChild` equals the returning child's id.
 Both checks keep a late delivery from acting for a step visit the parent
 has left.
 
-A commit that leaves a subprocess step cancels the awaited child. Two
-routes do it: a timer exit and a migration relocation. The leaving commit
-enqueues a `core.cancelSubprocessChild` row in the same transaction. The
+A parent can leave the step without the return in two ways: a timer exit
+and a migration relocation. Either commit enqueues a
+`core.cancelSubprocessChild` row in the same transaction. A migration
+commits only when no child is live, so its row finds nothing to cancel. The
 handler cancels a running child, runs its `onCancel` actions and cascades
 to its own children. A cancel of the parent enqueues no such row, since the
 sweep of running children covers it. A row that dead-letters leaves the

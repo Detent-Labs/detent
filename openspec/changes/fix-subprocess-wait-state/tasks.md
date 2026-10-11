@@ -61,13 +61,13 @@
 
 ## 8. Rules, guide and index
 
-- [ ] 8.1 Edit `.claude/rules/process-contract.md`: the Paths wait-state sentence, the Subprocesses paragraph (three handlers, `awaitedChild`), and the Runtime record note. Verify with `git grep -n "two internal" -- .claude docs`.
-- [ ] 8.2 Edit `.claude/rules/authoring-invariants.md` beside the subprocess wait-state rule. State that the cascade never evaluates the paths on entry and a guardless default stays allowed.
-- [ ] 8.3 Edit the Contract section and the Path section of `docs/authoring-guide.md`. The Path section says an automatic path fires by itself. Cover the paths running after the return, the else branch, the timer and migration cancel, and the view flags. Verify against the delta specs.
-- [ ] 8.4 Sweep `examples/` and `scripts/seed.ts`. The only subprocess step is `step_l_check`, and both its paths have guards. Verify that the examples still publish.
-- [ ] 8.5 Delete the `fix-subprocess-wait-state` entry from the audit index in `docs/decisions.md`. Verify with `git grep -n "fix-subprocess-wait-state" -- docs/decisions.md`.
-- [ ] 8.6 Edit the Purpose paragraph of `openspec/specs/automatic-transitions/spec.md` so its list of resting steps names the subprocess step. Verify by reading it against the delta.
-- [ ] 8.7 Edit `README.md` line 61 so the subprocess summary names the cancel handler. Verify with `git grep -n "downward cancel cascade" -- README.md`.
+- [x] 8.1 Edit `.claude/rules/process-contract.md`: the Paths wait-state sentence, the Subprocesses paragraph (three handlers, `awaitedChild`), and the Runtime record note. Verify with `git grep -n "two internal" -- .claude docs`.
+- [x] 8.2 Edit `.claude/rules/authoring-invariants.md` beside the subprocess wait-state rule. State that the cascade never evaluates the paths on entry and a guardless default stays allowed.
+- [x] 8.3 Edit the Contract section and the Path section of `docs/authoring-guide.md`. The Path section says an automatic path fires by itself. Cover the paths running after the return, the else branch, the timer and migration cancel, and the view flags. Verify against the delta specs.
+- [x] 8.4 Sweep `examples/` and `scripts/seed.ts`. The only subprocess step is `step_l_check`, and both its paths have guards. Verify that the examples still publish.
+- [x] 8.5 Delete the `fix-subprocess-wait-state` entry from the audit index in `docs/decisions.md`. Verify with `git grep -n "fix-subprocess-wait-state" -- docs/decisions.md`.
+- [x] 8.6 Edit the Purpose paragraph of `openspec/specs/automatic-transitions/spec.md` so its list of resting steps names the subprocess step. Verify by reading it against the delta.
+- [x] 8.7 Edit `README.md` line 61 so the subprocess summary names the cancel handler. Verify with `git grep -n "downward cancel cascade" -- README.md`.
 
 ## 9. Verification
 

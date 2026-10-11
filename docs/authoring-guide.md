@@ -678,8 +678,8 @@ A manual path waits for a person. The example gives `review` three of them:
 `approve`, `reject` and `escalate`.
 
 An automatic path fires by itself when its guard matches, except on a
-subprocess step. A guard is a CEL expression. Two or more automatic paths on one step need a `priority` each,
-and the engine tries the lowest number first.
+subprocess step. A guard is a CEL expression. Two or more automatic paths on
+one step need a `priority` each, and the engine tries the lowest number first.
 
 The example gives `book` two automatic paths. `booked` has priority 1 and the
 guard `data.booking_status == 'booked'`. `booking-failed` has priority 2 and

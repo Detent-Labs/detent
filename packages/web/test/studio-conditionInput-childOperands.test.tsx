@@ -1,6 +1,6 @@
 /**
- * fix-subprocess-wait-state task 7.3 (`studio-condition-builder`: "A subprocess
- * step's path guards offer the child's contract as operands").
+ * `studio-condition-builder`: "A subprocess step's path guards offer the
+ * child's contract as operands".
  *
  * `examples/subprocess-loan-parent.json`'s step `check` is a subprocess step
  * whose child resolved, so `loadedChildren` holds the credit-check child under
