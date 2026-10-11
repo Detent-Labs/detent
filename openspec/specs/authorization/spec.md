@@ -635,28 +635,34 @@ either test passes:
   process/step-default rule
 
 An actor who started an instance may cancel it without holding
-`system:cancel-any`, as long as the instance's current step is cancellable.
-An abandoned start therefore does not strand an unassigned running instance.
-That holds unless the process owner deliberately set that step's, or the
-whole process's, `cancellable` to `false`. There, only the two role/grant
-tests above still admit the cancellation. That bypass SHALL stay specific to
+`system:cancel-any`, as long as the instance's current step is cancellable. An
+abandoned start therefore does not strand an unassigned running instance. That
+holds unless the process owner deliberately set that step's, or the whole
+process's, `cancellable` to `false`. There, only the two role and grant tests
+above still admit the cancellation. That bypass SHALL stay specific to
 `cancelInstance`. It SHALL NOT become a reserved role of its own, or a general
 "owner" permission model. It SHALL NOT extend to publish. It SHALL NOT let a
 starter cancel an instance they did not start.
 
 The `cancellable` gate SHALL apply to the starter test alone. It SHALL NOT
 apply to `CANCEL_ANY_ROLE` or to a stored `cancel` grant. An operator holding
-either MUST remain able to cancel any running instance no matter what its
-process or step declares. This is deliberate. Without it, a process
-owner declaring a step not participant-cancellable could produce a running
-instance no one can cancel. This capability treats that outcome as
-strictly worse than the narrower authorization the gate otherwise adds.
+either MUST remain able to cancel any running instance, whatever its process
+or step declares. This is deliberate. Without it, a process owner declaring a
+step not participant-cancellable could produce a running instance no one can
+cancel. This capability treats that outcome as strictly worse than the
+narrower authorization the gate otherwise adds.
 
 The `can` test sits in the loaded branch for one reason. A scoped grant names a
 process, and the process id arrives with the instance. The load-free fast path
 therefore keeps asking the global question alone. A grant holder pays one
 instance load that a `system:cancel-any` holder does not. The two tests SHALL
 stay independent, so that neither one masks the other.
+
+On a non-running instance, the starter test SHALL pass only while the starter
+may read the instance. A starter whom a revocation names meets
+`AuthorizationError`, unless a live assignment applies. "A write call reveals a
+finished instance only to a reader" in `instance-visibility-set` states that
+rule. The role test and the grant test sit outside it.
 
 #### Scenario: A starter without the reserved role cancels their own instance
 
@@ -677,6 +683,7 @@ stay independent, so that neither one masks the other.
 - **WHEN** that same actor's only grant names a different process
 - **THEN** it throws `AuthorizationError`
 
+<!-- antislop: allow passive-voice - the scenario title must match the live spec verbatim, or archive drops it -->
 #### Scenario: A non-starter without the reserved role is still rejected
 
 - **WHEN** an actor who lacks `system:cancel-any`, has no grant over the
@@ -721,6 +728,13 @@ stay independent, so that neither one masks the other.
 - **THEN** it throws `AuthorizationError`, the same as any other starter
   receives. The `system:admin` role alone does not imply `system:cancel-any`,
   and this capability's roles imply nothing else
+
+#### Scenario: A revoked starter cannot cancel a finished instance
+
+- **WHEN** an administrator revoked the starter of a completed instance
+- **AND** the starter has no claim and no candidacy on its current step
+- **AND** the starter calls `cancelInstance` for that instance
+- **THEN** it throws `AuthorizationError`
 
 ### Requirement: The operator role gates the operator-facing reads and routes
 
@@ -767,12 +781,18 @@ existing `src/auth/cli.ts set-roles`.
 
 `getInstanceRecord` (`src/runtime/api.ts`) SHALL first try
 `requireRole(actor, ADMIN_ROLE)`. When that throws `AuthorizationError`,
-`getInstanceRecord` SHALL NOT propagate the rejection. It SHALL instead load
-the instance and SHALL permit the read when `instance.startedBy === actor.id`
-and `actor.roles` includes `DEVELOPER_ROLE` or `AUTHOR_ROLE`. Either authoring
-role therefore reads the record of an instance created through its own Studio
-Player session, without holding `system:admin`. The Player renders that record
-beside the form, and both roles reach the Player.
+`getInstanceRecord` SHALL NOT propagate the rejection. It SHALL load the
+instance instead. It SHALL permit the read when `instance.startedBy ===
+actor.id` and `actor.roles` includes `DEVELOPER_ROLE` or `AUTHOR_ROLE`. A
+revocation that refuses the starter overrides that permit. Either authoring role therefore reads the
+record of an instance created through its own Studio Player session, without
+holding `system:admin`. The Player renders that record beside the form, and
+both roles reach the Player.
+
+The revocation rule is the direct-read rule of `instance-visibility-set`. A
+live assignment outranks the revocation. A test instance admits its starter
+whatever a revocation says. The Player reads the record of a test instance, so
+that case must keep working.
 
 This bypass SHALL be `getInstanceRecord`-specific, mirroring `cancelInstance`'s
 existing starter bypass for `system:cancel-any`. It SHALL NOT extend to any
@@ -789,7 +809,7 @@ That preserves the guarantee this capability already holds for
 `cancelInstance`. The engine rejects a role-less caller before any instance
 state becomes observable to it.
 
-This addition leaves the requirement above untouched, the one gating `GET
+This addition leaves untouched the requirement that gates `GET
 /instances/:id/record` behind `system:admin`. An actor holding none of
 `system:admin`, `system:developer` and `system:author` still gets
 `AuthorizationError`, even for an instance they themselves started. The "same
@@ -822,13 +842,23 @@ no authoring role either.
   id
 - **THEN** it throws `AuthorizationError`
 
+<!-- antislop: allow passive-voice - the scenario title must match the live spec verbatim, or archive drops it -->
 #### Scenario: A participant with no authoring role is still refused, even for their own instance
 
 - **WHEN** an actor holding none of `system:admin`, `system:developer` and
   `system:author` calls `getInstanceRecord` for an instance they themselves
   started
-- **THEN** it throws `AuthorizationError`, unchanged from this capability's
-  existing behavior
+- **THEN** it throws `AuthorizationError`, as this capability already
+  required
+
+#### Scenario: A revoked author cannot read the record
+
+- **WHEN** an actor holding `system:author` but not `system:admin` started an
+  instance
+- **AND** an administrator revoked that actor from it
+- **AND** the actor has no claim and no candidacy on its current step
+- **AND** the actor calls `getInstanceRecord` for that instance
+- **THEN** it throws `AuthorizationError`
 
 ### Requirement: Reading one instance is authorized by relationship to it
 

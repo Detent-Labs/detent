@@ -43,7 +43,7 @@ import { DurationValidationError, CompileValidationError } from "../schema/compi
 import { DraftConflictError } from "../engine/drafts.js";
 import { MigrationPlanError } from "../engine/migration.js";
 import { ZodError } from "zod";
-import { RequestShapeError, NotFoundError, InstanceNotRunningError, InstanceRunningError } from "../errors.js";
+import { RequestShapeError, NotFoundError, InstanceNotRunningError, InstanceRunningError, UnknownActorError } from "../errors.js";
 import { log } from "../log.js";
 
 export type HttpResult = { status: number; body: unknown };
@@ -106,6 +106,9 @@ const MESSAGE_ERRORS: MessageMapping[] = [
   // What the engine refuses is the content of one field. The message names the
   // target, so an operator who mistyped an id sees which one.
   { ctor: UnknownDelegateError, status: 422, type: "unknown-delegate" },
+  // Same reasoning for a visibility revoke or grant naming an account the
+  // directory does not hold. A restore never raises it.
+  { ctor: UnknownActorError, status: 422, type: "unknown-actor" },
   { ctor: DraftConflictError, status: 409, type: "draft-conflict" },
   { ctor: MigrationPlanError, status: 409, type: "migration-plan" },
   { ctor: ReportOwnerInvariantError, status: 409, type: "report-owner-invariant" },

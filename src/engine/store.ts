@@ -373,6 +373,8 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   // actor usually reaches an instance through a role or a group, and deleting
   // that principal would revoke it for every other holder. Subtracted inside
   // each branch of the visible-scope read, so a denial never shortens a page.
+  // The started scope probes it too (buildInstanceWhere's notRevokedFor), by
+  // `actor_id`, the key's leading column.
   await db`CREATE TABLE IF NOT EXISTS instance_principals_denied (
     instance_id text NOT NULL,
     actor_id    text NOT NULL,

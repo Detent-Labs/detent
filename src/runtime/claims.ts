@@ -14,12 +14,14 @@ import {
 import type { Actor } from "../cel/eval.js";
 import { knownUserIds } from "../auth/users.js";
 import { InstanceNotRunningError } from "../errors.js";
-import type { Instance, InstanceId } from "../schema/definition.js";
+import type { InstanceId } from "../schema/definition.js";
+import { toWriteResult, type InstanceWriteResult } from "./internal.js";
 
 /**
  * Claim the current step of a running instance. Thin delegation to the engine
  * implementation — see `engine/transition.ts::claimStep` for the row-lock,
- * candidate-eligibility, and exclusivity semantics.
+ * candidate-eligibility, and exclusivity semantics. Answers the write result
+ * (`toWriteResult`), never the instance: a claim authorizes no read.
  *
  * `engineClaimStep` no-ops (returns the instance unchanged) rather than
  * throwing when the instance is not running — that no-op exists for internal
@@ -29,31 +31,32 @@ import type { Instance, InstanceId } from "../schema/definition.js";
  * only mean the no-op branch fired against the row the engine's own row lock
  * read — exact, not a separate unlocked check racing it.
  */
-export async function claimStep(instanceId: InstanceId, actor: Actor, db: SQL = sql): Promise<Instance> {
+export async function claimStep(instanceId: InstanceId, actor: Actor, db: SQL = sql): Promise<InstanceWriteResult> {
   const updated = await engineClaimStep(instanceId, actor, db);
   if (updated.status !== "running") throw new InstanceNotRunningError(updated.instanceId, updated.status);
-  return updated;
+  return toWriteResult(updated);
 }
 
 /**
  * Release a claim on the current step of a running instance. Thin delegation
  * to the engine implementation — see `engine/transition.ts::releaseClaim`.
- * Same non-running detection as `claimStep`, for the same reason.
+ * Same non-running detection as `claimStep`, for the same reason, and the same
+ * write result.
  */
-export async function releaseClaim(instanceId: InstanceId, actor: Actor, db: SQL = sql): Promise<Instance> {
+export async function releaseClaim(instanceId: InstanceId, actor: Actor, db: SQL = sql): Promise<InstanceWriteResult> {
   const updated = await engineReleaseClaim(instanceId, actor, db);
   if (updated.status !== "running") throw new InstanceNotRunningError(updated.instanceId, updated.status);
-  return updated;
+  return toWriteResult(updated);
 }
 
 /**
  * Delegate a claim on the current step of a running instance to a named
  * actor. Delegation to the engine implementation — see
  * `engine/transition.ts::delegateClaim`. Same non-running detection as
- * `claimStep`/`releaseClaim`, for the same reason. `toActorId` is still not
- * checked against `assignment.candidates`: the contract permits delegating
- * outside the candidate set, and the `assignment.delegated` event records
- * exactly that.
+ * `claimStep`/`releaseClaim`, for the same reason, and the same write result.
+ * `toActorId` is still not checked against `assignment.candidates`: the
+ * contract permits delegating outside the candidate set, and the
+ * `assignment.delegated` event records exactly that.
  *
  * It IS checked against the local account directory, but only where the
  * delegating actor's own id resolves there. The engine cannot ask whether a
@@ -68,12 +71,12 @@ export async function releaseClaim(instanceId: InstanceId, actor: Actor, db: SQL
  * first would make a non-claimant's error depend on whether the target exists,
  * turning this call into a directory-enumeration oracle.
  */
-export async function delegateClaim(instanceId: InstanceId, actor: Actor, toActorId: string, db: SQL = sql): Promise<Instance> {
+export async function delegateClaim(instanceId: InstanceId, actor: Actor, toActorId: string, db: SQL = sql): Promise<InstanceWriteResult> {
   const validateTarget = async (target: string): Promise<void> => {
     const known = await knownUserIds([actor.id, target], db);
     if (known.has(actor.id) && !known.has(target)) throw new UnknownDelegateError(target);
   };
   const updated = await engineDelegateClaim(instanceId, actor, toActorId, db, validateTarget);
   if (updated.status !== "running") throw new InstanceNotRunningError(updated.instanceId, updated.status);
-  return updated;
+  return toWriteResult(updated);
 }

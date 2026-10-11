@@ -142,7 +142,7 @@ export function OutboxScreen({ token, locale, onUnauthorized }: OutboxScreenProp
   const fail = useFail(onUnauthorized, (err) => setError(describeCaughtError(err, locale)));
 
   const fetchPage = useCallback(
-    async (cursor?: string) => {
+    async (cursor: string | undefined, isCurrent: () => boolean) => {
       setError(undefined);
       try {
         const page = await listOutbox(token, {
@@ -153,11 +153,12 @@ export function OutboxScreen({ token, locale, onUnauthorized }: OutboxScreenProp
         });
         // Only the initial load refreshes the pill counts; today's loadMore
         // never touched them, and an unconditional call here would start
-        // refreshing them on every page, a real behavior change.
-        if (cursor === undefined) setCounts(page.counts);
+        // refreshing them on every page, a real behavior change. A stale
+        // answer leaves the counts of the newest filter alone.
+        if (cursor === undefined && isCurrent()) setCounts(page.counts);
         return { items: page.items, cursor: page.cursor };
       } catch (err) {
-        fail(err);
+        if (isCurrent()) fail(err);
         throw err;
       }
     },

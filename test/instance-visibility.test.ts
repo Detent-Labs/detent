@@ -8,11 +8,12 @@
  * to the page size, never to the size of the reader's match set (design.md,
  * "The read is a UNION ALL per principal"). Two rejected forms return the same
  * rows while reading the whole match set. A row-level test cannot tell those
- * apart, so these two measure what the planner actually read.
+ * apart, so these two measure what the planner actually read. A third guard,
+ * at the very end, does the same for the started scope's denial probe.
  */
 import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, initSchema, appendInstancePrincipals, withTransaction } from "../src/engine/store.js";
-import { listInstances, buildVisibleRowSet } from "../src/runtime/api.js";
+import { listInstances, buildVisibleRowSet, buildInstanceWhere, buildDataWhere } from "../src/runtime/api.js";
 
 const DB = !!process.env.DATABASE_URL;
 
@@ -151,12 +152,11 @@ async function seedBulk() {
   await sql`ANALYZE instance_principals_denied`;
 }
 
-type PlanNode = { "Node Type": string; "Relation Name"?: string; "Actual Rows"?: number; Plans?: PlanNode[] };
+type PlanNode = { "Node Type": string; "Relation Name"?: string; "Index Name"?: string; "Actual Rows"?: number; Plans?: PlanNode[] };
 
-/** Every node of one `EXPLAIN (ANALYZE)` plan, flattened. */
-async function explainVisibleRowSet(actorId: string, principals: string[]): Promise<PlanNode[]> {
-  const fragment = buildVisibleRowSet({}, { actorId, principals }, 21, undefined, undefined, sql);
-  const rows = (await sql`EXPLAIN (ANALYZE, FORMAT JSON) ${fragment}`) as unknown as Record<string, unknown>[];
+/** Every node of one `EXPLAIN (ANALYZE)` plan over a SQL fragment, flattened. */
+async function planNodes(statement: unknown): Promise<PlanNode[]> {
+  const rows = (await sql`EXPLAIN (ANALYZE, FORMAT JSON) ${statement}`) as unknown as Record<string, unknown>[];
   const root = (Object.values(rows[0]!)[0] as { Plan: PlanNode }[])[0]!.Plan;
   const out: PlanNode[] = [];
   const walk = (n: PlanNode) => {
@@ -166,6 +166,9 @@ async function explainVisibleRowSet(actorId: string, principals: string[]): Prom
   walk(root);
   return out;
 }
+
+const explainVisibleRowSet = (actorId: string, principals: string[]) =>
+  planNodes(buildVisibleRowSet({}, { actorId, principals }, 21, undefined, undefined, sql));
 
 const principalNodes = (nodes: PlanNode[]) => nodes.filter((n) => n["Relation Name"] === "instance_principals");
 const rowsRead = (nodes: PlanNode[]) => principalNodes(nodes).reduce((sum, n) => sum + (n["Actual Rows"] ?? 0), 0);
@@ -198,4 +201,71 @@ test.skipIf(!DB)("a narrow reader pages without a sequential scan over the princ
   expect(principalNodes(nodes).length).toBeGreaterThan(0);
   expect(principalNodes(nodes).every((n) => n["Node Type"] !== "Seq Scan")).toBe(true);
   expect(rowsRead(nodes)).toBeLessThan(200);
+});
+
+// ============================================================
+// Plan guard: the started scope's denial probe (instance-visibility-set,
+// "A revocation holds on the started scope")
+// ============================================================
+
+const STARTED = 3_000;
+const OTHER_DENIALS = 20_000;
+
+/**
+ * `STARTED` instances all begun by `user_anna`, one of them revoked from her,
+ * beside `OTHER_DENIALS` denials naming other actors. The bulk denial table
+ * makes the probe's access path a real choice: on a table of one page the
+ * planner reads sequentially whatever index exists.
+ */
+async function seedStartedBulk() {
+  await sql`INSERT INTO instances (instance_id, transition_seq, body, kind, created_at)
+    SELECT 'inst_s' || g, 0,
+      jsonb_build_object(
+        'instanceId', 'inst_s' || g, 'processId', 'proc_vis', 'version', 1, 'definitionHash', 'h',
+        'currentStepId', 'step_a', 'transitionSeq', 0, 'data', '{}'::jsonb, 'status', 'completed',
+        'startedAt', '2026-01-01T00:00:00.000Z', 'startedBy', 'user_anna', 'assignment', NULL),
+      'published', now() - (g || ' seconds')::interval
+    FROM generate_series(1, ${STARTED}) g`;
+  await sql`INSERT INTO instance_principals_denied (instance_id, actor_id)
+    SELECT 'inst_o' || g, 'user_other' || (g % 400) FROM generate_series(1, ${OTHER_DENIALS}) g`;
+  await sql`INSERT INTO instance_principals_denied (instance_id, actor_id) VALUES ('inst_s2', 'user_anna')`;
+  await sql`ANALYZE instances`;
+  await sql`ANALYZE instance_principals_denied`;
+}
+
+/** The statement `listInstances` runs for `scope=started` and a non-administrator, one page deep. */
+function startedScopeStatement(actorId: string) {
+  const filter = { startedBy: actorId, notRevokedFor: { actorId, principals: [actorId] } };
+  return sql`
+    SELECT instance_id, body, created_at FROM instances
+    WHERE ${buildInstanceWhere(filter, sql)} AND ${buildDataWhere(undefined, sql)}
+    ORDER BY created_at DESC, instance_id DESC
+    LIMIT 21`;
+}
+
+test.skipIf(!DB)("the started scope reads a reader's denials through the primary key, not a sequential scan", async () => {
+  await seedStartedBulk();
+  const nodes = await planNodes(startedScopeStatement("user_anna"));
+  const denialNodes = nodes.filter((n) => n["Relation Name"] === "instance_principals_denied");
+  const pkeyNodes = nodes.filter((n) => n["Index Name"] === "instance_principals_denied_pkey");
+
+  // A plan that never touches the denial table would pass the checks below
+  // vacuously, and the term would have gone missing.
+  expect(denialNodes.length).toBeGreaterThan(0);
+  // The probe binds `actor_id`, the primary key's leading column. A probe by
+  // `instance_id` alone has no index to use: measured as a Seq Scan returning
+  // all 20,001 rows, one per revocation the installation ever recorded. With
+  // `actor_id` bound the planner picks a bitmap scan over the key and reads one.
+  expect(denialNodes.some((n) => n["Node Type"] === "Seq Scan")).toBe(false);
+  expect(pkeyNodes.length).toBeGreaterThan(0);
+  const rowsRead = denialNodes.reduce((sum, n) => sum + (n["Actual Rows"] ?? 0), 0);
+  expect(rowsRead).toBeLessThan(100);
+
+  // The plan belongs to the real read: the revoked instance is the second
+  // newest, and the first page skips it without coming back short.
+  const rows = (await startedScopeStatement("user_anna")) as { instance_id: string }[];
+  const ids = rows.map((r) => r.instance_id);
+  expect(ids).toHaveLength(21);
+  expect(ids).not.toContain("inst_s2");
+  expect(ids.slice(0, 2)).toEqual(["inst_s1", "inst_s3"]);
 });

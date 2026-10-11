@@ -66,3 +66,17 @@ export class InstanceRunningError extends Error {
     this.name = "InstanceRunningError";
   }
 }
+
+/**
+ * A visibility revoke or grant named an actor the local account directory does
+ * not hold. Only `changeVisibility` raises it, and only where the acting
+ * administrator resolves in that directory — a deployment on an external
+ * identity provider has no directory to check against. A restore never raises
+ * it: an account that left the directory after a revocation stays restorable.
+ */
+export class UnknownActorError extends Error {
+  constructor(readonly actorId: string) {
+    super(`visibility target is not a known account: ${actorId}`);
+    this.name = "UnknownActorError";
+  }
+}

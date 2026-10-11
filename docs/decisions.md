@@ -1557,6 +1557,64 @@ gap outside that change's own scope. The CLAIM tag is local to this section.
   target's candidacy. `loadInstanceForActor` admits that target only as the
   test instance's own starter or a `system:admin` holder.
 
+  Since `close-instance-reads-on-write-paths`, a candidate who claimed such an
+  instance and lost a double submission gets the opaque 403. A participant in
+  the same race gets 409 `instance-not-running`. The reader rule asks
+  `loadInstanceForActor`, which refuses that candidate.
+
+## Open from close-instance-reads-on-write-paths (needs its own OpenSpec change)
+
+The design for `close-instance-reads-on-write-paths` (2026-10-11) left three
+gaps outside that change's own scope. The tags WRITE and SUBMIT are local to
+this section.
+
+- **WRITE-1: the write routes still answer a caller who may not read with the
+  instance's existence.** Claim, release and delegate answer 409
+  `instance-not-running` for a finished instance. They answer 500 for an
+  unknown instance id. On a running instance, claim answers the typed 403
+  `not-assigned`, `not-a-candidate` or `already-claimed`. Release and delegate
+  answer `not-claimant`. Submit and form-draft save answer `not-claimed` or
+  `not-claimant`.
+
+  Each of those 403 types separates a running instance from a finished one.
+  Claim, release and delegate check status before authority. The `runtime-api`
+  requirement "An operation targeting a non-running instance is rejected at
+  the boundary" sets that order. The owner ruled on 2026-10-11 to keep it.
+
+  The task screen and the studio Player both read `not-claimed` and
+  `not-claimant`. Closing those two types needs a web change in the app area
+  and the studio area.
+
+  The change `harden-http-error-surface` (audit finding C-17) owns the 500 for
+  an unknown id. Its answer for an unknown id must be the opaque 403 and never
+  a 404. That matches the answer submit, form-draft save and the visibility
+  routes give an unknown id.
+
+  One difference stays by design. On a running instance, a revoked starter's
+  cancel or assignment-less submit succeeds. The same call on a finished
+  instance answers 403. The pair of answers tells the caller whether the
+  instance runs. It never tells the caller the status.
+
+  A revoked starter's refused cancel carries one of two texts. The text says
+  "may not read" when the instance has finished. It says "may not cancel" when
+  the running step is not cancellable. The refusal text therefore separates
+  those two cases.
+- **WRITE-2: a terminal step's leftover assignment still counts as live.** The
+  function `liveAssignmentFragment` (`src/runtime/queries.ts`) and the function
+  `loadInstanceForActor` (`src/runtime/internal.ts`) do not check the instance
+  status. The function `toWriteResult` filters on a running instance, because a
+  completed instance can keep an assignment. A revoked starter who is a
+  candidate in a completed instance's leftover assignment therefore keeps the
+  started-scope row and the record read.
+
+  This predates `close-instance-reads-on-write-paths`. The direct read and
+  `scope=visible` behave the same. That change spreads the behavior to the
+  started scope and the record read. It makes no fix.
+- **SUBMIT-1: the submit route's body goes to a writer who may not read.** The
+  route `POST /instances/:id/submit` answers the full `Instance`. On
+  2026-10-11 the owner ruled that body out of scope for
+  `close-instance-reads-on-write-paths`. No follow-up change is planned yet.
+
 ## Open from the studio-path-row-field-order final review (one OpenSpec change per screen)
 
 The final whole-branch review for `studio-path-row-field-order` (2026-09-17)
@@ -1590,26 +1648,6 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   `createDefaultAssignmentRegistry`. Anchors:
   `src/handlers/process-start.ts`, `src/handlers/instance-transition.ts`,
   `src/engine/assignment-strategies.ts`.
-- **`close-instance-reads-on-write-paths` (C-1, C-2, C-3, C-16, D-7; high)**:
-  Cancel and claim return instance data to a caller who lacks the read right,
-  a visibility revoke leaves some reads open and accepts an unknown account,
-  and write routes reveal whether an instance id exists. Anchors:
-  `src/runtime/instances.ts`, `src/runtime/claims.ts`,
-  `src/runtime/visibility.ts`.
-- **`keep-admin-edits-on-refresh` (F-1, F-7, F-17, F-18; high)**: A focus
-  refetch discards unsaved input in the data list and UI strings editors,
-  stale responses overwrite newer ones in the admin lists, the migrations
-  screen has no refresh control, and the Users and Groups screens reload the
-  whole directory on every focus. Anchors:
-  `packages/web/src/areas/admin/useRefresh.ts`,
-  `packages/web/src/shell/usePagedList.ts`,
-  `packages/web/src/areas/admin/screens/MigrationsScreen.tsx`.
-- **`guard-unsaved-studio-draft` (E1-2, E1-3, E1-4; high)**: The groups link,
-  the account menu and a 401 on save leave or discard an unsaved draft
-  without a prompt, and layout edits do not count as unsaved. Anchors:
-  `packages/web/src/areas/studio/root.tsx`,
-  `packages/web/src/areas/studio/panels/ProcessHeaderBar.tsx`,
-  `packages/web/src/areas/studio/screens/EditScreen.tsx`.
 - **`type-data-comparison-literals` (E2-2, E2-9, E2-16, F-5; high)**: The
   `instance.query` form and the report builder send every comparison value as
   a string, the report builder offers no way to type a list for the
@@ -1664,7 +1702,8 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   receive the runtime's development error page, the JWT check fixes no
   algorithm list and does not need `exp` from external issuers, and a bad
   cursor, a saved report with an invalid date and a claim on an unknown
-  instance each return 500. Anchors: `src/auth/login.ts`, `src/auth/jwt.ts`,
+  instance each return 500. The unknown-id answer must be the opaque 403,
+  never a 404, as WRITE-1 states. Anchors: `src/auth/login.ts`, `src/auth/jwt.ts`,
   `src/pagination.ts`.
 - **`harden-studio-json-surface` (E1-1, E1-5, E1-13; medium)**: The JSON
   surface refuses every apply once `collaboration` is set, a nested shape

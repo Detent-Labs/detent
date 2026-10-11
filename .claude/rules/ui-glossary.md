@@ -43,6 +43,7 @@ nav, the header bar, the tab row, then one tab body.
 | process surface | the one screen a draft opens on: the tab row and the body under it | `screens/EditScreen.tsx` |
 | screen nav | the row above the header bar. It holds Back to processes and nothing else | `screens/EditScreen.tsx` |
 | header bar | the process-identity row: name, key, revision, dirty/saved state, Save, Discard draft, Publish, the `⋮` menu | `panels/ProcessHeaderBar.tsx` |
+| restore notice | the notice under the header bar that offers a stored copy of unsaved work after a session ended | `panels/RestoreNotice.tsx` |
 | tab row | the row of eleven tabs over the body | `panels/ProcessTabRow.tsx` |
 | edge fade | the fade at an edge of the tab row with more tabs past it | `panels/ProcessTabRow.tsx` |
 | tab | one of the eleven. The authoring order runs Canvas, Steps, Fields, Data sources, Paths, Forms, Field matrix, Contract, Changes, Checks and Access | `routing.ts` |

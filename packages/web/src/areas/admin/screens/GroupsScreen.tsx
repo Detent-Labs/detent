@@ -14,6 +14,7 @@ import {
 } from "../api/client.js";
 import type { GroupSummary, GroupScope, ProcessSummary, UserSummary } from "../api/types.js";
 import { useRefresh } from "../useRefresh.js";
+import { DIRECTORY_FOCUS_INTERVAL_MS } from "../refreshLogic.js";
 import { describeCaughtError } from "../errors.js";
 import { useFail } from "../../../shell/useFail.js";
 import { ErrorBanner } from "../../../shell/ErrorBanner.js";
@@ -174,7 +175,7 @@ export function GroupsScreen({ token, locale, initialProcessId, onUnauthorized }
   const [newScopeType, setNewScopeType] = useState<ScopeType>("global");
   const [newScopeProcessIds, setNewScopeProcessIds] = useState<string[]>([]);
 
-  const { reloadToken, refresh } = useRefresh();
+  const { reloadToken, refresh } = useRefresh({ minFocusIntervalMs: DIRECTORY_FOCUS_INTERVAL_MS });
   const fail = useFail(onUnauthorized, (err) => setError(describeCaughtError(err, locale)));
 
   const editingName = (groupId: string) => editing?.groupId === groupId && editing.field === "name";

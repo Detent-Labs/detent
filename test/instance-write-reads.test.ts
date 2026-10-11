@@ -1,0 +1,688 @@
+/**
+ * Write calls answer a write result, never the instance (runtime-api spec "A
+ * write call answers a write result, never the instance"). The unit block
+ * pins `toWriteResult`'s key set. The DB block drives `cancelInstance`,
+ * `claimStep`, `releaseClaim` and `delegateClaim` end to end and checks that
+ * no instance member beyond the allowed four comes back. The reader blocks
+ * pin the other half of the rule: a write call reports a non-running
+ * instance to a caller who may read it, and refuses everyone else with one
+ * fixed text (instance-visibility-set, "A write call reveals a finished
+ * instance only to a reader"). The last two blocks pin where a revocation
+ * holds on the read side: the started scope and the author's record read
+ * (instance-visibility-set). DB-backed cases skip when DATABASE_URL is
+ * unset; bodies go through the real `publishBody`, as in
+ * assignment.runtime-api.test.ts.
+ */
+import { describe, test, expect, beforeAll, beforeEach } from "bun:test";
+import { sql, initSchema, createInstance } from "../src/engine/store.js";
+import { publishBody } from "../src/engine/definitions.js";
+import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
+import {
+  createProcessInstance,
+  claimStep,
+  releaseClaim,
+  delegateClaim,
+  submitAndTransition,
+  cancelInstance,
+  saveInstanceDraft,
+  revokeVisibility,
+  restoreVisibility,
+  listInstances,
+  getInstanceRecord,
+  InstanceNotRunningError,
+} from "../src/runtime/api.js";
+import { toWriteResult, throwToReader, loadInstanceForActor } from "../src/runtime/internal.js";
+import { getInstanceDraft } from "../src/engine/instance-drafts.js";
+import { NotFoundError } from "../src/errors.js";
+import { CANCEL_ANY_ROLE, ADMIN_ROLE, AUTHOR_ROLE, DEVELOPER_ROLE, AuthorizationError } from "../src/auth/authorize.js";
+import type { Instance, InstanceId, ProcessBody, ProcessId, PathId } from "../src/schema/definition.js";
+import type { Actor } from "../src/cel/eval.js";
+import { clearInstanceAudit } from "./audit-cleanup.js";
+
+const DB = !!process.env.DATABASE_URL;
+const candidate: Actor = { id: "user_1", roles: [] };
+const outsider: Actor = { id: "user_3", roles: [] };
+const canceller: Actor = { id: "user_canceller", roles: [CANCEL_ANY_ROLE] };
+const reg = createRegistry();
+const dataSourceReg = createDataSourceRegistry();
+const PID = "proc_write_result" as ProcessId;
+
+// The write result's whole key set. Nothing else of an `Instance` may appear.
+const ALLOWED_KEYS = ["assignment", "instanceId", "status", "transitionSeq"];
+// Instance members a reader's rule guards; a write result must carry none.
+const INSTANCE_ONLY_MEMBERS = ["data", "startedBy", "version", "processId", "definitionHash", "currentStepId", "startedAt", "kind", "timers", "parent"];
+
+function expectOnlyWriteResultMembers(result: object): void {
+  for (const key of Object.keys(result)) expect(ALLOWED_KEYS).toContain(key);
+  for (const member of INSTANCE_ONLY_MEMBERS) expect(result).not.toHaveProperty(member);
+}
+
+beforeAll(async () => {
+  if (DB) await initSchema();
+});
+beforeEach(async () => {
+  if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, instance_drafts, instance_principals, instance_principals_denied, definitions`;
+  if (DB) await clearInstanceAudit();
+});
+
+// step_a (assigned to user_1 and role approver) --(path_ab, manual)--> step_b (terminal).
+const assignedBody = (): ProcessBody =>
+  ({
+    key: "write_result",
+    label: { en: "Write result" },
+    baseLocale: "en",
+    fields: [],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        {
+          id: "step_a", key: "a", label: { en: "A" }, type: "task",
+          assignment: { strategy: { type: "static", config: { candidates: ["approver", "user_1"] } } },
+          paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }],
+        },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+const fullInstance = (over: Record<string, unknown> = {}): Instance =>
+  ({
+    instanceId: "inst_x", processId: "proc_x", version: 3, definitionHash: "hash_x",
+    currentStepId: "step_a", transitionSeq: 4, data: { secret: "s" },
+    status: "running", startedAt: "2026-01-01T00:00:00Z", startedBy: "user_1",
+    kind: "published", timers: [], parent: { instanceId: "inst_p", stepId: "step_p" },
+    assignment: { candidates: ["user_1"], claimedBy: "user_1", claimedAt: "2026-01-01T00:00:01Z" },
+    ...over,
+  }) as unknown as Instance;
+
+describe("toWriteResult: the key set", () => {
+  test("a running instance with an assignment yields exactly the four members", () => {
+    const result = toWriteResult(fullInstance());
+    expect(Object.keys(result).sort()).toEqual(ALLOWED_KEYS);
+    expect(result).toEqual({
+      instanceId: "inst_x" as InstanceId,
+      status: "running",
+      transitionSeq: 4,
+      assignment: { candidates: ["user_1"], claimedBy: "user_1", claimedAt: "2026-01-01T00:00:01Z" },
+    });
+    expectOnlyWriteResultMembers(result);
+  });
+
+  test("a stored null assignment yields no assignment key", () => {
+    const result = toWriteResult(fullInstance({ assignment: null }));
+    expect(Object.keys(result).sort()).toEqual(["instanceId", "status", "transitionSeq"]);
+    expect(result).not.toHaveProperty("assignment");
+  });
+
+  test("an absent assignment yields no assignment key", () => {
+    const result = toWriteResult(fullInstance({ assignment: undefined }));
+    expect(Object.keys(result).sort()).toEqual(["instanceId", "status", "transitionSeq"]);
+  });
+
+  test("a non-running instance that carries an assignment yields no assignment key", () => {
+    for (const status of ["completed", "cancelled", "faulted"] as const) {
+      const result = toWriteResult(fullInstance({ status }));
+      expect(Object.keys(result).sort()).toEqual(["instanceId", "status", "transitionSeq"]);
+      expect(result.status).toBe(status);
+    }
+  });
+
+  test("a member added to the instance later does not reach the result", () => {
+    const result = toWriteResult(fullInstance({ futureMember: "leak" }));
+    expect(result).not.toHaveProperty("futureMember");
+    expect(Object.keys(result).sort()).toEqual(ALLOWED_KEYS);
+  });
+});
+
+describe("write results over the Runtime API Layer", () => {
+  test.skipIf(!DB)("cancelInstance by a cancel-any holder returns no instance data", async () => {
+    await publishBody(PID, assignedBody(), reg, dataSourceReg);
+    const inst = await createProcessInstance(PID, candidate, dataSourceReg);
+
+    const result = await cancelInstance(inst.instanceId, canceller);
+    expect(result.instanceId).toBe(inst.instanceId);
+    expect(result.status).toBe("cancelled");
+    expect(result.transitionSeq).toBe(1);
+    // The cancelled instance runs no step any more, so no assignment shows.
+    expect(Object.keys(result).sort()).toEqual(["instanceId", "status", "transitionSeq"]);
+    expectOnlyWriteResultMembers(result);
+  });
+
+  test.skipIf(!DB)("cancelInstance by the starter returns no instance data", async () => {
+    await publishBody(PID, assignedBody(), reg, dataSourceReg);
+    const inst = await createProcessInstance(PID, candidate, dataSourceReg);
+
+    const result = await cancelInstance(inst.instanceId, candidate);
+    expect(result.status).toBe("cancelled");
+    expectOnlyWriteResultMembers(result);
+  });
+
+  test.skipIf(!DB)("cancelInstance on an already-cancelled instance answers status cancelled", async () => {
+    await publishBody(PID, assignedBody(), reg, dataSourceReg);
+    const inst = await createProcessInstance(PID, candidate, dataSourceReg);
+    const first = await cancelInstance(inst.instanceId, candidate);
+
+    const again = await cancelInstance(inst.instanceId, candidate);
+    expect(again.status).toBe("cancelled");
+    expect(again.transitionSeq).toBe(first.transitionSeq);
+    expectOnlyWriteResultMembers(again);
+
+    const byCanceller = await cancelInstance(inst.instanceId, canceller);
+    expect(byCanceller.status).toBe("cancelled");
+    expectOnlyWriteResultMembers(byCanceller);
+  });
+
+  test.skipIf(!DB)("cancelInstance by a cancel-any holder on a completed instance answers its status and no assignment", async () => {
+    await publishBody(PID, assignedBody(), reg, dataSourceReg);
+    const inst = await createProcessInstance(PID, candidate, dataSourceReg);
+    await claimStep(inst.instanceId, candidate);
+    const done = await submitAndTransition(inst.instanceId, "path_ab" as PathId, {}, candidate, dataSourceReg);
+    expect(done.status).toBe("completed");
+
+    const result = await cancelInstance(inst.instanceId, canceller);
+    expect(result.status).toBe("completed");
+    expect(result.transitionSeq).toBe(done.transitionSeq);
+    expect(result).not.toHaveProperty("assignment");
+    expectOnlyWriteResultMembers(result);
+  });
+
+  test.skipIf(!DB)("claimStep returns the write result with the new claim and no instance data", async () => {
+    await publishBody(PID, assignedBody(), reg, dataSourceReg);
+    const inst = await createProcessInstance(PID, candidate, dataSourceReg);
+
+    const result = await claimStep(inst.instanceId, candidate);
+    expect(result.instanceId).toBe(inst.instanceId);
+    expect(result.status).toBe("running");
+    expect(result.assignment?.claimedBy).toBe(candidate.id);
+    expect(result.assignment?.candidates).toEqual(["approver", "user_1"]);
+    expectOnlyWriteResultMembers(result);
+  });
+
+  test.skipIf(!DB)("releaseClaim returns the write result with the cleared claim and no instance data", async () => {
+    await publishBody(PID, assignedBody(), reg, dataSourceReg);
+    const inst = await createProcessInstance(PID, candidate, dataSourceReg);
+    await claimStep(inst.instanceId, candidate);
+
+    const result = await releaseClaim(inst.instanceId, candidate);
+    expect(result.status).toBe("running");
+    expect(result.assignment).toBeDefined();
+    expect(result.assignment?.claimedBy).toBeUndefined();
+    expect(result.assignment?.claimedAt).toBeUndefined();
+    expectOnlyWriteResultMembers(result);
+  });
+
+  test.skipIf(!DB)("delegateClaim returns the write result with the new claimant and no instance data", async () => {
+    await publishBody(PID, assignedBody(), reg, dataSourceReg);
+    const inst = await createProcessInstance(PID, candidate, dataSourceReg);
+    await claimStep(inst.instanceId, candidate);
+
+    const result = await delegateClaim(inst.instanceId, candidate, outsider.id);
+    expect(result.status).toBe("running");
+    expect(result.assignment?.claimedBy).toBe(outsider.id);
+    expect(result.assignment?.claimedAt).toBeDefined();
+    expectOnlyWriteResultMembers(result);
+  });
+});
+
+// ============================================================
+// The reader rule: a write call reports a non-running instance to readers only
+// ============================================================
+
+const starter: Actor = { id: "user_starter", roles: [] };
+const stranger: Actor = { id: "user_stranger", roles: [] };
+const operator: Actor = { id: "user_operator", roles: [ADMIN_ROLE] };
+const PLAIN_PID = "proc_write_reader_plain" as ProcessId;
+
+// step_a (no assignment) --(path_ab, manual)--> step_b (terminal). Only the
+// starter or an administrator may act on step_a, so a stranger is neither.
+const plainBody = (): ProcessBody =>
+  ({
+    key: "write_reader_plain",
+    label: { en: "Write reader plain" },
+    baseLocale: "en",
+    fields: [],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }] },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+async function startPlain(): Promise<InstanceId> {
+  await publishBody(PLAIN_PID, plainBody(), reg, dataSourceReg);
+  return (await createProcessInstance(PLAIN_PID, starter, dataSourceReg)).instanceId;
+}
+
+const submitPlain = (id: InstanceId, actor: Actor) => submitAndTransition(id, "path_ab" as PathId, {}, actor, dataSourceReg);
+
+/**
+ * The error a call rejects with. A call that resolves fails the test, so no
+ * assertion below passes because nothing was thrown.
+ */
+async function rejection(call: Promise<unknown>): Promise<unknown> {
+  try {
+    await call;
+  } catch (err) {
+    return err;
+  }
+  throw new Error("expected the call to reject, but it resolved");
+}
+
+// Each entry drives a fresh plain instance to a non-running status the starter caused.
+const FINISHERS: [status: "cancelled" | "completed", finish: (id: InstanceId) => Promise<unknown>][] = [
+  ["cancelled", (id) => cancelInstance(id, starter)],
+  ["completed", (id) => submitPlain(id, starter)],
+];
+
+describe("submit and draft save report a non-running instance to readers only", () => {
+  for (const [status, finish] of FINISHERS) {
+    test.skipIf(!DB)(`submit to a ${status} instance: a stranger gets AuthorizationError, the starter and an administrator get InstanceNotRunningError`, async () => {
+      const id = await startPlain();
+      await finish(id);
+
+      // Without throwToReader the stranger would get InstanceNotRunningError here.
+      const refused = await rejection(submitPlain(id, stranger));
+      expect(refused).toBeInstanceOf(AuthorizationError);
+      expect(refused).not.toBeInstanceOf(InstanceNotRunningError);
+
+      // A throwToReader that always refused would turn these into AuthorizationError.
+      for (const reader of [starter, operator]) {
+        const told = await rejection(submitPlain(id, reader));
+        expect(told).toBeInstanceOf(InstanceNotRunningError);
+        expect((told as InstanceNotRunningError).status).toBe(status);
+      }
+    });
+
+    test.skipIf(!DB)(`draft save on a ${status} instance: a stranger gets AuthorizationError, the starter and an administrator get InstanceNotRunningError, nothing is stored`, async () => {
+      const id = await startPlain();
+      await finish(id);
+
+      const refused = await rejection(saveInstanceDraft(id, { note: "x" }, stranger, sql));
+      expect(refused).toBeInstanceOf(AuthorizationError);
+      expect(refused).not.toBeInstanceOf(InstanceNotRunningError);
+
+      for (const reader of [starter, operator]) {
+        const told = await rejection(saveInstanceDraft(id, { note: "x" }, reader, sql));
+        expect(told).toBeInstanceOf(InstanceNotRunningError);
+        expect((told as InstanceNotRunningError).status).toBe(status);
+      }
+      expect(await getInstanceDraft(id, sql)).toBeUndefined();
+    });
+  }
+
+  test.skipIf(!DB)("the losing claimant of a double submit, who is not the starter, still gets InstanceNotRunningError", async () => {
+    await publishBody(PID, assignedBody(), reg, dataSourceReg);
+    const inst = await createProcessInstance(PID, starter, dataSourceReg);
+    // Pins the fixture: the claimant reads the instance through its claim, not as the starter.
+    expect(inst.startedBy).not.toBe(candidate.id);
+    await claimStep(inst.instanceId, candidate);
+
+    const submit = () => submitAndTransition(inst.instanceId, "path_ab" as PathId, {}, candidate, dataSourceReg);
+    const outcomes = await Promise.allSettled([submit(), submit()]);
+    const fulfilled = outcomes.filter((o) => o.status === "fulfilled");
+    const rejected = outcomes.filter((o): o is PromiseRejectedResult => o.status === "rejected");
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+    expect(rejected[0]!.reason).toBeInstanceOf(InstanceNotRunningError);
+    expect((rejected[0]!.reason as InstanceNotRunningError).status).toBe("completed");
+
+    // The claimant stays a reader after the instance finished.
+    const draft = await rejection(saveInstanceDraft(inst.instanceId, {}, candidate, sql));
+    expect(draft).toBeInstanceOf(InstanceNotRunningError);
+  });
+
+  // docs/decisions.md CLAIM-1: a candidate can claim a test instance, but only its starter can open it.
+  test.skipIf(!DB)("a candidate who claimed a test instance it cannot open loses a double submit with AuthorizationError, not InstanceNotRunningError", async () => {
+    const published = await publishBody(PID, assignedBody(), reg, dataSourceReg);
+    const submit = (id: InstanceId) => submitAndTransition(id, "path_ab" as PathId, {}, candidate, dataSourceReg);
+    /** Two concurrent submits by the claimant: one wins and completes the instance, the other is the loser this returns. */
+    const loserOfDoubleSubmit = async (id: InstanceId): Promise<unknown> => {
+      const outcomes = await Promise.allSettled([submit(id), submit(id)]);
+      expect(outcomes.filter((o) => o.status === "fulfilled")).toHaveLength(1);
+      const rejected = outcomes.filter((o): o is PromiseRejectedResult => o.status === "rejected");
+      expect(rejected).toHaveLength(1);
+      return rejected[0]!.reason;
+    };
+
+    // Control: on an ordinary instance the claimant is a reader, so the loser learns the status.
+    const ordinary = await startAssignedBy(starter);
+    await claimStep(ordinary, candidate);
+    const ordinaryLoser = await loserOfDoubleSubmit(ordinary);
+    expect(ordinaryLoser).toBeInstanceOf(InstanceNotRunningError);
+    expect((ordinaryLoser as InstanceNotRunningError).status).toBe("completed");
+
+    const testInstance = await createInstance(published.definition, {
+      processId: PID,
+      version: published.version,
+      kind: "test",
+      startedBy: starter.id,
+      assignment: { candidates: ["approver", candidate.id] },
+    });
+    // Pins the fixture: the candidate is not the test instance's starter, so the read rule refuses it.
+    expect(await rejection(loadInstanceForActor(testInstance.instanceId, candidate, sql))).toBeInstanceOf(AuthorizationError);
+    await claimStep(testInstance.instanceId, candidate);
+
+    const loser = await loserOfDoubleSubmit(testInstance.instanceId);
+    expect(loser).toBeInstanceOf(AuthorizationError);
+    expect(loser).not.toBeInstanceOf(InstanceNotRunningError);
+    expect((loser as AuthorizationError).message).toBe(`actor '${candidate.id}' may not submit instance '${testInstance.instanceId}'`);
+  });
+});
+
+describe("a starter whom a revocation names", () => {
+  test.skipIf(!DB)("is refused on submit and draft save once the instance has completed", async () => {
+    const id = await startPlain();
+    await submitPlain(id, starter);
+
+    // Baseline: before the revocation the starter reads the instance and learns its status.
+    expect(await rejection(submitPlain(id, starter))).toBeInstanceOf(InstanceNotRunningError);
+    expect(await rejection(saveInstanceDraft(id, {}, starter, sql))).toBeInstanceOf(InstanceNotRunningError);
+
+    await revokeVisibility(id, starter.id, operator, sql);
+
+    expect(await rejection(submitPlain(id, starter))).toBeInstanceOf(AuthorizationError);
+    expect(await rejection(saveInstanceDraft(id, {}, starter, sql))).toBeInstanceOf(AuthorizationError);
+    expect(await getInstanceDraft(id, sql)).toBeUndefined();
+  });
+
+  test.skipIf(!DB)("keeps write authority on a running instance whose step has no assignment", async () => {
+    const id = await startPlain();
+    await revokeVisibility(id, starter.id, operator, sql);
+
+    // Draft save and submit both rest on requireSubmitAuthority alone; a revocation narrows reads.
+    const saved = await saveInstanceDraft(id, { note: "wip" }, starter, sql);
+    expect(saved.updatedBy).toBe(starter.id);
+    expect(await getInstanceDraft(id, sql)).toBeDefined();
+
+    const done = await submitPlain(id, starter);
+    expect(done.status).toBe("completed");
+  });
+
+  for (const [status, finish] of FINISHERS) {
+    test.skipIf(!DB)(`is refused on cancel once the instance is ${status}, with the read text`, async () => {
+      const id = await startPlain();
+      await finish(id);
+
+      // Baseline: a starter who may read gets the idempotent no-op and the status.
+      const before = await cancelInstance(id, starter);
+      expect(before.status).toBe(status);
+
+      await revokeVisibility(id, starter.id, operator, sql);
+
+      const refused = await rejection(cancelInstance(id, starter));
+      expect(refused).toBeInstanceOf(AuthorizationError);
+      expect((refused as AuthorizationError).message).toMatch(/may not read instance/);
+    });
+  }
+
+  test.skipIf(!DB)("still cancels a running instance", async () => {
+    const id = await startPlain();
+    await revokeVisibility(id, starter.id, operator, sql);
+
+    const result = await cancelInstance(id, starter);
+    expect(result.status).toBe("cancelled");
+  });
+
+  test.skipIf(!DB)("of a test instance keeps cancel authority, where the same starter of a finished ordinary instance is refused", async () => {
+    const published = await publishBody(PLAIN_PID, plainBody(), reg, dataSourceReg);
+    const testInstance = await createInstance(published.definition, {
+      processId: PLAIN_PID,
+      version: published.version,
+      kind: "test",
+      startedBy: starter.id,
+    });
+    await revokeVisibility(testInstance.instanceId, starter.id, operator, sql);
+
+    const cancelled = await cancelInstance(testInstance.instanceId, starter);
+    expect(cancelled.status).toBe("cancelled");
+    // The test-instance rule precedes the denial test, so the finished test instance still answers its starter.
+    const again = await cancelInstance(testInstance.instanceId, starter);
+    expect(again.status).toBe("cancelled");
+
+    // Control: the same revocation on a finished ordinary instance refuses its starter.
+    const ordinary = await startPlain();
+    await cancelInstance(ordinary, starter);
+    await revokeVisibility(ordinary, starter.id, operator, sql);
+    const refused = await rejection(cancelInstance(ordinary, starter));
+    expect(refused).toBeInstanceOf(AuthorizationError);
+    expect((refused as AuthorizationError).message).toMatch(/may not read instance/);
+  });
+});
+
+describe("the refusal does not separate a finished, a running and an unknown instance", () => {
+  const unknown = "inst_does_not_exist" as InstanceId;
+  const refusalText = (id: string) => `actor '${stranger.id}' may not submit instance '${id}'`;
+
+  const textOf = async (call: Promise<unknown>): Promise<string> => {
+    const err = await rejection(call);
+    expect(err).toBeInstanceOf(AuthorizationError);
+    return (err as AuthorizationError).message;
+  };
+
+  test.skipIf(!DB)("submit gives a stranger one text, up to the instance id", async () => {
+    const finished = await startPlain();
+    await cancelInstance(finished, starter);
+    const running = await startPlain();
+
+    expect(await textOf(submitPlain(finished, stranger))).toBe(refusalText(finished));
+    expect(await textOf(submitPlain(running, stranger))).toBe(refusalText(running));
+    expect(await textOf(submitPlain(unknown, stranger))).toBe(refusalText(unknown));
+  });
+
+  test.skipIf(!DB)("draft save gives a stranger the same text", async () => {
+    const finished = await startPlain();
+    await cancelInstance(finished, starter);
+    const running = await startPlain();
+
+    expect(await textOf(saveInstanceDraft(finished, {}, stranger, sql))).toBe(refusalText(finished));
+    expect(await textOf(saveInstanceDraft(running, {}, stranger, sql))).toBe(refusalText(running));
+    expect(await textOf(saveInstanceDraft(unknown, {}, stranger, sql))).toBe(refusalText(unknown));
+  });
+
+  test.skipIf(!DB)("an unknown id gives an administrator NotFoundError on both calls, and a stranger never NotFoundError", async () => {
+    expect(await rejection(submitPlain(unknown, operator))).toBeInstanceOf(NotFoundError);
+    expect(await rejection(saveInstanceDraft(unknown, {}, operator, sql))).toBeInstanceOf(NotFoundError);
+
+    expect(await rejection(submitPlain(unknown, stranger))).not.toBeInstanceOf(NotFoundError);
+    expect(await rejection(saveInstanceDraft(unknown, {}, stranger, sql))).not.toBeInstanceOf(NotFoundError);
+  });
+});
+
+describe("throwToReader", () => {
+  test.skipIf(!DB)("rethrows the status error for a reader, the refusal for a stranger, and any other load error unchanged", async () => {
+    const id = await startPlain();
+    await cancelInstance(id, starter);
+    const err = new InstanceNotRunningError(id, "cancelled");
+    const refusal = new AuthorizationError("refusal");
+
+    expect(await rejection(throwToReader(err, starter, refusal, sql))).toBe(err);
+    expect(await rejection(throwToReader(err, stranger, refusal, sql))).toBe(refusal);
+
+    // An administrator's load of a missing instance raises NotFoundError, which is neither.
+    const missing = new InstanceNotRunningError("inst_does_not_exist", "cancelled");
+    const loadErr = await rejection(throwToReader(missing, operator, refusal, sql));
+    expect(loadErr).toBeInstanceOf(NotFoundError);
+    expect(loadErr).not.toBe(missing);
+    expect(loadErr).not.toBe(refusal);
+  });
+});
+
+// ============================================================
+// A revocation holds on the started scope
+// ============================================================
+
+const approver: Actor = { id: "user_approver", roles: ["approver"] };
+
+/** The page `handleListInstances` builds for `scope=started` and a caller without `ADMIN_ROLE`. */
+async function startedScope(actor: Actor, limit = 50, cursor?: string) {
+  const page = await listInstances(
+    { startedBy: actor.id, notRevokedFor: { actorId: actor.id, principals: [actor.id, ...actor.roles] } },
+    { limit, cursor },
+    sql,
+  );
+  return { ids: page.items.map((i) => i.instanceId as string), cursor: page.cursor };
+}
+
+async function startPlainBy(actor: Actor): Promise<InstanceId> {
+  await publishBody(PLAIN_PID, plainBody(), reg, dataSourceReg);
+  return (await createProcessInstance(PLAIN_PID, actor, dataSourceReg)).instanceId;
+}
+
+async function startAssignedBy(actor: Actor): Promise<InstanceId> {
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  return (await createProcessInstance(PID, actor, dataSourceReg)).instanceId;
+}
+
+describe("the started scope honors a revocation", () => {
+  test.skipIf(!DB)("a revoked starter of a completed instance loses the row, keeps every other, and a restore brings it back", async () => {
+    const finished = await startPlainBy(starter);
+    await submitPlain(finished, starter);
+    const other = await startPlainBy(starter);
+
+    // Baseline: both rows show before the revocation, so a missing row below is the revocation's doing.
+    expect(new Set((await startedScope(starter)).ids)).toEqual(new Set([finished, other]));
+
+    await revokeVisibility(finished, starter.id, operator, sql);
+    // Without the term the revoked row stays; a term that hid more would drop `other`.
+    expect((await startedScope(starter)).ids).toEqual([other]);
+
+    await restoreVisibility(finished, starter.id, operator, sql);
+    expect(new Set((await startedScope(starter)).ids)).toEqual(new Set([finished, other]));
+  });
+
+  test.skipIf(!DB)("a revocation names one actor: it does not reach a starter it does not name", async () => {
+    const mine = await startPlainBy(starter);
+    await revokeVisibility(mine, stranger.id, operator, sql);
+
+    // The denial names `stranger`, not the starter, so the starter keeps the row.
+    expect((await startedScope(starter)).ids).toEqual([mine]);
+  });
+
+  test.skipIf(!DB)("the starter who holds the claim keeps the row, while a revoked instance with no assignment goes", async () => {
+    const claimed = await startAssignedBy(candidate);
+    await claimStep(claimed, candidate);
+    const unassigned = await startPlainBy(candidate);
+    await revokeVisibility(claimed, candidate.id, operator, sql);
+    await revokeVisibility(unassigned, candidate.id, operator, sql);
+
+    // The pair shows the override discriminates: both are revoked, and only the live assignment survives.
+    expect((await startedScope(candidate)).ids).toEqual([claimed]);
+  });
+
+  test.skipIf(!DB)("a candidate on a step another actor claimed loses the row, a candidate on an unclaimed step keeps it", async () => {
+    const takenByOther = await startAssignedBy(candidate);
+    await claimStep(takenByOther, approver);
+    const unclaimed = await startAssignedBy(candidate);
+    await revokeVisibility(takenByOther, candidate.id, operator, sql);
+    await revokeVisibility(unclaimed, candidate.id, operator, sql);
+
+    // The candidate branch of the live-assignment test requires that nobody holds the claim.
+    expect((await startedScope(candidate)).ids).toEqual([unclaimed]);
+
+    // The documented divergence: the direct read admits any eligible candidate, claimed or not.
+    const { instance } = await loadInstanceForActor(takenByOther, candidate, sql);
+    expect(instance.instanceId).toBe(takenByOther);
+  });
+
+  test.skipIf(!DB)("a walk with a revoked row in the middle returns full pages and each other instance once", async () => {
+    await publishBody(PLAIN_PID, plainBody(), reg, dataSourceReg);
+    for (let k = 0; k < 5; k++) await createProcessInstance(PLAIN_PID, starter, dataSourceReg);
+    const newestFirst = (await startedScope(starter)).ids;
+    expect(newestFirst).toHaveLength(5);
+    // The second newest: a revocation applied after the page would leave page one a row short.
+    const revoked = newestFirst[1]!;
+    await revokeVisibility(revoked as InstanceId, starter.id, operator, sql);
+
+    const pages: string[][] = [];
+    let cursor: string | undefined;
+    for (let guard = 0; guard < 10; guard++) {
+      const page = await startedScope(starter, 2, cursor);
+      pages.push(page.ids);
+      cursor = page.cursor;
+      if (!cursor) break;
+    }
+
+    expect(cursor).toBeUndefined();
+    expect(pages.length).toBeGreaterThan(1);
+    for (const page of pages.slice(0, -1)) expect(page).toHaveLength(2);
+    const seen = pages.flat();
+    expect(seen).toHaveLength(4);
+    expect(new Set(seen)).toEqual(new Set(newestFirst.filter((id) => id !== revoked)));
+  });
+});
+
+// ============================================================
+// A revocation holds on the record read's starter branch
+// ============================================================
+
+describe("the record read honors a revocation on its starter branch", () => {
+  const recordRefusal = (actor: Actor, id: string) => `actor '${actor.id}' may not read the record of instance '${id}'`;
+
+  /** The `visibility.changed` revocations of `actor` in a record page. Revoking writes one event into the record. */
+  const revocationsOf = (page: Awaited<ReturnType<typeof getInstanceRecord>>, actor: Actor) =>
+    page.items.filter(
+      (el) => el.kind === "event" && el.event.kind === "visibility.changed" && el.event.payload.op === "revoked" && el.event.payload.actorId === actor.id,
+    );
+
+  for (const role of [AUTHOR_ROLE, DEVELOPER_ROLE]) {
+    const writer: Actor = { id: `user_writer_${role.replace("system:", "")}`, roles: [role] };
+
+    test.skipIf(!DB)(`a revoked ${role} cannot read the record of an instance they started, and a restore gives it back`, async () => {
+      const id = await startPlainBy(writer);
+      await submitPlain(id, writer);
+
+      // Baseline: the starter reads a non-empty record, so the refusal below is the revocation's.
+      expect((await getInstanceRecord(id, writer, {}, sql)).items.length).toBeGreaterThan(0);
+
+      await revokeVisibility(id, writer.id, operator, sql);
+      const refused = await rejection(getInstanceRecord(id, writer, {}, sql));
+      expect(refused).toBeInstanceOf(AuthorizationError);
+      // The record-specific text, not the read text that loadInstanceForActor throws.
+      expect((refused as AuthorizationError).message).toBe(recordRefusal(writer, id));
+
+      await restoreVisibility(id, writer.id, operator, sql);
+      expect((await getInstanceRecord(id, writer, {}, sql)).items.length).toBeGreaterThan(0);
+    });
+  }
+
+  test.skipIf(!DB)("an administrator reads the record of an instance whose starter is revoked", async () => {
+    const writer: Actor = { id: "user_writer_admin_read", roles: [AUTHOR_ROLE] };
+    const id = await startPlainBy(writer);
+    await submitPlain(id, writer);
+    await revokeVisibility(id, writer.id, operator, sql);
+
+    expect((await getInstanceRecord(id, operator, {}, sql)).items.length).toBeGreaterThan(0);
+  });
+
+  test.skipIf(!DB)("a revoked author with a live assignment still reads the record", async () => {
+    // user_1 starts an instance whose first step names user_1 as a candidate: the live assignment outranks the revocation.
+    const assignedAuthor: Actor = { id: candidate.id, roles: [AUTHOR_ROLE] };
+    const id = await startAssignedBy(assignedAuthor);
+    await revokeVisibility(id, assignedAuthor.id, operator, sql);
+
+    // The page carries the revocation event itself, so a pass here is a read that returned the record.
+    const page = await getInstanceRecord(id, assignedAuthor, {}, sql);
+    expect(revocationsOf(page, assignedAuthor)).toHaveLength(1);
+  });
+
+  test.skipIf(!DB)("a test instance's starter reads the record, revoked or not", async () => {
+    const writer: Actor = { id: "user_writer_test_instance", roles: [AUTHOR_ROLE] };
+    const published = await publishBody(PLAIN_PID, plainBody(), reg, dataSourceReg);
+    const testInstance = await createInstance(published.definition, {
+      processId: PLAIN_PID,
+      version: published.version,
+      kind: "test",
+      startedBy: writer.id,
+    });
+
+    // Baseline: the starter reads the record before the revocation, which has not landed in it yet.
+    const before = await getInstanceRecord(testInstance.instanceId, writer, {}, sql);
+    expect(revocationsOf(before, writer)).toHaveLength(0);
+    await revokeVisibility(testInstance.instanceId, writer.id, operator, sql);
+    // The test-instance rule precedes the denial test, so a revocation does not close the Player.
+    const after = await getInstanceRecord(testInstance.instanceId, writer, {}, sql);
+    expect(revocationsOf(after, writer)).toHaveLength(1);
+  });
+});

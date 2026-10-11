@@ -48,6 +48,14 @@ export const en = {
   "draftToolbar.discardDialogLastSaved": "Last saved",
   "draftToolbar.discardDialogKeepsPublished": "The published versions stay. Only the unpublished draft goes.",
 
+  // The notice under the header bar that offers the work a 401 kept in the
+  // tab (`panels/RestoreNotice.tsx`). `t` takes no values, so the message
+  // names no time.
+  "restoreNotice.message": "Your session ended while this draft had unsaved changes. Detent kept them in this browser tab.",
+  "restoreNotice.restore": "Restore unsaved changes",
+  "restoreNotice.discard": "Discard them",
+  "restoreNotice.replaceConfirm": "Replace your current changes with the restored ones?",
+
   "fieldCatalog.heading": "Field catalog",
   "fieldCatalog.addField": "+ Add field",
   "fieldCatalog.removeField": "Remove field",

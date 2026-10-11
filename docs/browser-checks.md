@@ -71,7 +71,7 @@ Measured in `instance-query-data-source`. A stale server answered a publish
 with no `findings` key. A fresh one, right after, answered the identical
 request with the finding a fresh publish-time check now computes.
 
-**Run `bun run e2e` too.** It drives four flows across all four areas from a
+**Run `bun run e2e` too.** It drives five flows across all four areas from a
 clean database. Run it before working through the checklist by hand.
 
 ## Checklist
@@ -649,6 +649,31 @@ A `bun:test` assertion covers the scope, the tone mapping and the route
 already. It cannot see a stamp whose tone reads as a defect where a cancelled
 case belongs. It cannot see a nav entry that wraps.
 
+### Cases I started: a revoked case
+
+Source: `close-instance-reads-on-write-paths` task 7.4.
+
+Seed the database. Log in as a participant holding no reserved role. Start a
+process whose first step names somebody else. Open Cases I started. Pass: the
+instance is on the list. The participant has no claim and no candidacy on it.
+
+As an operator, revoke the participant from that instance
+(`POST /instances/:id/visibility/revoke` with `{ "actorId": "<id>" }`). The
+target account must exist in the directory. Return to the screen and refresh.
+Pass: the row is gone, with no placeholder, no notice and no gap in its place.
+
+Restore the participant (`POST /instances/:id/visibility/restore` with the
+same body). Refresh. Pass: the row returns.
+
+Now, as the participant, start a process whose first step names the
+participant as a candidate. Claim that instance. As the operator, revoke the
+participant from it and refresh. Pass: the row stays, because the claim
+outranks the revocation.
+
+A `bun:test` assertion covers the scope and the claim exception already. It
+cannot see a placeholder where the row was. It cannot see a gap left in the
+list.
+
 ### Cases I took part in
 
 Source: `involved-cases-screen` task 5.1.
@@ -858,6 +883,65 @@ is where a publish rule reports.
 In Operations, drop `sku` from the list. Save the draft, then reload the
 editor. Pass: the `sku` row stays, keeps its target, and carries a warning. It
 does not vanish. The data list screen reports the same key under "Used by".
+
+### Admin edits survive a window refocus (`keep-admin-edits-on-refresh`)
+
+Source: `keep-admin-edits-on-refresh` task 6.2.
+
+`e2e/admin-edits.e2e.ts` covers the UI strings input and the Users throttle.
+This walk covers what a flow cannot judge: the data list editor, the callout's
+look, and German. It needs the `products` list from the table-shaped entry
+above, and a second browser context logged in as the same account.
+
+Open Operations, then Data lists, then `products`. Add two value rows and give
+each a value key and a label. Rename one column heading. Do not save. Then
+simulate the window switch:
+
+```sh
+playwright-cli -s=<worktree-name> run-code "async page => { await page.evaluate(() => window.dispatchEvent(new Event('focus'))) }"
+```
+
+A worktree refuses `eval`, so `run-code` carries the event. Pass: both rows and
+the new heading stay, and no callout shows.
+
+In the second context, edit one value's label on the same list and save. Then
+dispatch `focus` again in the first context. That pair is the changed-copy
+step.
+
+Pass: a warning callout shows above the controls. It opens with "The server
+copy changed while you were editing." Two more sentences say that the typed
+input stays and that saving replaces the server values. One button follows,
+"Discard my edits and load the server copy". The typed input is intact.
+
+Read the callout's look. Pass: it is a 3px advisory rule beside text in the
+refusal color. It is flat and has no radius. Nothing animates.
+
+Press the button with the keyboard. Pass: the inputs show the server copy, and
+the callout is gone. The next Tab lands on the first control after the callout.
+
+Type again, repeat the changed-copy step, then press Save. Pass: the save
+lands, the callout is gone, and the inputs show the saved copy.
+
+Repeat the changed-copy step, then switch the interface language to German
+with the callout showing. Pass: the screen refills from the server in German,
+with no callout. A language switch reseeds the inputs. Type again and repeat
+the changed-copy step in German. Pass: the callout and the button read in German.
+At a 1100px window the button stands under the sentence, takes no fixed width,
+and stays inside its row.
+
+Open Operations, then UI strings, and repeat the changed-copy step in both
+languages. Type into one key, and edit a different key in the second context.
+Pass: the sentence ends with "Saving overwrites the stored wording of the keys
+you edited." The key without a draft follows the server, and the key with a
+draft keeps its text.
+
+Emulate the dark scheme with the callout showing:
+
+```sh
+playwright-cli -s=<worktree-name> run-code "async page => { await page.emulateMedia({ colorScheme: 'dark' }) }"
+```
+
+Pass: the rule and the text keep readable contrast.
 
 ### Canvas grid snapping (`canvas-grid-snap`)
 
@@ -1712,6 +1796,174 @@ a dropped advance on reload. Either bug persists for the rest of the
 session. `studio-draftToolbarState.test.ts` pins that exact bug at the unit
 level. Here the real save/conflict/reload sequence drives it in a browser
 instead.
+
+### Unsaved draft: every exit asks first, and a 401 keeps the work (`guard-unsaved-studio-draft`)
+
+Source: `guard-unsaved-studio-draft` task 4.1.
+
+No `bun:test` assertion can click a menu, hold a drag or read a native dialog.
+Run these eight checks in a real browser. Open the production bundle on the
+engine's own port. Sign in as `demo-superuser@example.test`, password
+`seed-demo-password`. In the Processes list, choose "Create draft" on the row
+`it_offboarding`.
+
+Each check opens `/studio/processes/<id>/edit` for that draft, unless it names
+another route. A native dialog blocks automation. Accept or dismiss each one
+on purpose.
+
+**1. The groups link.** Open `/studio/processes/<id>/edit`. On the Fields tab,
+change a field's label and do not save. Pass: the header bar reads "Unsaved
+changes".
+
+Open the `⋮` menu and choose "Manage assignment groups for this process".
+Pass: the browser's native prompt `Leave this draft? Unsaved edits will be lost.`
+appears. Cancel keeps the screen and the new label.
+
+Press Save. Pass: the header bar reads "Saved". Choose the same link again.
+Pass: the browser navigates to `/admin/groups?processId=<id>` with no prompt.
+
+Open the draft again and change the label once more. Choose the link a third
+time and accept the prompt. Pass: the browser navigates to the same address.
+
+**2. The account menu.** Open the draft and change a field's label without
+saving. Open the account menu, "Account" in the header, and choose "Tasks"
+under "Go to".
+
+Pass: the same native prompt appears. Cancel keeps the draft, and the menu
+stays closed.
+
+Choose "Your profile", then "Log out". Pass: each one raises the same prompt,
+and Cancel keeps the draft and closes the menu.
+
+Press Save. Choose "Tasks" under "Go to". Pass: the browser navigates to `/app`
+with no prompt.
+
+Open the draft again and choose "Your profile". Pass: the browser navigates
+to `/profile` with no prompt. Open the draft once more and choose "Log out".
+Pass: the browser returns to `/login` with no prompt.
+
+**3. A layout-only change.** Open `/studio/processes/<id>/edit` on the
+Canvas tab. Drag one step to a new position and change nothing else. Pass: the
+header bar reads "Unsaved changes".
+
+Choose "Back to processes". Pass: the native prompt appears. Cancel it.
+
+Press Save. Pass: the header bar reads "Saved". Choose "Back to processes"
+again. Pass: the browser navigates to the process list at `/studio` with no
+prompt.
+
+Drag a step again and change nothing else. Choose "Publish" in the header bar.
+Pass: the Publish dialog reads "This draft has unsaved changes. Publishing saves
+them first." Cancel the dialog, because confirming mints a version.
+
+**4. A drag during a slow save.** Delay the answer of `PUT /drafts/:id` by a
+few seconds. A playwright route that waits before it fulfills does this. Change
+a label and press Save. Before the answer arrives, drag a step to a new
+position.
+
+Pass: after the answer, the step stays at the new position. The header bar
+still reads "Unsaved changes", because the layout moved during the request.
+
+Now the conflict path. Drag a step. Make `PUT /drafts/:id` answer 409 with a
+playwright route. The route fulfills only the PUT, with status 409 and the body
+`{"error":{"type":"draft-conflict","message":"Conflict."}}`. Press Save. Pass:
+the conflict banner appears with a "Reload" button.
+
+Press Reload. Pass: the header bar reads "Saved". Choose "Publish". Pass: the
+dialog opens without the save-first note. Cancel the dialog and unroute the
+answer.
+
+**5. Tab close and reload.** Change a label and do not save. Reload the tab.
+Pass: the browser's own leave prompt appears. Automation must accept or
+dismiss the `beforeunload` dialog.
+
+Save, then reload again. Pass: no prompt appears. The prompt text belongs to
+the browser, so the check reads only whether the dialog fires.
+
+**6. A 401 on save.** First prepare the second account. In another browser
+context, log in as `demo-developer@example.test`, password
+`seed-demo-password`. Read `actor.id` from the `POST /auth/login` response in
+the network log.
+
+In the first context, open the draft's Access tab. Type that id into the
+Developer list's add box and press Add. Pass: the id appears in the Developer
+list. Without it, the second account meets a refusal screen at the end of this
+check.
+
+Change a label and do not save. Make the save answer 401: a playwright route
+that fulfills `PUT /drafts/:id` with status 401 does this. Press Save. Pass:
+the login screen appears.
+
+Unroute the answer and log in again as `demo-superuser@example.test`. Open the
+same draft. Pass: a notice reads "Your session ended while this draft had
+unsaved changes. Detent kept them in this browser tab." It offers "Restore
+unsaved changes" and "Discard them".
+
+Choose "Restore unsaved changes". Pass: the label returns, and the header bar
+reads "Unsaved changes". The notice is gone.
+
+Make the save answer 401 again and press Save. Log in and open the draft
+once more. Choose "Discard them". Pass: the notice goes, and the draft shows
+the saved label.
+
+Change a label, make the save answer 401 and press Save. Unroute the answer,
+log in as `demo-superuser@example.test` and open the draft. While the notice
+shows, change another label. Pass: the header bar reads "Unsaved changes".
+
+Choose "Restore unsaved changes". Pass: the native prompt "Replace your current
+changes with the restored ones?" appears. Dismiss it. Pass: the notice stays,
+and the draft keeps the newer label. Choose "Restore unsaved changes" again and
+accept. Pass: the label from the 401 session returns, and the notice is gone.
+
+The restored draft reads "Unsaved changes". Make the save answer 401 and press
+Save. At the login screen, leave the first context alone. In the second
+context, open the draft, change a label and press Save. Pass: the header bar
+reads "Saved".
+
+Back in the first context, unroute the answer and log in as
+`demo-superuser@example.test`. Open the draft, choose "Restore unsaved changes"
+and press Save. Pass: the conflict banner appears, because the restore kept the
+stored revision. Press Reload. Pass: the
+header bar reads "Saved", and the draft holds the label from the second
+context.
+
+Change a label, make the save answer 401 and press Save. Unroute the answer,
+log in as `demo-superuser@example.test` and open the draft. Change another
+label. Delay the answer of `PUT /drafts/:id` by a few seconds and press Save.
+While the save runs, inspect the notice. Pass: both buttons carry the
+`disabled` attribute. After the answer arrives, the header bar reads "Saved",
+and the notice is gone.
+
+Change the label again, make the save answer 401 and press Save. At the login
+screen, log in as `demo-developer@example.test` on the same tab. Open the same
+draft.
+
+Pass: the header bar renders for that account, which proves it may open the
+draft. Only then read the notice. Pass: no notice appears, because the stored
+copy belongs to the first actor. A refusal screen instead of the header bar
+proves nothing, so repeat the Access tab step.
+
+**7. Discard draft after a drag.** Drag a step on the Canvas tab. Choose
+"Discard draft" in the header bar. The application's own dialog,
+"Discard this draft", opens. Confirm it. Pass: no native browser prompt
+appears, and the screen returns to the process list.
+
+**8. A 401 on a clean draft.** Open the draft and change nothing. The Save
+button stays disabled, so force the 401 on another request. Open the Access
+tab. Make `PUT /processes/:id/access` answer 401 with a playwright route.
+
+Type any text into the Developer list's add box and press Add. Pass: the login
+screen appears.
+
+Unroute the answer and log in as `demo-superuser@example.test`. Open the same
+draft. Pass: no notice appears. Read `Object.keys(sessionStorage)` in the page.
+Pass: no key starts with `studio.draftStash`.
+
+Two checks stay manual-only and sit outside the eight. On wide screens the
+notice puts its message and both buttons in one row. The message wraps at the
+68-character measure and the notice stacks below 40rem. Focus lands on the open
+tab after either button. Only a live render at a real width shows the first.
+Only a keyboard pass shows the second.
 
 ### Selecting a path shows the source step's Paths section with the row highlighted
 
