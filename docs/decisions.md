@@ -1617,8 +1617,9 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   `packages/web/src/areas/studio/screens/EditScreen.tsx`.
 - **`type-data-comparison-literals` (E2-2, E2-9, E2-16, F-5; high)**: The
   `instance.query` form and the report builder send every comparison value as
-  a string, the query form's attribute rows lose focus on each keystroke, and
-  a failed catalog fetch marks every reference as stale. Anchors:
+  a string, the report builder offers no way to type the operator `in`, the
+  query form's attribute rows lose focus on each keystroke, and a failed
+  catalog fetch marks every reference as stale. Anchors:
   `packages/web/src/areas/studio/panels/shared/InstanceQueryForm.tsx`,
   `packages/web/src/areas/reporting/screens/ReportBuilderScreen.tsx`,
   `packages/web/src/areas/studio/panels/shared/useTargetProcessCatalog.ts`.
@@ -1652,8 +1653,8 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   `src/engine/retention.ts`, `src/engine/host.ts`.
 - **`harden-reporting-export-and-queries` (C-4 (= D-2), C-5, C-13, C-19;
   medium)**: The CSV export does not neutralize formulas, report and CSV stop
-  at 50 rows without saying so, an editor can displace a report's owner, and
-  the aggregates load the whole range into memory. Anchors:
+  at 50 rows, and the CSV does not say so, an editor can displace a report's
+  owner, and the aggregates load the whole range into memory. Anchors:
   `src/runtime/reports.ts`, `src/engine/reporting.ts`,
   `src/http/reporting-routes.ts`.
 - **`harden-tenancy-provisioning` (C-8, C-9, C-14, C-15; medium)**: In SaaS
@@ -1678,10 +1679,10 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   `packages/web/test/studio-load-guard.test.ts`.
 - **`fix-condition-and-path-builders` (E2-1, E2-6, E2-10, E2-14, E2-17;
   medium)**: A manual path keeps a hidden guard that hides its button at
-  runtime, "+ Add row" deletes diverging visibility overrides, the condition
-  builder cannot read back integer or negative literals, a boolean value
-  field shows "No" on an empty row, and "Add path" always creates a manual
-  path. Anchors: `packages/web/src/areas/studio/panels/PathsPanel.tsx`,
+  runtime, one "+ Add row" removes every `visible` override when the steps
+  disagree on the condition, the condition builder cannot read back integer
+  or negative literals, a boolean value field shows "No" on an empty row, and
+  "Add path" always creates a manual path. Anchors: `packages/web/src/areas/studio/panels/PathsPanel.tsx`,
   `packages/web/src/areas/studio/panels/FieldCatalogPanel.tsx`,
   `packages/web/src/areas/studio/panels/shared/conditionLogic.ts`.
 - **`fix-subprocess-step-editor` (E2-3, E2-4, E2-5, E2-12, E2-18; medium)**:
@@ -1764,9 +1765,9 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   `src/http/admin-routes.ts`, `src/auth/users.ts`.
 - **`tidy-engine-internals` (B-9, B-15, B-16, C-12; low)**: Some readers skip
   the pin hash check, `initSchema` carries backward migrations, reporting
-  queries the history twice, one `tx.unsafe` call inserts an unquoted
-  identifier, and the definition cache keeps every draft snapshot until a
-  restart. Anchors: `src/engine/timers.ts`, `src/engine/store.ts`,
+  queries the history twice, one `tx.unsafe` call inserts an unescaped role
+  name that no outside input controls, and the definition cache keeps every
+  draft snapshot until a restart. Anchors: `src/engine/timers.ts`, `src/engine/store.ts`,
   `src/engine/definitions.ts`.
 - **`catalog-studio-literal-strings` (E2-19; low)**: Visible studio text sits
   as literals in the code instead of in the catalog. Anchors:
@@ -1779,8 +1780,9 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   Anchors: `src/engine/assignment-strategies.ts`, `src/tenancy/store.ts`,
   `packages/web/src/areas/reporting/api/client.ts`.
 - **`fix-openapi-auth-descriptions` (H-1, H-2, H-3; low)**: The file
-  `docs/openapi.yaml` describes `GET /instances` in part, lets a candidate
-  without a claim submit, and states other auth rules that lag the code.
+  `docs/openapi.yaml` describes `GET /instances` in part, allows a candidate
+  without a claim to submit, which the code refuses, and states other auth
+  rules that lag the code.
   Anchors: `docs/openapi.yaml`, `src/http/routes.ts`,
   `src/runtime/internal.ts`.
 - **`sweep-docs-drift-2026-10` (H-4, H-5, H-6, H-7, H-8, H-9, H-10, H-11,

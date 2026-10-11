@@ -305,7 +305,7 @@ None.
 - **B-13** The duration `P1D` means exactly 24 h, so the clock time shifts across a DST change. The guide says nothing about it: `duration.ts:36-38`, `docs/authoring-guide.md:790-791`.
 - **B-14** Some exports have no importer. The duplicate name `createDefaultAssignmentRegistry` is the root of B-3: `assignment-strategies.ts:76`, `:107`, `registry.ts:180`, `host.ts:106`, `instance-drafts.ts:15`.
 - **B-15** The function `initSchema` carries backward retrofits, and the reporting queries the history twice: `store.ts:184-190`, `:330-332`, `reporting.ts:261`, `:400`.
-- **B-16** The call `tx.unsafe` inserts an unquoted role name (`GRANT … TO "${engineRole}"`). No outside input controls it: `store.ts:964-967`.
+- **B-16** The call `tx.unsafe` inserts an unescaped role name (`GRANT … TO "${engineRole}"`). No outside input controls it: `store.ts:964-967`.
 
 **Runtime and tenants (C)**
 
