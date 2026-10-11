@@ -47,6 +47,18 @@ export function pendingWrite(row: OverrideRow, draft: string): { value: string |
   return { value: next };
 }
 
+/**
+ * Whether two server copies hold the same stored overrides for one area and
+ * locale. The screen shows one slice at a time, so a change in another area or
+ * locale is no conflict. Key order does not count.
+ */
+export function sameOverrides(a: UiStringOverrideMap, b: UiStringOverrideMap, area: string, locale: string): boolean {
+  const left = a[area]?.[locale] ?? {};
+  const right = b[area]?.[locale] ?? {};
+  const keys = Object.keys(left);
+  return keys.length === Object.keys(right).length && keys.every((key) => Object.hasOwn(right, key) && right[key] === left[key]);
+}
+
 /** Every row a save must write, in catalog order. Empty when nothing changed, which is what disables the save action. */
 export function pendingWrites(rows: OverrideRow[], drafts: Record<string, string>): { key: string; value: string | null }[] {
   const writes: { key: string; value: string | null }[] = [];

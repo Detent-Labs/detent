@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { layout, colors, fonts, space } from "form-ui/tokens.stylex";
 import { listUiStringOverrides, putUiStringOverride } from "../api/client.js";
@@ -7,8 +7,11 @@ import { useRefresh } from "../useRefresh.js";
 import { describeCaughtError } from "../errors.js";
 import { useFail } from "../../../shell/useFail.js";
 import { ErrorBanner } from "../../../shell/ErrorBanner.js";
+import { createLatestGate } from "../../../shell/latestGate.js";
 import { loadUiStringOverrides } from "../../../i18n/overrides.js";
-import { OVERRIDABLE_AREAS, localesOf, rowsFor, pendingWrites } from "./uiStringsLogic.js";
+import { ServerCopyNote } from "../ServerCopyNote.js";
+import { absorbServerCopy, serverCopyChanged, type ServerCopies } from "./serverCopy.js";
+import { OVERRIDABLE_AREAS, localesOf, rowsFor, pendingWrites, sameOverrides } from "./uiStringsLogic.js";
 import { t, tFill } from "../catalog.js";
 import type { UiLocale } from "../../../i18n/locale.js";
 
@@ -102,34 +105,93 @@ interface UiStringsScreenProps {
  * A save re-reads the public map and installs it, so the operator's own session
  * holds the new wording. Screens already rendered keep the old value until
  * React renders them again — the same reason the boot fetch sits in `main.tsx`.
+ *
+ * A refetch keeps the drafts. The rows read the newest server copy, so a key
+ * without a draft follows the server and a key with a draft keeps its draft.
  */
 export function UiStringsScreen({ token, locale: uiLocale, onUnauthorized }: UiStringsScreenProps) {
   const [area, setArea] = useState<string>(OVERRIDABLE_AREAS[0]);
   const [locale, setLocale] = useState<string>(localesOf(OVERRIDABLE_AREAS[0])[0] ?? "en");
-  const [overrides, setOverrides] = useState<UiStringOverrideMap>({});
+  const [copies, setCopies] = useState<ServerCopies<UiStringOverrideMap> | undefined>(undefined);
+  const copiesRef = useRef<ServerCopies<UiStringOverrideMap> | undefined>(undefined);
+  /** The newest server copy. A draft may have started from an older one. */
+  const overrides = copies?.latest ?? {};
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
+  /** Unsaved input. `load` reads the ref when an answer arrives; the state drives the callout. */
+  const dirtyRef = useRef(false);
+  const [dirty, setDirty] = useState(false);
+  const [gate] = useState(createLatestGate);
   const { reloadToken, refresh } = useRefresh();
   const fail = useFail(onUnauthorized, (err) => setError(describeCaughtError(err, uiLocale)));
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(undefined);
-    try {
-      setOverrides(await listUiStringOverrides(token));
-      setDrafts({});
-    } catch (err) {
-      fail(err);
-    } finally {
-      setLoading(false);
-    }
-  }, [token, uiLocale, fail]);
+  const touch = () => {
+    dirtyRef.current = true;
+    setDirty(true);
+    setSaved(false);
+  };
 
+  /**
+   * Drops the drafts on an area or locale switch. The new slice's inputs show
+   * `latest`, so `baseline` moves there too: an older baseline would raise
+   * the callout over a change the operator already sees.
+   */
+  const switchSlice = () => {
+    setDrafts({});
+    dirtyRef.current = false;
+    setDirty(false);
+    setSaved(false);
+    if (copiesRef.current) {
+      const { copies: rebased } = absorbServerCopy(copiesRef.current, copiesRef.current.latest, false);
+      copiesRef.current = rebased;
+      setCopies(rebased);
+    }
+  };
+
+  /**
+   * Fetches every stored override and stores it as the newest server copy. It
+   * clears the drafts only on the first load, without unsaved input, or when
+   * `reseed` asks for it. Only the newest call writes, so a focus load that
+   * started before a save never overwrites the copy the save produced.
+   *
+   * The chrome's locale is no dependency: a draft is the same text in any
+   * chrome language, and `fail` reads it through its own ref.
+   */
+  const load = useCallback(
+    async (reseed = false) => {
+      const isCurrent = gate.next();
+      setLoading(true);
+      setError(undefined);
+      try {
+        const next = await listUiStringOverrides(token);
+        if (!isCurrent()) return;
+        const { copies: nextCopies, reseed: doReseed } = absorbServerCopy(copiesRef.current, next, dirtyRef.current && !reseed);
+        copiesRef.current = nextCopies;
+        setCopies(nextCopies);
+        if (doReseed) {
+          setDrafts({});
+          dirtyRef.current = false;
+          setDirty(false);
+        }
+      } catch (err) {
+        if (isCurrent()) fail(err);
+      } finally {
+        if (isCurrent()) setLoading(false);
+      }
+    },
+    [token, fail, gate],
+  );
+
+  // A new `load` identity means a new token, which forces a reseed. A bare
+  // `reloadToken` bump (focus, Refresh) keeps the operator's unsaved input.
+  const lastLoad = useRef(load);
   useEffect(() => {
-    void load();
+    const reseed = lastLoad.current !== load;
+    lastLoad.current = load;
+    void load(reseed);
   }, [load, reloadToken]);
 
   const locales = localesOf(area);
@@ -140,8 +202,7 @@ export function UiStringsScreen({ token, locale: uiLocale, onUnauthorized }: UiS
   // otherwise list a locale that area has no catalog for, and show no rows.
   const pickArea = (next: string) => {
     setArea(next);
-    setDrafts({});
-    setSaved(false);
+    switchSlice();
     if (!localesOf(next).includes(locale)) setLocale(localesOf(next)[0] ?? "en");
   };
 
@@ -155,7 +216,13 @@ export function UiStringsScreen({ token, locale: uiLocale, onUnauthorized }: UiS
       // The public map, not the admin one: this is what every `t()` reads.
       await loadUiStringOverrides();
       setSaved(true);
-      refresh();
+      // The server now holds the input, so it is no longer unsaved, even if
+      // the reload below fails.
+      dirtyRef.current = false;
+      setDirty(false);
+      // A forced reseed: the drafts clear together with the new overrides, so
+      // the inputs never show the pre-save stored value.
+      await load(true);
     } catch (err) {
       fail(err);
     } finally {
@@ -188,8 +255,7 @@ export function UiStringsScreen({ token, locale: uiLocale, onUnauthorized }: UiS
             value={locale}
             onChange={(e) => {
               setLocale(e.target.value);
-              setDrafts({});
-              setSaved(false);
+              switchSlice();
             }}
           >
             {locales.map((code) => (
@@ -200,6 +266,12 @@ export function UiStringsScreen({ token, locale: uiLocale, onUnauthorized }: UiS
           </select>
         </label>
       </div>
+
+      <ServerCopyNote
+        message={dirty && serverCopyChanged(copies, (a, b) => sameOverrides(a, b, area, locale)) ? t(uiLocale, "uiStrings.serverChanged") : undefined}
+        discardLabel={t(uiLocale, "uiStrings.discardAndReload")}
+        onDiscard={() => void load(true)}
+      />
 
       {rows.length === 0 ? (
         <p {...stylex.props(styles.empty)}>{t(uiLocale, "uiStrings.emptyCatalog")}</p>
@@ -221,7 +293,7 @@ export function UiStringsScreen({ token, locale: uiLocale, onUnauthorized }: UiS
                   <input
                     value={drafts[row.key] ?? row.stored}
                     onChange={(e) => {
-                      setSaved(false);
+                      touch();
                       setDrafts((prev) => ({ ...prev, [row.key]: e.target.value }));
                     }}
                     aria-label={tFill(uiLocale, "uiStrings.overrideAria", { key: row.key })}
