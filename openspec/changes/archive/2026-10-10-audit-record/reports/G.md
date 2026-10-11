@@ -1,6 +1,6 @@
 # Area G: Tests, examples, infrastructure
 
-Baseline: HEAD `5f41cd8a`. Read only (`git grep`/`log`/`show`, Read). No `bun`, no Docker.
+State: HEAD `5f41cd8a`, read only (`git grep`/`log`/`show`, Read). No `bun`, no Docker.
 
 ## Findings
 
@@ -93,7 +93,7 @@ Baseline: HEAD `5f41cd8a`. Read only (`git grep`/`log`/`show`, Read). No `bun`, 
 
 ### G-8: `machine-paths.sh` misses Git Bash, macOS and JSON-escaped home paths
 
-- Case: A plan document quotes `/c/Users/alice/AI/detent/...`, the form Git Bash prints on this host. The pattern requires `[A-Za-z]:` before `Users`, or `/home/<user>/`. The forms `/c/Users/...`, `/Users/alice/...` (macOS), `c:/users/...` (lower case) and `"C:\\Users\\alice"` (JSON) do not match. The spec requires "on any platform".
+- Case: A plan document quotes a home path in the form Git Bash prints on this host. The pattern requires `[A-Za-z]:` before `Users`, or `/home/<user>/`. Four forms do not match: the Git Bash form, the macOS form, the lower-case drive form and the JSON-escaped form. The Git Bash form has the drive as the first path segment. The JSON-escaped form has doubled backslashes. The spec requires "on any platform".
 - Location: `scripts/gates/machine-paths.sh:28`; `openspec/specs/push-gate-checks/spec.md:356-357`
 - Severity: low
 - Evidence: confirmed (pattern read). The tree has no current hit (`MSYS_NO_PATHCONV=1 git grep -nIE` over the four forms: empty; positive control `/home/node` = 6 hits). Repro R-5.
@@ -201,7 +201,7 @@ Baseline: HEAD `5f41cd8a`. Read only (`git grep`/`log`/`show`, Read). No `bun`, 
   `import {readdirSync,readFileSync} from "node:fs"; import {compileProcessBody} from "/workspace/src/schema/compile.ts"; import {definitionHash} from "/workspace/src/schema/hash.ts"; for (const f of readdirSync("/workspace/examples").filter(n=>n.endsWith(".json"))) { const r=JSON.parse(readFileSync("/workspace/examples/"+f,"utf8")); if(!r.definitionHash) continue; const h=definitionHash(compileProcessBody(r.definition)); console.log(f, h===r.definitionHash?"OK":"STALE "+h); }`
   then `bun /tmp/h.ts`. Expected: `expense-approval.json OK`. Every `STALE` line proves a wrapper that is wrong today.
 - R-4 (G-7), in the container, outside `/workspace`: `mkdir -p /tmp/sg && printf 'import {test} from "bun:test";\ntest("a",()=>{});\ntest.todo("b",()=>{throw new Error("x")});\n' > /tmp/sg/a.test.ts && cd /tmp/sg && bun test > out.txt 2>&1; printf '[test] database: x_test\n' >> out.txt; grep -E 'skip|todo' out.txt; sh /workspace/scripts/gates/silent-green.sh out.txt; echo rc=$?`. Expected: a `1 todo` line, no `skip` line, `rc=0`.
-- R-5 (G-8): `printf '%s\n' '/c/Users/alice/x' '/Users/alice/x' 'c:/users/alice/x' 'C:\\Users\\alice' | grep -E '[A-Za-z]:[\/]Users[\/][A-Za-z0-9_]+|/home/[a-z][a-z0-9_-]*/'; echo rc=$?`. Expected: no output, `rc=1`.
+- R-5 (G-8): `printf '/%s/%s/alice/x\n/%s/alice/x\n%s:/%s/alice/x\nC:%s%s%salice\n' c Users Users c users '\\' Users '\\' | grep -E '[A-Za-z]:[\/]Users[\/][A-Za-z0-9_]+|/home/[a-z][a-z0-9_-]*/'; echo rc=$?`. Expected: no output, `rc=1`.
 - R-6 (G-9), in the container, `/tmp/s.ts`: print the expression `JSON.stringify(stripCompiledContent(compileProcessBody(b))) === JSON.stringify(authoredProcessBody.parse(b))` for `access-request.json`, `it-onboarding.json` and `it-offboarding.json`. The imports come from `/workspace/src/schema/{definition,compile,strip-compiled}.ts`, with `b = raw.definition ?? raw`. Expected per the test's intent: `true` per file. A `false` means that the round trip is broken today, with no guard.
 - R-7 (open question, see Not checked): in the container `cd /workspace/packages/form-ui && bun -e 'console.log(require("react/package.json").version, require("react-dom/package.json").version)'` and the same in `/workspace/packages/web`.
 
