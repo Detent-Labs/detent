@@ -1557,6 +1557,40 @@ gap outside that change's own scope. The CLAIM tag is local to this section.
   target's candidacy. `loadInstanceForActor` admits that target only as the
   test instance's own starter or a `system:admin` holder.
 
+  Since `close-instance-reads-on-write-paths`, a candidate who claimed such an
+  instance and lost a double submission gets the opaque 403. A participant in
+  the same race gets 409 `instance-not-running`. The reader rule asks
+  `loadInstanceForActor`, which refuses that candidate.
+
+## Open from close-instance-reads-on-write-paths (needs its own OpenSpec change)
+
+The design for `close-instance-reads-on-write-paths` (2026-10-11) left two
+gaps outside that change's own scope. The tags WRITE and SUBMIT are local to
+this section.
+
+- **WRITE-1: the write routes still answer a caller who may not read with the
+  instance's existence.** Claim, release and delegate answer 409
+  `instance-not-running` for a finished instance. They answer 500 for an
+  unknown instance id. The 403 types `not-claimed` and `not-claimant` tell a
+  caller that a running instance has an assignment. The task screen reads
+  those two types, so closing them needs a web change. Claim, release and
+  delegate check status before authority, by owner ruling of 2026-10-11.
+
+  The change `harden-http-error-surface` (audit finding C-17) owns the 500 for
+  an unknown id. Its answer for an unknown id must be the opaque 403 and never
+  a 404. Then an unknown id reads the same as an instance the caller may not
+  read.
+
+  One difference stays by design. On a running instance, a revoked starter's
+  cancel or assignment-less submit succeeds. The same call on a finished
+  instance answers 403. The pair of answers tells the caller whether the
+  instance runs. It never tells the caller the status.
+- **SUBMIT-1: the submit route's body goes to a writer who may not read.** The
+  route `POST /instances/:id/submit` answers the full `Instance`. The owner
+  ruled that body out of `close-instance-reads-on-write-paths` on 2026-10-11.
+  The proposal records the ruling under "Out of scope by owner ruling". No
+  follow-up change is planned yet.
+
 ## Open from the studio-path-row-field-order final review (one OpenSpec change per screen)
 
 The final whole-branch review for `studio-path-row-field-order` (2026-09-17)
@@ -1595,12 +1629,6 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   `createDefaultAssignmentRegistry`. Anchors:
   `src/handlers/process-start.ts`, `src/handlers/instance-transition.ts`,
   `src/engine/assignment-strategies.ts`.
-- **`close-instance-reads-on-write-paths` (C-1, C-2, C-3, C-16, D-7; high)**:
-  Cancel and claim return instance data to a caller who lacks the read right,
-  a visibility revoke leaves some reads open and accepts an unknown account,
-  and write routes reveal whether an instance id exists. Anchors:
-  `src/runtime/instances.ts`, `src/runtime/claims.ts`,
-  `src/runtime/visibility.ts`.
 - **`keep-admin-edits-on-refresh` (F-1, F-7, F-17, F-18; high)**: A focus
   refetch discards unsaved input in the data list and UI strings editors,
   stale responses overwrite newer ones in the admin lists, the migrations

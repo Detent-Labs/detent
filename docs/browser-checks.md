@@ -649,6 +649,29 @@ A `bun:test` assertion covers the scope, the tone mapping and the route
 already. It cannot see a stamp whose tone reads as a defect where a cancelled
 case belongs. It cannot see a nav entry that wraps.
 
+### Cases I started: a revoked case
+
+Source: `close-instance-reads-on-write-paths` task 7.4.
+
+Seed the database. Log in as a participant who started an instance and holds
+no claim on it. Open Cases I started. Pass: the instance is on the list.
+
+As an operator, revoke that participant from the instance
+(`POST /instances/:id/visibility/revoke`). The target account must exist in
+the directory. Return to the screen and refresh. Pass: the row is gone, with no
+placeholder, no notice and no gap in its place.
+
+Restore the participant (`POST /instances/:id/visibility/restore`). Refresh.
+Pass: the row returns.
+
+Now start an instance whose first step names the participant as a candidate.
+Claim it as the participant. Revoke the participant again and refresh. Pass:
+the row stays, because the claim outranks the revocation.
+
+A `bun:test` assertion covers the scope and the claim exception already. It
+cannot see a placeholder where the row was. It cannot see a gap left in the
+list.
+
 ### Cases I took part in
 
 Source: `involved-cases-screen` task 5.1.
