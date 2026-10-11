@@ -859,6 +859,64 @@ In Operations, drop `sku` from the list. Save the draft, then reload the
 editor. Pass: the `sku` row stays, keeps its target, and carries a warning. It
 does not vanish. The data list screen reports the same key under "Used by".
 
+### Admin edits survive a window refocus (`keep-admin-edits-on-refresh`)
+
+Source: keep-admin-edits-on-refresh task 6.2.
+
+`e2e/admin-edits.e2e.ts` covers the UI strings input and the Users throttle.
+This walk covers what a flow cannot judge: the data list editor, the callout's
+look, and German. It needs the `products` list from the table-shaped entry
+above, and a second browser context logged in as the same account.
+
+Open Operations, then Data lists, then `products`. Add two value rows and
+rename one column heading. Do not save. Then simulate the window switch:
+
+```sh
+playwright-cli -s=<worktree-name> run-code "async page => { await page.evaluate(() => window.dispatchEvent(new Event('focus'))) }"
+```
+
+A worktree refuses `eval`, so `run-code` carries the event. Pass: both rows and
+the new heading stay, and no callout shows.
+
+In the second context, edit one value's label on the same list and save. Then
+dispatch `focus` again in the first context. That pair is the changed-copy
+step.
+
+Pass: a warning callout shows above the controls. It opens with "The server
+copy changed while you were editing." Two more sentences say that the typed
+input stays and that saving replaces the server values. One button follows,
+"Discard my edits and load the server copy". The typed input is intact.
+
+Read the callout's look. Pass: it is a 3px advisory rule beside text in the
+refusal color. It is flat and has no radius. Nothing animates.
+
+Press the button. Pass: the inputs show the server copy, and the callout is
+gone.
+
+Type again, repeat the changed-copy step, then press Save. Pass: the save
+lands, the callout is gone, and the inputs show the saved copy.
+
+Repeat the changed-copy step, then switch the interface language to German
+with the callout showing. Pass: the screen refills from the server in German,
+with no callout. A language switch reseeds the inputs. Type again and repeat
+the changed-copy step in German. Pass: the callout and the button read in German.
+At a 1100px window the button wraps under the sentence and stays inside its
+row.
+
+Open Operations, then UI strings, and repeat the changed-copy step in both
+languages. Type into one key, and edit a different key in the second context.
+Pass: the sentence ends with "Saving overwrites the stored wording of the keys
+you edited." The key without a draft follows the server, and the key with a
+draft keeps its text.
+
+Emulate the dark scheme with the callout showing:
+
+```sh
+playwright-cli -s=<worktree-name> run-code "async page => { await page.emulateMedia({ colorScheme: 'dark' }) }"
+```
+
+Pass: the rule and the text keep readable contrast.
+
 ### Canvas grid snapping (`canvas-grid-snap`)
 
 Open Studio and a draft with several steps. This whole entry is a visual
