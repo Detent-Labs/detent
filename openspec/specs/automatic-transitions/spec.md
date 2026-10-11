@@ -7,7 +7,9 @@ evaluates the paths in priority order, takes the first whose guard holds, and
 commits that hop through the same transition machinery a manual path uses
 (`cause: "automatic"`). Evaluation runs the instance to rest — cascading through
 successive automatic steps until it reaches a manual step, an automatic step with
-no matching path (a wait-state), or a terminal step. A cascade that re-enters a
+no matching path (a wait-state), a subprocess step, or a terminal step. A
+subprocess step takes no path on entry, and the child's return evaluates its
+paths. A cascade that re-enters a
 step is a non-terminating loop; the instance is parked `faulted` and the loop is
 surfaced.
 ## Requirements
