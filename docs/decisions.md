@@ -1601,14 +1601,6 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   and write routes reveal whether an instance id exists. Anchors:
   `src/runtime/instances.ts`, `src/runtime/claims.ts`,
   `src/runtime/visibility.ts`.
-- **`keep-admin-edits-on-refresh` (F-1, F-7, F-17, F-18; high)**: A focus
-  refetch discards unsaved input in the data list and UI strings editors,
-  stale responses overwrite newer ones in the admin lists, the migrations
-  screen has no refresh control, and the Users and Groups screens reload the
-  whole directory on every focus. Anchors:
-  `packages/web/src/areas/admin/useRefresh.ts`,
-  `packages/web/src/shell/usePagedList.ts`,
-  `packages/web/src/areas/admin/screens/MigrationsScreen.tsx`.
 - **`type-data-comparison-literals` (E2-2, E2-9, E2-16, F-5; high)**: The
   `instance.query` form and the report builder send every comparison value as
   a string, the report builder offers no way to type a list for the

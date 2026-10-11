@@ -8,7 +8,7 @@
  * render a blank label.
  */
 import { describe, expect, it } from "bun:test";
-import { localesOf, rowsFor, pendingWrite, pendingWrites, OVERRIDABLE_AREAS } from "../src/areas/admin/screens/uiStringsLogic.js";
+import { localesOf, rowsFor, pendingWrite, pendingWrites, sameOverrides, OVERRIDABLE_AREAS } from "../src/areas/admin/screens/uiStringsLogic.js";
 import type { OverrideRow } from "../src/areas/admin/screens/uiStringsLogic.js";
 
 describe("localesOf", () => {
@@ -106,5 +106,48 @@ describe("pendingWrites", () => {
 
   it("skips a row whose draft was typed back to its stored value", () => {
     expect(pendingWrites(rows, { "login.title": "Sign in" })).toEqual([]);
+  });
+});
+
+describe("sameOverrides", () => {
+  const base = { shell: { en: { "login.title": "Sign in", "login.email": "E-mail" }, de: { "login.title": "Anmelden" } } };
+
+  it("counts an equal slice of the displayed area and locale as the same", () => {
+    const copy = { shell: { en: { "login.title": "Sign in", "login.email": "E-mail" }, de: { "login.title": "Anmelden" } } };
+    expect(sameOverrides(base, copy, "shell", "en")).toBe(true);
+  });
+
+  it("counts a changed value as a change", () => {
+    const next = { ...base, shell: { ...base.shell, en: { ...base.shell.en, "login.title": "Enter" } } };
+    expect(sameOverrides(base, next, "shell", "en")).toBe(false);
+  });
+
+  it("counts an added key as a change", () => {
+    const next = { ...base, shell: { ...base.shell, en: { ...base.shell.en, "login.password": "Secret" } } };
+    expect(sameOverrides(base, next, "shell", "en")).toBe(false);
+  });
+
+  it("counts a removed key as a change", () => {
+    const next = { ...base, shell: { ...base.shell, en: { "login.title": "Sign in" } } };
+    expect(sameOverrides(base, next, "shell", "en")).toBe(false);
+  });
+
+  it("counts a first override in a slice that held none as a change", () => {
+    expect(sameOverrides({}, { app: { en: { "tasks.title": "Inbox" } } }, "app", "en")).toBe(false);
+  });
+
+  it("ignores a change in another area", () => {
+    const next = { ...base, app: { en: { "tasks.title": "Inbox" } } };
+    expect(sameOverrides(base, next, "shell", "en")).toBe(true);
+  });
+
+  it("ignores a change in another locale of the same area", () => {
+    const next = { ...base, shell: { ...base.shell, de: { "login.title": "Einloggen" } } };
+    expect(sameOverrides(base, next, "shell", "en")).toBe(true);
+  });
+
+  it("ignores the order the server lists the keys in", () => {
+    const reordered = { shell: { en: { "login.email": "E-mail", "login.title": "Sign in" }, de: { "login.title": "Anmelden" } } };
+    expect(sameOverrides(base, reordered, "shell", "en")).toBe(true);
   });
 });

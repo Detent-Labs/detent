@@ -140,13 +140,13 @@ export function InstancesScreen({ token, locale, navigate, onUnauthorized }: Ins
   const fail = useFail(onUnauthorized, (err) => setError(describeCaughtError(err, locale)));
 
   const fetchPage = useCallback(
-    async (cursor?: string) => {
+    async (cursor: string | undefined, isCurrent: () => boolean) => {
       setError(undefined);
       try {
         const page = await listInstances(token, toListParams(filter, PAGE_LIMIT, cursor));
         return { items: page.items, cursor: page.cursor };
       } catch (err) {
-        fail(err);
+        if (isCurrent()) fail(err);
         throw err;
       }
     },

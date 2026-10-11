@@ -296,7 +296,7 @@ same checks plus a dependency audit. The suite uses its own database.
 
 ## Browser smoke suite
 
-A Playwright suite drives four flows against the production web build. It
+A Playwright suite drives five flows against the production web build. It
 runs as `bun run e2e`, and a separate CI job runs it beside the checks. The
 engine it starts uses a database of its own.
 
