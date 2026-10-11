@@ -72,7 +72,10 @@ None.
   `OutboxScreen.tsx`, `UsersScreen.tsx`, `GroupsScreen.tsx`, and the pure
   modules `dataListsLogic.ts` and `uiStringsLogic.ts`.
 - `packages/web/src/i18n/catalogs/admin.ts` (EN and DE).
-- `packages/web/test/`: logic tests for the new pure functions.
+- `packages/web/test/`: logic tests for the new pure functions, and a
+  static-markup test of the callout.
 - `e2e/admin-edits.e2e.ts`.
+- The flow count in `README.md`, `docs/current-state.md`,
+  `playwright.config.ts` and `scripts/e2e.ts`: four becomes five.
 - `docs/browser-checks.md`, `docs/decisions.md` (audit index entry).
 - No engine, HTTP or definition contract change.

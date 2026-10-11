@@ -19,7 +19,8 @@ interface PagedList<T> {
    * Writes `items` and `cursor` directly, with no fetch of its own. For a
    * screen whose initial load is a compound fetch outside this hook (see
    * `InstanceScreen.tsx`), so the hook's own `loadMore` continues from the
-   * page that fetch already retrieved instead of refetching page one.
+   * page that fetch already retrieved instead of refetching page one. It also
+   * ends any request in flight and clears `loading`.
    */
   reset: (items: T[], cursor?: string) => void;
 }

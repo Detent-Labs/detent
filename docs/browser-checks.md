@@ -861,15 +861,15 @@ does not vanish. The data list screen reports the same key under "Used by".
 
 ### Admin edits survive a window refocus (`keep-admin-edits-on-refresh`)
 
-Source: keep-admin-edits-on-refresh task 6.2.
+Source: `keep-admin-edits-on-refresh` task 6.2.
 
 `e2e/admin-edits.e2e.ts` covers the UI strings input and the Users throttle.
 This walk covers what a flow cannot judge: the data list editor, the callout's
 look, and German. It needs the `products` list from the table-shaped entry
 above, and a second browser context logged in as the same account.
 
-Open Operations, then Data lists, then `products`. Add two value rows and
-rename one column heading. Do not save. Then simulate the window switch:
+Open Operations, then Data lists, then `products`. Add two value rows and give
+each a value key and a label. Rename one column heading. Do not save. Then simulate the window switch:
 
 ```sh
 playwright-cli -s=<worktree-name> run-code "async page => { await page.evaluate(() => window.dispatchEvent(new Event('focus'))) }"
@@ -900,8 +900,8 @@ Repeat the changed-copy step, then switch the interface language to German
 with the callout showing. Pass: the screen refills from the server in German,
 with no callout. A language switch reseeds the inputs. Type again and repeat
 the changed-copy step in German. Pass: the callout and the button read in German.
-At a 1100px window the button wraps under the sentence and stays inside its
-row.
+At a 1100px window the button stands under the sentence, takes no fixed width,
+and stays inside its row.
 
 Open Operations, then UI strings, and repeat the changed-copy step in both
 languages. Type into one key, and edit a different key in the second context.

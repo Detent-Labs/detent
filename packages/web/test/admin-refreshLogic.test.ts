@@ -24,6 +24,11 @@ describe("focusRefetchDue", () => {
     expect(focusRefetchDue(lastAt, lastAt, 0)).toBe(true);
     expect(focusRefetchDue(lastAt, lastAt + 1, 0)).toBe(true);
   });
+
+  it("is true after the clock stepped backward", () => {
+    expect(focusRefetchDue(lastAt, lastAt - 1, 30000)).toBe(true);
+    expect(focusRefetchDue(lastAt, lastAt - 1, 0)).toBe(true);
+  });
 });
 
 describe("DIRECTORY_FOCUS_INTERVAL_MS", () => {

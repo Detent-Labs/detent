@@ -38,8 +38,8 @@ No human was available for the discovery interview. The owner ruling of
   callout shows. When a refetch fails, the error banner shows where the data
   would sit, and the input stays.
 - **Anti-goals.** No diff view, no merge, no per-field marker, no toast and
-  no polling. German text runs up to 40% longer. The button wraps under the
-  sentence and takes no fixed width.
+  no polling. German text runs up to 40% longer. The button stands under the
+  sentence, takes no fixed width, and stays inside its row.
 
 ## Goals / Non-Goals
 
@@ -116,7 +116,8 @@ old locale as the label of the new one.
 
 The data-list editor compares `label`, `description`, `columns` and `values`
 (value, label, attributes, active). It ignores `usedBy`, because a publish
-elsewhere causes no conflict. The UI-strings editor compares the stored
+elsewhere causes no conflict. It also ignores `sortOrder`, because the array
+order already is the order. The UI-strings editor compares the stored
 overrides of the displayed area and locale only. Both compare a stable
 projection, so the key order from the server cannot raise a false callout.
 

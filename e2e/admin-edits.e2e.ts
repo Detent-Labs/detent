@@ -68,7 +68,7 @@ test("a focus within 30 seconds does not reload the Users directory", async ({ p
   await focusWindow(page);
   // An absent request has no event to wait for.
   await page.waitForTimeout(1000);
-  expect(reads, "directory reads after a focus 1 second into the load").toBe(0);
+  expect(reads, "directory reads after a focus within the throttle interval").toBe(0);
 
   // The counter sees requests, and the Refresh button is never throttled.
   await page.getByRole("main").getByRole("button", { name: "Refresh", exact: true }).click();
