@@ -1571,25 +1571,33 @@ this section.
 - **WRITE-1: the write routes still answer a caller who may not read with the
   instance's existence.** Claim, release and delegate answer 409
   `instance-not-running` for a finished instance. They answer 500 for an
-  unknown instance id. The 403 types `not-claimed` and `not-claimant` tell a
-  caller that a running instance has an assignment. The task screen reads
-  those two types, so closing them needs a web change. Claim, release and
-  delegate check status before authority, by owner ruling of 2026-10-11.
+  unknown instance id. On a running instance, claim answers the typed 403
+  `not-assigned`, `not-a-candidate` or `already-claimed`. Release and delegate
+  answer `not-claimant`. Submit and form-draft save answer `not-claimed` or
+  `not-claimant`.
+
+  Each of those 403 types separates a running instance from a finished one.
+  Claim, release and delegate check status before authority. The `runtime-api`
+  requirement "An operation targeting a non-running instance is rejected at
+  the boundary" sets that order. The owner ruled on 2026-10-11 to keep it.
+
+  The task screen and the studio Player both read `not-claimed` and
+  `not-claimant`. Closing those two types needs a web change in the app area
+  and the studio area.
 
   The change `harden-http-error-surface` (audit finding C-17) owns the 500 for
   an unknown id. Its answer for an unknown id must be the opaque 403 and never
-  a 404. Then an unknown id reads the same as an instance the caller may not
-  read.
+  a 404. That matches the answer submit, form-draft save and the visibility
+  routes give an unknown id.
 
   One difference stays by design. On a running instance, a revoked starter's
   cancel or assignment-less submit succeeds. The same call on a finished
   instance answers 403. The pair of answers tells the caller whether the
   instance runs. It never tells the caller the status.
 - **SUBMIT-1: the submit route's body goes to a writer who may not read.** The
-  route `POST /instances/:id/submit` answers the full `Instance`. The owner
-  ruled that body out of `close-instance-reads-on-write-paths` on 2026-10-11.
-  The proposal records the ruling under "Out of scope by owner ruling". No
-  follow-up change is planned yet.
+  route `POST /instances/:id/submit` answers the full `Instance`. On
+  2026-10-11 the owner ruled that body out of scope for
+  `close-instance-reads-on-write-paths`. No follow-up change is planned yet.
 
 ## Open from the studio-path-row-field-order final review (one OpenSpec change per screen)
 

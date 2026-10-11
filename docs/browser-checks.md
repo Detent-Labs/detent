@@ -653,20 +653,22 @@ case belongs. It cannot see a nav entry that wraps.
 
 Source: `close-instance-reads-on-write-paths` task 7.4.
 
-Seed the database. Log in as a participant who started an instance and holds
-no claim on it. Open Cases I started. Pass: the instance is on the list.
+Seed the database. Log in as a participant holding no reserved role. Start a
+process whose first step names somebody else. Open Cases I started. Pass: the
+instance is on the list. The participant has no claim and no candidacy on it.
 
-As an operator, revoke that participant from the instance
-(`POST /instances/:id/visibility/revoke`). The target account must exist in
-the directory. Return to the screen and refresh. Pass: the row is gone, with no
-placeholder, no notice and no gap in its place.
+As an operator, revoke the participant from that instance
+(`POST /instances/:id/visibility/revoke` with `{ "actorId": "<id>" }`). The
+target account must exist in the directory. Return to the screen and refresh.
+Pass: the row is gone, with no placeholder, no notice and no gap in its place.
 
-Restore the participant (`POST /instances/:id/visibility/restore`). Refresh.
-Pass: the row returns.
+Restore the participant (`POST /instances/:id/visibility/restore` with the
+same body). Refresh. Pass: the row returns.
 
-Now start an instance whose first step names the participant as a candidate.
-Claim it as the participant. Revoke the participant again and refresh. Pass:
-the row stays, because the claim outranks the revocation.
+Now, as the participant, start a process whose first step names the
+participant as a candidate. Claim that instance. As the operator, revoke the
+participant from it and refresh. Pass: the row stays, because the claim
+outranks the revocation.
 
 A `bun:test` assertion covers the scope and the claim exception already. It
 cannot see a placeholder where the row was. It cannot see a gap left in the
