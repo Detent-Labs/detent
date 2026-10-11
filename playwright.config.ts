@@ -20,7 +20,7 @@ if (!baseURL) {
 export default defineConfig({
   testDir: "e2e",
   testMatch: "**/*.e2e.ts",
-  // The four flows share one `_e2e` database and count rows before and after
+  // The flows share one `_e2e` database and count rows before and after
   // their own mutation (design D4); a second worker or a retried flow would
   // race those counts.
   fullyParallel: false,
@@ -33,7 +33,7 @@ export default defineConfig({
   },
   projects: [
     {
-      // Logs in once and saves storageState, so the other three flows start
+      // Logs in once and saves storageState, so the other four flows start
       // authenticated without spending a login each — the login rate limit
       // counts successful logins (design D2).
       name: "setup",

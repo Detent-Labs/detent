@@ -1601,14 +1601,6 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   and write routes reveal whether an instance id exists. Anchors:
   `src/runtime/instances.ts`, `src/runtime/claims.ts`,
   `src/runtime/visibility.ts`.
-- **`keep-admin-edits-on-refresh` (F-1, F-7, F-17, F-18; high)**: A focus
-  refetch discards unsaved input in the data list and UI strings editors,
-  stale responses overwrite newer ones in the admin lists, the migrations
-  screen has no refresh control, and the Users and Groups screens reload the
-  whole directory on every focus. Anchors:
-  `packages/web/src/areas/admin/useRefresh.ts`,
-  `packages/web/src/shell/usePagedList.ts`,
-  `packages/web/src/areas/admin/screens/MigrationsScreen.tsx`.
 - **`guard-unsaved-studio-draft` (E1-2, E1-3, E1-4; high)**: The groups link,
   the account menu and a 401 on save leave or discard an unsaved draft
   without a prompt, and layout edits do not count as unsaved. Anchors:
