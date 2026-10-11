@@ -2,20 +2,25 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "bun:test";
 
 /**
- * `EditScreen.tsx` wires the unsaved-draft stash at six places, and no other
- * test sees any of them.
+ * `EditScreen.tsx` wires the unsaved-draft stash at several places, and no
+ * other test sees any of them.
  *
  * `ProcessSurface` wraps the shell's `onUnauthorized` as `stashOnUnauthorized`.
- * A 401 from any request on the screen then keeps unsaved work. Two consumers
- * take the wrapper: `useDraftToolbarActions` (save, discard, publish) and the
+ * A 401 from a request of either consumer then keeps unsaved work. The two
+ * consumers are `useDraftToolbarActions` (save, discard, publish) and the
  * `AccessPanel`. A raw callback on either one lets that request end the
- * session and lose the draft, with every type check still green.
+ * session and lose the draft, with every type check still green. Other
+ * requests on the screen never reach `onUnauthorized`. The wrapper writes the
+ * stash only while the draft is dirty, so a clean draft stores nothing.
  *
  * The stash goes stale in two places. A successful save and a discarded draft
  * each call `dropStash()`, and the discard does it before `navigate`, which
  * unmounts the screen. `RestoreNotice` renders only while a stash exists, and
- * its two buttons call the restore and discard handlers. The outer `EditScreen`
- * loads the draft before any draft exists, so it keeps the raw callback.
+ * its two buttons call the restore and discard handlers. Both buttons wait
+ * while a save or publish runs (`requestRunning`), because a restore during a
+ * save would let the save's answer overwrite the stored revision. The outer
+ * `EditScreen` loads the draft before any draft exists, so it keeps the raw
+ * callback.
  *
  * A source test in the idiom `studio-leave-guard.test.ts` uses: no harness in
  * this package can click a control or trigger a 401, so the wiring is guarded
@@ -108,6 +113,31 @@ function scan(source: string): string[] {
     if (!/\bstash\s*&&\s*$/.test(code.slice(0, notice.start))) violations.push("RestoreNotice is not gated on stash");
     if (propValue(notice.tag, "onRestore") !== "restoreStash") violations.push("RestoreNotice onRestore is not restoreStash");
     if (propValue(notice.tag, "onDiscard") !== "discardStash") violations.push("RestoreNotice onDiscard is not discardStash");
+    if (propValue(notice.tag, "disabled") !== "requestRunning") violations.push("RestoreNotice disabled is not requestRunning");
+  }
+
+  // The flag the notice waits on, and the two handlers that honor it when a
+  // click slips past the `disabled` attribute.
+  if (!/\bconst\s+requestRunning\s*=\s*actions\.saving\s*\|\|\s*actions\.publishing\s*;/.test(code)) {
+    violations.push("requestRunning is not actions.saving || actions.publishing");
+  }
+  for (const name of ["restoreStash", "discardStash"]) {
+    const handler = new RegExp(`\\bconst\\s+${name}\\s*=\\s*\\(\\)\\s*=>\\s*\\{`).exec(code);
+    const handlerBody = handler ? braced(code, handler.index + handler[0].length - 1) : undefined;
+    if (handlerBody === undefined || !/\brequestRunning\b/.test(handlerBody)) {
+      violations.push(`${name} does not return early while a request runs`);
+    }
+  }
+
+  // A clean draft has no work to keep, so the 401 stores nothing for it.
+  const wrapper = /\bconst\s+stashOnUnauthorized\s*=\s*\(\)\s*=>\s*\{/.exec(code);
+  const wrapperBody = wrapper ? braced(code, wrapper.index + wrapper[0].length - 1) : undefined;
+  if (wrapperBody === undefined) violations.push("stashOnUnauthorized not found");
+  else {
+    const write = wrapperBody.search(/\bstashDraft\s*\(/);
+    if (write < 0 || !/\bif\s*\(\s*dirtyNow\s*\)\s*\{?\s*$/.test(wrapperBody.slice(0, write))) {
+      violations.push("stashOnUnauthorized does not write the stash only while dirtyNow");
+    }
   }
 
   // The outer component loads the draft, so no unsaved work exists to stash.
@@ -180,6 +210,38 @@ describe("EditScreen.tsx wires the unsaved-draft stash", () => {
     expect(scan(restore)).toEqual(["RestoreNotice onRestore is not restoreStash"]);
     const discard = mutate(real, /onDiscard=\{discardStash\}/, "onDiscard={restoreStash}");
     expect(scan(discard)).toEqual(["RestoreNotice onDiscard is not discardStash"]);
+  });
+
+  it("a RestoreNotice that ignores a running save is flagged", () => {
+    const ignored = mutate(real, /\s+disabled=\{requestRunning\}/, "");
+    expect(scan(ignored)).toEqual(["RestoreNotice disabled is not requestRunning"]);
+    const wrong = mutate(real, /disabled=\{requestRunning\}/, "disabled={actions.saving}");
+    expect(scan(wrong)).toEqual(["RestoreNotice disabled is not requestRunning"]);
+  });
+
+  it("a requestRunning that leaves out the publish is flagged", () => {
+    const saving = mutate(real, /(\bconst requestRunning = actions\.saving) \|\| actions\.publishing;/, "$1;");
+    expect(scan(saving)).toEqual(["requestRunning is not actions.saving || actions.publishing"]);
+  });
+
+  it("a restore or discard that runs during a save is flagged", () => {
+    const restore = mutate(real, /stash === undefined \|\| requestRunning/, "stash === undefined");
+    expect(scan(restore)).toEqual(["restoreStash does not return early while a request runs"]);
+    const discard = mutate(real, /(\bconst discardStash = \(\) => \{\s*)if \(requestRunning\) return;\s*/, "$1");
+    expect(scan(discard)).toEqual(["discardStash does not return early while a request runs"]);
+  });
+
+  it("a 401 that stashes a clean draft is flagged", () => {
+    const always = mutate(real, /\bif \(dirtyNow\) (stashDraft\()/, "$1");
+    expect(scan(always)).toEqual(["stashOnUnauthorized does not write the stash only while dirtyNow"]);
+    const inverted = mutate(real, /\bif \(dirtyNow\) (stashDraft\()/, "if (!dirtyNow) $1");
+    expect(scan(inverted)).toEqual(["stashOnUnauthorized does not write the stash only while dirtyNow"]);
+  });
+
+  it("a stash call in a comment is not the dirty gate", () => {
+    const always = mutate(real, /\bif \(dirtyNow\) (stashDraft\()/, "$1");
+    const commented = mutate(always, /(\bconst stashOnUnauthorized = \(\) => \{)/, "$1\n// if (dirtyNow) stashDraft(\n");
+    expect(scan(commented)).toEqual(["stashOnUnauthorized does not write the stash only while dirtyNow"]);
   });
 
   it("an outer EditScreen load that wraps onUnauthorized is flagged", () => {

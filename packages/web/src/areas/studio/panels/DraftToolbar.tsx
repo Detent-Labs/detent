@@ -17,8 +17,8 @@ export interface DraftToolbarProps {
   onSaveState: Dispatch<SetStateAction<DraftSaveState>>;
   /** The body last known to be persisted, and its setter — lifted into
    * `EditorArea` (design.md: "the header bar reads lifted DraftToolbar
-   * state") so the new process-identity header bar can read `isDirty`
-   * too. `DraftToolbar` still computes both; only where they live moved up
+   * state") so the header bar can read `dirtyNow`, built from `isDraftDirty`.
+   * `DraftToolbar` still computes both; only where they live moved up
    * one level, mirroring how `saveState`/`onSaveState` already work. */
   savedBody: Draft;
   onSavedBodyChange: (body: Draft) => void;

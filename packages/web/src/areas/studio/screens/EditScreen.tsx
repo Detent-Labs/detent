@@ -414,7 +414,7 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
   // answers 409 and the conflict banner appears. `savedBody` and
   // `savedLayout` keep the loaded record, so the restored draft reads dirty.
   const restoreStash = () => {
-    if (stash === undefined) return;
+    if (stash === undefined || requestRunning) return;
     if (dirtyNow && !confirm(t("restoreNotice.replaceConfirm"))) return;
     replace(stash.body);
     setSaveState((s) => ({ ...s, revision: stash.revision, layout: stash.layout }));
@@ -422,6 +422,7 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
     focusTabButton(openTab);
   };
   const discardStash = () => {
+    if (requestRunning) return;
     dropStash();
     focusTabButton(openTab);
   };
@@ -796,6 +797,9 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
     onUnauthorized: stashOnUnauthorized,
     onCanPublishChange: setReloadedCanPublish,
   });
+  // A save's answer writes its revision over the draft's. The restore notice
+  // waits for the answer, or a restore would drop the stored revision.
+  const requestRunning = actions.saving || actions.publishing;
 
   const counts = processTabCounts(draft, validation.issues, changesCount);
   // The Checks tab's own count reads this color when the draft's worst open
@@ -920,7 +924,7 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
         onVersions={() => navigate({ name: "versions", processId })}
         onPlayer={() => navigate({ name: "play", processId })}
       />
-      {stash && <RestoreNotice onRestore={restoreStash} onDiscard={discardStash} />}
+      {stash && <RestoreNotice onRestore={restoreStash} onDiscard={discardStash} disabled={requestRunning} />}
       {formStepId !== undefined ? (
         formStep ? (
           <FormEditorScreen

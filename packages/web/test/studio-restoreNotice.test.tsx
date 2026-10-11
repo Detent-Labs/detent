@@ -33,6 +33,19 @@ describe("RestoreNotice", () => {
     expect(buttons[1]![1]).toContain("btn-secondary btn-destructive");
   });
 
+  it("leaves both buttons enabled by default", () => {
+    expect([...html.matchAll(/<button\b[^>]*>/g)].filter((b) => b[0].includes("disabled"))).toEqual([]);
+  });
+
+  it("disables both buttons while a request runs", () => {
+    const busy = renderToStaticMarkup(<RestoreNotice onRestore={noop} onDiscard={noop} disabled />);
+    const buttons = [...busy.matchAll(/<button\b[^>]*>/g)];
+    expect(buttons).toHaveLength(2);
+    for (const b of buttons) expect(b[0]).toContain("disabled");
+    const idle = renderToStaticMarkup(<RestoreNotice onRestore={noop} onDiscard={noop} disabled={false} />);
+    expect(idle).not.toContain("disabled");
+  });
+
   it("carries all four catalog strings, the replace prompt included", () => {
     for (const key of ["restoreNotice.message", "restoreNotice.restore", "restoreNotice.discard", "restoreNotice.replaceConfirm"] as const) {
       expect(en[key], key).toBeString();

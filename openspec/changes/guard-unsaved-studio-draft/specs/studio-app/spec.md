@@ -94,7 +94,8 @@ two controls. "Restore unsaved changes" puts the stored body and layout in the
 editor, keeps the stored revision and deletes the copy. "Discard them" deletes
 the copy too. A restore over newer unsaved changes SHALL ask for confirmation
 first. A successful save or a
-discard of the draft SHALL delete the copy.
+discard of the draft SHALL delete the copy. Both controls SHALL wait while a
+save or publish runs.
 
 #### Scenario: The same actor can restore after logging in again
 
@@ -146,6 +147,11 @@ discard of the draft SHALL delete the copy.
 
 - **WHEN** the developer discards the draft that has a copy
 - **THEN** no copy remains for that actor and process
+
+#### Scenario: The notice waits for a running save
+
+- **WHEN** a save or publish is running and the notice shows
+- **THEN** the screen disables both buttons until the answer arrives
 
 ## MODIFIED Requirements
 

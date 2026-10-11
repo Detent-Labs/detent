@@ -1718,7 +1718,7 @@ instead.
 Source: `guard-unsaved-studio-draft` task 4.1.
 
 No `bun:test` assertion can click a menu, hold a drag or read a native dialog.
-Run these seven checks in a real browser. Open the production bundle on the
+Run these eight checks in a real browser. Open the production bundle on the
 engine's own port. Sign in as `demo-superuser@example.test`, password
 `seed-demo-password`. In the Processes list, choose "Create draft" on the row
 `it_offboarding`.
@@ -1768,6 +1768,10 @@ Press Save. Pass: the header bar reads "Saved". Choose "Back to processes"
 again. Pass: the browser navigates to the process list at `/studio` with no
 prompt.
 
+Drag a step again and change nothing else. Choose "Publish" in the header bar.
+Pass: the Publish dialog reads "This draft has unsaved changes. Publishing saves
+them first." Cancel the dialog, because confirming mints a version.
+
 **4. A drag during a slow save.** Delay the answer of `PUT /drafts/:id` by a
 few seconds. A playwright route that waits before it fulfills does this. Change
 a label and press Save. Before the answer arrives, drag a step to a new
@@ -1775,6 +1779,15 @@ position.
 
 Pass: after the answer, the step stays at the new position. The header bar
 still reads "Unsaved changes", because the layout moved during the request.
+
+Now the conflict path. Drag a step. Make `PUT /drafts/:id` answer 409 with a
+playwright route. The route fulfills only the PUT, with status 409 and the body
+`{"error":{"type":"draft-conflict","message":"Conflict."}}`. Press Save. Pass:
+the conflict banner appears with a "Reload" button.
+
+Press Reload. Pass: the header bar reads "Saved". Choose "Publish". Pass: the
+dialog opens without the save-first note. Cancel the dialog and unroute the
+answer.
 
 **5. Tab close and reload.** Change a label and do not save. Reload the tab.
 Pass: the browser's own leave prompt appears. Automation must accept or
@@ -1809,6 +1822,34 @@ Make the save answer 401 again and press Save. Log in and open the draft
 once more. Choose "Discard them". Pass: the notice goes, and the draft shows
 the saved label.
 
+Change a label, make the save answer 401 and press Save. Unroute the answer,
+log in as `demo-superuser@example.test` and open the draft. While the notice
+shows, change another label. Pass: the header bar reads "Unsaved changes".
+
+Choose "Restore unsaved changes". Pass: the native prompt "Replace your current
+changes with the restored ones?" appears. Dismiss it. Pass: the notice stays,
+and the draft keeps the newer label. Choose "Restore unsaved changes" again and
+accept. Pass: the label from the 401 session returns, and the notice is gone.
+
+The restored draft reads "Unsaved changes". Make the save answer 401 and press
+Save. At the login screen, leave the first context alone. In the second
+context, open the draft, change a label and press Save. Pass: the header bar
+reads "Saved".
+
+Back in the first context, unroute the answer and log in as
+`demo-superuser@example.test`. Open the draft, choose "Restore unsaved changes"
+and press Save. Pass: the conflict banner appears, because the restore kept the
+stored revision. Press Reload. Pass: the
+header bar reads "Saved", and the draft holds the label from the second
+context.
+
+Change a label, make the save answer 401 and press Save. Unroute the answer,
+log in as `demo-superuser@example.test` and open the draft. Change another
+label. Delay the answer of `PUT /drafts/:id` by a few seconds and press Save.
+While the save runs, inspect the notice. Pass: both buttons carry the
+`disabled` attribute. After the answer arrives, the header bar reads "Saved",
+and the notice is gone.
+
 Change the label again, make the save answer 401 and press Save. At the login
 screen, log in as `demo-developer@example.test` on the same tab. Open the same
 draft.
@@ -1823,7 +1864,18 @@ proves nothing, so repeat the Access tab step.
 "Discard this draft", opens. Confirm it. Pass: no native browser prompt
 appears, and the screen returns to the process list.
 
-Two checks stay manual-only and sit outside the seven. The restore notice
+**8. A 401 on a clean draft.** Open the draft and change nothing. The Save
+button stays disabled, so force the 401 on another request. Open the Access
+tab. Make `PUT /processes/:id/access` answer 401 with a playwright route.
+
+Type any text into the Developer list's add box and press Add. Pass: the login
+screen appears.
+
+Unroute the answer and log in as `demo-superuser@example.test`. Open the same
+draft. Pass: no notice appears. Read `Object.keys(sessionStorage)` in the page.
+Pass: no key starts with `studio.draftStash`.
+
+Two checks stay manual-only and sit outside the eight. The restore notice
 shares one line with its message and both buttons on wide screens. It stacks
 below 40rem. Focus lands on the open tab after either button. Only a live
 render at a real width shows the first. Only a keyboard pass shows the second.

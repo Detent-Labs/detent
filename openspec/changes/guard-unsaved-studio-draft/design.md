@@ -101,10 +101,12 @@ the stash with the loaded record under `canonicalize`. It clears an equal stash
 and returns nothing. It also returns nothing for a malformed value.
 
 `ProcessSurface` wraps `onUnauthorized`. When the draft is dirty, the wrapper
-writes the stash and then calls the callback of the shell. Every panel on that
-screen gets the wrapped callback. A 401 from any of their requests
-therefore keeps the work. They all read the callback through `useFail`, which
-holds it in a ref. A new wrapper identity on every pass re-runs no effect.
+writes the stash and then calls the callback of the shell. Two consumers on that
+screen get the wrapped callback: the toolbar actions and the Access panel. A 401
+from a request of either keeps the work. Other requests on the screen never
+reach `onUnauthorized` and stay as before. Both read the callback through
+`useFail`, which holds it in a ref. A new wrapper identity on every pass
+re-runs no effect.
 
 A write that the browser refuses (quota, blocked storage) gets no handling beyond a catch. The
 logout proceeds as it does today.
@@ -130,6 +132,8 @@ changes. `onArrange` already does the same for a local overwrite. A
 restored draft saved against a moved server revision answers 409. The existing
 conflict banner then appears. Nothing gets overwritten silently.
 
+Both buttons stay disabled while a save or publish runs, so the save's answer cannot overwrite the stored revision.
+
 <!-- antislop: allow synonym-rotation -->
 <!-- Discard them and Discard draft are two studio controls with different effects. -->
 Four events clear the stash: a restore, "Discard them", a successful save and
@@ -140,8 +144,9 @@ newer draft that reached the same revision number.
 <!-- antislop: allow synonym-rotation -->
 <!-- Discard them and Discard draft are two studio controls with different effects. -->
 `RestoreNotice` follows the warning callout of `DESIGN.md`: refusal text beside
-a 3px advisory rule, with 8px before the text. It has `role="status"` and four
-catalog strings: the message, the two buttons and the replace prompt. The studio
+a 3px advisory rule, with 8px before the text. It has `role="status"` and renders
+three catalog strings: the message and the two buttons. `ProcessSurface` holds
+the fourth, the replace prompt. The studio
 `t(key)` takes no values, so the message names no time. The button reads "Discard them", the wording of the owner ruling of 2026-10-11.
 
 The notice sits between the header bar and the tab row, as a sibling of the

@@ -35,19 +35,22 @@ const styles = stylex.create({
 interface RestoreNoticeProps {
   onRestore: () => void;
   onDiscard: () => void;
+  /** Disables both buttons. A save in flight writes its answer's revision over
+   * the draft's, so a restore during it would drop the stored revision. */
+  disabled?: boolean;
 }
 
 /** Offers the unsaved work a 401 kept in this tab (`draft/draftStash.ts`).
  * `ProcessSurface` owns the stash and unmounts this after either button. */
-export function RestoreNotice({ onRestore, onDiscard }: RestoreNoticeProps) {
+export function RestoreNotice({ onRestore, onDiscard, disabled = false }: RestoreNoticeProps) {
   return (
     <div role="status" {...stylex.props(styles.notice)}>
       <p {...stylex.props(styles.message)}>{t("restoreNotice.message")}</p>
       <div {...stylex.props(styles.actions)}>
-        <button type="button" className="btn btn-secondary" onClick={onRestore}>
+        <button type="button" className="btn btn-secondary" disabled={disabled} onClick={onRestore}>
           {t("restoreNotice.restore")}
         </button>
-        <button type="button" className="btn btn-secondary btn-destructive" onClick={onDiscard}>
+        <button type="button" className="btn btn-secondary btn-destructive" disabled={disabled} onClick={onDiscard}>
           {t("restoreNotice.discard")}
         </button>
       </div>

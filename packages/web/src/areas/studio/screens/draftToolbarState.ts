@@ -3,11 +3,11 @@ import { canonicalize } from "workflow-engine/schema/canonical-json";
 /**
  * Whether the currently-open draft differs from the last body successfully
  * saved to the server, checked structurally, since neither side carries a
- * cheap identity or hash the client can compare instead. Publish always
- * targets the persisted draft (studio-publish spec), so a dirty draft must be
- * saved first. This is the gate `DraftToolbar`'s Publish action checks before
+ * cheap identity or hash the client can compare instead. This is the body half
+ * of `isDraftDirty`, the gate `DraftToolbar`'s Publish action checks before
  * calling `publishDraft` (studio-app spec: "Publishing with unsaved changes
- * prompts a save first").
+ * prompts a save first"). Publish always targets the persisted draft
+ * (studio-publish spec), so a dirty draft must be saved first.
  */
 export function isDirty(current: unknown, savedSnapshot: unknown): boolean {
   return JSON.stringify(current) !== JSON.stringify(savedSnapshot);
@@ -17,6 +17,10 @@ export function isDirty(current: unknown, savedSnapshot: unknown): boolean {
  * Whether the canvas layout differs from the last saved one. A stored layout
  * comes back in the key order of the database, so this compares the canonical
  * form: `JSON.stringify` would call two equal layouts different.
+ *
+ * ponytail: compares the layouts as they stand, with no normalizer. Ceiling:
+ * an edge-style round trip or a last-waypoint delete reads as unsaved until
+ * the next save. Upgrade: a normalizer inside `isLayoutDirty`.
  */
 export function isLayoutDirty(layout: Record<string, unknown>, savedLayout: Record<string, unknown>): boolean {
   return canonicalize(layout) !== canonicalize(savedLayout);
