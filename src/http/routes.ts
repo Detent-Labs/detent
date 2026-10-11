@@ -536,6 +536,16 @@ export async function handleListInstances(req: Request, resolver: ActorResolver,
         // scope=mine's assignedTo already follows. `actorPrincipals` is the
         // one resolver the direct read and report sharing use too.
         visibleTo: scope === "visible" ? { actorId: actor.id, principals: await actorPrincipals(actor, db) } : undefined,
+        // instance-visibility-set: scope=started withholds an instance from a
+        // starter a revocation names, unless a live assignment overrides it.
+        // An administrator skips the term, because the direct read never
+        // refuses that role. The principals are the actor id and roles, the
+        // set `isEligibleCandidate` tests on the direct read, so this scope
+        // pays no group lookup.
+        notRevokedFor:
+          scope === "started" && !actor.roles.includes(ADMIN_ROLE)
+            ? { actorId: actor.id, principals: [actor.id, ...actor.roles] }
+            : undefined,
       };
       const limit = parseLimit(url, MAX_LIST_LIMIT);
       const cursor = url.searchParams.get("cursor") ?? undefined;

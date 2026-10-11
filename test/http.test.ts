@@ -23,7 +23,7 @@ import { ConcurrencyConflict } from "../src/engine/transition.js";
 import { createServer } from "../src/http/server.js";
 import { mapError } from "../src/http/errors.js";
 import { parseMaxAttachmentBytes, parseLimit } from "../src/http/routes.js";
-import { MAX_LIST_LIMIT, MAX_RECORD_LIMIT, revokeVisibility } from "../src/runtime/api.js";
+import { MAX_LIST_LIMIT, MAX_RECORD_LIMIT, revokeVisibility, restoreVisibility } from "../src/runtime/api.js";
 import { devHeaderResolver, type ActorResolver } from "../src/auth/resolve.js";
 import { PUBLISH_ROLE, CANCEL_ANY_ROLE, ADMIN_ROLE, DEVELOPER_ROLE, type Permission } from "../src/auth/authorize.js";
 import type { FieldId, InstanceId, ProcessBody, ProcessId } from "../src/schema/definition.js";
@@ -1839,6 +1839,60 @@ test.skipIf(!DB)("GET /instances?scope=started carries a finished case", async (
   expect(row?.status).toBe("cancelled");
 });
 
+// instance-visibility-set, "A revocation holds on the started scope". The
+// administrator exemption lives in handleListInstances, so only a request
+// observes it; the Runtime API Layer tests state the filter directly.
+
+const startedIds = async (actor: Actor): Promise<string[]> => {
+  const res = await fetch(authedReq(`http://x/instances?scope=started`, "GET", actor));
+  expect(res.status).toBe(200);
+  return ((await res.json()) as { items: { instanceId: string }[] }).items.map((i) => i.instanceId);
+};
+
+const startAs = async (processId: ProcessId, actor: Actor): Promise<string> =>
+  ((await (await fetch(jsonReq(`http://x/processes/${processId}/instances`, "POST", actor))).json()) as { instanceId: string }).instanceId;
+
+test.skipIf(!DB)("GET /instances?scope=started withholds a case a revocation names, and keeps the starter's others", async () => {
+  const PID = pid("proc_http_scope_started_revoked");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+  const revoked = await startAs(PID, user1);
+  const kept = await startAs(PID, user1);
+  expect(new Set(await startedIds(user1))).toEqual(new Set([revoked, kept]));
+
+  await revokeVisibility(revoked as InstanceId, user1.id, admin, sql);
+
+  expect(await startedIds(user1)).toEqual([kept]);
+
+  await restoreVisibility(revoked as InstanceId, user1.id, admin, sql);
+  expect(new Set(await startedIds(user1))).toEqual(new Set([revoked, kept]));
+});
+
+test.skipIf(!DB)("GET /instances?scope=started lets an administrator keep a case a revocation names", async () => {
+  const PID = pid("proc_http_scope_started_revoked_admin");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+  const adminCase = await startAs(PID, admin);
+  const userCase = await startAs(PID, user1);
+  await revokeVisibility(adminCase as InstanceId, admin.id, admin, sql);
+  await revokeVisibility(userCase as InstanceId, user1.id, admin, sql);
+
+  // The control: the same revocation withholds the row from a caller without ADMIN_ROLE.
+  expect(await startedIds(user1)).toEqual([]);
+  // The administrator holds ADMIN_ROLE, which a revocation never reaches on the direct read.
+  expect(await startedIds(admin)).toEqual([adminCase]);
+});
+
+test.skipIf(!DB)("GET /instances?scope=started keeps a revoked case whose unclaimed step names the caller's role", async () => {
+  // "approver" is a candidate through the caller's role, not its id. The handler hands the
+  // filter [actor.id, ...actor.roles]; an id-only set would lose this row.
+  const PID = pid("proc_http_scope_started_revoked_role");
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  const approverStarter: Actor = { id: "user_approver_starter", roles: ["approver"] };
+  const candidateCase = await startAs(PID, approverStarter);
+  await revokeVisibility(candidateCase as InstanceId, approverStarter.id, admin, sql);
+
+  expect(await startedIds(approverStarter)).toEqual([candidateCase]);
+});
+
 test.skipIf(!DB)("GET /instances?scope=started&startedBy=<id> is a 400 request error", async () => {
   const res = await fetch(authedReq(`http://x/instances?scope=started&startedBy=someone_else`, "GET", user1));
   expect(res.status).toBe(400);
@@ -2212,6 +2266,23 @@ test.skipIf(!DB)("GET /instances/:instanceId/record is refused for a developer w
 
   const res = await fetch(authedReq(`http://x/instances/${created.instanceId}/record`, "GET", developer));
   expect(res.status).toBe(403);
+});
+
+test.skipIf(!DB)("GET /instances/:instanceId/record is 403 authorization for a developer starter whom a revocation names, and 200 once restored", async () => {
+  const PID = pid("proc_http_record_developer_revoked");
+  await publishBody(PID, simpleBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", developer))).json()) as { instanceId: string };
+  await fetch(jsonReq(`http://x/instances/${created.instanceId}/submit`, "POST", developer, { pathId: "path_ab", data: { field_amount: 10 } }));
+  const read = () => fetch(authedReq(`http://x/instances/${created.instanceId}/record`, "GET", developer));
+  expect((await read()).status).toBe(200);
+
+  await revokeVisibility(created.instanceId as InstanceId, developer.id, admin, sql);
+  const refused = await read();
+  expect(refused.status).toBe(403);
+  expect(((await refused.json()) as { error: { type: string } }).error.type).toBe("authorization");
+
+  await restoreVisibility(created.instanceId as InstanceId, developer.id, admin, sql);
+  expect((await read()).status).toBe(200);
 });
 
 test.skipIf(!DB)("GET /instances/:instanceId/record with no resolvable credential is 401, whether or not the instance exists", async () => {

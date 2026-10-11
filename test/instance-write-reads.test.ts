@@ -7,12 +7,14 @@
  * pin the other half of the rule: a write call reports a non-running
  * instance to a caller who may read it, and refuses everyone else with one
  * fixed text (instance-visibility-set, "A write call reveals a finished
- * instance only to a reader"). DB-backed cases skip when DATABASE_URL is
+ * instance only to a reader"). The last two blocks pin where a revocation
+ * holds on the read side: the started scope and the author's record read
+ * (instance-visibility-set). DB-backed cases skip when DATABASE_URL is
  * unset; bodies go through the real `publishBody`, as in
  * assignment.runtime-api.test.ts.
  */
 import { describe, test, expect, beforeAll, beforeEach } from "bun:test";
-import { sql, initSchema } from "../src/engine/store.js";
+import { sql, initSchema, createInstance } from "../src/engine/store.js";
 import { publishBody } from "../src/engine/definitions.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import {
@@ -24,12 +26,15 @@ import {
   cancelInstance,
   saveInstanceDraft,
   revokeVisibility,
+  restoreVisibility,
+  listInstances,
+  getInstanceRecord,
   InstanceNotRunningError,
 } from "../src/runtime/api.js";
-import { toWriteResult, throwToReader } from "../src/runtime/internal.js";
+import { toWriteResult, throwToReader, loadInstanceForActor } from "../src/runtime/internal.js";
 import { getInstanceDraft } from "../src/engine/instance-drafts.js";
 import { NotFoundError } from "../src/errors.js";
-import { CANCEL_ANY_ROLE, ADMIN_ROLE, AuthorizationError } from "../src/auth/authorize.js";
+import { CANCEL_ANY_ROLE, ADMIN_ROLE, AUTHOR_ROLE, DEVELOPER_ROLE, AuthorizationError } from "../src/auth/authorize.js";
 import type { Instance, InstanceId, ProcessBody, ProcessId, PathId } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
 import { clearInstanceAudit } from "./audit-cleanup.js";
@@ -439,5 +444,172 @@ describe("throwToReader", () => {
     expect(loadErr).toBeInstanceOf(NotFoundError);
     expect(loadErr).not.toBe(missing);
     expect(loadErr).not.toBe(refusal);
+  });
+});
+
+// ============================================================
+// A revocation holds on the started scope
+// ============================================================
+
+const approver: Actor = { id: "user_approver", roles: ["approver"] };
+
+/** The page `handleListInstances` builds for `scope=started` and a caller without `ADMIN_ROLE`. */
+async function startedScope(actor: Actor, limit = 50, cursor?: string) {
+  const page = await listInstances(
+    { startedBy: actor.id, notRevokedFor: { actorId: actor.id, principals: [actor.id, ...actor.roles] } },
+    { limit, cursor },
+    sql,
+  );
+  return { ids: page.items.map((i) => i.instanceId as string), cursor: page.cursor };
+}
+
+async function startPlainBy(actor: Actor): Promise<InstanceId> {
+  await publishBody(PLAIN_PID, plainBody(), reg, dataSourceReg);
+  return (await createProcessInstance(PLAIN_PID, actor, dataSourceReg)).instanceId;
+}
+
+async function startAssignedBy(actor: Actor): Promise<InstanceId> {
+  await publishBody(PID, assignedBody(), reg, dataSourceReg);
+  return (await createProcessInstance(PID, actor, dataSourceReg)).instanceId;
+}
+
+describe("the started scope honors a revocation", () => {
+  test.skipIf(!DB)("a revoked starter of a completed instance loses the row, keeps every other, and a restore brings it back", async () => {
+    const finished = await startPlainBy(starter);
+    await submitPlain(finished, starter);
+    const other = await startPlainBy(starter);
+
+    // Baseline: both rows show before the revocation, so a missing row below is the revocation's doing.
+    expect(new Set((await startedScope(starter)).ids)).toEqual(new Set([finished, other]));
+
+    await revokeVisibility(finished, starter.id, operator, sql);
+    // Without the term the revoked row stays; a term that hid more would drop `other`.
+    expect((await startedScope(starter)).ids).toEqual([other]);
+
+    await restoreVisibility(finished, starter.id, operator, sql);
+    expect(new Set((await startedScope(starter)).ids)).toEqual(new Set([finished, other]));
+  });
+
+  test.skipIf(!DB)("a revocation names one actor: it does not reach a starter it does not name", async () => {
+    const mine = await startPlainBy(starter);
+    await revokeVisibility(mine, stranger.id, operator, sql);
+
+    // The denial names `stranger`, not the starter, so the starter keeps the row.
+    expect((await startedScope(starter)).ids).toEqual([mine]);
+  });
+
+  test.skipIf(!DB)("the starter who holds the claim keeps the row, while a revoked instance with no assignment goes", async () => {
+    const claimed = await startAssignedBy(candidate);
+    await claimStep(claimed, candidate);
+    const unassigned = await startPlainBy(candidate);
+    await revokeVisibility(claimed, candidate.id, operator, sql);
+    await revokeVisibility(unassigned, candidate.id, operator, sql);
+
+    // The pair shows the override discriminates: both are revoked, and only the live assignment survives.
+    expect((await startedScope(candidate)).ids).toEqual([claimed]);
+  });
+
+  test.skipIf(!DB)("a candidate on a step another actor claimed loses the row, a candidate on an unclaimed step keeps it", async () => {
+    const takenByOther = await startAssignedBy(candidate);
+    await claimStep(takenByOther, approver);
+    const unclaimed = await startAssignedBy(candidate);
+    await revokeVisibility(takenByOther, candidate.id, operator, sql);
+    await revokeVisibility(unclaimed, candidate.id, operator, sql);
+
+    // The candidate branch of the live-assignment test requires that nobody holds the claim.
+    expect((await startedScope(candidate)).ids).toEqual([unclaimed]);
+
+    // The documented divergence: the direct read admits any eligible candidate, claimed or not.
+    const { instance } = await loadInstanceForActor(takenByOther, candidate, sql);
+    expect(instance.instanceId).toBe(takenByOther);
+  });
+
+  test.skipIf(!DB)("a walk with a revoked row in the middle returns full pages and each other instance once", async () => {
+    await publishBody(PLAIN_PID, plainBody(), reg, dataSourceReg);
+    for (let k = 0; k < 5; k++) await createProcessInstance(PLAIN_PID, starter, dataSourceReg);
+    const newestFirst = (await startedScope(starter)).ids;
+    expect(newestFirst).toHaveLength(5);
+    // The second newest: a revocation applied after the page would leave page one a row short.
+    const revoked = newestFirst[1]!;
+    await revokeVisibility(revoked as InstanceId, starter.id, operator, sql);
+
+    const pages: string[][] = [];
+    let cursor: string | undefined;
+    for (let guard = 0; guard < 10; guard++) {
+      const page = await startedScope(starter, 2, cursor);
+      pages.push(page.ids);
+      cursor = page.cursor;
+      if (!cursor) break;
+    }
+
+    expect(cursor).toBeUndefined();
+    expect(pages.length).toBeGreaterThan(1);
+    for (const page of pages.slice(0, -1)) expect(page).toHaveLength(2);
+    const seen = pages.flat();
+    expect(seen).toHaveLength(4);
+    expect(new Set(seen)).toEqual(new Set(newestFirst.filter((id) => id !== revoked)));
+  });
+});
+
+// ============================================================
+// A revocation holds on the record read's starter branch
+// ============================================================
+
+describe("the record read honors a revocation on its starter branch", () => {
+  const recordRefusal = (actor: Actor, id: string) => `actor '${actor.id}' may not read the record of instance '${id}'`;
+
+  for (const role of [AUTHOR_ROLE, DEVELOPER_ROLE]) {
+    const writer: Actor = { id: `user_writer_${role.replace("system:", "")}`, roles: [role] };
+
+    test.skipIf(!DB)(`a revoked ${role} cannot read the record of an instance they started, and a restore gives it back`, async () => {
+      const id = await startPlainBy(writer);
+      await submitPlain(id, writer);
+
+      // Baseline: the starter reads a non-empty record, so the refusal below is the revocation's.
+      expect((await getInstanceRecord(id, writer, {}, sql)).items.length).toBeGreaterThan(0);
+
+      await revokeVisibility(id, writer.id, operator, sql);
+      const refused = await rejection(getInstanceRecord(id, writer, {}, sql));
+      expect(refused).toBeInstanceOf(AuthorizationError);
+      // The record-specific text, not the read text that loadInstanceForActor throws.
+      expect((refused as AuthorizationError).message).toBe(recordRefusal(writer, id));
+
+      await restoreVisibility(id, writer.id, operator, sql);
+      expect((await getInstanceRecord(id, writer, {}, sql)).items.length).toBeGreaterThan(0);
+    });
+  }
+
+  test.skipIf(!DB)("an administrator reads the record of an instance whose starter is revoked", async () => {
+    const writer: Actor = { id: "user_writer_admin_read", roles: [AUTHOR_ROLE] };
+    const id = await startPlainBy(writer);
+    await submitPlain(id, writer);
+    await revokeVisibility(id, writer.id, operator, sql);
+
+    expect((await getInstanceRecord(id, operator, {}, sql)).items.length).toBeGreaterThan(0);
+  });
+
+  test.skipIf(!DB)("a revoked author with a live assignment still reads the record", async () => {
+    // user_1 starts an instance whose first step names user_1 as a candidate: the live assignment outranks the revocation.
+    const assignedAuthor: Actor = { id: candidate.id, roles: [AUTHOR_ROLE] };
+    const id = await startAssignedBy(assignedAuthor);
+    await revokeVisibility(id, assignedAuthor.id, operator, sql);
+
+    await getInstanceRecord(id, assignedAuthor, {}, sql);
+  });
+
+  test.skipIf(!DB)("a test instance's starter reads the record, revoked or not", async () => {
+    const writer: Actor = { id: "user_writer_test_instance", roles: [AUTHOR_ROLE] };
+    const published = await publishBody(PLAIN_PID, plainBody(), reg, dataSourceReg);
+    const testInstance = await createInstance(published.definition, {
+      processId: PLAIN_PID,
+      version: published.version,
+      kind: "test",
+      startedBy: writer.id,
+    });
+
+    await getInstanceRecord(testInstance.instanceId, writer, {}, sql);
+    await revokeVisibility(testInstance.instanceId, writer.id, operator, sql);
+    // The test-instance rule precedes the denial test, so a revocation does not close the Player.
+    await getInstanceRecord(testInstance.instanceId, writer, {}, sql);
   });
 });

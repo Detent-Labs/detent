@@ -128,6 +128,15 @@ export type InstanceListFilter = {
   // what switches listInstances onto the visibility read; absent leaves every
   // existing scope byte-for-byte unchanged.
   visibleTo?: { actorId: string; principals: string[] };
+  // A revoked starter's instance leaves the started scope (instance-visibility-set,
+  // "A revocation holds on the started scope"): the row passes when no denial
+  // names `actorId`, or when `liveAssignmentFragment` matches. Set by the HTTP
+  // layer for scope=started and never for an administrator, whom a revocation
+  // never reaches; `principals` is `[actor.id, ...actor.roles]`, the set
+  // `isEligibleCandidate` tests on the direct read. Absent compiles to `TRUE`.
+  // Deliberately not a member of `InstanceQueryFilter`: reports and the
+  // `instance.query` data source narrow through `visibleTo` alone.
+  notRevokedFor?: { actorId: string; principals: string[] };
 };
 
 /**
@@ -268,6 +277,18 @@ export type InstanceWhereFilter = Omit<InstanceListFilter, "includeDegraded" | "
  * `instance_id`, the table's own key.
  */
 export function buildInstanceWhere(filter: InstanceWhereFilter, db: SQL) {
+  // The probe qualifies the outer key as `instances.instance_id`: the denial
+  // table has a column of that name too. It binds `actor_id` first, the leading
+  // column of the table's primary key `(actor_id, instance_id)`, so the planner
+  // reads one actor's denials through that index. Unset folds to `TRUE`, which
+  // the planner drops, so no other read's plan changes.
+  const notRevoked = filter.notRevokedFor
+    ? db`(
+        NOT EXISTS (SELECT 1 FROM instance_principals_denied nr
+                    WHERE nr.actor_id = ${filter.notRevokedFor.actorId} AND nr.instance_id = instances.instance_id)
+        OR ${liveAssignmentFragment(filter.notRevokedFor.actorId, filter.notRevokedFor.principals, db)}
+      )`
+    : db`TRUE`;
   const statusArr = filter.status && filter.status.length > 0 ? db.array(filter.status, "TEXT") : null;
   const assignedToRolesArr = filter.assignedToRoles && filter.assignedToRoles.length > 0 ? db.array(filter.assignedToRoles, "TEXT") : null;
   const currentStepIdArr = Array.isArray(filter.currentStepId)
@@ -297,7 +318,27 @@ export function buildInstanceWhere(filter: InstanceWhereFilter, db: SQL) {
     AND (${filter.createdBefore ?? null}::timestamptz IS NULL OR created_at <= ${filter.createdBefore ?? null}::timestamptz)
     AND (kind <> 'test' OR ${filter.includeTestInstances ?? false})
     AND (${filter.kind ?? null}::text IS NULL OR kind = ${filter.kind ?? null})
+    AND ${notRevoked}
   `;
+}
+
+/**
+ * The live-assignment test: the actor holds the claim on the instance's current
+ * step, or nobody holds it and the actor is a candidate, by id or through one of
+ * `principals`. One fragment serves the assignment branch of `scope=visible`
+ * (`buildVisibleRowSet`) and the revocation override of `scope=started`
+ * (`buildInstanceWhere`'s `notRevokedFor`), so the two cannot drift. It reads the
+ * unqualified `body` column, so `instances` must be the relation in scope.
+ */
+function liveAssignmentFragment(actorId: string, principals: string[], db: SQL) {
+  const rolesArr = principals.length > 0 ? db.array(principals, "TEXT") : null;
+  return db`(
+    body->'assignment'->>'claimedBy' = ${actorId}
+    OR (body->'assignment'->>'claimedBy' IS NULL AND (
+      body->'assignment'->'candidates' @> to_jsonb(${actorId}::text)
+      OR (${rolesArr}::text[] IS NOT NULL AND body->'assignment'->'candidates' ?| ${rolesArr})
+    ))
+  )`;
 }
 
 /**
@@ -491,7 +532,6 @@ export function buildVisibleRowSet(
   db: SQL,
 ) {
   const instanceFilters = db`${buildInstanceWhere(filter, db)} AND ${buildDataWhere(filter.dataWhere, db)}`;
-  const rolesArr = visibleTo.principals.length > 0 ? db.array(visibleTo.principals, "TEXT") : null;
 
   const branch = (principal: string) => db`
     (SELECT vp.instance_id, vp.created_at FROM instance_principals vp
@@ -507,13 +547,7 @@ export function buildVisibleRowSet(
   const assigned = db`
     (SELECT instance_id, created_at FROM instances
       WHERE ${instanceFilters}
-        AND (
-          body->'assignment'->>'claimedBy' = ${visibleTo.actorId}
-          OR (body->'assignment'->>'claimedBy' IS NULL AND (
-            body->'assignment'->'candidates' @> to_jsonb(${visibleTo.actorId}::text)
-            OR (${rolesArr}::text[] IS NOT NULL AND body->'assignment'->'candidates' ?| ${rolesArr})
-          ))
-        )
+        AND ${liveAssignmentFragment(visibleTo.actorId, visibleTo.principals, db)}
         AND (${cursorCreatedAt ?? null}::timestamptz IS NULL
              OR (created_at, instance_id) < (${cursorCreatedAt ?? null}::timestamptz, ${cursorInstanceId ?? null}))
       ORDER BY created_at DESC, instance_id DESC

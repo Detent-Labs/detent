@@ -10,7 +10,7 @@ import { requireRole, ADMIN_ROLE, DEVELOPER_ROLE, AUTHOR_ROLE, AuthorizationErro
 import { decodeCursor } from "../pagination.js";
 import { historyEntry as historyEntrySchema, instanceEvent as instanceEventSchema } from "../schema/definition.js";
 import type { InstanceId, Instance, HistoryEntry, InstanceEvent } from "../schema/definition.js";
-import { DEFAULT_RECORD_LIMIT, MAX_RECORD_LIMIT, loadInstanceForRead, keysetPage, type Page } from "./internal.js";
+import { DEFAULT_RECORD_LIMIT, MAX_RECORD_LIMIT, loadInstanceForActor, keysetPage, type Page } from "./internal.js";
 
 export type InstanceRecordElement = { kind: "transition"; entry: HistoryEntry } | { kind: "event"; event: InstanceEvent };
 
@@ -29,9 +29,11 @@ export type InstanceRecordElement = { kind: "transition"; entry: HistoryEntry } 
  * Authorization mirrors `cancelInstance`'s two-path shape: `ADMIN_ROLE` is
  * tried first and needs no instance load at all (this query never joins on
  * `instances`); only the fallback — the caller holds an authoring role and
- * started the instance themselves — needs `loadInstanceForRead` to learn
- * `startedBy`. A caller satisfying neither collapses "doesn't exist" and
- * "not mine" into the same opaque `AuthorizationError`.
+ * started the instance themselves — needs `loadInstanceForActor` to learn
+ * `startedBy`. That load applies the read rule, so a starter whom a revocation
+ * names is refused unless a live assignment overrides it; a test instance
+ * admits its own starter. A caller satisfying neither collapses "doesn't
+ * exist", "not mine" and "revoked" into the same opaque `AuthorizationError`.
  *
  * Either authoring role satisfies that fallback, `DEVELOPER_ROLE` and
  * `AUTHOR_ROLE` alike: the studio Player renders this record beside the form,
@@ -50,7 +52,7 @@ export async function getInstanceRecord(
     if (!(err instanceof AuthorizationError)) throw err;
     let instance: Instance;
     try {
-      ({ instance } = await loadInstanceForRead(instanceId, db));
+      ({ instance } = await loadInstanceForActor(instanceId, actor, db));
     } catch {
       throw new AuthorizationError(`actor '${actor.id}' may not read the record of instance '${instanceId}'`);
     }
