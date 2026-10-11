@@ -82,20 +82,21 @@ const offersChild = (html: string) => offeredOperands(html).some((v) => v.starts
 const pickers = (html: string) => offeredOperands(html).filter((v) => v === "data.amount").length;
 
 describe("a subprocess step's path guard", () => {
-  const html = inContext(
-    <PathsPanel
-      paths={SUBPROCESS.paths as never}
-      steps={PARENT.workflow.steps as never}
-      fields={PARENT.fields as DraftField[]}
-      stepId={SUBPROCESS_STEP}
-      onChange={() => {}}
-      contentLocale="en"
-      baseLocale="en"
-    />,
-  );
+  const renderGuard = () =>
+    inContext(
+      <PathsPanel
+        paths={SUBPROCESS.paths as never}
+        steps={PARENT.workflow.steps as never}
+        fields={PARENT.fields as DraftField[]}
+        stepId={SUBPROCESS_STEP}
+        onChange={() => {}}
+        contentLocale="en"
+        baseLocale="en"
+      />,
+    );
 
   it("offers the child's outcome and its output field as operands", () => {
-    const operands = offeredOperands(html);
+    const operands = offeredOperands(renderGuard());
     expect(operands).toContain("child.outcome");
     expect(operands).toContain("child.data.amount");
   });

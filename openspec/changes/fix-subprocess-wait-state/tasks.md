@@ -54,10 +54,10 @@
 
 ## 7. Studio condition builder (A-5, web side)
 
-- [ ] 7.1 Delete the `stepId` prop from `BooleanOrExpressionInput`, `OverrideField`, `FormEditorStrip`, `NoteEditorStrip` and their callers. Delete the four `stepId=` attributes in `studio-formEditor-strip.test.tsx`. Keep `PathsPanel`.
-- [ ] 7.2 Run `bun install`, then `bun run typecheck` in the container. Verify that the compiler finds no stale `stepId` at the four flag sites.
-- [ ] 7.3 Add a web test for a subprocess step. Its view overrides offer no `child` operand, and its path guard still does. Verify that the test fails against the old code.
-- [ ] 7.4 Edit the comments in `ConditionInput.tsx` and `conditionLogic.ts` that describe the view-override sites. Verify by reading them against the delta spec.
+- [x] 7.1 Delete the `stepId` prop from `BooleanOrExpressionInput`, `OverrideField`, `FormEditorStrip`, `NoteEditorStrip` and their callers. Delete the four `stepId=` attributes in `studio-formEditor-strip.test.tsx`. Keep `PathsPanel`.
+- [x] 7.2 Run `bun install`, then `bun run typecheck` in the container. Verify that the compiler finds no stale `stepId` at the four flag sites.
+- [x] 7.3 Add a web test for a subprocess step. Its view overrides offer no `child` operand, and its path guard still does. Verify that the test fails against the old code.
+- [x] 7.4 Edit the comments in `ConditionInput.tsx` and `conditionLogic.ts` that describe the view-override sites. Verify by reading them against the delta spec.
 
 ## 8. Rules, guide and index
 
