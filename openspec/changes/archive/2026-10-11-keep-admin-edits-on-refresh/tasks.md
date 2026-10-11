@@ -120,5 +120,5 @@ The delta spec holds the scenarios. Every group lands its own tests.
 ## 8. Verification
 
 - [x] 8.1 Run `bun run lint`, then `bun run typecheck`, then `bun run build`, then the full `bun test` with `DATABASE_URL` set. Verify: all four exit 0 with 0 failures and a skip count at the floor.
-- [ ] 8.2 Run the antislop linter on every Markdown file the change touched. Verify: `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` exits 0.
-- [ ] 8.3 Run the whitespace gate. Verify: `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh` exits 0.
+- [x] 8.2 Run the antislop linter on every Markdown file the change touched. Verify: `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` exits 0.
+- [x] 8.3 Run the whitespace gate. Verify: `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh` exits 0.
