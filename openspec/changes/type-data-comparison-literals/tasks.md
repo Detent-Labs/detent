@@ -18,11 +18,11 @@
 
 ## 4. Studio form, catalog and attribute rows
 
-- [ ] 4.1 Add `type` to `TargetRef`, sort versions before the merge, and return `{ catalog, error }` from the hook. Verify a pure merge test covers newest-wins and plugin types.
-- [ ] 4.2 Add `attributeRows.ts` with `recordFromRows`, `duplicateRowIds` and a reseed test. Verify its unit test covers duplicates, empty keys and first-row-wins.
-- [ ] 4.3 Add pure comparison-row logic for typed literals, `in` lists and operator or field switches. Verify its unit test covers every `studio-plugin-config-form` literal scenario.
-- [ ] 4.4 Rework `InstanceQueryForm.tsx`: typed literal, list input, disabled state, error row, stale marks only with a catalog, stable attribute rows. Verify a static-markup test covers each state.
-- [ ] 4.5 Add the studio catalog strings and a `docs/browser-checks.md` entry for the form. Verify the catalog keys exist and the entry names each scenario.
+- [x] 4.1 Add `type` to `TargetRef`, sort versions before the merge, and return `{ catalog, error }` from the hook. Verify a pure merge test covers newest-wins and plugin types.
+- [x] 4.2 Add `attributeRows.ts` with `recordFromRows`, `duplicateRowIds` and a reseed test. Verify its unit test covers duplicates, empty keys and first-row-wins.
+- [x] 4.3 Add pure comparison-row logic for typed literals, `in` lists and operator or field switches. Verify its unit test covers every `studio-plugin-config-form` literal scenario.
+- [x] 4.4 Rework `InstanceQueryForm.tsx`: typed literal, list input, disabled state, error row, stale marks only with a catalog, stable attribute rows. Verify a static-markup test covers each state.
+- [x] 4.5 Add the studio catalog strings and a `docs/browser-checks.md` entry for the form. Verify the catalog keys exist and the entry names each scenario.
 
 ## 5. Report builder
 
