@@ -8,6 +8,7 @@ import {
   duplicateValues,
   mappingProcesses,
   readLabel,
+  sameDataList,
   toPayload,
   validateColumns,
   validateValues,
@@ -16,6 +17,7 @@ import {
   type ColumnRow,
   type ValueRow,
 } from "../src/areas/admin/screens/dataListsLogic.js";
+import type { DataListDetail } from "../src/areas/admin/api/types.js";
 
 const row = (value: string, label = value, retired = false, attributes: Record<string, string> = {}): ValueRow => ({
   value,
@@ -207,5 +209,80 @@ describe("validateColumns produces repeatable sentences", () => {
     const problems = validateColumns([column("", "string", ""), column("", "string", "")], "en");
     expect(problems).toHaveLength(5);
     expect(new Set(problems).size).toBe(3);
+  });
+});
+
+describe("sameDataList", () => {
+  const list = (): DataListDetail => ({
+    listKey: "cost_centres",
+    label: "Cost centres",
+    description: "Where a cost lands",
+    columns: [
+      { key: "code", label: "Code", type: "string" },
+      { key: "budget", label: "Budget", type: "number" },
+    ],
+    values: [
+      { value: "a", label: { en: "Alpha", de: "Alfa" }, attributes: { code: "A1", budget: 100 }, active: true, sortOrder: 0 },
+      { value: "b", label: { en: "Beta" }, attributes: { code: "B1" }, active: false, sortOrder: 1 },
+    ],
+    usedBy: [{ processId: "expense", version: 1, columns: ["code"] }],
+  });
+
+  it("counts two equal copies as the same", () => {
+    expect(sameDataList(list(), list())).toBe(true);
+  });
+
+  it("counts a changed value label as a change", () => {
+    const next = list();
+    next.values[0]!.label = { en: "Alpha 2", de: "Alfa" };
+    expect(sameDataList(list(), next)).toBe(false);
+  });
+
+  it("counts a changed column as a change", () => {
+    const next = list();
+    next.columns[1] = { key: "budget", label: "Budget", type: "string" };
+    expect(sameDataList(list(), next)).toBe(false);
+  });
+
+  it("counts a changed attribute as a change", () => {
+    const next = list();
+    next.values[0]!.attributes = { code: "A1", budget: 200 };
+    expect(sameDataList(list(), next)).toBe(false);
+  });
+
+  it("counts an added value as a change", () => {
+    const next = list();
+    next.values.push({ value: "c", label: { en: "Gamma" }, attributes: {}, active: true, sortOrder: 2 });
+    expect(sameDataList(list(), next)).toBe(false);
+  });
+
+  it("counts a retired value as a change", () => {
+    const next = list();
+    next.values[0]!.active = false;
+    expect(sameDataList(list(), next)).toBe(false);
+  });
+
+  it("counts a changed list label or description as a change", () => {
+    expect(sameDataList(list(), { ...list(), label: "Centres" })).toBe(false);
+    expect(sameDataList(list(), { ...list(), description: null })).toBe(false);
+  });
+
+  it("ignores the key order of a label map and an attribute map", () => {
+    const next = list();
+    next.values[0]!.label = { de: "Alfa", en: "Alpha" };
+    next.values[0]!.attributes = { budget: 100, code: "A1" };
+    expect(sameDataList(list(), next)).toBe(true);
+  });
+
+  it("ignores usedBy: a publish elsewhere raises no conflict", () => {
+    const next = list();
+    next.usedBy = [...next.usedBy, { processId: "travel", version: 3, columns: [] }];
+    expect(sameDataList(list(), next)).toBe(true);
+  });
+
+  it("ignores sortOrder: the array order is the order", () => {
+    const next = list();
+    next.values[1]!.sortOrder = 7;
+    expect(sameDataList(list(), next)).toBe(true);
   });
 });

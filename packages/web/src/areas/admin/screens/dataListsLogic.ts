@@ -4,7 +4,7 @@
  * an inline message before the operator loses their edits.
  */
 import type { UiLocale } from "../../../i18n/locale.js";
-import type { DataListUsage } from "../api/types.js";
+import type { DataListDetail, DataListUsage } from "../api/types.js";
 import { t, tFill } from "../catalog.js";
 
 /**
@@ -189,6 +189,32 @@ export function attributesToInputs(
     out[column.key] = value === undefined ? "" : String(value);
   }
   return out;
+}
+
+/** A map's entries in key order, so the order the server wrote them in never counts. */
+function sortedEntries<V>(map: Readonly<Record<string, V>>): [string, V][] {
+  return Object.keys(map)
+    .sort()
+    .map((key) => [key, map[key] as V]);
+}
+
+/** The parts of a list an editor's input starts from, in a form `JSON.stringify` compares stably. */
+function editableProjection(list: DataListDetail): unknown {
+  return {
+    label: list.label,
+    description: list.description,
+    columns: list.columns.map((c) => [c.key, c.label, c.type]),
+    values: list.values.map((v) => [v.value, sortedEntries(v.label), sortedEntries(v.attributes), v.active]),
+  };
+}
+
+/**
+ * Whether two server copies of a list hold the same editable content. It
+ * ignores `usedBy`, because a publish elsewhere conflicts with no edit, and
+ * `sortOrder`, because the array order already is the order.
+ */
+export function sameDataList(a: DataListDetail, b: DataListDetail): boolean {
+  return JSON.stringify(editableProjection(a)) === JSON.stringify(editableProjection(b));
 }
 
 /** A number input the operator filled with something that is not a number. */
