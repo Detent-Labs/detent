@@ -117,17 +117,17 @@ contains no `allow-file` and names no home-directory path.
 
 ## 13. Verification
 
-- [ ] 13.1 Run `openspec validate record-2026-10-10-audit`. Verify: it prints
+- [x] 13.1 Run `openspec validate record-2026-10-10-audit`. Verify: it prints
       that the change is valid.
-- [ ] 13.2 Run `bun run typecheck`, then `bun run build`, then the full
+- [x] 13.2 Run `bun run typecheck`, then `bun run build`, then the full
       `bun test` through `scripts/test-gated.sh` in the devcontainer. Set
       `DATABASE_URL` and `OPENSPEC_TELEMETRY=0`. Verify: each exits 0, and the
       log shows the pass and skip counts.
-- [ ] 13.3 Run the prose gate over the push range. Verify: the command
+- [x] 13.3 Run the prose gate over the push range. Verify: the command
       `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` exits 0
       and names no file.
-- [ ] 13.4 Run the whitespace and machine-path gates over the same range.
+- [x] 13.4 Run the whitespace and machine-path gates over the same range.
       Verify: `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh`
       exits 0, and so does `sh scripts/gates/machine-paths.sh`.
-- [ ] 13.5 Record that no browser check applies. Verify: `git diff --stat
+- [x] 13.5 Record that no browser check applies. Verify: `git diff --stat
       origin/main` names no file under `packages/`, `src/` or `test/`.

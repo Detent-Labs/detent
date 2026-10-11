@@ -145,8 +145,9 @@ Thirteen rulings shaped the work.
 ### Coordinator rulings of 2026-10-11
 
 12. On the prose gate: each translator wrote clean English first and repaired
-    what the linter reported. A targeted `antislop` directive with a reason
-    covers only a quote, a table or a finding id that the linter flags. No
+    what the linter reported. A targeted `antislop` directive needs a reason.
+    It covers only a quote, a table, a fixed glossary term or a finding id
+    that the linter flags. No
     file in the record carries a file-wide directive.
 13. On the originals: the record holds English only. The German originals are
     not part of the record.
