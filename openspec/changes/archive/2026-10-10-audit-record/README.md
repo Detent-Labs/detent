@@ -4,7 +4,7 @@ This entry holds the full-project audit of commit `5f41cd8a`, the HEAD of
 `main` on 2026-10-10. The audit only read the tree and changed no file. Nine
 review agents checked the areas A to H, with the studio split into E1 and E2.
 The coordinator then re-checked every high finding and every reproducible
-medium finding. The record has no change of its own. The change
+medium finding. This directory holds a record and no archived change. The change
 `record-2026-10-10-audit` placed it here, and the directory name takes the
 audit date.
 
@@ -39,9 +39,10 @@ proposal.
 
 ## Method and evidence
 
-Each finding carries one of three evidence tags. Reproduced means the finding
-quotes program output. Confirmed means a reader checked the code and confirmed
-the finding. Assumed means a guess, and the finding names the missing proof.
+Most findings carry one of three evidence tags. The dead-export findings D-10
+and F-15 name their search method instead. Reproduced means the finding quotes
+program output. Confirmed means a reader checked the code and confirmed the
+finding. Assumed means a guess, and the finding names the missing proof.
 
 The coordinator ran these checks in the devcontainer `workflow-engine-app-1`,
 with bun 1.3.11 and no server running:
@@ -66,13 +67,14 @@ exports map.
 
 The audit left four things unchecked:
 
-- No stack ran, so the browser checks and `e2e/` stayed manual. Code reading
-  alone backs every UI finding.
+- No stack ran, so the browser checks stayed manual and `e2e/` did not run.
+  Code reading alone backs most UI findings.
 - Repros that write to the database did not run. Code reading backs C-1, C-3,
   B-1 to B-5, D-3 and H-4.
 - No EXPLAIN and no profiler ran, so the scale of six findings stays assumed.
 - The LSP tool did not start, so dead exports rest on `git grep -w` and the
-  knowledge graph. Some files got only a partial read.
+  knowledge graph. These two do not rule out re-exports and dynamic access.
+  Some files got only a partial read.
 
 The section "Not checked" in `AUDIT.md` gives the full list. Each area report
 adds its own.
@@ -86,14 +88,14 @@ number in it serves as a live pointer into the current tree.
 
 Every open finding sits in
 [`docs/decisions.md`](../../../../docs/decisions.md), in the section "Open
-from the 2026-10-10 audit (one OpenSpec change each)". That section holds 36
-entries. Each fix change deletes its own entries in the commit that archives
-it. The change `sweep-docs-drift-2026-10` re-points the line citations of
-other entries.
+from the 2026-10-10 audit (one OpenSpec change each)". That section held 36
+entries when this record landed. Each fix change deletes its own entries in
+the commit that archives it. The change `sweep-docs-drift-2026-10` re-points
+the line citations of other entries.
 
 ## Rulings that shaped the work
 
-Twelve rulings shaped the audit, the record and the fix plan.
+Twelve rulings shaped the work.
 
 ### Owner rulings of 2026-10-10
 
@@ -123,14 +125,15 @@ Twelve rulings shaped the audit, the record and the fix plan.
    Its report and agent reports are in English. An index in
    `docs/decisions.md` joins it. The change `record-2026-10-10-audit` carries
    both. The ruling left one question open: how the translation passes the
-   prose gate.
+   prose gate. Ruling 11 answers it.
 
 ### Owner ruling of 2026-10-11, on security
 
 10. Nine findings concern security: C-1, C-2, C-3, C-8, D-1, D-3, D-8, G-5 and
-    G-12. The record keeps their case narrative and their quoted check output.
-    It drops the literal attack payloads. Each index entry states the risk in
-    one factual sentence with no trigger recipe.
+    G-12. The record keeps their case narrative, mechanism, locations and
+    quoted check output. It drops the literal attack payloads. The index
+    states each of the nine in one factual risk sentence with no trigger
+    recipe.
 
 ### Coordinator rulings of 2026-10-11
 
@@ -147,3 +150,4 @@ Twelve rulings shaped the audit, the record and the fix plan.
 - The fix plan and the per-change briefs. They steer the fix run, and the
   index keeps the map from finding to change.
 - The attack payloads of the nine security findings.
+- The raw check logs. The checks table above quotes the lines that matter.
