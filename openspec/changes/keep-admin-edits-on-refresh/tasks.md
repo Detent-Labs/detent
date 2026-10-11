@@ -41,10 +41,10 @@ The delta spec holds the scenarios. Every group lands its own tests.
 
 ## 3. The Migrations screen
 
-- [ ] 3.1 Add `useRefresh` and the Refresh button to `MigrationsScreen`. Use
+- [x] 3.1 Add `useRefresh` and the Refresh button to `MigrationsScreen`. Use
       the existing `common.refresh` key. Verify: the button renders in both
       locales on the production build.
-- [ ] 3.2 Move the reset of the picks into an effect keyed on `processId`. Key
+- [x] 3.2 Move the reset of the picks into an effect keyed on `processId`. Key
       the process fetch and the version fetch on `reloadToken` as well. Give
       both a `cancelled` flag. A cancelled effect skips its setter and `fail`.
       Verify: a refetch keeps the picked process,
@@ -53,21 +53,21 @@ The delta spec holds the scenarios. Every group lands its own tests.
 
 ## 4. The data-list editor keeps its input
 
-- [ ] 4.1 Add `areas/admin/screens/serverCopy.ts` with `absorbServerCopy` and
+- [x] 4.1 Add `areas/admin/screens/serverCopy.ts` with `absorbServerCopy` and
       `serverCopyChanged`. Add `sameDataList` to `dataListsLogic.ts`. Verify:
       `packages/web/test/admin-serverCopy.test.ts` covers first load, a clean
       refetch, a dirty refetch and a forced reseed. The `sameDataList` cases
       cover a changed value, a changed column, a reordered key and a changed
       `usedBy`, which must not count.
-- [ ] 4.2 Add the four catalog keys in EN and DE in
+- [x] 4.2 Add the four catalog keys in EN and DE in
       `packages/web/src/i18n/catalogs/admin.ts`. Verify: the existing catalog
       parity test passes with the new keys.
-- [ ] 4.3 Add `areas/admin/ServerCopyNote.tsx`: an always-mounted
+- [x] 4.3 Add `areas/admin/ServerCopyNote.tsx`: an always-mounted
       `role="status"` region and the Warning Callout from `DESIGN.md`. The
       button takes the `btn btn-secondary` classes. Verify: a
       `renderToStaticMarkup` test shows the region with no callout when
       `message` is unset, and the callout and the button when it is set.
-- [ ] 4.4 Wire `DataListScreen`. Hold `latest`, `baseline` and a dirty ref
+- [x] 4.4 Wire `DataListScreen`. Hold `latest`, `baseline` and a dirty ref
       with its state. `load(reseed)` uses a gate and `absorbServerCopy`.
       `save()` awaits `load(true)` in place of `refresh()`. Discard calls
       `load(true)`, and so does a change of `locale`. Render the note above the
@@ -81,12 +81,13 @@ The delta spec holds the scenarios. Every group lands its own tests.
       Verify: `packages/web/test/admin-uiStringsLogic.test.ts` covers an equal
       slice, a changed key, an added key, a removed key and a change in another
       area, which must not count.
-- [ ] 5.2 Wire `UiStringsScreen` the same way. The rows read `latest`. The
-      dirty flag derives from `pendingWrites(rows, drafts).length > 0`.
-      `save()` clears `drafts` and awaits `load(true)`. Render the note above
-      the table. Verify: on the production build, typed overrides survive a
-      `focus` event, a key without a draft follows the server, and a save
-      empties the unsaved count.
+- [ ] 5.2 Wire `UiStringsScreen` the same way. The rows read `latest`. A
+      dirty flag, set in the input handler and cleared with `drafts`, drives
+      the callout. `pendingWrites` still drives Save. `save()` awaits
+      `load(true)`, which clears `drafts` and the flag in one step. Render the
+      note above the table. Verify: on the production build, typed overrides
+      survive a `focus` event, a key without a draft follows the server, and a
+      save empties the unsaved count.
 
 ## 6. The browser checks
 

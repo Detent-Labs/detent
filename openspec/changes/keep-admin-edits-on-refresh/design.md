@@ -86,9 +86,11 @@ follows the server. A key with a draft keeps its draft. `baseline` serves
 only the callout test. A reseed on that screen clears `drafts`.
 
 The data-list editor sets the flag on every input change. It clears the flag
-on a successful save and on discard. The UI-strings editor derives the flag
-from `pendingWrites(rows, drafts).length > 0`, the count that already
-disables Save.
+on a successful save and on discard. The UI-strings editor sets the flag in
+its input handler and clears it when the drafts clear. The count
+`pendingWrites(rows, drafts).length` still drives Save and the unsaved
+message. A flag derived from that count would raise the callout over the
+operator's own save after a failed reload.
 
 Alternatives:
 
