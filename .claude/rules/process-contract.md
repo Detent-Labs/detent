@@ -74,10 +74,10 @@ idiom, since nothing matched.
 
 A guard, a `validation.rule` and a view flag (`visible`, `required`,
 `readonly`) must infer to `bool`. A `dyn` result passes. The engine acts on
-a condition only when it is `true`. Any other type parks the path or
-rejects the submission without a message. Publish checks this in
-`src/cel/check.ts`, not in the schema, so a body published earlier keeps
-running.
+a condition only when it is `true`. Any other type counts as false without a
+message. A guard then parks the path, and a rule rejects the submission.
+Publish checks this in `src/cel/check.ts`, not in the schema, so a body
+published earlier keeps running.
 
 A `matches` call takes a string literal as its pattern, never a field value
 or a built string. The literal must compile as a JavaScript `RegExp` and

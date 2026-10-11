@@ -130,11 +130,12 @@ its placement.
   `:315`).
 - A timer `deadline` must infer to `string` (`check.ts:260-269`).
 - A path `guard`, a `validation.rule` and a view flag (`visible`, `required`
-  or `readonly`) must infer to `bool`. A `dyn` result passes. The engine acts
-  on a condition only when it is `true`. Any other type parks the path or
-  rejects the submission without a message. The check lives on the publish
-  path, in `src/cel/check.ts` behind `validateReferences`. A refinement in
-  `definition.ts` would strand the instances pinned to a published body.
+  or `readonly`) must infer to `bool`. A `dyn` result passes, and the engine
+  acts on a condition only when it is `true`. Any other type counts as false
+  without a message. A guard then parks the path, and a rule rejects the
+  submission. The check lives on the publish path, in `src/cel/check.ts`
+  behind `validateReferences`. A refinement in `definition.ts` would strand
+  the instances pinned to a published body.
 - A `matches` call takes a string literal as its pattern, in both forms:
   `s.matches("p")` and `matches(s, "p")`. The literal compiles as a JavaScript
   `RegExp` and stays under the declared length bound. A pattern that does not

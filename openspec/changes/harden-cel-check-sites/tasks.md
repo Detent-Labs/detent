@@ -15,7 +15,7 @@
 - [x] 2.6 Confirm a test compiles each file under `examples/` and runs `validateProcessBody` on it. `test/cel.test.ts` does so for three files only. Add a test that covers all of them. Verify it passes.
 - [x] 2.7 Add the `bool` rule to the "Every CEL Expression parses" bullets in `.claude/rules/authoring-invariants.md`. Add it to the Expressions section of `.claude/rules/process-contract.md`. Verify with a grep for the new sentence in both files.
 - [x] 2.8 Teach the rule in `docs/authoring-guide.md`: the Path, View and Validation sections each gain one sentence and one comparison example. Verify the antislop linter reports nothing new on the file.
-- [ ] 2.9 Pass `expect: "bool"` for the guard in `checkSubprocessChildRefs`. Drop equal issues in `validateReferences`. Verify with two tests. A typed `child.data` guard fails. A string guard on a subprocess step reports once.
+- [x] 2.9 Pass `expect: "bool"` for the guard in `checkSubprocessChildRefs`. Drop equal issues in `validateReferences`. Verify with two tests. A typed `child.data` guard fails. A string guard on a subprocess step reports once.
 
 ## 3. Literal patterns for matches (A-3)
 

@@ -233,14 +233,14 @@ compare a field against another: `data.amount <= data.approved_amount`.
 A rule must infer to `bool`. Publishing rejects `data.status` alone and
 accepts `data.status == "ok"`.
 
+A step can override any of these per field. See View, below.
+
 A condition can test text with `matches`, for example
 `data.reference.matches("^[A-Z]{3}-[0-9]+$")`. The pattern must be a string
 literal, never a field or a built string. Publishing rejects a literal that
 does not compile as a JavaScript `RegExp`. The length bound of 4,000
 characters does not stop backtracking. A pattern such as `^(a+)+$` can still
 run slowly on a long value, as a field's `pattern` can.
-
-A step can override any of these per field. See View, below.
 
 ### Data source
 

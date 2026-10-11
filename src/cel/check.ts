@@ -451,7 +451,9 @@ export function validateProcessBody(body: ProcessBody): CelIssue[] {
  * `childBody.contract.outputFields` is an unknown-field error here, even though
  * it type-checks fine against the single-body `validateProcessBody` pass (which
  * has no child body to type it against). `child.outcome` is untouched — it stays
- * `string` regardless of the child's contract.
+ * `string` regardless of the child's contract. A guard must infer to `bool` here
+ * too: the first pass types `child.data` as `dyn`, so only this pass can see that
+ * a typed child output used alone is not a condition.
  */
 export function checkSubprocessChildRefs(body: ProcessBody, stepIndex: number, childBody: ProcessBody): CelIssue[] {
   const step = body.workflow.steps[stepIndex];
@@ -465,7 +467,7 @@ export function checkSubprocessChildRefs(body: ProcessBody, stepIndex: number, c
   (step.paths ?? []).forEach((p, pi) => {
     const g = asExpr(p.guard);
     if (!g) return;
-    const issue = checkSite(env, { src: g.src, loc: `${sloc}.paths[${pi}].guard` });
+    const issue = checkSite(env, { src: g.src, loc: `${sloc}.paths[${pi}].guard`, expect: "bool" });
     if (issue) issues.push(issue);
   });
   Object.entries(step.subprocess.outputMapping).forEach(([fid, e]) => {

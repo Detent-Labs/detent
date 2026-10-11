@@ -2,6 +2,7 @@ import { test, expect } from "bun:test";
 import { readFileSync, readdirSync } from "node:fs";
 import { validateProcessBody, validateMigrationSpec, checkSubprocessChildRefs, parseExpression, parseAst, checkAgainstFields, celType, ACTOR_SCHEMA, type CelIssue } from "../src/cel/check.js";
 import { evalTransforms } from "../src/cel/eval.js";
+import { validateReferences } from "../src/validate.js";
 import { compileProcessBody, MAX_PATTERN_LENGTH } from "../src/schema/compile.js";
 import { instance as instanceSchema, baseFieldType, processBody, type ProcessBody, type MigrationSpec, type Instance, type FieldDef } from "../src/schema/definition.js";
 
@@ -726,6 +727,36 @@ test("a child with no declared outputFields rejects every child.data reference",
 test("validateProcessBody's single-body check is unchanged: it still accepts any child.data key", () => {
   const b = body({ steps: [subprocessStep({ field_p_note: cel("child.data.internal_note") })] });
   expect(validateProcessBody(b)).toEqual([]);
+});
+
+// The single-body pass types child.data as dyn, so a typed child output used alone
+// as a guard slips past its bool expectation. The second pass knows the type.
+test("rejects a guard that reads a typed child output alone", () => {
+  const b = body({ steps: [subprocessStep({}, "child.data.amount")] });
+  expect(validateProcessBody(b)).toEqual([]);
+  const issues = checkSubprocessChildRefs(b, 0, childBodyWithOutputs(["field_amount"]));
+  expect(issues.length).toBe(1);
+  expect(issues[0].loc).toBe("steps[0].paths[0].guard");
+  expect(issues[0].message).toContain("expected bool, got double");
+});
+
+test("accepts a typed child output compared in a guard", () => {
+  const b = body({ steps: [subprocessStep({}, "child.data.amount > 1000.0")] });
+  expect(checkSubprocessChildRefs(b, 0, childBodyWithOutputs(["field_amount"]))).toEqual([]);
+});
+
+// Both passes see a string guard on a subprocess step once the child is loaded.
+// validateReferences keeps the first issue and drops the equal one.
+test("validateReferences reports a string guard on a subprocess step once, with the child loaded", () => {
+  const b = body({ steps: [subprocessStep({}, "data.booking_status")] });
+  const registryDescription = { actionTypes: [], assignmentStrategyTypes: [], dataSourceTypes: [] };
+  const loaded = validateReferences(b, { registryDescription, loadedChildren: { step_a: childBodyWithOutputs(["field_amount"]) }, targetsByLoc: {} });
+  const bare = validateReferences(b, { registryDescription, loadedChildren: {}, targetsByLoc: {} });
+  for (const refs of [loaded, bare]) {
+    expect(refs.celIssues.length).toBe(1);
+    expect(refs.celIssues[0].loc).toBe("steps[0].paths[0].guard");
+    expect(refs.celIssues[0].message).toContain("expected bool, got string");
+  }
 });
 
 // --- parseAst / ACTOR_SCHEMA: the studio condition builder's two entry points ---
