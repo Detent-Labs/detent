@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { layout, colors, fonts, space } from "form-ui/tokens.stylex";
 import {
@@ -11,15 +11,18 @@ import {
 } from "../api/client.js";
 import {
   allVersionsInRange,
+  columnRequestKey,
   draftFromReport,
   draftToInput,
   emptyDraft,
   isValidReportName,
-  rememberTypes,
+  seedTypes,
   syncRowIds,
+  typesAfterResponse,
+  typesFor,
   withoutRowId,
   withRowId,
-  type RememberedTypes,
+  type ProcessTypes,
   type ReportDraft,
 } from "./reportsLogic.js";
 import { describeCaughtError } from "./reportingLogic.js";
@@ -37,7 +40,6 @@ import type { ClientError, ColumnChoice, ReportExecutionResult, ReportQuery } fr
 const STATUSES = ["running", "completed", "cancelled", "faulted"] as const;
 /** The quiet time after the last filter change before the column request goes out. */
 const COLUMN_REQUEST_WAIT_MS = 300;
-const NO_TYPES: RememberedTypes = new Map();
 
 /** `app.css`'s screen/controls/scope/comparison rules, as StyleX. The
  * status checkboxes below keep their own literal inline layout style
@@ -122,6 +124,9 @@ export function ReportBuilderScreen({
   const [previewError, setPreviewError] = useState<ClientError | undefined>();
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<ClientError | undefined>();
+  // Every field type any response named, per process: a comparison that
+  // empties the range keeps its own field's type.
+  const [heldTypes, setHeldTypes] = useState<ProcessTypes | undefined>();
 
   // Load the existing report, once, when editing.
   useEffect(() => {
@@ -130,7 +135,9 @@ export function ReportBuilderScreen({
     getReport(reportId, token)
       .then((report) => {
         if (cancelled) return;
-        setDraft(draftFromReport(report));
+        const loaded = draftFromReport(report);
+        setDraft(loaded);
+        setHeldTypes(seedTypes(loaded.processId, loaded.dataWhere));
         setOwner(report.owner);
         setProcessLabel(report.processId);
       })
@@ -147,11 +154,8 @@ export function ReportBuilderScreen({
   // drop a version, which can add or drop a field from the union. The key is
   // the complete query, so an incomplete comparison sends nothing, and it
   // settles 300 ms after the last change. A new process settles at once.
-  const columnKey = draft ? JSON.stringify([draft.processId, draftToInput(draft).query]) : undefined;
+  const columnKey = draft ? columnRequestKey(draft) : undefined;
   const settledKey = useSettledKey(draft?.processId, columnKey, COLUMN_REQUEST_WAIT_MS);
-  // Every field type any response named, per process: a comparison that
-  // empties the range keeps its own field's type.
-  const typesRef = useRef<{ processId: string; types: RememberedTypes } | undefined>(undefined);
   useEffect(() => {
     if (!settledKey) return;
     let cancelled = false;
@@ -159,8 +163,7 @@ export function ReportBuilderScreen({
     fetchReportColumnChoices(processId, query, token)
       .then((next) => {
         if (cancelled) return;
-        const known = typesRef.current?.processId === processId ? typesRef.current.types : NO_TYPES;
-        typesRef.current = { processId, types: rememberTypes(known, next) };
+        setHeldTypes((prev) => typesAfterResponse(prev, processId, next));
         setChoices(next);
       })
       .catch(() => {
@@ -196,8 +199,7 @@ export function ReportBuilderScreen({
   }
 
   const versionsInRange = allVersionsInRange(choices);
-  // Written only together with `setChoices`, so this draw sees the types of the choices it draws.
-  const types = typesRef.current?.processId === draft.processId ? typesRef.current.types : NO_TYPES;
+  const types = typesFor(heldTypes, draft.processId);
 
   const runPreview = () => {
     setPreviewLoading(true);

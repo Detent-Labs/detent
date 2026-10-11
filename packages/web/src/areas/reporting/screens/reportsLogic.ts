@@ -74,6 +74,11 @@ export function isValidReportName(name: string): boolean {
   return name.trim().length > 0;
 }
 
+/** The column request's debounce key: the process and the complete query. An incomplete comparison leaves it unchanged. */
+export function columnRequestKey(draft: ReportDraft): string {
+  return JSON.stringify([draft.processId, draftToInput(draft).query]);
+}
+
 // ------------------------------------------------------------ comparisons
 //
 // The comparison row writes a value of the compared field's declared type,
@@ -101,6 +106,36 @@ export function rememberTypes(types: RememberedTypes, choices: readonly ColumnCh
   const next = new Map(types);
   for (const c of choices) next.set(c.fieldId, c.type);
   return next;
+}
+
+/** The remembered types of one process. */
+export type ProcessTypes = { processId: string; types: RememberedTypes };
+
+export const NO_TYPES: RememberedTypes = new Map();
+
+/**
+ * The map a loaded report starts with: each comparison's field maps to its
+ * value's type. A cleared or half-typed value then keeps its row's type
+ * until a response names the field and overwrites the entry.
+ */
+export function seedTypes(processId: string, comparisons: readonly DataComparison[]): ProcessTypes {
+  const types = new Map<string, string | undefined>();
+  for (const c of comparisons) {
+    const type = valueTypeOf(c.value);
+    if (type !== undefined && !types.has(c.fieldId)) types.set(c.fieldId, type);
+  }
+  return { processId, types };
+}
+
+/** `prev` with a response's types added. A response for another process starts a fresh map and leaves `prev` untouched. */
+export function typesAfterResponse(prev: ProcessTypes | undefined, processId: string, choices: readonly ColumnChoice[]): ProcessTypes {
+  const known = prev?.processId === processId ? prev.types : NO_TYPES;
+  return { processId, types: rememberTypes(known, choices) };
+}
+
+/** The map a draw for `processId` reads: none while the held map belongs to another process. */
+export function typesFor(held: ProcessTypes | undefined, processId: string): RememberedTypes {
+  return held?.processId === processId ? held.types : NO_TYPES;
 }
 
 /** A remembered field takes its declared type's value type. A field never named follows its value, and otherwise takes text. */

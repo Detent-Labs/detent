@@ -31,6 +31,12 @@ import {
   reconcileText,
   syncRowIds,
   withoutRowId,
+  columnRequestKey,
+  seedTypes,
+  typesAfterResponse,
+  typesFor,
+  booleanChoice,
+  valueFromChoice,
   type TextState,
 } from "../src/areas/reporting/screens/reportsLogic.js";
 import type { DataComparison, Report } from "../src/areas/reporting/api/types.js";
@@ -152,6 +158,83 @@ test("an emptied range keeps the row's number type and value", () => {
   // A comparison on 999999 matches nothing, so the next response names no field.
   const after = rememberTypes(seen, []);
   expect(valueTypeFor(after, "field_amount", 999999)).toBe("number");
+});
+
+test("a loaded comparison on a field no response named keeps its number type when its value clears", () => {
+  const seeded = seedTypes("proc_1", [{ fieldId: "field_amount", operator: "eq", value: 7 }]);
+  expect(valueTypeFor(typesFor(seeded, "proc_1"), "field_amount", 7)).toBe("number");
+  // The owner clears the input or types `7a`: the value is undefined, and the control stays a number input.
+  expect(valueTypeFor(typesFor(seeded, "proc_1"), "field_amount", undefined)).toBe("number");
+});
+
+test("seedTypes skips a value without a type, and the first comparison on a field wins", () => {
+  const seeded = seedTypes("proc_1", [
+    { fieldId: "field_a", operator: "eq", value: undefined },
+    { fieldId: "field_b", operator: "eq", value: true },
+    { fieldId: "field_b", operator: "eq", value: "x" },
+  ]);
+  expect(seeded.types.has("field_a")).toBe(false);
+  expect(seeded.types.get("field_b")).toBe("boolean");
+});
+
+test("a column response overwrites a seeded type", () => {
+  const seeded = seedTypes("proc_1", [{ fieldId: "field_amount", operator: "eq", value: 7 }]);
+  const after = typesAfterResponse(seeded, "proc_1", [{ fieldId: "field_amount", versions: [1], type: "string" }]);
+  expect(valueTypeFor(typesFor(after, "proc_1"), "field_amount", undefined)).toBe("string");
+});
+
+test("typesAfterResponse adds to the map of the same process", () => {
+  const first = typesAfterResponse(undefined, "proc_1", [{ fieldId: "field_amount", versions: [1], type: "number" }]);
+  const second = typesAfterResponse(first, "proc_1", [{ fieldId: "field_flag", versions: [1], type: "boolean" }]);
+  expect(second.processId).toBe("proc_1");
+  expect(second.types.get("field_amount")).toBe("number");
+  expect(second.types.get("field_flag")).toBe("boolean");
+});
+
+test("a response for another process never writes into the current process's map", () => {
+  const current = typesAfterResponse(undefined, "proc_2", [{ fieldId: "field_amount", versions: [1], type: "number" }]);
+  const other = typesAfterResponse(current, "proc_1", [{ fieldId: "field_amount", versions: [1], type: "string" }]);
+  // The proc_2 map stays as it was.
+  expect(current.types.get("field_amount")).toBe("number");
+  // A draw for proc_2 reads no proc_1 entry.
+  expect(typesFor(other, "proc_2").size).toBe(0);
+});
+
+test("a process switch drops the old process's map", () => {
+  const old = typesAfterResponse(undefined, "proc_1", [{ fieldId: "field_amount", versions: [1], type: "number" }]);
+  const switched = typesAfterResponse(old, "proc_2", [{ fieldId: "field_flag", versions: [1], type: "boolean" }]);
+  expect(switched.processId).toBe("proc_2");
+  expect(switched.types.has("field_amount")).toBe(false);
+  expect(switched.types.get("field_flag")).toBe("boolean");
+  expect(typesFor(switched, "proc_1").size).toBe(0);
+});
+
+test("columnRequestKey ignores an incomplete row and changes on a complete one", () => {
+  const draft = { ...emptyDraft("proc_1"), dataWhere: [AMOUNT] };
+  const key = columnRequestKey(draft);
+  const withIncomplete = { ...draft, dataWhere: [...draft.dataWhere, { fieldId: "field_amount", operator: "eq" as const, value: undefined }] };
+  expect(columnRequestKey(withIncomplete)).toBe(key);
+  const withComplete = { ...draft, dataWhere: [...draft.dataWhere, { fieldId: "field_amount", operator: "ne" as const, value: 7 }] };
+  expect(columnRequestKey(withComplete)).not.toBe(key);
+  expect(JSON.parse(columnRequestKey(withComplete))).toEqual(["proc_1", { dataWhere: [AMOUNT, { fieldId: "field_amount", operator: "ne", value: 7 }] }]);
+});
+
+test("columnRequestKey changes with the process", () => {
+  expect(columnRequestKey(emptyDraft("proc_1"))).not.toBe(columnRequestKey(emptyDraft("proc_2")));
+});
+
+test("valueFromChoice writes a boolean for Yes and No, and nothing for the empty choice", () => {
+  expect(valueFromChoice("true")).toBe(true);
+  expect(valueFromChoice("false")).toBe(false);
+  expect(valueFromChoice("")).toBeUndefined();
+});
+
+test("booleanChoice selects Yes or No for a boolean alone", () => {
+  expect(booleanChoice(true)).toBe("true");
+  expect(booleanChoice(false)).toBe("false");
+  expect(booleanChoice(undefined)).toBe("");
+  // A stored string "true" is not a boolean, so the empty choice shows.
+  expect(booleanChoice("true")).toBe("");
 });
 
 test("switchComparisonField keeps the value when both fields take the same value type", () => {

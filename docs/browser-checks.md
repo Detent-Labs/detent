@@ -2539,6 +2539,10 @@ omits the row.
 Type `abc` in a number row, add a second row, then remove the first row.
 Pass: the second row's input is empty.
 
+A saved report can hold a stored string such as `"abc"` on a number field.
+That row shows the "not a number" reason and still filters on `"abc"`. This
+is the expected state: the stored value stays until the owner retypes it.
+
 #### One column request per pause
 
 Clear the comparisons. Add a comparison on `amount` and type `12345` without
