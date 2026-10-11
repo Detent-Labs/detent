@@ -1529,8 +1529,9 @@ export const instance = z.object({
   // The child the current subprocess step visit waits for: the id the spawn
   // derives for that entry. Nullable for the same reason as `assignment`: a
   // commit leaving the step clears it through the shallow jsonb merge.
-  // `undefined` for an instance that never sat on a subprocess step, or that
-  // predates this field. Outside `ProcessBody`, so no hash moves.
+  // `undefined` until the first commit of an instance created on a
+  // non-subprocess step, or for one that predates this field. Outside
+  // `ProcessBody`, so no hash moves.
   awaitedChild: instanceId.nullable().optional(),
   status: instanceStatus,
   startedAt: timestamp,

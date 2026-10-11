@@ -291,12 +291,13 @@ export function planStepEntry(
     actionId: a.id,
     action: a,
   }));
-  // Leaving the awaited child: a timer exit, a migration relocation, or an
-  // unsuppressed re-entry of the same step. The row cancels that child post-
-  // commit (runs its onCancel, cascades to its own children), durably and
-  // at-least-once. A cancel commit leaves the child to the sweep of running
-  // children instead. A return commit reaches here with the field already
-  // cleared by its writeback, so it enqueues nothing.
+  // Leaving the awaited child: any commit whose computed value differs from the
+  // instance's. The routes are a timer exit, a migration relocation, a migration
+  // that flips the step type under a kept id, and an unsuppressed re-entry. The
+  // row cancels that child post-commit (runs its onCancel, cascades to its own
+  // children), durably and at-least-once. A cancel commit leaves the child to
+  // the sweep of running children instead. A return commit reaches here with the
+  // field already cleared by its writeback, so it enqueues nothing.
   const left = instance.awaitedChild;
   if (left && left !== awaitedChild && opts.status !== "cancelled") {
     const cancel = { id: CANCEL_CHILD_ACTION_ID, type: CANCEL_CHILD_ACTION_TYPE, config: { childId: left } };
@@ -809,6 +810,11 @@ export async function startInstance(
  * (the authoring invariant gives it the highest priority) and its guard is
  * vacuously true, so plain iteration yields it as the else-branch. Returns null
  * when nothing matches (a wait-state). Pure — no I/O.
+ *
+ * A subprocess step is the exception: `resolveAutomatic` never calls this for
+ * one, because its guards read `child`, which the standard guard context lacks.
+ * The subprocess return calls it with `child` in scope, which is the only
+ * evaluation a subprocess step's paths get.
  */
 export function selectAutomaticPath(step: Step, ctx: Record<string, unknown>): Path | null {
   const autos = (step.paths ?? []).filter((p) => p.trigger === "automatic");
@@ -866,10 +872,18 @@ async function markFaulted(instance: Instance, repeatedStepId: Step["id"], db: S
 /**
  * Advance an instance to rest by taking automatic paths. While the current step
  * is all-automatic and a guard matches, commit that hop; stop at a manual step,
- * an all-automatic step with no match (a wait-state), or a terminal step. Each
- * entered step is recorded; re-entering one is a non-terminating loop, so the
- * instance is marked `faulted` and AutomaticCascadeLoop is thrown. A no-op when
- * the instance already sits on a resting step.
+ * a subprocess step, an all-automatic step with no match (a wait-state), or a
+ * terminal step. Each entered step is recorded; re-entering one is a
+ * non-terminating loop, so the instance is marked `faulted` and
+ * AutomaticCascadeLoop is thrown. A no-op when the instance already sits on a
+ * resting step.
+ *
+ * A subprocess step stops the cascade before any path is selected, whatever its
+ * paths and guards. Its guards read `child`, which exists only once the child
+ * has returned, so a guardless default and a guard that holds without `child`
+ * must not fire on entry. Only the child's return (which selects the first hop
+ * itself, with `child` in scope), a timer, a cancel or a migration moves the
+ * parent off that step.
  */
 export async function resolveAutomatic(
   instance: Instance,
@@ -886,6 +900,7 @@ export async function resolveAutomatic(
     const paths = step.paths ?? [];
     const allAutomatic = paths.length > 0 && paths.every((p) => p.trigger === "automatic");
     if (step.terminal || !allAutomatic) return current;
+    if (step.type === "subprocess") return current;
 
     const path = selectAutomaticPath(step, buildGuardContext(body, current, actor));
     if (!path) return current; // wait-state: no guard matched

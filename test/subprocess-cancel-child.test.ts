@@ -192,7 +192,19 @@ test("an authored action of the cancel type fails to compile, and so to publish"
       { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
     ] },
   } as unknown as ProcessBody;
-  expect(() => compileProcessBody(body)).toThrow(CompileValidationError);
+  let thrown: unknown;
+  try {
+    compileProcessBody(body);
+  } catch (e) {
+    thrown = e;
+  }
+  expect(thrown).toBeInstanceOf(CompileValidationError);
+  // The located reserved-prefix issue, so an unrelated schema failure cannot satisfy this.
+  expect((thrown as CompileValidationError).issues).toContainEqual({
+    loc: "steps[0].onEntry[0].type",
+    value: "core.cancelSubprocessChild",
+    message: "action type uses the reserved 'core.' prefix",
+  });
 });
 
 test("a tenant registry holds three core. handlers, each with a config schema", () => {
