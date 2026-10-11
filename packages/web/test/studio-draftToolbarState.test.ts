@@ -139,8 +139,11 @@ describe("DraftToolbar's onSaved callback (design.md: onSaved vs the savedBody w
     // doSave()'s success branch:
     // `if (result) { onSavedBodyChange(draft); onSavedLayoutChange(result.layout); onSaved?.(); }`
     const draft = { key: "p", description: { en: "saved" } };
-    const result = { revision: 2, layout: { step_a: { x: 40, y: 0 } } };
-    expect(isLayoutDirty(result.layout, savedLayout)).toBe(true);
+    // The layout the save sent, and the answer: the same layout in the key
+    // order the database returns.
+    const sentLayout = { step_a: { x: 40, y: 0 } };
+    const result = { revision: 2, layout: { step_a: { y: 0, x: 40 } } };
+    expect(isLayoutDirty(sentLayout, savedLayout)).toBe(true);
     if (result) {
       savedBody = structuredClone(draft);
       savedLayout = result.layout;
@@ -148,7 +151,7 @@ describe("DraftToolbar's onSaved callback (design.md: onSaved vs the savedBody w
     }
 
     expect(isDirty(draft, savedBody)).toBe(false);
-    expect(isLayoutDirty(result.layout, savedLayout)).toBe(false);
+    expect(isLayoutDirty(sentLayout, savedLayout)).toBe(false);
     expect(onSavedCount).toBe(1);
   });
 

@@ -1733,20 +1733,30 @@ changes".
 
 Open the `⋮` menu and choose "Manage assignment groups for this process".
 Pass: the browser's native prompt `Leave this draft? Unsaved edits will be lost.`
-appears. Cancel keeps the screen and the new label. OK navigates to
-`/admin/groups?processId=<id>`.
+appears. Cancel keeps the screen and the new label.
 
-Save the draft, return to it and choose the same link. Pass: the header bar
-reads "Saved", and the link navigates to the same address with no prompt.
+Press Save. Pass: the header bar reads "Saved". Choose the same link again.
+Pass: the browser navigates to `/admin/groups?processId=<id>` with no prompt.
 
-**2. The account menu.** Change a label again and do not save. Open the
-account menu, "Account" in the header. Choose each of three entries in turn:
-an entry under "Go to", "Your profile" and "Log out". Pass: each one raises
-the same native prompt. Cancel keeps the draft, and the menu stays closed.
+Open the draft again and change the label once more. Choose the link a third
+time and accept the prompt. Pass: the browser navigates to the same address.
 
-Repeat on a saved draft. Pass: none of the three prompts. The area switch
-leaves for the other area, the profile entry opens `/profile` and "Log out"
-returns to `/login`.
+**2. The account menu.** Open the draft and change a field's label without
+saving. Open the account menu, "Account" in the header, and choose "Tasks"
+under "Go to".
+
+Pass: the same native prompt appears. Cancel keeps the draft, and the menu
+stays closed.
+
+Choose "Your profile", then "Log out". Pass: each one raises the same prompt,
+and Cancel keeps the draft and closes the menu.
+
+Press Save. Choose "Tasks" under "Go to". Pass: the browser navigates to `/app`
+with no prompt.
+
+Open the draft again and choose "Your profile". Pass: the browser navigates
+to `/profile` with no prompt. Open the draft once more and choose "Log out".
+Pass: the browser returns to `/login` with no prompt.
 
 **3. A layout-only change.** Open `/studio/processes/<id>/edit` on the
 Canvas tab. Drag one step to a new position and change nothing else. Pass: the
@@ -1773,9 +1783,19 @@ dismiss the `beforeunload` dialog.
 Save, then reload again. Pass: no prompt appears. The prompt text belongs to
 the browser, so the check reads only whether the dialog fires.
 
-**6. A 401 on save.** Change a label and do not save. Make the save answer
-401: a playwright route that fulfills `PUT /drafts/:id` with status 401 does
-this. Press Save. Pass: the login screen appears.
+**6. A 401 on save.** First prepare the second account. In another browser
+context, log in as `demo-developer@example.test`, password
+`seed-demo-password`. Read `actor.id` from the `POST /auth/login` response in
+the network log.
+
+In the first context, open the draft's Access tab. Type that id into the
+Developer list's add box and press Add. Pass: the id appears in the Developer
+list. Without it, the second account meets a refusal screen at the end of this
+check.
+
+Change a label and do not save. Make the save answer 401: a playwright route
+that fulfills `PUT /drafts/:id` with status 401 does this. Press Save. Pass:
+the login screen appears.
 
 Unroute the answer and log in again as `demo-superuser@example.test`. Open the
 same draft. Pass: a notice reads "Your session ended while this draft had
@@ -1789,9 +1809,14 @@ Make the save answer 401 again and press Save. Log in and open the draft
 once more. Choose "Discard them". Pass: the notice goes, and the draft shows
 the saved label.
 
-Repeat the 401, then log in as another seeded account on the same tab. Open the
-same draft. Pass: no notice appears. The stored copy belongs to the first
-actor.
+Change the label again, make the save answer 401 and press Save. At the login
+screen, log in as `demo-developer@example.test` on the same tab. Open the same
+draft.
+
+Pass: the header bar renders for that account, which proves it may open the
+draft. Only then read the notice. Pass: no notice appears, because the stored
+copy belongs to the first actor. A refusal screen instead of the header bar
+proves nothing, so repeat the Access tab step.
 
 **7. Discard draft after a drag.** Drag a step on the Canvas tab. Choose
 "Discard draft" in the header bar. The application's own dialog,

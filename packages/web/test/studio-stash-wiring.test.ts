@@ -187,10 +187,21 @@ describe("EditScreen.tsx wires the unsaved-draft stash", () => {
     expect(scan(wrapped)).toEqual(["EditScreen load does not use the raw onUnauthorized via useFail"]);
   });
 
-  it("a name in a comment is not wiring", () => {
+  // Every pin reads the first match, so a comment only counts when it sits
+  // ahead of the real wiring. Each case puts the commented copy first.
+  it("a wrapper name in a comment ahead of the raw callback is not wiring", () => {
     const raw = mutate(real, /\bonUnauthorized:\s*stashOnUnauthorized\b/, "onUnauthorized: onUnauthorized");
-    const commented = `${raw}\n// onUnauthorized: stashOnUnauthorized, dropStash();\n/* <RestoreNotice onRestore={restoreStash} /> */`;
+    const commented = mutate(raw, /(\buseDraftToolbarActions\s*\(\s*\{)/, "$1\n// onUnauthorized: stashOnUnauthorized,\n");
     expect(scan(commented)).toEqual(["useDraftToolbarActions onUnauthorized is not stashOnUnauthorized"]);
+  });
+
+  it("a RestoreNotice in a comment is not rendered", () => {
+    const gone = mutate(
+      real,
+      /\{stash && <RestoreNotice[^>]*\/>\}/,
+      "{/* {stash && <RestoreNotice onRestore={restoreStash} onDiscard={discardStash} />} */}",
+    );
+    expect(scan(gone)).toEqual(["RestoreNotice is not rendered"]);
   });
 
   it("whitespace and line breaks inside a prop change no verdict", () => {
