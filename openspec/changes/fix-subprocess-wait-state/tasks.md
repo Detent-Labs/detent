@@ -34,9 +34,9 @@
 
 ## 4. The leaving commit cancels the child (B-2)
 
-- [ ] 4.1 Add the R2 test: a timer forces a path while the child waits on a manual task. Verify that the child ends `cancelled`, its `onCancel` action runs, and a grandchild ends `cancelled`.
-- [ ] 4.2 Add a re-entry test, where the timer path leads back to the same step. Verify that the first child ends `cancelled`, the second child exists, and the first return changes nothing.
-- [ ] 4.3 Add a test that a parent cancel enqueues no leaving row. Verify that the sweep cancels the running child.
+- [x] 4.1 Add the R2 test: a timer forces a path while the child waits on a manual task. Verify that the child ends `cancelled`, its `onCancel` action runs, and a grandchild ends `cancelled`.
+- [x] 4.2 Add a re-entry test, where the timer path leads back to the same step. Verify that the first child ends `cancelled`, the second child exists, and the first return changes nothing.
+- [x] 4.3 Add a test that a parent cancel enqueues no leaving row. Verify that the sweep cancels the running child.
 
 ## 5. Migration
 
