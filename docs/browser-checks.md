@@ -2272,13 +2272,23 @@ shows no note. The tab strip of a tabbed form stays operable in every case.
 
 Source: `fix-form-ui-empty-values` task 5.3.
 
-Open a running task with an optional number field holding a value and an
-optional date field holding a value. Erase both controls and submit down a
-path. Pass: no `type-mismatch` error appears, and the instance moves on. In
-the admin area's instance detail, neither field is in the case data any more.
+Use the seeded `it-offboarding` example. Its Clarification step offers three
+optional fields: the number `backup_retention_months` and the dates
+`forwarding_until` and `return_date`. Start two cases as the contoso request
+owner. Fill the required fields of Submit the Exit Notification. Give the
+three fields a value, using answers that show them. Submit both. As the
+fabrikam operator, choose Request clarification on each case.
 
-Open another such task, erase both controls and click Save. Leave the task
-and reopen it. Pass: both controls come back empty. The committed
+Open the first case as the request owner. Pass: the Clarification step holds
+the three values.
+
+Erase the three controls, answer the required response and
+submit down the respond path. Pass: no `type-mismatch` error appears, and the
+case moves on. Open the case from Cases I started. Pass: the read-only form
+shows the three fields empty. None holds an earlier value.
+
+Open the second case, erase the three controls and click Save. Leave the
+task and reopen it. Pass: all three controls come back empty. The committed
 values stay out of them.
 
 ### Studio: path creation names
