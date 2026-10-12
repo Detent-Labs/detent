@@ -9,7 +9,7 @@ The studio SHALL read the process list once per mount of the process surface. Ev
 #### Scenario: Typing a process id sends one list request
 
 - **WHEN** the author types `proc_credit_check` into a `process.start` action, one character at a time
-- **THEN** the studio sends one `GET /processes` in all
+- **THEN** the typing causes one `GET /processes` in all
 - **AND** it reads a version body once, when the typed id matches a listed process
 
 #### Scenario: An id the list lacks reads as not checked

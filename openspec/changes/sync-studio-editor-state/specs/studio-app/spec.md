@@ -65,7 +65,7 @@ Confirming SHALL remove the data source from the draft. In the same draft change
 
 ### Requirement: A removal moves focus to the rail
 
-After a removal, keyboard focus SHALL land on the rail row that becomes current. An empty rail SHALL hand focus to the add control. Focus SHALL NOT stay on a control that now removes a neighbour.
+After a removal, keyboard focus SHALL land on the rail row that becomes current. An empty rail SHALL hand focus to its first add control. Focus SHALL NOT stay on a control that now removes a neighbour.
 
 #### Scenario: Removing a step hands focus to the steps rail
 

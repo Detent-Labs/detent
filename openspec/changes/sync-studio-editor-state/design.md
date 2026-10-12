@@ -39,7 +39,9 @@ One alternative derives the text only while the textarea lacks focus. That fails
 
 **2. `StepPage` and `DataSourceRow` mount per entity.** `EditScreen` passes `key={pageStep?.id ?? "none"}`. `DataSourcesPanel` passes `key={ds.id}`. The key replaces the shared button, which closes FIELDS-15. It also drops the JSON mode and the half-typed state of the earlier entity.
 
-The remount drops the focus that sat on the removed control. A removal therefore hands focus on. `onRemoveStep` and the data source removal wait one animation frame. They then focus the current row of the rail. The steps rail gives that row a fixed id. The data source rail gives its rows the source id. An empty rail hands focus to its add control, which also gets an id.
+The remount drops the focus that sat on the removed control. A removal therefore hands focus on. `onRemoveStep` and the data source removal wait one animation frame. They then focus the current row of the rail. The steps rail gives that row a fixed id. The data source rail gives its rows the source id. An empty rail hands focus to its first add control, which also gets an id.
+
+The steps rail has one add control per step kind.
 
 The alternative keeps one `StepPage` and resets state in an effect. That leaves one frame where step B shows the state of step A.
 
@@ -78,3 +80,7 @@ An id the list lacks becomes `"done"` with no body request. A listed id fetches 
 ## Migration Plan
 
 No stored data changes. A draft or version saved before the change opens unchanged. Rollback is a revert of the commits.
+
+## Open Questions
+
+None. The owner settled the one open question, E2-15, on 2026-10-12 (see Context).
