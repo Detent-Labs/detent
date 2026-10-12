@@ -48,7 +48,7 @@ import { deleteInstanceDraft } from "./instance-drafts.js";
 import { buildGuardContext, evalGuard, SYSTEM_ACTOR, type Actor } from "../cel/eval.js";
 import { ADMIN_ROLE } from "../auth/authorize.js";
 import { CANCEL_SINK_STEP_ID, instance as instanceSchema } from "../schema/definition.js";
-import type { ProcessBody, Instance, HistoryEntry, InstanceEvent, Action, Step, Path, AssignmentState } from "../schema/definition.js";
+import type { ProcessBody, Instance, HistoryEntry, InstanceEvent, Action, Step, Path, AssignmentState, Literal } from "../schema/definition.js";
 import { log } from "../log.js";
 
 /**
@@ -547,6 +547,19 @@ async function commitTransition(
 }
 
 /**
+ * Merge a submission patch over `data`: the patch is spread, then each key
+ * whose patch value is `null` is deleted. A `null` means the participant
+ * cleared the field, so the key must read as never written.
+ */
+export function applyDataPatch(data: Record<string, Literal>, patch: Record<string, Literal>): Record<string, Literal> {
+  const merged: Record<string, Literal> = { ...data, ...patch };
+  for (const key of Object.keys(patch)) {
+    if (patch[key] === null) delete merged[key];
+  }
+  return merged;
+}
+
+/**
  * Commit a single manual transition — guard check plus commit — with no
  * automatic-path cascade. Rejects if the path is not on the current step, is
  * not manual, or its guard is false. A concurrent transition that already
@@ -588,7 +601,7 @@ export async function commitManualTransition(
   if (!path) throw new Error(`path not on current step: ${pathId}`);
   if (path.trigger !== "manual") throw new Error(`not a manual path: ${pathId}`);
 
-  const mergedData = dataPatch ? { ...instance.data, ...dataPatch } : instance.data;
+  const mergedData = dataPatch ? (applyDataPatch(instance.data, dataPatch) as Instance["data"]) : instance.data;
   const evalInstance: Instance = dataPatch ? { ...instance, data: mergedData } : instance;
 
   if (!evalGuard(path.guard, buildGuardContext(body, evalInstance, actor))) throw new GuardRefused(pathId);
