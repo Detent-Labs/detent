@@ -32,8 +32,8 @@
 
 ## 6. Verification
 
-- [ ] 6.1 Run `bun run typecheck`, then `bun run build`, then the full gated `bun test` with `DATABASE_URL` set, in the lane's devcontainer.
-- [ ] 6.2 Run the antislop and whitespace gates over the pushed range, as the push gate does.
+- [x] 6.1 Run `bun run typecheck`, then `bun run build`, then the full gated `bun test` with `DATABASE_URL` set, in the lane's devcontainer.
+- [x] 6.2 Run the antislop and whitespace gates over the pushed range, as the push gate does.
 - [x] 6.3 Build `subprocess-loan-parent` from scratch in a browser on the production build and publish it. Then run `/impeccable critique` and `/impeccable audit` on the step page's subprocess section.
 
 ## Workflow follow-up
