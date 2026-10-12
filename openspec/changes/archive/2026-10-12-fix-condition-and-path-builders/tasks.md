@@ -41,7 +41,7 @@
 ## 6. Verification
 
 - [x] 6.1 Run `bun run typecheck`, then `bun run build`, then the full gated `bun test` with `DATABASE_URL` set, in the lane's devcontainer.
-- [ ] 6.2 Run the antislop and whitespace gates over the pushed range, as the push gate does.
+- [x] 6.2 Run the antislop and whitespace gates over the pushed range, as the push gate does.
 - [x] 6.3 Run a browser check on the production build for E2-1, E2-6, E2-10, E2-14 and E2-17. Then run `/impeccable critique` and `/impeccable audit` on the step page's Path to section and the Fields tab.
 
 ## Workflow follow-up
