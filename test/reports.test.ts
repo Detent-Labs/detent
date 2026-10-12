@@ -180,6 +180,77 @@ test.skipIf(!DB)("2.2 reassigning the owner to a non-editor is rejected", async 
   expect(stillIntact?.owner).toBe(owner.id);
 });
 
+test.skipIf(!DB)("2.2 an editor who takes ownership while dropping the owner is rejected", async () => {
+  const PID = pid("owner_invariant_takeover");
+  await publishBody(PID, reportBody("owner3", []), reg, dataSourceReg);
+  const created = await createReport(owner, { processId: PID, name: "R", editors: [editorActor.id] }, sql);
+
+  let raised: unknown;
+  try {
+    await updateReport(created.reportId, editorActor, { owner: editorActor.id, editors: [editorActor.id] }, sql);
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(ReportOwnerInvariantError);
+  const stillIntact = await getReport(created.reportId, owner, sql);
+  expect(stillIntact?.owner).toBe(owner.id);
+  expect([...(stillIntact?.editors ?? [])].sort()).toEqual([editorActor.id, owner.id].sort());
+});
+
+test.skipIf(!DB)("2.2 an editor who drops the owner from editors without taking ownership is rejected", async () => {
+  const PID = pid("owner_invariant_editor_drop");
+  await publishBody(PID, reportBody("owner3b", []), reg, dataSourceReg);
+  const created = await createReport(owner, { processId: PID, name: "R", editors: [editorActor.id] }, sql);
+
+  let raised: unknown;
+  try {
+    await updateReport(created.reportId, editorActor, { editors: [editorActor.id] }, sql);
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(ReportOwnerInvariantError);
+  const stillIntact = await getReport(created.reportId, owner, sql);
+  expect(stillIntact?.owner).toBe(owner.id);
+  expect([...(stillIntact?.editors ?? [])].sort()).toEqual([editorActor.id, owner.id].sort());
+});
+
+test.skipIf(!DB)("2.2 the owner can hand over ownership with a list that leaves them out", async () => {
+  const PID = pid("owner_invariant_handover");
+  await publishBody(PID, reportBody("owner4", []), reg, dataSourceReg);
+  const created = await createReport(owner, { processId: PID, name: "R", editors: [editorActor.id] }, sql);
+
+  const updated = await updateReport(created.reportId, owner, { owner: editorActor.id, editors: [editorActor.id] }, sql);
+  expect(updated?.owner).toBe(editorActor.id);
+  expect(updated?.editors).toEqual([editorActor.id]);
+});
+
+test.skipIf(!DB)("2.2 a new owner outside the current editors is rejected even when the same update adds them", async () => {
+  const PID = pid("owner_invariant_new_owner");
+  await publishBody(PID, reportBody("owner5", []), reg, dataSourceReg);
+  const created = await createReport(owner, { processId: PID, name: "R" }, sql);
+
+  let raised: unknown;
+  try {
+    await updateReport(created.reportId, owner, { owner: stranger.id, editors: [owner.id, stranger.id] }, sql);
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(ReportOwnerInvariantError);
+  const stillIntact = await getReport(created.reportId, owner, sql);
+  expect(stillIntact?.owner).toBe(owner.id);
+  expect(stillIntact?.editors).toEqual([owner.id]);
+});
+
+test.skipIf(!DB)("2.2 an editor's update that keeps the owner in editors is accepted", async () => {
+  const PID = pid("owner_invariant_editor_ok");
+  await publishBody(PID, reportBody("owner6", []), reg, dataSourceReg);
+  const created = await createReport(owner, { processId: PID, name: "R", editors: [editorActor.id] }, sql);
+
+  const updated = await updateReport(created.reportId, editorActor, { name: "Renamed", editors: [owner.id, editorActor.id, stranger.id] }, sql);
+  expect(updated?.owner).toBe(owner.id);
+  expect(updated?.name).toBe("Renamed");
+});
+
 test.skipIf(!DB)("2.3 report access is owner, editor or viewer, checked by membership", async () => {
   const PID = pid("membership");
   await publishBody(PID, reportBody("membership", []), reg, dataSourceReg);

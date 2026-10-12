@@ -154,7 +154,9 @@ export async function createReport(actor: Actor, input: ReportInput, db: SQL = s
 /**
  * `undefined` for an unknown id (the HTTP layer's 404), `AuthorizationError`
  * for an actor outside `owner`/`editors` (403), `ReportOwnerInvariantError`
- * for a patch that would strand the owner outside `editors` (409).
+ * for a patch that would strand the owner outside `editors`, name a new owner
+ * who is not already a current editor, or let a non-owner drop the current
+ * owner from `editors` (409).
  */
 export async function updateReport(reportId: string, actor: Actor, patch: ReportPatch, db: SQL = sql): Promise<Report | undefined> {
   const current = await fetchReportRaw(reportId, db);
@@ -166,6 +168,8 @@ export async function updateReport(reportId: string, actor: Actor, patch: Report
   const nextOwner = patch.owner ?? current.owner;
   const nextEditors = patch.editors ? [...new Set(patch.editors)] : current.editors;
   if (!nextEditors.includes(nextOwner)) throw new ReportOwnerInvariantError(reportId);
+  if (patch.owner !== undefined && !current.editors.includes(patch.owner)) throw new ReportOwnerInvariantError(reportId);
+  if (actor.id !== current.owner && !nextEditors.includes(current.owner)) throw new ReportOwnerInvariantError(reportId);
 
   await withTransaction(db, async (tx) => {
     await tx`UPDATE reports SET
@@ -446,6 +450,12 @@ const CSV_NO_VALUE = "(no value)";
 const CSV_NOT_IN_VERSION = "(not in this version)";
 const CSV_REDACTED = "(redacted)";
 
+/** The most rows a report execution returns; `reportResultToCsv` names it in the truncation line. */
+export const REPORT_ROW_LIMIT = 1000;
+
+/** A spreadsheet reads a cell starting with one of these as a formula. */
+const CSV_FORMULA_START = /^[=+\-@\t\r]/;
+
 /** RFC 4180 quoting: only a comma, a quote or a newline forces it; an embedded quote doubles. */
 function csvField(text: string): string {
   return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
@@ -467,7 +477,8 @@ function csvColumnHeader(c: ReportResultColumn): string {
 function csvCellText(cell: ReportCell | MergeReportCell): string {
   switch (cell.kind) {
     case "value":
-      return cell.value === null ? "" : String(cell.value);
+      if (cell.value === null) return "";
+      return typeof cell.value === "string" && CSV_FORMULA_START.test(cell.value) ? `'${cell.value}` : String(cell.value);
     case "no-value":
       return CSV_NO_VALUE;
     case "not-in-version":
@@ -481,10 +492,15 @@ function csvCellText(cell: ReportCell | MergeReportCell): string {
  * The CSV twin of `ReportTable.tsx`: one header row naming each column, one
  * row per instance. Pure and I/O-free, so a `bun:test` unit test covers the
  * three-way marker text with no database — see `csv-download-report-table`'s
- * design.md.
+ * design.md. A string value cell that starts with a formula character gets a
+ * leading apostrophe; a number keeps its sign. A truncated result ends with
+ * one marker line: the text in the first column, the others empty.
  */
 export function reportResultToCsv(result: ReportExecutionResult): string {
   const header = result.columns.map(csvColumnHeader).map(csvField).join(",");
   const rows = result.rows.map((row) => row.cells.map((cell) => csvField(csvCellText(cell))).join(","));
-  return [header, ...rows].map((line) => `${line}\r\n`).join("");
+  const marker = result.truncated
+    ? [csvField(`(truncated: first ${REPORT_ROW_LIMIT} rows only)`) + ",".repeat(Math.max(result.columns.length - 1, 0))]
+    : [];
+  return [header, ...rows, ...marker].map((line) => `${line}\r\n`).join("");
 }
