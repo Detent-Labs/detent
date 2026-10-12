@@ -2,8 +2,8 @@
 
 ## 1. The plugin editor text (E2-8)
 
-- [ ] 1.1 Derive the textarea text in `PluginEnvelopeEditor` from the stored config, and drop every `setConfigText` call. Test with a pure helper. A picked list key, a generated form write and invalid text each give the right text.
-- [ ] 1.2 Key `StepPage` in `EditScreen` and `DataSourceRow` in `DataSourcesPanel` per entity. Verify in the browser check in 7.3 that Next after Switch to JSON shows the form of step B.
+- [x] 1.1 Derive the textarea text in `PluginEnvelopeEditor` from the stored config, and drop every `setConfigText` call. Test with a pure helper. A picked list key, a generated form write and invalid text each give the right text.
+- [x] 1.2 Key `StepPage` in `EditScreen` and `DataSourceRow` in `DataSourcesPanel` per entity. Verify in the browser check in 7.3 that Next after Switch to JSON shows the form of step B.
 
 ## 2. Focus after a removal (FIELDS-15)
 
@@ -12,7 +12,7 @@
 
 ## 3. The timer deadline (E2-13)
 
-- [ ] 3.1 Write `{lang: "cel", src: ""}` from the deadline input when the text is empty. Test with a pure handler that the timer keeps `deadline` and gains no `duration`.
+- [x] 3.1 Write `{lang: "cel", src: ""}` from the deadline input when the text is empty. Test with a pure handler that the timer keeps `deadline` and gains no `duration`.
 
 ## 4. The data source removal (E2-15)
 

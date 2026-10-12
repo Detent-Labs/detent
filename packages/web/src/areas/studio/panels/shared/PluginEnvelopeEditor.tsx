@@ -5,6 +5,7 @@ import type { Plugin } from "workflow-engine/schema";
 import type { DraftOf } from "../../draft/types";
 import type { ConfigFieldDescriptor } from "../../api/types.js";
 import { t } from "../../catalog.js";
+import { shownConfig, type ConfigEdit } from "./pluginConfigText.js";
 
 const styles = stylex.create({
   pluginField: {
@@ -209,18 +210,17 @@ export function PluginEnvelopeEditor({
   typeLabel,
   customConfigEditor,
 }: Props) {
-  const [configText, setConfigText] = useState(() => JSON.stringify(value?.config ?? {}, null, 2));
-  const [configError, setConfigError] = useState<string | null>(null);
+  const [edit, setEdit] = useState<ConfigEdit | null>(null);
   const [showRawJson, setShowRawJson] = useState(false);
+  const { text: configText, error: configError } = shownConfig(edit, value?.config);
 
   const commitConfig = (text: string) => {
-    setConfigText(text);
     try {
       const parsed = JSON.parse(text);
-      setConfigError(null);
+      setEdit({ text, base: JSON.stringify(parsed), error: null });
       onChange({ ...value, type: value?.type ?? "", config: parsed });
     } catch (e) {
-      setConfigError(e instanceof Error ? e.message : t("common.invalidJson"));
+      setEdit({ text, base: JSON.stringify(value?.config ?? {}), error: e instanceof Error ? e.message : t("common.invalidJson") });
     }
   };
 
@@ -239,11 +239,10 @@ export function PluginEnvelopeEditor({
   const setConfigField = (key: string, fieldValue: unknown) => {
     const config = { ...(value?.config as Record<string, unknown> | undefined), [key]: fieldValue };
     onChange({ ...value, type: currentType, config });
-    setConfigText(JSON.stringify(config, null, 2));
   };
 
   const switchToJson = () => {
-    setConfigText(JSON.stringify(value?.config ?? {}, null, 2));
+    setEdit(null);
     setShowRawJson(true);
   };
 
@@ -286,7 +285,6 @@ export function PluginEnvelopeEditor({
         <>
           {customConfigEditor.render((value?.config as Record<string, unknown> | undefined) ?? {}, (config) => {
             onChange({ ...value, type: currentType, config });
-            setConfigText(JSON.stringify(config, null, 2));
           })}
           <button type="button" className="btn btn-secondary" onClick={switchToJson}>
             {t("plugin.switchToJson")}

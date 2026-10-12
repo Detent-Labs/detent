@@ -160,6 +160,7 @@ export function DataSourcesPanel({ token, selectedId, onAdd, onRemove }: Props) 
         <p className="empty">{t("dataSources.empty")}</p>
       ) : (
         <DataSourceRow
+          key={ds.id}
           ds={ds}
           listKeys={listKeys}
           registryTypes={registry?.dataSourceTypes}

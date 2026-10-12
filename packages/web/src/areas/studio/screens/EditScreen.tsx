@@ -1010,6 +1010,7 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
                 onAddStep={onAddStep}
               />
               <StepPage
+                key={pageStep?.id ?? "none"}
                 fields={fields}
                 token={token}
                 step={pageStep}
