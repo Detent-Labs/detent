@@ -12,8 +12,8 @@ C-13, C-19).
 
 ## What Changes
 
-- **C-4:** `reportResultToCsv` prefixes `'` to the text of a string value cell
-  that starts with `=`, `+`, `-`, `@`, a tab or a carriage return. A number
+- **C-4:** `reportResultToCsv` prefixes `'` to the text of a string or list value
+  cell. The text starts with `=`, `+`, `-`, `@`, a tab or a carriage return. A number
   keeps its sign. The header row and the three empty-cell markers stay as they
   are. The JSON execution stays as it is.
 - **C-5:** A report executes with its own row limit, `REPORT_ROW_LIMIT` = 1000.

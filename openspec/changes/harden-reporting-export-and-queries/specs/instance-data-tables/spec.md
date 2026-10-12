@@ -30,6 +30,76 @@ partial table that looks complete.
 - **WHEN** a report's query matches 1200 instances
 - **THEN** the execution returns 1000 rows and marks the table truncated
 
+### Requirement: Report sharing narrows access, never widens it
+
+Executing a report SHALL additionally need `can(actor, "read", processId,
+db)` to answer true on the report's target process. An actor may pass the
+report's owner, editor or viewer check. That actor might still lack
+`read` permission on the target process. Such an actor SHALL receive an
+empty table rather than a refusal.
+
+Passing both checks SHALL NOT return every instance of the process. A caller
+without `ADMIN_ROLE` SHALL receive only the rows they may see, by the
+`instance-visibility-set` capability's rule. A row outside that set SHALL be
+absent. There SHALL be no error, no marker and no count of what was withheld.
+That is the rule the empty table above already follows.
+
+An `ADMIN_ROLE` caller SHALL receive every matching row. That role reads any
+instance directly and lists every one under `scope=all`, so a report of theirs
+narrows nothing.
+
+The bound SHALL apply after that narrowing, and the truncation flag SHALL
+report the narrowed set. A viewer SHALL NOT receive a short table reported as
+complete.
+
+The report itself does not name every field a source instance might expose.
+An empty result reveals nothing about instances that exist. Sharing a
+report with an actor SHALL therefore never grant that actor visibility into
+data they could not otherwise read.
+
+#### Scenario: A viewer without process read access gets an empty table
+
+- **WHEN** an actor listed in a report's `viewers` list lacks `read`
+  permission on the report's target process
+- **THEN** executing the report returns an empty table, with neither a refusal
+  nor an error
+
+#### Scenario: A viewer with process read access gets the full table
+
+- **WHEN** an actor listed in a report's `viewers` list also holds `read` on
+  the report's target process
+- **AND** that actor may see every matching instance
+- **THEN** executing the report returns the matching rows
+
+#### Scenario: A viewer sees only the rows they may see
+
+- **WHEN** an actor passes both the membership check and the `read` check
+- **AND** some matching instances lie outside that actor's visible set
+- **THEN** the returned table holds the rows inside it and no others
+- **AND** the response names no error and no withheld count
+
+#### Scenario: A revoked viewer loses one row and keeps the rest
+
+- **WHEN** an administrator has revoked a viewer from one matching instance
+- **AND** that viewer has no claim and no candidacy on its current step
+- **THEN** that instance's row is absent and every other row stands
+
+#### Scenario: An operator's report stays unnarrowed
+
+- **WHEN** an actor holding `ADMIN_ROLE` executes the report
+- **THEN** the report returns every matching row
+
+#### Scenario: Truncation reports the narrowed set
+
+- **WHEN** 1010 instances match the query and the viewer may see 1001 of them
+- **THEN** the table holds 1000 rows and reports truncation
+- **AND** with 1000 visible among the same 1010 it holds 1000 rows and reports none
+
+#### Scenario: The CSV export narrows the same way
+
+- **WHEN** a viewer downloads the same report as CSV
+- **THEN** the file holds exactly the rows the table holds
+
 ## ADDED Requirements
 
 ### Requirement: An update cannot displace the current owner

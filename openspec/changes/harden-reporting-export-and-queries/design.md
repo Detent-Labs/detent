@@ -26,10 +26,10 @@ the history of the same instances again.
 
 ## Decisions
 
-**1. The prefix applies to `value` cells whose JS value is a string.**
-`csvCellText` checks `typeof cell.value === "string"`. It then tests the first
-character against `=`, `+`, `-`, `@`, tab and CR. A number keeps its sign, so a
-numeric column stays numeric in the spreadsheet. A merge cell always holds a
+**1. The prefix applies to `value` cells that hold text or a list.**
+`csvCellText` skips a number and a boolean by `typeof`. It tests the first
+character of the exported text against `=`, `+`, `-`, `@`, tab and CR.
+A number keeps its sign, so a numeric column stays numeric in the spreadsheet. A merge cell always holds a
 joined string. A merged `-5` exports as `'-5`. The design accepts that edge.
 
 The three marker texts start with `(`. The header starts with a field id. Neither

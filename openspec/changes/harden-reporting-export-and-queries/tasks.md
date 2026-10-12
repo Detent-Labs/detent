@@ -2,7 +2,7 @@
 
 ## 1. CSV formula prefix and truncation line
 
-- [ ] 1.1 Prefix `'` in `csvCellText` for string value cells per design decision 1. Verify a test in `test/reporting-csv.test.ts` exports `=1+1`, `+1`, `-x`, `@x`, a tab and a CR start, and keeps `-5` as a number.
+- [ ] 1.1 Prefix `'` in `csvCellText` for string and list value cells per design decision 1. Verify a test in `test/reporting-csv.test.ts` exports `=1+1`, `+1`, `-x`, `@x`, a tab, a CR start and a list `["=1+1"]`, and keeps `-5` as a number.
 - [ ] 1.2 Append the truncation line in `reportResultToCsv` per design decision 3. Verify `test/reporting-csv.test.ts` covers a truncated and a complete result.
 - [ ] 1.3 Verify the HTTP CSV route end to end. Verify `test/http-reporting-reports.test.ts` downloads a report holding `=1+1` and reads `'=1+1`.
 
@@ -26,7 +26,7 @@
 
 - [ ] 5.1 Add the narrowing sentence to `error.requestShape` in both locales of the reporting catalog. Verify `i18n-catalog-parity.test.ts` passes and the note reads the new text.
 - [ ] 5.2 Check a report over more than 1000 instances in a real browser on the production build with a named `playwright-cli` session. Verify the table shows 1000 rows and its note, and the CSV ends with the marker line. Seed 20001 rows and verify the cycle-time screen shows the narrowing note. Run `/impeccable critique` and `/impeccable audit` on the reporting route.
-- [ ] 5.3 Add a `docs/browser-checks.md` entry for that report. Verify the entry names the table note, the CSV marker and the narrowing note.
+- [ ] 5.3 Add a `docs/browser-checks.md` entry for that report. Fix the "50-instance execution bound" line near the report builder check to say 1000. Verify the entry names the table note, the CSV marker and the narrowing note.
 
 ## 6. Verification
 

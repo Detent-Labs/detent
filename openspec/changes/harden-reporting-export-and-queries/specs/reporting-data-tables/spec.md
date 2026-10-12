@@ -53,14 +53,20 @@ table's own header has one.
 
 A spreadsheet reads a cell as a formula when its text starts with `=`, `+`,
 `-`, `@`, a tab or a CR. The CSV export SHALL put one apostrophe before such
-text in a string value cell. It SHALL NOT prefix a number, a boolean, the
-header row or the three empty-cell markers. The JSON execution SHALL return
+text in a string or list value cell.
+It SHALL NOT prefix a number, a boolean, the header row or the three
+empty-cell markers. The JSON execution SHALL return
 the value unchanged.
 
 #### Scenario: A string cell that starts with an equals sign gets the prefix
 
 - **WHEN** a report's result holds the string value `=1+1` in a cell
 - **THEN** the exported CSV shows `'=1+1` for that cell
+
+#### Scenario: A list cell whose text starts with an equals sign gets the prefix
+
+- **WHEN** a report's result holds the list value `["=1+1", "x"]` in a cell
+- **THEN** the exported CSV text for that cell starts with `'=1+1`
 
 #### Scenario: A negative number keeps its sign
 
