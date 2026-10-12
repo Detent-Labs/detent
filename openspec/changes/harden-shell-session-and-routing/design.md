@@ -28,7 +28,7 @@ The comparison is a pure function in `session.ts`, `endedByStorageChange(held, s
 
 Alternatives: adopting the new session silently would switch the actor under unsaved studio work. A reload would drop that work as well and add a flash. Signing out is the same outcome a logout already has.
 
-**No write after sign-out.** A request that answers after the storage event must write nothing. `App` keeps the held session in a ref. A layout effect syncs it to the committed session. The storage handler and `logout` clear it at once, ahead of the render they queue. The hydration `then`, the profile page's `onSaved` and `logout` read that ref. Each returns when the ref no longer matches its session.
+**No write after sign-out.** A request that answers after the storage event must write nothing. `App` keeps the held session in a ref. A layout effect syncs it to the committed session. The storage handler and `logout` clear it at once. They do so ahead of the render they queue. The hydration `then`, the profile page's `onSaved` and `logout` read that ref. Each returns when the ref no longer matches its session.
 
 A late 401 reaches `logout` through every area's `onUnauthorized`. `logout` returns early when the ref is empty. Storage and the notice stay as they are. Otherwise it clears storage through `clearIfHeld`, which compares the stored token with the held one. A stale tab therefore leaves alone any session another tab stored since.
 
@@ -54,7 +54,7 @@ The address bar keeps the malformed URL. The area shows its default screen. Whet
 
 - The decision of the storage handler is a `bun:test` assertion on `endedByStorageChange`.
 - The routers' fallback is a `bun:test` assertion per router.
-- Two tabs, one logout, the other tab at `/login` with the notice is a smoke flow, `e2e/session-tabs.e2e.ts`. The listener wiring requires a DOM, and the flow requires no visual judgment. The smoke suite holds "at least" four flows, so a fifth does not need a delta.
+- Two tabs, one logout, the other tab at `/login` with the notice is a smoke flow, `e2e/session-tabs.e2e.ts`. The listener wiring requires a DOM. The flow makes no visual judgment. The smoke suite holds "at least" four flows, so a fifth does not need a delta.
 - Whether a browser keeps `%E0%A4%A` in `location.pathname` is a vendor behavior, so it is an entry in `docs/browser-checks.md`. A hung `/ui-strings` and the look of the notice go there too.
 
 ## Risks / Trade-offs
