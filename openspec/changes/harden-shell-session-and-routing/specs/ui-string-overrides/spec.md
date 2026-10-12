@@ -2,7 +2,7 @@
 
 ### Requirement: The override read stops after five seconds
 
-The read that runs before the first render SHALL stop when 5000 ms have passed without a complete answer. The system SHALL treat that stop as a failed read: the override map stays empty, and every screen renders its builtin value. The login screen SHALL render at that point.
+The read before the first render SHALL stop after 5000 ms without a complete answer. The system SHALL treat that stop as a failed read. The override map stays empty, and every screen renders its builtin value. The login screen SHALL render at that point.
 
 #### Scenario: The override route never answers
 
@@ -13,4 +13,4 @@ The read that runs before the first render SHALL stop when 5000 ms have passed w
 #### Scenario: A fast answer is used
 
 - **WHEN** the override read answers within 5000 ms
-- **THEN** the stored overrides are in place before the first render
+- **THEN** the stored overrides apply before the first render

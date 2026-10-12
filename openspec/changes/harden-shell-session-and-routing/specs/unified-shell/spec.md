@@ -2,7 +2,7 @@
 
 ### Requirement: A session change in another tab ends this tab's session
 
-The shell SHALL watch the stored session for changes made by another tab. While a tab holds a session, a change that removes the stored session or replaces it with one for another token SHALL end this tab's session at once. A stored session with the same token SHALL change nothing.
+The shell SHALL watch the stored session for changes made by another tab. A tab that holds a session SHALL end it at once when the stored session disappears. It SHALL end it too when the stored session carries another token. A stored session with the same token SHALL change nothing.
 
 The shell SHALL NOT write a session to storage that it held before such a change. Ending the session is client-side only and calls no API route.
 
@@ -33,7 +33,7 @@ The shell SHALL NOT write a session to storage that it held before such a change
 
 ### Requirement: The login screen names a session that another tab ended
 
-When the shell ends a session because of a change in another tab, the login screen SHALL show the line "Your session ended in another tab." The line SHALL come from the shell catalog, in every shipped locale. It SHALL be announced as a status and SHALL disappear when the actor logs in.
+When a change in another tab ends the session, the login screen SHALL show the line "Your session ended in another tab." The line SHALL come from the shell catalog, in every shipped locale. Screen readers SHALL announce it as a status. It SHALL disappear when the actor logs in.
 
 A logout the actor chooses in this tab SHALL NOT show the line.
 
@@ -55,7 +55,7 @@ A logout the actor chooses in this tab SHALL NOT show the line.
 
 ### Requirement: A malformed address resolves to the area's default route
 
-An address whose area path holds a malformed percent escape, such as `%E0%A4%A`, SHALL NOT throw while the shell renders. The router of the `studio`, `admin` and `app` areas SHALL resolve such a path to its default route, as it resolves an unknown path. The default routes are the process list, the instances list and the inbox.
+An address whose area path holds a malformed percent escape, such as `%E0%A4%A`, SHALL NOT throw while the shell renders. The `studio`, `admin` and `app` routers SHALL resolve such a path to their default route, as for an unknown path. The default routes are the process list, the instances list and the inbox.
 
 #### Scenario: A malformed escape in a studio address
 
