@@ -1789,13 +1789,6 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   `packages/web/src/areas/reporting/screens/ReportBuilderScreen.tsx`,
   `packages/web/src/areas/reporting/root.tsx`,
   `packages/web/src/areas/reporting/screens/ColumnEditor.tsx`.
-- **`close-ci-gate-gaps` (G-1, G-2, G-6, G-7, G-8, G-11, G-12; medium)**: The
-  CI lockfile gate checks a lockfile that `bun install` rewrote first, two
-  gates pass when `git diff` fails, Dependabot never updates `bun.lock`, the
-  gates `silent-green.sh` and `machine-paths.sh` miss known cases, the
-  workflow sets no `permissions`, and the test preload leaves a cluster-wide
-  login role with a fixed password. Anchors: `.github/workflows/check.yml`,
-  `scripts/gates/range.sh`, `test/preload-db.ts`.
 - **`widen-test-guards` (G-3, G-4, G-9, G-10, A-6; medium)**: The index guard
   in `migration.test.ts` checks an empty barrel, the example hash and
   round-trip tests cover a subset of the examples, three tests assert only

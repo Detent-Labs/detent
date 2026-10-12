@@ -13,6 +13,13 @@ on:
   push:
   pull_request:
 
+# The token reads repository contents and nothing else. No job writes to the
+# repository, an issue or a pull request. Every action below pins to a full
+# commit sha with its release in a trailing comment; the github-actions entry
+# in .github/dependabot.yml bumps the two together.
+permissions:
+  contents: read
+
 concurrency:
   group: check-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -22,9 +29,13 @@ jobs:
   host-gates:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      # persist-credentials: false on all three checkouts keeps each one from
+      # persisting the token for later steps. No later step needs it, since the
+      # host gates run local git commands only.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       # Feeds range.sh a line shaped like git's own pre-push protocol
       # (<local ref> <local sha> <remote ref> <remote sha>). A push event
@@ -61,11 +72,14 @@ jobs:
         run: sh scripts/gates/machine-paths.sh
 
   # bun run check, plus the two gates that need the devcontainer
-  # (CLAUDE.md's gate table again): frozen-lockfile and no-silent-green.
+  # (CLAUDE.md's gate table again): frozen-lockfile, which is also the job's
+  # install, and no-silent-green.
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # A runner is always the main checkout's own worktree, so this
       # resolves to the established name — sourced anyway so the exec steps
@@ -75,17 +89,21 @@ jobs:
           . scripts/worktree-env.sh
           docker compose -f .devcontainer/docker-compose.yml up -d --wait
 
+      # The job's first install, so no step before it can rewrite bun.lock.
+      # A plain `bun install` re-resolves the manifests and writes the
+      # lockfile it then judges. Dependabot PR 19 and PR 63 each changed a
+      # manifest and left bun.lock alone, and a plain install repaired the
+      # lockfile before the gate ran, so both went green.
       # A contributor's devcontainer already has node_modules from its
       # first provisioning (scripts/dev-up.sh). A fresh Actions checkout
-      # has none, so bun run check would fail before it even reaches
-      # typecheck, on a missing Bun type definition.
-      - name: bun install
-        run: |
-          . scripts/worktree-env.sh
-          docker compose -f .devcontainer/docker-compose.yml exec -T -w /workspace app bun install
+      # has none, and this frozen install provides them, so bun run check
+      # does not fail on a missing Bun type definition before typecheck.
+      - name: frozen-lockfile
+        run: sh scripts/gates/lockfile.sh
 
-      # bun audit needs the registry. `check` runs in the pre-push hook, and
-      # a push must not fail when the registry is down. That is why this
+      # bun audit reads the committed lockfile, since the install before it
+      # was frozen. It needs the registry. `check` runs in the pre-push hook,
+      # and a push must not fail when the registry is down. That is why this
       # step stays in CI and out of `bun run check`. To excuse an advisory
       # with no fixed release, add `--ignore=GHSA-...` here, one id at a
       # time, with a comment naming the package and the reason. None is
@@ -107,9 +125,6 @@ jobs:
           cat "$RUNNER_TEMP/check-out.txt"
           exit $status
 
-      - name: frozen-lockfile
-        run: sh scripts/gates/lockfile.sh
-
       - name: no-silent-green
         run: sh scripts/gates/silent-green.sh "$RUNNER_TEMP/check-out.txt"
 
@@ -123,17 +138,20 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Start the devcontainer stack
         run: |
           . scripts/worktree-env.sh
           docker compose -f .devcontainer/docker-compose.yml up -d --wait
 
-      - name: bun install
+      # No gate step in this job, so the install is frozen itself.
+      - name: bun install --frozen-lockfile
         run: |
           . scripts/worktree-env.sh
-          docker compose -f .devcontainer/docker-compose.yml exec -T -w /workspace app bun install
+          docker compose -f .devcontainer/docker-compose.yml exec -T -w /workspace app bun install --frozen-lockfile
 
       # A `docker compose exec` runs as root in this container, so the
       # browser's system libraries install with no `sudo` (design D5).
@@ -157,7 +175,7 @@ jobs:
       # so a failed flow's trace reaches the host path this action reads.
       - name: Upload the failed run's traces
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: e2e-test-results
           path: test-results/
