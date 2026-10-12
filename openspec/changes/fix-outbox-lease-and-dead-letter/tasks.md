@@ -21,10 +21,10 @@
 
 ## 4. Documentation
 
-- [ ] 4.1 Add the retry rules to `### Action` in `docs/authoring-guide.md`: `maxAttempts` is a whole number from 1 to 20, the default is 5, and an exponential delay stops growing at one hour. Say that an action which keeps failing ends in the dead letters. Check the section against the spec delta by eye.
-- [ ] 4.2 State the bound in `.claude/rules/process-contract.md` under "Actions and triggers", and add one sentence to `.claude/rules/authoring-invariants.md` naming the Zod placement and why it holds. Keep both unwrapped around `maxAttempts`.
-- [ ] 4.3 Strike this change's entry in the audit index in `docs/decisions.md`.
-- [ ] 4.4 Run the antislop linter on every Markdown file the change touches, with the push-gate range command from `CLAUDE.md`.
+- [x] 4.1 Add the retry rules to `### Action` in `docs/authoring-guide.md`: `maxAttempts` is a whole number from 1 to 20, the default is 5, and an exponential delay stops growing at one hour. Say that an action which keeps failing ends in the dead letters. Check the section against the spec delta by eye.
+- [x] 4.2 State the bound in `.claude/rules/process-contract.md` under "Actions and triggers", and add one sentence to `.claude/rules/authoring-invariants.md` naming the Zod placement and why it holds. Keep both unwrapped around `maxAttempts`.
+- [x] 4.3 Strike this change's entry in the audit index in `docs/decisions.md`.
+- [x] 4.4 Run the antislop linter on every Markdown file the change touches, with the push-gate range command from `CLAUDE.md`.
 
 ## 5. Verification
 

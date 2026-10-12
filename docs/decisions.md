@@ -1690,11 +1690,6 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   `http.request` sit in plain text in the immutable definition and in every
   outbox row. Anchors: `src/handlers/http.ts`, `src/engine/transition.ts`,
   `src/engine/admin-queries.ts`.
-- **`fix-outbox-lease-and-dead-letter` (B-4, B-5, B-12; medium)**: The outbox
-  lease covers the whole batch while the deadline covers one row, a row whose
-  writeback always fails never reaches the dead letters, and the retry
-  backoff and `maxAttempts` have no bound. Anchors: `src/engine/outbox.ts`,
-  `src/schema/definition.ts`.
 - **`bound-worker-scan-costs` (B-6, B-7, B-8, B-11; medium)**: The claim scan
   and the retention sweep grow with every instance ever run, one tenant's
   hung target stops the outbox for all tenants, and the admin outbox list has

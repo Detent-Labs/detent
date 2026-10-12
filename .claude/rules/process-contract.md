@@ -211,7 +211,8 @@ form. The idempotency key is a deterministic UUIDv5 hash of
 action has no authored key. The `transitionSeq` counter is monotonic per
 instance and doubles as the optimistic-concurrency token. An action's
 `execution` accepts async only. The engine reserves `blocking` and has not
-built it.
+built it. A retry policy's `maxAttempts` is an integer from 1 to 20. An
+exponential delay stops growing at one hour.
 
 Action results write back into `data` via `Action.output`, keyed by
 target `FieldId` and valued by a CEL expression over `result`. The
