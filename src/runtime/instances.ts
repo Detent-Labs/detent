@@ -62,6 +62,10 @@ export type InstanceView = {
   // Mirrors the underlying instance's own `kind`, so a caller renders a test
   // instance distinctly without a separate lookup.
   kind: Instance["kind"];
+  // The instance's persisted `transitionSeq`, the count of its committed
+  // transitions. Reported for every status. A caller compares it across two
+  // reads to tell whether the instance moved in between.
+  transitionSeq: number;
   // The resolved body's own `baseLocale`. A caller resolving a field's
   // `LocalizedText` label falls back to this, not to the active locale
   // twice. Reported for every status, since it describes the process
@@ -257,6 +261,7 @@ export async function getInstanceView(instanceId: InstanceId, actor: Actor, regi
     version: instance.version,
     status: instance.status,
     kind: instance.kind,
+    transitionSeq: instance.transitionSeq,
     baseLocale: body.baseLocale,
     step: { id: step.id, key: step.key, label: step.label, type: step.type },
     fields: await resolveFields(body, step, instance, actor, registry, db),
