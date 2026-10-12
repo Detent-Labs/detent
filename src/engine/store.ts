@@ -408,6 +408,19 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   // already-stored row unreadable. Its own statement for the same reason
   // manager_user_id has one.
   await db`ALTER TABLE auth_users ADD COLUMN IF NOT EXISTS locale text`;
+  // The login rate-limit windows (src/auth/login.ts): one row per window, scope
+  // 'email' (key = normalized email) or 'address' (key = caller address). No
+  // tenant column: tenancy here is database-per-tenant, so each tenant counts in
+  // its own table. The window_start index serves the per-request delete of
+  // expired rows.
+  await db`CREATE TABLE IF NOT EXISTS login_attempts (
+    scope        text        NOT NULL,
+    key          text        NOT NULL,
+    attempts     integer     NOT NULL,
+    window_start timestamptz NOT NULL,
+    PRIMARY KEY (scope, key)
+  )`;
+  await db`CREATE INDEX IF NOT EXISTS login_attempts_window_idx ON login_attempts (window_start)`;
   // Process-scoped permission grants (src/auth/grants.ts): one row maps a role
   // string to a permission and a scope, so any holder of that role gets that
   // permission over the process(es) the scope names. Read by

@@ -4,19 +4,12 @@
  * token actually authenticates a subsequent route, not just that `jwt.ts`
  * verifies a hand-signed token in isolation (see test/auth-jwt.test.ts).
  */
-import { test, expect, beforeAll, beforeEach } from "bun:test";
-import { sql, initSchema } from "../src/engine/store.js";
+import { test, expect, beforeAll, beforeEach, spyOn } from "bun:test";
+import { SQL } from "bun";
+import { sql, initSchema, withTransaction } from "../src/engine/store.js";
 import { createUser } from "../src/auth/users.js";
 import { jwtResolver } from "../src/auth/jwt.js";
-import {
-  handleLogin,
-  checkAndRecordAttempt,
-  MAX_ATTEMPTS,
-  WINDOW_MS,
-  MAX_TRACKED_EMAILS,
-  MAX_ADDRESS_ATTEMPTS,
-  MAX_TRACKED_ADDRESSES,
-} from "../src/auth/login.js";
+import { handleLogin, checkAndRecordAttempt, MAX_ATTEMPTS, WINDOW_MS, MAX_ADDRESS_ATTEMPTS } from "../src/auth/login.js";
 import { createServer, resolveAuthResolver, clientAddressOf } from "../src/http/server.js";
 import { PUBLISH_ROLE, ADMIN_ROLE } from "../src/auth/authorize.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
@@ -45,7 +38,7 @@ beforeAll(async () => {
   if (DB) await initSchema();
 });
 beforeEach(async () => {
-  if (DB) await sql`TRUNCATE auth_users, outbox, instances, history_entries, instance_events, definitions`;
+  if (DB) await sql`TRUNCATE auth_users, login_attempts, outbox, instances, history_entries, instance_events, definitions`;
   if (DB) await clearInstanceAudit();
 });
 
@@ -231,143 +224,264 @@ test.skipIf(!DB)("a malformed JSON body maps to 400", async () => {
   expect(result.status).toBe(400);
 });
 
-test("checkAndRecordAttempt allows up to MAX_ATTEMPTS, then limits, then resets after WINDOW_MS", () => {
-  let t = 0;
-  const now = () => t;
-  const map = new Map<string, { count: number; windowStart: number }>();
+// ============================================================
+// The windows in Postgres
+// ============================================================
 
+type WindowRow = { attempts: number; window_start: Date };
+
+const windowRow = async (scope: "email" | "address", key: string, db: SQL = sql): Promise<WindowRow | undefined> =>
+  ((await db`SELECT attempts, window_start FROM login_attempts WHERE scope = ${scope} AND key = ${key}`) as WindowRow[])[0];
+
+/** Moves a window's start back past `WINDOW_MS` by `UPDATE`, in place of an injected clock. */
+const endWindow = async (scope: "email" | "address", key: string): Promise<void> => {
+  await sql`UPDATE login_attempts SET window_start = now() - ${WINDOW_MS + 1000}::double precision * interval '1 millisecond' WHERE scope = ${scope} AND key = ${key}`;
+};
+
+const rowCount = async (db: SQL = sql): Promise<number> => ((await db`SELECT count(*)::int AS n FROM login_attempts`) as { n: number }[])[0]!.n;
+
+test.skipIf(!DB)("a second schema build leaves the login_attempts table and its rows unchanged", async () => {
+  await checkAndRecordAttempt(sql, "email", "schema@example.com", MAX_ATTEMPTS);
+  const before = await windowRow("email", "schema@example.com");
+  await initSchema();
+  expect(await windowRow("email", "schema@example.com")).toEqual(before);
+  const indexes = (await sql`SELECT indexname FROM pg_indexes WHERE tablename = 'login_attempts' ORDER BY indexname`) as { indexname: string }[];
+  expect(indexes.map((i) => i.indexname)).toEqual(["login_attempts_pkey", "login_attempts_window_idx"]);
+});
+
+test.skipIf(!DB)("checkAndRecordAttempt passes tries 1 to MAX_ATTEMPTS and limits the next one", async () => {
   for (let i = 0; i < MAX_ATTEMPTS; i++) {
-    expect(checkAndRecordAttempt(map, "a@example.com", now)).toBe("ok");
+    expect(await checkAndRecordAttempt(sql, "email", "a@example.com", MAX_ATTEMPTS)).toBe("ok");
   }
-  expect(checkAndRecordAttempt(map, "a@example.com", now)).toBe("limited");
-
-  t += WINDOW_MS + 1;
-  expect(checkAndRecordAttempt(map, "a@example.com", now)).toBe("ok");
+  expect(await checkAndRecordAttempt(sql, "email", "a@example.com", MAX_ATTEMPTS)).toBe("limited");
 });
 
-// This suite exercises the capacity (MAX_TRACKED_EMAILS) path at the pure
-// checkAndRecordAttempt level, not through handleLogin end-to-end. Reaching
-// capacity via real handleLogin calls now costs one Bun.password.verify per
-// distinct email (the login-timing fix in src/auth/users.ts runs the dummy-hash
-// verification on every path, ~100ms each), so a literal 50,000-request
-// end-to-end test would take well over an hour. The MAX_ATTEMPTS 429 path below
-// already proves handleLogin's dispatch on a "limited" result short-circuits
-// before verifyLogin; that dispatch is identical regardless of which branch of
-// checkAndRecordAttempt produced "limited".
-test("checkAndRecordAttempt evicts the earliest window once MAX_TRACKED_EMAILS live-window keys are tracked", () => {
-  const now = () => 1_000;
-  const map = new Map<string, { count: number; windowStart: number }>();
-  // Live windows, none expired at `now`, with `oldest@` the earliest by 1ms.
-  map.set("oldest@example.com", { count: 1, windowStart: 0 });
-  for (let i = 0; i < MAX_TRACKED_EMAILS - 1; i++) map.set(`user${i}@example.com`, { count: 1, windowStart: 1 });
-
-  expect(checkAndRecordAttempt(map, "new@example.com", now)).toBe("ok");
-  expect(map.has("new@example.com")).toBe(true);
-  expect(map.has("oldest@example.com")).toBe(false); // the earliest window, and the only one evicted
-  expect(map.size).toBe(MAX_TRACKED_EMAILS);
-
-  // an already-tracked email under MAX_ATTEMPTS is admitted normally, even
-  // though the map is at full capacity — the entry-exists branch never
-  // consults map size
-  map.set("under-limit@example.com", { count: 1, windowStart: 1 });
-  expect(checkAndRecordAttempt(map, "under-limit@example.com", now)).toBe("ok");
-
-  // an already-tracked email already at MAX_ATTEMPTS is still rate-limited
-  // normally, for the ordinary MAX_ATTEMPTS reason, not because of capacity
-  map.set("tracked@example.com", { count: MAX_ATTEMPTS, windowStart: 1 });
-  expect(checkAndRecordAttempt(map, "tracked@example.com", now)).toBe("limited");
+test.skipIf(!DB)("the count stops at one above the threshold, and a refused try leaves window_start alone", async () => {
+  await checkAndRecordAttempt(sql, "email", "cap@example.com", MAX_ATTEMPTS);
+  const started = (await windowRow("email", "cap@example.com"))!.window_start;
+  for (let i = 0; i < MAX_ATTEMPTS + 15; i++) await checkAndRecordAttempt(sql, "email", "cap@example.com", MAX_ATTEMPTS);
+  const row = (await windowRow("email", "cap@example.com"))!;
+  expect(row.attempts).toBe(MAX_ATTEMPTS + 1);
+  expect(row.window_start.getTime()).toBe(started.getTime());
 });
 
-// The re-arm write must move a key to the end of iteration order, or a
-// re-armed entry keeps its old, early position while carrying the newest
-// windowStart in the map — see design.md's A/B scenario for
-// dedup-runtime-pagination-webhook-sink.
-test("checkAndRecordAttempt evicts the true oldest window after a re-arm, not the entry re-armed last", () => {
-  const map = new Map<string, { count: number; windowStart: number }>();
-  const capacity = 2;
+test.skipIf(!DB)("an ended window restarts at one and takes a new start", async () => {
+  for (let i = 0; i < MAX_ATTEMPTS + 1; i++) await checkAndRecordAttempt(sql, "email", "roll@example.com", MAX_ATTEMPTS);
+  expect(await checkAndRecordAttempt(sql, "email", "roll@example.com", MAX_ATTEMPTS)).toBe("limited");
+  await endWindow("email", "roll@example.com");
+  const ended = (await windowRow("email", "roll@example.com"))!.window_start;
 
-  // Insert A, then insert B while A is still live.
-  expect(checkAndRecordAttempt(map, "A", () => 0, MAX_ATTEMPTS, capacity)).toBe("ok");
-  expect(checkAndRecordAttempt(map, "B", () => WINDOW_MS - 1, MAX_ATTEMPTS, capacity)).toBe("ok");
-
-  // A's window expires, then a later request re-arms it — the newest
-  // windowStart in the map. Map.set on an already-present key does not move
-  // it in iteration order on its own, so this only lands A at the end of
-  // iteration order because checkAndRecordAttempt deletes the key first.
-  const rearmedAt = WINDOW_MS + 500;
-  expect(checkAndRecordAttempt(map, "A", () => rearmedAt, MAX_ATTEMPTS, capacity)).toBe("ok");
-
-  // A third key, C, arrives and forces an eviction at capacity. B is the true
-  // oldest live window and must be the one evicted, not A.
-  expect(checkAndRecordAttempt(map, "C", () => rearmedAt + 100, MAX_ATTEMPTS, capacity)).toBe("ok");
-
-  expect(map.has("B")).toBe(false);
-  expect(map.has("A")).toBe(true);
-  expect(map.has("C")).toBe(true);
-  expect(map.size).toBe(2);
+  expect(await checkAndRecordAttempt(sql, "email", "roll@example.com", MAX_ATTEMPTS)).toBe("ok");
+  const row = (await windowRow("email", "roll@example.com"))!;
+  expect(row.attempts).toBe(1);
+  expect(row.window_start.getTime()).toBeGreaterThan(ended.getTime());
 });
 
-// The rule this replaced refused an untracked email at capacity, so a flood of
-// distinct values cost every untracked account its login until the window
-// rolled. The per-address window is what made that trade affordable to reverse:
-// it stops one caller from minting 50,000 entries in the first place.
-test("a full map of live windows costs the new email nothing but one evicted entry", () => {
-  const now = () => 1_000;
-  const map = new Map<string, { count: number; windowStart: number }>();
-  for (let i = 0; i < MAX_TRACKED_EMAILS; i++) map.set(`flood${i}@example.com`, { count: 1, windowStart: i });
-
-  expect(checkAndRecordAttempt(map, "victim@example.com", now)).toBe("ok");
-  expect(map.get("victim@example.com")).toEqual({ count: 1, windowStart: 1_000 });
-  expect(map.has("flood0@example.com")).toBe(false);
-  expect(map.has("flood1@example.com")).toBe(true);
-});
-
-test("checkAndRecordAttempt takes its threshold and capacity from its parameters", () => {
-  const now = () => 0;
-  const map = new Map<string, { count: number; windowStart: number }>();
-
-  // The address map passes MAX_ADDRESS_ATTEMPTS, which is above MAX_ATTEMPTS:
-  // an attempt count that limits the email map must not limit this one.
+test.skipIf(!DB)("checkAndRecordAttempt takes its threshold from its parameter, and the two scopes count apart", async () => {
+  // The address window passes MAX_ADDRESS_ATTEMPTS, which is above MAX_ATTEMPTS:
+  // a count that limits the email window must not limit this one.
   for (let i = 0; i < MAX_ADDRESS_ATTEMPTS; i++) {
-    expect(checkAndRecordAttempt(map, "203.0.113.7", now, MAX_ADDRESS_ATTEMPTS, MAX_TRACKED_ADDRESSES)).toBe("ok");
+    expect(await checkAndRecordAttempt(sql, "address", "203.0.113.7", MAX_ADDRESS_ATTEMPTS)).toBe("ok");
   }
-  expect(checkAndRecordAttempt(map, "203.0.113.7", now, MAX_ADDRESS_ATTEMPTS, MAX_TRACKED_ADDRESSES)).toBe("limited");
+  expect(await checkAndRecordAttempt(sql, "address", "203.0.113.7", MAX_ADDRESS_ATTEMPTS)).toBe("limited");
   expect(MAX_ADDRESS_ATTEMPTS).toBeGreaterThan(MAX_ATTEMPTS);
 
-  // A capacity of 2 evicts on the third distinct key, which the default
-  // capacity would not do.
-  const small = new Map<string, { count: number; windowStart: number }>();
-  expect(checkAndRecordAttempt(small, "a", now, MAX_ADDRESS_ATTEMPTS, 2)).toBe("ok");
-  expect(checkAndRecordAttempt(small, "b", now, MAX_ADDRESS_ATTEMPTS, 2)).toBe("ok");
-  expect(checkAndRecordAttempt(small, "c", now, MAX_ADDRESS_ATTEMPTS, 2)).toBe("ok");
-  expect(small.size).toBe(2);
-  expect(small.has("c")).toBe(true);
-  expect(small.has("a")).toBe(false); // the earliest window went
+  // The same string under the other scope is another window.
+  expect(await checkAndRecordAttempt(sql, "email", "203.0.113.7", MAX_ATTEMPTS)).toBe("ok");
+  expect((await windowRow("email", "203.0.113.7"))!.attempts).toBe(1);
 });
 
-test("checkAndRecordAttempt reclaims expired entries before judging capacity, and admits the new email", () => {
-  const now = () => 0;
-  const map = new Map<string, { count: number; windowStart: number }>();
-  // Every entry's window started long enough ago to have expired by "now".
-  for (let i = 0; i < MAX_TRACKED_EMAILS; i++) {
-    map.set(`user${i}@example.com`, { count: 1, windowStart: -(WINDOW_MS + 1) });
+test.skipIf(!DB)("an ended window's row is gone after another email's try", async () => {
+  await checkAndRecordAttempt(sql, "email", "ended@example.com", MAX_ATTEMPTS);
+  await checkAndRecordAttempt(sql, "email", "live@example.com", MAX_ATTEMPTS);
+  await endWindow("email", "ended@example.com");
+
+  expect((await handleLogin(loginRequest("other@example.com", "wrong-password"), SECRET, sql)).status).toBe(401);
+
+  expect(await windowRow("email", "ended@example.com")).toBeUndefined();
+  expect(await windowRow("email", "live@example.com")).toBeDefined(); // a live window stays
+});
+
+test.skipIf(!DB)("a flood of distinct emails leaves no row once its windows end and one more login arrives", async () => {
+  for (let i = 0; i < 200; i++) await checkAndRecordAttempt(sql, "email", `flood${i}@example.com`, MAX_ATTEMPTS);
+  await sql`UPDATE login_attempts SET window_start = now() - ${WINDOW_MS + 1000}::double precision * interval '1 millisecond'`;
+  expect(await rowCount()).toBe(200);
+
+  await handleLogin(loginRequest("victim@example.com", "wrong-password"), SECRET, sql);
+
+  // Only the new try's own row remains.
+  expect(await rowCount()).toBe(1);
+  expect((await windowRow("email", "victim@example.com"))!.attempts).toBe(1);
+});
+
+test.skipIf(!DB)("a locked expired row does not block the cleanup, and stays", async () => {
+  await checkAndRecordAttempt(sql, "email", "locked@example.com", MAX_ATTEMPTS);
+  await checkAndRecordAttempt(sql, "email", "free@example.com", MAX_ATTEMPTS);
+  await endWindow("email", "locked@example.com");
+  await endWindow("email", "free@example.com");
+
+  await withTransaction(sql, async (tx) => {
+    await tx`SELECT 1 FROM login_attempts WHERE scope = 'email' AND key = 'locked@example.com' FOR UPDATE`;
+    // A cleanup that waited for the lock would hang here until the test times out.
+    const res = await handleLogin(loginRequest("bystander@example.com", "wrong-password"), SECRET, sql);
+    expect(res.status).toBe(401);
+    expect(await windowRow("email", "free@example.com")).toBeUndefined();
+    expect(await windowRow("email", "locked@example.com")).toBeDefined();
+  });
+});
+
+test.skipIf(!DB)("a success clears the email row and leaves the address row", async () => {
+  await createUser("clear@example.com", "correct-horse", []);
+  const address = "198.51.100.20";
+  expect((await handleLogin(loginRequest("clear@example.com", "wrong-password"), SECRET, sql, address)).status).toBe(401);
+  expect((await windowRow("email", "clear@example.com"))!.attempts).toBe(1);
+
+  expect((await handleLogin(loginRequest("clear@example.com", "correct-horse"), SECRET, sql, address)).status).toBe(200);
+
+  expect(await windowRow("email", "clear@example.com")).toBeUndefined();
+  expect((await windowRow("address", address))!.attempts).toBe(2);
+});
+
+test.skipIf(!DB)("a request past its address threshold adds no email row", async () => {
+  for (let i = 0; i < MAX_ADDRESS_ATTEMPTS + 1; i++) await checkAndRecordAttempt(sql, "address", "198.51.100.30", MAX_ADDRESS_ATTEMPTS);
+  const res = await handleLogin(loginRequest("never-recorded@example.com", "wrong-password"), SECRET, sql, "198.51.100.30");
+  expect(res.status).toBe(429);
+  expect(await windowRow("email", "never-recorded@example.com")).toBeUndefined();
+});
+
+test.skipIf(!DB)("an undefined address writes no address row", async () => {
+  await handleLogin(loginRequest("no-addr-row@example.com", "wrong-password"), SECRET, sql);
+  expect(((await sql`SELECT count(*)::int AS n FROM login_attempts WHERE scope = 'address'`) as { n: number }[])[0]!.n).toBe(0);
+});
+
+// Tenancy is database-per-tenant, so a second tenant here is a second database
+// on the same server. `beta` holds its own `login_attempts` table.
+async function betaDatabase(): Promise<SQL> {
+  const url = new URL(process.env.DATABASE_URL as string);
+  const name = `${url.pathname.replace(/^\//, "")}_login_beta`;
+  const adminUrl = new URL(url);
+  adminUrl.pathname = "/postgres";
+  const admin = new SQL(adminUrl.toString());
+  try {
+    const found = (await admin`SELECT 1 FROM pg_database WHERE datname = ${name}`) as unknown[];
+    // The identifier cannot be a bind parameter; `name` derives from DATABASE_URL.
+    if (found.length === 0) await admin.unsafe(`CREATE DATABASE "${name}"`);
+  } finally {
+    await admin.close();
   }
+  const betaUrl = new URL(url);
+  betaUrl.pathname = `/${name}`;
+  const beta = new SQL(betaUrl.toString());
+  await initSchema(beta);
+  await beta`TRUNCATE auth_users, login_attempts`;
+  return beta;
+}
 
-  expect(checkAndRecordAttempt(map, "new@example.com", now)).toBe("ok");
-  expect(map.has("new@example.com")).toBe(true);
-  expect(map.size).toBe(1); // every expired entry was swept, only the new one remains
-});
+test.skipIf(!DB)(
+  "two tenants with one shared email keep separate windows, in both directions",
+  async () => {
+    const beta = await betaDatabase();
+    try {
+      await createUser("eve@corp.example", "acme-password", [], null, sql);
+      await createUser("eve@corp.example", "beta-password", [], null, beta);
+      const fetch = createServer(
+        createDataSourceRegistry(),
+        createRegistry(),
+        sql,
+        resolveAuthResolver({ AUTH_JWT_SECRET: SECRET }),
+        "*",
+        SECRET,
+        undefined,
+        undefined,
+        async (req) => (req.headers.get("x-test-tenant") === "beta" ? beta : sql),
+      );
+      const login = async (tenant: "acme" | "beta", password: string): Promise<number> =>
+        (
+          await fetch(
+            new Request("http://x/auth/login", {
+              method: "POST",
+              headers: { "content-type": "application/json", "x-test-tenant": tenant },
+              body: JSON.stringify({ email: "eve@corp.example", password }),
+            }),
+          )
+        ).status;
 
-test("a flood of distinct emails leaves the map at its ordinary state once the windows expire", () => {
-  let t = 0;
-  const now = () => t;
-  const map = new Map<string, { count: number; windowStart: number }>();
-  for (let i = 0; i < MAX_TRACKED_EMAILS; i++) map.set(`flood${i}@example.com`, { count: 1, windowStart: t });
+      // beta locks out ...
+      for (let i = 0; i < MAX_ATTEMPTS; i++) expect(await login("beta", "wrong-password")).toBe(401);
+      expect(await login("beta", "beta-password")).toBe(429);
 
-  t += WINDOW_MS + 1;
-  expect(checkAndRecordAttempt(map, "victim@example.com", now)).toBe("ok");
-  expect(map.has("victim@example.com")).toBe(true);
-  expect(map.size).toBe(1); // the whole flood was swept as expired
+      // ... and acme, with the same email, still reaches verifyLogin.
+      expect(await login("acme", "wrong-password")).toBe(401);
+      expect(await login("acme", "acme-password")).toBe(200);
+
+      // acme's success clears acme's row only: beta stays locked.
+      expect(await login("beta", "wrong-password")).toBe(429);
+      expect((await windowRow("email", "eve@corp.example", beta))!.attempts).toBe(MAX_ATTEMPTS + 1);
+      expect(await windowRow("email", "eve@corp.example")).toBeUndefined();
+    } finally {
+      await beta.close();
+    }
+  },
+  60_000,
+);
+
+test.skipIf(!DB)(
+  "two server instances on one database share one count, and 20 simultaneous tries let at most MAX_ATTEMPTS through",
+  async () => {
+    await createUser("shared@example.com", "correct-horse", []);
+    const build = () => createServer(createDataSourceRegistry(), createRegistry(), sql, resolveAuthResolver({ AUTH_JWT_SECRET: SECRET }), "*", SECRET);
+    const first = build();
+    const attempt = (fetch: ReturnType<typeof build>, password = "wrong-password"): Promise<Response> =>
+      fetch(
+        new Request("http://x/auth/login", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ email: "shared@example.com", password }),
+        }),
+      );
+
+    // The second instance stands for a restart: it holds no memory of the first.
+    for (let i = 0; i < MAX_ATTEMPTS; i++) expect((await attempt(first)).status).toBe(401);
+    const second = build();
+    expect((await attempt(second, "correct-horse")).status).toBe(429);
+
+    // A fresh email, 20 tries at once over both instances. A 401 means the try
+    // reached verifyLogin; every other one must be refused.
+    await sql`TRUNCATE login_attempts`;
+    const statuses = (await Promise.all(Array.from({ length: 20 }, (_, i) => attempt(i % 2 === 0 ? first : second)))).map((r) => r.status);
+    expect(statuses.filter((s) => s === 401)).toHaveLength(MAX_ATTEMPTS);
+    expect(statuses.filter((s) => s === 429)).toHaveLength(20 - MAX_ATTEMPTS);
+  },
+  60_000,
+);
+
+// No database needed: the handle records every statement and refuses the ones
+// against `login_attempts`. A statement against `auth_users` is `verifyLogin`.
+test.each([
+  ["the cleanup", /DELETE FROM login_attempts/],
+  ["the window upsert", /INSERT INTO login_attempts/],
+])("a database error in %s answers 500 and never calls verifyLogin", async (_label, failing) => {
+  const statements: string[] = [];
+  const db = ((strings: TemplateStringsArray) => {
+    const text = strings.join("?");
+    statements.push(text);
+    return failing.test(text) ? Promise.reject(new Error("connection terminated")) : Promise.resolve([]);
+  }) as unknown as SQL;
+  const errorSpy = spyOn(console, "error").mockImplementation(() => {});
+  try {
+    const fetch = createServer(createDataSourceRegistry(), createRegistry(), db, resolveAuthResolver({ AUTH_JWT_SECRET: SECRET }), "*", SECRET);
+    const res = await fetch(
+      new Request("http://x/auth/login", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: "down@example.com", password: "irrelevant" }),
+      }),
+    );
+    expect(res.status).toBe(500);
+    expect(statements.some((s) => s.includes("auth_users"))).toBe(false);
+  } finally {
+    errorSpy.mockRestore();
+  }
 });
 
 test.skipIf(!DB)("an email under MAX_ATTEMPTS is not rate-limited", async () => {
