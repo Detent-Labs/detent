@@ -86,3 +86,13 @@ export function hydrateSession(session: Session, account: { displayName?: string
     locale: asUiLocale(account.locale) ?? session.locale,
   };
 }
+
+/**
+ * Whether a `storage` event from another tab ends the session this tab holds:
+ * the stored session is gone, or carries another token. The same token with
+ * other hydrated fields is a rewrite, not an end. A tab holding no session has
+ * nothing to end.
+ */
+export function endedByStorageChange(held: Session | undefined, stored: Session | undefined): boolean {
+  return held !== undefined && (stored === undefined || stored.token !== held.token);
+}

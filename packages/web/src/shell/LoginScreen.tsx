@@ -30,14 +30,26 @@ const styles = stylex.create({
   error: {
     color: colors.refusal,
   },
+  // DESIGN.md's warning callout without its refusal text: a 3px rule in
+  // Advisory, 8px before the text, and the text in ink.
+  notice: {
+    margin: 0,
+    color: colors.text,
+    borderLeftWidth: 3,
+    borderLeftStyle: "solid",
+    borderLeftColor: colors.advisory,
+    paddingLeft: space.s2,
+  },
 });
 
 interface LoginScreenProps {
   locale: UiLocale;
   onLoggedIn: (session: Session) => void;
+  /** A line above the first field, for what happened before this screen appeared. */
+  notice?: string;
 }
 
-export function LoginScreen({ locale, onLoggedIn }: LoginScreenProps) {
+export function LoginScreen({ locale, onLoggedIn, notice }: LoginScreenProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -76,6 +88,11 @@ export function LoginScreen({ locale, onLoggedIn }: LoginScreenProps) {
         }}
       >
         <h1>{t(locale, "login.title")}</h1>
+        {notice && (
+          <p role="status" {...stylex.props(styles.notice)}>
+            {notice}
+          </p>
+        )}
         <label {...stylex.props(styles.formLabel)}>
           {t(locale, "login.email")}
           <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" />

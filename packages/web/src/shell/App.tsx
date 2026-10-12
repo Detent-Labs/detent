@@ -8,6 +8,8 @@ import {
   browserStorage,
   hydrateSession,
   needsHydration,
+  endedByStorageChange,
+  SESSION_STORAGE_KEY,
   type Session,
 } from "./session.js";
 import { AREAS, landingArea, mayEnter, type Area } from "./areas.js";
@@ -67,6 +69,7 @@ export interface AreaRootProps {
 export function App() {
   const { pathname, go } = useLocation();
   const [session, setSession] = useState<Session | undefined>(() => loadSession());
+  const [endedElsewhere, setEndedElsewhere] = useState(false);
   const [locale, setLocale] = useState<UiLocale>(() =>
     loadLocale(browserStorage(), typeof navigator === "undefined" ? undefined : navigator.language),
   );
@@ -80,7 +83,26 @@ export function App() {
   const logout = useCallback(() => {
     clearSession();
     setSession(undefined);
+    setEndedElsewhere(false);
     go(LOGIN_PATH);
+  }, [go]);
+
+  // Another tab removed or replaced the stored session: this tab ends its own
+  // at once, client-side only, and adopts nothing. The ref spares the listener a
+  // re-registration on every session change and a stale closure. A tab already
+  // on the login screen holds no session, so it ignores the event.
+  const heldSession = useRef(session);
+  heldSession.current = session;
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== SESSION_STORAGE_KEY && e.key !== null) return;
+      if (!endedByStorageChange(heldSession.current, loadSession())) return;
+      setSession(undefined);
+      setEndedElsewhere(true);
+      go(LOGIN_PATH);
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
   }, [go]);
 
   // The account menu's picker. Whether the choice reaches `PATCH /account/me`
@@ -136,7 +158,9 @@ export function App() {
     return (
       <LoginScreen
         locale={locale}
+        notice={endedElsewhere ? t(locale, "login.sessionEndedElsewhere") : undefined}
         onLoggedIn={(s) => {
+          setEndedElsewhere(false);
           setSession(s);
           persistSession(s);
           go(`/${landingArea(s.roles)}`);

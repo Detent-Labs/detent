@@ -5,6 +5,7 @@ import {
   clearSession,
   hydrateSession,
   needsHydration,
+  endedByStorageChange,
   SESSION_STORAGE_KEY,
 } from "../src/shell/session.js";
 import { landingArea, mayEnter, permittedAreas } from "../src/shell/areas.js";
@@ -173,5 +174,25 @@ describe("area gating", () => {
     // Chrome.tsx's switcher is exactly `permittedAreas(roles)` minus the open area.
     const others = permittedAreas(["system:datalists"]).filter((a) => a !== "app");
     expect(others).toEqual(["admin"]);
+  });
+});
+
+describe("endedByStorageChange", () => {
+  it("ends the session when another tab logged out", () => {
+    expect(endedByStorageChange(session, undefined)).toBe(true);
+  });
+
+  it("ends the session when another tab logged in with a different token", () => {
+    expect(endedByStorageChange(session, { ...session, token: "tok_other", actorId: "user_2" })).toBe(true);
+  });
+
+  it("keeps the session when the same token comes back with other hydrated fields", () => {
+    expect(endedByStorageChange({ ...session, displayName: undefined, locale: undefined }, session)).toBe(false);
+    expect(endedByStorageChange(session, { ...session, displayName: "Ada L.", locale: "en" })).toBe(false);
+  });
+
+  it("ends nothing when this tab holds no session", () => {
+    expect(endedByStorageChange(undefined, undefined)).toBe(false);
+    expect(endedByStorageChange(undefined, session)).toBe(false);
   });
 });
