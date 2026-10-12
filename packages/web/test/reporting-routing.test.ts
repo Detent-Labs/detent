@@ -39,3 +39,13 @@ describe("the reporting area's process-view routes", () => {
     expect(matchRoute("/reports/rep%20with%20space")).toEqual({ name: "report", reportId: "rep with space" });
   });
 });
+
+describe("the reporting area's malformed address", () => {
+  it("falls back to the picker on a malformed report id", () => {
+    expect(matchRoute("/reports/%E0%A4%A")).toEqual({ name: "picker" });
+  });
+
+  it("falls back to the picker on a malformed process id", () => {
+    expect(matchRoute("/processes/%E0%A4%A/sla")).toEqual({ name: "picker" });
+  });
+});

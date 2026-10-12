@@ -1,13 +1,15 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { matchShell, useLocation, areaHref, LOGIN_PATH, PROFILE_PATH, type NavigateOptions } from "./routing.js";
 import {
   loadSession,
   persistSession,
-  clearSession,
+  clearIfHeld,
   browserStorage,
   hydrateSession,
   needsHydration,
+  endedByStorageChange,
+  SESSION_STORAGE_KEY,
   type Session,
 } from "./session.js";
 import { AREAS, landingArea, mayEnter, type Area } from "./areas.js";
@@ -67,9 +69,19 @@ export interface AreaRootProps {
 export function App() {
   const { pathname, go } = useLocation();
   const [session, setSession] = useState<Session | undefined>(() => loadSession());
+  const [endedElsewhere, setEndedElsewhere] = useState(false);
   const [locale, setLocale] = useState<UiLocale>(() =>
     loadLocale(browserStorage(), typeof navigator === "undefined" ? undefined : navigator.language),
   );
+
+  // The session this tab holds, as every late callback must see it: a layout
+  // effect moves it to the committed session, and the storage handler and
+  // `logout` clear it at once, ahead of the render they queue. A request that
+  // answers in that gap therefore finds no session to write or clear.
+  const heldSession = useRef(session);
+  useLayoutEffect(() => {
+    heldSession.current = session;
+  }, [session]);
 
   // Memoized: passed down as `onUnauthorized`/`onLogout` and, through EditScreen's
   // `load`, into a useCallback dependency array. An inline arrow here gets a new
@@ -78,9 +90,32 @@ export function App() {
   // editor's), which would re-fire `load`'s effect and refetch the draft,
   // discarding unsaved edits.
   const logout = useCallback(() => {
-    clearSession();
+    const held = heldSession.current;
+    // Already ended by a storage event: a late 401 must neither clear storage
+    // nor hide the notice.
+    if (!held) return;
+    heldSession.current = undefined;
+    // Never removes a newer session that another tab stored since.
+    clearIfHeld(held);
     setSession(undefined);
+    setEndedElsewhere(false);
     go(LOGIN_PATH);
+  }, [go]);
+
+  // Another tab removed or replaced the stored session: this tab ends its own
+  // at once, client-side only, and adopts nothing. A tab already on the login
+  // screen holds no session, so it ignores the event.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== SESSION_STORAGE_KEY && e.key !== null) return;
+      if (!endedByStorageChange(heldSession.current, loadSession())) return;
+      heldSession.current = undefined;
+      setSession(undefined);
+      setEndedElsewhere(true);
+      go(LOGIN_PATH);
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
   }, [go]);
 
   // The account menu's picker. Whether the choice reaches `PATCH /account/me`
@@ -115,7 +150,7 @@ export function App() {
     let live = true;
     void fetchAccount(session.token)
       .then((account) => {
-        if (!live) return;
+        if (!live || heldSession.current?.token !== session.token) return;
         const hydrated = hydrateSession(session, account);
         setSession(hydrated);
         persistSession(hydrated);
@@ -136,7 +171,9 @@ export function App() {
     return (
       <LoginScreen
         locale={locale}
+        notice={endedElsewhere ? t(locale, "login.sessionEndedElsewhere") : undefined}
         onLoggedIn={(s) => {
+          setEndedElsewhere(false);
           setSession(s);
           persistSession(s);
           go(`/${landingArea(s.roles)}`);
@@ -165,6 +202,9 @@ export function App() {
           token={session.token}
           locale={locale}
           onSaved={(account) => {
+            // A save that resolves after another tab ended this session
+            // arrives with a closure over the ended one. It writes nothing.
+            if (heldSession.current?.token !== session.token) return;
             // The account of record just moved, so the session follows it, and
             // a locale chosen here becomes the active one at once. The form's
             // own PATCH already carried it to the account, so this writes the
