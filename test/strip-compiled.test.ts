@@ -5,19 +5,14 @@
  * Pure schema work; no DB, so nothing skips.
  */
 import { test, expect, describe } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { authoredProcessBody, type ProcessBody } from "../src/schema/definition.js";
 import { compileProcessBody } from "../src/schema/compile.js";
 import { stripCompiledContent } from "../src/schema/strip-compiled.js";
 
-const EXAMPLES = [
-  "expense-approval.json",
-  "subprocess-credit-check-child.json",
-  "subprocess-loan-parent.json",
-  "purchase-requisition.json",
-  "laptop-inventory.json",
-  "employee-onboarding.json",
-];
+const EXAMPLES = readdirSync(new URL("../examples/", import.meta.url))
+  .filter((f) => f.endsWith(".json"))
+  .sort();
 
 function readExample(name: string): ProcessBody {
   const raw = JSON.parse(readFileSync(new URL(`../examples/${name}`, import.meta.url), "utf-8"));
@@ -25,6 +20,10 @@ function readExample(name: string): ProcessBody {
 }
 
 describe("stripCompiledContent", () => {
+  test("the example list is not empty", () => {
+    expect(EXAMPLES.length).toBeGreaterThan(0);
+  });
+
   for (const name of EXAMPLES) {
     test(`round-trips ${name}`, () => {
       const authored = readExample(name);
