@@ -1676,13 +1676,6 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   Vite. Anchors: `packages/web/src/areas/studio/panels/FieldMatrixGrid.tsx`,
   `packages/web/src/areas/studio/canvas/CanvasView.tsx`,
   `packages/web/vite.config.ts`.
-- **`fix-reporting-builder-ui` (C-6 (= F-6), F-4, F-11; medium)**: The date
-  filter of the report builder computes in UTC and drops the last day, the
-  reporting area does not end the session on a 401, and a failed column
-  choice appears as an empty choice. Anchors:
-  `packages/web/src/areas/reporting/screens/ReportBuilderScreen.tsx`,
-  `packages/web/src/areas/reporting/root.tsx`,
-  `packages/web/src/areas/reporting/screens/ColumnEditor.tsx`.
 - **`widen-test-guards` (G-3, G-4, G-9, G-10, A-6; medium)**: The index guard
   in `migration.test.ts` checks an empty barrel, the example hash and
   round-trip tests cover a subset of the examples, three tests assert only
