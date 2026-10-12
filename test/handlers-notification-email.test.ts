@@ -143,22 +143,24 @@ type FakeServer = {
   stop: () => void;
 };
 
-/** A scriptable SMTP server on a random loopback port. One connection at a time. */
+/** The state of one connection. It rides on the socket, so a late command lands on its own session. */
+type Connection = { index: number; session: FakeSession; buffer: string; inData: boolean };
+
+/** A scriptable SMTP server on a random loopback port. Each connection keeps its own state. */
 function fakeSmtp(opts: FakeOptions = {}): FakeServer {
   const commands: string[] = [];
   const messages: string[] = [];
   const sessions: FakeSession[] = [];
-  let buffer = "";
-  let inData = false;
-  let rcptIndex = 0;
   const replyFor = (verb: string, fallback = "250 ok\r\n") => opts.replies?.[verb] ?? fallback;
 
-  const server = Bun.listen({
+  const server = Bun.listen<Connection>({
     hostname: "127.0.0.1",
     port: 0,
     socket: {
       open(socket) {
-        sessions.push({ commands: [], rcpts: [], messages: [] });
+        const session: FakeSession = { commands: [], rcpts: [], messages: [] };
+        socket.data = { index: sessions.length, session, buffer: "", inData: false };
+        sessions.push(session);
         if (opts.silent) return;
         const greet = () => socket.write(replyFor("GREETING", "220 fake ESMTP\r\n"));
         if (opts.greetingDelayMs) setTimeout(greet, opts.greetingDelayMs);
@@ -166,26 +168,27 @@ function fakeSmtp(opts: FakeOptions = {}): FakeServer {
       },
       data(socket, chunk) {
         if (opts.silent) return;
-        buffer += Buffer.from(chunk).toString("latin1");
+        const conn = socket.data;
+        const { session } = conn;
+        conn.buffer += Buffer.from(chunk).toString("latin1");
         for (;;) {
-          if (inData) {
-            const end = buffer.indexOf("\r\n.\r\n");
+          if (conn.inData) {
+            const end = conn.buffer.indexOf("\r\n.\r\n");
             if (end < 0) return;
-            const message = buffer.slice(0, end);
+            const message = conn.buffer.slice(0, end);
             messages.push(message);
-            sessions[sessions.length - 1]!.messages.push(message);
-            buffer = buffer.slice(end + 5);
-            inData = false;
+            session.messages.push(message);
+            conn.buffer = conn.buffer.slice(end + 5);
+            conn.inData = false;
             socket.write(replyFor("BODY", "250 queued\r\n"));
             if (opts.dropAfterBody) socket.end();
             continue;
           }
-          const eol = buffer.indexOf("\r\n");
+          const eol = conn.buffer.indexOf("\r\n");
           if (eol < 0) return;
-          const line = buffer.slice(0, eol);
-          buffer = buffer.slice(eol + 2);
+          const line = conn.buffer.slice(0, eol);
+          conn.buffer = conn.buffer.slice(eol + 2);
           commands.push(line);
-          const session = sessions[sessions.length - 1]!;
           session.commands.push(line);
           const verb = line.split(/[\s:]/)[0]!.toUpperCase();
           if (verb === "EHLO") {
@@ -196,14 +199,14 @@ function fakeSmtp(opts: FakeOptions = {}): FakeServer {
             session.rcpts.push(line.replace(/^RCPT TO:<(.*)>$/i, "$1"));
             const overLimit = opts.maxRcptPerSession !== undefined && inSession >= opts.maxRcptPerSession;
             socket.write(
-              opts.rcptReplies?.[rcptIndex++] ??
-                opts.sessionRcptReplies?.[sessions.length - 1]?.[inSession] ??
+              opts.rcptReplies?.[inSession] ??
+                opts.sessionRcptReplies?.[conn.index]?.[inSession] ??
                 (overLimit ? "452 too many recipients\r\n" : "250 recipient ok\r\n"),
             );
           } else if (verb === "DATA") {
             const reply = replyFor("DATA", "354 send it\r\n");
             socket.write(reply);
-            if (reply.startsWith("3")) inData = true;
+            if (reply.startsWith("3")) conn.inData = true;
           } else if (verb === "QUIT") {
             socket.write(replyFor("QUIT", "221 bye\r\n"));
             socket.end();
@@ -799,6 +802,32 @@ test("the timeout bounds each session, not the whole delivery", async () => {
   await withFake({ greetingDelayMs: 400 }, async () => {
     const result = (await mailDef.handler(ctxFor(batchConfig(addresses(250)), { timeout: "PT1S" }))) as NotificationEmailResult;
     expect(result.recipients).toHaveLength(250);
+  });
+});
+
+// --- the lease budget ---------------------------------------------------------
+// The outbox abandons a handler that outlives CLAIM_LEASE_MS but cannot cancel
+// it, so a later batch that cannot finish inside the lease must not start.
+
+test("a later batch that cannot fit the lease is never started and the delivery fails as transient", async () => {
+  // The first session takes about 1.5 s. 1.5 s plus the second batch's 29 s bound exceeds the 30 s lease.
+  await withFake({ greetingDelayMs: 1500 }, async (server) => {
+    const err = await rejects(mailDef.handler(ctxFor(batchConfig(addresses(101)), { timeout: "PT29S" })));
+    expect(err).toBeInstanceOf(Error);
+    expect(err).not.toBeInstanceOf(PermanentError);
+    expect((err as Error).message).toContain("1 of 2");
+    expect((err as Error).message).not.toContain("example.test");
+    expect(server.sessions).toHaveLength(1);
+    expect(server.messages).toHaveLength(1);
+  });
+});
+
+test("the first batch always starts, even when the declared timeout exceeds the lease", async () => {
+  await withFake({}, async (server) => {
+    const to = addresses(3);
+    const result = (await mailDef.handler(ctxFor(batchConfig(to), { timeout: "PT31S" }))) as NotificationEmailResult;
+    expect(result.recipients).toEqual(to);
+    expect(server.messages).toHaveLength(1);
   });
 });
 

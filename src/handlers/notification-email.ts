@@ -24,7 +24,7 @@
 import { z } from "zod";
 import { emailAddressSchema, emailsForUserIds } from "../auth/users.js";
 import { durationMs } from "../engine/duration.js";
-import { PermanentError } from "../engine/outbox.js";
+import { CLAIM_LEASE_MS, PermanentError } from "../engine/outbox.js";
 import type { HandlerContext, HandlerDef, OutboxActors } from "../engine/registry.js";
 import { log } from "../log.js";
 
@@ -391,14 +391,15 @@ function clientName(from: string): string {
  * picking one would need a selection rule this engine does not have.
  *
  * ponytail: the candidate list is unbounded, and it sends in batches of
- * SMTP_MAX_RECIPIENTS_PER_SESSION, one session after another. The batch size is
- * fixed at the RFC 5321 minimum. N recipients take ceil(N / 100) sequential
- * sessions inside the outbox's claim lease, and a lease that runs out retries
- * the row and resends the batches already delivered. Candidates come from a
- * publish-validated strategy, and the two shipped ones produce a configured list
- * or one manager. If a strategy ever resolves a directory group of thousands,
- * make the batch size configurable for a relay that allows more, or enqueue one
- * outbox row per batch.
+ * SMTP_MAX_RECIPIENTS_PER_SESSION, one session after another, all inside the
+ * outbox's claim lease. The ceiling is that lease budget. A batch starts only
+ * while the elapsed time plus its timeout bound fits CLAIM_LEASE_MS. A group
+ * that does not fit one lease never finishes: each try sends the batches that
+ * fit, then fails as transient, the batches already sent repeat on every try,
+ * and the row dead-letters after its attempts. `org.group-members` and the group
+ * branch of `org.actor-from-field` resolve whole groups, so the list can grow
+ * past that ceiling. Upgrade entry point: one outbox row per batch (a separate
+ * change), or a remaining lease the handler can read.
  */
 function actorIdsFor(tokens: NotificationActorToken[], actors: OutboxActors | undefined): string[] {
   const ids: string[] = [];
@@ -455,17 +456,18 @@ async function resolveRecipients(
 }
 
 async function notificationEmailHandler(ctx: HandlerContext): Promise<NotificationEmailResult> {
+  const startedAt = performance.now();
   const config = notificationEmailConfigSchema.parse(ctx.config);
   const env = readSmtpEnv();
   const recipients = await resolveRecipients(config, ctx);
 
   // No recipient resolved: send nothing and succeed. A step that resolved to no
-  // candidate already records an `assignment.unresolved` event. When every
-  // resolved account held an invalid address, the per-account drop warnings keep
-  // that visible. Dead-lettering here would report the same fact a second time
-  // and park a row an operator then discards by hand. The warning keeps the
-  // condition visible without that chore. The Message-ID is still built, so `result` keeps its declared shape
-  // for an Action.output mapping.
+  // candidate already records an `assignment.unresolved` event, and a dropped
+  // invalid address already logged its own warning. Dead-lettering here would
+  // report the same fact a second time and park a row an operator then discards
+  // by hand. The warning below keeps the condition visible without that chore.
+  // The Message-ID is still built, so `result` keeps its declared shape for an
+  // Action.output mapping.
   if (recipients.length === 0) {
     log.warn("notification.email resolved no recipient", {
       instanceId: ctx.instanceId,
@@ -492,7 +494,18 @@ async function notificationEmailHandler(ctx: HandlerContext): Promise<Notificati
 
   // Sequential, and a failure in any batch fails the delivery. Earlier batches
   // stay sent; the retry repeats them under the same Message-IDs.
+  //
+  // The outbox abandons a handler that outlives CLAIM_LEASE_MS but cannot cancel
+  // it, and an abandoned handler that kept sending would deliver batches the
+  // retry sends again. So the first batch always starts, and a later one starts
+  // only when the elapsed time plus its own timeout bound fits the lease. The
+  // lease also covers the rest of the claimed rows, so this is an upper bound.
   for (const [i, batch] of batches.entries()) {
+    if (i > 0 && performance.now() - startedAt + timeoutMs > CLAIM_LEASE_MS) {
+      throw new Error(
+        `notification.email: stopped after ${i} of ${batches.length} batches, the next cannot finish inside the ${CLAIM_LEASE_MS}ms claim lease`,
+      );
+    }
     await deliverBatch(config, batch, env, messageIds[i]!, timeoutMs);
   }
   return result;

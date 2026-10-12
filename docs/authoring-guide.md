@@ -855,8 +855,9 @@ with a warning, and the other recipients still get the message.
 
 An action that resolves to no address at all sends nothing and counts as done.
 That happens when a step resolved to no candidate, which the case record
-already reports as an unresolved assignment. Fix the assignment, not the
-notification.
+already reports as an unresolved assignment. It also happens when every
+resolved account holds an invalid address, which the engine logs per account.
+Fix the assignment or the accounts, and leave the notification alone.
 
 The engine reads the actors as they stood when it queued the action. It does
 not read them as they stand when the message goes out. So a case that has moved
