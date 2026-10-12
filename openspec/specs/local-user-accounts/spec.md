@@ -8,7 +8,7 @@ provider: the `auth_users` table, argon2id password hashing/verification
 `POST /auth/login` route and its 8-hour token issuance (signed for the
 `jwt-authentication` capability's local `"bps"` issuer), the generic-401
 non-disclosure rule shared by an unknown email, a wrong password and a
-disabled account, a per-email in-memory rate limiter on repeated login
+disabled account, a per-email, database-backed rate limiter on repeated login
 attempts, and the user-management CLI (`src/auth/cli.ts`). The engine does
 not become an identity provider: no registration, no self-service password
 reset, no MFA, no session store, no refresh tokens and no revocation list.
