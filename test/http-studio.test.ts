@@ -29,7 +29,7 @@ const fetch = createServer(dataSourceReg, reg, sql, devHeaderResolver);
 
 beforeAll(initDb);
 beforeEach(async () => {
-  if (DB) await sql`TRUNCATE drafts, draft_snapshots, templates, outbox, instances, history_entries, instance_events, definitions, migration_plans, permission_grants`;
+  if (DB) await sql`TRUNCATE drafts, draft_snapshots, process_access_roles, templates, outbox, instances, history_entries, instance_events, definitions, migration_plans, permission_grants`;
   if (DB) await clearInstanceAudit();
 });
 
