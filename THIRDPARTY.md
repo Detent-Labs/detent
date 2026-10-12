@@ -66,8 +66,8 @@ Declared directly in a `package.json` (root or a `packages/*` workspace).
 | `jose` | 6.2.4 | MIT |
 | `lucide-react` | 1.50.0 | ISC |
 | `oxlint` | 1.85.0 | MIT |
-| `react` | 19.2.8, 18.3.1 | MIT |
-| `react-dom` | 19.2.8, 18.3.1 | MIT |
+| `react` | 19.2.8 | MIT |
+| `react-dom` | 19.2.8 | MIT |
 | `typescript` | 7.0.2 | Apache-2.0 |
 | `vite` | 8.2.1 | MIT |
 | `zod` | 4.6.5 | MIT |
