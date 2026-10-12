@@ -6,7 +6,7 @@
  * Postgres and skip when DATABASE_URL is unset — a skip is visible, a false green is
  * not.
  */
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { test, expect, beforeAll, beforeEach, spyOn } from "bun:test";
 import { sql, initSchema, createInstance } from "../src/engine/store.js";
@@ -1715,14 +1715,26 @@ test.skipIf(!DB)("schema init drops the three expression indexes the column inde
 // The sites that deliberately keep the jsonb expression are elsewhere — a
 // comparison already narrowed to one row by instance_id, or a residual filter
 // behind another index's selection. The change's design.md enumerates them.
+//
+// The module set is read from the tree: every .ts file of src/runtime/, plus the
+// two engine modules. A reader that moves to a new runtime file stays guarded.
 const PROMOTED_KEYS = ["processId", "version", "status", "currentStepId", "startedBy"];
-const REWRITTEN_MODULES = ["runtime/api.ts", "engine/definitions.ts", "engine/reporting.ts"];
+const ENGINE_REWRITTEN_MODULES = ["engine/definitions.ts", "engine/reporting.ts"];
+const REWRITTEN_MODULES = [
+  ...readdirSync(fileURLToPath(new URL("../src/runtime/", import.meta.url)))
+    .filter((f) => f.endsWith(".ts"))
+    .sort()
+    .map((f) => `runtime/${f}`),
+  ...ENGINE_REWRITTEN_MODULES,
+];
 
 function engineSource(rel: string): string {
   return readFileSync(fileURLToPath(new URL(`../src/${rel}`, import.meta.url)), "utf8");
 }
 
 test("the fully rewritten instance readers name the generated columns, never the jsonb expressions", () => {
+  // An empty directory read must fail the test, not pass it vacuously.
+  expect(REWRITTEN_MODULES.length).toBeGreaterThan(ENGINE_REWRITTEN_MODULES.length);
   const offenders: string[] = [];
   for (const rel of REWRITTEN_MODULES) {
     const src = engineSource(rel);
