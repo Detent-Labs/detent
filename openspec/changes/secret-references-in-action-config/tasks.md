@@ -17,9 +17,9 @@
 
 ## 3. Documents
 
-- [ ] 3.1 Add the `HTTP_SECRET_ENV_ALLOWLIST` row and a section on rotation and the trade-offs to `docs/runbooks/deployment.md`. Check that the row and the section name the entry form.
-- [ ] 3.2 Teach the reference in `docs/authoring-guide.md`, and add one line to `README.md`. Check that both state the whole-value rule.
-- [ ] 3.3 Delete the `secret-references-in-action-config` entry from the audit index in `docs/decisions.md`. Check the index lists no other entry by this name.
+- [x] 3.1 Add the `HTTP_SECRET_ENV_ALLOWLIST` row and a section on rotation and the trade-offs to `docs/runbooks/deployment.md`. Check that the row and the section name the entry form.
+- [x] 3.2 Teach the reference in `docs/authoring-guide.md`, and add one line to `README.md`. Check that both state the whole-value rule.
+- [x] 3.3 Delete the `secret-references-in-action-config` entry from the audit index in `docs/decisions.md`. Check the index lists no other entry by this name.
 
 ## 4. Verification
 
