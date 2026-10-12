@@ -1300,6 +1300,19 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   1300x900 on the group "Personal details": each list names all 12 steps and
   wraps to five lines. Risk (Low): each zone's own control sits below five
   lines of the same names.
+- **FIELDS-26: a changed option value leaves CEL comparisons on the old
+  string.** A change or deletion of an option `value` on a field leaves every
+  CEL comparison such as `data.priority == "high"` on the old string. The
+  type check raises no error and the studio shows no message.
+  The key-rename guard (audit finding E2-7) locks the key against label
+  changes and counts the readers of a key. It leaves this gap open on purpose, since
+  finding a comparison needs a heuristic over CEL string literals, and that
+  heuristic gives false positives. Risk (Medium): a guard stops matching after
+  an option rename, and the path parks.
+
+  Name the fix: extend the reader walk in
+  `packages/web/src/areas/studio/draft/key-readers.ts` to report a string
+  literal compared with the field.
 
 ## Open from the 2026-09-13 Changes tab audit (one OpenSpec change per screen)
 
@@ -1681,11 +1694,6 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   hung target stops the outbox for all tenants, and the admin outbox list has
   no index for its sort order. Anchors: `src/engine/resolution.ts`,
   `src/engine/retention.ts`, `src/engine/host.ts`.
-- **`guard-field-key-renames` (E2-7; medium)**: A label change renames the
-  field key, and the CEL expressions that read the old key keep it. Anchors:
-  `packages/web/src/areas/studio/panels/FieldCatalogPanel.tsx`,
-  `packages/web/src/areas/studio/panels/fieldCatalogLogic.ts`,
-  `packages/web/src/areas/studio/draft/deriveKey.ts`.
 - **`cut-studio-render-cost` (E2-11, E1-6, K-1; medium)**: Hidden tabs
   recompute on every keystroke, the canvas reparses every guard on each
   pointer move, and the studio chunk exceeds the 500 kB warning threshold of
