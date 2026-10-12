@@ -277,7 +277,9 @@ Every operation whose target is not one process SHALL keep the gate it has:
 A draft carries its `proc_` id from its first save. `drafts.process_id` is
 the table's key, and `PUT /drafts/:processId` names it. The
 `process-access-roles` capability's Developer list scopes the four draft
-routes and the drafts list instead. That list works alongside this seam's
+routes, the two publish routes and the drafts list instead. The two publish
+routes still await `requirePermission` with `"publish"`, and the list check
+follows it. That list works alongside this seam's
 `Permission` value, not through it. A grant in this seam names a role. A
 Developer list names an actor or a group, so the two mechanisms stay
 separate. `requireRole` SHALL stay exported and SHALL stay synchronous.
@@ -414,6 +416,15 @@ separate. `requireRole` SHALL stay exported and SHALL stay synchronous.
 - **WHEN** `can(actor, "cancel", processId, db)` runs for that same actor
   and process
 - **THEN** it answers false
+
+#### Scenario: A publish grant does not stand in for a Developer list entry
+
+- **WHEN** an actor holds a stored grant of `"publish"` scoped to one process
+- **AND** the actor holds `system:author` but is not on that process's Developer
+  list
+- **THEN** `can(actor, "publish", processId, db)` answers true
+- **AND** the two publish routes still refuse the actor with 403
+
 ### Requirement: A grant scope carries the plugin envelope
 
 A grant's scope SHALL take the `{ type, config }` shape the definition contract

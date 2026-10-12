@@ -36,19 +36,12 @@ before.
 ### Requirement: The Developer list gates both publish routes
 
 `POST /drafts/:processId/publish` and `POST /processes` SHALL refuse an actor
-who does not hold `ADMIN_ROLE` and does not match the Developer list of the
-process they name. The refusal SHALL be an authorization error, which the
-HTTP wrapper maps to 403. The check SHALL run in addition to the `publish`
-permission check and SHALL NOT replace it. A refusal SHALL persist no version.
+who lacks `ADMIN_ROLE` and does not match the process's Developer list. The
+refusal SHALL be an authorization error. The check SHALL run beside the
+`publish` permission check and SHALL NOT replace it.
 
-A process with no draft and no published version has no Developer list yet.
-Both routes SHALL skip the list check for it, so the first publish of a new
-process stays possible. Both routes SHALL share one definition of that
-condition with the draft routes.
-
-A grant of `"publish"` scoped to a process SHALL NOT stand in for a Developer
-list entry. The two mechanisms stay separate, as the `authorization`
-capability states.
+A process with no draft and no published version has no list yet. Both routes
+SHALL skip the check for it, so its first publish stays possible.
 
 #### Scenario: A publisher off the list gets 403 on both routes
 
@@ -64,6 +57,12 @@ capability states.
 - **WHEN** a group is on a process's Developer list
 - **AND** a member of that group holds `system:author` and `system:publish`
 - **THEN** that member publishes through either route
+
+#### Scenario: A publish grant does not replace a list entry
+
+- **WHEN** an actor holds a grant of `"publish"` scoped to a process
+- **AND** the actor is not on that process's Developer list
+- **THEN** both publish routes refuse the actor
 
 #### Scenario: The list entry alone is not enough
 

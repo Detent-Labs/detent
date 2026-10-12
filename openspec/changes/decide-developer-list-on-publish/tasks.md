@@ -27,5 +27,5 @@
 
 ## 5. Verification
 
-- [ ] 5.1 Run `bun run typecheck`, then `bun run build`, then the full gated `bun test` with `DATABASE_URL` set. Record what each printed.
-- [ ] 5.2 Run the prose gate and the whitespace gate over the branch range. Record what each printed.
+- [x] 5.1 Run `bun run typecheck`, then `bun run build`, then the full gated `bun test` with `DATABASE_URL` set. Record what each printed.
+- [x] 5.2 Run the prose gate and the whitespace gate over the branch range. Record what each printed.
