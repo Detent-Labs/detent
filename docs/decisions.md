@@ -1696,12 +1696,6 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   hung target stops the outbox for all tenants, and the admin outbox list has
   no index for its sort order. Anchors: `src/engine/resolution.ts`,
   `src/engine/retention.ts`, `src/engine/host.ts`.
-- **`harden-tenancy-provisioning` (C-8, C-9, C-14, C-15; medium)**: In SaaS
-  mode a token from an external identity provider never resolves to its
-  tenant, tenant pools open more than once and never close, two tenants can
-  share one database, and the provisioning connection drops its URL
-  parameters. Anchors: `src/auth/jwt.ts`, `src/tenancy/provision.ts`,
-  `src/tenancy/connections.ts`.
 - **`fix-subprocess-step-editor` (E2-3, E2-4, E2-5, E2-12, E2-18; medium)**:
   The subprocess editor offers parent fields as `inputMapping` keys and shows
   "pinned" without writing it, a step kind switch leaves keys behind, the
