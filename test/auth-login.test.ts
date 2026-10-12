@@ -357,8 +357,12 @@ test.skipIf(!DB)("an undefined address writes no address row", async () => {
   expect(((await sql`SELECT count(*)::int AS n FROM login_attempts WHERE scope = 'address'`) as { n: number }[])[0]!.n).toBe(0);
 });
 
-test.skipIf(!DB)("an email far past the btree row limit answers 401, then 429, never 500", async () => {
-  const email = `${"x".repeat(5000)}@example.com`;
+test.skipIf(!DB)("a 6000-character incompressible email answers 401, then 429, never 500", async () => {
+  // Concatenated md5 digests do not compress. A repeated character would, and
+  // Postgres would then store it below the 2704-byte btree row limit.
+  const digests = Array.from({ length: 188 }, (_, i) => new Bun.CryptoHasher("md5").update(String(i)).digest("hex")).join("");
+  const email = `${digests.slice(0, 5988)}@example.com`;
+  expect(email).toHaveLength(6000);
   for (let i = 0; i < MAX_ATTEMPTS; i++) {
     expect((await handleLogin(loginRequest(email, "wrong-password"), SECRET, sql)).status).toBe(401);
   }
