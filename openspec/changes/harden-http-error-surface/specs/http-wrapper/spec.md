@@ -106,6 +106,16 @@ and no copy SHALL exist in a caller.
   `["gestern","inst_x"]`
 - **THEN** the response is `400` with `error.type` equal to `"request-shape"`
 
+#### Scenario: A NUL character in a text position is a 400
+
+- **WHEN** a cursor's text position holds `a\u0000b`
+- **THEN** the response is `400`
+
+#### Scenario: An integer past its column is a 400
+
+- **WHEN** the sequence position of a record cursor holds `2147483648`
+- **THEN** the response is `400`
+
 #### Scenario: A calendar date that does not exist is a 400
 
 - **WHEN** a timestamp position of a cursor holds `2026-02-30 10:00:00+00`

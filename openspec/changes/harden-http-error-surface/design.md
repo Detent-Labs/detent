@@ -160,12 +160,15 @@ reasons still answers 500 through `mapError`. The upgrade entry point is
 ### 6. One instant check for the list route, the report schema and the cast
 
 `parseInstant` moves from `routes.ts` to `src/instant.ts` and uses
-`isInstant`. Three callers share it:
+`isInstant`. Four callers share it:
 
 - `GET /instances` (`createdAfter`, `createdBefore`), as before. The shape
   test is stricter than `Date.parse` alone. A value such as `"Oct 11 2026"`
   passed before and now answers 400. The spec text already says "ISO-8601
   instant".
+- `parseRange` in `reporting-routes.ts` reads `from` and `to` of the three
+  reporting views. It tests them with `isInstant` before `Date.parse`, so the
+  views reject a year before 0001 as well.
 - `reportQuerySchema` refines both bounds with `isInstant`. A bad bound
   raises the existing `RequestShapeError` through `parseBody`. This covers
   create, save, draft preview and column choices.

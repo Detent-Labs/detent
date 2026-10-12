@@ -16,8 +16,8 @@
 - [ ] 2.3 Set `development: false` on `Bun.serve`. Add `ENV NODE_ENV=production` to `docker/engine.Dockerfile`. Two text-level tests read `docker/engine.Dockerfile` and `src/http/server.ts` and expect those two settings, the technique `test/openapi-exclusions.test.ts` uses.
 - [ ] 2.4 Reject a NUL byte in the login email in `handleLogin`, before either rate-limit window records a try.
 - [ ] 2.5 A test sends the NUL-byte login through `createServer` and expects the JSON 400 `request-shape` envelope. It reuses the throwing database handle from 2.2 to show that no query runs. A second test sends six such requests, `MAX_ATTEMPTS` plus one, and expects six 400 answers.
-- [ ] 2.6 Wrap the `getInstanceView` call in the cascade-loop branch of `handleSubmit`. A test wraps `sql` in a `Proxy` that throws on the `instance_drafts` read of `getInstanceView` and forwards everything else. It expects the mapped 500.
-- [ ] 2.7 Start `bun run serve` with `NODE_ENV=production`. Send `POST /auth/login` with a wrong password and expect a JSON 401 and the usual startup output.
+- [ ] 2.6 Wrap the `getInstanceView` call in the cascade-loop branch of `handleSubmit`. A test wraps `sql` in a `Proxy` that throws on the `instance_drafts` read of `getInstanceView` and forwards everything else. It expects the mapped 500. The test calls `handleSubmit` directly and never goes through `createServer`, because the dispatcher catch of 2.1 would hide a missing local try. It needs a submission that ends in `AutomaticCascadeLoop` (see `test/http.test.ts`). The `Proxy` throws on a statement that selects from `instance_drafts`. `begin` and every other member forward to the real handle.
+- [ ] 2.7 Start `bun run serve` in the devcontainer with `NODE_ENV=production`, `AUTH_JWT_SECRET` set and a free `PORT`. Send `POST /auth/login` with an unknown email and expect a JSON 401 and the usual startup output.
 
 ## 3. JWT algorithms and expiry
 
@@ -29,8 +29,9 @@
 
 - [ ] 4.1 Make `routes.ts` import `parseInstant` from `src/instant.ts`. The existing `GET /instances` date tests still pass. Grep `test/` and `packages/web` for `createdAfter` and `createdBefore` values. The web client sends `toISOString()` only. The tests send ISO strings and one `created_at::text` form.
 - [ ] 4.2 Refine `createdAfter` and `createdBefore` in `reportQuerySchema` with `isInstant`. Tests cover create, save, draft preview and column choices with `"letzte Woche"`.
-- [ ] 4.3 Assert both bounds in `buildInstanceWhere`.
-- [ ] 4.4 A test inserts a report row with a bad bound directly. It grants a viewer `read` on the process and runs the report. It expects 400 on `/reporting/reports/:id/table` and on the CSV route. It uses `spyOn(console, "error")` to expect no `unhandled error` entry. A viewer without `read` keeps the empty table.
+- [ ] 4.3 Make `parseRange` in `src/http/reporting-routes.ts` test `from` and `to` with `isInstant` before `Date.parse`. A reporting-view test sends `from=0000-01-01` and expects 400.
+- [ ] 4.4 Assert both bounds in `buildInstanceWhere`.
+- [ ] 4.5 A test inserts a report row with a bad bound directly. It grants a viewer `read` on the process and runs the report. It expects 400 on `/reporting/reports/:id/table` and on the CSV route. It uses `spyOn(console, "error")` to expect no `unhandled error` entry. A viewer without `read` keeps the empty table.
 
 ## 5. Claim on an unknown id
 
