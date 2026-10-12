@@ -129,6 +129,11 @@ export const en = {
   "fieldCatalog.labelLabel": "Label",
   "fieldCatalog.descriptionLabel": "Description",
   "fieldCatalog.keyLabel": "Key",
+  "fieldCatalog.keyReadByMany":
+    "Read by {count} expressions. The label no longer sets this key, and changing the key does not touch them.",
+  "fieldCatalog.keyReadByOne":
+    "Read by 1 expression. The label no longer sets this key, and changing the key does not touch it.",
+  "fieldCatalog.keyPublished": "This field is in a published version. The label no longer sets its key.",
   "fieldCatalog.dataSourceLabel": "Data source",
   "fieldCatalog.requiredLabel": "A participant must fill this in",
   "fieldCatalog.requiredNoSteps": "No step asks for this field yet, so there is nothing to require.",

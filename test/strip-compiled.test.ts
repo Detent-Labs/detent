@@ -5,19 +5,14 @@
  * Pure schema work; no DB, so nothing skips.
  */
 import { test, expect, describe } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { authoredProcessBody, type ProcessBody } from "../src/schema/definition.js";
 import { compileProcessBody } from "../src/schema/compile.js";
 import { stripCompiledContent } from "../src/schema/strip-compiled.js";
 
-const EXAMPLES = [
-  "expense-approval.json",
-  "subprocess-credit-check-child.json",
-  "subprocess-loan-parent.json",
-  "purchase-requisition.json",
-  "laptop-inventory.json",
-  "employee-onboarding.json",
-];
+const EXAMPLES = readdirSync(new URL("../examples/", import.meta.url))
+  .filter((f) => f.endsWith(".json"))
+  .sort();
 
 function readExample(name: string): ProcessBody {
   const raw = JSON.parse(readFileSync(new URL(`../examples/${name}`, import.meta.url), "utf-8"));
@@ -25,6 +20,10 @@ function readExample(name: string): ProcessBody {
 }
 
 describe("stripCompiledContent", () => {
+  test("the example list is not empty", () => {
+    expect(EXAMPLES.length).toBeGreaterThan(0);
+  });
+
   for (const name of EXAMPLES) {
     test(`round-trips ${name}`, () => {
       const authored = readExample(name);
@@ -33,8 +32,8 @@ describe("stripCompiledContent", () => {
   }
 
   test("removes the reserved outcome from a contracted process", () => {
-    // The only example carrying a contract, so the only one exercising the
-    // outcome half of the inverse.
+    // Needs an example whose contract declares the reserved outcome once
+    // compiled, so the outcome half of the inverse has something to remove.
     const compiled = compileProcessBody(readExample("subprocess-credit-check-child.json"));
     expect(compiled.contract?.outcomes).toContain("cancelled");
     expect(stripCompiledContent(compiled).contract?.outcomes).not.toContain("cancelled");
