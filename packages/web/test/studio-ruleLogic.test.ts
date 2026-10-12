@@ -83,6 +83,19 @@ describe("fromRuleCel", () => {
     ]);
   });
 
+  it("reads an integer and a negative literal as comparison rows", () => {
+    const ops = operandsFor(field("prioritaet", "number", { format: "integer" }), [field("amount", "number")]);
+    expect(fromRuleCel("data.prioritaet > -3", ops)!.rows).toEqual([
+      { kind: "cmp", operand: "data.prioritaet", op: ">", value: { kind: "literal", value: -3 } },
+    ]);
+    expect(fromRuleCel("data.prioritaet > 3", ops)!.rows).toEqual([
+      { kind: "cmp", operand: "data.prioritaet", op: ">", value: { kind: "literal", value: 3 } },
+    ]);
+    expect(fromRuleCel("data.amount > -5.0", ops)!.rows).toEqual([
+      { kind: "cmp", operand: "data.amount", op: ">", value: { kind: "literal", value: -5 } },
+    ]);
+  });
+
   it("reads a field-against-field comparison as a field-value row", () => {
     const ops = operandsFor(field("amount", "number"), [field("checked_amount", "number")]);
     const condition = fromRuleCel("data.amount >= data.checked_amount", ops)!;

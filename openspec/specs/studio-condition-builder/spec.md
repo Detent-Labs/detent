@@ -14,6 +14,7 @@ existing condition back by parsing it. A hand-written guard and a built
 one therefore stay one artifact.
 
 ## Requirements
+
 ### Requirement: The builder is the default surface at every condition site
 
 The studio SHALL offer a row builder as the default editor for a path guard.
@@ -284,7 +285,10 @@ operator, which emits `in`.
 
 The value editor SHALL follow the operand's type and the field's own declared
 `format`. A field declaring options in the body SHALL show those options by
-label and write the option value. A boolean SHALL offer yes or no. A number
+label and write the option value. A boolean SHALL offer yes, no and an empty
+choice. A row on a boolean operand starts on the empty choice. The row
+stays incomplete until the author picks yes or no. Picking "No" from the empty
+choice SHALL write the row. A number
 SHALL use a native number input, and a `format: "date"` or
 `format: "datetime"` field SHALL use the matching native input.
 `instance.status` SHALL offer the engine's instance statuses. A field bound to
@@ -323,12 +327,29 @@ resolves those values.
 - **WHEN** a developer picks a `string` field bound to a data source
 - **THEN** the value editor takes free text
 
+#### Scenario: A new boolean row starts empty
+
+- **WHEN** a developer adds a row on a boolean operand
+- **THEN** the value select shows the empty choice
+- **AND** the row shows the incomplete mark
+
+#### Scenario: Choosing No on a new boolean row writes the row
+
+- **WHEN** a developer picks "No" in the value select of that new row
+- **THEN** the builder writes `data.approved == false`
+
 ### Requirement: The written literal follows the operand's declared type
 
 The builder SHALL write a literal in the form the operand's CEL type requires.
 The form the author typed does not govern. A `double` operand SHALL emit the
 CEL `double` form. An `int` operand SHALL emit a bare integer, with no decimal
 part, since a `double` literal does not type-check against an `int`.
+
+The text SHALL be valid CEL for every finite number. A `double` literal whose
+JavaScript text carries an exponent, such as `1e21`, SHALL keep that text
+without a trailing `.0`. An `int` operand SHALL take a safe integer only.
+A value beyond the safe range counts as no literal, and the row stays
+incomplete.
 
 The builder SHALL write a string literal in double quotes. It SHALL escape any
 character the CEL string grammar requires it to escape. It SHALL write a bare
@@ -340,6 +361,8 @@ boolean operand as an explicit comparison against `true`.
   backslash
 - **THEN** the written literal escapes it, and the whole expression parses
 
+<!-- antislop: allow passive-voice -->
+<!-- Why: copied byte for byte from the live requirement. -->
 #### Scenario: A number literal is written in double form
 
 - **WHEN** an author types `1000` as the value of a `number` operand declaring
@@ -352,20 +375,45 @@ boolean operand as an explicit comparison against `true`.
   `{type: "number", format: "integer"}` operand
 - **THEN** the builder writes `data.prioritaet > 3`, which type-checks
 
+#### Scenario: A large double gets valid CEL text
+
+- **WHEN** an author types `1e21` as the value of a `number` operand
+- **THEN** the builder writes `data.amount > 1e+21`, which parses and type-checks
+
+#### Scenario: An integer beyond the safe range is no literal
+
+- **WHEN** an author types `9007199254740993` as the value of a
+  `{type: "number", format: "integer"}` operand
+- **THEN** the row stays marked incomplete, and the written expression omits it
+
+<!-- antislop: allow passive-voice -->
+<!-- Why: copied byte for byte from the live requirement. -->
 #### Scenario: A single-quoted literal is normalised on edit
 
 - **WHEN** an author edits a guard that reads `data.status == 'failed'`
 - **THEN** the written guard reads `data.status == "failed"`, with the same
   meaning
 
+<!-- antislop: allow passive-voice -->
+<!-- Why: copied byte for byte from the live requirement. -->
 ### Requirement: An incomplete row is held in the builder and not written
 
+<!-- antislop: allow negation-habit -->
+<!-- Why: copied byte for byte from the live requirement. -->
 A row may name an operand and carry no value. The builder SHALL then keep the
 row visible and marked incomplete. It SHALL leave that row out of the written
 expression, and SHALL NOT emit a fragment that does not parse.
 
-When no row contributes, the builder SHALL write no expression. That is the
-state an empty text input produces today.
+When rows exist and none contributes, the builder SHALL write nothing. The
+expression the draft holds, if any, SHALL stand as it was.
+
+Removing a row is the one action that can remove that expression. A removal
+that leaves no complete row SHALL remove the condition, the same as clearing
+the text input. A removal at a site whose draft has no condition SHALL leave
+the draft as it was.
+
+The readout line under the rows SHALL show the expression the draft holds while
+no row contributes.
 
 #### Scenario: A half-filled row does not reach the draft
 
@@ -379,12 +427,71 @@ state an empty text input produces today.
 - **THEN** the guard goes away, the same as clearing the text input
 - **AND** the publish-time path rules judge the result as they do today
 
-### Requirement: An automatic path's guard shows a plain-English summary on its canvas edge
+#### Scenario: An unfinished edit keeps the stored condition
 
-The canvas SHALL show a plain-English summary of an automatic path's
-guard as a label on that path's edge. A new pure function,
-`summarizeCondition`, SHALL build that summary from the same
-`Condition`/`Row` model the builder already computes for that guard.
+- **WHEN** a guard reads `data.amount > 1000.0`
+- **AND** an author picks another operand for its only row, which leaves the
+  row without a value
+- **THEN** the row stays visible and marked incomplete
+- **AND** the guard still reads `data.amount > 1000.0`
+
+#### Scenario: Removing a row added to an empty site changes nothing
+
+- **WHEN** a condition site has no expression
+- **AND** an author adds a row and then removes it
+- **THEN** the site writes nothing
+
+### Requirement: The builder reads back every literal it writes
+
+The builder SHALL read each literal it writes back as a comparison row. A
+condition then survives a remount as the same row.
+
+The parser returns an integer literal as a `bigint`. The reader SHALL accept it
+and SHALL turn it into a number while the value stays a safe integer. It SHALL
+fold a unary minus over a numeric literal into a negative number. That holds
+for an integer and a double. A literal outside the safe range stays a raw row,
+and so does any other node.
+
+The rule builder for `validation.rule` shares these readers and SHALL meet the
+same rule.
+
+#### Scenario: An integer literal reads back as a row
+
+- **WHEN** a guard reads `data.prioritaet > 3` and `prioritaet` is a
+  `{type: "number", format: "integer"}` field
+- **THEN** the builder shows one comparison row with the value `3`
+
+#### Scenario: A negative literal reads back as a row
+
+- **WHEN** a guard reads `data.amount > -5.0` and `amount` is a `number` field
+- **THEN** the builder shows one comparison row with the value `-5`
+
+#### Scenario: Every written literal reads back
+
+- **WHEN** the builder writes a literal for a `string`, `bool`, `int` or
+  `double` operand, including a negative number and a double with an exponent
+- **THEN** reading the written text yields a comparison row with the same
+  operand, operator and value
+
+#### Scenario: An unsafe integer stays a raw row
+
+- **WHEN** a guard reads `data.prioritaet == 9007199254740993`
+- **THEN** the builder shows that comparison as one raw row
+
+#### Scenario: A validation rule reads back the same literals
+
+- **WHEN** a field's `validation.rule` reads `data.prioritaet > -3`
+- **THEN** the rule builder shows one comparison row
+
+### Requirement: A path's guard shows a plain-English summary on its canvas edge
+
+The canvas SHALL show a plain-English summary of a path's guard as a label on
+that path's edge. That holds for an automatic path and for a manual path.
+A new pure function, `summarizeCondition`, SHALL build that summary from the
+same `Condition`/`Row` model the builder already computes for that guard.
+
+<!-- antislop: allow synonym-rotation trailing-negation -->
+<!-- Why: copied byte for byte from the removed requirement. -->
 It SHALL NOT read `celReadout`, the builder's raw-CEL preview text, to
 produce this summary. That text is CEL syntax, not a sentence.
 
@@ -392,10 +499,15 @@ A guard the builder cannot represent as rows SHALL show its raw CEL text
 as the edge label instead. See "A fragment the builder cannot represent
 survives as a raw row" above.
 
+The priority badge and the "else" marker stay with automatic paths. A manual
+path draws its guard label and no badge.
+
 #### Scenario: A single-row guard shows its plain-English form
 
 - **WHEN** an automatic path's guard reads `data.status == "approved"`,
   and the builder shows it as one row
+<!-- antislop: allow trailing-negation -->
+<!-- Why: copied byte for byte from the removed scenario. -->
 - **THEN** the path's canvas edge shows a label built from that row, not
   the raw CEL
 
@@ -406,17 +518,31 @@ survives as a raw row" above.
 - **THEN** the path's canvas edge shows that fragment's CEL text as the
   label
 
-### Requirement: The path inspector shows a "triggered by" control, and the guard under an "Only when" heading
+#### Scenario: A manual path's guard shows on its edge
 
+- **WHEN** a manual path's guard reads `data.amount > 1000.0`
+- **THEN** the path's canvas edge shows a label built from that row
+- **AND** the edge shows no priority badge
+
+### Requirement: The path inspector shows a "triggered by" control, and the guard for either trigger under an "Only when" heading
+
+<!-- antislop: allow synonym-rotation negation-habit -->
+<!-- Why: copied byte for byte from the removed requirement. -->
 The path inspector SHALL render the path's existing `trigger` field
 as a two-option segmented control, labeled "triggered by". The options
 are a participant's choice (`trigger: "manual"`), and a condition
 (`trigger: "automatic"`). This SHALL set the same field the path
 inspector sets today; it adds no new field.
 
-Choosing "a condition" SHALL show the existing `ConditionBuilder` row
-UI under an "Only when" heading. Choosing "a participant's choice"
-SHALL hide it, since a manual path carries no guard.
+The path inspector SHALL render the existing `ConditionBuilder` row UI under an
+"Only when" heading for both triggers. On an automatic path the guard decides
+whether the path fires. On a manual path the guard decides whether the
+participant gets the button. The inspector SHALL say so beside the guard.
+The `priority` input SHALL show for an automatic path alone.
+
+Choosing "a participant's choice" SHALL drop the path's `priority` and SHALL
+keep its guard. Choosing "a condition" SHALL keep a guard the path already
+carries.
 
 #### Scenario: Choosing "a condition" shows the guard under "Only when"
 
@@ -426,12 +552,20 @@ SHALL hide it, since a manual path carries no guard.
 - **AND** the existing `ConditionBuilder` row UI renders under an
   "Only when" heading
 
-#### Scenario: Choosing "a participant's choice" hides the guard
+#### Scenario: A manual path shows its guard editor
 
-- **WHEN** the developer selects "a participant's choice" in a path's
-  "triggered by" control
+- **WHEN** the developer opens a manual path
+- **THEN** the "Only when" heading and the `ConditionBuilder` row UI render
+- **AND** no `priority` input renders
+
+#### Scenario: Choosing "a participant's choice" keeps the guard
+
+- **WHEN** the developer builds `amount > 1000` on an automatic path with
+  priority 1, then selects "a participant's choice"
 - **THEN** the path's `trigger` becomes `manual`
-- **AND** no "Only when" panel renders for that path
+- **AND** the path keeps the guard `data.amount > 1000.0`
+- **AND** the path has no `priority`
+- **AND** the "Only when" panel still renders for that path
 
 ### Requirement: The path-guard site's CEL toggle is a labeled "Developer view" disclosure
 

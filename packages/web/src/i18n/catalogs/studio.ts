@@ -111,6 +111,7 @@ export const en = {
   "fieldCatalog.onlyAskWhenHeading": "Only ask this when",
   "fieldCatalog.conditionNoSteps": "No step asks for this field yet, so there is nothing to condition.",
   "fieldCatalog.conditionScopeNote": "Writes to: {steps}.",
+  "fieldCatalog.conditionClear": "Clear on {steps}",
   "fieldCatalog.conditionDivergentNote": "These steps currently disagree: {steps}.",
   "fieldCatalog.conditionLiteralNote": "This replaces a literal condition on: {steps}.",
   "fieldCatalog.whereValuesHeading": "Where values come from",
@@ -249,6 +250,10 @@ export const en = {
   "paths.triggeredByLabel": "triggered by",
   "paths.triggeredByManual": "a participant's choice",
   "paths.triggeredByAutomatic": "a condition",
+  // A manual path's guard: the runtime offers the button only while it holds.
+  "paths.manualGuardNote": "The participant sees this path's button only while the condition holds.",
+  "paths.manualGuardHint": "guard (leave empty to always offer this path)",
+  "paths.automaticGuardHint": "guard (omit for the default/else path)",
 
   "timers.empty": "No timers.",
   "timers.addTimer": "+ Add timer",
@@ -470,6 +475,9 @@ export const en = {
   // The strip inside the preview, named apart from the authoring strip above
   // it: one form-editor screen draws both over the same tab labels.
   "formPreview.formTabsLabel": "Form tabs in the preview",
+  // One line per guarded manual path. The preview has no instance data, so it
+  // draws the control and names the condition the runtime tests.
+  "formPreview.guardedPathNote": "{label}: shown only when {condition}",
 
   "columnMapping.heading": "Column mapping",
   "columnMapping.noColumns": "This list declares no column, so there is nothing to map.",

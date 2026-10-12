@@ -8,6 +8,8 @@ import {
   fieldRequiredOverrides,
   applyRequiredOverride,
   needsTechnicalToggleConfirm,
+  visibleClearSteps,
+  clearConditionLabel,
 } from "../src/areas/studio/draft/field-usage.js";
 import type { Draft } from "../src/areas/studio/draft/types.js";
 
@@ -145,6 +147,68 @@ describe("applyVisibleOverride", () => {
     applyVisibleOverride(d, "field_vendor", undefined);
     expect("visible" in d.workflow!.steps![0]!.view!.fields![0]!).toBe(false);
     expect("visible" in d.workflow!.steps![1]!.view!.fields![0]!).toBe(false);
+  });
+
+  it("drops visible from every referencing entry of a divergent field, so it reads uniform", () => {
+    const d = draft();
+    (d.workflow!.steps![0]!.view!.fields![0] as Record<string, unknown>).visible = false;
+    (d.workflow!.steps![1]!.view!.fields![0] as Record<string, unknown>).visible = { lang: "cel", src: "data.x" };
+    expect(fieldVisibleOverrides(d, "field_vendor").kind).toBe("divergent");
+
+    applyVisibleOverride(d, "field_vendor", undefined);
+
+    expect("visible" in d.workflow!.steps![0]!.view!.fields![0]!).toBe(false);
+    expect("visible" in d.workflow!.steps![1]!.view!.fields![0]!).toBe(false);
+    expect(fieldVisibleOverrides(d, "field_vendor")).toEqual({
+      kind: "uniform",
+      stepIds: ["step_a", "step_b"],
+      value: undefined,
+    });
+  });
+});
+
+describe("visibleClearSteps", () => {
+  it("names every step of a divergent field", () => {
+    expect(visibleClearSteps({ kind: "divergent", stepIds: ["step_a", "step_b"], literalStepIds: [] })).toEqual([
+      "step_a",
+      "step_b",
+    ]);
+  });
+
+  it("names every step of a uniform field that carries a condition", () => {
+    expect(
+      visibleClearSteps({ kind: "uniform", stepIds: ["step_a", "step_b"], value: { lang: "cel", src: "data.x" } }),
+    ).toEqual(["step_a", "step_b"]);
+  });
+
+  it("offers nothing for a uniform field with no condition", () => {
+    expect(visibleClearSteps({ kind: "uniform", stepIds: ["step_a"], value: undefined })).toBeUndefined();
+  });
+
+  it("offers nothing for a field no step references", () => {
+    expect(visibleClearSteps({ kind: "none" })).toBeUndefined();
+  });
+
+  it("follows the draft: shows once a view carries a visible key and hides after the clear", () => {
+    const d = draft();
+    expect(visibleClearSteps(fieldVisibleOverrides(d, "field_vendor"))).toBeUndefined();
+    (d.workflow!.steps![0]!.view!.fields![0] as Record<string, unknown>).visible = { lang: "cel", src: "data.x" };
+    expect(visibleClearSteps(fieldVisibleOverrides(d, "field_vendor"))).toEqual(["step_a", "step_b"]);
+    applyVisibleOverride(d, "field_vendor", undefined);
+    expect(visibleClearSteps(fieldVisibleOverrides(d, "field_vendor"))).toBeUndefined();
+  });
+});
+
+describe("clearConditionLabel", () => {
+  it("names every step it clears, in order", () => {
+    expect(clearConditionLabel(["Draft Requisition", "Manager Approval", "Finance Review"])).toBe(
+      "Clear on Draft Requisition, Manager Approval, Finance Review",
+    );
+  });
+
+  it("keeps a $ in a step label literal", () => {
+    // A string replacement would read `$&` as the matched `{steps}`.
+    expect(clearConditionLabel(["Pay $& go", "Review"])).toBe("Clear on Pay $& go, Review");
   });
 });
 

@@ -5778,3 +5778,116 @@ clip box, across widths. An e2e flow cannot make that measurement;
 only a live render, at a real width, shows the clearance. The source
 scan test covers only the static half, that the style itself declares
 the room.
+
+### Path guards, held condition rows and Add path (`fix-condition-and-path-builders`)
+
+Source: `fix-condition-and-path-builders` task 5.2. A `bun:test` run cannot click
+a control or read a label off a live canvas. The five findings below stay
+manual.
+
+Open Studio at `/studio` and a draft of `purchase_requisition`. Its first step
+carries two manual paths, "Submit for approval" and "Withdraw".
+
+#### A manual path keeps its guard (E2-1)
+
+Open the Steps tab and select that first step. In "Path to", open "Submit for
+approval". Set "triggered by" to "a condition". Build one row under "Only
+when": `quantity` greater than 5. Set "triggered by" back to "a participant's
+choice".
+
+Pass: the "Only when" heading and the row stay on screen.
+
+Pass: no `priority` input shows.
+
+Pass: the Canvas tab draws the path's edge with a label for the row and no
+priority badge.
+
+Pass: the preview in that step's form editor, from the Forms tab, names the
+path and its condition in words. The line sits under the controls.
+
+Pass: "Withdraw" has no condition line in that preview.
+
+#### A half-built row writes nothing (E2-6)
+
+Open a draft of `purchase_requisition`. On the Field matrix tab, find the
+`cost_center` row and clear the "visible" box under Manager Approval. Open
+`Cost Center` on the Fields tab. Its "Only ask this when" zone says the
+steps disagree and names Manager Approval.
+
+Pass: a "Clear on <steps>" command stands in the footer beside "Edit as CEL".
+It names every step that asks for the field.
+
+Press "+ Add row". Return to the Field matrix tab.
+
+Pass: the "visible" box under Manager Approval is still clear.
+
+Back on the Fields tab, press "Remove row". Return to the Field matrix tab.
+
+Pass: the "visible" box under Manager Approval is still clear.
+
+Back on the Fields tab, read the command before you press it.
+
+Pass: the command reads "Clear on Draft Requisition, Manager Approval, Finance
+Review". It names every step that asks for `cost_center`.
+
+Press "Clear on <steps>".
+
+Pass: the row shows every "visible" box ticked. The command no longer shows.
+
+#### An unfinished edit keeps the stored condition (E2-6)
+
+Open a draft of `purchase_requisition` and the Steps tab. Select "Draft
+Requisition" and open its path "Submit for approval". Under "Only when", build
+one row: `Quantity`, `>` and `5`. Then pick `Unit Price` as that row's operand.
+
+Pass: the row turns dashed and shows its incomplete flag.
+
+Pass: the readout under the rows still reads `data.quantity > 5.0`.
+
+Open another tab, then return to the Steps tab and the same path.
+
+Pass: the readout still reads `data.quantity > 5.0`.
+
+Repeat the edit once on a field with a rule. Open `Quantity` on the Fields tab
+and its Validation zone. Under `rule`, build one row that compares this answer
+with `5`. Then pick another field as the row's operand.
+
+Pass: the row turns dashed and shows its incomplete flag.
+
+Pass: the readout under the rows still shows the rule from before the edit.
+
+#### An integer and a negative number read back as rows (E2-10)
+
+Open a draft of `it_offboarding`. In any path's "Only when", add a row on the
+integer field "Backup retention in months". Pick `>` and type `3`. Add a second
+row on the same field with `<` and `-5`. Open another tab, then return to the
+Steps tab and the same path.
+
+Pass: the first row shows the field, `>` and `3` as a comparison row.
+
+Pass: the second row shows the field, `<` and `-5` as a comparison row.
+
+Pass: no row reads "Written by hand. Edit it as CEL."
+
+#### A new boolean row starts empty (E2-14)
+
+In the `purchase_requisition` draft, press "+ Add row" under any path's "Only
+when". Pick the boolean field "Covered by the cost center's remaining budget".
+
+Pass: the value select shows its empty choice as the selected one.
+
+Choose "no".
+
+Pass: the JSON surface carries `data.budget_ok == false` in that path's guard.
+
+#### Add path takes the sibling trigger (E2-17)
+
+Open a draft of `credit_check` and select its `Decide` step, which carries two
+automatic paths. Pick a target step and press "+ Add path".
+
+Pass: the new path's "triggered by" control reads "a condition".
+
+Open a draft of `loan_application` and select its `check` step, a subprocess
+step. Pick a target step and press "+ Add path".
+
+Pass: that new path's "triggered by" control also reads "a condition".

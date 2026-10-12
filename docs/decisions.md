@@ -1707,14 +1707,6 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   share one database, and the provisioning connection drops its URL
   parameters. Anchors: `src/auth/jwt.ts`, `src/tenancy/provision.ts`,
   `src/tenancy/connections.ts`.
-- **`fix-condition-and-path-builders` (E2-1, E2-6, E2-10, E2-14, E2-17;
-  medium)**: A manual path keeps a hidden guard that hides its button at
-  runtime, one "+ Add row" removes every `visible` override when the steps
-  disagree on the condition, the condition builder cannot read back integer
-  or negative literals, a boolean value field shows "No" on an empty row, and
-  "Add path" always creates a manual path. Anchors: `packages/web/src/areas/studio/panels/PathsPanel.tsx`,
-  `packages/web/src/areas/studio/panels/FieldCatalogPanel.tsx`,
-  `packages/web/src/areas/studio/panels/shared/conditionLogic.ts`.
 - **`fix-subprocess-step-editor` (E2-3, E2-4, E2-5, E2-12, E2-18; medium)**:
   The subprocess editor offers parent fields as `inputMapping` keys and shows
   "pinned" without writing it, a step kind switch leaves keys behind, the
@@ -1858,6 +1850,20 @@ LEAF-1, LOAD-1 and REFUSE-1 are local to this section.
   asks for a mono list at 12 pixels, which needs `parseDraftText` to return an
   array. A stale error also stays after an edit. One change per screen should
   take these together. The owner ruled that this change makes no layout change.
+
+## Open from fix-condition-and-path-builders (needs its own OpenSpec change)
+
+The final review of `fix-condition-and-path-builders` (2026-10-12) found one
+gap that the change leaves open. The tag HOLD-1 is local to this section.
+
+- **HOLD-1: an unfinished row in a condition of several rows writes a weaker
+  condition.** Take a stored guard `A && B`, and let the author pick another
+  operand for row A. `toCel` leaves the unfinished row out and writes `B` at
+  once. The saved guard now admits more cases and can reroute an automatic
+  path. The spec text "leave that row out" allows this, so the change kept
+  it. A later change could hold the whole condition while any row is
+  incomplete. Anchors: `commitDecision` and
+  `toCel` in `packages/web/src/areas/studio/panels/shared/conditionLogic.ts`.
 
 ## Open from fix-form-ui-empty-values (needs its own OpenSpec change)
 

@@ -6,6 +6,12 @@ export function updateAt<T>(list: T[], index: number, patch: Partial<T>): T[] {
   return list.map((item, i) => (i === index ? { ...item, ...patch } : item));
 }
 
+/** `list` with the item at `index` replaced whole. Unlike `updateAt`'s merge,
+ * a key the new item lacks is gone. */
+export function replaceAt<T>(list: T[], index: number, next: T): T[] {
+  return list.map((item, i) => (i === index ? next : item));
+}
+
 export function moveTo<T>(list: T[], from: number, to: number): T[] {
   // Clamp to into the valid range [0, list.length - 1]
   const clampedTo = Math.max(0, Math.min(to, list.length - 1));

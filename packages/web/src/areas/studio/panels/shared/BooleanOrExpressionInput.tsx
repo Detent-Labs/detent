@@ -27,8 +27,8 @@ interface Props {
  * carries its own builder/CEL toggle inside it, so the site never shows two
  * controls for one choice.
  *
- * The chosen arm is remembered rather than read back off the value: the builder
- * writes `undefined` while a row is incomplete, and deriving the mode from that
+ * The chosen arm is remembered rather than read back off the value: the value
+ * reads `undefined` while no row is complete, and deriving the mode from that
  * would collapse the override to the checkbox mid-edit. See `overrideMode`.
  *
  * It hands `ConditionInput` no `stepId`, so the picker offers no `child.*`
