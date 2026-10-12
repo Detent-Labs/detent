@@ -824,6 +824,20 @@ test.skipIf(!DB)("a rejected child routes the parent down the rejected path", as
   expect(dataField(p, "field_p_result")).toBe("rejected");
 });
 
+test.skipIf(!DB)("a child that completes in its creation cascade carries no re-resolution mark", async () => {
+  const cv = await publishBody(CHILD_PID, childBody(), emptyRegistry, dataSourceReg);
+  const pv = await publishBody(PARENT_PID, parentMidCascadeBody(cv.version), emptyRegistry, dataSourceReg);
+  const { registry } = engineRegistry();
+  const parent = await startInstance(pv.definition, { processId: PARENT_PID, version: pv.version }, actor);
+  await seedField(parent.instanceId, "field_p_amount", 500);
+
+  await drainOutbox(sql, registry); // delivers the spawn: the child is created marked, then driven to its terminal
+  const childId = subprocessChildId(parent.instanceId, 1, "step_p_sub");
+  const child = await loadInstance(childId);
+  expect(child!.status).toBe("completed");
+  expect(await resolveState(childId)).toBe("idle");
+});
+
 test.skipIf(!DB)("a return interrupted after its first hop is durably resumed by re-resolution", async () => {
   // The production return handler (makeReturnHandler) commits the parent's
   // first hop off the subprocess step inside a locked transaction, then calls

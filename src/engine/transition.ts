@@ -380,21 +380,17 @@ export function planStepEntry(
  * for its own commit (flag and defer, rather than cascade inline) to every
  * step entry.
  *
- * Conditioned on the *resulting* status being `running` — not unconditional —
- * for two reasons. First, a commit onto a terminal step, or a `cancelled`
- * override, would otherwise flag an instance the re-resolution worker's own
- * claim query (`WHERE body->>'status' = 'running'`) never selects again: the
- * mark would sit `'pending'` forever, dead weight with no reader. Second, and
- * more subtly, the re-resolution worker's own resolveAutomatic call commits
- * its cascade hops through this same function while the row is `'claimed'`;
- * an unconditional write would stomp that claim back to `'pending'` on every
- * such hop, so the worker's own end-of-pass `WHERE resolve_state = 'claimed'`
- * clear would match nothing and the row would need a second, purely
- * confirmatory pass to settle at `'idle'`. A cascade whose last hop lands on
- * a terminal step (the common case) now converges in the same pass that did
- * the work; one whose last hop lands on a non-terminal wait-state still takes
- * one extra pass to settle, which is safe — the mark is never lost, only
- * revisited once more than strictly necessary.
+ * A commit whose resulting status is not `running` writes `'idle'` instead: a
+ * terminal step, a `cancelled` override. The re-resolution claim selects
+ * `status = 'running'` rows only, so a mark on a finished instance has no
+ * reader. It would stay in the partial index `instances_resolve_open_idx` for
+ * good and cost the claim a row to skip on every tick. Writing `'idle'` also
+ * overwrites a `'claimed'` mark. The worker's own cascade commits its hops
+ * through this function while the row is `'claimed'`, so a cascade whose last
+ * hop lands on a terminal step settles in the pass that did the work. A hop
+ * onto a `running` step writes `'pending'` over that claim, so the worker's
+ * end-of-pass `WHERE resolve_state = 'claimed'` clear matches nothing and
+ * one more pass settles the row. The mark is never lost.
  *
  * A caller patching `data` must hold the instance row locked (`SELECT ... FOR
  * UPDATE`) across its read and this commit: the predicate does not protect
@@ -444,7 +440,7 @@ export async function applyStepEntry(tx: SQL, plan: StepEntryPlan, extraFields?:
     SET body = body || ${patch}::jsonb,
         transition_seq = ${next.transitionSeq},
         next_timer_at = ${nextTimerAt},
-        resolve_state = CASE WHEN ${next.status} = 'running' THEN 'pending' ELSE resolve_state END,
+        resolve_state = CASE WHEN ${next.status} = 'running' THEN 'pending' ELSE 'idle' END,
         cancel_sweep_state = CASE WHEN ${next.status} = 'cancelled' THEN 'pending' ELSE cancel_sweep_state END
     WHERE instance_id = ${entry.instanceId} AND transition_seq = ${prevSeq}
     RETURNING instance_id`) as unknown[];
@@ -860,13 +856,16 @@ export async function executeAutomaticTransition(
  * transition — no seq bump, no HistoryEntry — so flip and event are written in
  * one transaction guarded by the same OCC predicate: if the instance moved
  * concurrently the UPDATE matches no row and neither the flip nor the event is
- * written. The thrown AutomaticCascadeLoop still names the repeated step to the
- * caller; this is the durable copy of that fact.
+ * written. The same statement clears `resolve_state`: a `faulted` instance is
+ * not `running`, so the re-resolution claim never selects it. The thrown
+ * AutomaticCascadeLoop still names the repeated step to the caller; this is
+ * the durable copy of that fact.
  */
 async function markFaulted(instance: Instance, repeatedStepId: Step["id"], db: SQL): Promise<void> {
   await withTransaction(db, async (tx) => {
     const upd = (await tx`UPDATE instances
-      SET body = jsonb_set(body, '{status}', (${["faulted"]}::jsonb) -> 0)
+      SET body = jsonb_set(body, '{status}', (${["faulted"]}::jsonb) -> 0),
+          resolve_state = 'idle'
       WHERE instance_id = ${instance.instanceId} AND transition_seq = ${instance.transitionSeq}
       RETURNING instance_id`) as unknown[];
     if (upd.length === 0) return; // lost the OCC race: instance moved, nothing to record

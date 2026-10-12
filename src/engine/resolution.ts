@@ -43,6 +43,22 @@ function parseInstance(raw: unknown): Instance {
 }
 
 /**
+ * The claim's inner SELECT. It reads the generated `status` column, so the
+ * partial index `instances_resolve_open_idx` (rows with a mark) serves it in
+ * `instance_id` order and the scan costs the marked rows, not every instance.
+ * Exported so the plan test explains the statement the worker runs.
+ */
+export function claimSelect(db: SQL, leaseMs: number) {
+  return db`SELECT instance_id FROM instances
+    WHERE status = 'running'
+      AND (resolve_state = 'pending'
+        OR (resolve_state = 'claimed' AND resolve_claimed_at < now() - (${leaseMs} * interval '1 millisecond')))
+    ORDER BY instance_id
+    FOR UPDATE SKIP LOCKED
+    LIMIT 100`;
+}
+
+/**
  * One re-resolution pass. Claim `pending` running instances `FOR UPDATE SKIP
  * LOCKED`, run resolveAutomatic on each with its frozen body, then CAS-clear to
  * `idle`. Returns the number of instances processed (a resolver miss is not
@@ -59,15 +75,7 @@ export async function drainResolutions(
   // be reclaimed if this pass dies. FOR UPDATE SKIP LOCKED so concurrent drains
   // never claim the same row.
   const claimed = (await db`UPDATE instances SET resolve_state = 'claimed', resolve_claimed_at = now()
-    WHERE instance_id IN (
-      SELECT instance_id FROM instances
-      WHERE (body->>'status') = 'running'
-        AND (resolve_state = 'pending'
-          OR (resolve_state = 'claimed' AND resolve_claimed_at < now() - (${leaseMs} * interval '1 millisecond')))
-      ORDER BY instance_id
-      FOR UPDATE SKIP LOCKED
-      LIMIT 100
-    )
+    WHERE instance_id IN (${claimSelect(db, leaseMs)})
     RETURNING instance_id, body`) as { instance_id: string; body: unknown }[];
 
   // A failing instance is left 'claimed' rather than requeued to 'pending':
