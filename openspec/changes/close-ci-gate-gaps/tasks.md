@@ -49,9 +49,12 @@
 
 ## 7. Verification
 
-- [ ] 7.1 Run `bun run typecheck` in the devcontainer. Record the exit status.
-- [ ] 7.2 Run `bun run lint` and `bun run build` in the devcontainer. Record both exit statuses.
-- [ ] 7.3 Run the full `bun test` with `DATABASE_URL` set, through `scripts/test-gated.sh`, with `OPENSPEC_TELEMETRY=0`. Record the summary lines and the gate's verdict.
-- [ ] 7.4 Run `bun run test:tz` in the devcontainer. Record its summary.
-- [ ] 7.5 On the host, run the prose, whitespace, machine-path and lockfile gates with the range piped in. Record what each printed.
-- [ ] 7.6 After the push, read the CI log of the `check` job. Confirm that `frozen-lockfile` ran before `bun audit` and passed. Confirm that the host gates printed the fallback note only if a force-push happened.
+- [x] 7.1 Run `bun run typecheck` in the devcontainer. Record the exit status.
+- [x] 7.2 Run `bun run lint` and `bun run build` in the devcontainer. Record both exit statuses.
+- [x] 7.3 Run the full `bun test` with `DATABASE_URL` set, through `scripts/test-gated.sh`, with `OPENSPEC_TELEMETRY=0`. Record the summary lines and the gate's verdict.
+- [x] 7.4 Run `bun run test:tz` in the devcontainer. Record its summary.
+- [x] 7.5 On the host, run the prose, whitespace, machine-path and lockfile gates with the range piped in. Record what each printed.
+
+## Workflow follow-up
+
+- After the push, read the CI log of the `check` job. Confirm that `frozen-lockfile` ran before `bun audit` and passed. Confirm that the host gates printed the fallback note only if a force-push happened.
