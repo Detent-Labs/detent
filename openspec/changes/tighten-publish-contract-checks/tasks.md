@@ -24,9 +24,9 @@
 
 ## 4. Verification
 
-- [ ] 4.1 Run `bun run typecheck`, then `bun run build`, then the full `bun test` through `scripts/test-gated.sh` with `DATABASE_URL` set. Verify: record the printed result.
-- [ ] 4.2 Run the antislop gate over the range: `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`. Verify: it exits 0.
-- [ ] 4.3 Run the whitespace gate over the range: `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh`. Verify: it exits 0.
+- [x] 4.1 Run `bun run typecheck`, then `bun run build`, then the full `bun test` through `scripts/test-gated.sh` with `DATABASE_URL` set. Verify: record the printed result.
+- [x] 4.2 Run the antislop gate over the range: `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`. Verify: it exits 0.
+- [x] 4.3 Run the whitespace gate over the range: `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh`. Verify: it exits 0.
 
 ## Workflow follow-up
 
