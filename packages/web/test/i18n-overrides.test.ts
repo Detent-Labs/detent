@@ -8,7 +8,12 @@
  * runs on every render.
  */
 import { afterEach, describe, expect, it } from "bun:test";
-import { setUiStringOverrides, resolveOverride, loadUiStringOverrides } from "../src/i18n/overrides.js";
+import {
+  setUiStringOverrides,
+  resolveOverride,
+  loadUiStringOverrides,
+  UI_STRINGS_TIMEOUT_MS,
+} from "../src/i18n/overrides.js";
 import { t as shellT } from "../src/shell/catalog.js";
 import { t as appT } from "../src/areas/app/catalog.js";
 import { t as studioT } from "../src/areas/studio/catalog.js";
@@ -90,5 +95,29 @@ describe("loadUiStringOverrides", () => {
   it("leaves the map empty when the body carries no overrides object", async () => {
     await withFetch(async () => Response.json({ overrides: "not a map" }));
     expect(shellT("en", "login.title")).toBe("Log in");
+  });
+
+  it("stops waiting for a request that never answers, and leaves the map empty", async () => {
+    const real = globalThis.fetch;
+    // Answers only by rejecting when the caller's signal aborts, as a real fetch does.
+    const hung = (_url: unknown, init?: RequestInit): Promise<Response> =>
+      new Promise((_resolve, reject) => {
+        const signal = init?.signal;
+        if (!signal) return;
+        if (signal.aborted) return reject(signal.reason);
+        signal.addEventListener("abort", () => reject(signal.reason));
+      });
+    globalThis.fetch = hung as unknown as typeof globalThis.fetch;
+    try {
+      await loadUiStringOverrides(20);
+    } finally {
+      globalThis.fetch = real;
+    }
+    expect(resolveOverride("shell", "en", "login.title")).toBeUndefined();
+    expect(shellT("en", "login.title")).toBe("Log in");
+  }, 1000);
+
+  it("limits the read to 5000 ms", () => {
+    expect(UI_STRINGS_TIMEOUT_MS).toBe(5000);
   });
 });

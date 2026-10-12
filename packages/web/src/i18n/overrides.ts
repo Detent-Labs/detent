@@ -32,17 +32,21 @@ export function resolveOverride(area: string, locale: string, key: string): stri
   return overrides[area]?.[locale]?.[key];
 }
 
+/** How long the boot read of `/ui-strings` may take before the first render proceeds without it. */
+export const UI_STRINGS_TIMEOUT_MS = 5000;
+
 /**
  * Fetch every override and install it. Unauthenticated: the login screen
  * renders before a token exists, and its own wording must be overridable.
  *
  * Swallows every failure. A deployment whose engine is briefly unreachable must
  * still reach its login screen, and wording counts for little against that. The
- * map then stays empty and every screen renders its builtin value.
+ * map then stays empty and every screen renders its builtin value. A stalled
+ * request ends after `timeoutMs` and counts as a failure.
  */
-export async function loadUiStringOverrides(): Promise<void> {
+export async function loadUiStringOverrides(timeoutMs: number = UI_STRINGS_TIMEOUT_MS): Promise<void> {
   try {
-    const res = await fetch(`${API_BASE}/ui-strings`);
+    const res = await fetch(`${API_BASE}/ui-strings`, { signal: AbortSignal.timeout(timeoutMs) });
     if (!res.ok) return;
     const body = (await res.json()) as { overrides?: unknown };
     if (body.overrides && typeof body.overrides === "object") {
