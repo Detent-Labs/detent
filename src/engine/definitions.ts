@@ -408,6 +408,14 @@ type InstanceTransitionActionConfig = { processId: string; instanceIdField: stri
  * would otherwise dead-letter every delivery, one instance at a time, with
  * nothing said at publish time — so this rejects rather than reports.
  *
+ * `instanceIdField` also binds to a data source of type `"instance.query"`
+ * over the action's `processId` (`cross-process-validation`'s "An
+ * instance.transition action's instanceIdField binds to an instance query
+ * over the action's process"). The submit-time option check then admits only
+ * an id that source offers. This rejects too: the body in hand names the
+ * binding, and delivery does not recheck it. A hash-hit re-publish returns
+ * before this runs.
+ *
  * `pathId` resolves into the target process, against the versions holding
  * live instances — the same reporting rule, and the same reason, the
  * `"instance.query"` step/field references above follow: the population a
@@ -420,7 +428,8 @@ async function validateInstanceTransitionReferences(
   db: SQL,
 ): Promise<PublishFinding[]> {
   const findings: PublishFinding[] = [];
-  const catalog = new Set(collectFieldsDeep(body.fields).map((f) => f.id as string));
+  const fields = collectFieldsDeep(body.fields);
+  const catalog = new Set(fields.map((f) => f.id as string));
   const sites = collect(body).filter((s) => s.action.type === INSTANCE_TRANSITION_ACTION_TYPE);
   // One live-count query per target process, not per action site: two actions
   // naming the same target otherwise run the same aggregate twice. The bodies
@@ -445,6 +454,27 @@ async function validateInstanceTransitionReferences(
     if (!catalog.has(config.instanceIdField)) {
       throw new CrossProcessValidationError(
         `instance.transition action at '${loc}' names instanceIdField '${config.instanceIdField}' which the publishing body's own catalog does not declare`,
+      );
+    }
+
+    // 3.6: the field's value is restricted by its bound `instance.query`
+    // source, whose submit-time option check admits only the ids it offers.
+    const field = fields.find((f) => f.id === config.instanceIdField);
+    const bound = field?.dataSource ? (body.dataSources ?? []).find((d) => d.id === field.dataSource) : undefined;
+    if (!bound) {
+      throw new CrossProcessValidationError(
+        `instance.transition action at '${loc}' names instanceIdField '${config.instanceIdField}' which is bound to no data source in the publishing body; bind it to an '${INSTANCE_QUERY_DATA_SOURCE_TYPE}' source over process '${targetProcessId}'`,
+      );
+    }
+    if (bound.type !== INSTANCE_QUERY_DATA_SOURCE_TYPE) {
+      throw new CrossProcessValidationError(
+        `instance.transition action at '${loc}' names instanceIdField '${config.instanceIdField}' bound to data source '${bound.id}' of type '${bound.type}', not '${INSTANCE_QUERY_DATA_SOURCE_TYPE}'`,
+      );
+    }
+    const boundProcessId = (bound.config as InstanceQueryDataSourceConfig).processId as string;
+    if (boundProcessId !== targetProcessId) {
+      throw new CrossProcessValidationError(
+        `instance.transition action at '${loc}' names instanceIdField '${config.instanceIdField}' bound to data source '${bound.id}' over process '${boundProcessId}', not the action's process '${targetProcessId}'`,
       );
     }
 

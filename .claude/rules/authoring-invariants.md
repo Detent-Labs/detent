@@ -108,6 +108,15 @@ its placement.
   checks. It reads the target's live versions, so it cannot sit in
   `definition.ts` or `compile.ts`. This is the first criterion of
   `definition-contract`: a hand-written body cannot bypass it.
+- An `instance.transition` action's `instanceIdField` names a field bound to
+  a data source of type `"instance.query"` over the action's own `processId`.
+  Publish rejects a field with no `dataSource`, a fixed `options` list, a
+  source of another type, or a query over another process. The error is a
+  `CrossProcessValidationError` naming the action's location and the field.
+  The check is `validateInstanceTransitionReferences`, one of
+  `publishBody`'s DB-resolving checks. It runs after the hash-hit return, so
+  an identical re-publish of an older unbound body stays a no-op. The
+  submit-time option check then admits only an id the source offers.
 - `unmappableStep` present iff `onUnmappable === "route-to-step"`. Migration
   maps reference only valid ids.
 - `migrationSpec.fieldMap` is injective. Two sources targeting one field

@@ -8,8 +8,9 @@
 import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, initSchema } from "../src/engine/store.js";
 import { publishBody, CrossProcessValidationError } from "../src/engine/definitions.js";
-import { createDataSourceRegistry } from "../src/engine/registry.js";
 import { createDefaultRegistry, createDefaultDataSourceRegistry } from "../src/engine/host.js";
+import { compileProcessBody } from "../src/schema/compile.js";
+import { definitionHash } from "../src/schema/hash.js";
 import { createProcessInstance } from "../src/runtime/api.js";
 import { writeGrant } from "../src/auth/grants.js";
 import { AuthorizationError, ADMIN_ROLE } from "../src/auth/authorize.js";
@@ -19,10 +20,9 @@ import { clearInstanceAudit } from "./audit-cleanup.js";
 
 const DB = !!process.env.DATABASE_URL;
 const reg = createDefaultRegistry(); // instance.transition registered, for publishBody's own registry check
-const dsReg = createDataSourceRegistry();
-// instance.query registered too, only for the combined-site-kinds test below —
-// every other test's body carries no data source, so the empty dsReg above stays their default.
-const defaultDsReg = createDefaultDataSourceRegistry();
+// instance.query registered: every instance.transition action's field binds to one.
+const dsReg = createDefaultDataSourceRegistry();
+const defaultDsReg = dsReg;
 const actor: Actor = { id: "user_1", roles: [] };
 const pid = (n: string) => n as ProcessId;
 
@@ -35,7 +35,7 @@ const targetV1Body = (): ProcessBody =>
     key: "target",
     label: { en: "Target" },
     baseLocale: "en",
-    fields: [],
+    fields: [{ id: "field_t_label", key: "label", label: { en: "Label" }, type: "string" }],
     workflow: {
       initialStep: "step_a",
       steps: [
@@ -56,7 +56,7 @@ const targetV2Body = (): ProcessBody =>
     key: "target",
     label: { en: "Target" },
     baseLocale: "en",
-    fields: [],
+    fields: [{ id: "field_t_label", key: "label", label: { en: "Label" }, type: "string" }],
     workflow: {
       initialStep: "step_a",
       steps: [
@@ -67,18 +67,33 @@ const targetV2Body = (): ProcessBody =>
     },
   }) as unknown as ProcessBody;
 
-/** One field (`field_target_id`) and one terminal step carrying the `instance.transition` action under test. */
-const actorBody = (config: Record<string, unknown>): ProcessBody =>
-  ({
+/**
+ * One field (`field_target_id`) and one terminal step carrying the
+ * `instance.transition` action under test. The field binds to an
+ * `instance.query` source over the action's own `processId` unless `bind`
+ * overrides the field's `dataSource`, the field's `options`, or the body's
+ * `dataSources`.
+ */
+type Bind = { dataSource?: string | null; options?: unknown[]; dataSources?: unknown[] };
+const queryDs = (processId: unknown) => ({ id: "ds_target", key: "target", type: "instance.query", config: { processId, labelFieldId: "field_t_label" } });
+const actorBody = (config: Record<string, unknown>, bind: Bind = {}): ProcessBody => {
+  const dataSource = bind.dataSource === undefined ? "ds_target" : bind.dataSource;
+  return {
     key: "actor",
     label: { en: "Actor" },
     baseLocale: "en",
-    fields: [{ id: "field_target_id", key: "target_id", label: { en: "Target Id" }, type: "string" }],
+    fields: [{
+      id: "field_target_id", key: "target_id", label: { en: "Target Id" }, type: "string",
+      ...(dataSource ? { dataSource } : {}),
+      ...(bind.options ? { options: bind.options } : {}),
+    }],
+    dataSources: bind.dataSources ?? [queryDs(config.processId)],
     workflow: {
       initialStep: "step_r",
       steps: [{ id: "step_r", key: "r", label: { en: "R" }, type: "task", terminal: true, onEntry: [{ id: "action_it", type: "instance.transition", config }] }],
     },
-  }) as unknown as ProcessBody;
+  } as unknown as ProcessBody;
+};
 
 beforeAll(async () => {
   if (DB) await initSchema();
@@ -132,6 +147,93 @@ test.skipIf(!DB)("a declared instanceIdField publishes, subject to the other che
   expect(result.findings).toEqual([]);
 });
 
+// ---- instanceIdField binds to an instance.query source over the action's process ----
+
+const transitionConfig = (processId: string = TARGET_ID) => ({ processId, instanceIdField: "field_target_id", pathId: "path_ab" });
+
+async function publishRaising(body: ProcessBody): Promise<CrossProcessValidationError> {
+  let raised: unknown;
+  try {
+    await publishBody(ACTOR_ID, body, reg, dsReg);
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(CrossProcessValidationError);
+  return raised as CrossProcessValidationError;
+}
+
+const versionCount = async (processId: string): Promise<number> =>
+  Number(((await sql`SELECT count(*)::int AS n FROM definitions WHERE process_id = ${processId}`) as { n: number }[])[0].n);
+
+test.skipIf(!DB)("a field without a data source rejects the publish, naming the location and the field", async () => {
+  await publishBody(TARGET_ID, targetV1Body(), reg, dsReg);
+  const err = await publishRaising(actorBody(transitionConfig(), { dataSource: null, dataSources: [] }));
+  expect(err.message).toContain("onEntry");
+  expect(err.message).toContain("field_target_id");
+  expect(err.message).toContain("no data source");
+  expect(await versionCount(ACTOR_ID)).toBe(0);
+});
+
+test.skipIf(!DB)("a field with a fixed option list rejects the publish", async () => {
+  await publishBody(TARGET_ID, targetV1Body(), reg, dsReg);
+  const err = await publishRaising(
+    actorBody(transitionConfig(), { dataSource: null, dataSources: [], options: [{ value: "inst_x", label: { en: "X" } }] }),
+  );
+  expect(err.message).toContain("onEntry");
+  expect(err.message).toContain("field_target_id");
+  expect(await versionCount(ACTOR_ID)).toBe(0);
+});
+
+test.skipIf(!DB)("a field bound to another data source type rejects the publish", async () => {
+  await publishBody(TARGET_ID, targetV1Body(), reg, dsReg);
+  const err = await publishRaising(
+    actorBody(transitionConfig(), { dataSources: [{ id: "ds_target", key: "target", type: "db.list", config: { listKey: "products" } }] }),
+  );
+  expect(err.message).toContain("onEntry");
+  expect(err.message).toContain("field_target_id");
+  expect(err.message).toContain("db.list");
+  expect(await versionCount(ACTOR_ID)).toBe(0);
+});
+
+test.skipIf(!DB)("a field bound to a query over another process rejects the publish, naming both process ids", async () => {
+  const OTHER_ID = pid("proc_itcp_other");
+  await publishBody(TARGET_ID, targetV1Body(), reg, dsReg);
+  await publishBody(OTHER_ID, targetV1Body(), reg, dsReg);
+  const err = await publishRaising(actorBody(transitionConfig(), { dataSources: [queryDs(OTHER_ID)] }));
+  expect(err.message).toContain("onEntry");
+  expect(err.message).toContain("field_target_id");
+  expect(err.message).toContain(TARGET_ID);
+  expect(err.message).toContain(OTHER_ID);
+  expect(await versionCount(ACTOR_ID)).toBe(0);
+});
+
+test.skipIf(!DB)("a field bound to a query over the target process publishes", async () => {
+  await publishBody(TARGET_ID, targetV1Body(), reg, dsReg);
+  const result = await publishBody(ACTOR_ID, actorBody(transitionConfig()), reg, dsReg);
+  expect(result.version).toBe(1);
+});
+
+test.skipIf(!DB)("a self-targeting action with a bound field publishes", async () => {
+  const SELF = pid("proc_itcp_self_bound");
+  const result = await publishBody(SELF, actorBody(transitionConfig(SELF)), reg, dsReg);
+  expect(result.version).toBe(1);
+});
+
+test.skipIf(!DB)("a re-publish of an unbound body that an earlier version holds stays a no-op", async () => {
+  await publishBody(TARGET_ID, targetV1Body(), reg, dsReg);
+  const unbound = actorBody(transitionConfig(), { dataSource: null, dataSources: [] });
+  await publishRaising(unbound); // a fresh publish of this body fails the binding rule
+  // A row from before the rule: it reaches the table without the publish path.
+  const compiled = compileProcessBody(unbound);
+  await sql`INSERT INTO definitions (process_id, version, definition_hash, status, body)
+    VALUES (${ACTOR_ID}, 1, ${definitionHash(compiled)}, 'published', ${compiled})`;
+
+  const again = await publishBody(ACTOR_ID, unbound, reg, dsReg);
+  expect(again.version).toBe(1);
+  expect(again.findings).toEqual([]);
+  expect(await versionCount(ACTOR_ID)).toBe(1);
+});
+
 // ---- pathId reported against the versions holding live instances ----
 
 test.skipIf(!DB)("a path every live version carries reports nothing", async () => {
@@ -173,8 +275,9 @@ test.skipIf(!DB)("a target with no live instances reports the path", async () =>
   await publishBody(TARGET_ID, targetV1Body(), reg, dsReg); // no instances created
 
   const result = await publishBody(ACTOR_ID, actorBody({ processId: TARGET_ID, instanceIdField: "field_target_id", pathId: "path_ab" }), reg, dsReg);
-  expect(result.findings).toHaveLength(1);
-  expect(result.findings[0]).toMatchObject({ referenceKind: "path", reference: "path_ab", carriedByVersions: [], liveInstanceCountOutsideCarryingVersions: 0 });
+  const pathFindings = result.findings.filter((f) => f.referenceKind === "path"); // the bound source reports its own label field too
+  expect(pathFindings).toHaveLength(1);
+  expect(pathFindings[0]).toMatchObject({ reference: "path_ab", carriedByVersions: [], liveInstanceCountOutsideCarryingVersions: 0 });
 });
 
 // ---- the publishing actor's read grant on the target ----
@@ -233,7 +336,7 @@ const combinedSiteBody = (): ProcessBody =>
     key: "combined",
     label: { en: "Combined" },
     baseLocale: "en",
-    fields: [{ id: "field_target_id", key: "target_id", label: { en: "Target Id" }, type: "string" }],
+    fields: [{ id: "field_target_id", key: "target_id", label: { en: "Target Id" }, type: "string", dataSource: "ds_iq" }],
     dataSources: [{ id: "ds_iq", key: "iq", type: "instance.query", config: { processId: TARGET_ID, labelFieldId: "field_target_id" } }],
     workflow: {
       initialStep: "step_r",

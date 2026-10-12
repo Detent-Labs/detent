@@ -2,17 +2,17 @@
 
 ## 1. Handler refuses a target of another kind
 
-- [ ] 1.1 In `src/handlers/instance-transition.ts`, throw a `PermanentError` naming both kinds when `target.kind` differs from `acting.kind`. Verify with a test.
-- [ ] 1.2 Add tests to `test/instance-transition.test.ts` for test→published, published→test and same-kind. Verify the first two fail permanently and the third moves.
-- [ ] 1.3 Update the handler's header comment to name the `kind` rule. Verify by reading the comment.
+- [x] 1.1 In `src/handlers/instance-transition.ts`, throw a `PermanentError` naming both kinds when `target.kind` differs from `acting.kind`. Verify with a test.
+- [x] 1.2 Add tests to `test/instance-transition.test.ts` for test→published, published→test and same-kind. Verify the first two fail permanently and the third moves.
+- [x] 1.3 Update the handler's header comment to name the `kind` rule. Verify by reading the comment.
 
 ## 2. Publish binds instanceIdField to an instance query
 
-- [ ] 2.1 In `validateInstanceTransitionReferences`, reject an action whose field has no `instance.query` source over the action's `processId`. Verify with 2.2.
-- [ ] 2.2 Add tests to `test/instance-transition-cross-process.test.ts` for the six binding scenarios and the re-publish scenario. Verify the four rejections name the location and field.
-- [ ] 2.3 Give every existing test body that publishes an `instance.transition` action a bound field. Verify the touched suites pass.
-- [ ] 2.4 Add an end-to-end test: an id the source does not offer fails the option check and enqueues nothing. An offered id moves the target. Verify both.
-- [ ] 2.5 Write the rule in `.claude/rules/authoring-invariants.md`. Verify the new bullet names the check and its placement.
+- [x] 2.1 In `validateInstanceTransitionReferences`, reject an action whose field has no `instance.query` source over the action's `processId`. Verify with 2.2.
+- [x] 2.2 Add tests to `test/instance-transition-cross-process.test.ts` for the six binding scenarios and the re-publish scenario. Verify the four rejections name the location and field.
+- [x] 2.3 Give every existing test body that publishes an `instance.transition` action a bound field. Verify the touched suites pass.
+- [x] 2.4 Add an end-to-end test: an id the source does not offer fails the option check and enqueues nothing. An offered id moves the target. Verify both.
+- [x] 2.5 Write the rule in `.claude/rules/authoring-invariants.md`. Verify the new bullet names the check and its placement.
 
 ## 3. Publish requires migrate on the target
 
