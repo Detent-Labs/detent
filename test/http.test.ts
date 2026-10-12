@@ -2205,6 +2205,16 @@ test.skipIf(!DB)("GET /instances with a cursor decoding to non-string elements i
   expect(body.error.type).toBe("request-shape");
 });
 
+test.skipIf(!DB)("GET /instances with a cursor whose values have the wrong kind is a 400", async () => {
+  for (const wrongValue of [["gestern", "inst_x"], ["2026-02-30 10:00:00+00", "inst_x"], ["2026-10-11T10:00:00Z", "a\u0000b"]]) {
+    const cursor = Buffer.from(JSON.stringify(wrongValue)).toString("base64url");
+    const res = await fetch(authedReq(`http://x/instances?cursor=${cursor}`, "GET", admin));
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: { type: string } };
+    expect(body.error.type).toBe("request-shape");
+  }
+});
+
 test.skipIf(!DB)("GET /instances with a stale but well-formed cursor is still a valid request, answering an empty page", async () => {
   const PID = pid("proc_http_stale_cursor");
   await publishBody(PID, simpleBody(), reg, dataSourceReg);

@@ -62,7 +62,7 @@ export async function getInstanceRecord(
     }
   }
   const limit = Math.min(page.limit ?? DEFAULT_RECORD_LIMIT, MAX_RECORD_LIMIT);
-  const [cursorSeqRaw, cursorAt, cursorId] = page.cursor ? decodeCursor(page.cursor, 3) : [undefined, undefined, undefined];
+  const [cursorSeqRaw, cursorAt, cursorId] = page.cursor ? decodeCursor(page.cursor, ["int32", "text", "text"]) : [undefined, undefined, undefined];
   const cursorSeq = cursorSeqRaw !== undefined ? Number(cursorSeqRaw) : null;
 
   const rows = (await db`

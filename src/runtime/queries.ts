@@ -578,7 +578,7 @@ export async function listInstances(
   await assertNoNonScalarComparedField(filter, filter.dataWhere, db);
 
   const limit = Math.min(page.limit ?? DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT);
-  const [cursorCreatedAt, cursorInstanceId] = page.cursor ? decodeCursor(page.cursor, 2) : [undefined, undefined];
+  const [cursorCreatedAt, cursorInstanceId] = page.cursor ? decodeCursor(page.cursor, ["timestamp", "text"]) : [undefined, undefined];
 
   // created_at::text (created_at_cursor) carries Postgres's full microsecond
   // precision, unlike the driver's own Date conversion of the plain
