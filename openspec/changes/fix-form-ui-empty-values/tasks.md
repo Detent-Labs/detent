@@ -38,7 +38,7 @@
 
 ## 6. Verification
 
-- [ ] 6.1 Run `bun run typecheck`, then `bun run build`, then the full gated `bun test` with `DATABASE_URL` set. Record each result.
-- [ ] 6.2 Run the antislop prose gate and the whitespace gate over the pushed range. Record each result.
+- [x] 6.1 Run `bun run typecheck`, then `bun run build`, then the full gated `bun test` with `DATABASE_URL` set. Record each result.
+- [x] 6.2 Run the antislop prose gate and the whitespace gate over the pushed range. Record each result.
 - [x] 6.3 Check the task screen in a browser on the production build. Cover a cleared number, a cleared date, a completed case and a restored draft.
 - [x] 6.4 Run `/impeccable critique` and `/impeccable audit` on the task route. Record the result.
