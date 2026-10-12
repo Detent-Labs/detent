@@ -339,7 +339,7 @@
 
     "postcss-value-parser": ["postcss-value-parser@4.2.0", "", {}, "sha512-1NNCs6uurfkVbeXG4S8JFT9t19m45ICnif8zWLd5oPSZ50QnwMfK+H3jv408d4jw/7Bttv5axS5IiHoLaVNHeQ=="],
 
-    "react": ["react@19.2.8", "", {}, "sha512-PWaYA1L/q9u2u7xYQi+Y3L3Yfnie7XyLeaJICV1MGD6LprsBxcAqGjYyr0eY3p+QdsA+x/Irkt4Qif8D63+Sbw=="],
+    "react": ["react@19.3.0", "", {}, "sha512-E8LUcbtBWt20bbl2YoHfx4ZDBdxVTfOKtCZn9cDSJ4l6/nuoApcpIBcj47t2wZoVX8g2ZHuMHbiShgCR1T5Sog=="],
 
     "react-dom": ["react-dom@19.2.8", "", { "dependencies": { "scheduler": "^0.27.0" }, "peerDependencies": { "react": "^19.2.8" } }, "sha512-rVprimfGBG3DR+Tq0IQG2DT5PxKth1WIGDmj5yPmlzr4YBe7uyE+Du4oVqTDXZSHGGGXRtTJEGSSePyQCMBglQ=="],
 
@@ -377,12 +377,8 @@
 
     "web/form-ui": ["form-ui@file:packages/form-ui", { "dependencies": { "workflow-engine": "file:../.." }, "devDependencies": { "@stylexjs/stylex": "0.19.1", "@types/react": "^19", "@types/react-dom": "^19" }, "peerDependencies": { "@stylexjs/stylex": "0.19.1", "react": "^19", "react-dom": "^19", "zod": "^4.4.3" } }],
 
-    "web/workflow-engine": ["workflow-engine@root:", {}],
+    "web/react": ["react@19.2.8", "", {}, "sha512-PWaYA1L/q9u2u7xYQi+Y3L3Yfnie7XyLeaJICV1MGD6LprsBxcAqGjYyr0eY3p+QdsA+x/Irkt4Qif8D63+Sbw=="],
 
     "web/form-ui/workflow-engine": ["workflow-engine@file:.", {}],
-
-    "web/workflow-engine/form-ui": ["form-ui@workspace:packages/form-ui"],
-
-    "web/workflow-engine/form-ui/workflow-engine": ["workflow-engine@root:", {}],
   }
 }
