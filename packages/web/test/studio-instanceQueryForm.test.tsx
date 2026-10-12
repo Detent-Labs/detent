@@ -171,3 +171,30 @@ describe("the attribute rows", () => {
     expect(html).not.toContain("An earlier row already uses this column key");
   });
 });
+
+describe("a stored field id the options lack", () => {
+  const stored = '<option value="field_gone" class="studioMono" selected="">field_gone</option>';
+
+  it("stays the selected option of the comparison and attribute selects while the catalog loads", () => {
+    const html = render({ where: REFERENCES.where, attributes: REFERENCES.attributes }, undefined);
+    expect(html.split(stored).length - 1).toBe(2);
+  });
+
+  it("stays the selected option after a failed fetch", () => {
+    const html = render({ where: REFERENCES.where, attributes: REFERENCES.attributes }, undefined, true);
+    expect(html.split(stored).length - 1).toBe(2);
+  });
+
+  it("adds no extra option for a field the catalog holds", () => {
+    const html = render({ where: [{ fieldId: "field_priority", operator: "eq", value: 1 }] }, CATALOG);
+    expect(html).toContain('<option value="field_priority" selected="">Priority (priority)</option>');
+    expect(html).not.toContain('class="studioMono" selected=""');
+  });
+});
+
+describe("the data sources tab", () => {
+  it("keys the instance.query form by its data source, so row text never carries over to another one", () => {
+    const source = readFileSync(join(import.meta.dir, "../src/areas/studio/panels/DataSourcesPanel.tsx"), "utf8");
+    expect(source).toMatch(/<InstanceQueryForm key=\{ds\.id\}/);
+  });
+});

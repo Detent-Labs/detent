@@ -111,7 +111,7 @@ export function rememberTypes(types: RememberedTypes, choices: readonly ColumnCh
 /** The remembered types of one process. */
 export type ProcessTypes = { processId: string; types: RememberedTypes };
 
-export const NO_TYPES: RememberedTypes = new Map();
+const NO_TYPES: RememberedTypes = new Map();
 
 /**
  * `prev` with each loaded comparison's field mapped to its value's type, for

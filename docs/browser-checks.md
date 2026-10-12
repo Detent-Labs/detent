@@ -2470,6 +2470,11 @@ not a number. The JSON then holds neither `value` nor `valueFromField`.
 Pick the boolean field. Pass: a Yes/No choice replaces the text input, and Yes
 writes `true`.
 
+#### A removed row keeps its text to itself
+
+Type `abc` in a number row. Add a second row, then remove the first. Pass: the
+input of the second row is empty.
+
 #### The in list
 
 Switch the operator to `in`. Pass: the right-side choice offers the literal
@@ -2483,6 +2488,9 @@ holds `["a", "b"]`.
 Stop the engine, or block `GET /processes/:id/versions` in the browser's
 network tools. Pick the target again. Pass: one error row stands under the
 process picker. The form marks no reference stale.
+
+The stored comparisons and attributes stay in sight. Each literal control
+refuses input. Each field select still shows its stored field id.
 
 Restore the route and pick another process. Pass: the error row disappears.
 

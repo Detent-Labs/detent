@@ -134,12 +134,27 @@ function StaleMark({ id, known }: { id: string; known: boolean | undefined }) {
   return <span {...stylex.props(styles.studioWarning)}>{t("instanceQuery.staleReference")}</span>;
 }
 
-function FieldOptions({ fields }: { fields: readonly TargetRef[] }) {
-  return fields.map((f) => (
-    <option key={f.id} value={f.id}>
-      {f.label} ({f.key})
-    </option>
-  ));
+/**
+ * One option per field. A stored id the list lacks gets its own leading
+ * option, drawn as the raw id, so the select still shows the row's field
+ * while the catalog loads, after a failed fetch, or for a stale reference.
+ */
+function FieldOptions({ fields, stored = "" }: { fields: readonly TargetRef[]; stored?: string }) {
+  const missing = stored !== "" && !fields.some((f) => f.id === stored);
+  return (
+    <>
+      {missing && (
+        <option value={stored} {...stylex.props(styles.studioMono)}>
+          {stored}
+        </option>
+      )}
+      {fields.map((f) => (
+        <option key={f.id} value={f.id}>
+          {f.label} ({f.key})
+        </option>
+      ))}
+    </>
+  );
 }
 
 const STATUSES = ["running", "completed", "cancelled", "faulted"] as const;
@@ -324,7 +339,7 @@ function ComparisonRow({ entry, fields, ownFields, onChange, onRemove }: Compari
         onChange={(e) => onChange(switchField(entry, e.target.value, fields))}
       >
         <option value="">{t("instanceQuery.pickField")}</option>
-        <FieldOptions fields={fields ?? []} />
+        <FieldOptions fields={fields ?? []} stored={entry.fieldId} />
       </select>
       <select
         aria-label={t("instanceQuery.operator")}
@@ -482,7 +497,7 @@ function AttributeRows({ attributes, fieldOptions, knownFieldIds, onCommit }: At
             />
             <select aria-label={t("instanceQuery.attributeField")} value={row.fieldId} onChange={(e) => patchRow(row.rowId, { fieldId: e.target.value })}>
               <option value="">{t("instanceQuery.pickField")}</option>
-              <FieldOptions fields={fieldOptions} />
+              <FieldOptions fields={fieldOptions} stored={row.fieldId} />
             </select>
             {duplicate && (
               <span id={reasonId} {...stylex.props(styles.studioWarning)}>

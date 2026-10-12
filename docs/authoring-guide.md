@@ -368,8 +368,8 @@ on an `email` field.
 
 One admitting live version is enough, so a field retyped between two live
 versions stays publishable. A `null` literal is exempt. So is a
-`valueFromField` entry, which has no literal. A plugin-typed field admits any
-literal. The check reads only the versions of the target that hold a running
+`valueFromField` entry, which has no literal. A `file` field admits any
+literal, and so does a plugin-typed field. The check reads only the versions of the target that hold a running
 instance.
 
 `attributes` copies more than the label onto the option, for a
