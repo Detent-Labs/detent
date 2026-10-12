@@ -58,7 +58,7 @@ import { describeConfigSchema, type ConfigFieldDescriptor } from "../engine/conf
 import type { ZodTypeAny } from "zod";
 import type { ActorResolver } from "../auth/resolve.js";
 import { requireRole, requirePermission, can, AuthorizationError, DEVELOPER_ROLE, TEMPLATES_ROLE, AUTHOR_ROLE, ADMIN_ROLE, CREATE_ROLE } from "../auth/authorize.js";
-import { addAccessPrincipal, deleteAccessPrincipal, getAccessLists, processesMatchingAccessList, matchesAccessList, requireDeveloperListOrAdmin, type AccessKind } from "../auth/process-access.js";
+import { addAccessPrincipal, deleteAccessPrincipal, getAccessLists, processesMatchingAccessList, matchesAccessList, requireDeveloperListOrAdmin, requirePublishListAccess, type AccessKind } from "../auth/process-access.js";
 import { notFound, RequestShapeError, type HttpResult } from "./errors.js";
 import { route, readJson, parseVersion } from "./routes.js";
 import type { ProcessId, ProcessBody, MigrationSpec, Instance } from "../schema/definition.js";
@@ -277,7 +277,8 @@ export async function handleCreateTestInstance(
  * nothing to accept beyond the process id. Needs an authoring role (either one)
  * and, separately, `PUBLISH_ROLE` — neither authoring role implies anything
  * else, so publishing from Studio stays gated exactly as publishing from
- * anywhere else. `publishBody` and the `base_version` stamp
+ * anywhere else. A process that already has a draft or a version also needs
+ * `ADMIN_ROLE` or a Developer list match (`requirePublishListAccess`). `publishBody` and the `base_version` stamp
  * run inside one `withTransaction` so a stamp failure can never leave a
  * published version with an un-stamped draft — the publish itself would roll
  * back too, matching the "both or neither" a caller expects from one HTTP call.
@@ -298,6 +299,7 @@ export async function handlePublishDraft(
     async (actor) => {
       requireAuthoring(actor);
       await requirePermission(actor, "publish", processId as ProcessId, db);
+      await requirePublishListAccess(actor, processId as ProcessId, db);
     },
     async (actor) => {
       const draft = await getDraft(processId as ProcessId, db);

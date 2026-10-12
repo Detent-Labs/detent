@@ -16,6 +16,7 @@ import { createServer } from "../src/http/server.js";
 import { devHeaderResolver } from "../src/auth/resolve.js";
 import { DEVELOPER_ROLE, PUBLISH_ROLE, TEMPLATES_ROLE, ADMIN_ROLE, REPORTS_ROLE, AUTHOR_ROLE, DATALISTS_ROLE, CREATE_ROLE } from "../src/auth/authorize.js";
 import { matchesAccessList } from "../src/auth/process-access.js";
+import { createGroup, setGroupMembers } from "../src/auth/groups.js";
 import type { Actor } from "../src/cel/eval.js";
 import type { ProcessId, ProcessBody } from "../src/schema/definition.js";
 
@@ -51,6 +52,11 @@ const grantPublish = async (role: string, processId: string): Promise<void> => {
 /** Same as `grantPublish`, for `"migrate"`. */
 const grantMigrate = async (role: string, processId: string): Promise<void> => {
   await sql`INSERT INTO permission_grants (role, permission, scope) VALUES (${role}, ${"migrate"}, ${{ type: "process", config: { processId } }})`;
+};
+
+/** Puts `principal` on `processId`'s Developer list, the entry the publish routes require of a non-admin publisher. */
+const listDeveloper = async (processId: string, principal: string): Promise<void> => {
+  await sql`INSERT INTO process_access_roles (process_id, kind, principal) VALUES (${processId}, ${"developer"}, ${principal}) ON CONFLICT DO NOTHING`;
 };
 
 let n = 0;
@@ -477,6 +483,7 @@ test.skipIf(!DB)("a successful publish stamps base_version, leaves revision unch
   const processId = pid();
   await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("v1"), layout: {}, revision: 0 }));
 
+  await listDeveloper(processId, publisher.id);
   const res = await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", publisher));
   expect(res.status).toBe(200);
   const body = (await res.json()) as { processId: string; version: number; definitionHash: string; status: string };
@@ -492,6 +499,7 @@ test.skipIf(!DB)("a successful publish stamps base_version, leaves revision unch
 test.skipIf(!DB)("a second publish after further edits updates base_version to the latest", async () => {
   const processId = pid();
   await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("v1"), layout: {}, revision: 0 }));
+  await listDeveloper(processId, publisher.id);
   await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", publisher)); // -> version 1
 
   await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("v2"), layout: {}, revision: 0 })); // -> revision 1
@@ -508,6 +516,7 @@ test.skipIf(!DB)("a successful publish carries findings in its response body", a
   const processId = pid();
   await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("v1"), layout: {}, revision: 0 }));
 
+  await listDeveloper(processId, publisher.id);
   const res = await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", publisher));
   expect(res.status).toBe(200);
   const body = (await res.json()) as { findings: unknown[] };
@@ -521,11 +530,73 @@ test.skipIf(!DB)("publishing a draft carrying an instance.query source without a
   const processId = pid();
   await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: instanceQueryDraftBody(targetId), layout: {}, revision: 0 }));
 
-  // authorPublisher: AUTHOR_ROLE + PUBLISH_ROLE, no ADMIN_ROLE and no grant row.
+  // authorPublisher: AUTHOR_ROLE + PUBLISH_ROLE, no ADMIN_ROLE and no grant row. Listed, so the refusal comes from the read grant and not from the list.
+  await listDeveloper(processId, authorPublisher.id);
   const res = await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", authorPublisher));
   expect(res.status).toBe(403);
   const errBody = (await res.json()) as { error: { type: string } };
   expect(errBody.error.type).toBe("authorization");
+});
+
+/* ------------------------------------------- the Developer list on publish
+ * A process that already has a draft needs ADMIN_ROLE or a Developer list match
+ * to publish, on top of system:publish (studio-publish).
+ */
+
+const versionCount = async (processId: string): Promise<number> => {
+  const rows = (await sql`SELECT count(*)::int AS n FROM definitions WHERE process_id = ${processId}`) as { n: number }[];
+  return rows[0]!.n;
+};
+
+const draftBaseVersion = async (processId: string): Promise<number | null> => {
+  const rows = (await sql`SELECT base_version FROM drafts WHERE process_id = ${processId}`) as { base_version: number | null }[];
+  return rows[0]!.base_version;
+};
+
+test.skipIf(!DB)("an unlisted author holding system:publish is refused on publish, persisting no version", async () => {
+  const processId = pid();
+  await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("v1"), layout: {}, revision: 0 }));
+
+  const res = await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", authorPublisher));
+  expect(res.status).toBe(403);
+  expect(((await res.json()) as { error: { type: string } }).error.type).toBe("authorization");
+  expect(await versionCount(processId)).toBe(0);
+  expect(await draftBaseVersion(processId)).toBeNull();
+});
+
+test.skipIf(!DB)("a member of a group on the Developer list publishes", async () => {
+  const processId = pid();
+  await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("v1"), layout: {}, revision: 0 }));
+  const group = await createGroup("publish_list_group", { type: "global" }, sql);
+  await setGroupMembers(group.groupId, [authorPublisher.id], sql);
+  await listDeveloper(processId, group.groupId);
+
+  const res = await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", authorPublisher));
+  expect(res.status).toBe(200);
+  expect(((await res.json()) as { version: number }).version).toBe(1);
+  expect(await versionCount(processId)).toBe(1);
+});
+
+test.skipIf(!DB)("an admin off the Developer list publishes", async () => {
+  const processId = pid();
+  await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("v1"), layout: {}, revision: 0 }));
+  const admin: Actor = { id: "user_admin_publish", roles: [ADMIN_ROLE, AUTHOR_ROLE, PUBLISH_ROLE] };
+
+  const res = await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", admin));
+  expect(res.status).toBe(200);
+  expect(((await res.json()) as { version: number }).version).toBe(1);
+  expect(await versionCount(processId)).toBe(1);
+});
+
+test.skipIf(!DB)("a listed actor without system:publish is still refused on publish", async () => {
+  const processId = pid();
+  await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("v1"), layout: {}, revision: 0 }));
+  // `developer` is the draft's creator, so it is on the list.
+  expect(await matchesAccessList(developer, processId as ProcessId, "developer", sql)).toBe(true);
+
+  const res = await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", developer));
+  expect(res.status).toBe(403);
+  expect(await versionCount(processId)).toBe(0);
 });
 
 // ============================================================
@@ -624,6 +695,7 @@ test.skipIf(!DB)("POST /drafts/:processId/instances succeeds for an admin not on
 test.skipIf(!DB)("POST /drafts/:processId/instances refuses an unlisted author once the process is published with no draft", async () => {
   const processId = pid();
   await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("v1"), layout: {}, revision: 0 }));
+  await listDeveloper(processId, publisher.id);
   await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", publisher));
   // deleteDraft only removes the drafts row (src/engine/drafts.ts), leaving the published
   // `definitions` row in place, so the process now has a published version and no draft.
@@ -651,6 +723,7 @@ test.skipIf(!DB)("GET /processes/:processId/versions/:version with no resolvable
 test.skipIf(!DB)("GET /processes/:processId/versions/:version without system:developer maps to 403, even though the metadata sibling requires no role", async () => {
   const processId = pid();
   await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("v1"), layout: {}, revision: 0 }));
+  await listDeveloper(processId, publisher.id);
   await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", publisher));
 
   const versionRes = await fetch(authedReq(`http://x/processes/${processId}/versions/1`, "GET", bystander));
@@ -663,6 +736,7 @@ test.skipIf(!DB)("GET /processes/:processId/versions/:version without system:dev
 test.skipIf(!DB)("GET /processes/:processId/versions/:version returns the compiled body for a published version", async () => {
   const processId = pid();
   await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("v1"), layout: {}, revision: 0 }));
+  await listDeveloper(processId, publisher.id);
   await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", publisher));
 
   const res = await fetch(authedReq(`http://x/processes/${processId}/versions/1`, "GET", developer));
@@ -708,6 +782,7 @@ test.skipIf(!DB)("GET /migration-plans/... for an unregistered key maps to 404",
 test.skipIf(!DB)("register-then-read round trip; re-registering an unapplied plan overwrites the spec", async () => {
   const processId = pid();
   await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("v1"), layout: {}, revision: 0 }));
+  await listDeveloper(processId, publisher.id);
   await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", publisher)); // -> version 1
   await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("v2"), layout: {}, revision: 0 }));
   await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", publisher)); // -> version 2
@@ -727,6 +802,7 @@ test.skipIf(!DB)("register-then-read round trip; re-registering an unapplied pla
 test.skipIf(!DB)("an author holding a scoped migrate grant registers and reads a plan without system:developer", async () => {
   const processId = pid();
   await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("v1"), layout: {}, revision: 0 }));
+  await listDeveloper(processId, publisher.id);
   await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", publisher)); // -> version 1
   await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("v2"), layout: {}, revision: 0 }));
   await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", publisher)); // -> version 2
@@ -742,6 +818,7 @@ test.skipIf(!DB)("an author holding a scoped migrate grant registers and reads a
 test.skipIf(!DB)("registering a plan with fromVersion equal to toVersion maps to 409 migration-plan", async () => {
   const processId = pid();
   await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("v1"), layout: {}, revision: 0 }));
+  await listDeveloper(processId, publisher.id);
   await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", publisher));
 
   const res = await fetch(authedReq(`http://x/migration-plans/${processId}/1/1`, "PUT", developer, {}));
@@ -753,6 +830,7 @@ test.skipIf(!DB)("registering a plan with fromVersion equal to toVersion maps to
 test.skipIf(!DB)("registering against an already-applied plan is rejected", async () => {
   const processId = pid();
   await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("v1"), layout: {}, revision: 0 }));
+  await listDeveloper(processId, publisher.id);
   await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", publisher));
   await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("v2"), layout: {}, revision: 0 }));
   await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", publisher));
@@ -785,6 +863,7 @@ test.skipIf(!DB)("GET .../orphan-keys for an unpublished version maps to 409 mig
 test.skipIf(!DB)("GET .../orphan-keys for a clean published version returns an empty result", async () => {
   const processId = pid();
   await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("v1"), layout: {}, revision: 0 }));
+  await listDeveloper(processId, publisher.id);
   await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", publisher));
 
   const res = await fetch(authedReq(`http://x/processes/${processId}/versions/1/orphan-keys`, "GET", developer));
@@ -797,6 +876,7 @@ test.skipIf(!DB)("GET .../orphan-keys for a clean published version returns an e
 test.skipIf(!DB)("an author holding a scoped migrate grant scans orphan keys without system:developer", async () => {
   const processId = pid();
   await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("v1"), layout: {}, revision: 0 }));
+  await listDeveloper(processId, publisher.id);
   await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", publisher));
   await grantMigrate("finance-authors", processId);
 
@@ -808,6 +888,7 @@ test.skipIf(!DB)("GET .../orphan-keys reports an instance's data keys absent fro
   const processId = pid();
   const fieldA = { id: "field_a", key: "a", label: { en: "A" }, type: "string" };
   await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("v1", [fieldA]), layout: {}, revision: 0 }));
+  await listDeveloper(processId, publisher.id);
   await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", publisher));
 
   const inst = await mkInstance(processId as ProcessId, 1, { field_a: "kept", field_ghost: "orphan" });
@@ -1022,6 +1103,7 @@ test.skipIf(!DB)("a curator reads a published version's body, the one source a t
     authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("Seedable"), layout: {}, revision: 0 }),
   );
   expect(published.status).toBe(200);
+  await listDeveloper(processId, publisher.id);
   expect((await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", publisher))).status).toBe(200);
 
   const res = await fetch(authedReq(`http://x/processes/${processId}/versions/1`, "GET", curator));
@@ -1157,6 +1239,7 @@ test.skipIf(!DB)("an author publishes only with the publish role", async () => {
       .status,
   ).toBe(200);
   expect((await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", author))).status).toBe(403);
+  await listDeveloper(processId, authorPublisher.id);
   expect((await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", authorPublisher))).status).toBe(200);
 });
 
@@ -1171,6 +1254,7 @@ test.skipIf(!DB)("an author reads the templates and a published version body, an
 
   const processId = pid();
   await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", author, { body: publishableBody("Seedable"), layout: {}, revision: 0 }));
+  await listDeveloper(processId, authorPublisher.id);
   expect((await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", authorPublisher))).status).toBe(200);
   expect((await fetch(authedReq(`http://x/processes/${processId}/versions/1`, "GET", author))).status).toBe(200);
 });
