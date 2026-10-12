@@ -23,9 +23,9 @@
 
 ## 4. Authoring guide
 
-- [ ] 4.1 In `docs/authoring-guide.md`, state that `instanceIdField` binds to an `instance.query` source over the target process. Verify the example gains the data source and the bound field.
-- [ ] 4.2 State the trust model and the `migrate` rule in the same section. Verify it says the source offers every instance it selects.
-- [ ] 4.3 Strike the `bind-instance-transition-target` entry from the audit index in `docs/decisions.md`. Verify `git grep -n "bind-instance-transition-target" docs/decisions.md` finds none.
+- [x] 4.1 In `docs/authoring-guide.md`, state that `instanceIdField` binds to an `instance.query` source over the target process. Verify the example gains the data source and the bound field.
+- [x] 4.2 State the trust model and the `migrate` rule in the same section. Verify it says the source offers every instance it selects.
+- [x] 4.3 Strike the `bind-instance-transition-target` entry from the audit index in `docs/decisions.md`. Verify `git grep -n "bind-instance-transition-target" docs/decisions.md` finds none.
 
 ## 5. Verification
 
