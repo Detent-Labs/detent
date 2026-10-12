@@ -75,6 +75,6 @@ Every group lands its own tests.
 
 ## 6. Verification
 
-- [ ] 6.1 Run `bun run lint`, then `bun run typecheck`, then `bun run build`, then the full `bun test` with `DATABASE_URL` set, through `sh scripts/test-gated.sh bun test` in the devcontainer. Verify: all four exit 0 with 0 failures and a skip count at the floor.
-- [ ] 6.2 Run the antislop linter on every Markdown file the change touched. Verify: `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` exits 0.
-- [ ] 6.3 Run the whitespace gate. Verify: `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh` exits 0.
+- [x] 6.1 Run `bun run lint`, then `bun run typecheck`, then `bun run build`, then the full `bun test` with `DATABASE_URL` set, through `sh scripts/test-gated.sh bun test` in the devcontainer. Verify: all four exit 0 with 0 failures and a skip count at the floor.
+- [x] 6.2 Run the antislop linter on every Markdown file the change touched. Verify: `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` exits 0.
+- [x] 6.3 Run the whitespace gate. Verify: `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh` exits 0.
