@@ -13,8 +13,8 @@ import { compileProcessBody } from "../src/schema/compile.js";
 import { definitionHash } from "../src/schema/hash.js";
 import { createProcessInstance } from "../src/runtime/api.js";
 import { writeGrant } from "../src/auth/grants.js";
-import { AuthorizationError, ADMIN_ROLE, DEVELOPER_ROLE, can } from "../src/auth/authorize.js";
-import { addAccessPrincipal } from "../src/auth/process-access.js";
+import { AuthorizationError, ADMIN_ROLE, AUTHOR_ROLE, DEVELOPER_ROLE, can } from "../src/auth/authorize.js";
+import { addAccessPrincipal, matchesAccessList } from "../src/auth/process-access.js";
 import type { ProcessBody, ProcessId } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
 import { clearInstanceAudit } from "./audit-cleanup.js";
@@ -295,6 +295,8 @@ test.skipIf(!DB)("an author without the read grant on an instance.transition tar
     raised = e;
   }
   expect(raised).toBeInstanceOf(AuthorizationError);
+  // The read check runs first, so the error names the read role, not migrate's.
+  expect((raised as AuthorizationError).message).toContain("system:admin");
 });
 
 test.skipIf(!DB)("an author holding the read grant publishes", async () => {
@@ -369,6 +371,7 @@ test.skipIf(!DB)("publishing rejects a body naming one ungranted target from bot
     raised = e;
   }
   expect(raised).toBeInstanceOf(AuthorizationError);
+  expect((raised as AuthorizationError).message).toContain("system:admin");
 });
 
 test.skipIf(!DB)("an author holding the read grant publishes a body naming one target from both site kinds", async () => {
@@ -470,6 +473,50 @@ test.skipIf(!DB)("a Reader list entry on the target does not stand in for migrat
 
   const err = await publishRaisingAs(ACTOR_ID, actorBody(transitionConfig()), listed);
   expect(err.message).toContain(TARGET_ID);
+  expect(await versionCount(ACTOR_ID)).toBe(0);
+});
+
+// Holding migrate without read still fails: the read gate covers instance.transition targets.
+test.skipIf(!DB)("an author with a stored migrate grant and no read on the target fails the read gate", async () => {
+  await publishBody(TARGET_ID, targetV1Body(), reg, dsReg);
+  await grantOn("itcp-migrate-only", "migrate", TARGET_ID);
+  const migrateOnly: Actor = { id: "user_migrate_only", roles: ["itcp-migrate-only"] };
+
+  const err = await publishRaisingAs(ACTOR_ID, actorBody(transitionConfig()), migrateOnly);
+  expect(err.message).toContain("system:admin");
+  expect(err.message).toContain(TARGET_ID);
+  expect(await versionCount(ACTOR_ID)).toBe(0);
+});
+
+test.skipIf(!DB)("an author with the developer role and no read on the target fails the read gate", async () => {
+  await publishBody(TARGET_ID, targetV1Body(), reg, dsReg);
+  const developer: Actor = { id: "user_dev_noread", roles: [DEVELOPER_ROLE] };
+
+  const err = await publishRaisingAs(ACTOR_ID, actorBody(transitionConfig()), developer);
+  expect(err.message).toContain("system:admin");
+  expect(await versionCount(ACTOR_ID)).toBe(0);
+});
+
+test.skipIf(!DB)("an author holding only the operator role has read and no migrate, and fails on migrate", async () => {
+  await publishBody(TARGET_ID, targetV1Body(), reg, dsReg);
+  const operator: Actor = { id: "user_operator_only", roles: [ADMIN_ROLE] };
+
+  const err = await publishRaisingAs(ACTOR_ID, actorBody(transitionConfig()), operator);
+  expect(err.message).toContain("system:developer");
+  expect(err.message).toContain(TARGET_ID);
+  expect(await versionCount(ACTOR_ID)).toBe(0);
+});
+
+test.skipIf(!DB)("a Developer list entry on the target does not stand in for migrate", async () => {
+  await publishBody(TARGET_ID, targetV1Body(), reg, dsReg);
+  await addAccessPrincipal({ id: "user_admin_acl_dev", roles: [ADMIN_ROLE] }, TARGET_ID, "developer", "user_dev_listed", sql);
+  await grantOn("itcp-dev-listed", "read", TARGET_ID);
+  // AUTHOR_ROLE satisfies the Developer list's role clause, so the list matches this actor.
+  const listed: Actor = { id: "user_dev_listed", roles: ["itcp-dev-listed", AUTHOR_ROLE] };
+  expect(await matchesAccessList(listed, TARGET_ID, "developer", sql)).toBe(true);
+
+  const err = await publishRaisingAs(ACTOR_ID, actorBody(transitionConfig()), listed);
+  expect(err.message).toContain("system:developer");
   expect(await versionCount(ACTOR_ID)).toBe(0);
 });
 
