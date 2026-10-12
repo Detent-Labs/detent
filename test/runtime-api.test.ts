@@ -11,7 +11,7 @@ import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, initSchema, withTransaction, appendInstanceEvent, newInstanceEventId, createInstance } from "../src/engine/store.js";
 import { publishBody } from "../src/engine/definitions.js";
 import { createRegistry, createDataSourceRegistry, createAssignmentRegistry } from "../src/engine/registry.js";
-import { executeManualTransition, cancelInstance, fireTimer, ConcurrencyConflict, GuardRefused, AutomaticCascadeLoop } from "../src/engine/transition.js";
+import { executeManualTransition, cancelInstance, fireTimer, ConcurrencyConflict, GuardRefused, AutomaticCascadeLoop, applyDataPatch } from "../src/engine/transition.js";
 import { compileProcessBody } from "../src/schema/compile.js";
 import { definitionHash } from "../src/schema/hash.js";
 import {
@@ -2820,6 +2820,24 @@ test.skipIf(!DB)("a createdBefore built from a summary's millisecond-truncated c
   expect(beforePage.items).toEqual([]);
 });
 
+test.skipIf(!DB)("listInstances and queryInstances reject a creation bound that is no instant as a request-shape error, never as a 500", async () => {
+  const PID = pid("proc_list_created_bad_bound");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  await createProcessInstance(PID, actor, dataSourceReg);
+
+  for (const bound of [{ createdAfter: "letzte Woche" }, { createdBefore: "0000-01-01" }, { createdBefore: "" }]) {
+    for (const run of [() => listInstances({ processId: PID, ...bound }), () => queryInstances({ processId: PID, ...bound })]) {
+      let raised: unknown;
+      try {
+        await run();
+      } catch (e) {
+        raised = e;
+      }
+      expect({ bound, type: (raised as Error | undefined)?.constructor.name }).toEqual({ bound, type: "RequestShapeError" });
+    }
+  }
+});
+
 // ------------------------------------------------------------
 // dataWhere
 // ------------------------------------------------------------
@@ -3388,4 +3406,274 @@ test.skipIf(!DB)("getInstanceRecord is refused for a plain participant, even for
     raised = e;
   }
   expect(raised).toBeInstanceOf(AuthorizationError);
+});
+
+// ============================================================
+// A null value clears a field; a blank value is missing (fix-form-ui-empty-values)
+// ============================================================
+
+/**
+ * step_a: amount (optional, catalog default 120), due_on (optional date),
+ * category (optional, static options), locked (readonly, catalog default),
+ * name (required string), zero (required number), flag (required boolean).
+ * step_a --(path_ab, manual, guardless)--> step_b (terminal).
+ */
+const clearBody = (): ProcessBody =>
+  ({
+    key: "clear_body",
+    label: { en: "Clear Body" },
+    baseLocale: "en",
+    fields: [
+      { id: "field_amount", key: "amount", label: { en: "Amount" }, type: "number", default: 120 },
+      { id: "field_due_on", key: "due_on", label: { en: "Due On" }, type: "string", format: "date" },
+      {
+        id: "field_category",
+        key: "category",
+        label: { en: "Category" },
+        type: "string",
+        options: [{ value: "a", label: { en: "A" } }, { value: "b", label: { en: "B" } }],
+      },
+      { id: "field_locked", key: "locked", label: { en: "Locked" }, type: "string", default: "kept" },
+      { id: "field_name", key: "name", label: { en: "Name" }, type: "string" },
+      { id: "field_zero", key: "zero", label: { en: "Zero" }, type: "number" },
+      { id: "field_flag", key: "flag", label: { en: "Flag" }, type: "boolean" },
+    ],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        {
+          id: "step_a",
+          key: "a",
+          label: { en: "A" },
+          type: "task",
+          view: {
+            fields: [
+              { ref: "field_amount" },
+              { ref: "field_due_on" },
+              { ref: "field_category" },
+              { ref: "field_locked", readonly: true },
+              { ref: "field_name", required: true },
+              { ref: "field_zero", required: true },
+              { ref: "field_flag", required: true },
+            ],
+          },
+          paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }],
+        },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+/**
+ * x is optional, y is optional with a rule reading data.x, and path_ab's guard
+ * reads data.x. A key missing from the merged data makes both raise.
+ */
+const dependsBody = (): ProcessBody =>
+  ({
+    key: "depends_body",
+    label: { en: "Depends Body" },
+    baseLocale: "en",
+    fields: [
+      { id: "field_x", key: "x", label: { en: "X" }, type: "number" },
+      { id: "field_y", key: "y", label: { en: "Y" }, type: "string", validation: { rule: cel("data.x != 5.0") } },
+    ],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        {
+          id: "step_a",
+          key: "a",
+          label: { en: "A" },
+          type: "task",
+          view: { fields: [{ ref: "field_x" }, { ref: "field_y" }] },
+          paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual", guard: cel("data.x > 0") }],
+        },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+/** Complete seed for clearBody: every required field holds a value. */
+const clearSeed = (over: Record<string, unknown> = {}) =>
+  ({ field_name: "Bob", field_zero: 0, field_flag: false, ...over }) as unknown as Instance["data"];
+
+async function clearInstance(seed: Instance["data"] = clearSeed()): Promise<InstanceId> {
+  const PID = pid(`proc_clear_${crypto.randomUUID()}`);
+  await publishBody(PID, clearBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg, { data: seed });
+  return created.instanceId;
+}
+
+async function storedData(instanceId: InstanceId): Promise<Record<string, unknown>> {
+  const rows = (await sql`SELECT body->'data' AS data FROM instances WHERE instance_id = ${instanceId}`) as { data: Record<string, unknown> }[];
+  return rows[0]!.data;
+}
+
+async function submitIssues(instanceId: InstanceId, data: Record<string, unknown>): Promise<SubmissionValidationError["issues"] | null> {
+  try {
+    await submitAndTransition(instanceId, "path_ab" as PathId, data as unknown as Instance["data"], actor, dataSourceReg);
+    return null;
+  } catch (e) {
+    if (e instanceof SubmissionValidationError) return e.issues;
+    throw e;
+  }
+}
+
+test("applyDataPatch spreads the patch and deletes each key whose patch value is null", () => {
+  const data = { a: 1, b: "keep", c: [1] };
+  const merged = applyDataPatch(data, { a: null, c: [2], d: 0 });
+  expect(merged).toEqual({ b: "keep", c: [2], d: 0 });
+  expect("a" in merged).toBe(false);
+  expect(data).toEqual({ a: 1, b: "keep", c: [1] }); // the input is not mutated
+});
+
+test("applyDataPatch ignores a null for a key the data never held", () => {
+  expect(applyDataPatch({ a: 1 }, { z: null })).toEqual({ a: 1 });
+});
+
+test.skipIf(!DB)("a cleared optional number leaves the data", async () => {
+  const instanceId = await clearInstance();
+  expect((await storedData(instanceId)).field_amount).toBe(120);
+
+  const after = await submitAndTransition(instanceId, "path_ab" as PathId, { field_amount: null } as unknown as Instance["data"], actor, dataSourceReg);
+
+  expect("field_amount" in after.data).toBe(false);
+  expect("field_amount" in (await storedData(instanceId))).toBe(false);
+  expect(after.currentStepId as string).toBe("step_b");
+});
+
+test.skipIf(!DB)("a null for a readonly field draws readonly-field and the instance keeps its value", async () => {
+  const instanceId = await clearInstance();
+  expect((await storedData(instanceId)).field_locked).toBe("kept");
+
+  const issues = await submitIssues(instanceId, { field_locked: null });
+
+  expect(issues).toContainEqual({ kind: "readonly-field", fieldId: "field_locked" as FieldId });
+  expect((await storedData(instanceId)).field_locked).toBe("kept");
+});
+
+test.skipIf(!DB)("a null for an unknown field draws unknown-field", async () => {
+  const instanceId = await clearInstance();
+  const issues = await submitIssues(instanceId, { field_nonexistent: null });
+  expect(issues).toContainEqual({ kind: "unknown-field", fieldId: "field_nonexistent" as FieldId });
+});
+
+test.skipIf(!DB)("the audit log records a cleared field as a set entry with a JSON null", async () => {
+  const instanceId = await clearInstance();
+  await submitAndTransition(instanceId, "path_ab" as PathId, { field_amount: null } as unknown as Instance["data"], actor, dataSourceReg);
+
+  const rows = (await sql`
+    SELECT op, value IS NULL AS sql_null, value::text AS value_text
+    FROM instance_audit
+    WHERE instance_id = ${instanceId} AND field_id = 'field_amount'
+    ORDER BY seq DESC LIMIT 1`) as { op: string; sql_null: boolean; value_text: string }[];
+  expect(rows).toHaveLength(1);
+  expect(rows[0]!.op).toBe("set");
+  expect(rows[0]!.sql_null).toBe(false);
+  expect(rows[0]!.value_text).toBe("null");
+});
+
+test.skipIf(!DB)("a cleared optional date skips the format check and leaves the data", async () => {
+  const instanceId = await clearInstance(clearSeed({ field_due_on: "2026-02-28" }));
+
+  const after = await submitAndTransition(instanceId, "path_ab" as PathId, { field_due_on: null } as unknown as Instance["data"], actor, dataSourceReg);
+
+  expect("field_due_on" in after.data).toBe(false);
+  expect("field_due_on" in (await storedData(instanceId))).toBe(false);
+});
+
+test.skipIf(!DB)("a cleared select skips the option check", async () => {
+  const instanceId = await clearInstance(clearSeed({ field_category: "a" }));
+
+  const after = await submitAndTransition(instanceId, "path_ab" as PathId, { field_category: null } as unknown as Instance["data"], actor, dataSourceReg);
+
+  expect("field_category" in after.data).toBe(false);
+});
+
+test.skipIf(!DB)("a guard that reads a cleared field raises, and the engine refuses the path", async () => {
+  const PID = pid("proc_clear_guard");
+  await publishBody(PID, dependsBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg, { data: { field_x: 5 } as unknown as Instance["data"] });
+
+  let raised: unknown;
+  try {
+    await submitAndTransition(created.instanceId, "path_ab" as PathId, { field_x: null } as unknown as Instance["data"], actor, dataSourceReg);
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(GuardRefused);
+  expect((await storedData(created.instanceId)).field_x).toBe(5);
+
+  // Control: the same guard passes while the field holds a value.
+  const after = await submitAndTransition(created.instanceId, "path_ab" as PathId, { field_x: 7 } as unknown as Instance["data"], actor, dataSourceReg);
+  expect(after.currentStepId as string).toBe("step_b");
+});
+
+test.skipIf(!DB)("a rule on another field reads the merged data without the cleared key", async () => {
+  const PID = pid("proc_clear_rule");
+  await publishBody(PID, dependsBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg, { data: { field_x: 3 } as unknown as Instance["data"] });
+
+  let raised: unknown;
+  try {
+    await submitAndTransition(created.instanceId, "path_ab" as PathId, { field_x: null, field_y: "v" } as unknown as Instance["data"], actor, dataSourceReg);
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(SubmissionValidationError);
+  const issues = (raised as SubmissionValidationError).issues;
+  expect(issues).toContainEqual({ kind: "rule-failed", fieldId: "field_y" as FieldId });
+  expect(issues.some((i) => (i.fieldId as string) === "field_x")).toBe(false);
+});
+
+test.skipIf(!DB)("createProcessInstance reads a null seed as a type mismatch, not a clear", async () => {
+  const PID = pid("proc_clear_seed");
+  await publishBody(PID, clearBody(), reg, dataSourceReg);
+
+  let raised: unknown;
+  try {
+    await createProcessInstance(PID, actor, dataSourceReg, { data: { field_name: null } as unknown as Instance["data"] });
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(SubmissionValidationError);
+  expect((raised as SubmissionValidationError).issues).toEqual([{ kind: "type-mismatch", fieldId: "field_name" as FieldId, expected: "string" }]);
+});
+
+test.skipIf(!DB)("an erased required text field fails with required-missing", async () => {
+  const instanceId = await clearInstance();
+  const issues = await submitIssues(instanceId, { field_name: "" });
+  expect(issues).toContainEqual({ kind: "required-missing", fieldId: "field_name" as FieldId });
+});
+
+test.skipIf(!DB)("a stored empty string counts as missing at a later submission", async () => {
+  const instanceId = await clearInstance(clearSeed({ field_name: "" }));
+  const issues = await submitIssues(instanceId, {});
+  expect(issues).toContainEqual({ kind: "required-missing", fieldId: "field_name" as FieldId });
+});
+
+test.skipIf(!DB)("a cleared required field fails with required-missing", async () => {
+  const instanceId = await clearInstance();
+  const issues = await submitIssues(instanceId, { field_name: null });
+  expect(issues).toEqual([{ kind: "required-missing", fieldId: "field_name" as FieldId }]);
+  expect((await storedData(instanceId)).field_name).toBe("Bob");
+});
+
+test.skipIf(!DB)("zero and false satisfy the required check", async () => {
+  const instanceId = await clearInstance(clearSeed({ field_zero: 0, field_flag: false }));
+  const after = await submitAndTransition(instanceId, "path_ab" as PathId, {} as Instance["data"], actor, dataSourceReg);
+  expect(after.currentStepId as string).toBe("step_b");
+  expect(after.data).toMatchObject({ field_zero: 0, field_flag: false });
+});
+
+test.skipIf(!DB)("an empty list satisfies the required check", async () => {
+  const body = clearBody() as unknown as { fields: unknown[]; workflow: { steps: { view?: { fields: unknown[] } }[] } };
+  body.fields.push({ id: "field_tags", key: "tags", label: { en: "Tags" }, type: "list" });
+  body.workflow.steps[0]!.view!.fields.push({ ref: "field_tags", required: true });
+  const PID = pid(`proc_clear_list_${crypto.randomUUID()}`);
+  await publishBody(PID, body as unknown as ProcessBody, reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg, { data: clearSeed({ field_tags: [] }) });
+  const after = await submitAndTransition(created.instanceId, "path_ab" as PathId, {} as Instance["data"], actor, dataSourceReg);
+  expect(after.currentStepId as string).toBe("step_b");
+  expect(after.data).toMatchObject({ field_tags: [] });
 });

@@ -14,6 +14,15 @@ export function editableFieldIds(fields: ResolvedViewEntry[]): Set<string> {
   );
 }
 
+/** True when the form has nothing to submit: the instance is not `running`,
+ * or no path is available on its step. A consumer passes the answer to
+ * `FieldForm` as `readonly`. */
+export function formIsReadonly(view: { status: string; availablePaths: unknown[] }): boolean {
+  return view.availablePaths.length === 0 || view.status !== "running";
+}
+
+/** Keeps a `null` value: a cleared field travels in a submission and a saved
+ * form draft, and the engine reads it as a removed field. */
 export function filterToEditable(data: Record<string, unknown>, fields: ResolvedViewEntry[]): Record<string, unknown> {
   const editable = editableFieldIds(fields);
   const filtered: Record<string, unknown> = {};

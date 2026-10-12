@@ -48,6 +48,7 @@ import {
   handlePublish,
   handleListProcesses,
   handleListVersions,
+  errorContext,
 } from "./routes.js";
 import {
   handleAdminListOutbox,
@@ -123,7 +124,7 @@ import {
   handleGetMyProcessAccess,
 } from "./studio-routes.js";
 import { handleMetrics } from "./metrics.js";
-import { notFound, type HttpResult, type HttpBinaryResult } from "./errors.js";
+import { notFound, mapError, type HttpResult, type HttpBinaryResult } from "./errors.js";
 import { log } from "../log.js";
 import { z } from "zod";
 
@@ -764,7 +765,7 @@ export function createServer(
   // `server` is Bun's second fetch-handler argument, and it is optional because
   // every existing test invokes this handler with a `Request` alone. Absent, no
   // peer address is available and the per-source login window does not apply.
-  return async (req: Request, server?: BunServer): Promise<Response> => {
+  const dispatch = async (req: Request, server?: BunServer): Promise<Response> => {
     const url = new URL(req.url);
     const parts = url.pathname.split("/").filter(Boolean);
     const origin = req.headers.get("Origin");
@@ -855,6 +856,20 @@ export function createServer(
 
     return toRes(notFound(`no route: ${req.method} ${url.pathname}`));
   };
+
+  // The one net under every handler. A handler without a `guarded` of its own
+  // and the static-asset path land here, so a throw answers a message-free
+  // JSON 500 through `mapError` instead of reaching Bun's own error response.
+  // The CORS headers ride along, which the browser
+  // needs to read the 500; `GET /metrics` gains them on a throw too.
+  return async (req: Request, server?: BunServer): Promise<Response> => {
+    const origin = req.headers.get("Origin");
+    try {
+      return await dispatch(req, server);
+    } catch (err) {
+      return toResponse(mapError(err, errorContext(req)), allowedOrigins, origin);
+    }
+  };
 }
 
 // Sized to the largest plausible legitimate request — a definition or draft of
@@ -898,7 +913,10 @@ export async function startHttpServer(
     assignmentRegistry, tenancy?.resolveTenantDb, tenancy?.tenantOf,
   );
   const port = Number(process.env.PORT ?? 3000);
-  const server = Bun.serve({ fetch, port, maxRequestBodySize: MAX_REQUEST_BODY_SIZE });
+  // `development: false` keeps Bun's HTML error page, which embeds the message
+  // and a source excerpt, out of any answer. The dispatcher catch covers every
+  // throw it can see; this covers what it cannot.
+  const server = Bun.serve({ fetch, port, maxRequestBodySize: MAX_REQUEST_BODY_SIZE, development: false });
   const engine = startEngine(db, registry, assignmentRegistry, tenancy?.tenants);
   log.info("HTTP server listening", { port: server.port, webRoot: webRoot ?? null });
   return {

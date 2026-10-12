@@ -64,7 +64,7 @@ const DEFAULT_LIST_LIMIT = 50;
 /** Groups by name ascending, keyset-paged on `(name, group_id)`, mirroring `listUsers`'s shape. */
 export async function listGroups(page: { limit?: number; cursor?: string } = {}, db: SQL = sql): Promise<Page<GroupSummary>> {
   const limit = Math.min(page.limit ?? DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT);
-  const [cursorName, cursorGroupId] = page.cursor ? decodeCursor(page.cursor, 2) : [undefined, undefined];
+  const [cursorName, cursorGroupId] = page.cursor ? decodeCursor(page.cursor, ["text", "text"]) : [undefined, undefined];
   const rows = (await db`
     SELECT group_id, name, scope, members
     FROM groups

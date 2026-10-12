@@ -78,8 +78,8 @@ Hard v1 boundaries hold until a deliberate decision moves them.
 - Exactly one active step per instance. No parallelism and no multi-instance
   steps.
 - Subprocesses are synchronous call-and-return only. No fan-out.
-- Action execution is async and post-commit. The `blocking` flag holds a
-  reserved name that nothing implements.
+- Action execution is async and post-commit. The `blocking` value fails to
+  parse until the engine implements it.
 
 The project is pre-1.0. No deployment runs this engine. No stored instance
 pins a version anybody else depends on. A contract change costs an OpenSpec

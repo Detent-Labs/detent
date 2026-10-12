@@ -171,6 +171,10 @@ export function tabSwitchState(
  * per `design-language.md`'s "Never assemble a sentence from fragments", and
  * this package keeps the screen catalog it does not ship. `EntityTabs.tsx`'s
  * move announcer already spends the same two placeholders the same way.
+ *
+ * One pass with a replacer function fills both placeholders. A string
+ * replacement would read `$&` and `$$` in a label as patterns, and a second
+ * pass would search the inserted label for `{count}`.
  */
 export function tabSwitchAnnouncement(
   sentences: { one: string; many: string },
@@ -178,7 +182,9 @@ export function tabSwitchAnnouncement(
   fieldCount: number,
 ): string {
   if (fieldCount < 1) return "";
-  return (fieldCount === 1 ? sentences.one : sentences.many).replace("{tab}", tabLabel).replace("{count}", String(fieldCount));
+  return (fieldCount === 1 ? sentences.one : sentences.many).replace(/\{(tab|count)\}/g, (_, name: string) =>
+    name === "tab" ? tabLabel : String(fieldCount),
+  );
 }
 
 /**

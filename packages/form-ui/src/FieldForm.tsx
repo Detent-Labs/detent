@@ -13,6 +13,7 @@ import { booleanLabels, resolveText } from "./locale.js";
 import { issueCountText, issueMessage } from "./issue-messages.js";
 import { drawnTabs, nextTabIndex, openTabKey, tabIssueCount } from "./tabs.js";
 import { colors, fonts, space } from "./tokens.stylex.js";
+import { datetimeInputValue, numberFromInput, textFromInput } from "./values.js";
 
 /** Every `form-ui.css` rule, as StyleX. A layout choice with a fixed set of
  * outcomes (`columns`, `span`) is chosen among named styles in code — see
@@ -253,6 +254,10 @@ interface FieldFormProps {
    * same tab labels, so each consumer names its own. Absent leaves the
    * `tablist` unnamed, which is what a form with no tab renders anyway. */
   tabsLabel?: string;
+  /** True disables every control, group members included, the way a view
+   * field's own `readonly` disables one. The tab strip stays operable: a tab
+   * navigates and holds no value. A consumer passes `formIsReadonly(view)`. */
+  readonly?: boolean;
 }
 
 /** The tab button's own element id, and the id of the panel it controls.
@@ -328,11 +333,12 @@ interface ViewEntryProps {
   locale: LocaleCode;
   issuesByField?: Map<string, SubmissionIssue[]>;
   columns?: 1 | 2;
+  readonly?: boolean;
 }
 
 /** Dispatches one resolved view entry to its renderer: a field reaches
  * `FieldInput` unchanged, a note reaches `NoteText`. */
-function ViewEntryInput({ entry, allFields, values, onChange, locale, issuesByField, columns }: ViewEntryProps) {
+function ViewEntryInput({ entry, allFields, values, onChange, locale, issuesByField, columns, readonly }: ViewEntryProps) {
   if (!isResolvedViewField(entry)) {
     return <NoteText note={entry} locale={locale} columns={columns} />;
   }
@@ -345,6 +351,7 @@ function ViewEntryInput({ entry, allFields, values, onChange, locale, issuesByFi
       locale={locale}
       issuesByField={issuesByField}
       columns={columns}
+      readonly={readonly}
     />
   );
 }
@@ -363,7 +370,7 @@ function ViewEntryInput({ entry, allFields, values, onChange, locale, issuesByFi
  * accessibility tree. The open tab is derived on every render and stored
  * nowhere — this component holds no tab state, the same way it holds no value
  * and no locale state. */
-export function FieldForm({ fields, values, onChange, locale, issuesByField, columns = 1, tabs, activeTab, onTabChange, tabsLabel }: FieldFormProps) {
+export function FieldForm({ fields, values, onChange, locale, issuesByField, columns = 1, tabs, activeTab, onTabChange, tabsLabel, readonly }: FieldFormProps) {
   const strip = drawnTabs(fields, tabs ?? []);
   // `activeTab` when the strip draws that tab, the first drawn tab otherwise,
   // with no effect and no state. `undefined` means no strip draws, which is
@@ -450,6 +457,7 @@ export function FieldForm({ fields, values, onChange, locale, issuesByField, col
             locale={locale}
             issuesByField={issuesByField}
             columns={columns}
+            readonly={readonly}
           />
         ))}
       </div>
@@ -480,6 +488,8 @@ interface FieldInputProps {
    * straight down: a group inherits the form's count and declares none of its
    * own, which is what keeps an already-published one-column form stacked. */
   columns?: 1 | 2;
+  /** See `FieldFormProps.readonly`. A group passes it to its members. */
+  readonly?: boolean;
 }
 
 /** A group is a container, not a leaf, so it draws at the form's full width
@@ -491,7 +501,7 @@ function isGroup(field: ResolvedViewField): boolean {
   return field.field.type === "group";
 }
 
-export function FieldInput({ field, allFields, values, onChange, locale, issuesByField, columns = 1 }: FieldInputProps) {
+export function FieldInput({ field, allFields, values, onChange, locale, issuesByField, columns = 1, readonly }: FieldInputProps) {
   const def = field.field;
   const label = resolveText(def.label, locale, locale) || def.key;
   const issues = issuesByField?.get(def.id) ?? [];
@@ -516,6 +526,7 @@ export function FieldInput({ field, allFields, values, onChange, locale, issuesB
             locale={locale}
             issuesByField={issuesByField}
             columns={columns}
+            readonly={readonly}
           />
         ))}
       </fieldset>
@@ -523,7 +534,7 @@ export function FieldInput({ field, allFields, values, onChange, locale, issuesB
   }
 
   const value = values[def.id];
-  const disabled = field.readonly;
+  const disabled = field.readonly || !!readonly;
   const hasIssues = issues.length > 0;
   const issuesId = `${def.id}-issues`;
   // Every branch below carries the same three: required/invalid state
@@ -613,7 +624,7 @@ export function FieldInput({ field, allFields, values, onChange, locale, issuesB
         step={def.format === "integer" ? 1 : undefined}
         disabled={disabled}
         value={value === undefined || value === null ? "" : String(value)}
-        onChange={(e) => onChange(def.id, e.target.value === "" ? undefined : Number(e.target.value))}
+        onChange={(e) => onChange(def.id, numberFromInput(e.target.value))}
         {...stylex.props(styles.control)}
         {...a11yProps}
       />
@@ -682,7 +693,7 @@ export function FieldInput({ field, allFields, values, onChange, locale, issuesB
       <select
         disabled={disabled}
         value={(value as string) ?? ""}
-        onChange={(e) => onChange(def.id, e.target.value)}
+        onChange={(e) => onChange(def.id, textFromInput(e.target.value))}
         {...stylex.props(styles.control)}
         {...a11yProps}
       >
@@ -696,7 +707,7 @@ export function FieldInput({ field, allFields, values, onChange, locale, issuesB
         disabled={disabled}
         rows={4}
         value={(value as string) ?? ""}
-        onChange={(e) => onChange(def.id, e.target.value)}
+        onChange={(e) => onChange(def.id, textFromInput(e.target.value))}
         {...stylex.props(styles.control, styles.textareaResize)}
         {...a11yProps}
       />
@@ -707,12 +718,17 @@ export function FieldInput({ field, allFields, values, onChange, locale, issuesB
     // format's own native input, which enforces the same domain the engine
     // checks. A dataSource-bound picker is NOT here — its options resolve
     // server-side into `field.options`, same as a static-options field.
+    // A zoned `datetime` shows as local time; the stored value stays as it is
+    // until the participant types.
+    const shown = (value as string | null | undefined) ?? "";
+    const textInputValue =
+      def.type === "string" && def.format === "datetime" && typeof shown === "string" ? datetimeInputValue(shown) : shown;
     control = (
       <input
         type={def.type === "string" ? NATIVE_INPUT_TYPE[def.format ?? ""] ?? "text" : "text"}
         disabled={disabled}
-        value={(value as string) ?? ""}
-        onChange={(e) => onChange(def.id, e.target.value)}
+        value={textInputValue}
+        onChange={(e) => onChange(def.id, textFromInput(e.target.value))}
         {...stylex.props(styles.control)}
         {...a11yProps}
       />

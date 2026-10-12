@@ -6,7 +6,7 @@
 import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, initSchema, createInstance } from "../src/engine/store.js";
 import { executeManualTransition, startInstance } from "../src/engine/transition.js";
-import { createAssignmentRegistry, createDefaultAssignmentRegistry } from "../src/engine/registry.js";
+import { createAssignmentRegistry, createStaticAssignmentRegistry } from "../src/engine/registry.js";
 import type { ProcessBody, Instance, InstanceEvent, HistoryEntry } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
 import { clearInstanceAudit } from "./audit-cleanup.js";
@@ -180,7 +180,7 @@ test.skipIf(!DB)("a static strategy configured with an empty list records the ev
   // visibly as a failed lookup.
   const body = bodyWith({ type: "static", config: { candidates: [] } });
   const inst = await createInstance(body, { processId: "proc_ev" as Instance["processId"], version: 1 });
-  await executeManualTransition(inst, "path_ab", body, actor, sql, undefined, createDefaultAssignmentRegistry());
+  await executeManualTransition(inst, "path_ab", body, actor, sql, undefined, createStaticAssignmentRegistry());
 
   const [event] = unresolvedEvents(await eventsOf(inst.instanceId));
   expect(payloadOf(event!)).toEqual({ stepId: "step_b", reason: "no-candidates" });

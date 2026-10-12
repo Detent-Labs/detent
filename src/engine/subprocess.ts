@@ -51,7 +51,7 @@ import { createSeededInstance } from "./seeded-create.js";
 import type { ResolveLatestByContract } from "./definitions.js";
 import type { ResolveBody } from "./resolution.js";
 import {
-  createDefaultAssignmentRegistry,
+  createStaticAssignmentRegistry,
   type Registry,
   type HandlerContext,
   type AssignmentRegistry,
@@ -68,7 +68,7 @@ function makeSpawnHandler(
   db: SQL,
   resolveBody: ResolveBody,
   resolveLatestByContract: ResolveLatestByContract,
-  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
+  assignmentRegistry: AssignmentRegistry = createStaticAssignmentRegistry(),
 ): (ctx: HandlerContext) => Promise<unknown> {
   return async (ctx) => {
     const { subprocessStepId, parentSeq } = ctx.config as { subprocessStepId: string; parentSeq: number };
@@ -179,7 +179,7 @@ function makeSpawnHandler(
 export function makeReturnHandler(
   db: SQL,
   resolveBody: ResolveBody,
-  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
+  assignmentRegistry: AssignmentRegistry = createStaticAssignmentRegistry(),
 ): (ctx: HandlerContext) => Promise<unknown> {
   return async (ctx) => {
     // The config names the parent instance and the outcome only. Which step of the
@@ -375,7 +375,7 @@ export function registerSubprocessHandlers(
   db: SQL,
   resolveBody: ResolveBody,
   resolveLatestByContract: ResolveLatestByContract,
-  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
+  assignmentRegistry: AssignmentRegistry = createStaticAssignmentRegistry(),
 ): void {
   registry.set(SPAWN_ACTION_TYPE, {
     handler: makeSpawnHandler(db, resolveBody, resolveLatestByContract, assignmentRegistry),

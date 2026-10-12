@@ -206,9 +206,12 @@ Zod refinements on `viewField` itself.
 (`{ type, config }`), never inline code. Triggers run in order:
 `onExit(source)`, then `onPath`, then `onEntry(target)`. `CLAUDE.md`'s
 brief states the commit-then-dispatch outbox order; see it for the short
-form. The default idempotency key is a deterministic UUIDv5 hash of
-`instanceId + transitionSeq + actionId`. The `transitionSeq` counter is
-monotonic per instance and doubles as the optimistic-concurrency token.
+form. The idempotency key is a deterministic UUIDv5 hash of
+`instanceId + transitionSeq + actionId`. The engine derives it, and an
+action has no authored key. The `transitionSeq` counter is monotonic per
+instance and doubles as the optimistic-concurrency token. An action's
+`execution` accepts async only. The engine reserves `blocking` and has not
+built it.
 
 Action results write back into `data` via `Action.output`, keyed by
 target `FieldId` and valued by a CEL expression over `result`. The
@@ -249,8 +252,9 @@ uses it as a manual path's submit-button text.
 (`definition.ts:920`, `:989`). A cancellation synthesizes a hidden cancel
 path. Its `onPath` actions are the step's own `onCancel` actions. The
 engine skips the step's `onExit` for this transition. `authoredProcessBody`
-reserves the cancel-sink id, key, and outcome for the engine alone. The
-`cancellation` spec covers the rest.
+reserves the cancel-sink id, key, and outcome for the engine alone. Publish
+pins the sink to the engine's own injection, so a hand-written sink of
+another shape fails. The `cancellation` spec covers the rest.
 
 **Collaboration.** `comments` and `attachments` are flags on both the
 body and the step. A step's own entry wins over the process's entry.

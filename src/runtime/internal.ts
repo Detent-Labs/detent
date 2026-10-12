@@ -110,7 +110,7 @@ export async function pagedRead<Row>(
   limit: number,
   cursor: string | undefined,
 ): Promise<Row[]> {
-  const [cursorCreatedAt, cursorId] = cursor ? decodeCursor(cursor, 2) : [undefined, undefined];
+  const [cursorCreatedAt, cursorId] = cursor ? decodeCursor(cursor, ["timestamp", "text"]) : [undefined, undefined];
   return (await db.unsafe(
     `SELECT ${columns}, created_at::text AS created_at_cursor FROM ${table}
      WHERE instance_id = $1

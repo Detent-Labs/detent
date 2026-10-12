@@ -14,7 +14,7 @@
 
 import type { SQL } from "bun";
 import { sql, setAuditAttribution } from "./store.js";
-import type { OutboxActors, Registry } from "./registry.js";
+import { createStaticAssignmentRegistry, type AssignmentRegistry, type OutboxActors, type Registry } from "./registry.js";
 import { logSkippedItem } from "./poll.js";
 import { durationMs } from "./duration.js";
 import { evalOutput } from "../cel/eval.js";
@@ -90,9 +90,14 @@ export class PermanentError extends Error {
  * patch. An unregistered type is a PermanentError (dead-letter, no retry). Runs
  * outside any DB transaction; MUST stay idempotent on the idempotency key.
  */
-export type DeliverFn = (row: ClaimedRow, registry: Registry, db: SQL) => Promise<Record<string, unknown>>;
+export type DeliverFn = (
+  row: ClaimedRow,
+  registry: Registry,
+  db: SQL,
+  assignmentRegistry: AssignmentRegistry,
+) => Promise<Record<string, unknown>>;
 
-export const deliver: DeliverFn = async (row, registry, db) => {
+export const deliver: DeliverFn = async (row, registry, db, assignmentRegistry) => {
   const def = registry.get(row.action.type);
   if (!def) throw new PermanentError(`no handler registered for type: ${row.action.type}`);
   const result = await def.handler({
@@ -102,6 +107,7 @@ export const deliver: DeliverFn = async (row, registry, db) => {
     instanceId: row.instance_id,
     ...(row.actors ? { actors: row.actors } : {}),
     db,
+    assignmentRegistry,
   });
   return evalOutput(row.action.output, result);
 };
@@ -178,6 +184,10 @@ async function appendOutcome(
  * resolution workers use: a miss just skips the check for that row rather than
  * blocking delivery, so the feature composes with every existing caller that
  * has no store to wire in.
+ *
+ * `assignmentRegistry` reaches every handler's context. It defaults to the
+ * static registry, like the other trailing parameters. `startEngine` is the
+ * production caller and always passes the engine's own registry.
  */
 export async function drainOutbox(
   db: SQL = sql,
@@ -185,6 +195,7 @@ export async function drainOutbox(
   deliverFn: DeliverFn = deliver,
   leaseMs: number = CLAIM_LEASE_MS,
   resolveBody: ResolveBody = () => undefined,
+  assignmentRegistry: AssignmentRegistry = createStaticAssignmentRegistry(),
 ): Promise<number> {
   // tx1: atomically claim due rows (and re-lease stale claims), incrementing
   // attempts in the same UPDATE. RETURNING attempts then yields the
@@ -235,7 +246,7 @@ export async function drainOutbox(
     let failureMessage: string | undefined;
     const deadline = rejectAfter(leaseMs);
     try {
-      patch = await Promise.race([deliverFn(row, registry, db), deadline.promise]);
+      patch = await Promise.race([deliverFn(row, registry, db, assignmentRegistry), deadline.promise]);
     } catch (e) {
       permanent = e instanceof PermanentError;
       failureMessage = e instanceof Error ? e.message : String(e);

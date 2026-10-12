@@ -194,7 +194,7 @@ const DEFAULT_LIST_LIMIT = 50;
  */
 export async function listUsers(page: { limit?: number; cursor?: string } = {}, db: SQL = sql): Promise<Page<UserSummary>> {
   const limit = Math.min(page.limit ?? DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT);
-  const [cursorEmail, cursorUserId] = page.cursor ? decodeCursor(page.cursor, 2) : [undefined, undefined];
+  const [cursorEmail, cursorUserId] = page.cursor ? decodeCursor(page.cursor, ["text", "text"]) : [undefined, undefined];
   const rows = (await db`
     SELECT user_id, email, roles, disabled, manager_user_id, display_name
     FROM auth_users

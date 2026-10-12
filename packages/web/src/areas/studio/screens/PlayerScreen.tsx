@@ -6,6 +6,7 @@ import {
   PathButtons,
   filterToEditable,
   firstTabWithIssue,
+  formIsReadonly,
   resolveFieldsLocale,
   resolveTabsLocale,
   resolveText,
@@ -383,6 +384,7 @@ export function PlayerScreen({ processId, token, navigate, onUnauthorized }: Pla
             </p>
 
             <FieldForm
+              readonly={formIsReadonly(view)}
               fields={resolveFieldsLocale(view.fields, "en", view.baseLocale)}
               values={formValues}
               onChange={(fieldId, value) => setFormValues((v) => ({ ...v, [fieldId]: value }))}

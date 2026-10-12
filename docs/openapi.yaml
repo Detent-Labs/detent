@@ -79,7 +79,10 @@ paths:
               schema:
                 $ref: "#/components/schemas/LoginResponse"
         "400":
-          description: Request body is not valid JSON, or is missing `email`/`password`.
+          description: >-
+            Request body is not valid JSON, is missing `email`/`password`, or
+            carries an `email` with a NUL character. The NUL check runs before
+            the rate limit and counts as no failed attempt.
           content:
             application/json:
               schema:
@@ -325,7 +328,7 @@ paths:
                 $ref: "#/components/schemas/InstanceSummaryPage"
         "400":
           description: >-
-            An invalid `limit`/`status`/`version`/`createdAfter`/`createdBefore`
+            An invalid `limit`/`status`/`version`/`createdAfter`/`createdBefore`/`cursor`
             value, a `version` with no `processId`, `scope=mine` combined with
             `assignedTo`, or `scope=started` combined with `startedBy`.
           content:
@@ -387,7 +390,13 @@ paths:
       tags: [instances]
       operationId: submitInstance
       summary: Submit field data and trigger a manual transition
-      description: No reserved-role requirement; the claimant, or an eligible candidate on an unclaimed step, may submit.
+      description: >-
+        No reserved-role requirement; the claimant, or an eligible candidate
+        on an unclaimed step, may submit. A `null` value for a field in
+        `data` clears that field: the key leaves the instance data, and no
+        type, option, constraint or rule check runs for it. An unknown or
+        readonly key is still refused, `null` or not. A required field counts
+        `undefined`, `null` and `""` as missing.
       parameters:
         - $ref: "#/components/parameters/instanceId"
       requestBody:
@@ -554,13 +563,20 @@ paths:
           description: >-
             The actor is not an eligible candidate and, on a test instance, is
             neither its starter nor a `system:admin` holder; or the step is
-            already claimed by someone else.
+            already claimed by someone else. The same answer covers an
+            instance id that exists nowhere, when the actor lacks `system:admin`.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "409":
           description: The instance is not running.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "500":
+          description: The instance does not exist, for a `system:admin` holder. Also covers any unrecognized server-side failure.
           content:
             application/json:
               schema:
@@ -591,13 +607,22 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "403":
-          description: The actor is not the step's current claimant.
+          description: >-
+            The actor is not the step's current claimant. The same answer
+            covers an instance id that exists nowhere, when the actor lacks
+            `system:admin`.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "409":
           description: The instance is not running.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "500":
+          description: The instance does not exist, for a `system:admin` holder. Also covers any unrecognized server-side failure.
           content:
             application/json:
               schema:
@@ -643,7 +668,10 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "403":
-          description: The actor is not the step's current claimant.
+          description: >-
+            The actor is not the step's current claimant. The same answer
+            covers an instance id that exists nowhere, when the actor lacks
+            `system:admin`.
           content:
             application/json:
               schema:
@@ -659,6 +687,12 @@ paths:
             `toActorId` names no account in the deployment's local directory.
             Checked only where the delegating actor's own id resolves there;
             an externally issued identity skips the check.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "500":
+          description: The instance does not exist, for a `system:admin` holder. Also covers any unrecognized server-side failure.
           content:
             application/json:
               schema:
@@ -730,7 +764,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/InstanceCommentPage"
         "400":
-          description: An invalid `limit` value.
+          description: An invalid `limit` or `cursor` value.
           content:
             application/json:
               schema:
@@ -836,7 +870,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/InstanceAttachmentPage"
         "400":
-          description: An invalid `limit` value.
+          description: An invalid `limit` or `cursor` value.
           content:
             application/json:
               schema:
@@ -981,7 +1015,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/InstanceRecordPage"
         "400":
-          description: An invalid `limit` value.
+          description: An invalid `limit` or `cursor` value.
           content:
             application/json:
               schema:
@@ -1400,7 +1434,10 @@ components:
       in: query
       schema:
         type: string
-      description: An opaque page cursor returned by a previous call.
+      description: >-
+        An opaque page cursor returned by a previous call. A value that is not
+        such a cursor, or that holds a position of the wrong kind, is rejected
+        with 400.
 
   schemas:
     Actor:

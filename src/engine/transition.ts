@@ -37,17 +37,18 @@ import {
   SPAWN_ACTION_TYPE,
   RETURN_ACTION_TYPE,
   CANCEL_CHILD_ACTION_TYPE,
-  createDefaultAssignmentRegistry,
+  createStaticAssignmentRegistry,
   outboxActorsOf,
   resolveStepAssignment,
   type AssignmentRegistry,
 } from "./registry.js";
+import { NotFoundError } from "../errors.js";
 import { armStepTimers, minFireAt, type TimerDrop } from "./duration.js";
 import { deleteInstanceDraft } from "./instance-drafts.js";
 import { buildGuardContext, evalGuard, SYSTEM_ACTOR, type Actor } from "../cel/eval.js";
 import { ADMIN_ROLE } from "../auth/authorize.js";
 import { CANCEL_SINK_STEP_ID, instance as instanceSchema } from "../schema/definition.js";
-import type { ProcessBody, Instance, HistoryEntry, InstanceEvent, Action, Step, Path, AssignmentState } from "../schema/definition.js";
+import type { ProcessBody, Instance, HistoryEntry, InstanceEvent, Action, Step, Path, AssignmentState, Literal } from "../schema/definition.js";
 import { log } from "../log.js";
 
 /**
@@ -513,7 +514,7 @@ async function commitTransition(
   db: SQL,
   overrides?: Pick<StepEntryOpts, "status" | "timers" | "entryVersion" | "suppressSpawn" | "events">,
   extraFields?: Record<string, unknown>,
-  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
+  assignmentRegistry: AssignmentRegistry = createStaticAssignmentRegistry(),
 ): Promise<Instance> {
   const { assignment, unresolved } = await resolveStepAssignment(target, assignmentRegistry, assignmentContextFor(instance), db);
   // The seq and version this entry lands on, mirroring planStepEntry's own
@@ -546,6 +547,19 @@ async function commitTransition(
 }
 
 /**
+ * Merge a submission patch over `data`: the patch is spread, then each key
+ * whose patch value is `null` is deleted. A `null` means the participant
+ * cleared the field, so the key must read as never written.
+ */
+export function applyDataPatch(data: Record<string, Literal>, patch: Record<string, Literal>): Record<string, Literal> {
+  const merged: Record<string, Literal> = { ...data, ...patch };
+  for (const key of Object.keys(patch)) {
+    if (patch[key] === null) delete merged[key];
+  }
+  return merged;
+}
+
+/**
  * Commit a single manual transition — guard check plus commit — with no
  * automatic-path cascade. Rejects if the path is not on the current step, is
  * not manual, or its guard is false. A concurrent transition that already
@@ -571,7 +585,7 @@ export async function commitManualTransition(
   actor: Actor,
   db: SQL = sql,
   dataPatch?: Instance["data"],
-  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
+  assignmentRegistry: AssignmentRegistry = createStaticAssignmentRegistry(),
   events?: InstanceEvent[],
 ): Promise<Instance> {
   // Deliberately a no-op, not a throw: internal idempotent re-entry (e.g. a
@@ -587,7 +601,7 @@ export async function commitManualTransition(
   if (!path) throw new Error(`path not on current step: ${pathId}`);
   if (path.trigger !== "manual") throw new Error(`not a manual path: ${pathId}`);
 
-  const mergedData = dataPatch ? { ...instance.data, ...dataPatch } : instance.data;
+  const mergedData = dataPatch ? (applyDataPatch(instance.data, dataPatch) as Instance["data"]) : instance.data;
   const evalInstance: Instance = dataPatch ? { ...instance, data: mergedData } : instance;
 
   if (!evalGuard(path.guard, buildGuardContext(body, evalInstance, actor))) throw new GuardRefused(pathId);
@@ -628,7 +642,7 @@ export async function executeManualTransition(
   actor: Actor,
   db: SQL = sql,
   dataPatch?: Instance["data"],
-  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
+  assignmentRegistry: AssignmentRegistry = createStaticAssignmentRegistry(),
   events?: InstanceEvent[],
 ): Promise<Instance> {
   if (instance.status !== "running") return instance;
@@ -773,7 +787,7 @@ export async function startInstance(
   opts: { processId: Instance["processId"]; version: number },
   actor: Actor,
   db: SQL = sql,
-  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
+  assignmentRegistry: AssignmentRegistry = createStaticAssignmentRegistry(),
 ): Promise<Instance> {
   // The initial step's timers are armed atomically inside createInstance (a crash
   // between INSERT and a separate arming UPDATE would strand them). If resolveAutomatic
@@ -830,7 +844,7 @@ export async function executeAutomaticTransition(
   path: Path,
   body: ProcessBody,
   db: SQL = sql,
-  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
+  assignmentRegistry: AssignmentRegistry = createStaticAssignmentRegistry(),
 ): Promise<Instance> {
   const source = body.workflow.steps.find((s) => s.id === instance.currentStepId);
   if (!source) throw new Error(`current step not in body: ${instance.currentStepId}`);
@@ -890,7 +904,7 @@ export async function resolveAutomatic(
   body: ProcessBody,
   actor: Actor,
   db: SQL = sql,
-  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
+  assignmentRegistry: AssignmentRegistry = createStaticAssignmentRegistry(),
 ): Promise<Instance> {
   let current = instance;
   const seen = new Set<string>([current.currentStepId]);
@@ -932,7 +946,7 @@ export async function fireTimer(
   timerId: string,
   body: ProcessBody,
   db: SQL = sql,
-  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
+  assignmentRegistry: AssignmentRegistry = createStaticAssignmentRegistry(),
 ): Promise<Instance> {
   if (instance.status !== "running") return instance;
 
@@ -1054,7 +1068,7 @@ export class UnknownDelegateError extends Error {
 
 async function loadForClaim(tx: SQL, instanceId: string): Promise<Instance> {
   const rows = (await tx`SELECT body FROM instances WHERE instance_id = ${instanceId} FOR UPDATE`) as { body: unknown }[];
-  if (rows.length === 0) throw new Error(`instance not found: ${instanceId}`);
+  if (rows.length === 0) throw new NotFoundError(`instance not found: ${instanceId}`);
   return instanceSchema.parse(typeof rows[0].body === "string" ? JSON.parse(rows[0].body) : rows[0].body);
 }
 

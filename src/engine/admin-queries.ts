@@ -86,7 +86,7 @@ export async function listOutbox(
   db: SQL = sql,
 ): Promise<Page<OutboxRow>> {
   const limit = Math.min(page.limit ?? DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT);
-  const [cursorCreatedAt, cursorKey] = page.cursor ? decodeCursor(page.cursor, 2) : [undefined, undefined];
+  const [cursorCreatedAt, cursorKey] = page.cursor ? decodeCursor(page.cursor, ["timestamp", "text"]) : [undefined, undefined];
   const statusArr = filter.status && filter.status.length > 0 ? db.array(filter.status, "TEXT") : null;
 
   // created_at::text (created_at_cursor) carries Postgres's full microsecond
@@ -177,7 +177,7 @@ export async function countInstancesByStatus(db: SQL = sql): Promise<Record<stri
  */
 export async function listPendingTimers(page: { limit?: number; cursor?: string } = {}, db: SQL = sql): Promise<Page<PendingTimer>> {
   const limit = Math.min(page.limit ?? DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT);
-  const [cursorTime, cursorId] = page.cursor ? decodeCursor(page.cursor, 2) : [undefined, undefined];
+  const [cursorTime, cursorId] = page.cursor ? decodeCursor(page.cursor, ["timestamp", "text"]) : [undefined, undefined];
 
   // next_timer_at::text (next_timer_at_cursor) carries Postgres's full
   // microsecond precision, unlike the driver's own Date conversion of the
@@ -287,7 +287,7 @@ export async function listInstanceAudit(
   db: SQL = sql,
 ): Promise<Page<AuditEntry>> {
   const limit = Math.min(page.limit ?? DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT);
-  const [cursorSeq] = page.cursor ? decodeCursor(page.cursor, 1) : [undefined];
+  const [cursorSeq] = page.cursor ? decodeCursor(page.cursor, ["int64"]) : [undefined];
 
   // A SQL-NULL `value` column (redacted) and a stored jsonb `null` literal
   // (an authored JSON null) both deserialize to the same JS `null`, so

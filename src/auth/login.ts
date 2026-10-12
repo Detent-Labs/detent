@@ -130,6 +130,12 @@ export async function handleLogin(
   if (typeof body.email !== "string" || typeof body.password !== "string") {
     return { status: 400, body: { error: { type: "request-shape", message: "request body must be { email: string, password: string }" } } };
   }
+  // Postgres refuses a NUL in a text parameter, so such an email could only
+  // reach `verifyLogin` and raise. It names no account, so it is no guess: it
+  // runs before both windows and counts against neither.
+  if (body.email.includes("\u0000")) {
+    return { status: 400, body: { error: { type: "request-shape", message: "email must not contain a NUL character" } } };
+  }
 
   const limited: HttpResult = { status: 429, body: { error: { type: "rate-limited", message: "too many login attempts, try again later" } } };
 

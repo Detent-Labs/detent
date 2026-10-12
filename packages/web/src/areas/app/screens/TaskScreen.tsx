@@ -7,6 +7,7 @@ import {
   PathButtons,
   filterToEditable,
   firstTabWithIssue,
+  formIsReadonly,
   resolveFieldsLocale,
   resolveTabsLocale,
   resolveText,
@@ -34,6 +35,7 @@ import { AppClientError } from "../api/client.js";
 import { describeError, type ErrorOutcome } from "../errors.js";
 import { is401 } from "../../../shell/useFail.js";
 import { resolveClaimControls, maySubmit, type ClaimControls } from "./claimLogic.js";
+import { readonlyNoteKey, seedTaskValues } from "./taskLogic.js";
 import { t } from "../catalog.js";
 import type { UiLocale } from "../../../i18n/locale.js";
 import type { InstanceAttachment, InstanceComment, InstanceView } from "../api/types.js";
@@ -212,9 +214,7 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
 
   const applyView = useCallback((next: InstanceView) => {
     setView(next);
-    const seeded: Record<string, unknown> = {};
-    for (const f of next.fields.filter(isResolvedViewField)) seeded[f.field.id] = next.draft?.data[f.field.id] ?? f.value;
-    setFormValues(seeded);
+    setFormValues(seedTaskValues(next.fields.filter(isResolvedViewField), next.draft));
     setDraftRestoredAt(next.draft?.updatedAt);
   }, []);
 
@@ -417,6 +417,12 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
     ? resolveClaimControls(view.status, view.assignment, actorId, actorRoles)
     : { state: "none" };
 
+  // A case that is not running, or a step with no available path, offers no
+  // submit, so the form reads but does not edit. Claim state plays no part:
+  // an unclaimed task with an available path stays editable.
+  const readonly = view ? formIsReadonly(view) : false;
+  const readonlyKey = view ? readonlyNoteKey(view) : undefined;
+
   const screenProps = stylex.props(styles.screen);
   return (
     <main className={`app-task ${screenProps.className}`} style={screenProps.style}>
@@ -451,9 +457,12 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
         </p>
       )}
 
+      {readonlyKey && <p {...stylex.props(styles.taskDraftNotice)}>{t(locale, readonlyKey)}</p>}
+
       {view && (
         <>
           <FieldForm
+            readonly={readonly}
             fields={resolveFieldsLocale(view.fields, locale, view.baseLocale)}
             values={formValues}
             onChange={(fieldId, value) => setFormValues((v) => ({ ...v, [fieldId]: value }))}
@@ -539,7 +548,7 @@ export function TaskScreen({ instanceId, token, actorId, actorRoles, locale, nav
                 </button>
               </span>
             )}
-            {maySubmit(claimControls) && view.status === "running" && (
+            {maySubmit(claimControls) && view.status === "running" && !readonly && (
               <button type="button" className="btn btn-secondary" disabled={loading} onClick={() => void doSave()}>
                 {t(locale, "task.save")}
               </button>

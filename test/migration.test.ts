@@ -10,7 +10,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { test, expect, beforeAll, beforeEach, spyOn } from "bun:test";
 import { sql, initSchema, createInstance } from "../src/engine/store.js";
-import { createDefaultAssignmentRegistry, resolveStepAssignment } from "../src/engine/registry.js";
+import { createStaticAssignmentRegistry, resolveStepAssignment } from "../src/engine/registry.js";
 import { publishBody, createDefinitionStore } from "../src/engine/definitions.js";
 import { startInstance, executeManualTransition, claimStep, CANCEL_CHILD_ACTION_TYPE } from "../src/engine/transition.js";
 import { drainOutbox } from "../src/engine/outbox.js";
@@ -120,7 +120,7 @@ const mkInstance = async (pid: Instance["processId"], version: number, data?: Re
   // `startInstance` and `api.ts::createProcessInstance` do at creation.
   const initial = body.workflow.steps.find((st) => st.id === body.workflow.initialStep)!;
   const instanceId = `inst_${crypto.randomUUID()}`;
-  const { assignment } = await resolveStepAssignment(initial, createDefaultAssignmentRegistry(), {
+  const { assignment } = await resolveStepAssignment(initial, createStaticAssignmentRegistry(), {
     id: instanceId,
     startedBy: undefined,
     data: (data ?? {}) as Instance["data"],

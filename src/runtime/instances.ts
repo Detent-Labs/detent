@@ -30,7 +30,7 @@ import type {
   LocaleCode,
   InstanceEvent,
 } from "../schema/definition.js";
-import { createDefaultAssignmentRegistry, resolveStepAssignment, type DataSourceRegistry, type AssignmentRegistry } from "../engine/registry.js";
+import { createStaticAssignmentRegistry, resolveStepAssignment, type DataSourceRegistry, type AssignmentRegistry } from "../engine/registry.js";
 import {
   getStore,
   parseInstance,
@@ -130,7 +130,7 @@ export async function createProcessInstance(
   registry: DataSourceRegistry,
   opts?: { version?: number; data?: Instance["data"]; fromDraft?: boolean },
   db: SQL = sql,
-  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
+  assignmentRegistry: AssignmentRegistry = createStaticAssignmentRegistry(),
 ): Promise<Instance> {
   const store = getStore(db);
   let version: number;
@@ -335,7 +335,7 @@ export async function submitAndTransition(
   actor: Actor,
   registry: DataSourceRegistry,
   db: SQL = sql,
-  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
+  assignmentRegistry: AssignmentRegistry = createStaticAssignmentRegistry(),
 ): Promise<Instance> {
   const store = getStore(db);
   const submitted = data as Record<string, Literal>;
@@ -365,7 +365,7 @@ export async function submitAndTransition(
 
       requireSubmitAuthority(instance, actor, instanceId);
 
-      const resolved = await validateSubmissionData(body, step, instance, actor, submitted, registry, tx);
+      const resolved = await validateSubmissionData(body, step, instance, actor, submitted, registry, tx, { checkRequired: true, allowClear: true });
 
       // After validation, never inside it: a `SubmissionValidationError` blames a
       // field on the participant's form, and a mismatching attribute is the

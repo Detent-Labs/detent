@@ -1219,6 +1219,10 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   dialog's heading (`panels/RemoveFieldDialog.tsx:116`) pass a replacer
   function, `() => label`.
 
+  The `packages/form-ui` site now passes a replacer too, in one pass:
+  `tabSwitchAnnouncement` (`packages/form-ui/src/tabs.ts`), fixed by
+  `fix-form-ui-empty-values`. The count below covers `packages/web/src` alone.
+
   Measured 2026-09-13, `packages/web/src` holds 54 `.replace("{` calls in 15
   files. Twelve pass a replacer function: the five removal fills, and seven in
   `panels/ChangeList.tsx`, `panels/ChangesView.tsx` and
@@ -1567,8 +1571,10 @@ this section.
 
 - **WRITE-1: the write routes still answer a caller who may not read with the
   instance's existence.** Claim, release and delegate answer 409
-  `instance-not-running` for a finished instance. They answer 500 for an
-  unknown instance id. On a running instance, claim answers the typed 403
+  `instance-not-running` for a finished instance. They answer 403
+  `authorization` for an unknown instance id to a caller without `system:admin`,
+  as the next paragraphs state. On a
+  running instance, claim answers the typed 403
   `not-assigned`, `not-a-candidate` or `already-claimed`. Release and delegate
   answer `not-claimant`. Submit and form-draft save answer `not-claimed` or
   `not-claimant`.
@@ -1582,10 +1588,12 @@ this section.
   `not-claimant`. Closing those two types needs a web change in the app area
   and the studio area.
 
-  The change `harden-http-error-surface` (audit finding C-17) owns the 500 for
-  an unknown id. Its answer for an unknown id must be the opaque 403 and never
-  a 404. That matches the answer submit, form-draft save and the visibility
-  routes give an unknown id.
+  The change `harden-http-error-surface` (audit finding C-17) shipped the
+  answer for an unknown id. A caller without `system:admin` gets the opaque 403
+  `authorization`, never a 404. That matches the answer submit, form-draft save
+  and the visibility routes give an unknown id. A `system:admin` holder gets
+  the `NotFoundError` answer. The typed refusals above still tell a caller that
+  an instance exists, and WRITE-1 keeps that gap open.
 
   One difference stays by design. On a running instance, a revoked starter's
   cancel or assignment-less submit succeeds. The same call on a finished
@@ -1678,17 +1686,6 @@ of `5f41cd8a`. Each fix change deletes its own entries in the commit that
 archives it, and `sweep-docs-drift-2026-10` re-points the line citations of
 other entries. C-4 merges D-2, and C-6 merges F-6.
 
-- **`fix-handler-assignment-registry` (B-3, B-14; high)**: The handlers
-  `process.start` and `instance.transition` resolve assignments with the
-  static strategy alone, through a second function named
-  `createDefaultAssignmentRegistry`. Anchors:
-  `src/handlers/process-start.ts`, `src/handlers/instance-transition.ts`,
-  `src/engine/assignment-strategies.ts`.
-- **`tighten-publish-contract-checks` (A-2, A-8; medium)**: The idempotent
-  compile branch accepts a hand-written cancel sink of any shape, and publish
-  stores `Action.execution` and `Action.idempotencyKey`, which nothing reads.
-  Anchors: `src/schema/compile.ts`, `src/schema/definition.ts`,
-  `src/engine/transition.ts`.
 - **`bind-instance-transition-target` (D-3; medium)**: The
   `instance.transition` handler drives a target instance with system rights,
   and participant data decides which instance that is. Anchors:
@@ -1719,14 +1716,6 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   share one database, and the provisioning connection drops its URL
   parameters. Anchors: `src/auth/jwt.ts`, `src/tenancy/provision.ts`,
   `src/tenancy/connections.ts`.
-- **`harden-http-error-surface` (D-1, D-8, C-10, C-11, C-17; medium)**: An
-  error in the login route escapes `mapError`, so an anonymous caller can
-  receive the runtime's development error page, the JWT check fixes no
-  algorithm list and does not need `exp` from external issuers, and a bad
-  cursor, a saved report with an invalid date and a claim on an unknown
-  instance each return 500. The unknown-id answer must be the opaque 403,
-  never a 404, as WRITE-1 states. Anchors: `src/auth/login.ts`, `src/auth/jwt.ts`,
-  `src/pagination.ts`.
 - **`fix-condition-and-path-builders` (E2-1, E2-6, E2-10, E2-14, E2-17;
   medium)**: A manual path keeps a hidden guard that hides its button at
   runtime, one "+ Add row" removes every `visible` override when the steps
@@ -1762,12 +1751,6 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   Vite. Anchors: `packages/web/src/areas/studio/panels/FieldMatrixGrid.tsx`,
   `packages/web/src/areas/studio/canvas/CanvasView.tsx`,
   `packages/web/vite.config.ts`.
-- **`fix-form-ui-empty-values` (F-3, F-8, F-14, F-16; medium)**: The package
-  form-ui and the engine disagree on cleared fields, the form accepts input
-  when no path is available, the tab announcement expands `$` patterns from
-  the label, and form-ui declares React 18 as its peer while the consumer
-  uses React 19. Anchors: `packages/form-ui/src/FieldForm.tsx`,
-  `packages/form-ui/src/tabs.ts`, `packages/form-ui/package.json`.
 - **`fix-admin-instance-and-outbox-screens` (F-2, F-9, F-10; medium)**: The
   instance header shows an expired claim and a stale `transitionSeq`, the
   header reports no armed timer once 201 timers run, and the outbox discards
@@ -1894,9 +1877,22 @@ gap that the change leaves open. The tag HOLD-1 is local to this section.
   condition.** Take a stored guard `A && B`, and let the author pick another
   operand for row A. `toCel` leaves the unfinished row out and writes `B` at
   once. The saved guard now admits more cases and can reroute an automatic
-  path. The spec text "leave that row out" allows this, so the change kept it. A later change could hold the
-  whole condition while any row is incomplete. Anchors: `commitDecision` and
+  path. The spec text "leave that row out" allows this, so the change kept
+  it. A later change could hold the whole condition while any row is
+  incomplete. Anchors: `commitDecision` and
   `toCel` in `packages/web/src/areas/studio/panels/shared/conditionLogic.ts`.
+
+## Open from fix-form-ui-empty-values (needs its own OpenSpec change)
+
+The final review of `fix-form-ui-empty-values` surfaced one gap outside that
+change's scope. The CLAIMVIEW tag is local to this section.
+
+- **CLAIMVIEW-1: a viewer who cannot claim sees inputs that accept typing.**
+  A viewer who is no candidate, or whose step another actor claimed, sees
+  editable inputs. The Task screen shows neither Save nor a path button.
+  `formIsReadonly` ignores claim state on purpose. The `end-user-app` spec
+  makes field editability independent of claim state, and finding F-8 kept
+  that rule. Covering the case needs a spec change and a third note cause.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 
@@ -1986,7 +1982,8 @@ audit of 2026-09-10.
 16. **Delete the unused registry seams.** Rejected. That set is
     `devHeaderResolver`, the action `Registry`, the `DataSourceRegistry`, the
     `AssignmentRegistry`'s multi-strategy handlers, `exampleRegistry.ts` with
-    `RegistryPanel.tsx`, and `Action.execution`'s reserved enum. `CLAUDE.md`
+    `RegistryPanel.tsx`, and `Action.execution`'s reserved enum. The enum has
+    since narrowed to `async` (`tighten-publish-contract-checks`). `CLAUDE.md`
     records the reserved enum and the dev-header seam as v1 boundaries, and
     the registries as the plugin seam. The two studio files have
     since left the tree on their own change, on 2026-08-18; the rest stand.
