@@ -367,8 +367,8 @@ test("accepts a well-typed guard", () => {
 });
 
 // A condition site infers to bool. The engine acts on a guard, a view flag or a
-// validation rule only when it evaluates to `true`; any other type parks the path
-// or rejects the submission without a message, so the mistake is a publish error.
+// validation rule only when it evaluates to `true`; any other type counts as false
+// without a message, so the mistake is a publish error.
 const condFields = [...typedFields, field("status", "string"), field("count", "number", "integer")];
 const condIssues = (steps: unknown[]) => validateProcessBody(body({ fields: condFields, steps }));
 const viewStep = (entry: Record<string, unknown>) => ({
