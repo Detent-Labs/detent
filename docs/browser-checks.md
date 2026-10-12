@@ -5770,9 +5770,36 @@ Back on the Fields tab, press "Remove row". Return to the Field matrix tab.
 
 Pass: the "visible" box under Manager Approval is still clear.
 
-Back on the Fields tab, press "Clear on <steps>".
+Back on the Fields tab, read the command before you press it.
+
+Pass: the command reads "Clear on Draft Requisition, Manager Approval, Finance
+Review". It names every step that asks for `cost_center`.
+
+Press "Clear on <steps>".
 
 Pass: the row shows every "visible" box ticked. The command no longer shows.
+
+#### An unfinished edit keeps the stored condition (E2-6)
+
+Open a draft of `purchase_requisition` and the Steps tab. Select "Draft
+Requisition" and open its path "Submit for approval". Under "Only when", build
+one row: `Quantity`, `>` and `5`. Then pick `Unit Price` as that row's operand.
+
+Pass: the row turns dashed and shows its incomplete flag.
+
+Pass: the readout under the rows still reads `data.quantity > 5.0`.
+
+Open another tab, then return to the Steps tab and the same path.
+
+Pass: the readout still reads `data.quantity > 5.0`.
+
+Repeat the edit once on a field with a rule. Open `Quantity` on the Fields tab
+and its Validation zone. Under `rule`, build one row that compares this answer
+with `5`. Then pick another field as the row's operand.
+
+Pass: the row turns dashed and shows its incomplete flag.
+
+Pass: the readout under the rows still shows the rule from before the edit.
 
 #### An integer and a negative number read back as rows (E2-10)
 
@@ -5801,11 +5828,11 @@ Pass: the JSON surface carries `data.budget_ok == false` in that path's guard.
 #### Add path takes the sibling trigger (E2-17)
 
 Open a draft of `credit_check` and select its `Decide` step, which carries two
-automatic paths. Pick a target step and press "add path".
+automatic paths. Pick a target step and press "+ Add path".
 
 Pass: the new path's "triggered by" control reads "a condition".
 
 Open a draft of `loan_application` and select its `check` step, a subprocess
-step. Pick a target step and press "add path".
+step. Pick a target step and press "+ Add path".
 
 Pass: that new path's "triggered by" control also reads "a condition".

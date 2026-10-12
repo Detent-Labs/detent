@@ -1885,6 +1885,19 @@ LEAF-1, LOAD-1 and REFUSE-1 are local to this section.
   array. A stale error also stays after an edit. One change per screen should
   take these together. The owner ruled that this change makes no layout change.
 
+## Open from fix-condition-and-path-builders (needs its own OpenSpec change)
+
+The final review of `fix-condition-and-path-builders` (2026-10-12) found one
+gap that the change leaves open. The tag HOLD-1 is local to this section.
+
+- **HOLD-1: an unfinished row in a condition of several rows writes a weaker
+  condition.** Take a stored guard `A && B`, and let the author pick another
+  operand for row A. `toCel` leaves the unfinished row out and writes `B` at
+  once. The saved guard now admits more cases and can reroute an automatic
+  path. The spec text "leave that row out" allows this, so the change kept it. A later change could hold the
+  whole condition while any row is incomplete. Anchors: `commitDecision` and
+  `toCel` in `packages/web/src/areas/studio/panels/shared/conditionLogic.ts`.
+
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 
 Each entry below names a cut somebody proposed, the reason a reviewer refused
