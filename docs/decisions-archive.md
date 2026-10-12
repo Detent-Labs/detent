@@ -894,6 +894,7 @@ system that resulted; this file explains why it took that shape.
   before 1.0. Shape: one table. One statement checks and increments
   together. Follow-up change: `postgres-login-rate-limit`.
 
-  The change `postgres-login-rate-limit` shipped. It added one table in the
+  The change `postgres-login-rate-limit` shipped 2026-10-12 (the line anchors
+  above are those of `37f11867`). It added one table in the
   tenant's own database and one upsert that checks and counts together. It
   also closed audit finding C-7.

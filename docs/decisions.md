@@ -702,7 +702,7 @@ build.
   A script that runs on the origin can read the token from `localStorage`
   and send it away. The attacker can then replay it from anywhere until it
   expires, up to eight hours (`TOKEN_LIFETIME_HOURS`,
-  `src/auth/login.ts:21`). An `HttpOnly` cookie would stop that theft. It
+  `src/auth/login.ts:23`). An `HttpOnly` cookie would stop that theft. It
   would still let such a script misuse the open session. The owner accepted
   this residual risk on 2026-09-23.
 - **SEC-8: attachment `contentType` is caller-supplied and echoed on

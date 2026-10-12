@@ -230,12 +230,15 @@ test.skipIf(!DB)("a malformed JSON body maps to 400", async () => {
 
 type WindowRow = { attempts: number; window_start: Date };
 
-const windowRow = async (scope: "email" | "address", key: string, db: SQL = sql): Promise<WindowRow | undefined> =>
-  ((await db`SELECT attempts, window_start FROM login_attempts WHERE scope = ${scope} AND key = ${key}`) as WindowRow[])[0];
+/** The stored key: the SHA-256 hex digest of the email or address. */
+const digest = (key: string): string => new Bun.CryptoHasher("sha256").update(key).digest("hex");
 
-/** Moves a window's start back past `WINDOW_MS` by `UPDATE`, in place of an injected clock. */
+const windowRow = async (scope: "email" | "address", key: string, db: SQL = sql): Promise<WindowRow | undefined> =>
+  ((await db`SELECT attempts, window_start FROM login_attempts WHERE scope = ${scope} AND key = ${digest(key)}`) as WindowRow[])[0];
+
+/** Moves a window's start back past `WINDOW_MS`. */
 const endWindow = async (scope: "email" | "address", key: string): Promise<void> => {
-  await sql`UPDATE login_attempts SET window_start = now() - ${WINDOW_MS + 1000}::double precision * interval '1 millisecond' WHERE scope = ${scope} AND key = ${key}`;
+  await sql`UPDATE login_attempts SET window_start = now() - ${WINDOW_MS + 1000}::double precision * interval '1 millisecond' WHERE scope = ${scope} AND key = ${digest(key)}`;
 };
 
 const rowCount = async (db: SQL = sql): Promise<number> => ((await db`SELECT count(*)::int AS n FROM login_attempts`) as { n: number }[])[0]!.n;
@@ -321,7 +324,7 @@ test.skipIf(!DB)("a locked expired row does not block the cleanup, and stays", a
   await endWindow("email", "free@example.com");
 
   await withTransaction(sql, async (tx) => {
-    await tx`SELECT 1 FROM login_attempts WHERE scope = 'email' AND key = 'locked@example.com' FOR UPDATE`;
+    await tx`SELECT 1 FROM login_attempts WHERE scope = 'email' AND key = ${digest("locked@example.com")} FOR UPDATE`;
     // A cleanup that waited for the lock would hang here until the test times out.
     const res = await handleLogin(loginRequest("bystander@example.com", "wrong-password"), SECRET, sql);
     expect(res.status).toBe(401);
@@ -354,6 +357,41 @@ test.skipIf(!DB)("an undefined address writes no address row", async () => {
   expect(((await sql`SELECT count(*)::int AS n FROM login_attempts WHERE scope = 'address'`) as { n: number }[])[0]!.n).toBe(0);
 });
 
+test.skipIf(!DB)("an email far past the btree row limit answers 401, then 429, never 500", async () => {
+  const email = `${"x".repeat(5000)}@example.com`;
+  for (let i = 0; i < MAX_ATTEMPTS; i++) {
+    expect((await handleLogin(loginRequest(email, "wrong-password"), SECRET, sql)).status).toBe(401);
+  }
+  expect((await handleLogin(loginRequest(email, "wrong-password"), SECRET, sql)).status).toBe(429);
+});
+
+test.skipIf(!DB)("login_attempts holds no plaintext email or address after a failed login", async () => {
+  await handleLogin(loginRequest("Plain.Text@Example.com", "wrong-password"), SECRET, sql, "198.51.100.50");
+  const keys = ((await sql`SELECT key FROM login_attempts`) as { key: string }[]).map((r) => r.key);
+  expect(keys.sort()).toEqual([digest("plain.text@example.com"), digest("198.51.100.50")].sort());
+  for (const key of keys) expect(key).toMatch(/^[0-9a-f]{64}$/);
+});
+
+test.skipIf(!DB)("one email from several addresses is limited on the next try, whatever address it comes from", async () => {
+  await createUser("spread@example.com", "correct-horse", []);
+  for (let i = 0; i < MAX_ATTEMPTS; i++) {
+    expect((await handleLogin(loginRequest("spread@example.com", "wrong-password"), SECRET, sql, `198.51.100.${60 + i}`)).status).toBe(401);
+  }
+  const limited = await handleLogin(loginRequest("spread@example.com", "correct-horse"), SECRET, sql, "198.51.100.99");
+  expect(limited.status).toBe(429);
+});
+
+test.skipIf(!DB)("a limited email reaches verifyLogin again once its window ends, and a success logs in", async () => {
+  await createUser("rollover@example.com", "correct-horse", []);
+  for (let i = 0; i < MAX_ATTEMPTS; i++) {
+    expect((await handleLogin(loginRequest("rollover@example.com", "wrong-password"), SECRET, sql)).status).toBe(401);
+  }
+  expect((await handleLogin(loginRequest("rollover@example.com", "correct-horse"), SECRET, sql)).status).toBe(429);
+
+  await endWindow("email", "rollover@example.com");
+  expect((await handleLogin(loginRequest("rollover@example.com", "correct-horse"), SECRET, sql)).status).toBe(200);
+});
+
 // Tenancy is database-per-tenant, so a second tenant here is a second database
 // on the same server. `beta` holds its own `login_attempts` table.
 async function betaDatabase(): Promise<SQL> {
@@ -372,8 +410,13 @@ async function betaDatabase(): Promise<SQL> {
   const betaUrl = new URL(url);
   betaUrl.pathname = `/${name}`;
   const beta = new SQL(betaUrl.toString());
-  await initSchema(beta);
-  await beta`TRUNCATE auth_users, login_attempts`;
+  try {
+    await initSchema(beta);
+    await beta`TRUNCATE auth_users, login_attempts`;
+  } catch (e) {
+    await beta.close();
+    throw e;
+  }
   return beta;
 }
 
@@ -395,6 +438,8 @@ test.skipIf(!DB)(
         undefined,
         async (req) => (req.headers.get("x-test-tenant") === "beta" ? beta : sql),
       );
+      // Both tenants see the same caller address, so each address window is exercised.
+      const peer = { requestIP: () => ({ address: "198.51.100.40", family: "IPv4", port: 1 }) } as unknown as Parameters<typeof fetch>[1];
       const login = async (tenant: "acme" | "beta", password: string): Promise<number> =>
         (
           await fetch(
@@ -403,6 +448,7 @@ test.skipIf(!DB)(
               headers: { "content-type": "application/json", "x-test-tenant": tenant },
               body: JSON.stringify({ email: "eve@corp.example", password }),
             }),
+            peer,
           )
         ).status;
 
@@ -418,6 +464,12 @@ test.skipIf(!DB)(
       expect(await login("beta", "wrong-password")).toBe(429);
       expect((await windowRow("email", "eve@corp.example", beta))!.attempts).toBe(MAX_ATTEMPTS + 1);
       expect(await windowRow("email", "eve@corp.example")).toBeUndefined();
+
+      // Each database counted the shared address on its own: beta's 7 tries
+      // (5 wrong, 1 refused, 1 refused) and acme's 2 (wrong, correct). acme's
+      // success left its own address row.
+      expect((await windowRow("address", "198.51.100.40", beta))!.attempts).toBe(MAX_ATTEMPTS + 2);
+      expect((await windowRow("address", "198.51.100.40"))!.attempts).toBe(2);
     } finally {
       await beta.close();
     }

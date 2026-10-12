@@ -53,13 +53,23 @@ async function deleteExpiredAttempts(db: SQL): Promise<void> {
 }
 
 /**
+ * The stored `login_attempts.key`: the SHA-256 hex digest of the normalized
+ * email or the caller address. A digest has a fixed length, so no email can
+ * exceed the btree limit on an index row, and the table holds no plaintext
+ * email.
+ */
+function attemptKey(key: string): string {
+  return new Bun.CryptoHasher("sha256").update(key).digest("hex");
+}
+
+/**
  * Counts one try for `(scope, key)` in the `login_attempts` table of `db` and
- * answers whether it passes. One upsert checks and records, so the row lock
- * serializes concurrent tries for a key across requests and across server
- * processes. A window that has ended restarts at 1. The count stops at
- * `maxAttempts + 1`, and a refused try leaves `window_start` alone, so refusals
- * do not extend the window. The window's age compares with the database clock.
- * A database error propagates.
+ * answers whether it passes. The row is stored under `attemptKey(key)`. One
+ * upsert checks and records, so the row lock serializes concurrent tries for a
+ * key across requests and across server processes. A window that has ended
+ * restarts at 1. The count stops at `maxAttempts + 1`, and a refused try leaves
+ * `window_start` alone, so refusals do not extend the window. The window's age
+ * compares with the database clock. A database error propagates.
  */
 export async function checkAndRecordAttempt(
   db: SQL,
@@ -69,7 +79,7 @@ export async function checkAndRecordAttempt(
 ): Promise<"ok" | "limited"> {
   const rows = (await db`
     INSERT INTO login_attempts (scope, key, attempts, window_start)
-    VALUES (${scope}, ${key}, 1, now())
+    VALUES (${scope}, ${attemptKey(key)}, 1, now())
     ON CONFLICT (scope, key) DO UPDATE SET
       attempts = CASE WHEN login_attempts.window_start <= now() - ${WINDOW_MS}::double precision * interval '1 millisecond'
                       THEN 1 ELSE LEAST(login_attempts.attempts + 1, ${maxAttempts}::integer + 1) END,
@@ -96,7 +106,7 @@ export async function handleLogin(
     return { status: 400, body: { error: { type: "request-shape", message: "request body must be { email: string, password: string }" } } };
   }
   // Postgres refuses a NUL in a text parameter, so such an email could only
-  // reach `verifyLogin` and raise. It names no account, so it is no guess: it
+  // reach a query and raise. It names no account, so it is no guess: it
   // runs before both windows and counts against neither.
   if (body.email.includes("\u0000")) {
     return { status: 400, body: { error: { type: "request-shape", message: "email must not contain a NUL character" } } };
@@ -127,7 +137,7 @@ export async function handleLogin(
   // The email's window clears; the address's does not. Clearing it would let a
   // caller holding one valid account reset the address window at will, and so
   // try one password against every other account for free.
-  await db`DELETE FROM login_attempts WHERE scope = 'email' AND key = ${normalizedEmail}`;
+  await db`DELETE FROM login_attempts WHERE scope = 'email' AND key = ${attemptKey(normalizedEmail)}`;
 
   const key = new TextEncoder().encode(secret);
   // The tenant this database belongs to, so every later request resolves its

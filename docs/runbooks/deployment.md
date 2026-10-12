@@ -208,7 +208,8 @@ derives from whatever directory issues those tokens.
 ## Running more than one engine process
 
 A tenant may run more than one engine process against one database. No
-state is process-local today. A second process or a restart changes no
+process keeps state the engine enforces. The login rate-limit windows live in
+the tenant's `login_attempts` table. A second process or a restart changes no
 threshold the engine enforces.
 
 Start one process before the others, on a new database and after an

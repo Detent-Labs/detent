@@ -409,10 +409,10 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   // manager_user_id has one.
   await db`ALTER TABLE auth_users ADD COLUMN IF NOT EXISTS locale text`;
   // The login rate-limit windows (src/auth/login.ts): one row per window, scope
-  // 'email' (key = normalized email) or 'address' (key = caller address). No
-  // tenant column: tenancy here is database-per-tenant, so each tenant counts in
-  // its own table. The window_start index serves the per-request delete of
-  // expired rows.
+  // 'email' or 'address'. key = SHA-256 hex of the normalized email or the
+  // caller address; the fixed length bounds the index row. No tenant column:
+  // tenancy here is database-per-tenant, so each tenant counts in its own
+  // table. The window_start index serves the per-request delete of expired rows.
   await db`CREATE TABLE IF NOT EXISTS login_attempts (
     scope        text        NOT NULL,
     key          text        NOT NULL,
