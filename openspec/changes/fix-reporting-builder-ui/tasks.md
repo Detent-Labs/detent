@@ -20,7 +20,7 @@
 
 ## 4. Documentation and browser check
 
-- [x] 4.1 Add a "The report builder dates, session end and column error" walk to `docs/browser-checks.md`, with the three checks of this change. Verify that the prose gate reports no rise for the file.
+- [x] 4.1 Add a walk of this change's three checks to `docs/browser-checks.md`. Verify that the prose gate reports no rise for the file.
 - [x] 4.2 Strike the `fix-reporting-builder-ui` entry from the audit index in `docs/decisions.md`. Verify with `git grep -n fix-reporting-builder-ui -- docs/decisions.md` that no entry remains.
 - [ ] 4.3 Run the browser walk of task 4.1 on the production build. Then run `/impeccable critique` and `/impeccable audit` against `/reporting/reports/new`. Verify that the report file prints each result.
 
