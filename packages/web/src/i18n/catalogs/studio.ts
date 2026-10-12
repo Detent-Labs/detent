@@ -801,7 +801,6 @@ export const en = {
   "changeList.prop.onFire": "On fire",
   "changeList.prop.targetPath": "Target path",
   "changeList.prop.config": "Config",
-  "changeList.prop.idempotencyKey": "Idempotency key",
   "changeList.prop.output": "Output",
   "changeList.prop.execution": "Execution",
   "changeList.prop.retry": "Retry",

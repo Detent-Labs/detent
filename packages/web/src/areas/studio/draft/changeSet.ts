@@ -100,7 +100,6 @@ export const PROPERTY_WORDS: { readonly [key: string]: CatalogKey | undefined } 
   onFire: "changeList.prop.onFire",
   targetPath: "changeList.prop.targetPath",
   // action, retryPolicy
-  idempotencyKey: "changeList.prop.idempotencyKey",
   output: "changeList.prop.output",
   execution: "changeList.prop.execution",
   retry: "changeList.prop.retry",

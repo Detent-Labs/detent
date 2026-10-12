@@ -197,7 +197,8 @@ export type Plugin = z.infer<typeof plugin>;
 export const definitionStatus = z.enum(["draft", "published"]);
 export const stepType = z.enum(["task", "subprocess"]); // terminal is a property, not a type
 export const pathTrigger = z.enum(["manual", "automatic"]);
-export const execution = z.enum(["async", "blocking"]); // v1 implements async only
+// Every action is delivered after the commit; the engine has no blocking delivery.
+export const execution = z.enum(["async"]);
 export const instanceStatus = z.enum(["running", "completed", "cancelled", "faulted"]);
 export const baseFieldType = z.enum([
   "string", "number", "boolean", "list", "file", "group",
@@ -623,7 +624,6 @@ export const retryPolicy = z.object({
 
 export const action = plugin.extend({
   id: actionId,
-  idempotencyKey: z.string().nullable().optional(),
   output: z.record(fieldId, expression).optional(),
   execution: execution.optional(),
   retry: retryPolicy.optional(),
@@ -1133,9 +1133,10 @@ export type ProcessBody = z.infer<typeof processBody>;
  * legitimately contains none of that prefix's actions (they are synthesized at
  * runtime, never stored), so the ban generalizes to every body reaching the
  * compile pass and lives there instead (`src/schema/compile.ts`), ahead of the
- * `publishedProcessBody`-valid early return this schema's sibling does not
- * gate. See `harden-publish-validation` design.md for why the prefix ban and
- * the three identity checks below split onto different sides of that line.
+ * `publishedProcessBody`-valid early return, which validates the sink by
+ * comparing the body with its own recompile. See `harden-publish-validation`
+ * design.md for why the prefix ban and the three identity checks below split
+ * onto different sides of that line.
  */
 export const authoredProcessBody = processBody.superRefine((b, ctx) => {
   const add = (message: string, path: (string | number)[]) =>

@@ -32,6 +32,7 @@ import {
   type ChangeRow,
 } from "../src/areas/studio/draft/changeSet.js";
 import { t } from "../src/areas/studio/catalog.js";
+import { containerNodes } from "./zodContainerPaths.js";
 
 // Fixtures are plain JSON, mutated per case. `any` keeps the mutations short;
 // `describeChanges` takes `unknown` on both sides.
@@ -942,5 +943,29 @@ describe("describeChanges: word coverage", () => {
       }
     }
     expect(missing).toEqual([]);
+  });
+
+  /** Object shapes under `processBody` that `shapes` leaves out on purpose,
+   * keyed by their sorted key list. */
+  const EXEMPT_KEY_SETS: { readonly [keys: string]: string } = {
+    "attachments,comments": "`collaboration`: the changes list shows it as one JSON object",
+    strategy: "`assignment`: shown by its strategy word, so `assignment.strategy` is read as a whole",
+    "lang,src": "the expression object: `changeSet.ts` renders it as one CEL leaf",
+  };
+
+  // `containerNodes` does not descend into union options, so `viewField` and
+  // `viewNote` under `view.fields[]` are not reached here (design Non-Goals).
+  it("lists a shape with the same keys, or an exemption, for every object under processBody", () => {
+    const listed = new Set(Object.values(shapes).map((schema) => declaredKeys(schema).sort().join(",")));
+    const unlisted: string[] = [];
+    for (const node of containerNodes(processBody)) {
+      if (node.kind !== "object") continue;
+      const keys = declaredKeys(node.schema).sort();
+      const keySet = keys.join(",");
+      if (keys.length > 0 && !listed.has(keySet) && !Object.hasOwn(EXEMPT_KEY_SETS, keySet)) {
+        unlisted.push(`${node.path}: ${keys.join(", ")}`);
+      }
+    }
+    expect(unlisted).toEqual([]);
   });
 });
