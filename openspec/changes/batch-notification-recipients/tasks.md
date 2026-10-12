@@ -13,17 +13,17 @@
 - [x] 2.3 Add `SMTP_MAX_RECIPIENTS_PER_SESSION = 100`. Move the socket, deadline and cleanup into `deliverBatch`, one session per batch. Give each batch its own `To:` header. Add a `-<n>` suffix to the `Message-ID` when more than one batch exists. Verify the existing handler tests pass unchanged.
 - [x] 2.4 Return the whole list as `recipients` and the first batch's `Message-ID` as `messageId`. Replace the `ponytail:` mark on `actorIdsFor` with one that names the new ceiling. Verify with handler tests for 100, 101 and 250 addresses. Add an SMTP stub that answers `452` past the hundredth `RCPT TO`. Cover a `550` and a `450` in the second batch.
 - [x] 2.5 Verify a retried delivery repeats every batch's `Message-ID`. Verify a list of only malformed addresses opens no connection and succeeds.
-- [ ] 2.6 Stop starting batches once the elapsed time plus the next batch's timeout exceeds `CLAIM_LEASE_MS`, and fail as transient. Name the new ceiling in the `ponytail:` mark. Verify with tests for a stopped second batch and a first batch that always starts.
+- [x] 2.6 Stop starting batches once the elapsed time plus the next batch's timeout exceeds `CLAIM_LEASE_MS`, and fail as transient. Name the new ceiling in the `ponytail:` mark. Verify with tests for a stopped second batch and a first batch that always starts.
 
 ## 3. Documentation
 
 - [x] 3.1 Document batching and the skipped address in `docs/authoring-guide.md`, under "Who a notification reaches". Verify by reading that section against the delta spec.
-- [ ] 3.2 Strike the `batch-notification-recipients` entry in the audit index in `docs/decisions.md`. Verify the entry no longer appears in the index.
+- [x] 3.2 Strike the `batch-notification-recipients` entry in the audit index in `docs/decisions.md`. Verify the entry no longer appears in the index.
 
 ## 4. Verification
 
-- [ ] 4.1 Run `bun run typecheck` in the devcontainer. Verify it prints no error.
-- [ ] 4.2 Run `bun run build` in the devcontainer. Verify it exits 0.
-- [ ] 4.3 Run the full `bun test` through `scripts/test-gated.sh` with DATABASE_URL set. Verify the gate prints no rejection and no failed test.
+- [x] 4.1 Run `bun run typecheck` in the devcontainer. Verify it prints no error.
+- [x] 4.2 Run `bun run build` in the devcontainer. Verify it exits 0.
+- [x] 4.3 Run the full `bun test` through `scripts/test-gated.sh` with DATABASE_URL set. Verify the gate prints no rejection and no failed test.
 - [ ] 4.4 Run the prose gate and the whitespace gate over the pushed range on the host. Verify both exit 0.
-- [ ] 4.5 Run `openspec validate batch-notification-recipients`. Verify it reports the change valid.
+- [x] 4.5 Run `openspec validate batch-notification-recipients`. Verify it reports the change valid.

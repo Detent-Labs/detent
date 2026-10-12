@@ -437,6 +437,9 @@ through the same `requireRole` check.
 
 The request body SHALL be `{ email: string, password: string, roles?:
 string[] }`. `email` and `password` SHALL each be non-empty after trimming.
+`email` SHALL also be a valid address after trimming, by the rule "A new
+account's email is a valid address" states. The route SHALL check it before
+the write.
 
 A `roles` array the body carries SHALL pass the same bounds `PATCH
 /admin/users/:id/roles` already enforces. Each entry SHALL be a non-empty
@@ -448,7 +451,7 @@ The route SHALL enforce no minimum length or character-set rule on
 `password`. `Bun.password.hash` accepts any input. This route adds no check
 the rest of the system lacks.
 
-The request body SHALL carry no display name. The route SHALL store none.
+The request body SHALL have no display name. The route SHALL store none.
 `PATCH /admin/users/:id/name` is the one route that writes that column. A
 second way in would be a second way to drift. The created account's
 `displayName` therefore resolves to its email, the rule
@@ -490,6 +493,12 @@ ahead of the insert races that constraint.
 
 - **WHEN** a `POST /admin/users` request omits `email`, omits `password`, or
   sends either as an empty string after trimming
+- **THEN** the response is 400 and the route writes no row
+
+#### Scenario: The route refuses an email that is no valid address
+
+- **WHEN** a `POST /admin/users` request carries the `email` `max.muster`, or
+  an `email` with a CR and an LF in it
 - **THEN** the response is 400 and the route writes no row
 
 #### Scenario: The route refuses an out-of-bounds role set

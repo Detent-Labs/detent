@@ -1741,11 +1741,6 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   percent escape in the address crashes the studio area. Anchors:
   `packages/web/src/shell/App.tsx`, `packages/web/src/main.tsx`,
   `packages/web/src/areas/studio/routing.ts`.
-- **`batch-notification-recipients` (D-4, D-6; low)**: The
-  `notification.email` handler mails an unbounded group in one
-  all-or-nothing send, and the code never checks an account's email as an
-  address. Anchors: `src/handlers/notification-email.ts`,
-  `src/http/admin-routes.ts`, `src/auth/users.ts`.
 - **`tidy-engine-internals` (B-9, B-15, B-16, C-12; low)**: Some readers skip
   the pin hash check, `initSchema` carries backward migrations, reporting
   queries the history twice, one `tx.unsafe` call inserts an unescaped role
