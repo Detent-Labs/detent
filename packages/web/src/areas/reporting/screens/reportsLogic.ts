@@ -18,6 +18,7 @@ import {
   type Parsed,
   type ValueType,
 } from "../../../shell/literalValue.js";
+import { fromDateInput } from "./reportingLogic.js";
 
 export type ReportDraft = {
   processId: string;
@@ -68,6 +69,17 @@ export function draftToInput(draft: ReportDraft) {
     viewers: draft.viewers,
     editors: draft.editors,
   };
+}
+
+/**
+ * `draft` with one date bound set from a date input's `YYYY-MM-DD` value. A
+ * `start` edge sets `createdAfter` to local midnight of that day and an `end`
+ * edge sets `createdBefore` to the last local millisecond, the instants the
+ * three views send. An empty value clears the bound.
+ */
+export function withDateBound(draft: ReportDraft, edge: "start" | "end", value: string): ReportDraft {
+  const bound = value ? fromDateInput(value, edge) : "";
+  return edge === "start" ? { ...draft, createdAfter: bound } : { ...draft, createdBefore: bound };
 }
 
 export function isValidReportName(name: string): boolean {

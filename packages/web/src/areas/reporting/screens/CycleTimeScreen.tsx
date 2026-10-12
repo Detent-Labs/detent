@@ -3,6 +3,7 @@ import * as stylex from "@stylexjs/stylex";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { fetchCycleTime } from "../api/client.js";
 import { describeCaughtError, formatDuration, scaleTo, stepName, type DateRange } from "./reportingLogic.js";
+import { useFail } from "../../../shell/useFail.js";
 import { DurationRule, EmptyState, ErrorNote, ScopeNote, SkippedNote, WaitingNote } from "../components.js";
 import { t, tCount } from "../catalog.js";
 import type { UiLocale } from "../../../i18n/locale.js";
@@ -100,15 +101,18 @@ export function CycleTimeScreen({
   token,
   baseLocale,
   locale,
+  onUnauthorized,
 }: {
   processId: string;
   range: DateRange;
   token: string;
   baseLocale: string;
   locale: UiLocale;
+  onUnauthorized: () => void;
 }) {
   const [view, setView] = useState<CycleTimeView | undefined>();
   const [error, setError] = useState<ClientError | undefined>();
+  const fail = useFail(onUnauthorized, (err) => setError(describeCaughtError(err)));
 
   useEffect(() => {
     let cancelled = false;
@@ -116,9 +120,9 @@ export function CycleTimeScreen({
     setError(undefined);
     fetchCycleTime(processId, range, token)
       .then((v) => { if (!cancelled) setView(v); })
-      .catch((cause: unknown) => { if (!cancelled) setError(describeCaughtError(cause)); });
+      .catch((cause: unknown) => { if (!cancelled) fail(cause); });
     return () => { cancelled = true; };
-  }, [processId, range, token]);
+  }, [processId, range, token, fail]);
 
   if (error) return <ErrorNote error={error} locale={locale} />;
   if (!view) return <WaitingNote locale={locale} />;

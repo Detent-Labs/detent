@@ -11,8 +11,13 @@
  * (`stylex-phase-2-areas`), and only the step-form renderer, `form-ui`'s
  * default export, is the thing this canary guards against.
  *
+ * The 401 canaries guard the shell's session-expiry path: the root takes
+ * `onUnauthorized`, and every screen that imports the API client builds its
+ * error handler with `useFail(onUnauthorized`.
+ *
  * These are canaries. All hold today by construction; the test is what fails
- * when a later change wires in `form-ui` or calls a route outside the prefix.
+ * when a later change wires in `form-ui`, calls a route outside the prefix or
+ * adds a screen that shows a 401 as an error message.
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
@@ -52,6 +57,19 @@ test("the authoring entry points stay out of this area", () => {
   const forbidden = ["workflow-engine/schema/compile", "workflow-engine/cel/check", "workflow-engine/engine/registry-check"];
   for (const file of sources) {
     expect(importsOf(file).filter((s) => forbidden.includes(s)), file).toEqual([]);
+  }
+});
+
+test("the area root hands the shell's session-expiry callback to its screens", () => {
+  const root = readFileSync(join(AREA, "root.tsx"), "utf8");
+  expect(/\bonUnauthorized\b[^=]*\}: AreaRootProps/.test(root), "root.tsx destructures onUnauthorized").toBe(true);
+});
+
+test("every screen that calls the API ends the session on a 401", () => {
+  const callers = sources.filter((f) => f.endsWith("Screen.tsx") && importsOf(f).includes("../api/client.js"));
+  expect(callers.length).toBeGreaterThan(0);
+  for (const file of callers) {
+    expect(readFileSync(file, "utf8").includes("useFail(onUnauthorized"), file).toBe(true);
   }
 });
 
