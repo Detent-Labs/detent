@@ -23,11 +23,11 @@
 
 ## 4. Task screen and Player
 
-- [ ] 4.1 Move the draft seed from `TaskScreen.applyView` into a pure function. It tests `id in draft.data`. A test covers a `null` draft value.
-- [ ] 4.2 Pass `formIsReadonly(view)` to `FieldForm` in `TaskScreen.tsx`, and hide Save when it answers true. A pure helper picks the note key, and a test covers it.
-- [ ] 4.3 Add the two `task.readonly*` keys to the English and German app catalogs. The catalog parity test passes.
-- [ ] 4.4 Pass `formIsReadonly(view)` to `FieldForm` in `PlayerScreen.tsx`. The browser check in 6.3 covers a finished test instance.
-- [ ] 4.5 Run `bun install`, the web typecheck and the web build in the container. Each prints no error.
+- [x] 4.1 Move the draft seed from `TaskScreen.applyView` into a pure function. It tests `id in draft.data`. A test covers a `null` draft value.
+- [x] 4.2 Pass `formIsReadonly(view)` to `FieldForm` in `TaskScreen.tsx`, and hide Save when it answers true. A pure helper picks the note key, and a test covers it.
+- [x] 4.3 Add the two `task.readonly*` keys to the English and German app catalogs. The catalog parity test passes.
+- [x] 4.4 Pass `formIsReadonly(view)` to `FieldForm` in `PlayerScreen.tsx`. The browser check in 6.3 covers a finished test instance.
+- [x] 4.5 Run `bun install`, the web typecheck and the web build in the container. Each prints no error.
 
 ## 5. Docs and index
 
