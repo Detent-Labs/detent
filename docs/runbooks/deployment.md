@@ -5,7 +5,9 @@ one home for that list. `README.md` carries the commands that build and run
 the two images. It points here for the rest.
 
 Two images exist. `docker/engine.Dockerfile` builds the engine. The engine
-reads its configuration from the container environment.
+reads its configuration from the container environment. The image sets
+`NODE_ENV=production`. Leave it set: without it, Bun answers an error with a
+development page that shows the message and a source excerpt.
 `docker/frontend.Dockerfile` builds the browser bundle behind nginx. That
 image reads one build argument and no runtime variable.
 
@@ -19,8 +21,8 @@ default is safe for a deployment.
 | `DATABASE_URL` | The Postgres connection string. | Yes | None. | |
 | `PORT` | The TCP port the HTTP server binds. | No | `3000` | |
 | `WEB_ROOT` | The directory of the built browser bundle the engine serves. | No | `packages/web/dist`, beside the engine source. | |
-| `AUTH_JWT_SECRET` | The local HS256 signing key. Its presence registers `POST /auth/login`. | One of three, see below. | None. | |
-| `AUTH_ISSUERS` | A JSON array of `{iss, jwksUrl, audience, rolesClaim}`. It accepts tokens an external issuer signs. | One of three, see below. | None. | |
+| `AUTH_JWT_SECRET` | The local HS256 signing key. Its presence registers `POST /auth/login`. The local branch accepts HS256 only. | One of three, see below. | None. | |
+| `AUTH_ISSUERS` | A JSON array of `{iss, jwksUrl, audience, rolesClaim}`. It accepts tokens an external issuer signs. A token needs an `exp` claim and an asymmetric algorithm: RS, PS, ES or EdDSA. | One of three, see below. | None. | |
 | `ALLOW_INSECURE_DEV_AUTH` | `1` disables authentication. The engine then trusts the actor headers as sent. | One of three. | Unset. | Never `1` here. Configure `AUTH_JWT_SECRET` or `AUTH_ISSUERS` instead. |
 | `CORS_ALLOWED_ORIGINS` | A comma-separated origin list for the CORS headers. | No | Unset, which emits no CORS header. | The value `*` allows every origin. Name the origins the browser bundle answers from. |
 | `DATA_RETENTION_DAYS` | The age at which the sweep deletes a terminal instance. A positive integer. | No | Unset, which runs no sweep. | |
