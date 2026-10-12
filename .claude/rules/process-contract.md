@@ -334,7 +334,7 @@ data sources the same way. The check runs after the hash-hit no-op
 return. A body published before the handler's registration stays valid
 on an identical re-publish. It throws the results in a fixed
 order: action registry, assignment registry, data source registry, then
-CEL (`definitions.ts:731-747`). The class
+CEL (`definitions.ts:783-799`). The class
 `DataSourceRegistryValidationError` also carries
 `checkInstanceQueryValueFromField`'s issues.
 

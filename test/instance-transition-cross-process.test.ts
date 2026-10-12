@@ -1,9 +1,8 @@
 /**
  * Publish-time cross-process validation over an `instance.transition` action:
- * `cross-process-validation`'s two ADDED requirements (processId
- * resolvability, the pathId reference union) plus the MODIFIED read-grant
- * requirement's `instance.transition` scenarios. DB-backed; skips when
- * DATABASE_URL is unset.
+ * `cross-process-validation`'s processId, pathId, instanceIdField binding and
+ * migrate requirements, plus the read-grant requirement's `instance.transition`
+ * scenarios. DB-backed; skips when DATABASE_URL is unset.
  */
 import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, initSchema } from "../src/engine/store.js";
@@ -333,9 +332,9 @@ test.skipIf(!DB)("a publish with no actor supplied skips the check", async () =>
  * `validateCrossProcessReadGrant` collects target `processId`s from two
  * loops — every `"instance.query"` data source, then every
  * `instance.transition` action — into one `Set` before checking. A body
- * naming the same target from BOTH loops exercises that merge: this is the
- * one shape the single-site-kind tests above cannot reach, since each of
- * them carries only one kind of site.
+ * naming the same target from BOTH loops exercises that merge. The binding
+ * rule makes every `instance.transition` body carry both site kinds, so this
+ * shape matches `actorBody` and stays as the named case of the merge.
  */
 const combinedSiteBody = (): ProcessBody =>
   ({

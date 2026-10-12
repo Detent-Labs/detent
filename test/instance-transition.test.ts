@@ -321,7 +321,7 @@ test.skipIf(!DB)("a submitted id the bound source does not offer fails the optio
   const tv = await publishBody(pid("proc_it_opt_target"), targetBody(), registry, dataSourceReg);
   const ov = await publishBody(pid("proc_it_opt_other"), targetBody(), registry, dataSourceReg);
   const av = await publishBody(pid("proc_it_opt_actor"), actorBody(tv.processId, "path_issue", true), registry, dataSourceReg);
-  const target = await startInstance(tv.definition, { processId: tv.processId, version: tv.version }, actor);
+  const target = await startInstance(tv.definition, { processId: tv.processId, version: tv.version }, { id: "user_other", roles: [] }); // started by someone else: the acting user cannot otherwise see it
   const other = await startInstance(ov.definition, { processId: ov.processId, version: ov.version }, actor); // another process: the source never offers it
   const acting = await createProcessInstance(av.processId, actor, dataSourceReg);
 
