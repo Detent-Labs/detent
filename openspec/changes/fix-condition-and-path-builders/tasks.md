@@ -17,10 +17,11 @@
 
 - [ ] 3.1 Add a pure `commitDecision` to `conditionLogic.ts`. It takes the written text, the row counts and the stored source, and returns write, clear or hold. Verify with the table test in 3.2.
 - [ ] 3.2 Test `commitDecision` for four cases: unfinished row, removal of the last stored row, removal with nothing stored, and a complete row.
-- [ ] 3.3 In `ConditionInput.tsx`, call `commitDecision`, keep `seededFrom` on a hold, and print the stored source in the readout. Verify the unfinished-edit scenario in a browser.
-- [ ] 3.4 Add the `clearLabel` prop. Put the authoring-command button in both footers, and reset the local rows on press.
-- [ ] 3.5 In `FieldCatalogPanel.tsx`, pass `clearLabel` from `fieldVisibleOverrides`. Add the studio catalog key. Verify the command shows for a divergent field and hides when no view carries `visible`.
-- [ ] 3.6 Test that `applyVisibleOverride` with `undefined` drops `visible` from every referencing entry. Verify a divergent field reads as `uniform` afterwards.
+- [ ] 3.3 In `ConditionInput.tsx` and `RuleInput.tsx`, call `commitDecision` and keep `seededFrom` on a hold. Print the held source in the readout. Verify the unfinished-edit scenario in a browser.
+- [ ] 3.4 Fix the comments in `BooleanOrExpressionInput.tsx`, `ConditionInput.tsx` and `RuleInput.tsx` that say an unfinished row writes `undefined`. Verify with `git grep -n 'writes .undefined' -- packages/web/src`.
+- [ ] 3.5 Add the `clearLabel` prop. Put the authoring-command button in both footers, and reset the local rows on press.
+- [ ] 3.6 In `FieldCatalogPanel.tsx`, pass `clearLabel` from `fieldVisibleOverrides`. Add the studio catalog key. Verify the command shows for a divergent field and hides when no view carries `visible`.
+- [ ] 3.7 Test that `applyVisibleOverride` with `undefined` drops `visible` from every referencing entry. Verify a divergent field reads as `uniform` afterwards.
 
 ## 4. The path row, the add action and the canvas (E2-1, E2-17)
 
@@ -28,8 +29,8 @@
 - [ ] 4.2 Use `triggerForNewPath` in `PathsPanel.addPath` and in `CanvasView`'s connect drag. Verify with a browser check on a subprocess step.
 - [ ] 4.3 In `PathsPanel.tsx`, show the "Only when" fieldset for both triggers. Keep `priority` automatic-only, and add the manual-path note and hint to the studio catalog.
 - [ ] 4.4 Add a static-markup test that a manual path with a guard shows the `ConditionBuilder` and no `priority` input.
-- [ ] 4.5 In `CanvasView.tsx`, show the guard label for any guarded path. Keep the badge and the "else" marker automatic-only. Verify a manual edge shows its label in a browser.
-- [ ] 4.6 Add a pure `guardedManualPathNotes` to the preview's logic module, and show its lines in `FormPreview.tsx`. Test: guarded path, unguarded path, unreadable guard.
+- [ ] 4.5 Add `edgeGuardLabel` to `conditionLogic.ts` and call it from `CanvasView.tsx`. Keep the badge and the "else" marker automatic-only. Test both triggers, and verify a manual edge shows its label in a browser.
+- [ ] 4.6 Add a pure `guardedManualPathNotes` in `draft/guarded-path-notes.ts`, and show its lines in `FormPreview.tsx`. Test: guarded path, unguarded path, unreadable guard.
 
 ## 5. Docs and the audit index
 
@@ -46,3 +47,4 @@
 ## Workflow follow-up
 
 - Verify, sync the delta specs, archive, push, open the PR and merge on green CI.
+- At sync, place each added requirement beside the removed one it replaces.

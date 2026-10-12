@@ -33,7 +33,7 @@ None.
 
 ## Impact
 
-- `packages/web/src/areas/studio/`: `panels/PathsPanel.tsx`, `panels/FieldCatalogPanel.tsx`, `panels/FormPreview.tsx`, `panels/shared/ConditionInput.tsx`, `ConditionBuilder.tsx`, `RuleBuilder.tsx`, `conditionLogic.ts`, `ruleLogic.ts`, `canvas/CanvasView.tsx`, `draft/createPath.ts`, and the studio catalog.
+- `packages/web/src/areas/studio/`: `panels/PathsPanel.tsx`, `panels/FieldCatalogPanel.tsx`, `panels/FormPreview.tsx`, `panels/shared/ConditionInput.tsx`, `ConditionBuilder.tsx`, `RuleInput.tsx`, `RuleBuilder.tsx`, `BooleanOrExpressionInput.tsx` (a comment), `conditionLogic.ts`, `ruleLogic.ts`, `canvas/CanvasView.tsx`, `draft/createPath.ts`, `draft/guarded-path-notes.ts`, and the studio catalog.
 - Tests under `packages/web/test/`.
 - `docs/authoring-guide.md`: one sentence on the conditional button.
 - `docs/browser-checks.md`: one checklist entry.

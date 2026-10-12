@@ -33,7 +33,8 @@ All five fixes sit in `packages/web/src/areas/studio/`. See `proposal.md` for th
 - The form preview prints one line per guarded manual path under the controls. The line holds the path label, then the condition in the canvas edge's words. The preview has no instance data, so it cannot hide the control.
 - Anti-goals: no new color, no new weight, no tooltip that carries the only copy of a fact.
 
-**1. The write rule lives in `ConditionInput.commit`.**
+**1. The write rule lives in one pure function, used by both inputs.**
+`commitDecision` in `conditionLogic.ts` takes the written text, the old and new row counts, and the source the draft holds. `ConditionInput.commit` and `RuleInput.commit` both call it. The rule input has the same defect: an unfinished edit deletes a stored `validation.rule`.
 `commit` compares the new row count with the old one. It writes `undefined` only when a row was removed, no complete row is left, and a source is stored. In every other case that leaves no complete row, it keeps the new rows in local state and calls `onChange` not at all. `seededFrom` stays as it was, so the unfinished row survives the next render.
 Alternative: pass the action kind from `ConditionBuilder` through `onChange`. Rejected: a row-count comparison keeps the builder's interface as it is.
 
@@ -48,11 +49,12 @@ Alternative: a separate button in `FieldCatalogPanel`, outside the footer. Rejec
 `triggerForNewPath(source)` returns `automatic` for a `subprocess` step, else the first path's trigger, else `manual`. `PathsPanel.addPath` and `CanvasView`'s connect drag both call it. The canvas had the sibling rule inline and no subprocess rule.
 
 **5. The guard editor ignores the trigger; only `priority` depends on it.**
-`PathsPanel` renders the `studioOnlyWhen` fieldset for both triggers. The trigger buttons write `{ trigger: "manual", priority: undefined }` and `{ trigger: "automatic" }`. `priority` is the one key the invariants tie to automatic paths, so it is the one key a switch drops.
+`PathsPanel` renders the `studioOnlyWhen` fieldset for both triggers. A pure `pathWithTrigger` in `draft/createPath.ts` builds the patch. A switch to manual returns the path without its `priority` key. A switch to automatic changes `trigger` alone. `priority` is the one key the invariants tie to automatic paths, so it is the one key a switch drops.
 Alternative: drop `guard` and `priority` on the switch, as the audit's second suggestion said. Rejected by the owner ruling, since a manual path may carry a guard.
 
 **6. The canvas draws a guard label for any guarded path.**
-`guardLabel` drops its `automatic` condition. The priority badge and the "else" marker keep theirs. The accessible name already carries the guard for any trigger (`studio-canvas`, "A path is a focusable control"), and a test confirms it.
+A pure `edgeGuardLabel` in `conditionLogic.ts` gives the label of any guarded path.
+`CanvasView` calls it where `guardLabel` stood, so a test can reach the rule. The priority badge and the "else" marker keep their automatic condition. The accessible name already carries the guard for any trigger (`studio-canvas`, "A path is a focusable control"). A test confirms it.
 
 **7. Read-back and write fixes sit in `conditionLogic.ts`.**
 `literalOf` reads `bigint` as `Number(v)` while `Number.isSafeInteger` holds. It reads a `-_` node whose `args` is a `value` node as the negated number, to any depth. The nested case `--5` folds twice. `celLiteral` writes a `double` as `String(n)` when that text holds an `e`, else `${n}.0` for an integer value. For an `int` it requires `Number.isSafeInteger`. A test per type writes a literal, reads the text back through `fromCel`, and expects the same row.
@@ -68,3 +70,11 @@ Both `ConditionBuilder` and `RuleBuilder` show the value `""` for an undefined v
 - [Removing the last row at a view-override site still clears every referencing view] → That matches today's behavior for agreeing views. Only the divergent state needed the new rule.
 - [The form preview line adds copy to an inert pane] → The line sits inside the existing `inert` body. It takes no focus and creates no tab stop.
 - [A guarded manual path hides its button at runtime] → That is the owner-approved behavior. The canvas, the preview and the Paths tab now show it.
+
+## Migration Plan
+
+The change touches draft-editing behavior only. The definition contract, the stored drafts and every published version stay as they are. A manual path that already carries a guard now shows it, and its behavior at runtime does not change. No example under `examples/` carries one. A rollback is a revert of the commits, with no data step.
+
+## Open Questions
+
+None. The owner settled the manual-path guard on 2026-10-10 and the clear command's placement on 2026-10-12.
