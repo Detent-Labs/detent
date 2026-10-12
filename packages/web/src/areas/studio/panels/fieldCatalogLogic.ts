@@ -1,9 +1,11 @@
 import type { FieldControl, FieldFormat } from "workflow-engine/schema";
 import { t } from "../catalog.js";
 import { deriveKey, dedupeKey, shouldAutoDeriveKey } from "../draft/deriveKey.js";
-import { flattenDraftFields, type DraftField } from "../draft/fields.js";
+import { draftFields, flattenDraftFields, type DraftField } from "../draft/fields.js";
 import { resolveDraftLocalizedText, type DraftLocalizedText } from "../draft/localized-text.js";
+import { countKeyReaders } from "../draft/key-readers.js";
 import { flattenRailFields } from "../draft/panel-rail.js";
+import type { Draft } from "../draft/types.js";
 
 /**
  * A field's label edit's whole key decision (design.md: "Extract the
@@ -17,6 +19,11 @@ import { flattenRailFields } from "../draft/panel-rail.js";
  * `taken` is the caller's own `draftFields(draft)`-derived set (design.md:
  * "do not hand-roll a second flatten"), excluding the field being edited.
  *
+ * `locked` is the caller's verdict that a CEL expression reads the key or a
+ * published version holds the field (`isFieldKeyLocked`). It stops auto-fill
+ * for a non-empty key, even while the key equals the prior derivation. An
+ * empty key has neither reader nor publication, so it derives regardless.
+ *
  * Returns the derived-and-deduped key when the lock check says auto-fill is
  * still live, or `undefined` when it says to leave `key` untouched.
  */
@@ -26,12 +33,46 @@ export function nextFieldKey(
   newLabel: DraftLocalizedText,
   baseLocale: string,
   taken: ReadonlySet<string>,
+  locked = false,
 ): string | undefined {
+  if (locked && currentKey !== "") return undefined;
   const priorDerived = deriveKey(resolveDraftLocalizedText(priorLabel, baseLocale, baseLocale) ?? "");
   if (!shouldAutoDeriveKey(currentKey, priorDerived)) return undefined;
 
   const newDerived = deriveKey(resolveDraftLocalizedText(newLabel, baseLocale, baseLocale) ?? "");
   return dedupeKey(newDerived, taken);
+}
+
+/**
+ * Whether a label change may no longer set `field`'s key: a CEL expression
+ * anywhere in the draft reads `data.<key>`, or the draft's base version holds
+ * a field with the same `id`. `published` is `usePublishedFieldIds()`'s
+ * value, and `undefined` (the base version not read yet, or its read failed)
+ * counts every field that has an `id` as published, the safe side. A field
+ * with no `id` is not published. A `group` field sits outside the lock and
+ * never reaches this function.
+ */
+export function isFieldKeyLocked(draft: Draft, field: DraftField, published: ReadonlySet<string> | undefined): boolean {
+  if (field.id !== undefined && (published === undefined || published.has(field.id))) return true;
+  return countKeyReaders(draft, field.key ?? "") > 0;
+}
+
+/**
+ * The patch a label change writes to a field that is not a `group`: the new
+ * label, plus the key `nextFieldKey` derives while the lock leaves
+ * auto-fill live. A group's label goes through `view-group-sync.ts::
+ * writeGroupLabel` instead, which rewrites the view entries naming its key.
+ */
+export function labelChangePatch(
+  draft: Draft,
+  field: DraftField,
+  label: DraftField["label"],
+  baseLocale: string,
+  published: ReadonlySet<string> | undefined,
+): Partial<DraftField> {
+  const taken = new Set(draftFields(draft).filter((f) => f.id !== field.id).map((f) => f.key ?? ""));
+  const derivedKey = nextFieldKey(field.key ?? "", field.label, label, baseLocale, taken, isFieldKeyLocked(draft, field, published));
+  return derivedKey === undefined ? { label } : { label, key: derivedKey };
 }
 
 /**

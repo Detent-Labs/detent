@@ -25,15 +25,16 @@ import { LocalizedTextInput } from "./shared/LocalizedTextInput";
 import { FieldValidationEditor } from "./shared/FieldValidationEditor";
 import { DefaultValueEditor } from "./shared/DefaultValueEditor";
 import { fieldLocaleGaps, missingTranslationWarning, resolveDraftLocalizedText, seedLocalizedText } from "../draft/localized-text";
-import { draftFields, flattenDraftFields } from "../draft/fields";
+import { flattenDraftFields } from "../draft/fields";
 import { writeGroupKey, writeGroupLabel } from "../draft/view-group-sync.js";
+import { usePublishedFieldIds } from "../draft/publishedFields.js";
 import {
   ADD_FIRST_FIELD_ID,
   droppedByKindChange,
   fieldLabelInputId,
+  labelChangePatch,
   moveControlId,
   moveTargetsFor,
-  nextFieldKey,
   removeControlId,
 } from "./fieldCatalogLogic.js";
 import { fieldCheckZone, type FieldCheckZone } from "./fieldCheckZone.js";
@@ -632,6 +633,7 @@ function FieldEditor({
   onAdd,
 }: FieldEditorProps) {
   const { draft, mutate, contentLocale, validation } = useDraft();
+  const published = usePublishedFieldIds();
 
   // How many times the definition half has been written since this field was
   // selected. It rides in the usage rows' React key, so each write remounts
@@ -697,8 +699,9 @@ function FieldEditor({
   const baseLocale = draft.baseLocale ?? "en";
   const fieldId = field.id;
   /** Deduped against the whole catalog, including every group's nested
-   * children (design.md: `FieldDef.key` is one flat CEL namespace). A
-   * group's label goes through `writeGroupLabel`, so the key it derives
+   * children (design.md: `FieldDef.key` is one flat CEL namespace). A key
+   * that a CEL expression reads, or that the base version holds, stays
+   * (`fieldCatalogLogic.ts::isFieldKeyLocked`). A group's label goes through `writeGroupLabel`, so the key it derives
    * rewrites the view entries naming the old one. */
   const updateLabel = (label: DraftField["label"]) => {
     if (field.type === "group" && fieldId !== undefined) {
@@ -706,9 +709,7 @@ function FieldEditor({
       mutate((d) => writeGroupLabel(d, fieldId, label, baseLocale));
       return;
     }
-    const taken = new Set(draftFields(draft).filter((f) => f.id !== field.id).map((f) => f.key ?? ""));
-    const derivedKey = nextFieldKey(field.key ?? "", field.label, label, baseLocale, taken);
-    onChange(derivedKey === undefined ? { label } : { label, key: derivedKey });
+    onChange(labelChangePatch(draft, field, label, baseLocale, published));
   };
   const usage = fieldId ? fieldUsage(draft, fieldId, contentLocale, baseLocale) : [];
   const visibleState = fieldId ? fieldVisibleOverrides(draft, fieldId) : ({ kind: "none" } as const);

@@ -6,7 +6,14 @@ import type { ValidationResult } from "../src/areas/studio/draft/validation.js";
 import type { EditorIssue } from "../src/areas/studio/draft/issues.js";
 import { DraftContext, type DraftContextValue } from "../src/areas/studio/draft/store.js";
 import { FieldCatalogPanel, MoveFieldControl } from "../src/areas/studio/panels/FieldCatalogPanel.js";
-import { ADD_FIRST_FIELD_ID, fieldLabelInputId, moveControlId, removeControlId } from "../src/areas/studio/panels/fieldCatalogLogic.js";
+import {
+  ADD_FIRST_FIELD_ID,
+  fieldLabelInputId,
+  labelChangePatch,
+  moveControlId,
+  removeControlId,
+} from "../src/areas/studio/panels/fieldCatalogLogic.js";
+import { writeGroupLabel } from "../src/areas/studio/draft/view-group-sync.js";
 
 const NOOP = () => {};
 
@@ -319,5 +326,113 @@ describe("FieldCatalogPanel", () => {
     expect(child).toMatch(/data-checked="failed"[^>]*>What this field asks</);
 
     expect(render("field_g")).not.toContain("data-checked");
+  });
+});
+
+/**
+ * What `FieldEditor::updateLabel` writes for a label change. It reads the lock
+ * through `labelChangePatch` and `writeGroupLabel`. The panel renders to static
+ * markup in this suite, which fires no change event, so these cases call the
+ * two writes `updateLabel` calls.
+ */
+describe("a label change in the field catalog", () => {
+  const cel = (src: string) => ({ lang: "cel" as const, src });
+  const amountLabel = { en: "Amount" };
+  const totalLabel = { en: "Total amount" };
+
+  const guardedDraft = (): Draft =>
+    ({
+      baseLocale: "en",
+      fields: [fld("field_amount", "amount", { label: amountLabel })],
+      workflow: {
+        initialStep: "step_a",
+        steps: [
+          {
+            id: "step_a",
+            key: "a",
+            label: { en: "A" },
+            type: "task",
+            paths: [{ id: "path_a", key: "p", label: "P", to: "step_a", trigger: "automatic", guard: cel("data.amount > 1000.0") }],
+          },
+        ],
+      },
+    }) as unknown as Draft;
+
+  const fieldOf = (draft: Draft, id: string): DraftField => (draft.fields as unknown as DraftField[]).find((f) => f.id === id)!;
+
+  it("leaves a key that a guard reads when the label changes", () => {
+    const draft = guardedDraft();
+    const patch = labelChangePatch(draft, fieldOf(draft, "field_amount"), totalLabel, "en", new Set());
+
+    expect(patch).toEqual({ label: totalLabel });
+  });
+
+  it("leaves a published field's key when the label changes", () => {
+    const draft = { baseLocale: "en", fields: [fld("field_amount", "amount", { label: amountLabel })] } as unknown as Draft;
+    const patch = labelChangePatch(draft, fieldOf(draft, "field_amount"), totalLabel, "en", new Set(["field_amount"]));
+
+    expect(patch).toEqual({ label: totalLabel });
+  });
+
+  it("leaves the key while the base version has not loaded", () => {
+    const draft = { baseLocale: "en", fields: [fld("field_amount", "amount", { label: amountLabel })] } as unknown as Draft;
+    const patch = labelChangePatch(draft, fieldOf(draft, "field_amount"), totalLabel, "en", undefined);
+
+    expect(patch).toEqual({ label: totalLabel });
+  });
+
+  it("follows the label for an unread field the base version lacks", () => {
+    const draft = { baseLocale: "en", fields: [fld("field_amount", "amount", { label: amountLabel })] } as unknown as Draft;
+    const patch = labelChangePatch(draft, fieldOf(draft, "field_amount"), totalLabel, "en", new Set(["field_other"]));
+
+    expect(patch).toEqual({ label: totalLabel, key: "total_amount" });
+  });
+
+  it("follows the label in a draft with no base version", () => {
+    const draft = { baseLocale: "en", fields: [fld("field_amount", "amount", { label: amountLabel })] } as unknown as Draft;
+    const patch = labelChangePatch(draft, fieldOf(draft, "field_amount"), totalLabel, "en", new Set());
+
+    expect(patch).toEqual({ label: totalLabel, key: "total_amount" });
+  });
+
+  it("derives a key for an empty-key field even when its id is published", () => {
+    const draft = { baseLocale: "en", fields: [fld("field_new", "", { label: undefined })] } as unknown as Draft;
+    const patch = labelChangePatch(draft, fieldOf(draft, "field_new"), totalLabel, "en", new Set(["field_new"]));
+
+    expect(patch).toEqual({ label: totalLabel, key: "total_amount" });
+  });
+
+  it("does not count a field with no id as published", () => {
+    const field = { key: "amount", label: amountLabel, type: "string" } as unknown as DraftField;
+    const draft = { baseLocale: "en", fields: [field] } as unknown as Draft;
+    const patch = labelChangePatch(draft, field, totalLabel, "en", undefined);
+
+    expect(patch).toEqual({ label: totalLabel, key: "total_amount" });
+  });
+
+  it("keeps a group field following its label and rewrites its view entries", () => {
+    const draft = {
+      baseLocale: "en",
+      fields: [grp("field_request", "request", [fld("field_child", "child")])],
+      workflow: {
+        initialStep: "step_a",
+        steps: [
+          {
+            id: "step_a",
+            key: "a",
+            label: { en: "A" },
+            type: "task",
+            view: { fields: [{ ref: "field_request" }, { ref: "field_child", group: "request" }] },
+          },
+        ],
+      },
+    } as unknown as Draft;
+    (fieldOf(draft, "field_request") as { label: unknown }).label = { en: "Request" };
+
+    writeGroupLabel(draft, "field_request", { en: "Order request" }, "en");
+
+    expect(fieldOf(draft, "field_request").key).toBe("order_request");
+    const entries = (draft.workflow as unknown as { steps: { view: { fields: { group?: string }[] } }[] }).steps[0]!.view.fields;
+    expect(entries[1]!.group).toBe("order_request");
   });
 });
