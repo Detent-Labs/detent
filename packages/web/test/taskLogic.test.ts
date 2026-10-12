@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { formIsReadonly } from "form-ui";
 import { readonlyNoteKey, seedTaskValues } from "../src/areas/app/screens/taskLogic.js";
 import type { InstanceView } from "../src/areas/app/api/types.js";
 
@@ -38,5 +39,19 @@ describe("readonlyNoteKey", () => {
 
   it("gives no note for a running step with an available path", () => {
     expect(note("running", [path])).toBeUndefined();
+  });
+});
+
+describe("formIsReadonly and readonlyNoteKey", () => {
+  const path = { id: "path_a", key: "approve", label: "Approve" } as InstanceView["availablePaths"][number];
+  const statuses: InstanceView["status"][] = ["running", "completed", "cancelled", "faulted"];
+
+  it("agree on every status and path combination", () => {
+    for (const status of statuses) {
+      for (const availablePaths of [[], [path]]) {
+        const view = { status, availablePaths };
+        expect(formIsReadonly(view)).toBe(readonlyNoteKey(view) !== undefined);
+      }
+    }
   });
 });

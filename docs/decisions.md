@@ -1885,6 +1885,18 @@ LEAF-1, LOAD-1 and REFUSE-1 are local to this section.
   array. A stale error also stays after an edit. One change per screen should
   take these together. The owner ruled that this change makes no layout change.
 
+## Open from fix-form-ui-empty-values (needs its own OpenSpec change)
+
+The final review of `fix-form-ui-empty-values` surfaced one gap outside that
+change's scope. The CLAIMVIEW tag is local to this section.
+
+- **CLAIMVIEW-1: a viewer who cannot claim sees inputs that accept typing.**
+  A viewer who is no candidate, or whose step another actor claimed, sees
+  editable inputs. The Task screen shows neither Save nor a path button.
+  `formIsReadonly` ignores claim state on purpose. The `end-user-app` spec
+  makes field editability independent of claim state, and finding F-8 kept
+  that rule. Covering the case needs a spec change and a third note cause.
+
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 
 Each entry below names a cut somebody proposed, the reason a reviewer refused

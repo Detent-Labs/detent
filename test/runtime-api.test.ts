@@ -3647,3 +3647,15 @@ test.skipIf(!DB)("zero and false satisfy the required check", async () => {
   expect(after.currentStepId as string).toBe("step_b");
   expect(after.data).toMatchObject({ field_zero: 0, field_flag: false });
 });
+
+test.skipIf(!DB)("an empty list satisfies the required check", async () => {
+  const body = clearBody() as unknown as { fields: unknown[]; workflow: { steps: { view?: { fields: unknown[] } }[] } };
+  body.fields.push({ id: "field_tags", key: "tags", label: { en: "Tags" }, type: "list" });
+  body.workflow.steps[0]!.view!.fields.push({ ref: "field_tags", required: true });
+  const PID = pid(`proc_clear_list_${crypto.randomUUID()}`);
+  await publishBody(PID, body as unknown as ProcessBody, reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg, { data: clearSeed({ field_tags: [] }) });
+  const after = await submitAndTransition(created.instanceId, "path_ab" as PathId, {} as Instance["data"], actor, dataSourceReg);
+  expect(after.currentStepId as string).toBe("step_b");
+  expect(after.data).toMatchObject({ field_tags: [] });
+});

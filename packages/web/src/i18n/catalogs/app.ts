@@ -134,7 +134,7 @@ export const de: Record<keyof typeof en, string> = {
   "task.save": "Speichern",
   "task.formDraftSaved": "Formularentwurf gespeichert",
   "task.formDraftRestored": "Formularentwurf wiederhergestellt, gespeichert am",
-  "task.readonlyNotRunning": "Dieser Fall läuft nicht mehr. Das Formular ist schreibgeschützt.",
+  "task.readonlyNotRunning": "Dieser Vorgang läuft nicht mehr. Das Formular ist schreibgeschützt.",
   "task.readonlyNoPath": "Auf diesem Schritt ist noch keine Aktion möglich. Das Formular ist schreibgeschützt.",
   "task.backToTasks": "Zurück zu meinen Aufgaben",
   "task.commentsHeading": "Kommentare",

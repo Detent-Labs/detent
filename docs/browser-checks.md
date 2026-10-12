@@ -2258,7 +2258,7 @@ Pass: every input rejects focus and typing. No Save control and no path
 button shows. A muted line above the form reads "This case is not running.
 The form is read-only."
 
-The German catalog reads "Dieser Fall läuft nicht mehr. Das Formular ist
+The German catalog reads "Dieser Vorgang läuft nicht mehr. Das Formular ist
 schreibgeschützt." Open a running case on a wait-state step with no manual
 path. Pass: the inputs reject typing, and no path button shows. The muted
 line reads "No action is available on this step yet. The form is read-only."
@@ -2272,24 +2272,32 @@ shows no note. The tab strip of a tabbed form stays operable in every case.
 
 Source: `fix-form-ui-empty-values` task 5.3.
 
-Use the seeded `it-offboarding` example. Its Clarification step offers three
-optional fields: the number `backup_retention_months` and the dates
-`forwarding_until` and `return_date`. Start two cases as the contoso request
-owner. Fill the required fields of Submit the Exit Notification. Give the
-three fields a value, using answers that show them. Submit both. As the
-fabrikam operator, choose Request clarification on each case.
+Use the seeded `it-offboarding` example with two demo accounts. Grant one the
+role `contoso-request-owner` and the other `fabrikam-operator`. Use the
+admin Users screen, or `bun run src/auth/cli.ts set-roles <email> <roles>`.
+Any account may start a case. Every step below carries an assignment, so
+claim the step first wherever an actor acts.
 
-Open the first case as the request owner. Pass: the Clarification step holds
-the three values.
+Its Clarification step offers three optional fields: the number
+`backup_retention_months` and the dates `forwarding_until` and `return_date`.
+Start two cases as the request owner. Claim Submit the Exit Notification and
+fill its required fields. Give the three fields a value, using answers that
+show them, and submit both cases.
 
-Erase the three controls, answer the required response and
-submit down the respond path. Pass: no `type-mismatch` error appears, and the
-case moves on. Open the case from Cases I started. Pass: the read-only form
+As the operator, claim Review the Exit Notification on each case. Fill the required
+`ticket_no` and `processed_by`. Choose Request clarification.
+
+Open the first case as the request owner and claim the Clarification step.
+Pass: the three controls hold the values.
+
+Erase the three controls and answer the required response. Submit down the
+respond path. Pass: no `type-mismatch` error appears, and the case returns to
+the Review step. Open the case from Cases I started. Pass: the Review step
 shows the three fields empty. None holds an earlier value.
 
-Open the second case, erase the three controls and click Save. Leave the
-task and reopen it. Pass: all three controls come back empty. The committed
-values stay out of them.
+Open the second case's Clarification step, claim it and erase the three
+controls. Click Save, leave the task and reopen it. Pass: all three controls
+come back empty. The committed values stay out of them.
 
 ### Studio: path creation names
 

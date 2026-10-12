@@ -111,7 +111,7 @@ two causes. Each has its own catalog key, so a translator sees whole sentences.
 
 | Key | EN | DE |
 |---|---|---|
-| `task.readonlyNotRunning` | This case is not running. The form is read-only. | Dieser Fall läuft nicht mehr. Das Formular ist schreibgeschützt. |
+| `task.readonlyNotRunning` | This case is not running. The form is read-only. | Dieser Vorgang läuft nicht mehr. Das Formular ist schreibgeschützt. |
 | `task.readonlyNoPath` | No action is available on this step yet. The form is read-only. | Auf diesem Schritt ist noch keine Aktion möglich. Das Formular ist schreibgeschützt. |
 
 German runs about 15% longer. The line wraps in the reading column, and
