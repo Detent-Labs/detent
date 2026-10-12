@@ -1,6 +1,7 @@
 /**
- * Vendor-neutral `notification.email` action handler: sends one plain-text
- * message over SMTP. Subject and body are static, publish-validated JSON — no
+ * Vendor-neutral `notification.email` action handler: sends plain-text mail
+ * over SMTP, one message per batch of at most SMTP_MAX_RECIPIENTS_PER_SESSION
+ * recipients. Subject and body are static, publish-validated JSON — no
  * instance `data`, no lookup of the instance — exactly like `http.request`,
  * whose file layout this mirrors.
  *
@@ -20,9 +21,8 @@
  * following the DATABASE_URL / AUTH_JWT_SECRET convention.
  */
 
-import type { SQL } from "bun";
 import { z } from "zod";
-import { emailsForUserIds } from "../auth/users.js";
+import { emailAddressSchema, emailsForUserIds } from "../auth/users.js";
 import { durationMs } from "../engine/duration.js";
 import { PermanentError } from "../engine/outbox.js";
 import type { HandlerContext, HandlerDef, OutboxActors } from "../engine/registry.js";
@@ -39,6 +39,13 @@ export const NOTIFICATION_EMAIL_ACTION_TYPE = "notification.email";
  */
 export const SMTP_DEFAULT_TIMEOUT_MS = 5_000;
 
+/**
+ * The most recipients one SMTP session carries. RFC 5321 §4.5.3.1.10 obliges a
+ * server to accept 100, so a smaller number gains nothing and a larger one fails
+ * on a conforming relay. A longer list sends in consecutive batches of this size.
+ */
+export const SMTP_MAX_RECIPIENTS_PER_SESSION = 100;
+
 /** The three roles `toActors` may name, each mapping onto state the instance already carries. */
 export const NOTIFICATION_ACTOR_TOKENS = ["candidate", "claimant", "starter"] as const;
 
@@ -52,7 +59,7 @@ export type NotificationActorToken = (typeof NOTIFICATION_ACTOR_TOKENS)[number];
  */
 export const notificationEmailConfigSchema = z
   .object({
-    to: z.array(z.string().email()).default([]),
+    to: z.array(emailAddressSchema).default([]),
     toActors: z.array(z.enum(NOTIFICATION_ACTOR_TOKENS)).default([]),
     subject: z.string(),
     body: z.string(),
@@ -253,20 +260,26 @@ function buildMessage(
  * The Message-ID carries the delivery's idempotency key, so a cooperating mail
  * system can dedupe a redelivered message — the counterpart of
  * `http.request`'s Idempotency-Key header. Its domain comes from SMTP_FROM.
+ *
+ * A list that needs several batches passes each batch's one-based number, which
+ * follows the key after a hyphen. The same batch keeps the same identifier on
+ * every try of the delivery. A single batch passes none and keeps the plain form.
  */
-function buildMessageId(idempotencyKey: string, from: string): string {
+function buildMessageId(idempotencyKey: string, from: string, batchNumber?: number): string {
   const domain = from.split("@")[1] ?? "localhost";
-  return `<${idempotencyKey}@${domain}>`;
+  const suffix = batchNumber === undefined ? "" : `-${batchNumber}`;
+  return `<${idempotencyKey}${suffix}@${domain}>`;
 }
 
+/** One SMTP session: the whole conversation for one batch, ending with the point of no return. */
 async function runSession(
   wire: SmtpWire,
   config: z.infer<typeof notificationEmailConfigSchema>,
   recipients: string[],
   env: SmtpEnv,
-  idempotencyKey: string,
+  messageId: string,
   phase: { current: string },
-): Promise<NotificationEmailResult> {
+): Promise<void> {
   phase.current = "connect";
   const socket = await Bun.connect({ hostname: env.host, port: env.port, socket: wire.handlers });
   wire.attach(socket);
@@ -308,10 +321,11 @@ async function runSession(
   wire.write(`MAIL FROM:<${env.from}>\r\n`);
   requireOk(await wire.next(), "MAIL FROM");
 
-  // Every recipient is checked before DATA. Delivering to the accepted ones and
-  // reporting the rest breaks under at-least-once: a 4xx rejection is
-  // transient, the outbox retries the row, and every already-accepted address
-  // receives the message twice. Aborting here means nothing was sent at all.
+  // Every recipient of the batch is checked before DATA. Delivering to the
+  // accepted ones and reporting the rest breaks under at-least-once: a 4xx
+  // rejection is transient, the outbox retries the row, and every
+  // already-accepted address receives the message twice. Aborting here means
+  // nothing of this batch was sent at all.
   for (const address of recipients) {
     phase.current = `RCPT TO ${address}`;
     wire.write(`RCPT TO:<${address}>\r\n`);
@@ -322,11 +336,6 @@ async function runSession(
   wire.write("DATA\r\n");
   requireOk(await wire.next(), "DATA");
 
-  const messageId = buildMessageId(idempotencyKey, env.from);
-  // Built before the message goes out, so producing the result cannot raise
-  // after the server has already accepted it.
-  const result: NotificationEmailResult = { messageId, recipients: [...recipients] };
-
   phase.current = "message body";
   wire.write(`${buildMessage(config, recipients, env, messageId)}.\r\n`);
   requireOk(await wire.next(), "message body");
@@ -334,9 +343,41 @@ async function runSession(
   // The 250 above is the point of no return. SMTP carries no idempotency
   // contract and most receivers ignore Message-ID, so a redelivery is a second
   // real message. QUIT is written without awaiting its reply for that reason:
-  // nothing after this line can fail the delivery.
+  // nothing after this line can fail the batch.
   wire.write("QUIT\r\n");
-  return result;
+}
+
+/**
+ * Sends one batch in a session of its own. `timeoutMs` bounds this session
+ * alone, so a long list over a slow relay is bounded per batch and the outbox's
+ * claim lease stays the bound on the delivery as a whole.
+ */
+async function deliverBatch(
+  config: z.infer<typeof notificationEmailConfigSchema>,
+  batch: string[],
+  env: SmtpEnv,
+  messageId: string,
+  timeoutMs: number,
+): Promise<void> {
+  const wire = new SmtpWire();
+  // The session step that was waiting when the bound fired. A bare "the session
+  // timed out" leaves an operator without the one fact that localizes the fault.
+  const phase = { current: "connect" };
+  let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timeoutHandle = setTimeout(() => {
+      // Release the socket rather than waiting for the outbox's claim lease.
+      wire.close();
+      reject(new Error(`notification.email: the SMTP session exceeded ${timeoutMs}ms during ${phase.current}`));
+    }, timeoutMs);
+  });
+
+  try {
+    await Promise.race([runSession(wire, config, batch, env, messageId, phase), deadline]);
+  } finally {
+    clearTimeout(timeoutHandle);
+    wire.close();
+  }
 }
 
 /** EHLO's argument. A relay only logs it; SMTP_FROM's domain is the honest answer. */
@@ -349,11 +390,14 @@ function clientName(from: string): string {
  * `candidate` yields every candidate: they are all eligible to do the work, so
  * picking one would need a selection rule this engine does not have.
  *
- * ponytail: the candidate list is uncapped, so a strategy resolving hundreds of
- * actors produces that many `RCPT TO` commands. Candidates come from a
- * publish-validated strategy rather than from submitted input, and the two
- * shipped strategies produce a configured list or one manager. Cap it here if a
- * strategy ever resolves an unbounded directory group.
+ * ponytail: the candidate list is unbounded, and it sends in batches of
+ * SMTP_MAX_RECIPIENTS_PER_SESSION, one session after another. The batch size is
+ * fixed at the RFC 5321 minimum. N recipients take ceil(N / 100) sequential
+ * sessions inside the outbox's claim lease, and a lease that runs out retries
+ * the row and resends the batches already delivered. Candidates come from a
+ * publish-validated strategy, and the two shipped ones produce a configured list
+ * or one manager. Raise or configure the batch size, or give each batch its own
+ * outbox row, if a strategy ever resolves a directory group of thousands.
  */
 function actorIdsFor(tokens: NotificationActorToken[], actors: OutboxActors | undefined): string[] {
   const ids: string[] = [];
@@ -372,20 +416,38 @@ function actorIdsFor(tokens: NotificationActorToken[], actors: OutboxActors | un
  *
  * An id matching no account, or one whose account is disabled, contributes
  * nothing. `emailsForUserIds` drops both, so the Map lookup below misses.
+ *
+ * A stored address that `emailAddressSchema` refuses contributes nothing either:
+ * a line break or an angle bracket would reach an SMTP command, and a typo draws
+ * a 5xx that drops the mail for its whole batch. One warning per dropped account
+ * names the instance, the action and the account id. The address text stays out
+ * of the log, since it may hold line breaks.
  */
 async function resolveRecipients(
   config: z.infer<typeof notificationEmailConfigSchema>,
-  actors: OutboxActors | undefined,
-  db: SQL,
+  ctx: HandlerContext,
 ): Promise<string[]> {
-  const ids = actorIdsFor(config.toActors, actors);
-  const byId = await emailsForUserIds(ids, db);
+  const ids = actorIdsFor(config.toActors, ctx.actors);
+  const byId = await emailsForUserIds(ids, ctx.db);
   const seen = new Set<string>();
   const out: string[] = [];
-  for (const address of [...config.to, ...ids.map((id) => byId.get(id))]) {
+  const add = (address: string | undefined): void => {
     if (address && !seen.has(address)) {
       seen.add(address);
       out.push(address);
+    }
+  };
+  for (const address of config.to) add(address);
+  for (const userId of new Set(ids)) {
+    const address = byId.get(userId);
+    if (address === undefined) continue;
+    if (emailAddressSchema.safeParse(address).success) add(address);
+    else {
+      log.warn("notification.email dropped a stored address that is no valid address", {
+        instanceId: ctx.instanceId,
+        actionId: ctx.action.id,
+        userId,
+      });
     }
   }
   return out;
@@ -394,7 +456,7 @@ async function resolveRecipients(
 async function notificationEmailHandler(ctx: HandlerContext): Promise<NotificationEmailResult> {
   const config = notificationEmailConfigSchema.parse(ctx.config);
   const env = readSmtpEnv();
-  const recipients = await resolveRecipients(config, ctx.actors, ctx.db);
+  const recipients = await resolveRecipients(config, ctx);
 
   // No recipient resolved: send nothing and succeed. A step that resolved to no
   // candidate already records an `assignment.unresolved` event, so dead-lettering
@@ -411,27 +473,27 @@ async function notificationEmailHandler(ctx: HandlerContext): Promise<Notificati
     return { messageId: buildMessageId(ctx.idempotencyKey, env.from), recipients: [] };
   }
 
-  const wire = new SmtpWire();
-
   const timeoutMs = ctx.action.timeout ? durationMs(ctx.action.timeout) : SMTP_DEFAULT_TIMEOUT_MS;
-  // The session step that was waiting when the bound fired. A bare "the session
-  // timed out" leaves an operator without the one fact that localizes the fault.
-  const phase = { current: "connect" };
-  let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
-  const deadline = new Promise<never>((_, reject) => {
-    timeoutHandle = setTimeout(() => {
-      // Release the socket rather than waiting for the outbox's claim lease.
-      wire.close();
-      reject(new Error(`notification.email: the SMTP session exceeded ${timeoutMs}ms during ${phase.current}`));
-    }, timeoutMs);
-  });
 
-  try {
-    return await Promise.race([runSession(wire, config, recipients, env, ctx.idempotencyKey, phase), deadline]);
-  } finally {
-    clearTimeout(timeoutHandle);
-    wire.close();
+  // Consecutive batches in list order, one message each. A single batch keeps the
+  // plain Message-ID; several number every batch from one, the first included.
+  const batches: string[][] = [];
+  for (let i = 0; i < recipients.length; i += SMTP_MAX_RECIPIENTS_PER_SESSION) {
+    batches.push(recipients.slice(i, i + SMTP_MAX_RECIPIENTS_PER_SESSION));
   }
+  const messageIds = batches.map((_, i) =>
+    buildMessageId(ctx.idempotencyKey, env.from, batches.length > 1 ? i + 1 : undefined),
+  );
+  // Built before any message goes out, so producing the result cannot raise
+  // after a server has already accepted one.
+  const result: NotificationEmailResult = { messageId: messageIds[0]!, recipients };
+
+  // Sequential, and a failure in any batch fails the delivery. Earlier batches
+  // stay sent; the retry repeats them under the same Message-IDs.
+  for (const [i, batch] of batches.entries()) {
+    await deliverBatch(config, batch, env, messageIds[i]!, timeoutMs);
+  }
+  return result;
 }
 
 /**
