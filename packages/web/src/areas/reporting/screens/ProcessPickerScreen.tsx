@@ -3,6 +3,7 @@ import * as stylex from "@stylexjs/stylex";
 import { layout, colors, fonts, space } from "form-ui/tokens.stylex";
 import { listProcesses } from "../api/client.js";
 import { describeCaughtError, stepName } from "./reportingLogic.js";
+import { useFail } from "../../../shell/useFail.js";
 import { EmptyState, ErrorNote, WaitingNote } from "../components.js";
 import { t } from "../catalog.js";
 import type { UiLocale } from "../../../i18n/locale.js";
@@ -67,21 +68,24 @@ export function ProcessPickerScreen({
   token,
   locale,
   onPick,
+  onUnauthorized,
 }: {
   token: string;
   locale: UiLocale;
   onPick: (processId: string, label: string) => void;
+  onUnauthorized: () => void;
 }) {
   const [processes, setProcesses] = useState<ProcessSummary[] | undefined>();
   const [error, setError] = useState<ClientError | undefined>();
+  const fail = useFail(onUnauthorized, (err) => setError(describeCaughtError(err)));
 
   useEffect(() => {
     let cancelled = false;
     listProcesses(token)
       .then((rows) => { if (!cancelled) setProcesses(rows); })
-      .catch((cause: unknown) => { if (!cancelled) setError(describeCaughtError(cause)); });
+      .catch((cause: unknown) => { if (!cancelled) fail(cause); });
     return () => { cancelled = true; };
-  }, [token]);
+  }, [token, fail]);
 
   return (
     <main {...stylex.props(styles.screen)}>

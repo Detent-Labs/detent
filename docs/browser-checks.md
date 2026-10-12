@@ -2704,6 +2704,44 @@ request goes out at once.
 render, and `reporting-debounce.test.ts` drives the wait with a fake timer.
 Neither sees a real request body or a real keystroke.
 
+### The report builder's dates, session end and column error (`fix-reporting-builder-ui`)
+
+Source: `fix-reporting-builder-ui` tasks 4.1 and 4.3.
+
+Log in as `demo-superuser@example.test` in a browser set to
+`Europe/Zurich`. Open `/reporting/reports/new` and pick a process. Keep the
+network tools open on the `POST /reporting/reports/columns` requests.
+
+#### A picked day covers the whole day
+
+Pick 1 October 2026 as From and 31 October 2026 as To. Pass: the request body
+holds `"createdAfter":"2026-09-30T22:00:00.000Z"` and
+`"createdBefore":"2026-10-31T22:59:59.999Z"`. Both inputs still show the
+picked days. Clear To. Pass: the next body has no `createdBefore`.
+
+#### A failed column request shows a note
+
+Block the columns request with a 500 answer. Change To by one day. Pass: the
+filter section and the column section each show a "Failed" note. "Add
+comparison" stays disabled. Remove the block and change To again. Pass: both
+notes disappear and the pickers offer the process's fields.
+
+#### A 401 ends the session
+
+Answer the `fetch` request of a view with `401` and type `actor-resolution`,
+then open a view such as `/reporting/processes/<id>/cycle-time`. Pass: the
+login screen appears and `web.session` is gone from storage. Repeat with
+the answer on `POST /reporting/reports` and press "Save report". Pass: the same
+result.
+
+`reporting-reportsLogic.test.ts` covers the date conversion under
+`TZ=Europe/Zurich`, and `reporting-boundaries.test.ts` checks that each screen
+builds its handler with `useFail`. Neither runs a request, so the effects
+stay a browser check.
+
+Measured on 2026-10-12 at a 1280 px and a 375 px viewport. The 375 px page
+showed no horizontal scroll.
+
 ### The instance.transition action's config form (`instance-transition-action`)
 
 Source: `instance-transition-action` tasks 4.1 and 7.5.
