@@ -29,6 +29,6 @@
 
 ## 5. Verification
 
-- [ ] 5.1 Run `bun run typecheck`, then `bun run build`. Verify both exit 0.
-- [ ] 5.2 Run the full `bun test` with `DATABASE_URL` set, through `scripts/test-gated.sh`. Verify zero failures and the gate accepts the run.
-- [ ] 5.3 Run the prose and whitespace gates over the pushed range. Verify both exit 0.
+- [x] 5.1 Run `bun run typecheck`, then `bun run build`. Verify both exit 0.
+- [x] 5.2 Run the full `bun test` with `DATABASE_URL` set, through `scripts/test-gated.sh`. Verify zero failures and the gate accepts the run.
+- [x] 5.3 Run the prose and whitespace gates over the pushed range. Verify both exit 0.

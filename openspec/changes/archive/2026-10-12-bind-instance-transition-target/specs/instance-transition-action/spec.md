@@ -9,7 +9,7 @@ instance's `kind`. A difference SHALL fail the delivery permanently, naming
 both kinds. The target does not move.
 
 A test instance therefore cannot move a published one, and a published instance
-cannot move a test one. A retry cannot change either `kind`, so the failure is
+cannot move a test one. A retry cannot change either `kind`, so the refusal is
 permanent.
 
 #### Scenario: A test instance cannot move a published one
