@@ -25,7 +25,7 @@ import { mapError } from "../src/http/errors.js";
 import { parseMaxAttachmentBytes, parseLimit, handleSubmit } from "../src/http/routes.js";
 import { MAX_LIST_LIMIT, MAX_RECORD_LIMIT, revokeVisibility, restoreVisibility } from "../src/runtime/api.js";
 import { devHeaderResolver, type ActorResolver } from "../src/auth/resolve.js";
-import { PUBLISH_ROLE, CANCEL_ANY_ROLE, ADMIN_ROLE, DEVELOPER_ROLE, type Permission } from "../src/auth/authorize.js";
+import { PUBLISH_ROLE, CANCEL_ANY_ROLE, ADMIN_ROLE, DEVELOPER_ROLE, AUTHOR_ROLE, type Permission } from "../src/auth/authorize.js";
 import type { FieldId, InstanceId, ProcessBody, ProcessId } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
 
@@ -38,7 +38,7 @@ const fetch = createServer(dataSourceReg, reg, sql, devHeaderResolver);
 
 beforeAll(initDb);
 beforeEach(async () => {
-  if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, instance_comments, instance_attachments, instance_drafts, definitions, permission_grants`;
+  if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, instance_comments, instance_attachments, instance_drafts, definitions, permission_grants, process_access_roles`;
   if (DB) await clearInstanceAudit();
 });
 
@@ -2824,6 +2824,87 @@ test.skipIf(!DB)("POST /processes: that same grant admits no other process", asy
 
   const store = createDefinitionStore(sql);
   expect(await store.resolveBody(otherPid as ProcessId, 1)).toBeUndefined();
+});
+
+// The Developer list gate on POST /processes (process-access-roles, "The
+// Developer list gates both publish routes").
+/** system:author + system:publish, no admin: the actor the list check decides on. */
+const listedPublisher: Actor = { id: "user_list_publisher", roles: [AUTHOR_ROLE, PUBLISH_ROLE] };
+
+const listDeveloper = async (processId: string, principal: string): Promise<void> => {
+  await sql`INSERT INTO process_access_roles (process_id, kind, principal) VALUES (${processId}, ${"developer"}, ${principal}) ON CONFLICT DO NOTHING`;
+};
+
+const developerPrincipals = async (processId: string): Promise<string[]> => {
+  const rows = (await sql`SELECT principal FROM process_access_roles WHERE process_id = ${processId} AND kind = 'developer' ORDER BY principal`) as { principal: string }[];
+  return rows.map((r) => r.principal);
+};
+
+test.skipIf(!DB)("POST /processes: an author with system:publish who is off the Developer list gets 403 and persists no version", async () => {
+  const PID = "proc_http_publish_unlisted";
+  await publishBody(PID as ProcessId, simpleBody(), reg, dataSourceReg);
+
+  const res = await fetch(publishReq(listedPublisher, PID, guardedBody()));
+  expect(res.status).toBe(403);
+  const body = (await res.json()) as { error: { type: string } };
+  expect(body.error.type).toBe("authorization");
+
+  const store = createDefinitionStore(sql);
+  expect(await store.resolveBody(PID as ProcessId, 1)).toBeDefined();
+  expect(await store.resolveBody(PID as ProcessId, 2)).toBeUndefined();
+});
+
+test.skipIf(!DB)("POST /processes: a publisher on the Developer list publishes the next version", async () => {
+  const PID = "proc_http_publish_listed";
+  await publishBody(PID as ProcessId, simpleBody(), reg, dataSourceReg);
+  await listDeveloper(PID, listedPublisher.id);
+
+  const res = await fetch(publishReq(listedPublisher, PID, guardedBody()));
+  expect(res.status).toBe(200);
+  expect(((await res.json()) as { version: number }).version).toBe(2);
+});
+
+test.skipIf(!DB)("POST /processes: a first publish by a non-admin succeeds, lists the publisher, and the same actor then publishes version 2", async () => {
+  const PID = "proc_http_publish_first";
+  const first = await fetch(publishReq(listedPublisher, PID, simpleBody()));
+  expect(first.status).toBe(200);
+  expect(((await first.json()) as { version: number }).version).toBe(1);
+  expect(await developerPrincipals(PID)).toEqual([listedPublisher.id]);
+
+  const second = await fetch(publishReq(listedPublisher, PID, guardedBody()));
+  expect(second.status).toBe(200);
+  expect(((await second.json()) as { version: number }).version).toBe(2);
+});
+
+test.skipIf(!DB)("POST /processes: a failed first publish leaves the Developer list empty", async () => {
+  const PID = "proc_http_publish_first_fails";
+  const res = await fetch(publishReq(listedPublisher, PID, actionBody("nope.unregistered")));
+  expect(res.status).toBe(422);
+
+  expect(await developerPrincipals(PID)).toEqual([]);
+  const store = createDefinitionStore(sql);
+  expect(await store.resolveBody(PID as ProcessId, 1)).toBeUndefined();
+});
+
+test.skipIf(!DB)("POST /processes: an admin off the Developer list publishes the next version", async () => {
+  const PID = "proc_http_publish_admin_unlisted";
+  await publishBody(PID as ProcessId, simpleBody(), reg, dataSourceReg);
+
+  const res = await fetch(publishReq(admin, PID, guardedBody()));
+  expect(res.status).toBe(200);
+  expect(((await res.json()) as { version: number }).version).toBe(2);
+  expect(await developerPrincipals(PID)).toEqual([]);
+});
+
+test.skipIf(!DB)("POST /processes: a listed actor holding system:publish but no authoring role gets 403", async () => {
+  const PID = "proc_http_publish_listed_no_authoring";
+  await publishBody(PID as ProcessId, simpleBody(), reg, dataSourceReg);
+  await listDeveloper(PID, publisherNoRead.id);
+
+  const res = await fetch(publishReq(publisherNoRead, PID, guardedBody()));
+  expect(res.status).toBe(403);
+  const store = createDefinitionStore(sql);
+  expect(await store.resolveBody(PID as ProcessId, 2)).toBeUndefined();
 });
 
 // The publish gate reads its target processId out of the body, so it runs

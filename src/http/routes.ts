@@ -33,6 +33,9 @@ import {
   type InstanceListFilter,
 } from "../runtime/api.js";
 import { publishBody, listProcesses, listVersions } from "../engine/definitions.js";
+import { appendCreatorAsDeveloper, hasNoDraftAndNoPublishedVersion } from "../engine/drafts.js";
+import { withTransaction } from "../engine/store.js";
+import { requireDeveloperListOrAdmin } from "../auth/process-access.js";
 import { instanceStatus } from "../schema/definition.js";
 import type { Actor } from "../cel/eval.js";
 import type { ActorResolver } from "../auth/resolve.js";
@@ -633,7 +636,14 @@ export async function handleGrantVisibility(instanceId: string, req: Request, re
  * actor (`src/auth/authorize.ts`), which maps to `PUBLISH_ROLE` today —
  * publish carries no other use for the actor value.
  *
- * That gate sits AFTER the body parse and the shape check, not before them,
+ * A process that already has a draft or a published version also needs
+ * `ADMIN_ROLE` or a Developer list match, as `POST /drafts/:processId/publish`
+ * does. A process with neither has no list yet, so its first publish skips
+ * that check. The first publish writes the publishing actor onto the new
+ * process's Developer list in the same transaction as version 1, so the same
+ * actor can publish version 2. A failed first publish rolls the entry back.
+ *
+ * The permission gate sits AFTER the body parse and the shape check, not before them,
  * because it names the target process and the body is what carries it. The
  * property the earlier placement protected still holds: an actor without the
  * permission never reaches `publishBody`, so no definition store, registry or
@@ -659,8 +669,19 @@ export async function handlePublish(
     // The shape check proves only that this is a string; the `proc_` prefix is
     // publishBody's to enforce. `can` ignores the value today, and a scoped
     // grant later must not read it as an id the store already holds.
-    await requirePermission(actor, "publish", parsed.processId as ProcessId, db);
-    const published = await publishBody(parsed.processId as ProcessId, parsed.body as ProcessBody, registry, dataSourceRegistry, db, assignmentRegistry, actor);
+    const processId = parsed.processId as ProcessId;
+    await requirePermission(actor, "publish", processId, db);
+    // One answer serves both the list check and the seeding below. A process
+    // with no draft and no published version has no Developer list yet.
+    const isFirstPublish = await hasNoDraftAndNoPublishedVersion(processId, db);
+    if (!isFirstPublish) await requireDeveloperListOrAdmin(actor, processId, db);
+    const published = isFirstPublish
+      ? await withTransaction(db, async (tx) => {
+          const result = await publishBody(processId, parsed.body as ProcessBody, registry, dataSourceRegistry, tx, assignmentRegistry, actor);
+          await appendCreatorAsDeveloper(tx, processId, actor.id);
+          return result;
+        })
+      : await publishBody(processId, parsed.body as ProcessBody, registry, dataSourceRegistry, db, assignmentRegistry, actor);
     return {
       status: 200,
       body: {
