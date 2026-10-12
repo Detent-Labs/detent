@@ -40,6 +40,7 @@ import { RequestShapeError } from "../src/errors.js";
 import type { ProcessBody, ProcessId, PathId, InstanceId, FieldId, Instance, StepId, Step } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
 import { clearInstanceAudit } from "./audit-cleanup.js";
+import { cloneInstances } from "./helpers/bulk-instances.js";
 
 const DB = !!process.env.DATABASE_URL;
 const actor: Actor = { id: "user_1", roles: [] };
@@ -3223,6 +3224,33 @@ test.skipIf(!DB)("queryInstances caps a limit above the enforced maximum", async
 
   const page = await queryInstances({ processId: PID }, { limit: 100_000 });
   expect(page.items.length).toBeLessThanOrEqual(200);
+});
+
+test.skipIf(!DB)("queryInstances returns 200 items for a limit of 1000 when no maxLimit is stated", async () => {
+  const PID = pid("proc_query_default_max");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  const first = await createProcessInstance(PID, actor, dataSourceReg);
+  await cloneInstances(sql, first.instanceId, 1199);
+
+  const page = await queryInstances({ processId: PID }, { limit: 1000 }, sql);
+  expect(page.items).toHaveLength(200);
+  expect(page.truncated).toBe(true);
+});
+
+test.skipIf(!DB)("queryInstances honours a stated maxLimit: 1200 matches, limit and maxLimit 1000, 1000 items and truncated", async () => {
+  const PID = pid("proc_query_stated_max");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  const first = await createProcessInstance(PID, actor, dataSourceReg);
+  await cloneInstances(sql, first.instanceId, 1199);
+
+  const page = await queryInstances({ processId: PID }, { limit: 1000, maxLimit: 1000 }, sql);
+  expect(page.items).toHaveLength(1000);
+  expect(page.truncated).toBe(true);
+
+  // maxLimit only clamps: a smaller limit still wins.
+  const small = await queryInstances({ processId: PID }, { limit: 7, maxLimit: 1000 }, sql);
+  expect(small.items).toHaveLength(7);
+  expect(small.truncated).toBe(true);
 });
 
 test.skipIf(!DB)("queryInstances orders newest-first, and a truncated result is the same subset on repeat calls", async () => {

@@ -17,6 +17,7 @@ frontend calls, and the `authorization` capability for the `system:developer`
 role its shell checks (presentationally) and every studio route enforces
 (authoritatively).
 ## Requirements
+
 ### Requirement: Studio is a workspace package that reaches the engine only through its two sanctioned boundaries
 
 Studio SHALL live at `packages/web/src/areas/studio`, inside the one workspace
@@ -573,6 +574,7 @@ template is no published version.
 
 - **WHEN** an actor holds `system:developer` but not `CREATE_ROLE`
 - **THEN** the `/processes` screen offers no create-new-process action
+
 ### Requirement: Creating a draft for a published process starts from the latest published version
 
 Creating a draft from the process list SHALL seed the draft body from the
@@ -3443,6 +3445,8 @@ reads a non-array value as an empty selection.
 
 ### Requirement: The Fields view's effect half states usage, a condition and requiredness
 
+<!-- antislop: allow trailing-negation -->
+<!-- Why: copied byte for byte from the live requirement. -->
 "Column mapping" SHALL show in the effect half only when the field's
 data source is mappable, per the existing `showsColumnMapping` rule.
 Its absence draws no rule of its own. It sits in the effect half
@@ -3471,9 +3475,20 @@ admits `child`: the runtime resolves the flag with no child in scope.
 Updating the condition SHALL write the same override to every
 referencing view, and SHALL name the write before it happens. Where a
 referencing view holds a literal, the notice SHALL name that step.
-Clearing the condition SHALL drop the `visible` key from every
-referencing view. It SHALL name that scope before it happens, on the
-same terms a write does. The field SHALL NOT store a field-level
+
+An unfinished row SHALL write nothing. Each referencing view's `visible`
+key SHALL stand as it did until the row is complete. That holds when the
+views disagree.
+
+The row SHALL carry a "Clear on <steps>" command in the builder's footer,
+beside the CEL toggle. It SHALL show only while some referencing view has a
+`visible` key. Pressing it SHALL drop the `visible` key from every
+referencing view. Its label SHALL name every step it clears, so the scope
+stands before the press.
+
+Removing the last row of a condition the views hold SHALL clear it too, on
+the same terms. Removing a row the author just added, when no view holds a
+condition, SHALL change nothing. The field SHALL NOT keep a field-level
 condition.
 
 "Ask for this" SHALL read and write the `required` override of every
@@ -3517,10 +3532,24 @@ every step. A field no step view references SHALL show it disabled too.
 
 #### Scenario: Clearing the condition names its scope
 
-- **WHEN** the developer clears "Only ask this when" on a field that
-  two step views reference
-- **THEN** the row named both steps before the clear, and neither view
-  carries a `visible` key afterwards
+- **WHEN** the developer presses "Clear on <steps>" in "Only ask this when"
+  on a field that two step views reference
+- **THEN** the command's label named both steps before the press, and
+  neither view carries a `visible` key afterwards
+
+#### Scenario: Adding a row to diverging views writes nothing
+
+- **WHEN** one referencing view carries `visible: false` and another carries
+  an expression
+- **AND** the developer presses "Add row" and leaves it unfinished
+- **THEN** both views keep the `visible` value they carried
+- **AND** removing that row leaves both views as they were
+
+#### Scenario: The clear command shows only with something to clear
+
+- **WHEN** no referencing view carries a `visible` key
+- **THEN** the row shows no "Clear on <steps>" command
+- **AND** the command shows once a view carries a `visible` key
 
 #### Scenario: The condition row names diverging views
 
@@ -3559,6 +3588,8 @@ every step. A field no step view references SHALL show it disabled too.
 
 #### Scenario: Ask for this names disagreeing views
 
+<!-- antislop: allow negation-habit -->
+<!-- Why: copied byte for byte from the live scenario. -->
 - **WHEN** one referencing view carries `required: true` and another
   carries no `required` key
 - **THEN** the row says the views disagree and names the differing step

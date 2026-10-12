@@ -648,10 +648,14 @@ function assertNoDenylistedQueryKeys(filter: object): void {
  * hand back a partial list a picker would treat as complete. See design.md
  * "The data read resolves no labels" and "The data read bounds rather than
  * pages".
+ *
+ * The bound is `limit`, default `DEFAULT_LIST_LIMIT`, clamped to `maxLimit`,
+ * default `MAX_LIST_LIMIT`. Only the in-process report execution passes a
+ * `maxLimit`; no route builds a `page` argument.
  */
 export async function queryInstances(
   filter: InstanceQueryFilter = {},
-  page: { limit?: number } = {},
+  page: { limit?: number; maxLimit?: number } = {},
   db: SQL = sql,
 ): Promise<InstanceDataPage> {
   assertNoDenylistedQueryKeys(filter);
@@ -661,7 +665,7 @@ export async function queryInstances(
   assertDataWhereHasProcessId(filter);
   await assertNoNonScalarComparedField(filter, filter.dataWhere, db);
 
-  const limit = Math.min(page.limit ?? DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT);
+  const limit = Math.min(page.limit ?? DEFAULT_LIST_LIMIT, page.maxLimit ?? MAX_LIST_LIMIT);
   // report-row-visibility: a caller stating `visibleTo` reads the same joined
   // row set `listInstances` reads under scope=visible, so the report, the
   // visible list and the direct read cannot disagree. The bound sits inside

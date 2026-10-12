@@ -6,13 +6,18 @@
  * `executeManualTransition` as `SYSTEM_ACTOR` — never as the participant
  * whose submission enqueued the delivery.
  *
+ * The target must share the acting instance's `kind`: a test instance never
+ * moves a published one, and a published instance never moves a test one.
+ * The field named by `instanceIdField` binds to an `instance.query` source
+ * at publish, so a participant submits only an id that source offers.
+ *
  * Every one of the config's three keys is a flat `z.string()`, never the
  * branded `processId`/`fieldId`/`pathId` schemas: a pattern-constrained
  * property takes `config-descriptor.ts`'s generated form back to the raw JSON
  * textarea (see design.md). Referential validity is checked at publish
- * (`validateInstanceTransitionReferences`, `validateCrossProcessReadGrant`)
- * and, for what publish cannot pin down (the target's live step), here on
- * delivery.
+ * (`validateInstanceTransitionReferences`, `validateCrossProcessReadGrant`,
+ * `validateInstanceTransitionWriteGrant`) and, for what publish cannot pin
+ * down (the target's live step), here on delivery.
  */
 
 import { z } from "zod";
@@ -72,6 +77,11 @@ async function instanceTransitionHandler(ctx: HandlerContext): Promise<unknown> 
   if (target.processId !== config.processId) {
     throw new PermanentError(
       `instance.transition: target instance '${targetInstanceId}' belongs to process '${target.processId}', not '${config.processId}'`,
+    );
+  }
+  if (target.kind !== acting.kind) {
+    throw new PermanentError(
+      `instance.transition: target instance '${targetInstanceId}' is of kind '${target.kind}', the acting instance of kind '${acting.kind}'`,
     );
   }
 

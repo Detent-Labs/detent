@@ -403,7 +403,19 @@ type fills the columns.
 
 `instance.transition` closes the write half of the pattern `instance.query`
 opens. `instance.query` only reads another process's instances. This action
-moves the one a participant picked:
+moves the one a participant picked.
+
+Take a plain text field in the place of the picker. A participant could type
+the id of any laptop in `proc_laptop_inventory`. That includes one on a shelf
+the author never meant to offer. The action would move it. A field bound to
+`ds_devices` lets the participant submit only an id the source offers.
+
+The field and the action together:
+
+```json
+{ "id": "field_device", "key": "device", "type": "string",
+  "dataSource": "ds_devices" }
+```
 
 ```json
 { "id": "action_issue", "type": "instance.transition",
@@ -422,6 +434,11 @@ current step. The action drives the target along it, as the system actor.
 A guard on that path sees the system actor, never the participant whose
 submission triggered the action.
 
+The `instanceIdField` field must carry an `instance.query` data source over
+the action's own `processId`. Publish rejects any other field. A field with
+no data source fails, and so does one with a fixed option list. A field bound
+to another source type fails too, as does a query over another process.
+
 Put the action where the pick takes effect. Use `onEntry` of the step the
 picker's own path leads to, or `onPath` of that path itself. The device
 leaves the shelf the moment the participant who picked it moves on.
@@ -434,6 +451,20 @@ The second dead-letters immediately, naming the step the device already
 stands on. It does not retry five times first. A target already off the
 path's source step dead-letters the same way. So does one already not
 running, or one refusing the path's own guard.
+
+The source does not filter by the participant's visibility. The action
+therefore moves any instance the source offers, even one the participant
+cannot see. Bound the offered set with the source's `statuses`, `stepIds` and
+`where`. Publish does not demand `stepIds`.
+
+Publishing a body with this action needs `migrate` on the target process, on
+top of `read`. The global developer role or a stored grant supplies it. A
+Reader or Developer list entry does not. A target that is the publishing
+process itself needs `migrate` too.
+
+An acting instance moves a target of its own kind only. A test instance never
+moves a published instance, and the reverse. The source lists published
+instances alone, so a test run's action dead-letters.
 
 ### Columns on a data list
 
@@ -711,6 +742,10 @@ button a participant clicks to take it.
 
 A manual path waits for a person. The example gives `review` three of them:
 `approve`, `reject` and `escalate`.
+
+A manual path can carry a guard too. The participant sees its button only
+while the guard holds. A manual path with an empty guard always shows its
+button. The step page offers the "Only when" editor for both kinds of path.
 
 An automatic path fires by itself when its guard matches, except on a
 subprocess step. A guard is a CEL expression. Two or more automatic paths on

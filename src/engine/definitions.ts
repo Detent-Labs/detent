@@ -408,6 +408,14 @@ type InstanceTransitionActionConfig = { processId: string; instanceIdField: stri
  * would otherwise dead-letter every delivery, one instance at a time, with
  * nothing said at publish time — so this rejects rather than reports.
  *
+ * `instanceIdField` also binds to a data source of type `"instance.query"`
+ * over the action's `processId` (`cross-process-validation`'s "An
+ * instance.transition action's instanceIdField binds to an instance query
+ * over the action's process"). The submit-time option check then admits only
+ * an id that source offers. This rejects too: the body in hand names the
+ * binding, and delivery does not recheck it. A hash-hit re-publish returns
+ * before this runs.
+ *
  * `pathId` resolves into the target process, against the versions holding
  * live instances — the same reporting rule, and the same reason, the
  * `"instance.query"` step/field references above follow: the population a
@@ -420,7 +428,8 @@ async function validateInstanceTransitionReferences(
   db: SQL,
 ): Promise<PublishFinding[]> {
   const findings: PublishFinding[] = [];
-  const catalog = new Set(collectFieldsDeep(body.fields).map((f) => f.id as string));
+  const fields = collectFieldsDeep(body.fields);
+  const catalog = new Set(fields.map((f) => f.id as string));
   const sites = collect(body).filter((s) => s.action.type === INSTANCE_TRANSITION_ACTION_TYPE);
   // One live-count query per target process, not per action site: two actions
   // naming the same target otherwise run the same aggregate twice. The bodies
@@ -445,6 +454,27 @@ async function validateInstanceTransitionReferences(
     if (!catalog.has(config.instanceIdField)) {
       throw new CrossProcessValidationError(
         `instance.transition action at '${loc}' names instanceIdField '${config.instanceIdField}' which the publishing body's own catalog does not declare`,
+      );
+    }
+
+    // 3.6: the field's value is restricted by its bound `instance.query`
+    // source, whose submit-time option check admits only the ids it offers.
+    const field = fields.find((f) => f.id === config.instanceIdField);
+    const bound = field?.dataSource ? (body.dataSources ?? []).find((d) => d.id === field.dataSource) : undefined;
+    if (!bound) {
+      throw new CrossProcessValidationError(
+        `instance.transition action at '${loc}' names instanceIdField '${config.instanceIdField}' which is bound to no data source in the publishing body; bind it to an '${INSTANCE_QUERY_DATA_SOURCE_TYPE}' source over process '${targetProcessId}'`,
+      );
+    }
+    if (bound.type !== INSTANCE_QUERY_DATA_SOURCE_TYPE) {
+      throw new CrossProcessValidationError(
+        `instance.transition action at '${loc}' names instanceIdField '${config.instanceIdField}' bound to data source '${bound.id}' of type '${bound.type}', not '${INSTANCE_QUERY_DATA_SOURCE_TYPE}'`,
+      );
+    }
+    const boundProcessId = (bound.config as InstanceQueryDataSourceConfig).processId as string;
+    if (boundProcessId !== targetProcessId) {
+      throw new CrossProcessValidationError(
+        `instance.transition action at '${loc}' names instanceIdField '${config.instanceIdField}' bound to data source '${bound.id}' over process '${boundProcessId}', not the action's process '${targetProcessId}'`,
       );
     }
 
@@ -480,13 +510,13 @@ async function validateInstanceTransitionReferences(
 /**
  * 5.4: the publishing actor must hold `read` on every `"instance.query"`
  * data source's target process, and on every `instance.transition` action's
- * target process — the second mutates a live instance of the target, a
- * stronger reach than the first's read, so it does not carry a weaker gate.
- * Both site kinds check against the same `read` permission, collected
- * together and checked once per target process per publish. Skipped entirely
- * when `actor` is absent — the publish entry point runs actor-free by
- * default; see `cross-process-validation`'s "The publishing author holds a
- * read grant on the target process".
+ * target process. Both site kinds check the same `read` permission first,
+ * collected together and checked once per target process per publish. The
+ * second kind carries a further gate, `validateInstanceTransitionWriteGrant`,
+ * because it mutates a live instance of the target. Skipped entirely when
+ * `actor` is absent — the publish entry point runs actor-free by default; see
+ * `cross-process-validation`'s "The publishing author holds a read grant on
+ * the target process".
  */
 async function validateCrossProcessReadGrant(body: ProcessBody, actor: Actor | undefined, db: SQL): Promise<void> {
   if (!actor) return;
@@ -500,6 +530,27 @@ async function validateCrossProcessReadGrant(body: ProcessBody, actor: Actor | u
   }
   for (const targetProcessId of targetProcessIds) {
     await requirePermission(actor, "read", targetProcessId as ProcessId, db);
+  }
+}
+
+/**
+ * The publishing actor must hold `migrate` on every `instance.transition`
+ * action's target process, checked once per target process. A self-targeting
+ * action gets no exemption. `requirePermission` answers `migrate` from the
+ * global developer role or a stored grant alone: neither the operator role nor
+ * a Reader list entry stands in. An `"instance.query"` source adds no target
+ * here and keeps the read gate alone. Skipped when `actor` is absent, like the
+ * read grant; see `cross-process-validation`'s "The publishing author holds
+ * migrate on an instance.transition target".
+ */
+async function validateInstanceTransitionWriteGrant(body: ProcessBody, actor: Actor | undefined, db: SQL): Promise<void> {
+  if (!actor) return;
+  const targetProcessIds = new Set<string>();
+  for (const { action } of collect(body).filter((s) => s.action.type === INSTANCE_TRANSITION_ACTION_TYPE)) {
+    targetProcessIds.add((action.config as InstanceTransitionActionConfig).processId);
+  }
+  for (const targetProcessId of targetProcessIds) {
+    await requirePermission(actor, "migrate", targetProcessId as ProcessId, db);
   }
 }
 
@@ -651,12 +702,13 @@ export async function publishBody(
   db: SQL = sql,
   assignmentRegistry: AssignmentRegistry = createStaticAssignmentRegistry(),
   // Trailing and optional so the ~25 existing callers compile unchanged. The
-  // read-grant check in validateCrossProcessReadGrant runs only when a
-  // caller supplies this — every authorization gate otherwise sits at the
-  // HTTP route, which this one check cannot: it gates on a process only the
-  // body names, resolved after the route hands off. See
-  // `cross-process-validation`'s "The publishing author holds a read grant
-  // on the target process".
+  // read-grant check in validateCrossProcessReadGrant and the migrate check
+  // in validateInstanceTransitionWriteGrant run only when a caller supplies
+  // this — every authorization gate otherwise sits at the HTTP route, which
+  // these checks cannot: they gate on a process only the body names, resolved
+  // after the route hands off. See `cross-process-validation`'s "The
+  // publishing author holds a read grant on the target process" and "The
+  // publishing author holds migrate on an instance.transition target".
   actor?: Actor,
 ): Promise<PublishResult> {
   // Structure first: the Zod gate, duration and the twelve structural checks,
@@ -762,6 +814,7 @@ export async function publishBody(
     ...(await validateInstanceTransitionReferences(body, processId, definitionStore, db)),
   ];
   await validateCrossProcessReadGrant(body, actor, db);
+  await validateInstanceTransitionWriteGrant(body, actor, db);
 
   const max = (await db`SELECT COALESCE(MAX(version), 0) AS m FROM definitions
     WHERE process_id = ${processId}`) as { m: number }[];

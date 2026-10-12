@@ -2475,7 +2475,7 @@ restores the same process, filters, columns and share lists exactly,
 including the just-added viewer. Confirm this after a full page reload, not
 only from the in-memory state a save leaves behind.
 
-Push a process past the 50-instance execution bound and preview again. Pass:
+Push a process past the 1000-row report limit and preview again. Pass:
 a stated notice starts "This table is incomplete" and explains more
 instances matched than the table can show. The table never goes silently
 short with no explanation.
@@ -2502,6 +2502,29 @@ caught the "Add columnAdd" duplicate name, since fixed in
 `ColumnEditor.tsx`'s `FieldPicker`. Nor can either see a save that silently
 fails to persist a locally-added viewer. This walk confirms that round trip
 with a real reload, rather than trusting in-memory state.
+
+### Report row limit, CSV marker and range cap (`harden-reporting-export-and-queries`)
+
+Seed a process with 1100 running instances in range, for example by cloning
+one instance row in SQL. Log in as `demo-superuser@example.test` and build a
+report over that process with one column. Choose Preview table.
+
+Pass: the table holds 1000 rows. The notice "This table is incomplete" shows
+above it. Save the report and choose Download CSV. Pass: the file holds the
+header row, 1000 data rows and a last line that reads
+`(truncated: first 1000 rows only)`.
+
+Seed more clones until the process holds more than 20000 instances in range.
+Open the process's cycle-time view with the default range. Pass: the screen
+shows its failure note in place of the figures.
+
+The note names two causes: a malformed request, or a range with too many
+instances. It tells the reader to narrow the date range. Repeat in German. Pass: the
+German note says the same and fits the viewport without clipping.
+
+This check stays manual because it needs a real download and a real error
+render. `test/reporting-routes.test.ts` covers the 400 and
+`test/reporting-csv.test.ts` covers the marker line.
 
 ### The instance.query data source's purpose-built form
 
@@ -2693,14 +2716,19 @@ Pass: the generated form renders three text inputs. They are `processId`,
 the form.
 
 Fill all three. Name a published target process. Name a field of this process
-that holds an instance id. Name a manual path on the target's own step.
+bound to an `instance.query` data source over that target process. Name a
+manual path on the target's own step.
 
-Save the draft. Publish it. Pass: the publish succeeds.
+Save the draft. Publish it as an actor who holds `read` and `migrate` on the
+target process. Pass: the publish succeeds.
 
 Now change `pathId` to an id no live version of the target carries. Publish
 again. Pass: the header bar lists one finding line below the published-version
 line. That line names the action's location in the body, since an action
 carries no data source id to name instead.
+
+Last, unbind the field, save the draft, and publish again. Pass: the publish
+fails with a cross-process error naming the action's location and the field.
 
 `test/config-descriptor.test.ts` asserts the descriptor this form reads.
 `packages/web/test/studio-processHeaderBar-findingFallback.test.tsx` asserts
@@ -5842,3 +5870,116 @@ clip box, across widths. An e2e flow cannot make that measurement;
 only a live render, at a real width, shows the clearance. The source
 scan test covers only the static half, that the style itself declares
 the room.
+
+### Path guards, held condition rows and Add path (`fix-condition-and-path-builders`)
+
+Source: `fix-condition-and-path-builders` task 5.2. A `bun:test` run cannot click
+a control or read a label off a live canvas. The five findings below stay
+manual.
+
+Open Studio at `/studio` and a draft of `purchase_requisition`. Its first step
+carries two manual paths, "Submit for approval" and "Withdraw".
+
+#### A manual path keeps its guard (E2-1)
+
+Open the Steps tab and select that first step. In "Path to", open "Submit for
+approval". Set "triggered by" to "a condition". Build one row under "Only
+when": `quantity` greater than 5. Set "triggered by" back to "a participant's
+choice".
+
+Pass: the "Only when" heading and the row stay on screen.
+
+Pass: no `priority` input shows.
+
+Pass: the Canvas tab draws the path's edge with a label for the row and no
+priority badge.
+
+Pass: the preview in that step's form editor, from the Forms tab, names the
+path and its condition in words. The line sits under the controls.
+
+Pass: "Withdraw" has no condition line in that preview.
+
+#### A half-built row writes nothing (E2-6)
+
+Open a draft of `purchase_requisition`. On the Field matrix tab, find the
+`cost_center` row and clear the "visible" box under Manager Approval. Open
+`Cost Center` on the Fields tab. Its "Only ask this when" zone says the
+steps disagree and names Manager Approval.
+
+Pass: a "Clear on <steps>" command stands in the footer beside "Edit as CEL".
+It names every step that asks for the field.
+
+Press "+ Add row". Return to the Field matrix tab.
+
+Pass: the "visible" box under Manager Approval is still clear.
+
+Back on the Fields tab, press "Remove row". Return to the Field matrix tab.
+
+Pass: the "visible" box under Manager Approval is still clear.
+
+Back on the Fields tab, read the command before you press it.
+
+Pass: the command reads "Clear on Draft Requisition, Manager Approval, Finance
+Review". It names every step that asks for `cost_center`.
+
+Press "Clear on <steps>".
+
+Pass: the row shows every "visible" box ticked. The command no longer shows.
+
+#### An unfinished edit keeps the stored condition (E2-6)
+
+Open a draft of `purchase_requisition` and the Steps tab. Select "Draft
+Requisition" and open its path "Submit for approval". Under "Only when", build
+one row: `Quantity`, `>` and `5`. Then pick `Unit Price` as that row's operand.
+
+Pass: the row turns dashed and shows its incomplete flag.
+
+Pass: the readout under the rows still reads `data.quantity > 5.0`.
+
+Open another tab, then return to the Steps tab and the same path.
+
+Pass: the readout still reads `data.quantity > 5.0`.
+
+Repeat the edit once on a field with a rule. Open `Quantity` on the Fields tab
+and its Validation zone. Under `rule`, build one row that compares this answer
+with `5`. Then pick another field as the row's operand.
+
+Pass: the row turns dashed and shows its incomplete flag.
+
+Pass: the readout under the rows still shows the rule from before the edit.
+
+#### An integer and a negative number read back as rows (E2-10)
+
+Open a draft of `it_offboarding`. In any path's "Only when", add a row on the
+integer field "Backup retention in months". Pick `>` and type `3`. Add a second
+row on the same field with `<` and `-5`. Open another tab, then return to the
+Steps tab and the same path.
+
+Pass: the first row shows the field, `>` and `3` as a comparison row.
+
+Pass: the second row shows the field, `<` and `-5` as a comparison row.
+
+Pass: no row reads "Written by hand. Edit it as CEL."
+
+#### A new boolean row starts empty (E2-14)
+
+In the `purchase_requisition` draft, press "+ Add row" under any path's "Only
+when". Pick the boolean field "Covered by the cost center's remaining budget".
+
+Pass: the value select shows its empty choice as the selected one.
+
+Choose "no".
+
+Pass: the JSON surface carries `data.budget_ok == false` in that path's guard.
+
+#### Add path takes the sibling trigger (E2-17)
+
+Open a draft of `credit_check` and select its `Decide` step, which carries two
+automatic paths. Pick a target step and press "+ Add path".
+
+Pass: the new path's "triggered by" control reads "a condition".
+
+Open a draft of `loan_application` and select its `check` step, a subprocess
+step. Pick a target step and press "+ Add path".
+
+Pass: that new path's "triggered by" control also reads "a condition".

@@ -5,9 +5,8 @@
  * The guarded-manual-path cases exist because `definition.ts` puts `guard` on
  * every path beside `trigger`, not on `automatic` alone, and
  * `resolveAvailablePaths` evaluates a manual path's guard before offering it.
- * `PathsPanel` shows the guard editor for an automatic path only, and
- * switching a guarded path back to manual leaves its guard in the body, so a
- * real draft reaches this state.
+ * `PathsPanel` shows the guard editor for either trigger, and switching a
+ * guarded path to manual keeps its guard, so a real draft reaches this state.
  */
 import { describe, expect, it } from "bun:test";
 import type { Step } from "workflow-engine/schema";

@@ -19,6 +19,8 @@ import { ADMIN_ROLE } from "../src/auth/authorize.js";
 import type { ProcessBody, ProcessId, FieldId, InstanceId, Instance } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
 import { clearInstanceAudit } from "./audit-cleanup.js";
+import { REPORT_ROW_LIMIT } from "../src/runtime/reports.js";
+import { cloneInstances, addPrincipalToProcess } from "./helpers/bulk-instances.js";
 
 const DB = !!process.env.DATABASE_URL;
 const reg = createRegistry();
@@ -145,19 +147,43 @@ test.skipIf(!DB)("a preview narrows per row the way a saved execution does", asy
   expect(preview.rows.map((r) => r.instanceId)).toEqual([ids[0]!]);
 });
 
+/** One real instance plus `total - 1` clones from a single bulk insert. Returns every id. */
+async function bulkFixture(total: number): Promise<{ processId: ProcessId; reportId: string; ids: string[] }> {
+  const { processId, reportId, ids } = await fixture(1);
+  const clones = await cloneInstances(sql, ids[0]!, total - 1);
+  return { processId, reportId, ids: [ids[0]!, ...clones] };
+}
+
 test.skipIf(!DB)("truncation reports the narrowed set, not the matched one", async () => {
-  // DEFAULT_LIST_LIMIT is 50 and runReportQuery passes no limit.
-  const { reportId, ids } = await fixture(60);
-  for (const id of ids.slice(0, 51)) await see(id, viewer.id);
+  // REPORT_ROW_LIMIT is 1000. 1010 instances match; the viewer sees 1001 of them.
+  const { processId, reportId, ids } = await bulkFixture(1010);
+  await addPrincipalToProcess(sql, processId, viewer.id);
+  for (const id of ids.slice(1001)) {
+    await sql`DELETE FROM instance_principals WHERE instance_id = ${id} AND principal = ${viewer.id}`;
+  }
 
   const over = await executeReport(reportId, viewer, sql);
-  expect(over?.rows).toHaveLength(50);
+  expect(over?.rows).toHaveLength(REPORT_ROW_LIMIT);
   expect(over?.truncated).toBe(true);
 
-  await sql`DELETE FROM instance_principals WHERE instance_id = ${ids[50]!} AND principal = ${viewer.id}`;
+  // Narrowed to exactly 1000: the 1010 matched rows no longer decide `truncated`.
+  await sql`DELETE FROM instance_principals WHERE instance_id = ${ids[1000]!} AND principal = ${viewer.id}`;
   const exact = await executeReport(reportId, viewer, sql);
-  expect(exact?.rows).toHaveLength(50);
+  expect(exact?.rows).toHaveLength(REPORT_ROW_LIMIT);
   expect(exact?.truncated).toBe(false);
+});
+
+test.skipIf(!DB)("a report over 1200 instances returns the report row limit and truncated, as operator and as grant holder", async () => {
+  const { processId, reportId } = await bulkFixture(1200);
+  await addPrincipalToProcess(sql, processId, viewer.id);
+
+  const asAdmin = await executeReport(reportId, admin, sql);
+  expect(asAdmin?.rows).toHaveLength(REPORT_ROW_LIMIT);
+  expect(asAdmin?.truncated).toBe(true);
+
+  const asViewer = await executeReport(reportId, viewer, sql);
+  expect(asViewer?.rows).toHaveLength(REPORT_ROW_LIMIT);
+  expect(asViewer?.truncated).toBe(true);
 });
 
 test.skipIf(!DB)("queryInstances narrows with visibleTo and returns every match without it", async () => {

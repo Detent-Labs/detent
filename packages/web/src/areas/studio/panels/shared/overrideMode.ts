@@ -11,10 +11,10 @@ export function isExpression(v: BoolOrExpr): v is DraftOf<Expression> {
 /**
  * Which arm a view override shows.
  *
- * The mode cannot be read off the value alone. A condition builder writes
- * `undefined` for as long as its only row is incomplete, and an override that
- * read `undefined` as "not an expression" would collapse to the checkbox on the
- * author's first click — taking the half-filled row with it.
+ * The mode cannot be read off the value alone. Choosing the CEL arm writes
+ * `undefined` itself, and the value stays `undefined` until a row is complete.
+ * An override that read `undefined` as "not an expression" would collapse to
+ * the checkbox on the author's first click — taking the half-filled row with it.
  *
  * So `undefined` is the one ambiguous state, and there the author's last choice
  * decides. A value that is actually present speaks for itself, whatever was

@@ -223,6 +223,29 @@ test.skipIf(!DB)("GET /reporting/reports/:id/table.csv returns a header-only CSV
   expect(await res.text()).toBe("field_x\r\n");
 });
 
+test.skipIf(!DB)("GET /reporting/reports/:id/table.csv prefixes a formula string, while the table keeps the raw value", async () => {
+  const P = pid();
+  const v = await publishBody(P, body(), reg, dataSourceReg);
+  await createInstance(v.definition, { processId: P, version: v.version, data: { field_x: "=1+1" } as never }, sql);
+  const created = (await (
+    await fetch(
+      req("http://x/reporting/reports", adminReports, "POST", {
+        processId: P,
+        name: "Formula report",
+        columns: [{ type: "field", fieldId: "field_x" }],
+      }),
+    )
+  ).json()) as { reportId: string };
+
+  const csv = await fetch(req(`http://x/reporting/reports/${created.reportId}/table.csv`, adminReports));
+  expect(csv.status).toBe(200);
+  expect(await csv.text()).toBe("field_x\r\n'=1+1\r\n");
+
+  const table = await fetch(req(`http://x/reporting/reports/${created.reportId}/table`, adminReports));
+  const json = (await table.json()) as { rows: { cells: { value: unknown }[] }[] };
+  expect(json.rows[0]!.cells[0]!.value).toBe("=1+1");
+});
+
 // ============================================================
 // 4.3 Error shapes
 // ============================================================
