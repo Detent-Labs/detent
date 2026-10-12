@@ -174,6 +174,34 @@ async function appendOutcome(
 }
 
 /**
+ * Move a claimed row to the dead-letter state, append the outcome and log it.
+ * The CAS matches the attempt count the worker's own claim produced
+ * (`casAttempts`); `attempts` is the count the row stores and the outcome
+ * reports. A zero-row CAS (a peer reclaimed or delivered the row) changes
+ * nothing.
+ */
+async function deadLetter(
+  tx: SQL,
+  row: ClaimedRow,
+  casAttempts: number,
+  attempts: number,
+  lastError: string | undefined,
+): Promise<void> {
+  const cas = (await tx`UPDATE outbox SET status = 'dead-letter', attempts = ${attempts}, last_error = ${lastError ?? null}
+    WHERE idempotency_key = ${row.idempotency_key} AND status = 'claimed' AND attempts = ${casAttempts}
+    RETURNING idempotency_key`) as unknown[];
+  if (cas.length === 0) return;
+  await appendOutcome(tx, row, { status: "dead-letter", attempts });
+  log.error("outbox row dead-lettered", {
+    instanceId: row.instance_id,
+    actionId: row.action.id,
+    actionType: row.action.type,
+    attempts,
+    lastError,
+  });
+}
+
+/**
  * One drain pass. Claim due rows (fresh `pending` plus `claimed` rows past their
  * lease) `FOR UPDATE SKIP LOCKED`, commit the claim, then for each: run the
  * handler off the lock (raced against the lease that remains, so a hung handler
@@ -238,6 +266,15 @@ export async function drainOutbox(
     // The claim UPDATE already incremented this; row.attempts IS the
     // post-claim count, not one less than it.
     const attempts = row.attempts;
+
+    // A row claimed above its maximum ran out of attempts through claims that
+    // finished nothing: tx2 threw, or the worker died. It dead-letters without
+    // another run. The tx2 CAS keeps this safe when a peer already holds the row.
+    const maxAttempts = maxAttemptsFor(row.action);
+    if (attempts > maxAttempts) {
+      await db.begin((tx) => deadLetter(tx, row, attempts, maxAttempts, `abandoned after ${maxAttempts} attempts`));
+      continue;
+    }
 
     // The lease runs from the claim and covers the whole batch. A row reached
     // after it ran out starts no handler: a peer may already hold the row. It
@@ -309,8 +346,7 @@ export async function drainOutbox(
 
         // Writeback, gated on running in the same UPDATE (no TOCTOU). Only a
         // running instance accepts a write; completed/cancelled/faulted are
-        // data-immutable and suppress. fieldId is a validated field_<uuid>, so the
-        // path array literal is injection-safe.
+        // data-immutable and suppress.
         let affected = 0;
         const droppedTargets: FieldId[] = [];
         for (const [fid, val] of Object.entries(patch)) {
@@ -331,8 +367,8 @@ export async function drainOutbox(
             continue;
           }
           // [val]->0 wraps any JSON value as a proper jsonb value (a bare param
-          // would land as a jsonb scalar string). fieldId is a validated
-          // field_<uuid>, so the path array literal is injection-safe.
+          // would land as a jsonb scalar string). The field id is bound as one
+          // path element, so no character in it selects another path.
           // Also flag the instance for re-resolution: a changed `data` may now
           // satisfy an automatic path the instance is parked on. Set in the same
           // UPDATE so it is flagged iff a running row is affected — a suppressed
@@ -348,7 +384,7 @@ export async function drainOutbox(
           // the ordinary suppression accounting below rather than writing under a
           // stale field id.
           const r = (await tx`UPDATE instances
-            SET body = jsonb_set(body, ${`{data,${fid}}`}::text[], (${[val]}::jsonb) -> 0, true),
+            SET body = jsonb_set(body, ARRAY['data', ${fid}::text],(${[val]}::jsonb) -> 0, true),
                 resolve_state = 'pending'
             WHERE instance_id = ${row.instance_id} AND (body->>'status') = 'running'
               AND (body->>'version')::int = ${row.field_version}
@@ -365,19 +401,8 @@ export async function drainOutbox(
         const suppressed = eligible > 0 && affected === 0;
         await appendOutcome(tx, row, { status: "succeeded", attempts, suppressed, droppedTargets });
         delivered++;
-      } else if (permanent || attempts >= maxAttemptsFor(row.action)) {
-        const cas = (await tx`UPDATE outbox SET status = 'dead-letter', attempts = ${attempts}, last_error = ${failureMessage ?? null}
-          WHERE idempotency_key = ${row.idempotency_key} AND status = 'claimed' AND attempts = ${attempts}
-          RETURNING idempotency_key`) as unknown[];
-        if (cas.length === 0) return;
-        await appendOutcome(tx, row, { status: "dead-letter", attempts });
-        log.error("outbox row dead-lettered", {
-          instanceId: row.instance_id,
-          actionId: row.action.id,
-          actionType: row.action.type,
-          attempts,
-          lastError: failureMessage,
-        });
+      } else if (permanent || attempts >= maxAttempts) {
+        await deadLetter(tx, row, attempts, attempts, failureMessage);
       } else {
         // Transient: back off and return to pending (drop the lease) for a later drain.
         const backoffMs = backoffMsFor(row.action, attempts);

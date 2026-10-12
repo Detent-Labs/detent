@@ -9,9 +9,9 @@
 
 ## 2. A row past its cap dead-letters, and the writeback path is one element
 
-- [ ] 2.1 Dead-letter a row claimed with `attempts` above `maxAttemptsFor(action)` before any handler runs (design decision 4). Use the dead-letter CAS, store `attempts = maxAttemptsFor(action)`, write `last_error` of `abandoned after N attempts`, append the outcome and log. Test (repro R4): a registry handler returns `{ note: "a\u0000b" }` and the action maps it to a string field. Drain until the row settles, with the lease shortened and each pass at least one lease apart. Expect `dead-letter`, the handler run count equal to the cap, the `last_error` text, and a `dead-letter` outcome in the history entry.
-- [ ] 2.2 Bind the writeback path as `ARRAY['data', ${fid}::text]` and delete the comments that call `fieldId` a validated uuid (design decision 5). Test: a field id holding `,` and `}` writes under exactly that key of `data`, and no other key changes. Confirm first that the id passes `fieldId` and that the instance can hold it.
-- [ ] 2.3 Add a test that an action with `retry.maxAttempts` of 2 runs its failing handler twice and dead-letters on the second failure, and that the row is not claimed again. The existing cap tests stay green.
+- [x] 2.1 Dead-letter a row claimed with `attempts` above `maxAttemptsFor(action)` before any handler runs (design decision 4). Use the dead-letter CAS, store `attempts = maxAttemptsFor(action)`, write `last_error` of `abandoned after N attempts`, append the outcome and log. Test (repro R4): a registry handler returns `{ note: "a\u0000b" }` and the action maps it to a string field. Drain until the row settles, with the lease shortened and each pass at least one lease apart. Expect `dead-letter`, the handler run count equal to the cap, the `last_error` text, and a `dead-letter` outcome in the history entry.
+- [x] 2.2 Bind the writeback path as `ARRAY['data', ${fid}::text]` and delete the comments that call `fieldId` a validated uuid (design decision 5). Test: a field id holding `,` and `}` writes under exactly that key of `data`, and no other key changes. Confirm first that the id passes `fieldId` and that the instance can hold it.
+- [x] 2.3 Add a test that an action with `retry.maxAttempts` of 2 runs its failing handler twice and dead-letters on the second failure, and that the row is not claimed again. The existing cap tests stay green.
 
 ## 3. Retry bounds
 

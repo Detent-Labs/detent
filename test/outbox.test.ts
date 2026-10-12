@@ -690,10 +690,10 @@ test.skipIf(!DB)("a row whose mark transaction throws does not starve the batch"
   await executeManualTransition(good, "path_ab", body, actor); // enqueues action_set, parks running
   await executeManualTransition(bad, "path_ab", body, actor);
 
-  // The bad row returns a patch whose fieldId makes the tx2 jsonb path literal
-  // malformed ({data,x}} — a bad array literal), so its mark transaction throws;
-  // the good row returns an empty patch and marks cleanly.
-  const seam: DeliverFn = async (row) => (row.instance_id === bad.instanceId ? { "x}": 1 } : {});
+  // The bad row returns a patch whose value holds U+0000, which Postgres rejects
+  // in jsonb, so its mark transaction throws; the good row returns an empty
+  // patch and marks cleanly.
+  const seam: DeliverFn = async (row) => (row.instance_id === bad.instanceId ? { field_x: "a\u0000b" } : {});
 
   // The poison row's tx2 throw is isolated: the good row still delivers.
   expect(await drainOutbox(sql, reg, seam)).toBe(1);
@@ -1018,6 +1018,120 @@ test.skipIf(!DB)("a claim that never reaches tx2 still costs an attempt (crashed
   expect(await drainOutbox(sql, reg, boom)).toBe(0);
   const after = await rows(inst.instanceId);
   expect(after.every((x) => x.status === "dead-letter" && x.attempts === MAX_ATTEMPTS)).toBe(true);
+});
+
+test.skipIf(!DB)("a row whose marking transaction always throws runs its handler at the cap, then dead-letters without another run", async () => {
+  // Postgres rejects U+0000 in jsonb, so the writeback inside tx2 throws on every run.
+  const runs: string[] = [];
+  const nulReg = createRegistry();
+  nulReg.set("nul_writer", { handler: async () => { runs.push("run"); return { note: "a\u0000b" }; } });
+  const body = {
+    baseLocale: "en",
+    fields: [],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }] },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", onEntry: [actOut("nul", "nul_writer", "field_note", "result.note")], paths: [{ id: "path_bc", key: "bc", label: "Bc", to: "step_c", trigger: "manual" }] },
+        { id: "step_c", key: "c", label: { en: "C" }, type: "task", terminal: true },
+      ],
+    },
+  } as unknown as ProcessBody;
+  const inst = await createFrom(body);
+  await executeManualTransition(inst, "path_ab", body, actor);
+
+  const errorSpy = spyOn(console, "error").mockImplementation(() => {});
+  const leaseMs = 100;
+  let passes = 0;
+  // The row stays claimed after each failed mark, so a later claim needs the lease to lapse.
+  while (passes < MAX_ATTEMPTS + 4) {
+    await drainOutbox(sql, nulReg, undefined, leaseMs);
+    passes++;
+    if ((await rows(inst.instanceId))[0]!.status === "dead-letter") break;
+    await new Promise((r) => setTimeout(r, leaseMs + 50));
+  }
+  const deadLetterLogs = errorSpy.mock.calls.map((c) => JSON.parse(c[0] as string)).filter((l) => l.msg === "outbox row dead-lettered");
+  errorSpy.mockRestore();
+
+  const [row] = await rows(inst.instanceId);
+  expect(row!.status).toBe("dead-letter");
+  expect(row!.attempts).toBe(MAX_ATTEMPTS);
+  expect(row!.last_error).toBe(`abandoned after ${MAX_ATTEMPTS} attempts`);
+  expect(runs).toHaveLength(MAX_ATTEMPTS); // the claim past the cap ran no handler
+  expect(passes).toBe(MAX_ATTEMPTS + 1);
+
+  const o = await outcomes(inst.instanceId);
+  expect(o).toHaveLength(1);
+  expect(o[0]).toMatchObject({ status: "dead-letter", attempts: MAX_ATTEMPTS });
+  expect(deadLetterLogs).toHaveLength(1);
+  expect(deadLetterLogs[0].attempts).toBe(MAX_ATTEMPTS);
+  expect(deadLetterLogs[0].lastError).toBe(`abandoned after ${MAX_ATTEMPTS} attempts`);
+
+  await new Promise((r) => setTimeout(r, leaseMs + 50));
+  await drainOutbox(sql, nulReg, undefined, leaseMs);
+  expect(runs).toHaveLength(MAX_ATTEMPTS); // a dead-lettered row is not claimed again
+});
+
+test.skipIf(!DB)("a row claimed past its cap dead-letters at the cap without running its handler", async () => {
+  const body = threeActionBody();
+  const inst = await create();
+  await executeManualTransition(inst, "path_ab", body, actor);
+  await sql`UPDATE outbox SET attempts = ${MAX_ATTEMPTS}, status = 'claimed', claimed_at = now() - interval '1 hour' WHERE instance_id = ${inst.instanceId}`;
+
+  // The pass claims at MAX_ATTEMPTS + 1, so every row is past its cap.
+  const ran: string[] = [];
+  const seam: DeliverFn = async (row) => { ran.push(row.idempotency_key); return {}; };
+  await drainOutbox(sql, reg, seam);
+  expect(ran).toEqual([]); // abandoned rows start no handler
+  const r = await rows(inst.instanceId);
+  expect(r.every((x) => x.status === "dead-letter" && x.attempts === MAX_ATTEMPTS && x.last_error === `abandoned after ${MAX_ATTEMPTS} attempts`)).toBe(true);
+});
+
+test.skipIf(!DB)("an action with retry.maxAttempts of 2 runs its failing handler twice, dead-letters on the second failure, and is not claimed again", async () => {
+  const body = retryActionBody({ maxAttempts: 2, backoff: "none" } as Action["retry"]);
+  const inst = await createFrom(body);
+  await executeManualTransition(inst, "path_ab", body, actor);
+
+  let runs = 0;
+  const failing: DeliverFn = async () => {
+    runs++;
+    throw new Error("delivery failed");
+  };
+  const errorSpy = spyOn(console, "error").mockImplementation(() => {});
+  await drainOutbox(sql, reg, failing);
+  let r = await rows(inst.instanceId);
+  expect(r[0]!.status).toBe("pending"); // the first failure retries
+  expect(r[0]!.attempts).toBe(1);
+
+  await makeDue(inst.instanceId);
+  await drainOutbox(sql, reg, failing);
+  r = await rows(inst.instanceId);
+  expect(r[0]!.status).toBe("dead-letter"); // the second failure is the last
+  expect(r[0]!.attempts).toBe(2);
+  expect(r[0]!.last_error).toBe("delivery failed");
+
+  for (let i = 0; i < 3; i++) {
+    await makeDue(inst.instanceId);
+    await drainOutbox(sql, reg, failing);
+  }
+  errorSpy.mockRestore();
+  expect(runs).toBe(2); // never claimed again
+  expect((await rows(inst.instanceId))[0]!.attempts).toBe(2);
+});
+
+test.skipIf(!DB)("a field id holding , and } writes under exactly that key of data and no other key changes", async () => {
+  // fieldId checks only the field_ prefix, and the instance's data record accepts any such key.
+  const body = outputBody(false);
+  const inst = await createFrom(body);
+  await executeManualTransition(inst, "path_ab", body, actor);
+  // field_x is an object, so an array literal read as the path data,field_x,y would write inside it.
+  await sql`UPDATE instances SET body = jsonb_set(body, '{data}', ${[{ field_x: { y: 1 }, field_keep: "kept" }]}::jsonb -> 0) WHERE instance_id = ${inst.instanceId}`;
+
+  const seam: DeliverFn = async () => ({ "field_x,y": 7, "field_q}": 8 });
+  expect(await drainOutbox(sql, reg, seam)).toBe(1);
+
+  expect(await instData(inst.instanceId)).toEqual({ field_x: { y: 1 }, field_keep: "kept", "field_x,y": 7, "field_q}": 8 });
+  expect(await outcomes(inst.instanceId)).toEqual([expect.objectContaining({ status: "succeeded" })]);
 });
 
 test.skipIf(!DB)("a row whose handler hangs on every attempt eventually dead-letters, via the deadline race each time", async () => {
