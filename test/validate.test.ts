@@ -3,9 +3,11 @@ import { describe, it, expect } from "bun:test";
 import {
   processVersion,
   processBody,
+  authoredProcessBody,
   publishedProcessBody,
   instanceEvent,
   migrationSpec,
+  CANCEL_SINK_KEY,
   MAX_TIMER_DURATION_MS,
   checkPathTriggerConsistency,
   type ProcessBody,
@@ -953,6 +955,193 @@ describe("migration schema additions", () => {
       expect(rejects((d) => {
         delete d.definition.workflow.steps[0].assignment.strategy.config;
       })).toBe(true);
+    });
+  });
+});
+
+// definition-contract capability: each invariant below gets a body (or step)
+// that validates, then the same input changed in the single respect the
+// invariant names. The valid twin shows the refusal comes from that respect.
+describe("definition-contract: authoring invariants reject their violating input", () => {
+  const step = (id: string, key: string, extra: Record<string, unknown> = {}): any => ({
+    id, key, label: { en: key }, type: "task", ...extra,
+  });
+  const manual = (id: string, to: string): any => ({ id, key: id, label: id, to, trigger: "manual" });
+  const issuesOf = (result: any): { message: string; path: (string | number)[] }[] =>
+    result.success ? [] : result.error.issues.map((i: any) => ({ message: i.message, path: i.path }));
+
+  /** step_a (one manual path) -> step_b (terminal): validates. */
+  const base = (): any => ({
+    key: "p", label: { en: "P" }, baseLocale: "en", fields: [],
+    workflow: {
+      initialStep: "step_a",
+      steps: [step("step_a", "a", { paths: [manual("path_ab", "step_b")] }), step("step_b", "b", { terminal: true })],
+    },
+  });
+
+  it("rejects a terminal step that owns a path, and accepts the same step without it", () => {
+    const b = base();
+    expect(processBody.safeParse(b).success).toBe(true);
+    b.workflow.steps[1].paths = [manual("path_ba", "step_a")];
+    expect(issuesOf(processBody.safeParse(b))).toEqual([
+      { message: "a terminal step has no outgoing paths", path: ["workflow", "steps", 1, "paths"] },
+    ]);
+  });
+
+  it("rejects a timer whose targetPath another step owns, and accepts one the step owns", () => {
+    // step_a owns path_ac, step_c owns path_cb; the timer sits on step_c.
+    const b = base();
+    b.workflow.steps[0].paths = [manual("path_ac", "step_c")];
+    b.workflow.steps.splice(1, 0, step("step_c", "c", {
+      paths: [manual("path_cb", "step_b")],
+      timers: [{ id: "timer_t", duration: "PT1H", onFire: { targetPath: "path_cb", actions: [] } }],
+    }));
+    expect(processBody.safeParse(b).success).toBe(true);
+    b.workflow.steps[1].timers[0].onFire.targetPath = "path_ac";
+    expect(issuesOf(processBody.safeParse(b))).toEqual([
+      {
+        message: "timer targetPath is not an outgoing path of this step: path_ac",
+        path: ["workflow", "steps", 1, "timers", 0],
+      },
+    ]);
+  });
+
+  describe("a timer declares exactly one of duration or deadline", () => {
+    const withTimer = (timer: Record<string, unknown>): any => {
+      const b = base();
+      b.workflow.steps[0].timers = [{ id: "timer_t", onFire: { actions: [] }, ...timer }];
+      return b;
+    };
+    const deadline = { lang: "cel", src: "data.due" };
+    const MESSAGE = "exactly one of duration or deadline";
+
+    it("accepts a duration alone and a deadline alone", () => {
+      expect(processBody.safeParse(withTimer({ duration: "PT1H" })).success).toBe(true);
+      expect(processBody.safeParse(withTimer({ deadline })).success).toBe(true);
+    });
+
+    it("rejects a timer declaring both", () => {
+      expect(issuesOf(processBody.safeParse(withTimer({ duration: "PT1H", deadline })))).toEqual([
+        { message: MESSAGE, path: ["workflow", "steps", 0, "timers", 0, "duration"] },
+      ]);
+    });
+
+    it("rejects a timer declaring neither", () => {
+      expect(issuesOf(processBody.safeParse(withTimer({})))).toEqual([
+        { message: MESSAGE, path: ["workflow", "steps", 0, "timers", 0, "duration"] },
+      ]);
+    });
+  });
+
+  describe("a subprocess reference pairs its binding with pinnedVersion and contractRef", () => {
+    const withSpec = (spec: Record<string, unknown>): any => {
+      const b = base();
+      b.workflow.steps[0] = step("step_a", "a", {
+        type: "subprocess",
+        subprocess: { processId: "proc_child", inputMapping: {}, outputMapping: {}, ...spec },
+        paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "automatic", priority: 1 }],
+      });
+      return b;
+    };
+    const PIN = "pinnedVersion is present iff versionBinding is 'pinned'";
+    const REF = "contractRef is required for latest-at-spawn";
+    const at = (leaf: string) => ["workflow", "steps", 0, "subprocess", leaf];
+
+    it("accepts a pinned reference with pinnedVersion and a latest-at-spawn one with contractRef", () => {
+      expect(processBody.safeParse(withSpec({ versionBinding: "pinned", pinnedVersion: 1 })).success).toBe(true);
+      expect(processBody.safeParse(withSpec({ versionBinding: "latest-at-spawn", contractRef: "ref" })).success).toBe(true);
+    });
+
+    it("rejects a pinned reference without pinnedVersion", () => {
+      expect(issuesOf(processBody.safeParse(withSpec({ versionBinding: "pinned" })))).toEqual([
+        { message: PIN, path: at("pinnedVersion") },
+      ]);
+    });
+
+    it("rejects a latest-at-spawn reference that names pinnedVersion", () => {
+      const b = withSpec({ versionBinding: "latest-at-spawn", contractRef: "ref", pinnedVersion: 1 });
+      expect(issuesOf(processBody.safeParse(b))).toEqual([{ message: PIN, path: at("pinnedVersion") }]);
+    });
+
+    it("rejects a latest-at-spawn reference without contractRef", () => {
+      expect(issuesOf(processBody.safeParse(withSpec({ versionBinding: "latest-at-spawn" })))).toEqual([
+        { message: REF, path: at("contractRef") },
+      ]);
+    });
+  });
+
+  describe("a contract binds its outcomes to terminal steps", () => {
+    /** step_a forks to two terminal steps; the contract declares "done". */
+    const contracted = (): any => {
+      const b = base();
+      b.contract = { inputFields: [], outputFields: [], outcomes: ["done"] };
+      b.workflow.steps[0].paths.push(manual("path_ac", "step_c"));
+      b.workflow.steps[1].outcome = "done";
+      b.workflow.steps.push(step("step_c", "c", { terminal: true, outcome: "done" }));
+      return b;
+    };
+
+    it("rejects a terminal step without an outcome, and accepts it once it names one", () => {
+      const b = contracted();
+      expect(processBody.safeParse(b).success).toBe(true);
+      delete b.workflow.steps[2].outcome;
+      expect(issuesOf(processBody.safeParse(b))).toEqual([
+        { message: "contracted process: terminal step 'c' needs an outcome", path: ["workflow", "steps", 2, "outcome"] },
+      ]);
+    });
+
+    it("rejects a declared outcome that no terminal step names, and accepts it once one does", () => {
+      const b = contracted();
+      b.contract.outcomes.push("rejected");
+      expect(issuesOf(processBody.safeParse(b))).toEqual([
+        { message: "declared outcome 'rejected' has no terminal step", path: ["contract", "outcomes"] },
+      ]);
+      b.workflow.steps[2].outcome = "rejected";
+      expect(processBody.safeParse(b).success).toBe(true);
+    });
+  });
+
+  it("rejects two steps sharing one id, and accepts them with distinct ids", () => {
+    const b = base();
+    b.workflow.steps.push(step("step_c", "c", { terminal: true }));
+    expect(processBody.safeParse(b).success).toBe(true);
+    b.workflow.steps[2].id = "step_b";
+    expect(issuesOf(processBody.safeParse(b))).toEqual([
+      { message: "duplicate step ids", path: ["workflow", "steps"] },
+    ]);
+  });
+
+  it("rejects an authored step carrying the reserved cancel-sink key under another id, and accepts another key", () => {
+    const b = base();
+    b.workflow.steps.push(step("step_c", "c", { terminal: true }));
+    expect(authoredProcessBody.safeParse(b).success).toBe(true);
+    b.workflow.steps[2].key = CANCEL_SINK_KEY;
+    expect(issuesOf(authoredProcessBody.safeParse(b))).toEqual([
+      { message: "reserved cancel-sink step key may not be authored", path: ["workflow", "steps", 2, "key"] },
+    ]);
+  });
+
+  describe("a migration spec pairs unmappableStep with onUnmappable route-to-step", () => {
+    const MESSAGE = "unmappableStep is present iff onUnmappable is 'route-to-step'";
+
+    it("accepts the pair, and accepts reject-and-pin without a step", () => {
+      expect(migrationSpec.safeParse({ onUnmappable: "route-to-step", unmappableStep: "step_a" }).success).toBe(true);
+      expect(migrationSpec.safeParse({ onUnmappable: "reject-and-pin" }).success).toBe(true);
+    });
+
+    it("rejects unmappableStep without route-to-step", () => {
+      expect(issuesOf(migrationSpec.safeParse({ unmappableStep: "step_a" }))).toEqual([
+        { message: MESSAGE, path: ["unmappableStep"] },
+      ]);
+      expect(issuesOf(migrationSpec.safeParse({ onUnmappable: "reject-and-pin", unmappableStep: "step_a" }))).toEqual([
+        { message: MESSAGE, path: ["unmappableStep"] },
+      ]);
+    });
+
+    it("rejects route-to-step without unmappableStep", () => {
+      expect(issuesOf(migrationSpec.safeParse({ onUnmappable: "route-to-step" }))).toEqual([
+        { message: MESSAGE, path: ["unmappableStep"] },
+      ]);
     });
   });
 });
