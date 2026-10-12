@@ -48,6 +48,7 @@ import {
 import { createDefaultAssignmentRegistry } from "../engine/assignment-strategies.js";
 import type { Instance, PathId, ProcessId, InstanceId, StepId, ProcessBody } from "../schema/definition.js";
 import { mapError, RequestShapeError, type HttpResult, type HttpBinaryResult, type ErrorContext } from "./errors.js";
+import { parseInstant } from "../instant.js";
 import { z } from "zod";
 
 /**
@@ -431,18 +432,6 @@ function parseStatuses(url: URL): Instance["status"][] | undefined {
     if (!parsed.success) throw new RequestShapeError(`unknown status '${s}'`);
     return parsed.data;
   });
-}
-
-/**
- * `createdAfter`/`createdBefore` must parse as an ISO-8601 instant. Validated
- * here, before the value ever reaches a SQL `::timestamptz` cast — an invalid
- * string handed straight to Postgres would raise an untyped error `mapError`
- * falls back to 500 on, not the 400 the spec requires. Mirrors
- * `reporting-routes.ts`'s `parseRange`.
- */
-function parseInstant(raw: string, label: string): string {
-  if (Number.isNaN(Date.parse(raw))) throw new RequestShapeError(`${label} must be an ISO-8601 instant, got '${raw}'`);
-  return raw;
 }
 
 /** An omitted scope resolves to "all" — that is what it has always meant. Any other value is a request error. */

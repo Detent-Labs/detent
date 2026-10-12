@@ -2820,6 +2820,24 @@ test.skipIf(!DB)("a createdBefore built from a summary's millisecond-truncated c
   expect(beforePage.items).toEqual([]);
 });
 
+test.skipIf(!DB)("listInstances and queryInstances reject a creation bound that is no instant as a request-shape error, never as a 500", async () => {
+  const PID = pid("proc_list_created_bad_bound");
+  await publishBody(PID, twoPathsBody(), reg, dataSourceReg);
+  await createProcessInstance(PID, actor, dataSourceReg);
+
+  for (const bound of [{ createdAfter: "letzte Woche" }, { createdBefore: "0000-01-01" }, { createdBefore: "" }]) {
+    for (const run of [() => listInstances({ processId: PID, ...bound }), () => queryInstances({ processId: PID, ...bound })]) {
+      let raised: unknown;
+      try {
+        await run();
+      } catch (e) {
+        raised = e;
+      }
+      expect({ bound, type: (raised as Error | undefined)?.constructor.name }).toEqual({ bound, type: "RequestShapeError" });
+    }
+  }
+});
+
 // ------------------------------------------------------------
 // dataWhere
 // ------------------------------------------------------------
