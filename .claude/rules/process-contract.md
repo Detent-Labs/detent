@@ -348,7 +348,7 @@ An assignment strategy's own `configSchema` is a Zod schema too
 id, never inline, and its options resolve at runtime, never at publish.
 
 The strategy `org.group-members`, one of three org-aware assignment
-strategies, adds one of the seven DB-resolving publish-time checks
+strategies, adds one of the eight DB-resolving publish-time checks
 listed below. For every entry in
 the body's own `allowedGroups`, `publishBody` confirms a group with that
 id exists in the `groups` store (`src/auth/groups.ts`). It also confirms
@@ -358,14 +358,16 @@ the group's scope permits the publishing process. A violation throws
 already-published body's re-publish stays a no-op even after a
 referenced group's scope narrows underneath it (`group-scope-validation`).
 
-The function `publishBody` awaits seven DB-resolving checks in all, in
+The function `publishBody` awaits eight DB-resolving checks in all, in
 this order: `validateCrossProcess`, `validateSubprocessCycle`,
 `validateProcessChaining`, `validateGroupScope`,
 `validateInstanceQueryReferences`, `validateInstanceTransitionReferences`,
-`validateCrossProcessReadGrant`. The two `instance*References` checks
-also return the `PublishFinding`s the publish result carries. The check
-`validateCrossProcessReadGrant` runs only when the caller supplies an
-actor. The check `validateInstanceQueryReferences` also rejects a
+`validateCrossProcessReadGrant`, `validateInstanceTransitionWriteGrant`.
+The two `instance*References` checks
+also return the `PublishFinding`s the publish result carries. The two grant
+checks run only when the caller supplies an actor. The write check requires
+`migrate` on each `instance.transition` target, which a Reader list entry
+cannot supply. The check `validateInstanceQueryReferences` also rejects a
 comparison literal that no live target version admits through
 `typeMatches`. It reads those versions from the database, so it takes the
 publish-path placement.

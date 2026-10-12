@@ -15,8 +15,8 @@
  * branded `processId`/`fieldId`/`pathId` schemas: a pattern-constrained
  * property takes `config-descriptor.ts`'s generated form back to the raw JSON
  * textarea (see design.md). Referential validity is checked at publish
- * (`validateInstanceTransitionReferences`, `validateCrossProcessReadGrant`)
- * and, for what publish cannot pin down (the target's live step), here on
+ * (`validateInstanceTransitionReferences`, `validateCrossProcessReadGrant`,
+ * `validateInstanceTransitionWriteGrant`) and, for what publish cannot pin down (the target's live step), here on
  * delivery.
  */
 

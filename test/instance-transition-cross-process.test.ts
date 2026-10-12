@@ -13,7 +13,8 @@ import { compileProcessBody } from "../src/schema/compile.js";
 import { definitionHash } from "../src/schema/hash.js";
 import { createProcessInstance } from "../src/runtime/api.js";
 import { writeGrant } from "../src/auth/grants.js";
-import { AuthorizationError, ADMIN_ROLE } from "../src/auth/authorize.js";
+import { AuthorizationError, ADMIN_ROLE, DEVELOPER_ROLE, can } from "../src/auth/authorize.js";
+import { addAccessPrincipal } from "../src/auth/process-access.js";
 import type { ProcessBody, ProcessId } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
 import { clearInstanceAudit } from "./audit-cleanup.js";
@@ -99,7 +100,7 @@ beforeAll(async () => {
   if (DB) await initSchema();
 });
 beforeEach(async () => {
-  if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, definitions, permission_grants`;
+  if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, definitions, permission_grants, process_access_roles`;
   if (DB) await clearInstanceAudit();
 });
 
@@ -300,16 +301,19 @@ test.skipIf(!DB)("an author holding the read grant publishes", async () => {
   await publishBody(TARGET_ID, targetV1Body(), reg, dsReg);
   await createProcessInstance(TARGET_ID, actor, dsReg);
   await writeGrant({ role: "itcp-reader", permission: "read", scope: { type: "process", config: { processId: TARGET_ID } } }, sql);
+  await writeGrant({ role: "itcp-reader", permission: "migrate", scope: { type: "process", config: { processId: TARGET_ID } } }, sql);
   const granted: Actor = { id: "user_granted", roles: ["itcp-reader"] };
 
   const result = await publishBody(ACTOR_ID, actorBody({ processId: TARGET_ID, instanceIdField: "field_target_id", pathId: "path_ab" }), reg, dsReg, sql, undefined, granted);
   expect(result.version).toBeGreaterThan(0);
 });
 
-test.skipIf(!DB)("the operator role short-circuits the grant, with no grant row present", async () => {
+// The operator role answers `read` alone; `migrate` needs the developer role
+// beside it, so this actor holds both.
+test.skipIf(!DB)("the operator role short-circuits the read grant, with no grant row present", async () => {
   await publishBody(TARGET_ID, targetV1Body(), reg, dsReg);
   await createProcessInstance(TARGET_ID, actor, dsReg);
-  const operatorActor: Actor = { id: "user_admin", roles: [ADMIN_ROLE] };
+  const operatorActor: Actor = { id: "user_admin", roles: [ADMIN_ROLE, DEVELOPER_ROLE] };
 
   const result = await publishBody(ACTOR_ID, actorBody({ processId: TARGET_ID, instanceIdField: "field_target_id", pathId: "path_ab" }), reg, dsReg, sql, undefined, operatorActor);
   expect(result.version).toBeGreaterThan(0);
@@ -371,8 +375,118 @@ test.skipIf(!DB)("an author holding the read grant publishes a body naming one t
   await publishBody(TARGET_ID, targetV1Body(), reg, defaultDsReg);
   await createProcessInstance(TARGET_ID, actor, defaultDsReg);
   await writeGrant({ role: "itcp-reader-combined", permission: "read", scope: { type: "process", config: { processId: TARGET_ID } } }, sql);
+  await writeGrant({ role: "itcp-reader-combined", permission: "migrate", scope: { type: "process", config: { processId: TARGET_ID } } }, sql);
   const granted: Actor = { id: "user_granted_combined", roles: ["itcp-reader-combined"] };
 
   const result = await publishBody(ACTOR_ID, combinedSiteBody(), reg, defaultDsReg, sql, undefined, granted);
   expect(result.version).toBeGreaterThan(0);
+});
+
+// ---- the publishing actor's migrate grant on the target ----
+
+const grantOn = (role: string, permission: "read" | "migrate", processId: ProcessId) =>
+  writeGrant({ role, permission, scope: { type: "process", config: { processId } } }, sql);
+
+async function publishRaisingAs(processId: ProcessId, body: ProcessBody, who: Actor): Promise<AuthorizationError> {
+  let raised: unknown;
+  try {
+    await publishBody(processId, body, reg, dsReg, sql, undefined, who);
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(AuthorizationError);
+  return raised as AuthorizationError;
+}
+
+test.skipIf(!DB)("an author with read and no migrate on the target fails, naming the target and persisting no version", async () => {
+  await publishBody(TARGET_ID, targetV1Body(), reg, dsReg);
+  await grantOn("itcp-read-only", "read", TARGET_ID);
+  const readOnly: Actor = { id: "user_read_only", roles: ["itcp-read-only"] };
+
+  const err = await publishRaisingAs(ACTOR_ID, actorBody(transitionConfig()), readOnly);
+  expect(err.message).toContain(TARGET_ID);
+  expect(err.message).toContain("system:developer");
+  expect(await versionCount(ACTOR_ID)).toBe(0);
+});
+
+test.skipIf(!DB)("a self-targeting action needs migrate on the publishing process too", async () => {
+  const SELF = pid("proc_itcp_self_migrate");
+  await grantOn("itcp-self-read", "read", SELF);
+  const readOnly: Actor = { id: "user_self_read", roles: ["itcp-self-read"] };
+
+  const err = await publishRaisingAs(SELF, actorBody(transitionConfig(SELF)), readOnly);
+  expect(err.message).toContain(SELF);
+  expect(await versionCount(SELF)).toBe(0);
+
+  await grantOn("itcp-self-read", "migrate", SELF);
+  const result = await publishBody(SELF, actorBody(transitionConfig(SELF)), reg, dsReg, sql, undefined, readOnly);
+  expect(result.version).toBe(1);
+});
+
+test.skipIf(!DB)("the global developer role publishes an instance.transition body", async () => {
+  await publishBody(TARGET_ID, targetV1Body(), reg, dsReg);
+  await grantOn("itcp-dev-read", "read", TARGET_ID);
+  const developer: Actor = { id: "user_dev", roles: ["itcp-dev-read", DEVELOPER_ROLE] };
+
+  const result = await publishBody(ACTOR_ID, actorBody(transitionConfig()), reg, dsReg, sql, undefined, developer);
+  expect(result.version).toBe(1);
+});
+
+test.skipIf(!DB)("a stored migrate grant on the target publishes", async () => {
+  await publishBody(TARGET_ID, targetV1Body(), reg, dsReg);
+  await grantOn("itcp-migrator", "read", TARGET_ID);
+  await grantOn("itcp-migrator", "migrate", TARGET_ID);
+  const migrator: Actor = { id: "user_migrator", roles: ["itcp-migrator"] };
+
+  const result = await publishBody(ACTOR_ID, actorBody(transitionConfig()), reg, dsReg, sql, undefined, migrator);
+  expect(result.version).toBe(1);
+});
+
+test.skipIf(!DB)("a publish with no actor skips the migrate check", async () => {
+  await publishBody(TARGET_ID, targetV1Body(), reg, dsReg);
+
+  const result = await publishBody(ACTOR_ID, actorBody(transitionConfig()), reg, dsReg);
+  expect(result.version).toBe(1);
+});
+
+test.skipIf(!DB)("two actions naming one target fail once for that process", async () => {
+  await publishBody(TARGET_ID, targetV1Body(), reg, dsReg);
+  await grantOn("itcp-twice", "read", TARGET_ID);
+  const readOnly: Actor = { id: "user_twice", roles: ["itcp-twice"] };
+  const body = actorBody(transitionConfig());
+  const step = body.workflow.steps[0] as unknown as { onEntry: unknown[] };
+  step.onEntry.push({ id: "action_it_2", type: "instance.transition", config: transitionConfig() });
+
+  const err = await publishRaisingAs(ACTOR_ID, body, readOnly);
+  expect(err.message.split(TARGET_ID).length - 1).toBe(1);
+  expect(await versionCount(ACTOR_ID)).toBe(0);
+});
+
+test.skipIf(!DB)("a Reader list entry on the target does not stand in for migrate", async () => {
+  await publishBody(TARGET_ID, targetV1Body(), reg, dsReg);
+  await addAccessPrincipal({ id: "user_admin_acl", roles: [ADMIN_ROLE] }, TARGET_ID, "reader", "user_listed", sql);
+  const listed: Actor = { id: "user_listed", roles: [] };
+  expect(await can(listed, "read", TARGET_ID, sql)).toBe(true); // read arrives through the Reader list alone
+
+  const err = await publishRaisingAs(ACTOR_ID, actorBody(transitionConfig()), listed);
+  expect(err.message).toContain(TARGET_ID);
+  expect(await versionCount(ACTOR_ID)).toBe(0);
+});
+
+test.skipIf(!DB)("an instance.query source alone keeps the read gate: read without migrate publishes", async () => {
+  await publishBody(TARGET_ID, targetV1Body(), reg, dsReg);
+  await grantOn("itcp-query-only", "read", TARGET_ID);
+  const readOnly: Actor = { id: "user_query_only", roles: ["itcp-query-only"] };
+  // A body with an instance.query source over TARGET_ID and no instance.transition action.
+  const body = {
+    key: "querier",
+    label: { en: "Querier" },
+    baseLocale: "en",
+    fields: [{ id: "field_target_id", key: "target_id", label: { en: "Target Id" }, type: "string", dataSource: "ds_target" }],
+    dataSources: [queryDs(TARGET_ID)],
+    workflow: { initialStep: "step_r", steps: [{ id: "step_r", key: "r", label: { en: "R" }, type: "task", terminal: true }] },
+  } as unknown as ProcessBody;
+
+  const result = await publishBody(ACTOR_ID, body, reg, dsReg, sql, undefined, readOnly);
+  expect(result.version).toBe(1);
 });

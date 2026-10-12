@@ -16,10 +16,10 @@
 
 ## 3. Publish requires migrate on the target
 
-- [ ] 3.1 Add `validateInstanceTransitionWriteGrant` beside `validateCrossProcessReadGrant`, and call it in `publishBody` after the read check. Verify with 3.2.
-- [ ] 3.2 Add tests for the eight scenarios of the two `migrate` requirements. Verify a Reader list entry alone fails and a global developer role passes.
-- [ ] 3.3 Update the read-grant comment, the `publishBody` actor comment and the `handlers/instance-transition.ts` header. Verify none says both sites share one gate.
-- [ ] 3.4 In `.claude/rules/process-contract.md` and `.claude/rules/authoring-invariants.md`, replace "seven" with "eight" DB-resolving checks and list the new one. Verify with `git grep -n "seven DB"`.
+- [x] 3.1 Add `validateInstanceTransitionWriteGrant` beside `validateCrossProcessReadGrant`, and call it in `publishBody` after the read check. Verify with 3.2.
+- [x] 3.2 Add tests for the eight scenarios of the two `migrate` requirements. Verify a Reader list entry alone fails and a global developer role passes.
+- [x] 3.3 Update the read-grant comment, the `publishBody` actor comment and the `handlers/instance-transition.ts` header. Verify none says both sites share one gate.
+- [x] 3.4 In `.claude/rules/process-contract.md` and `.claude/rules/authoring-invariants.md`, replace "seven" with "eight" DB-resolving checks and list the new one. Verify with `git grep -n "seven DB"`.
 
 ## 4. Authoring guide
 
