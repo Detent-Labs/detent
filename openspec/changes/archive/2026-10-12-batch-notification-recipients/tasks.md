@@ -25,5 +25,5 @@
 - [x] 4.1 Run `bun run typecheck` in the devcontainer. Verify it prints no error.
 - [x] 4.2 Run `bun run build` in the devcontainer. Verify it exits 0.
 - [x] 4.3 Run the full `bun test` through `scripts/test-gated.sh` with DATABASE_URL set. Verify the gate prints no rejection and no failed test.
-- [ ] 4.4 Run the prose gate and the whitespace gate over the pushed range on the host. Verify both exit 0.
+- [x] 4.4 Run the prose gate and the whitespace gate over the pushed range on the host. Verify both exit 0.
 - [x] 4.5 Run `openspec validate batch-notification-recipients`. Verify it reports the change valid.
