@@ -1676,10 +1676,6 @@ of `5f41cd8a`. Each fix change deletes its own entries in the commit that
 archives it, and `sweep-docs-drift-2026-10` re-points the line citations of
 other entries. C-4 merges D-2, and C-6 merges F-6.
 
-- **`secret-references-in-action-config` (G-5; medium)**: Credentials for
-  `http.request` sit in plain text in the immutable definition and in every
-  outbox row. Anchors: `src/handlers/http.ts`, `src/engine/transition.ts`,
-  `src/engine/admin-queries.ts`.
 - **`bound-worker-scan-costs` (B-6, B-7, B-8, B-11; medium)**: The claim scan
   and the retention sweep grow with every instance ever run, one tenant's
   hung target stops the outbox for all tenants, and the admin outbox list has

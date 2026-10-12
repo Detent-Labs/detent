@@ -13,7 +13,7 @@ image reads one build argument and no runtime variable.
 
 ## Runtime variables the engine reads
 
-The engine reads twenty-one variables. A blank cell in the last column means the
+The engine reads twenty-two variables. A blank cell in the last column means the
 default is safe for a deployment.
 
 | Variable | What it controls | Mandatory | Default | Unsafe default, and what to set |
@@ -32,6 +32,7 @@ default is safe for a deployment.
 | `METRICS_TOKEN` | The bearer token `GET /metrics` needs. An empty value counts as unset. | No | Unset, which leaves `GET /metrics` unregistered. | |
 | `TRUST_PROXY` | `1` reads the caller's address from `X-Forwarded-For`. | No | Unset, which reads the peer address. | `1` without a proxy that overwrites the header. Read "The proxy rule" below first. |
 | `HTTP_ACTION_ALLOWED_HOSTS` | A comma-separated list. It names the hosts the `http.request` action may reach. | Yes, for a definition using `http.request`. | Unset, which refuses every host. | |
+| `HTTP_SECRET_ENV_ALLOWLIST` | A comma-separated list of the variables a reference may read. With many tenants (`TENANT_CONTROL_PLANE_URL` set), write each entry as `tenant:NAME`. An entry without a tenant has no effect there. One tenant ignores an entry with a colon. Each `NAME` matches `[A-Z][A-Z0-9_]*`. | Yes, for a definition using a header reference. | Unset. That refuses every reference. | |
 | `TENANT_CONTROL_PLANE_URL` | The control-plane connection string. Its presence turns SaaS mode on. | No | Unset, which runs one tenant on `DATABASE_URL`. | Read "Serving many tenants" below first. |
 | `HTTP_ACTION_ALLOW_INSECURE` | `1` permits a plain-HTTP target. | No | Unset. Then `https` alone. | `1` sends the request in the clear. Give the target a TLS certificate instead. |
 | `SMTP_HOST` | The relay the `notification.email` action connects to. | Yes, for a definition using `notification.email`. | None. | |
@@ -72,6 +73,49 @@ screen.
 
 Add the host alone, as `api.example.com`. The engine compares the target's
 host against the list. An entry carrying a port or a scheme matches nothing.
+
+### Header credentials come from the environment
+
+An author never types a credential into a definition. The author writes a
+reference instead, for example `"Authorization": { "env": "PARTNER_API_TOKEN" }`.
+The engine reads that variable from its own environment at each delivery. The
+published version and the outbox row hold the reference and never the value.
+
+`HTTP_SECRET_ENV_ALLOWLIST` lists the names an author may reference. It starts
+empty, and an empty list refuses every reference. With one tenant, write the
+bare name, as in `PARTNER_API_TOKEN`. With many tenants, write `tenant:NAME`,
+as in `acme:PARTNER_API_TOKEN`. Each side ignores the other's form, so a mixed
+list fails closed.
+
+The variable holds the whole header value. For `Authorization: Bearer sk_live_1`
+the operator stores `Bearer sk_live_1`, prefix included.
+
+To rotate a credential, change the variable and restart the engine. The author
+publishes no new version. Old versions and old outbox rows never held the
+value.
+
+A refused reference dead-letters the row. The message names the variable and
+never shows a value.
+
+Four cases refuse:
+
+- The name is outside the list.
+- The variable is unset.
+- Its value is empty, or only spaces.
+- Its value holds a byte that a header cannot carry.
+
+Fix the environment. Then retry the row from the admin area's outbox screen.
+
+Two trade-offs follow. A listed name serves every author of the tenant and
+every allowed host. List a name only if all authors may use it. Never list a
+variable the engine itself reads, such as `DATABASE_URL`, `AUTH_JWT_SECRET`,
+`SMTP_PASSWORD` or `METRICS_TOKEN`. Keep
+`HTTP_ACTION_ALLOWED_HOSTS` short, since each listed host can receive the value.
+A host that echoes request headers can also return the value to the author
+through `Action.output`.
+
+Credentials already written as literal strings stay in their versions. A
+reference is the new path, and no rule bans a literal.
 
 ## The build argument each image takes
 
