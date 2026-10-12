@@ -85,7 +85,9 @@ its placement.
   subprocess step's paths are all-automatic. The step is a wait-state: a manual
   path would let an actor advance the parent while the child still runs. All
   three are Zod refinements in `definition.ts`'s `step` superRefine, beside the
-  path-trigger checks.
+  path-trigger checks. The cascade never evaluates a subprocess step's paths
+  on entry, because `child` exists only after the return. A guardless default
+  stays allowed and takes an outcome no guard matches.
 - A published body must not reach its own `processId` through subprocess
   references. Publish rejects a direct self-reference and any longer chain a
   new version would close. The comparison uses process ids and ignores

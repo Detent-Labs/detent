@@ -1642,11 +1642,6 @@ of `5f41cd8a`. Each fix change deletes its own entries in the commit that
 archives it, and `sweep-docs-drift-2026-10` re-points the line citations of
 other entries. C-4 merges D-2, and C-6 merges F-6.
 
-- **`fix-subprocess-wait-state` (B-1, B-2, A-5; high)**: A guardless path
-  leaves a subprocess step before any child exists, a timer exit leaves the
-  child running, and publish checks view flags against a `child` the runtime
-  never supplies. Anchors: `src/engine/transition.ts`,
-  `src/engine/subprocess.ts`, `src/cel/check.ts`.
 - **`fix-handler-assignment-registry` (B-3, B-14; high)**: The handlers
   `process.start` and `instance.transition` resolve assignments with the
   static strategy alone, through a second function named

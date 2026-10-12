@@ -67,7 +67,9 @@ const styles = stylex.create({
 interface Props {
   value: DraftOf<Expression> | undefined;
   onChange: (next: DraftOf<Expression> | undefined) => void;
-  /** The step this condition sits on. Supplies `child.*` when its child resolved. */
+  /** The subprocess step whose path guard this is. Supplies `child.*` when its
+   * child resolved. A view override passes none: the runtime resolves a view
+   * flag with no child in scope, so the authoring check rejects `child` there. */
   stepId?: string;
   placeholder?: string;
   /**

@@ -19,7 +19,7 @@ import {
 } from "../schema/definition.js";
 import { definitionHash } from "../schema/hash.js";
 import { armStepTimers, minFireAt } from "./duration.js";
-import { idempotencyKey } from "./idempotency.js";
+import { idempotencyKey, subprocessChildId } from "./idempotency.js";
 import { SPAWN_ACTION_TYPE, outboxActorsOf } from "./registry.js";
 
 /**
@@ -1132,8 +1132,9 @@ export async function appendInstancePrincipals(tx: SQL, instanceId: string, prin
  * definition's initialStep, transitionSeq 0, and persist it. Creation is not a
  * transition — no HistoryEntry, no trigger actions — but it is a step entry, so
  * it carries the entry consequences the initial step declares: its timers are
- * armed, and if it is a subprocess step its spawn is enqueued (both inside the
- * INSERT transaction; see below).
+ * armed, and if it is a subprocess step its spawn is enqueued and the instance
+ * records the child it awaits, derived at sequence 0 (all inside the INSERT
+ * transaction; see below).
  * ponytail: instanceId is UUIDv4; the contract calls for UUIDv7 (time-sortable).
  * transitionSeq already orders history per instance, so upgrade to v7 only when
  * cross-instance time ordering is needed.
@@ -1209,7 +1210,16 @@ export async function createInstance(
     ...(opts.kind !== undefined ? { kind: opts.kind } : {}),
   });
   const { armed: timers, drops } = armStepTimers(initial, startedAt, body, seed);
-  const inst: Instance = { ...seed, timers, assignment: opts.assignment };
+  const subStep = initial?.type === "subprocess" ? initial : undefined;
+  // A subprocess initial step awaits the child its spawn row below derives at
+  // sequence 0, as planStepEntry records it for a transition. Any other initial
+  // step leaves the field absent.
+  const inst: Instance = {
+    ...seed,
+    timers,
+    assignment: opts.assignment,
+    ...(subStep ? { awaitedChild: subprocessChildId(seed.instanceId, 0, subStep.id) as NonNullable<Instance["awaitedChild"]> } : {}),
+  };
   // A timer the initial step declared but arming could not compute a fireAt for.
   // Recorded at seq 0 — creation advances no sequence, and an event records the
   // seq in force rather than advancing it.
@@ -1243,7 +1253,6 @@ export async function createInstance(
   //
   // This stays within the store's persistence-only remit: nothing is evaluated,
   // the row is a static function of the initial step and the instance id.
-  const subStep = initial?.type === "subprocess" ? initial : undefined;
   const spawn = subStep && {
     id: `action_spawn_${subStep.id}`,
     type: SPAWN_ACTION_TYPE,

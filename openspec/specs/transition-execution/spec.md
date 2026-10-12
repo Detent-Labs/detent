@@ -132,9 +132,15 @@ derive its `toStepId` or trigger list from an authored path.
 Every consequence of committing a transition onto a step SHALL apply to a
 synthesized transition identically to an authored one, because each is a function of
 the step being **entered** rather than of how it was entered: the instance's
-resulting `status`, the subprocess spawn, the subprocess return, the enqueue of the
-supplied actions, the appended `HistoryEntry`, the armed timer set, and the
-scheduling column.
+resulting `status`, the subprocess spawn, the subprocess return, the child a
+subprocess step awaits, the enqueue of the supplied actions, the appended
+`HistoryEntry`, the armed timer set, and the scheduling column.
+
+<!-- antislop: allow trailing-negation - the contrast between the step left and the step entered is the rule -->
+
+The cancellation of the child a commit leaves depends on the step **left**, not on
+the step entered. A timer-forced or migration transition enqueues it. A synthesized
+cancel commit omits it, because the sweep of running children covers it.
 
 This is scoped to transitions. Instance creation is a separate step-entry path that
 does not route through the shared commit and therefore does not inherit these
@@ -142,7 +148,8 @@ consequences generically; each one creation needs is reproduced there deliberate
 The subprocess spawn is reproduced: an instance created on a definition whose
 `initialStep` is a `subprocess` step SHALL have its spawn enqueued inside the
 creation transaction, carried by a `subprocess.spawn-enqueued` event rather than by
-a `HistoryEntry` (creation writes none). See the `subprocess-execution` and
+a `HistoryEntry` (creation writes none). The same creation SHALL record the child
+the step awaits, derived at sequence 0. See the `subprocess-execution` and
 `runtime-events` specs, which own that requirement. The remaining divergence —
 creation appends no `HistoryEntry` and advances no `transitionSeq` — is intrinsic to
 creation, not a gap.
@@ -160,6 +167,14 @@ parent parked on a subprocess step with no child.
 #### Scenario: Synthesized transition obeys optimistic concurrency
 - **WHEN** a synthesized transition is computed from `transitionSeq` N while another transition already committed at N+1
 - **THEN** the synthesized transition is rejected as a concurrency conflict and leaves no partial write
+
+#### Scenario: A synthesized transition off a subprocess step cancels its child
+- **WHEN** a timer-forced or migration transition leaves a subprocess step whose parent awaits a child
+- **THEN** the commit clears the awaited child and enqueues the child's cancellation
+
+#### Scenario: A cancel commit enqueues no leaving cancellation
+- **WHEN** a cancellation commits the parked parent onto the cancel sink
+- **THEN** the commit enqueues no child cancellation row, because the sweep of running children covers it
 
 #### Scenario: Synthesized transition to a terminal step completes on arm
 - **WHEN** a synthesized transition commits to a terminal target step
@@ -215,9 +230,9 @@ as inputs. Without them the `HistoryEntry` and the enqueued rows are unconstruct
 
 The execution step SHALL accept an optional field patch and write it to the instance
 row alongside its own fields, under the same optimistic-concurrency predicate. The
-ordinary path writes only the step, the sequence, the status and the timers; a caller
-that must also rewrite the instance's pin or payload supplies those here rather than
-issuing a second statement.
+ordinary path writes only the step, its entry time, the sequence, the status, the
+timers, the assignment and the awaited child; a caller that must also rewrite the
+instance's pin or payload supplies those here rather than issuing a second statement.
 
 The patch SHALL NOT override the fields the plan itself writes. A patch that set the
 sequence would leave the instance body disagreeing with the promoted sequence column
@@ -250,9 +265,10 @@ is the only thing that closes this.
 
 #### Scenario: No patch writes exactly the fields written before
 
+<!-- antislop: allow sentence-length - the THEN clause lists each field the row writes -->
 - **WHEN** a step entry is applied with no patch
-- **THEN** the instance row's step, sequence, status, timers and scheduling column are
-  written, and no other field is touched
+- **THEN** the instance row's step, entry time, sequence, status, timers, assignment,
+  awaited child and scheduling column are written, and no other field is touched
 
 ### Requirement: The resulting status is derived from the target step
 
@@ -314,24 +330,30 @@ overriding it, SHALL re-examine this.
 The planning step SHALL accept four further overrides, each defaulting to current
 behaviour:
 
+<!-- antislop: allow sentence-length - the suppression item names the carried-over child and the cleared child together -->
 - a **pre-computed armed timer set**, used in place of arming the target step. The
   scheduling column SHALL still be derived by the planner from the supplied set, so a
   caller cannot leave the two inconsistent.
 - the **definition version recorded** on the `HistoryEntry` and on any `timer.unarmed`
   events, defaulting to the instance's version.
 - **suppression of the subprocess spawn**, for a commit re-entering the step the
-  instance is already parked on.
+  instance is already parked on. A suppressed spawn onto a subprocess target also
+  carries the awaited child over, so the live child stays the one the parent waits
+  for. A suppressed spawn onto another step type clears it.
 - **additional events** to append in the commit transaction. A caller supplying its own
   timer set produces no drops of the planner's own but may have computed drops while
   deriving that set; without this channel it could only record them by mutating the
   returned plan.
 
+<!-- antislop: allow run-ons - the delta spec opens the unsuppressed case with a one-word lead-in -->
+
 Spawn suppression is not a convenience. The spawn's idempotency is keyed on the
 transition sequence — the child id derives from the parent instance, that sequence, and
 the step id, and the handler's guard is a lookup on that id. A commit re-entering the
-parked step advances the sequence, derives a **different** child id, misses the guard,
-and creates a second child alongside the live one. Idempotency protects the redelivery
-of one commit, not two commits onto one step.
+parked step advances the sequence and derives a **different** child id. Unsuppressed,
+it would cancel the live child as a left visit and spawn a replacement. A migration
+that keeps the parent on its step would then destroy the child's work. Idempotency
+protects the redelivery of one commit, not two commits onto one step.
 
 Suppression SHALL NOT be inferred from the target equalling the instance's current
 step: an authored self-loop is a real re-entry that must spawn. Whether a re-entry is
@@ -357,7 +379,14 @@ genuine is the caller's knowledge, so the decision is the caller's.
 #### Scenario: A suppressed spawn enqueues nothing
 
 - **WHEN** a step entry to a subprocess target is planned with the spawn suppressed
-- **THEN** no spawn row is enqueued
+- **THEN** no spawn row is enqueued, and the instance keeps its awaited child
+  with no cancellation row
+
+#### Scenario: An unsuppressed re-entry cancels the previous visit's child
+
+- **WHEN** a step entry re-enters a subprocess step without suppressing the spawn
+- **THEN** the plan records the new visit's child and enqueues the cancellation
+  of the previous visit's child
 
 #### Scenario: An unsuppressed re-entry derives a different child id
 

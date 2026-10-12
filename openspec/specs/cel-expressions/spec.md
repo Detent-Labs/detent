@@ -185,13 +185,13 @@ step and the view field, so an author can find it.
 
 It SHALL be checked in the scope the engine evaluates it in: `data`,
 `instance` and `actor`, with neither `result` nor `child`. That holds on a
-subprocess step too, which is the one place the surrounding view field's
-`visible`, `required` and `readonly` flags do get `child`. Those three flags
-resolve while a child instance can exist. A validation rule runs during
-submission, against `buildGuardContext(body, mergedInstance, actor)`, which
-registers no `child`. Checking it with `child` in scope would let an author
-publish a rule referencing an unbound name. That name is never bound at the
-moment the rule runs.
+subprocess step too. The surrounding view field's `visible`, `required` and
+`readonly` flags get no `child` either. The runtime resolves the flags while it
+renders the form, and the rule during submission. Both run against
+`buildGuardContext(body, instance, actor)`, which registers no `child`.
+Checking one of them with `child` in scope would let an author publish an
+expression referencing an unbound name. That name is never bound when the
+expression runs. A flag that read it would always evaluate to false.
 
 #### Scenario: A syntactically broken step-level rule is rejected
 
@@ -209,8 +209,14 @@ moment the rule runs.
 
 - **WHEN** a subprocess step's view field declares a `validation.rule`
   referencing `child`
-- **THEN** publish fails, even though the same step's `visible`, `required`
-  and `readonly` expressions may reference `child`
+- **THEN** publish fails
+
+#### Scenario: A view flag referencing child is rejected on a subprocess step
+
+- **WHEN** a subprocess step's view entry declares a `visible`, `required` or
+  `readonly` expression referencing `child.outcome` or `child.data`
+- **THEN** publish fails and names the unknown reference, because the runtime
+  resolves the flag with no child in scope
 
 #### Scenario: A step-level rule referencing result is rejected
 

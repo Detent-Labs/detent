@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { overrideMode } from "../src/areas/studio/panels/shared/overrideMode.js";
 
-const expr = { lang: "cel" as const, src: 'child.outcome == "approved"' };
+const expr = { lang: "cel" as const, src: "data.amount > 1.0" };
 
 describe("overrideMode", () => {
   it("shows CEL while the builder writes nothing, so a first row survives", () => {

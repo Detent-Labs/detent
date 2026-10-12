@@ -30,10 +30,11 @@ this check from a published body at all — so removing the exemption costs
 nothing and removes a second layer that would have to be re-argued if any
 other path ever produced one.
 
-The engine's two internal handlers (`SPAWN_ACTION_TYPE`, `RETURN_ACTION_TYPE`)
-SHALL declare `configSchema`s describing the config they are actually
-dispatched with, so that a config reaching them is shape-checked rather than
-accepted as author-controlled `unknown`.
+The engine's three internal handlers (`SPAWN_ACTION_TYPE`, `RETURN_ACTION_TYPE`
+and `CANCEL_CHILD_ACTION_TYPE`) SHALL declare `configSchema`s. Each schema
+describes the config its handler is actually dispatched with. A config reaching
+them is then shape-checked. The registry no longer accepts it as
+author-controlled `unknown`.
 
 #### Scenario: An action with a registered type passes
 
@@ -67,8 +68,9 @@ accepted as author-controlled `unknown`.
 
 - **WHEN** the subprocess handlers are registered
 - **THEN** the spawn handler declares a `configSchema` for
-  `{ subprocessStepId, parentSeq }` and the return handler one for
-  `{ parentInstanceId, childOutcome }`
+  `{ subprocessStepId, parentSeq }`, the return handler one for
+  `{ parentInstanceId, childOutcome }`, and the cancel handler one for
+  `{ childId }`
 
 ### Requirement: A resolved action's config is checked against its handler's schema
 

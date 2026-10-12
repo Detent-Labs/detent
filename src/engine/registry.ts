@@ -72,12 +72,15 @@ export interface HandlerDef {
  * Engine-owned action types (reserved `core.` prefix, rejected in authored
  * bodies). Enqueued by the step-entry paths (planStepEntry on a transition,
  * createInstance at a subprocess initial step) and handled by the internal
- * handlers registered in subprocess.ts. Homed in this leaf module — it imports
- * only zod types and the schema — so store.ts and transition.ts can both name
- * them without an import cycle; transition.ts re-exports them.
+ * handlers registered in subprocess.ts. The cancel type is enqueued by a
+ * commit that leaves a subprocess step: it cancels the child the parent
+ * awaited. Homed in this leaf module — it imports only zod types and the
+ * schema — so store.ts and transition.ts can name them without an import
+ * cycle; transition.ts re-exports them.
  */
 export const SPAWN_ACTION_TYPE = "core.spawnSubprocess";
 export const RETURN_ACTION_TYPE = "core.returnSubprocess";
+export const CANCEL_CHILD_ACTION_TYPE = "core.cancelSubprocessChild";
 
 /**
  * The `process.start` action type, homed here for the same reason as the
