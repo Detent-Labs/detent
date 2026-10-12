@@ -22,6 +22,43 @@ test("the document declares at least the customer-facing paths", () => {
   expect(documentedPaths.length).toBeGreaterThan(10);
 });
 
+/** `:name` and `{name}` segments both become `{}`, so the spec and the document compare. */
+const normalise = (path: string) => path.replace(/:\w+|\{\w+\}/g, "{}");
+
+/** Path key (normalised) to its method keys: the four-space-indented `    get:` lines under it. */
+const documentedMethods = new Map<string, Set<string>>();
+{
+  let current: Set<string> | undefined;
+  for (const line of DOC.split("\n")) {
+    const path = /^ {2}(\/[^\s:]*):/.exec(line);
+    if (path) {
+      current = documentedMethods.get(normalise(path[1]!)) ?? new Set<string>();
+      documentedMethods.set(normalise(path[1]!), current);
+      continue;
+    }
+    const method = /^ {4}(get|put|post|delete|patch):/.exec(line);
+    if (method && current) current.add(method[1]!.toUpperCase());
+  }
+}
+
+test("every route the spec requires is documented under its path and method", async () => {
+  const spec = await Bun.file(new URL("../openspec/specs/http-api-documentation/spec.md", import.meta.url)).text();
+  const start = spec.indexOf("It SHALL describe every route");
+  const end = spec.indexOf("It SHALL NOT", start);
+  expect(start).toBeGreaterThanOrEqual(0);
+  expect(end).toBeGreaterThan(start);
+  const required = [...spec.slice(start, end).matchAll(/`(GET|PUT|POST|DELETE|PATCH)\s+(\/[^`\s]*)`/g)].map(
+    (m) => `${m[1]} ${normalise(m[2]!)}`,
+  );
+  // A paragraph that yields no pair would make the check below vacuous.
+  expect(required.length).toBeGreaterThan(0);
+  const missing = required.filter((route) => {
+    const [method, path] = route.split(" ") as [string, string];
+    return !documentedMethods.get(path)?.has(method);
+  });
+  expect(missing).toEqual([]);
+});
+
 test("the public override read is documented, and its two admin siblings are not", () => {
   // A route any caller can reach without a token belongs in one list or the
   // other. Omitting it would read as an oversight rather than as a decision.

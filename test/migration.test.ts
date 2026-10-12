@@ -242,8 +242,11 @@ test.skipIf(!DB)("freezing is per key", async () => {
   await registerMigrationPlan(p as Instance["processId"], 1, 4, {} as MigrationSpec);
   await registerMigrationPlan(p as Instance["processId"], 2, 4, {} as MigrationSpec);
   await migrateInstances(p as Instance["processId"], 1, 4, sql); // applies (1->4) only
-  // (2->4) unapplied, still replaceable.
+  // (1->4) is frozen, so registering it again is refused.
+  await expectReject(registerMigrationPlan(p as Instance["processId"], 1, 4, {} as MigrationSpec), /already applied/);
+  // (2->4) unapplied, still replaceable: the new spec replaces the old one.
   await registerMigrationPlan(p as Instance["processId"], 2, 4, { transforms: {} } as MigrationSpec);
+  expect((await resolveMigrationPlan(p as Instance["processId"], 2, 4))!.spec).toEqual({ transforms: {} });
 });
 
 test.skipIf(!DB)("a registration racing an invocation cannot leave the frozen spec disagreeing with what was applied", async () => {
