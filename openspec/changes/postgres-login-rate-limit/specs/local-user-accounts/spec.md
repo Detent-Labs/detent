@@ -146,6 +146,13 @@ rather than exempting it from the window.
 - **THEN** the per-address window counts against the last entry, so the value
   the caller picked changes nothing
 
+#### Scenario: An email of 5000 characters is an ordinary wrong password
+
+- **WHEN** `POST /auth/login` receives an email of 5000 characters with a wrong
+  password
+- **THEN** the response is the existing generic `401`
+- **AND** the request counts toward that email's window like any other
+
 #### Scenario: Two processes share one count
 
 - **WHEN** two server processes of one tenant together receive
@@ -187,9 +194,9 @@ expiry.
 
 ### Requirement: The rate-limit table drops expired rows
 
-The rate-limit table SHALL NOT keep a row whose window ended more than
-`WINDOW_MS` ago. Each check of a window SHALL delete such rows. An ended row
-has no information, since its next use would start a new window.
+Each login request SHALL delete every row whose window has ended, before it
+checks a window. An ended row has no information, since its next use would
+start a new window.
 
 #### Scenario: An ended window leaves no row behind
 

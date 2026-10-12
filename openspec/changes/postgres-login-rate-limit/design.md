@@ -64,7 +64,7 @@ It would only couple the tenants.
 ```
 login_attempts (
   scope        text        NOT NULL,   -- 'email' or 'address'
-  key          text        NOT NULL,   -- normalized email, or caller address
+  key          text        NOT NULL,   -- SHA-256 hex of the normalized email, or of the caller address
   attempts     integer     NOT NULL,
   window_start timestamptz NOT NULL,
   PRIMARY KEY (scope, key)
@@ -73,6 +73,10 @@ login_attempts (
 
 plus an index on `window_start` for the cleanup. Two tables would repeat one
 shape. Separate `email` and `address` columns would need a partial key.
+
+The key is a digest because an email has no length bound. A long value would
+exceed the index row limit and answer `500`, where `verifyLogin` answers `401`.
+The digest also keeps plaintext emails out of the table.
 
 `scope` carries no `CHECK`. Only `src/auth/login.ts` writes the table, with
 two literals.
