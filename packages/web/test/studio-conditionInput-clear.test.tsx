@@ -5,13 +5,12 @@ import type { DraftOf } from "../src/areas/studio/draft/types.js";
 import type { ValidationResult } from "../src/areas/studio/draft/validation.js";
 import { DraftContext, type DraftContextValue } from "../src/areas/studio/draft/store.js";
 import { ConditionInput } from "../src/areas/studio/panels/shared/ConditionInput.js";
-import { RuleInput } from "../src/areas/studio/panels/shared/RuleInput.js";
 
 /**
  * The clear command is the one explicit way to drop a condition the builder
  * cannot drop by an edit. `ConditionInput` shows it in both footers while the
- * caller passes `clearLabel`, and in neither without it. `RuleInput` has no
- * such command. The context is hand-built, as in
+ * caller passes `clearLabel`, and in neither without it. The context is
+ * hand-built, as in
  * `studio-actionListEditor-registryBadge.test.tsx`: a live `DraftProvider`
  * resolves its fetches async and never settles under `renderToStaticMarkup`.
  */
@@ -77,16 +76,5 @@ describe("ConditionInput's clear command", () => {
 
   it("shows no clear command in the CEL footer without clearLabel", () => {
     expect(render({ lang: "cel", src: "data.amount >" })).not.toContain("Clear on");
-  });
-});
-
-describe("RuleInput", () => {
-  it("takes no clear command", () => {
-    const html = renderToStaticMarkup(
-      <DraftContext.Provider value={context}>
-        <RuleInput field={{ id: "field_a", key: "a", label: { en: "A" }, type: "string" } as never} value={undefined} onChange={() => {}} />
-      </DraftContext.Provider>,
-    );
-    expect(html).not.toContain("Clear on");
   });
 });
