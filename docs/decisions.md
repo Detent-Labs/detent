@@ -1678,12 +1678,6 @@ of `5f41cd8a`. Each fix change deletes its own entries in the commit that
 archives it, and `sweep-docs-drift-2026-10` re-points the line citations of
 other entries. C-4 merges D-2, and C-6 merges F-6.
 
-- **`fix-handler-assignment-registry` (B-3, B-14; high)**: The handlers
-  `process.start` and `instance.transition` resolve assignments with the
-  static strategy alone, through a second function named
-  `createDefaultAssignmentRegistry`. Anchors:
-  `src/handlers/process-start.ts`, `src/handlers/instance-transition.ts`,
-  `src/engine/assignment-strategies.ts`.
 - **`tighten-publish-contract-checks` (A-2, A-8; medium)**: The idempotent
   compile branch accepts a hand-written cancel sink of any shape, and publish
   stores `Action.execution` and `Action.idempotencyKey`, which nothing reads.

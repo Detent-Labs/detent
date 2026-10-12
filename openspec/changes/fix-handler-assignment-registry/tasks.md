@@ -25,8 +25,8 @@
 
 ## 4. Documentation and index
 
-- [ ] 4.1 Run `git grep -n "createDefaultAssignmentRegistry\|HandlerContext" -- docs .claude README.md`. Edit each hit that names the wrong factory or lacks the new field. Verify that the grep shows only correct uses.
-- [ ] 4.2 Delete the `fix-handler-assignment-registry` entry from the audit index in `docs/decisions.md`. Verify with `git grep -n "fix-handler-assignment-registry" -- docs/decisions.md`.
+- [x] 4.1 Run `git grep -n "createDefaultAssignmentRegistry\|HandlerContext" -- docs .claude README.md`. Edit each hit that names the wrong factory or lacks the new field. Verify that the grep shows only correct uses.
+- [x] 4.2 Delete the `fix-handler-assignment-registry` entry from the audit index in `docs/decisions.md`. Verify with `git grep -n "fix-handler-assignment-registry" -- docs/decisions.md`.
 
 ## 5. Verification
 
