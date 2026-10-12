@@ -226,6 +226,16 @@ test.skipIf(!DB)("2.2 the owner can hand over ownership with a list that leaves 
   expect(updated?.editors).toEqual([editorActor.id]);
 });
 
+test.skipIf(!DB)("2.2 an editor can take ownership while the former owner stays an editor", async () => {
+  const PID = pid("owner_invariant_takeover_keep");
+  await publishBody(PID, reportBody("owner4b", []), reg, dataSourceReg);
+  const created = await createReport(owner, { processId: PID, name: "R", editors: [editorActor.id] }, sql);
+
+  const updated = await updateReport(created.reportId, editorActor, { owner: editorActor.id, editors: [owner.id, editorActor.id] }, sql);
+  expect(updated?.owner).toBe(editorActor.id);
+  expect(updated?.editors).toContain(owner.id);
+});
+
 test.skipIf(!DB)("2.2 a new owner outside the current editors is rejected even when the same update adds them", async () => {
   const PID = pid("owner_invariant_new_owner");
   await publishBody(PID, reportBody("owner5", []), reg, dataSourceReg);

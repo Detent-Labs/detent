@@ -112,13 +112,41 @@ test("a merge cell holding a formula-like string gets the prefix", () => {
   expect(reportResultToCsv(result).split("\r\n")[1]).toBe("'-5");
 });
 
-test("the three empty-cell markers and the header carry no prefix", () => {
+test("the three empty-cell markers carry no prefix", () => {
   const result: ReportExecutionResult = {
-    columns: [{ type: "field", fieldId: "_x" as FieldId }],
-    rows: [{ instanceId: "inst_1" as InstanceId, cells: [{ kind: "no-value" }] }],
+    columns: [{ type: "field", fieldId: "a" as FieldId }, { type: "field", fieldId: "b" as FieldId }, { type: "field", fieldId: "c" as FieldId }],
+    rows: [{ instanceId: "inst_1" as InstanceId, cells: [{ kind: "no-value" }, { kind: "not-in-version" }, { kind: "redacted" }] }],
     truncated: false,
   };
-  expect(reportResultToCsv(result)).toBe("_x\r\n(no value)\r\n");
+  expect(reportResultToCsv(result)).toBe("a,b,c\r\n(no value),(not in this version),(redacted)\r\n");
+});
+
+test("a list value exports as text and gets the prefix when its first item starts a formula", () => {
+  const result: ReportExecutionResult = {
+    columns: [{ type: "field", fieldId: "tags" as FieldId }],
+    rows: [
+      { instanceId: "inst_1" as InstanceId, cells: [{ kind: "value", value: ["=1+1", "x"] }] },
+      { instanceId: "inst_2" as InstanceId, cells: [{ kind: "value", value: ["safe", "=1+1"] }] },
+      { instanceId: "inst_3" as InstanceId, cells: [{ kind: "value", value: ["=1+1"] }] },
+    ],
+    truncated: false,
+  };
+  const lines = reportResultToCsv(result).split("\r\n");
+  expect(lines[1]).toBe(`"'=1+1,x"`);
+  expect(lines[2]).toBe(`"safe,=1+1"`);
+  expect(lines[3]).toBe("'=1+1");
+});
+
+test("a number and a boolean stay raw even when their text starts with a formula character", () => {
+  const result: ReportExecutionResult = {
+    columns: [{ type: "field", fieldId: "v" as FieldId }],
+    rows: [
+      { instanceId: "inst_1" as InstanceId, cells: [{ kind: "value", value: -5 }] },
+      { instanceId: "inst_2" as InstanceId, cells: [{ kind: "value", value: false }] },
+    ],
+    truncated: false,
+  };
+  expect(reportResultToCsv(result)).toBe("v\r\n-5\r\nfalse\r\n");
 });
 
 test("a truncated result ends with the marker line, padded to the column count", () => {

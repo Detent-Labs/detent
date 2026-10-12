@@ -61,10 +61,15 @@ export type ReportInput = {
 
 export type ReportPatch = Partial<Pick<ReportInput, "name" | "query" | "columns" | "viewers" | "editors">> & { owner?: string };
 
-/** Thrown by `updateReport` when a patch would leave the owner out of `editors` — see the "owner cannot be removed from editors" requirement. */
+/**
+ * Thrown by `updateReport` in three cases: the patched `editors` leave out the
+ * resulting owner, the patch names a new owner outside the current `editors`,
+ * or a non-owner actor's `editors` drop the current owner. See the
+ * "owner cannot be removed from editors" and "update cannot displace the current owner" requirements.
+ */
 export class ReportOwnerInvariantError extends Error {
   constructor(reportId: string) {
-    super(`report '${reportId}' must keep its owner in its editors list`);
+    super(`report '${reportId}' must keep its owner in its editors, a new owner must already be an editor, and only the owner may remove the owner from editors`);
     this.name = "ReportOwnerInvariantError";
   }
 }
@@ -476,9 +481,13 @@ function csvColumnHeader(c: ReportResultColumn): string {
  */
 function csvCellText(cell: ReportCell | MergeReportCell): string {
   switch (cell.kind) {
-    case "value":
+    case "value": {
       if (cell.value === null) return "";
-      return typeof cell.value === "string" && CSV_FORMULA_START.test(cell.value) ? `'${cell.value}` : String(cell.value);
+      const text = String(cell.value);
+      // A number or boolean keeps its raw text; a string or a list (joined by `String`) is text.
+      const isText = typeof cell.value !== "number" && typeof cell.value !== "boolean";
+      return isText && CSV_FORMULA_START.test(text) ? `'${text}` : text;
+    }
     case "no-value":
       return CSV_NO_VALUE;
     case "not-in-version":
@@ -492,8 +501,8 @@ function csvCellText(cell: ReportCell | MergeReportCell): string {
  * The CSV twin of `ReportTable.tsx`: one header row naming each column, one
  * row per instance. Pure and I/O-free, so a `bun:test` unit test covers the
  * three-way marker text with no database — see `csv-download-report-table`'s
- * design.md. A string value cell that starts with a formula character gets a
- * leading apostrophe; a number keeps its sign. A truncated result ends with
+ * design.md. A text or list value cell that starts with a formula character
+ * gets a leading apostrophe; a number or boolean keeps its raw text. A truncated result ends with
  * one marker line: the text in the first column, the others empty.
  */
 export function reportResultToCsv(result: ReportExecutionResult): string {
