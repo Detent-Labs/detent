@@ -9,11 +9,11 @@
 
 ## 2. form-ui: null, read-only switch, datetime and announcement
 
-- [ ] 2.1 Map a cleared number, text, date, email, multiline or single select to `null` in `FieldForm`. Unit tests cover the mapping.
-- [ ] 2.2 Add the `readonly` prop to `FieldForm` and export `formIsReadonly` from `submit.ts`. A static render test and a helper test cover both.
-- [ ] 2.3 Convert a zoned `datetime` value to the local input format. Tests cover `Z`, an offset, a zoneless value and a bad value.
-- [ ] 2.4 Fill both placeholders of `tabSwitchAnnouncement` in one pass with a replacer. Tests cover `Kosten $&` and a label of `{count}`.
-- [ ] 2.5 Test in `packages/form-ui/test/submit.test.ts` that `filterToEditable` keeps a `null` value.
+- [x] 2.1 Map a cleared number, text, date, email, multiline or single select to `null` in `FieldForm`. Unit tests cover the mapping.
+- [x] 2.2 Add the `readonly` prop to `FieldForm` and export `formIsReadonly` from `submit.ts`. A static render test and a helper test cover both.
+- [x] 2.3 Convert a zoned `datetime` value to the local input format. Tests cover `Z`, an offset, a zoneless value and a bad value.
+- [x] 2.4 Fill both placeholders of `tabSwitchAnnouncement` in one pass with a replacer. Tests cover `Kosten $&` and a label of `{count}`.
+- [x] 2.5 Test in `packages/form-ui/test/submit.test.ts` that `filterToEditable` keeps a `null` value.
 
 ## 3. React peer range
 
