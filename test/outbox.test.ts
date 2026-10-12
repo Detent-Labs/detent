@@ -402,7 +402,7 @@ test.skipIf(!DB)("a row that keeps failing exhausts attempts and dead-letters", 
 // --- egress policy: a refused host dead-letters, a permitted one does not ---
 
 /** step_a --(path_ab, manual, guardless)--> step_b terminal (onEntry: one http.request action against `url`). */
-const httpActionBody = (url: string): ProcessBody =>
+const httpActionBody = (url: string, headers?: Record<string, unknown>): ProcessBody =>
   ({
     baseLocale: "en",
     fields: [],
@@ -412,7 +412,7 @@ const httpActionBody = (url: string): ProcessBody =>
         { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }] },
         {
           id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true,
-          onEntry: [{ id: "action_egress", type: HTTP_ACTION_TYPE, config: { url, method: "POST" } } as unknown as Action],
+          onEntry: [{ id: "action_egress", type: HTTP_ACTION_TYPE, config: { url, method: "POST", ...(headers ? { headers } : {}) } } as unknown as Action],
         },
       ],
     },
@@ -451,6 +451,52 @@ test.skipIf(!DB)("an http.request action against an allowlisted host does not de
   const r = await rows(inst.instanceId);
   expect(r).toHaveLength(1);
   expect(r[0]!.status).not.toBe("dead-letter");
+});
+
+test.skipIf(!DB)("an environment reference stays a reference in the outbox row and resolves on the wire at delivery", async () => {
+  const secret = "sk_live_outbox_1";
+  const seen: (string | null)[] = [];
+  const server = Bun.serve({
+    port: 0,
+    fetch: (req) => {
+      seen.push(req.headers.get("authorization"));
+      return new Response("{}", { headers: { "Content-Type": "application/json" } });
+    },
+  });
+  try {
+    const body = httpActionBody(`http://localhost:${server.port}/hook`, { Authorization: { env: "TEST_PARTNER_TOKEN" } });
+    const inst = await createFrom(body);
+    await withEnv(
+      {
+        HTTP_ACTION_ALLOWED_HOSTS: `localhost:${server.port}`,
+        HTTP_ACTION_ALLOW_INSECURE: "1",
+        HTTP_SECRET_ENV_ALLOWLIST: "TEST_PARTNER_TOKEN",
+        TEST_PARTNER_TOKEN: secret,
+      },
+      async () => {
+        await executeManualTransition(inst, "path_ab", body, actor);
+
+        // Before delivery the row holds the reference, and the secret text is in no column.
+        const stored = (await sql`SELECT action->'config'->'headers'->'Authorization' AS ref, outbox::text AS everything
+          FROM outbox WHERE instance_id = ${inst.instanceId}`) as { ref: unknown; everything: string }[];
+        expect(stored).toHaveLength(1);
+        expect(typeof stored[0]!.ref === "string" ? JSON.parse(stored[0]!.ref) : stored[0]!.ref).toEqual({ env: "TEST_PARTNER_TOKEN" });
+        expect(stored[0]!.everything).not.toContain(secret);
+
+        expect(await drainOutbox(sql, reg)).toBe(1);
+      },
+    );
+
+    expect(seen).toEqual([secret]);
+    const after = (await sql`SELECT status, outbox::text AS everything FROM outbox WHERE instance_id = ${inst.instanceId}`) as {
+      status: string;
+      everything: string;
+    }[];
+    expect(after[0]!.status).toBe("delivered");
+    expect(after[0]!.everything).not.toContain(secret);
+  } finally {
+    server.stop(true);
+  }
 });
 
 // --- the per-row boundary ---

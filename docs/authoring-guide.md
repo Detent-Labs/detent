@@ -877,6 +877,35 @@ deployment opted into plain HTTP. And the handler does not follow a redirect:
 a target that answers `301` or `302` dead-letters with that status. Point the
 action at the final address instead.
 
+A header may need a credential. Do not type it into the process. A definition
+is immutable once published, and every outbox row copies the action. Write a
+reference in its place:
+
+```json
+{
+  "type": "http.request",
+  "config": {
+    "url": "https://api.example.com/bookings",
+    "method": "POST",
+    "headers": {
+      "Authorization": { "env": "PARTNER_API_TOKEN" }
+    }
+  }
+}
+```
+
+The reference replaces the whole header value. Your operator stores the full
+value in that variable, `Bearer ` prefix included, and lists the name in the
+deployment. You never see or store the value. A rotation keeps the same version.
+
+A name outside the list dead-letters the action. So does a variable that is
+unset, empty, or holds a character a header cannot carry. The message names the
+variable. Ask your operator to fix it.
+
+The reference works in header values only. A `url` or a `body` takes no
+reference. A `{ "env": ... }` object inside a `body` is plain data and goes out
+as written.
+
 ### Timer
 
 A clock on a step. It carries a `duration` or a `deadline`, never both. The

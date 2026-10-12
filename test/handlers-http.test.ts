@@ -20,7 +20,8 @@ import { createRegistry, createStaticAssignmentRegistry, type HandlerContext } f
 
 /** http.request reads no database, so a stand-in handle satisfies the required field. */
 const noDb = (() => Promise.resolve([])) as unknown as SQL;
-import type { Action } from "../src/schema/definition.js";
+import { checkActionRegistry } from "../src/engine/registry-check.js";
+import type { Action, ProcessBody } from "../src/schema/definition.js";
 
 type CapturedRequest = { method: string; headers: Record<string, string>; bodyText: string };
 
@@ -88,12 +89,16 @@ const jsonResponse = (body: unknown, status = 200) =>
 const action = (config: Record<string, unknown>, timeout?: string): Action =>
   ({ id: "action_http", type: HTTP_ACTION_TYPE, config, ...(timeout ? { timeout } : {}) }) as unknown as Action;
 
-const ctxFor = (config: Record<string, unknown>, opts: { idempotencyKey?: string; timeout?: string } = {}): HandlerContext => ({
+const ctxFor = (
+  config: Record<string, unknown>,
+  opts: { idempotencyKey?: string; timeout?: string; tenant?: string } = {},
+): HandlerContext => ({
   action: action(config, opts.timeout),
   config,
   idempotencyKey: opts.idempotencyKey ?? "idem_1",
   instanceId: "inst_1",
   db: noDb,
+  ...(opts.tenant !== undefined ? { tenant: opts.tenant } : {}),
   assignmentRegistry: createStaticAssignmentRegistry(),
 });
 
@@ -479,4 +484,264 @@ test("a config.headers entry named Idempotency-Key (any casing) fails schema val
 test("a well-formed config passes schema validation", () => {
   const result = httpConfigSchema.safeParse({ url: "http://example.com", method: "POST", headers: { "X-A": "1" }, body: { a: 1 } });
   expect(result.success).toBe(true);
+});
+
+// --- environment references in headers ---------------------------------------------
+
+const SECRET_REF = { Authorization: { env: "PARTNER_API_TOKEN" } };
+
+/** Runs `fn` with console output captured, so a case can prove a value reached no log line. */
+async function capturingConsole<T>(fn: () => Promise<T>): Promise<{ result: T; output: string }> {
+  const lines: string[] = [];
+  const methods = ["log", "info", "warn", "error", "debug"] as const;
+  const originals = methods.map((m) => console[m]);
+  for (const m of methods) console[m] = (...args: unknown[]) => void lines.push(args.map(String).join(" "));
+  try {
+    return { result: await fn(), output: lines.join("\n") };
+  } finally {
+    methods.forEach((m, i) => (console[m] = originals[i]!));
+  }
+}
+
+test("a header reference resolves to the variable's value at delivery", async () => {
+  await withServer(
+    () => jsonResponse({}),
+    async (url, requests) => {
+      await withEnv({ HTTP_SECRET_ENV_ALLOWLIST: "PARTNER_API_TOKEN", PARTNER_API_TOKEN: "sk_live_1" }, () =>
+        httpHandlerDef.handler(ctxFor({ url, headers: SECRET_REF })),
+      );
+      expect(requests).toHaveLength(1);
+      expect(requests[0]!.headers["authorization"]).toBe("sk_live_1");
+    },
+  );
+});
+
+test("a name outside HTTP_SECRET_ENV_ALLOWLIST is refused permanently, and no request leaves", async () => {
+  await withServer(
+    () => jsonResponse({}),
+    async (url, requests) => {
+      const err = await withEnv(
+        { HTTP_SECRET_ENV_ALLOWLIST: "PARTNER_API_TOKEN", AUTH_JWT_SECRET: "jwt_secret_value" },
+        () => rejects(httpHandlerDef.handler(ctxFor({ url, headers: { Authorization: { env: "AUTH_JWT_SECRET" } } }))),
+      );
+      expect(err).toBeInstanceOf(PermanentError);
+      expect((err as Error).message).toContain("AUTH_JWT_SECRET");
+      expect((err as Error).message).not.toContain("jwt_secret_value");
+      expect(requests).toHaveLength(0);
+    },
+  );
+});
+
+test("an unset or empty HTTP_SECRET_ENV_ALLOWLIST refuses every reference", async () => {
+  await withServer(
+    () => jsonResponse({}),
+    async (url, requests) => {
+      for (const list of [undefined, "", " , "]) {
+        const err = await withEnv({ HTTP_SECRET_ENV_ALLOWLIST: list, PARTNER_API_TOKEN: "sk_live_1" }, () =>
+          rejects(httpHandlerDef.handler(ctxFor({ url, headers: SECRET_REF }))),
+        );
+        expect(err).toBeInstanceOf(PermanentError);
+        expect((err as Error).message).toContain("PARTNER_API_TOKEN");
+      }
+      expect(requests).toHaveLength(0);
+    },
+  );
+});
+
+test("a list entry survives surrounding space", async () => {
+  await withServer(
+    () => jsonResponse({}),
+    async (url, requests) => {
+      await withEnv({ HTTP_SECRET_ENV_ALLOWLIST: " OTHER_TOKEN , PARTNER_API_TOKEN ", PARTNER_API_TOKEN: "sk_live_1" }, () =>
+        httpHandlerDef.handler(ctxFor({ url, headers: SECRET_REF })),
+      );
+      expect(requests[0]!.headers["authorization"]).toBe("sk_live_1");
+    },
+  );
+});
+
+test("a list entry differing only in case does not match, and no request leaves", async () => {
+  await withServer(
+    () => jsonResponse({}),
+    async (url, requests) => {
+      const err = await withEnv({ HTTP_SECRET_ENV_ALLOWLIST: "partner_api_token", PARTNER_API_TOKEN: "sk_live_1" }, () =>
+        rejects(httpHandlerDef.handler(ctxFor({ url, headers: SECRET_REF }))),
+      );
+      expect(err).toBeInstanceOf(PermanentError);
+      expect((err as Error).message).toContain("PARTNER_API_TOKEN");
+      expect((err as Error).message).not.toContain("sk_live_1");
+      expect(requests).toHaveLength(0);
+    },
+  );
+});
+
+test("an entry that names a tenant matches nothing in a deployment with one tenant", async () => {
+  await withServer(
+    () => jsonResponse({}),
+    async (url, requests) => {
+      const err = await withEnv(
+        { HTTP_SECRET_ENV_ALLOWLIST: "acme:PARTNER_API_TOKEN", PARTNER_API_TOKEN: "sk_live_1" },
+        () => rejects(httpHandlerDef.handler(ctxFor({ url, headers: SECRET_REF }))),
+      );
+      expect(err).toBeInstanceOf(PermanentError);
+      expect(requests).toHaveLength(0);
+    },
+  );
+});
+
+test("in a deployment with many tenants a tenant:NAME entry serves that tenant only", async () => {
+  await withServer(
+    () => jsonResponse({}),
+    async (url, requests) => {
+      await withEnv({ HTTP_SECRET_ENV_ALLOWLIST: "acme:PARTNER_API_TOKEN", PARTNER_API_TOKEN: "sk_live_1" }, async () => {
+        await httpHandlerDef.handler(ctxFor({ url, headers: SECRET_REF }, { tenant: "acme" }));
+        expect(requests.map((r) => r.headers["authorization"])).toEqual(["sk_live_1"]);
+
+        const err = await rejects(httpHandlerDef.handler(ctxFor({ url, headers: SECRET_REF }, { tenant: "beta" })));
+        expect(err).toBeInstanceOf(PermanentError);
+        expect((err as Error).message).toContain("PARTNER_API_TOKEN");
+        expect((err as Error).message).not.toContain("sk_live_1");
+        expect(requests).toHaveLength(1);
+      });
+    },
+  );
+});
+
+test("in a deployment with many tenants an unscoped entry refuses every tenant", async () => {
+  await withServer(
+    () => jsonResponse({}),
+    async (url, requests) => {
+      await withEnv({ HTTP_SECRET_ENV_ALLOWLIST: "PARTNER_API_TOKEN", PARTNER_API_TOKEN: "sk_live_1" }, async () => {
+        for (const tenant of ["acme", "beta"]) {
+          const err = await rejects(httpHandlerDef.handler(ctxFor({ url, headers: SECRET_REF }, { tenant })));
+          expect(err).toBeInstanceOf(PermanentError);
+        }
+      });
+      expect(requests).toHaveLength(0);
+    },
+  );
+});
+
+test("a list holding scoped and unscoped entries serves each deployment form its own", async () => {
+  await withServer(
+    () => jsonResponse({}),
+    async (url, requests) => {
+      await withEnv({ HTTP_SECRET_ENV_ALLOWLIST: "acme:PARTNER_API_TOKEN,OTHER_TOKEN", PARTNER_API_TOKEN: "sk_live_1", OTHER_TOKEN: "sk_live_2" }, async () => {
+        await httpHandlerDef.handler(ctxFor({ url, headers: SECRET_REF }, { tenant: "acme" }));
+        await rejects(httpHandlerDef.handler(ctxFor({ url, headers: { Authorization: { env: "OTHER_TOKEN" } } }, { tenant: "acme" })));
+        // An empty tenant key reads as no tenant: the unscoped form applies.
+        await httpHandlerDef.handler(ctxFor({ url, headers: { Authorization: { env: "OTHER_TOKEN" } } }, { tenant: "" }));
+        await rejects(httpHandlerDef.handler(ctxFor({ url, headers: SECRET_REF })));
+      });
+      expect(requests.map((r) => r.headers["authorization"])).toEqual(["sk_live_1", "sk_live_2"]);
+    },
+  );
+});
+
+test("an unset variable named in the list fails permanently, and no request leaves", async () => {
+  await withServer(
+    () => jsonResponse({}),
+    async (url, requests) => {
+      const err = await withEnv({ HTTP_SECRET_ENV_ALLOWLIST: "PARTNER_API_TOKEN", PARTNER_API_TOKEN: undefined }, () =>
+        rejects(httpHandlerDef.handler(ctxFor({ url, headers: SECRET_REF }))),
+      );
+      expect(err).toBeInstanceOf(PermanentError);
+      expect((err as Error).message).toContain("PARTNER_API_TOKEN");
+      expect(requests).toHaveLength(0);
+    },
+  );
+});
+
+test("an empty variable fails permanently, as an unset one does", async () => {
+  await withServer(
+    () => jsonResponse({}),
+    async (url, requests) => {
+      const err = await withEnv({ HTTP_SECRET_ENV_ALLOWLIST: "PARTNER_API_TOKEN", PARTNER_API_TOKEN: "" }, () =>
+        rejects(httpHandlerDef.handler(ctxFor({ url, headers: SECRET_REF }))),
+      );
+      expect(err).toBeInstanceOf(PermanentError);
+      expect((err as Error).message).toContain("PARTNER_API_TOKEN");
+      expect(requests).toHaveLength(0);
+    },
+  );
+});
+
+test("a variable holding only spaces fails permanently as empty, and no request leaves", async () => {
+  await withServer(
+    () => jsonResponse({}),
+    async (url, requests) => {
+      const err = await withEnv({ HTTP_SECRET_ENV_ALLOWLIST: "PARTNER_API_TOKEN", PARTNER_API_TOKEN: "   " }, () =>
+        rejects(httpHandlerDef.handler(ctxFor({ url, headers: SECRET_REF }))),
+      );
+      expect(err).toBeInstanceOf(PermanentError);
+      expect((err as Error).message).toContain("PARTNER_API_TOKEN");
+      expect((err as Error).message).toContain("which is empty");
+      expect(requests).toHaveLength(0);
+    },
+  );
+});
+
+test("a value with a line break fails permanently, and the value reaches no message and no log line", async () => {
+  await withServer(
+    () => jsonResponse({}),
+    async (url, requests) => {
+      const { result: err, output } = await capturingConsole(() =>
+        withEnv({ HTTP_SECRET_ENV_ALLOWLIST: "PARTNER_API_TOKEN", PARTNER_API_TOKEN: "sk_live_1\nX-Injected: 1" }, () =>
+          rejects(httpHandlerDef.handler(ctxFor({ url, headers: SECRET_REF }))),
+        ),
+      );
+      expect(err).toBeInstanceOf(PermanentError);
+      expect((err as Error).message).toContain("PARTNER_API_TOKEN");
+      expect((err as Error).message).not.toContain("sk_live_1");
+      expect(output).not.toContain("sk_live_1");
+      expect(requests).toHaveLength(0);
+    },
+  );
+});
+
+test("the variable and the list are read at each delivery", async () => {
+  await withServer(
+    () => jsonResponse({}),
+    async (url, requests) => {
+      await withEnv({ HTTP_SECRET_ENV_ALLOWLIST: "PARTNER_API_TOKEN", PARTNER_API_TOKEN: "sk_live_1" }, async () => {
+        await httpHandlerDef.handler(ctxFor({ url, headers: SECRET_REF }));
+        process.env.PARTNER_API_TOKEN = "sk_live_2";
+        await httpHandlerDef.handler(ctxFor({ url, headers: SECRET_REF }));
+        process.env.HTTP_SECRET_ENV_ALLOWLIST = "OTHER_TOKEN";
+        await rejects(httpHandlerDef.handler(ctxFor({ url, headers: SECRET_REF })));
+      });
+      expect(requests.map((r) => r.headers["authorization"])).toEqual(["sk_live_1", "sk_live_2"]);
+    },
+  );
+});
+
+test("a refused host is reported before any reference is looked at", async () => {
+  // The host refusal wins over a reference the list would also refuse, so the
+  // environment is never consulted for a target the policy denies.
+  const err = await withEnv({ HTTP_ACTION_ALLOWED_HOSTS: "api.example.com", HTTP_SECRET_ENV_ALLOWLIST: undefined }, () =>
+    rejects(httpHandlerDef.handler(ctxFor({ url: "https://other.example.com/hook", headers: SECRET_REF }))),
+  );
+  expect(err).toBeInstanceOf(PermanentError);
+  expect((err as Error).message).toContain("HTTP_ACTION_ALLOWED_HOSTS");
+  expect((err as Error).message).not.toContain("HTTP_SECRET_ENV_ALLOWLIST");
+});
+
+test("a publish check rejects each malformed header reference with a located issue", () => {
+  const body = (headers: unknown) =>
+    ({
+      workflow: {
+        steps: [{ onEntry: [{ id: "action_http", type: HTTP_ACTION_TYPE, config: { url: "https://api.example.com", headers } }] }],
+      },
+    }) as unknown as ProcessBody;
+  const registry = createRegistry();
+  registry.set(HTTP_ACTION_TYPE, httpHandlerDef);
+
+  for (const bad of [{ env: "A_B", default: "x" }, { env: "lower" }, { secret: "id" }, { env: 1 }, {}]) {
+    const issues = checkActionRegistry(body({ Authorization: bad }), registry);
+    expect(issues.length).toBeGreaterThan(0);
+    // The union may report the object itself or the key inside it that failed.
+    expect(issues[0]!.loc.startsWith("steps[0].onEntry[0].config.headers.Authorization")).toBe(true);
+    expect(issues[0]!.type).toBe(HTTP_ACTION_TYPE);
+  }
+  expect(checkActionRegistry(body({ Authorization: { env: "PARTNER_API_TOKEN" }, "X-A": "1" }), registry)).toEqual([]);
 });
