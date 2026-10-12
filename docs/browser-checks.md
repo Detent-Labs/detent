@@ -943,6 +943,72 @@ playwright-cli -s=<worktree-name> run-code "async page => { await page.emulateMe
 
 Pass: the rule and the text keep readable contrast.
 
+### The instance header and the Discard confirmation (`fix-admin-instance-and-outbox-screens`)
+
+Source: `fix-admin-instance-and-outbox-screens` task 5.2.
+
+A `bun:test` assertion cannot see a rendered header or a native confirm dialog.
+This walk covers both. It needs the `expense_approval` process from the seed. It
+also needs two accounts, one with the role `employee` and one with
+`finance-approver`, and a browser logged in as an operator.
+
+Start an `expense_approval` instance. Claim its first step as the `employee`
+account, then submit it with `POST /instances/:id/submit`. The instance moves
+to Review, which has no claimant. `GET /instances/:id` then returns no
+`assignment.claimedBy`. `GET /instances/:id/record` still holds the
+`assignment.claimed` event.
+
+Open `/admin/instances/<id>`. Pass: "Claim state" reads "unclaimed", and
+"Transition seq" equals the `transitionSeq` from `GET /instances/:id`. "Armed
+timer" shows the fire time of the seven-day reminder, in local time.
+
+Switch the interface language to German. Pass: "Anspruch" reads "nicht
+beansprucht". "Übergangsnummer" shows the same number, and "Gestellter Timer"
+shows the same fire time.
+
+Run the control. Start a second instance and claim its first step. Reload its
+screen. Pass: "Claim state" reads "claimed by" and the account id. This proves
+the screen can show a claim at all.
+
+Open a third instance that sits on its first step, which arms no timer. Pass:
+"Armed timer" reads "none", and "keiner" in German. Then list the requests
+the screen sent:
+
+```sh
+playwright-cli -s=<worktree-name> requests
+```
+
+Pass: the list holds `GET /admin/timers?instanceId=<id>&limit=1`. It holds
+no `GET /processes` request.
+
+Make two outbox rows dead-letter. Let an `http.request` action aim at a closed
+port until its attempts run out. Alternatively, insert the rows into `outbox`
+with the status `dead-letter`. Open Operations, then Outbox, and filter to Dead letter.
+
+Press Discard on one row. Pass: a native confirm opens. It reads "Discarding
+is final. This action's side effect never goes out, and you cannot retry it
+afterwards. Continue?" Dismiss it:
+
+```sh
+playwright-cli -s=<worktree-name> dialog-dismiss
+```
+
+A native confirm blocks every other `playwright-cli` read, so answer it first.
+Pass: the request list has no `POST /admin/outbox/<key>/discard`, and the row
+stays `dead-letter`.
+
+Press Discard again and accept it with `dialog-accept`. Pass: the list holds
+exactly one `POST /admin/outbox/<key>/discard`. The count line reads
+"discarded: 1". Under "All statuses" the row shows DISCARDED with no buttons.
+
+Switch to German and repeat the dismiss and accept pair on the second row.
+Pass: the confirm reads "Das Verwerfen ist endgültig. Der Seiteneffekt dieser
+Aktion wird nie ausgeführt, und ein erneuter Versuch ist danach nicht mehr
+möglich. Fortfahren?" Dismissing sends nothing. Accepting sends one POST.
+
+Press Retry on a dead-letter row and dismiss it. Pass: the confirm names the
+re-run and the idempotency key, and the request list gains no POST.
+
 ### Canvas grid snapping (`canvas-grid-snap`)
 
 Open Studio and a draft with several steps. This whole entry is a visual

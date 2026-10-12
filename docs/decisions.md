@@ -1746,13 +1746,6 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   Vite. Anchors: `packages/web/src/areas/studio/panels/FieldMatrixGrid.tsx`,
   `packages/web/src/areas/studio/canvas/CanvasView.tsx`,
   `packages/web/vite.config.ts`.
-- **`fix-admin-instance-and-outbox-screens` (F-2, F-9, F-10; medium)**: The
-  instance header shows an expired claim and a stale `transitionSeq`, the
-  header reports no armed timer once 201 timers run, and the outbox discards
-  a row without a confirmation. Anchors:
-  `packages/web/src/areas/admin/screens/InstanceScreen.tsx`,
-  `packages/web/src/areas/admin/screens/OutboxScreen.tsx`,
-  `src/engine/admin-queries.ts`.
 - **`fix-reporting-builder-ui` (C-6 (= F-6), F-4, F-11; medium)**: The date
   filter of the report builder computes in UTC and drops the last day, the
   reporting area does not end the session on a 401, and a failed column
