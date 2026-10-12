@@ -13,14 +13,19 @@
  * expressions that reference them live in the same immutable ProcessBody, so a
  * key rename is a same-artifact rewrite — internally consistent per version.
  *
- * `checkProcessChainingTarget` below is the one deliberate exception to "no
+ * `checkProcessChainingTarget` below is a deliberate exception to "no
  * dependency but the CEL library and definition.ts": it needs `collect`
  * (aliased `collectFullActionSites`) from `../engine/registry-check.js` and
  * `PROCESS_START_ACTION_TYPE` from `../engine/registry.js` to find every
  * `process.start` action site, and `collectFieldsDeep` from
- * `../schema/definition.js` to build a target's accepted field-id set. None
- * of `registry-check.ts`, `registry.ts` or `schema/definition.ts` imports
- * back from this file.
+ * `../schema/definition.js` to build a target's accepted field-id set.
+ * `collect()` below reads the same `process.start` action sites from
+ * `registry-check.ts` for their mapping values. None of `registry-check.ts`,
+ * `registry.ts` or `schema/definition.ts` imports back from this file.
+ *
+ * `astProblem` is the other: it needs `MAX_PATTERN_LENGTH` from
+ * `../schema/compile.js` for the `matches` pattern bound. `compile.ts` does
+ * not import this file.
  */
 
 import { Environment, parse, serialize } from "@marcbachmann/cel-js";
@@ -29,6 +34,7 @@ import { leafFields, collectFieldsDeep, isViewField } from "../schema/definition
 import type { ProcessBody, FieldDef, Expression, MigrationSpec } from "../schema/definition.js";
 import { collect as collectFullActionSites } from "../engine/registry-check.js";
 import { PROCESS_START_ACTION_TYPE } from "../engine/registry.js";
+import { MAX_PATTERN_LENGTH } from "../schema/compile.js";
 
 // The formal expression context. instance/actor shapes are pinned here.
 // ponytail: minimal shapes, widen when a real guard needs more.
@@ -151,6 +157,19 @@ function buildEnv(
 }
 
 /**
+ * The child nodes of a parsed AST node, for the three walks below. `args` is an
+ * array for most operators, and one level of nested array (a call's argument
+ * list, a map entry) is flattened. A unary operator (`!`, `-`) holds its single
+ * operand as a node in `args`, so a walk that reads `args` as an array alone
+ * skips everything under a negation.
+ */
+function astChildren(node: unknown): unknown[] {
+  const args = (node as { args?: unknown }).args;
+  const list = Array.isArray(args) ? args : args && typeof args === "object" ? [args] : [];
+  return list.flatMap((a) => (Array.isArray(a) ? a : [a]));
+}
+
+/**
  * Time constructors are forbidden anywhere in an expression: CEL is pure/total
  * with no wall-clock, and time-based transitions live only in timers. `now()`
  * (non-deterministic) and the pure constructors `timestamp()`/`duration()` are
@@ -165,13 +184,9 @@ function forbiddenTimeCall(node: unknown): string | null {
   const n = node as { op?: string; args?: unknown };
   if (n.op === "call" && Array.isArray(n.args) && typeof n.args[0] === "string" && FORBIDDEN_FUNCS.has(n.args[0]))
     return n.args[0];
-  const args = Array.isArray(n.args) ? n.args : [];
-  for (const a of args) {
-    const kids = Array.isArray(a) ? a : [a];
-    for (const k of kids) {
-      const f = forbiddenTimeCall(k);
-      if (f) return f;
-    }
+  for (const k of astChildren(n)) {
+    const f = forbiddenTimeCall(k);
+    if (f) return f;
   }
   return null;
 }
@@ -200,14 +215,66 @@ function comprehensionTooDeep(node: unknown, depth = 0): string | null {
     }
     return comprehensionTooDeep(args[1], depth);
   }
-  for (const a of args) {
-    const kids = Array.isArray(a) ? a : [a];
-    for (const k of kids) {
-      const f = comprehensionTooDeep(k, depth);
-      if (f) return f;
-    }
+  for (const k of astChildren(n)) {
+    const f = comprehensionTooDeep(k, depth);
+    if (f) return f;
   }
   return null;
+}
+
+/**
+ * The message for a `matches` pattern node that is not a string literal that
+ * compiles, or null. Both callers wrap `astProblem` in an empty `catch`, so the
+ * `new RegExp` failure is caught here and returned: a throw would be swallowed
+ * and the bad pattern would pass.
+ */
+function patternProblem(pattern: unknown): string | null {
+  const p = pattern as { op?: string; args?: unknown } | null;
+  if (!p || typeof p !== "object" || p.op !== "value" || typeof p.args !== "string")
+    return "matches() needs a string literal as its pattern";
+  if (p.args.length > MAX_PATTERN_LENGTH) return `matches() pattern exceeds the ${MAX_PATTERN_LENGTH}-character bound`;
+  try {
+    new RegExp(p.args);
+  } catch {
+    return "matches() pattern does not compile as a JavaScript RegExp";
+  }
+  return null;
+}
+
+/**
+ * The first `matches` call in the tree whose pattern fails `patternProblem`, or
+ * null. The receiver form is `{op:"rcall", args:["matches", receiver, [pattern]]}`
+ * and the call form is `{op:"call", args:["matches", [subject, pattern]]}`. A call
+ * with no pattern argument is left to the type check, which rejects the arity.
+ */
+function matchesProblem(node: unknown): string | null {
+  if (!node || typeof node !== "object") return null;
+  const n = node as { op?: string; args?: unknown };
+  const args = Array.isArray(n.args) ? n.args : [];
+  if (args[0] === "matches" && (n.op === "rcall" || n.op === "call")) {
+    const given = args[n.op === "rcall" ? 2 : 1];
+    const pattern = Array.isArray(given) ? given[n.op === "rcall" ? 0 : 1] : undefined;
+    const bad = pattern === undefined ? null : patternProblem(pattern);
+    if (bad) return bad;
+  }
+  for (const k of astChildren(n)) {
+    const f = matchesProblem(k);
+    if (f) return f;
+  }
+  return null;
+}
+
+/**
+ * The first AST-level problem in a parsed expression, or null: a banned time
+ * function, then a comprehension nest past the limit, then a `matches` call
+ * whose pattern is not a compiling literal. `checkSite` and
+ * `validateMigrationSpec` both call it, so a rule added here reaches every
+ * checked site.
+ */
+function astProblem(ast: unknown): string | null {
+  const bad = forbiddenTimeCall(ast);
+  if (bad) return `time function not allowed: ${bad}() (time lives only in timers)`;
+  return comprehensionTooDeep(ast) ?? matchesProblem(ast);
 }
 
 interface Site {
@@ -238,7 +305,7 @@ function collect(body: ProcessBody): Site[] {
   // Process-wide catalog: validation.rule + default. No step, so no result/child.
   const walkFields = (fs: FieldDef[], loc: string) => {
     fs.forEach((f, i) => {
-      push(f.validation?.rule, `${loc}[${i}].validation.rule`, false, false);
+      push(f.validation?.rule, `${loc}[${i}].validation.rule`, false, false, "bool");
       push(asExpr(f.default), `${loc}[${i}].default`, false, false);
       if (f.fields) walkFields(f.fields, `${loc}[${i}].fields`);
     });
@@ -254,7 +321,9 @@ function collect(body: ProcessBody): Site[] {
     // the same evalOutput path, so they are a checked site like any other.
     outputs(s.onCancel, `${sloc}.onCancel`);
     (s.paths ?? []).forEach((p, pi) => {
-      push(p.guard, `${sloc}.paths[${pi}].guard`, false, child);
+      // A guard, a view flag and a validation rule take effect only when they
+      // yield `true`, so each expects `bool`; any other type is a publish error.
+      push(p.guard, `${sloc}.paths[${pi}].guard`, false, child, "bool");
       outputs(p.onPath, `${sloc}.paths[${pi}].onPath`);
     });
     (s.timers ?? []).forEach((t, ti) => {
@@ -276,11 +345,11 @@ function collect(body: ProcessBody): Site[] {
     // the child runs, and a `child.*` reference would be unbound there and
     // always evaluate to false.
     (s.view?.fields ?? []).forEach((vf, vi) => {
-      push(asExpr(vf.visible), `${sloc}.view.fields[${vi}].visible`, false, false);
+      push(asExpr(vf.visible), `${sloc}.view.fields[${vi}].visible`, false, false, "bool");
       if (isViewField(vf)) {
-        push(asExpr(vf.required), `${sloc}.view.fields[${vi}].required`, false, false);
-        push(asExpr(vf.readonly), `${sloc}.view.fields[${vi}].readonly`, false, false);
-        push(vf.validation?.rule, `${sloc}.view.fields[${vi}].validation.rule`, false, false);
+        push(asExpr(vf.required), `${sloc}.view.fields[${vi}].required`, false, false, "bool");
+        push(asExpr(vf.readonly), `${sloc}.view.fields[${vi}].readonly`, false, false, "bool");
+        push(vf.validation?.rule, `${sloc}.view.fields[${vi}].validation.rule`, false, false, "bool");
       }
     });
     if (s.subprocess) {
@@ -292,6 +361,23 @@ function collect(body: ProcessBody): Site[] {
       );
     }
   });
+
+  // A process.start mapping value is evaluated at delivery over `data`, `instance`
+  // and `actor` (`createSeededInstance`), so it takes neither `result` nor `child`
+  // and no expected type. The studio runs this with no registry, so `config` is
+  // unvalidated: read `inputMapping` only from a plain object and skip any entry
+  // that is not a CEL expression.
+  // ponytail: only process.start reads CEL from its config. A second handler that
+  // does needs a per-handler hook on HandlerDef that names its CEL sites and scope.
+  for (const { action, loc } of collectFullActionSites(body)) {
+    if (action.type !== PROCESS_START_ACTION_TYPE) continue;
+    const mapping = (action.config as { inputMapping?: unknown } | null | undefined)?.inputMapping;
+    if (!mapping || typeof mapping !== "object" || Array.isArray(mapping)) continue;
+    for (const [key, v] of Object.entries(mapping)) {
+      const e = asExpr(v);
+      if (e && typeof e.src === "string") push(e, `${loc}.config.inputMapping.${key}`, false, false);
+    }
+  }
 
   return sites;
 }
@@ -312,11 +398,8 @@ export interface CelIssue {
 function checkSite(env: Environment, site: { src: string; loc: string; expect?: string }): CelIssue | undefined {
   // Forbidden time constructors first (env.check would accept the pure ones).
   try {
-    const ast = parse(site.src).ast;
-    const bad = forbiddenTimeCall(ast);
-    if (bad) return { loc: site.loc, src: site.src, message: `time function not allowed: ${bad}() (time lives only in timers)` };
-    const nested = comprehensionTooDeep(ast);
-    if (nested) return { loc: site.loc, src: site.src, message: nested };
+    const problem = astProblem(parse(site.src).ast);
+    if (problem) return { loc: site.loc, src: site.src, message: problem };
   } catch {
     // parse failure is reported by the type-check below
   }
@@ -370,7 +453,9 @@ export function validateProcessBody(body: ProcessBody): CelIssue[] {
  * `childBody.contract.outputFields` is an unknown-field error here, even though
  * it type-checks fine against the single-body `validateProcessBody` pass (which
  * has no child body to type it against). `child.outcome` is untouched — it stays
- * `string` regardless of the child's contract.
+ * `string` regardless of the child's contract. A guard must infer to `bool` here
+ * too: the first pass types `child.data` as `dyn`, so only this pass can see that
+ * a typed child output used alone is not a condition.
  */
 export function checkSubprocessChildRefs(body: ProcessBody, stepIndex: number, childBody: ProcessBody): CelIssue[] {
   const step = body.workflow.steps[stepIndex];
@@ -384,7 +469,7 @@ export function checkSubprocessChildRefs(body: ProcessBody, stepIndex: number, c
   (step.paths ?? []).forEach((p, pi) => {
     const g = asExpr(p.guard);
     if (!g) return;
-    const issue = checkSite(env, { src: g.src, loc: `${sloc}.paths[${pi}].guard` });
+    const issue = checkSite(env, { src: g.src, loc: `${sloc}.paths[${pi}].guard`, expect: "bool" });
     if (issue) issues.push(issue);
   });
   Object.entries(step.subprocess.outputMapping).forEach(([fid, e]) => {
@@ -474,15 +559,9 @@ export function validateMigrationSpec(spec: MigrationSpec, fromBody: ProcessBody
     }
     const expect = celType(targetField);
     try {
-      const ast = parse(expr.src).ast;
-      const bad = forbiddenTimeCall(ast);
-      if (bad) {
-        issues.push({ loc, src: expr.src, message: `time function not allowed: ${bad}() (time lives only in timers)` });
-        continue;
-      }
-      const nested = comprehensionTooDeep(ast);
-      if (nested) {
-        issues.push({ loc, src: expr.src, message: nested });
+      const problem = astProblem(parse(expr.src).ast);
+      if (problem) {
+        issues.push({ loc, src: expr.src, message: problem });
         continue;
       }
     } catch {

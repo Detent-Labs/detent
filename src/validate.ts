@@ -213,14 +213,22 @@ export function validateReferences(body: ProcessBody, inputs: ReferenceValidatio
     dataSourceConfigIssues = checkConfigOnly(dataSourceSites, (type) => registries.dataSourceRegistry.get(type));
   }
 
-  const celIssues: CelIssue[] = [...checkCelExpressions(body)];
+  const found: CelIssue[] = [...checkCelExpressions(body)];
   body.workflow.steps.forEach((step, stepIndex) => {
     if (step.type !== "subprocess") return;
     const childBody = loadedChildren[step.id];
     if (!childBody) return;
-    celIssues.push(...checkSubprocessChildRefs(body, stepIndex, childBody));
+    found.push(...checkSubprocessChildRefs(body, stepIndex, childBody));
   });
-  celIssues.push(...checkProcessChainingTarget(body, targetsByLoc));
+  found.push(...checkProcessChainingTarget(body, targetsByLoc));
+  // The second pass repeats first-pass issues at the same site; keep the first of each.
+  const seen = new Set<string>();
+  const celIssues = found.filter((i) => {
+    const key = JSON.stringify([i.loc, i.message]);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 
   return {
     actionTypeIssues,

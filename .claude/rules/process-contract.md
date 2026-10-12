@@ -74,6 +74,21 @@ surfaced to a participant. The most common cause is a field the instance
 has not written yet. The instance then waits at that path, the wait-state
 idiom, since nothing matched.
 
+A guard, a `validation.rule` and a view flag (`visible`, `required`,
+`readonly`) must infer to `bool`. A `dyn` result passes. The engine acts on
+a condition only when it is `true`. Any other type counts as false without a
+message. A guard then parks the path, and a rule rejects the submission.
+Publish checks this in `src/cel/check.ts`, not in the schema, so a body
+published earlier keeps running.
+
+A `matches` call takes a string literal as its pattern, never a field value
+or a built string. The literal must compile as a JavaScript `RegExp` and
+stay under the declared length bound. A pattern that does not compile raises
+on every evaluation, which a guard reads as no match. A literal that compiles
+can still backtrack on a long participant string. The length bound does not
+stop that, as with `validation.pattern`. Publish checks the rule in
+`src/cel/check.ts`, and a migration transform meets it at plan registration.
+
 The library `@marcbachmann/cel-js` pins an exact version in
 `package.json`, with no caret. An upgrade is a deliberate, reviewed
 commit that re-runs `test/cel.test.ts`. An evaluation-semantics change in
@@ -87,6 +102,13 @@ It does not fail the spawn or the return; see "Runtime record" below,
 reads only `result`. A raise there means the handler's return does not
 match the action's contract. That fails loudly rather than leaving an
 optional field unset.
+
+A `process.start` action's `config.inputMapping` entry follows the same
+total-evaluation rule, and a raising entry leaves its target unwritten. The
+engine evaluates it over `data`, `instance` and `actor`, with no `result` and
+no `child`. Publish checks each value like a guard: it parses, type-checks,
+bans time functions and bounds structure and length. Only that one key of a
+plugin `config` holds CEL.
 
 **Data vs presentation.** The catalog defines each field once,
 process-wide. Each step carries a flat `view`. Its entries either

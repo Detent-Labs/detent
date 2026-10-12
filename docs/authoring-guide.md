@@ -230,8 +230,17 @@ the browser. A negative `amount` waits until the participant sends the form.
 
 `rule` is a CEL expression. It sees the same data every guard sees, so it can
 compare a field against another: `data.amount <= data.approved_amount`.
+A rule must infer to `bool`. Publishing rejects `data.status` alone and
+accepts `data.status == "ok"`.
 
 A step can override any of these per field. See View, below.
+
+A condition can test text with `matches`, for example
+`data.reference.matches("^[A-Z]{3}-[0-9]+$")`. The pattern must be a string
+literal, never a field or a built string. Publishing rejects a literal that
+does not compile as a JavaScript `RegExp`. The length bound of 4,000
+characters does not stop backtracking. A pattern such as `^(a+)+$` can still
+run slowly on a long value, as a field's `pattern` can.
 
 ### Data source
 
@@ -552,6 +561,9 @@ too. Only a literal `true` on both flags trips the rule. A hidden entry
 (`visible: false`) publishes as well, since the engine never resolves
 `required` or `readonly` for a field nobody sees.
 
+A `visible`, `required` or `readonly` expression must infer to `bool`.
+Publishing rejects `data.amount` alone and accepts `data.amount > 1000.0`.
+
 A step can also override a field's validation, in one of two modes. The
 default mode is `merge`. It keeps every catalog bound the step does not name,
 and replaces only the ones it does. The `replace` mode drops the catalog's
@@ -684,6 +696,9 @@ one step need a `priority` each, and the engine tries the lowest number first.
 The example gives `book` two automatic paths. `booked` has priority 1 and the
 guard `data.booking_status == 'booked'`. `booking-failed` has priority 2 and
 the guard `data.booking_status == 'failed'`.
+
+A guard must infer to `bool`. Publishing rejects `data.booking_status` alone
+and accepts `data.booking_status == 'booked'`.
 
 A guard never throws. A guard that fails, because a field holds no value yet,
 is not a match. If no automatic path matches, the process waits on the step.
@@ -891,6 +906,12 @@ another process from the current one's data. It does not wait for it: no
 wait-state, no outcome, no contract. Use it when one process's end step
 should start an unrelated process, not call one and park for its
 result.
+
+The mapping values of a `process.start` action are CEL over the current
+instance's data. They read `data`, `instance` and `actor`. Here `actor` is
+the system actor, because no person starts the chained instance. Publish
+checks each value like a guard: it parses the source and checks the types.
+It bans time functions and bounds the nesting, the node count and the length.
 
 A subprocess reference must not form a cycle. A process may not call
 itself, directly or through other processes it calls. Publishing rejects a

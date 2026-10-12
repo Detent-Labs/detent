@@ -40,6 +40,7 @@ import {
   CANCEL_SINK_KEY,
   RESERVED_CANCEL_OUTCOME,
   RESERVED_ACTION_PREFIX,
+  PROCESS_START_ACTION_TYPE,
   ALLOWED_BY_TYPE,
   formatMatches,
   isViewField,
@@ -732,8 +733,11 @@ interface ExpressionSite {
 
 /** Every Expression.src site outside the field tree: path guards, every
  * Action.output value (all five action positions), timer deadlines, view
- * field visible/required/readonly, and subprocess input/outputMapping
- * values. A field's own `validation.rule` and `default` are bounded inside
+ * field visible/required/readonly, subprocess input/outputMapping values, and
+ * the `config.inputMapping` values of every `process.start` action. That last
+ * walk is duck-typed: this pass runs before Zod, so `config` may be any value
+ * and only a plain-object `inputMapping` is read. A field's own
+ * `validation.rule` and `default` are bounded inside
  * `checkFieldTree`'s own pass instead (`checkFieldExpressionLength`), not
  * here. Deliberately independent of src/cel/check.ts's own `collect()` —
  * that one also needs scope flags for type-checking, this one needs only
@@ -778,6 +782,14 @@ function collectExpressionSites(body: ProcessBody): ExpressionSite[] {
       Object.entries(s.subprocess.outputMapping ?? {}).forEach(([fid, e]) => push(e, `${sloc}.subprocess.outputMapping.${fid}`));
     }
   });
+
+  collectActionSites(body)
+    .filter(({ action: a }) => a?.type === PROCESS_START_ACTION_TYPE)
+    .forEach(({ action: a, loc }) => {
+      const mapping = a?.config?.inputMapping;
+      if (!mapping || typeof mapping !== "object" || Array.isArray(mapping)) return;
+      Object.entries(mapping).forEach(([key, e]) => push(e, `${loc}.config.inputMapping.${key}`));
+    });
 
   return sites;
 }

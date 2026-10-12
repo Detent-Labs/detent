@@ -1,9 +1,10 @@
 import { test, expect } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { validateProcessBody, validateMigrationSpec, checkSubprocessChildRefs, parseExpression, parseAst, checkAgainstFields, celType, ACTOR_SCHEMA, type CelIssue } from "../src/cel/check.js";
 import { evalTransforms } from "../src/cel/eval.js";
-import { compileProcessBody } from "../src/schema/compile.js";
-import { instance as instanceSchema, baseFieldType, type ProcessBody, type MigrationSpec, type Instance, type FieldDef } from "../src/schema/definition.js";
+import { validateReferences } from "../src/validate.js";
+import { compileProcessBody, MAX_PATTERN_LENGTH } from "../src/schema/compile.js";
+import { instance as instanceSchema, baseFieldType, processBody, type ProcessBody, type MigrationSpec, type Instance, type FieldDef } from "../src/schema/definition.js";
 
 // Minimal ProcessBody builders. validateProcessBody reads only fields /
 // dataSources / workflow.steps, so these cast loosely on purpose — the full
@@ -344,16 +345,22 @@ test("a data source is not visible to a guard either (withheld from every site)"
   expect(issues[0]!.message.toLowerCase()).toContain("unknown variable: users");
 });
 
-// The expectation is scoped to the deadline site only: every other site stays
-// unconstrained, so non-string results elsewhere must still pass.
+// Each expectation is scoped to its own sites: the deadline expects `string`, the
+// condition sites expect `bool`, and an Action.output or subprocess mapping value
+// carries no expectation. A number and a string there must still pass.
 test("the deadline result-type expectation does not leak into other sites", () => {
   const step = {
     id: "step_a",
     key: "a",
     label: { en: "A" },
-    type: "task",
+    type: "subprocess",
     // Action.output writeback: a double, not a string.
-    onEntry: [{ id: "action_a", type: "http", config: {}, output: { field_amount: { lang: "cel", src: "result.total" } } }],
+    onEntry: [{ id: "action_a", type: "http", config: {}, output: { field_amount: { lang: "cel", src: "1.5" } } }],
+    // Subprocess mappings: a string, not a bool.
+    subprocess: {
+      inputMapping: { field_note: { lang: "cel", src: "data.note" } },
+      outputMapping: { field_note: { lang: "cel", src: "child.outcome" } },
+    },
     // View flags: booleans.
     view: {
       fields: [
@@ -373,6 +380,12 @@ test("the deadline result-type expectation does not leak into other sites", () =
     timers: [{ id: "timer_a", deadline: { lang: "cel", src: "data.due_at" }, onFire: { actions: [] } }],
   };
   expect(validateProcessBody(body({ fields: typedFields, steps: [step] }))).toEqual([]);
+
+  // Control: the same body with a string guard fails at the guard alone, so the
+  // sites are collected together and each keeps its own expectation.
+  const control = { ...step, paths: [{ ...step.paths[0]!, guard: { lang: "cel", src: "data.note" } }] };
+  const issues = validateProcessBody(body({ fields: typedFields, steps: [control] }));
+  expect(issues.map((i) => i.loc)).toEqual(["steps[0].paths[0].guard"]);
 });
 
 // 5.6 no wall-clock access: now() and the pure time constructors are all blocked
@@ -389,14 +402,124 @@ test("accepts a well-typed guard", () => {
   expect(validateProcessBody(body({ steps: [guardStep("data.booking_status == 'booked'")] }))).toEqual([]);
 });
 
+// A condition site infers to bool. The engine acts on a guard, a view flag or a
+// validation rule only when it evaluates to `true`; any other type counts as false
+// without a message, so the mistake is a publish error.
+const condFields = [...typedFields, field("status", "string"), field("count", "number", "integer")];
+const condIssues = (steps: unknown[]) => validateProcessBody(body({ fields: condFields, steps }));
+const viewStep = (entry: Record<string, unknown>) => ({
+  id: "step_a",
+  key: "a",
+  label: { en: "A" },
+  type: "task",
+  terminal: true,
+  view: { fields: [entry] },
+});
+
+test("rejects a string-typed guard, on an automatic and on a manual path", () => {
+  const automatic = condIssues([guardStep("data.status")]);
+  expect(automatic.map((i) => i.loc)).toEqual(["steps[0].paths[0].guard"]);
+  expect(automatic[0]!.message).toBe("expected bool, got string");
+
+  const manual = guardStep("data.status");
+  const manualPath = { ...manual.paths[0]!, trigger: "manual" };
+  const issues = condIssues([{ ...manual, paths: [manualPath] }]);
+  expect(issues.map((i) => i.loc)).toEqual(["steps[0].paths[0].guard"]);
+  expect(issues[0]!.message).toBe("expected bool, got string");
+});
+
+test("rejects a guard that reads child.outcome alone on a subprocess step", () => {
+  const issues = condIssues([guardStep("child.outcome", "subprocess")]);
+  expect(issues.map((i) => i.loc)).toEqual(["steps[0].paths[0].guard"]);
+  expect(issues[0]!.message).toBe("expected bool, got string");
+});
+
+test("rejects an int-typed visible, required and readonly flag", () => {
+  for (const flag of ["visible", "required", "readonly"]) {
+    const issues = condIssues([viewStep({ ref: "field_amount", [flag]: cel("data.count") })]);
+    expect(issues.map((i) => i.loc)).toEqual([`steps[0].view.fields[0].${flag}`]);
+    expect(issues[0]!.message).toBe("expected bool, got int");
+  }
+});
+
+test("rejects an int-typed visible flag on a note", () => {
+  const note = { kind: "note", text: { en: "n" }, visible: cel("data.count") };
+  const issues = condIssues([viewStep(note)]);
+  expect(issues.map((i) => i.loc)).toEqual(["steps[0].view.fields[0].visible"]);
+  expect(issues[0]!.message).toBe("expected bool, got int");
+});
+
+test("rejects a string-typed validation.rule, in the catalog and on a step", () => {
+  const withRule = { ...field("amount", "number"), validation: { rule: cel("data.status") } };
+  const catalog = validateProcessBody(body({ fields: [withRule, field("status", "string")], steps: [] }));
+  expect(catalog.map((i) => i.loc)).toEqual(["fields[0].validation.rule"]);
+  expect(catalog[0]!.message).toBe("expected bool, got string");
+
+  const step = condIssues([ruleStep("data.status")]);
+  expect(step.map((i) => i.loc)).toEqual(["steps[0].view.fields[0].validation.rule"]);
+  expect(step[0]!.message).toBe("expected bool, got string");
+});
+
+test("accepts a bool-typed condition at every site", () => {
+  expect(condIssues([guardStep('data.status == "ok"')])).toEqual([]);
+  expect(condIssues([guardStep("data.approved")])).toEqual([]);
+  expect(condIssues([guardStep("child.outcome == 'ok'", "subprocess")])).toEqual([]);
+  for (const flag of ["visible", "required", "readonly"]) {
+    expect(condIssues([viewStep({ ref: "field_amount", [flag]: cel("data.approved") })])).toEqual([]);
+  }
+  expect(condIssues([ruleStep('data.status == "ok"')])).toEqual([]);
+  const withRule = { ...field("amount", "number"), validation: { rule: cel("data.amount > 0.0") } };
+  expect(validateProcessBody(body({ fields: [withRule], steps: [] }))).toEqual([]);
+});
+
+test("accepts a dyn-typed condition at every site", () => {
+  expect(condIssues([guardStep("data.receipt")])).toEqual([]);
+  for (const flag of ["visible", "required", "readonly"]) {
+    expect(condIssues([viewStep({ ref: "field_amount", [flag]: cel("data.receipt") })])).toEqual([]);
+  }
+  expect(condIssues([ruleStep("data.receipt")])).toEqual([]);
+  const withRule = { ...field("amount", "number"), validation: { rule: cel("data.receipt") } };
+  expect(validateProcessBody(body({ fields: [withRule, field("receipt", "file")], steps: [] }))).toEqual([]);
+});
+
+// The rule runs on the publish path (check.ts behind validateReferences), not in the
+// Zod schema: a body published before the rule keeps reading, and its pinned
+// instances keep running.
+test("processBody still parses a body whose guard reads data.status alone", () => {
+  const stored = {
+    key: "legacy",
+    label: { en: "Legacy" },
+    baseLocale: "en",
+    fields: [{ id: "field_status", key: "status", label: { en: "Status" }, type: "string" }],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        {
+          id: "step_a",
+          key: "a",
+          label: { en: "A" },
+          type: "task",
+          paths: [
+            { id: "path_go", key: "go", label: "Go", to: "step_b", trigger: "automatic", priority: 1, guard: cel("data.status") },
+          ],
+        },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
+      ],
+    },
+  };
+  expect(() => processBody.parse(stored)).not.toThrow();
+});
+
 // Every shipped example must survive the check, since publish now enforces it —
 // an example that cannot be published is not an example. Checked against the
 // COMPILED body, which is what publishBody hands to validateProcessBody.
-test.each([
-  "expense-approval.json",
-  "subprocess-credit-check-child.json",
-  "subprocess-loan-parent.json",
-])("accepts the real %s example", (name) => {
+const exampleFiles = readdirSync(new URL("../examples/", import.meta.url)).filter((f) => f.endsWith(".json"));
+
+test("examples/ holds the shipped example files", () => {
+  expect(exampleFiles.length).toBeGreaterThanOrEqual(9);
+});
+
+test.each(exampleFiles)("accepts the real %s example", (name) => {
   const json = JSON.parse(readFileSync(new URL(`../examples/${name}`, import.meta.url), "utf8"));
   const authored = (json.definition ?? json) as ProcessBody;
   expect(validateProcessBody(compileProcessBody(authored))).toEqual([]);
@@ -467,7 +590,8 @@ test("checkAgainstFields rejects a syntax error the same way validateProcessBody
 
 // ---- migration transforms (cel-expressions delta) ----------------------------
 // A transform's identifiers resolve against the SOURCE catalog; its result type is
-// checked against the TARGET field it writes. cel(...) shortens an expression.
+// checked against the TARGET field it writes. cel(...) shortens an expression, and
+// the condition-site tests above call it as well.
 const cel = (src: string) => ({ lang: "cel", src });
 const migBody = (fields: { key: string; type: string | object }[], dataSources?: any[]): ProcessBody =>
   ({
@@ -641,6 +765,36 @@ test("validateProcessBody's single-body check is unchanged: it still accepts any
   expect(validateProcessBody(b)).toEqual([]);
 });
 
+// The single-body pass types child.data as dyn, so a typed child output used alone
+// as a guard slips past its bool expectation. The second pass knows the type.
+test("rejects a guard that reads a typed child output alone", () => {
+  const b = body({ steps: [subprocessStep({}, "child.data.amount")] });
+  expect(validateProcessBody(b)).toEqual([]);
+  const issues = checkSubprocessChildRefs(b, 0, childBodyWithOutputs(["field_amount"]));
+  expect(issues.length).toBe(1);
+  expect(issues[0].loc).toBe("steps[0].paths[0].guard");
+  expect(issues[0].message).toContain("expected bool, got double");
+});
+
+test("accepts a typed child output compared in a guard", () => {
+  const b = body({ steps: [subprocessStep({}, "child.data.amount > 1000.0")] });
+  expect(checkSubprocessChildRefs(b, 0, childBodyWithOutputs(["field_amount"]))).toEqual([]);
+});
+
+// Both passes see a string guard on a subprocess step once the child is loaded.
+// validateReferences keeps the first issue and drops the equal one.
+test("validateReferences reports a string guard on a subprocess step once, with the child loaded", () => {
+  const b = body({ steps: [subprocessStep({}, "data.booking_status")] });
+  const registryDescription = { actionTypes: [], assignmentStrategyTypes: [], dataSourceTypes: [] };
+  const loaded = validateReferences(b, { registryDescription, loadedChildren: { step_a: childBodyWithOutputs(["field_amount"]) }, targetsByLoc: {} });
+  const bare = validateReferences(b, { registryDescription, loadedChildren: {}, targetsByLoc: {} });
+  for (const refs of [loaded, bare]) {
+    expect(refs.celIssues.length).toBe(1);
+    expect(refs.celIssues[0].loc).toBe("steps[0].paths[0].guard");
+    expect(refs.celIssues[0].message).toContain("expected bool, got string");
+  }
+});
+
 // --- parseAst / ACTOR_SCHEMA: the studio condition builder's two entry points ---
 
 test("parseAst returns null for source that does not parse", () => {
@@ -732,4 +886,289 @@ test("rejects a migration transform with three nested comprehensions", () => {
   expect(issues.length).toBe(1);
   expect(issues[0].loc).toBe("migration.transforms.field_ok");
   expect(issues[0].message).toContain("comprehension nesting limit");
+});
+
+// ---- matches pattern (cel-expressions delta) ---------------------------------
+// A matches call takes a string-literal pattern that compiles, in both call
+// forms and anywhere in the tree. Both callers run the AST rules inside an
+// empty catch, so a pattern that fails to compile must come back as a message.
+// A swallowed throw would let the bad pattern through and fail these tests.
+const matchFields = [field("s", "string"), field("p", "string"), field("b", "boolean"), field("items", "list")];
+const matchIssues = (src: string) => validateProcessBody(body({ fields: matchFields, steps: [guardStep(src)] }));
+const NO_COMPILE = "does not compile as a JavaScript RegExp";
+
+test("rejects an uncompilable literal pattern in the receiver form", () => {
+  const issues = matchIssues('data.s.matches("(")');
+  expect(issues.length).toBe(1);
+  expect(issues[0].loc).toBe(GUARD_LOC);
+  expect(issues[0].message).toContain(NO_COMPILE);
+});
+
+test("rejects an uncompilable literal pattern in the call form", () => {
+  const issues = matchIssues('matches(data.s, "(")');
+  expect(issues.length).toBe(1);
+  expect(issues[0].loc).toBe(GUARD_LOC);
+  expect(issues[0].message).toContain(NO_COMPILE);
+});
+
+test("rejects a pattern that is a field reference or a concatenation", () => {
+  for (const src of ["data.s.matches(data.p)", 'data.s.matches("a" + "b")', "matches(data.s, data.p)"]) {
+    const issues = matchIssues(src);
+    expect(issues.length).toBe(1);
+    expect(issues[0].loc).toBe(GUARD_LOC);
+    expect(issues[0].message).toContain("matches() needs a string literal as its pattern");
+  }
+});
+
+test("finds a bad matches call inside a comprehension body", () => {
+  const issues = matchIssues('data.items.all(i, i.matches("("))');
+  expect(issues.length).toBe(1);
+  expect(issues[0].loc).toBe(GUARD_LOC);
+  expect(issues[0].message).toContain(NO_COMPILE);
+});
+
+test("finds a bad matches call inside another call's receiver", () => {
+  const issues = matchIssues('string(data.s.matches("(")).size() > 0');
+  expect(issues.length).toBe(1);
+  expect(issues[0].message).toContain(NO_COMPILE);
+});
+
+test("accepts a valid literal pattern", () => {
+  expect(matchIssues('data.s.matches("^[a-z]+$")')).toEqual([]);
+});
+
+// The helper reads the decoded string. `"^[a-z]+\\d$"` holds a backslash and a d.
+// `"\\("` decodes to a backslash and a paren, which compiles; the raw source text
+// `\\(` would not.
+test("compiles the decoded string, not the raw source text", () => {
+  expect(matchIssues('data.s.matches("^[a-z]+\\\\d$")')).toEqual([]);
+  expect(matchIssues('data.s.matches("\\\\(")')).toEqual([]);
+});
+
+test("a matches call with a missing argument falls through to the type check", () => {
+  const issues = matchIssues("data.s.matches()");
+  expect(issues.length).toBe(1);
+  expect(issues[0].message).not.toContain("string literal");
+  expect(issues[0].message).not.toContain(NO_COMPILE);
+});
+
+test("reports an over-long literal pattern at a migration transform", () => {
+  const from = migBody([{ key: "s", type: "string" }]);
+  const to = migBody([{ key: "ok", type: "boolean" }]);
+  const issues = validateMigrationSpec(spec({ field_ok: cel(`data.s.matches("${"a".repeat(MAX_PATTERN_LENGTH + 1)}")`) }), from, to);
+  expect(issues.length).toBe(1);
+  expect(issues[0].loc).toBe("migration.transforms.field_ok");
+  expect(issues[0].message).toContain(`${MAX_PATTERN_LENGTH}-character bound`);
+});
+
+test("accepts a literal pattern at exactly the length bound", () => {
+  const from = migBody([{ key: "s", type: "string" }]);
+  const to = migBody([{ key: "ok", type: "boolean" }]);
+  const src = `data.s.matches("${"a".repeat(MAX_PATTERN_LENGTH)}")`;
+  expect(validateMigrationSpec(spec({ field_ok: cel(src) }), from, to)).toEqual([]);
+});
+
+test("a migration transform meets the same literal-pattern rule", () => {
+  const from = migBody([{ key: "s", type: "string" }, { key: "p", type: "string" }]);
+  const to = migBody([{ key: "ok", type: "boolean" }]);
+  const nonLiteral = validateMigrationSpec(spec({ field_ok: cel("data.s.matches(data.p)") }), from, to);
+  expect(nonLiteral.length).toBe(1);
+  expect(nonLiteral[0].loc).toBe("migration.transforms.field_ok");
+  expect(nonLiteral[0].message).toContain("matches() needs a string literal as its pattern");
+  const broken = validateMigrationSpec(spec({ field_ok: cel('data.s.matches("(")') }), from, to);
+  expect(broken.length).toBe(1);
+  expect(broken[0].message).toContain(NO_COMPILE);
+});
+
+test("checkAgainstFields applies the matches rule to a scratchpad expression", () => {
+  const fields = [fieldDef("s", "string")];
+  const bad = checkAgainstFields('data.s.matches("(")', fields);
+  expect(bad.ok).toBe(false);
+  if (!bad.ok) expect(bad.message).toContain(NO_COMPILE);
+  expect(checkAgainstFields('data.s.matches("^[a-z]+$")', fields)).toEqual({ ok: true });
+});
+
+// ---- unary operators ---------------------------------------------------------
+// A unary operator (`!`, `-`) keeps its single operand as a node in `args`, not
+// in an array. Every AST rule must still walk it.
+test("finds a matches call under a negation", () => {
+  const bad = matchIssues('!data.s.matches("(")');
+  expect(bad.length).toBe(1);
+  expect(bad[0].loc).toBe(GUARD_LOC);
+  expect(bad[0].message).toContain(NO_COMPILE);
+  const nonLiteral = matchIssues("!data.s.matches(data.p)");
+  expect(nonLiteral.length).toBe(1);
+  expect(nonLiteral[0].message).toContain("matches() needs a string literal as its pattern");
+});
+
+test("finds a matches call under a double negation, a negated group and a negated operand", () => {
+  expect(matchIssues('!!data.s.matches("(")')[0]?.message).toContain(NO_COMPILE);
+  expect(matchIssues('!(data.b || data.s.matches("("))')[0]?.message).toContain(NO_COMPILE);
+  expect(matchIssues("data.b && !data.s.matches(data.p)")[0]?.message).toContain("string literal");
+});
+
+test("finds a matches call under a unary minus around a ternary", () => {
+  const issues = matchIssues('-(data.s.matches("(") ? 1 : 2) == -1');
+  expect(issues.length).toBe(1);
+  expect(issues[0].message).toContain(NO_COMPILE);
+});
+
+test("accepts a negated valid pattern and a negated two-deep comprehension", () => {
+  expect(matchIssues('!data.s.matches("^[a-z]+$")')).toEqual([]);
+  expect(matchIssues("!data.items.all(a, data.items.exists(b, a == b))")).toEqual([]);
+});
+
+test("rejects a negated three-deep comprehension with the nesting limit", () => {
+  const issues = matchIssues("!data.items.all(a, data.items.all(b, data.items.all(c, true)))");
+  expect(issues.length).toBe(1);
+  expect(issues[0].loc).toBe(GUARD_LOC);
+  expect(issues[0].message).toContain("comprehension nesting limit");
+});
+
+test("rejects a negated time function with the time-function message", () => {
+  const issues = matchIssues('!(timestamp("2020-01-01T00:00:00Z") > timestamp("2019-01-01T00:00:00Z"))');
+  expect(issues.length).toBe(1);
+  expect(issues[0].loc).toBe(GUARD_LOC);
+  expect(issues[0].message).toContain("time function not allowed");
+});
+
+// ---- process.start mapping values (process-chaining delta) -------------------
+// A process.start action's config.inputMapping values are CEL, evaluated at
+// delivery over `data`, `instance` and `actor`. Only that known key is a checked
+// site; the studio runs this check with an unvalidated `config`, so a malformed
+// one must not throw.
+const startFields = [...typedFields, field("items", "list")];
+const startAction = (config: unknown, type = "process.start") => ({ id: "action_chain", type, config });
+const startStep = (action: unknown) => ({
+  id: "step_a",
+  key: "a",
+  label: { en: "A" },
+  type: "task",
+  onEntry: [action],
+  paths: [{ id: "path_a", key: "pa", label: "Pa", to: "step_b", trigger: "manual" }],
+});
+const startMapping = (mapping: unknown) => startStep(startAction({ processId: "proc_target", inputMapping: mapping }));
+const startIssues = (mapping: unknown) => validateProcessBody(body({ fields: startFields, steps: [startMapping(mapping)] }));
+const MAP_LOC = "steps[0].onEntry[0].config.inputMapping.field_t_amount";
+
+test("rejects an unknown field reference in a process.start mapping value", () => {
+  const issues = startIssues({ field_t_amount: cel("data.missing") });
+  expect(issues.length).toBe(1);
+  expect(issues[0].loc).toBe(MAP_LOC);
+  expect(msgs(issues).toLowerCase()).toContain("missing");
+});
+
+test("rejects a time function in a process.start mapping value", () => {
+  const issues = startIssues({ field_t_amount: cel('timestamp("2020-01-01T00:00:00Z")') });
+  expect(issues.length).toBe(1);
+  expect(issues[0].loc).toBe(MAP_LOC);
+  expect(issues[0].message).toContain("time function not allowed");
+});
+
+test("rejects three nested comprehensions in a process.start mapping value", () => {
+  const issues = startIssues({ field_t_amount: cel("data.items.all(a, data.items.all(b, data.items.all(c, a == b && b == c)))") });
+  expect(issues.length).toBe(1);
+  expect(issues[0].loc).toBe(MAP_LOC);
+  expect(issues[0].message).toContain("comprehension nesting limit");
+});
+
+test("rejects a bad matches pattern in a process.start mapping value", () => {
+  const issues = startIssues({ field_t_amount: cel('data.note.matches("(")') });
+  expect(issues.length).toBe(1);
+  expect(issues[0].loc).toBe(MAP_LOC);
+  expect(issues[0].message).toContain("does not compile as a JavaScript RegExp");
+});
+
+test("rejects result and child.outcome in a process.start mapping value", () => {
+  for (const [src, word] of [["result", "result"], ["child.outcome", "child"]] as const) {
+    const issues = startIssues({ field_t_amount: cel(src) });
+    expect(issues.length).toBe(1);
+    expect(issues[0].loc).toBe(MAP_LOC);
+    expect(issues[0].message.toLowerCase()).toContain(word);
+  }
+});
+
+test("accepts a well-typed process.start mapping value whatever type it infers to", () => {
+  expect(startIssues({ field_t_amount: cel("data.amount * 2.0") })).toEqual([]);
+  expect(startIssues({ field_t_note: cel("data.note") })).toEqual([]);
+  expect(startIssues({ field_t_who: cel("actor.id + instance.id") })).toEqual([]);
+});
+
+test("checks every entry of a process.start mapping, each at its own key", () => {
+  const issues = startIssues({ field_ok: cel("data.amount"), field_bad: cel("data.missing"), field_worse: cel("result") });
+  expect(issues.map((i) => i.loc).sort()).toEqual([
+    "steps[0].onEntry[0].config.inputMapping.field_bad",
+    "steps[0].onEntry[0].config.inputMapping.field_worse",
+  ]);
+});
+
+test("a process.start action at a path and at a timer is a checked site too", () => {
+  const action = startAction({ processId: "proc_target", inputMapping: { field_t_amount: cel("data.missing") } });
+  const onPath = {
+    id: "step_a", key: "a", label: { en: "A" }, type: "task",
+    paths: [{ id: "path_a", key: "pa", label: "Pa", to: "step_b", trigger: "manual", onPath: [action] }],
+  };
+  const onFire = {
+    id: "step_a", key: "a", label: { en: "A" }, type: "task",
+    paths: [{ id: "path_a", key: "pa", label: "Pa", to: "step_b", trigger: "manual" }],
+    timers: [{ id: "timer_a", duration: "PT1H", onFire: { actions: [action] } }],
+  };
+  expect(validateProcessBody(body({ fields: startFields, steps: [onPath] })).map((i) => i.loc)).toEqual([
+    "steps[0].paths[0].onPath[0].config.inputMapping.field_t_amount",
+  ]);
+  expect(validateProcessBody(body({ fields: startFields, steps: [onFire] })).map((i) => i.loc)).toEqual([
+    "steps[0].timers[0].onFire.actions[0].config.inputMapping.field_t_amount",
+  ]);
+});
+
+test("reads no other plugin config for CEL", () => {
+  const bad = cel("data.missing");
+  // Another action type, even with the same key shape.
+  const http = startStep(startAction({ processId: "proc_target", inputMapping: { field_t_amount: bad }, nested: { value: bad } }, "http.request"));
+  expect(validateProcessBody(body({ fields: startFields, steps: [http] }))).toEqual([]);
+  // Another key of a process.start config.
+  const other = startStep(startAction({ processId: "proc_target", inputMapping: {}, extra: bad, nested: { value: bad } }));
+  expect(validateProcessBody(body({ fields: startFields, steps: [other] }))).toEqual([]);
+});
+
+test("a malformed process.start config is skipped without a throw", () => {
+  const configs: unknown[] = [
+    undefined,
+    null,
+    "text",
+    42,
+    [],
+    {},
+    { processId: "proc_target" },
+    { processId: "proc_target", inputMapping: "text" },
+    { processId: "proc_target", inputMapping: 42 },
+    { processId: "proc_target", inputMapping: null },
+    { processId: "proc_target", inputMapping: [cel("data.missing")] },
+  ];
+  for (const config of configs) {
+    const step = startStep(startAction(config));
+    expect(() => validateProcessBody(body({ fields: startFields, steps: [step] }))).not.toThrow();
+    expect(validateProcessBody(body({ fields: startFields, steps: [step] }))).toEqual([]);
+  }
+});
+
+test("a process.start mapping entry that is not a CEL expression is skipped", () => {
+  const entries: unknown[] = [
+    null,
+    "data.missing",
+    42,
+    true,
+    [],
+    {},
+    { lang: "json", src: "data.missing" },
+    { lang: "cel" },
+    { lang: "cel", src: 7 },
+  ];
+  for (const entry of entries) {
+    expect(() => startIssues({ field_t_amount: entry })).not.toThrow();
+    expect(startIssues({ field_t_amount: entry })).toEqual([]);
+  }
+  // A skipped entry does not hide its sibling.
+  const issues = startIssues({ field_skip: null, field_t_amount: cel("data.missing") });
+  expect(issues.map((i) => i.loc)).toEqual([MAP_LOC]);
 });
