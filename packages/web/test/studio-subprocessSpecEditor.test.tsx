@@ -35,6 +35,7 @@ function render(spec: Parameters<typeof SubprocessSpecEditor>[0]["value"], local
     <SubprocessSpecEditor
       value={spec}
       fields={[]}
+      childInputs={{ status: "idle", fields: [] }}
       onChange={() => {}}
       processes={PROCESSES}
       contentLocale={locale}
@@ -89,5 +90,123 @@ describe("the version binding pair", () => {
       contractRef: "ref",
     });
     expect(latest).toContain(studioCatalog.en["subprocess.bindingNote"]);
+  });
+});
+
+const CHILD = PROCESSES[0]!.processId;
+const CHILD_FIELDS = [
+  { id: "fld_amount", key: "amount", label: "Amount" },
+  { id: "fld_applicant", key: "applicant", label: "Applicant" },
+];
+const PARENT_FIELDS = [{ id: "fld_parent_only", key: "parent_only", type: "string" }] as never;
+
+function renderWith(
+  spec: Parameters<typeof SubprocessSpecEditor>[0]["value"],
+  childInputs: Parameters<typeof SubprocessSpecEditor>[0]["childInputs"],
+): string {
+  return renderToStaticMarkup(
+    <SubprocessSpecEditor
+      value={spec}
+      fields={PARENT_FIELDS}
+      childInputs={childInputs}
+      onChange={() => {}}
+      processes={PROCESSES}
+      contentLocale="en"
+    />,
+  );
+}
+
+const PINNED = {
+  processId: CHILD as never,
+  versionBinding: "pinned" as const,
+  pinnedVersion: 2,
+  inputMapping: {},
+  outputMapping: {},
+};
+const CEL = (src: string) => ({ lang: "cel" as const, src });
+
+describe("a step with no spec", () => {
+  it("shows the process select alone", () => {
+    const html = renderWith(undefined, { status: "idle", fields: [] });
+    expect(html).toContain(studioCatalog.en["subprocess.processLabel"]);
+    expect(html).not.toContain(studioCatalog.en["subprocess.bindingLegend"]);
+    expect(html).not.toContain(studioCatalog.en["subprocess.pinnedVersionLabel"]);
+    expect(html).not.toContain("inputMapping");
+    expect(html).not.toContain("outputMapping");
+    expect(html).not.toContain(studioCatalog.en["subprocess.addInputMapping"]);
+  });
+});
+
+describe("the inputMapping editor", () => {
+  const addInput = studioCatalog.en["subprocess.addInputMapping"];
+  const addDisabled = (html: string) =>
+    new RegExp(`<button[^>]*disabled=""[^>]*>${addInput.replace(/\W/g, "\\$&")}</button>`).test(html);
+
+  it("offers the child's input field keys and none of the parent's", () => {
+    const html = renderWith(
+      { ...PINNED, inputMapping: { fld_amount: CEL("data.x") } as never },
+      { status: "ready", fields: CHILD_FIELDS },
+    );
+    expect(html).toContain('<option value="fld_amount" selected="">amount</option>');
+    expect(html).toContain('<option value="fld_applicant">applicant</option>');
+    const inputFieldset = html.slice(html.indexOf("inputMapping"), html.indexOf("outputMapping"));
+    expect(inputFieldset).not.toContain("parent_only");
+  });
+
+  it("keeps the parent's fields as the outputMapping targets", () => {
+    const html = renderWith(
+      { ...PINNED, outputMapping: { fld_parent_only: CEL("child.data.x") } as never },
+      { status: "ready", fields: CHILD_FIELDS },
+    );
+    expect(html.slice(html.indexOf("outputMapping"))).toContain(">parent_only</option>");
+  });
+
+  it("enables + add when the child is ready and lists a free field", () => {
+    expect(addDisabled(renderWith(PINNED, { status: "ready", fields: CHILD_FIELDS }))).toBe(false);
+  });
+
+  it("disables + add and prints the loading note while the read runs", () => {
+    const html = renderWith(PINNED, { status: "loading", fields: [] });
+    expect(addDisabled(html)).toBe(true);
+    expect(html).toContain(studioCatalog.en["subprocess.childInputsLoading"]);
+  });
+
+  it("disables + add and prints the failed note after a failed read", () => {
+    const html = renderWith({ ...PINNED, inputMapping: { fld_amount: CEL("data.x") } as never }, { status: "failed", fields: [] });
+    expect(addDisabled(html)).toBe(true);
+    expect(html).toContain(studioCatalog.en["subprocess.childInputsFailed"]);
+    // The stored row stays, as an unlisted option.
+    expect(html).toContain(`fld_amount ${studioCatalog.en["mapping.unlistedKey"]}`);
+  });
+
+  it("prints the no-input-fields note for a ready child that lists none", () => {
+    const html = renderWith(PINNED, { status: "ready", fields: [] });
+    expect(addDisabled(html)).toBe(true);
+    expect(html).toContain(studioCatalog.en["subprocess.childInputsNone"]);
+  });
+
+  it("disables + add once every child field has a row", () => {
+    const mapping = { fld_amount: CEL("a"), fld_applicant: CEL("b") } as never;
+    const html = renderWith({ ...PINNED, inputMapping: mapping }, { status: "ready", fields: CHILD_FIELDS });
+    expect(addDisabled(html)).toBe(true);
+    expect(html).not.toContain(studioCatalog.en["subprocess.childInputsNone"]);
+  });
+
+  it("marks a stored key the child no longer lists", () => {
+    const html = renderWith(
+      { ...PINNED, inputMapping: { fld_gone: CEL("data.x") } as never },
+      { status: "ready", fields: CHILD_FIELDS },
+    );
+    expect(html).toContain(`fld_gone ${studioCatalog.en["mapping.unlistedKey"]}`);
+    expect(html).toContain('<option value="fld_gone" selected="">');
+  });
+
+  it("prints no note while the child is idle or ready with fields", () => {
+    for (const childInputs of [{ status: "idle" as const, fields: [] }, { status: "ready" as const, fields: CHILD_FIELDS }]) {
+      const html = renderWith(PINNED, childInputs);
+      expect(html).not.toContain(studioCatalog.en["subprocess.childInputsLoading"]);
+      expect(html).not.toContain(studioCatalog.en["subprocess.childInputsFailed"]);
+      expect(html).not.toContain(studioCatalog.en["subprocess.childInputsNone"]);
+    }
   });
 });

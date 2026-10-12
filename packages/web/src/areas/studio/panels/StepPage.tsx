@@ -14,6 +14,7 @@ import { ActionListEditor } from "./ActionListEditor";
 import { SubprocessSpecEditor } from "./SubprocessSpecEditor";
 import { PluginEnvelopeEditor } from "./shared/PluginEnvelopeEditor";
 import { useRegistry } from "./shared/useRegistry.js";
+import { useChildInputFields } from "./shared/useChildInputFields";
 import { PathsPanel } from "./PathsPanel";
 import { TimersPanel } from "./TimersPanel";
 import { IssueItems, NotCheckedBadge } from "./shared/IssueList";
@@ -476,6 +477,18 @@ export function StepPage({
 
   const index = steps.findIndex((s) => s.id === step?.id);
 
+  // The child's input fields feed the subprocess editor's inputMapping. The
+  // version is the pinned one, or the process's newest for latest-at-spawn. A
+  // step of another kind, or one with no process, leaves the hook idle.
+  const callSpec = step?.type === "subprocess" ? step.subprocess : undefined;
+  const callVersion =
+    callSpec?.versionBinding === "pinned"
+      ? callSpec.pinnedVersion
+      : callSpec?.versionBinding === "latest-at-spawn"
+        ? processes.find((p) => p.processId === callSpec.processId)?.version
+        : undefined;
+  const childInputs = useChildInputFields(token, callSpec?.processId, callVersion);
+
   const loadChildFile = async (id: string | undefined, file: File | undefined) => {
     if (!id || !file) return;
     try {
@@ -691,6 +704,7 @@ export function StepPage({
             <SubprocessSpecEditor
               value={step.subprocess}
               fields={fields}
+              childInputs={childInputs}
               onChange={(subprocess) => updateStep({ subprocess })}
               processes={[...processes]}
               contentLocale={contentLocale}

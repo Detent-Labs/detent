@@ -409,6 +409,9 @@ export const en = {
   "subprocess.removeMappingEntry": "remove",
   "subprocess.addInputMapping": "+ Add input mapping",
   "subprocess.addOutputMapping": "+ Add output mapping",
+  "subprocess.childInputsLoading": "Loading the input fields of the called process.",
+  "subprocess.childInputsFailed": "The input fields of the called process could not load.",
+  "subprocess.childInputsNone": "The called process declares no input fields.",
 
   "contentLocale.legend": "Content locale",
   "contentLocale.invalid": "invalid locale code",
