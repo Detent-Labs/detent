@@ -118,10 +118,14 @@ gains `collaboration`. The table gains `objects: { collaboration: {} }`.
   map sends `outcome` to `howItEnds`, `onCancel` to `exit`, and the identity
   keys to the masthead, as the audit recorded.
 - `studio-changeSet.test.ts` keeps its named `shapes` list, because
-  `OWNED_LISTS` uses those names. The list gains `collaboration` and
-  `assignment`. A new test uses the container walk. It requires that every
-  object schema with declared keys under `processBody` has a listed shape with
-  the same key set. A new nested object with no listed shape then fails.
+  `OWNED_LISTS` uses those names. The list stays as it is. Its word-coverage
+  test demands a word for every key, and three shapes read without one:
+  `collaboration` shows as a JSON object, `assignment` shows by its strategy
+  word, and an expression shows as one CEL leaf. A new test uses the container
+  walk. It requires that every object schema with declared keys under
+  `processBody` has a listed shape with the same key set, or sits in a short
+  exemption list in the test. Each exemption carries its reason. A new nested
+  object in neither place fails the test.
 
 **6. The layout does not change.** The refusal uses the existing inline error.
 Only the message grows a longer path. `/impeccable shape` reduces to a copy

@@ -2,16 +2,16 @@
 
 ## 1. The load guard
 
-- [ ] 1.1 Add `collaboration` to `KNOWN_KEYS` and export the set. Add a test in `studio-load-guard.test.ts` that compares it to `Object.keys(processBody.shape)`.
-- [ ] 1.2 Add the `Shape` type, `DRAFT_SHAPE` and the walker from design decision 1. Test that the guard flags `workflow.steps` as an object, a string step and a `null` `view`.
-- [ ] 1.3 Test that a body with `collaboration.comments` false, an empty body and absent step containers return no issues. Test the same for a well-typed body that breaks an invariant.
-- [ ] 1.4 Grep `examples/` and `packages/web/test` for a body with a `null` container, and fix any hit. Rewrite the `null` comment in `studio-fieldRemoval.test.ts`. Rewrite the header comment in `load-guard.ts`, which names `draft/validate.ts` where the file is `draft/validation.ts`.
-- [ ] 1.5 Add the helper `packages/web/test/zodContainerPaths.ts` with `containerNodes`, per design decision 3. Add a test that `DRAFT_SHAPE` flattens to the same paths, including `view.fields[]`. See it fail when a row leaves the table.
+- [x] 1.1 Add `collaboration` to `KNOWN_KEYS` and export the set. Add a test in `studio-load-guard.test.ts` that compares it to `Object.keys(processBody.shape)`.
+- [x] 1.2 Add the `Shape` type, `DRAFT_SHAPE` and the walker from design decision 1. Test that the guard flags `workflow.steps` as an object, a string step and a `null` `view`.
+- [x] 1.3 Test that a body with `collaboration.comments` false, an empty body and absent step containers return no issues. Test the same for a well-typed body that breaks an invariant.
+- [x] 1.4 Grep `examples/` and `packages/web/test` for a body with a `null` container, and fix any hit. Rewrite the `null` comment in `studio-fieldRemoval.test.ts`. Rewrite the header comment in `load-guard.ts`, which names `draft/validate.ts` where the file is `draft/validation.ts`.
+- [x] 1.5 Add the helper `packages/web/test/zodContainerPaths.ts` with `containerNodes`, per design decision 3. Add a test that `DRAFT_SHAPE` flattens to the same paths, including `view.fields[]`. See it fail when a row leaves the table.
 
 ## 2. The mirror tests
 
-- [ ] 2.1 Add a test to `studio-sectionsFor.test.ts` that maps every key of `step.shape` to a section or `masthead`. See it fail when a key leaves the map.
-- [ ] 2.2 Add `collaboration` and `assignment` to the `shapes` list in `studio-changeSet.test.ts`. Add a test that every object schema under `processBody` has a listed shape with the same key set.
+- [x] 2.1 Add a test to `studio-sectionsFor.test.ts` that maps every key of `step.shape` to a section or `masthead`. See it fail when a key leaves the map.
+- [x] 2.2 Add a test to `studio-changeSet.test.ts` that every object schema under `processBody` has a listed shape with the same key set. Exempt `collaboration`, `assignment` and expressions, each with a reason.
 
 ## 3. Verification
 
