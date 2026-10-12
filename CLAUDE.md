@@ -206,7 +206,7 @@ directives already work.
 | `changed-markdown-prose` | `gates/prose.sh` | a rising antislop finding count in the Markdown the push changes |
 | `no-machine-paths` | `gates/machine-paths.sh` | an absolute home-directory path in a tracked file |
 | `frozen-lockfile` | `gates/lockfile.sh` | a manifest the committed `bun.lock` cannot satisfy |
-| `no-silent-green` | `gates/silent-green.sh` | a suite run with no database, or one skipping past the floor |
+| `no-silent-green` | `gates/silent-green.sh` | a suite run with no database, skips and todos past the skip floor, passes below the pass floor, or a summary it cannot read |
 
 The first three need only git and a shell, so they run on the host and report
 even when the container is down. The last two run in the devcontainer.
@@ -214,7 +214,14 @@ even when the container is down. The last two run in the devcontainer.
 Two properties are worth knowing before a push. `--no-verify` bypasses the hook,
 and so disables every gate at once, never just the one in the way. The skip floor
 in `scripts/gates/skip-floor.txt` is a ratchet: raise it only in the commit that
-adds the skip, with a row naming what the increase covers.
+adds the skip, with a row naming what the increase covers. A todo test counts as
+a skip.
+
+`no-silent-green` reads the whole summary of the run. The pass floor in
+`scripts/gates/pass-floor.txt` guards the other side. A run that passes fewer
+tests fails the gate, and a change that deletes tests on purpose lowers the floor
+in the same commit. The gate also rejects a run whose summary it cannot read:
+no `pass` line, no `Ran N tests` line, or counts that do not add up to N.
 
 ### Prose debt: what the ratchet permits
 
@@ -435,13 +442,15 @@ after a substantial change lands.
   the compose credentials. Don't just remember to check by
   eye: `scripts/test-gated.sh` runs the command, prints its full output, and
   then runs `scripts/gates/silent-green.sh` over that output. It gives the
-  same DATABASE_URL-unset and skip-floor checks the push gate runs, before
-  pushing instead of at push time. From the host, in one call:
+  same DATABASE_URL-unset, skip-floor, pass-floor and unreadable-summary
+  checks the push gate runs, before pushing instead of at push time. From the
+  host, in one call:
   `. scripts/worktree-env.sh && MSYS_NO_PATHCONV=1 rtk test docker compose -f .devcontainer/docker-compose.yml exec -T -w /workspace app sh scripts/test-gated.sh bun test`.
 - **The host call filters through rtk.** It runs on the host and stays
   optional, since the runner also works without it. Inside the devcontainer,
-  run `sh scripts/test-gated.sh bun test`. The exit code is the suite's, or 1
-  when the gate rejects the run. Measured on 2026-09-30
+  run the full suite with `sh scripts/test-gated.sh bun test`, since a subset
+  run fails the pass floor. The exit code is the suite's own, or 1 when the
+  suite exits 0 and the gate rejects the run. Measured on 2026-09-30
   with rtk 0.50.0 and 4997 tests: a green run prints 6 lines and 87
   characters, against 5581 lines and 523110 characters raw. A red run keeps
   each failing test's name, its diff and its stack lines.

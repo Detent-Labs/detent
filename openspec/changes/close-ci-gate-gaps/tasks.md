@@ -42,10 +42,10 @@
 
 ## 6. Prose that names the gates
 
-- [ ] 6.1 Reword the `no-silent-green` row and the floor paragraph in `CLAUDE.md`. Name the todo rule, the unreadable summary and the pass floor. Reword the runner paragraph to say that the runner wants the full suite.
-- [ ] 6.2 Reword the hosted-CI sentence in `docs/current-state.md` to say that the install is frozen. Check `ROADMAP.md` and `README.md` for a sentence that the new CI order made false.
-- [ ] 6.3 Delete the `close-ci-gate-gaps` entry from the audit index in `docs/decisions.md`. Verify that `git grep -n close-ci-gate-gaps docs/decisions.md` prints nothing.
-- [ ] 6.4 Run the antislop linter on every Markdown file this change touched. Fix each finding or add a targeted directive with a reason.
+- [x] 6.1 Reword the `no-silent-green` row and the floor paragraph in `CLAUDE.md`. Name the todo rule, the unreadable summary and the pass floor. Reword the runner paragraph to say that the runner wants the full suite.
+- [x] 6.2 Reword the hosted-CI sentence in `docs/current-state.md` to say that the install is frozen. Check `ROADMAP.md` and `README.md` for a sentence that the new CI order made false.
+- [x] 6.3 Delete the `close-ci-gate-gaps` entry from the audit index in `docs/decisions.md`. Verify that `git grep -n close-ci-gate-gaps docs/decisions.md` prints nothing.
+- [x] 6.4 Run the antislop linter on every Markdown file this change touched. Fix each finding or add a targeted directive with a reason.
 
 ## 7. Verification
 

@@ -286,7 +286,8 @@ owner also builds, previews, shares and exports saved reports.
 
 All tooling runs inside the devcontainer, and a preflight script checks it.
 The pre-push hook runs the gates and a lint-first check. Hosted CI runs the
-same checks plus a dependency audit. The suite uses its own database.
+same checks plus a dependency audit, after an install frozen to the committed
+lockfile. The suite uses its own database.
 
 - Paths: `.devcontainer/`, `.githooks/`, `scripts/gates/`,
   `scripts/preflight.sh`, `.github/workflows/check.yml`, `bunfig.toml`,
