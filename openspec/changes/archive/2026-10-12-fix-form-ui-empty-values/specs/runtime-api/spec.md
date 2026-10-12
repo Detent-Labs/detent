@@ -5,7 +5,7 @@
 ### Requirement: A null value in a submission clears the field
 
 In `submitAndTransition`, a submitted `null` SHALL mean the participant cleared that field.
-The engine SHALL delete the key from the committed `data`, so the field behaves as never written.
+The engine SHALL leave the key out of the committed `data`, so the field behaves as never written.
 The key still meets the field-set rule of the submit requirement.
 A `null` for an unknown key or a `readonly` field draws `unknown-field` or `readonly-field`, as any value would.
 
@@ -20,7 +20,7 @@ A `null` for an unknown key or a `readonly` field draws `unknown-field` or `read
 - **THEN** the result carries a `readonly-field` issue for that field
 - **AND** the instance keeps its stored value
 
-#### Scenario: The audit log records the deletion
+#### Scenario: The audit log records the cleared value
 
 - **WHEN** a submission clears a field that held a value
 - **THEN** the instance audit log gains a `set` entry for that field whose value is a JSON null
@@ -29,7 +29,7 @@ A `null` for an unknown key or a `readonly` field draws `unknown-field` or `read
 
 A cleared key SHALL meet no type, option, constraint or rule check, since it has no value to judge.
 The merged data that a `validation.rule`, the required check and the path guard read SHALL omit the key.
-A guard that reads a deleted field raises, and a raising guard means no match.
+A guard that reads a cleared field raises, and a raising guard means no match.
 
 #### Scenario: A cleared optional date skips the format check
 
