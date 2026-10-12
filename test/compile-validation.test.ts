@@ -11,7 +11,13 @@
  */
 import { readFileSync, readdirSync } from "node:fs";
 import { describe, it, expect } from "bun:test";
-import { processVersion, processBody, publishedProcessBody, type ProcessBody } from "../src/schema/definition.js";
+import {
+  processVersion,
+  processBody,
+  publishedProcessBody,
+  CANCEL_SINK_STEP_ID,
+  type ProcessBody,
+} from "../src/schema/definition.js";
 import {
   compileProcessBody,
   CompileValidationError,
@@ -1564,5 +1570,155 @@ describe("compile: a view entry's group names a group field the view carries", (
     const err = rejects(b);
     expect(err.issues.some((i) => i.loc === "steps[0].view.fields[2].group")).toBe(true);
     expect(err.message).toContain('"outer"');
+  });
+});
+
+// tighten-publish-contract-checks: a body that already satisfies
+// publishedProcessBody takes compileProcessBody's early return. That schema
+// counts cancel-sinks and validates nothing else, so the early return also pins
+// the sink to what publish injects: a hand-written sink of another shape
+// cannot ride through.
+describe("compile: the cancel-sink must match the engine's injection", () => {
+  /** baseBody with a contract: step_b binds the declared outcome "approved". */
+  const contractedBase = (): any => {
+    const b = baseBody();
+    b.contract = { inputFields: [], outputFields: [], outcomes: ["approved"] };
+    b.workflow.steps[1].outcome = "approved";
+    return b;
+  };
+
+  const sinkOf = (b: any): any => b.workflow.steps.find((s: any) => s.id === CANCEL_SINK_STEP_ID);
+
+  /** The compiled form of `authored`, then `tamper` applied: a body a
+   * hand-writer could submit. It really takes the early return. */
+  const handWritten = (authored: any, tamper: (b: any) => void): any => {
+    const b: any = structuredClone(compileProcessBody(authored as ProcessBody));
+    tamper(b);
+    expect(publishedProcessBody.safeParse(b).success).toBe(true);
+    return b;
+  };
+
+  const expectSinkIssue = (body: any, index: number) => {
+    const err = rejects(body);
+    expect(err.issues).toHaveLength(1);
+    expect(err.issues[0]!.loc).toBe(`steps[${index}]`);
+    expect(err.issues[0]!.value).toBe(CANCEL_SINK_STEP_ID);
+    expect(err.issues[0]!.message).toContain("remove it and let publish inject it");
+  };
+
+  it("rejects a sink carrying another outcome", () => {
+    const b = handWritten(contractedBase(), (c) => {
+      sinkOf(c).outcome = "approved";
+      c.contract.outcomes = ["approved"];
+    });
+    expectSinkIssue(b, 2);
+  });
+
+  it("rejects a non-terminal sink", () => {
+    const b = handWritten(baseBody(), (c) => {
+      const sink = sinkOf(c);
+      delete sink.terminal;
+      sink.paths = [{ id: "path_sink_out", key: "out", label: "Out", to: "step_b", trigger: "manual" }];
+    });
+    expectSinkIssue(b, 2);
+  });
+
+  it("rejects a sink declaring an action", () => {
+    const b = handWritten(baseBody(), (c) => {
+      sinkOf(c).onEntry = [{ id: "action_sink", type: "noop", config: {} }];
+    });
+    expectSinkIssue(b, 2);
+  });
+
+  it("rejects a sink placed ahead of the authored steps", () => {
+    const b = handWritten(baseBody(), (c) => {
+      const sink = c.workflow.steps.pop();
+      c.workflow.steps.unshift(sink);
+    });
+    expectSinkIssue(b, 0);
+  });
+
+  it("rejects a contracted body whose outcomes lack the reserved outcome", () => {
+    const b = handWritten(contractedBase(), (c) => {
+      const sink = sinkOf(c);
+      delete sink.terminal;
+      delete sink.outcome;
+      sink.paths = [{ id: "path_sink_out", key: "out", label: "Out", to: "step_b", trigger: "manual" }];
+      c.contract.outcomes = ["approved"];
+    });
+    expect(b.contract.outcomes).not.toContain("cancelled");
+    expectSinkIssue(b, 2);
+  });
+
+  it("accepts the sink the engine injects, contracted or not", () => {
+    for (const authored of [baseBody(), contractedBase()]) {
+      const compiled = compileProcessBody(authored as ProcessBody);
+      expect(canonicalize(compileProcessBody(compiled))).toBe(canonicalize(compiled));
+    }
+  });
+});
+
+// Re-publishing the output of a previous compile is a byte-identical no-op for
+// every definition shipped under examples/. Guards the comparison above against
+// rejecting a body the engine itself produced.
+describe("compile: every example publishes twice to byte-identical output", () => {
+  const files = readdirSync(new URL("../examples/", import.meta.url))
+    .filter((name) => name.endsWith(".json"))
+    .sort();
+
+  it("covers all nine example files", () => {
+    expect(files).toHaveLength(9);
+  });
+
+  for (const name of files) {
+    it(`${name}`, () => {
+      const raw = JSON.parse(readFileSync(new URL(`../examples/${name}`, import.meta.url), "utf8"));
+      const first = compileProcessBody((raw.definition ?? raw) as ProcessBody);
+      const second = compileProcessBody(first);
+      expect(JSON.stringify(second)).toBe(JSON.stringify(first));
+      expect(canonicalize(second)).toBe(canonicalize(first));
+    });
+  }
+});
+
+// tighten-publish-contract-checks: Action.execution accepts "async" only, and
+// Action.idempotencyKey is no longer declared. The key was never read: the
+// engine derives every outbox row's key from instance, sequence and action id.
+describe("compile: an action declares async execution and no idempotency key", () => {
+  const withAction = (extra: Record<string, unknown>) => {
+    const b = baseBody();
+    b.workflow.steps[0].onEntry = [{ id: "action_x", type: "t", config: {}, ...extra }];
+    return b;
+  };
+
+  it("rejects execution: \"blocking\"", () => {
+    let thrown: unknown;
+    try {
+      compileProcessBody(withAction({ execution: "blocking" }) as ProcessBody);
+    } catch (err) {
+      thrown = err;
+    }
+    expect((thrown as Error | undefined)?.name).toBe("ZodError");
+    const paths = (thrown as { issues: { path: unknown[] }[] }).issues.map((i) => i.path.join("."));
+    expect(paths).toContain("workflow.steps.0.onEntry.0.execution");
+  });
+
+  it("accepts execution: \"async\"", () => {
+    const out = compileProcessBody(withAction({ execution: "async" }) as ProcessBody);
+    expect(out.workflow.steps[0]!.onEntry![0]!.execution).toBe("async");
+  });
+
+  it("rejects idempotencyKey: null as an unknown key with a located issue", () => {
+    const err = rejects(withAction({ idempotencyKey: null }));
+    expect(
+      err.issues.some((i) => i.loc === "workflow.steps[0].onEntry[0].idempotencyKey" && i.value === "idempotencyKey"),
+    ).toBe(true);
+  });
+
+  it("rejects idempotencyKey: \"x\" as an unknown key with a located issue", () => {
+    const err = rejects(withAction({ idempotencyKey: "x" }));
+    expect(
+      err.issues.some((i) => i.loc === "workflow.steps[0].onEntry[0].idempotencyKey" && i.value === "idempotencyKey"),
+    ).toBe(true);
   });
 });

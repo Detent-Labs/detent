@@ -56,6 +56,11 @@ cancellation of running instances. Where absent, the default is `true`. This
 blocks only participants; operators and actors with reserved roles remain
 authorized regardless.
 
+Publishing adds a hidden final step that receives cancellations, so write the
+body without one. A body that carries such a step other than the exact one
+publish adds fails publish. An edited JSON copy of a published body, such as a
+promotion file, can trip this.
+
 ### Version
 
 You publish a process, and that publication is a version. A published version
@@ -770,6 +775,10 @@ whatever it receives. The demo's booking always succeeds; a real accounting
 system would decide instead. `review`'s reminder timer sends
 `notification.email`. On entry to `escalated_review` the example runs both
 `http.request` and `notification.email`.
+
+An action runs async only. Omit `execution` or write `"async"`; the value
+`"blocking"` fails to parse. The engine derives each delivery's idempotency key,
+and an action cannot set one.
 
 An action can write its result back into the payload. The engine verifies the
 value against the target field's declared type first. A value of the wrong

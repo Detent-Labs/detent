@@ -15,7 +15,7 @@ import { drainTimers } from "../src/engine/timers.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import { HTTP_ACTION_TYPE, httpHandlerDef } from "../src/handlers/http.js";
 import { NOTIFICATION_EMAIL_ACTION_TYPE, notificationEmailHandlerDef } from "../src/handlers/notification-email.js";
-import { compileProcessBody } from "../src/schema/compile.js";
+import { compileProcessBody, CompileValidationError } from "../src/schema/compile.js";
 import { definitionHash } from "../src/schema/hash.js";
 import type { ProcessBody, ProcessId, Instance, Action } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
@@ -211,6 +211,24 @@ test.skipIf(!DB)("a rejected publish reports every issue, not only the first", a
     "steps[1].onEntry.actions[0].output.field_go",
     "steps[1].paths[0].guard",
   ]);
+  expect(await definitionCount()).toBe(0);
+});
+
+// A body already carrying a cancel-sink satisfies publishedProcessBody, so it
+// skips authored compilation. A sink of another shape must still be refused.
+test.skipIf(!DB)("publish rejects a hand-written cancel-sink that is not the engine's and stores no version", async () => {
+  const lookalike = structuredClone(compileProcessBody(waitBody("sayYes"))) as unknown as Record<string, any>;
+  const sink = lookalike.workflow.steps.find((s: any) => s.id === "step_cancel_sink");
+  sink.onEntry = [{ id: "action_sink", type: "sayYes", config: {} }];
+
+  let caught: unknown;
+  try {
+    await publishBody(PID, lookalike as unknown as ProcessBody, reg, dataSourceReg);
+  } catch (e) {
+    caught = e;
+  }
+  expect(caught).toBeInstanceOf(CompileValidationError);
+  expect((caught as CompileValidationError).issues.map((i) => i.loc)).toEqual(["steps[3]"]);
   expect(await definitionCount()).toBe(0);
 });
 

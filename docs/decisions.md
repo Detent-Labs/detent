@@ -1684,11 +1684,6 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   `createDefaultAssignmentRegistry`. Anchors:
   `src/handlers/process-start.ts`, `src/handlers/instance-transition.ts`,
   `src/engine/assignment-strategies.ts`.
-- **`tighten-publish-contract-checks` (A-2, A-8; medium)**: The idempotent
-  compile branch accepts a hand-written cancel sink of any shape, and publish
-  stores `Action.execution` and `Action.idempotencyKey`, which nothing reads.
-  Anchors: `src/schema/compile.ts`, `src/schema/definition.ts`,
-  `src/engine/transition.ts`.
 - **`bind-instance-transition-target` (D-3; medium)**: The
   `instance.transition` handler drives a target instance with system rights,
   and participant data decides which instance that is. Anchors:
@@ -1973,7 +1968,8 @@ audit of 2026-09-10.
 16. **Delete the unused registry seams.** Rejected. That set is
     `devHeaderResolver`, the action `Registry`, the `DataSourceRegistry`, the
     `AssignmentRegistry`'s multi-strategy handlers, `exampleRegistry.ts` with
-    `RegistryPanel.tsx`, and `Action.execution`'s reserved enum. `CLAUDE.md`
+    `RegistryPanel.tsx`, and `Action.execution`'s reserved enum. The enum has
+    since narrowed to `async` (`tighten-publish-contract-checks`). `CLAUDE.md`
     records the reserved enum and the dev-header seam as v1 boundaries, and
     the registries as the plugin seam. The two studio files have
     since left the tree on their own change, on 2026-08-18; the rest stand.
