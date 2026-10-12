@@ -747,21 +747,21 @@ build.
 
 <!-- antislop: allow trailing-negation -->
 <!-- "Decided, not yet built" quotes an existing section heading verbatim. -->
-Three items on the Prioritized Action List of
+Four items on the Prioritized Action List of
 [`openspec/changes/archive/2026-08-18-code-review-record/CODE_REVIEW.md`](../openspec/changes/archive/2026-08-18-code-review-record/CODE_REVIEW.md)
-are open, and CQ-1 is resolved. SEC-1 closed 2026-09-23 as
-`add-publish-cycle-check-and-cel-deadline`; see `docs/decisions-archive.md`.
+stood open. CQ-1, ARCH-1 and TEST-1 are resolved, and DEP-1 stays open.
+SEC-1 closed 2026-09-23 as `add-publish-cycle-check-and-cel-deadline`; see
+`docs/decisions-archive.md`.
 Each was re-checked against the tree on 2026-09-09. That review holds the
 reasoning and the recommended fix. The owner decided the other five on
 2026-09-23. See "Decided, not yet built" and "Accepted risks" above. This
-section records that nothing else tracks the three still open.
+section records that nothing else tracks the one still open.
 
-- **TEST-1: nothing asserts that every route refuses an uncredentialed
-  request.** Each handler carries its own `requireRole` or `requirePermission`
-  call, and the route table holds 86 entries (`src/http/server.ts:554`). No
-  test iterates that table. Risk: a route added without a check ships
-  silently, which is the first entry of the OWASP Top 10. The review's fix is
-  a table-driven test plus a named exemption set.
+- **TEST-1 (resolved by `widen-test-guards`): nothing asserted that every route
+  refuses an uncredentialed request.** `test/http-route-auth.test.ts` reads the
+  route table from `src/http/server.ts` and sends each row a request with no
+  credential. Each route answers 401. A named exemption set holds
+  `POST /auth/login` and `GET /ui-strings`.
 - **DEP-1: CI runs no SAST and no secret scanning.**
   `.github/workflows/check.yml` is the only workflow, and it holds no CodeQL
   or `gitleaks` job. Dependabot covers version drift alone
@@ -1708,12 +1708,6 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   Vite. Anchors: `packages/web/src/areas/studio/panels/FieldMatrixGrid.tsx`,
   `packages/web/src/areas/studio/canvas/CanvasView.tsx`,
   `packages/web/vite.config.ts`.
-- **`widen-test-guards` (G-3, G-4, G-9, G-10, A-6; medium)**: The index guard
-  in `migration.test.ts` checks an empty barrel, the example hash and
-  round-trip tests cover a subset of the examples, three tests assert only
-  what a response is not, and seven invariants have no rejecting test.
-  Anchors: `test/migration.test.ts`, `test/view-layout-hash.test.ts`,
-  `test/strip-compiled.test.ts`.
 - **`fix-studio-screen-races` (E1-8, E1-9, E1-10; low)**: Late responses
   overwrite a newer selection in the player and in Tools, the migration plan
   drops a duplicate mapping without a message, and "Create" on the Templates
