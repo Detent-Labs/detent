@@ -6279,7 +6279,9 @@ browser. Log in as an operator in tab A. Open `/app` in tab B. Log out in tab A.
 
 Pass: tab B shows the login screen on its own. A line above the first field
 reads "Your session ended in another tab." It stands beside a 3px rule in the
-advisory color, in the ink color, with no icon. Switch the language to German
-before the logout. Pass: the line reads in German and wraps without clipping at
-a 360px width. Log in again in tab B. Pass: the line disappears. `e2e/session-tabs.e2e.ts`
-asserts the sign-out and the text. This entry keeps only the visual judgment.
+advisory color, in the ink color, with no icon.
+
+Switch the language to German before the logout. Pass: the line reads in German
+and wraps without clipping at a 360px width. Log in again in tab B. Pass: the
+line disappears. `e2e/session-tabs.e2e.ts` asserts the sign-out and the text.
+This entry keeps only the visual judgment.
