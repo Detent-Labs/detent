@@ -59,7 +59,9 @@ only, and the environment withholds `result`, `child`, data sources, and
 **Expressions.** `CLAUDE.md`'s brief covers CEL's shape, purity, and total
 evaluation. This section states where each namespace is visible. Guards
 read the frozen context: `data`, `instance`, `actor`, plus
-`child.outcome`/`child.data` inside a subprocess step. A declared data
+`child.outcome`/`child.data` in a subprocess step's path guards and
+`outputMapping`. A view flag (`visible`, `required`, `readonly`) reads no
+`child`, even on that step. A declared data
 source is not a readable CEL namespace. A CEL reference to one is a
 publish error, since the engine resolves none. One extra namespace,
 `result` (a handler's structured return), is scoped only to an
@@ -71,6 +73,21 @@ A raising guard means no match. It is never a throw, a park, or an error
 surfaced to a participant. The most common cause is a field the instance
 has not written yet. The instance then waits at that path, the wait-state
 idiom, since nothing matched.
+
+A guard, a `validation.rule` and a view flag (`visible`, `required`,
+`readonly`) must infer to `bool`. A `dyn` result passes. The engine acts on
+a condition only when it is `true`. Any other type counts as false without a
+message. A guard then parks the path, and a rule rejects the submission.
+Publish checks this in `src/cel/check.ts`, not in the schema, so a body
+published earlier keeps running.
+
+A `matches` call takes a string literal as its pattern, never a field value
+or a built string. The literal must compile as a JavaScript `RegExp` and
+stay under the declared length bound. A pattern that does not compile raises
+on every evaluation, which a guard reads as no match. A literal that compiles
+can still backtrack on a long participant string. The length bound does not
+stop that, as with `validation.pattern`. Publish checks the rule in
+`src/cel/check.ts`, and a migration transform meets it at plan registration.
 
 The library `@marcbachmann/cel-js` pins an exact version in
 `package.json`, with no caret. An upgrade is a deliberate, reviewed
@@ -85,6 +102,13 @@ It does not fail the spawn or the return; see "Runtime record" below,
 reads only `result`. A raise there means the handler's return does not
 match the action's contract. That fails loudly rather than leaving an
 optional field unset.
+
+A `process.start` action's `config.inputMapping` entry follows the same
+total-evaluation rule, and a raising entry leaves its target unwritten. The
+engine evaluates it over `data`, `instance` and `actor`, with no `result` and
+no `child`. Publish checks each value like a guard: it parses, type-checks,
+bans time functions and bounds structure and length. Only that one key of a
+plugin `config` holds CEL.
 
 **Data vs presentation.** The catalog defines each field once,
 process-wide. Each step carries a flat `view`. Its entries either
@@ -209,8 +233,9 @@ delivery cannot stop the worker.
 rule and the priority-uniqueness rule; this section states only their
 runtime meaning. Among automatic paths, the lowest `priority` evaluates
 first, and the first matching guard wins. A wait-state has no default:
-no match means the instance waits, bounded by a timer. A gated side
-effect takes the shape of a visible wait-state with result-driven
+no match means the instance waits, bounded by a timer. A subprocess step
+differs: it may carry a default, and its paths run after the return. A
+gated side effect takes the shape of a visible wait-state with result-driven
 automatic paths, instead of hidden transaction semantics.
 
 The key `Path.key` must be non-empty after trimming, for either trigger
@@ -247,6 +272,42 @@ implementation floats. A spawn refuses a child once the parent's own
 nesting depth reaches 16 (`MAX_SUBPROCESS_DEPTH`,
 `src/engine/subprocess.ts`). The cap backs up `validateSubprocessCycle`.
 
+A subprocess step parks the parent until its child returns. The cascade
+never evaluates the step's paths on entry, because `child` exists only
+after the return. A guardless default stays allowed. It is the else
+branch for an outcome no guard matches. A guard that ignores `child` does
+not fire on entry either. The return selects the first hop with `child`
+in scope.
+
+The instance record carries `awaitedChild`, the id of the child the
+parked parent waits for. It sits outside `ProcessBody`, so
+`definitionHash` stays the same. An entry onto a subprocess step writes
+the child id the spawn derives. Any commit that leaves the step clears the
+field, and so does the return's writeback. An identity migration carries
+it over.
+
+Three engine-internal handlers run a subprocess step:
+`core.spawnSubprocess`, `core.returnSubprocess` and
+`core.cancelSubprocessChild`. The spawn creates a child only while the
+parent is running and `awaitedChild` equals the id the spawn derives. The
+return applies only when `awaitedChild` equals the returning child's id.
+Both checks keep a late delivery from acting for a step visit the parent
+has left.
+
+A parent can leave the step without the return in two ways: a timer exit
+and a migration relocation. Either commit enqueues a
+`core.cancelSubprocessChild` row in the same transaction. A migration
+commits only when no child is live, so its row finds nothing to cancel. The
+handler cancels a running child, runs its `onCancel` actions and cascades
+to its own children. A cancel of the parent enqueues no such row, since the
+sweep of running children covers it. A row that dead-letters leaves the
+child running until an operator retries it.
+
+A migration that vacates the step defers with `child-in-flight` while a
+child is live, so it never cancels a running child. A spawn still queued
+does not defer it. The late spawn finds `awaitedChild` cleared and creates
+nothing.
+
 **Extensibility.** A field's own `type` may also be a `{ type, config }`
 envelope, but no registry resolves it (`definition.ts:344`). A guard is
 never a plugin envelope; it stays CEL-only.
@@ -255,7 +316,7 @@ Custom actions, data sources and assignment strategies are plugins
 behind one envelope, `{ type, config }`. Three
 registries resolve them: the action `Registry`, the `AssignmentRegistry`,
 and the `DataSourceRegistry` (`registry.ts`). No action type is exempt
-from registry resolution, `core.` included. The two internal subprocess
+from registry resolution, `core.` included. The three internal subprocess
 handlers register their own `configSchema` (`src/engine/subprocess.ts`).
 A candidate resolver, a handler, and a data source each take a `db`
 handle scoped to the instance's own tenant. A handle bound once at
@@ -317,7 +378,8 @@ the walk, since it is fire-and-forget rather than a wait-state
 reference.
 
 **Runtime record (the audit backbone).** The instance carries
-assignment/claim state and persisted timer firings. Each `HistoryEntry`
+assignment/claim state and persisted timer firings. A parked parent adds
+`awaitedChild`, the child it waits for. Each `HistoryEntry`
 is append-only. It records the definition `version` active at that
 entry, so step/path ids resolve after a migration. It also records the
 cause (`user`, `timer`, `automatic`, `migration`, or `cancel`) and

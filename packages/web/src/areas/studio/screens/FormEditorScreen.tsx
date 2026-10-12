@@ -581,14 +581,12 @@ function OverrideField({
   value,
   flagKey,
   disabled,
-  stepId,
   onChange,
 }: {
   label: string;
   value: BoolOrExpr;
   flagKey: FlagKey;
   disabled?: boolean;
-  stepId?: string;
   onChange: (next: BoolOrExpr) => void;
 }) {
   const cel = isExpression(value);
@@ -606,7 +604,7 @@ function OverrideField({
       {cel && <span {...stylex.props(styles.formCel)}>{t("formEditor.markCel")}</span>}
       <details {...stylex.props(styles.studioDevview)}>
         <summary {...stylex.props(styles.studioDevviewSummary)}>{t("formEditor.developerView")}</summary>
-        <BooleanOrExpressionInput label={label} value={value} flagKey={flagKey} stepId={stepId} onChange={onChange} />
+        <BooleanOrExpressionInput label={label} value={value} flagKey={flagKey} onChange={onChange} />
       </details>
     </div>
   );
@@ -681,7 +679,6 @@ function TabPicker({
 export interface FormEditorStripProps {
   row: DraftViewField;
   label: string;
-  stepId: DraftStep["id"];
   ownStepIndex: number;
   written: WrittenAccessor;
   technicalFieldIds: Set<string>;
@@ -706,7 +703,6 @@ export interface FormEditorStripProps {
 export function FormEditorStrip({
   row,
   label,
-  stepId,
   ownStepIndex,
   written,
   technicalFieldIds,
@@ -730,7 +726,6 @@ export function FormEditorStrip({
       <h3 {...stylex.props(styles.formStripHeading)}>{label}</h3>
       <OverrideField
         label={t("formEditor.visible")}
-        stepId={stepId}
         flagKey="visible"
         value={row.visible}
         onChange={(visible) => onChangeFlag("visible", visible)}
@@ -738,7 +733,6 @@ export function FormEditorStrip({
       {!isTechnical && (
         <OverrideField
           label={t("formEditor.required")}
-          stepId={stepId}
           flagKey="required"
           disabled={gatedKeys(row, written, technicalFieldIds, ownStepIndex).includes("required")}
           value={row.required}
@@ -748,7 +742,6 @@ export function FormEditorStrip({
       {!isTechnical && (
         <OverrideField
           label={t("formEditor.readonly")}
-          stepId={stepId}
           flagKey="readonly"
           disabled={gatedKeys(row, written, technicalFieldIds, ownStepIndex).includes("readonly")}
           value={row.readonly}
@@ -777,7 +770,6 @@ export function FormEditorStrip({
  * is a per-step choice among those cards. */
 export interface NoteEditorStripProps {
   row: DraftOf<ViewNote>;
-  stepId: DraftStep["id"];
   baseLocale: string | undefined;
   groupKeys: string[];
   /** The same two the field strip takes: a note takes a tab the same way a
@@ -801,7 +793,6 @@ export interface NoteEditorStripProps {
  */
 export function NoteEditorStrip({
   row,
-  stepId,
   baseLocale,
   groupKeys,
   tabOptions,
@@ -823,7 +814,7 @@ export function NoteEditorStrip({
       {missingTranslationWarning(row.text, contentLocale, baseLocale) && (
         <p {...stylex.props(styles.studioWarning)}>{missingTranslationWarning(row.text, contentLocale, baseLocale)}</p>
       )}
-      <OverrideField label={t("formEditor.visible")} stepId={stepId} flagKey="visible" value={row.visible} onChange={onChangeVisible} />
+      <OverrideField label={t("formEditor.visible")} flagKey="visible" value={row.visible} onChange={onChangeVisible} />
       <label {...stylex.props(styles.formStripField)}>
         {t("formEditor.span")}
         <select value={String(row.span ?? 1)} onChange={(e) => onChangeSpan(Number(e.target.value) as 1 | 2)}>
@@ -1486,7 +1477,6 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
             <FormEditorStrip
               row={selectedRow}
               label={labelFor(selectedRow.ref)}
-              stepId={step.id}
               ownStepIndex={index}
               written={written}
               technicalFieldIds={technicalIds}
@@ -1500,7 +1490,6 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
           ) : selectedRow ? (
             <NoteEditorStrip
               row={selectedRow}
-              stepId={step.id}
               baseLocale={draft.baseLocale}
               groupKeys={groupKeys}
               tabOptions={tabOptions}

@@ -104,6 +104,31 @@ test("an all-automatic step with no matching guard is a wait-state (stays put)",
   expect(rested.transitionSeq).toBe(0);
 });
 
+// A subprocess step takes no path on entry: its guards read `child`, which exists
+// only once the child returns, so even a path that is true without `child` waits.
+test("resolveAutomatic leaves a subprocess step with a guardless default parked", async () => {
+  const body = mkBody([
+    step("step_s", { type: "subprocess", paths: [autoPath("path_app", "step_x", 1, 'child.outcome == "approved"'), autoPath("path_def", "step_y", 2)] }),
+    step("step_x", { terminal: true }),
+    step("step_y", { terminal: true }),
+  ], "step_s");
+  const i = inst({ currentStepId: "step_s" });
+  const rested = await resolveAutomatic(i, body, actor);
+  expect(rested.currentStepId as string).toBe("step_s");
+  expect(rested.transitionSeq).toBe(0);
+});
+
+test("resolveAutomatic leaves a subprocess step parked when a guard holds without reading child", async () => {
+  const body = mkBody([
+    step("step_s", { type: "subprocess", paths: [autoPath("path_g", "step_x", 1, "1 > 0")] }),
+    step("step_x", { terminal: true }),
+  ], "step_s");
+  const i = inst({ currentStepId: "step_s" });
+  const rested = await resolveAutomatic(i, body, actor);
+  expect(rested.currentStepId as string).toBe("step_s");
+  expect(rested.transitionSeq).toBe(0);
+});
+
 // --- DB-backed: cascade, faulted loop, creation ----------------------------
 
 beforeAll(async () => {

@@ -115,7 +115,9 @@ function draftWithSites(actionIds: string[]): Draft {
     key: "p",
     label: { en: "P" },
     baseLocale: "en",
-    fields: [],
+    // The acting process declares the `amount` its mapping values read, so the
+    // only CEL issue a site can raise is the target-membership one under test.
+    fields: [{ id: "field_amount", key: "amount", label: { en: "Amount" }, type: "number" }],
     workflow: {
       initialStep: "step_a",
       steps: [

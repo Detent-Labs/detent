@@ -480,6 +480,79 @@ describe("compile: authored strings are length-bounded", () => {
     const err = rejects(b);
     expect(err.issues.some((i) => i.loc === "steps[0].view.fields[0].visible")).toBe(true);
   });
+
+  // A process.start mapping value is an Expression.src the engine evaluates at
+  // delivery, so it carries the same bound. Only that action type's known key
+  // counts, and the pass runs on the raw body before Zod, so a malformed config
+  // must not throw.
+  const startAction = (config: unknown, type = "process.start"): unknown => ({ id: "action_chain", type, config });
+  const withEntryAction = (action: unknown): any => {
+    const b = baseBody();
+    b.workflow.steps[0].onEntry = [action];
+    return b;
+  };
+  const longSrc = "true == true && " + "a".repeat(MAX_EXPRESSION_LENGTH);
+
+  it("rejects an over-long process.start mapping value at its entry", () => {
+    const b = withEntryAction(startAction({ processId: "proc_target", inputMapping: { field_t_amount: cel(longSrc) } }));
+    const err = rejects(b);
+    const hit = err.issues.filter((i) => i.loc.endsWith(".config.inputMapping.field_t_amount"));
+    expect(hit.length).toBe(1);
+    expect(hit[0]!.loc).toBe("steps[0].onEntry[0].config.inputMapping.field_t_amount");
+    expect(hit[0]!.message).toContain(String(MAX_EXPRESSION_LENGTH));
+  });
+
+  it("rejects an over-long process.start mapping value at a path and a timer too", () => {
+    const action = startAction({ processId: "proc_target", inputMapping: { field_t_amount: cel(longSrc) } });
+    const onPath = baseBody();
+    onPath.workflow.steps[0].paths[0].onPath = [action];
+    expect(rejects(onPath).issues.map((i) => i.loc)).toContain("steps[0].paths[0].onPath[0].config.inputMapping.field_t_amount");
+    const onFire = baseBody();
+    onFire.workflow.steps[0].timers = [{ id: "timer_a", duration: "PT1H", onFire: { actions: [action] } }];
+    expect(rejects(onFire).issues.map((i) => i.loc)).toContain(
+      "steps[0].timers[0].onFire.actions[0].config.inputMapping.field_t_amount",
+    );
+  });
+
+  it("accepts a process.start mapping value at exactly the bound", () => {
+    const src = "a".repeat(MAX_EXPRESSION_LENGTH);
+    const b = withEntryAction(startAction({ processId: "proc_target", inputMapping: { field_t_amount: cel(src) } }));
+    expect(() => compileProcessBody(b as ProcessBody)).not.toThrow();
+  });
+
+  it("reads no other config for a length bound", () => {
+    const http = withEntryAction(startAction({ inputMapping: { field_t_amount: cel(longSrc) } }, "http.request"));
+    expect(() => compileProcessBody(http as ProcessBody)).not.toThrow();
+    const other = withEntryAction(startAction({ processId: "proc_target", inputMapping: {}, extra: cel(longSrc) }));
+    expect(() => compileProcessBody(other as ProcessBody)).not.toThrow();
+  });
+
+  it("a malformed process.start config or mapping entry raises no length issue and no throw", () => {
+    const configs: unknown[] = [
+      null,
+      "text",
+      [],
+      { processId: "proc_target", inputMapping: "text" },
+      { processId: "proc_target", inputMapping: null },
+      { processId: "proc_target", inputMapping: [cel(longSrc)] },
+      { processId: "proc_target", inputMapping: { field_t_amount: null } },
+      { processId: "proc_target", inputMapping: { field_t_amount: { lang: "cel" } } },
+      { processId: "proc_target", inputMapping: { field_t_amount: { lang: "json", src: longSrc } } },
+    ];
+    for (const config of configs) {
+      try {
+        compileProcessBody(withEntryAction(startAction(config)) as ProcessBody);
+      } catch (err) {
+        // The Zod parse after the structural checks may reject a config that is
+        // not a record. Anything else must be a CompileValidationError for some
+        // other rule, with no issue on a mapping entry. A TypeError out of the
+        // length pass is the failure this guards.
+        if ((err as Error).name === "ZodError") continue;
+        expect(err).toBeInstanceOf(CompileValidationError);
+        expect((err as CompileValidationError).issues.some((i) => i.loc.includes(".config.inputMapping"))).toBe(false);
+      }
+    }
+  });
 });
 
 describe("compile: idempotent re-publish survives every new check", () => {

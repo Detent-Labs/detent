@@ -166,6 +166,54 @@ describe("runValidation: an assignment-less step", () => {
   });
 });
 
+// harden-cel-check-sites: a process.start action's mapping values are checked CEL
+// sites. The studio reaches them through validateReferences with no registry, so
+// the issue must appear before publish, located at the mapping entry and anchored
+// on the action.
+describe("runValidation: a process.start mapping value", () => {
+  const MAP_LOC = "steps[0].onEntry[0].config.inputMapping.field_t_amount";
+  const chainDraft = (config: unknown): Draft => {
+    const body = cleanBody();
+    (body.workflow!.steps![0] as unknown as { onEntry?: unknown[] }).onEntry = [
+      { id: "action_chain", type: "process.start", config },
+    ];
+    return body;
+  };
+  const mapping = (src: string): Draft =>
+    chainDraft({ processId: "proc_target", inputMapping: { field_t_amount: { lang: "cel", src } } });
+
+  it("reports a time function as a 'cel' issue naming the mapping entry", () => {
+    const result = runValidation(mapping('timestamp("2020-01-01T00:00:00Z")'), undefined, {}, {});
+    expect(result.zodValid).toBe(true);
+    const issue = result.issues.find((i) => i.source === "cel");
+    expect(issue).toBeDefined();
+    expect(issue!.loc).toBe(MAP_LOC);
+    expect(issue!.message).toContain("time function not allowed");
+    expect(issue!.entityType).toBe("action");
+    expect(issue!.entityId).toBe("action_chain");
+  });
+
+  it("reports an unknown field reference at the mapping entry", () => {
+    const result = runValidation(mapping("data.missing"), undefined, {}, {});
+    const issue = result.issues.find((i) => i.source === "cel");
+    expect(issue).toBeDefined();
+    expect(issue!.loc).toBe(MAP_LOC);
+    expect(issue!.message.toLowerCase()).toContain("missing");
+  });
+
+  it("raises no 'cel' issue for a well-typed mapping value", () => {
+    const result = runValidation(mapping("data.amount * 2.0"), undefined, {}, {});
+    expect(result.dimensions.cel).toBe("ran");
+    expect(result.issues.some((i) => i.source === "cel")).toBe(false);
+  });
+
+  it("does not throw on a malformed mapping", () => {
+    for (const config of [null, "text", { inputMapping: "text" }, { inputMapping: null }, { inputMapping: [1] }]) {
+      expect(() => runValidation(chainDraft(config), undefined, {}, {})).not.toThrow();
+    }
+  });
+});
+
 // technical-field-marker: compile.ts::checkTechnicalFields' two rules anchor
 // through resolveLoc's dotted-loc conventions — the view rule on its step,
 // the group rule on its field — never on the process root.
