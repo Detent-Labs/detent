@@ -249,7 +249,7 @@ word. `ROADMAP.md` carries stage-by-stage status.
 - A subprocess-callable child's fields should stay inside its own
   `inputFields`. `.claude/rules/authoring-invariants.md` once stated that
   rule, but the code does not enforce it. Three sites read `inputFields`:
-  `src/engine/definitions.ts:501-505`, `src/schema/compile.ts:466-468` and
+  `src/engine/definitions.ts:544-548`, `src/schema/compile.ts:466-468` and
   `:1139`. Live specs stay silent on the rule too. Building it takes its own
   definition contract change.
 
@@ -1192,8 +1192,8 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
 - **FIELDS-17: two kept settings fail no check the draft ever runs.** A
   removal leaves a `valueFromField` or `instanceIdField` value that names a
   removed id, since both are plugin-config settings `fieldRemovalReach` only
-  counts. `checkInstanceQueryValueFromField` (`src/engine/definitions.ts:224`)
-  and `validateInstanceTransitionReferences` (`:373`) reject an unresolved
+  counts. `checkInstanceQueryValueFromField` (`src/engine/definitions.ts:228`)
+  and `validateInstanceTransitionReferences` (`:416`) reject an unresolved
   one, but only `publishBody` calls them. The studio's own checks rail,
   `draft/validation.ts::runValidation` (`:82`), calls `validateStructure` and
   `validateReferences` alone, so neither check runs before publish. Risk
@@ -1684,15 +1684,6 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   `createDefaultAssignmentRegistry`. Anchors:
   `src/handlers/process-start.ts`, `src/handlers/instance-transition.ts`,
   `src/engine/assignment-strategies.ts`.
-- **`type-data-comparison-literals` (E2-2, E2-9, E2-16, F-5; high)**: The
-  `instance.query` form and the report builder send every comparison value as
-  a string, the report builder offers no way to type a list for the
-  comparison `in`, the query form's attribute rows lose focus on each
-  keystroke, and a failed catalog fetch marks every reference as stale.
-  Anchors:
-  `packages/web/src/areas/studio/panels/shared/InstanceQueryForm.tsx`,
-  `packages/web/src/areas/reporting/screens/ReportBuilderScreen.tsx`,
-  `packages/web/src/areas/studio/panels/shared/useTargetProcessCatalog.ts`.
 - **`tighten-publish-contract-checks` (A-2, A-8; medium)**: The idempotent
   compile branch accepts a hand-written cancel sink of any shape, and publish
   stores `Action.execution` and `Action.idempotencyKey`, which nothing reads.
