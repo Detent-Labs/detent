@@ -27,7 +27,7 @@
 
 ## 5. Verification
 
-- [ ] 5.1 Run `bun run typecheck` and `bun run build` in the devcontainer. Check: both exit 0.
-- [ ] 5.2 Run `OPENSPEC_TELEMETRY=0 sh scripts/test-gated.sh bun test` with `DATABASE_URL` set. Check: the gate accepts the run.
+- [x] 5.1 Run `bun run typecheck` and `bun run build` in the devcontainer. Check: both exit 0.
+- [x] 5.2 Run `OPENSPEC_TELEMETRY=0 sh scripts/test-gated.sh bun test` with `DATABASE_URL` set. Check: the gate accepts the run.
 - [ ] 5.3 Run the prose and whitespace gates over the pushed range on the host. Check: both exit 0.
-- [ ] 5.4 Check the Fields tab on the production build in a real browser. Run `/impeccable critique` and `/impeccable audit`. Check: each finding has a fix or a record.
+- [x] 5.4 Check the Fields tab on the production build in a real browser. Run `/impeccable critique` and `/impeccable audit`. Check: each finding has a fix or a record.
