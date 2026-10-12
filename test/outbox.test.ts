@@ -835,8 +835,10 @@ test.skipIf(!DB)("a later success clears a previously recorded error", async () 
 // --- delivery deadline: a hung handler cannot hang the pass -------------------
 
 test.skipIf(!DB)("a handler that never settles is raced against the lease: the pass completes and the row backs off", async () => {
-  const body = threeActionBody();
-  const inst = await create();
+  // One row: a hung first row spends the whole lease, so rows behind it are
+  // released unstarted (see the release test below).
+  const body = retryActionBody(undefined);
+  const inst = await createFrom(body);
   await executeManualTransition(inst, "path_ab", body, actor);
 
   // A real never-resolving promise, not a mock — Promise.race must actually
@@ -855,28 +857,142 @@ test.skipIf(!DB)("a handler that never settles is raced against the lease: the p
   // The pass having completed, a later drain still runs — proving the worker
   // itself was never stuck, only this one delivery.
   await makeDue(inst.instanceId);
-  expect(await drainOutbox(sql, reg, okDeliver)).toBe(3);
+  expect(await drainOutbox(sql, reg, okDeliver)).toBe(1);
 });
 
-test.skipIf(!DB)("unrelated rows, including an engine-internal spawn row, are delivered in the presence of a hung row", async () => {
+test.skipIf(!DB)("unrelated rows, including an engine-internal spawn row, are delivered on the next pass after a hung row", async () => {
   const insertRow = (instanceId: string, actionId: string, actionType: string) =>
     sql`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action)
       VALUES (${"idem_" + actionId}, ${instanceId}, ${1}, ${actionId}, ${{ id: actionId, type: actionType, config: {} }})`;
-  // Ordered ahead (earlier created_at) of the row below — drainOutbox's claim
-  // scan is ORDER BY created_at, so without the deadline race this hung row
-  // would never let the loop reach the one after it.
   await insertRow("inst_hang_1", "action_hang", "hang");
   await insertRow("inst_spawn_1", "action_spawn_1", "core.spawnSubprocess");
 
-  const seam: DeliverFn = async (row) =>
-    row.action.type === "hang" ? await new Promise<Record<string, unknown>>(() => {}) : {};
+  // The claim's RETURNING order is not the created_at order of its subselect, so
+  // whichever row the loop reaches first is the one that hangs.
+  const ran: string[] = [];
+  const seam: DeliverFn = async (row) => {
+    ran.push(row.instance_id);
+    return ran.length === 1 ? await new Promise<Record<string, unknown>>(() => {}) : {};
+  };
+  const statusOf = async (): Promise<Record<string, string>> => {
+    const statuses = (await sql`SELECT instance_id, status FROM outbox WHERE instance_id IN (${"inst_hang_1"}, ${"inst_spawn_1"})`) as
+      { instance_id: string; status: string }[];
+    return Object.fromEntries(statuses.map((r) => [r.instance_id, r.status]));
+  };
 
-  expect(await drainOutbox(sql, reg, seam, 50)).toBe(1); // only the row behind the hung one
-  const statuses = (await sql`SELECT instance_id, status FROM outbox WHERE instance_id IN (${"inst_hang_1"}, ${"inst_spawn_1"})`) as
-    { instance_id: string; status: string }[];
-  const byId = Object.fromEntries(statuses.map((r) => [r.instance_id, r.status]));
-  expect(byId.inst_spawn_1).toBe("delivered"); // reached and delivered in the same pass
-  expect(byId.inst_hang_1).toBe("pending"); // backed off, not stuck
+  // The hung row spends the whole lease, so the row behind it is released unstarted.
+  expect(await drainOutbox(sql, reg, seam, 50)).toBe(0);
+  expect(ran).toHaveLength(1);
+  const hung = ran[0];
+  const other = hung === "inst_hang_1" ? "inst_spawn_1" : "inst_hang_1";
+  let byId = await statusOf();
+  expect(byId[hung]).toBe("pending"); // backed off, not stuck
+  expect(byId[other]).toBe("pending"); // released, not stuck and not delivered yet
+
+  expect(await drainOutbox(sql, reg, seam, 50)).toBe(1); // the hung row is still backing off
+  expect(ran).toEqual([hung, other]);
+  byId = await statusOf();
+  expect(byId[other]).toBe("delivered");
+  expect(byId[hung]).toBe("pending");
+});
+
+test.skipIf(!DB)("a row reached after the lease ran out is released unstarted with its attempt refunded", async () => {
+  const insertRow = (instanceId: string, actionId: string, actionType: string, attempts: number) =>
+    sql`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action, attempts)
+      VALUES (${"idem_" + actionId}, ${instanceId}, ${1}, ${actionId}, ${{ id: actionId, type: actionType, config: {} }}, ${attempts})`;
+  await insertRow("inst_lease_1", "action_lease_1", "first", 2);
+  await insertRow("inst_lease_2", "action_lease_2", "second", 2);
+
+  // The claim's RETURNING order is not the created_at order of its subselect, so
+  // whichever row the loop reaches first is the one that hangs.
+  const ran: string[] = [];
+  const seam: DeliverFn = async (row) => {
+    ran.push(row.instance_id);
+    return ran.length === 1 ? await new Promise<Record<string, unknown>>(() => {}) : {};
+  };
+
+  expect(await drainOutbox(sql, reg, seam, 50)).toBe(0);
+  expect(ran).toHaveLength(1); // the handler behind the hung row never ran
+  const behindId = ran[0] === "inst_lease_1" ? "inst_lease_2" : "inst_lease_1";
+  const [behind] = await rows(behindId);
+  expect(behind.status).toBe("pending");
+  expect(behind.attempts).toBe(2); // the value before the claim
+  expect(behind.claimed_at).toBeNull();
+
+  expect(await drainOutbox(sql, reg, seam, 50)).toBe(1); // due at once: the next pass delivers it
+  expect(ran[1]).toBe(behindId);
+  expect((await rows(behindId))[0].status).toBe("delivered");
+});
+
+test.skipIf(!DB)("each row's deadline is the lease that remains, so a batch of slow rows starts no handler past the lease", async () => {
+  const noBackoff = { retry: { backoff: "none" } };
+  for (let i = 0; i < 10; i++) {
+    const id = `action_batch_${i}`;
+    await sql`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action)
+      VALUES (${"idem_" + id}, ${"inst_batch_" + i}, ${1}, ${id}, ${{ id, type: "slow", config: {}, ...noBackoff }})`;
+  }
+
+  const starts: number[] = [];
+  const slow: DeliverFn = async () => {
+    starts.push(performance.now());
+    await new Promise((r) => setTimeout(r, 100));
+    return {};
+  };
+
+  const t0 = performance.now();
+  await drainOutbox(sql, reg, slow, 250);
+  expect(starts.length).toBeLessThan(10);
+  expect(Math.max(...starts)).toBeLessThanOrEqual(t0 + 250); // no handler started after the lease
+  const claimedAfter = (await sql`SELECT count(*)::int AS n FROM outbox WHERE status = 'claimed'`) as { n: number }[];
+  expect(claimedAfter[0].n).toBe(0);
+
+  // backoff "none": the rows the pass cut off are due at once, so fast passes finish the batch.
+  for (let i = 0; i < 10; i++) await drainOutbox(sql, reg, okDeliver);
+  const left = (await sql`SELECT count(*)::int AS n FROM outbox WHERE status <> 'delivered'`) as { n: number }[];
+  expect(left[0].n).toBe(0);
+});
+
+// --- the marking transaction acts only on the claim it made ---------------------
+
+/** A deliverFn that does what a peer's reclaim does to the row (one more attempt, a fresh lease), then runs `then`. */
+const reclaimedByPeer = (then: () => Promise<Record<string, unknown>>): DeliverFn => async (row) => {
+  await sql`UPDATE outbox SET attempts = attempts + 1, claimed_at = now() WHERE idempotency_key = ${row.idempotency_key}`;
+  return then();
+};
+
+test.skipIf(!DB)("a worker whose row a peer reclaimed does not reset the peer's claim after a failure", async () => {
+  const body = threeActionBody();
+  const inst = await create();
+  await executeManualTransition(inst, "path_ab", body, actor);
+
+  expect(await drainOutbox(sql, reg, reclaimedByPeer(async () => { throw new Error("late failure"); }))).toBe(0);
+  const r = await rows(inst.instanceId);
+  expect(r.every((x) => x.status === "claimed" && x.attempts === 2 && x.claimed_at !== null)).toBe(true);
+});
+
+test.skipIf(!DB)("a worker whose row a peer reclaimed applies no writeback and no outcome after a success", async () => {
+  const body = outputBody(false);
+  const inst = await createFrom(body);
+  await executeManualTransition(inst, "path_ab", body, actor);
+
+  expect(await drainOutbox(sql, reg, reclaimedByPeer(async () => ({ field_val: 7 })))).toBe(0);
+  const r = await rows(inst.instanceId);
+  expect(r[0].status).toBe("claimed");
+  expect(r[0].attempts).toBe(2);
+  expect((await instData(inst.instanceId)).field_val).toBeUndefined();
+  expect(await outcomes(inst.instanceId)).toEqual([]);
+});
+
+test.skipIf(!DB)("a worker at its attempt cap does not dead-letter a row a peer reclaimed", async () => {
+  const body = threeActionBody();
+  const inst = await create();
+  await executeManualTransition(inst, "path_ab", body, actor);
+  await sql`UPDATE outbox SET attempts = ${MAX_ATTEMPTS - 1} WHERE instance_id = ${inst.instanceId}`; // the claim lands on the cap
+
+  expect(await drainOutbox(sql, reg, reclaimedByPeer(async () => { throw new Error("late failure"); }))).toBe(0);
+  const r = await rows(inst.instanceId);
+  expect(r.every((x) => x.status === "claimed" && x.attempts === MAX_ATTEMPTS + 1)).toBe(true);
+  expect(await outcomes(inst.instanceId)).toEqual([]);
 });
 
 test.skipIf(!DB)("a claim that never reaches tx2 still costs an attempt (crashed worker / lease-expiry reclaim)", async () => {
@@ -905,8 +1021,8 @@ test.skipIf(!DB)("a claim that never reaches tx2 still costs an attempt (crashed
 });
 
 test.skipIf(!DB)("a row whose handler hangs on every attempt eventually dead-letters, via the deadline race each time", async () => {
-  const body = threeActionBody();
-  const inst = await create();
+  const body = retryActionBody(undefined); // one row: rows behind a hung row are released, not raced
+  const inst = await createFrom(body);
   await executeManualTransition(inst, "path_ab", body, actor);
 
   const hang: DeliverFn = () => new Promise<Record<string, unknown>>(() => {});

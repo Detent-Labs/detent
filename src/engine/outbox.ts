@@ -45,8 +45,10 @@ function backoffMsFor(action: Action, attempts: number): number {
   }
 }
 // A claimed row whose lease has elapsed is treated as abandoned (crashed worker)
-// and reclaimed by a later drain. ponytail: 30s covers ordinary handler I/O;
-// raise only if a real handler legitimately runs longer.
+// and reclaimed by a later drain. The lease starts at the claim and covers the
+// whole batch of up to 100 rows: each row's deadline is what remains of it.
+// ponytail: 30s covers ordinary handler I/O across a batch; raise only if real
+// handlers legitimately run longer, or claim fewer rows per pass.
 export const CLAIM_LEASE_MS = 30_000;
 
 /**
@@ -122,7 +124,7 @@ const parseActors = (a: unknown): OutboxActors | null =>
 function rejectAfter(ms: number): { promise: Promise<never>; clear: () => void } {
   let handle: ReturnType<typeof setTimeout>;
   const promise = new Promise<never>((_, reject) => {
-    handle = setTimeout(() => reject(new Error(`delivery exceeded the claim lease (${ms}ms)`)), ms);
+    handle = setTimeout(() => reject(new Error(`delivery exceeded the claim lease (${Math.round(ms)}ms remaining at start)`)), ms);
   });
   return { promise, clear: () => clearTimeout(handle) };
 }
@@ -174,9 +176,14 @@ async function appendOutcome(
 /**
  * One drain pass. Claim due rows (fresh `pending` plus `claimed` rows past their
  * lease) `FOR UPDATE SKIP LOCKED`, commit the claim, then for each: run the
- * handler off the lock (raced against the claim lease, so a hung handler cannot
- * hang the pass), and in a CAS-gated second transaction apply the writeback +
- * outcome + delivered mark. Returns the count delivered this pass.
+ * handler off the lock (raced against the lease that remains, so a hung handler
+ * cannot hang the pass), and in a CAS-gated second transaction apply the
+ * writeback + outcome + delivered mark. The lease starts at the claim and
+ * covers the whole batch, so each row's deadline is the remainder; a row
+ * reached after the lease ran out starts no handler and returns to `pending`
+ * with its attempt refunded. The CAS matches the attempt count the worker's own
+ * claim produced, so a worker whose row a peer reclaimed changes nothing.
+ * Returns the count delivered this pass.
  *
  * `resolveBody` resolves the process body a row's `field_version` pins, so the
  * writeback can be type-checked against the field it targets. Defaults to a
@@ -203,6 +210,10 @@ export async function drainOutbox(
   // attempt and the dead-letter cap is reachable even for a delivery that never
   // reaches tx2 (a killed worker, a lease-expiry reclaim). The single UPDATE is
   // its own transaction, so the lock is released as soon as it returns.
+  // claimStart precedes the UPDATE, so the database stamps claimed_at after it
+  // and a worker's deadline never outlasts a peer's right to reclaim. A
+  // monotonic clock keeps the remainder right if the wall clock steps.
+  const claimStart = performance.now();
   const claimed = (await db`UPDATE outbox SET status = 'claimed', claimed_at = now(), attempts = outbox.attempts + 1
     WHERE idempotency_key IN (
       SELECT idempotency_key FROM outbox
@@ -228,7 +239,19 @@ export async function drainOutbox(
     // post-claim count, not one less than it.
     const attempts = row.attempts;
 
-    // Run the handler off the lock, raced against the claim lease: a delivery
+    // The lease runs from the claim and covers the whole batch. A row reached
+    // after it ran out starts no handler: a peer may already hold the row. It
+    // returns to pending, due at once (next_attempt_at is already past), with
+    // the attempt its claim cost refunded, since no delivery ran. If the
+    // release throws, the row stays claimed and lease reclaim applies.
+    const remainingMs = leaseMs - (performance.now() - claimStart);
+    if (remainingMs <= 0) {
+      await db`UPDATE outbox SET status = 'pending', claimed_at = NULL, attempts = ${attempts - 1}
+        WHERE idempotency_key = ${row.idempotency_key} AND status = 'claimed' AND attempts = ${attempts}`;
+      continue;
+    }
+
+    // Run the handler off the lock, raced against the lease that remains: a delivery
     // still running past its lease holds a row a peer may already have
     // reclaimed, so completing it is unsound regardless — the race turns that
     // into an ordinary transient failure instead of hanging this pass (and,
@@ -244,7 +267,7 @@ export async function drainOutbox(
     let patch: Record<string, unknown> | undefined;
     let permanent = false;
     let failureMessage: string | undefined;
-    const deadline = rejectAfter(leaseMs);
+    const deadline = rejectAfter(remainingMs);
     try {
       patch = await Promise.race([deliverFn(row, registry, db, assignmentRegistry), deadline.promise]);
     } catch (e) {
@@ -259,9 +282,9 @@ export async function drainOutbox(
     await db.begin(async (tx) => {
       if (patch !== undefined) {
         const cas = (await tx`UPDATE outbox SET status = 'delivered', delivered_at = now(), attempts = ${attempts}, last_error = NULL
-          WHERE idempotency_key = ${row.idempotency_key} AND status = 'claimed'
+          WHERE idempotency_key = ${row.idempotency_key} AND status = 'claimed' AND attempts = ${attempts}
           RETURNING idempotency_key`) as unknown[];
-        if (cas.length === 0) return; // already delivered by a peer
+        if (cas.length === 0) return; // a peer reclaimed or delivered the row
 
         // instance-audit-log-chain: attributes any instances writeback below to
         // this action delivery, no actor (design.md "Actor and source arrive
@@ -344,7 +367,7 @@ export async function drainOutbox(
         delivered++;
       } else if (permanent || attempts >= maxAttemptsFor(row.action)) {
         const cas = (await tx`UPDATE outbox SET status = 'dead-letter', attempts = ${attempts}, last_error = ${failureMessage ?? null}
-          WHERE idempotency_key = ${row.idempotency_key} AND status = 'claimed'
+          WHERE idempotency_key = ${row.idempotency_key} AND status = 'claimed' AND attempts = ${attempts}
           RETURNING idempotency_key`) as unknown[];
         if (cas.length === 0) return;
         await appendOutcome(tx, row, { status: "dead-letter", attempts });
@@ -360,7 +383,7 @@ export async function drainOutbox(
         const backoffMs = backoffMsFor(row.action, attempts);
         await tx`UPDATE outbox SET status = 'pending', attempts = ${attempts}, claimed_at = NULL, last_error = ${failureMessage ?? null},
           next_attempt_at = now() + (${backoffMs} * interval '1 millisecond')
-          WHERE idempotency_key = ${row.idempotency_key} AND status = 'claimed'`;
+          WHERE idempotency_key = ${row.idempotency_key} AND status = 'claimed' AND attempts = ${attempts}`;
       }
     });
    } catch (e) {
