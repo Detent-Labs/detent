@@ -260,6 +260,59 @@ export type TenantSource = () => Promise<TenantHandle[]>;
 /** The default: this process's own database, one entry, which is today's behaviour exactly. */
 export const singleTenantSource = (db: SQL): TenantSource => async () => [{ key: "", db }];
 
+/** The most tenant drains one worker runs at once. A fixed bound: no time budget, no setting. */
+export const TENANT_TICK_CONCURRENCY = 8;
+
+/**
+ * One worker's pool of tenant drains. The returned function starts a drain for
+ * every tenant in `tenants` whose previous drain has ended, and returns once
+ * it has started them all. It never awaits a running drain, except to wait for
+ * a free slot while `bound` drains already run.
+ *
+ * A tenant whose drain still runs is skipped, so no tenant gets two drains at
+ * once. A drain that throws goes to `onError` (which must not throw) and frees
+ * its slot, so the tenant is drained again on the next call. A finishing drain
+ * hands its slot to the longest waiter.
+ */
+export function createTenantPool(bound: number = TENANT_TICK_CONCURRENCY) {
+  const inFlight = new Set<string>();
+  const waiting: Array<() => void> = [];
+  let running = 0;
+  const acquire = async (): Promise<void> => {
+    if (running < bound) {
+      running += 1;
+      return;
+    }
+    await new Promise<void>((resolve) => waiting.push(resolve));
+  };
+  const release = (): void => {
+    const next = waiting.shift();
+    if (next) next();
+    else running -= 1;
+  };
+  return async (
+    tenants: TenantHandle[],
+    drain: (t: TenantHandle) => Promise<unknown>,
+    onError: (t: TenantHandle, e: unknown) => void,
+  ): Promise<void> => {
+    for (const t of tenants) {
+      if (inFlight.has(t.key)) continue;
+      await acquire();
+      inFlight.add(t.key);
+      void (async () => {
+        try {
+          await drain(t);
+        } catch (e) {
+          onError(t, e);
+        } finally {
+          inFlight.delete(t.key);
+          release();
+        }
+      })();
+    }
+  };
+}
+
 /**
  * Everything a worker tick needs for ONE tenant. Built on first sight of that
  * tenant and cached: `createDefinitionStore` holds a per-database cache, and
@@ -292,7 +345,8 @@ function tenantContexts(shared: Registry, assignmentRegistry: AssignmentRegistry
  * `tenants` defaults to this process's own database, so an on-premise
  * deployment polls exactly what it polls today. In SaaS mode it reads the
  * control plane, and the worker COUNT stays four whatever the tenant count —
- * each tick walks the list rather than each tenant getting its own workers.
+ * each worker drains the tenants in parallel, at most `TENANT_TICK_CONCURRENCY`
+ * at once, rather than each tenant getting its own workers.
  *
  * `registry` is the shared, author-facing one. It is not mutated here: each
  * tenant gets a copy carrying its own `core.*` handlers.
@@ -307,19 +361,23 @@ export function startEngine(
   const retentionDays = parseRetentionDays();
 
   /**
-   * Run `fn` for every live tenant. A tenant whose tick throws is logged and
-   * skipped, and the rest still run: in a shared process one tenant's fault
-   * must not stop the others. `pollForever` would otherwise abandon the whole
-   * pass at the first throw.
+   * Start `fn` for every live tenant whose previous run by this worker has
+   * ended, at most `TENANT_TICK_CONCURRENCY` at once. The tick does not await
+   * a running drain, so a tenant with a slow drain delays no other tenant, and
+   * a tenant whose drain still runs at the next tick gets no second one. A
+   * tenant whose run throws is logged and skipped, and the rest still run: in
+   * a shared process one tenant's fault must not stop the others. A throw from
+   * `tenants()` rejects the tick, which `pollForever` logs.
    */
-  const eachTenant = (worker: string, fn: (c: ReturnType<typeof contextFor>) => Promise<unknown>) => async () => {
-    for (const t of await tenants()) {
-      try {
-        await fn(contextFor(t));
-      } catch (e) {
-        log.warn("tenant tick skipped", { worker, tenant: t.key, error: e instanceof Error ? e.message : String(e) });
-      }
-    }
+  const eachTenant = (worker: string, fn: (c: ReturnType<typeof contextFor>) => Promise<unknown>) => {
+    const startDrains = createTenantPool();
+    return async () => {
+      await startDrains(
+        await tenants(),
+        (t) => fn(contextFor(t)),
+        (t, e) => log.warn("tenant tick skipped", { worker, tenant: t.key, error: e instanceof Error ? e.message : String(e) }),
+      );
+    };
   };
 
   const workers = [
