@@ -2,10 +2,10 @@
 
 ## 1. Issuer to tenant (C-8)
 
-- [ ] 1.1 Add `tenant?: string` to `IssuerConfig` and to `parseAuthIssuers`'s schema. Verify `test/auth-jwt.test.ts` parses an entry with and without `tenant`. Verify it rejects a numeric `tenant` with an error naming `AUTH_ISSUERS`.
-- [ ] 1.2 Give `tenantKeyOf` the optional issuer map and add `tenantsByIssuer`, per design decision 1. Verify `test/auth-jwt.test.ts` covers a mapped issuer and an unmapped one that returns `undefined`. Verify it covers a local token that still returns its claim, and an external token claiming another tenant.
-- [ ] 1.3 Export `startTenancy` with its `issuers`, `control` and `deps` parameters. Map `iss` in `resolveTenantDb` and `tenantOf`, and fail startup per design decision 2. Pass the issuers parsed from `AUTH_ISSUERS` in `startHttpServer`. Verify a new `test/tenancy-issuers.test.ts` shows startup failing for an issuer with no `tenant`. Verify it fails for an unlisted tenant, and that each message names the issuer. Verify an on-premise start ignores the field.
-- [ ] 1.4 Document the `tenant` field in `docs/runbooks/deployment.md`, in the `AUTH_ISSUERS` row and in the paragraph on how a request finds its database. Verify both places say each entry needs a `tenant` in SaaS mode.
+- [x] 1.1 Add `tenant?: string` to `IssuerConfig` and to `parseAuthIssuers`'s schema. Verify `test/auth-jwt.test.ts` parses an entry with and without `tenant`. Verify it rejects a numeric `tenant` with an error naming `AUTH_ISSUERS`.
+- [x] 1.2 Give `tenantKeyOf` the optional issuer map and add `tenantsByIssuer`, per design decision 1. Verify `test/auth-jwt.test.ts` covers a mapped issuer and an unmapped one that returns `undefined`. Verify it covers a local token that still returns its claim, and an external token claiming another tenant.
+- [x] 1.3 Export `startTenancy` with its `issuers`, `control` and `deps` parameters. Map `iss` in `resolveTenantDb` and `tenantOf`, and fail startup per design decision 2. Pass the issuers parsed from `AUTH_ISSUERS` in `startHttpServer`. Verify a new `test/tenancy-issuers.test.ts` shows startup failing for an issuer with no `tenant`. Verify it fails for an unlisted tenant, and that each message names the issuer. Verify an on-premise start ignores the field.
+- [x] 1.4 Document the `tenant` field in `docs/runbooks/deployment.md`, in the `AUTH_ISSUERS` row and in the paragraph on how a request finds its database. Verify both places say each entry needs a `tenant` in SaaS mode.
 
 ## 2. Connection pools (C-9)
 

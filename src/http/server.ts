@@ -20,8 +20,8 @@ import { type Registry, type DataSourceRegistry, type AssignmentRegistry } from 
 import { createDefaultAssignmentRegistry } from "../engine/assignment-strategies.js";
 import { devHeaderResolver, type ActorResolver } from "../auth/resolve.js";
 import { createTenantConnections, TenantUnreachable, UnknownTenant } from "../tenancy/connections.js";
-import { controlPlane, initControlPlane, saasMode } from "../tenancy/store.js";
-import { tenantKeyOf } from "../auth/jwt.js";
+import { controlPlane, initControlPlane, saasMode, tenantByKey } from "../tenancy/store.js";
+import { tenantKeyOf, tenantsByIssuer } from "../auth/jwt.js";
 import { serveWebAsset, resolveWebRoot, isNavigationRequest } from "./static.js";
 import { jwtResolver, type IssuerConfig } from "../auth/jwt.js";
 import { handleLogin } from "../auth/login.js";
@@ -349,13 +349,14 @@ function match(segments: string[], parts: string[]): string[] | null {
 }
 
 /**
- * Parse `AUTH_ISSUERS`: a JSON array of `{iss, jwksUrl, audience, rolesClaim}`.
+ * Parse `AUTH_ISSUERS`: a JSON array of `{iss, jwksUrl, audience, rolesClaim}`
+ * plus an optional `tenant`. SaaS mode requires `tenant`; `startTenancy` checks it.
  * Unset or empty means no external issuers. A malformed value throws rather
  * than silently disabling issuers — the composition root lets this propagate
  * so startup fails loudly (design.md "Configuration selects the resolver").
  */
 const issuerConfigSchema = z.array(
-  z.object({ iss: z.string(), jwksUrl: z.string(), audience: z.string(), rolesClaim: z.string() }),
+  z.object({ iss: z.string(), jwksUrl: z.string(), audience: z.string(), rolesClaim: z.string(), tenant: z.string().optional() }),
 );
 
 export function parseAuthIssuers(raw: string | undefined): IssuerConfig[] | undefined {
@@ -370,7 +371,7 @@ export function parseAuthIssuers(raw: string | undefined): IssuerConfig[] | unde
   if (!result.success) {
     const i = result.error.issues[0]?.path[0];
     const at = typeof i === "number" ? `[${i}]` : "";
-    throw new Error(`AUTH_ISSUERS${at} must be { iss, jwksUrl, audience, rolesClaim } (all strings)`);
+    throw new Error(`AUTH_ISSUERS${at} must be { iss, jwksUrl, audience, rolesClaim, tenant? } (all strings)`);
   }
   return result.data;
 }
@@ -437,27 +438,45 @@ export function resolveAuthResolver(
  *
  * A request carrying no resolvable tenant raises, and the dispatcher answers
  * 401 — including the login request, whose tenant comes from its host.
+ *
+ * Every `issuers` entry must name a tenant the control plane lists, or startup
+ * fails with an error naming that issuer. An external token then resolves to
+ * its issuer's tenant alone.
  */
-async function startTenancy(): Promise<{
+export async function startTenancy(
+  issuers: readonly IssuerConfig[],
+  control: SQL = controlPlane(),
+  deps: Parameters<typeof createTenantConnections>[1] = {},
+): Promise<{
   resolveTenantDb: (req: Request) => Promise<SQL>;
   tenantOf: (req: Request) => string | undefined;
   tenants: TenantSource;
 }> {
-  const control = controlPlane();
   await initControlPlane(control);
+  const lookup = deps.lookup ?? tenantByKey;
+  for (const issuer of issuers) {
+    if (issuer.tenant === undefined) {
+      throw new Error(`AUTH_ISSUERS: issuer ${issuer.iss} names no tenant, and SaaS mode needs one on every entry`);
+    }
+    if (!(await lookup(issuer.tenant, control))) {
+      throw new Error(`AUTH_ISSUERS: issuer ${issuer.iss} names tenant ${issuer.tenant}, which the control plane does not list`);
+    }
+  }
+  const byIssuer = tenantsByIssuer(issuers);
   const connections = createTenantConnections(control, {
     onSkip: (key, cause) => log.warn("tenant skipped", { tenant: key, error: cause instanceof Error ? cause.message : String(cause) }),
+    ...deps,
   });
   log.info("SaaS mode: tenants resolve per request from the control plane");
   return {
     resolveTenantDb: async (req) => {
       // The login request is the one holding no token, so its tenant comes from
       // the host it arrived on. Every other request carries the claim.
-      const key = tenantKeyOf(req.headers) ?? hostTenantKey(req);
+      const key = tenantKeyOf(req.headers, byIssuer) ?? hostTenantKey(req);
       if (!key) throw new UnknownTenant("(none)");
       return connections.handleFor(key);
     },
-    tenantOf: (req) => tenantKeyOf(req.headers) ?? hostTenantKey(req),
+    tenantOf: (req) => tenantKeyOf(req.headers, byIssuer) ?? hostTenantKey(req),
     tenants: () => connections.live(),
   };
 }
@@ -904,7 +923,7 @@ export async function startHttpServer(
   // SaaS mode, or not. Unset, everything below is exactly what it was: one
   // schema built here, no control-plane connection, and the process handle on
   // every request and every tick.
-  const tenancy = saasMode() ? await startTenancy() : undefined;
+  const tenancy = saasMode() ? await startTenancy(parseAuthIssuers(process.env.AUTH_ISSUERS) ?? []) : undefined;
   if (!tenancy) await initSchema(db);
   const allowedOrigins = parseAllowedOrigins(process.env.CORS_ALLOWED_ORIGINS);
   const webRoot = resolveWebRoot(process.env.WEB_ROOT);
