@@ -23,5 +23,5 @@
 
 ## 4. Verification
 
-- [ ] 4.1 Run `bun run typecheck`, then `bun run build`, then the full `bun test` through `scripts/test-gated.sh` with `DATABASE_URL` set. Read the verdict from a named failure.
-- [ ] 4.2 Run the prose and whitespace gates over the push range on the host.
+- [x] 4.1 Run `bun run typecheck`, then `bun run build`, then the full `bun test` through `scripts/test-gated.sh` with `DATABASE_URL` set. Read the verdict from a named failure.
+- [x] 4.2 Run the prose and whitespace gates over the push range on the host.
