@@ -22,6 +22,9 @@ import {
   compileProcessBody,
   CompileValidationError,
   MAX_EXPRESSION_LENGTH,
+  MAX_KEY_LENGTH,
+  MAX_PLUGIN_TYPE_LENGTH,
+  MAX_DURATION_LENGTH,
 } from "../src/schema/compile.js";
 import { canonicalize } from "../src/schema/canonical-json.js";
 
@@ -1720,5 +1723,68 @@ describe("compile: an action declares async execution and no idempotency key", (
     expect(
       err.issues.some((i) => i.loc === "workflow.steps[0].onEntry[0].idempotencyKey" && i.value === "idempotencyKey"),
     ).toBe(true);
+  });
+});
+
+// The four string bounds that `describe("compile: authored strings are
+// length-bounded")` above leaves out. Each pair is a string of exactly the
+// bound (accepted) and one character longer (refused for the bound alone).
+describe("compile: Plugin.type, duration, FieldDef.key and columnMapping key stop at their length bound", () => {
+  const boundMessage = (what: string, bound: number) => `${what} exceeds the ${bound}-character bound`;
+  const issueAt = (err: CompileValidationError, loc: string) => err.issues.filter((i) => i.loc === loc);
+
+  it("refuses a Plugin.type one character past the bound and accepts one at the bound", () => {
+    const withType = (length: number): any => {
+      const b = baseBody();
+      b.workflow.steps[0].onEntry = [{ id: "action_x", type: "t".repeat(length), config: {} }];
+      return b;
+    };
+    expect(() => compileProcessBody(withType(MAX_PLUGIN_TYPE_LENGTH))).not.toThrow();
+    const hit = issueAt(rejects(withType(MAX_PLUGIN_TYPE_LENGTH + 1)), "steps[0].onEntry[0].type");
+    expect(hit.map((i) => i.message)).toEqual([boundMessage("type", MAX_PLUGIN_TYPE_LENGTH)]);
+  });
+
+  it("refuses a duration one character past the bound and accepts one at the bound", () => {
+    // A zero-padded value keeps its magnitude at one second, so validateDurations
+    // (grammar and magnitude, run first) accepts it and checkLengthBounds alone
+    // sees the length. An over-long value of real magnitude never gets that far:
+    // validateDurations refuses it with a DurationValidationError.
+    const padded = (length: number) => "PT" + "0".repeat(length - 4) + "1S";
+    const withDuration = (value: string): any => {
+      const b = baseBody();
+      b.workflow.steps[0].timers = [{ id: "timer_t", duration: value, onFire: { targetPath: "path_ab" } }];
+      return b;
+    };
+    expect(padded(MAX_DURATION_LENGTH)).toHaveLength(MAX_DURATION_LENGTH);
+    expect(() => compileProcessBody(withDuration(padded(MAX_DURATION_LENGTH)))).not.toThrow();
+    const hit = issueAt(rejects(withDuration(padded(MAX_DURATION_LENGTH + 1))), "steps[0].timers[0].duration");
+    expect(hit.map((i) => i.message)).toEqual([boundMessage("duration", MAX_DURATION_LENGTH)]);
+  });
+
+  it("refuses a FieldDef.key one character past the bound and accepts one at the bound", () => {
+    const withKey = (length: number): any => {
+      const b = baseBody();
+      b.fields[0].key = "k".repeat(length);
+      return b;
+    };
+    expect(() => compileProcessBody(withKey(MAX_KEY_LENGTH))).not.toThrow();
+    const hit = issueAt(rejects(withKey(MAX_KEY_LENGTH + 1)), "fields[0].key");
+    expect(hit.map((i) => i.message)).toEqual([boundMessage("key", MAX_KEY_LENGTH)]);
+  });
+
+  it("refuses a columnMapping key one character past the bound and accepts one at the bound", () => {
+    const withColumn = (length: number): any => {
+      const b = baseBody();
+      const column = "c".repeat(length);
+      b.dataSources = [{ id: "ds_products", key: "products", type: "db.list", config: { listKey: "products" } }];
+      b.fields = [
+        { id: "field_product", key: "product", label: { en: "Product" }, type: "string", dataSource: "ds_products", columnMapping: { [column]: "field_amount" } },
+        { id: "field_amount", key: "amount", label: { en: "Amount" }, type: "number" },
+      ];
+      return b;
+    };
+    expect(() => compileProcessBody(withColumn(MAX_KEY_LENGTH))).not.toThrow();
+    const err = rejects(withColumn(MAX_KEY_LENGTH + 1));
+    expect(err.issues.map((i) => i.message)).toEqual([boundMessage("columnMapping key", MAX_KEY_LENGTH)]);
   });
 });
