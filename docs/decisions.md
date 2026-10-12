@@ -1567,8 +1567,10 @@ this section.
 
 - **WRITE-1: the write routes still answer a caller who may not read with the
   instance's existence.** Claim, release and delegate answer 409
-  `instance-not-running` for a finished instance. They answer 500 for an
-  unknown instance id. On a running instance, claim answers the typed 403
+  `instance-not-running` for a finished instance. They answer 403
+  `authorization` for an unknown instance id to a caller without `system:admin`,
+  as the next paragraphs state. On a
+  running instance, claim answers the typed 403
   `not-assigned`, `not-a-candidate` or `already-claimed`. Release and delegate
   answer `not-claimant`. Submit and form-draft save answer `not-claimed` or
   `not-claimant`.
@@ -1582,10 +1584,12 @@ this section.
   `not-claimant`. Closing those two types needs a web change in the app area
   and the studio area.
 
-  The change `harden-http-error-surface` (audit finding C-17) owns the 500 for
-  an unknown id. Its answer for an unknown id must be the opaque 403 and never
-  a 404. That matches the answer submit, form-draft save and the visibility
-  routes give an unknown id.
+  The change `harden-http-error-surface` (audit finding C-17) shipped the
+  answer for an unknown id. A caller without `system:admin` gets the opaque 403
+  `authorization`, never a 404. That matches the answer submit, form-draft save
+  and the visibility routes give an unknown id. A `system:admin` holder gets
+  the `NotFoundError` answer. The typed refusals above still tell a caller that
+  an instance exists, and WRITE-1 keeps that gap open.
 
   One difference stays by design. On a running instance, a revoked starter's
   cancel or assignment-less submit succeeds. The same call on a finished
@@ -1708,14 +1712,6 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   share one database, and the provisioning connection drops its URL
   parameters. Anchors: `src/auth/jwt.ts`, `src/tenancy/provision.ts`,
   `src/tenancy/connections.ts`.
-- **`harden-http-error-surface` (D-1, D-8, C-10, C-11, C-17; medium)**: An
-  error in the login route escapes `mapError`, so an anonymous caller can
-  receive the runtime's development error page, the JWT check fixes no
-  algorithm list and does not need `exp` from external issuers, and a bad
-  cursor, a saved report with an invalid date and a claim on an unknown
-  instance each return 500. The unknown-id answer must be the opaque 403,
-  never a 404, as WRITE-1 states. Anchors: `src/auth/login.ts`, `src/auth/jwt.ts`,
-  `src/pagination.ts`.
 - **`fix-condition-and-path-builders` (E2-1, E2-6, E2-10, E2-14, E2-17;
   medium)**: A manual path keeps a hidden guard that hides its button at
   runtime, one "+ Add row" removes every `visible` override when the steps

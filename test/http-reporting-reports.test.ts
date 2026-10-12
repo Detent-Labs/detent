@@ -5,7 +5,7 @@
  * `/reporting/*` view routes are covered by reporting-routes.test.ts; this
  * file covers only the new report routes this change adds.
  */
-import { test, expect, beforeAll, beforeEach } from "bun:test";
+import { test, expect, beforeAll, beforeEach, spyOn } from "bun:test";
 import { sql, initSchema, createInstance } from "../src/engine/store.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import { createServer } from "../src/http/server.js";
@@ -251,4 +251,100 @@ test.skipIf(!DB)("a malformed create/update body answers 400 and runs no query",
 
   const after = (await sql`SELECT count(*)::int AS n FROM reports`) as { n: number }[];
   expect(after[0]!.n).toBe(before[0]!.n);
+});
+
+// ============================================================
+// Date bounds: one instant check on write and on read
+// ============================================================
+
+type ErrorBody = { error: { type: string } };
+
+test.skipIf(!DB)("create, save, draft preview and column choices answer 400 request-shape for a bound that is no date", async () => {
+  const P = pid();
+  await publishBody(P, body(), reg, dataSourceReg);
+  const created = (await (
+    await fetch(req("http://x/reporting/reports", owner, "POST", { processId: P, name: "Dated" }))
+  ).json()) as { reportId: string };
+  const before = (await sql`SELECT count(*)::int AS n FROM reports`) as { n: number }[];
+
+  for (const query of [{ createdAfter: "letzte Woche" }, { createdBefore: "letzte Woche" }, { createdAfter: "0000-01-01" }]) {
+    const answers = [
+      await fetch(req("http://x/reporting/reports", owner, "POST", { processId: P, name: "Bad", query })),
+      await fetch(req(`http://x/reporting/reports/${created.reportId}`, owner, "PUT", { query })),
+      await fetch(req("http://x/reporting/reports/preview", adminReports, "POST", { processId: P, query })),
+      await fetch(req("http://x/reporting/reports/columns", adminReports, "POST", { processId: P, query })),
+    ];
+    for (const res of answers) {
+      expect(res.status).toBe(400);
+      expect(((await res.json()) as ErrorBody).error.type).toBe("request-shape");
+    }
+  }
+
+  // Neither the create nor the save left a trace.
+  const after = (await sql`SELECT count(*)::int AS n FROM reports`) as { n: number }[];
+  expect(after[0]!.n).toBe(before[0]!.n);
+  const [stored] = (await sql`SELECT query FROM reports WHERE instance_report_id = ${created.reportId}`) as { query: unknown }[];
+  expect(stored!.query).toEqual({});
+});
+
+test.skipIf(!DB)("a report whose bounds are valid instants still saves and runs", async () => {
+  const P = pid();
+  const v = await publishBody(P, body(), reg, dataSourceReg);
+  await createInstance(v.definition, { processId: P, version: v.version, data: { field_x: "hi" } as never }, sql);
+  const query = { createdAfter: "2026-10-01T00:00:00Z", createdBefore: "2999-01-01T00:00:00Z" };
+
+  const created = await fetch(
+    req("http://x/reporting/reports", adminReports, "POST", { processId: P, name: "Valid", query, columns: [{ type: "field", fieldId: "field_x" }] }),
+  );
+  expect(created.status).toBe(201);
+  const { reportId } = (await created.json()) as { reportId: string };
+  const table = await fetch(req(`http://x/reporting/reports/${reportId}/table`, adminReports));
+  expect(table.status).toBe(200);
+  expect(((await table.json()) as { rows: unknown[] }).rows).toHaveLength(1);
+});
+
+// A saved report predates the write-side check, or was written by SQL. The
+// stored bound has to answer for itself when the report runs.
+test.skipIf(!DB)("a stored report with a bound that is no date answers 400 request-shape on the table and the CSV, with no unhandled-error log", async () => {
+  const P = pid();
+  const v = await publishBody(P, body(), reg, dataSourceReg);
+  await createInstance(v.definition, { processId: P, version: v.version, data: { field_x: "hi" } as never }, sql);
+  await sql`INSERT INTO permission_grants (role, permission, scope)
+    VALUES (${"finance-readers"}, ${"read"}, ${{ type: "process", config: { processId: P } }})`;
+  const viewer: Actor = { id: "user_viewer", roles: [REPORTS_ROLE, "finance-readers"] };
+  const created = (await (
+    await fetch(
+      req("http://x/reporting/reports", owner, "POST", {
+        processId: P,
+        name: "Stored bad bound",
+        columns: [{ type: "field", fieldId: "field_x" }],
+        viewers: [viewer.id],
+      }),
+    )
+  ).json()) as { reportId: string };
+
+  const errorSpy = spyOn(console, "error").mockImplementation(() => {});
+  try {
+    for (const stored of [{ createdBefore: "letzte Woche" }, { createdAfter: "0000-01-01" }]) {
+      await sql`UPDATE reports SET query = ${stored} WHERE instance_report_id = ${created.reportId}`;
+      for (const path of ["table", "table.csv"]) {
+        const res = await fetch(req(`http://x/reporting/reports/${created.reportId}/${path}`, viewer));
+        expect({ stored, path, status: res.status }).toEqual({ stored, path, status: 400 });
+        expect(res.headers.get("content-type")).toContain("application/json");
+        expect(((await res.json()) as ErrorBody).error.type).toBe("request-shape");
+      }
+    }
+    const logged = errorSpy.mock.calls.map((c) => c.join(" ")).join("\n");
+    expect(logged).not.toContain("unhandled error");
+  } finally {
+    errorSpy.mockRestore();
+  }
+
+  // A member without `read` on the process keeps the empty table, bound or not.
+  const noRead = await fetch(req(`http://x/reporting/reports/${created.reportId}/table`, owner));
+  expect(noRead.status).toBe(200);
+  expect(((await noRead.json()) as { rows: unknown[] }).rows).toEqual([]);
+  const noReadCsv = await fetch(req(`http://x/reporting/reports/${created.reportId}/table.csv`, owner));
+  expect(noReadCsv.status).toBe(200);
+  expect(await noReadCsv.text()).toBe("field_x\r\n");
 });

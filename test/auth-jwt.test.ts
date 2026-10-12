@@ -88,6 +88,17 @@ describe("local (bps) issuer", () => {
     await expectRejects(() => resolver(headers(`Bearer ${token}`), noDb));
   });
 
+  test("a token signed with HS512 by the configured key is rejected", async () => {
+    const resolver = jwtResolver({ localSecret: SECRET });
+    const token = await new SignJWT({ roles: [] })
+      .setProtectedHeader({ alg: "HS512" })
+      .setIssuer(LOCAL_ISSUER)
+      .setSubject("user_1")
+      .setExpirationTime("8h")
+      .sign(new TextEncoder().encode(SECRET));
+    await expectRejects(() => resolver(headers(`Bearer ${token}`), noDb));
+  });
+
   test("an unknown issuer is rejected", async () => {
     const resolver = jwtResolver({ localSecret: SECRET });
     const token = await new SignJWT({ roles: [] })
@@ -127,12 +138,12 @@ describe("local (bps) issuer", () => {
 });
 
 describe("JWKS-backed external issuer", () => {
-  async function withJwksServer(fn: (issuer: IssuerConfig, privateKey: CryptoKey) => Promise<void>): Promise<void> {
-    const { publicKey, privateKey } = await generateKeyPair("RS256");
+  async function withJwksServer(fn: (issuer: IssuerConfig, privateKey: CryptoKey) => Promise<void>, alg = "RS256"): Promise<void> {
+    const { publicKey, privateKey } = await generateKeyPair(alg);
     const jwk = await exportJWK(publicKey);
     const server = Bun.serve({
       port: 0,
-      fetch: () => Response.json({ keys: [{ ...jwk, alg: "RS256", use: "sig" }] }),
+      fetch: () => Response.json({ keys: [{ ...jwk, alg, use: "sig" }] }),
     });
     try {
       const issuer: IssuerConfig = {
@@ -161,6 +172,67 @@ describe("JWKS-backed external issuer", () => {
       const actor = await resolver(headers(`Bearer ${token}`), noDb);
       expect(actor).toEqual({ id: "oid-abc-123", roles: ["employee"] });
     });
+  });
+
+  test("a token with no exp claim is rejected", async () => {
+    await withJwksServer(async (issuer, privateKey) => {
+      const token = await new SignJWT({ roles: ["employee"] })
+        .setProtectedHeader({ alg: "RS256" })
+        .setIssuer(issuer.iss)
+        .setSubject("oid-abc-123")
+        .setAudience(issuer.audience)
+        .sign(privateKey);
+
+      const resolver = jwtResolver({ issuers: [issuer] });
+      await expectRejects(() => resolver(headers(`Bearer ${token}`), noDb));
+    });
+  });
+
+  test("a token with a future exp claim still resolves", async () => {
+    await withJwksServer(async (issuer, privateKey) => {
+      const token = await new SignJWT({ roles: ["employee"] })
+        .setProtectedHeader({ alg: "RS256" })
+        .setIssuer(issuer.iss)
+        .setSubject("oid-abc-123")
+        .setAudience(issuer.audience)
+        .setExpirationTime(Math.floor(Date.now() / 1000) + 3600)
+        .sign(privateKey);
+
+      const resolver = jwtResolver({ issuers: [issuer] });
+      expect(await resolver(headers(`Bearer ${token}`), noDb)).toEqual({ id: "oid-abc-123", roles: ["employee"] });
+    });
+  });
+
+  test("REGRESSION GUARD: a token with an HS256 header is rejected", async () => {
+    // jose already refuses an HMAC header against a remote key set, so this
+    // proves nothing about the `algorithms` option; it pins that behavior.
+    await withJwksServer(async (issuer) => {
+      const token = await new SignJWT({ roles: ["employee"] })
+        .setProtectedHeader({ alg: "HS256" })
+        .setIssuer(issuer.iss)
+        .setSubject("oid-abc-123")
+        .setAudience(issuer.audience)
+        .setExpirationTime("8h")
+        .sign(new TextEncoder().encode(SECRET));
+
+      const resolver = jwtResolver({ issuers: [issuer] });
+      await expectRejects(() => resolver(headers(`Bearer ${token}`), noDb));
+    });
+  });
+
+  test("an Ed25519 token resolves", async () => {
+    await withJwksServer(async (issuer, privateKey) => {
+      const token = await new SignJWT({ roles: ["employee"] })
+        .setProtectedHeader({ alg: "Ed25519" })
+        .setIssuer(issuer.iss)
+        .setSubject("oid-abc-123")
+        .setAudience(issuer.audience)
+        .setExpirationTime("8h")
+        .sign(privateKey);
+
+      const resolver = jwtResolver({ issuers: [issuer] });
+      expect(await resolver(headers(`Bearer ${token}`), noDb)).toEqual({ id: "oid-abc-123", roles: ["employee"] });
+    }, "Ed25519");
   });
 
   test("a token with the wrong audience is rejected", async () => {

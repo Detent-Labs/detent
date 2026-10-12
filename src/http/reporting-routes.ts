@@ -36,6 +36,7 @@ import { instanceStatus, type ProcessId } from "../schema/definition.js";
 import type { ActorResolver } from "../auth/resolve.js";
 import type { Actor } from "../cel/eval.js";
 import { requireRole, requirePermission, REPORTS_ROLE } from "../auth/authorize.js";
+import { instantMs, isInstant } from "../instant.js";
 import { RequestShapeError, notFound, type HttpResult, type HttpBinaryResult } from "./errors.js";
 import { route, readJson } from "./routes.js";
 
@@ -53,8 +54,8 @@ const reportColumnSchema = z.union([
 ]);
 const reportQuerySchema = z.object({
   status: z.array(instanceStatus).optional(),
-  createdAfter: z.string().optional(),
-  createdBefore: z.string().optional(),
+  createdAfter: z.string().refine(isInstant, "createdAfter must be an ISO-8601 instant").optional(),
+  createdBefore: z.string().refine(isInstant, "createdBefore must be an ISO-8601 instant").optional(),
   dataWhere: z.array(z.object({ fieldId: z.string().min(1), operator: z.enum(["eq", "ne", "in"]), value: z.unknown() })).optional(),
 });
 const createReportBodySchema = z.object({
@@ -101,10 +102,10 @@ function parseRange(url: URL): DateRange {
   const from = url.searchParams.get("from");
   const to = url.searchParams.get("to");
   if (from === null || to === null) throw new RequestShapeError("both 'from' and 'to' are required");
-  const fromMs = Date.parse(from);
-  const toMs = Date.parse(to);
-  if (Number.isNaN(fromMs)) throw new RequestShapeError(`'from' must be an ISO date, got '${from}'`);
-  if (Number.isNaN(toMs)) throw new RequestShapeError(`'to' must be an ISO date, got '${to}'`);
+  if (!isInstant(from)) throw new RequestShapeError(`'from' must be an ISO date, got '${from}'`);
+  if (!isInstant(to)) throw new RequestShapeError(`'to' must be an ISO date, got '${to}'`);
+  const fromMs = instantMs(from);
+  const toMs = instantMs(to);
   if (fromMs > toMs) throw new RequestShapeError("'from' must not be after 'to'");
   return { from: new Date(fromMs).toISOString(), to: new Date(toMs).toISOString() };
 }
