@@ -530,8 +530,8 @@ test.skipIf(!DB)("a process.start into an org.group-members start step holds the
   expect(await unresolvedEvents(startedId)).toHaveLength(0);
 });
 
-// Negative control: the same chain drained with the static-only registry the
-// handlers used to build for themselves resolves to nobody.
+// Negative control: the static-only registry alone resolves no `org.*`
+// strategy, so the same chain resolves to nobody.
 test.skipIf(!DB)("the same chain drained with the static registry resolves to no candidates and records the event", async () => {
   const { groupId } = await groupWithTwoMembers("start-group-static");
 

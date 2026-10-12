@@ -6,12 +6,13 @@
  * the database: it imports `src/auth/users.ts`, which imports `sql` from
  * `store.ts`, which imports `SPAWN_ACTION_TYPE` back from `registry.ts`. Putting
  * this entry there would close that cycle and cost `registry.ts` the leaf status
- * that lets `store.ts`, `transition.ts` and `definitions.ts` each default a
- * parameter to `createStaticAssignmentRegistry()`.
+ * that lets the engine modules each default a parameter to
+ * `createStaticAssignmentRegistry()`.
  *
  * This module's `createDefaultAssignmentRegistry` builds the full set: the
- * static entry plus the org-aware ones. `src/http/server.ts`, the composition
- * root, uses it as the default for both `createServer` and `serve`.
+ * static entry plus the org-aware ones. `startHttpServer` in
+ * `src/http/server.ts`, the composition root, uses it as its default. So do
+ * `routes.ts` and `studio-routes.ts` for their handlers.
  */
 import { z } from "zod";
 import { getManagerOf } from "../auth/users.js";

@@ -526,8 +526,8 @@ test.skipIf(!DB)("the named path onto an org.group-members step holds the group'
   expect(await unresolvedEvents(after.instanceId)).toHaveLength(0);
 });
 
-// Negative control: the same move drained with the static-only registry the
-// handler used to build for itself resolves to nobody.
+// Negative control: the static-only registry alone resolves no `org.*`
+// strategy, so the same move resolves to nobody.
 test.skipIf(!DB)("the same move drained with the static registry resolves to no candidates and records the event", async () => {
   const { groupId } = await groupWithTwoMembers("group-static");
 

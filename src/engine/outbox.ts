@@ -184,6 +184,10 @@ async function appendOutcome(
  * resolution workers use: a miss just skips the check for that row rather than
  * blocking delivery, so the feature composes with every existing caller that
  * has no store to wire in.
+ *
+ * `assignmentRegistry` reaches every handler's context. It defaults to the
+ * static registry, like the other trailing parameters. `startEngine` is the
+ * production caller and always passes the engine's own registry.
  */
 export async function drainOutbox(
   db: SQL = sql,

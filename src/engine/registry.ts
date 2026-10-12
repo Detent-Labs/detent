@@ -198,11 +198,10 @@ export const staticAssignmentStrategyDef: AssignmentStrategyDef = {
 /**
  * A registry pre-populated with the built-in `static` strategy alone. The
  * org-aware set is `createDefaultAssignmentRegistry` in
- * `assignment-strategies.ts`. Homed here
- * rather than in host.ts (where the action and data-source defaults live)
- * because this resolver imports nothing — it reads its own config — so
- * registry.ts stays the leaf module it already was, and store.ts,
- * transition.ts and definitions.ts can all default a parameter to it without
+ * `assignment-strategies.ts`. Homed here rather than in host.ts (where the
+ * action and data-source defaults live) because this resolver imports
+ * nothing — it reads its own config — so registry.ts stays the leaf module it
+ * already was. The engine modules can then default a parameter to it without
  * closing an import cycle through host.ts.
  */
 export function createStaticAssignmentRegistry(): AssignmentRegistry {

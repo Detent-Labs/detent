@@ -22,6 +22,7 @@
 - [x] 3.3 Add a `test/instance-transition.test.ts` case. The action moves a target onto an `org.group-members` step. Verify that the target holds the group's members as candidates.
 - [x] 3.4 Add a case where the moved target takes an automatic hop onto an `org.manager-of-starter` step. Verify that the manager is the candidate.
 - [x] 3.5 Add a negative control to 3.1 and 3.3. Drain with the static registry. Verify empty candidates and a no-candidates event.
+- [x] 3.6 Add a test that `startEngine` hands its registry to the handler context. Verify identity with a sentinel registry.
 
 ## 4. Documentation and index
 
