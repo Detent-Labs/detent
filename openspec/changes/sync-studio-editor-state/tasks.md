@@ -7,8 +7,8 @@
 
 ## 2. Focus after a removal (FIELDS-15)
 
-- [ ] 2.1 Give the steps rail's current row and its add control fixed ids, and move focus to them after `onRemoveStep`. Test the id helpers and the choice of target.
-- [ ] 2.2 Give the data source rail rows and the add control ids, and move focus after a data source removal. Test the target for a middle, a last and an only source.
+- [x] 2.1 Give the steps rail's current row and its add control fixed ids, and move focus to them after `onRemoveStep`. Test the id helpers and the choice of target.
+- [x] 2.2 Give the data source rail rows and the add control ids, and move focus after a data source removal. Test the target for a middle, a last and an only source.
 
 ## 3. The timer deadline (E2-13)
 
@@ -16,9 +16,9 @@
 
 ## 4. The data source removal (E2-15)
 
-- [ ] 4.1 Add `draft/data-source-removal.ts` with the reach count, `hasDataSourceReach` and the removal recipe. Test an unused source and a source on three fields at two depths. Test a column mapping and an unknown id. Test that `runValidation` then reports no unresolved `dataSource`.
-- [ ] 4.2 Add `RemoveDataSourceDialog.tsx`, shaped like `RemoveFieldDialog`, with its catalog keys. Test the markup: counts, Cancel focus, no row for a zero count.
-- [ ] 4.3 Branch `DataSourcesTab`: remove at once with no reach, open the dialog otherwise. Verify with the browser check in 7.3.
+- [x] 4.1 Add `draft/data-source-removal.ts` with the reach count, `hasDataSourceReach` and the removal recipe. Test an unused source and a source on three fields at two depths. Test a column mapping and an unknown id. Test that `runValidation` then reports no unresolved `dataSource`.
+- [x] 4.2 Add `RemoveDataSourceDialog.tsx`, shaped like `RemoveFieldDialog`, with its catalog keys. Test the markup: counts, Cancel focus, no row for a zero count.
+- [x] 4.3 Branch `DataSourcesTab`: remove at once with no reach, open the dialog otherwise. Verify with the browser check in 7.3.
 
 ## 5. The chaining fetch (E1-7)
 

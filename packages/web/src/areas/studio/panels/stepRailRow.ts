@@ -19,3 +19,21 @@ export function railRowIssues(issues: readonly EditorIssue[], step: DraftStep): 
   const mine = issues.filter((i) => ids.has(i.entityId));
   return { count: mine.length, blocker: mine.some((i) => i.source !== "view") };
 }
+
+/** The DOM id of the current row's main button. One row is current at a time,
+ * so one fixed id names it. */
+export const STEPS_RAIL_CURRENT_ID = "studio-steps-rail-current";
+
+/** The DOM id of the rail's first add control, the one `ADD_CONTROLS` lists
+ * first. */
+export const STEPS_RAIL_ADD_FIRST_ID = "studio-steps-rail-add-first";
+
+/**
+ * Where focus lands after the step page removes a step: the rail's current
+ * row while `remaining` steps stay, else the first add control, since an empty
+ * rail holds no row. The removed step's page remounts, so the control that
+ * pressed Remove this step is gone.
+ */
+export function focusAfterStepRemove(remaining: number): string {
+  return remaining > 0 ? STEPS_RAIL_CURRENT_ID : STEPS_RAIL_ADD_FIRST_ID;
+}

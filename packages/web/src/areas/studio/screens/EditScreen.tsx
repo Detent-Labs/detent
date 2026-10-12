@@ -6,6 +6,7 @@ import { draftFields } from "../draft/fields.js";
 import type { Draft } from "../draft/types.js";
 import { t } from "../catalog.js";
 import { StepsRail } from "../panels/StepsRail.js";
+import { focusAfterStepRemove } from "../panels/stepRailRow.js";
 import { StepPage, type WalkNeighbour } from "../panels/StepPage.js";
 import { useDraftToolbarActions } from "../panels/DraftToolbar.js";
 import { ProcessHeaderBar } from "../panels/ProcessHeaderBar.js";
@@ -596,14 +597,19 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
 
   /** The step page's remove control: one step, by id. The canvas keeps its
    * own delete control for a whole selection. A path pointing at a removed
-   * step stays as it is, and the checks rail reports it. */
+   * step stays as it is, and the checks rail reports it. The page remounts
+   * for the next step, which drops the focus Remove this step held. One
+   * animation frame later the rail's current row takes it, or the first add
+   * control when the rail holds no row. */
   const onRemoveStep = (stepId: string) => {
+    const remaining = steps.filter((s) => s.id !== stepId).length;
     mutate((d) => {
       if (!d.workflow?.steps) return;
       d.workflow.steps = d.workflow.steps.filter((s) => s.id !== stepId);
       if (d.workflow.initialStep === stepId) d.workflow.initialStep = d.workflow.steps[0]?.id;
     });
     if (stepId === inspectedStepId) onSelectStep(undefined);
+    requestAnimationFrame(() => document.getElementById(focusAfterStepRemove(remaining))?.focus());
   };
 
   /** Deletes every step in the set, the way the step page's own remove control
@@ -1034,7 +1040,7 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
               onShowStep={(target) => navigate({ name: "edit", processId, stepId: target })}
             />,
           )}
-          {tabPanel("dataSources", <DataSourcesTab token={token} />)}
+          {tabPanel("dataSources", <DataSourcesTab token={token} visible={!jsonOpen && openTab === "dataSources"} />)}
           {tabPanel("paths", <PathsView draft={draft} contentLocale={contentLocale} />)}
           {/* The Forms tab: one plate per step that declares a view
               (`studio-forms-overview`). A plate's control opens the form

@@ -6,7 +6,12 @@ import { describe, expect, it } from "bun:test";
 import type { Step } from "workflow-engine/schema";
 import type { DraftOf } from "../src/areas/studio/draft/types.js";
 import type { EditorIssue } from "../src/areas/studio/draft/issues.js";
-import { railRowIssues } from "../src/areas/studio/panels/stepRailRow.js";
+import {
+  focusAfterStepRemove,
+  railRowIssues,
+  STEPS_RAIL_ADD_FIRST_ID,
+  STEPS_RAIL_CURRENT_ID,
+} from "../src/areas/studio/panels/stepRailRow.js";
 
 type DraftStep = DraftOf<Step>;
 
@@ -47,5 +52,20 @@ describe("railRowIssues", () => {
 
   it("counts no issue belonging to another step", () => {
     expect(railRowIssues([issue("step_elsewhere", "zod")], step).count).toBe(0);
+  });
+});
+
+describe("focusAfterStepRemove", () => {
+  it("names the current row while any step stays", () => {
+    expect(focusAfterStepRemove(3)).toBe(STEPS_RAIL_CURRENT_ID);
+    expect(focusAfterStepRemove(1)).toBe(STEPS_RAIL_CURRENT_ID);
+  });
+
+  it("names the first add control once the rail holds no row", () => {
+    expect(focusAfterStepRemove(0)).toBe(STEPS_RAIL_ADD_FIRST_ID);
+  });
+
+  it("names two different ids, so a press never lands on the wrong control", () => {
+    expect(STEPS_RAIL_CURRENT_ID).not.toBe(STEPS_RAIL_ADD_FIRST_ID);
   });
 });

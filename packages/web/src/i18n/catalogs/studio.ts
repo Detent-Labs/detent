@@ -200,6 +200,12 @@ export const en = {
   "dataSources.empty": "No data sources yet.",
   "dataSources.addDataSource": "+ Add data source",
   "dataSources.removeDataSource": "Remove data source",
+  "dataSources.removeDialogHeading": "Remove the data source “{source}”?",
+  "dataSources.removeDialogFieldsTerm": "Fields using it",
+  "dataSources.removeDialogColumnMappingsTerm": "Column mappings on them",
+  "dataSources.removeDialogNoteClears": "Removing it also clears the data source and the column mappings from those fields.",
+  "dataSources.removeDialogNoteNoUndo": "The studio has no undo.",
+  "dataSources.removeDialogCancel": "Cancel",
   "dataSources.pickListKey": "Pick a data list",
   "dataSources.dataListLabel": "data list",
 
