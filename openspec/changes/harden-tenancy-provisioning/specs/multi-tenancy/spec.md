@@ -88,27 +88,27 @@ deployment fault rather than a caller fault, and the two must not read alike.
 
 In SaaS mode every `AUTH_ISSUERS` entry SHALL carry a `tenant`, and the
 control plane SHALL list that tenant. Each issuer SHALL appear once. A
-violation SHALL fail startup with an error naming the issuer. Outside SaaS
+violation SHALL fail startup with a message naming the issuer. Outside SaaS
 mode the field SHALL have no effect.
 
 #### Scenario: An issuer with no tenant fails startup
 
 - **WHEN** the server starts in SaaS mode with an `AUTH_ISSUERS` entry that has
   no `tenant`
-- **THEN** startup fails with an error naming that issuer's `iss`
+- **THEN** startup fails with a message naming that issuer's `iss`
 - **AND** no server listens
 
 #### Scenario: An issuer naming an unlisted tenant fails startup
 
 - **WHEN** the server starts in SaaS mode with an `AUTH_ISSUERS` entry whose
   `tenant` the control plane does not list
-- **THEN** startup fails with an error naming the issuer and the tenant
+- **THEN** startup fails with a message naming the issuer and the tenant
 
 #### Scenario: A repeated issuer fails startup
 
 - **WHEN** the server starts in SaaS mode with two `AUTH_ISSUERS` entries that
   share one `iss`
-- **THEN** startup fails with an error naming that issuer's `iss`
+- **THEN** startup fails with a message naming that issuer's `iss`
 
 #### Scenario: On-premise ignores the field
 
@@ -142,7 +142,7 @@ again. Stopping the server SHALL end every tenant pool.
 ### Requirement: A tenant database belongs to one tenant
 
 Provisioning SHALL refuse a database URL that names the same host, port and
-database as a listed tenant. Credentials and parameters SHALL NOT change that
+database as a listed tenant. Credentials and the query string SHALL NOT change that
 answer. Provisioning SHALL refuse before it creates a database or builds a
 schema. The control plane SHALL also hold `database_url` unique. The unique
 index then refuses a second row with the same URL string.
@@ -151,10 +151,10 @@ index then refuses a second row with the same URL string.
 
 - **WHEN** tenant `acme` has database `tenant_acme`, and an operator
   provisions tenant `beta` with a URL naming `tenant_acme` on the same host
-- **THEN** provisioning fails with an error naming `acme`
+- **THEN** provisioning fails with a message naming `acme`
 - **AND** `beta` is not listed
 
-#### Scenario: Credentials and parameters do not hide the same database
+#### Scenario: Credentials and the query string do not hide the same database
 
 - **WHEN** an operator provisions a tenant with the URL of a listed tenant's
   database but another password and `?sslmode=require`
@@ -165,9 +165,9 @@ index then refuses a second row with the same URL string.
 - **WHEN** two writes insert the same `database_url`
 - **THEN** the second write fails and one row exists
 
-### Requirement: Provisioning keeps the URL's connection parameters
+### Requirement: Provisioning keeps the URL's query string
 
-The admin connection that runs `CREATE DATABASE` SHALL carry every parameter
+The admin connection that runs `CREATE DATABASE` SHALL carry the whole query string
 of the tenant's database URL, `sslmode` included. It SHALL differ from that
 URL in the database name alone.
 

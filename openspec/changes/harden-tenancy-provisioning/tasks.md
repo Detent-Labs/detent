@@ -22,10 +22,10 @@
 
 ## 4. Verification
 
-- [ ] 4.1 Run `bun run typecheck` in the devcontainer. Report the printed result.
-- [ ] 4.2 Run `bun run build` in the devcontainer. Report the printed result.
-- [ ] 4.3 Run the FULL `bun test` with DATABASE_URL set through `scripts/test-gated.sh` and `OPENSPEC_TELEMETRY=0`. Report pass, fail and skip counts.
-- [ ] 4.4 Run the prose gate and the whitespace gate on the host over the pushed range. Report the printed result.
+- [x] 4.1 Run `bun run typecheck` in the devcontainer. Report the printed result.
+- [x] 4.2 Run `bun run build` in the devcontainer. Report the printed result.
+- [x] 4.3 Run the FULL `bun test` with DATABASE_URL set through `scripts/test-gated.sh` and `OPENSPEC_TELEMETRY=0`. Report pass, fail and skip counts.
+- [x] 4.4 Run the prose gate and the whitespace gate on the host over the pushed range. Report the printed result.
 
 ## Workflow follow-up
 
