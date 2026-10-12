@@ -30,15 +30,15 @@
 
 ## 5. Records
 
-- [ ] 5.1 Strike this change's entry in the audit index of `docs/decisions.md`. Verify the entry is gone and no citation breaks.
+- [x] 5.1 Strike this change's entry in the audit index of `docs/decisions.md`. Verify the entry is gone and no citation breaks.
 - [x] 5.2 Fix the comment that said `instances_redacted_idx` stays small. Verify `git grep instances_redacted_idx -- src docs` finds nothing live.
 - [x] 5.3 Check `docs/current-state.md`, `docs/runbooks` and `README.md` for the three index names. Verify each hit names the new index.
 
 ## 6. Verification
 
-- [ ] 6.1 Run `bun run typecheck`, then `bun run build`, then the full gated `bun test` with `DATABASE_URL` set. Verify all three exit 0.
-- [ ] 6.2 Run the prose and whitespace gates over the push range. Verify both print nothing and exit 0.
-- [ ] 6.3 Run the audit's R6 and R7 queries again on the final schema. Verify the plans match the design table.
+- [x] 6.1 Run `bun run typecheck`, then `bun run build`, then the full gated `bun test` with `DATABASE_URL` set. Verify all three exit 0.
+- [x] 6.2 Run the prose and whitespace gates over the push range. Verify both print nothing and exit 0.
+- [x] 6.3 Run the audit's R6 and R7 queries again on the final schema. Verify the plans match the design table.
 
 ## Workflow follow-up
 

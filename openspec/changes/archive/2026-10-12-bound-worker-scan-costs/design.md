@@ -147,6 +147,9 @@ status-filtered list keeps its speed, as the table shows.
 - [Text comparison of timestamps] → A hand-edited body with a non-UTC string
   would sort wrongly. No writer produces one, and `started_at` carries the
   same assumption.
+- [A bulk redaction leaves dead retention-index entries] → Each redacted row
+  leaves the partial index. Until autovacuum runs, the next sweep reads the dead
+  entries: 116 ms for 166,000 of them, 0.04 ms after `VACUUM`.
 - [The first `initSchema` rewrites stale marks] → One `UPDATE` over the stale
   rows, once. On a database with millions of finished instances it takes
   seconds and locks only its own rows.

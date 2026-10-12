@@ -1692,11 +1692,6 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   `http.request` sit in plain text in the immutable definition and in every
   outbox row. Anchors: `src/handlers/http.ts`, `src/engine/transition.ts`,
   `src/engine/admin-queries.ts`.
-- **`bound-worker-scan-costs` (B-6, B-7, B-8, B-11; medium)**: The claim scan
-  and the retention sweep grow with every instance ever run, one tenant's
-  hung target stops the outbox for all tenants, and the admin outbox list has
-  no index for its sort order. Anchors: `src/engine/resolution.ts`,
-  `src/engine/retention.ts`, `src/engine/host.ts`.
 - **`harden-tenancy-provisioning` (C-8, C-9, C-14, C-15; medium)**: In SaaS
   mode a token from an external identity provider never resolves to its
   tenant, tenant pools open more than once and never close, two tenants can
