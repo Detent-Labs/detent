@@ -14,6 +14,10 @@
  *   those four instead need `requireDeveloperListOrAdmin`: `ADMIN_ROLE`
  *   bypasses `requireAuthoring` entirely there (matching `GET
  *   /processes/:processId/access` below), any other actor still needs both.
+ *   The publish route additionally needs `requirePublishListAccess` after
+ *   `requirePermission`: `ADMIN_ROLE` or a Developer list match, skipped for a
+ *   processId with no draft and no published version. `POST /processes`
+ *   (`routes.ts`) applies the same rule.
  * - `requireStudioRead` (those two OR templates) on the two template reads and
  *   the published version body.
  * - `await requirePermission(actor, "migrate", processId, db)` alone on the
