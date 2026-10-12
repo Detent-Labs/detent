@@ -189,6 +189,9 @@ export function App() {
           token={session.token}
           locale={locale}
           onSaved={(account) => {
+            // A save that resolves after another tab ended this session
+            // arrives with a closure over the ended one. It writes nothing.
+            if (heldSession.current?.token !== session.token) return;
             // The account of record just moved, so the session follows it, and
             // a locale chosen here becomes the active one at once. The form's
             // own PATCH already carried it to the account, so this writes the
