@@ -50,11 +50,12 @@ so no cycle forms.
 The four draft routes keep their own call sites and change only the import.
 Alternative: a copy in `routes.ts`. Rejected, since two copies drift.
 
-**A new `requirePublishListAccess(actor, processId, db)` carries the
-publish-side rule.** It returns for `ADMIN_ROLE`. It also returns when the
-process has no draft and no published version. Otherwise it throws the
-refusal the draft routes throw. Both publish handlers call it directly after
-`requirePermission`. Alternative: inline the three lines in each handler.
+**`requirePublishListAccess(actor, processId, db)` carries the publish-side
+rule.** It returns true for a first publish: no draft and no published
+version. Otherwise it returns false for
+`ADMIN_ROLE` or a list match, and throws the refusal the draft routes throw.
+Both publish handlers call it directly after `requirePermission`.
+`POST /processes` reuses the boolean to decide the seeding. Alternative: inline the three lines in each handler.
 Rejected for the same drift reason. A copy could also get the first-publish
 carve-out wrong.
 
