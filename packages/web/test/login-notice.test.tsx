@@ -7,14 +7,17 @@ function render(notice?: string): string {
 }
 
 describe("LoginScreen's notice", () => {
-  it("renders the notice as a status line between the title and the first field", () => {
+  it("renders the notice in the status region between the title and the first field", () => {
     const html = render("Your session ended in another tab.");
-    expect(html).toMatch(/<p\b[^>]*\brole="status"[^>]*>Your session ended in another tab\.<\/p>/);
+    expect(html).toMatch(/<div\b[^>]*\brole="status"[^>]*><p\b[^>]*>Your session ended in another tab\.<\/p><\/div>/);
     expect(html.indexOf("</h1>")).toBeLessThan(html.indexOf('role="status"'));
     expect(html.indexOf('role="status"')).toBeLessThan(html.indexOf("<label"));
   });
 
-  it("renders no status line without a notice", () => {
-    expect(render()).not.toContain('role="status"');
+  it("keeps the status region mounted and empty without a notice", () => {
+    const html = render();
+    // No whitespace or child node: `:empty` collapses the region only while it holds none.
+    expect(html).toMatch(/<div\b[^>]*\brole="status"[^>]*><\/div>/);
+    expect(html).not.toContain("Your session ended");
   });
 });
