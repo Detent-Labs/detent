@@ -21,8 +21,8 @@ the history of the same instances again.
 **Non-Goals:**
 - A cursor, a streamed CSV or a row limit above 1000. They need their own change.
 - A span limit on the range, or a partial aggregate.
-- A UI change. The table already shows its truncation note, and the screens
-  already show a request error.
+- A new screen state. The table already shows its truncation note. The screens
+  already show a request-shape note, and decision 7 changes only its wording.
 
 ## Decisions
 
@@ -77,13 +77,22 @@ that error to 400. The query reads `body`, so the limit bounds memory as well as
 the row count. The `LIMIT` clause costs one extra row. Alternative: a
 `count(*)` first. That scans the range twice.
 
+**7. The request-shape note names the cause.** The screens never show
+`error.message`, so the 400 of decision 6 reads "That request was malformed."
+in `packages/web/src/i18n/catalogs/reporting.ts` (`error.requestShape`). The
+string gains a second sentence in English and German: narrow the date range.
+The note keeps its error type and its place. A client-side range check already
+blocks a malformed date, so this note shows for a cap refusal in practice.
+Alternative: a new error type for the cap. That adds a union member, a switch
+arm and a client type for one sentence.
+
 ## Risks / Trade-offs
 
 - A range at 20000 instances still loads 20000 bodies and their history. The
   cap bounds the cost. The in-memory model stays an open question in
   `docs/decisions.md`.
 - A process with more than 20000 instances in one range now fails where it
-  succeeded before. The message tells the caller to narrow the range.
+  succeeded before. The note tells the reader to narrow the range.
 - A report capped at 1000 rows renders 1000 table rows in the browser. One
   browser check covers a report with more than 1000 rows.
 - Prefixing a string such as a phone number shows an apostrophe in some tools.
@@ -93,3 +102,7 @@ the row count. The `LIMIT` clause costs one extra row. Alternative: a
 
 No stored data changes. The change deploys with the engine. A rollback restores
 the old behavior.
+
+## Open Questions
+
+None.

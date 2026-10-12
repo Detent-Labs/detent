@@ -28,9 +28,10 @@ C-13, C-19).
   range with more than 20000 instances answers `400` and runs no aggregate. The
   change does not add a span limit. It returns no partial result.
 
-The change touches no schema and no definition contract rule. No screen changes.
-The 400 reaches the screens through their existing error note, and the
-truncation note exists already.
+The change touches no schema and no definition contract rule. The truncation
+note exists already. The 400 reaches the screens as the request-shape note,
+and its text blames the request. That wording misleads here. The note gains
+one sentence in English and German that says to narrow the date range.
 
 ## Capabilities
 
@@ -48,11 +49,14 @@ None.
 - `instance-data-query`: a caller can raise the enforced maximum for itself
   with `maxLimit`.
 - `reporting-analytics-api`: a range above the instance cap answers `400`.
+- `reporting-app`: the request-shape note tells the reader to narrow the date
+  range.
 
 ## Impact
 
-- `src/runtime/reports.ts`, `src/runtime/queries.ts`, `src/runtime/internal.ts`,
+- `src/runtime/reports.ts`, `src/runtime/queries.ts`,
   `src/engine/reporting.ts`, `src/http/reporting-routes.ts`.
+- `packages/web/src/i18n/catalogs/reporting.ts`, one string in each locale.
 - `docs/openapi.yaml` excludes `reporting/*`, so it stays as it is.
 - `docs/decisions.md`: the archive commit strikes the change's entry in the
   audit index.
