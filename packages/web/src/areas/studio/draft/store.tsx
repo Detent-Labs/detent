@@ -6,7 +6,7 @@ import { collectUsedLocales } from "./localized-text";
 import { listProcesses, getVersionBody } from "../api/client.js";
 import { useRegistry } from "../panels/shared/useRegistry.js";
 import type { RegistryInfo } from "../api/types.js";
-import { collectChainingActionSites, resolveChainingTargets, syncLoadedTargets } from "./chainingFetch";
+import { collectChainingActionSites, resolveChainingTargets, syncLoadedTargets, type ChainingListing } from "./chainingFetch";
 
 const EMPTY_DRAFT: Draft = {};
 
@@ -88,23 +88,34 @@ export function DraftProvider({ children, initial, token }: { children: ReactNod
   const registry = useRegistry(token);
 
   // Resolved process.start chaining target bodies, keyed by the triggering
-  // action's own id. `chainingFetchState` dedupes the listProcesses +
-  // getVersionBody pair per distinct target processId (never per site) —
-  // outside React state, so updating it triggers no render of its own.
+  // action's own id. `chainingFetchState` dedupes the body fetch per target
+  // processId (never per site); the process list is read once per mount
+  // through the shared `chainingListing` below. It lives outside React state, so updating it
+  // triggers no render of its own.
   // `chainingBodyCache` holds each resolved processId's body so a second
   // site targeting an already-"done" processId can read it with no fetch.
   const [loadedChainingTargets, setLoadedChainingTargets] = useState<Record<ActionId, ProcessBody>>({});
   const chainingFetchState = useRef<Map<string, "pending" | "done">>(new Map());
   const chainingBodyCache = useRef<Map<string, ProcessBody>>(new Map());
+  // One process list per mount, shared by every target id the effect resolves.
+  const chainingListing = useRef<ChainingListing>({});
   const draftRef = useRef(draft);
   draftRef.current = draft;
 
   useEffect(() => {
     const sites = collectChainingActionSites(draft);
-    resolveChainingTargets(sites, token, chainingFetchState.current, chainingBodyCache.current, { listProcesses, getVersionBody }, () => {
-      const currentSites = collectChainingActionSites(draftRef.current);
-      setLoadedChainingTargets(syncLoadedTargets(currentSites, chainingBodyCache.current));
-    });
+    resolveChainingTargets(
+      sites,
+      token,
+      chainingFetchState.current,
+      chainingBodyCache.current,
+      chainingListing.current,
+      { listProcesses, getVersionBody },
+      () => {
+        const currentSites = collectChainingActionSites(draftRef.current);
+        setLoadedChainingTargets(syncLoadedTargets(currentSites, chainingBodyCache.current));
+      },
+    );
     setLoadedChainingTargets(syncLoadedTargets(sites, chainingBodyCache.current));
   }, [draft, token]);
 

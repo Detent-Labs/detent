@@ -6,7 +6,7 @@ import { t } from "../catalog.js";
 import { useDraft } from "../draft/store.js";
 import { resolveDraftLocalizedText } from "../draft/localized-text.js";
 import type { StepKind } from "../draft/createStep.js";
-import { railRowIssues } from "./stepRailRow.js";
+import { railRowIssues, STEPS_RAIL_ADD_FIRST_ID, STEPS_RAIL_CURRENT_ID } from "./stepRailRow.js";
 
 /** The width below which the Steps tab stands one column, so the rail gives
  * up its own and caps its height instead of pushing the step page a screen
@@ -281,6 +281,7 @@ export function StepsRail({ currentStepId, onSelectStep, onMove, onAddStep }: Pr
                 }}
               >
                 <button
+                  id={current ? STEPS_RAIL_CURRENT_ID : undefined}
                   type="button"
                   {...stylex.props(styles.rowMain, current && styles.rowMainCurrent)}
                   aria-current={current ? "true" : undefined}
@@ -341,8 +342,14 @@ export function StepsRail({ currentStepId, onSelectStep, onMove, onAddStep }: Pr
         <h2 {...stylex.props(styles.footHeading)} id={footHeadingId}>
           {t("stepsRail.addLegend")}
         </h2>
-        {ADD_CONTROLS.map(({ kind, label }) => (
-          <button key={kind} type="button" className="btn btn-secondary" onClick={() => onAddStep(kind)}>
+        {ADD_CONTROLS.map(({ kind, label }, i) => (
+          <button
+            key={kind}
+            id={i === 0 ? STEPS_RAIL_ADD_FIRST_ID : undefined}
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => onAddStep(kind)}
+          >
             {t(label)}
           </button>
         ))}

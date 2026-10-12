@@ -29,8 +29,22 @@ import { flattenRailFields, issueCountForEntityId } from "../draft/panel-rail";
 import { moveFieldAndSyncViews } from "../draft/view-group-sync";
 import { fieldRemovalReach, hasReach, removeFieldAndReferences, type FieldRemovalReach } from "../draft/field-removal";
 import { FieldCatalogPanel } from "./FieldCatalogPanel";
+import {
+  dataSourceRemovalReach,
+  hasDataSourceReach,
+  removeDataSourceAndReferences,
+  type DataSourceRemovalReach,
+} from "../draft/data-source-removal";
 import { RemoveFieldDialog } from "./RemoveFieldDialog";
+import { RemoveDataSourceDialog } from "./RemoveDataSourceDialog";
 import { DataSourcesPanel } from "./DataSourcesPanel";
+import {
+  ADD_DATA_SOURCE_ID,
+  dataSourceRailId,
+  focusAfterDataSourceRemove,
+  neighbourAfterDataSourceRemove,
+  removeDataSourceControlId,
+} from "./dataSourceRailLogic";
 
 type DraftDataSource = DraftOf<DataSourceDef>;
 
@@ -664,16 +678,43 @@ export function FieldsTab({
   );
 }
 
+/** A removal `DataSourcesTab::requestRemove` has measured: the source, its key
+ * with the rail's fallback for an unnamed one, and the removal's reach. */
+interface DataSourceRemoval {
+  dataSourceId: string;
+  label: string;
+  reach: DataSourceRemovalReach;
+}
+
 /**
  * The Data sources tab: the declared sources' own entity rail beside the open
  * source's editor. A data source nests under nothing, so no entry carries a
  * move control.
  */
-export function DataSourcesTab({ token }: { token: string }) {
+export function DataSourcesTab({
+  token,
+  visible,
+}: {
+  token: string;
+  /** False while the Data sources tab hides. Every tab body stays mounted, so
+   * a browser Back can hide this tab while its removal dialog stands open. A
+   * hide declines that removal, the way `FieldsTab` does. */
+  visible: boolean;
+}) {
   const { draft, mutate, validation } = useDraft();
   const dataSources = draft.dataSources ?? [];
 
   const [selectedDataSourceIdState, setSelectedDataSourceId] = useState<string | undefined>(undefined);
+
+  // `pendingRemoval` is the removal `RemoveDataSourceDialog` asks about, while
+  // the dialog stays open. `removeTriggerRef` holds that removal's Remove data
+  // source control, where `useConfirmDialog` returns focus on a decline.
+  const [pendingRemoval, setPendingRemoval] = useState<DataSourceRemoval | undefined>(undefined);
+  const removeTriggerRef = useRef<HTMLButtonElement>(null);
+
+  // Same rule as `FieldsTab`: the update runs during this render, so no commit
+  // holds the dialog inside a hidden tab body, where it would stay modal.
+  if (!visible && pendingRemoval !== undefined) setPendingRemoval(undefined);
 
   const dataSourceIds = dataSources
     .map((ds) => ds.id)
@@ -689,12 +730,46 @@ export function DataSourcesTab({ token }: { token: string }) {
     setSelectedDataSourceId(dataSource.id);
   };
 
-  const removeDataSource = (index: number) => {
-    const neighbor = dataSources[index + 1] ?? dataSources[index - 1];
-    mutate((d) => {
-      d.dataSources?.splice(index, 1);
-    });
-    setSelectedDataSourceId(neighbor?.id);
+  /**
+   * Remove data source's press in the open source's editor reaches this, as
+   * `DataSourcesPanel`'s `onRemove`. It measures the removal's reach on this
+   * render's draft, once per press. A source no field names leaves at once.
+   * One a field names waits in `pendingRemoval` for `RemoveDataSourceDialog`,
+   * which the tab renders outside the keyed `DataSourceRow`: a confirm
+   * remounts that row. The trigger ref points at the pressed control, found by
+   * `removeDataSourceControlId`, so a decline hands focus back to it.
+   */
+  const requestRemove = (index: number) => {
+    const ds = dataSources[index];
+    if (ds?.id === undefined) return;
+    const reach = dataSourceRemovalReach(draft, ds.id);
+    if (reach === undefined) return;
+    const removal: DataSourceRemoval = { dataSourceId: ds.id, label: ds.key || t("panelsScreen.unnamedDataSource"), reach };
+    if (!hasDataSourceReach(reach)) {
+      removeDataSource(removal);
+      return;
+    }
+    const trigger = document.getElementById(removeDataSourceControlId(ds.id));
+    removeTriggerRef.current = trigger instanceof HTMLButtonElement ? trigger : null;
+    setPendingRemoval(removal);
+  };
+
+  /**
+   * Makes a removal `requestRemove` measured, at once or on the dialog's
+   * confirm. One `mutate` runs `removeDataSourceAndReferences`, so the source
+   * and the field references to it leave in one draft change. The tab selects
+   * the neighbour, then hands focus to the neighbour's rail row, or to Add
+   * data source when none remain. The row remounts for the next source, so
+   * the focus waits one animation frame for that commit.
+   */
+  const removeDataSource = ({ dataSourceId }: DataSourceRemoval) => {
+    const index = dataSources.findIndex((ds) => ds.id === dataSourceId);
+    if (index === -1) return;
+    const neighbour = neighbourAfterDataSourceRemove(dataSources, index);
+    const focusId = focusAfterDataSourceRemove(dataSources, index);
+    mutate((d) => removeDataSourceAndReferences(d, dataSourceId));
+    setSelectedDataSourceId(neighbour?.id);
+    requestAnimationFrame(() => document.getElementById(focusId)?.focus());
   };
 
   return (
@@ -707,6 +782,7 @@ export function DataSourcesTab({ token }: { token: string }) {
             return (
               <li key={ds.id}>
                 <button
+                  id={dataSourceRailId(ds.id)}
                   type="button"
                   {...stylex.props(styles.railRow, selectedDataSourceId === ds.id && styles.railRowCurrent)}
                   aria-current={selectedDataSourceId === ds.id ? "true" : undefined}
@@ -728,7 +804,7 @@ export function DataSourcesTab({ token }: { token: string }) {
             );
           })}
           <li>
-            <button type="button" {...stylex.props(styles.railRow)} onClick={addDataSource}>
+            <button id={ADD_DATA_SOURCE_ID} type="button" {...stylex.props(styles.railRow)} onClick={addDataSource}>
               {t("dataSources.addDataSource")}
             </button>
           </li>
@@ -739,9 +815,27 @@ export function DataSourcesTab({ token }: { token: string }) {
           token={token}
           selectedId={selectedDataSourceId}
           onAdd={addDataSource}
-          onRemove={removeDataSource}
+          onRemove={requestRemove}
         />
       </div>
+      {/* Outside the keyed `DataSourceRow`, which a confirm remounts. A confirm
+          clears the trigger ref before the dialog unmounts, so the hook's
+          focus return finds nothing and `removeDataSource` alone places
+          focus. A decline keeps the ref, so focus returns to Remove data
+          source. */}
+      {visible && pendingRemoval !== undefined && (
+        <RemoveDataSourceDialog
+          label={pendingRemoval.label}
+          reach={pendingRemoval.reach}
+          triggerRef={removeTriggerRef}
+          onCancel={() => setPendingRemoval(undefined)}
+          onConfirm={() => {
+            removeTriggerRef.current = null;
+            setPendingRemoval(undefined);
+            removeDataSource(pendingRemoval);
+          }}
+        />
+      )}
     </div>
   );
 }

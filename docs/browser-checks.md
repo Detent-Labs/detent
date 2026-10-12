@@ -6128,3 +6128,89 @@ Pass: the list still holds one `approved` and the JSON surface stores
 Type ` pending ` and press "+ Add outcome".
 
 Pass: the JSON surface stores `pending`.
+
+### Editor state that follows the draft (`sync-studio-editor-state`)
+
+Source: `sync-studio-editor-state` task 6.1. A `bun:test` run cannot press a
+control, watch focus move or count the requests a keystroke sends. The four
+findings below stay manual. Use the production build on `127.0.0.1`, per
+"Before you start".
+
+Open Studio at `/studio` and a draft with three steps. On the JSON
+surface, give it two `db.list` data sources, `countries` and `regions`. Name
+`countries` in the `dataSource` of three fields, one of them inside a group.
+Give one of those fields a `columnMapping`. Give the first step a timer with
+the deadline `data.due_at`. Create two data lists, `countries` and `regions`,
+on the admin Data lists screen. Reload the draft after the lists exist.
+
+#### The JSON text follows the config (E2-8)
+
+Open the Data sources tab and select `countries`. Its "config (JSON)"
+textarea reads `{}`.
+
+Pick `countries` in the "data list" select.
+
+Pass: the textarea reads `{ "listKey": "countries" }`.
+
+Click into the textarea, type one character and press Backspace.
+
+Pass: the "data list" select still reads `countries`.
+
+Open the Steps tab on step 1. Pick "A fixed list of people" as the assignment,
+type `alice` under candidates and press "Edit as JSON". Press "Next".
+
+Pass: the assignment of step 2 shows its own empty `config` and no type. It
+does not show `alice`.
+
+#### The walk keeps its focus (E2-8, FIELDS-15)
+
+Press "Next" with the keyboard on step 1.
+
+Pass: "Next" holds the focus on step 2. Pressing it again reaches step 3.
+
+Pass: on step 3 the focus has moved to "Previous step", since "Next" is off.
+
+#### An emptied deadline stays a deadline (E2-13)
+
+On step 1, find the timer in the Time limit section. Clear the text of the
+deadline input.
+
+Pass: the kind select still reads "A deadline a condition computes (CEL)" and
+the empty input stays on the page.
+
+Pick "A time limit".
+
+Pass: the number and unit controls show, reading 1 and hours.
+
+#### A data source removal clears its references (E2-15, FIELDS-15)
+
+On the Data sources tab, add a data source and press "Remove data source".
+
+Pass: it leaves at once, with no dialog, and the focus lands on a rail row.
+
+Select `countries` and press "Remove data source".
+
+Pass: a dialog counts 3 fields and 1 column mapping, and "Cancel" holds the
+focus. Press Escape. The draft keeps the source and "Remove data source" holds
+the focus again.
+
+Press "Remove data source" again and confirm.
+
+Pass: the rail row of the next data source holds the focus. The Checks tab
+reports no unresolved `dataSource`. On the JSON surface none of the three
+fields holds `dataSource` and the one `columnMapping` is gone.
+
+On the Steps tab, press "Remove this step" on step 2.
+
+Pass: the focus lands on the current row of the steps rail.
+
+#### A process id sends no list request per keystroke (E1-7)
+
+On step 1, add a `process.start` action on entry. In its "config (JSON)"
+textarea, place the caret between the quotes of an empty `processId`. Type
+`proc_credit_check`, one character at a time, with the network panel open.
+
+Pass: the typing sends no `GET /processes`. It sends one
+`GET /processes/proc_credit_check/versions/1` once the id is whole.
+
+Discard the draft.

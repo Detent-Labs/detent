@@ -6,6 +6,7 @@ import type { DraftOf } from "../draft/types";
 import type { DraftField } from "../draft/fields";
 import { mintId } from "../draft/ids";
 import { removeAt, updateAt } from "../draft/list-ops";
+import { deadlinePatch } from "../draft/timer-deadline.js";
 import { maxTimeLimitCount, timeLimitDuration, timeLimitInRange, timeLimitParts, type TimeLimitUnit } from "../draft/time-limit.js";
 import { t, type CatalogKey } from "../catalog.js";
 import { ExpressionInput } from "./shared/ExpressionInput";
@@ -196,7 +197,7 @@ export function TimersPanel({ timers, paths, fields, onChange, registryTypes, re
             ) : (
               <label>
                 deadline
-                <ExpressionInput value={timer.deadline} onChange={(deadline) => updateTimer(index, { deadline })} />
+                <ExpressionInput value={timer.deadline} onChange={(deadline) => updateTimer(index, deadlinePatch(deadline))} />
               </label>
             )}
 
