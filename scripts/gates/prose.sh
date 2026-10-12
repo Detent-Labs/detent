@@ -52,8 +52,10 @@ TAB=$(printf '\t')
 ranges=$(mktemp)
 pairs=$(mktemp)
 findings=$(mktemp)
+diff_out=$(mktemp)
+diff_err=$(mktemp)
 blob="${TMPDIR:-/tmp}/prose-gate-$$.md"
-trap 'rm -f "$ranges" "$pairs" "$findings" "$blob"' EXIT
+trap 'rm -f "$ranges" "$pairs" "$findings" "$diff_out" "$diff_err" "$blob"' EXIT
 
 # stdin yields once. Capture it, then read the capture.
 cat > "$ranges"
@@ -69,16 +71,27 @@ cat > "$ranges"
 #
 # --diff-filter=d drops a path the range deleted, which is why a deleted file
 # needs no special case below.
+#
+# The diff lands in a temp file, and the loop reads the file. A shell reads only
+# the last command's status in a pipeline, so `git diff | while ...` swallowed
+# the status of a range git could not diff, and the gate then reported that the
+# push changes no Markdown. Now that status stops the gate.
 while IFS= read -r range; do
   [ -n "$range" ] || continue
-  git diff --name-status -M --diff-filter=d "$range" -- '*.md' 2>/dev/null \
-    | while IFS="$TAB" read -r st p1 p2; do
-        [ -n "$p1" ] || continue
-        case "$st" in
-          R*|C*) printf '%s\t%s\t%s\n' "$range" "$p1" "$p2" ;;
-          *)     printf '%s\t%s\t%s\n' "$range" "$p1" "$p1" ;;
-        esac
-      done >> "$pairs" || true
+
+  rc=0
+  git diff --name-status -M --diff-filter=d "$range" -- '*.md' > "$diff_out" 2> "$diff_err" || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    bad_range "$RULE" "$range" "$diff_err"
+  fi
+
+  while IFS="$TAB" read -r st p1 p2; do
+    [ -n "$p1" ] || continue
+    case "$st" in
+      R*|C*) printf '%s\t%s\t%s\n' "$range" "$p1" "$p2" ;;
+      *)     printf '%s\t%s\t%s\n' "$range" "$p1" "$p1" ;;
+    esac
+  done < "$diff_out" >> "$pairs"
 done < "$ranges"
 
 sort -u "$pairs" -o "$pairs"

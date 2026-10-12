@@ -4,9 +4,11 @@
  * the engine's own grants — INSERT/SELECT on `instance_audit`, EXECUTE on
  * `redact_instance_fields` — and nothing else. The devcontainer's
  * DATABASE_URL is the `postgres` superuser, whom no grant restrains, so this
- * suite is the only place the guarantee is actually measured. Skips whenever
- * the probe role could not be created (a maintenance role with no
- * CREATEROLE), the way the DB suites skip on `!DB`.
+ * suite is the only place the guarantee is actually measured. The preload
+ * draws a fresh password for the role each run and exports it as
+ * DETENT_AUDIT_PROBE_PASSWORD. Skips whenever the role is absent or the
+ * variable is unset (a maintenance role with no CREATEROLE can neither create
+ * the role nor set its password), the way the DB suites skip on `!DB`.
  */
 import { SQL } from "bun";
 import { test, expect, beforeAll, afterAll } from "bun:test";
@@ -14,11 +16,12 @@ import { sql, initSchema, withTransaction } from "../src/engine/store.js";
 import { clearInstanceAudit } from "./audit-cleanup.js";
 
 const DB = !!process.env.DATABASE_URL;
+const PROBE_PASSWORD = process.env.DETENT_AUDIT_PROBE_PASSWORD;
 
-function probeUrl(url: string): string {
+function probeUrl(url: string, password: string): string {
   const parsed = new URL(url);
   parsed.username = "detent_audit_probe";
-  parsed.password = "probe";
+  parsed.password = password;
   return parsed.toString();
 }
 
@@ -28,7 +31,7 @@ let probe: SQL | undefined;
 if (DB) {
   await initSchema();
   const rows = (await sql`SELECT 1 FROM pg_roles WHERE rolname = 'detent_audit_probe'`) as unknown[];
-  PROBE = rows.length > 0;
+  PROBE = rows.length > 0 && !!PROBE_PASSWORD;
   if (PROBE) {
     // 5.7: exactly the engine's own grants, issued as the owner (only it can
     // grant on its own relation/function) plus the wider `instances` grant
@@ -46,7 +49,7 @@ if (DB) {
     // interrupted run left behind — a REVOKE of a membership not currently
     // held is a harmless no-op, as `postgres`.
     await sql`REVOKE detent_audit_owner FROM detent_audit_probe`;
-    probe = new SQL(probeUrl(process.env.DATABASE_URL as string), { max: 1 });
+    probe = new SQL(probeUrl(process.env.DATABASE_URL as string, PROBE_PASSWORD as string), { max: 1 });
   }
 }
 
@@ -164,7 +167,7 @@ test.skipIf(!DB || !PROBE)(
     // A throwaway client, never the shared `probe` pool other tests reuse:
     // a transaction a raised SET LOCAL ROLE aborts leaves its connection in
     // a state later queries on that same pool hang against.
-    const throwaway = new SQL(probeUrl(process.env.DATABASE_URL as string), { max: 1 });
+    const throwaway = new SQL(probeUrl(process.env.DATABASE_URL as string, PROBE_PASSWORD as string), { max: 1 });
     try {
       await expect(
         withTransaction(throwaway, async (tx) => {
@@ -212,3 +215,22 @@ test.skipIf(!DB || !PROBE)(
     await expectRefused(probe!`DELETE FROM instance_audit WHERE instance_id = ${id}`);
   },
 );
+
+// The role is cluster-scoped and outlives the suite, so the password it held
+// before the preload drew a random one must stay dead. 28P01
+// (invalid_password) is the refusal under test; a dropped connection raises
+// something else and fails the test rather than reading as a pass. The query
+// sits in an async function: Bun's SQL query is lazy, and `rejects` on the bare
+// query hangs the runner at full CPU, where a real Promise settles.
+test.skipIf(!DB || !PROBE)("the retired fixed password `probe` no longer authenticates the probe role", async () => {
+  const retired = new SQL(probeUrl(process.env.DATABASE_URL as string, "probe"), { max: 1 });
+  try {
+    await expect(
+      (async () => {
+        await retired`SELECT 1`;
+      })(),
+    ).rejects.toMatchObject({ errno: "28P01" });
+  } finally {
+    await retired.close();
+  }
+});
