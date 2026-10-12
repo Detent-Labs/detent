@@ -61,6 +61,14 @@ export interface HandlerContext {
    */
   db: SQL;
   /**
+   * The tenant key of this delivery in a deployment that serves many tenants.
+   * Absent, or `""`, in a deployment with one tenant. Optional so every other
+   * call site of `drainOutbox` and `deliver` stays unchanged; only the host
+   * supplies it. A handler reads it only to scope something per tenant, and
+   * reaches the tenant's data through `db`, never through this key.
+   */
+  tenant?: string;
+  /**
    * The assignment registry the engine runs with, the one that resolves a
    * step's assignment strategy. Required, like `db`. A handler that starts or
    * moves an instance passes this on and builds no registry of its own, so an

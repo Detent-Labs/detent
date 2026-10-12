@@ -89,12 +89,16 @@ const jsonResponse = (body: unknown, status = 200) =>
 const action = (config: Record<string, unknown>, timeout?: string): Action =>
   ({ id: "action_http", type: HTTP_ACTION_TYPE, config, ...(timeout ? { timeout } : {}) }) as unknown as Action;
 
-const ctxFor = (config: Record<string, unknown>, opts: { idempotencyKey?: string; timeout?: string } = {}): HandlerContext => ({
+const ctxFor = (
+  config: Record<string, unknown>,
+  opts: { idempotencyKey?: string; timeout?: string; tenant?: string } = {},
+): HandlerContext => ({
   action: action(config, opts.timeout),
   config,
   idempotencyKey: opts.idempotencyKey ?? "idem_1",
   instanceId: "inst_1",
   db: noDb,
+  ...(opts.tenant !== undefined ? { tenant: opts.tenant } : {}),
   assignmentRegistry: createStaticAssignmentRegistry(),
 });
 
@@ -544,7 +548,7 @@ test("an unset or empty HTTP_SECRET_ENV_ALLOWLIST refuses every reference", asyn
   );
 });
 
-test("a list entry survives surrounding space and is compared with case", async () => {
+test("a list entry survives surrounding space and is compared case-sensitively", async () => {
   await withServer(
     () => jsonResponse({}),
     async (url, requests) => {
@@ -566,6 +570,55 @@ test("an entry that names a tenant matches nothing in a deployment with one tena
       );
       expect(err).toBeInstanceOf(PermanentError);
       expect(requests).toHaveLength(0);
+    },
+  );
+});
+
+test("in a deployment with many tenants a tenant:NAME entry serves that tenant only", async () => {
+  await withServer(
+    () => jsonResponse({}),
+    async (url, requests) => {
+      await withEnv({ HTTP_SECRET_ENV_ALLOWLIST: "acme:PARTNER_API_TOKEN", PARTNER_API_TOKEN: "sk_live_1" }, async () => {
+        await httpHandlerDef.handler(ctxFor({ url, headers: SECRET_REF }, { tenant: "acme" }));
+        expect(requests.map((r) => r.headers["authorization"])).toEqual(["sk_live_1"]);
+
+        const err = await rejects(httpHandlerDef.handler(ctxFor({ url, headers: SECRET_REF }, { tenant: "beta" })));
+        expect(err).toBeInstanceOf(PermanentError);
+        expect((err as Error).message).toContain("PARTNER_API_TOKEN");
+        expect((err as Error).message).not.toContain("sk_live_1");
+        expect(requests).toHaveLength(1);
+      });
+    },
+  );
+});
+
+test("in a deployment with many tenants an unscoped entry refuses every tenant", async () => {
+  await withServer(
+    () => jsonResponse({}),
+    async (url, requests) => {
+      await withEnv({ HTTP_SECRET_ENV_ALLOWLIST: "PARTNER_API_TOKEN", PARTNER_API_TOKEN: "sk_live_1" }, async () => {
+        for (const tenant of ["acme", "beta"]) {
+          const err = await rejects(httpHandlerDef.handler(ctxFor({ url, headers: SECRET_REF }, { tenant })));
+          expect(err).toBeInstanceOf(PermanentError);
+        }
+      });
+      expect(requests).toHaveLength(0);
+    },
+  );
+});
+
+test("a list holding scoped and unscoped entries serves each deployment form its own", async () => {
+  await withServer(
+    () => jsonResponse({}),
+    async (url, requests) => {
+      await withEnv({ HTTP_SECRET_ENV_ALLOWLIST: "acme:PARTNER_API_TOKEN,OTHER_TOKEN", PARTNER_API_TOKEN: "sk_live_1", OTHER_TOKEN: "sk_live_2" }, async () => {
+        await httpHandlerDef.handler(ctxFor({ url, headers: SECRET_REF }, { tenant: "acme" }));
+        await rejects(httpHandlerDef.handler(ctxFor({ url, headers: { Authorization: { env: "OTHER_TOKEN" } } }, { tenant: "acme" })));
+        // An empty tenant key reads as no tenant: the unscoped form applies.
+        await httpHandlerDef.handler(ctxFor({ url, headers: { Authorization: { env: "OTHER_TOKEN" } } }, { tenant: "" }));
+        await rejects(httpHandlerDef.handler(ctxFor({ url, headers: SECRET_REF })));
+      });
+      expect(requests.map((r) => r.headers["authorization"])).toEqual(["sk_live_1", "sk_live_2"]);
     },
   );
 });

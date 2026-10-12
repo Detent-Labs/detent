@@ -146,20 +146,28 @@ function isLegalHeaderValue(s: string): boolean {
  * Answers the value of one environment reference, or throws the permanent
  * refusal. The operator decides which variables an author can name:
  * `HTTP_SECRET_ENV_ALLOWLIST` is a comma-separated list, read per call like
- * `HTTP_ACTION_ALLOWED_HOSTS`. Entries are trimmed and compared with case. Unset
- * or empty refuses every reference. An entry holding a colon names a tenant and
- * matches nothing here: this form serves a deployment with one tenant.
+ * `HTTP_ACTION_ALLOWED_HOSTS`. Entries are trimmed and compared case-sensitively.
+ * Unset or empty refuses every reference. The tenant decides which entries
+ * count. With no tenant (a deployment with one tenant) only an entry without a
+ * colon counts. With a tenant (a deployment with many) only `tenant:NAME`
+ * counts, split at the first colon, and an entry without a colon is ignored.
+ * Each side ignores the other's form, so a mixed-up list refuses.
  *
  * A message names the header and the variable and never a value. The outbox
  * stores message text in `last_error`, which the admin area shows. The value
  * check runs here, before `fetch`, because the transport could raise a message
  * that quotes the offending header.
  */
-function resolveEnvReference(header: string, name: string): string {
+function resolveEnvReference(header: string, name: string, tenant: string | undefined): string {
   const allowed = (process.env.HTTP_SECRET_ENV_ALLOWLIST ?? "")
     .split(",")
     .map((entry) => entry.trim())
-    .filter((entry) => entry !== "" && !entry.includes(":"));
+    .filter((entry) => entry !== "")
+    .flatMap((entry) => {
+      const colon = entry.indexOf(":");
+      if (!tenant) return colon === -1 ? [entry] : [];
+      return colon !== -1 && entry.slice(0, colon) === tenant ? [entry.slice(colon + 1)] : [];
+    });
   if (!allowed.includes(name)) {
     throw new PermanentError(`http.request header "${header}" references ${name}, which is not in HTTP_SECRET_ENV_ALLOWLIST`);
   }
@@ -182,10 +190,10 @@ const CONTENT_TYPE_HEADER = "Content-Type";
  * Resolve each environment reference, then merge engine-computed headers on
  * top of the author's, per the design's precedence rules.
  */
-function buildHeaders(config: z.infer<typeof httpConfigSchema>, idempotencyKey: string): Record<string, string> {
+function buildHeaders(config: z.infer<typeof httpConfigSchema>, idempotencyKey: string, tenant: string | undefined): Record<string, string> {
   const headers: Record<string, string> = {};
   for (const [name, value] of Object.entries(config.headers ?? {})) {
-    headers[name] = typeof value === "string" ? value : resolveEnvReference(name, value.env);
+    headers[name] = typeof value === "string" ? value : resolveEnvReference(name, value.env, tenant);
   }
   headers[IDEMPOTENCY_HEADER] = idempotencyKey;
   if (config.body !== undefined && !Object.keys(headers).some((k) => k.toLowerCase() === CONTENT_TYPE_HEADER.toLowerCase())) {
@@ -238,7 +246,7 @@ async function httpHandler(ctx: HandlerContext): Promise<HttpActionResult> {
   if (refusal) throw new PermanentError(refusal);
 
   // After the egress check: a refused target must never touch the environment.
-  const headers = buildHeaders(config, ctx.idempotencyKey);
+  const headers = buildHeaders(config, ctx.idempotencyKey, ctx.tenant);
 
   // A timeout always applies — the action's declared value overrides the
   // engine default rather than deciding whether one exists at all, so the
