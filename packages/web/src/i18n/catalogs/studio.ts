@@ -648,6 +648,16 @@ export const en = {
   "stepKind.participant": "A step someone works",
   "stepKind.subprocess": "A call to another process",
   "stepKind.terminal": "An end",
+  "kindSwitch.heading": "Switch to “{kind}”?",
+  "kindSwitch.subprocessTerm": "Subprocess call",
+  "kindSwitch.pathsTerm": "Outgoing paths",
+  "kindSwitch.timersTerm": "Time limits",
+  "kindSwitch.onExitTerm": "Exit actions",
+  "kindSwitch.onCancelTerm": "Cancel actions",
+  "kindSwitch.cancellableTerm": "Cancellable setting",
+  "kindSwitch.outcomeTerm": "Outcome",
+  "kindSwitch.noUndo": "The studio has no undo.",
+  "kindSwitch.confirm": "Switch and remove",
 
   // The note under the canvas bar's step-kind menu entries
   // (`studio-guided-vocabulary`), read through `newStepNote`. The bar's menu
