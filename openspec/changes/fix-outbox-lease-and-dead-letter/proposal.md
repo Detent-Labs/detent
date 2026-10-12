@@ -2,8 +2,8 @@
 
 ## Why
 
-The outbox promises at-least-once delivery and a terminal dead-letter. With
-two engine processes, or a row whose commit keeps failing, it breaks both.
+The outbox promises at-least-once delivery and a terminal dead-letter. Two
+engine processes break both promises. So does a row whose commit keeps failing.
 The 2026-10-10 audit found three gaps (B-4, B-5, B-12). The runbook supports
 more than one engine process, so the first is reachable today.
 
@@ -13,9 +13,9 @@ more than one engine process, so the first is reachable today.
   at each row. A hung target lets a peer reclaim rows 7 to 100 while the first
   worker still holds them. Each row's deadline becomes the remaining lease from
   the claim. A row whose lease ran out before its turn returns to `pending`
-  unstarted, and its attempt is refunded.
+  unstarted. Its `attempts` count returns to the value before the claim.
 - **B-4.** The three compare-and-set statements of the second transaction also
-  match the attempt count the claim produced. A late worker whose row a peer
+  match the `attempts` count the claim produced. A late worker whose row a peer
   reclaimed then changes nothing.
 - **B-5.** A row claimed with `attempts` above its action's `maxAttempts` is
   dead-lettered without running the handler, with `last_error` of
@@ -23,9 +23,9 @@ more than one engine process, so the first is reachable today.
   then reaches the dead letters. The writeback path binds as
   `ARRAY['data', fid]`, so a field id with a `,` or `}` cannot alter it.
 - **B-12.** `retry.maxAttempts` becomes an integer from 1 to 20. The
-  exponential delay is capped at `max(baseDelay, 1 hour)`.
+  exponential delay stops growing at `max(baseDelay, 1 hour)`.
   **BREAKING** for a hand-written body with a `maxAttempts` outside that range:
-  it fails to parse. Nothing is deployed, and `examples/` stays within 5.
+  it fails to parse. No deployment exists, and `examples/` stays within 5.
 - `docs/authoring-guide.md` states the retry bounds.
 
 ## Capabilities
@@ -36,9 +36,9 @@ None.
 
 ### Modified Capabilities
 
-- `transactional-outbox`: the deadline becomes the remaining lease per row, the
-  second transaction matches its own claim, an abandoned row at the cap
-  dead-letters, and the retry policy gains its bounds.
+- `transactional-outbox`: the deadline becomes the remaining lease per row.
+  The second transaction matches its own claim. An abandoned row at the cap
+  dead-letters. The retry policy gains its bounds.
 
 ## Impact
 
