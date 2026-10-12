@@ -361,6 +361,67 @@ test.skipIf(!DB)("listPendingTimers pages correctly when two timers share a mill
   expect(page2.items.map((it) => it.instanceId)).toEqual([newer.instanceId]);
 });
 
+// fix-admin-instance-and-outbox-screens: the instanceId filter applies before
+// LIMIT, so an instance sorting after every other armed timer is still found.
+test.skipIf(!DB)("listPendingTimers with instanceId finds a timer sorting after the page limit", async () => {
+  const P = pid();
+  const v = await publishBody(P, waitBody("timers_filter"), reg, dataSourceReg);
+  const body = (await createDefinitionStore(sql).resolveBody(P, v.version))!;
+
+  const earlier: Instance[] = [];
+  for (let i = 0; i < 3; i++) earlier.push(await createInstance(body, { processId: P, version: v.version }, sql));
+  const last = await createInstance(body, { processId: P, version: v.version }, sql);
+  for (const inst of earlier) {
+    await sql`UPDATE instances SET next_timer_at = now() - interval '2 hour' WHERE instance_id = ${inst.instanceId}`;
+  }
+  await sql`UPDATE instances SET next_timer_at = now() + interval '2 hour' WHERE instance_id = ${last.instanceId}`;
+
+  const unfiltered = await listPendingTimers({ limit: 1 }, sql);
+  expect(unfiltered.items.map((i) => i.instanceId)).not.toContain(last.instanceId);
+
+  const page = await listPendingTimers({ limit: 1, instanceId: last.instanceId }, sql);
+  expect(page.items.map((i) => i.instanceId)).toEqual([last.instanceId]);
+  expect(page.cursor).toBeUndefined();
+});
+
+test.skipIf(!DB)("listPendingTimers with instanceId returns nothing for a running instance with no armed timer", async () => {
+  const P = pid();
+  const v = await publishBody(P, waitBody("timers_filter_none"), reg, dataSourceReg);
+  const body = (await createDefinitionStore(sql).resolveBody(P, v.version))!;
+  const armed = await createInstance(body, { processId: P, version: v.version }, sql);
+  const noTimer = await createInstance(body, { processId: P, version: v.version }, sql);
+  await sql`UPDATE instances SET next_timer_at = now() + interval '1 hour' WHERE instance_id = ${armed.instanceId}`;
+
+  const page = await listPendingTimers({ instanceId: noTimer.instanceId }, sql);
+  expect(page.items).toEqual([]);
+  expect(page.cursor).toBeUndefined();
+});
+
+test.skipIf(!DB)("listPendingTimers with instanceId returns nothing for a completed instance that still carries a timer", async () => {
+  const P = pid();
+  const v = await publishBody(P, waitBody("timers_filter_completed"), reg, dataSourceReg);
+  const body = (await createDefinitionStore(sql).resolveBody(P, v.version))!;
+  const done = await createInstance(body, { processId: P, version: v.version }, sql);
+  await sql`UPDATE instances SET next_timer_at = now() - interval '1 hour', body = jsonb_set(body, '{status}', '"completed"'::jsonb)
+    WHERE instance_id = ${done.instanceId}`;
+
+  const page = await listPendingTimers({ instanceId: done.instanceId }, sql);
+  expect(page.items).toEqual([]);
+  expect(page.cursor).toBeUndefined();
+});
+
+test.skipIf(!DB)("listPendingTimers with instanceId returns nothing for an unknown id", async () => {
+  const P = pid();
+  const v = await publishBody(P, waitBody("timers_filter_unknown"), reg, dataSourceReg);
+  const body = (await createDefinitionStore(sql).resolveBody(P, v.version))!;
+  const armed = await createInstance(body, { processId: P, version: v.version }, sql);
+  await sql`UPDATE instances SET next_timer_at = now() + interval '1 hour' WHERE instance_id = ${armed.instanceId}`;
+
+  const page = await listPendingTimers({ instanceId: "inst_does_not_exist" }, sql);
+  expect(page.items).toEqual([]);
+  expect(page.cursor).toBeUndefined();
+});
+
 // ============================================================
 // `discarded` inertness (spec's "A discarded row is never delivered" /
 // "does not block or break a migration")

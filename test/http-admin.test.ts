@@ -221,6 +221,26 @@ test.skipIf(!DB)("GET /admin/timers with system:admin succeeds", async () => {
   expect(body.items).toEqual([]);
 });
 
+test.skipIf(!DB)("GET /admin/timers?instanceId= returns only that instance's entry, past the limit", async () => {
+  const p = migrationPid();
+  await publishMigrationVersions(p, 1);
+  const first = await createRunningInstance(p, 1);
+  const second = await createRunningInstance(p, 1);
+  await sql`UPDATE instances SET next_timer_at = now() - interval '1 hour' WHERE instance_id = ${first.instanceId}`;
+  await sql`UPDATE instances SET next_timer_at = now() + interval '1 hour' WHERE instance_id = ${second.instanceId}`;
+
+  const res = await fetch(authedReq(`http://x/admin/timers?instanceId=${second.instanceId}&limit=1`, "GET", admin));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { items: { instanceId: string }[]; cursor?: string };
+  expect(body.items.map((i) => i.instanceId)).toEqual([second.instanceId]);
+  expect(body.cursor).toBeUndefined();
+
+  const unknown = await fetch(authedReq("http://x/admin/timers?instanceId=inst_nope", "GET", admin));
+  const none = (await unknown.json()) as { items: unknown[]; cursor?: string };
+  expect(none.items).toEqual([]);
+  expect(none.cursor).toBeUndefined();
+});
+
 // ============================================================
 // GET /admin/users
 // ============================================================

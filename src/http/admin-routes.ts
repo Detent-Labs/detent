@@ -117,7 +117,8 @@ export async function handleAdminListTimers(req: Request, resolver: ActorResolve
     const url = new URL(req.url);
     const limit = parseLimit(url, MAX_LIST_LIMIT);
     const cursor = url.searchParams.get("cursor") ?? undefined;
-    const page = await listPendingTimers({ limit, cursor }, db);
+    const instanceId = url.searchParams.get("instanceId") ?? undefined;
+    const page = await listPendingTimers({ limit, cursor, instanceId }, db);
     return { status: 200, body: page };
   });
 }
