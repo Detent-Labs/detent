@@ -1698,7 +1698,8 @@ describe("compile: an action declares async execution and no idempotency key", (
       thrown = err;
     }
     expect((thrown as Error | undefined)?.name).toBe("ZodError");
-    expect(JSON.stringify((thrown as { issues: unknown }).issues)).toContain("execution");
+    const paths = (thrown as { issues: { path: unknown[] }[] }).issues.map((i) => i.path.join("."));
+    expect(paths).toContain("workflow.steps.0.onEntry.0.execution");
   });
 
   it("accepts execution: \"async\"", () => {
