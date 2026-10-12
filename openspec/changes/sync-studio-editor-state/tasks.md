@@ -28,14 +28,14 @@
 
 ## 6. Docs
 
-- [ ] 6.1 Add a checklist entry to `docs/browser-checks.md` for the four findings. Verify it names the route and the pass condition.
-- [ ] 6.2 Strike FIELDS-15 and this change's entry in `docs/decisions.md`. Verify with a search that neither remains.
+- [x] 6.1 Add a checklist entry to `docs/browser-checks.md` for the four findings. Verify it names the route and the pass condition.
+- [x] 6.2 Strike FIELDS-15 and this change's entry in `docs/decisions.md`. Verify with a search that neither remains.
 
 ## 7. Verification
 
 - [ ] 7.1 Run `bun run typecheck`, then `bun run build`, then the full gated `bun test` with `DATABASE_URL` set, in the lane's devcontainer.
 - [ ] 7.2 Run the antislop and whitespace gates over the pushed range, as the push gate does.
-- [ ] 7.3 Check the four findings in a browser on the production build, then run `/impeccable critique` and `/impeccable audit` on the Data sources tab.
+- [x] 7.3 Check the four findings in a browser on the production build, then run `/impeccable critique` and `/impeccable audit` on the Data sources tab.
 
 ## Workflow follow-up
 
