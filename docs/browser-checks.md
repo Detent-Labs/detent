@@ -943,6 +943,75 @@ playwright-cli -s=<worktree-name> run-code "async page => { await page.emulateMe
 
 Pass: the rule and the text keep readable contrast.
 
+### The instance header and the Discard confirmation (`fix-admin-instance-and-outbox-screens`)
+
+Source: `fix-admin-instance-and-outbox-screens` task 5.2.
+
+A `bun:test` assertion cannot see a rendered header or a native confirm dialog.
+This walk covers both. It needs the `expense_approval` process from the seed. It
+also needs two accounts, one with the role `employee` and one with
+`finance-approver`, and a browser logged in as an operator.
+
+Start an `expense_approval` instance. Claim its first step as the `employee`
+account, then submit it with `POST /instances/:id/submit`. The instance moves
+to Review, which has no claimant. `GET /instances/:id` then returns no
+`assignment.claimedBy`. `GET /instances/:id/record` still holds the
+`assignment.claimed` event.
+
+Open `/admin/instances/<id>`. Pass: "Claim state" reads "unclaimed", and
+"Transition seq" equals the `transitionSeq` from `GET /instances/:id`. "Armed
+timer" shows the fire time of the seven-day reminder, in local time.
+
+Switch the interface language to German. Pass: "Anspruch" reads "nicht
+beansprucht". "Übergangsnummer" shows the same number, and "Gestellter Timer"
+shows the same fire time.
+
+Run the control. Start a second instance and claim its first step. Reload its
+screen. Pass: "Claim state" reads "claimed by" and the account id. This proves
+the screen can show a claim at all.
+
+Open a third instance that sits on its first step, which arms no timer. Pass:
+"Armed timer" reads "none", and "keiner" in German. Then list the requests
+the screen sent:
+
+```sh
+playwright-cli -s=<worktree-name> requests
+```
+
+Pass: the list holds `GET /admin/timers?instanceId=<id>&limit=1`. It has no
+bare `GET /processes` request. Only `GET /processes/<id>/versions` appears, for
+the Definition hash row.
+
+Make three outbox rows dead-letter. Let an `http.request` action aim at a
+closed port until its attempts run out. Alternatively, insert the rows into
+`outbox` with the status `dead-letter`. Open Operations, then Outbox, and
+filter to Dead letter. Row 1 takes the English dismiss and accept pair. Row 2
+takes the German pair. Row 3 takes the Retry dismiss.
+
+Press Discard on row 1. Pass: a native confirm opens. It reads "Discarding
+is final. This action's side effect never goes out, and you cannot retry it
+afterwards. Continue?" Dismiss it:
+
+```sh
+playwright-cli -s=<worktree-name> dialog-dismiss
+```
+
+A native confirm blocks every other `playwright-cli` read, so answer it first.
+Pass: the request list has no `POST /admin/outbox/<key>/discard`, and the row
+stays `dead-letter`.
+
+Press Discard on row 1 again and accept it with `dialog-accept`. Pass: the list
+holds exactly one `POST /admin/outbox/<key>/discard`. The count line reads
+"discarded: 1". Under "All statuses" row 1 shows DISCARDED with no buttons.
+
+Switch to German and repeat the dismiss and accept pair on row 2.
+Pass: the confirm reads "Das Verwerfen ist endgültig. Der Seiteneffekt dieser
+Aktion wird nie ausgeführt, und ein erneuter Versuch ist danach nicht mehr
+möglich. Fortfahren?" Dismissing sends nothing. Accepting sends one POST.
+
+Press Retry on row 3 and dismiss it. Pass: the confirm names the re-run and the
+idempotency key, the request list gains no POST, and row 3 stays `dead-letter`.
+
 ### Canvas grid snapping (`canvas-grid-snap`)
 
 Open Studio and a draft with several steps. This whole entry is a visual
@@ -5914,3 +5983,148 @@ Open a draft of `loan_application` and select its `check` step, a subprocess
 step. Pick a target step and press "+ Add path".
 
 Pass: that new path's "triggered by" control also reads "a condition".
+
+### The subprocess step editor (`fix-subprocess-step-editor`)
+
+Source: `fix-subprocess-step-editor` task 5.1. A `bun:test` run cannot press a
+control, watch focus move or read the Checks tab after an edit. The five
+findings below stay manual. Use the production build on `127.0.0.1`, per
+"Before you start".
+
+Open Studio at `/studio`. Seed the examples first, so the process list holds
+`credit_check` and `loan_application`
+(`examples/subprocess-credit-check-child.json` and
+`examples/subprocess-loan-parent.json`).
+
+#### A new subprocess step writes a whole spec (E2-3, E2-4)
+
+Start a new draft. Give it a task step as its initial step. On the Fields tab,
+add a text field `applicant_name` and a number field `requested_amount`.
+
+On the Canvas tab, add a subprocess step from the canvas bar. Add a path from
+the initial step to it. Select the subprocess step on the Steps tab. Open
+"Which process it calls".
+
+Pass: the section shows the process select alone. The binding select, the
+version field and both mapping editors stay hidden.
+
+Pick "Credit Check" in the process select.
+
+Pass: the binding select appears and reads "Always this exact version". The
+version field shows the newest version of `credit_check`.
+
+Pass: the Checks tab lists no Zod "Required" issue for the step's spec.
+
+Press "+ Add input mapping" under `inputMapping`.
+
+Pass: the row's key select offers `amount`, the child's one input field. It
+offers neither `applicant_name` nor `requested_amount`.
+
+Pass: "+ Add input mapping" stays disabled once a row holds `amount`.
+
+Give the row the CEL text `data.requested_amount`.
+
+Pass: the Checks tab shows no issue for the step's spec.
+
+Add an end step. Add a path from the subprocess step to it. Publish the draft.
+
+Pass: the publish succeeds.
+
+Discard the draft.
+
+#### Opening the example shows the stored child key (E2-4)
+
+Open a fresh draft of `loan_application`. Select its `check` step. Open "Which
+process it calls". The step calls `credit_check` pinned at version 1.
+
+Pass: the `inputMapping` row's select shows `amount`, the key of the stored
+child field.
+
+Switch the binding to "The newest version whose contract still matches".
+
+Pass: the row keeps `amount` as its key.
+
+Through the JSON surface, change the stored `inputMapping` key to a field id the
+child does not list. Return to the step.
+
+Pass: the row's select shows "(not in the list)" for that key. The row stays
+until you remove it or pick a listed key.
+
+Discard the draft.
+
+#### Rows of the shared mapping editor stay distinct (E2-12)
+
+Open a fresh draft of `loan_application`. Select its `check` step. Under
+`outputMapping`, both rows hold a target.
+
+Pass: the target select of the first row shows the second row's target as
+disabled. The second row's select does the same for the first.
+
+Clear all text in the first row's CEL input.
+
+Pass: the row stays on screen with its target. The JSON surface keeps the
+target with an empty `src`.
+
+Press the first row's "remove" control.
+
+Pass: the row goes and the JSON surface drops that target.
+
+Add a `group` field to the draft. Open the target select of a row.
+
+Pass: the select lists the scalar fields and leaves the group field out.
+
+Discard the draft.
+
+#### A step kind switch confirms before it removes keys (E2-5)
+
+Open a fresh draft of `loan_application`. Select its `check` step. Press the
+"A step someone works" option in "What this step is".
+
+Pass: a dialog opens with the heading "Switch to “A step someone works”?".
+
+Pass: the dialog counts one "Subprocess call" and states "The studio has no
+undo."
+
+Pass: keyboard focus stands on Cancel.
+
+Press Enter.
+
+Pass: the dialog closes and the step stays a subprocess step. Focus returns to
+the "A step someone works" option.
+
+Press the same option again, then press Escape.
+
+Pass: the dialog closes, the step stays as it was, and focus returns to the
+option.
+
+Open the dialog again from the option. Then press "Switch and remove".
+
+Pass: the step is a task step and the JSON surface shows no `subprocess` key on
+it.
+
+Pass: keyboard focus stands on the "A step someone works" option that opened
+the dialog.
+
+Pass: the Checks tab shows no issue "only a subprocess step may declare a
+subprocess spec".
+
+Select the `submit` step, a task step with one path. Press the "An end" option.
+
+Pass: the dialog counts one "Outgoing paths". Cancel leaves the path in place.
+
+Open a draft of `purchase_requisition`. Add a task step that has no paths,
+time limits, exit actions or cancel actions. Press "An end" on it.
+
+Pass: the step becomes an end step at once and no dialog opens.
+
+#### The Contract tab trims an outcome (E2-18)
+
+Open a draft of `credit_check` and its Contract tab. Under outcomes, type
+` approved ` with a space on each side and press "+ Add outcome".
+
+Pass: the list still holds one `approved` and the JSON surface stores
+`approved` with no space.
+
+Type ` pending ` and press "+ Add outcome".
+
+Pass: the JSON surface stores `pending`.

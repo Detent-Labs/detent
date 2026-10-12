@@ -190,8 +190,13 @@ export async function countInstancesByStatus(db: SQL = sql): Promise<Record<stri
 /**
  * Running instances whose `next_timer_at` is set, ordered ascending so the
  * most overdue comes first, keyset-paged on `(next_timer_at, instance_id)`.
+ * `instanceId` narrows the read to that one instance. The predicate applies
+ * before `LIMIT`, so an instance sorting past the page is still found.
  */
-export async function listPendingTimers(page: { limit?: number; cursor?: string } = {}, db: SQL = sql): Promise<Page<PendingTimer>> {
+export async function listPendingTimers(
+  page: { limit?: number; cursor?: string; instanceId?: string } = {},
+  db: SQL = sql,
+): Promise<Page<PendingTimer>> {
   const limit = Math.min(page.limit ?? DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT);
   const [cursorTime, cursorId] = page.cursor ? decodeCursor(page.cursor, ["timestamp", "text"]) : [undefined, undefined];
 
@@ -203,6 +208,7 @@ export async function listPendingTimers(page: { limit?: number; cursor?: string 
   const rows = (await db`
     SELECT instance_id, body, next_timer_at, next_timer_at::text AS next_timer_at_cursor FROM instances
     WHERE (body->>'status') = 'running' AND next_timer_at IS NOT NULL
+      AND (${page.instanceId ?? null}::text IS NULL OR instance_id = ${page.instanceId ?? null})
       AND (
         ${cursorTime ?? null}::timestamptz IS NULL
         OR (next_timer_at, instance_id) > (${cursorTime ?? null}::timestamptz, ${cursorId ?? null})

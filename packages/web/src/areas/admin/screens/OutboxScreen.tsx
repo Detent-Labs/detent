@@ -184,6 +184,7 @@ export function OutboxScreen({ token, locale, onUnauthorized }: OutboxScreenProp
   };
 
   const doDiscard = async (key: string) => {
+    if (!window.confirm(t(locale, "outbox.discardConfirm"))) return;
     setBusyKey(key);
     try {
       await discardOutboxRow(key, token);

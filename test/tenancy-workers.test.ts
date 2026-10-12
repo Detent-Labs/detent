@@ -342,6 +342,72 @@ test("a drain that throws reaches onError once, releases its slot, and is draine
   await settle();
 });
 
+/**
+ * A handle that claims one outbox row, labelled by `key`, the first time the
+ * claim query runs and answers every other query with nothing. `begin` runs
+ * its callback on the same handle, so the delivered mark finds no row to
+ * change and the pass ends.
+ */
+const claimingDb = (key: string): SQL => {
+  let claimed = false;
+  const fn = (strings: TemplateStringsArray) => {
+    if (!claimed && strings.join("?").includes("SET status = 'claimed'")) {
+      claimed = true;
+      return Promise.resolve([
+        {
+          idempotency_key: `idem_${key}`,
+          instance_id: `inst_${key}`,
+          transition_seq: 1,
+          action: { id: "action_probe", type: "test.tenant-probe", config: {} },
+          attempts: 1,
+          event_id: null,
+          field_version: 1,
+          actors: null,
+        },
+      ]);
+    }
+    return Promise.resolve([]);
+  };
+  (fn as unknown as { begin: unknown }).begin = (cb: (tx: unknown) => unknown) => cb(fn);
+  return fn as unknown as SQL;
+};
+
+test("the outbox worker hands each tenant's key to its handlers", async () => {
+  const seen: { instanceId: string; tenant: string | undefined }[] = [];
+  const registry = createRegistry();
+  registry.set("test.tenant-probe", {
+    handler: async (ctx) => {
+      seen.push({ instanceId: ctx.instanceId, tenant: ctx.tenant });
+      return {};
+    },
+  });
+  const tenants: TenantHandle[] = [
+    { key: "acme", db: claimingDb("acme") },
+    { key: "beta", db: claimingDb("beta") },
+  ];
+  const engine = startEngine(idleDb("unused"), registry, undefined, async () => tenants);
+  await oneTick(engine);
+  expect(seen.sort((a, b) => a.instanceId.localeCompare(b.instanceId))).toEqual([
+    { instanceId: "inst_acme", tenant: "acme" },
+    { instanceId: "inst_beta", tenant: "beta" },
+  ]);
+});
+
+test("a deployment with one tenant hands its handlers no tenant", async () => {
+  const seen: { tenant: string | undefined; hasKey: boolean }[] = [];
+  const registry = createRegistry();
+  registry.set("test.tenant-probe", {
+    handler: async (ctx) => {
+      seen.push({ tenant: ctx.tenant, hasKey: "tenant" in ctx });
+      return {};
+    },
+  });
+  const engine = startEngine(claimingDb("solo"), registry);
+  await oneTick(engine);
+  // The source key is "", and deliver leaves the field out rather than passing "".
+  expect(seen).toEqual([{ tenant: undefined, hasKey: false }]);
+});
+
 /** Run two ticks, mutating the tenant list between them. */
 async function oneTick2(engine: { stop: () => void }, between: () => void): Promise<void> {
   await new Promise((r) => setTimeout(r, TICK_INTERVAL_MS + 150));

@@ -109,6 +109,12 @@ paths:
         Requires the `system:publish` role. The check reads the `processId`
         the body carries, so it runs after the request-shape check: a caller
         lacking the role whose body is malformed reads 400, not 403.
+        A process that already has a draft or a published version also needs
+        the `system:admin` role or a place on that process's Developer list,
+        with `system:developer` or `system:author`. A first publish of a new
+        `processId` skips that check and writes the publishing actor onto the
+        new process's Developer list in the same transaction, so the same
+        actor can publish version 2. A failed first publish writes no entry.
       requestBody:
         required: true
         content:
@@ -135,7 +141,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "403":
-          description: The actor lacks the `system:publish` role.
+          description: The actor lacks the `system:publish` role, or the process already exists and the actor is neither `system:admin` nor on its Developer list.
           content:
             application/json:
               schema:
@@ -1645,6 +1651,11 @@ components:
           type: integer
         status:
           $ref: "#/components/schemas/InstanceStatus"
+        transitionSeq:
+          type: integer
+          description: >-
+            The count of the instance's committed transitions. Reports
+            regardless of `status`.
         step:
           type: object
           properties:
@@ -1688,7 +1699,7 @@ components:
           type: string
           format: date-time
           description: Set when data retention has redacted this instance's payload.
-      required: [instanceId, processId, version, status, step, fields, availablePaths, columns, tabs]
+      required: [instanceId, processId, version, status, transitionSeq, step, fields, availablePaths, columns, tabs]
 
     InstanceSummary:
       type: object

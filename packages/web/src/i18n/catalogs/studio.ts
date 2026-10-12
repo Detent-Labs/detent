@@ -409,6 +409,10 @@ export const en = {
   "subprocess.removeMappingEntry": "remove",
   "subprocess.addInputMapping": "+ Add input mapping",
   "subprocess.addOutputMapping": "+ Add output mapping",
+  "subprocess.childInputsLoading": "Loading the input fields of the called process.",
+  "subprocess.childInputsFailed": "The input fields of the called process could not load.",
+  "subprocess.childInputsNone": "The called process declares no input fields.",
+  "subprocess.noteAllMapped": "Every input field of the called process is mapped.",
 
   "contentLocale.legend": "Content locale",
   "contentLocale.invalid": "invalid locale code",
@@ -645,6 +649,16 @@ export const en = {
   "stepKind.participant": "A step someone works",
   "stepKind.subprocess": "A call to another process",
   "stepKind.terminal": "An end",
+  "kindSwitch.heading": "Switch to “{kind}”?",
+  "kindSwitch.subprocessTerm": "Subprocess call",
+  "kindSwitch.pathsTerm": "Outgoing paths",
+  "kindSwitch.timersTerm": "Time limits",
+  "kindSwitch.onExitTerm": "Exit actions",
+  "kindSwitch.onCancelTerm": "Cancel actions",
+  "kindSwitch.cancellableTerm": "Cancellable setting",
+  "kindSwitch.outcomeTerm": "Outcome",
+  "kindSwitch.noUndo": "The studio has no undo.",
+  "kindSwitch.confirm": "Switch and remove",
 
   // The note under the canvas bar's step-kind menu entries
   // (`studio-guided-vocabulary`), read through `newStepNote`. The bar's menu
@@ -941,6 +955,7 @@ export const en = {
   "pathsView.empty": "This process has no path yet. Drag from a step on the canvas to make one.",
 
   "expression.placeholder": "CEL expression",
+  "mapping.unlistedKey": "(not in the list)",
   "plugin.typePlaceholder": "plugin type identifier",
   "plugin.selectType": "-- select type --",
   "plugin.unregisteredType": "(unregistered)",

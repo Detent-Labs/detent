@@ -202,10 +202,11 @@ what it controls, whether a deployment must set it, and its default. It also
 marks the defaults that are unsafe to keep. Read it before the first
 deployment, and again when an upgrade adds a variable.
 
-Two of those defaults deny rather than permit.
+Three of those defaults deny rather than permit.
 `HTTP_ACTION_ALLOWED_HOSTS` starts empty and refuses every `http.request`
-target. `METRICS_TOKEN` starts unset and leaves `GET /metrics` unregistered.
-The runbook covers both.
+target. `HTTP_SECRET_ENV_ALLOWLIST` starts empty and refuses every header
+reference. A reference replaces the whole header value. `METRICS_TOKEN` starts
+unset and leaves `GET /metrics` unregistered. The runbook covers all three.
 
 The image never sets
 `ALLOW_INSECURE_DEV_AUTH` itself. A deployment that omits both auth

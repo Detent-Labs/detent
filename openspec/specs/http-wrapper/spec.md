@@ -1111,6 +1111,12 @@ global `system:publish` role admits every process. A stored grant of
 question through `await requirePermission(actor, "publish", processId, db)`,
 and SHALL NOT read `Actor.roles` itself.
 
+An actor who does not hold `system:admin` SHALL also appear on the Developer
+list of the body's `processId`, per the `process-access-roles` capability. That
+check follows the permission check and runs before the publish chain. It does
+not apply to a `processId` with no draft and no published version, which is a
+first publish. A refused caller reads 403, and the publish chain never runs.
+
 That call needs the target process id, and the request body carries it. The
 gate SHALL therefore run after the body parse and the shape check. It SHALL run
 before anything else.
@@ -1142,40 +1148,44 @@ idempotent on an identical body.
 
 #### Scenario: Publishing a valid body
 
-- **WHEN** `POST /processes` is requested with a valid authored body by an
-  actor carrying the `system:publish` role
+- **WHEN** an actor carrying the `system:publish` role requests
+  `POST /processes` with a valid authored body
 - **THEN** the response is 200 and carries version 1 and its hash
 - **AND** the version is readable from the definition store
 
 #### Scenario: Re-publishing an identical body
 
-- **WHEN** the same body is published again
+- **WHEN** a caller publishes the same body again
 - **THEN** the response carries the same version and hash as the first publish
 
 #### Scenario: Publishing a changed body
 
-- **WHEN** a changed body for the same process is published
+- **WHEN** a caller publishes a changed body for the same process
 - **THEN** the response carries version 2
 
+<!-- Why: a MODIFIED block keeps each base scenario name word for word, or archive drops the scenario. -->
+<!-- antislop: allow passive-voice -->
 #### Scenario: A malformed request body is rejected
 
-- **WHEN** `POST /processes` is requested with a body that is not valid JSON
+- **WHEN** a caller requests `POST /processes` with a body that is not valid JSON
 - **THEN** the response is 400 with a typed error body
 
+<!-- Why: a MODIFIED block keeps each base scenario name word for word, or archive drops the scenario. -->
+<!-- antislop: allow passive-voice -->
 #### Scenario: Publishing without the required role is rejected
 
-- **WHEN** `POST /processes` is requested by an actor whose resolved
-  `Actor.roles` omits `system:publish`
+- **WHEN** an actor whose resolved `Actor.roles` omits `system:publish`
+  requests `POST /processes`
 - **AND** no grant admits that actor for that `processId`
 - **THEN** the response is 403 with `error.type` equal to `"authorization"`
-- **AND** no definition is persisted, even if the request body would
+- **AND** the store persists no definition, even if the request body would
   otherwise have been valid
 
 #### Scenario: A grant admits a caller without the global role
 
-- **WHEN** `POST /processes` is requested by an actor lacking `system:publish`
+- **WHEN** an actor lacking `system:publish` requests `POST /processes`
 - **AND** the store holds a grant of `"publish"` to a role that actor holds
-- **AND** that grant is scoped to the body's `processId`
+- **AND** that grant names the body's `processId` as its scope
 - **THEN** the engine authorizes the publish
 
 #### Scenario: That same grant admits no other process
@@ -1185,19 +1195,49 @@ idempotent on an identical body.
 
 #### Scenario: A malformed body from an unauthorized caller reports the body
 
-- **WHEN** `POST /processes` is requested with a body that is not valid JSON,
-  by an actor the gate would refuse
+- **WHEN** an actor the gate would refuse requests `POST /processes` with a
+  body that is not valid JSON
 - **THEN** the response is 400 with a typed error body
-- **AND** no definition is persisted
+- **AND** the store persists no definition
 
 #### Scenario: The gate still precedes the publish chain
 
-- **WHEN** `POST /processes` is requested with a well-formed body by an actor
-  whose resolved `Actor.roles` omits `system:publish`
+- **WHEN** an actor whose resolved `Actor.roles` omits `system:publish`
+  requests `POST /processes` with a well-formed body
 - **AND** no grant admits that actor
 - **THEN** the response is 403
 - **AND** the definition store, the action registry and the CEL check are never
   reached
+
+#### Scenario: A publisher off the Developer list gets 403
+
+- **WHEN** an actor holding `system:author` and `system:publish` requests
+  `POST /processes`
+- **AND** the body's `processId` names a process with a published version
+- **AND** the actor is not on that process's Developer list
+- **THEN** the response is 403 with `error.type` equal to `"authorization"`
+- **AND** the store persists no definition
+
+#### Scenario: A listed publisher publishes a new version
+
+- **WHEN** an actor holding `system:author` and `system:publish` is on the
+  Developer list of a published process
+- **AND** the actor publishes a changed body for it through `POST /processes`
+- **THEN** the response is 200 and carries the next version
+
+#### Scenario: The first publish of a new process asks for no list entry
+
+- **WHEN** an actor holding `system:publish` and not `system:admin` requests
+  `POST /processes`
+- **AND** the body's `processId` has no draft and no published version
+- **THEN** the response is 200 and carries version 1
+
+#### Scenario: An admin publishes without a list entry
+
+- **WHEN** an actor holding `system:admin` and `system:publish` requests
+  `POST /processes`
+- **AND** the actor is not on the Developer list of the body's `processId`
+- **THEN** the response is 200
 
 ### Requirement: Publish-time validation failures map to 422
 

@@ -29,8 +29,13 @@ beside it. Neither authoring role implies anything else, as
 `process-drafts` already established. Publishing from Studio therefore stays
 gated exactly as publishing from anywhere else.
 
-The route reads its `processId` from the path, so the gate needs no body. It
-SHALL run before the handler reads the draft.
+An actor who does not hold `ADMIN_ROLE` SHALL also appear on the process's
+Developer list, per the `process-access-roles` capability. That check follows
+the two checks above. It does not apply when the process has no draft and no
+published version. `ADMIN_ROLE` passes it with no list entry.
+
+The route reads its `processId` from the path, so the gate does not need a
+body. It SHALL run before the handler reads the draft.
 
 The handler SHALL read the persisted draft (`getDraft`). It SHALL pass that
 `body` unchanged to the existing `publishBody`. It SHALL return `{processId,
@@ -89,6 +94,8 @@ is the source of truth.
   with a saved draft
 - **THEN** the engine answers with the authorization error
 
+<!-- Why: a MODIFIED block keeps each base scenario name word for word, or archive drops the scenario. -->
+<!-- antislop: allow negation-habit -->
 #### Scenario: A grant carries no authoring role
 
 - **WHEN** an actor holding that grant, and neither `system:developer` nor
@@ -102,6 +109,29 @@ is the source of truth.
   with no row in `drafts`
 - **THEN** the response is 404, the same not-found shape
   `GET /drafts/:processId` already returns
+
+
+#### Scenario: A publisher off the Developer list gets 403
+
+- **WHEN** an actor holding `system:author` and `system:publish` calls the
+  publish route for a process that has a saved draft
+- **AND** the actor is not on that process's Developer list
+- **THEN** the response is 403 with `error.type` equal to `"authorization"`
+- **AND** the store persists no version and the draft stays unpublished
+
+#### Scenario: A group member on the Developer list publishes
+
+- **WHEN** an actor holding `system:author` and `system:publish` belongs to a
+  group on that process's Developer list
+- **AND** the actor calls the publish route
+- **THEN** the publish succeeds
+
+#### Scenario: An admin publishes without a list entry
+
+- **WHEN** an actor holding `system:admin`, `system:author` and
+  `system:publish` calls the publish route
+- **AND** the actor is not on that process's Developer list
+- **THEN** the publish succeeds
 
 ### Requirement: A successful publish stamps the draft's base_version, without disturbing its optimistic-concurrency revision
 

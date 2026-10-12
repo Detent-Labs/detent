@@ -1688,24 +1688,6 @@ of `5f41cd8a`. Each fix change deletes its own entries in the commit that
 archives it, and `sweep-docs-drift-2026-10` re-points the line citations of
 other entries. C-4 merges D-2, and C-6 merges F-6.
 
-- **`secret-references-in-action-config` (G-5; medium)**: Credentials for
-  `http.request` sit in plain text in the immutable definition and in every
-  outbox row. Anchors: `src/handlers/http.ts`, `src/engine/transition.ts`,
-  `src/engine/admin-queries.ts`.
-- **`harden-tenancy-provisioning` (C-8, C-9, C-14, C-15; medium)**: In SaaS
-  mode a token from an external identity provider never resolves to its
-  tenant, tenant pools open more than once and never close, two tenants can
-  share one database, and the provisioning connection drops its URL
-  parameters. Anchors: `src/auth/jwt.ts`, `src/tenancy/provision.ts`,
-  `src/tenancy/connections.ts`.
-- **`fix-subprocess-step-editor` (E2-3, E2-4, E2-5, E2-12, E2-18; medium)**:
-  The subprocess editor offers parent fields as `inputMapping` keys and shows
-  "pinned" without writing it, a step kind switch leaves keys behind, the
-  mapping editor overwrites or drops rows, and the contract panel stores an
-  outcome untrimmed. Anchors:
-  `packages/web/src/areas/studio/panels/SubprocessSpecEditor.tsx`,
-  `packages/web/src/areas/studio/panels/shared/FieldExpressionMapEditor.tsx`,
-  `packages/web/src/areas/studio/draft/performedBy.ts`.
 - **`sync-studio-editor-state` (E2-8, E2-13, E2-15, E1-7; medium)**: Stale
   JSON text in the plugin editor lands in another entity, a cleared deadline
   leaves a timer with no input, a removed data source leaves field
@@ -1725,13 +1707,6 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   Vite. Anchors: `packages/web/src/areas/studio/panels/FieldMatrixGrid.tsx`,
   `packages/web/src/areas/studio/canvas/CanvasView.tsx`,
   `packages/web/vite.config.ts`.
-- **`fix-admin-instance-and-outbox-screens` (F-2, F-9, F-10; medium)**: The
-  instance header shows an expired claim and a stale `transitionSeq`, the
-  header reports no armed timer once 201 timers run, and the outbox discards
-  a row without a confirmation. Anchors:
-  `packages/web/src/areas/admin/screens/InstanceScreen.tsx`,
-  `packages/web/src/areas/admin/screens/OutboxScreen.tsx`,
-  `src/engine/admin-queries.ts`.
 - **`fix-reporting-builder-ui` (C-6 (= F-6), F-4, F-11; medium)**: The date
   filter of the report builder computes in UTC and drops the last day, the
   reporting area does not end the session on a 401, and a failed column
@@ -1791,9 +1766,6 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   `ROADMAP.md`, `README.md`, `CLAUDE.md`, two specs, line anchors in this
   file and several code comments state stale facts. Anchors:
   `docs/authoring-guide.md`, `ROADMAP.md`, `src/auth/authorize.ts`.
-- **`decide-developer-list-on-publish` (D-5; low)**: The Developer access list
-  has no effect on the two publish routes. Anchors:
-  `src/http/studio-routes.ts`, `src/http/routes.ts`.
 - **`postgres-login-rate-limit` (C-7; medium)**: The login lockout counts per
   email across all tenants, so a success in one tenant resets the window in
   another. Anchors: `src/auth/login.ts`.
