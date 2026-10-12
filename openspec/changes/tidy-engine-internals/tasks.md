@@ -2,10 +2,10 @@
 
 ## 1. Hash and pin check in resolveBody (B-9)
 
-- [ ] 1.1 Add `DefinitionHashMismatch`. Keep the verified hash in each `createDefinitionStore` cache entry. Check each loaded body against its row's `definition_hash` in `resolveBody`, `resolveLatest` and `resolveLatestByContract`. A new test edits a `definitions` row's body and expects a throw. Another test loads an unedited row and expects the body. Verify with the full gated suite.
-- [ ] 1.2 Add the optional `pinHash` argument to `ResolveBody` and `ResolveBodyFn`. Compare it with the stored hash on every call. A new test expects a throw for a pin that differs from the row. It covers a cache hit and a miss. Verify with the full gated suite.
-- [ ] 1.3 Pass `inst.definitionHash` as `pinHash` in the timer worker, the spawn, return and cancel-child handlers, and `sweepCancelledChildren`. One new test per path uses a row with a changed hash. The timer test expects the row to leave the scan. The handler tests expect a throw. Verify with the full gated suite.
-- [ ] 1.4 Check the nine tests that insert into `definitions` or `draft_snapshots` by hand. Fix any whose stored hash differs from its body's hash. Verify with the full gated suite.
+- [x] 1.1 Add `DefinitionHashMismatch`. Keep the verified hash in each `createDefinitionStore` cache entry. Check each loaded body against its row's `definition_hash` in `resolveBody`, `resolveLatest` and `resolveLatestByContract`. A new test edits a `definitions` row's body and expects a throw. Another test loads an unedited row and expects the body. Verify with the full gated suite.
+- [x] 1.2 Add the optional `pinHash` argument to `ResolveBody` and `ResolveBodyFn`. Compare it with the stored hash on every call. A new test expects a throw for a pin that differs from the row. It covers a cache hit and a miss. Verify with the full gated suite.
+- [x] 1.3 Pass `inst.definitionHash` as `pinHash` in the timer worker, the spawn, return and cancel-child handlers, and `sweepCancelledChildren`. One new test per path uses a row with a changed hash. The timer test expects the row to leave the scan. The handler tests expect a throw. Verify with the full gated suite.
+- [x] 1.4 Check the nine tests that insert into `definitions` or `draft_snapshots` by hand. Fix any whose stored hash differs from its body's hash. Verify with the full gated suite.
 
 ## 2. Draft snapshots stay out of the cache (C-12)
 

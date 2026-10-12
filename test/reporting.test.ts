@@ -10,6 +10,7 @@
 import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, initSchema, createInstance } from "../src/engine/store.js";
 import { publishBody } from "../src/engine/definitions.js";
+import { definitionHash } from "../src/schema/hash.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import { cycleTime, bottleneck, sla, type DateRange } from "../src/engine/reporting.js";
 import { CANCEL_SINK_STEP_ID, type HistoryEntry, type Instance, type ProcessBody, type ProcessId, type StepId } from "../src/schema/definition.js";
@@ -450,8 +451,14 @@ test.skipIf(!DB)("two timers firing in one traversal count as one breach", async
   await entry({ instanceId: inst.instanceId, seq: 1, version, fromStepId: "step_a", toStepId: "step_c", at: at(10), cause: "user", pathId: "path_ab" });
   await entry({ instanceId: inst.instanceId, seq: 2, version, fromStepId: "step_c", toStepId: "step_d", at: at(60), cause: "timer", pathId: "path_esc" });
   // A reminder on the same step, same visit, on top of the escalation.
-  await sql`UPDATE definitions SET body = jsonb_set(body, '{workflow,steps,2,timers}',
-    ${[{ id: "timer_esc", duration: "P14D", onFire: { targetPath: "path_esc" } }, { id: "timer_c_rem", duration: "P1D", onFire: { actions: [] } }]}::jsonb)
+  // The row's hash follows its body: resolveBody refuses a body that no longer hashes to its row.
+  const stored = (await sql`SELECT body FROM definitions WHERE process_id = ${P} AND version = ${version}`) as { body: ProcessBody }[];
+  const withReminder = structuredClone(stored[0].body);
+  withReminder.workflow.steps[2].timers = [
+    { id: "timer_esc", duration: "P14D", onFire: { targetPath: "path_esc" } },
+    { id: "timer_c_rem", duration: "P1D", onFire: { actions: [] } },
+  ] as unknown as typeof withReminder.workflow.steps[number]["timers"];
+  await sql`UPDATE definitions SET body = ${JSON.stringify(withReminder)}::jsonb, definition_hash = ${definitionHash(withReminder)}
     WHERE process_id = ${P} AND version = ${version}`;
   await firedEvent(inst.instanceId, 1, version, "timer_c_rem", at(30));
 

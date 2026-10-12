@@ -7,7 +7,7 @@
 import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { ZodError } from "zod";
 import { sql, initSchema, createInstance, createDraftSnapshot } from "../src/engine/store.js";
-import { publishBody, createDefinitionStore } from "../src/engine/definitions.js";
+import { publishBody, createDefinitionStore, DefinitionHashMismatch } from "../src/engine/definitions.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import {
   getInstanceView,
@@ -169,6 +169,14 @@ test.skipIf(!DB)("resolveBody resolves a negative version from a persisted draft
   const { resolveBody } = createDefinitionStore();
   const resolved = await resolveBody(PID, version);
   expect(resolved).toEqual(body);
+});
+
+test.skipIf(!DB)("resolveBody throws for a draft_snapshots row whose body no longer matches its hash", async () => {
+  const body = simpleBody();
+  const version = await createDraftSnapshot(PID, definitionHash(body), body, sql);
+  await sql`UPDATE draft_snapshots SET body = jsonb_set(body, '{label,en}', '"Edited"') WHERE process_id = ${PID} AND version = ${version}`;
+  const { resolveBody } = createDefinitionStore();
+  await expect(Promise.resolve().then(() => resolveBody(PID, version))).rejects.toBeInstanceOf(DefinitionHashMismatch);
 });
 
 test.skipIf(!DB)("resolveBody for a real, positive version behaves identically to before this change", async () => {

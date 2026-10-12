@@ -20,8 +20,10 @@ import {
   ConcurrencyConflict,
   CANCEL_CHILD_ACTION_TYPE,
   SPAWN_ACTION_TYPE,
+  RETURN_ACTION_TYPE,
 } from "../src/engine/transition.js";
-import { publishBody, createDefinitionStore } from "../src/engine/definitions.js";
+import { publishBody, createDefinitionStore, DefinitionHashMismatch } from "../src/engine/definitions.js";
+import { contractHash, definitionHash } from "../src/schema/hash.js";
 import { registerSubprocessHandlers } from "../src/engine/subprocess.js";
 import { drainOutbox } from "../src/engine/outbox.js";
 import { subprocessChildId } from "../src/engine/idempotency.js";
@@ -782,4 +784,118 @@ test.skipIf(!DB)("a parent cancel enqueues no leaving row, and the sweep cancels
   expect(await cancelRowTargets(parent.instanceId)).toEqual([]);
   expect((await loadInstance(parent.instanceId))!.status).toBe("cancelled");
   expect((await loadInstance(childId))!.status).toBe("cancelled");
+});
+
+// --- DB: the engine's pin sites hand the instance's hash to resolveBody ----------
+
+/** Replace a row's body and its hash together: the row check passes, only a pin can tell. */
+async function restoreRowWithAnotherBody(processId: string, version: number): Promise<void> {
+  const rows = (await sql`SELECT body FROM definitions WHERE process_id = ${processId} AND version = ${version}`) as { body: unknown }[];
+  const changed = { ...(rows[0]!.body as Record<string, unknown>), label: { en: "Restored" } } as unknown as ProcessBody;
+  await sql`UPDATE definitions SET body = ${JSON.stringify(changed)}::jsonb, definition_hash = ${definitionHash(changed)}
+    WHERE process_id = ${processId} AND version = ${version}`;
+}
+const thrownBy = (run: () => Promise<unknown>): Promise<unknown> => run().then(() => undefined, (e: unknown) => e);
+function expectPinMismatch(error: unknown): void {
+  expect(error).toBeInstanceOf(DefinitionHashMismatch);
+  expect((error as DefinitionHashMismatch).reason).toBe("pin");
+}
+
+test.skipIf(!DB)("resolveLatestByContract throws DefinitionHashMismatch for an edited row it returns", async () => {
+  const W_PID = "proc_cc_pin_latest_w" as Instance["processId"];
+  const wv = await publishBody(W_PID, waitingChildBody(), publishRegistry, dataSourceReg);
+  await sql`UPDATE definitions SET body = jsonb_set(body, '{label,en}', '"Edited"') WHERE process_id = ${W_PID}`;
+  const ref = contractHash(wv.definition.contract!);
+  const error = await thrownBy(() => createDefinitionStore(sql).resolveLatestByContract(W_PID, ref));
+  expect(error).toBeInstanceOf(DefinitionHashMismatch);
+  expect((error as DefinitionHashMismatch).reason).toBe("body");
+});
+
+test.skipIf(!DB)("the spawn pins its parent with the parent's hash and looks the child up with no pin", async () => {
+  const W_PID = "proc_cc_pin_spy_w" as Instance["processId"];
+  const P_PID = "proc_cc_pin_spy_p" as Instance["processId"];
+  const wv = await publishBody(W_PID, waitingChildBody(), publishRegistry, dataSourceReg);
+  const pv = await publishBody(P_PID, callerBody("cc_pin_spy_p", W_PID, wv.version), publishRegistry, dataSourceReg);
+  const calls: [string, number, string | undefined][] = [];
+  const { registry } = engineRegistry((real) => async (processId, version, pinHash) => {
+    calls.push([processId, version, pinHash]);
+    return real(processId, version, pinHash);
+  });
+  const parent = await startInstance(pv.definition, { processId: P_PID, version: pv.version }, actor);
+
+  await spawnHandler(registry)(spawnCtx(parent.instanceId, 1));
+  expect(calls).toContainEqual([P_PID, pv.version, parent.definitionHash]);
+  expect(calls).toContainEqual([W_PID, wv.version, undefined]);
+});
+
+test.skipIf(!DB)("the spawn throws when its parent's stored row no longer matches the parent's pin", async () => {
+  const W_PID = "proc_cc_pin_sp_p_w" as Instance["processId"];
+  const P_PID = "proc_cc_pin_sp_p_p" as Instance["processId"];
+  const wv = await publishBody(W_PID, waitingChildBody(), publishRegistry, dataSourceReg);
+  const pv = await publishBody(P_PID, callerBody("cc_pin_sp_p_p", W_PID, wv.version), publishRegistry, dataSourceReg);
+  const parent = await startInstance(pv.definition, { processId: P_PID, version: pv.version }, actor); // spawn still queued
+  await restoreRowWithAnotherBody(P_PID, pv.version);
+
+  const { registry } = engineRegistry();
+  expectPinMismatch(await thrownBy(() => spawnHandler(registry)(spawnCtx(parent.instanceId, 1)) as Promise<unknown>));
+  expect(await countChildren(parent.instanceId)).toBe(0);
+});
+
+test.skipIf(!DB)("the spawn throws when an existing child's stored row no longer matches the child's pin", async () => {
+  const { W_PID, wv, parent } = await parkedOverWaitingChild("pin_sp_c");
+  await restoreRowWithAnotherBody(W_PID, wv.version);
+
+  const { registry } = engineRegistry();
+  expectPinMismatch(await thrownBy(() => spawnHandler(registry)(spawnCtx(parent.instanceId, 1)) as Promise<unknown>));
+});
+
+function returnCtx(parentId: string, childId: string): HandlerContext {
+  const config = { parentInstanceId: parentId, childOutcome: "done" };
+  return {
+    action: { id: `action_return_${childId}`, type: RETURN_ACTION_TYPE, config } as unknown as HandlerContext["action"],
+    config,
+    idempotencyKey: `test-return-${childId}`,
+    instanceId: childId,
+    db: sql,
+    assignmentRegistry: createStaticAssignmentRegistry(),
+  };
+}
+const returnHandler = (registry: Reg) => registry.get(RETURN_ACTION_TYPE)!.handler;
+
+test.skipIf(!DB)("the return throws when the parent's stored row no longer matches the parent's pin", async () => {
+  const { P_PID, pv, parent, childId } = await parkedOverWaitingChild("pin_ret_p");
+  await restoreRowWithAnotherBody(P_PID, pv.version);
+
+  const { registry } = engineRegistry();
+  expectPinMismatch(await thrownBy(() => returnHandler(registry)(returnCtx(parent.instanceId, childId)) as Promise<unknown>));
+  expect((await loadInstance(parent.instanceId))!.status).toBe("running");
+});
+
+test.skipIf(!DB)("the return throws when the child's stored row no longer matches the child's pin", async () => {
+  const { W_PID, wv, parent, childId } = await parkedOverWaitingChild("pin_ret_c");
+  await restoreRowWithAnotherBody(W_PID, wv.version);
+
+  const { registry } = engineRegistry();
+  expectPinMismatch(await thrownBy(() => returnHandler(registry)(returnCtx(parent.instanceId, childId)) as Promise<unknown>));
+  expect((await loadInstance(parent.instanceId))!.status).toBe("running");
+});
+
+test.skipIf(!DB)("the cancel-child handler throws when the child's stored row no longer matches the child's pin", async () => {
+  const { W_PID, wv, parent, childId } = await parkedOverWaitingChild("pin_cc");
+  await restoreRowWithAnotherBody(W_PID, wv.version);
+
+  const { registry } = engineRegistry();
+  expectPinMismatch(await thrownBy(() => cancelHandler(registry)(cancelCtx(parent.instanceId, childId)) as Promise<unknown>));
+  expect((await loadInstance(childId))!.status).toBe("running");
+});
+
+test.skipIf(!DB)("a parent cancel's sweep leaves a child running when the child's stored row no longer matches its pin", async () => {
+  const { W_PID, wv, pv, parent, childId } = await parkedOverWaitingChild("pin_sweep");
+  await restoreRowWithAnotherBody(W_PID, wv.version);
+
+  const { resolveBody } = engineRegistry();
+  await cancelInstance((await loadInstance(parent.instanceId))!, pv.definition, actor, sql, resolveBody);
+  expect((await loadInstance(parent.instanceId))!.status).toBe("cancelled");
+  expect((await loadInstance(childId))!.status).toBe("running"); // the sweep could not resolve it
+  expect(await cancelSweepState(parent.instanceId)).toBe("pending");
 });
