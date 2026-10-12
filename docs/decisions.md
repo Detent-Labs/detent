@@ -1716,14 +1716,6 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   share one database, and the provisioning connection drops its URL
   parameters. Anchors: `src/auth/jwt.ts`, `src/tenancy/provision.ts`,
   `src/tenancy/connections.ts`.
-- **`fix-condition-and-path-builders` (E2-1, E2-6, E2-10, E2-14, E2-17;
-  medium)**: A manual path keeps a hidden guard that hides its button at
-  runtime, one "+ Add row" removes every `visible` override when the steps
-  disagree on the condition, the condition builder cannot read back integer
-  or negative literals, a boolean value field shows "No" on an empty row, and
-  "Add path" always creates a manual path. Anchors: `packages/web/src/areas/studio/panels/PathsPanel.tsx`,
-  `packages/web/src/areas/studio/panels/FieldCatalogPanel.tsx`,
-  `packages/web/src/areas/studio/panels/shared/conditionLogic.ts`.
 - **`fix-subprocess-step-editor` (E2-3, E2-4, E2-5, E2-12, E2-18; medium)**:
   The subprocess editor offers parent fields as `inputMapping` keys and shows
   "pinned" without writing it, a step kind switch leaves keys behind, the
