@@ -146,9 +146,9 @@ rather than exempting it from the window.
 - **THEN** the per-address window counts against the last entry, so the value
   the caller picked changes nothing
 
-#### Scenario: An email of 5000 characters is an ordinary wrong password
+#### Scenario: An email of 6000 characters is an ordinary wrong password
 
-- **WHEN** `POST /auth/login` receives an email of 5000 characters with a wrong
+- **WHEN** `POST /auth/login` receives an email of 6000 characters with a wrong
   password
 - **THEN** the response is the existing generic `401`
 - **AND** the request counts toward that email's window like any other
