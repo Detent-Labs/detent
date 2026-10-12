@@ -534,8 +534,10 @@ test.skipIf(!DB)("publishing a draft carrying an instance.query source without a
   await listDeveloper(processId, authorPublisher.id);
   const res = await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", authorPublisher));
   expect(res.status).toBe(403);
-  const errBody = (await res.json()) as { error: { type: string } };
+  const errBody = (await res.json()) as { error: { type: string; message: string } };
   expect(errBody.error.type).toBe("authorization");
+  // The read-grant refusal names the target process; the list refusal names the draft's own process.
+  expect(errBody.error.message).toContain(`for process '${targetId}'`);
 });
 
 /* ------------------------------------------- the Developer list on publish
@@ -562,6 +564,18 @@ test.skipIf(!DB)("an unlisted author holding system:publish is refused on publis
   expect(((await res.json()) as { error: { type: string } }).error.type).toBe("authorization");
   expect(await versionCount(processId)).toBe(0);
   expect(await draftBaseVersion(processId)).toBeNull();
+});
+
+test.skipIf(!DB)("a process-scoped publish grant does not stand in for a Developer list entry on publish", async () => {
+  const processId = pid();
+  // `developer` created the draft, so financeAuthor (AUTHOR_ROLE + a publish grant) is not on the list.
+  await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", developer, { body: publishableBody("v1"), layout: {}, revision: 0 }));
+  await grantPublish("finance-authors", processId);
+
+  const res = await fetch(authedReq(`http://x/drafts/${processId}/publish`, "POST", financeAuthor));
+  expect(res.status).toBe(403);
+  expect(((await res.json()) as { error: { type: string } }).error.type).toBe("authorization");
+  expect(await versionCount(processId)).toBe(0);
 });
 
 test.skipIf(!DB)("a member of a group on the Developer list publishes", async () => {

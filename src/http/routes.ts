@@ -33,9 +33,9 @@ import {
   type InstanceListFilter,
 } from "../runtime/api.js";
 import { publishBody, listProcesses, listVersions } from "../engine/definitions.js";
-import { appendCreatorAsDeveloper, hasNoDraftAndNoPublishedVersion } from "../engine/drafts.js";
+import { appendCreatorAsDeveloper } from "../engine/drafts.js";
 import { withTransaction } from "../engine/store.js";
-import { requireDeveloperListOrAdmin } from "../auth/process-access.js";
+import { requirePublishListAccess } from "../auth/process-access.js";
 import { instanceStatus } from "../schema/definition.js";
 import type { Actor } from "../cel/eval.js";
 import type { ActorResolver } from "../auth/resolve.js";
@@ -643,8 +643,8 @@ export async function handleGrantVisibility(instanceId: string, req: Request, re
  * process's Developer list in the same transaction as version 1, so the same
  * actor can publish version 2. A failed first publish rolls the entry back.
  *
- * The permission gate sits AFTER the body parse and the shape check, not before them,
- * because it names the target process and the body is what carries it. The
+ * The permission gate sits AFTER the body parse and the shape check, not
+ * before them, because it names the target process and the body is what carries it. The
  * property the earlier placement protected still holds: an actor without the
  * permission never reaches `publishBody`, so no definition store, registry or
  * CEL check runs and no version is consumed. The one visible consequence is
@@ -671,17 +671,14 @@ export async function handlePublish(
     // grant later must not read it as an id the store already holds.
     const processId = parsed.processId as ProcessId;
     await requirePermission(actor, "publish", processId, db);
-    // One answer serves both the list check and the seeding below. A process
-    // with no draft and no published version has no Developer list yet.
-    const isFirstPublish = await hasNoDraftAndNoPublishedVersion(processId, db);
-    if (!isFirstPublish) await requireDeveloperListOrAdmin(actor, processId, db);
-    const published = isFirstPublish
-      ? await withTransaction(db, async (tx) => {
-          const result = await publishBody(processId, parsed.body as ProcessBody, registry, dataSourceRegistry, tx, assignmentRegistry, actor);
-          await appendCreatorAsDeveloper(tx, processId, actor.id);
-          return result;
-        })
-      : await publishBody(processId, parsed.body as ProcessBody, registry, dataSourceRegistry, db, assignmentRegistry, actor);
+    // The list check also reports whether this is a first publish (no draft, no
+    // published version, so no Developer list yet), which decides the seeding.
+    const isFirstPublish = await requirePublishListAccess(actor, processId, db);
+    const published = await withTransaction(db, async (tx) => {
+      const result = await publishBody(processId, parsed.body as ProcessBody, registry, dataSourceRegistry, tx, assignmentRegistry, actor);
+      if (isFirstPublish) await appendCreatorAsDeveloper(tx, processId, actor.id);
+      return result;
+    });
     return {
       status: 200,
       body: {

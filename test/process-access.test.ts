@@ -189,14 +189,14 @@ test.skipIf(!DB)("requirePublishListAccess passes an admin off the list", async 
   await addDraft(processId);
   const admin: Actor = { id: "user_admin", roles: [ADMIN_ROLE] };
 
-  await requirePublishListAccess(admin, processId, sql);
+  expect(await requirePublishListAccess(admin, processId, sql)).toBe(false);
 });
 
 test.skipIf(!DB)("requirePublishListAccess passes a first publish for an unlisted actor", async () => {
   const processId = pid();
   const stranger: Actor = { id: "user_stranger", roles: [AUTHOR_ROLE] };
 
-  await requirePublishListAccess(stranger, processId, sql);
+  expect(await requirePublishListAccess(stranger, processId, sql)).toBe(true);
 });
 
 test.skipIf(!DB)("requirePublishListAccess passes a listed actor", async () => {
@@ -205,7 +205,7 @@ test.skipIf(!DB)("requirePublishListAccess passes a listed actor", async () => {
   await addToList(processId, "developer", "user_dev");
   const dev: Actor = { id: "user_dev", roles: [AUTHOR_ROLE] };
 
-  await requirePublishListAccess(dev, processId, sql);
+  expect(await requirePublishListAccess(dev, processId, sql)).toBe(false);
 });
 
 test.skipIf(!DB)("requirePublishListAccess passes a member of a listed group", async () => {
@@ -216,7 +216,7 @@ test.skipIf(!DB)("requirePublishListAccess passes a member of a listed group", a
   await addToList(processId, "developer", group.groupId);
   const member: Actor = { id: "user_member", roles: [AUTHOR_ROLE] };
 
-  await requirePublishListAccess(member, processId, sql);
+  expect(await requirePublishListAccess(member, processId, sql)).toBe(false);
 });
 
 test.skipIf(!DB)("requirePublishListAccess refuses an unlisted actor", async () => {
