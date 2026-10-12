@@ -1310,7 +1310,7 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   heuristic gives false positives. Risk (Medium): a guard stops matching after
   an option rename, and the path parks.
 
-  Name the fix: extend the reader walk in
+  Upgrade entry: extend the reader walk in
   `packages/web/src/areas/studio/draft/key-readers.ts` to report a string
   literal compared with the field.
 
