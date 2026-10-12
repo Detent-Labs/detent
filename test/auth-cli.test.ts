@@ -44,6 +44,16 @@ test.skipIf(!DB)("bun run src/auth/cli.ts add-user creates a row whose hash veri
   expect(result?.roles).toEqual(["employee", "admin"]);
 });
 
+test.skipIf(!DB)(
+  "add-user refuses an address with no domain, exits non-zero and writes no row",
+  async () => {
+    expect(await runCli("add-user", "max.muster", "pw", "employee")).not.toBe(0);
+    const rows = (await sql`SELECT count(*)::int AS n FROM auth_users`) as { n: number }[];
+    expect(rows[0]!.n).toBe(0);
+  },
+  30_000,
+);
+
 // Each case below is one `bun` process plus one argon2 hash, past the 5s default.
 test.skipIf(!DB)(
   "add-user stores a trailing display name and leaves display_name NULL without one",
