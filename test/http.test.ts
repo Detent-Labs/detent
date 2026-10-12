@@ -22,7 +22,7 @@ import { drainResolutions } from "../src/engine/resolution.js";
 import { ConcurrencyConflict } from "../src/engine/transition.js";
 import { createServer } from "../src/http/server.js";
 import { mapError } from "../src/http/errors.js";
-import { parseMaxAttachmentBytes, parseLimit } from "../src/http/routes.js";
+import { parseMaxAttachmentBytes, parseLimit, handleSubmit } from "../src/http/routes.js";
 import { MAX_LIST_LIMIT, MAX_RECORD_LIMIT, revokeVisibility, restoreVisibility } from "../src/runtime/api.js";
 import { devHeaderResolver, type ActorResolver } from "../src/auth/resolve.js";
 import { PUBLISH_ROLE, CANCEL_ANY_ROLE, ADMIN_ROLE, DEVELOPER_ROLE, type Permission } from "../src/auth/authorize.js";
@@ -720,6 +720,51 @@ test.skipIf(!DB)("a post-commit cascade loop surfaces as 200 with a faulted view
   );
   expect(res.status).toBe(200);
   const view = (await res.json()) as { status: string };
+  expect(view.status).toBe("faulted");
+});
+
+// Calls `handleSubmit` directly, never through `createServer`: the dispatcher
+// catch would map the same throw and hide a missing local try.
+test.skipIf(!DB)("a failed view read after a cascade-loop submission is the mapped 500, from handleSubmit itself", async () => {
+  const PID = pid("proc_http_cascade_view_read_fails");
+  await publishBody(PID, cascadeLoopBody(), reg, dataSourceReg);
+  const created = (await (await fetch(jsonReq(`http://x/processes/${PID}/instances`, "POST", user1))).json()) as { instanceId: string };
+
+  // Only `getInstanceView` selects from instance_drafts on this path (via
+  // `getInstanceDraft`); the submit transaction deletes the row through `tx`,
+  // a handle this Proxy never sees. `begin` and every other member forward to
+  // the real handle.
+  const failingViewDb = new Proxy(sql, {
+    apply(target, thisArg, args) {
+      const text = Array.isArray(args[0]) ? (args[0] as string[]).join(" ") : "";
+      if (/select[\s\S]*from\s+instance_drafts/i.test(text)) throw new Error("relation instance_drafts_secret");
+      return Reflect.apply(target as unknown as (...a: unknown[]) => unknown, thisArg, args);
+    },
+  });
+
+  const errorSpy = spyOn(console, "error").mockImplementation(() => {});
+  try {
+    const result = await handleSubmit(
+      created.instanceId,
+      jsonReq(`http://x/instances/${created.instanceId}/submit`, "POST", user1, { pathId: "path_ag", data: { field_marker: "x" } }),
+      devHeaderResolver,
+      dataSourceReg,
+      failingViewDb,
+    );
+    expect(result.status).toBe(500);
+    const body = result.body as { error: { type: string; message?: string } };
+    expect(body.error.type).toBe("internal");
+    expect(body.error.message).toBeUndefined();
+    const logged = errorSpy.mock.calls.map((c) => c.join(" ")).join("\n");
+    expect(logged).toContain("POST");
+    expect(logged).toContain(`/instances/${created.instanceId}/submit`);
+    expect(logged).toContain("instance_drafts_secret");
+  } finally {
+    errorSpy.mockRestore();
+  }
+
+  // The write committed before the view read failed: the instance is faulted.
+  const view = (await (await fetch(authedReq(`http://x/instances/${created.instanceId}`, "GET", user1))).json()) as { status: string };
   expect(view.status).toBe("faulted");
 });
 

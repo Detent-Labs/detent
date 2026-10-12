@@ -290,8 +290,14 @@ export async function handleSubmit(
     // The write already committed before this raised; report the resulting
     // (now-faulted) view instead of an error response — see design.md.
     if (err instanceof AutomaticCascadeLoop && actor) {
-      const view = await getInstanceView(instanceId as InstanceId, actor, dataSourceRegistry, db);
-      return { status: 200, body: view };
+      // A failed read maps like any other read. It is a different throw than
+      // `err`, raised inside this catch, so the outer try cannot see it.
+      try {
+        const view = await getInstanceView(instanceId as InstanceId, actor, dataSourceRegistry, db);
+        return { status: 200, body: view };
+      } catch (viewErr) {
+        return mapError(viewErr, errorContext(req));
+      }
     }
     return mapError(err, errorContext(req));
   }
