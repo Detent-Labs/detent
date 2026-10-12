@@ -33,7 +33,7 @@ The shell SHALL NOT write a session to storage that it held before such a change
 
 ### Requirement: The login screen names a session that another tab ended
 
-When a change in another tab ends the session, the login screen SHALL show the line "Your session ended in another tab." The line SHALL come from the shell catalog in every shipped locale. Screen readers SHALL announce it as a status. It SHALL disappear when the actor logs in.
+When another tab ends the session, the login screen SHALL show the line "Your session ended in another tab." The line SHALL come from the shell catalog in every shipped locale. Screen readers SHALL announce it as a status. It SHALL disappear when the actor logs in.
 
 A logout the actor chooses in this tab SHALL NOT show the line.
 
