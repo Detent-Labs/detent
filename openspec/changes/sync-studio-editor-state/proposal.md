@@ -17,7 +17,7 @@ The 2026-10-10 audit logged these as E2-8, E2-13, E2-15 and E1-7. FIELDS-15 name
 ## What Changes
 
 - The plugin editor's JSON textarea shows the stored `config` whenever the author did not just type that text (E2-8). Picking a list key, using the generated form or moving to another entity never leaves stale text behind.
-- `StepPage` and `DataSourceRow` mount per entity, keyed by the step id and the data source id (E2-8, FIELDS-15). After a removal, focus moves to the rail row that becomes current. An empty rail hands it to the add control.
+- `StepPage` and `DataSourceRow` mount per entity, keyed by the step id and the data source id (E2-8, FIELDS-15). After a removal, focus moves to the rail row that becomes current. An empty rail hands it to the add control. Previous and Next keep focus on the walk, since the keyed page remounts their button.
 - An emptied deadline stays a deadline (E2-13). The timer keeps `deadline: {lang: "cel", src: ""}`, the field the "deadline" choice seeds, so the kind select, the input and the draft agree.
 - Removing a data source that fields use confirms first, and clears the references (E2-15). The dialog counts the fields and the column mappings. One draft mutation removes the source, unsets `dataSource` on every field that names it and drops the `columnMapping` of those fields. A source no field uses leaves at once.
 - The studio lists processes once per mount for `process.start` targets (E1-7). It reads a body only for an id that list holds. A failed read is not remembered.
@@ -35,7 +35,7 @@ None.
 
 - `studio-plugin-config-form`: the raw JSON text follows the stored config. The step page and the data source editor mount per entity.
 - `studio-app`: removing a data source that fields use confirms first and clears the references. A removal moves focus to the rail.
-- `studio-step-page`: a timer keeps the kind the author chose when the deadline text is empty.
+- `studio-step-page`: a timer keeps the kind the author chose when the deadline text is empty. The walk between steps keeps keyboard focus.
 - `studio-checks-rail`: the chaining targets load from one process list per mount.
 
 ## Impact

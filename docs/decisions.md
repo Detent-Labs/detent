@@ -1166,17 +1166,6 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   that makes N + 2 tree walks and N scans of the check list. Risk
   (Informational): the cost grows with the square of the catalog's size and
   stays harmless at 51 entries.
-- **FIELDS-15: a step or data source removal reuses its own button for the
-  next entity.** `panels/DataSourcesPanel.tsx`'s `DataSourceRow` (`:161`) and
-  `screens/EditScreen.tsx`'s `<StepPage>` (`:952`) render with no `key`,
-  unlike the Fields tab's own `FieldEditor`, keyed by the field's id
-  (`panels/FieldCatalogPanel.tsx:1162`). A press on "Remove data source" or
-  "Remove this step" therefore keeps its own button element in the DOM.
-  `removeDataSource` (`panels/EntityTabs.tsx:692`) and `onRemoveStep`
-  (`screens/EditScreen.tsx:556`) each pick a neighbour, and the same button
-  then renders that neighbour's own remove control. This is a code reading;
-  no browser run has confirmed it. Risk (Medium): a second Enter or Space
-  removes a neighbour with no separate confirmation.
 - **FIELDS-16: two check messages call a removed field present.** A removal
   leaves a kept `org.actor-from-field` assignment setting that names the
   removed id, since `fieldRemovalReach` only counts a plugin setting
@@ -1696,14 +1685,6 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   hung target stops the outbox for all tenants, and the admin outbox list has
   no index for its sort order. Anchors: `src/engine/resolution.ts`,
   `src/engine/retention.ts`, `src/engine/host.ts`.
-- **`sync-studio-editor-state` (E2-8, E2-13, E2-15, E1-7; medium)**: Stale
-  JSON text in the plugin editor lands in another entity, a cleared deadline
-  leaves a timer with no input, a removed data source leaves field
-  references dangling, and each keystroke in a `process.start` process id
-  fires a `GET /processes`. Anchors:
-  `packages/web/src/areas/studio/panels/shared/PluginEnvelopeEditor.tsx`,
-  `packages/web/src/areas/studio/panels/TimersPanel.tsx`,
-  `packages/web/src/areas/studio/draft/chainingFetch.ts`.
 - **`guard-field-key-renames` (E2-7; medium)**: A label change renames the
   field key, and the CEL expressions that read the old key keep it. Anchors:
   `packages/web/src/areas/studio/panels/FieldCatalogPanel.tsx`,

@@ -9,6 +9,7 @@
 
 - [x] 2.1 Give the steps rail's current row and its add control fixed ids, and move focus to them after `onRemoveStep`. Test the id helpers and the choice of target.
 - [x] 2.2 Give the data source rail rows and the add control ids, and move focus after a data source removal. Test the target for a middle, a last and an only source.
+- [ ] 2.3 Give Previous and Next fixed ids and keep focus on the walk after a press. Test the choice of target, then check it in 7.3.
 
 ## 3. The timer deadline (E2-13)
 
