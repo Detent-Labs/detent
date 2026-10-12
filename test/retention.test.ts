@@ -141,7 +141,7 @@ test.skipIf(!DB)("redactInstance throws NotFoundError for an unknown instance", 
 test.skipIf(!DB)("sweepRetention redacts an eligible completed instance past the window", async () => {
   const i = await mk();
   await setStatus(i.instanceId, "completed");
-  await setEnteredAt(i.instanceId, "2020-01-01T00:00:00Z");
+  await setEnteredAt(i.instanceId, "2020-01-01T00:00:00.000Z");
 
   await sweepRetention(sql, 30);
   expect(await rowRedactedAt(i.instanceId)).not.toBeNull();
@@ -150,7 +150,7 @@ test.skipIf(!DB)("sweepRetention redacts an eligible completed instance past the
 test.skipIf(!DB)("sweepRetention redacts an eligible cancelled instance the same way", async () => {
   const i = await mk();
   await setStatus(i.instanceId, "cancelled");
-  await setEnteredAt(i.instanceId, "2020-01-01T00:00:00Z");
+  await setEnteredAt(i.instanceId, "2020-01-01T00:00:00.000Z");
 
   await sweepRetention(sql, 30);
   expect(await rowRedactedAt(i.instanceId)).not.toBeNull();
@@ -168,7 +168,7 @@ test.skipIf(!DB)("sweepRetention skips a completed instance still inside the win
 test.skipIf(!DB)("sweepRetention never redacts a faulted instance, regardless of age", async () => {
   const i = await mk();
   await setStatus(i.instanceId, "faulted");
-  await setEnteredAt(i.instanceId, "2020-01-01T00:00:00Z");
+  await setEnteredAt(i.instanceId, "2020-01-01T00:00:00.000Z");
 
   await sweepRetention(sql, 30);
   expect(await rowRedactedAt(i.instanceId)).toBeNull();
@@ -178,7 +178,7 @@ test.skipIf(!DB)("sweepRetention falls back to startedAt for an instance predati
   const i = await mk();
   await setStatus(i.instanceId, "completed");
   // Simulate a pre-existing instance: drop currentStepEnteredAt, backdate startedAt.
-  await sql`UPDATE instances SET body = (body - 'currentStepEnteredAt') || ${{ startedAt: "2020-01-01T00:00:00Z" }}::jsonb
+  await sql`UPDATE instances SET body = (body - 'currentStepEnteredAt') || ${{ startedAt: "2020-01-01T00:00:00.000Z" }}::jsonb
     WHERE instance_id = ${i.instanceId}`;
 
   await sweepRetention(sql, 30);
@@ -190,7 +190,7 @@ test.skipIf(!DB)("sweepRetention redacts every eligible instance across several 
   for (let n = 0; n < 5; n++) {
     const i = await mk();
     await setStatus(i.instanceId, "completed");
-    await setEnteredAt(i.instanceId, "2020-01-01T00:00:00Z");
+    await setEnteredAt(i.instanceId, "2020-01-01T00:00:00.000Z");
     ids.push(i.instanceId);
   }
 
@@ -203,10 +203,10 @@ test.skipIf(!DB)("sweepRetention redacts every eligible instance across several 
 test.skipIf(!DB)("sweepRetention does not stop the batch when one instance's redaction fails", async () => {
   const i = await mk();
   await setStatus(i.instanceId, "completed");
-  await setEnteredAt(i.instanceId, "2020-01-01T00:00:00Z");
+  await setEnteredAt(i.instanceId, "2020-01-01T00:00:00.000Z");
   const other = await mk();
   await setStatus(other.instanceId, "completed");
-  await setEnteredAt(other.instanceId, "2020-01-01T00:00:00Z");
+  await setEnteredAt(other.instanceId, "2020-01-01T00:00:00.000Z");
   // Force the first id's redaction to fail without changing its `status`
   // text (the sweep's WHERE clause must still select it): `data` becomes a
   // string, which instanceSchema.parse rejects inside redactInstance.
@@ -216,10 +216,60 @@ test.skipIf(!DB)("sweepRetention does not stop the batch when one instance's red
   expect(await rowRedactedAt(other.instanceId)).not.toBeNull();
 });
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+test.skipIf(!DB)("sweepRetention selects an instance just outside the window and not one just inside it", async () => {
+  const outside = await mk();
+  await setStatus(outside.instanceId, "completed");
+  await setEnteredAt(outside.instanceId, new Date(Date.now() - 30 * DAY_MS - 60_000).toISOString());
+  const inside = await mk();
+  await setStatus(inside.instanceId, "completed");
+  await setEnteredAt(inside.instanceId, new Date(Date.now() - 30 * DAY_MS + 60_000).toISOString());
+
+  await sweepRetention(sql, 30);
+  expect(await rowRedactedAt(outside.instanceId)).not.toBeNull();
+  expect(await rowRedactedAt(inside.instanceId)).toBeNull();
+});
+
+test.skipIf(!DB)("a failing instance ahead in entry-time order hides none behind it, and the next tick selects it again", async () => {
+  // The failing instance entered first, so it leads the keyset. Its id has no
+  // say in the order: entry time comes before instance_id.
+  const failing = await mk();
+  await setStatus(failing.instanceId, "completed");
+  await setEnteredAt(failing.instanceId, "2020-01-01T00:00:00.000Z");
+  const behind: string[] = [];
+  for (const entered of ["2020-02-01T00:00:00.000Z", "2020-03-01T00:00:00.000Z"]) {
+    const i = await mk();
+    await setStatus(i.instanceId, "completed");
+    await setEnteredAt(i.instanceId, entered);
+    behind.push(i.instanceId);
+  }
+  // `data` becomes a string, which instanceSchema.parse rejects inside redactInstance.
+  await sql`UPDATE instances SET body = body || '{"data": "not-an-object"}'::jsonb WHERE instance_id = ${failing.instanceId}`;
+
+  const skippedIds = async (): Promise<unknown[]> => {
+    const errorSpy = spyOn(console, "error").mockImplementation(() => {});
+    await sweepRetention(sql, 30);
+    const ids = errorSpy.mock.calls
+      .map((c) => JSON.parse(c[0] as string) as Record<string, unknown>)
+      .filter((l) => l.msg === "worker skipped a failing item")
+      .map((l) => l.instanceId);
+    errorSpy.mockRestore();
+    return ids;
+  };
+
+  expect(await skippedIds()).toEqual([failing.instanceId]);
+  for (const id of behind) expect(await rowRedactedAt(id)).not.toBeNull();
+  expect(await rowRedactedAt(failing.instanceId)).toBeNull();
+
+  // Still unredacted, so the next tick selects it again and fails on it again.
+  expect(await skippedIds()).toEqual([failing.instanceId]);
+});
+
 test.skipIf(!DB)("sweepRetention does nothing over an instance already redacted", async () => {
   const i = await mk();
   await setStatus(i.instanceId, "completed");
-  await setEnteredAt(i.instanceId, "2020-01-01T00:00:00Z");
+  await setEnteredAt(i.instanceId, "2020-01-01T00:00:00.000Z");
   await redactInstance(i.instanceId, sql);
   await addComment(i.instanceId);
 

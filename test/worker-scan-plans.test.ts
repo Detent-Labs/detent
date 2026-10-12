@@ -8,6 +8,7 @@
 import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, initSchema } from "../src/engine/store.js";
 import { claimSelect, CLAIM_LEASE_MS } from "../src/engine/resolution.js";
+import { retentionSelect } from "../src/engine/retention.js";
 
 const DB = !!process.env.DATABASE_URL;
 
@@ -118,4 +119,54 @@ test.skipIf(!DB)("initSchema leaves the partial index and no longer builds the f
   const names = ((await sql`SELECT indexname FROM pg_indexes WHERE tablename = 'instances'`) as { indexname: string }[]).map((r) => r.indexname);
   expect(names).toContain("instances_resolve_open_idx");
   expect(names).not.toContain("instances_resolve_idx");
+});
+
+// ============================================================
+// Retention sweep (data-retention, "A tick with nothing eligible reads no
+// stored instance")
+// ============================================================
+
+const RETENTION_DAYS = 30;
+
+/**
+ * `FINISHED` completed instances inside the retention window, plus a few running
+ * ones whose entry time is old: the status predicate alone keeps those out. No
+ * row is eligible. `currentStepEnteredAt` is spread over the last hours, in the
+ * `toISOString()` form every writer emits.
+ */
+async function seedRetentionBulk() {
+  await sql`INSERT INTO instances (instance_id, transition_seq, body)
+    SELECT 'inst_c' || lpad(g::text, 6, '0'), 0,
+      jsonb_build_object('instanceId', 'inst_c' || lpad(g::text, 6, '0'),
+        'currentStepEnteredAt', to_char((now() AT TIME ZONE 'UTC') - make_interval(secs => g), 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))
+        || ((${[instanceRow("completed")]}::jsonb) -> 0)
+    FROM generate_series(1, ${FINISHED}) g`;
+  await sql`INSERT INTO instances (instance_id, transition_seq, body)
+    SELECT 'inst_r' || lpad(g::text, 6, '0'), 0,
+      jsonb_build_object('instanceId', 'inst_r' || lpad(g::text, 6, '0'), 'currentStepEnteredAt', '2020-01-01T00:00:00.000Z')
+        || ((${[instanceRow("running")]}::jsonb) -> 0)
+    FROM generate_series(1, 5) g`;
+  await sql`ANALYZE instances`;
+}
+
+test.skipIf(!DB)("a retention tick with nothing eligible reads no instance row", async () => {
+  await seedRetentionBulk();
+  const nodes = await planNodes(retentionSelect(sql, RETENTION_DAYS, "", ""));
+
+  // The rejected form compared `(body->>'currentStepEnteredAt')::timestamptz` on
+  // every unredacted row: measured at 256 ms over 133,339 rows of 300,000. The
+  // index keys on the entry time, so the cutoff bounds the scan and it reads none.
+  expect(nodes.some((n) => n["Index Name"] === "instances_retention_idx")).toBe(true);
+  expect(nodes.some((n) => n["Node Type"] === "Seq Scan")).toBe(false);
+  expect(nodes.some((n) => n["Node Type"] === "Sort")).toBe(false);
+  expect(removedByFilter(nodes)).toBe(0);
+  for (const n of nodes.filter((n) => n["Relation Name"] === "instances")) expect(n["Actual Rows"]).toBe(0);
+});
+
+test.skipIf(!DB)("initSchema twice leaves one retention index and no redacted_at index", async () => {
+  await initSchema();
+  await initSchema();
+  const names = ((await sql`SELECT indexname FROM pg_indexes WHERE tablename = 'instances'`) as { indexname: string }[]).map((r) => r.indexname);
+  expect(names.filter((n) => n === "instances_retention_idx")).toHaveLength(1);
+  expect(names).not.toContain("instances_redacted_idx");
 });

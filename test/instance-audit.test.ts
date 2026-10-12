@@ -564,7 +564,7 @@ test.skipIf(!DB)("4.7 swapping two rows' seq values makes verification name the 
 test.skipIf(!DB)("6.1 the automatic sweep names no actor, so its rows carry a null one", async () => {
   const i = await mk({ field_x: "1" });
   await setStatus(i.instanceId, "completed");
-  await setEnteredAt(i.instanceId, "2020-01-01T00:00:00Z");
+  await setEnteredAt(i.instanceId, "2020-01-01T00:00:00.000Z");
 
   await sweepRetention(sql, 30);
 

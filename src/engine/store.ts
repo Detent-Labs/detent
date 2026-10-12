@@ -280,10 +280,6 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   // SQL NULL and silently drop it under three-valued logic. The column
   // default backfills every pre-existing row to 'published' at ALTER time.
   await db`ALTER TABLE instances ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAULT 'published'`;
-  // The retention sweep's selection query filters on this column first (most
-  // rows are NULL forever, so a partial index stays small), then checks
-  // status/currentStepEnteredAt in memory over the reduced row set.
-  await db`CREATE INDEX IF NOT EXISTS instances_redacted_idx ON instances (redacted_at) WHERE redacted_at IS NULL`;
   // Six standardized Instance scalars, promoted out of the jsonb body into
   // real columns, on the redacted_at precedent above: the key stays in body
   // (parseInstance is unchanged), and the column is additive infrastructure
@@ -329,6 +325,10 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   await db`DROP INDEX IF EXISTS instances_selection_idx`;
   await db`DROP INDEX IF EXISTS instances_current_step_idx`;
   await db`DROP INDEX IF EXISTS instances_started_by_idx`;
+  // The old retention index covered every unredacted row, so with retention off
+  // it held the whole table. CREATE INDEX IF NOT EXISTS would leave a reused
+  // name alone, so the replacement has a new name and this DROP stays for good.
+  await db`DROP INDEX IF EXISTS instances_redacted_idx`;
   // Readers: the migration population scan and findOrphanKeys
   // (src/engine/migration.ts), liveVersionCounts (src/engine/definitions.ts),
   // selectInRange and the bottlenecks WIP query (src/engine/reporting.ts),
@@ -344,6 +344,14 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   // Readers: buildInstanceWhere's shared startedBy filter, reached by the same
   // two reads, and the participant-facing GET /instances?scope=started route.
   await db`CREATE INDEX IF NOT EXISTS instances_started_by_col_idx ON instances (started_by)`;
+  // Reader: sweepRetention (src/engine/retention.ts), which pages unredacted
+  // completed and cancelled instances by (entry time, instance_id). The key
+  // names started_at, the column; currentStepEnteredAt has no column, so it
+  // stays a jsonb expression. Text order equals time order because every
+  // writer emits toISOString(): the transition's `at` (transition.ts) and
+  // startedAt (store.ts). The sweep repeats the expression and the partial
+  // predicate verbatim, which is how the planner proves the index applies.
+  await db`CREATE INDEX IF NOT EXISTS instances_retention_idx ON instances ((COALESCE(body->>'currentStepEnteredAt', started_at)), instance_id) WHERE redacted_at IS NULL AND status IN ('completed', 'cancelled')`;
   // Reader: the resolution worker's claim (drainResolutions in
   // src/engine/resolution.ts), which filters status = 'running' and orders by
   // instance_id. It holds the marked rows only (pending or claimed), so a scan
