@@ -93,15 +93,19 @@ export class PermanentError extends Error {
  * evaluate `Action.output` over the returned `result` into a fieldId->value
  * patch. An unregistered type is a PermanentError (dead-letter, no retry). Runs
  * outside any DB transaction; MUST stay idempotent on the idempotency key.
+ *
+ * `tenant` is the tenant key in a deployment serving many tenants. It reaches
+ * the handler context only when it is a non-empty string.
  */
 export type DeliverFn = (
   row: ClaimedRow,
   registry: Registry,
   db: SQL,
   assignmentRegistry: AssignmentRegistry,
+  tenant?: string,
 ) => Promise<Record<string, unknown>>;
 
-export const deliver: DeliverFn = async (row, registry, db, assignmentRegistry) => {
+export const deliver: DeliverFn = async (row, registry, db, assignmentRegistry, tenant) => {
   const def = registry.get(row.action.type);
   if (!def) throw new PermanentError(`no handler registered for type: ${row.action.type}`);
   const result = await def.handler({
@@ -111,6 +115,7 @@ export const deliver: DeliverFn = async (row, registry, db, assignmentRegistry) 
     instanceId: row.instance_id,
     ...(row.actors ? { actors: row.actors } : {}),
     db,
+    ...(tenant ? { tenant } : {}),
     assignmentRegistry,
   });
   return evalOutput(row.action.output, result);

@@ -274,14 +274,14 @@ export const singleTenantSource = (db: SQL): TenantSource => async () => [{ key:
  * read `ctx.db`.
  */
 function tenantContexts(shared: Registry, assignmentRegistry: AssignmentRegistry) {
-  const cache = new Map<string, { db: SQL; registry: Registry; resolveBody: ReturnType<typeof createDefinitionStore>["resolveBody"] }>();
+  const cache = new Map<string, { key: string; db: SQL; registry: Registry; resolveBody: ReturnType<typeof createDefinitionStore>["resolveBody"] }>();
   return (t: TenantHandle) => {
     let ctx = cache.get(t.key);
     if (!ctx) {
       const { resolveBody, resolveLatestByContract } = createDefinitionStore(t.db);
       const registry: Registry = new Map(shared);
       registerSubprocessHandlers(registry, t.db, resolveBody, resolveLatestByContract, assignmentRegistry);
-      ctx = { db: t.db, registry, resolveBody };
+      ctx = { key: t.key, db: t.db, registry, resolveBody };
       cache.set(t.key, ctx);
     }
     return ctx;
@@ -323,7 +323,7 @@ export function startEngine(
   };
 
   const workers = [
-    pollForever("outbox", eachTenant("outbox", (c) => drainOutbox(c.db, c.registry, deliver, CLAIM_LEASE_MS, c.resolveBody, assignmentRegistry)), 500),
+    pollForever("outbox", eachTenant("outbox", (c) => drainOutbox(c.db, c.registry, (row, reg, db, ar) => deliver(row, reg, db, ar, c.key), CLAIM_LEASE_MS, c.resolveBody, assignmentRegistry)), 500),
     pollForever("resolution", eachTenant("resolution", (c) => drainResolutions(c.db, c.resolveBody, undefined, assignmentRegistry)), 500),
     pollForever("timers", eachTenant("timers", (c) => drainTimers(c.db, c.resolveBody, assignmentRegistry)), 500),
     ...(retentionDays !== undefined
