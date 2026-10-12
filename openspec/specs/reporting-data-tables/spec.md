@@ -271,3 +271,36 @@ The report builder SHALL wait 300 ms after the last change to a filter. Only the
 #### Scenario: Typing a value sends one column request
 - **WHEN** a process owner types the five characters `12345` into a comparison, each less than 300 ms after the last
 - **THEN** the builder sends one column request after the last keystroke
+
+### Requirement: A saved report's date bounds must parse
+
+A report query's `createdAfter` and `createdBefore` SHALL each be an ISO-8601
+instant. Create, save, draft preview and column choices SHALL answer `400`
+with `error.type` equal to `"request-shape"` for a bound that is not one. A
+stored query with such a bound SHALL answer `400` with the same type when the
+report runs. The owner and every viewer with `read` on the report's process
+get that answer. A member without `read` keeps the empty table.
+
+#### Scenario: A caller creates a report with a bound that is no date
+
+- **WHEN** `POST /reporting/reports` has `query.createdAfter` equal to
+  `"letzte Woche"`
+- **THEN** the response is `400` with `error.type` equal to `"request-shape"`
+- **AND** the server stores no report
+
+#### Scenario: A stored invalid bound fails when the report runs
+
+- **WHEN** a viewer with `read` on the report's process runs a saved report
+- **AND** its stored `createdBefore` is not an ISO-8601 instant
+- **THEN** the response is `400` with `error.type` equal to `"request-shape"`
+- **AND** the log has no `unhandled error` entry
+
+#### Scenario: The CSV export answers the same
+
+- **WHEN** that viewer downloads the same report as CSV
+- **THEN** the response is the same JSON `400` envelope
+
+#### Scenario: A valid bound still runs
+
+- **WHEN** a report has `createdAfter` equal to `"2026-10-01T00:00:00Z"`
+- **THEN** it runs as before

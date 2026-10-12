@@ -48,7 +48,7 @@
 
 ## 7. Verification
 
-- [ ] 7.1 Run `bun run typecheck`.
-- [ ] 7.2 Run `bun run build`.
-- [ ] 7.3 Run the full `bun test` with `DATABASE_URL` set through `scripts/test-gated.sh` in the devcontainer.
-- [ ] 7.4 Run the prose and whitespace gates on the host over the push range.
+- [x] 7.1 Run `bun run typecheck`.
+- [x] 7.2 Run `bun run build`.
+- [x] 7.3 Run the full `bun test` with `DATABASE_URL` set through `scripts/test-gated.sh` in the devcontainer.
+- [x] 7.4 Run the prose and whitespace gates on the host over the push range.

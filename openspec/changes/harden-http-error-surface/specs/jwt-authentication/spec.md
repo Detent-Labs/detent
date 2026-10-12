@@ -25,7 +25,7 @@ any other algorithm SHALL throw `ActorResolutionError`.
 
 The external branch SHALL need the `exp` claim. A token of a configured
 external issuer with no `exp` SHALL throw `ActorResolutionError`. An identity
-provider that omits `exp` then cannot issue a token that never expires.
+provider that omits `exp` then cannot produce a token that never expires.
 
 #### Scenario: An external token with no exp
 
