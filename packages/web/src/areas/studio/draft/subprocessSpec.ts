@@ -32,3 +32,19 @@ export function specForProcess(
   if (current.versionBinding === "pinned" && newest !== undefined) next.pinnedVersion = newest;
   return next;
 }
+
+/**
+ * The version whose body names the called process's input fields. A pinned
+ * binding names its `pinnedVersion`. A latest-at-spawn binding names the
+ * newest version, which is the process-list row's `version`. Anything else
+ * (no spec, no binding, no pinned number, a process the list lacks) gives
+ * `undefined`, and the reader stays idle.
+ */
+export function childVersionFor(
+  spec: DraftSubprocessSpec | undefined,
+  processes: readonly ProcessSummary[],
+): number | undefined {
+  if (spec?.versionBinding === "pinned") return spec.pinnedVersion;
+  if (spec?.versionBinding === "latest-at-spawn") return processes.find((p) => p.processId === spec.processId)?.version;
+  return undefined;
+}

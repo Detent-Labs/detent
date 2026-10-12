@@ -3,6 +3,7 @@ import type { DraftOf } from "../../draft/types";
 import { t } from "../../catalog.js";
 import { ExpressionInput } from "./ExpressionInput";
 import {
+  EMPTY_EXPRESSION,
   type MapTargetField,
   editRow,
   moveRow,
@@ -43,7 +44,7 @@ export function FieldExpressionMapEditor({
 
   const addEntry = () => {
     if (nextTarget === undefined) return;
-    onChange(editRow(mapping, nextTarget, undefined));
+    onChange(editRow(mapping, nextTarget, EMPTY_EXPRESSION));
   };
 
   return (

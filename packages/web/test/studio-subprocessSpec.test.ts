@@ -4,7 +4,7 @@
  * (`fix-subprocess-step-editor`, design.md decisions 1 and 2).
  */
 import { describe, expect, it } from "bun:test";
-import { specForProcess } from "../src/areas/studio/draft/subprocessSpec.js";
+import { childVersionFor, specForProcess } from "../src/areas/studio/draft/subprocessSpec.js";
 import { childInputRefs, childInputsFor } from "../src/areas/studio/panels/shared/useChildInputFields.js";
 import type { ProcessSummary } from "../src/areas/studio/api/types.js";
 import type { ProcessId } from "workflow-engine/schema";
@@ -109,5 +109,28 @@ describe("childInputsFor", () => {
 
   it("returns the result for the same key", () => {
     expect(childInputsFor(ready, "p@1")).toEqual({ status: "ready", fields: ready.fields });
+  });
+});
+
+describe("childVersionFor", () => {
+  it("returns the pinned version of a pinned binding", () => {
+    expect(childVersionFor({ processId: CREDIT, versionBinding: "pinned", pinnedVersion: 2 }, PROCESSES)).toBe(2);
+  });
+
+  it("reads the process-list row's version for latest-at-spawn", () => {
+    expect(childVersionFor({ processId: VENDOR, versionBinding: "latest-at-spawn", contractRef: "r" }, PROCESSES)).toBe(7);
+  });
+
+  it("returns undefined for latest-at-spawn on a process the list does not carry", () => {
+    expect(childVersionFor({ processId: "proc_absent" as ProcessId, versionBinding: "latest-at-spawn" }, PROCESSES)).toBeUndefined();
+  });
+
+  it("returns undefined for a pinned binding with no pinnedVersion", () => {
+    expect(childVersionFor({ processId: CREDIT, versionBinding: "pinned" }, PROCESSES)).toBeUndefined();
+  });
+
+  it("returns undefined for no spec or a spec with no binding", () => {
+    expect(childVersionFor(undefined, PROCESSES)).toBeUndefined();
+    expect(childVersionFor({ processId: CREDIT }, PROCESSES)).toBeUndefined();
   });
 });
