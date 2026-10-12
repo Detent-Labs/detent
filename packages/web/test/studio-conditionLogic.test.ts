@@ -170,6 +170,84 @@ describe("literals follow the operand's declared type", () => {
   });
 });
 
+describe("the builder reads back every literal it writes", () => {
+  const operands = catalog([
+    field("amount", "number"),
+    field("prioritaet", "number", { format: "integer" }),
+    field("approved", "boolean"),
+    field("note", "string"),
+  ]);
+
+  const cmp = (src: string) => fromCel(src, operands)!.rows;
+
+  it("an integer literal reads as a comparison row", () => {
+    expect(cmp("data.prioritaet > 3")).toEqual([{ kind: "cmp", operand: "data.prioritaet", op: ">", value: 3 }]);
+  });
+
+  it("a negative double reads as a comparison row", () => {
+    expect(cmp("data.amount > -5.0")).toEqual([{ kind: "cmp", operand: "data.amount", op: ">", value: -5 }]);
+  });
+
+  it("a double with an exponent is written as valid CEL and reads back", () => {
+    expect(celLiteral(1e21, "double")).toBe("1e+21");
+    const condition: Condition = { joiner: "&&", rows: [{ kind: "cmp", operand: "data.amount", op: ">", value: 1e21 }] };
+    const src = toCel(condition, operands)!;
+    expect(src).toBe("data.amount > 1e+21");
+    expect(cmp(src)).toEqual(condition.rows);
+    const fields = [{ id: "field_amount", key: "amount", label: { en: "amount" }, type: "number" }] as unknown as FieldDef[];
+    expect(checkAgainstFields(src, fields)).toEqual({ ok: true });
+  });
+
+  it("a nested minus folds twice", () => {
+    expect(cmp("data.prioritaet > --5")).toEqual([{ kind: "cmp", operand: "data.prioritaet", op: ">", value: 5 }]);
+  });
+
+  it("an integer beyond the safe range stays a raw row", () => {
+    expect(cmp("data.prioritaet == 9007199254740993")).toEqual([{ kind: "raw", src: "data.prioritaet == 9007199254740993" }]);
+    expect(cmp("data.prioritaet == -9007199254740993")).toEqual([{ kind: "raw", src: "data.prioritaet == -9007199254740993" }]);
+  });
+
+  it("a minus over a non-numeric node stays a raw row", () => {
+    expect(cmp("data.amount > -data.amount")).toEqual([{ kind: "raw", src: "data.amount > -data.amount" }]);
+  });
+
+  it("an integer operand takes a safe integer only", () => {
+    expect(celLiteral(9007199254740991, "int")).toBe("9007199254740991");
+    // Built from text: a numeric literal past the safe range is a lint error,
+    // and it rounds to the same number this produces.
+    expect(celLiteral(Number("9007199254740993"), "int")).toBeUndefined();
+    expect(celLiteral(1e21, "int")).toBeUndefined();
+  });
+
+  it("a fractional double keeps its text", () => {
+    expect(celLiteral(1.5e-7, "double")).toBe("1.5e-7");
+    expect(celLiteral(-0.25, "double")).toBe("-0.25");
+  });
+
+  // One row per type, written with `toCel` and read with `fromCel`.
+  const roundTrip: [string, Condition["rows"][number]][] = [
+    ["string", { kind: "cmp", operand: "data.note", op: "==", value: "he said \"hi\"" }],
+    ["bool true", { kind: "cmp", operand: "data.approved", op: "==", value: true }],
+    ["bool false", { kind: "cmp", operand: "data.approved", op: "!=", value: false }],
+    ["int", { kind: "cmp", operand: "data.prioritaet", op: ">=", value: 3 }],
+    ["negative int", { kind: "cmp", operand: "data.prioritaet", op: "<", value: -3 }],
+    ["double", { kind: "cmp", operand: "data.amount", op: "<=", value: 1000 }],
+    ["negative double", { kind: "cmp", operand: "data.amount", op: ">", value: -5 }],
+    ["fractional double", { kind: "cmp", operand: "data.amount", op: "==", value: 10.5 }],
+    ["double with an exponent", { kind: "cmp", operand: "data.amount", op: "<", value: 1e21 }],
+    ["small double with an exponent", { kind: "cmp", operand: "data.amount", op: ">", value: 1.5e-7 }],
+    ["list contains", { kind: "cmp", operand: "actor.roles", op: "in", value: "manager" }],
+  ];
+
+  for (const [name, row] of roundTrip) {
+    it(`round-trips a ${name} row`, () => {
+      const condition: Condition = { joiner: "&&", rows: [row] };
+      const src = toCel(condition, operands)!;
+      expect(fromCel(src, operands)!.rows).toEqual([row]);
+    });
+  }
+});
+
 describe("toCel", () => {
   const operands = catalog([field("amount", "number"), field("note", "string")]);
 

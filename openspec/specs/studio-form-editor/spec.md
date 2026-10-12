@@ -752,6 +752,15 @@ SHALL carry one control per manual path the step declares, taking each path's
 own label. A step declaring only automatic paths SHALL carry one submit
 control.
 
+A manual path can carry a guard. The runtime offers its control only while
+that guard holds. The preview has no instance data to test the guard against.
+It SHALL still draw the control. It SHALL print a line under the controls that
+names the path and its condition.
+
+The line reads the path's label, then the condition in the words the canvas
+edge uses. A guard the builder cannot read prints its CEL
+text instead. A manual path with no guard SHALL get no line.
+
 The preview SHALL take no keyboard focus and no pointer interaction. It carries
 the `inert` attribute, so a screen reader passes over it. Every change in the
 form canvas SHALL reach the preview at once, without a reload.
@@ -771,6 +780,18 @@ form canvas SHALL reach the preview at once, without a reload.
 - **WHEN** the step declares two manual paths labelled "Approve" and "Reject"
 - **THEN** the preview carries one control reading "Approve"
 - **AND** the preview carries one control reading "Reject"
+
+#### Scenario: A guarded manual path names its condition
+
+- **WHEN** the step declares a manual path labelled "Approve" with the guard
+  `data.amount > 1000.0`
+- **THEN** the preview carries the control "Approve"
+- **AND** a line under the controls names "Approve" and its condition in words
+
+#### Scenario: An unguarded manual path gets no line
+
+- **WHEN** the step declares a manual path with no guard
+- **THEN** the preview prints no condition line for that path
 
 #### Scenario: The preview takes no focus
 

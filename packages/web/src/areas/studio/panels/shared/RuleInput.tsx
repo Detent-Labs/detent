@@ -8,6 +8,7 @@ import { useDraft } from "../../draft/store";
 import { t } from "../../catalog.js";
 import { ExpressionInput } from "./ExpressionInput";
 import { RuleBuilder } from "./RuleBuilder";
+import { commitDecision } from "./conditionLogic";
 import { buildRuleOperands, fromRuleCel, ruleOperandSignature, toRuleCel, type RuleCondition } from "./ruleLogic";
 
 const styles = stylex.create({
@@ -117,11 +118,16 @@ export function RuleInput({ field, value, onChange }: Props) {
   // JSON surface.
   const [devOpen, setDevOpen] = useState(condition === null);
   const unparseable = condition === null;
-  const preview = condition ? toRuleCel(condition, operands) : src;
+  // While no row contributes, the draft may still hold a rule that an
+  // unfinished edit left standing, and the readout says so.
+  const preview = condition ? (toRuleCel(condition, operands) ?? src) : src;
 
   const commit = (next: RuleCondition) => {
     setCondition(next);
     const written = toRuleCel(next, operands);
+    const decision = commitDecision(written, condition?.rows.length ?? 0, next.rows.length, src);
+    // `seededFrom` stays put on a hold, so the unfinished row survives the render.
+    if (decision === "hold") return;
     seededFrom.current = { src: written, signature };
     onChange(written === undefined ? undefined : { lang: "cel", src: written });
   };

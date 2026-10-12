@@ -72,3 +72,23 @@ export function newPath(
   const { key, label } = derivePathDefaults(source, target, contentLocale, baseLocale, unnamedStepPlaceholder);
   return { id: mintId("path"), key, label, to: to as DraftPath["to"], trigger };
 }
+
+/** The trigger a new path out of `source` takes, so the step stays valid the
+ * moment the path exists (`studio-canvas`). A subprocess step's paths are all
+ * automatic. Any other step's paths share one trigger, so a new path follows
+ * the first; a step with no path starts manual. `PathsPanel`'s "add path" and
+ * the canvas's connect drag both call this. */
+export function triggerForNewPath(source: DraftStep): PathTrigger {
+  if (source.type === "subprocess") return "automatic";
+  return source.paths?.[0]?.trigger ?? "manual";
+}
+
+/** `path` with its trigger switched. `priority` is the one key the invariants
+ * tie to automatic paths, so a switch to manual drops it. The guard stays for
+ * either trigger: a manual path's guard decides whether the participant gets
+ * the button. */
+export function pathWithTrigger(path: DraftPath, trigger: PathTrigger): DraftPath {
+  const next: DraftPath = { ...path, trigger };
+  if (trigger === "manual") delete next.priority;
+  return next;
+}

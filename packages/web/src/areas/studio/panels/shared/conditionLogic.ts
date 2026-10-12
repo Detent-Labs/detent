@@ -251,10 +251,21 @@ export function memberPath(node: CelNode): string | undefined {
   return base === undefined ? undefined : `${base}.${name}`;
 }
 
-/** Exported for `ruleLogic.ts`'s reuse. */
+/**
+ * The parser returns an integer literal as a `bigint` and a negative literal
+ * as a `-_` node over the positive one. A `bigint` outside the safe range
+ * stays unread, so the comparison falls to a raw row instead of rounding.
+ * Exported for `ruleLogic.ts`'s reuse.
+ */
 export function literalOf(node: CelNode): string | number | boolean | undefined {
+  if (node.op === "-_" && isCelNode(node.args)) {
+    const inner = literalOf(node.args);
+    // `0 - inner` keeps `-0.0` at 0, which `-inner` would turn into -0.
+    return typeof inner === "number" ? 0 - inner : undefined;
+  }
   if (node.op !== "value") return undefined;
   const v = node.args;
+  if (typeof v === "bigint") return Number.isSafeInteger(Number(v)) ? Number(v) : undefined;
   return typeof v === "string" || typeof v === "number" || typeof v === "boolean" ? v : undefined;
 }
 
@@ -336,20 +347,36 @@ function celString(v: string): string {
  * A field carrying `format: "integer"` types as CEL `int` instead, and the
  * two do not mix: `data.anzahl > 3.0` fails the check against one. So an
  * `int` operand takes a bare integer, and a value with a decimal part is no
- * literal for it at all.
+ * literal for it at all. The reader takes only a safe integer back, so the
+ * writer offers no other.
+ *
+ * JavaScript prints a magnitude from 1e21 up with an exponent (`1e+21`), and
+ * `1e+21.0` is no CEL. That text is already a `double`, so it stays as it is.
  */
 export function celLiteral(value: string | number | boolean, celTypeName: string): string | undefined {
   if (celTypeName === "bool") return value === true || value === "true" ? "true" : "false";
   if (celTypeName === "int") {
     const n = typeof value === "number" ? value : Number(value);
-    return Number.isInteger(n) ? String(n) : undefined;
+    return Number.isSafeInteger(n) ? String(n) : undefined;
   }
   if (celTypeName === "double") {
     const n = typeof value === "number" ? value : Number(value);
     if (!Number.isFinite(n)) return undefined;
-    return Number.isInteger(n) ? `${n}.0` : String(n);
+    const text = String(n);
+    return Number.isInteger(n) && !text.includes("e") ? `${text}.0` : text;
   }
   return celString(String(value));
+}
+
+/** The boolean select's value for a row's literal: `""` stands for no choice yet. */
+export function boolChoiceOf(value: string | number | boolean | undefined): "" | "true" | "false" {
+  if (value === undefined || value === "") return "";
+  return value === true || value === "true" ? "true" : "false";
+}
+
+/** The inverse of `boolChoiceOf`: the empty choice leaves the row unfinished. */
+export function boolValueOf(choice: string): boolean | undefined {
+  return choice === "" ? undefined : choice === "true";
 }
 
 /** True when a row carries everything `toCel` needs to write it. */
@@ -365,8 +392,8 @@ export function isComplete(row: Row, byPath: Map<string, Operand>): boolean {
  * Write the rows back to CEL. An incomplete row is skipped rather than emitted
  * half-written: the draft saves continuously and `validateProcessBody` runs
  * live, so `data.amount > ` would put a parse error in the IssueList on every
- * keystroke. `undefined` is the same "no condition" state an empty text input
- * produces today.
+ * keystroke. `undefined` means no row contributes. `commitDecision` decides
+ * what the draft does with that.
  */
 export function toCel(condition: Condition, operands: Operand[]): string | undefined {
   const byPath = new Map(operands.map((o) => [o.path, o]));
@@ -382,6 +409,27 @@ export function toCel(condition: Condition, operands: Operand[]): string | undef
   });
 
   return parts.length ? parts.join(` ${condition.joiner} `) : undefined;
+}
+
+/**
+ * What an authoring action does to the draft. `written` is the text `toCel` or
+ * `toRuleCel` produced for the new rows, `stored` the source the draft holds.
+ *
+ * - `write`: a row contributes, so the draft takes the new text.
+ * - `clear`: a row was removed, no row contributes and a source is stored. The
+ *   author took the condition out.
+ * - `hold`: the draft stays as it is. An unfinished row is an edit in progress,
+ *   so it never deletes a stored source. Removing a row from an empty site
+ *   also lands here, which keeps the views of a divergent field intact.
+ */
+export function commitDecision(
+  written: string | undefined,
+  oldRowCount: number,
+  newRowCount: number,
+  stored: string | undefined,
+): "write" | "clear" | "hold" {
+  if (written !== undefined) return "write";
+  return newRowCount < oldRowCount && stored !== undefined ? "clear" : "hold";
 }
 
 // --- plain-English summary (studio-condition-builder) ---------------------
@@ -446,14 +494,24 @@ export function summarizeCondition(condition: Condition, operands: Operand[]): s
 }
 
 /**
- * The canvas edge label for an automatic path's guard: a plain-English
- * summary when the guard parses into rows, the raw CEL text otherwise (a
- * fragment the builder cannot represent at all — see "A fragment the builder
- * cannot represent survives as a raw row").
+ * The readable form of a guard's CEL text: a plain-English summary when the
+ * guard parses into rows, the raw CEL text otherwise (a fragment the builder
+ * cannot represent at all — see "A fragment the builder cannot represent
+ * survives as a raw row").
  */
 export function guardEdgeLabel(src: string, operands: Operand[]): string {
   const condition = fromCel(src, operands);
   if (!condition) return src;
   const summary = summarizeCondition(condition, operands);
   return summary || src;
+}
+
+/**
+ * The canvas edge label for a path, whatever its trigger: the guard's readable
+ * form, or `undefined` for a path with no guard. A manual path's guard decides
+ * whether the participant gets the button, so its edge names it too.
+ */
+export function edgeGuardLabel(path: { guard?: { src?: string } }, operands: Operand[]): string | undefined {
+  const src = path.guard?.src;
+  return src ? guardEdgeLabel(src, operands) : undefined;
 }

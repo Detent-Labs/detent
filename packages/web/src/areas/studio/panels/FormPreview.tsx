@@ -7,6 +7,8 @@ import type { DraftOf } from "../draft/types.js";
 import type { DraftField } from "../draft/fields.js";
 import { previewViewEntries } from "../draft/field-preview.js";
 import { resolveDraftLocalizedText } from "../draft/localized-text.js";
+import { guardedManualPathNotes, type GuardedPathNote } from "../draft/guarded-path-notes.js";
+import { buildOperands } from "./shared/conditionLogic.js";
 import { t } from "../catalog.js";
 
 type DraftStep = DraftOf<Step>;
@@ -73,6 +75,23 @@ const styles = stylex.create({
     fontSize: "1.25rem",
     fontWeight: 800,
   },
+  guardNotes: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s1,
+    listStyle: "none",
+    margin: 0,
+    padding: 0,
+  },
+  // The step page's note tone: muted text at the body size.
+  guardNote: {
+    color: colors.textMuted,
+  },
+  // CEL is a machine value: the mono face, at the size of the line around it.
+  cel: {
+    fontFamily: fonts.mono,
+    fontSize: "inherit",
+  },
 });
 
 interface Props {
@@ -113,6 +132,7 @@ export function FormPreview({ step, fields, processLabel, contentLocale, baseLoc
   const { entries, values, tabs } = previewViewEntries(step.view, fields, contentLocale, baseLocale);
   const columns: 1 | 2 = step.view?.columns === 2 ? 2 : 1;
   const stepLabel = resolveDraftLocalizedText(step.label, contentLocale, baseLocale) || step.key || t("steps.unnamedStep");
+  const guardNotes = guardedManualPathNotes(step, buildOperands({ fields, locale: contentLocale, baseLocale }));
 
   return (
     <aside {...stylex.props(styles.pane, style)} aria-label={t("formPreview.heading")}>
@@ -137,8 +157,40 @@ export function FormPreview({ step, fields, processLabel, contentLocale, baseLoc
           tabsLabel={t("formPreview.formTabsLabel")}
         />
         <PathButtons paths={previewPaths(step)} onSubmit={() => {}} />
+        {/* The runtime offers a guarded manual path's control only while its
+            guard holds. The preview has no instance to test the guard
+            against, so it draws the control and names the condition. */}
+        {guardNotes.length > 0 && (
+          <ul {...stylex.props(styles.guardNotes)}>
+            {guardNotes.map((note, index) => (
+              <li key={note.pathId ?? index} {...stylex.props(styles.guardNote)}>
+                <GuardNoteLine note={note} />
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </aside>
+  );
+}
+
+/**
+ * One guarded manual path's line. The sentence stays one catalog key; it is
+ * split at its `{condition}` slot, so the condition goes in as a node and a
+ * guard printed as CEL takes the mono face inside the sentence. The label is
+ * filled into each half after the split, so a label holding the slot's own
+ * text cannot move it. Function replacers keep a `$` in a label literal.
+ */
+function GuardNoteLine({ note }: { note: GuardedPathNote }) {
+  const [before = "", after = ""] = t("formPreview.guardedPathNote")
+    .split("{condition}")
+    .map((half) => half.replace("{label}", () => note.label));
+  return (
+    <>
+      {before}
+      {note.raw ? <code {...stylex.props(styles.cel)}>{note.condition}</code> : note.condition}
+      {after}
+    </>
   );
 }
 

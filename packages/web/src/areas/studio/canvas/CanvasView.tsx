@@ -6,7 +6,7 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import { useDraft } from "../draft/store";
 import { updateInDraftArray } from "../draft/draft-array-crud";
 import { newStep } from "../draft/createStep";
-import { newPath } from "../draft/createPath";
+import { newPath, triggerForNewPath } from "../draft/createPath";
 import { seedLocalizedText, resolveDraftLocalizedText } from "../draft/localized-text";
 import { t } from "../catalog.js";
 import { drawnPositions, type LayoutStep } from "./layout";
@@ -32,9 +32,10 @@ import { drawnBox, hiddenStepIds, anchorBoxFor, type StepGroup } from "./groups"
 import { computeFit, MIN_SCALE, MAX_SCALE, FIT_GUTTER, type Fit } from "./fit";
 import { resolveDropGesture } from "./dropGesture";
 import { inlineRenamePatch } from "./inlineRename";
+import { pathName } from "./pathName";
 import { nextFocus, entryFocus, type ArrowKey, type Focus } from "./traversal";
 import { nextStepKey } from "../panels/stepsPanelLogic.js";
-import { buildOperands, guardEdgeLabel } from "../panels/shared/conditionLogic";
+import { buildOperands, edgeGuardLabel } from "../panels/shared/conditionLogic";
 
 const HANDLE_RADIUS = 7;
 /** The waypoint handle's side. A square, not a circle: the canvas already has
@@ -1053,7 +1054,7 @@ export function CanvasView({
 
     if (sourceStep?.id) {
       const existingPaths = sourceStep.paths ?? [];
-      const candidateTrigger = existingPaths[0]?.trigger ?? "manual";
+      const candidateTrigger = triggerForNewPath(sourceStep);
       // Visible nodes only: a hidden member is not a connect-drag target, or
       // a release over a collapsed box would create a path to a step nobody
       // can see.
@@ -1128,35 +1129,6 @@ export function CanvasView({
     ];
     if (s.terminal === true && s.outcome) parts.push(t("canvas.nodeLabelOutcome").replace("{outcome}", s.outcome));
     if (s.id !== undefined && s.id === initialStepId) parts.push(t("canvas.nodeLabelInitial"));
-    return parts.join(", ");
-  };
-
-  /** A path's accessible name. The guard is a slot rather than an appended
-   * segment: every path either carries one or says it carries none. The
-   * trigger slot takes the schema's own enum value, which this catalog leaves
-   * untranslated on purpose.
-   *
-   * `guardText` is the readable guard the edge label already draws, and the
-   * caller passes it because the operands it rests on resolve per step. A
-   * reader would otherwise hear the CEL source, `data.amount > 1000`, while
-   * the readable string sits beside it under `aria-hidden`. `guardEdgeLabel`
-   * returns the source itself where nothing resolves, so the fallback holds. */
-  const pathName = (
-    path: NonNullable<(typeof steps)[number]["paths"]>[number],
-    source: (typeof steps)[number],
-    guardText: string | undefined,
-  ) => {
-    const parts = [
-      t("canvas.pathLabel")
-        .replace("{label}", path.label ?? "")
-        .replace("{source}", stepLabel(source))
-        .replace("{target}", stepLabel(steps.find((s) => s.id === path.to)))
-        .replace("{trigger}", path.trigger ?? t("canvas.pathLabelNoTrigger"))
-        .replace("{guard}", guardText ?? t("canvas.pathLabelNoGuard")),
-    ];
-    if (path.trigger === "automatic" && path.priority !== undefined) {
-      parts.push(t("canvas.pathLabelPriority").replace("{priority}", String(path.priority)));
-    }
     return parts.join(", ");
   };
 
@@ -1502,13 +1474,12 @@ export function CanvasView({
             const automaticGuarded = path.trigger === "automatic" && path.guard !== undefined;
             const automaticDefault = path.trigger === "automatic" && path.guard === undefined;
             const isSelected = path.id !== undefined && path.id === selectedPathId;
-            const guardSrc = path.guard?.src;
             // The readable guard serves both the drawn label and the path's
-            // accessible name, so it resolves once for either. Only an
-            // automatic guarded path draws it.
-            const guardText = guardSrc ? guardEdgeLabel(guardSrc, operands) : undefined;
-            const guardLabel = automaticGuarded ? guardText : undefined;
-            if (guardLabel) {
+            // accessible name, so it resolves once for either. Any guarded
+            // path draws it; the badge and the "else" marker below stay
+            // automatic-only.
+            const guardText = edgeGuardLabel(path, operands);
+            if (guardText) {
               // Cap the label to the free space on the segment its midpoint
               // actually falls on, so it never needs to spill onto a
               // neighboring node in the first place; the post-node paint
@@ -1525,7 +1496,7 @@ export function CanvasView({
                 x: midX,
                 y: midY + 4,
                 maxWidth,
-                text: guardLabel,
+                text: guardText,
                 stepId: step.id as string,
                 pathId: path.id,
               });
@@ -1562,7 +1533,7 @@ export function CanvasView({
                 data-step-id={path.id !== undefined ? step.id : undefined}
                 role="button"
                 tabIndex={focus.kind === "path" && focus.pathId === path.id ? 0 : -1}
-                aria-label={pathName(path, step, guardText)}
+                aria-label={pathName(path, stepLabel(step), stepLabel(steps.find((s) => s.id === path.to)), guardText)}
                 // The press takes the roving stop, entered through the source,
                 // which is the end Up and Down walk from. A path with no id
                 // takes none: nothing can name it.

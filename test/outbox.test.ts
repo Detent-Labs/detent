@@ -8,7 +8,7 @@
 import { test, expect, beforeAll, beforeEach, spyOn } from "bun:test";
 import { sql, initSchema, createInstance } from "../src/engine/store.js";
 import { executeManualTransition, fireTimer, ConcurrencyConflict } from "../src/engine/transition.js";
-import { drainOutbox, MAX_ATTEMPTS, CLAIM_LEASE_MS, type DeliverFn } from "../src/engine/outbox.js";
+import { drainOutbox, backoffMsFor, BACKOFF_CAP_MS, MAX_ATTEMPTS, CLAIM_LEASE_MS, type DeliverFn } from "../src/engine/outbox.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import { publishBody, createDefinitionStore } from "../src/engine/definitions.js";
 import { createUser, setDisabled } from "../src/auth/users.js";
@@ -690,10 +690,10 @@ test.skipIf(!DB)("a row whose mark transaction throws does not starve the batch"
   await executeManualTransition(good, "path_ab", body, actor); // enqueues action_set, parks running
   await executeManualTransition(bad, "path_ab", body, actor);
 
-  // The bad row returns a patch whose fieldId makes the tx2 jsonb path literal
-  // malformed ({data,x}} — a bad array literal), so its mark transaction throws;
-  // the good row returns an empty patch and marks cleanly.
-  const seam: DeliverFn = async (row) => (row.instance_id === bad.instanceId ? { "x}": 1 } : {});
+  // The bad row returns a patch whose value holds U+0000, which Postgres rejects
+  // in jsonb, so its mark transaction throws; the good row returns an empty
+  // patch and marks cleanly.
+  const seam: DeliverFn = async (row) => (row.instance_id === bad.instanceId ? { field_x: "a\u0000b" } : {});
 
   // The poison row's tx2 throw is isolated: the good row still delivers.
   expect(await drainOutbox(sql, reg, seam)).toBe(1);
@@ -835,8 +835,10 @@ test.skipIf(!DB)("a later success clears a previously recorded error", async () 
 // --- delivery deadline: a hung handler cannot hang the pass -------------------
 
 test.skipIf(!DB)("a handler that never settles is raced against the lease: the pass completes and the row backs off", async () => {
-  const body = threeActionBody();
-  const inst = await create();
+  // One row: a hung first row spends the whole lease, so rows behind it are
+  // released unstarted (see the release test below).
+  const body = retryActionBody(undefined);
+  const inst = await createFrom(body);
   await executeManualTransition(inst, "path_ab", body, actor);
 
   // A real never-resolving promise, not a mock — Promise.race must actually
@@ -844,7 +846,7 @@ test.skipIf(!DB)("a handler that never settles is raced against the lease: the p
   const hang: DeliverFn = () => new Promise<Record<string, unknown>>(() => {});
 
   const start = Date.now();
-  expect(await drainOutbox(sql, reg, hang, 50)).toBe(0); // raced out, nothing delivered
+  expect(await drainOutbox(sql, reg, hang, 300)).toBe(0); // raced out, nothing delivered
   expect(Date.now() - start).toBeLessThan(2000); // bounded by the (short) lease, not hung
 
   const r = await rows(inst.instanceId);
@@ -855,28 +857,171 @@ test.skipIf(!DB)("a handler that never settles is raced against the lease: the p
   // The pass having completed, a later drain still runs — proving the worker
   // itself was never stuck, only this one delivery.
   await makeDue(inst.instanceId);
-  expect(await drainOutbox(sql, reg, okDeliver)).toBe(3);
+  expect(await drainOutbox(sql, reg, okDeliver)).toBe(1);
 });
 
-test.skipIf(!DB)("unrelated rows, including an engine-internal spawn row, are delivered in the presence of a hung row", async () => {
+test.skipIf(!DB)("unrelated rows, including an engine-internal spawn row, are delivered on the next pass after a hung row", async () => {
   const insertRow = (instanceId: string, actionId: string, actionType: string) =>
     sql`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action)
       VALUES (${"idem_" + actionId}, ${instanceId}, ${1}, ${actionId}, ${{ id: actionId, type: actionType, config: {} }})`;
-  // Ordered ahead (earlier created_at) of the row below — drainOutbox's claim
-  // scan is ORDER BY created_at, so without the deadline race this hung row
-  // would never let the loop reach the one after it.
   await insertRow("inst_hang_1", "action_hang", "hang");
   await insertRow("inst_spawn_1", "action_spawn_1", "core.spawnSubprocess");
 
-  const seam: DeliverFn = async (row) =>
-    row.action.type === "hang" ? await new Promise<Record<string, unknown>>(() => {}) : {};
+  // The claim's RETURNING order is not the created_at order of its subselect, so
+  // whichever row the loop reaches first is the one that hangs.
+  const ran: string[] = [];
+  const seam: DeliverFn = async (row) => {
+    ran.push(row.instance_id);
+    return ran.length === 1 ? await new Promise<Record<string, unknown>>(() => {}) : {};
+  };
+  const statusOf = async (): Promise<Record<string, string>> => {
+    const statuses = (await sql`SELECT instance_id, status FROM outbox WHERE instance_id IN (${"inst_hang_1"}, ${"inst_spawn_1"})`) as
+      { instance_id: string; status: string }[];
+    return Object.fromEntries(statuses.map((r) => [r.instance_id, r.status]));
+  };
 
-  expect(await drainOutbox(sql, reg, seam, 50)).toBe(1); // only the row behind the hung one
-  const statuses = (await sql`SELECT instance_id, status FROM outbox WHERE instance_id IN (${"inst_hang_1"}, ${"inst_spawn_1"})`) as
-    { instance_id: string; status: string }[];
-  const byId = Object.fromEntries(statuses.map((r) => [r.instance_id, r.status]));
-  expect(byId.inst_spawn_1).toBe("delivered"); // reached and delivered in the same pass
-  expect(byId.inst_hang_1).toBe("pending"); // backed off, not stuck
+  // The hung row spends the whole lease, so the row behind it is released unstarted.
+  expect(await drainOutbox(sql, reg, seam, 300)).toBe(0);
+  expect(ran).toHaveLength(1);
+  const hung = ran[0];
+  const other = hung === "inst_hang_1" ? "inst_spawn_1" : "inst_hang_1";
+  let byId = await statusOf();
+  expect(byId[hung]).toBe("pending"); // backed off, not stuck
+  expect(byId[other]).toBe("pending"); // released, not stuck and not delivered yet
+
+  expect(await drainOutbox(sql, reg, seam, 300)).toBe(1); // the hung row is still backing off
+  expect(ran).toEqual([hung, other]);
+  byId = await statusOf();
+  expect(byId[other]).toBe("delivered");
+  expect(byId[hung]).toBe("pending");
+});
+
+test.skipIf(!DB)("a row reached after the lease ran out is released unstarted with its attempt refunded", async () => {
+  const insertRow = (instanceId: string, actionId: string, actionType: string, attempts: number) =>
+    sql`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action, attempts)
+      VALUES (${"idem_" + actionId}, ${instanceId}, ${1}, ${actionId}, ${{ id: actionId, type: actionType, config: {} }}, ${attempts})`;
+  await insertRow("inst_lease_1", "action_lease_1", "first", 2);
+  await insertRow("inst_lease_2", "action_lease_2", "second", 2);
+
+  // The claim's RETURNING order is not the created_at order of its subselect, so
+  // whichever row the loop reaches first is the one that hangs.
+  const ran: string[] = [];
+  const seam: DeliverFn = async (row) => {
+    ran.push(row.instance_id);
+    return ran.length === 1 ? await new Promise<Record<string, unknown>>(() => {}) : {};
+  };
+
+  expect(await drainOutbox(sql, reg, seam, 300)).toBe(0);
+  expect(ran).toHaveLength(1); // the handler behind the hung row never ran
+  const behindId = ran[0] === "inst_lease_1" ? "inst_lease_2" : "inst_lease_1";
+  const [behind] = await rows(behindId);
+  expect(behind.status).toBe("pending");
+  expect(behind.attempts).toBe(2); // the value before the claim
+  expect(behind.claimed_at).toBeNull();
+
+  expect(await drainOutbox(sql, reg, seam, 300)).toBe(1); // due at once: the next pass delivers it
+  expect(ran[1]).toBe(behindId);
+  expect((await rows(behindId))[0].status).toBe("delivered");
+});
+
+test.skipIf(!DB)("each row's deadline is the lease that remains, so a batch of slow rows starts no handler past the lease", async () => {
+  const noBackoff = { retry: { backoff: "none" } };
+  for (let i = 0; i < 10; i++) {
+    const id = `action_batch_${i}`;
+    await sql`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action)
+      VALUES (${"idem_" + id}, ${"inst_batch_" + i}, ${1}, ${id}, ${{ id, type: "slow", config: {}, ...noBackoff }})`;
+  }
+
+  const starts: number[] = [];
+  const slow: DeliverFn = async () => {
+    starts.push(performance.now());
+    await new Promise((r) => setTimeout(r, 100));
+    return {};
+  };
+
+  const t0 = performance.now();
+  await drainOutbox(sql, reg, slow, 250);
+  expect(starts.length).toBeLessThan(10);
+  expect(Math.max(...starts)).toBeLessThanOrEqual(t0 + 250 + 10); // no handler started after the lease (10 ms timer tolerance)
+  const claimedAfter = (await sql`SELECT count(*)::int AS n FROM outbox WHERE status = 'claimed'`) as { n: number }[];
+  expect(claimedAfter[0].n).toBe(0);
+
+  // backoff "none": the rows the pass cut off are due at once, so fast passes finish the batch.
+  for (let i = 0; i < 10; i++) await drainOutbox(sql, reg, okDeliver);
+  const left = (await sql`SELECT count(*)::int AS n FROM outbox WHERE status <> 'delivered'`) as { n: number }[];
+  expect(left[0].n).toBe(0);
+});
+
+test.skipIf(!DB)("a handler that outlives the lease is abandoned when the lease measured from the claim ends", async () => {
+  for (const n of [1, 2]) {
+    const id = `action_outlive_${n}`;
+    await sql`INSERT INTO outbox (idempotency_key, instance_id, transition_seq, action_id, action)
+      VALUES (${"idem_" + id}, ${"inst_outlive_" + n}, ${1}, ${id}, ${{ id, type: "slow", config: {} }})`;
+  }
+
+  // The claim's RETURNING order is not the created_at order, so the counter, not the row, names the first handler.
+  // The first handler leaves at most 160 ms of the 400 ms lease; the second needs 300 ms, so only a deadline of
+  // the lease that remains abandons it. A fresh 400 ms per row would let it finish and deliver.
+  const ran: string[] = [];
+  const sleeps = [240, 300];
+  const seam: DeliverFn = async (row) => {
+    const sleep = sleeps[ran.length]!;
+    ran.push(row.instance_id);
+    await new Promise((r) => setTimeout(r, sleep));
+    return {};
+  };
+
+  await drainOutbox(sql, reg, seam, 400);
+  expect(ran).toHaveLength(2);
+  const [first] = await rows(ran[0]!);
+  const [second] = await rows(ran[1]!);
+  expect(first!.status).toBe("delivered");
+  expect(second!.status).toBe("pending"); // abandoned at the lease end, backing off
+  expect(second!.attempts).toBe(1);
+  expect(new Date(second!.next_attempt_at as string).getTime()).toBeGreaterThan(Date.now());
+});
+
+// --- the marking transaction acts only on the claim it made ---------------------
+
+/** A deliverFn that does what a peer's reclaim does to the row (one more attempt, a fresh lease), then runs `then`. */
+const reclaimedByPeer = (then: () => Promise<Record<string, unknown>>): DeliverFn => async (row) => {
+  await sql`UPDATE outbox SET attempts = attempts + 1, claimed_at = now() WHERE idempotency_key = ${row.idempotency_key}`;
+  return then();
+};
+
+test.skipIf(!DB)("a worker whose row a peer reclaimed does not reset the peer's claim after a failure", async () => {
+  const body = threeActionBody();
+  const inst = await create();
+  await executeManualTransition(inst, "path_ab", body, actor);
+
+  expect(await drainOutbox(sql, reg, reclaimedByPeer(async () => { throw new Error("late failure"); }))).toBe(0);
+  const r = await rows(inst.instanceId);
+  expect(r.every((x) => x.status === "claimed" && x.attempts === 2 && x.claimed_at !== null)).toBe(true);
+});
+
+test.skipIf(!DB)("a worker whose row a peer reclaimed applies no writeback and no outcome after a success", async () => {
+  const body = outputBody(false);
+  const inst = await createFrom(body);
+  await executeManualTransition(inst, "path_ab", body, actor);
+
+  expect(await drainOutbox(sql, reg, reclaimedByPeer(async () => ({ field_val: 7 })))).toBe(0);
+  const r = await rows(inst.instanceId);
+  expect(r[0].status).toBe("claimed");
+  expect(r[0].attempts).toBe(2);
+  expect((await instData(inst.instanceId)).field_val).toBeUndefined();
+  expect(await outcomes(inst.instanceId)).toEqual([]);
+});
+
+test.skipIf(!DB)("a worker at its attempt cap does not dead-letter a row a peer reclaimed", async () => {
+  const body = threeActionBody();
+  const inst = await create();
+  await executeManualTransition(inst, "path_ab", body, actor);
+  await sql`UPDATE outbox SET attempts = ${MAX_ATTEMPTS - 1} WHERE instance_id = ${inst.instanceId}`; // the claim lands on the cap
+
+  expect(await drainOutbox(sql, reg, reclaimedByPeer(async () => { throw new Error("late failure"); }))).toBe(0);
+  const r = await rows(inst.instanceId);
+  expect(r.every((x) => x.status === "claimed" && x.attempts === MAX_ATTEMPTS + 1)).toBe(true);
+  expect(await outcomes(inst.instanceId)).toEqual([]);
 });
 
 test.skipIf(!DB)("a claim that never reaches tx2 still costs an attempt (crashed worker / lease-expiry reclaim)", async () => {
@@ -904,15 +1049,151 @@ test.skipIf(!DB)("a claim that never reaches tx2 still costs an attempt (crashed
   expect(after.every((x) => x.status === "dead-letter" && x.attempts === MAX_ATTEMPTS)).toBe(true);
 });
 
-test.skipIf(!DB)("a row whose handler hangs on every attempt eventually dead-letters, via the deadline race each time", async () => {
+test.skipIf(!DB)("a row whose marking transaction always throws runs its handler at the cap, then dead-letters without another run", async () => {
+  // Postgres rejects U+0000 in jsonb, so the writeback inside tx2 throws on every run.
+  const runs: string[] = [];
+  const nulReg = createRegistry();
+  nulReg.set("nul_writer", { handler: async () => { runs.push("run"); return { note: "a\u0000b" }; } });
+  const body = {
+    baseLocale: "en",
+    fields: [{ id: "field_note", key: "note", label: { en: "Note" }, type: "string" }],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }] },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", onEntry: [actOut("nul", "nul_writer", "field_note", "result.note")], paths: [{ id: "path_bc", key: "bc", label: "Bc", to: "step_c", trigger: "manual" }] },
+        { id: "step_c", key: "c", label: { en: "C" }, type: "task", terminal: true },
+      ],
+    },
+  } as unknown as ProcessBody;
+  const inst = await createFrom(body);
+  await executeManualTransition(inst, "path_ab", body, actor);
+
+  const errorSpy = spyOn(console, "error").mockImplementation(() => {});
+  const leaseMs = 300;
+  let passes = 0;
+  // The row stays claimed after each failed mark, so a later claim needs the lease to lapse.
+  while (passes < MAX_ATTEMPTS + 4) {
+    await drainOutbox(sql, nulReg, undefined, leaseMs);
+    passes++;
+    if ((await rows(inst.instanceId))[0]!.status === "dead-letter") break;
+    await new Promise((r) => setTimeout(r, leaseMs + 50));
+  }
+  const deadLetterLogs = errorSpy.mock.calls.map((c) => JSON.parse(c[0] as string)).filter((l) => l.msg === "outbox row dead-lettered");
+  errorSpy.mockRestore();
+
+  const [row] = await rows(inst.instanceId);
+  expect(row!.status).toBe("dead-letter");
+  expect(row!.attempts).toBe(MAX_ATTEMPTS);
+  expect(row!.last_error).toBe(`abandoned after ${MAX_ATTEMPTS} attempts`);
+  expect(runs).toHaveLength(MAX_ATTEMPTS); // the claim past the cap ran no handler
+
+  const o = await outcomes(inst.instanceId);
+  expect(o).toHaveLength(1);
+  expect(o[0]).toMatchObject({ status: "dead-letter", attempts: MAX_ATTEMPTS });
+  expect(deadLetterLogs).toHaveLength(1);
+  expect(deadLetterLogs[0].attempts).toBe(MAX_ATTEMPTS);
+  expect(deadLetterLogs[0].lastError).toBe(`abandoned after ${MAX_ATTEMPTS} attempts`);
+
+  await new Promise((r) => setTimeout(r, leaseMs + 50));
+  await drainOutbox(sql, nulReg, undefined, leaseMs);
+  expect(runs).toHaveLength(MAX_ATTEMPTS); // a dead-lettered row is not claimed again
+});
+
+test.skipIf(!DB)("a row claimed past its cap dead-letters at the cap without running its handler", async () => {
   const body = threeActionBody();
   const inst = await create();
   await executeManualTransition(inst, "path_ab", body, actor);
+  await sql`UPDATE outbox SET attempts = ${MAX_ATTEMPTS}, status = 'claimed', claimed_at = now() - interval '1 hour' WHERE instance_id = ${inst.instanceId}`;
+
+  // The pass claims at MAX_ATTEMPTS + 1, so every row is past its cap.
+  const ran: string[] = [];
+  const seam: DeliverFn = async (row) => { ran.push(row.idempotency_key); return {}; };
+  await drainOutbox(sql, reg, seam);
+  expect(ran).toEqual([]); // abandoned rows start no handler
+  const r = await rows(inst.instanceId);
+  expect(r.every((x) => x.status === "dead-letter" && x.attempts === MAX_ATTEMPTS && x.last_error === `abandoned after ${MAX_ATTEMPTS} attempts`)).toBe(true);
+});
+
+test.skipIf(!DB)("a row of an action with retry.maxAttempts of 2 claimed at 3 attempts dead-letters without running its handler", async () => {
+  const body = retryActionBody({ maxAttempts: 2, backoff: "none" } as Action["retry"]);
+  const inst = await createFrom(body);
+  await executeManualTransition(inst, "path_ab", body, actor);
+  await sql`UPDATE outbox SET attempts = 2, status = 'claimed', claimed_at = now() - interval '1 hour' WHERE instance_id = ${inst.instanceId}`;
+
+  const ran: string[] = [];
+  const seam: DeliverFn = async (row) => { ran.push(row.idempotency_key); return {}; };
+  const errorSpy = spyOn(console, "error").mockImplementation(() => {});
+  try {
+    await drainOutbox(sql, reg, seam);
+  } finally {
+    errorSpy.mockRestore();
+  }
+  expect(ran).toEqual([]);
+  const [row] = await rows(inst.instanceId);
+  expect(row!.status).toBe("dead-letter");
+  expect(row!.attempts).toBe(2);
+  expect(row!.last_error).toBe("abandoned after 2 attempts");
+});
+
+test.skipIf(!DB)("an action with retry.maxAttempts of 2 runs its failing handler twice, dead-letters on the second failure, and is not claimed again", async () => {
+  const body = retryActionBody({ maxAttempts: 2, backoff: "none" } as Action["retry"]);
+  const inst = await createFrom(body);
+  await executeManualTransition(inst, "path_ab", body, actor);
+
+  let runs = 0;
+  const failing: DeliverFn = async () => {
+    runs++;
+    throw new Error("delivery failed");
+  };
+  const errorSpy = spyOn(console, "error").mockImplementation(() => {});
+  const snapshots: Record<string, unknown>[] = [];
+  try {
+    await drainOutbox(sql, reg, failing);
+    snapshots.push((await rows(inst.instanceId))[0]!);
+    await makeDue(inst.instanceId);
+    await drainOutbox(sql, reg, failing);
+    snapshots.push((await rows(inst.instanceId))[0]!);
+    for (let i = 0; i < 3; i++) {
+      await makeDue(inst.instanceId);
+      await drainOutbox(sql, reg, failing);
+    }
+  } finally {
+    errorSpy.mockRestore();
+  }
+  expect(snapshots[0]).toMatchObject({ status: "pending", attempts: 1 }); // the first failure retries
+  expect(snapshots[1]).toMatchObject({ status: "dead-letter", attempts: 2, last_error: "delivery failed" }); // the second failure is the last
+  expect(runs).toBe(2); // never claimed again
+  expect((await rows(inst.instanceId))[0]!.attempts).toBe(2);
+});
+
+test.skipIf(!DB)("a field id holding , and } writes under exactly that key of data and no other key changes", async () => {
+  // fieldId checks only the field_ prefix, and the instance's data record accepts any such key.
+  const body = outputBody(false);
+  const inst = await createFrom(body);
+  await executeManualTransition(inst, "path_ab", body, actor);
+  // field_x is an object, so an array literal read as the path data,field_x,y would write inside it.
+  await sql`UPDATE instances SET body = jsonb_set(body, '{data}', ${[{ field_x: { y: 1 }, field_keep: "kept" }]}::jsonb -> 0) WHERE instance_id = ${inst.instanceId}`;
+
+  const seam: DeliverFn = async () => ({ "field_x,y": 7, "field_q}": 8 });
+  expect(await drainOutbox(sql, reg, seam)).toBe(1);
+
+  expect(await instData(inst.instanceId)).toEqual({ field_x: { y: 1 }, field_keep: "kept", "field_x,y": 7, "field_q}": 8 });
+  expect(await outcomes(inst.instanceId)).toEqual([expect.objectContaining({ status: "succeeded" })]);
+});
+
+test.skipIf(!DB)("a row whose handler hangs on every attempt eventually dead-letters, via the deadline race each time", async () => {
+  const body = retryActionBody(undefined); // one row: rows behind a hung row are released, not raced
+  const inst = await createFrom(body);
+  await executeManualTransition(inst, "path_ab", body, actor);
 
   const hang: DeliverFn = () => new Promise<Record<string, unknown>>(() => {});
-  for (let i = 0; i < MAX_ATTEMPTS; i++) {
+  // A slow claim can leave no lease for the handler, which releases the row with its attempt refunded,
+  // so the loop runs until the row dead-letters, with a cap above MAX_ATTEMPTS.
+  for (let i = 0; i < MAX_ATTEMPTS + 4; i++) {
     await makeDue(inst.instanceId); // bypass backoff to drive escalation
-    await drainOutbox(sql, reg, hang, 20); // each pass races out at the (short) lease
+    await drainOutbox(sql, reg, hang, 300); // each pass races out at the lease
+    if ((await rows(inst.instanceId))[0]!.status === "dead-letter") break;
   }
   const r = await rows(inst.instanceId);
   expect(r.every((x) => x.status === "dead-letter" && x.attempts === MAX_ATTEMPTS)).toBe(true);
@@ -1181,4 +1462,37 @@ test.skipIf(!DB)("a row predating the stamp still delivers, with no actor ids", 
   for (const t of ["e1", "p1", "x1"]) spyReg.set(t, { handler: async (ctx) => { saw = ctx.actors; return {}; } });
   expect(await drainOutbox(sql, spyReg)).toBe(3);
   expect(saw).toBeUndefined();
+});
+
+// backoffMsFor: pure, no DB. The exponential branch stops at an hour unless the author's base is larger.
+const retryAction = (retry: Action["retry"]): Action => ({ id: "act_retry", type: "test.retry", config: {}, retry } as unknown as Action);
+
+test("exponential backoff of a one-second base at attempt 20 is capped at one hour", () => {
+  const a = retryAction({ maxAttempts: 20, backoff: "exponential", baseDelay: "PT1S" });
+  expect(backoffMsFor(a, 19)).toBe(BACKOFF_CAP_MS); // an uncapped delay would be 2^18 seconds
+  expect(backoffMsFor(a, 20)).toBe(BACKOFF_CAP_MS);
+  expect(BACKOFF_CAP_MS).toBe(3_600_000);
+});
+
+test("exponential backoff of a base above the cap stays at the base", () => {
+  const a = retryAction({ maxAttempts: 5, backoff: "exponential", baseDelay: "PT2H" });
+  expect(backoffMsFor(a, 3)).toBe(2 * 3_600_000);
+});
+
+test("exponential backoff of a one-second base at attempt 3 is 4 seconds", () => {
+  const a = retryAction({ maxAttempts: 5, backoff: "exponential", baseDelay: "PT1S" });
+  expect(backoffMsFor(a, 3)).toBe(4000);
+});
+
+test("fixed backoff is the base at every attempt, even past the cap, and none is zero", () => {
+  const fixed = retryAction({ maxAttempts: 20, backoff: "fixed", baseDelay: "PT2H" });
+  expect(backoffMsFor(fixed, 1)).toBe(2 * 3_600_000);
+  expect(backoffMsFor(fixed, 20)).toBe(2 * 3_600_000);
+  const none = retryAction({ maxAttempts: 20, backoff: "none", baseDelay: "PT2H" });
+  expect(backoffMsFor(none, 20)).toBe(0);
+});
+
+test("an action with no retry policy backs off from the engine default base", () => {
+  expect(backoffMsFor(retryAction(undefined), 1)).toBe(1000);
+  expect(backoffMsFor(retryAction(undefined), 3)).toBe(4000);
 });

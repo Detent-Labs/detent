@@ -5,9 +5,10 @@ const expr = { lang: "cel" as const, src: "data.amount > 1.0" };
 
 describe("overrideMode", () => {
   it("shows CEL while the builder writes nothing, so a first row survives", () => {
-    // The builder emits `undefined` for as long as its only row is incomplete.
-    // Reading that as "not an expression" would collapse the override to the
-    // checkbox on the author's first click and discard the row.
+    // Choosing the CEL arm writes `undefined`, and the value stays `undefined`
+    // until a row is complete. Reading that as "not an expression" would
+    // collapse the override to the checkbox on the author's first click and
+    // discard the row.
     expect(overrideMode(undefined, "cel")).toBe("cel");
   });
 
