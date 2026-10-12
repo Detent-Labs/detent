@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 
-const require = createRequire(import.meta.url);
+const resolveFromHere = createRequire(import.meta.url);
 
 const manifest = (path: string) =>
   JSON.parse(readFileSync(new URL(path, import.meta.url), "utf8")) as {
@@ -13,7 +13,7 @@ const manifest = (path: string) =>
 describe("React major", () => {
   test("the tests load React 19", () => {
     for (const name of ["react", "react-dom"]) {
-      const { version } = require(`${name}/package.json`) as { version: string };
+      const { version } = resolveFromHere(`${name}/package.json`) as { version: string };
       expect(version.split(".")[0]).toBe("19");
     }
   });
