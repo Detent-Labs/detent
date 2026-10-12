@@ -20,12 +20,13 @@ import {
   syncRowIds,
   typesAfterResponse,
   typesFor,
+  withDateBound,
   withoutRowId,
   withRowId,
   type ProcessTypes,
   type ReportDraft,
 } from "./reportsLogic.js";
-import { describeCaughtError } from "./reportingLogic.js";
+import { describeCaughtError, toDateInput } from "./reportingLogic.js";
 import { useSettledKey } from "./debounce.js";
 import { ComparisonRow } from "./ComparisonRow.js";
 import { ColumnEditor } from "./ColumnEditor.js";
@@ -283,16 +284,16 @@ export function ReportBuilderScreen({
             <span {...stylex.props(styles.controlsLabelSpan)}>{t(locale, "range.from")}</span>
             <input
               type="date"
-              value={draft.createdAfter ? draft.createdAfter.slice(0, 10) : ""}
-              onChange={(e) => setDraft({ ...draft, createdAfter: e.target.value ? new Date(e.target.value).toISOString() : "" })}
+              value={toDateInput(draft.createdAfter)}
+              onChange={(e) => setDraft(withDateBound(draft, "start", e.target.value))}
             />
           </label>
           <label {...stylex.props(styles.controlsLabel)}>
             <span {...stylex.props(styles.controlsLabelSpan)}>{t(locale, "range.to")}</span>
             <input
               type="date"
-              value={draft.createdBefore ? draft.createdBefore.slice(0, 10) : ""}
-              onChange={(e) => setDraft({ ...draft, createdBefore: e.target.value ? new Date(e.target.value).toISOString() : "" })}
+              value={toDateInput(draft.createdBefore)}
+              onChange={(e) => setDraft(withDateBound(draft, "end", e.target.value))}
             />
           </label>
         </div>

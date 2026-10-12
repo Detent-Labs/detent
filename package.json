@@ -23,7 +23,7 @@
     "typecheck": "bun run typecheck:engine && bun run --filter './packages/*' typecheck",
     "build": "bun run --filter './packages/*' build",
     "test": "bun test",
-    "test:tz": "TZ=Europe/Zurich bun test packages/web/test/reporting-reportingLogic.test.ts",
+    "test:tz": "TZ=Europe/Zurich bun test packages/web/test/reporting-reportingLogic.test.ts packages/web/test/reporting-reportsLogic.test.ts",
     "lint": "oxlint --deny-warnings --report-unused-disable-directives src packages test scripts e2e playwright.config.ts",
     "check": "bun run lint && bun run typecheck && bun run build && bun test && bun run test:tz",
     "serve": "bun run src/http/server.ts",

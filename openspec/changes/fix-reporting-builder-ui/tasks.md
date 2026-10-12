@@ -2,9 +2,9 @@
 
 ## 1. Builder date bounds
 
-- [ ] 1.1 Add `withDateBound(draft, edge, value)` to `screens/reportsLogic.ts`. Verify with tests in `reporting-reportsLogic.test.ts`. A 1 to 31 October pick yields local midnight and 23:59:59.999. An empty value clears the bound. `toDateInput` of the result returns the picked day.
-- [ ] 1.2 Use `withDateBound` and `toDateInput` in `ReportBuilderScreen.tsx` for the From and To inputs. Verify that no `new Date(e.target.value)` and no `.slice(0, 10)` remain in the file.
-- [ ] 1.3 Widen `test:tz` in `package.json` to run `reporting-reportsLogic.test.ts` beside the existing file. Verify with `bun run test:tz` in the container. Verify that the new tests fail when `withDateBound` builds the bound from `new Date(value)`.
+- [x] 1.1 Add `withDateBound(draft, edge, value)` to `screens/reportsLogic.ts`. Verify with tests in `reporting-reportsLogic.test.ts`. A 1 to 31 October pick yields local midnight and 23:59:59.999. An empty value clears the bound. `toDateInput` of the result returns the picked day.
+- [x] 1.2 Use `withDateBound` and `toDateInput` in `ReportBuilderScreen.tsx` for the From and To inputs. Verify that no `new Date(e.target.value)` and no `.slice(0, 10)` remain in the file.
+- [x] 1.3 Widen `test:tz` in `package.json` to run `reporting-reportsLogic.test.ts` beside the existing file. Verify with `bun run test:tz` in the container. Verify that the new tests fail when `withDateBound` builds the bound from `new Date(value)`.
 
 ## 2. Session end on 401
 

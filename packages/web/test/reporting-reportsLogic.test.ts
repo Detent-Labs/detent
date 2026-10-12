@@ -37,8 +37,10 @@ import {
   typesFor,
   booleanChoice,
   valueFromChoice,
+  withDateBound,
   type TextState,
 } from "../src/areas/reporting/screens/reportsLogic.js";
+import { toDateInput } from "../src/areas/reporting/screens/reportingLogic.js";
 import type { DataComparison, Report } from "../src/areas/reporting/api/types.js";
 
 test("isValidReportName rejects empty and whitespace-only names", () => {
@@ -440,4 +442,46 @@ test("mergeCellDisplay renders no-value distinctly from a value of the empty str
   expect(display.kind).toBe("no-value");
   expect(display.collision).toBe(false);
   expect(display.kind).not.toBe(mergeCellDisplay({ kind: "value", value: "", collision: false }, "en").kind);
+});
+
+// ------------------------------------------------------------ date bounds
+//
+// `bun run test:tz` runs this file under TZ=Europe/Zurich, where a UTC-midnight
+// bound lands on a different instant than local midnight.
+
+test("withDateBound builds the 1 to 31 October range from local midnight to the last local millisecond", () => {
+  const from = withDateBound(emptyDraft("proc_1"), "start", "2026-10-01");
+  const range = withDateBound(from, "end", "2026-10-31");
+  const after = new Date(range.createdAfter);
+  const before = new Date(range.createdBefore);
+  expect([after.getFullYear(), after.getMonth(), after.getDate(), after.getHours(), after.getMinutes(), after.getSeconds(), after.getMilliseconds()]).toEqual([2026, 9, 1, 0, 0, 0, 0]);
+  expect([before.getFullYear(), before.getMonth(), before.getDate(), before.getHours(), before.getMinutes(), before.getSeconds(), before.getMilliseconds()]).toEqual([2026, 9, 31, 23, 59, 59, 999]);
+});
+
+test("withDateBound leaves the draft's other fields alone", () => {
+  const draft = { ...emptyDraft("proc_1"), name: "Onboarding", status: ["running" as const] };
+  const next = withDateBound(draft, "start", "2026-10-01");
+  expect(next).toEqual({ ...draft, createdAfter: next.createdAfter });
+  expect(draft.createdAfter).toBe("");
+});
+
+test("withDateBound clears the bound for an empty value, and draftToInput then drops it", () => {
+  const range = withDateBound(withDateBound(emptyDraft("proc_1"), "start", "2026-10-01"), "end", "2026-10-31");
+  const cleared = withDateBound(range, "end", "");
+  expect(cleared.createdBefore).toBe("");
+  expect(cleared.createdAfter).toBe(range.createdAfter);
+  expect(draftToInput(cleared).query.createdBefore).toBeUndefined();
+});
+
+test("toDateInput of a built bound returns the picked day for both edges", () => {
+  for (const day of ["2026-10-01", "2026-10-31", "2026-03-29", "2026-10-25", "2026-01-01", "2026-12-31"]) {
+    expect(toDateInput(withDateBound(emptyDraft("proc_1"), "start", day).createdAfter)).toBe(day);
+    expect(toDateInput(withDateBound(emptyDraft("proc_1"), "end", day).createdBefore)).toBe(day);
+  }
+});
+
+test("a From bound is at or before an instance that starts half an hour after local midnight of that day", () => {
+  const { createdAfter } = withDateBound(emptyDraft("proc_1"), "start", "2026-10-01");
+  const instanceStart = new Date(2026, 9, 1, 0, 30).getTime();
+  expect(Date.parse(createdAfter)).toBeLessThanOrEqual(instanceStart);
 });
