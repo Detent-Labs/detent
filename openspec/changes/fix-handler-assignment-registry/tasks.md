@@ -17,11 +17,11 @@
 
 ## 3. Tests for the fault
 
-- [ ] 3.1 Add a `test/process-chaining.test.ts` case. A `process.start` action targets a process whose start step uses `org.group-members`. Drain with the full registry from `assignment-strategies.ts`. Verify that the started instance holds the two members as candidates and records no `assignment.unresolved` event.
-- [ ] 3.2 Add an `org.actor-from-field` case beside it. The `inputMapping` writes the person. Verify that the candidates hold that person.
-- [ ] 3.3 Add a `test/instance-transition.test.ts` case. The action moves a target onto an `org.group-members` step. Verify that the target holds the group's members as candidates.
-- [ ] 3.4 Add a case where the moved target takes an automatic hop onto an `org.manager-of-starter` step. Verify that the manager is the candidate.
-- [ ] 3.5 Run the new cases against the old handler code in a scratch copy of the tree. Verify that each fails with empty candidates. Never revert in the shared tree.
+- [x] 3.1 Add a `test/process-chaining.test.ts` case. A `process.start` action targets a process whose start step uses `org.group-members`. Drain with the full registry from `assignment-strategies.ts`. Verify that the started instance holds the two members as candidates and records no `assignment.unresolved` event.
+- [x] 3.2 Add an `org.actor-from-field` case beside it. The `inputMapping` writes the person. Verify that the candidates hold that person.
+- [x] 3.3 Add a `test/instance-transition.test.ts` case. The action moves a target onto an `org.group-members` step. Verify that the target holds the group's members as candidates.
+- [x] 3.4 Add a case where the moved target takes an automatic hop onto an `org.manager-of-starter` step. Verify that the manager is the candidate.
+- [x] 3.5 Add a negative control to 3.1 and 3.3. Drain with the static registry. Verify empty candidates and a no-candidates event.
 
 ## 4. Documentation and index
 

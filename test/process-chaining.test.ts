@@ -11,7 +11,10 @@ import { sql, initSchema, createInstance } from "../src/engine/store.js";
 import { startInstance, commitManualTransition, cancelInstance } from "../src/engine/transition.js";
 import { publishBody, createDefinitionStore, CrossProcessValidationError, CelValidationError } from "../src/engine/definitions.js";
 import { createDefaultRegistry } from "../src/engine/host.js";
-import { createDataSourceRegistry, createStaticAssignmentRegistry, RETURN_ACTION_TYPE, type Registry as Reg } from "../src/engine/registry.js";
+import { createDataSourceRegistry, createStaticAssignmentRegistry, RETURN_ACTION_TYPE, type Registry as Reg, type AssignmentRegistry } from "../src/engine/registry.js";
+import { createDefaultAssignmentRegistry, GROUP_MEMBERS_STRATEGY_TYPE, ACTOR_FROM_FIELD_STRATEGY_TYPE } from "../src/engine/assignment-strategies.js";
+import { createUser } from "../src/auth/users.js";
+import { createGroup, setGroupMembers } from "../src/auth/groups.js";
 import { drainOutbox, deliver, MAX_ATTEMPTS, type ClaimedRow } from "../src/engine/outbox.js";
 import { idempotencyKey } from "../src/engine/idempotency.js";
 import { PROCESS_START_ACTION_TYPE } from "../src/handlers/process-start.js";
@@ -439,4 +442,120 @@ test.skipIf(!DB)("a process.start action dispatched from a published instance st
   const target = await loadInstance(expectedId);
   expect(target).toBeDefined();
   expect(target!.kind).toBe("published");
+});
+
+// --- the started instance resolves assignment with the engine's strategies ----
+
+// Target whose start step carries `strategy` and rests there (one manual path),
+// so the started instance's candidates are the ones its start step resolved.
+const targetAssignedBody = (strategy: { type: string; config: Record<string, unknown> }, allowedGroups: string[] = []): ProcessBody =>
+  ({
+    key: "target_assigned", baseLocale: "en", label: { en: "Target Assigned" },
+    fields: [
+      { id: "field_t_amount", key: "amount", label: { en: "Amount" }, type: "number" },
+      { id: "field_t_approver", key: "approver", label: { en: "Approver" }, type: "string", format: "person" },
+    ],
+    ...(allowedGroups.length ? { allowedGroups } : {}),
+    workflow: {
+      initialStep: "step_t_entry",
+      steps: [
+        { id: "step_t_entry", key: "t_entry", label: { en: "Entry" }, type: "task", assignment: { strategy },
+          paths: [{ id: "path_t_done", key: "t_done", label: "T Done", to: "step_t_done", trigger: "manual" }] },
+        { id: "step_t_done", key: "t_done", label: { en: "Done" }, type: "task", terminal: true },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+// Drain with the assignment registry `startEngine`'s worker would pass.
+async function drainAllWith(registry: Reg, assignmentRegistry: AssignmentRegistry): Promise<void> {
+  while ((await drainOutbox(sql, registry, undefined, undefined, undefined, assignmentRegistry)) > 0) { /* keep draining */ }
+}
+
+const unresolvedEvents = async (instanceId: string): Promise<{ event: Record<string, unknown> }[]> => {
+  const r = (await sql`SELECT event FROM instance_events WHERE instance_id = ${instanceId} AND kind = 'assignment.unresolved'`) as
+    { event: unknown }[];
+  return r.map((x) => ({ event: (typeof x.event === "string" ? JSON.parse(x.event) : x.event) as Record<string, unknown> }));
+};
+
+const newUserId = async (label: string): Promise<string> =>
+  (await createUser(`pc-${label}-${crypto.randomUUID()}@example.com`, "pw", [])).userId;
+
+/**
+ * Publish an assigned target and an actor chaining into it, submit the actor,
+ * and drain the outbox with `assignmentRegistry`. Returns the started instance.
+ */
+async function chainIntoAssignedTarget(opts: {
+  suffix: string;
+  strategy: { type: string; config: Record<string, unknown> };
+  allowedGroups?: string[];
+  mapping?: Record<string, unknown>;
+  assignmentRegistry: AssignmentRegistry;
+}) {
+  const registry = createDefaultRegistry();
+  const tv = await publishBody(
+    `proc_pc_asg_target_${opts.suffix}` as Instance["processId"],
+    targetAssignedBody(opts.strategy, opts.allowedGroups),
+    registry, dataSourceReg, sql, createDefaultAssignmentRegistry(),
+  );
+  const av = await publishBody(`proc_pc_asg_actor_${opts.suffix}` as Instance["processId"], actorBody(tv.processId, opts.mapping), registry, dataSourceReg);
+  const started = await startInstance(av.definition, { processId: av.processId, version: av.version }, actor);
+  const done = await commitManualTransition(started, "path_a_done", av.definition, actor, sql, { field_a_amount: 500 } as unknown as Instance["data"]);
+
+  await drainAllWith(registry, opts.assignmentRegistry);
+
+  const startedId = `inst_${idempotencyKey(done.instanceId, done.transitionSeq, "action_chain")}`;
+  return { target: await loadInstance(startedId), startedId };
+}
+
+async function groupWithTwoMembers(label: string) {
+  const a = await newUserId(`${label}-a`);
+  const b = await newUserId(`${label}-b`);
+  const group = await createGroup(`pc-${label}-${crypto.randomUUID()}`, { type: "global" });
+  await setGroupMembers(group.groupId, [a, b]);
+  return { a, b, groupId: group.groupId };
+}
+
+const groupMembersStrategy = (groupId: string) => ({ type: GROUP_MEMBERS_STRATEGY_TYPE, config: { groupId } });
+
+test.skipIf(!DB)("a process.start into an org.group-members start step holds the group's members as candidates", async () => {
+  const { a, b, groupId } = await groupWithTwoMembers("start-group");
+
+  const { target, startedId } = await chainIntoAssignedTarget({
+    suffix: "group", strategy: groupMembersStrategy(groupId), allowedGroups: [groupId], assignmentRegistry: createDefaultAssignmentRegistry(),
+  });
+
+  expect(target).toBeDefined();
+  expect(target!.currentStepId as string).toBe("step_t_entry");
+  expect([...target!.assignment!.candidates].sort()).toEqual([a, b].sort());
+  expect(await unresolvedEvents(startedId)).toHaveLength(0);
+});
+
+// Negative control: the same chain drained with the static-only registry the
+// handlers used to build for themselves resolves to nobody.
+test.skipIf(!DB)("the same chain drained with the static registry resolves to no candidates and records the event", async () => {
+  const { groupId } = await groupWithTwoMembers("start-group-static");
+
+  const { target, startedId } = await chainIntoAssignedTarget({
+    suffix: "group_static", strategy: groupMembersStrategy(groupId), allowedGroups: [groupId], assignmentRegistry: createStaticAssignmentRegistry(),
+  });
+
+  expect(target!.assignment!.candidates).toEqual([]);
+  const events = await unresolvedEvents(startedId);
+  expect(events).toHaveLength(1);
+  expect(events[0]!.event.payload).toEqual({ stepId: "step_t_entry", reason: "no-candidates" });
+});
+
+test.skipIf(!DB)("a process.start mapping a person into the org.actor-from-field start step's field holds that person as candidate", async () => {
+  const approver = await newUserId("approver");
+
+  const { target, startedId } = await chainIntoAssignedTarget({
+    suffix: "actor_field",
+    strategy: { type: ACTOR_FROM_FIELD_STRATEGY_TYPE, config: { fieldId: "field_t_approver" } },
+    mapping: { field_t_approver: cel(JSON.stringify(approver)) },
+    assignmentRegistry: createDefaultAssignmentRegistry(),
+  });
+
+  expect(dataField(target, "field_t_approver")).toBe(approver);
+  expect(target!.assignment!.candidates).toEqual([approver]);
+  expect(await unresolvedEvents(startedId)).toHaveLength(0);
 });
