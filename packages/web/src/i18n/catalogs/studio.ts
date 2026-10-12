@@ -412,6 +412,7 @@ export const en = {
   "subprocess.childInputsLoading": "Loading the input fields of the called process.",
   "subprocess.childInputsFailed": "The input fields of the called process could not load.",
   "subprocess.childInputsNone": "The called process declares no input fields.",
+  "subprocess.noteAllMapped": "Every input field of the called process is mapped.",
 
   "contentLocale.legend": "Content locale",
   "contentLocale.invalid": "invalid locale code",

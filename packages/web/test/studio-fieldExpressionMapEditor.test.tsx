@@ -168,6 +168,11 @@ describe("field expression map logic", () => {
     expect(opts).toHaveLength(3);
   });
 
+  it("rowOptions marks no stored key as unlisted while the targets are unknown", () => {
+    const opts = rowOptions(targetsOf(FIELDS), ["field_gone"], "field_gone", false);
+    expect(opts.at(-1)).toEqual({ value: "field_gone", label: "field_gone", disabled: false, unlisted: false });
+  });
+
   it("nextUnusedTarget picks the first non-group target no row holds", () => {
     expect(nextUnusedTarget(FIELDS, [])).toBe("field_a");
     expect(nextUnusedTarget(FIELDS, ["field_a"])).toBe("field_b");

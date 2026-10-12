@@ -176,8 +176,15 @@ describe("the inputMapping editor", () => {
     const html = renderWith({ ...PINNED, inputMapping: { fld_amount: CEL("data.x") } as never }, { status: "failed", fields: [] });
     expect(addDisabled(html)).toBe(true);
     expect(html).toContain(studioCatalog.en["subprocess.childInputsFailed"]);
-    // The stored row stays, as an unlisted option.
-    expect(html).toContain(`fld_amount ${studioCatalog.en["mapping.unlistedKey"]}`);
+    // The list is unknown, so the stored row stays as stored and carries no marker.
+    expect(html).toContain('<option value="fld_amount" selected="">fld_amount</option>');
+    expect(html).not.toContain(studioCatalog.en["mapping.unlistedKey"]);
+  });
+
+  it("carries no unlisted marker on a stored key while the read loads", () => {
+    const html = renderWith({ ...PINNED, inputMapping: { fld_amount: CEL("data.x") } as never }, { status: "loading", fields: [] });
+    expect(html).toContain('<option value="fld_amount" selected="">fld_amount</option>');
+    expect(html).not.toContain(studioCatalog.en["mapping.unlistedKey"]);
   });
 
   it("prints the no-input-fields note for a ready child that lists none", () => {
@@ -191,6 +198,7 @@ describe("the inputMapping editor", () => {
     const html = renderWith({ ...PINNED, inputMapping: mapping }, { status: "ready", fields: CHILD_FIELDS });
     expect(addDisabled(html)).toBe(true);
     expect(html).not.toContain(studioCatalog.en["subprocess.childInputsNone"]);
+    expect(html).toContain(studioCatalog.en["subprocess.noteAllMapped"]);
   });
 
   it("marks a stored key the child no longer lists", () => {
@@ -208,7 +216,16 @@ describe("the inputMapping editor", () => {
       expect(html).not.toContain(studioCatalog.en["subprocess.childInputsLoading"]);
       expect(html).not.toContain(studioCatalog.en["subprocess.childInputsFailed"]);
       expect(html).not.toContain(studioCatalog.en["subprocess.childInputsNone"]);
+      expect(html).not.toContain(studioCatalog.en["subprocess.noteAllMapped"]);
     }
+  });
+
+  it("prints no all-mapped note while a child field is still free", () => {
+    const html = renderWith(
+      { ...PINNED, inputMapping: { fld_amount: CEL("a") } as never },
+      { status: "ready", fields: CHILD_FIELDS },
+    );
+    expect(html).not.toContain(studioCatalog.en["subprocess.noteAllMapped"]);
   });
 });
 
@@ -229,6 +246,14 @@ describe("the note as a live region", () => {
       expect(html).toContain(`>${studioCatalog.en[key]}</p>`);
       expect(addTag(html)).toContain(`aria-describedby="${id}"`);
     }
+  });
+
+  it("points the disabled + add at the all-mapped note", () => {
+    const mapping = { fld_amount: CEL("a"), fld_applicant: CEL("b") } as never;
+    const html = renderWith({ ...PINNED, inputMapping: mapping }, { status: "ready", fields: CHILD_FIELDS });
+    const id = statusId(html);
+    expect(id).toBeTruthy();
+    expect(addTag(html)).toContain(`aria-describedby="${id}"`);
   });
 
   it("keeps the status region in the DOM, empty, when no note shows", () => {

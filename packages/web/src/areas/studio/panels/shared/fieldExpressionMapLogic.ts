@@ -41,10 +41,16 @@ export function targetsOf(fields: readonly MapTargetField[]): MapTarget[] {
 
 /**
  * The options of one row's select. A target another row holds is disabled. A
- * stored key outside the targets is appended as an unlisted option, so the
- * select can show it.
+ * stored key outside the targets is appended as an option, so the select can
+ * show it. The option carries the unlisted mark only when the target list is
+ * known; an unknown list says nothing about the key.
  */
-export function rowOptions(targets: readonly MapTarget[], usedKeys: readonly string[], rowKey: string): RowOption[] {
+export function rowOptions(
+  targets: readonly MapTarget[],
+  usedKeys: readonly string[],
+  rowKey: string,
+  targetsKnown = true,
+): RowOption[] {
   const options: RowOption[] = targets.map((t) => ({
     value: t.id,
     label: t.label,
@@ -52,7 +58,7 @@ export function rowOptions(targets: readonly MapTarget[], usedKeys: readonly str
     unlisted: false,
   }));
   if (!targets.some((t) => t.id === rowKey)) {
-    options.push({ value: rowKey, label: rowKey, disabled: false, unlisted: true });
+    options.push({ value: rowKey, label: rowKey, disabled: false, unlisted: targetsKnown });
   }
   return options;
 }

@@ -11,6 +11,7 @@ import { t } from "../catalog.js";
 import { processLabel } from "../draft/guided-labels.js";
 import { specForProcess } from "../draft/subprocessSpec";
 import { FieldExpressionMapEditor } from "./shared/FieldExpressionMapEditor";
+import { nextUnusedTarget } from "./shared/fieldExpressionMapLogic";
 import type { ChildInputFields } from "./shared/useChildInputFields";
 
 type DraftSpec = DraftOf<SubprocessSpec>;
@@ -45,15 +46,16 @@ interface Props {
   contentLocale: string;
 }
 
-/** The note under the `inputMapping` editor, when the child's fields are not a usable list. */
-function childInputsNote(childInputs: ChildInputFields) {
+/** The note under the `inputMapping` editor, when "+ add" is disabled or the child's fields are not a usable list. */
+function childInputsNote(childInputs: ChildInputFields, mappedKeys: readonly string[]) {
   switch (childInputs.status) {
     case "loading":
       return t("subprocess.childInputsLoading");
     case "failed":
       return t("subprocess.childInputsFailed");
     case "ready":
-      return childInputs.fields.length === 0 ? t("subprocess.childInputsNone") : undefined;
+      if (childInputs.fields.length === 0) return t("subprocess.childInputsNone");
+      return nextUnusedTarget(childInputs.fields, mappedKeys) === undefined ? t("subprocess.noteAllMapped") : undefined;
     default:
       return undefined;
   }
@@ -107,7 +109,7 @@ export function SubprocessSpecEditor({ value, fields, childInputs, onChange, pro
   const binding = value.versionBinding ?? "pinned";
   const updateMapping = (kind: MappingKind, next: Partial<Record<FieldId, DraftOf<Expression>>>) =>
     update({ [kind]: next } as Partial<DraftSpec>);
-  const note = childInputsNote(childInputs);
+  const note = childInputsNote(childInputs, Object.keys(value.inputMapping ?? {}));
 
   return (
     <fieldset className="subprocess-spec">
@@ -156,6 +158,7 @@ export function SubprocessSpecEditor({ value, fields, childInputs, onChange, pro
         fields={childInputs.fields}
         addDisabled={childInputs.status !== "ready" || childInputs.fields.length === 0}
         addDescribedBy={note ? noteId : undefined}
+        targetsKnown={childInputs.status === "ready"}
         onChange={(next) => updateMapping("inputMapping", next)}
       />
       {/* The region stays in the DOM, so a change from loading to failed is announced. */}

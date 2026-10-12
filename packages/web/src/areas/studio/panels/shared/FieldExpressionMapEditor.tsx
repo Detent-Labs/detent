@@ -25,6 +25,9 @@ interface FieldExpressionMapEditorProps {
   addDisabled?: boolean;
   /** The id of an element that says why "+ add" is disabled. */
   addDescribedBy?: string;
+  /** False while the caller cannot say which targets exist. A stored key then
+   * carries no unlisted mark. Defaults to true. */
+  targetsKnown?: boolean;
   onChange: (next: Partial<Record<FieldId, DraftOf<Expression>>>) => void;
 }
 
@@ -38,6 +41,7 @@ export function FieldExpressionMapEditor({
   fields,
   addDisabled,
   addDescribedBy,
+  targetsKnown = true,
   onChange,
 }: FieldExpressionMapEditorProps) {
   const entries = Object.entries(mapping ?? {});
@@ -56,7 +60,7 @@ export function FieldExpressionMapEditor({
       {entries.map(([fieldId, expr]) => (
         <div key={fieldId} className="mapping-row">
           <select value={fieldId} onChange={(e) => onChange(moveRow(mapping, fieldId, e.target.value, expr))}>
-            {rowOptions(targets, usedKeys, fieldId).map((o) => (
+            {rowOptions(targets, usedKeys, fieldId, targetsKnown).map((o) => (
               <option key={o.value} value={o.value} disabled={o.disabled}>
                 {o.unlisted ? `${o.label} ${t("mapping.unlistedKey")}` : o.label}
               </option>
