@@ -1,21 +1,26 @@
 /**
- * notification.email action handler: pure unit tests against a locally started
- * Bun.listen fake SMTP server, no DATABASE_URL required. The handler's one
- * database read is address resolution, and `accountsDb` below stands in for the
- * pool — `local-user-accounts`' own suite covers the real query. Mirrors
- * handlers-http.test.ts's style — flat test(), no describe blocks. The one
- * exception is the end-to-end send, which needs a real SMTP endpoint and skips
- * without SMTP_HOST, the same way the DB-backed suites skip without
- * DATABASE_URL.
+ * notification.email action handler: unit tests against a locally started
+ * Bun.listen fake SMTP server. The handler's one database read is address
+ * resolution, and `accountsDb` below stands in for the pool —
+ * `local-user-accounts`' own suite covers the real query. Mirrors
+ * handlers-http.test.ts's style — flat test(), no describe blocks. Two tests
+ * are exceptions. The end-to-end send needs a real SMTP endpoint and skips
+ * without SMTP_HOST. The test that inserts an account row holding a CR/LF
+ * address through SQL needs a real database and skips without DATABASE_URL, the
+ * same way the DB-backed suites skip.
  */
-import { test, expect } from "bun:test";
+import { test, expect, spyOn } from "bun:test";
 import type { SQL } from "bun";
 import {
   notificationEmailHandlerDef,
   notificationEmailConfigSchema,
   NOTIFICATION_EMAIL_ACTION_TYPE,
   SMTP_DEFAULT_TIMEOUT_MS,
+  SMTP_MAX_RECIPIENTS_PER_SESSION,
+  type NotificationEmailResult,
 } from "../src/handlers/notification-email.js";
+import { log } from "../src/log.js";
+import { initSchema, sql } from "../src/engine/store.js";
 import { deliver, PermanentError, type ClaimedRow } from "../src/engine/outbox.js";
 import { createRegistry, createStaticAssignmentRegistry, type HandlerContext, type OutboxActors } from "../src/engine/registry.js";
 import { createDefaultRegistry } from "../src/engine/host.js";
@@ -119,55 +124,89 @@ type FakeOptions = {
   silent?: boolean;
   /** Advertise STARTTLS in the EHLO response. */
   offerStartTls?: boolean;
+  /** Answer 452 to every RCPT TO past this many in one session, as a relay with a recipient limit does. */
+  maxRcptPerSession?: number;
+  /** One reply per RCPT TO within the session at that zero-based index. A missing entry answers 250. */
+  sessionRcptReplies?: Record<number, string[]>;
+  /** Hold the greeting back by this many milliseconds in every session. */
+  greetingDelayMs?: number;
 };
 
-type FakeServer = { port: number; commands: string[]; messages: string[]; stop: () => void };
+/** What one SMTP connection saw: its commands, its RCPT TO addresses and its accepted messages. */
+type FakeSession = { commands: string[]; rcpts: string[]; messages: string[] };
 
-/** A scriptable SMTP server on a random loopback port. One connection at a time. */
+type FakeServer = {
+  port: number;
+  commands: string[];
+  messages: string[];
+  sessions: FakeSession[];
+  stop: () => void;
+};
+
+/** The state of one connection. It rides on the socket, so a late command lands on its own session. */
+type Connection = { index: number; session: FakeSession; buffer: string; inData: boolean };
+
+/** A scriptable SMTP server on a random loopback port. Each connection keeps its own state. */
 function fakeSmtp(opts: FakeOptions = {}): FakeServer {
   const commands: string[] = [];
   const messages: string[] = [];
-  let buffer = "";
-  let inData = false;
-  let rcptIndex = 0;
+  const sessions: FakeSession[] = [];
   const replyFor = (verb: string, fallback = "250 ok\r\n") => opts.replies?.[verb] ?? fallback;
 
-  const server = Bun.listen({
+  const server = Bun.listen<Connection>({
     hostname: "127.0.0.1",
     port: 0,
     socket: {
       open(socket) {
-        if (!opts.silent) socket.write(replyFor("GREETING", "220 fake ESMTP\r\n"));
+        const session: FakeSession = { commands: [], rcpts: [], messages: [] };
+        socket.data = { index: sessions.length, session, buffer: "", inData: false };
+        sessions.push(session);
+        if (opts.silent) return;
+        const greet = () => socket.write(replyFor("GREETING", "220 fake ESMTP\r\n"));
+        if (opts.greetingDelayMs) setTimeout(greet, opts.greetingDelayMs);
+        else greet();
       },
       data(socket, chunk) {
         if (opts.silent) return;
-        buffer += Buffer.from(chunk).toString("latin1");
+        const conn = socket.data;
+        const { session } = conn;
+        conn.buffer += Buffer.from(chunk).toString("latin1");
         for (;;) {
-          if (inData) {
-            const end = buffer.indexOf("\r\n.\r\n");
+          if (conn.inData) {
+            const end = conn.buffer.indexOf("\r\n.\r\n");
             if (end < 0) return;
-            messages.push(buffer.slice(0, end));
-            buffer = buffer.slice(end + 5);
-            inData = false;
+            const message = conn.buffer.slice(0, end);
+            messages.push(message);
+            session.messages.push(message);
+            conn.buffer = conn.buffer.slice(end + 5);
+            conn.inData = false;
             socket.write(replyFor("BODY", "250 queued\r\n"));
             if (opts.dropAfterBody) socket.end();
             continue;
           }
-          const eol = buffer.indexOf("\r\n");
+          const eol = conn.buffer.indexOf("\r\n");
           if (eol < 0) return;
-          const line = buffer.slice(0, eol);
-          buffer = buffer.slice(eol + 2);
+          const line = conn.buffer.slice(0, eol);
+          conn.buffer = conn.buffer.slice(eol + 2);
           commands.push(line);
+          session.commands.push(line);
           const verb = line.split(/[\s:]/)[0]!.toUpperCase();
           if (verb === "EHLO") {
             const ext = opts.offerStartTls ? "250-STARTTLS\r\n" : "";
             socket.write(replyFor("EHLO", `250-fake greets you\r\n${ext}250 SIZE 10240000\r\n`));
           } else if (verb === "RCPT") {
-            socket.write(opts.rcptReplies?.[rcptIndex++] ?? "250 recipient ok\r\n");
+            const inSession = session.rcpts.length;
+            session.rcpts.push(line.replace(/^RCPT TO:<(.*)>$/i, "$1"));
+            const overLimit = opts.maxRcptPerSession !== undefined && inSession >= opts.maxRcptPerSession;
+            socket.write(
+              opts.rcptReplies?.[inSession] ??
+                opts.sessionRcptReplies?.[conn.index]?.[inSession] ??
+                (overLimit ? "452 too many recipients\r\n" : "250 recipient ok\r\n"),
+            );
           } else if (verb === "DATA") {
             const reply = replyFor("DATA", "354 send it\r\n");
             socket.write(reply);
-            if (reply.startsWith("3")) inData = true;
+            if (reply.startsWith("3")) conn.inData = true;
           } else if (verb === "QUIT") {
             socket.write(replyFor("QUIT", "221 bye\r\n"));
             socket.end();
@@ -179,7 +218,7 @@ function fakeSmtp(opts: FakeOptions = {}): FakeServer {
     },
   });
 
-  return { port: server.port, commands, messages, stop: () => server.stop(true) };
+  return { port: server.port, commands, messages, sessions, stop: () => server.stop(true) };
 }
 
 /** Point the handler at a fresh fake server for the duration of `fn`. */
@@ -657,4 +696,238 @@ test("the To header lists every resolved address", async () => {
     await resolvingDef.handler(ctxForAccounts(actorConfig(["candidate"]), { actors }));
     expect(server.messages[0]).toContain("To: alice@example.test, bob@example.test");
   });
+});
+
+// --- batches: at most SMTP_MAX_RECIPIENTS_PER_SESSION per session ------------
+
+const addresses = (n: number): string[] => Array.from({ length: n }, (_, i) => `u${i + 1}@example.test`);
+const batchConfig = (to: string[]) => ({ to, subject: "s", body: "b" });
+const headerOf = (raw: string, name: string): string | undefined =>
+  raw
+    .split("\r\n")
+    .find((l) => l.startsWith(`${name}: `))
+    ?.slice(name.length + 2);
+const toList = (raw: string): string[] => (headerOf(raw, "To") ?? "").split(", ");
+const sizes = (server: FakeServer): number[] => server.sessions.map((s) => s.rcpts.length);
+const hasData = (s: FakeSession): boolean => s.commands.some((c) => c.toUpperCase() === "DATA");
+
+test("the batch size is 100, the RFC 5321 minimum a relay must accept", () => {
+  expect(SMTP_MAX_RECIPIENTS_PER_SESSION).toBe(100);
+});
+
+test("a list of 100 sends one message with the plain Message-ID", async () => {
+  await withFake({}, async (server) => {
+    const to = addresses(100);
+    const result = (await mailDef.handler(ctxFor(batchConfig(to), { idempotencyKey: "idem_100" }))) as NotificationEmailResult;
+    expect(sizes(server)).toEqual([100]);
+    expect(server.messages).toHaveLength(1);
+    expect(headerOf(server.messages[0]!, "Message-ID")).toBe("<idem_100@example.test>");
+    expect(result.messageId).toBe("<idem_100@example.test>");
+    expect(result.recipients).toEqual(to);
+  });
+});
+
+test("a list of 101 sends two messages, each with a numbered Message-ID", async () => {
+  await withFake({}, async (server) => {
+    const to = addresses(101);
+    const result = (await mailDef.handler(ctxFor(batchConfig(to), { idempotencyKey: "idem_101" }))) as NotificationEmailResult;
+    expect(sizes(server)).toEqual([100, 1]);
+    expect(server.sessions.map((s) => headerOf(s.messages[0]!, "Message-ID"))).toEqual([
+      "<idem_101-1@example.test>",
+      "<idem_101-2@example.test>",
+    ]);
+    expect(result.messageId).toBe("<idem_101-1@example.test>");
+    expect(result.recipients).toEqual(to);
+  });
+});
+
+test("a list of 250 sends three messages, each naming only its own addresses", async () => {
+  await withFake({}, async (server) => {
+    const to = addresses(250);
+    const result = (await mailDef.handler(ctxFor(batchConfig(to), { idempotencyKey: "idem_250" }))) as NotificationEmailResult;
+    expect(sizes(server)).toEqual([100, 100, 50]);
+    expect(server.sessions.map((s) => s.rcpts)).toEqual([to.slice(0, 100), to.slice(100, 200), to.slice(200)]);
+    expect(server.sessions.map((s) => toList(s.messages[0]!))).toEqual([to.slice(0, 100), to.slice(100, 200), to.slice(200)]);
+    const ids = server.sessions.map((s) => headerOf(s.messages[0]!, "Message-ID"));
+    expect(new Set(ids).size).toBe(3);
+    expect(result.recipients).toEqual(to);
+    expect(result.messageId).toBe(ids[0]!);
+  });
+});
+
+test("a relay limit of 100 per session no longer defeats a group of 300", async () => {
+  await withFake({ maxRcptPerSession: 100 }, async (server) => {
+    const to = addresses(300);
+    const result = (await mailDef.handler(ctxFor(batchConfig(to)))) as NotificationEmailResult;
+    expect(sizes(server)).toEqual([100, 100, 100]);
+    expect(server.messages).toHaveLength(3);
+    expect(result.recipients).toEqual(to);
+  });
+});
+
+test("a 550 in the second batch sends no DATA for it and dead-letters, the first batch stays sent", async () => {
+  await withFake({ sessionRcptReplies: { 1: ["250 ok\r\n", "550 no such mailbox\r\n"] } }, async (server) => {
+    const err = await rejects(mailDef.handler(ctxFor(batchConfig(addresses(150)))));
+    expect(err).toBeInstanceOf(PermanentError);
+    expect(server.sessions).toHaveLength(2);
+    expect(hasData(server.sessions[0]!)).toBe(true);
+    expect(hasData(server.sessions[1]!)).toBe(false);
+    expect(server.messages).toHaveLength(1);
+  });
+});
+
+test("a 450 in the second batch fails the whole delivery as transient", async () => {
+  await withFake({ sessionRcptReplies: { 1: ["250 ok\r\n", "450 mailbox busy\r\n"] } }, async (server) => {
+    const err = await rejects(mailDef.handler(ctxFor(batchConfig(addresses(150)))));
+    expect(err).not.toBeInstanceOf(PermanentError);
+    expect(hasData(server.sessions[1]!)).toBe(false);
+    expect(server.messages).toHaveLength(1);
+  });
+});
+
+test("a retried delivery repeats every batch's Message-ID", async () => {
+  const idsOfRun = () =>
+    withFake({}, async (server) => {
+      await mailDef.handler(ctxFor(batchConfig(addresses(250)), { idempotencyKey: "idem_retry" }));
+      return server.sessions.map((s) => headerOf(s.messages[0]!, "Message-ID"));
+    });
+  const first = await idsOfRun();
+  const second = await idsOfRun();
+  expect(first).toHaveLength(3);
+  expect(second).toEqual(first);
+});
+
+test("the timeout bounds each session, not the whole delivery", async () => {
+  // Three sessions of about 400 ms each fit a 1 s bound that their 1.2 s total exceeds.
+  await withFake({ greetingDelayMs: 400 }, async () => {
+    const result = (await mailDef.handler(ctxFor(batchConfig(addresses(250)), { timeout: "PT1S" }))) as NotificationEmailResult;
+    expect(result.recipients).toHaveLength(250);
+  });
+});
+
+// --- the lease budget ---------------------------------------------------------
+// The outbox abandons a handler that outlives CLAIM_LEASE_MS but cannot cancel
+// it, so a later batch that cannot finish inside the lease must not start.
+
+test("a later batch that cannot fit the lease is never started and the delivery fails as transient", async () => {
+  // The first session takes about 1.5 s. 1.5 s plus the second batch's 29 s bound exceeds the 30 s lease.
+  await withFake({ greetingDelayMs: 1500 }, async (server) => {
+    const err = await rejects(mailDef.handler(ctxFor(batchConfig(addresses(101)), { timeout: "PT29S" })));
+    expect(err).toBeInstanceOf(Error);
+    expect(err).not.toBeInstanceOf(PermanentError);
+    expect((err as Error).message).toContain("1 of 2");
+    expect((err as Error).message).not.toContain("example.test");
+    expect(server.sessions).toHaveLength(1);
+    expect(server.messages).toHaveLength(1);
+  });
+});
+
+test("the first batch always starts, even when the declared timeout exceeds the lease", async () => {
+  await withFake({}, async (server) => {
+    const to = addresses(3);
+    const result = (await mailDef.handler(ctxFor(batchConfig(to), { timeout: "PT31S" }))) as NotificationEmailResult;
+    expect(result.recipients).toEqual(to);
+    expect(server.messages).toHaveLength(1);
+  });
+});
+
+// --- a stored address that is no valid address -------------------------------
+
+const MALFORMED_ACCOUNTS: Account[] = [
+  { user_id: "user_alice", email: "alice@example.test" },
+  { user_id: "user_bad", email: "max.muster" },
+  { user_id: "user_bob", email: "bob@example.test" },
+];
+
+/** The warn calls that name a dropped account; the "no recipient" warning names none. */
+const droppedWarnings = (warn: { mock: { calls: unknown[][] } }) =>
+  warn.mock.calls.filter((c) => (c[1] as { userId?: string } | undefined)?.userId !== undefined);
+
+test("a malformed stored address is dropped, the others send, and one warning names the account", async () => {
+  const warn = spyOn(log, "warn").mockImplementation(() => {});
+  try {
+    await withFake({}, async (server) => {
+      const actors = { candidates: ["user_alice", "user_bad", "user_bob"] };
+      const ctx = ctxFor(actorConfig(["candidate"]), { actors, db: accountsDb(MALFORMED_ACCOUNTS) });
+      const result = (await mailDef.handler(ctx)) as NotificationEmailResult;
+      expect(result.recipients).toEqual(["alice@example.test", "bob@example.test"]);
+      expect(rcptAddresses(server)).toEqual(["alice@example.test", "bob@example.test"]);
+      const dropped = droppedWarnings(warn);
+      expect(dropped).toHaveLength(1);
+      expect(dropped[0]![1]).toMatchObject({ instanceId: "inst_1", actionId: "action_mail", userId: "user_bad" });
+      expect(JSON.stringify(dropped[0])).not.toContain("max.muster");
+    });
+  } finally {
+    warn.mockRestore();
+  }
+});
+
+test("an address with a line break never reaches the server or a header", async () => {
+  const warn = spyOn(log, "warn").mockImplementation(() => {});
+  try {
+    await withFake({}, async (server) => {
+      const evil = "a@x.ch>\r\nRCPT TO:<leak@evil.example";
+      const accounts = [...MALFORMED_ACCOUNTS, { user_id: "user_evil", email: evil }];
+      const actors = { candidates: ["user_alice", "user_evil", "user_bob"] };
+      await mailDef.handler(ctxFor(actorConfig(["candidate"]), { actors, db: accountsDb(accounts) }));
+      const wire = server.commands.join("\n") + server.messages.join("\n");
+      expect(wire).not.toContain("leak@evil.example");
+      expect(wire).not.toContain("a@x.ch");
+      expect(JSON.stringify(warn.mock.calls)).not.toContain("leak@evil.example");
+      expect(droppedWarnings(warn)).toHaveLength(1);
+    });
+  } finally {
+    warn.mockRestore();
+  }
+});
+
+test("only malformed addresses resolve: no connection opens and the delivery succeeds", async () => {
+  const warn = spyOn(log, "warn").mockImplementation(() => {});
+  try {
+    await withFake({}, async (server) => {
+      const accounts: Account[] = [
+        { user_id: "user_a", email: "max.muster" },
+        { user_id: "user_b", email: "x@y" },
+      ];
+      const ctx = ctxFor(actorConfig(["candidate"]), {
+        actors: { candidates: ["user_a", "user_b"] },
+        db: accountsDb(accounts),
+        idempotencyKey: "idem_bad",
+      });
+      const result = (await mailDef.handler(ctx)) as NotificationEmailResult;
+      expect(result).toEqual({ messageId: "<idem_bad@example.test>", recipients: [] });
+      expect(server.sessions).toHaveLength(0);
+      expect(droppedWarnings(warn)).toHaveLength(2);
+    });
+  } finally {
+    warn.mockRestore();
+  }
+});
+
+// createUser refuses a bad address now, so the row goes in by direct SQL and the
+// handler reads it back through the real `emailsForUserIds` query.
+const DB = !!process.env.DATABASE_URL;
+
+test.skipIf(!DB)("a stored address with a CR and LF, inserted by SQL, never reaches the server", async () => {
+  await initSchema();
+  const evil = "a@x.ch>\r\nRCPT TO:<leak@evil.example";
+  const ids = ["user_hbr_good", "user_hbr_evil"];
+  await sql`
+    INSERT INTO auth_users (user_id, email, password_hash)
+    SELECT id, email, 'not-a-real-hash'
+    FROM UNNEST(${sql.array(ids, "TEXT")}::text[], ${sql.array(["hbr-good@example.test", evil], "TEXT")}::text[]) AS t(id, email)
+  `;
+  const warn = spyOn(log, "warn").mockImplementation(() => {});
+  try {
+    await withFake({}, async (server) => {
+      const ctx = ctxFor(actorConfig(["candidate"]), { actors: { candidates: ids }, db: sql });
+      const result = (await mailDef.handler(ctx)) as NotificationEmailResult;
+      expect(result.recipients).toEqual(["hbr-good@example.test"]);
+      expect(server.commands.join("\n") + server.messages.join("\n")).not.toContain("leak@evil.example");
+      expect(droppedWarnings(warn)).toHaveLength(1);
+    });
+  } finally {
+    warn.mockRestore();
+    await sql`DELETE FROM auth_users WHERE user_id = ANY(${sql.array(ids, "TEXT")})`;
+  }
 });

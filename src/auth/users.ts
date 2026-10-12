@@ -10,6 +10,7 @@
  * recovery path for a deployment where no account holds `system:admin`.
  */
 import { SQL } from "bun";
+import { z } from "zod";
 import { sql } from "../engine/store.js";
 import { encodeCursor, decodeCursor } from "../pagination.js";
 import { MAX_LIST_LIMIT, type Page } from "../engine/admin-queries.js";
@@ -62,7 +63,18 @@ export function validateDisplayName(value: string | null): DisplayNameValidation
   return { ok: true, displayName: trimmed };
 }
 
+/**
+ * The one rule for an address that reaches an SMTP command or a header: the
+ * account writer here and the `notification.email` handler's `to` entries both
+ * parse with it, so the write check and the send check cannot drift. It
+ * refuses CR, LF, a space, `<`, `>` and an address with no domain dot.
+ */
+export const emailAddressSchema = z.string().email();
+
 export async function createUser(email: string, password: string, roles: string[] = [], displayName?: string | null, db: SQL = sql): Promise<{ userId: string }> {
+  // Checked before the hash so a refused address costs no argon2 work. A plain
+  // `Error`, for the reason `normalizeDisplayName` states; the HTTP route checks first.
+  if (!emailAddressSchema.safeParse(email).success) throw new Error("email is not a valid address");
   const userId = `user_${crypto.randomUUID()}`;
   const passwordHash = await Bun.password.hash(password);
   await db`INSERT INTO auth_users (user_id, email, password_hash, roles, display_name) VALUES (${userId}, ${email}, ${passwordHash}, ${db.array(roles, "TEXT")}, ${normalizeDisplayName(displayName)})`;

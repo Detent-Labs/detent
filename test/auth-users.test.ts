@@ -54,6 +54,39 @@ test.skipIf(!DB)("a created user's password verifies and returns userId/roles", 
   expect(result).toEqual({ userId, roles: ["employee"], displayName: "b@example.com" });
 });
 
+// Every notification reads `auth_users.email` as an SMTP address, so the writer
+// is the one place a typo or a line break can be kept out of it.
+test.skipIf(!DB)("createUser refuses an address that is no valid address and writes no row", async () => {
+  const bad = ["max.muster", "a@x.ch>\r\nRCPT TO:<leak@evil.example", "a@x.ch\r", "a@x.ch\n", "<a@x.ch>", "a b@x.ch", "a@x.ch>"];
+  for (const email of bad) {
+    await expect(createUser(email, "pw", [])).rejects.toThrow(/email/);
+  }
+  const rows = (await sql`SELECT count(*)::int AS n FROM auth_users`) as { n: number }[];
+  expect(rows[0]!.n).toBe(0);
+});
+
+test.skipIf(!DB)("createUser checks the address before it hashes the password", async () => {
+  const hash = Bun.password.hash;
+  let hashed = 0;
+  Bun.password.hash = ((...args: Parameters<typeof hash>) => {
+    hashed++;
+    return hash(...args);
+  }) as typeof hash;
+  try {
+    await expect(createUser("max.muster", "pw", [])).rejects.toThrow(/email/);
+    expect(hashed).toBe(0);
+    await createUser("jane@co.com", "pw", []);
+    expect(hashed).toBe(1);
+  } finally {
+    Bun.password.hash = hash;
+  }
+});
+
+test.skipIf(!DB)("createUser still creates an account for a plain address, and it can log in", async () => {
+  const { userId } = await createUser("jane@co.com", "correct-horse", []);
+  expect((await verifyLogin("jane@co.com", "correct-horse"))?.userId).toBe(userId);
+});
+
 test.skipIf(!DB)("a wrong password does not verify", async () => {
   await createUser("c@example.com", "correct-horse", []);
   expect(await verifyLogin("c@example.com", "wrong-password")).toBeUndefined();

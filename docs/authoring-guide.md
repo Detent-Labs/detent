@@ -848,10 +848,16 @@ Every candidate receives the message: they are all eligible to do the work.
 Name at least one recipient across the two lists. An action naming none is a
 publish error.
 
+A long recipient list sends as several messages. Each message reaches at most
+100 recipients and names only its own recipients in `To:`. An account whose
+stored address is not a valid address receives nothing. The engine skips it
+with a warning, and the other recipients still get the message.
+
 An action that resolves to no address at all sends nothing and counts as done.
 That happens when a step resolved to no candidate, which the case record
-already reports as an unresolved assignment. Fix the assignment, not the
-notification.
+already reports as an unresolved assignment. It also happens when every
+resolved account holds an invalid address, which the engine logs per account.
+Fix the assignment or the accounts, and leave the notification alone.
 
 The engine reads the actors as they stood when it queued the action. It does
 not read them as they stand when the message goes out. So a case that has moved
