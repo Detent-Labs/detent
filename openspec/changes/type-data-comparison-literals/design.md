@@ -51,6 +51,8 @@ A row component holds `text` and the last `value` prop it saw in state. Each key
 
 That rule covers a raw JSON change, a removed sibling row and a cleared value after a field change. It cannot loop, because the memory updates before the next draw. Take a stored value of the wrong type, such as `"5"` on a number field. The row adopts its text once, then stays quiet. A guard that compared the parsed text with the prop on every draw would loop there.
 
+Comparison rows in both areas carry stable row ids. The form mints an id on add and drops it on remove. Without it, removing row 0 hands its text to row 1.
+
 Today's code binds the input to `JSON.stringify(value)`. That binding makes the next comma nest the list in F-5. Rejected: lift the text state into the screen. It adds a second structure keyed by row, and that structure needs row ids too.
 
 ### 3. The studio form reads the type from the catalog
@@ -79,7 +81,9 @@ Rejected: key the rows by index. It stops the focus loss but cannot mark a dupli
 
 `draftToInput` filters out a comparison whose `value` is `undefined`. Preview, save and the column request all call it, so one filter covers the three. `draftFromReport` loads saved comparisons as they are. A new row starts with `value: undefined`.
 
-`ComparisonRow` reads `type` from its `ColumnChoice` and picks the control from `literalType`. The screen keeps a ref map from field id to the last type any response named. A comparison can empty the range and drop its own field from the next response. The map keeps the type, so the row stays editable. For a field never seen, the row follows the type of its current value. The first request for a process fires at once. Later requests wait on a key made of `JSON.stringify` of the process id and the complete query. An incomplete row leaves the key unchanged, so it sends no request. A valid number changes the key on each keystroke, and the 300 ms wait collapses those requests.
+`ComparisonRow` reads `type` from its `ColumnChoice` and picks the control from `literalType`. The screen keeps state, `{ processId, types }`, with the last type any response named for each field. A comparison can empty the range and drop its own field from the next response. The state keeps the type, so the row stays editable. A loaded report seeds the state with the value types of its comparisons, and a response overwrites a seed. A field never seen follows the type of its current value.
+
+The first request for a process fires at once. Later requests wait on a key made of `JSON.stringify` of the process id and the complete query. An incomplete row leaves the key unchanged, so it sends no request. A valid number changes the key on each keystroke, and the 300 ms wait collapses those requests.
 
 The debounce is a pure `createDebouncer` function with an injected timer, plus a thin hook. A test drives it with a fake timer.
 

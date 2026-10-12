@@ -1642,6 +1642,18 @@ are local to this section.
   JSON surface. Each half follows its own spec. A real fix needs an OpenSpec
   change that decides which version set the form reads.
 
+- **LITERAL-3: the studio data source editor scrolls sideways at 390 px.** The
+  browser check of the same change measured an inner `overflow-x: auto` box
+  with a content width of 494 px against a client width of 358 px. The widest
+  leaf is the target process select, whose options read
+  `key (proc_<uuid>)`. `main` has the same option text, so the overflow
+  predates the change. The rows the change added wrap at 494 px, not at the
+  viewport, so a reason sentence and the comma hint sit off screen until the
+  author scrolls the box. Capping the select and zeroing the fieldset
+  `min-inline-size` in the live DOM did not narrow it, so the cause sits higher
+  in the editor's layout. The fix belongs to a screen change under
+  `studio-app`, with `/impeccable adapt`.
+
 ## Open from the studio-path-row-field-order final review (one OpenSpec change per screen)
 
 The final whole-branch review for `studio-path-row-field-order` (2026-09-17)

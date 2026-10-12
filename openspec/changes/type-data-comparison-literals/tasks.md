@@ -33,11 +33,11 @@
 
 ## 6. Verification
 
-- [ ] 6.1 Run `bun run typecheck` in the devcontainer, after `bun install` for the `form-ui` copy. Report the printed result.
-- [ ] 6.2 Run `bun run build` in the devcontainer. Report the printed result.
-- [ ] 6.3 Run the FULL `bun test` with DATABASE_URL set through `scripts/test-gated.sh` and `OPENSPEC_TELEMETRY=0`. Report pass, fail and skip counts.
+- [x] 6.1 Run `bun run typecheck` in the devcontainer, after `bun install` for the `form-ui` copy. Report the printed result.
+- [x] 6.2 Run `bun run build` in the devcontainer. Report the printed result.
+- [x] 6.3 Run the FULL `bun test` with DATABASE_URL set through `scripts/test-gated.sh` and `OPENSPEC_TELEMETRY=0`. Report pass, fail and skip counts.
 - [ ] 6.4 Run the prose gate and the whitespace gate on the host over the pushed range. Report the printed result.
-- [ ] 6.5 Check both builders in a real browser on the production build, with `playwright-cli` and a named session. Run `/impeccable critique` and `/impeccable audit` on both routes.
+- [x] 6.5 Check both builders in a real browser on the production build, with `playwright-cli` and a named session. Run `/impeccable critique` and `/impeccable audit` on both routes.
 
 ## Workflow follow-up
 
