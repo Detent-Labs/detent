@@ -85,7 +85,9 @@ its placement.
   subprocess step's paths are all-automatic. The step is a wait-state: a manual
   path would let an actor advance the parent while the child still runs. All
   three are Zod refinements in `definition.ts`'s `step` superRefine, beside the
-  path-trigger checks.
+  path-trigger checks. The cascade never evaluates a subprocess step's paths
+  on entry, because `child` exists only after the return. A guardless default
+  stays allowed and takes an outcome no guard matches.
 - A published body must not reach its own `processId` through subprocess
   references. Publish rejects a direct self-reference and any longer chain a
   new version would close. The comparison uses process ids and ignores
@@ -129,6 +131,28 @@ its placement.
   with the message "time function not allowed" (`src/cel/check.ts:161`,
   `:315`).
 - A timer `deadline` must infer to `string` (`check.ts:260-269`).
+- A path `guard`, a `validation.rule` and a view flag (`visible`, `required`
+  or `readonly`) must infer to `bool`. A `dyn` result passes, and the engine
+  acts on a condition only when it is `true`. Any other type counts as false
+  without a message. A guard then parks the path, and a rule rejects the
+  submission. The check lives on the publish path, in `src/cel/check.ts`
+  behind `validateReferences`. A refinement in `definition.ts` would strand
+  the instances pinned to a published body.
+- A `matches` call takes a string literal as its pattern, in both forms:
+  `s.matches("p")` and `matches(s, "p")`. The literal compiles as a JavaScript
+  `RegExp` and stays under the declared length bound. A pattern that does not
+  compile raises on every evaluation, and a guard reads a raise as `false`.
+  The check lives on the publish path, in `src/cel/check.ts` behind
+  `validateReferences`. A migration transform meets it too, at plan
+  registration.
+- A `process.start` action's `config.inputMapping` value is a checked CEL
+  site. It reads `data`, `instance` and `actor`, with no `result` and no
+  `child`, because the delivery supplies nothing else. It meets the
+  time-function ban and the structural bound, and it declares no expected
+  type. Only that key counts, and the check reads no other action `config`
+  for CEL. The CEL checks live on the publish path, in `src/cel/check.ts`
+  behind `validateReferences`. The length bound lives in the compile pass
+  (`compile.ts::checkLengthBounds`), before the hash-hit return.
 - No action anywhere in the body carries a `type` with the reserved `core.`
   prefix. The compile pass checks this on both compile branches
   (`compile.ts::checkReservedActionPrefix`). The cancel-sink id/key/outcome

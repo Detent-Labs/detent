@@ -7,7 +7,9 @@
  */
 import { test, expect, beforeAll } from "bun:test";
 import { sql, initSchema, createInstance, withTransaction } from "../src/engine/store.js";
-import { startInstance, cancelInstance, selectAutomaticPath, executeAutomaticTransition, SPAWN_ACTION_TYPE } from "../src/engine/transition.js";
+import {
+  startInstance, cancelInstance, selectAutomaticPath, executeAutomaticTransition, executeManualTransition, resolveAutomatic, SPAWN_ACTION_TYPE,
+} from "../src/engine/transition.js";
 import { publishBody, createDefinitionStore } from "../src/engine/definitions.js";
 import { registerSubprocessHandlers } from "../src/engine/subprocess.js";
 import { cancelInstance as apiCancelInstance } from "../src/runtime/api.js";
@@ -447,6 +449,69 @@ const subInitialCallerBody = (key: string, childPid: string, childVersion: numbe
     },
   }) as unknown as ProcessBody;
 
+// A subprocess step whose second path is a guardless default (the highest
+// priority): the else-branch of the return's evaluation. `startAt: "entry"`
+// reaches the step by an automatic hop (seq 1); `"sub"` makes it the initial step
+// (seq 0).
+const guardlessDefaultParentBody = (childVersion: number, startAt: "entry" | "sub"): ProcessBody =>
+  ({
+    key: `parent_gd_${startAt}`, baseLocale: "en", label: { en: "Parent Guardless Default" },
+    fields: [
+      { id: "field_p_amount", key: "amount", label: { en: "Amount" }, type: "number" },
+      { id: "field_p_result", key: "result", label: { en: "Result" }, type: "string" },
+    ],
+    workflow: {
+      initialStep: startAt === "entry" ? "step_p_entry" : "step_p_sub",
+      steps: [
+        ...(startAt === "entry"
+          ? [{ id: "step_p_entry", key: "p_entry", label: { en: "Entry" }, type: "task", paths: [autoPath("path_p_sub", "step_p_sub")] }]
+          : []),
+        { id: "step_p_sub", key: "p_sub", label: { en: "Sub" }, type: "subprocess",
+          subprocess: {
+            processId: CHILD_PID, versionBinding: "pinned", pinnedVersion: childVersion,
+            inputMapping: { field_c_amount: cel("data.amount") },
+            outputMapping: { field_p_result: cel("child.outcome") },
+          },
+          paths: [
+            autoPath("path_p_app", "step_p_approved", 1, 'child.outcome == "approved"'),
+            autoPath("path_p_def", "step_p_defaulted", 2),
+          ] },
+        { id: "step_p_approved", key: "p_approved", label: { en: "PApproved" }, type: "task", terminal: true },
+        { id: "step_p_defaulted", key: "p_defaulted", label: { en: "PDefaulted" }, type: "task", terminal: true },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+// A manual form step submits the amount, then enters a subprocess step whose
+// first path guards on parent data alone. The guard holds at entry, so only the
+// parking rule keeps the parent on the step until the child returns.
+const dataGuardParentBody = (childVersion: number): ProcessBody =>
+  ({
+    key: "parent_dg", baseLocale: "en", label: { en: "Parent Data Guard" },
+    fields: [
+      { id: "field_p_amount", key: "amount", label: { en: "Amount" }, type: "number" },
+      { id: "field_p_result", key: "result", label: { en: "Result" }, type: "string" },
+    ],
+    workflow: {
+      initialStep: "step_p_form",
+      steps: [
+        { id: "step_p_form", key: "p_form", label: { en: "Form" }, type: "task", paths: [manualPath("path_p_submit", "step_p_sub")] },
+        { id: "step_p_sub", key: "p_sub", label: { en: "Sub" }, type: "subprocess",
+          subprocess: {
+            processId: CHILD_PID, versionBinding: "pinned", pinnedVersion: childVersion,
+            inputMapping: { field_c_amount: cel("data.amount") },
+            outputMapping: { field_p_result: cel("child.outcome") },
+          },
+          paths: [
+            autoPath("path_p_big", "step_p_big", 1, "data.amount > 100.0"),
+            autoPath("path_p_app", "step_p_approved", 2, 'child.outcome == "approved"'),
+          ] },
+        { id: "step_p_big", key: "p_big", label: { en: "PBig" }, type: "task", terminal: true },
+        { id: "step_p_approved", key: "p_approved", label: { en: "PApproved" }, type: "task", terminal: true },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
 function engineRegistry(assignmentRegistry?: AssignmentRegistry): { registry: Reg; resolveBody: ReturnType<typeof createDefinitionStore>["resolveBody"] } {
   const store = createDefinitionStore(sql);
   const registry: Reg = new Map();
@@ -498,6 +563,12 @@ const moveTo = async (id: string, stepId: string): Promise<void> => {
 const relinkChild = async (childId: string, stepId: string): Promise<void> => {
   await sql`UPDATE instances SET body = jsonb_set(body, '{parent,stepId}', (${[stepId]}::jsonb) -> 0)
     WHERE instance_id = ${childId}`;
+};
+// Point a parent's `awaitedChild` at `childId`. `moveTo` and `createInstance` on
+// a non-subprocess step bypass the step-entry seam that records it, and the
+// spawn and the return act only for the child the parent awaits.
+const setAwaitedChild = async (id: string, childId: string): Promise<void> => {
+  await sql`UPDATE instances SET body = body || jsonb_build_object('awaitedChild', ${childId}::text) WHERE instance_id = ${id}`;
 };
 
 // The subprocess.spawn-enqueued events of one instance, newest-seq last.
@@ -780,8 +851,11 @@ test.skipIf(!DB)("a return interrupted after its first hop is durably resumed by
     const childNs = { outcome: "approved", data: childData };
     const { patch } = evalFieldMap(step.subprocess!.outputMapping, { ...buildGuardContext(parentBody, p, SYSTEM_ACTOR), child: childNs });
     await tx`UPDATE instances SET body = jsonb_set(body, '{data}', coalesce(body->'data', '{}'::jsonb) || ((${[patch]}::jsonb) -> 0))
+                   || jsonb_build_object('awaitedChild', null)
       WHERE instance_id = ${parent.instanceId}`;
-    const parked: Instance = { ...p, data: { ...p.data, ...patch } as Instance["data"] };
+    // As in the handler: the returned child is no longer awaited, so the first
+    // hop plans no cancel row for it.
+    const parked: Instance = { ...p, data: { ...p.data, ...patch } as Instance["data"], awaitedChild: null };
     const path = selectAutomaticPath(step, { ...buildGuardContext(parentBody, parked, SYSTEM_ACTOR), child: childNs })!;
     const committed = await executeAutomaticTransition(parked, path, parentBody, tx);
     return committed;
@@ -798,6 +872,8 @@ test.skipIf(!DB)("a return interrupted after its first hop is durably resumed by
   expect(rested!.status).toBe("completed");
   expect(dataField(rested, "field_p_result")).toBe("approved");
   expect(await resolveState(parent.instanceId)).toBe("idle");
+  expect(rested!.awaitedChild).toBeNull();
+  expect(await sql`SELECT 1 FROM outbox WHERE instance_id = ${parent.instanceId} AND action->>'type' = 'core.cancelSubprocessChild'`).toHaveLength(0);
 });
 
 test.skipIf(!DB)("spawn is idempotent: redelivery creates no second child", async () => {
@@ -974,6 +1050,7 @@ test.skipIf(!DB)("a parent whose linked step changed after enqueue is still foun
 
   await moveTo(parent.instanceId, "step_p_sub2");
   await relinkChild(childId, "step_p_sub2");
+  await setAwaitedChild(parent.instanceId, childId); // the relocated parent still awaits this child
 
   await drainAll(registry);
   const p = await loadInstance(parent.instanceId);
@@ -1038,7 +1115,10 @@ test.skipIf(!DB)("a parent that legitimately moved on is a delivered no-op", asy
   await drainOutbox(sql, registry); // return enqueued
   const childId = subprocessChildId(parent.instanceId, 1, "step_p_sub");
 
-  await moveTo(parent.instanceId, "step_p_approved"); // left the subprocess step; link untouched
+  // Left the subprocess step; link untouched. `moveTo` keeps `awaitedChild`
+  // naming this child, so the `currentStepId` check alone decides here.
+  await moveTo(parent.instanceId, "step_p_approved");
+  expect((await loadInstance(parent.instanceId))!.awaitedChild as string).toBe(childId);
   await drainAll(registry);
 
   const p = await loadInstance(parent.instanceId);
@@ -1057,10 +1137,12 @@ test.skipIf(!DB)("a parent parked at the linked step where that step is not a su
   await drainOutbox(sql, registry); // return enqueued
   const childId = subprocessChildId(parent.instanceId, 1, "step_p_sub");
 
-  // Parked at the linked step, and that step is not a subprocess step: a
-  // contradiction, surfaced rather than swallowed.
+  // Parked at the linked step, and that step is not a subprocess step, while
+  // `awaitedChild` (kept by `moveTo`) still names this child: a contradiction,
+  // surfaced rather than swallowed.
   await relinkChild(childId, "step_p_entry");
   await moveTo(parent.instanceId, "step_p_entry");
+  expect((await loadInstance(parent.instanceId))!.awaitedChild as string).toBe(childId);
   await drainOutbox(sql, registry);
 
   const row = await returnRow(childId);
@@ -1494,6 +1576,112 @@ test.skipIf(!DB)("a matched outcome records no unmatched event", async () => {
   expect(await outcomeUnmatchedEvents(parent.instanceId)).toHaveLength(0);
 });
 
+// --- DB: a subprocess step parks until its child returns ---------------------
+
+const GD_PID = "proc_parent_guardless_default" as Instance["processId"];
+
+test.skipIf(!DB)("a guardless default does not fire on entry: the parent stays parked and the approved outcome takes the approved path", async () => {
+  const { registry } = engineRegistry();
+  const cv = await publishBody(CHILD_PID, childBody(), emptyRegistry, dataSourceReg);
+  const pv = await publishBody(GD_PID, guardlessDefaultParentBody(cv.version, "entry"), emptyRegistry, dataSourceReg);
+  const parent = await startInstance(pv.definition, { processId: GD_PID, version: pv.version }, actor);
+  // The entry hop lands on the subprocess step and the cascade stops there. The
+  // guardless default is true on entry; taking it would complete the parent.
+  expect(parent.currentStepId as string).toBe("step_p_sub");
+  expect(parent.status).toBe("running");
+  expect(parent.transitionSeq).toBe(1);
+  expect(await historyCount(parent.instanceId)).toBe(1); // the entry hop alone
+  await seedField(parent.instanceId, "field_p_amount", 500); // <= 1000 -> approved
+
+  await drainOutbox(sql, registry); // spawn only (the return is enqueued during this pass)
+  expect(await loadInstance(subprocessChildId(parent.instanceId, 1, "step_p_sub"))).toBeDefined();
+  const parked = await loadInstance(parent.instanceId);
+  expect(parked!.currentStepId as string).toBe("step_p_sub");
+  expect(parked!.status).toBe("running");
+  // A re-resolution pass over the parked row takes no path either.
+  const resolved = await resolveAutomatic(parked!, pv.definition, actor, sql);
+  expect(resolved.currentStepId as string).toBe("step_p_sub");
+  expect(resolved.transitionSeq).toBe(1);
+
+  await drainAll(registry); // child terminal -> return -> parent advance
+  const p = await loadInstance(parent.instanceId);
+  expect(p!.currentStepId as string).toBe("step_p_approved"); // the guarded path, not the default
+  expect(p!.status).toBe("completed");
+  expect(dataField(p, "field_p_result")).toBe("approved");
+  expect(await outcomeUnmatchedEvents(parent.instanceId)).toHaveLength(0);
+});
+
+test.skipIf(!DB)("an outcome that matches no guarded path takes the guardless default once the child returned", async () => {
+  const { registry } = engineRegistry();
+  const cv = await publishBody(CHILD_PID, childBody(), emptyRegistry, dataSourceReg);
+  const pv = await publishBody(GD_PID, guardlessDefaultParentBody(cv.version, "entry"), emptyRegistry, dataSourceReg);
+  const parent = await startInstance(pv.definition, { processId: GD_PID, version: pv.version }, actor);
+  expect(parent.currentStepId as string).toBe("step_p_sub");
+  await seedField(parent.instanceId, "field_p_amount", 5000); // > 1000 -> "rejected", which no guarded path matches
+
+  await drainOutbox(sql, registry); // spawn only
+  expect(await loadInstance(subprocessChildId(parent.instanceId, 1, "step_p_sub"))).toBeDefined();
+  // The child exists and has not returned: the default has not fired.
+  expect((await loadInstance(parent.instanceId))!.currentStepId as string).toBe("step_p_sub");
+
+  await drainAll(registry); // child terminal "rejected" -> return -> default path
+  const p = await loadInstance(parent.instanceId);
+  expect(p!.currentStepId as string).toBe("step_p_defaulted");
+  expect(p!.status).toBe("completed");
+  expect(dataField(p, "field_p_result")).toBe("rejected"); // the writeback landed before the advance
+  expect(await outcomeUnmatchedEvents(parent.instanceId)).toHaveLength(0); // a default is a match
+});
+
+test.skipIf(!DB)("a subprocess initial step with a guardless default stays at sequence 0 until the child returns", async () => {
+  const { registry } = engineRegistry();
+  const cv = await publishBody(CHILD_PID, childBody(), emptyRegistry, dataSourceReg);
+  const pv = await publishBody(GD_PID, guardlessDefaultParentBody(cv.version, "sub"), emptyRegistry, dataSourceReg);
+  const parent = await startInstance(pv.definition, { processId: GD_PID, version: pv.version }, actor);
+  expect(parent.currentStepId as string).toBe("step_p_sub");
+  expect(parent.status).toBe("running");
+  expect(parent.transitionSeq).toBe(0);
+  expect(await historyCount(parent.instanceId)).toBe(0);
+  await seedField(parent.instanceId, "field_p_amount", 500);
+
+  await drainOutbox(sql, registry); // spawn only
+  expect(await loadInstance(subprocessChildId(parent.instanceId, 0, "step_p_sub"))).toBeDefined();
+  const parked = await loadInstance(parent.instanceId);
+  expect(parked!.currentStepId as string).toBe("step_p_sub");
+  expect(parked!.transitionSeq).toBe(0);
+
+  await drainAll(registry);
+  const p = await loadInstance(parent.instanceId);
+  expect(p!.currentStepId as string).toBe("step_p_approved");
+  expect(p!.status).toBe("completed");
+  expect(dataField(p, "field_p_result")).toBe("approved");
+});
+
+test.skipIf(!DB)("a guard over parent data alone does not fire on entry: the parent stays parked until the child returns", async () => {
+  const { registry } = engineRegistry();
+  const cv = await publishBody(CHILD_PID, childBody(), emptyRegistry, dataSourceReg);
+  const pv = await publishBody(PARENT_PID, dataGuardParentBody(cv.version), emptyRegistry, dataSourceReg);
+  const started = await startInstance(pv.definition, { processId: PARENT_PID, version: pv.version }, actor);
+  expect(started.currentStepId as string).toBe("step_p_form");
+  // The submit writes amount 500 and enters the subprocess step. `data.amount > 100.0`
+  // holds there, with no `child` in scope; the cascade must still stop.
+  const parent = await executeManualTransition(started, "path_p_submit", pv.definition, actor, sql, { field_p_amount: 500 } as unknown as Instance["data"]);
+  expect(parent.currentStepId as string).toBe("step_p_sub");
+  expect(parent.status).toBe("running");
+  expect(parent.transitionSeq).toBe(1);
+
+  await drainOutbox(sql, registry); // spawn only
+  expect(await loadInstance(subprocessChildId(parent.instanceId, 1, "step_p_sub"))).toBeDefined();
+  const parked = await loadInstance(parent.instanceId);
+  expect(parked!.currentStepId as string).toBe("step_p_sub");
+  expect(dataField(parked, "field_p_result")).toBeUndefined(); // no return has applied yet
+
+  await drainAll(registry); // the return evaluates the guards with child in scope
+  const p = await loadInstance(parent.instanceId);
+  expect(p!.currentStepId as string).toBe("step_p_big"); // the first guard that holds, evaluated after the return
+  expect(p!.status).toBe("completed");
+  expect(dataField(p, "field_p_result")).toBe("approved"); // the return applied its writeback first
+});
+
 // --- DB: creation at a subprocess initial step -------------------------------
 
 const SI_PID = "proc_parent_sub_initial" as Instance["processId"];
@@ -1699,25 +1887,48 @@ test.skipIf(!DB)("an ordinary creation enqueues nothing and records no spawn eve
 // "no pre-play validation" property createProcessInstance's own draft path
 // relies on. `processBody.parse` alone (no compileProcessBody) is enough to
 // get a typed ProcessBody, matching that path's own parse.
+//
+// Creation on the subprocess initial step records the derived child as
+// awaited, so the spawn passes the awaited-child check and the test-instance
+// check is what refuses it: `spawnError` reads that refusal off the spawn row.
+// The frozen body sits in no `draft_snapshots` row, so `testKindRegistry`
+// resolves it in place of the store, as the store resolves a snapshot.
+const testKindRegistry = (processId: string, body: ProcessBody): Reg => {
+  const store = createDefinitionStore(sql);
+  const registry: Reg = new Map();
+  registerSubprocessHandlers(
+    registry, sql, async (pid, ver) => (pid === processId && ver === -1 ? body : store.resolveBody(pid, ver)), store.resolveLatestByContract,
+  );
+  return registry;
+};
+const spawnError = async (parent: Instance): Promise<string> => {
+  expect(parent.awaitedChild as string).toBe(subprocessChildId(parent.instanceId, 0, "step_p_sub"));
+  const r = (await sql`SELECT last_error FROM outbox
+    WHERE instance_id = ${parent.instanceId} AND action->>'type' = ${SPAWN_ACTION_TYPE}`) as { last_error: string | null }[];
+  return r[0]?.last_error ?? "";
+};
+
 test.skipIf(!DB)("a test instance's subprocess step fails gracefully when the child has no resolvable version, creating no child", async () => {
-  const { registry } = engineRegistry();
   const NOVER_PID = "proc_parent_test_kind_unresolved" as Instance["processId"];
   const body = processBody.parse(subInitialParentBody(999999));
+  const registry = testKindRegistry(NOVER_PID, body);
   const parent = await createInstance(body, { processId: NOVER_PID, version: -1, kind: "test" });
   expect(parent.currentStepId as string).toBe("step_p_sub");
   await drainAll(registry);
   expect(await countChildren(parent.instanceId)).toBe(0);
+  expect(await spawnError(parent)).toContain("test instance");
 });
 
 test.skipIf(!DB)("a test instance's subprocess step fails gracefully even when the child HAS a resolvable version, creating no child", async () => {
-  const { registry } = engineRegistry();
   const RESOLV_PID = "proc_parent_test_kind_resolved" as Instance["processId"];
   const cv = await publishBody(CHILD_PID, childBody(), emptyRegistry, dataSourceReg);
   const body = processBody.parse(subInitialParentBody(cv.version));
+  const registry = testKindRegistry(RESOLV_PID, body);
   const parent = await createInstance(body, { processId: RESOLV_PID, version: -1, kind: "test" });
   expect(parent.currentStepId as string).toBe("step_p_sub");
   await drainAll(registry);
   expect(await countChildren(parent.instanceId)).toBe(0);
+  expect(await spawnError(parent)).toContain("test instance");
 });
 
 // --- spawn depth cap: a runtime backstop for a cycle publish did not catch ----
@@ -1773,6 +1984,9 @@ test.skipIf(!DB)("spawn refuses a child once the parent's own nesting depth reac
     sql,
   );
   await seedField(parent.instanceId, "field_p_amount", 500);
+  // The parent awaits the derived child, so the depth check is what refuses it.
+  const childId = subprocessChildId(parent.instanceId, parent.transitionSeq, "step_p_sub");
+  await setAwaitedChild(parent.instanceId, childId);
 
   const handler = registry.get(SPAWN_ACTION_TYPE)!.handler;
   let err: unknown;
@@ -1785,7 +1999,6 @@ test.skipIf(!DB)("spawn refuses a child once the parent's own nesting depth reac
   expect((err as Error).message).toContain("step_p_sub"); // names the subprocess step
   expect((err as Error).message).toContain("16"); // names the depth limit
 
-  const childId = subprocessChildId(parent.instanceId, parent.transitionSeq, "step_p_sub");
   expect(await loadInstance(childId)).toBeUndefined();
 });
 
@@ -1804,11 +2017,12 @@ test.skipIf(!DB)("a spawn below the depth cap proceeds, creating the child linke
     sql,
   );
   await seedField(parent.instanceId, "field_p_amount", 500);
+  const childId = subprocessChildId(parent.instanceId, parent.transitionSeq, "step_p_sub");
+  await setAwaitedChild(parent.instanceId, childId);
 
   const handler = registry.get(SPAWN_ACTION_TYPE)!.handler;
   await handler(spawnCtx(parent.instanceId, "step_p_sub", parent.transitionSeq, "action_spawn_depth_below_cap"));
 
-  const childId = subprocessChildId(parent.instanceId, parent.transitionSeq, "step_p_sub");
   const child = await loadInstance(childId);
   expect(child).toBeDefined();
   expect(child!.parent?.instanceId).toBe(parent.instanceId); // linked to the parent as usual

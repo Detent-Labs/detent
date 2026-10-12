@@ -137,9 +137,9 @@ export function collect(body: ProcessBody): Site[] {
  * action cannot reach this check from a published body at all; resolving it
  * here anyway, rather than special-casing it away, means a future path that
  * did produce one would be validated instead of waved through. The engine's
- * two internal handlers (`SPAWN_ACTION_TYPE`, `RETURN_ACTION_TYPE`) register
- * with `configSchema`s of their own (`src/engine/subprocess.ts`) for exactly
- * that reason.
+ * three internal handlers (`SPAWN_ACTION_TYPE`, `RETURN_ACTION_TYPE`,
+ * `CANCEL_CHILD_ACTION_TYPE`) register with `configSchema`s of their own
+ * (`src/engine/subprocess.ts`) for exactly that reason.
  */
 export function checkActionRegistry(body: ProcessBody, registry: Registry): RegistryIssue[] {
   const sites = collectTypedActionSites(body);

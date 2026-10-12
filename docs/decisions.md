@@ -1196,12 +1196,8 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   and `validateInstanceTransitionReferences` (`:373`) reject an unresolved
   one, but only `publishBody` calls them. The studio's own checks rail,
   `draft/validation.ts::runValidation` (`:82`), calls `validateStructure` and
-  `validateReferences` alone, so neither check runs before publish. A
-  `process.start` action's `config.inputMapping` value goes further:
-  `validateProcessChaining` (`src/engine/definitions.ts:531`) checks only the
-  mapping's target keys against the started process, and reads no mapping
-  value's CEL text at all. Risk (Medium): an author sees no warning until a
-  live instance drops the mapped entry (`mapping.entry-dropped`).
+  `validateReferences` alone, so neither check runs before publish. Risk
+  (Medium): an author sees no warning from the checks rail before publish.
 - **FIELDS-18: a reused key rebinds an old expression with no message.** A
   removal leaves every CEL expression that reads a removed field's key,
   since `fieldRemovalReach`'s `celReads` count and `removeFieldAndReferences`
@@ -1265,9 +1261,10 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   (`panels/RemoveFieldDialog.tsx:192-193`). It names no expression and no
   setting, and no later screen lists them all
   (`openspec/specs/studio-app/spec.md:4100-4102`).
-  A kept CEL read surfaces later as an unknown-key result on the Checks tab.
-  A kept `valueFromField` or `instanceIdField` setting, and a kept
-  `process.start` mapping value, fail the way FIELDS-17 already describes.
+  A kept CEL read, or a kept `process.start` mapping value, surfaces later as
+  an unknown-key result on the Checks tab.
+  A kept `valueFromField` or `instanceIdField` setting fails the way FIELDS-17
+  already describes.
 
   The step list the note leans on, "Used in", sits out of view when the
   author presses Remove field. Measured: its heading sat at -59px on one
@@ -1642,11 +1639,6 @@ of `5f41cd8a`. Each fix change deletes its own entries in the commit that
 archives it, and `sweep-docs-drift-2026-10` re-points the line citations of
 other entries. C-4 merges D-2, and C-6 merges F-6.
 
-- **`fix-subprocess-wait-state` (B-1, B-2, A-5; high)**: A guardless path
-  leaves a subprocess step before any child exists, a timer exit leaves the
-  child running, and publish checks view flags against a `child` the runtime
-  never supplies. Anchors: `src/engine/transition.ts`,
-  `src/engine/subprocess.ts`, `src/cel/check.ts`.
 - **`fix-handler-assignment-registry` (B-3, B-14; high)**: The handlers
   `process.start` and `instance.transition` resolve assignments with the
   static strategy alone, through a second function named
@@ -1662,11 +1654,6 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   `packages/web/src/areas/studio/panels/shared/InstanceQueryForm.tsx`,
   `packages/web/src/areas/reporting/screens/ReportBuilderScreen.tsx`,
   `packages/web/src/areas/studio/panels/shared/useTargetProcessCatalog.ts`.
-- **`harden-cel-check-sites` (A-1, A-3, A-4; medium)**: CEL in a
-  `process.start` input mapping skips every publish check, publish never
-  compiles a `matches()` regex, and publish accepts a guard, view flag or
-  `validation.rule` whose type is not `bool`. Anchors: `src/cel/check.ts`,
-  `src/cel/eval.ts`, `src/handlers/process-start.ts`.
 - **`tighten-publish-contract-checks` (A-2, A-8; medium)**: The idempotent
   compile branch accepts a hand-written cancel sink of any shape, and publish
   stores `Action.execution` and `Action.idempotencyKey`, which nothing reads.

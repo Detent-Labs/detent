@@ -3465,9 +3465,8 @@ name it.
 When no step view references the field, the row SHALL show disabled.
 It SHALL state that no step asks for it yet.
 
-The row's operand picker SHALL withhold `child.*`. The row writes one
-expression across steps of mixed type, and a `visible` override admits
-`child` on a subprocess step alone.
+The row's operand picker SHALL withhold `child.*`. No `visible` override
+admits `child`: the runtime resolves the flag with no child in scope.
 
 Updating the condition SHALL write the same override to every
 referencing view, and SHALL name the write before it happens. Where a
