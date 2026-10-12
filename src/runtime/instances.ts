@@ -365,7 +365,7 @@ export async function submitAndTransition(
 
       requireSubmitAuthority(instance, actor, instanceId);
 
-      const resolved = await validateSubmissionData(body, step, instance, actor, submitted, registry, tx);
+      const resolved = await validateSubmissionData(body, step, instance, actor, submitted, registry, tx, { checkRequired: true, allowClear: true });
 
       // After validation, never inside it: a `SubmissionValidationError` blames a
       // field on the participant's form, and a mismatching attribute is the
