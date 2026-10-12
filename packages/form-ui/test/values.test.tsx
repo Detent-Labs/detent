@@ -38,18 +38,27 @@ function findChangeHandler(node: ReactNode, tag: string): ((e: unknown) => void)
 /** Drives the control `FieldInput` draws for `field`, as the browser would:
  * the handler receives the control's raw DOM value. Returns what `onChange`
  * reported. */
-function reported(field: ResolvedViewField, tag: string, target: Record<string, unknown>): unknown[] {
-  const calls: unknown[] = [];
+function fire(
+  field: ResolvedViewField,
+  tag: string,
+  target: Record<string, unknown>,
+  context: { allFields?: ResolvedViewEntry[]; values?: Record<string, unknown>; onChange: (id: string, v: unknown) => void },
+): void {
   const tree = FieldInput({
     field,
-    allFields: [field],
-    values: {},
-    onChange: (_id, v) => calls.push(v),
+    allFields: context.allFields ?? [field],
+    values: context.values ?? {},
+    onChange: context.onChange,
     locale: "en",
   });
   const handler = findChangeHandler(tree as ReactNode, tag);
   if (!handler) throw new Error(`no <${tag}> with an onChange`);
   handler({ target });
+}
+
+function reported(field: ResolvedViewField, tag: string, target: Record<string, unknown>): unknown[] {
+  const calls: unknown[] = [];
+  fire(field, tag, target, { onChange: (_id, v) => calls.push(v) });
   return calls;
 }
 
@@ -254,18 +263,32 @@ describe("FieldForm: a datetime field converts for display only", () => {
     expect(html("soon")).toContain('value="soon"');
   });
 
-  it("submits an untouched zoned value unchanged", () => {
+  it("reports the raw typed string, not a converted one", () => {
+    const field = entry({ id: "f1", type: "string", format: "datetime" });
+    expect(reported(field, "input", { value: "2026-10-10T14:30" })).toEqual(["2026-10-10T14:30"]);
+  });
+
+  it("submits an untouched zoned value unchanged after an edit elsewhere in the form", () => {
     const stored = "2026-10-10T12:30:00Z";
-    const field = entry({ id: "f1", type: "string", format: "datetime" }, { value: stored });
-    const spy: unknown[][] = [];
-    renderToStaticMarkup(
-      <FieldForm fields={[field]} values={{ f1: stored }} onChange={(...args) => spy.push(args)} locale="en" />,
-    );
-    // Display conversion fires no change, so the form state keeps the stored value.
-    expect(spy).toEqual([]);
-    const submitted = filterToEditable({ f1: stored }, [field]);
+    const f1 = entry({ id: "f1", key: "f1", type: "string", format: "datetime" }, { value: stored });
+    const f2 = entry({ id: "f2", key: "f2", type: "string" });
+    const fields = [f1, f2];
+    // Form state kept the way a consumer keeps it.
+    let values: Record<string, unknown> = { f1: stored };
+    const onChange = (id: string, v: unknown) => {
+      values = { ...values, [id]: v };
+    };
+    // A render pass. A render that wrote the converted value into state
+    // would replace f1 here.
+    renderToStaticMarkup(<FieldForm fields={fields} values={values} onChange={onChange} locale="en" />);
+    for (const f of fields) FieldInput({ field: f, allFields: fields, values, onChange, locale: "en" });
+    // The participant types in the sibling field only.
+    fire(f2, "input", { value: "hello" }, { allFields: fields, values, onChange });
+    expect(values.f2).toBe("hello");
+    const submitted = filterToEditable(values, fields);
+    expect(submitted.f2).toBe("hello");
     expect(submitted.f1).toBe(stored);
-    expect(JSON.stringify(submitted)).toBe('{"f1":"2026-10-10T12:30:00Z"}');
+    expect(JSON.stringify(submitted)).toBe('{"f1":"2026-10-10T12:30:00Z","f2":"hello"}');
   });
 
   it("does not convert a date field", () => {
