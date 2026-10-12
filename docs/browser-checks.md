@@ -978,14 +978,17 @@ the screen sent:
 playwright-cli -s=<worktree-name> requests
 ```
 
-Pass: the list holds `GET /admin/timers?instanceId=<id>&limit=1`. It holds
-no `GET /processes` request.
+Pass: the list holds `GET /admin/timers?instanceId=<id>&limit=1`. It has no
+bare `GET /processes` request. Only `GET /processes/<id>/versions` appears, for
+the Definition hash row.
 
-Make two outbox rows dead-letter. Let an `http.request` action aim at a closed
-port until its attempts run out. Alternatively, insert the rows into `outbox`
-with the status `dead-letter`. Open Operations, then Outbox, and filter to Dead letter.
+Make three outbox rows dead-letter. Let an `http.request` action aim at a
+closed port until its attempts run out. Alternatively, insert the rows into
+`outbox` with the status `dead-letter`. Open Operations, then Outbox, and
+filter to Dead letter. Row 1 takes the English dismiss and accept pair. Row 2
+takes the German pair. Row 3 takes the Retry dismiss.
 
-Press Discard on one row. Pass: a native confirm opens. It reads "Discarding
+Press Discard on row 1. Pass: a native confirm opens. It reads "Discarding
 is final. This action's side effect never goes out, and you cannot retry it
 afterwards. Continue?" Dismiss it:
 
@@ -997,17 +1000,17 @@ A native confirm blocks every other `playwright-cli` read, so answer it first.
 Pass: the request list has no `POST /admin/outbox/<key>/discard`, and the row
 stays `dead-letter`.
 
-Press Discard again and accept it with `dialog-accept`. Pass: the list holds
-exactly one `POST /admin/outbox/<key>/discard`. The count line reads
-"discarded: 1". Under "All statuses" the row shows DISCARDED with no buttons.
+Press Discard on row 1 again and accept it with `dialog-accept`. Pass: the list
+holds exactly one `POST /admin/outbox/<key>/discard`. The count line reads
+"discarded: 1". Under "All statuses" row 1 shows DISCARDED with no buttons.
 
-Switch to German and repeat the dismiss and accept pair on the second row.
+Switch to German and repeat the dismiss and accept pair on row 2.
 Pass: the confirm reads "Das Verwerfen ist endgültig. Der Seiteneffekt dieser
 Aktion wird nie ausgeführt, und ein erneuter Versuch ist danach nicht mehr
 möglich. Fortfahren?" Dismissing sends nothing. Accepting sends one POST.
 
-Press Retry on a dead-letter row and dismiss it. Pass: the confirm names the
-re-run and the idempotency key, and the request list gains no POST.
+Press Retry on row 3 and dismiss it. Pass: the confirm names the re-run and the
+idempotency key, the request list gains no POST, and row 3 stays `dead-letter`.
 
 ### Canvas grid snapping (`canvas-grid-snap`)
 
