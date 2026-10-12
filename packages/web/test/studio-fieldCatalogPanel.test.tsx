@@ -6,7 +6,19 @@ import type { ValidationResult } from "../src/areas/studio/draft/validation.js";
 import type { EditorIssue } from "../src/areas/studio/draft/issues.js";
 import { DraftContext, type DraftContextValue } from "../src/areas/studio/draft/store.js";
 import { FieldCatalogPanel, MoveFieldControl } from "../src/areas/studio/panels/FieldCatalogPanel.js";
-import { ADD_FIRST_FIELD_ID, fieldLabelInputId, moveControlId, removeControlId } from "../src/areas/studio/panels/fieldCatalogLogic.js";
+import {
+  ADD_FIRST_FIELD_ID,
+  fieldKeyNoticeId,
+  fieldLabelInputId,
+  keyInputStep,
+  keyNoticeFor,
+  type KeyInputEvent,
+  labelChangePatch,
+  moveControlId,
+  removeControlId,
+} from "../src/areas/studio/panels/fieldCatalogLogic.js";
+import { PublishedFieldIdsContext } from "../src/areas/studio/draft/publishedFields.js";
+import { writeGroupLabel } from "../src/areas/studio/draft/view-group-sync.js";
 
 const NOOP = () => {};
 
@@ -319,5 +331,296 @@ describe("FieldCatalogPanel", () => {
     expect(child).toMatch(/data-checked="failed"[^>]*>What this field asks</);
 
     expect(render("field_g")).not.toContain("data-checked");
+  });
+});
+
+/**
+ * What `FieldEditor::updateLabel` writes for a label change. It reads the lock
+ * through `labelChangePatch` and `writeGroupLabel`. The panel renders to static
+ * markup in this suite, which fires no change event, so these cases call the
+ * two writes `updateLabel` calls.
+ */
+describe("a label change in the field catalog", () => {
+  const cel = (src: string) => ({ lang: "cel" as const, src });
+  const amountLabel = { en: "Amount" };
+  const totalLabel = { en: "Total amount" };
+
+  const guardedDraft = (): Draft =>
+    ({
+      baseLocale: "en",
+      fields: [fld("field_amount", "amount", { label: amountLabel })],
+      workflow: {
+        initialStep: "step_a",
+        steps: [
+          {
+            id: "step_a",
+            key: "a",
+            label: { en: "A" },
+            type: "task",
+            paths: [{ id: "path_a", key: "p", label: "P", to: "step_a", trigger: "automatic", guard: cel("data.amount > 1000.0") }],
+          },
+        ],
+      },
+    }) as unknown as Draft;
+
+  const fieldOf = (draft: Draft, id: string): DraftField => (draft.fields as unknown as DraftField[]).find((f) => f.id === id)!;
+
+  it("leaves a key that a guard reads when the label changes", () => {
+    const draft = guardedDraft();
+    const patch = labelChangePatch(draft, fieldOf(draft, "field_amount"), totalLabel, "en", new Set());
+
+    expect(patch).toEqual({ label: totalLabel });
+  });
+
+  it("leaves a published field's key when the label changes", () => {
+    const draft = { baseLocale: "en", fields: [fld("field_amount", "amount", { label: amountLabel })] } as unknown as Draft;
+    const patch = labelChangePatch(draft, fieldOf(draft, "field_amount"), totalLabel, "en", new Set(["field_amount"]));
+
+    expect(patch).toEqual({ label: totalLabel });
+  });
+
+  it("leaves the key while the base version has not loaded", () => {
+    const draft = { baseLocale: "en", fields: [fld("field_amount", "amount", { label: amountLabel })] } as unknown as Draft;
+    const patch = labelChangePatch(draft, fieldOf(draft, "field_amount"), totalLabel, "en", undefined);
+
+    expect(patch).toEqual({ label: totalLabel });
+  });
+
+  it("follows the label for an unread field the base version lacks", () => {
+    const draft = { baseLocale: "en", fields: [fld("field_amount", "amount", { label: amountLabel })] } as unknown as Draft;
+    const patch = labelChangePatch(draft, fieldOf(draft, "field_amount"), totalLabel, "en", new Set(["field_other"]));
+
+    expect(patch).toEqual({ label: totalLabel, key: "total_amount" });
+  });
+
+  it("follows the label in a draft with no base version", () => {
+    const draft = { baseLocale: "en", fields: [fld("field_amount", "amount", { label: amountLabel })] } as unknown as Draft;
+    const patch = labelChangePatch(draft, fieldOf(draft, "field_amount"), totalLabel, "en", new Set());
+
+    expect(patch).toEqual({ label: totalLabel, key: "total_amount" });
+  });
+
+  it("derives a key for an empty-key field even when its id is published", () => {
+    const draft = { baseLocale: "en", fields: [fld("field_new", "", { label: undefined })] } as unknown as Draft;
+    const patch = labelChangePatch(draft, fieldOf(draft, "field_new"), totalLabel, "en", new Set(["field_new"]));
+
+    expect(patch).toEqual({ label: totalLabel, key: "total_amount" });
+  });
+
+  it("does not count a field with no id as published", () => {
+    const field = { key: "amount", label: amountLabel, type: "string" } as unknown as DraftField;
+    const draft = { baseLocale: "en", fields: [field] } as unknown as Draft;
+    const patch = labelChangePatch(draft, field, totalLabel, "en", undefined);
+
+    expect(patch).toEqual({ label: totalLabel, key: "total_amount" });
+  });
+
+  it("keeps a group field following its label and rewrites its view entries", () => {
+    const draft = {
+      baseLocale: "en",
+      fields: [grp("field_request", "request", [fld("field_child", "child")])],
+      workflow: {
+        initialStep: "step_a",
+        steps: [
+          {
+            id: "step_a",
+            key: "a",
+            label: { en: "A" },
+            type: "task",
+            view: { fields: [{ ref: "field_request" }, { ref: "field_child", group: "request" }] },
+          },
+        ],
+      },
+    } as unknown as Draft;
+    (fieldOf(draft, "field_request") as { label: unknown }).label = { en: "Request" };
+
+    writeGroupLabel(draft, "field_request", { en: "Order request" }, "en");
+
+    expect(fieldOf(draft, "field_request").key).toBe("order_request");
+    const entries = (draft.workflow as unknown as { steps: { view: { fields: { group?: string }[] } }[] }).steps[0]!.view.fields;
+    expect(entries[1]!.group).toBe("order_request");
+  });
+});
+
+const readAmount = (src: string) => ({ lang: "cel", src });
+
+/** A draft whose `amount` field is read by `readers` CEL expressions. */
+function draftWithReaders(readers: string[]): Draft {
+  return {
+    baseLocale: "en",
+    fields: [fld("field_amount", "amount")],
+    workflow: { guards: readers.map(readAmount) },
+  } as unknown as Draft;
+}
+
+function renderKeyEditor(draft: Draft, selectedId: string, published: ReadonlySet<string> | undefined): string {
+  return renderToStaticMarkup(
+    <PublishedFieldIdsContext.Provider value={published}>
+      <DraftContext.Provider value={contextValue(draft)}>
+        <FieldCatalogPanel
+          token="test-token"
+          selectedId={selectedId}
+          onAdd={NOOP}
+          onRemove={NOOP}
+          onShowStep={NOOP}
+          onMoveField={NOOP}
+        />
+      </DraftContext.Provider>
+    </PublishedFieldIdsContext.Provider>,
+  );
+}
+
+/** The `<input>` element that carries the field's key, whole. */
+function keyInput(html: string): string {
+  const labelAt = html.indexOf(">Key<");
+  expect(labelAt).toBeGreaterThan(-1);
+  const inputAt = html.indexOf("<input", labelAt);
+  return html.slice(inputAt, html.indexOf(">", inputAt) + 1);
+}
+
+/** Feeds a key input the events of one gesture and collects what it would write. */
+function runKeyInput(currentKey: string, events: KeyInputEvent[]): { writes: (string | undefined)[]; shown: string } {
+  let typed: string | undefined;
+  const writes: (string | undefined)[] = [];
+  for (const event of events) {
+    const step = keyInputStep(typed, event, currentKey);
+    typed = step.typed;
+    writes.push(step.write);
+  }
+  return { writes, shown: typed ?? currentKey };
+}
+
+describe("keyInputStep", () => {
+  it("writes nothing while the author types, and one key after the commit", () => {
+    const typing = [..."total"].map((_, i, chars): KeyInputEvent => ({ kind: "type", text: chars.slice(0, i + 1).join("") }));
+    const typedOnly = runKeyInput("amount", typing);
+    expect(typedOnly.writes.every((write) => write === undefined)).toBe(true);
+    expect(typedOnly.shown).toBe("total");
+
+    const committed = runKeyInput("amount", [...typing, { kind: "commit" }]);
+    expect(committed.writes.filter((write) => write !== undefined)).toEqual(["total"]);
+    expect(committed.shown).toBe("amount");
+  });
+
+  it("writes once when Enter is followed by the blur", () => {
+    const { writes } = runKeyInput("amount", [
+      { kind: "type", text: "total_amount" },
+      { kind: "commit" },
+      { kind: "commit" },
+    ]);
+    expect(writes.filter((write) => write !== undefined)).toEqual(["total_amount"]);
+  });
+
+  it("writes nothing for the text the field already carries", () => {
+    const { writes } = runKeyInput("amount", [
+      { kind: "type", text: "amoun" },
+      { kind: "type", text: "amount" },
+      { kind: "commit" },
+    ]);
+    expect(writes.every((write) => write === undefined)).toBe(true);
+  });
+
+  it("writes nothing for a commit with no typing", () => {
+    expect(runKeyInput("amount", [{ kind: "commit" }]).writes).toEqual([undefined]);
+  });
+
+  it("writes an empty text that clears the key", () => {
+    const { writes } = runKeyInput("amount", [{ kind: "type", text: "" }, { kind: "commit" }]);
+    expect(writes).toEqual([undefined, ""]);
+  });
+});
+
+describe("keyNoticeFor", () => {
+  it("counts several readers", () => {
+    expect(keyNoticeFor("amount", 3, false)).toBe(
+      "Read by 3 expressions. The label no longer sets this key, and changing the key does not touch them.",
+    );
+  });
+
+  it("uses the singular for one reader", () => {
+    expect(keyNoticeFor("amount", 1, false)).toBe(
+      "Read by 1 expression. The label no longer sets this key, and changing the key does not touch it.",
+    );
+  });
+
+  it("names the publication of a field nothing reads", () => {
+    expect(keyNoticeFor("amount", 0, true)).toBe("This field is in a published version. The label no longer sets its key.");
+  });
+
+  it("prefers the readers over the publication", () => {
+    expect(keyNoticeFor("amount", 2, true)).toContain("Read by 2 expressions");
+  });
+
+  it("shows nothing for a new field nothing reads", () => {
+    expect(keyNoticeFor("amount", 0, false)).toBeUndefined();
+  });
+
+  it("shows nothing for an empty key, whatever the rest says", () => {
+    expect(keyNoticeFor("", 0, true)).toBeUndefined();
+    expect(keyNoticeFor("", 2, true)).toBeUndefined();
+  });
+});
+
+describe("the notice under a field's key input", () => {
+  it("counts every expression that reads the key, and ties it to the input", () => {
+    const draft = draftWithReaders(["data.amount > 1000.0", "data.amount < 5000.0", "data.amount + data.amount > 1.0"]);
+    const html = renderKeyEditor(draft, "field_amount", new Set());
+    expect(html).toContain("Read by 3 expressions.");
+    expect(keyInput(html)).toContain(`aria-describedby="${fieldKeyNoticeId("field_amount")}"`);
+    expect(html).toContain(`<p id="${fieldKeyNoticeId("field_amount")}"`);
+  });
+
+  it("puts the notice beside the key's label, never inside it", () => {
+    const html = renderKeyEditor(draftWithReaders(["data.amount > 1.0"]), "field_amount", new Set());
+    const noticeAt = html.indexOf(`id="${fieldKeyNoticeId("field_amount")}"`);
+    expect(noticeAt).toBeGreaterThan(-1);
+    expect(html.lastIndexOf("<label", noticeAt)).toBeLessThan(html.lastIndexOf("</label>", noticeAt));
+  });
+
+  it("uses the singular for one reader", () => {
+    const html = renderKeyEditor(draftWithReaders(["data.amount > 1.0"]), "field_amount", new Set());
+    expect(html).toContain("Read by 1 expression.");
+    expect(html).not.toContain("Read by 1 expressions");
+  });
+
+  it("names the publication of a field nothing reads", () => {
+    const html = renderKeyEditor(draftWithReaders([]), "field_amount", new Set(["field_amount"]));
+    expect(html).toContain("This field is in a published version. The label no longer sets its key.");
+    expect(keyInput(html)).toContain(`aria-describedby="${fieldKeyNoticeId("field_amount")}"`);
+  });
+
+  it("shows no notice for a new field nothing reads", () => {
+    const html = renderKeyEditor(draftWithReaders([]), "field_amount", new Set());
+    expect(html).not.toContain(fieldKeyNoticeId("field_amount"));
+    expect(html).not.toContain("published version");
+    expect(keyInput(html)).not.toContain("aria-describedby");
+  });
+
+  it("shows no notice while the base version loads and nothing reads the key", () => {
+    const html = renderKeyEditor(draftWithReaders([]), "field_amount", undefined);
+    expect(html).not.toContain(fieldKeyNoticeId("field_amount"));
+    expect(keyInput(html)).not.toContain("aria-describedby");
+  });
+
+  it("shows no notice for an empty key", () => {
+    const draft = { baseLocale: "en", fields: [fld("field_amount", "")] } as unknown as Draft;
+    const html = renderKeyEditor(draft, "field_amount", new Set(["field_amount"]));
+    expect(html).not.toContain(fieldKeyNoticeId("field_amount"));
+  });
+
+  it("shows no notice for a group, though an expression names its key", () => {
+    const draft = {
+      baseLocale: "en",
+      fields: [grp("field_g", "amount", [])],
+      workflow: { guards: [readAmount("data.amount > 1.0")] },
+    } as unknown as Draft;
+    const html = renderKeyEditor(draft, "field_g", new Set(["field_g"]));
+    expect(html).not.toContain(fieldKeyNoticeId("field_g"));
+    expect(keyInput(html)).not.toContain("aria-describedby");
+  });
+
+  it("shows the draft's key while nothing is typed", () => {
+    const html = renderKeyEditor(draftWithReaders([]), "field_amount", new Set());
+    expect(keyInput(html)).toContain('value="amount"');
   });
 });

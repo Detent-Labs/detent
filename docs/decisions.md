@@ -1289,6 +1289,43 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   1300x900 on the group "Personal details": each list names all 12 steps and
   wraps to five lines. Risk (Low): each zone's own control sits below five
   lines of the same names.
+- **FIELDS-26: a changed option value leaves CEL comparisons on the old
+  string.** A change or deletion of an option `value` on a field leaves every
+  CEL comparison such as `data.priority == "high"` on the old string. The
+  type check raises no error and the studio shows no message.
+  The key-rename guard (audit finding E2-7) locks the key against label
+  changes and counts the readers of a key. It leaves this gap open on purpose, since
+  finding a comparison needs a heuristic over CEL string literals, and that
+  heuristic gives false positives. Risk (Medium): a guard stops matching after
+  an option rename, and the path parks.
+
+  Upgrade entry: extend the reader walk in
+  `packages/web/src/areas/studio/draft/key-readers.ts` to report a string
+  literal compared with the field.
+- **FIELDS-27: a key notice names no reader and a rename leaves them
+  dangling.** The notice counts the expressions that read a key, names none
+  and offers no jump to them. The "Used in" column beside it has a "Show on
+  the canvas" pattern to copy. After a committed rename, the notice recomputes
+  for the new key and drops to no readers. An expression that now reads a key
+  no field has gets no message beyond the checks rail's unknown-variable
+  result. The key input has no Escape revert and no pending hint while the
+  typed text differs from the key. Risk (Medium): a rename silently strands
+  every guard that read the old key.
+
+  Upgrade entry: a "rename and rewrite readers" command can close all three
+  gaps. A rewrite would reuse the traversal of `removeFieldAndReferences`.
+- **FIELDS-28: the lock shows no notice while the base version loads or
+  fails.** Until the base version body has loaded, a field with a non-empty
+  key counts as published, so the label no longer sets its key. The notice
+  needs a confirmed publication, so it shows nothing. A failed fetch keeps
+  that state, and the error is swallowed. A new field in a draft with a base
+  version then derives `a` from the first letter and freezes. The empty-key
+  case still derives. Risk (Low): the key stops following the label with no
+  message.
+
+  Upgrade entry: surface the fetch state from
+  `packages/web/src/areas/studio/draft/publishedFields.tsx` and show a loading
+  or error sentence.
 
 ## Open from the 2026-09-13 Changes tab audit (one OpenSpec change per screen)
 
@@ -1665,11 +1702,6 @@ of `5f41cd8a`. Each fix change deletes its own entries in the commit that
 archives it, and `sweep-docs-drift-2026-10` re-points the line citations of
 other entries. C-4 merges D-2, and C-6 merges F-6.
 
-- **`guard-field-key-renames` (E2-7; medium)**: A label change renames the
-  field key, and the CEL expressions that read the old key keep it. Anchors:
-  `packages/web/src/areas/studio/panels/FieldCatalogPanel.tsx`,
-  `packages/web/src/areas/studio/panels/fieldCatalogLogic.ts`,
-  `packages/web/src/areas/studio/draft/deriveKey.ts`.
 - **`cut-studio-render-cost` (E2-11, E1-6, K-1; medium)**: Hidden tabs
   recompute on every keystroke, the canvas reparses every guard on each
   pointer move, and the studio chunk exceeds the 500 kB warning threshold of
