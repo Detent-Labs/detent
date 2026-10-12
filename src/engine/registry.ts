@@ -60,6 +60,14 @@ export interface HandlerContext {
    * needing no database ignores it, the way `http.request` does.
    */
   db: SQL;
+  /**
+   * The assignment registry the engine runs with, the one that resolves a
+   * step's assignment strategy. Required, like `db`. A handler that starts or
+   * moves an instance passes this on and builds no registry of its own, so an
+   * operator-registered strategy resolves the same way in every path. No handler
+   * may fall back to another registry.
+   */
+  assignmentRegistry: AssignmentRegistry;
 }
 
 /** A registered handler plus its plugin config JSON Schema. */

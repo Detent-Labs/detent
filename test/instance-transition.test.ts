@@ -8,7 +8,7 @@ import { sql, initSchema, loadInstance } from "../src/engine/store.js";
 import { startInstance, commitManualTransition, cancelInstance } from "../src/engine/transition.js";
 import { publishBody } from "../src/engine/definitions.js";
 import { createDefaultRegistry } from "../src/engine/host.js";
-import { createDataSourceRegistry, type Registry as Reg } from "../src/engine/registry.js";
+import { createDataSourceRegistry, createStaticAssignmentRegistry, type Registry as Reg } from "../src/engine/registry.js";
 import { drainOutbox, deliver, type ClaimedRow } from "../src/engine/outbox.js";
 import { idempotencyKey } from "../src/engine/idempotency.js";
 import { INSTANCE_TRANSITION_ACTION_TYPE } from "../src/handlers/instance-transition.js";
@@ -294,11 +294,11 @@ test.skipIf(!DB)("a redelivery moves the target at most once", async () => {
     actors: null,
   };
 
-  await deliver(row, registry, sql);
+  await deliver(row, registry, sql, createStaticAssignmentRegistry());
   const afterFirst = await loadInstance(sql, target.instanceId);
   expect(afterFirst!.currentStepId as string).toBe("step_issued");
 
-  await deliver(row, registry, sql); // redelivery of the same physical row
+  await deliver(row, registry, sql, createStaticAssignmentRegistry()); // redelivery of the same physical row
   const afterSecond = await loadInstance(sql, target.instanceId);
   expect(afterSecond!.currentStepId as string).toBe("step_issued"); // unchanged
 
@@ -365,7 +365,7 @@ test.skipIf(!DB)("two genuinely concurrent deliveries for the same target: exact
   // Both deliveries load the target before either commits: a genuine race
   // through commitTransition's own OCC predicate, not the sequential
   // current-step check above.
-  const results = await Promise.allSettled([deliver(rowFor(doneA), registry, sql), deliver(rowFor(doneB), registry, sql)]);
+  const results = await Promise.allSettled([deliver(rowFor(doneA), registry, sql, createStaticAssignmentRegistry()), deliver(rowFor(doneB), registry, sql, createStaticAssignmentRegistry())]);
   const fulfilled = results.filter((r) => r.status === "fulfilled");
   const rejected = results.filter((r) => r.status === "rejected");
   expect(fulfilled).toHaveLength(1);

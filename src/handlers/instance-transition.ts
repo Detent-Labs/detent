@@ -22,12 +22,7 @@ import { loadInstance, newInstanceEventId } from "../engine/store.js";
 import { executeManualTransition, GuardRefused, ConcurrencyConflict } from "../engine/transition.js";
 import { createDefinitionStore } from "../engine/definitions.js";
 import type { FieldId, InstanceEvent, PathId } from "../schema/definition.js";
-import {
-  createStaticAssignmentRegistry,
-  INSTANCE_TRANSITION_ACTION_TYPE,
-  type HandlerContext,
-  type HandlerDef,
-} from "../engine/registry.js";
+import { INSTANCE_TRANSITION_ACTION_TYPE, type HandlerContext, type HandlerDef } from "../engine/registry.js";
 
 export { INSTANCE_TRANSITION_ACTION_TYPE };
 
@@ -124,11 +119,8 @@ async function instanceTransitionHandler(ctx: HandlerContext): Promise<unknown> 
     at: new Date().toISOString(),
   };
 
-  // One registry per delivery, shared by the transition call — the
-  // single-construction shape `process-start.ts` uses.
-  const assignmentRegistry = createStaticAssignmentRegistry();
   try {
-    await executeManualTransition(target, config.pathId, targetBody, SYSTEM_ACTOR, ctx.db, undefined, assignmentRegistry, [event]);
+    await executeManualTransition(target, config.pathId, targetBody, SYSTEM_ACTOR, ctx.db, undefined, ctx.assignmentRegistry, [event]);
   } catch (e) {
     if (e instanceof GuardRefused) {
       throw new PermanentError(`instance.transition: the guard on path '${config.pathId}' refused`);

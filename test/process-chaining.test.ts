@@ -11,7 +11,7 @@ import { sql, initSchema, createInstance } from "../src/engine/store.js";
 import { startInstance, commitManualTransition, cancelInstance } from "../src/engine/transition.js";
 import { publishBody, createDefinitionStore, CrossProcessValidationError, CelValidationError } from "../src/engine/definitions.js";
 import { createDefaultRegistry } from "../src/engine/host.js";
-import { createDataSourceRegistry, RETURN_ACTION_TYPE, type Registry as Reg } from "../src/engine/registry.js";
+import { createDataSourceRegistry, createStaticAssignmentRegistry, RETURN_ACTION_TYPE, type Registry as Reg } from "../src/engine/registry.js";
 import { drainOutbox, deliver, MAX_ATTEMPTS, type ClaimedRow } from "../src/engine/outbox.js";
 import { idempotencyKey } from "../src/engine/idempotency.js";
 import { PROCESS_START_ACTION_TYPE } from "../src/handlers/process-start.js";
@@ -241,8 +241,8 @@ test.skipIf(!DB)("a redelivered start creates no second instance", async () => {
     field_version: done.version,
     actors: null,
   };
-  await deliver(row, registry, sql);
-  await deliver(row, registry, sql);
+  await deliver(row, registry, sql, createStaticAssignmentRegistry());
+  await deliver(row, registry, sql, createStaticAssignmentRegistry());
 
   expect(await countChainedFrom(done.instanceId)).toBe(1);
 });

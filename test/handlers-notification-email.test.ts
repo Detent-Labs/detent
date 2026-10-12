@@ -17,7 +17,7 @@ import {
   SMTP_DEFAULT_TIMEOUT_MS,
 } from "../src/handlers/notification-email.js";
 import { deliver, PermanentError, type ClaimedRow } from "../src/engine/outbox.js";
-import { createRegistry, type HandlerContext, type OutboxActors } from "../src/engine/registry.js";
+import { createRegistry, createStaticAssignmentRegistry, type HandlerContext, type OutboxActors } from "../src/engine/registry.js";
 import { createDefaultRegistry } from "../src/engine/host.js";
 import type { Action } from "../src/schema/definition.js";
 
@@ -62,6 +62,7 @@ const ctxFor = (
   // Empty by default: every literal-`to` case below resolves no actor, so the
   // account lookup short-circuits and never reaches this handle.
   db: opts.db ?? accountsDb([]),
+  assignmentRegistry: createStaticAssignmentRegistry(),
 });
 
 const validConfig = { to: ["ops@example.test"], subject: "Task waiting", body: "Please review." };
@@ -210,7 +211,7 @@ test("createDefaultRegistry resolves notification.email", () => {
 test("a caller-supplied registry without the handler is unaffected", async () => {
   // The same row against a registry that never registered the type: it
   // dead-letters as unregistered, exactly as it would have before this change.
-  const err = await rejects(deliver(rowFor(validConfig), createRegistry(), accountsDb([])));
+  const err = await rejects(deliver(rowFor(validConfig), createRegistry(), accountsDb([]), createStaticAssignmentRegistry()));
   expect(err).toBeInstanceOf(PermanentError);
   expect((err as Error).message).toContain(NOTIFICATION_EMAIL_ACTION_TYPE);
 });
@@ -401,7 +402,7 @@ test("deliver evaluates an Action.output mapping over the handler's result", asy
     const reg = createRegistry();
     reg.set(NOTIFICATION_EMAIL_ACTION_TYPE, mailDef);
     const row = rowFor(validConfig, { field_sent: { lang: "cel", src: "result.messageId" } });
-    const patch = await deliver(row, reg, accountsDb([]));
+    const patch = await deliver(row, reg, accountsDb([]), createStaticAssignmentRegistry());
     expect(patch).toEqual({ field_sent: "<idem_row@example.test>" });
   });
 });
@@ -410,7 +411,7 @@ test("deliver succeeds with no Action.output mapping and writes no field", async
   await withFake({}, async (server) => {
     const reg = createRegistry();
     reg.set(NOTIFICATION_EMAIL_ACTION_TYPE, mailDef);
-    const patch = await deliver(rowFor(validConfig), reg, accountsDb(ACCOUNTS));
+    const patch = await deliver(rowFor(validConfig), reg, accountsDb(ACCOUNTS), createStaticAssignmentRegistry());
     expect(patch).toEqual({});
     expect(server.messages).toHaveLength(1);
   });
@@ -421,7 +422,7 @@ test("an output mapping that cannot read the result fails transiently, after the
     const reg = createRegistry();
     reg.set(NOTIFICATION_EMAIL_ACTION_TYPE, mailDef);
     const row = rowFor(validConfig, { field_sent: { lang: "cel", src: "result.noSuchKey" } });
-    const err = await rejects(deliver(row, reg, accountsDb([])));
+    const err = await rejects(deliver(row, reg, accountsDb([]), createStaticAssignmentRegistry()));
     // Transient, so the outbox retries and the message goes out again. This is
     // the duplicate-mail hazard the declared result shape exists to keep an
     // author away from, demonstrated rather than only described.

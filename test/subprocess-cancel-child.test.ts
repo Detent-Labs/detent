@@ -28,7 +28,7 @@ import { subprocessChildId } from "../src/engine/idempotency.js";
 import { compileProcessBody, CompileValidationError } from "../src/schema/compile.js";
 import { SYSTEM_ACTOR, type Actor } from "../src/cel/eval.js";
 import type { ProcessBody, Instance } from "../src/schema/definition.js";
-import type { Registry as Reg, DataSourceRegistry, HandlerContext } from "../src/engine/registry.js";
+import { createStaticAssignmentRegistry, type Registry as Reg, type DataSourceRegistry, type HandlerContext } from "../src/engine/registry.js";
 import type { ResolveBody } from "../src/engine/resolution.js";
 
 const DB = !!process.env.DATABASE_URL;
@@ -213,6 +213,7 @@ function cancelCtx(parentId: string, childId: string): HandlerContext {
     idempotencyKey: `test-cancel-${childId}`,
     instanceId: parentId,
     db: sql,
+    assignmentRegistry: createStaticAssignmentRegistry(),
   };
 }
 const cancelHandler = (registry: Reg) => registry.get(CANCEL_CHILD_ACTION_TYPE)!.handler;
@@ -533,6 +534,7 @@ function spawnCtx(parentId: string, parentSeq: number): HandlerContext {
     idempotencyKey: `test-spawn-${parentId}-${parentSeq}`,
     instanceId: parentId,
     db: sql,
+    assignmentRegistry: createStaticAssignmentRegistry(),
   };
 }
 const spawnHandler = (registry: Reg) => registry.get(SPAWN_ACTION_TYPE)!.handler;
