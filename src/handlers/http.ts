@@ -1,8 +1,10 @@
 /**
  * Generic, vendor-neutral `http.request` action handler: calls an authored URL
  * and returns a structured result for `Action.output` to write back. `config`
- * is static, publish-validated JSON — no instance `data`, no DB lookup. The
- * first fully stateless handler in the registry.
+ * is static, publish-validated JSON — no instance `data`, no DB lookup. A
+ * header value may name an environment variable instead of holding a value;
+ * the handler reads it at delivery. The first fully stateless handler in the
+ * registry.
  */
 
 import { z } from "zod";
@@ -40,11 +42,40 @@ export const HTTP_MAX_RESPONSE_BYTES = 1_048_576; // 1 MiB
  */
 export const IDEMPOTENCY_HEADER = "Idempotency-Key";
 
+/**
+ * `^[A-Z][A-Z0-9_]*$`, written as a loop. A regex literal here would also match
+ * an ISO duration such as `PT1S`, and `test/duration.test.ts` allows one owner
+ * of a duration-matching pattern: the schema.
+ */
+function isEnvName(s: string): boolean {
+  if (s === "") return false;
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    const upper = c >= 65 && c <= 90;
+    const digitOrUnderscore = (c >= 48 && c <= 57) || c === 95;
+    if (!upper && !(i > 0 && digitOrUnderscore)) return false;
+  }
+  return true;
+}
+
+/**
+ * A header value is a literal string or a reference to a process environment
+ * variable. The reference keeps the credential out of the definition, the
+ * draft and the outbox row: only the name is stored. A strict object, so an
+ * unknown key or a second reference shape fails at publish.
+ */
+const headerValueSchema = z.union([
+  z.string(),
+  z.strictObject({
+    env: z.string().refine(isEnvName, { message: "an environment variable name is upper-case letters, digits and underscores, led by a letter" }),
+  }),
+]);
+
 export const httpConfigSchema = z
   .object({
     url: z.string().url(),
     method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]).default("POST"),
-    headers: z.record(z.string(), z.string()).optional(),
+    headers: z.record(z.string(), headerValueSchema).optional(),
     body: z.unknown().optional(),
   })
   .refine((c) => !(c.method === "GET" && c.body !== undefined), {
@@ -98,11 +129,64 @@ export function egressRefusal(url: string): string | undefined {
   return undefined;
 }
 
+/**
+ * Every character `fetch` accepts in a header value: tab, printable ASCII,
+ * Latin-1 high half (`[\t\x20-\x7e\x80-\xff]`). A loop, not a regex, for the
+ * reason `isEnvName` states.
+ */
+function isLegalHeaderValue(s: string): boolean {
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    if (c !== 9 && !(c >= 0x20 && c <= 0x7e) && !(c >= 0x80 && c <= 0xff)) return false;
+  }
+  return true;
+}
+
+/**
+ * Answers the value of one environment reference, or throws the permanent
+ * refusal. The operator decides which variables an author can name:
+ * `HTTP_SECRET_ENV_ALLOWLIST` is a comma-separated list, read per call like
+ * `HTTP_ACTION_ALLOWED_HOSTS`. Entries are trimmed and compared with case. Unset
+ * or empty refuses every reference. An entry holding a colon names a tenant and
+ * matches nothing here: this form serves a deployment with one tenant.
+ *
+ * A message names the header and the variable and never a value. The outbox
+ * stores message text in `last_error`, which the admin area shows. The value
+ * check runs here, before `fetch`, because the transport could raise a message
+ * that quotes the offending header.
+ */
+function resolveEnvReference(header: string, name: string): string {
+  const allowed = (process.env.HTTP_SECRET_ENV_ALLOWLIST ?? "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry !== "" && !entry.includes(":"));
+  if (!allowed.includes(name)) {
+    throw new PermanentError(`http.request header "${header}" references ${name}, which is not in HTTP_SECRET_ENV_ALLOWLIST`);
+  }
+  const value = process.env[name];
+  if (value === undefined) {
+    throw new PermanentError(`http.request header "${header}" references ${name}, which is not set`);
+  }
+  if (value === "") {
+    throw new PermanentError(`http.request header "${header}" references ${name}, which is empty`);
+  }
+  if (!isLegalHeaderValue(value)) {
+    throw new PermanentError(`http.request header "${header}" references ${name}, whose value is not a legal header value`);
+  }
+  return value;
+}
+
 const CONTENT_TYPE_HEADER = "Content-Type";
 
-/** Merge engine-computed headers on top of the author's, per the design's precedence rules. */
+/**
+ * Resolve each environment reference, then merge engine-computed headers on
+ * top of the author's, per the design's precedence rules.
+ */
 function buildHeaders(config: z.infer<typeof httpConfigSchema>, idempotencyKey: string): Record<string, string> {
-  const headers: Record<string, string> = { ...config.headers };
+  const headers: Record<string, string> = {};
+  for (const [name, value] of Object.entries(config.headers ?? {})) {
+    headers[name] = typeof value === "string" ? value : resolveEnvReference(name, value.env);
+  }
   headers[IDEMPOTENCY_HEADER] = idempotencyKey;
   if (config.body !== undefined && !Object.keys(headers).some((k) => k.toLowerCase() === CONTENT_TYPE_HEADER.toLowerCase())) {
     headers[CONTENT_TYPE_HEADER] = "application/json";
@@ -153,6 +237,7 @@ async function httpHandler(ctx: HandlerContext): Promise<HttpActionResult> {
   const refusal = egressRefusal(config.url);
   if (refusal) throw new PermanentError(refusal);
 
+  // After the egress check: a refused target must never touch the environment.
   const headers = buildHeaders(config, ctx.idempotencyKey);
 
   // A timeout always applies — the action's declared value overrides the
