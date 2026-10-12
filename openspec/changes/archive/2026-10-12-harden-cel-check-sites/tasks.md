@@ -43,13 +43,13 @@
 
 ## 6. Verification
 
-- [ ] 6.1 Run `bun install`, then `bun run typecheck`, in the devcontainer. Verify it exits 0.
-- [ ] 6.2 Run `bun run build` in the devcontainer. Verify it exits 0.
-- [ ] 6.3 Run the full `bun test` with `DATABASE_URL` set, through `scripts/test-gated.sh`. Verify `0 fail` and a skip count within the floor.
-- [ ] 6.4 Run the prose gate over the pushed range on the host. Verify it exits 0.
-- [ ] 6.5 Run the whitespace gate over the pushed range on the host. Verify it exits 0.
-- [ ] 6.6 Run `openspec validate harden-cel-check-sites --strict`. Verify it reports the change as valid.
-- [ ] 6.7 Replay repro scripts 1, 3 and 4 from `tmp/audit-2026-10-10/reports/A.md` in the devcontainer. Run repro 4 on a guard site through `validateProcessBody`, because the scratchpad has no expected type. Verify each body now draws a located CEL issue.
+- [x] 6.1 Run `bun install`, then `bun run typecheck`, in the devcontainer. Verify it exits 0.
+- [x] 6.2 Run `bun run build` in the devcontainer. Verify it exits 0.
+- [x] 6.3 Run the full `bun test` with `DATABASE_URL` set, through `scripts/test-gated.sh`. Verify `0 fail` and a skip count within the floor.
+- [x] 6.4 Run the prose gate over the pushed range on the host. Verify it exits 0.
+- [x] 6.5 Run the whitespace gate over the pushed range on the host. Verify it exits 0.
+- [x] 6.6 Run `openspec validate harden-cel-check-sites --strict`. Verify it reports the change as valid.
+- [x] 6.7 Replay repro scripts 1, 3 and 4 from `tmp/audit-2026-10-10/reports/A.md` in the devcontainer. Run repro 4 on a guard site through `validateProcessBody`, because the scratchpad has no expected type. Verify each body now draws a located CEL issue.
 
 ## Workflow follow-up
 
