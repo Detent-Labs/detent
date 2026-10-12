@@ -2,21 +2,21 @@
 
 ## 1. Cross-tab session
 
-- [ ] 1.1 Add `endedByStorageChange` to `shell/session.ts`. Extend `test/session.test.ts`: logout, foreign login, same token, no held session.
-- [ ] 1.2 Add the `login.sessionEndedElsewhere` key to the EN and DE shell catalogs. The catalog parity test passes.
-- [ ] 1.3 Add an optional `notice` prop to `LoginScreen`. Render it as a `role="status"` line with the callout rule. A render test covers it.
-- [ ] 1.4 Add the `storage` listener and the notice state to `App`. Clear the state on login and on a chosen logout.
-- [ ] 1.5 Add `e2e/session-tabs.e2e.ts`: two pages, a logout in one, the other at `/login` with the notice. `bun run e2e` passes in the container.
+- [x] 1.1 Add `endedByStorageChange` to `shell/session.ts`. Extend `test/session.test.ts`: logout, foreign login, same token, no held session.
+- [x] 1.2 Add the `login.sessionEndedElsewhere` key to the EN and DE shell catalogs. The catalog parity test passes.
+- [x] 1.3 Add an optional `notice` prop to `LoginScreen`. Render it as a `role="status"` line with the callout rule. A render test covers it.
+- [x] 1.4 Add the `storage` listener and the notice state to `App`. Clear the state on login and on a chosen logout.
+- [x] 1.5 Add `e2e/session-tabs.e2e.ts`: two pages, a logout in one, the other at `/login` with the notice. `bun run e2e` passes in the container.
 
 ## 2. Override read limit
 
-- [ ] 2.1 Add `UI_STRINGS_TIMEOUT_MS` and `AbortSignal.timeout` to `loadUiStringOverrides`. Extend `test/i18n-overrides.test.ts`: a never-answering fetch resolves with an empty map, and the constant is 5000.
-- [ ] 2.2 Correct the build-target comment in `main.tsx`. `grep` finds no `es2020` or `chrome87` in it.
+- [x] 2.1 Add `UI_STRINGS_TIMEOUT_MS` and `AbortSignal.timeout` to `loadUiStringOverrides`. Extend `test/i18n-overrides.test.ts`: a never-answering fetch resolves with an empty map, and the constant is 5000.
+- [x] 2.2 Correct the build-target comment in `main.tsx`. `grep` finds no `es2020` or `chrome87` in it.
 
 ## 3. Malformed address
 
-- [ ] 3.1 Add `shell/safeMatch.ts`. Wrap the studio, admin, app and reporting `matchRoute` with it.
-- [ ] 3.2 Extend `studio-routing`, `admin-routing`, `reporting-routing` and `routing` tests. A malformed escape falls back to the default, and a valid escape still decodes.
+- [x] 3.1 Add `shell/safeMatch.ts`. Wrap the studio, admin, app and reporting `matchRoute` with it.
+- [x] 3.2 Extend `studio-routing`, `admin-routing`, `reporting-routing` and `routing` tests. A malformed escape falls back to the default, and a valid escape still decodes.
 
 ## 4. Verification
 

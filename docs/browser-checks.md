@@ -6252,3 +6252,34 @@ Pass: the typing sends no `GET /processes`. It sends one
 `GET /processes/proc_credit_check/versions/1` once the id is whole.
 
 Discard the draft.
+
+### The shell survives a malformed address, a hung boot read and a second tab
+
+Source: `harden-shell-session-and-routing` task 4.1.
+
+**1. A malformed escape in the address.** Log in. Open
+`/studio/processes/%E0%A4%A/edit` by typing it into the address bar.
+
+Pass: the studio shows the process list, with no "Something went wrong."
+fallback. The check settles what the unit tests cannot: whether the browser
+leaves the escape unchanged in `location.pathname`. `packages/web/test/` asserts
+the matchers. Repeat with `/admin/instances/%E0%A4%A`, `/app/tasks/%E0%A4%A`
+and `/reporting/reports/%E0%A4%A`. Each shows its area's default screen.
+
+**2. A `/ui-strings` read that never answers.** In the network panel, block
+the request URL `/ui-strings`, or throttle it to offline, then reload `/login`.
+Pass: the login screen appears with its built-in wording within about five
+seconds. The page never stays white.
+
+This stays manual because it needs a request that hangs rather than fails.
+`packages/web/test/i18n-overrides.test.ts` asserts the abort with a stub.
+
+**3. The look of the session notice.** Open `/login` in two tabs of one
+browser. Log in as an operator in tab A. Open `/app` in tab B. Log out in tab A.
+
+Pass: tab B shows the login screen on its own. A line above the first field
+reads "Your session ended in another tab." It stands beside a 3px rule in the
+advisory color, in the ink color, with no icon. Switch the language to German
+before the logout. Pass: the line reads in German and wraps without clipping at
+a 360px width. Log in again in tab B. Pass: the line disappears. `e2e/session-tabs.e2e.ts`
+asserts the sign-out and the text. This entry keeps only the visual judgment.
