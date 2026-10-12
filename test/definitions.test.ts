@@ -17,7 +17,7 @@ import { HTTP_ACTION_TYPE, httpHandlerDef } from "../src/handlers/http.js";
 import { NOTIFICATION_EMAIL_ACTION_TYPE, notificationEmailHandlerDef } from "../src/handlers/notification-email.js";
 import { compileProcessBody, CompileValidationError } from "../src/schema/compile.js";
 import { definitionHash } from "../src/schema/hash.js";
-import type { ProcessBody, ProcessId, Instance, Action } from "../src/schema/definition.js";
+import { retryPolicy, type ProcessBody, type ProcessId, type Instance, type Action } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
 
 import { clearInstanceAudit } from "./audit-cleanup.js";
@@ -616,4 +616,17 @@ test("a field declaring redactable: false hashes differently from the same body 
   const withoutKey = waitBody("sayYes");
 
   expect(definitionHash(compileProcessBody(withKey))).not.toBe(definitionHash(compileProcessBody(withoutKey)));
+});
+
+// outbox retry bounds: retryPolicy.maxAttempts is an integer from 1 to 20. Pure, no DB.
+test("retryPolicy rejects a maxAttempts of 0, 21, 2.5 and the string \"3\"", () => {
+  for (const maxAttempts of [0, 21, 2.5, "3"]) {
+    expect(retryPolicy.safeParse({ maxAttempts, backoff: "none" }).success).toBe(false);
+  }
+});
+
+test("retryPolicy accepts a maxAttempts of 1 and of 20", () => {
+  for (const maxAttempts of [1, 20]) {
+    expect(retryPolicy.safeParse({ maxAttempts, backoff: "exponential", baseDelay: "PT1S" }).success).toBe(true);
+  }
 });

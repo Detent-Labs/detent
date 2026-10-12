@@ -25,6 +25,8 @@ import { log } from "../log.js";
 
 export const MAX_ATTEMPTS = 5;
 const BACKOFF_BASE_MS = 1000;
+/** The exponential schedule stops growing here, unless the author's own base delay is larger. */
+export const BACKOFF_CAP_MS = 3_600_000;
 
 /** An action's own `retry.maxAttempts`, or the engine default when it declares none. */
 function maxAttemptsFor(action: Action): number {
@@ -32,7 +34,7 @@ function maxAttemptsFor(action: Action): number {
 }
 
 /** An action's own `retry.backoff`/`retry.baseDelay`-driven delay for this attempt, or the engine default schedule when it declares none. */
-function backoffMsFor(action: Action, attempts: number): number {
+export function backoffMsFor(action: Action, attempts: number): number {
   const policy = action.retry;
   const baseDelayMs = policy?.baseDelay !== undefined ? durationMs(policy.baseDelay) : BACKOFF_BASE_MS;
   switch (policy?.backoff ?? "exponential") {
@@ -41,7 +43,7 @@ function backoffMsFor(action: Action, attempts: number): number {
     case "fixed":
       return baseDelayMs;
     case "exponential":
-      return baseDelayMs * 2 ** (attempts - 1);
+      return Math.min(baseDelayMs * 2 ** (attempts - 1), Math.max(baseDelayMs, BACKOFF_CAP_MS));
   }
 }
 // A claimed row whose lease has elapsed is treated as abandoned (crashed worker)

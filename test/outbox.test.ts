@@ -8,7 +8,7 @@
 import { test, expect, beforeAll, beforeEach, spyOn } from "bun:test";
 import { sql, initSchema, createInstance } from "../src/engine/store.js";
 import { executeManualTransition, fireTimer, ConcurrencyConflict } from "../src/engine/transition.js";
-import { drainOutbox, MAX_ATTEMPTS, CLAIM_LEASE_MS, type DeliverFn } from "../src/engine/outbox.js";
+import { drainOutbox, backoffMsFor, BACKOFF_CAP_MS, MAX_ATTEMPTS, CLAIM_LEASE_MS, type DeliverFn } from "../src/engine/outbox.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import { publishBody, createDefinitionStore } from "../src/engine/definitions.js";
 import { createUser, setDisabled } from "../src/auth/users.js";
@@ -1411,4 +1411,36 @@ test.skipIf(!DB)("a row predating the stamp still delivers, with no actor ids", 
   for (const t of ["e1", "p1", "x1"]) spyReg.set(t, { handler: async (ctx) => { saw = ctx.actors; return {}; } });
   expect(await drainOutbox(sql, spyReg)).toBe(3);
   expect(saw).toBeUndefined();
+});
+
+// backoffMsFor: pure, no DB. The exponential branch stops at an hour unless the author's base is larger.
+const retryAction = (retry: Action["retry"]): Action => ({ id: "act_retry", type: "test.retry", config: {}, retry } as unknown as Action);
+
+test("exponential backoff of a one-second base at attempt 20 is capped at one hour", () => {
+  const a = retryAction({ maxAttempts: 20, backoff: "exponential", baseDelay: "PT1S" });
+  expect(backoffMsFor(a, 20)).toBe(BACKOFF_CAP_MS);
+  expect(BACKOFF_CAP_MS).toBe(3_600_000);
+});
+
+test("exponential backoff of a base above the cap stays at the base", () => {
+  const a = retryAction({ maxAttempts: 5, backoff: "exponential", baseDelay: "PT2H" });
+  expect(backoffMsFor(a, 3)).toBe(2 * 3_600_000);
+});
+
+test("exponential backoff of a one-second base at attempt 3 is 4 seconds", () => {
+  const a = retryAction({ maxAttempts: 5, backoff: "exponential", baseDelay: "PT1S" });
+  expect(backoffMsFor(a, 3)).toBe(4000);
+});
+
+test("fixed backoff is the base at every attempt, even past the cap, and none is zero", () => {
+  const fixed = retryAction({ maxAttempts: 20, backoff: "fixed", baseDelay: "PT2H" });
+  expect(backoffMsFor(fixed, 1)).toBe(2 * 3_600_000);
+  expect(backoffMsFor(fixed, 20)).toBe(2 * 3_600_000);
+  const none = retryAction({ maxAttempts: 20, backoff: "none", baseDelay: "PT2H" });
+  expect(backoffMsFor(none, 20)).toBe(0);
+});
+
+test("an action with no retry policy backs off from the engine default base", () => {
+  expect(backoffMsFor(retryAction(undefined), 1)).toBe(1000);
+  expect(backoffMsFor(retryAction(undefined), 3)).toBe(4000);
 });

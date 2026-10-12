@@ -15,9 +15,9 @@
 
 ## 3. Retry bounds
 
-- [ ] 3.1 Change `retryPolicy.maxAttempts` in `src/schema/definition.ts` to `z.number().int().min(1).max(20)`. Tests in `test/definitions.test.ts`: 0, 21, 2.5 and `"3"` fail to parse; 1 and 20 parse. Run the `examples/` tests and `packages/web/test/studio-changeSet.test.ts` too, and fix any literal that breaks.
-- [ ] 3.2 Cap the exponential branch of `backoffMsFor` at `max(base, BACKOFF_CAP_MS)` with the cap at one hour, exported for the test (design decision 6). Unit tests: base 1 s at attempt 20 gives one hour; base 2 h at attempt 3 gives 2 h; base 1 s at attempt 3 gives 4 s; `fixed` and `none` are unchanged.
-- [ ] 3.3 Check `packages/web` for a retry input or a hand-kept list that bounds `maxAttempts` (the `changeSet.ts` entry is a label only). Report the result in the task ledger; edit only if a mirror holds the old shape.
+- [x] 3.1 Change `retryPolicy.maxAttempts` in `src/schema/definition.ts` to `z.number().int().min(1).max(20)`. Tests in `test/definitions.test.ts`: 0, 21, 2.5 and `"3"` fail to parse; 1 and 20 parse. Run the `examples/` tests and `packages/web/test/studio-changeSet.test.ts` too, and fix any literal that breaks.
+- [x] 3.2 Cap the exponential branch of `backoffMsFor` at `max(base, BACKOFF_CAP_MS)` with the cap at one hour, exported for the test (design decision 6). Unit tests: base 1 s at attempt 20 gives one hour; base 2 h at attempt 3 gives 2 h; base 1 s at attempt 3 gives 4 s; `fixed` and `none` are unchanged.
+- [x] 3.3 Check `packages/web` for a retry input or a hand-kept list that bounds `maxAttempts` (the `changeSet.ts` entry is a label only). Report the result in the task ledger; edit only if a mirror holds the old shape.
 
 ## 4. Documentation
 
