@@ -535,9 +535,9 @@ async function migrateOne(
     // the same statement (design.md "Actor and source arrive through
     // set_config"). No actor: a migration is system-driven, never an acting user.
     await setAuditAttribution(tx, null, "migration");
-    // applyStepEntry itself flags resolve_state = 'pending' on every commit onto a running step, so
-    // migration's cascade deferral (rather than nesting commits) falls out of
-    // that general rule and needs no separate flag here.
+    // applyStepEntry itself flags resolve_state = 'pending' on every commit
+    // onto a running step, so migration's cascade deferral (rather than nesting
+    // commits) falls out of that general rule and needs no separate flag here.
     await applyStepEntry(tx, plan, { version: toVersion, definitionHash: definitionHash(toBody), data });
     // Every migration clears the draft, relocation or not: a fieldMap-only
     // migration leaves currentStepId unchanged, so the step_id gate alone

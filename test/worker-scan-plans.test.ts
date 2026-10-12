@@ -92,10 +92,8 @@ test.skipIf(!DB)("the resolution claim reads the marked rows through the partial
   await seedClaimBulk();
   const nodes = await planNodes(claimSelect(sql, CLAIM_LEASE_MS));
 
-  // The rejected form read `body->>'status'` over `instances_resolve_idx
-  // (resolve_state)` and filtered out every finished row: measured at 1119.6 ms
-  // and 290,000 rows removed over 300,000 instances. The partial index holds
-  // the marked rows only, so the scan reads what is live.
+  // The partial index holds the marked rows only, so the scan reads what is
+  // live and the status filter removes no row.
   expect(nodes.some((n) => n["Index Name"] === "instances_resolve_open_idx")).toBe(true);
   expect(nodes.some((n) => n["Node Type"] === "Seq Scan")).toBe(false);
   expect(nodes.some((n) => n["Node Type"] === "Sort")).toBe(false);

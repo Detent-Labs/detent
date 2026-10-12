@@ -90,12 +90,12 @@ export async function redactInstance(
  * predates that key — without the fallback, the oldest instances (exactly the
  * ones retention exists to bound) would never become eligible. The cutoff is
  * built in SQL in the form of `Date.toISOString()`, so the text comparison
- * follows time order. The partial predicate and the entry expression repeat
- * `instances_retention_idx` verbatim, so the planner proves the index applies
- * and a tick with nothing eligible reads no instance row. `faulted` instances
- * are excluded: a fault is an anomaly an operator may still need to inspect,
- * not a normal completion. Exported so the plan test explains the statement
- * the worker runs.
+ * follows time order. The cutoff string is truncated to the millisecond. The
+ * partial predicate and the entry expression repeat `instances_retention_idx`
+ * verbatim, so the planner proves the index applies and a tick with nothing
+ * eligible reads no instance row. `faulted` instances are excluded: a fault is
+ * an anomaly an operator may still need to inspect, not a normal completion.
+ * Exported so the plan test explains the statement the worker runs.
  */
 export function retentionSelect(db: SQL, days: number, lastEntry: string, lastId: string) {
   return db`SELECT instance_id, COALESCE(body->>'currentStepEnteredAt', started_at) AS entry FROM instances

@@ -136,7 +136,10 @@ status-filtered list keeps its speed, as the table shows.
   `engine-poll-loop-consolidation` spec already lets an in-flight tick
   complete. A detached drain behaves the same.
 - [Nine or more slow tenants block a tick's later tenants] → The wait for a
-  slot ends when any drain ends. The lease bounds each drain.
+  slot ends when any drain ends. The lease bounds an outbox drain only. A
+  resolution, timer or retention drain that hangs holds its slot until it
+  ends. Eight hung drains park that worker's tick. The serial loop parked it
+  after one.
 - [Text comparison of timestamps] → A hand-edited body with a non-UTC string
   would sort wrongly. No writer produces one, and `started_at` carries the
   same assumption.
@@ -149,7 +152,8 @@ status-filtered list keeps its speed, as the table shows.
 `initSchema` is idempotent and carries the whole migration. It creates the
 three indexes, clears stale marks and drops the two old indexes. Order
 matters. The clear runs after the `status` column and the partial index
-exist. To roll back, deploy the previous release. It recreates
+exist. The first start after deploy builds the retention and outbox indexes
+with one scan each. To roll back, deploy the previous release. It recreates
 `instances_resolve_idx` and `instances_redacted_idx` on its own start.
 
 ## Open Questions

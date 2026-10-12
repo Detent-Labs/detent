@@ -88,6 +88,11 @@ export function outboxListSelect(
   cursorKey: string | null,
   limit: number,
 ) {
+  // created_at::text (created_at_cursor) carries Postgres's full microsecond
+  // precision, unlike the driver's own Date conversion of the plain
+  // created_at column, which is only millisecond-precise. See
+  // fix-instance-list-cursor-precision's design.md — the same fix
+  // listInstances and listComments already apply.
   return db`
     SELECT idempotency_key, instance_id, transition_seq, action_id, action->>'type' AS action_type,
            status, attempts, next_attempt_at, created_at, claimed_at, last_error,
@@ -118,11 +123,6 @@ export async function listOutbox(
   const [cursorCreatedAt, cursorKey] = page.cursor ? decodeCursor(page.cursor, ["timestamp", "text"]) : [undefined, undefined];
   const statusArr = filter.status && filter.status.length > 0 ? db.array(filter.status, "TEXT") : null;
 
-  // created_at::text (created_at_cursor) carries Postgres's full microsecond
-  // precision, unlike the driver's own Date conversion of the plain
-  // created_at column, which is only millisecond-precise. See
-  // fix-instance-list-cursor-precision's design.md — the same fix
-  // listInstances and listComments already apply.
   const rows = (await outboxListSelect(db, statusArr, filter.instanceId ?? null, cursorCreatedAt ?? null, cursorKey ?? null, limit + 1) as unknown) as (Parameters<typeof toOutboxRow>[0] & { created_at_cursor: string })[];
 
   const hasMore = rows.length > limit;

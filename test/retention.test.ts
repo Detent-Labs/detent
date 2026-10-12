@@ -232,17 +232,16 @@ test.skipIf(!DB)("sweepRetention selects an instance just outside the window and
 });
 
 test.skipIf(!DB)("a failing instance ahead in entry-time order hides none behind it, and the next tick selects it again", async () => {
-  // The failing instance entered first, so it leads the keyset. Its id has no
-  // say in the order: entry time comes before instance_id.
-  const failing = await mk();
-  await setStatus(failing.instanceId, "completed");
-  await setEnteredAt(failing.instanceId, "2020-01-01T00:00:00.000Z");
-  const behind: string[] = [];
-  for (const entered of ["2020-02-01T00:00:00.000Z", "2020-03-01T00:00:00.000Z"]) {
-    const i = await mk();
-    await setStatus(i.instanceId, "completed");
-    await setEnteredAt(i.instanceId, entered);
-    behind.push(i.instanceId);
+  // The failing instance entered first, so it leads the keyset, and it holds
+  // the highest instance_id of the three, so entry order and id order diverge.
+  // Entry time comes before instance_id in the order.
+  const ids = [(await mk()).instanceId, (await mk()).instanceId, (await mk()).instanceId].sort();
+  const failing = { instanceId: ids[2] };
+  const behind = [ids[0], ids[1]];
+  const entered = ["2020-01-01T00:00:00.000Z", "2020-02-01T00:00:00.000Z", "2020-03-01T00:00:00.000Z"];
+  for (const [n, id] of [failing.instanceId, ...behind].entries()) {
+    await setStatus(id, "completed");
+    await setEnteredAt(id, entered[n]);
   }
   // `data` becomes a string, which instanceSchema.parse rejects inside redactInstance.
   await sql`UPDATE instances SET body = body || '{"data": "not-an-object"}'::jsonb WHERE instance_id = ${failing.instanceId}`;

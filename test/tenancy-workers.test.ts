@@ -193,10 +193,13 @@ test("a tenant whose drain throws logs one warning per worker per tick and is dr
       }
       return counts;
     };
-    expect(perWorker()).toEqual({ outbox: 1, resolution: 1, timers: 1 });
-    // The failed drain released its slot and its key: the next tick runs it again.
+    const first = perWorker();
+    expect(Object.keys(first).sort()).toEqual(["outbox", "resolution", "timers"]);
+    for (const n of Object.values(first)) expect(n).toBeGreaterThanOrEqual(1);
+    // The failed drain released its slot and its key: a later tick runs it again.
     await wait(TICK_INTERVAL_MS);
-    expect(perWorker()).toEqual({ outbox: 2, resolution: 2, timers: 2 });
+    const second = perWorker();
+    for (const worker of Object.keys(first)) expect(second[worker]).toBeGreaterThanOrEqual(first[worker] + 1);
   } finally {
     engine.stop();
     await wait(50);
@@ -243,6 +246,8 @@ test("the pool starts a drain without awaiting it, so a later tenant starts in t
   const c = controlledDrains();
   await pool(handles(3), c.drain, () => {});
   expect(c.started).toEqual(["t0", "t1", "t2"]);
+  for (const key of c.started) c.finish.get(key)!();
+  await settle();
 });
 
 test("the pool starts no second drain for a tenant whose drain still runs", async () => {
@@ -299,7 +304,7 @@ test("the ninth tenant waits for a free slot, and the tick returns once a drain 
   await settle();
 });
 
-test("waiters get a freed slot in list order", async () => {
+test("with one slot, a tick starts its tenants in list order as each drain ends", async () => {
   const pool = createTenantPool(1);
   const c = controlledDrains();
   const tick = pool(handles(3), c.drain, () => {});

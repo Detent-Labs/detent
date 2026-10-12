@@ -837,10 +837,10 @@ four Low ones stay open.
   `bun audit` step.** The `check` job now runs `bun audit
   --audit-level=high` right after `bun install`. A high or critical
   advisory fails the job. Dependabot still covers version drift alone.
-- **PERF-1: fixed 500 ms polling per tenant.** `src/engine/host.ts:326`
+- **PERF-1: fixed 500 ms polling per tenant.** `src/engine/host.ts:384`
   runs `pollForever` for the outbox drain on a 500 ms loop wrapped in
-  `eachTenant`, with the resolution and timer sweeps beside it at `:327` and
-  `:328`. Risk (Low): at many tenants each cycle issues work proportional to tenant
+  `eachTenant`, with the resolution and timer sweeps beside it at `:385` and
+  `:386`. Risk (Low): at many tenants each cycle issues work proportional to tenant
   count whether or not any tenant holds a pending row. The review names a
   Postgres `LISTEN`/`NOTIFY` wake-up or one cross-tenant claim query as the
   replacement, once tenancy grows past a handful.

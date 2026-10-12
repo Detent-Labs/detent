@@ -370,10 +370,9 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   // permanently, for the reason the three expression-index drops above stay.
   await db`CREATE INDEX IF NOT EXISTS instances_resolve_open_idx ON instances (instance_id) WHERE resolve_state <> 'idle'`;
   await db`DROP INDEX IF EXISTS instances_resolve_idx`;
-  // Clear marks a finished instance carried before the commit paths cleared
-  // them. Runs after the index and the status column exist: the first run on an
-  // existing database rewrites the stale rows once, and every later run reads
-  // the partial index, which then holds the live marks only.
+  // A mark on an instance that is not running has no reader. The first run on
+  // an existing database clears those marks once; every later run finds none.
+  // Runs after the index and the status column exist.
   await db`UPDATE instances SET resolve_state = 'idle' WHERE resolve_state <> 'idle' AND status <> 'running'`;
   // Who took part in an instance (instance-visibility-set). One row per
   // (instance, principal); a principal is an actor id, a role string or a group
