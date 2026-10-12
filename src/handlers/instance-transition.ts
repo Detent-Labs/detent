@@ -23,7 +23,7 @@ import { executeManualTransition, GuardRefused, ConcurrencyConflict } from "../e
 import { createDefinitionStore } from "../engine/definitions.js";
 import type { FieldId, InstanceEvent, PathId } from "../schema/definition.js";
 import {
-  createDefaultAssignmentRegistry,
+  createStaticAssignmentRegistry,
   INSTANCE_TRANSITION_ACTION_TYPE,
   type HandlerContext,
   type HandlerDef,
@@ -126,7 +126,7 @@ async function instanceTransitionHandler(ctx: HandlerContext): Promise<unknown> 
 
   // One registry per delivery, shared by the transition call — the
   // single-construction shape `process-start.ts` uses.
-  const assignmentRegistry = createDefaultAssignmentRegistry();
+  const assignmentRegistry = createStaticAssignmentRegistry();
   try {
     await executeManualTransition(target, config.pathId, targetBody, SYSTEM_ACTOR, ctx.db, undefined, assignmentRegistry, [event]);
   } catch (e) {

@@ -648,7 +648,7 @@ export const en = {
   "stepKindNote.terminal": "Closes the case with a named outcome.",
 
   // The four assignment strategies the engine registers: `static` in
-  // `src/engine/registry.ts`'s createDefaultAssignmentRegistry, and the three
+  // `src/engine/registry.ts`'s createStaticAssignmentRegistry, and the three
   // `org.` types in `src/engine/assignment-strategies.ts`. A registered
   // strategy this table misses falls back to its registry type, in mono.
   "assignmentStrategy.static.name": "A fixed list of people",

@@ -7,13 +7,11 @@
  * `store.ts`, which imports `SPAWN_ACTION_TYPE` back from `registry.ts`. Putting
  * this entry there would close that cycle and cost `registry.ts` the leaf status
  * that lets `store.ts`, `transition.ts` and `definitions.ts` each default a
- * parameter to `createDefaultAssignmentRegistry()`.
+ * parameter to `createStaticAssignmentRegistry()`.
  *
- * This module's `createDefaultAssignmentRegistry` deliberately shares that name.
- * `src/http/server.ts` — the composition root — imports the identifier and uses
- * it as the default for both `createServer` and `serve`, so switching the whole
- * HTTP surface onto the org-aware set is a change of import, with no
- * default-parameter expression touched.
+ * This module's `createDefaultAssignmentRegistry` builds the full set: the
+ * static entry plus the org-aware ones. `src/http/server.ts`, the composition
+ * root, uses it as the default for both `createServer` and `serve`.
  */
 import { z } from "zod";
 import { getManagerOf } from "../auth/users.js";
@@ -22,7 +20,7 @@ import type { FieldId } from "../schema/definition.js";
 import {
   type AssignmentRegistry,
   type AssignmentStrategyDef,
-  createDefaultAssignmentRegistry as createStaticAssignmentRegistry,
+  createStaticAssignmentRegistry,
 } from "./registry.js";
 
 export const MANAGER_OF_STARTER_STRATEGY_TYPE = "org.manager-of-starter";

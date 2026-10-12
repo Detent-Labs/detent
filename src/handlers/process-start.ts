@@ -25,7 +25,7 @@ import {
   type ProcessBody,
 } from "../schema/definition.js";
 import {
-  createDefaultAssignmentRegistry,
+  createStaticAssignmentRegistry,
   PROCESS_START_ACTION_TYPE,
   type HandlerContext,
   type HandlerDef,
@@ -45,7 +45,7 @@ async function processStartHandler(ctx: HandlerContext): Promise<unknown> {
   // One registry per delivery, shared by createSeededInstance and the
   // drive-to-rest below — the earlier second construction duplicated an
   // identical Map for no reason.
-  const assignmentRegistry = createDefaultAssignmentRegistry();
+  const assignmentRegistry = createStaticAssignmentRegistry();
 
   let started: Instance;
   let startedBody: ProcessBody;

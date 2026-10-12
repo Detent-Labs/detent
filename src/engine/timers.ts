@@ -11,7 +11,7 @@
 import type { SQL } from "bun";
 import { sql } from "./store.js";
 import { fireTimer } from "./transition.js";
-import { createDefaultAssignmentRegistry, type AssignmentRegistry } from "./registry.js";
+import { createStaticAssignmentRegistry, type AssignmentRegistry } from "./registry.js";
 import { instance as instanceSchema, type Instance } from "../schema/definition.js";
 import type { ResolveBody } from "./resolution.js";
 import { logSkippedItem } from "./poll.js";
@@ -46,7 +46,7 @@ async function pushOutOfScan(db: SQL, instanceId: string, observedNextTimerAt: u
 export async function drainTimers(
   db: SQL = sql,
   resolveBody: ResolveBody = () => undefined,
-  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
+  assignmentRegistry: AssignmentRegistry = createStaticAssignmentRegistry(),
 ): Promise<number> {
   const dueRows = (await db`SELECT instance_id, body, next_timer_at FROM instances
     WHERE (body->>'status') = 'running' AND next_timer_at IS NOT NULL AND next_timer_at <= now()

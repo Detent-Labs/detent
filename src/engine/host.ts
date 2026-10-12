@@ -19,7 +19,7 @@ import {
   createRegistry,
   type Registry,
   createDataSourceRegistry,
-  createDefaultAssignmentRegistry,
+  createStaticAssignmentRegistry,
   type DataSourceRegistry,
   type AssignmentRegistry,
 } from "./registry.js";
@@ -300,7 +300,7 @@ function tenantContexts(shared: Registry, assignmentRegistry: AssignmentRegistry
 export function startEngine(
   db: SQL = sql,
   registry: Registry = createDefaultRegistry(),
-  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
+  assignmentRegistry: AssignmentRegistry = createStaticAssignmentRegistry(),
   tenants: TenantSource = singleTenantSource(db),
 ): { stop: () => void } {
   const contextFor = tenantContexts(registry, assignmentRegistry);

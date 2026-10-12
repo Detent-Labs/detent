@@ -2,10 +2,10 @@
 
 ## 1. Rename the static factory
 
-- [ ] 1.1 Rename the `registry.ts` export to `createStaticAssignmentRegistry` and rewrite its comment. Verify with `bun run typecheck` that every importer now fails or follows.
-- [ ] 1.2 Edit every importer to the new name: the engine default parameters, `src/engine/host.ts`, `src/runtime/instances.ts` and the test files that mean the static set. Verify with `bun run typecheck`.
-- [ ] 1.3 In `assignment-strategies.ts`, import `createStaticAssignmentRegistry` without an alias. Delete the comment that calls the shared name deliberate. Verify with `git grep -n "createDefaultAssignmentRegistry" -- src`.
-- [ ] 1.4 Edit the two comments in `packages/web` that name the old factory for `static`. Verify with `git grep -n "createDefaultAssignmentRegistry" -- packages`.
+- [x] 1.1 Rename the `registry.ts` export to `createStaticAssignmentRegistry` and rewrite its comment. Verify with `bun run typecheck` that every importer now fails or follows.
+- [x] 1.2 Edit every importer to the new name: the engine default parameters, `src/engine/host.ts`, `src/runtime/instances.ts` and the tests that mean the static set. Verify with `bun run typecheck`.
+- [x] 1.3 In `assignment-strategies.ts`, import `createStaticAssignmentRegistry` without an alias. Delete the comment that calls the shared name deliberate. Verify with `git grep -n "createDefaultAssignmentRegistry" -- src`.
+- [x] 1.4 Edit the two comments in `packages/web` that name the old factory for `static`. Verify with `git grep -n "createDefaultAssignmentRegistry" -- packages`.
 
 ## 2. The context carries the registry
 
