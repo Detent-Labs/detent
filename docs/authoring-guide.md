@@ -771,9 +771,17 @@ system would decide instead. `review`'s reminder timer sends
 `notification.email`. On entry to `escalated_review` the example runs both
 `http.request` and `notification.email`.
 
+An action runs async only. Omit `execution` or write `"async"`; the value
+`"blocking"` fails to parse. The engine derives each delivery's idempotency key,
+and an action cannot set one.
+
 An action can write its result back into the payload. The engine verifies the
 value against the target field's declared type first. A value of the wrong
 type never lands.
+
+Publishing adds the cancel-sink step itself, so write the body without one. A
+body that carries a sink other than the exact one publish injects fails
+publish. An edited copy of a published version can trip this.
 
 #### Who a notification reaches
 

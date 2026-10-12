@@ -1133,8 +1133,8 @@ export type ProcessBody = z.infer<typeof processBody>;
  * legitimately contains none of that prefix's actions (they are synthesized at
  * runtime, never stored), so the ban generalizes to every body reaching the
  * compile pass and lives there instead (`src/schema/compile.ts`), ahead of the
- * `publishedProcessBody`-valid early return this schema's sibling does not
- * gate. See `harden-publish-validation` design.md for why the prefix ban and
+ * `publishedProcessBody`-valid early return, which validates the sink by
+ * comparing the body with its own recompile. See `harden-publish-validation` design.md for why the prefix ban and
  * the three identity checks below split onto different sides of that line.
  */
 export const authoredProcessBody = processBody.superRefine((b, ctx) => {

@@ -28,8 +28,8 @@ violation cannot exist in an already-published body. The publish-path
 placement also makes a check unbypassable.
 
 A hand-written body cannot skip it by only satisfying
-`publishedProcessBody`, since that schema checks only the cancel-sink
-count. The read path cannot settle placement on its own. `definition.ts`
+`publishedProcessBody`, since that schema counts cancel-sinks and
+validates nothing else about them. The read path cannot settle placement on its own. `definition.ts`
 also deserializes stored bodies. A tightened refinement there strands every
 instance already pinned to that body. Each body-resolving worker holds its
 own per-instance error boundary, so one stranded instance does not stop the
@@ -169,6 +169,16 @@ its placement.
   checks stay a Zod refinement in `authoredProcessBody`. A compiled body
   legitimately carries all three, so generalizing them would reject every
   compiled body on sight.
+- A body that already carries a cancel-sink must equal the engine's own
+  compile of its stripped form. The early return compares the two and
+  throws a `CompileValidationError` located at `steps[<sink index>]` on a
+  mismatch. A sink with another outcome, a non-terminal sink, a sink with
+  actions, or a sink at another position fails there. A body whose
+  `contract.outcomes` lacks the reserved outcome fails the same way.
+- `Action.execution` accepts `"async"` or no value. The value `"blocking"`
+  fails to parse, because the engine has no blocking delivery.
+- An action has no `idempotencyKey`. Publishing rejects one as an unknown
+  key, even a `null` value (`compile.ts::checkUnknownKeys`).
 - The authored body has no key the definition contract does not declare.
   This applies at any depth: process, contract, field, data source,
   workflow, step, path, action, timer, view entry, and validation. It
