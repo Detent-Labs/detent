@@ -306,4 +306,3 @@ same rule.
 
 - **WHEN** a field's `validation.rule` reads `data.prioritaet > -3`
 - **THEN** the rule builder shows one comparison row
-

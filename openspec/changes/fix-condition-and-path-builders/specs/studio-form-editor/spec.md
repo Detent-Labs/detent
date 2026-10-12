@@ -67,4 +67,3 @@ form canvas SHALL reach the preview at once, without a reload.
 
 - **WHEN** a view entry declares `required: true`
 - **THEN** the preview marks that entry's label as required
-
