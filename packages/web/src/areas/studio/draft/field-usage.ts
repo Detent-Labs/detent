@@ -82,6 +82,16 @@ export function fieldVisibleOverrides(draft: Draft, fieldId: string): FieldVisib
   return { kind: "uniform", stepIds, value: entries[0]!.visible as DraftOf<Expression> | undefined };
 }
 
+/** The steps a "Clear on <steps>" command would clear, or `undefined` when no
+ * referencing view carries a `visible` key and the command has nothing to do.
+ * A divergent state always has a key somewhere: a literal, or two differing
+ * expressions. A uniform state has one only when `value` is defined. */
+export function visibleClearSteps(state: FieldVisibleState): string[] | undefined {
+  if (state.kind === "divergent") return state.stepIds;
+  if (state.kind === "uniform" && state.value !== undefined) return state.stepIds;
+  return undefined;
+}
+
 /**
  * The condition row's writer (design.md decision 3): a pure mutating recipe
  * of the shape `mutate` (`draft/store.tsx`) takes, not a function that

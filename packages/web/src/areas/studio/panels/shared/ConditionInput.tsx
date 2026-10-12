@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
 import type { Expression } from "workflow-engine/schema";
@@ -7,7 +7,7 @@ import { useDraft } from "../../draft/store";
 import { t } from "../../catalog.js";
 import { ExpressionInput } from "./ExpressionInput";
 import { ConditionBuilder } from "./ConditionBuilder";
-import { buildOperands, fromCel, operandSignature, toCel, type Condition } from "./conditionLogic";
+import { buildOperands, commitDecision, fromCel, operandSignature, toCel, type Condition } from "./conditionLogic";
 
 const styles = stylex.create({
   conditionInput: {
@@ -38,6 +38,33 @@ const styles = stylex.create({
   // reading the same `aria-expanded` the button already carries.
   conditionModeExpanded: {
     color: colors.text,
+  },
+  conditionActions: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "baseline",
+    gap: space.s2,
+    minWidth: 0,
+  },
+  // The authoring command (`DESIGN.md` Buttons): a ghost button in slate, mono
+  // at 11px, equal to the change list's command. It composes over
+  // `btn btn-ghost`, whose accent it replaces. Its label lists step labels, so
+  // it wraps anywhere instead of clipping.
+  conditionClear: {
+    fontFamily: fonts.mono,
+    fontSize: 11,
+    color: {
+      default: colors.textMuted,
+      ":hover": colors.text,
+      ":active": colors.text,
+    },
+    textAlign: "left",
+    overflowWrap: "anywhere",
+    backgroundColor: {
+      default: "transparent",
+      ":hover": colors.surfaceMuted,
+      ":active": `color-mix(in srgb, ${colors.text} 14%, transparent)`,
+    },
   },
   conditionReadout: {
     display: "flex",
@@ -83,18 +110,27 @@ interface Props {
    * body.
    */
   toggleVariant?: "link" | "disclosure";
+  /**
+   * The label of a clear command in the footer, beside the CEL toggle. Its
+   * presence shows the command. Pressing it calls `onChange(undefined)` and
+   * empties the local rows. Only a site that can hold a condition the rows do
+   * not show passes it: the Fields tab, where the referencing views can
+   * disagree and `value` reads `undefined` for all of them.
+   */
+  clearLabel?: string;
 }
 
 /**
  * The condition surface: a row builder, the CEL it produces on a read-only
  * line, and a toggle to the raw CEL input.
  *
- * `onChange` fires on an authoring action alone. Mounting, reading and
- * switching the mode never write, so a guard the author only looks at stays
- * byte for byte — the rule that keeps the database from filling with
- * flattened conditions.
+ * `onChange` fires on an authoring action that settles the condition: a
+ * complete row, the removal of a row that takes a stored source with it, or the
+ * clear command. Mounting, reading, switching the mode and an unfinished row
+ * never write, so a guard the author only looks at stays byte for byte — the
+ * rule that keeps the database from filling with flattened conditions.
  */
-export function ConditionInput({ value, onChange, stepId, placeholder, toggleVariant = "link" }: Props) {
+export function ConditionInput({ value, onChange, stepId, placeholder, toggleVariant = "link", clearLabel }: Props) {
   const { draft, loadedChildren, contentLocale } = useDraft();
 
   const operands = useMemo(
@@ -144,14 +180,53 @@ export function ConditionInput({ value, onChange, stepId, placeholder, toggleVar
   const [celMode, setCelMode] = useState(condition === null);
 
   const unparseable = condition === null;
-  const preview = condition ? toCel(condition, operands) : src;
+  // While no row contributes, the draft may still hold a source: an unfinished
+  // edit leaves it standing, and the readout says so.
+  const preview = condition ? (toCel(condition, operands) ?? src) : src;
 
   const commit = (next: Condition) => {
     setCondition(next);
     const written = toCel(next, operands);
+    const decision = commitDecision(written, condition?.rows.length ?? 0, next.rows.length, src);
+    // `seededFrom` stays put on a hold, so the unfinished row survives the render.
+    if (decision === "hold") return;
     seededFrom.current = { src: written, signature };
     onChange(written === undefined ? undefined : { lang: "cel", src: written });
   };
+
+  // The explicit clear. `src` reads `undefined` in the divergent state before
+  // and after, so the seed would not change and the rows are reset here.
+  const clear = () => {
+    setCondition({ joiner: "&&", rows: [] });
+    seededFrom.current = { src: undefined, signature };
+    onChange(undefined);
+  };
+
+  // `btn btn-ghost` plus the compiled style, joined in one `className`: a
+  // `className` written after a spread of `stylex.props` would replace it.
+  const clearCompiled = stylex.props(styles.conditionClear);
+  const clearButton = clearLabel !== undefined && (
+    <button
+      type="button"
+      {...clearCompiled}
+      className={`btn btn-ghost ${clearCompiled.className ?? ""}`.trim()}
+      onClick={clear}
+    >
+      {clearLabel}
+    </button>
+  );
+
+  /** The footer's trailing controls: the clear command, when the site passes
+   * one, then the CEL toggle. */
+  const actions = (toggle: ReactNode) =>
+    clearButton ? (
+      <span {...stylex.props(styles.conditionActions)}>
+        {clearButton}
+        {toggle}
+      </span>
+    ) : (
+      toggle
+    );
 
   const toggleButton = (expanded: boolean, onClick: () => void, disabled?: boolean) =>
     toggleVariant === "disclosure" ? (
@@ -187,7 +262,7 @@ export function ConditionInput({ value, onChange, stepId, placeholder, toggleVar
               {t("condition.unparseable")}
             </p>
           )}
-          {toggleButton(true, () => setCelMode(false), unparseable)}
+          {actions(toggleButton(true, () => setCelMode(false), unparseable))}
         </div>
       </div>
     );
@@ -201,7 +276,7 @@ export function ConditionInput({ value, onChange, stepId, placeholder, toggleVar
           <span {...stylex.props(styles.conditionReadoutLabel)}>{t("condition.celReadout")}</span>
           <code {...stylex.props(styles.conditionReadoutCode)}>{preview ?? t("condition.celEmpty")}</code>
         </p>
-        {toggleButton(false, () => setCelMode(true))}
+        {actions(toggleButton(false, () => setCelMode(true)))}
       </div>
     </div>
   );

@@ -111,6 +111,7 @@ export const en = {
   "fieldCatalog.onlyAskWhenHeading": "Only ask this when",
   "fieldCatalog.conditionNoSteps": "No step asks for this field yet, so there is nothing to condition.",
   "fieldCatalog.conditionScopeNote": "Writes to: {steps}.",
+  "fieldCatalog.conditionClear": "Clear on {steps}",
   "fieldCatalog.conditionDivergentNote": "These steps currently disagree: {steps}.",
   "fieldCatalog.conditionLiteralNote": "This replaces a literal condition on: {steps}.",
   "fieldCatalog.whereValuesHeading": "Where values come from",

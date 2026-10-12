@@ -48,6 +48,7 @@ import {
   fieldVisibleOverrides,
   type FieldUsageRow,
   needsTechnicalToggleConfirm,
+  visibleClearSteps,
 } from "../draft/field-usage";
 import { previewViewFields } from "../draft/field-preview";
 import { ConditionInput } from "./shared/ConditionInput";
@@ -711,6 +712,7 @@ function FieldEditor({
   const usage = fieldId ? fieldUsage(draft, fieldId, contentLocale, baseLocale) : [];
   const visibleState = fieldId ? fieldVisibleOverrides(draft, fieldId) : ({ kind: "none" } as const);
   const requiredState = fieldId ? fieldRequiredOverrides(draft, fieldId) : ({ kind: "none" } as const);
+  const clearSteps = visibleClearSteps(visibleState);
   const preview = previewViewFields(field, contentLocale, baseLocale);
   // Two fields preview with no option list, and the row names which one. A
   // bare person field declares no data source, so it takes its own wording
@@ -998,6 +1000,14 @@ function FieldEditor({
                   value={visibleState.kind === "uniform" ? visibleState.value : undefined}
                   onChange={writeVisible}
                   toggleVariant="link"
+                  clearLabel={
+                    clearSteps
+                      ? t("fieldCatalog.conditionClear").replace(
+                          "{steps}",
+                          clearSteps.map((id) => usageStepLabel(usage, id)).join(", "),
+                        )
+                      : undefined
+                  }
                 />
               </>
             )}

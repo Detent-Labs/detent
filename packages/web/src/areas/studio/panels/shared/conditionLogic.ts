@@ -392,8 +392,8 @@ export function isComplete(row: Row, byPath: Map<string, Operand>): boolean {
  * Write the rows back to CEL. An incomplete row is skipped rather than emitted
  * half-written: the draft saves continuously and `validateProcessBody` runs
  * live, so `data.amount > ` would put a parse error in the IssueList on every
- * keystroke. `undefined` is the same "no condition" state an empty text input
- * produces today.
+ * keystroke. `undefined` means no row contributes. `commitDecision` decides
+ * what the draft does with that.
  */
 export function toCel(condition: Condition, operands: Operand[]): string | undefined {
   const byPath = new Map(operands.map((o) => [o.path, o]));
@@ -409,6 +409,27 @@ export function toCel(condition: Condition, operands: Operand[]): string | undef
   });
 
   return parts.length ? parts.join(` ${condition.joiner} `) : undefined;
+}
+
+/**
+ * What an authoring action does to the draft. `written` is the text `toCel` or
+ * `toRuleCel` produced for the new rows, `stored` the source the draft holds.
+ *
+ * - `write`: a row contributes, so the draft takes the new text.
+ * - `clear`: a row was removed, no row contributes and a source is stored. The
+ *   author took the condition out.
+ * - `hold`: the draft stays as it is. An unfinished row is an edit in progress,
+ *   so it never deletes a stored source. Removing a row from an empty site
+ *   also lands here, which keeps the views of a divergent field intact.
+ */
+export function commitDecision(
+  written: string | undefined,
+  oldRowCount: number,
+  newRowCount: number,
+  stored: string | undefined,
+): "write" | "clear" | "hold" {
+  if (written !== undefined) return "write";
+  return newRowCount < oldRowCount && stored !== undefined ? "clear" : "hold";
 }
 
 // --- plain-English summary (studio-condition-builder) ---------------------
