@@ -1850,9 +1850,9 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
 
 ## Open from harden-studio-json-surface (needs its own OpenSpec change)
 
-The final review of `harden-studio-json-surface` (2026-10-12) found two gaps
-that the change leaves open on purpose. The tags LEAF-1 and LOAD-1 are local to
-this section.
+The final review and the browser check of `harden-studio-json-surface`
+(2026-10-12) found three gaps that the change leaves open on purpose. The tags
+LEAF-1, LOAD-1 and REFUSE-1 are local to this section.
 
 - **LEAF-1: the guard checks containers only.** An object where a string
   belongs passes Apply and unmounts the studio on render. Take a
@@ -1877,6 +1877,20 @@ this section.
   crashes the studio when an author opens it. A later change could run
   `checkDraftShape` on each of the three paths and show the refusal in place of
   the crash. Whether the server should refuse such a body is a separate call.
+
+- **REFUSE-1: the refusal reads poorly in the JSON surface.** The impeccable
+  critique and audit ran on the production build. The error `<p>` in
+  `panels/JsonView.tsx` sits below a 24-row textarea and the Apply row. At 1280
+  by 720 its top is 14 pixels inside the viewport, and at 375 by 667 none of it
+  shows. Apply looks like a no-op, and focus stays on Apply. The `<p>` has no
+  `role="alert"` and the textarea has no `aria-invalid` or `aria-describedby`,
+  so a screen reader hears nothing. `MigrationSpecEditor` sets both attributes,
+  and `MigrationPlanScreen` uses `role="alert"`. A path longer than the box
+  does not wrap at 320 pixels. Each line prints its path twice, as in
+  `workflow.steps: 'workflow.steps' must be an array if present`. `DESIGN.md`
+  asks for a mono list at 12 pixels, which needs `parseDraftText` to return an
+  array. A stale error also stays after an edit. One change per screen should
+  take these together. The owner ruled that this change makes no layout change.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 

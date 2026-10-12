@@ -62,6 +62,7 @@ None.
   `studio-changeSet.test.ts`, the helper `zodContainerPaths.ts`, and a comment
   in `studio-fieldRemoval.test.ts`.
 - `openspec/specs/studio-json-view/spec.md`, through the delta spec.
-- `docs/decisions.md`: archive strikes the audit index entry for this change.
+- `docs/decisions.md`: a new open section holds three follow-ups. Archive
+  strikes the audit index entry for this change.
 - `src/schema/definition.ts`, the engine, the HTTP surface and
   `docs/authoring-guide.md` stay as they are.
