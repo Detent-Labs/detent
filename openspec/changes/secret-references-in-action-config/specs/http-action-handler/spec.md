@@ -173,7 +173,7 @@ for any text the transport raises.
 
 #### Scenario: An empty value fails the delivery
 
-- **WHEN** the variable holds the empty string
+- **WHEN** the variable holds the empty string or only spaces
 - **THEN** the delivery fails permanently, as for an unset variable
 
 #### Scenario: An illegal value never appears in the message

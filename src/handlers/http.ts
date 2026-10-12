@@ -63,6 +63,11 @@ function isEnvName(s: string): boolean {
  * variable. The reference keeps the credential out of the definition, the
  * draft and the outbox row: only the name is stored. A strict object, so an
  * unknown key or a second reference shape fails at publish.
+ *
+ * ponytail: an environment variable stands in for a secret store, with no
+ * per-process scope. Ceiling: a listed name serves every author of the tenant
+ * and every allowed host. Upgrade entry point: add a further union member here,
+ * such as `{ secret: id }`, resolved against a store.
  */
 const headerValueSchema = z.union([
   z.string(),
@@ -130,9 +135,11 @@ export function egressRefusal(url: string): string | undefined {
 }
 
 /**
- * Every character `fetch` accepts in a header value: tab, printable ASCII,
- * Latin-1 high half (`[\t\x20-\x7e\x80-\xff]`). A loop, not a regex, for the
- * reason `isEnvName` states.
+ * The RFC 9110 field-value set: tab, printable ASCII, Latin-1 high half
+ * (`[\t\x20-\x7e\x80-\xff]`). A strict subset of what `fetch` accepts. The
+ * strict set keeps a resolved value out of a transport message, since `fetch`
+ * never raises on a value this accepts. A loop, not a regex, for the reason
+ * `isEnvName` states.
  */
 function isLegalHeaderValue(s: string): boolean {
   for (let i = 0; i < s.length; i++) {
@@ -175,7 +182,7 @@ function resolveEnvReference(header: string, name: string, tenant: string | unde
   if (value === undefined) {
     throw new PermanentError(`http.request header "${header}" references ${name}, which is not set`);
   }
-  if (value === "") {
+  if (value.trim() === "") {
     throw new PermanentError(`http.request header "${header}" references ${name}, which is empty`);
   }
   if (!isLegalHeaderValue(value)) {

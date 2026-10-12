@@ -58,7 +58,7 @@ In a deployment with many tenants, `ctx.tenant` is non-empty. The handler then r
 
 **5. Every refusal is permanent and carries the name only.**
 
-A retry meets the same environment, so each refusal throws `PermanentError`. Four cases refuse. They are a name outside the list, an unset variable and an empty value. The fourth is a value outside the legal header set (`[\t\x20-\x7e\x80-\xff]`). The legal-value check runs before `fetch`.
+A retry meets the same environment, so each refusal throws `PermanentError`. Four cases refuse. They are a name outside the list, an unset variable and an empty value (the empty string or only spaces). The fourth is a value outside the legal header set (`[\t\x20-\x7e\x80-\xff]`). The legal-value check runs before `fetch`.
 
 Without that check the transport could raise a message that quotes the offending header. The outbox stores message text in `last_error`, which the admin area shows. No message and no log line includes a value. A test asserts this with a value that holds a line break.
 

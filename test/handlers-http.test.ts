@@ -548,7 +548,7 @@ test("an unset or empty HTTP_SECRET_ENV_ALLOWLIST refuses every reference", asyn
   );
 });
 
-test("a list entry survives surrounding space and is compared case-sensitively", async () => {
+test("a list entry survives surrounding space", async () => {
   await withServer(
     () => jsonResponse({}),
     async (url, requests) => {
@@ -556,6 +556,21 @@ test("a list entry survives surrounding space and is compared case-sensitively",
         httpHandlerDef.handler(ctxFor({ url, headers: SECRET_REF })),
       );
       expect(requests[0]!.headers["authorization"]).toBe("sk_live_1");
+    },
+  );
+});
+
+test("a list entry differing only in case does not match, and no request leaves", async () => {
+  await withServer(
+    () => jsonResponse({}),
+    async (url, requests) => {
+      const err = await withEnv({ HTTP_SECRET_ENV_ALLOWLIST: "partner_api_token", PARTNER_API_TOKEN: "sk_live_1" }, () =>
+        rejects(httpHandlerDef.handler(ctxFor({ url, headers: SECRET_REF }))),
+      );
+      expect(err).toBeInstanceOf(PermanentError);
+      expect((err as Error).message).toContain("PARTNER_API_TOKEN");
+      expect((err as Error).message).not.toContain("sk_live_1");
+      expect(requests).toHaveLength(0);
     },
   );
 });
@@ -646,6 +661,21 @@ test("an empty variable fails permanently, as an unset one does", async () => {
       );
       expect(err).toBeInstanceOf(PermanentError);
       expect((err as Error).message).toContain("PARTNER_API_TOKEN");
+      expect(requests).toHaveLength(0);
+    },
+  );
+});
+
+test("a variable holding only spaces fails permanently as empty, and no request leaves", async () => {
+  await withServer(
+    () => jsonResponse({}),
+    async (url, requests) => {
+      const err = await withEnv({ HTTP_SECRET_ENV_ALLOWLIST: "PARTNER_API_TOKEN", PARTNER_API_TOKEN: "   " }, () =>
+        rejects(httpHandlerDef.handler(ctxFor({ url, headers: SECRET_REF }))),
+      );
+      expect(err).toBeInstanceOf(PermanentError);
+      expect((err as Error).message).toContain("PARTNER_API_TOKEN");
+      expect((err as Error).message).toContain("which is empty");
       expect(requests).toHaveLength(0);
     },
   );

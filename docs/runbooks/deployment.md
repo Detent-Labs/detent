@@ -32,7 +32,7 @@ default is safe for a deployment.
 | `METRICS_TOKEN` | The bearer token `GET /metrics` needs. An empty value counts as unset. | No | Unset, which leaves `GET /metrics` unregistered. | |
 | `TRUST_PROXY` | `1` reads the caller's address from `X-Forwarded-For`. | No | Unset, which reads the peer address. | `1` without a proxy that overwrites the header. Read "The proxy rule" below first. |
 | `HTTP_ACTION_ALLOWED_HOSTS` | A comma-separated list. It names the hosts the `http.request` action may reach. | Yes, for a definition using `http.request`. | Unset, which refuses every host. | |
-| `HTTP_SECRET_ENV_ALLOWLIST` | A comma-separated list. It names the variables a reference may read. | Yes, for a reference. | Unset. That refuses every reference. | With many tenants (`TENANT_CONTROL_PLANE_URL` set), write each entry as `tenant:NAME`. An entry without a tenant has no effect there. One tenant ignores an entry with a colon. Each `NAME` matches `[A-Z][A-Z0-9_]*`. |
+| `HTTP_SECRET_ENV_ALLOWLIST` | A comma-separated list of the variables a reference may read. With many tenants (`TENANT_CONTROL_PLANE_URL` set), write each entry as `tenant:NAME`. An entry without a tenant has no effect there. One tenant ignores an entry with a colon. Each `NAME` matches `[A-Z][A-Z0-9_]*`. | Yes, for a definition using a header reference. | Unset. That refuses every reference. | |
 | `TENANT_CONTROL_PLANE_URL` | The control-plane connection string. Its presence turns SaaS mode on. | No | Unset, which runs one tenant on `DATABASE_URL`. | Read "Serving many tenants" below first. |
 | `HTTP_ACTION_ALLOW_INSECURE` | `1` permits a plain-HTTP target. | No | Unset. Then `https` alone. | `1` sends the request in the clear. Give the target a TLS certificate instead. |
 | `SMTP_HOST` | The relay the `notification.email` action connects to. | Yes, for a definition using `notification.email`. | None. | |
@@ -97,14 +97,19 @@ value.
 A refused reference dead-letters the row. The message names the variable and
 never shows a value.
 
-Four cases refuse. The name is outside the list. The
-variable is unset. Its value is empty. Or its value holds a byte that a header
-cannot carry.
+Four cases refuse:
+
+- The name is outside the list.
+- The variable is unset.
+- Its value is empty, or only spaces.
+- Its value holds a byte that a header cannot carry.
 
 Fix the environment. Then retry the row from the admin area's outbox screen.
 
 Two trade-offs follow. A listed name serves every author of the tenant and
-every allowed host. List a name only if all authors may use it so. Keep
+every allowed host. List a name only if all authors may use it. Never list a
+variable the engine itself reads, such as `DATABASE_URL`, `AUTH_JWT_SECRET`,
+`SMTP_PASSWORD` or `METRICS_TOKEN`. Keep
 `HTTP_ACTION_ALLOWED_HOSTS` short, since each listed host can receive the value.
 A host that echoes request headers can also return the value to the author
 through `Action.output`.

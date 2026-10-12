@@ -62,10 +62,9 @@ export interface HandlerContext {
   db: SQL;
   /**
    * The tenant key of this delivery in a deployment that serves many tenants.
-   * Absent, or `""`, in a deployment with one tenant. Optional so every other
-   * call site of `drainOutbox` and `deliver` stays unchanged; only the host
-   * supplies it. A handler reads it only to scope something per tenant, and
-   * reaches the tenant's data through `db`, never through this key.
+   * Absent, or `""`, in a deployment with one tenant. Only the host supplies
+   * it. A handler reads it only to scope something per tenant, and reaches the
+   * tenant's data through `db`, never through this key.
    */
   tenant?: string;
   /**

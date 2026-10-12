@@ -892,8 +892,9 @@ The reference replaces the whole header value. Your operator stores the full
 value in that variable, `Bearer ` prefix included, and lists the name in the
 deployment. You never see or store the value. A rotation keeps the same version.
 
-A name outside the list dead-letters the action, and so does an unset variable.
-The message names the variable. Ask your operator to fix it.
+A name outside the list dead-letters the action. So does a variable that is
+unset, empty, or holds a character a header cannot carry. The message names the
+variable. Ask your operator to fix it.
 
 The reference works in header values only. A `url` or a `body` takes no
 reference. A `{ "env": ... }` object inside a `body` is plain data and goes out
