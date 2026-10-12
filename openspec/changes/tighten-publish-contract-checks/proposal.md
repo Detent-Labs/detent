@@ -49,4 +49,6 @@ None.
   `docs/decisions.md`.
 - A stored body that sets `execution: "blocking"` stops parsing on read. No
   deployment stores one. A stored body that sets `idempotencyKey` still
-  parses, because the schema strips the key on read.
+  parses, because the schema strips the key on read. Its recomputed hash then
+  differs, so an instance pinned to that version fails with `PinMismatch`. A
+  dev database that seeded the two examples needs a reset and a reseed.

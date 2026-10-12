@@ -1931,7 +1931,8 @@ audit of 2026-09-10.
 16. **Delete the unused registry seams.** Rejected. That set is
     `devHeaderResolver`, the action `Registry`, the `DataSourceRegistry`, the
     `AssignmentRegistry`'s multi-strategy handlers, `exampleRegistry.ts` with
-    `RegistryPanel.tsx`, and `Action.execution`'s reserved enum. `CLAUDE.md`
+    `RegistryPanel.tsx`, and `Action.execution`'s reserved enum. The enum has
+    since narrowed to `async` (`tighten-publish-contract-checks`). `CLAUDE.md`
     records the reserved enum and the dev-header seam as v1 boundaries, and
     the registries as the plugin seam. The two studio files have
     since left the tree on their own change, on 2026-08-18; the rest stand.

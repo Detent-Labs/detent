@@ -68,7 +68,9 @@ old bodies readable, but the owner chose the enum.
 **D5. `idempotencyKey` leaves the schema.** `checkUnknownKeys` walks the Zod
 schema, so removal alone makes publish reject the key, `null` included. A
 stored body that set the key still parses, because Zod strips unknown keys on
-read. The hash of such a body shifts on re-publish, which no deployment sees.
+read. Its recomputed hash then differs from the stored one. An instance
+pinned to that version fails with `PinMismatch`. Only dev databases that seed
+the two examples hold such a version.
 Honoring the key would need a per-instance template, since one constant would
 dedupe a delivery across all instances.
 
@@ -91,7 +93,10 @@ return. That gap let the lookalike through.
 
 ## Migration Plan
 
-No deployment runs this engine, so nothing migrates. The sweep edits two
+No deployment runs this engine, so nothing migrates. A dev database that
+seeded `expense-approval` or `purchase-requisition` before this change needs
+a reset and a reseed. Its pinned instances fail with `PinMismatch` otherwise.
+The sweep edits two
 files under `examples/` in the same commit as the schema change. Rollback is
 a revert of that commit. A revert restores the old acceptance of a stray sink,
 the `"blocking"` value and the `idempotencyKey` key.
