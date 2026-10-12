@@ -1679,3 +1679,44 @@ describe("compile: every example publishes twice to byte-identical output", () =
     });
   }
 });
+
+// tighten-publish-contract-checks: Action.execution accepts "async" only, and
+// Action.idempotencyKey is no longer declared. The key was never read: the
+// engine derives every outbox row's key from instance, sequence and action id.
+describe("compile: an action declares async execution and no idempotency key", () => {
+  const withAction = (extra: Record<string, unknown>) => {
+    const b = baseBody();
+    b.workflow.steps[0].onEntry = [{ id: "action_x", type: "t", config: {}, ...extra }];
+    return b;
+  };
+
+  it("rejects execution: \"blocking\"", () => {
+    let thrown: unknown;
+    try {
+      compileProcessBody(withAction({ execution: "blocking" }) as ProcessBody);
+    } catch (err) {
+      thrown = err;
+    }
+    expect((thrown as Error | undefined)?.name).toBe("ZodError");
+    expect(JSON.stringify((thrown as { issues: unknown }).issues)).toContain("execution");
+  });
+
+  it("accepts execution: \"async\"", () => {
+    const out = compileProcessBody(withAction({ execution: "async" }) as ProcessBody);
+    expect(out.workflow.steps[0]!.onEntry![0]!.execution).toBe("async");
+  });
+
+  it("rejects idempotencyKey: null as an unknown key with a located issue", () => {
+    const err = rejects(withAction({ idempotencyKey: null }));
+    expect(
+      err.issues.some((i) => i.loc === "workflow.steps[0].onEntry[0].idempotencyKey" && i.value === "idempotencyKey"),
+    ).toBe(true);
+  });
+
+  it("rejects idempotencyKey: \"x\" as an unknown key with a located issue", () => {
+    const err = rejects(withAction({ idempotencyKey: "x" }));
+    expect(
+      err.issues.some((i) => i.loc === "workflow.steps[0].onEntry[0].idempotencyKey" && i.value === "idempotencyKey"),
+    ).toBe(true);
+  });
+});

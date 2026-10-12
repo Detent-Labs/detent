@@ -197,7 +197,8 @@ export type Plugin = z.infer<typeof plugin>;
 export const definitionStatus = z.enum(["draft", "published"]);
 export const stepType = z.enum(["task", "subprocess"]); // terminal is a property, not a type
 export const pathTrigger = z.enum(["manual", "automatic"]);
-export const execution = z.enum(["async", "blocking"]); // v1 implements async only
+// Every action is delivered after the commit; the engine has no blocking delivery.
+export const execution = z.enum(["async"]);
 export const instanceStatus = z.enum(["running", "completed", "cancelled", "faulted"]);
 export const baseFieldType = z.enum([
   "string", "number", "boolean", "list", "file", "group",
@@ -623,7 +624,6 @@ export const retryPolicy = z.object({
 
 export const action = plugin.extend({
   id: actionId,
-  idempotencyKey: z.string().nullable().optional(),
   output: z.record(fieldId, expression).optional(),
   execution: execution.optional(),
   retry: retryPolicy.optional(),

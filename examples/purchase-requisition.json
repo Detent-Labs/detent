@@ -986,7 +986,6 @@
                 }
               },
               "execution": "async",
-              "idempotencyKey": null,
               "retry": {
                 "maxAttempts": 5,
                 "backoff": "exponential",
@@ -1004,7 +1003,6 @@
                 "method": "POST"
               },
               "execution": "async",
-              "idempotencyKey": null,
               "retry": {
                 "maxAttempts": 3,
                 "backoff": "exponential",

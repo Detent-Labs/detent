@@ -47,9 +47,15 @@ import { canonicalize } from "../src/schema/canonical-json.js";
  * None of these three example bodies declares either key, so all three
  * literals stay exactly as `field-model-type-format-control` left them —
  * unlike the earlier changes above, this one moves nothing.
+ *
+ * `tighten-publish-contract-checks` moved `expense-approval.json` a fifth
+ * time: `Action.idempotencyKey` left the schema, so the three
+ * `"idempotencyKey": null` lines left the body. The literal below is that
+ * fifth fresh measurement. The two subprocess bodies set no action key, so
+ * their literals are unmoved.
  */
 const PRE_CHANGE_HASHES: Record<string, string> = {
-  "expense-approval.json": "4d340d360fc4c1c92b13d8cf69f72ba2e28a09c0affcac0d0c8358f01162e5b1",
+  "expense-approval.json": "18f69e892621803090bcbe093f82e90aa0ff7d682934771017ec207348ca32e6",
   "subprocess-credit-check-child.json": "aa07358556ff42fc66275e8c2908093a085d501075539768693bb7c01619e5b8",
   "subprocess-loan-parent.json": "c3afcb3c7e5c3b95c63c443ebb054f5b90ab883a2fdc78c8c02f534ee838c208",
 };
