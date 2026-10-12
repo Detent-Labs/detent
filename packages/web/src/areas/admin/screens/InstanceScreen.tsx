@@ -8,7 +8,6 @@ import {
   getInstanceView,
   listInstanceAudit,
   listPendingTimers,
-  listProcesses,
   listVersions,
   verifyInstanceAudit,
 } from "../api/client.js";
@@ -21,6 +20,7 @@ import { useFail } from "../../../shell/useFail.js";
 import { usePagedList } from "../../../shell/usePagedList.js";
 import { ErrorBanner } from "../../../shell/ErrorBanner.js";
 import { labelText } from "./instancesLogic.js";
+import { claimantOf } from "./instanceHeaderLogic.js";
 import { t, tFill } from "../catalog.js";
 import type { UiLocale } from "../../../i18n/locale.js";
 import type { InstanceStatus } from "../api/types.js";
@@ -147,25 +147,6 @@ const badgeTone: Record<InstanceStatus, typeof styles.badgeOpen> = {
 function formatAuditValue(value: unknown): string {
   return typeof value === "string" ? value : JSON.stringify(value);
 }
-// ponytail: no per-instance timer read exists over HTTP (GET /admin/timers has
-// no instanceId filter — see admin-operations-api's three admin-queries.ts
-// functions). A generous single page covers the pending-timer backlog any
-// real deployment carries; add an instanceId filter if that stops holding.
-const TIMERS_SCAN_LIMIT = 200;
-
-/** transitionSeq and claim state have no single-instance read of their own —
- * both are derived from however much of the record has loaded, latest wins. */
-function deriveFromRecord(items: InstanceRecordElement[]): { transitionSeq?: number; claimedBy?: string | null } {
-  let transitionSeq: number | undefined;
-  let claimedBy: string | null | undefined;
-  for (const el of items) {
-    if (el.kind === "transition") transitionSeq = el.entry.transitionSeq;
-    if (el.kind === "event" && el.event.kind === "assignment.claimed") claimedBy = el.event.payload.actorId;
-    if (el.kind === "event" && el.event.kind === "assignment.released") claimedBy = null;
-    if (el.kind === "event" && el.event.kind === "assignment.delegated") claimedBy = el.event.payload.toActorId;
-  }
-  return { transitionSeq, claimedBy };
-}
 
 /**
  * `describeRecordElement`'s `{at, summary}` plus the one field only this
@@ -185,10 +166,6 @@ function describeElement(el: InstanceRecordElement): { at: string; summary: stri
 export function InstanceScreen({ instanceId, navigate, token, locale, onUnauthorized }: InstanceScreenProps) {
   const [view, setView] = useState<InstanceView | undefined>(undefined);
   const [versions, setVersions] = useState<VersionSummary[]>([]);
-  // baseLocale is process-level, not carried by InstanceView itself — resolved
-  // via GET /processes so the step label renders in the process's own base
-  // locale rather than an arbitrary object-key order.
-  const [baseLocale, setBaseLocale] = useState<string | undefined>(undefined);
   const [timer, setTimer] = useState<PendingTimer | undefined>(undefined);
   const [verify, setVerify] = useState<AuditVerifyResult | undefined>(undefined);
   const [loading, setLoading] = useState(false);
@@ -244,11 +221,10 @@ export function InstanceScreen({ instanceId, navigate, token, locale, onUnauthor
     try {
       const v = await getInstanceView(instanceId, token);
       setView(v);
-      const [vs, rec, timers, processes, audit, verifyResult] = await Promise.all([
+      const [vs, rec, timers, audit, verifyResult] = await Promise.all([
         listVersions(v.processId, token),
         getInstanceRecord(instanceId, token, { limit: RECORD_PAGE_LIMIT }),
-        listPendingTimers(token, { limit: TIMERS_SCAN_LIMIT }),
-        listProcesses(token),
+        listPendingTimers(token, { instanceId, limit: 1 }),
         listInstanceAudit(instanceId, token, { limit: AUDIT_PAGE_LIMIT }),
         verifyInstanceAudit(instanceId, token),
       ]);
@@ -258,9 +234,8 @@ export function InstanceScreen({ instanceId, navigate, token, locale, onUnauthor
       // from here instead of refetching page one.
       resetRecordList(rec.items, rec.cursor);
       resetAuditList(audit.items, audit.cursor);
-      setTimer(timers.items.find((t) => t.instanceId === instanceId));
+      setTimer(timers.items[0]);
       setVerify(verifyResult);
-      setBaseLocale(processes.find((p) => p.processId === v.processId)?.baseLocale);
     } catch (err) {
       fail(err);
     } finally {
@@ -316,7 +291,7 @@ export function InstanceScreen({ instanceId, navigate, token, locale, onUnauthor
   }
 
   const definitionHash = versions.find((v) => v.version === view.version)?.definitionHash ?? "—";
-  const derived = deriveFromRecord(recordList.items);
+  const claimant = claimantOf(view);
 
   return (
     <main {...stylex.props(styles.screen)}>
@@ -351,16 +326,16 @@ export function InstanceScreen({ instanceId, navigate, token, locale, onUnauthor
         </div>
         <div>
           <dt {...stylex.props(styles.detailTerm)}>{t(locale, "instance.currentStep")}</dt>
-          <dd {...stylex.props(styles.detailValue)}>{(baseLocale ? labelText(view.step.label, baseLocale) : "") || view.step.key}</dd>
+          <dd {...stylex.props(styles.detailValue)}>{labelText(view.step.label, view.baseLocale) || view.step.key}</dd>
         </div>
         <div>
           <dt {...stylex.props(styles.detailTerm)}>{t(locale, "instance.transitionSeq")}</dt>
-          <dd {...stylex.props(styles.detailValue)}>{derived.transitionSeq ?? "—"}</dd>
+          <dd {...stylex.props(styles.detailValue)}>{view.transitionSeq}</dd>
         </div>
         <div>
           <dt {...stylex.props(styles.detailTerm)}>{t(locale, "instance.claimState")}</dt>
           <dd {...stylex.props(styles.detailValue)}>
-            {derived.claimedBy ? tFill(locale, "instance.claimedBy", { actor: derived.claimedBy }) : t(locale, "instance.unclaimed")}
+            {claimant ? tFill(locale, "instance.claimedBy", { actor: claimant }) : t(locale, "instance.unclaimed")}
           </dd>
         </div>
         <div>

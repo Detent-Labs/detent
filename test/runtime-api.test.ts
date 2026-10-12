@@ -1287,6 +1287,67 @@ test.skipIf(!DB)("getInstanceView on a cancelled instance still resolves, with n
   expect(view.availablePaths).toEqual([]);
 });
 
+// fix-admin-instance-and-outbox-screens: the view carries the instance's own
+// transitionSeq, whatever its status.
+test.skipIf(!DB)("getInstanceView carries transitionSeq 0 on a fresh instance and 3 after three transitions", async () => {
+  const PID = pid("proc_view_seq_running");
+  await publishBody(PID, selfLoopBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+  expect((await getInstanceView(created.instanceId, actor, dataSourceReg)).transitionSeq).toBe(0);
+
+  for (let i = 0; i < 3; i++) {
+    await submitAndTransition(created.instanceId, "path_self" as PathId, {} as Instance["data"], actor, dataSourceReg);
+  }
+
+  const view = await getInstanceView(created.instanceId, actor, dataSourceReg);
+  expect(view.status).toBe("running");
+  expect(view.transitionSeq).toBe(3);
+});
+
+test.skipIf(!DB)("getInstanceView carries transitionSeq on a completed instance", async () => {
+  const PID = pid("proc_view_seq_completed");
+  await publishBody(PID, cascadeBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+  const result = await submitAndTransition(
+    created.instanceId,
+    "path_ab" as PathId,
+    { field_decision: "approve" } as unknown as Instance["data"],
+    actor, dataSourceReg,
+  );
+  expect(result.status).toBe("completed");
+  expect(result.transitionSeq).toBeGreaterThan(0);
+
+  const view = await getInstanceView(result.instanceId, actor, dataSourceReg);
+  expect(view.status).toBe("completed");
+  expect(view.transitionSeq).toBe(result.transitionSeq);
+});
+
+test.skipIf(!DB)("getInstanceView carries transitionSeq on a cancelled instance", async () => {
+  const PID = pid("proc_view_seq_cancelled");
+  const published = await publishBody(PID, selfLoopBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+
+  const cancelled = await cancelInstance(created, published.definition, actor);
+  expect(cancelled.status).toBe("cancelled");
+  expect(cancelled.transitionSeq).toBeGreaterThan(0);
+
+  const view = await getInstanceView(cancelled.instanceId, actor, dataSourceReg);
+  expect(view.status).toBe("cancelled");
+  expect(view.transitionSeq).toBe(cancelled.transitionSeq);
+});
+
+test.skipIf(!DB)("getInstanceView carries transitionSeq on a faulted instance", async () => {
+  const PID = pid("proc_view_seq_faulted");
+  await publishBody(PID, selfLoopBody(), reg, dataSourceReg);
+  const created = await createProcessInstance(PID, actor, dataSourceReg);
+  await submitAndTransition(created.instanceId, "path_self" as PathId, {} as Instance["data"], actor, dataSourceReg);
+  await sql`UPDATE instances SET body = jsonb_set(body, '{status}', '"faulted"'::jsonb) WHERE instance_id = ${created.instanceId}`;
+
+  const view = await getInstanceView(created.instanceId, recordAdmin, dataSourceReg);
+  expect(view.status).toBe("faulted");
+  expect(view.transitionSeq).toBe(1);
+});
+
 /**
  * configure-task-collaboration: process declares collaboration, step_a
  * carries no override, so getInstanceView must resolve the process default

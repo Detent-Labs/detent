@@ -1645,6 +1645,11 @@ components:
           type: integer
         status:
           $ref: "#/components/schemas/InstanceStatus"
+        transitionSeq:
+          type: integer
+          description: >-
+            The count of the instance's committed transitions. Reports
+            regardless of `status`.
         step:
           type: object
           properties:
@@ -1688,7 +1693,7 @@ components:
           type: string
           format: date-time
           description: Set when data retention has redacted this instance's payload.
-      required: [instanceId, processId, version, status, step, fields, availablePaths, columns, tabs]
+      required: [instanceId, processId, version, status, transitionSeq, step, fields, availablePaths, columns, tabs]
 
     InstanceSummary:
       type: object
