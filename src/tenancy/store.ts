@@ -61,6 +61,9 @@ export async function initControlPlane(db: SQL): Promise<void> {
     database_url text NOT NULL,
     created_at   timestamptz NOT NULL DEFAULT now()
   )`;
+  // Compares the URL string, so it backstops only the exact-URL race between
+  // two provisionings. `provisionTenant`'s identity check carries the typo case.
+  await db`CREATE UNIQUE INDEX IF NOT EXISTS tenants_database_url_key ON tenants (database_url)`;
 }
 
 const toRecord = (r: { id: string; key: string; name: string; database_url: string }): TenantRecord => ({

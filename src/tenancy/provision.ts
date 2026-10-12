@@ -11,7 +11,7 @@
 
 import { SQL } from "bun";
 import { initSchema } from "../engine/store.js";
-import { insertTenant, tenantByKey, type TenantRecord } from "./store.js";
+import { insertTenant, listTenants, tenantByKey, type TenantRecord } from "./store.js";
 
 /** `key` is what a token's `tenant` claim carries, so it stays a slug a human types. */
 const KEY_PATTERN = /^[a-z][a-z0-9_-]*$/;
@@ -28,6 +28,45 @@ export class TenantKeyTaken extends Error {
     super(`tenancy: a tenant with key ${key} exists already`);
     this.name = "TenantKeyTaken";
   }
+}
+
+export class TenantDatabaseTaken extends Error {
+  constructor(key: string, owner: string, identity: string) {
+    super(`tenancy: tenant ${key} cannot use database ${identity}, tenant ${owner} lists it already`);
+    this.name = "TenantDatabaseTaken";
+  }
+}
+
+/**
+ * `host:port/database` of a connection URL. Credentials and query parameters
+ * stay out, so a typo that differs only in password or `sslmode` still names the
+ * same database. A `host` query parameter (a socket URL) replaces the hostname.
+ * The port defaults to 5432 and the hostname is lowercase. Throws when the URL
+ * does not parse.
+ */
+export function databaseIdentity(databaseUrl: string): string {
+  const url = new URL(databaseUrl);
+  const host = (url.searchParams.get("host") || url.hostname).toLowerCase();
+  return `${host}:${url.port || "5432"}/${url.pathname.replace(/^\//, "")}`;
+}
+
+function identityOrUndefined(databaseUrl: string): string | undefined {
+  try {
+    return databaseIdentity(databaseUrl);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The URL `createDatabaseFor` connects with: the tenant URL with its database
+ * replaced by `postgres`. Credentials, host, port and every query parameter
+ * (`sslmode` included) stay.
+ */
+export function adminUrlFor(databaseUrl: string): string {
+  const admin = new URL(databaseUrl);
+  admin.pathname = "/postgres";
+  return admin.toString();
 }
 
 export interface ProvisionOptions {
@@ -61,7 +100,7 @@ async function createDatabaseFor(databaseUrl: string): Promise<void> {
   if (!DB_NAME_PATTERN.test(name)) {
     throw new Error(`tenancy: '${name}' is not a valid database name (${DB_NAME_PATTERN.source})`);
   }
-  const admin = new SQL(`${url.protocol}//${url.username}:${url.password}@${url.host}/postgres`);
+  const admin = new SQL(adminUrlFor(databaseUrl));
   try {
     const existing = (await admin`SELECT 1 FROM pg_database WHERE datname = ${name}`) as unknown[];
     if (existing.length === 0) await admin.unsafe(`CREATE DATABASE "${name}"`);
@@ -73,13 +112,24 @@ async function createDatabaseFor(databaseUrl: string): Promise<void> {
 /**
  * Create a tenant's database, build its schema, and list it.
  *
- * The pre-read below is a courtesy that gives a clear message; the unique
- * constraint on `key` is what actually decides, so a concurrent provisioning
- * cannot slip between the check and the write.
+ * The key and database pre-reads below are a courtesy that gives a clear
+ * message; the unique constraints on `key` and `database_url` are what actually
+ * decide, so a concurrent provisioning cannot slip between the check and the
+ * write. The database check compares `databaseIdentity`, so it also catches a
+ * URL that differs from a listed one in credentials or parameters, which the
+ * `database_url` index cannot.
  */
 export async function provisionTenant(control: SQL, opts: ProvisionOptions): Promise<TenantRecord> {
   if (!KEY_PATTERN.test(opts.key)) throw new InvalidTenantKey(opts.key);
   if (await tenantByKey(opts.key, control)) throw new TenantKeyTaken(opts.key);
+
+  // A URL that does not parse has no identity; `createDatabase` rejects it.
+  const identity = identityOrUndefined(opts.databaseUrl);
+  if (identity) {
+    for (const t of await listTenants(control)) {
+      if (identityOrUndefined(t.databaseUrl) === identity) throw new TenantDatabaseTaken(opts.key, t.key, identity);
+    }
+  }
 
   const createDatabase = opts.createDatabase ?? createDatabaseFor;
   const connect = opts.connect ?? ((url: string) => new SQL(url));
