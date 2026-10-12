@@ -52,9 +52,16 @@ None.
 - `src/engine/retention.ts`: the sweep query and keyset.
 - `src/engine/host.ts`: `eachTenant`, `TENANT_TICK_CONCURRENCY`.
 - `src/engine/store.ts`: `initSchema` indexes and the stale-mark clear.
-- Tests: `automatic`, `resolution`, `retention`, `tenancy-workers`, and one
-  plan test per index.
+  `createInstance` writes the mark from the seed status.
+- `src/engine/admin-queries.ts`: `outboxListSelect` moves out of the list
+  function, so the plan test can explain it.
+- `src/engine/migration.ts`: one comment follows the new mark rule.
+- Exports for the plan tests: `claimSelect`, `retentionSelect` and
+  `outboxListSelect`.
+- Tests: `automatic`, `resolution`, `retention`, `tenancy-workers`,
+  `instance-audit`, `subprocess`, and one plan test per index.
 - `docs/decisions.md`: the audit index entry for this change is struck.
-  PERF-1 stays open and untouched, since the retention loop kept its cadence.
+  PERF-1 stays open, since the retention loop kept its cadence. Its `host.ts`
+  line citations move to the new line numbers.
 - No change to `src/schema/definition.ts`, no new environment variable and no
   HTTP change.

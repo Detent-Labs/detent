@@ -140,6 +140,10 @@ status-filtered list keeps its speed, as the table shows.
   resolution, timer or retention drain that hangs holds its slot until it
   ends. Eight hung drains park that worker's tick. The serial loop parked it
   after one.
+- [A parked tick outlives `stop()`] → A tick that waits on a slot still starts
+  the rest of its list after `stop()`. An in-flight tick completes, as
+  `engine-poll-loop-consolidation` allows. The shutdown path may log one
+  warning per drain that fails.
 - [Text comparison of timestamps] → A hand-edited body with a non-UTC string
   would sort wrongly. No writer produces one, and `started_at` carries the
   same assumption.

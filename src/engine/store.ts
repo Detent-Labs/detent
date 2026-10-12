@@ -361,7 +361,8 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   // instance_id. It holds the marked rows only (pending or claimed), so a scan
   // costs the live marks, not every instance the engine ever stored. Every
   // commit that leaves an instance not running clears its mark (applyStepEntry,
-  // markFaulted), so a finished instance never enters it.
+  // markFaulted), and createInstance writes none for an instance created
+  // finished, so a finished instance never enters it.
   //
   // The name differs from the dropped instances_resolve_idx on purpose.
   // CREATE INDEX IF NOT EXISTS leaves an index of a given name alone whatever
@@ -1311,13 +1312,16 @@ export async function createInstance(
   // collide on the deterministic outbox key and fail the handler.
   await withTransaction(db, async (tx) => {
     await setAuditAttribution(tx, opts.startedBy ?? null, "creation");
-    // resolve_state starts 'pending', not the column's 'idle' default: both
+    // A running instance starts 'pending', not the column's 'idle' default: both
     // callers (startInstance, the subprocess spawn handler) immediately cascade
     // the instance they just created, and a crash between this INSERT and that
     // cascade's first hop would otherwise leave a cascade-eligible initial step
-    // unmarked — the same gap applyStepEntry closes for every later commit.
+    // unmarked — the same gap applyStepEntry closes for every later commit. An
+    // instance created already finished (a terminal initialStep) starts 'idle',
+    // as every commit that leaves an instance not running leaves it.
+    const resolveState = inst.status === "running" ? "pending" : "idle";
     const inserted = (await tx`INSERT INTO instances (instance_id, transition_seq, body, next_timer_at, resolve_state, kind)
-      VALUES (${inst.instanceId}, ${inst.transitionSeq}, ${inst}, ${minFireAt(timers)}, 'pending', ${inst.kind})
+      VALUES (${inst.instanceId}, ${inst.transitionSeq}, ${inst}, ${minFireAt(timers)}, ${resolveState}, ${inst.kind})
       ON CONFLICT (instance_id) DO NOTHING
       RETURNING instance_id`) as unknown[];
     if (inserted.length === 0) return;

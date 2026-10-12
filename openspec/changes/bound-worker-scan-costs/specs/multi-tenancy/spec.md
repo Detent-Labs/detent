@@ -15,8 +15,9 @@ connection, and SHALL log one warning naming it. It SHALL continue for every
 other tenant.
 
 The worker count SHALL NOT grow with the tenant count. One unreachable tenant
-SHALL NOT delay another beyond the connection try it costs. One tenant whose
-drain runs long SHALL NOT delay the drain of any other tenant.
+SHALL NOT delay another beyond the connection try it costs. While fewer than
+eight drains of that worker run, one tenant's long drain SHALL NOT delay
+another tenant's drain.
 
 <!-- antislop: allow passive-voice - a MODIFIED block keeps the live scenario name verbatim -->
 #### Scenario: On-premise polling is unchanged

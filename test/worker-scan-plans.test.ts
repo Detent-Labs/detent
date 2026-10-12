@@ -6,7 +6,8 @@
  * DB-backed; skips when DATABASE_URL is unset.
  */
 import { test, expect, beforeAll, beforeEach } from "bun:test";
-import { sql, initSchema } from "../src/engine/store.js";
+import { sql, initSchema, createInstance } from "../src/engine/store.js";
+import type { ProcessBody, Instance } from "../src/schema/definition.js";
 import { claimSelect, CLAIM_LEASE_MS } from "../src/engine/resolution.js";
 import { retentionSelect } from "../src/engine/retention.js";
 import { outboxListSelect } from "../src/engine/admin-queries.js";
@@ -113,7 +114,41 @@ test.skipIf(!DB)("initSchema clears the mark of an instance that is not running 
   expect(await resolveStateOf("inst_live")).toBe("pending");
 });
 
-test.skipIf(!DB)("initSchema leaves the partial index and no longer builds the full-column one", async () => {
+test.skipIf(!DB)("an instance created on a terminal initialStep reads completed and carries no mark", async () => {
+  const body = {
+    baseLocale: "en",
+    fields: [],
+    workflow: {
+      initialStep: "step_done",
+      steps: [{ id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true }],
+    },
+  } as unknown as ProcessBody;
+  const inst = await createInstance(body, { processId: "proc_scan" as Instance["processId"], version: 1 });
+
+  expect(inst.status).toBe("completed");
+  expect(await resolveStateOf(inst.instanceId)).toBe("idle");
+});
+
+test.skipIf(!DB)("an instance created on a running initialStep starts with a pending mark", async () => {
+  const body = {
+    baseLocale: "en",
+    fields: [],
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        { id: "step_a", key: "a", label: { en: "A" }, type: "task" },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
+      ],
+    },
+  } as unknown as ProcessBody;
+  const inst = await createInstance(body, { processId: "proc_scan" as Instance["processId"], version: 1 });
+
+  expect(inst.status).toBe("running");
+  expect(await resolveStateOf(inst.instanceId)).toBe("pending");
+});
+
+test.skipIf(!DB)("initSchema drops the old full-column resolve index and leaves the partial one", async () => {
+  await sql`CREATE INDEX instances_resolve_idx ON instances (resolve_state)`;
   await initSchema();
   const names = ((await sql`SELECT indexname FROM pg_indexes WHERE tablename = 'instances'`) as { indexname: string }[]).map((r) => r.indexname);
   expect(names).toContain("instances_resolve_open_idx");
@@ -152,9 +187,8 @@ test.skipIf(!DB)("a retention tick with nothing eligible reads no instance row",
   await seedRetentionBulk();
   const nodes = await planNodes(retentionSelect(sql, RETENTION_DAYS, "", ""));
 
-  // The rejected form compared `(body->>'currentStepEnteredAt')::timestamptz` on
-  // every unredacted row: measured at 256 ms over 133,339 rows of 300,000. The
-  // index keys on the entry time, so the cutoff bounds the scan and it reads none.
+  // The index keys on the entry time, so the cutoff bounds the scan. A form that
+  // casts the entry time on every unredacted row reads them all.
   expect(nodes.some((n) => n["Index Name"] === "instances_retention_idx")).toBe(true);
   expect(nodes.some((n) => n["Node Type"] === "Seq Scan")).toBe(false);
   expect(nodes.some((n) => n["Node Type"] === "Sort")).toBe(false);
@@ -162,7 +196,8 @@ test.skipIf(!DB)("a retention tick with nothing eligible reads no instance row",
   for (const n of nodes.filter((n) => n["Relation Name"] === "instances")) expect(n["Actual Rows"]).toBe(0);
 });
 
-test.skipIf(!DB)("initSchema twice leaves one retention index and no redacted_at index", async () => {
+test.skipIf(!DB)("initSchema drops the old redacted_at index and leaves one retention index", async () => {
+  await sql`CREATE INDEX instances_redacted_idx ON instances (redacted_at) WHERE redacted_at IS NULL`;
   await initSchema();
   await initSchema();
   const names = ((await sql`SELECT indexname FROM pg_indexes WHERE tablename = 'instances'`) as { indexname: string }[]).map((r) => r.indexname);
@@ -193,8 +228,8 @@ test.skipIf(!DB)("the unfiltered outbox list reads its first page through outbox
   await seedOutboxBulk();
   const nodes = await planNodes(outboxListSelect(sql, null, null, null, null, 51));
 
-  // Without the index every page sorted the whole table: measured at 52-79 ms
-  // over 500,000 rows, against 0.04-0.07 ms with it.
+  // The index delivers the rows in list order, so the plan holds no sort of the
+  // whole table.
   expect(nodes.some((n) => n["Index Name"] === "outbox_created_idx")).toBe(true);
   expect(nodes.some((n) => n["Node Type"] === "Seq Scan")).toBe(false);
   expect(nodes.some((n) => n["Node Type"] === "Sort")).toBe(false);

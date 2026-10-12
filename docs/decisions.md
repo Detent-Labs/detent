@@ -68,15 +68,16 @@ word. `ROADMAP.md` carries stage-by-stage status.
   `instance_id`, `transition_seq`, `body`, `resolve_state`,
   `resolve_claimed_at`, `cancel_sweep_state`, `next_timer_at`, `created_at`
   and `redacted_at`. Every other field of `Instance` lives inside the jsonb,
-  and six indexes stand in for eight of those keys. Three are expression
+  and seven indexes stand in for nine of those keys. Four are expression
   indexes over keys no column carries: `instances_claimed_by_idx` over
   `assignment.claimedBy`, `instances_candidates_idx` (GIN) over
-  `assignment.candidates`, and `instances_parent_idx` over
-  `parent.instanceId`. The other three are plain btrees over generated
+  `assignment.candidates`, `instances_parent_idx` over
+  `parent.instanceId`, and `instances_retention_idx` over
+  `currentStepEnteredAt`. The other three are plain btrees over generated
   columns: `instances_selection_col_idx` over
   `process_id`/`version`/`status`, `instances_current_step_col_idx` over
   `current_step_id` and `instances_started_by_col_idx` over `started_by`.
-  All six live in `initSchema` (`src/engine/store.ts`).
+  All seven live in `initSchema` (`src/engine/store.ts`).
 
   Change 1 (2026-08-30) promoted six of those keys into generated columns and
   left the three indexes over them in expression form. Change 3
