@@ -5929,8 +5929,12 @@ Open Studio at `/studio`. Seed the examples first, so the process list holds
 
 #### A new subprocess step writes a whole spec (E2-3, E2-4)
 
-Start a new draft. On the Canvas tab, add a subprocess step from the canvas
-bar. Select it on the Steps tab. Open "Which process it calls".
+Start a new draft. Give it a task step as its initial step. On the Fields tab,
+add a text field `applicant_name` and a number field `requested_amount`.
+
+On the Canvas tab, add a subprocess step from the canvas bar. Add a path from
+the initial step to it. Select the subprocess step on the Steps tab. Open
+"Which process it calls".
 
 Pass: the section shows the process select alone. The binding select, the
 version field and both mapping editors stay hidden.
@@ -5945,25 +5949,27 @@ Pass: the Checks tab lists no Zod "Required" issue for the step's spec.
 Press "+ Add input mapping" under `inputMapping`.
 
 Pass: the row's key select offers `amount`, the child's one input field. It
-offers none of the fields of the draft you edit.
+offers neither `applicant_name` nor `requested_amount`.
 
 Pass: "+ Add input mapping" stays disabled once a row holds `amount`.
 
-Give the row the CEL text `data.amount`. Add a field `amount` to the draft
-first if its field list is empty.
+Give the row the CEL text `data.requested_amount`.
 
 Pass: the Checks tab shows no issue for the step's spec.
 
-Add an end step and a path from the subprocess step to it. Publish the draft.
+Add an end step. Add a path from the subprocess step to it. Publish the draft.
 
 Pass: the publish succeeds.
 
+Discard the draft.
+
 #### Opening the example shows the stored child key (E2-4)
 
-Open a draft of `loan_application`. Select its `check` step. Open "Which
+Open a fresh draft of `loan_application`. Select its `check` step. Open "Which
 process it calls". The step calls `credit_check` pinned at version 1.
 
-Pass: the `inputMapping` row's select shows `amount`, the stored key.
+Pass: the `inputMapping` row's select shows `amount`, the key of the stored
+child field.
 
 Switch the binding to "The newest version whose contract still matches".
 
@@ -5975,10 +5981,35 @@ child does not list. Return to the step.
 Pass: the row's select shows "(not in the list)" for that key. The row stays
 until you remove it or pick a listed key.
 
+Discard the draft.
+
+#### Rows of the shared mapping editor stay distinct (E2-12)
+
+Open a fresh draft of `loan_application`. Select its `check` step. Under
+`outputMapping`, both rows hold a target.
+
+Pass: the target select of the first row shows the second row's target as
+disabled. The second row's select does the same for the first.
+
+Clear all text in the first row's CEL input.
+
+Pass: the row stays on screen with its target. The JSON surface keeps the
+target with an empty `src`.
+
+Press the first row's "remove" control.
+
+Pass: the row goes and the JSON surface drops that target.
+
+Add a `group` field to the draft. Open the target select of a row.
+
+Pass: the select lists the scalar fields and leaves the group field out.
+
+Discard the draft.
+
 #### A step kind switch confirms before it removes keys (E2-5)
 
-Open a draft of `loan_application` and select its `check` step. Press the "A
-step someone works" option in "What this step is".
+Open a fresh draft of `loan_application`. Select its `check` step. Press the
+"A step someone works" option in "What this step is".
 
 Pass: a dialog opens with the heading "Switch to “A step someone works”?".
 
@@ -6002,7 +6033,7 @@ Open the dialog again from the option. Then press "Switch and remove".
 Pass: the step is a task step and the JSON surface shows no `subprocess` key on
 it.
 
-Pass: the Checks tab drops the issue "only a subprocess step may declare a
+Pass: the Checks tab shows no issue "only a subprocess step may declare a
 subprocess spec".
 
 Select the `submit` step, a task step with one path. Press the "An end" option.
@@ -6013,27 +6044,6 @@ Open a draft of `purchase_requisition`. Add a task step that has no paths,
 time limits, exit actions or cancel actions. Press "An end" on it.
 
 Pass: the step becomes an end step at once and no dialog opens.
-
-#### Rows of the shared mapping editor stay distinct (E2-12)
-
-Open a draft of `loan_application` and select its `check` step. Under
-`outputMapping`, both rows hold a target.
-
-Pass: the target select of the first row shows the second row's target as
-disabled. The second row's select does the same for the first.
-
-Clear all text in the first row's CEL input.
-
-Pass: the row stays on screen with its target. The JSON surface keeps the
-target with an empty `src`.
-
-Press the first row's "remove" control.
-
-Pass: the row goes and the JSON surface drops that target.
-
-Add a `group` field to the draft. Open the target select of a row.
-
-Pass: the select lists the scalar fields and leaves the group field out.
 
 #### The Contract tab trims an outcome (E2-18)
 
