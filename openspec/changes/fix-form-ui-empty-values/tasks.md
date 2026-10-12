@@ -31,10 +31,10 @@
 
 ## 5. Docs and index
 
-- [ ] 5.1 In `docs/openapi.yaml`, say that a `null` value in the submit body clears a field. Say that a blank value fails a required field.
-- [ ] 5.2 Strike the `fix-form-ui-empty-values` entry in the audit index of `docs/decisions.md`.
-- [ ] 5.3 Add a read-only check and a cleared-field check to `docs/browser-checks.md`, beside the task screen draft check.
-- [ ] 5.4 Correct the FIELDS-19 entry in `docs/decisions.md`. Say the `packages/form-ui` site now passes a replacer.
+- [x] 5.1 In `docs/openapi.yaml`, say that a `null` value in the submit body clears a field. Say that a blank value fails a required field.
+- [x] 5.2 Strike the `fix-form-ui-empty-values` entry in the audit index of `docs/decisions.md`.
+- [x] 5.3 Add a read-only check and a cleared-field check to `docs/browser-checks.md`, beside the task screen draft check.
+- [x] 5.4 Correct the FIELDS-19 entry in `docs/decisions.md`. Say the `packages/form-ui` site now passes a replacer.
 
 ## 6. Verification
 
