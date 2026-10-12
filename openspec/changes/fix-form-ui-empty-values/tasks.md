@@ -17,9 +17,9 @@
 
 ## 3. React peer range
 
-- [ ] 3.1 Set the `react` and `react-dom` peers of `packages/form-ui` to `^19`. Run `bun install` in the container and keep the new `bun.lock`.
-- [ ] 3.2 Check that the form-ui tests resolve React 19 and the built bundle carries one React. The form-ui suite passes.
-- [ ] 3.3 Regenerate `THIRDPARTY.md` if the lock changed, and check the script reports no drift.
+- [x] 3.1 Set the `react` and `react-dom` peers of `packages/form-ui` to `^19`. Run `bun install` in the container and keep the new `bun.lock`.
+- [x] 3.2 Check that the form-ui tests resolve React 19 and the built bundle carries one React. The form-ui suite passes.
+- [x] 3.3 Regenerate `THIRDPARTY.md` if the lock changed, and check the script reports no drift.
 
 ## 4. Task screen and Player
 
