@@ -48,28 +48,46 @@ export interface ChainingFetchIO {
   getVersionBody: (processId: string, version: number, token: string) => Promise<unknown>;
 }
 
+/** The process list one mount shares across every `processId` it resolves.
+ * `current` holds the in-flight or settled `listProcesses` promise; a failed
+ * read clears it. */
+export interface ChainingListing {
+  current?: Promise<{ processId: string; version: number }[]>;
+}
+
 /**
- * Kicks off at most one `listProcesses` + `getVersionBody` pair per distinct
- * `processId` in `sites` that `fetchState` has not already seen — the dedup
- * guard design.md's "Chaining targets auto-fetch" decision requires: two
- * sites (the same site across an edit, or two different sites anywhere in
- * the draft) that target the same `processId` share one pair, never issue
- * two. A `processId` already `"pending"` or `"done"` is skipped outright:
- * this function starts no new fetch for it, and a caller reads its
- * already-resolved body (once done) straight out of `bodyCache`.
+ * Resolves each distinct `processId` in `sites` that `fetchState` has not
+ * already seen. A `processId` already `"pending"` or `"done"` is skipped
+ * outright: two sites that target the same id (the same site across an edit,
+ * or two sites anywhere in the draft) share one resolution, and a caller
+ * reads the resolved body (once done) straight out of `bodyCache`.
+ *
+ * Every unseen id shares the one process list in `listing`: the first starts
+ * `listProcesses` and stores the promise, later ids (each keystroke in a
+ * `processId` field yields a new id) wait on it. An id the list lacks marks
+ * `"done"` with no body request and no `bodyCache` entry, so every site
+ * referencing it reads not-checked, never an error. A listed id fetches its
+ * body once.
+ *
+ * A failed list read clears `listing.current`, and a failed body read deletes
+ * the id's `fetchState` entry. Both leave the id unseen, so the next call
+ * (the next draft change) retries.
  *
  * `onSettled()` fires once per distinct `processId` this call actually
- * fetched, after `fetchState`/`bodyCache` are updated for it — the caller's
- * signal to re-sync whatever depends on `bodyCache` (`syncLoadedTargets`
- * below). A `processId` with no matching `listProcesses` entry, or a failed
- * fetch, still marks `"done"` with no `bodyCache` entry: every site
- * referencing it then reads not-checked, never an error.
+ * started, success or failure, after `fetchState`/`bodyCache` are updated for
+ * it — the caller's signal to re-sync whatever depends on `bodyCache`
+ * (`syncLoadedTargets` below).
+ *
+ * ponytail: a failed read has no backoff. The ceiling is one retry per draft
+ * change while the server is down. Upgrade: a retry timer, or a failure
+ * counter in `listing`.
  */
 export function resolveChainingTargets(
   sites: readonly ChainingActionSite[],
   token: string,
   fetchState: Map<string, "pending" | "done">,
   bodyCache: Map<string, ProcessBody>,
+  listing: ChainingListing,
   io: ChainingFetchIO,
   onSettled: () => void,
 ): void {
@@ -78,18 +96,29 @@ export function resolveChainingTargets(
     if (fetchState.has(processId)) continue;
     fetchState.set(processId, "pending");
     (async () => {
+      let listed = listing.current;
+      let summaries: Awaited<NonNullable<ChainingListing["current"]>>;
       try {
-        const summaries = await io.listProcesses(token);
-        const summary = summaries.find((p) => p.processId === processId);
-        if (!summary) return;
-        const body = (await io.getVersionBody(processId, summary.version, token)) as ProcessBody;
-        bodyCache.set(processId, body);
+        if (!listed) {
+          listed = io.listProcesses(token);
+          listing.current = listed;
+        }
+        summaries = await listed;
       } catch {
-        // A target with no matching listProcesses entry, or a failed fetch,
-        // gets no bodyCache entry — every site referencing it reads
-        // not-checked, not an error.
-      } finally {
+        if (listing.current === listed) listing.current = undefined;
+        fetchState.delete(processId);
+        onSettled();
+        return;
+      }
+      try {
+        const summary = summaries.find((p) => p.processId === processId);
+        if (summary) {
+          bodyCache.set(processId, (await io.getVersionBody(processId, summary.version, token)) as ProcessBody);
+        }
         fetchState.set(processId, "done");
+      } catch {
+        fetchState.delete(processId);
+      } finally {
         onSettled();
       }
     })();

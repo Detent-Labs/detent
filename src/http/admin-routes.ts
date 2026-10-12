@@ -34,6 +34,7 @@ import {
   setPasswordById,
   setDisplayName,
   validateDisplayName,
+  emailAddressSchema,
   DISPLAY_NAME_MAX_LENGTH,
   SelfManagerError,
 } from "../auth/users.js";
@@ -206,12 +207,16 @@ function requireNonBlank(value: unknown, label: string): string {
  * A duplicate email answers 409 from the column's own UNIQUE constraint. A
  * SELECT ahead of the insert would race a concurrent create for the same
  * address, and the constraint decides the outcome either way.
+ *
+ * An email that is not a valid address answers 400 before the write, by the
+ * same `emailAddressSchema` check `createUser` applies.
  */
 export async function handleAdminCreateUser(req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
   return route(req, resolver, db, (actor) => requireRole(actor, ADMIN_ROLE), async () => {
     const body = (await readJson(req)) as { email?: unknown; password?: unknown; roles?: unknown };
     const email = requireNonBlank(body.email, "email").trim();
     const password = requireNonBlank(body.password, "password");
+    if (!emailAddressSchema.safeParse(email).success) throw new RequestShapeError("email must be a valid address");
     const roles = body.roles === undefined ? [] : parseRoles(body.roles);
 
     let created: Awaited<ReturnType<typeof createUser>>;

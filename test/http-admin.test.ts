@@ -373,6 +373,16 @@ test.skipIf(!DB)("POST /admin/users refuses a missing or blank email or password
   expect(rows[0]!.n).toBe(0);
 });
 
+test.skipIf(!DB)("POST /admin/users refuses an email that is no valid address with 400 and writes no row", async () => {
+  const bad = ["max.muster", "a@x.ch>\r\nRCPT TO:<leak@evil.example", "a b@x.ch", "  <a@x.ch>  "];
+  for (const email of bad) {
+    const res = await fetch(authedReq("http://x/admin/users", "POST", admin, { email, password: "pw" }));
+    expect(res.status).toBe(400);
+  }
+  const rows = (await sql`SELECT count(*)::int AS n FROM auth_users`) as { n: number }[];
+  expect(rows[0]!.n).toBe(0);
+});
+
 test.skipIf(!DB)("POST /admin/users refuses an out-of-bounds role set with 400 and writes no row", async () => {
   const overLong = { email: "r1@example.com", password: "pw", roles: ["x".repeat(65)] };
   const overMany = { email: "r2@example.com", password: "pw", roles: Array.from({ length: 65 }, (_, i) => `role-${i}`) };
