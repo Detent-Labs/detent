@@ -20,10 +20,10 @@
 
 ## 4. Verification
 
-- [ ] 4.1 Add the malformed-address, hung `/ui-strings` and notice-look checks to `docs/browser-checks.md`.
-- [ ] 4.2 Run the browser check on the production build: a hung `/ui-strings` and `/studio/processes/%E0%A4%A/edit`.
-- [ ] 4.3 Run `/impeccable critique` and `/impeccable audit` against `/login`.
-- [ ] 4.4 Run `bun run typecheck` and `bun run build` in the container.
-- [ ] 4.5 Run the full gated suite with `OPENSPEC_TELEMETRY=0`. The command is `sh scripts/test-gated.sh bun test`.
-- [ ] 4.6 Run the prose and whitespace gates over the pushed range on the host.
-- [ ] 4.7 Strike the `harden-shell-session-and-routing` entry in the audit index of `docs/decisions.md`.
+- [x] 4.1 Add the malformed-address, hung `/ui-strings` and notice-look checks to `docs/browser-checks.md`.
+- [x] 4.2 Run the browser check on the production build: a hung `/ui-strings` and `/studio/processes/%E0%A4%A/edit`.
+- [x] 4.3 Run `/impeccable critique` and `/impeccable audit` against `/login`.
+- [x] 4.4 Run `bun run typecheck` and `bun run build` in the container.
+- [x] 4.5 Run the full gated suite with `OPENSPEC_TELEMETRY=0`. The command is `sh scripts/test-gated.sh bun test`.
+- [x] 4.6 Run the prose and whitespace gates over the pushed range on the host.
+- [x] 4.7 Strike the `harden-shell-session-and-routing` entry in the audit index of `docs/decisions.md`.

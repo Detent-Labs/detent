@@ -1715,12 +1715,6 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   `packages/web/src/areas/studio/screens/PlayerScreen.tsx`,
   `packages/web/src/areas/studio/screens/migrationPlanLogic.ts`,
   `packages/web/src/areas/studio/screens/TemplatesScreen.tsx`.
-- **`harden-shell-session-and-routing` (F-12, F-13, E1-11; low)**: Tabs do not
-  share the session, so a stale tab can restore a logged-out session, the
-  first page load waits on `/ui-strings` with no time limit, and a malformed
-  percent escape in the address crashes the studio area. Anchors:
-  `packages/web/src/shell/App.tsx`, `packages/web/src/main.tsx`,
-  `packages/web/src/areas/studio/routing.ts`.
 - **`tidy-engine-internals` (B-9, B-15, B-16, C-12; low)**: Some readers skip
   the pin hash check, `initSchema` carries backward migrations, reporting
   queries the history twice, one `tx.unsafe` call inserts an unescaped role
