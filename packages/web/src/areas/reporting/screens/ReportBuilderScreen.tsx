@@ -20,12 +20,14 @@ import {
   syncRowIds,
   typesAfterResponse,
   typesFor,
+  withDateBound,
   withoutRowId,
   withRowId,
   type ProcessTypes,
   type ReportDraft,
 } from "./reportsLogic.js";
-import { describeCaughtError } from "./reportingLogic.js";
+import { describeCaughtError, toDateInput } from "./reportingLogic.js";
+import { useFail } from "../../../shell/useFail.js";
 import { useSettledKey } from "./debounce.js";
 import { ComparisonRow } from "./ComparisonRow.js";
 import { ColumnEditor } from "./ColumnEditor.js";
@@ -105,18 +107,21 @@ export function ReportBuilderScreen({
   locale,
   actorId,
   onSaved,
+  onUnauthorized,
 }: {
   reportId?: string;
   token: string;
   locale: UiLocale;
   actorId: string;
   onSaved: (reportId: string) => void;
+  onUnauthorized: () => void;
 }) {
   const [draft, setDraft] = useState<ReportDraft | undefined>(reportId ? undefined : undefined);
   const [owner, setOwner] = useState(actorId);
   const [processLabel, setProcessLabel] = useState<string | undefined>();
   const [loadError, setLoadError] = useState<ClientError | undefined>();
   const [choices, setChoices] = useState<ColumnChoice[]>([]);
+  const [choicesError, setChoicesError] = useState<ClientError | undefined>();
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<ClientError | undefined>();
   const [preview, setPreview] = useState<ReportExecutionResult | undefined>();
@@ -127,6 +132,16 @@ export function ReportBuilderScreen({
   // Every field type any response named, per process: a comparison that
   // empties the range keeps its own field's type.
   const [heldTypes, setHeldTypes] = useState<ProcessTypes | undefined>();
+  // One `fail` per request site: a 401 ends the session, any other error
+  // lands in that site's own state.
+  const failLoad = useFail(onUnauthorized, (err) => setLoadError(describeCaughtError(err)));
+  const failChoices = useFail(onUnauthorized, (err) => {
+    setChoices([]);
+    setChoicesError(describeCaughtError(err));
+  });
+  const failPreview = useFail(onUnauthorized, (err) => setPreviewError(describeCaughtError(err)));
+  const failSave = useFail(onUnauthorized, (err) => setSaveError(describeCaughtError(err)));
+  const failDownload = useFail(onUnauthorized, (err) => setDownloadError(describeCaughtError(err)));
 
   // Load the existing report, once, when editing.
   useEffect(() => {
@@ -142,12 +157,12 @@ export function ReportBuilderScreen({
         setProcessLabel(report.processId);
       })
       .catch((cause: unknown) => {
-        if (!cancelled) setLoadError(describeCaughtError(cause));
+        if (!cancelled) failLoad(cause);
       });
     return () => {
       cancelled = true;
     };
-  }, [reportId, token]);
+  }, [reportId, token, failLoad]);
 
   // Column choices track the process and the query axes that bound which
   // versions are in range — a status/date-range/comparison change can add or
@@ -165,14 +180,15 @@ export function ReportBuilderScreen({
         if (cancelled) return;
         setHeldTypes((prev) => typesAfterResponse(prev, processId, next));
         setChoices(next);
+        setChoicesError(undefined);
       })
-      .catch(() => {
-        if (!cancelled) setChoices([]);
+      .catch((cause: unknown) => {
+        if (!cancelled) failChoices(cause);
       });
     return () => {
       cancelled = true;
     };
-  }, [settledKey, token]);
+  }, [settledKey, token, failChoices]);
 
   // One key per comparison row, so a removal never hands one row's text to
   // the next (`reportsLogic.ts::syncRowIds`).
@@ -194,6 +210,7 @@ export function ReportBuilderScreen({
           setProcessLabel(label);
           setDraft(emptyDraft(processId));
         }}
+        onUnauthorized={onUnauthorized}
       />
     );
   }
@@ -207,7 +224,7 @@ export function ReportBuilderScreen({
     const input = draftToInput(draft);
     previewReport({ processId: input.processId, query: input.query, columns: input.columns }, token)
       .then((result) => setPreview(result))
-      .catch((cause: unknown) => setPreviewError(describeCaughtError(cause)))
+      .catch(failPreview)
       .finally(() => setPreviewLoading(false));
   };
 
@@ -218,7 +235,7 @@ export function ReportBuilderScreen({
     const call = reportId ? updateReport(reportId, input, token) : createReport(input, token);
     call
       .then((report) => onSaved(report.reportId))
-      .catch((cause: unknown) => setSaveError(describeCaughtError(cause)))
+      .catch(failSave)
       .finally(() => setSaving(false));
   };
 
@@ -240,7 +257,7 @@ export function ReportBuilderScreen({
         anchor.click();
         URL.revokeObjectURL(url);
       })
-      .catch((cause: unknown) => setDownloadError(describeCaughtError(cause)))
+      .catch(failDownload)
       .finally(() => setDownloading(false));
   };
 
@@ -283,16 +300,16 @@ export function ReportBuilderScreen({
             <span {...stylex.props(styles.controlsLabelSpan)}>{t(locale, "range.from")}</span>
             <input
               type="date"
-              value={draft.createdAfter ? draft.createdAfter.slice(0, 10) : ""}
-              onChange={(e) => setDraft({ ...draft, createdAfter: e.target.value ? new Date(e.target.value).toISOString() : "" })}
+              value={toDateInput(draft.createdAfter)}
+              onChange={(e) => setDraft(withDateBound(draft, "start", e.target.value))}
             />
           </label>
           <label {...stylex.props(styles.controlsLabel)}>
             <span {...stylex.props(styles.controlsLabelSpan)}>{t(locale, "range.to")}</span>
             <input
               type="date"
-              value={draft.createdBefore ? draft.createdBefore.slice(0, 10) : ""}
-              onChange={(e) => setDraft({ ...draft, createdBefore: e.target.value ? new Date(e.target.value).toISOString() : "" })}
+              value={toDateInput(draft.createdBefore)}
+              onChange={(e) => setDraft(withDateBound(draft, "end", e.target.value))}
             />
           </label>
         </div>
@@ -313,6 +330,7 @@ export function ReportBuilderScreen({
             locale={locale}
           />
         ))}
+        {choicesError && <ErrorNote error={choicesError} locale={locale} />}
         <button
           type="button"
           className="btn btn-secondary"
@@ -332,6 +350,7 @@ export function ReportBuilderScreen({
         versionsInRange={versionsInRange}
         onChange={(columns) => setDraft({ ...draft, columns })}
         locale={locale}
+        choicesError={choicesError}
       />
 
       <ShareEditor

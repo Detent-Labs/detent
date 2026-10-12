@@ -3,6 +3,7 @@ import * as stylex from "@stylexjs/stylex";
 import { layout, colors, fonts, space } from "form-ui/tokens.stylex";
 import { listMyReports } from "../api/client.js";
 import { describeCaughtError } from "./reportingLogic.js";
+import { useFail } from "../../../shell/useFail.js";
 import { EmptyState, ErrorNote, WaitingNote } from "../components.js";
 import { t } from "../catalog.js";
 import type { UiLocale } from "../../../i18n/locale.js";
@@ -80,15 +81,18 @@ export function ReportsListScreen({
   actorId,
   onOpen,
   onNew,
+  onUnauthorized,
 }: {
   token: string;
   locale: UiLocale;
   actorId: string;
   onOpen: (reportId: string) => void;
   onNew: () => void;
+  onUnauthorized: () => void;
 }) {
   const [reports, setReports] = useState<Report[] | undefined>();
   const [error, setError] = useState<ClientError | undefined>();
+  const fail = useFail(onUnauthorized, (err) => setError(describeCaughtError(err)));
 
   useEffect(() => {
     let cancelled = false;
@@ -97,12 +101,12 @@ export function ReportsListScreen({
         if (!cancelled) setReports(body.reports);
       })
       .catch((cause: unknown) => {
-        if (!cancelled) setError(describeCaughtError(cause));
+        if (!cancelled) fail(cause);
       });
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [token, fail]);
 
   const controlsProps = stylex.props(styles.controls);
   return (
