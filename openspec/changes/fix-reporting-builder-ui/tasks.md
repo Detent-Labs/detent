@@ -15,13 +15,13 @@
 
 ## 3. Failed column request
 
-- [ ] 3.1 Keep the error of the column request in `choicesError` state and clear it on success. Show an `ErrorNote` above the "Add comparison" button. Verify in the browser check of task 4.3. A failing column request shows the note, and a later success removes it.
+- [x] 3.1 Keep the error of the column request in `choicesError` state and clear it on success. Show an `ErrorNote` above the "Add comparison" button. Verify in the browser check of task 4.3. A failing column request shows the note, and a later success removes it.
 - [x] 3.2 Add the optional `choicesError` prop to `ColumnEditor` and show the same note under its heading. Verify with a static-render test in `reporting-columnEditor.test.tsx`. The section shows the note with the prop and no note without it.
 
 ## 4. Documentation and browser check
 
-- [ ] 4.1 Add a "The report builder dates, session end and column error" walk to `docs/browser-checks.md`, with the three checks of this change. Verify that the prose gate reports no rise for the file.
-- [ ] 4.2 Strike the `fix-reporting-builder-ui` entry from the audit index in `docs/decisions.md`. Verify with `git grep -n fix-reporting-builder-ui -- docs/decisions.md` that no entry remains.
+- [x] 4.1 Add a "The report builder dates, session end and column error" walk to `docs/browser-checks.md`, with the three checks of this change. Verify that the prose gate reports no rise for the file.
+- [x] 4.2 Strike the `fix-reporting-builder-ui` entry from the audit index in `docs/decisions.md`. Verify with `git grep -n fix-reporting-builder-ui -- docs/decisions.md` that no entry remains.
 - [ ] 4.3 Run the browser walk of task 4.1 on the production build. Then run `/impeccable critique` and `/impeccable audit` against `/reporting/reports/new`. Verify that the report file prints each result.
 
 ## 5. Verification
