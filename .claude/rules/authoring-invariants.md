@@ -182,6 +182,9 @@ its placement.
   fails to parse, because the engine has no blocking delivery.
 - An action has no `idempotencyKey`. Publishing rejects one as an unknown
   key, even a `null` value (`compile.ts::checkUnknownKeys`).
+- `retryPolicy.maxAttempts` is an integer from 1 to 20. This is a Zod
+  bound in `definition.ts`. It holds there because no published body can
+  violate it, and the bodies under `examples/` stay within 5.
 - The authored body has no key the definition contract does not declare.
   This applies at any depth: process, contract, field, data source,
   workflow, step, path, action, timer, view entry, and validation. It

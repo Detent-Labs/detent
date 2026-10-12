@@ -617,7 +617,7 @@ export type DataSourceDef = z.infer<typeof dataSourceDef>;
 // ============================================================
 
 export const retryPolicy = z.object({
-  maxAttempts: z.number(),
+  maxAttempts: z.number().int().min(1).max(20),
   backoff: z.enum(["none", "fixed", "exponential"]),
   baseDelay: duration.optional(),
 });
