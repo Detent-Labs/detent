@@ -381,7 +381,7 @@ async function runReportQuery(
     : { actorId: actor.id, principals: await actorPrincipals(actor, db) };
   const filter: InstanceQueryFilter = { processId: spec.processId, ...spec.query, ...(visibleTo ? { visibleTo } : {}) };
   const [{ items, truncated }, coverage] = await Promise.all([
-    queryInstances(filter, {}, db),
+    queryInstances(filter, { limit: REPORT_ROW_LIMIT, maxLimit: REPORT_ROW_LIMIT }, db),
     resolveVersionCoverage(spec.processId, spec.query, db),
   ]);
 

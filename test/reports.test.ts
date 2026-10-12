@@ -24,9 +24,11 @@ import {
   ReportOwnerInvariantError,
   type ReportColumn,
 } from "../src/runtime/api.js";
+import { REPORT_ROW_LIMIT } from "../src/runtime/reports.js";
 import type { ProcessBody, ProcessId, FieldId, Instance } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
 import { clearInstanceAudit } from "./audit-cleanup.js";
+import { cloneInstances } from "./helpers/bulk-instances.js";
 
 const DB = !!process.env.DATABASE_URL;
 const reg = createRegistry();
@@ -623,16 +625,24 @@ test.skipIf(!DB)("3.6 a merge column on a redacted instance renders redacted, no
   expect(result?.rows[0]?.cells[0]).toEqual({ kind: "redacted" });
 });
 
-test.skipIf(!DB)("3.7 report execution reuses queryInstances's own bounding", async () => {
+test.skipIf(!DB)("3.7 report execution bounds its result at REPORT_ROW_LIMIT, one over trips truncation", async () => {
   const PID = pid("truncation");
   const v = await publishBody(PID, reportBody("truncation", []), reg, dataSourceReg);
-  // DEFAULT_LIST_LIMIT is 50 (private in src/runtime/api.ts) — one over it trips truncation.
-  for (let i = 0; i < 51; i++) await createInstance(v.definition, { processId: PID, version: v.version }, sql);
+  expect(REPORT_ROW_LIMIT).toBe(1000);
+  const first = await createInstance(v.definition, { processId: PID, version: v.version }, sql);
+  // One bulk insert: 1001 instances in all, one over the report row limit.
+  const clones = await cloneInstances(sql, first.instanceId, REPORT_ROW_LIMIT);
 
   const report = await createReport(owner, { processId: PID, name: "R", viewers: [admin.id] }, sql);
-  const result = await executeReport(report.reportId, admin, sql);
-  expect(result?.truncated).toBe(true);
-  expect(result?.rows).toHaveLength(50);
+  const over = await executeReport(report.reportId, admin, sql);
+  expect(over?.rows).toHaveLength(REPORT_ROW_LIMIT);
+  expect(over?.truncated).toBe(true);
+
+  // Removing one lands exactly on the bound: 1000 rows, nothing cut.
+  await sql`DELETE FROM instances WHERE instance_id = ${clones[0]!}`;
+  const exact = await executeReport(report.reportId, admin, sql);
+  expect(exact?.rows).toHaveLength(REPORT_ROW_LIMIT);
+  expect(exact?.truncated).toBe(false);
 });
 
 test.skipIf(!DB)("3.7 a result within the bound is not marked truncated", async () => {
