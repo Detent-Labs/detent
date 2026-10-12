@@ -47,8 +47,8 @@ skip when the environment has no password.
 
 #### Scenario: The server refuses the retired fixed password
 
-- **WHEN** a client connects as the audit probe role with the password `probe`
-- **THEN** the server refuses the connection
+- **WHEN** a login as the audit probe role uses the password `probe`
+- **THEN** the server refuses the login
 
 #### Scenario: A run without the password skips the probe suite
 
