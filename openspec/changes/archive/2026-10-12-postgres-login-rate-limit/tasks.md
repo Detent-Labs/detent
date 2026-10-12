@@ -21,10 +21,10 @@
 
 ## 3. Verification
 
-- [ ] 3.1 Run `bun run typecheck`, then `bun run build`, then the full `bun test` with `DATABASE_URL` set through `scripts/test-gated.sh`.
-- [ ] 3.2 Run the antislop gate: `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`.
-- [ ] 3.3 Run the whitespace gate: `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh`.
-- [ ] 3.4 Run `openspec validate postgres-login-rate-limit` and verify it passes.
+- [x] 3.1 Run `bun run typecheck`, then `bun run build`, then the full `bun test` with `DATABASE_URL` set through `scripts/test-gated.sh`.
+- [x] 3.2 Run the antislop gate: `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`.
+- [x] 3.3 Run the whitespace gate: `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh`.
+- [x] 3.4 Run `openspec validate postgres-login-rate-limit` and verify it passes.
 
 ## Workflow follow-up
 
