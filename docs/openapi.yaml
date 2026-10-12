@@ -387,7 +387,13 @@ paths:
       tags: [instances]
       operationId: submitInstance
       summary: Submit field data and trigger a manual transition
-      description: No reserved-role requirement; the claimant, or an eligible candidate on an unclaimed step, may submit.
+      description: >-
+        No reserved-role requirement; the claimant, or an eligible candidate
+        on an unclaimed step, may submit. A `null` value for a field in
+        `data` clears that field: the key leaves the instance data, and no
+        type, option, constraint or rule check runs for it. An unknown or
+        readonly key is still refused, `null` or not. A required field counts
+        `undefined`, `null` and `""` as missing.
       parameters:
         - $ref: "#/components/parameters/instanceId"
       requestBody:

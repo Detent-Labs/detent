@@ -1219,6 +1219,10 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   dialog's heading (`panels/RemoveFieldDialog.tsx:116`) pass a replacer
   function, `() => label`.
 
+  The `packages/form-ui` site now passes a replacer too, in one pass:
+  `tabSwitchAnnouncement` (`packages/form-ui/src/tabs.ts`), fixed by
+  `fix-form-ui-empty-values`. The count below covers `packages/web/src` alone.
+
   Measured 2026-09-13, `packages/web/src` holds 54 `.replace("{` calls in 15
   files. Twelve pass a replacer function: the five removal fills, and seven in
   `panels/ChangeList.tsx`, `panels/ChangesView.tsx` and
@@ -1757,12 +1761,13 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   Vite. Anchors: `packages/web/src/areas/studio/panels/FieldMatrixGrid.tsx`,
   `packages/web/src/areas/studio/canvas/CanvasView.tsx`,
   `packages/web/vite.config.ts`.
-- **`fix-form-ui-empty-values` (F-3, F-8, F-14, F-16; medium)**: The package
+- ~~**`fix-form-ui-empty-values` (F-3, F-8, F-14, F-16; medium)**~~: The package
   form-ui and the engine disagree on cleared fields, the form accepts input
   when no path is available, the tab announcement expands `$` patterns from
   the label, and form-ui declares React 18 as its peer while the consumer
   uses React 19. Anchors: `packages/form-ui/src/FieldForm.tsx`,
   `packages/form-ui/src/tabs.ts`, `packages/form-ui/package.json`.
+  Done: `fix-form-ui-empty-values`.
 - **`fix-admin-instance-and-outbox-screens` (F-2, F-9, F-10; medium)**: The
   instance header shows an expired claim and a stale `transitionSeq`, the
   header reports no armed timer once 201 timers run, and the outbox discards

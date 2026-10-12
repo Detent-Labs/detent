@@ -2249,6 +2249,38 @@ save, restore and clear mechanics against the API. This entry confirms
 `TaskScreen.tsx` renders the Save control, the two notices, and the
 seed-from-draft behavior, which those files cannot observe.
 
+### Task screen and Player: a read-only form
+
+Source: `fix-form-ui-empty-values` task 5.3.
+
+Log in as a participant. Open a completed case from Cases I started.
+Pass: every input rejects focus and typing. No Save control and no path
+button shows. A muted line above the form reads "This case is not running.
+The form is read-only."
+
+The German catalog reads "Dieser Fall läuft nicht mehr. Das Formular ist
+schreibgeschützt." Open a running case on a wait-state step with no manual
+path. Pass: the inputs reject typing, and no path button shows. The muted
+line reads "No action is available on this step yet. The form is read-only."
+
+Open a running case on a step with an available path. Pass: the inputs stay
+editable, Save and the path buttons show, and no note appears. Open the
+Player on a completed case. Pass: the inputs reject typing and the Player
+shows no note. The tab strip of a tabbed form stays operable in every case.
+
+### Task screen: a cleared field leaves the case
+
+Source: `fix-form-ui-empty-values` task 5.3.
+
+Open a running task with an optional number field holding a value and an
+optional date field holding a value. Erase both controls and submit down a
+path. Pass: no `type-mismatch` error appears, and the instance moves on. In
+the admin area's instance detail, neither field is in the case data any more.
+
+Open another such task, erase both controls and click Save. Leave the task
+and reopen it. Pass: both controls come back empty. The committed
+values stay out of them.
+
 ### Studio: path creation names
 
 Source: `require-path-key-label` task 5.6. No defect record exists for
