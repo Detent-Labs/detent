@@ -29,9 +29,9 @@ jobs:
   host-gates:
     runs-on: ubuntu-latest
     steps:
-      # persist-credentials: false on all three checkouts. No later step needs
-      # the token (the host gates run local git commands only), and the
-      # devcontainer mounts this checkout's .git, which would otherwise hold it.
+      # persist-credentials: false on all three checkouts keeps each one from
+      # persisting the token for later steps. No later step needs it, since the
+      # host gates run local git commands only.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0

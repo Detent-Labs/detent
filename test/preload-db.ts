@@ -49,8 +49,8 @@ async function ensureDatabase(testUrl: string): Promise<void> {
     // is its own definer function"). Runs unconditionally, even on a database
     // that already existed, so a `_test` database predating this change still
     // gets the role. The role outlives the suite by design — it is
-    // cluster-scoped, and nothing here drops it. Its password does not: each run
-    // replaces it with a fresh random one and hands it to the suite through
+    // cluster-scoped, and nothing here drops it. Each run replaces its password
+    // with a fresh random one and hands it to the suite through
     // DETENT_AUDIT_PROBE_PASSWORD, so no fixed credential stands in the cluster.
     try {
       await admin`

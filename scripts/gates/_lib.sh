@@ -18,7 +18,8 @@
 #
 # Two primitives rather than one combined `fail_rule`, because the gates reject
 # in different shapes. `whitespace.sh` and `prose.sh` set a flag, keep checking
-# and exit later. `silent-green.sh` rejects at three separate points.
+# and exit later. `silent-green.sh` exits at the first of several separate
+# rejection points.
 #
 # `bad_range` is the third: the two gates that read a pushed range share the
 # wording for a range git cannot diff.

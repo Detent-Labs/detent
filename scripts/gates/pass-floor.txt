@@ -9,9 +9,9 @@
 # below this number.
 #
 # Lower this only in the same commit as the change that deletes tests on
-# purpose, and add a row below naming what the decrease covers. A growing suite
-# leaves the number stale-low, which only loosens the margin. Nothing forces a
-# raise.
+# purpose, and add a line under the measurement note below, above the integer,
+# naming what the decrease covers. A growing suite leaves the number stale-low,
+# which only loosens the margin. Nothing forces a raise.
 #
 # Measured 2026-10-11, at 64c08161: 5206 pass, 1 skip, 0 fail, `Ran 5207 tests
 # across 269 files`, plus 20 pass in test:tz.

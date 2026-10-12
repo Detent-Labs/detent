@@ -7,8 +7,8 @@
  * suite is the only place the guarantee is actually measured. The preload
  * draws a fresh password for the role each run and exports it as
  * DETENT_AUDIT_PROBE_PASSWORD. Skips whenever the role is absent or the
- * variable is unset (a maintenance role with no CREATEROLE could create
- * neither), the way the DB suites skip on `!DB`.
+ * variable is unset (a maintenance role with no CREATEROLE can neither create
+ * the role nor set its password), the way the DB suites skip on `!DB`.
  */
 import { SQL } from "bun";
 import { test, expect, beforeAll, afterAll } from "bun:test";

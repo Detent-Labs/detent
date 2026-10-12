@@ -291,6 +291,7 @@ test("a valid range with a trailing space still rejects the push", async () => {
   });
 });
 
+// Control: passes on the old scripts. It pairs with the trailing-space case above.
 test("a valid clean range passes the whitespace gate", async () => {
   await withRepo(async (repo) => {
     const base = await repo.commit({ "a.txt": "one\n" });
@@ -302,6 +303,7 @@ test("a valid clean range passes the whitespace gate", async () => {
   });
 });
 
+// Control: passes on the old scripts.
 test("a valid range with Markdown reaches the prose gate's linter check", async () => {
   await withRepo(async (repo) => {
     const base = await repo.commit({ "a.txt": "one\n" });
@@ -332,6 +334,7 @@ test("a missing remote sha falls back to the range since main", async () => {
   });
 });
 
+// Control for the mutation run: a spec scenario that passes on the old scripts.
 test("a reachable remote sha keeps its own range", async () => {
   await withRepo(async (repo) => {
     const main = await repo.commit({ "a.txt": "one\n" });
@@ -346,6 +349,7 @@ test("a reachable remote sha keeps its own range", async () => {
   });
 });
 
+// Control: passes on the old scripts.
 test("a new branch still gets the range since main", async () => {
   await withRepo(async (repo) => {
     const main = await repo.commit({ "a.txt": "one\n" });
@@ -506,6 +510,7 @@ test("a run that passes fewer tests than the pass floor is rejected", async () =
   expect(stderr).toContain(`pass floor is ${floor.pass}`);
 });
 
+// Control: passes on the old gate, which has no pass floor.
 test("the pass floor reads the largest pass count of the run", async () => {
   // The small test:tz summary comes first here. A gate that read the last
   // summary alone would see 20 passes.
