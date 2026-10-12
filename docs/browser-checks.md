@@ -5723,3 +5723,84 @@ clip box, across widths. An e2e flow cannot make that measurement;
 only a live render, at a real width, shows the clearance. The source
 scan test covers only the static half, that the style itself declares
 the room.
+
+### Path guards, held condition rows and Add path (`fix-condition-and-path-builders`)
+
+Source: `fix-condition-and-path-builders` task 5.2. A `bun:test` run cannot click
+a control or read a label off a live canvas. The five findings below stay
+manual.
+
+Open Studio at `/studio` and a draft of `purchase_requisition`. Its first step
+carries two manual paths, "Submit for approval" and "Withdraw".
+
+#### A manual path keeps its guard (E2-1)
+
+Open the Steps tab and select that first step. In "Path to", open "Submit for
+approval". Set "triggered by" to "a condition". Build one row under "Only
+when": `quantity` greater than 5. Set "triggered by" back to "a participant's
+choice".
+
+Pass: the "Only when" heading and the row stay on screen.
+
+Pass: no `priority` input shows.
+
+Pass: the Canvas tab draws the path's edge with a label for the row and no
+priority badge.
+
+Pass: the preview in that step's form editor, from the Forms tab, names the
+path and its condition in words. The line sits under the controls.
+
+Pass: "Withdraw" has no condition line in that preview.
+
+#### A half-built row writes nothing (E2-6)
+
+Pick a field that two or more steps ask for. Open the `⋮` menu's Views group,
+then "Open the JSON surface". Give one referencing view `visible: false` and
+another a CEL expression. Leave the JSON surface and open that field on the
+Fields tab. Its "Only ask this when" footer names the disagreeing steps.
+
+Press "+ Add row", then "Remove row". Open the JSON surface.
+
+Pass: both views carry the `visible` value they held before.
+
+Back on the Fields tab, press "Clear on <steps>" in the footer beside "Edit as
+CEL".
+
+Pass: the JSON surface shows no `visible` key on any view that references the
+field.
+
+#### An integer and a negative number read back as rows (E2-10)
+
+Open a draft of `it_offboarding`. In any path's "Only when", add a row on the
+integer field "Backup retention in months". Pick `>` and type `3`. Add a second
+row on the same field with `<` and `-5`. Open another tab, then return to the
+Steps tab and the same path.
+
+Pass: the first row shows the field, `>` and `3` as a comparison row.
+
+Pass: the second row shows the field, `<` and `-5` as a comparison row.
+
+Pass: no row reads "Written by hand. Edit it as CEL."
+
+#### A new boolean row starts empty (E2-14)
+
+In the `purchase_requisition` draft, press "+ Add row" under any path's "Only
+when". Pick the boolean field "Covered by the cost center's remaining budget".
+
+Pass: the value select shows its empty choice as the selected one.
+
+Choose "no".
+
+Pass: the JSON surface carries `data.budget_ok == false` in that path's guard.
+
+#### Add path takes the sibling trigger (E2-17)
+
+Open a draft of `credit_check` and select its `Decide` step, which carries two
+automatic paths. Pick a target step and press "add path".
+
+Pass: the new path's "triggered by" control reads "a condition".
+
+Open a draft of `loan_application` and select its `check` step, a subprocess
+step. Pick a target step and press "add path".
+
+Pass: that new path's "triggered by" control also reads "a condition".
