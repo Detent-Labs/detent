@@ -152,6 +152,41 @@ describe("authoredProcessBody: reserved identity", () => {
     expect(publishedProcessBody.safeParse(b).success).toBe(true);
     expect(() => compileProcessBody(b)).toThrow(CompileValidationError);
   });
+
+  // The lookalike above is the engine's own sink, so it is the forged action
+  // that fails it. Drop the action and compile accepts the body unchanged.
+  it("accepts the same lookalike once the forged action is gone", () => {
+    const b: any = contractedBody();
+    b.workflow.steps.push({
+      id: CANCEL_SINK_STEP_ID,
+      key: CANCEL_SINK_KEY,
+      label: { en: "Cancelled" },
+      type: "task",
+      terminal: true,
+      outcome: RESERVED_CANCEL_OUTCOME,
+    });
+    if (!b.contract.outcomes.includes(RESERVED_CANCEL_OUTCOME)) b.contract.outcomes.push(RESERVED_CANCEL_OUTCOME);
+    expect(publishedProcessBody.safeParse(b).success).toBe(true);
+    expect(compileProcessBody(b)).toEqual(publishedProcessBody.parse(b));
+  });
+
+  // A hand-written sink that is not the engine's: another outcome would let a
+  // cancelled child return `approved` to its parent.
+  it("rejects a hand-written sink carrying another outcome", () => {
+    const b: any = nonContractedBody();
+    b.contract = { inputFields: [], outputFields: [], outcomes: ["approved"] };
+    for (const s of b.workflow.steps) if (s.terminal) s.outcome = "approved";
+    b.workflow.steps.push({
+      id: CANCEL_SINK_STEP_ID,
+      key: CANCEL_SINK_KEY,
+      label: { en: "Cancelled" },
+      type: "task",
+      terminal: true,
+      outcome: "approved",
+    });
+    expect(publishedProcessBody.safeParse(b).success).toBe(true);
+    expect(() => compileProcessBody(b)).toThrow(CompileValidationError);
+  });
 });
 
 describe("onCancel step field", () => {

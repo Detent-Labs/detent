@@ -1688,11 +1688,6 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   `createDefaultAssignmentRegistry`. Anchors:
   `src/handlers/process-start.ts`, `src/handlers/instance-transition.ts`,
   `src/engine/assignment-strategies.ts`.
-- **`tighten-publish-contract-checks` (A-2, A-8; medium)**: The idempotent
-  compile branch accepts a hand-written cancel sink of any shape, and publish
-  stores `Action.execution` and `Action.idempotencyKey`, which nothing reads.
-  Anchors: `src/schema/compile.ts`, `src/schema/definition.ts`,
-  `src/engine/transition.ts`.
 - **`bind-instance-transition-target` (D-3; medium)**: The
   `instance.transition` handler drives a target instance with system rights,
   and participant data decides which instance that is. Anchors:
@@ -1723,13 +1718,6 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   share one database, and the provisioning connection drops its URL
   parameters. Anchors: `src/auth/jwt.ts`, `src/tenancy/provision.ts`,
   `src/tenancy/connections.ts`.
-- **`harden-studio-json-surface` (E1-1, E1-5, E1-13; medium)**: The JSON
-  surface refuses every apply once `collaboration` is set, a nested shape
-  mismatch passes its guard and crashes the studio area, and the guard tests
-  stay green when a schema key is missing. Anchors:
-  `packages/web/src/areas/studio/draft/load-guard.ts`,
-  `packages/web/src/areas/studio/screens/EditScreen.tsx`,
-  `packages/web/test/studio-load-guard.test.ts`.
 - **`fix-condition-and-path-builders` (E2-1, E2-6, E2-10, E2-14, E2-17;
   medium)**: A manual path keeps a hidden guard that hides its button at
   runtime, one "+ Add row" removes every `visible` override when the steps
@@ -1844,6 +1832,50 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   email across all tenants, so a success in one tenant resets the window in
   another. Anchors: `src/auth/login.ts`.
 
+## Open from harden-studio-json-surface (needs its own OpenSpec change)
+
+The final review and the browser check of `harden-studio-json-surface`
+(2026-10-12) found three gaps that the change leaves open on purpose. The tags
+LEAF-1, LOAD-1 and REFUSE-1 are local to this section.
+
+- **LEAF-1: the guard checks containers only.** An object where a string
+  belongs passes Apply and unmounts the studio on render. Take a
+  `contract.outcomes` element that holds an object. `ContractPanel` renders it
+  in `<span>{o}</span>`, and React throws. A `fields[].key` and a
+  `LocalizedText` value that hold an object fail the same way. The `Shape`
+  table skips the elements of a `"strings"` list and checks no leaf. A later
+  change could add a checked-string kind and a union/leaf kind to `Shape`,
+  then add rows. Anchors: the `Shape` table and its `ponytail:` comment in
+  `packages/web/src/areas/studio/draft/load-guard.ts`,
+  `packages/web/src/areas/studio/panels/ContractPanel.tsx`,
+  `packages/web/src/areas/studio/draft/localized-text.ts`.
+
+- **LOAD-1: three paths load a body with no guard, and the server stores one
+  unchecked.** The guard runs only at Apply in the JSON surface. The reload in
+  `useDraftToolbarActions` (`panels/DraftToolbar.tsx`) calls `replace` with the
+  fetched body. The initial load in `EditScreen` (`screens/EditScreen.tsx`)
+  reads `getDraft` and hands the record to the store. The stash restore in the
+  same file, `restoreStash`, calls `replace` with the stored body. On the
+  server, `saveDraft` (`src/engine/drafts.ts`) checks the envelope and keeps
+  the body unparsed. A draft saved over HTTP with `"steps": {}` therefore
+  crashes the studio when an author opens it. A later change could run
+  `checkDraftShape` on each of the three paths and show the refusal in place of
+  the crash. Whether the server should refuse such a body is a separate call.
+
+- **REFUSE-1: the refusal reads poorly in the JSON surface.** The impeccable
+  critique and audit ran on the production build. The error `<p>` in
+  `panels/JsonView.tsx` sits below a 24-row textarea and the Apply row. At 1280
+  by 720 its top is 14 pixels inside the viewport, and at 375 by 667 none of it
+  shows. Apply looks like a no-op, and focus stays on Apply. The `<p>` has no
+  `role="alert"` and the textarea has no `aria-invalid` or `aria-describedby`,
+  so a screen reader hears nothing. `MigrationSpecEditor` sets both attributes,
+  and `MigrationPlanScreen` uses `role="alert"`. A path longer than the box
+  does not wrap at 320 pixels. Each line prints its path twice, as in
+  `workflow.steps: 'workflow.steps' must be an array if present`. `DESIGN.md`
+  asks for a mono list at 12 pixels, which needs `parseDraftText` to return an
+  array. A stale error also stays after an edit. One change per screen should
+  take these together. The owner ruled that this change makes no layout change.
+
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 
 Each entry below names a cut somebody proposed, the reason a reviewer refused
@@ -1932,7 +1964,8 @@ audit of 2026-09-10.
 16. **Delete the unused registry seams.** Rejected. That set is
     `devHeaderResolver`, the action `Registry`, the `DataSourceRegistry`, the
     `AssignmentRegistry`'s multi-strategy handlers, `exampleRegistry.ts` with
-    `RegistryPanel.tsx`, and `Action.execution`'s reserved enum. `CLAUDE.md`
+    `RegistryPanel.tsx`, and `Action.execution`'s reserved enum. The enum has
+    since narrowed to `async` (`tighten-publish-contract-checks`). `CLAUDE.md`
     records the reserved enum and the dev-header seam as v1 boundaries, and
     the registries as the plugin seam. The two studio files have
     since left the tree on their own change, on 2026-08-18; the rest stand.
