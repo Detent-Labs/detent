@@ -101,7 +101,7 @@ named by the issuer's configured `rolesClaim` to `Actor.roles`. A token
 carrying no such claim SHALL resolve to `roles: []` rather than being rejected.
 This applies identically to every issuer, local or external — `IssuerConfig`
 (`src/auth/jwt.ts`) has no per-issuer subject-claim field, only `iss`,
-`jwksUrl`, `audience`, `rolesClaim`. NOT YET BUILT: for an external identity
+`jwksUrl`, `audience`, `rolesClaim` and `tenant`. NOT YET BUILT: for an external identity
 provider whose `sub` is not a stable, non-PII subject identifier (e.g. Entra
 ID, where the stable identifier is the `oid` claim, not `sub`), `Actor.id`
 today is whatever that provider's `sub` contains — there is no configurable
@@ -125,7 +125,7 @@ guarantee the code enforces.
 
 The composition root (`src/http/server.ts`) SHALL read `AUTH_JWT_SECRET` (the
 local signing key) and `AUTH_ISSUERS` (a JSON array of
-`{iss, jwksUrl, audience, rolesClaim}`), following the same convention as
+`{iss, jwksUrl, audience, rolesClaim}` plus an optional `tenant`), following the same convention as
 `DATABASE_URL` and `CORS_ALLOWED_ORIGINS`. If either variable is set, the JWT
 resolver SHALL be the server's `ActorResolver` and `devHeaderResolver` SHALL
 NOT be. The two SHALL NEVER be active simultaneously. A malformed
@@ -192,6 +192,18 @@ verification key and the issuing key therefore cannot diverge.
 
 - **WHEN** the server starts with an `AUTH_ISSUERS` value that is not a JSON
   array of valid issuer entries
+- **THEN** startup fails with an error naming the configuration variable
+
+#### Scenario: An issuer entry may name a tenant
+
+- **WHEN** the server starts with an `AUTH_ISSUERS` entry that carries
+  `tenant: "acme"`
+- **THEN** startup parses the entry and keeps the tenant
+
+#### Scenario: A tenant that is not a string fails startup
+
+- **WHEN** the server starts with an `AUTH_ISSUERS` entry whose `tenant` is a
+  number
 - **THEN** startup fails with an error naming the configuration variable
 
 #### Scenario: A server cannot be constructed without choosing a resolver
@@ -305,8 +317,8 @@ tenant whose database authenticated the account.
 `LOCAL_ISSUER` SHALL stay one constant. Every deployment issues under the same
 issuer, so the issuer cannot name a tenant and the claim must.
 
-An externally-issued token SHALL carry no such claim. Its `iss` names its
-tenant, which the existing issuer dispatch already maps.
+An externally-issued token SHALL NOT select its tenant through any claim. It
+SHALL resolve to the tenant that its issuer's `AUTH_ISSUERS` entry names.
 
 A token whose `tenant` claim names no listed tenant SHALL fail the same way an
 unverifiable token fails.
@@ -319,7 +331,7 @@ unverifiable token fails.
 #### Scenario: An external token resolves by issuer
 
 - **WHEN** a token arrives from a configured external issuer
-- **THEN** its tenant comes from that issuer's mapping, and the claim is absent
+- **THEN** its tenant is the one that issuer's `AUTH_ISSUERS` entry names, whatever claims the token carries
 
 #### Scenario: A single-tenant deployment ignores the claim
 

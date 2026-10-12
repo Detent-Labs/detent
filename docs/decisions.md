@@ -1696,12 +1696,6 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   hung target stops the outbox for all tenants, and the admin outbox list has
   no index for its sort order. Anchors: `src/engine/resolution.ts`,
   `src/engine/retention.ts`, `src/engine/host.ts`.
-- **`harden-tenancy-provisioning` (C-8, C-9, C-14, C-15; medium)**: In SaaS
-  mode a token from an external identity provider never resolves to its
-  tenant, tenant pools open more than once and never close, two tenants can
-  share one database, and the provisioning connection drops its URL
-  parameters. Anchors: `src/auth/jwt.ts`, `src/tenancy/provision.ts`,
-  `src/tenancy/connections.ts`.
 - **`sync-studio-editor-state` (E2-8, E2-13, E2-15, E1-7; medium)**: Stale
   JSON text in the plugin editor lands in another entity, a cleared deadline
   leaves a timer with no input, a removed data source leaves field
