@@ -5754,20 +5754,25 @@ Pass: "Withdraw" has no condition line in that preview.
 
 #### A half-built row writes nothing (E2-6)
 
-Pick a field that two or more steps ask for. Open the `⋮` menu's Views group,
-then "Open the JSON surface". Give one referencing view `visible: false` and
-another a CEL expression. Leave the JSON surface and open that field on the
-Fields tab. Its "Only ask this when" footer names the disagreeing steps.
+Open a draft of `purchase_requisition`. On the Field matrix tab, find the
+`cost_center` row and clear the "visible" box under Manager Approval. Open
+`Cost Center` on the Fields tab. Its "Only ask this when" zone says the
+steps disagree and names Manager Approval.
 
-Press "+ Add row", then "Remove row". Open the JSON surface.
+Pass: a "Clear on <steps>" command stands in the footer beside "Edit as CEL".
+It names every step that asks for the field.
 
-Pass: both views carry the `visible` value they held before.
+Press "+ Add row". Return to the Field matrix tab.
 
-Back on the Fields tab, press "Clear on <steps>" in the footer beside "Edit as
-CEL".
+Pass: the "visible" box under Manager Approval is still clear.
 
-Pass: the JSON surface shows no `visible` key on any view that references the
-field.
+Back on the Fields tab, press "Remove row". Return to the Field matrix tab.
+
+Pass: the "visible" box under Manager Approval is still clear.
+
+Back on the Fields tab, press "Clear on <steps>".
+
+Pass: the row shows every "visible" box ticked. The command no longer shows.
 
 #### An integer and a negative number read back as rows (E2-10)
 
