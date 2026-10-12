@@ -18,6 +18,7 @@
 - [x] 3.2 Add `databaseIdentity`, `TenantDatabaseTaken` and the check in `provisionTenant`, per design decision 4. Verify `test/tenancy-provision.test.ts` covers the typo from the brief and a listed database with another password and `sslmode`. Verify it covers a socket URL with a `host` parameter and a distinct database on the same host that passes. Verify the refused call created no database and listed no tenant.
 - [x] 3.3 Add the unique index on `tenants.database_url` to `initControlPlane`. Verify a DB test inserts one URL under two keys through `insertTenant` and sees the second insert fail. Verify two calls of `initControlPlane` succeed.
 - [x] 3.4 Show `TenantDatabaseTaken` through the CLI. Verify `add-tenant` prints the message and exits 1 for a taken database.
+- [x] 3.5 Close the fail-closed gaps the final review found: Host fallback, repeated issuer, stale jwt requirement. Verify the new tests in test/tenancy-issuers.test.ts pass.
 
 ## 4. Verification
 

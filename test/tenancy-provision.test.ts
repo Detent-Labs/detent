@@ -230,8 +230,37 @@ test.skipIf(!DB)("another password and sslmode do not hide a listed database", a
 });
 
 test.skipIf(!DB)("a socket URL with the same host parameter and database is refused", async () => {
-  const { caught } = await provisionSecond("postgres://u:p@localhost/tenant_acme?host=/var/run/a", "postgres://u:p@localhost/tenant_acme?host=/var/run/a");
+  const { caught, steps } = await provisionSecond("postgres://u:p@localhost/tenant_acme?host=/var/run/a", "postgres://u:p@localhost/tenant_acme?host=/var/run/a");
   expect(caught).toBeInstanceOf(TenantDatabaseTaken);
+  expect(steps).toEqual([]);
+  expect(await tenantByKey("beta", sql)).toBeUndefined();
+});
+
+test.skipIf(!DB)("the same database name on a different host does not collide", async () => {
+  const { caught, steps } = await provisionSecond("postgres://u:p@db-one/tenant_acme", "postgres://u:p@db-two/tenant_acme");
+  expect(caught).toBeUndefined();
+  expect(steps).toEqual(["create", "schema"]);
+});
+
+test.skipIf(!DB)("the same database name on a different port does not collide", async () => {
+  const { caught, steps } = await provisionSecond("postgres://u:p@db:5432/tenant_acme", "postgres://u:p@db:5433/tenant_acme");
+  expect(caught).toBeUndefined();
+  expect(steps).toEqual(["create", "schema"]);
+});
+
+test.skipIf(!DB)("a stored URL that does not parse is skipped", async () => {
+  await insertTenant({ id: "tenant_bad", key: "broken", name: "Broken", databaseUrl: "not a url" }, sql);
+  const s = seams();
+  const tenant = await provisionTenant(sql, {
+    key: "beta",
+    name: "Beta",
+    databaseUrl: "postgres://u:p@db/tenant_beta",
+    createDatabase: s.createDatabase,
+    connect: s.connect,
+    buildSchema: s.buildSchema,
+  });
+  expect(tenant.key).toBe("beta");
+  expect(s.steps).toEqual(["create", "schema"]);
 });
 
 test.skipIf(!DB)("socket URLs with different host parameters do not collide", async () => {
@@ -257,6 +286,7 @@ test.skipIf(!DB)("the control plane refuses one URL under two keys", async () =>
     caught = e;
   }
   expect(caught).toBeDefined();
+  expect((caught as Error).message).toMatch(/tenants_database_url_key|duplicate/);
   const rows = (await sql`SELECT key FROM tenants WHERE database_url = ${databaseUrl}`) as { key: string }[];
   expect(rows.map((r) => r.key)).toEqual(["acme"]);
 });
@@ -265,6 +295,7 @@ test.skipIf(!DB)("add-tenant prints the taken-database message and exits 1", asy
   // The identity check precedes `CREATE DATABASE`, so the child opens no tenant database.
   await insertTenant({ id: "tenant_1", key: "acme", name: "Acme", databaseUrl: "postgres://u:p@db/tenant_acme" }, sql);
   const child = Bun.spawn(["bun", "run", "src/tenancy/cli.ts", "add-tenant", "beta", "Beta", "postgres://u:other@db/tenant_acme"], {
+    cwd: `${import.meta.dir}/..`,
     env: { ...process.env, TENANT_CONTROL_PLANE_URL: process.env.DATABASE_URL },
     stdout: "pipe",
     stderr: "pipe",

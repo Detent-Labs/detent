@@ -1,5 +1,5 @@
 <!-- antislop: allow-file passive-voice em-dash sentence-length trailing-negation run-ons negation-habit -->
-<!-- Both MODIFIED requirements are copied whole from the live spec, as the MODIFIED rule demands.
+<!-- All three MODIFIED requirements are copied whole from the live spec, as the MODIFIED rule demands.
      The copy carries the live spec's findings, and only the tenant lines are new. -->
 # Spec Delta
 
@@ -122,3 +122,32 @@ verification key and the issuing key therefore cannot diverge.
 - **WHEN** `createServer` is called
 - **THEN** its `resolver` argument is required — omitting it is a type error,
   not a silent selection of the unsigned-header resolver
+
+### Requirement: A locally-issued token names its tenant
+
+A token this engine issues SHALL carry a `tenant` claim holding the key of the
+tenant whose database authenticated the account.
+
+`LOCAL_ISSUER` SHALL stay one constant. Every deployment issues under the same
+issuer, so the issuer cannot name a tenant and the claim must.
+
+An externally-issued token SHALL NOT select its tenant through any claim. It
+SHALL resolve to the tenant that its issuer's `AUTH_ISSUERS` entry names.
+
+A token whose `tenant` claim names no listed tenant SHALL fail the same way an
+unverifiable token fails.
+
+#### Scenario: A local token carries the tenant that authenticated it
+
+- **WHEN** an account in tenant `acme` logs in
+- **THEN** its token carries `tenant` set to `acme`
+
+#### Scenario: An external token resolves by issuer
+
+- **WHEN** a token arrives from a configured external issuer
+- **THEN** its tenant is the one that issuer's `AUTH_ISSUERS` entry names, whatever claims the token carries
+
+#### Scenario: A single-tenant deployment ignores the claim
+
+- **WHEN** the server runs with SaaS mode off
+- **THEN** a token verifies whether or not it carries the claim

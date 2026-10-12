@@ -52,9 +52,9 @@ async function startError(issuers: IssuerConfig[]): Promise<string> {
   throw new Error("startTenancy did not raise");
 }
 
-async function requestFrom(iss: string, claims: Record<string, unknown> = {}): Promise<Request> {
+async function requestFrom(iss: string, claims: Record<string, unknown> = {}, host?: string): Promise<Request> {
   const jwt = await new SignJWT(claims).setProtectedHeader({ alg: "HS256" }).setIssuer(iss).setSubject("u").sign(new TextEncoder().encode("k".repeat(32)));
-  return new Request("http://app.example/instances", { headers: { Authorization: `Bearer ${jwt}` } });
+  return new Request("http://app.example/instances", { headers: { Authorization: `Bearer ${jwt}`, ...(host !== undefined ? { Host: host } : {}) } });
 }
 
 test("an issuer with no tenant fails startup and the message names its iss", async () => {
@@ -101,11 +101,42 @@ test("an external token claiming another tenant still reaches its issuer's tenan
   expect(((await tenancy.resolveTenantDb(req)) as unknown as { url: string }).url).toBe("postgres://host/acme");
 });
 
-test("a token from an unlisted issuer reaches no tenant", async () => {
+test("a token from an unlisted issuer reaches no tenant, whatever host it arrives on", async () => {
   const tenancy = await startTenancy([issuer("https://login.acme.example/", "acme")], control, deps());
-  const req = await requestFrom("https://stranger.example/", { tenant: "acme" });
+  const req = await requestFrom("https://stranger.example/", { tenant: "acme" }, "acme.example");
+  expect(req.headers.get("Host")).toBe("acme.example");
   expect(tenancy.tenantOf(req)).toBeUndefined();
   await expect(tenancy.resolveTenantDb(req)).rejects.toBeInstanceOf(UnknownTenant);
+});
+
+test("a token with a mapped issuer ignores a different host label", async () => {
+  const tenancy = await startTenancy(
+    [issuer("https://login.acme.example/", "acme"), issuer("https://login.globex.example/", "globex")],
+    control,
+    deps(),
+  );
+  const req = await requestFrom("https://login.acme.example/", {}, "globex.example");
+  expect(tenancy.tenantOf(req)).toBe("acme");
+  expect(((await tenancy.resolveTenantDb(req)) as unknown as { url: string }).url).toBe("postgres://host/acme");
+});
+
+test("a request with no Authorization header still resolves by its host", async () => {
+  const tenancy = await startTenancy([issuer("https://login.acme.example/", "acme")], control, deps());
+  const login = new Request("http://app.example/auth/login", { method: "POST", headers: { Host: "globex.example" } });
+  expect(tenancy.tenantOf(login)).toBe("globex");
+  expect(((await tenancy.resolveTenantDb(login)) as unknown as { url: string }).url).toBe("postgres://host/globex");
+  const hostless = new Request("http://localhost/auth/login", { method: "POST", headers: { Host: "localhost:3000" } });
+  expect(tenancy.tenantOf(hostless)).toBeUndefined();
+  await expect(tenancy.resolveTenantDb(hostless)).rejects.toBeInstanceOf(UnknownTenant);
+});
+
+test("a repeated issuer fails startup and the message names its iss", async () => {
+  const message = await startError([
+    issuer("https://login.acme.example/", "acme"),
+    issuer("https://login.acme.example/", "globex"),
+  ]);
+  expect(message).toContain("AUTH_ISSUERS");
+  expect(message).toContain("https://login.acme.example/");
 });
 
 let stopServer: (() => Promise<void>) | undefined;

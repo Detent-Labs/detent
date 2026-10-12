@@ -57,9 +57,12 @@ claim name. The owner chose the static mapping.
 parses `process.env.AUTH_ISSUERS` again and hands the list to `startTenancy`.
 In SaaS mode it raises when an entry has no `tenant`. It also raises when
 `tenantByKey` finds no row for an entry's tenant. Both messages name the
-issuer. The check runs after `initControlPlane` and before `Bun.serve`, so a
-bad mapping never serves a request. A second parse of one string costs little.
-It cannot disagree with the first. `parseAuthIssuers` keeps `tenant`
+issuer. It also raises when an `iss` appears twice. The resolver would verify
+against the first entry while the map kept the last. A request with a Bearer
+token takes its tenant from the token alone. The host serves only a request
+with no token. The check runs after `initControlPlane` and before
+`Bun.serve`, so a bad mapping never serves a request. A second parse of one
+string costs little. It cannot disagree with the first. `parseAuthIssuers` keeps `tenant`
 optional, because on-premise has no tenants. The check sits in `startTenancy`
 for the same reason: only SaaS mode runs it.
 

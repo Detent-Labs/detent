@@ -21,7 +21,7 @@ import { createDefaultAssignmentRegistry } from "../engine/assignment-strategies
 import { devHeaderResolver, type ActorResolver } from "../auth/resolve.js";
 import { createTenantConnections, TenantUnreachable, UnknownTenant } from "../tenancy/connections.js";
 import { controlPlane, initControlPlane, saasMode, tenantByKey } from "../tenancy/store.js";
-import { tenantKeyOf, tenantsByIssuer } from "../auth/jwt.js";
+import { hasBearer, tenantKeyOf, tenantsByIssuer } from "../auth/jwt.js";
 import { serveWebAsset, resolveWebRoot, isNavigationRequest } from "./static.js";
 import { jwtResolver, type IssuerConfig } from "../auth/jwt.js";
 import { handleLogin } from "../auth/login.js";
@@ -437,11 +437,13 @@ export function resolveAuthResolver(
  * that touches it, so an unreachable address surfaces here.
  *
  * A request carrying no resolvable tenant raises, and the dispatcher answers
- * 401 — including the login request, whose tenant comes from its host.
+ * 401. A request with a Bearer token takes its tenant from the token alone,
+ * and a token whose tenant does not resolve raises: the host never stands in
+ * for it. The login request holds no token, so its tenant comes from its host.
  *
- * Every `issuers` entry must name a tenant the control plane lists, or startup
- * fails with an error naming that issuer. An external token then resolves to
- * its issuer's tenant alone.
+ * Every `issuers` entry must name a tenant the control plane lists, and each
+ * `iss` may appear once, or startup fails with an error naming that issuer. An
+ * external token then resolves to its issuer's tenant alone.
  */
 export async function startTenancy(
   issuers: readonly IssuerConfig[],
@@ -455,7 +457,14 @@ export async function startTenancy(
 }> {
   await initControlPlane(control);
   const lookup = deps.lookup ?? tenantByKey;
+  const seen = new Set<string>();
   for (const issuer of issuers) {
+    // The resolver verifies against the first entry of an `iss`, while the
+    // issuer-to-tenant map keeps the last. A repeat would split the two.
+    if (seen.has(issuer.iss)) {
+      throw new Error(`AUTH_ISSUERS: issuer ${issuer.iss} appears more than once`);
+    }
+    seen.add(issuer.iss);
     if (issuer.tenant === undefined) {
       throw new Error(`AUTH_ISSUERS: issuer ${issuer.iss} names no tenant, and SaaS mode needs one on every entry`);
     }
@@ -469,15 +478,17 @@ export async function startTenancy(
     ...deps,
   });
   log.info("SaaS mode: tenants resolve per request from the control plane");
+  // A Bearer token names the tenant alone. The login request is the one holding
+  // no token, so its tenant comes from the host it arrived on.
+  const tenantFor = (req: Request): string | undefined =>
+    hasBearer(req.headers) ? tenantKeyOf(req.headers, byIssuer) : hostTenantKey(req);
   return {
     resolveTenantDb: async (req) => {
-      // The login request is the one holding no token, so its tenant comes from
-      // the host it arrived on. Every other request carries the claim.
-      const key = tenantKeyOf(req.headers, byIssuer) ?? hostTenantKey(req);
+      const key = tenantFor(req);
       if (!key) throw new UnknownTenant("(none)");
       return connections.handleFor(key);
     },
-    tenantOf: (req) => tenantKeyOf(req.headers, byIssuer) ?? hostTenantKey(req),
+    tenantOf: tenantFor,
     tenants: () => connections.live(),
     close: () => connections.close(),
   };
@@ -953,9 +964,12 @@ export async function startHttpServer(
     // reach the workers it expects. `engine.stop()` is synchronous —
     // `pollForever` only clears a pending timeout.
     stop: async () => {
-      await server.stop();
-      engine.stop();
-      await tenancy?.close();
+      try {
+        await server.stop();
+        engine.stop();
+      } finally {
+        await tenancy?.close();
+      }
     },
   };
 }

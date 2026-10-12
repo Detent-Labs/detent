@@ -46,6 +46,16 @@ export function tenantKeyOf(credential: unknown, byIssuer?: ReadonlyMap<string, 
   }
 }
 
+/**
+ * Whether the request carries an `Authorization: Bearer ...` header. A request
+ * that does takes its tenant from the token alone, so the host it arrived on
+ * can never stand in for a token whose tenant does not resolve.
+ */
+export function hasBearer(credential: unknown): boolean {
+  const authorization = (credential as Headers).get?.("Authorization");
+  return !!authorization && authorization.startsWith(BEARER_PREFIX);
+}
+
 /** `iss` to tenant for every issuer entry that names one. */
 export function tenantsByIssuer(issuers: readonly IssuerConfig[]): Map<string, string> {
   const map = new Map<string, string>();

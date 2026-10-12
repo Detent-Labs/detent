@@ -43,6 +43,11 @@ export class TenantDatabaseTaken extends Error {
  * same database. A `host` query parameter (a socket URL) replaces the hostname.
  * The port defaults to 5432 and the hostname is lowercase. Throws when the URL
  * does not parse.
+ *
+ * ponytail: the identity is a string. `localhost`, `127.0.0.1` and a DNS alias
+ * of one server compare unequal, so the check catches a typo in the same host
+ * spelling and nothing cleverer. The entry to close it is this function:
+ * resolve the host, or compare through the server's own `inet_server_addr()`.
  */
 export function databaseIdentity(databaseUrl: string): string {
   const url = new URL(databaseUrl);

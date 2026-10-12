@@ -14,6 +14,11 @@ names, and to no other. A claim inside an externally-issued token SHALL NOT
 select a tenant. A token from an issuer that `AUTH_ISSUERS` does not list
 names no tenant.
 
+A request that carries a Bearer token SHALL take its tenant from that token
+alone. The host it arrived on SHALL NOT stand in for a token whose tenant does
+not resolve. A request with no Bearer token, the login request, SHALL resolve
+its tenant from the first label of its host.
+
 <!-- antislop: allow synonym-rotation -->
 An unknown tenant key SHALL answer 401, the answer an unverifiable token gets.
 A key whose database refuses the connection SHALL answer 503. That is a
@@ -59,13 +64,32 @@ deployment fault rather than a caller fault, and the two must not read alike.
   `tenant` claim of `globex`
 - **THEN** its handler runs against `acme`'s database, never `globex`'s
 
+#### Scenario: A token from an unknown issuer does not fall back to the host
+
+- **WHEN** a request arrives on the host `acme.example` and carries a token from
+  an issuer that `AUTH_ISSUERS` does not list
+- **THEN** the request answers 401
+
+#### Scenario: A token ignores the host label
+
+- **WHEN** a request arrives on the host `globex.example` and carries a valid
+  token from the issuer that names `acme`
+- **THEN** its handler runs against `acme`'s database
+
+#### Scenario: A request with no token resolves by its host
+
+- **WHEN** a login request arrives on the host `acme.example` with no
+  `Authorization` header
+- **THEN** its handler runs against the database `tenants` records for `acme`
+
 ## ADDED Requirements
 
 ### Requirement: Each configured issuer names a listed tenant in SaaS mode
 
 In SaaS mode every `AUTH_ISSUERS` entry SHALL carry a `tenant`, and the
-control plane SHALL list that tenant. A violation SHALL fail startup with an
-error naming the issuer. Outside SaaS mode the field SHALL have no effect.
+control plane SHALL list that tenant. Each issuer SHALL appear once. A
+violation SHALL fail startup with an error naming the issuer. Outside SaaS
+mode the field SHALL have no effect.
 
 #### Scenario: An issuer with no tenant fails startup
 
@@ -79,6 +103,12 @@ error naming the issuer. Outside SaaS mode the field SHALL have no effect.
 - **WHEN** the server starts in SaaS mode with an `AUTH_ISSUERS` entry whose
   `tenant` the control plane does not list
 - **THEN** startup fails with an error naming the issuer and the tenant
+
+#### Scenario: A repeated issuer fails startup
+
+- **WHEN** the server starts in SaaS mode with two `AUTH_ISSUERS` entries that
+  share one `iss`
+- **THEN** startup fails with an error naming that issuer's `iss`
 
 #### Scenario: On-premise ignores the field
 
@@ -114,8 +144,8 @@ again. Stopping the server SHALL end every tenant pool.
 Provisioning SHALL refuse a database URL that names the same host, port and
 database as a listed tenant. Credentials and parameters SHALL NOT change that
 answer. Provisioning SHALL refuse before it creates a database or builds a
-schema. The control plane SHALL also hold `database_url` unique. A concurrent
-provisioning then cannot list one database twice.
+schema. The control plane SHALL also hold `database_url` unique. The unique
+index then refuses a second row with the same URL string.
 
 #### Scenario: A second tenant on the same database fails
 

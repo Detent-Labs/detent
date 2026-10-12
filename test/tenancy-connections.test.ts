@@ -195,10 +195,33 @@ test("close() ends a pool that is still opening", async () => {
 });
 
 test("close() with a refused entry in the map still resolves", async () => {
-  const { map } = trackedMap([record("acme")], () => true);
+  const { map, opened } = trackedMap([record("acme")], () => true);
   const opening = map.handleFor("acme").catch(() => undefined);
   await map.close();
   await opening;
+  expect(opened.length).toBe(1);
+  expect(endsOf(opened[0]!)).toBe(1);
+});
+
+test("a rejecting end() during a refused probe still raises TenantUnreachable", async () => {
+  const records = [record("acme")];
+  let attempts = 0;
+  const map = createTenantConnections(control, {
+    lookup: async (key) => records.find((r) => r.key === key),
+    listAll: async () => records,
+    connect: (url) => {
+      attempts += 1;
+      const db = fakeDb(url, true);
+      (db as unknown as { end: () => Promise<void> }).end = () => Promise.reject(new Error("end failed"));
+      return db;
+    },
+  });
+  const caught = await map.handleFor("acme").catch((e: unknown) => e);
+  expect(caught).toBeInstanceOf(TenantUnreachable);
+  expect((caught as Error).message).toContain("connection refused");
+  // The entry is gone, so the next call opens again.
+  await expect(map.handleFor("acme")).rejects.toBeInstanceOf(TenantUnreachable);
+  expect(attempts).toBe(2);
 });
 
 test("live() answers one handle per listed tenant", async () => {

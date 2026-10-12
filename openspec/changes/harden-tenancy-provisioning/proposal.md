@@ -39,7 +39,7 @@ None.
   A tenant database belongs to one tenant. A pool opens once per tenant and
   ends with the server. Provisioning keeps the URL parameters.
 - `jwt-authentication`: an `AUTH_ISSUERS` entry carries a `tenant`, required
-  in SaaS mode.
+  in SaaS mode. An external token selects its tenant through no claim.
 
 ## Impact
 
