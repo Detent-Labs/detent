@@ -22,7 +22,7 @@ default is safe for a deployment.
 | `PORT` | The TCP port the HTTP server binds. | No | `3000` | |
 | `WEB_ROOT` | The directory of the built browser bundle the engine serves. | No | `packages/web/dist`, beside the engine source. | |
 | `AUTH_JWT_SECRET` | The local HS256 signing key. Its presence registers `POST /auth/login`. The local branch accepts HS256 only. | One of three, see below. | None. | |
-| `AUTH_ISSUERS` | A JSON array of `{iss, jwksUrl, audience, rolesClaim}`. It accepts tokens an external issuer signs. A token needs an `exp` claim and an asymmetric algorithm: RS, PS, ES or EdDSA. | One of three, see below. | None. | |
+| `AUTH_ISSUERS` | A JSON array of `{iss, jwksUrl, audience, rolesClaim}`. It accepts tokens an external issuer signs. A token needs an `exp` claim and an asymmetric algorithm: RS, PS, ES or EdDSA. In SaaS mode each entry also needs a `tenant`, and an `iss` may appear once. | One of three, see below. | None. | |
 | `ALLOW_INSECURE_DEV_AUTH` | `1` disables authentication. The engine then trusts the actor headers as sent. | One of three. | Unset. | Never `1` here. Configure `AUTH_JWT_SECRET` or `AUTH_ISSUERS` instead. |
 | `CORS_ALLOWED_ORIGINS` | A comma-separated origin list for the CORS headers. | No | Unset, which emits no CORS header. | The value `*` allows every origin. Name the origins the browser bundle answers from. |
 | `DATA_RETENTION_DAYS` | The age at which the sweep deletes a terminal instance. A positive integer. | No | Unset, which runs no sweep. | |
@@ -252,17 +252,26 @@ TENANT_CONTROL_PLANE_URL=... bun run src/tenancy/cli.ts add-tenant <key> <name> 
 ```
 
 That creates the database and builds its schema. It lists the tenant last. A
-break part-way therefore leaves nothing a request can reach. `list-tenants`
+break part-way therefore leaves nothing a request can reach.
+
+`add-tenant` refuses a
+database URL that another tenant holds. Host, port and database name decide
+that. The control plane builds a unique index on `database_url` at the next
+start. That start fails if two rows share a URL. `list-tenants`
 prints what the control plane holds. No HTTP route creates a tenant:
 provisioning is yours, never a signup form.
 
 A request finds its own database two ways. A token this engine issued carries
-its tenant, minted at login. A token from an external issuer resolves by that
-issuer, which `AUTH_ISSUERS` already maps.
+its tenant, minted at login. A token from an external issuer resolves to the
+`tenant` that its `AUTH_ISSUERS` entry names. In SaaS mode each entry needs a
+`tenant`, and the control plane must list it. Startup fails and names the
+issuer otherwise. Each `iss` may appear once. Several issuers may name one
+tenant. A claim inside an external token never picks the tenant.
 
 The login request itself carries no token yet. It takes its tenant from the
 host it arrived on, reading `acme` from `acme.example.com`. Point each tenant's
-host at the same deployment.
+host at the same deployment. A request with a token takes its tenant from the
+token alone, and the host never stands in for it.
 
 Two answers are worth telling apart in a log. An unknown tenant reads 401, the
 answer a bad token gets, so nobody learns your tenant list by probing. A known
