@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { FieldId } from "workflow-engine/schema";
 import { useDraft } from "../draft/store";
 import { t } from "../catalog.js";
+import { appendOutcome } from "../draft/contractOutcomes";
 import { draftFields } from "../draft/fields";
 import { IssueList } from "./shared/IssueList";
 
@@ -24,8 +25,9 @@ export function ContractPanel() {
     if (!newOutcome.trim()) return;
     mutate((d) => {
       d.contract ??= {};
-      d.contract.outcomes ??= [];
-      if (!d.contract.outcomes.includes(newOutcome)) d.contract.outcomes.push(newOutcome);
+      const current = d.contract.outcomes ?? [];
+      const next = appendOutcome(current, newOutcome);
+      if (next !== current) d.contract.outcomes = [...next];
     });
     setNewOutcome("");
   };
