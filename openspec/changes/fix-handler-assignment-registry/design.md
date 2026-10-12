@@ -32,8 +32,10 @@ field.
 
 **Non-Goals:**
 
-- No change to a default parameter on an engine function. About twenty of them
-  keep a static default under the new name.
+- No change to a default parameter on an engine function. Sixteen of them keep
+  a static default under the new name.
+- No starter for a chained instance. Creation passes `startedBy: undefined`, so
+  `org.manager-of-starter` on a chained start step still resolves to nothing.
 - No change to the definition contract, the publish checks or the resolution
   deadline.
 - No fix for the other dead exports of audit finding B-14. The change
@@ -45,8 +47,10 @@ field.
 
 `HandlerContext` gains a required `assignmentRegistry: AssignmentRegistry`,
 beside the required `db`. An absent database handle has no sane fallback. An
-absent registry has none either. `DeliverFn` takes the registry as a fourth
-parameter. It copies the registry into the context. `drainOutbox` takes it as a
+absent registry has none either. `DeliverFn` takes the registry as a required
+fourth parameter. It copies the registry into the context. About eighteen test
+calls of `deliver(row, registry, db)` need the static registry. They get it in
+this change. `drainOutbox` takes it as a
 sixth parameter. `startEngine` passes the one it received.
 
 The sixth parameter of `drainOutbox` has a static default, as its other trailing
@@ -92,3 +96,13 @@ the candidates on the started or moved instance.
   handler path. `startEngine` is the only production caller.
 - [The web package names the old factory in two comments] → Rename it in both
   comments in this change.
+
+## Migration Plan
+
+The change does not add persisted state and touches no stored row. It deploys as a
+code change. A rollback reverts the commit. An outbox row queued before the
+deploy runs with the new handlers, so the registry fix reaches it.
+
+## Open Questions
+
+None.

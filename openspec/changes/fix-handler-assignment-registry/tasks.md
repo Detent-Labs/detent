@@ -13,7 +13,7 @@
 - [ ] 2.2 Add the registry as a fourth parameter of `DeliverFn` and `deliver`, and copy it into the context. Add it as a sixth parameter of `drainOutbox` with a static default. Verify with `bun run typecheck`.
 - [ ] 2.3 Pass the engine's registry from `startEngine` to `drainOutbox`. Verify that the outbox call in `host.ts` names it.
 - [ ] 2.4 Read the registry from `ctx` in `process-start.ts` and `instance-transition.ts`. Delete their own construction and the import. Verify with `git grep -n "AssignmentRegistry()" -- src/handlers`.
-- [ ] 2.5 Fix each hand-built `HandlerContext` in `test/` that the compiler reports. Verify with `bun run typecheck`.
+- [ ] 2.5 Fix each hand-built `HandlerContext` and each direct `deliver(` call in `test/` that the compiler reports. Pass `createStaticAssignmentRegistry()`. Verify with `bun run typecheck`.
 
 ## 3. Tests for the fault
 

@@ -56,5 +56,7 @@ None.
 - Every other file that imports the static factory from `registry.ts` follows
   the rename: engine default parameters, `src/runtime/instances.ts`, and tests.
 - `HandlerContext` gains a required field. A test that builds a context by hand
-  adds one.
+  adds one. So does a test that calls `deliver` directly.
+- Two comments in `packages/web` that name the old factory.
+- Docs under `docs/` and `.claude/` that name the old factory or the context.
 - `docs/decisions.md`: the audit index entry for this change is struck.
