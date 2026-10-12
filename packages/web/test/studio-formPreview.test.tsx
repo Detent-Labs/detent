@@ -140,6 +140,44 @@ describe("The preview's own controls", () => {
   });
 });
 
+describe("The preview's line for a guarded manual path", () => {
+  const LINE = "Approve: shown only when Amount (amount) is greater than 1000";
+
+  it("still draws the control, and names the path and its condition under the controls", () => {
+    const html = render(
+      step({
+        paths: [
+          { id: "path_1", key: "approve", label: "Approve", to: "step_b", trigger: "manual", guard: { lang: "cel", src: "data.amount > 1000.0" } },
+          { id: "path_2", key: "reject", label: "Reject", to: "step_c", trigger: "manual" },
+        ],
+      }),
+    );
+
+    expect(html).toMatch(/<button[^>]*>Approve<\/button>/);
+    expect(html).toContain(LINE);
+    expect(html.indexOf(LINE)).toBeGreaterThan(html.indexOf("Reject"));
+    // The line sits inside the inert body, so it takes no focus either.
+    let inside = 0;
+    new HTMLRewriter()
+      .on("[inert] li", {
+        text(chunk) {
+          if (chunk.text.includes("shown only when")) inside++;
+        },
+      })
+      .transform(html);
+    expect(inside).toBe(1);
+  });
+
+  it("prints no line for an unguarded manual path", () => {
+    const html = render(
+      step({ paths: [{ id: "path_1", key: "approve", label: "Approve", to: "step_b", trigger: "manual" }] }),
+    );
+
+    expect(html).toContain("Approve");
+    expect(html).not.toContain("shown only when");
+  });
+});
+
 describe("The preview's tab strip", () => {
   it("draws the draft's tabs, with their authored labels", () => {
     const html = render(TABBED);

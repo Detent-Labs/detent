@@ -494,14 +494,24 @@ export function summarizeCondition(condition: Condition, operands: Operand[]): s
 }
 
 /**
- * The canvas edge label for an automatic path's guard: a plain-English
- * summary when the guard parses into rows, the raw CEL text otherwise (a
- * fragment the builder cannot represent at all — see "A fragment the builder
- * cannot represent survives as a raw row").
+ * The readable form of a guard's CEL text: a plain-English summary when the
+ * guard parses into rows, the raw CEL text otherwise (a fragment the builder
+ * cannot represent at all — see "A fragment the builder cannot represent
+ * survives as a raw row").
  */
 export function guardEdgeLabel(src: string, operands: Operand[]): string {
   const condition = fromCel(src, operands);
   if (!condition) return src;
   const summary = summarizeCondition(condition, operands);
   return summary || src;
+}
+
+/**
+ * The canvas edge label for a path, whatever its trigger: the guard's readable
+ * form, or `undefined` for a path with no guard. A manual path's guard decides
+ * whether the participant gets the button, so its edge names it too.
+ */
+export function edgeGuardLabel(path: { guard?: { src?: string } }, operands: Operand[]): string | undefined {
+  const src = path.guard?.src;
+  return src ? guardEdgeLabel(src, operands) : undefined;
 }

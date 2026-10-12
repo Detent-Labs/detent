@@ -2,10 +2,10 @@ import { useState } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { ChevronDown } from "lucide-react";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
-import type { Path, PathTrigger, Step, StepId } from "workflow-engine/schema";
+import type { Path, Step, StepId } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
 import type { DraftField } from "../draft/fields";
-import { newPath } from "../draft/createPath";
+import { newPath, pathWithTrigger, triggerForNewPath } from "../draft/createPath";
 import { removeAt, updateAt } from "../draft/list-ops";
 import { t } from "../catalog.js";
 import { ConditionInput } from "./shared/ConditionInput";
@@ -166,6 +166,13 @@ const styles = stylex.create({
     letterSpacing: "0.06em",
     color: colors.textMuted,
   },
+  // Copied from `StepPage.tsx`'s `note` rather than imported: compiled StyleX
+  // styles stay beside their own module (design.md).
+  note: {
+    color: colors.textMuted,
+    marginBlock: space.s2,
+    marginInline: 0,
+  },
 });
 
 interface Props {
@@ -219,12 +226,16 @@ export function PathsPanel({
 
   const addPath = () => {
     if (!sourceStep || !targetStep?.id) return;
-    onChange([...list, newPath(sourceStep, targetStep, targetStep.id, "manual", contentLocale, baseLocale, t("steps.unnamedStep"))]);
+    const trigger = triggerForNewPath(sourceStep);
+    onChange([...list, newPath(sourceStep, targetStep, targetStep.id, trigger, contentLocale, baseLocale, t("steps.unnamedStep"))]);
     setNewPathTarget("");
   };
 
   const removePath = (index: number) => onChange(removeAt(list, index));
   const updatePath = (index: number, patch: Partial<DraftPath>) => onChange(updateAt(list, index, patch));
+  // A whole-path replace, not a patch: `updateAt` merges, so it cannot drop
+  // the `priority` key a switch to manual removes.
+  const replacePath = (index: number, next: DraftPath) => onChange(list.map((p, i) => (i === index ? next : p)));
 
   return (
     <div {...stylex.props(styles.pathsPanel)}>
@@ -285,7 +296,7 @@ export function PathsPanel({
               type="button"
               {...stylex.props(styles.segmentedOption, (path.trigger ?? "manual") === "manual" && styles.segmentedOptionPressed)}
               aria-pressed={(path.trigger ?? "manual") === "manual"}
-              onClick={() => updatePath(index, { trigger: "manual" as PathTrigger })}
+              onClick={() => replacePath(index, pathWithTrigger(path, "manual"))}
             >
               {t("paths.triggeredByManual")}
             </button>
@@ -297,15 +308,19 @@ export function PathsPanel({
                 path.trigger === "automatic" && styles.segmentedOptionPressed,
               )}
               aria-pressed={path.trigger === "automatic"}
-              onClick={() => updatePath(index, { trigger: "automatic" as PathTrigger })}
+              onClick={() => replacePath(index, pathWithTrigger(path, "automatic"))}
             >
               {t("paths.triggeredByAutomatic")}
             </button>
           </fieldset>
 
-          {path.trigger === "automatic" && (
-            <fieldset {...stylex.props(styles.studioOnlyWhen)}>
-              <legend {...stylex.props(styles.studioOnlyWhenLegend)}>{t("condition.onlyWhenHeading")}</legend>
+          {/* The guard editor stands for either trigger: on an automatic path
+              the guard decides whether the path fires, on a manual path
+              whether the participant gets the button. Only `priority`
+              depends on the trigger. */}
+          <fieldset {...stylex.props(styles.studioOnlyWhen)}>
+            <legend {...stylex.props(styles.studioOnlyWhenLegend)}>{t("condition.onlyWhenHeading")}</legend>
+            {path.trigger === "automatic" ? (
               <label>
                 priority
                 <input
@@ -316,17 +331,19 @@ export function PathsPanel({
                   }
                 />
               </label>
-              <label>
-                guard (omit for the default/else path)
-                <ConditionInput
-                  value={path.guard}
-                  stepId={stepId}
-                  onChange={(guard) => updatePath(index, { guard })}
-                  toggleVariant="disclosure"
-                />
-              </label>
-            </fieldset>
-          )}
+            ) : (
+              <p {...stylex.props(styles.note)}>{t("paths.manualGuardNote")}</p>
+            )}
+            <label>
+              {path.trigger === "automatic" ? "guard (omit for the default/else path)" : t("paths.manualGuardHint")}
+              <ConditionInput
+                value={path.guard}
+                stepId={stepId}
+                onChange={(guard) => updatePath(index, { guard })}
+                toggleVariant="disclosure"
+              />
+            </label>
+          </fieldset>
 
           <ActionListEditor
             label="onPath"
