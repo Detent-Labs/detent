@@ -1,7 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { t } from "../../catalog.js";
-import { inputTypeFor, operatorsFor, type CmpOp } from "./conditionLogic";
+import { boolChoiceOf, boolValueOf, inputTypeFor, operatorsFor, type CmpOp } from "./conditionLogic";
 import {
   fieldValueOperandsFor,
   isRuleRowComplete,
@@ -136,7 +136,8 @@ function LiteralEditor({
 
   if (operand.celType === "bool") {
     return (
-      <select aria-label={label} value={current === true || current === "true" ? "true" : "false"} onChange={(e) => onChange(e.target.value === "true")}>
+      <select aria-label={label} value={boolChoiceOf(current)} onChange={(e) => onChange(boolValueOf(e.target.value))}>
+        <option value="">{t("condition.selectValue")}</option>
         <option value="true">{t("condition.yes")}</option>
         <option value="false">{t("condition.no")}</option>
       </select>

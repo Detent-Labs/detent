@@ -1,7 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { t } from "../../catalog.js";
-import { inputTypeFor, isComplete, operatorsFor, type CmpOp, type Condition, type Operand, type Row } from "./conditionLogic";
+import { boolChoiceOf, boolValueOf, inputTypeFor, isComplete, operatorsFor, type CmpOp, type Condition, type Operand, type Row } from "./conditionLogic";
 
 const styles = stylex.create({
   conditionEmpty: {
@@ -91,11 +91,8 @@ function ValueEditor({
 
   if (operand.celType === "bool") {
     return (
-      <select
-        aria-label={label}
-        value={row.value === true || row.value === "true" ? "true" : "false"}
-        onChange={(e) => onChange(e.target.value === "true")}
-      >
+      <select aria-label={label} value={boolChoiceOf(row.value)} onChange={(e) => onChange(boolValueOf(e.target.value))}>
+        <option value="">{t("condition.selectValue")}</option>
         <option value="true">{t("condition.yes")}</option>
         <option value="false">{t("condition.no")}</option>
       </select>

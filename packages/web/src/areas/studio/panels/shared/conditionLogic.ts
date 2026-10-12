@@ -368,6 +368,17 @@ export function celLiteral(value: string | number | boolean, celTypeName: string
   return celString(String(value));
 }
 
+/** The boolean select's value for a row's literal: `""` stands for no choice yet. */
+export function boolChoiceOf(value: string | number | boolean | undefined): "" | "true" | "false" {
+  if (value === undefined || value === "") return "";
+  return value === true || value === "true" ? "true" : "false";
+}
+
+/** The inverse of `boolChoiceOf`: the empty choice leaves the row unfinished. */
+export function boolValueOf(choice: string): boolean | undefined {
+  return choice === "" ? undefined : choice === "true";
+}
+
 /** True when a row carries everything `toCel` needs to write it. */
 export function isComplete(row: Row, byPath: Map<string, Operand>): boolean {
   if (row.kind === "raw") return row.src.trim().length > 0;
