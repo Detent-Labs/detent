@@ -8,7 +8,8 @@
 import type { SQL } from "bun";
 import { test, expect, describe } from "bun:test";
 import { SignJWT, generateKeyPair, exportJWK } from "jose";
-import { jwtResolver, LOCAL_ISSUER, type IssuerConfig } from "../src/auth/jwt.js";
+import { jwtResolver, tenantKeyOf, tenantsByIssuer, LOCAL_ISSUER, type IssuerConfig } from "../src/auth/jwt.js";
+import { parseAuthIssuers } from "../src/http/server.js";
 import { ActorResolutionError } from "../src/auth/resolve.js";
 
 /**
@@ -342,3 +343,59 @@ async function expectRejects(fn: () => Promise<unknown>): Promise<void> {
   }
   expect(caught).toBeInstanceOf(ActorResolutionError);
 }
+
+describe("tenantKeyOf and tenantsByIssuer", () => {
+  const issuer = (iss: string, tenant?: string): IssuerConfig => ({
+    iss, jwksUrl: `${iss}jwks`, audience: "detent", rolesClaim: "roles", ...(tenant !== undefined ? { tenant } : {}),
+  });
+  const byIssuer = tenantsByIssuer([issuer("https://login.acme.example/", "acme"), issuer("https://other.example/")]);
+
+  /** Only decoded, never verified, so any signing key serves. */
+  async function tokenFrom(iss: string, claims: Record<string, unknown> = {}): Promise<Headers> {
+    const jwt = await new SignJWT(claims).setProtectedHeader({ alg: "HS256" }).setIssuer(iss).setSubject("u").sign(new TextEncoder().encode(SECRET));
+    return headers(`Bearer ${jwt}`);
+  }
+
+  test("tenantsByIssuer keeps only entries that name a tenant", () => {
+    expect([...byIssuer]).toEqual([["https://login.acme.example/", "acme"]]);
+  });
+
+  test("a mapped external issuer resolves to its tenant", async () => {
+    expect(tenantKeyOf(await tokenFrom("https://login.acme.example/"), byIssuer)).toBe("acme");
+  });
+
+  test("an unmapped external issuer resolves to no tenant", async () => {
+    expect(tenantKeyOf(await tokenFrom("https://stranger.example/"), byIssuer)).toBeUndefined();
+    expect(tenantKeyOf(await tokenFrom("https://other.example/"), byIssuer)).toBeUndefined();
+  });
+
+  test("an external issuer resolves to no tenant when no map is passed", async () => {
+    expect(tenantKeyOf(await tokenFrom("https://login.acme.example/"))).toBeUndefined();
+  });
+
+  test("a local token still returns its tenant claim", async () => {
+    expect(tenantKeyOf(await tokenFrom(LOCAL_ISSUER, { tenant: "globex" }), byIssuer)).toBe("globex");
+    expect(tenantKeyOf(await tokenFrom(LOCAL_ISSUER, { tenant: "globex" }))).toBe("globex");
+    expect(tenantKeyOf(await tokenFrom(LOCAL_ISSUER), byIssuer)).toBeUndefined();
+  });
+
+  test("an external token claiming another tenant stays on its issuer's tenant", async () => {
+    expect(tenantKeyOf(await tokenFrom("https://login.acme.example/", { tenant: "globex" }), byIssuer)).toBe("acme");
+    expect(tenantKeyOf(await tokenFrom("https://stranger.example/", { tenant: "globex" }), byIssuer)).toBeUndefined();
+  });
+});
+
+describe("AUTH_ISSUERS tenant field", () => {
+  const entry = { iss: "https://login.acme.example/", jwksUrl: "https://login.acme.example/jwks", audience: "detent", rolesClaim: "roles" };
+
+  test("an entry parses with and without a tenant", () => {
+    const [withTenant] = parseAuthIssuers(JSON.stringify([{ ...entry, tenant: "acme" }]))!;
+    const [without] = parseAuthIssuers(JSON.stringify([entry]))!;
+    expect(withTenant!.tenant).toBe("acme");
+    expect(without!.tenant).toBeUndefined();
+  });
+
+  test("a numeric tenant is rejected with an error naming AUTH_ISSUERS", () => {
+    expect(() => parseAuthIssuers(JSON.stringify([{ ...entry, tenant: 7 }]))).toThrow(/AUTH_ISSUERS\[0\]/);
+  });
+});

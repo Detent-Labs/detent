@@ -27,10 +27,12 @@ export const LOCAL_ISSUER = "bps";
  *
  * A locally-issued token carries the claim, since `LOCAL_ISSUER` is one
  * constant every deployment shares and so cannot name a tenant. An externally
- * issued token needs none: its `iss` identifies its tenant, and the caller maps
- * it.
+ * issued token resolves through `tenantsByIssuer`: the tenant is the one its
+ * issuer's `AUTH_ISSUERS` entry names. An issuer the map lacks, or no map,
+ * answers `undefined`. A `tenant` claim inside an external token is never read,
+ * so that token cannot move itself to another tenant.
  */
-export function tenantKeyOf(credential: unknown): string | undefined {
+export function tenantKeyOf(credential: unknown, byIssuer?: ReadonlyMap<string, string>): string | undefined {
   const authorization = (credential as Headers).get?.("Authorization");
   if (!authorization || !authorization.startsWith(BEARER_PREFIX)) return undefined;
   const token = authorization.slice(BEARER_PREFIX.length).trim();
@@ -38,10 +40,27 @@ export function tenantKeyOf(credential: unknown): string | undefined {
   try {
     const payload = decodeJwt(token) as { iss?: unknown; tenant?: unknown };
     if (payload.iss === LOCAL_ISSUER) return typeof payload.tenant === "string" ? payload.tenant : undefined;
-    return typeof payload.iss === "string" ? payload.iss : undefined;
+    return typeof payload.iss === "string" ? byIssuer?.get(payload.iss) : undefined;
   } catch {
     return undefined;
   }
+}
+
+/**
+ * Whether the request carries an `Authorization: Bearer ...` header. A request
+ * that does takes its tenant from the token alone, so the host it arrived on
+ * can never stand in for a token whose tenant does not resolve.
+ */
+export function hasBearer(credential: unknown): boolean {
+  const authorization = (credential as Headers).get?.("Authorization");
+  return !!authorization && authorization.startsWith(BEARER_PREFIX);
+}
+
+/** `iss` to tenant for every issuer entry that names one. */
+export function tenantsByIssuer(issuers: readonly IssuerConfig[]): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const i of issuers) if (i.tenant !== undefined) map.set(i.iss, i.tenant);
+  return map;
 }
 const BEARER_PREFIX = "Bearer ";
 
@@ -62,6 +81,8 @@ export interface IssuerConfig {
   jwksUrl: string;
   audience: string;
   rolesClaim: string;
+  /** The tenant this issuer's tokens belong to. Required in SaaS mode, ignored otherwise. */
+  tenant?: string;
 }
 
 export interface JwtResolverConfig {

@@ -4,10 +4,12 @@
  * across tenants, because nothing else is shared. It gets the heaviest test in
  * this change for that reason.
  *
- * A pool opens lazily, on the first request that names its tenant, and stays
- * open. ponytail: no eviction. A deployment holding more idle tenants than
- * Postgres allows connections needs one, and the entry to add it is `close`
- * below. Nothing measures that today.
+ * A pool opens on the first call that names its tenant: a request, or the
+ * outbox, resolution, timers and retention workers, which open every listed
+ * tenant at their first tick. Concurrent first calls share one open sequence.
+ * The pool stays open until `close`. ponytail: no eviction. A deployment
+ * holding more idle tenants than Postgres allows connections needs one, and
+ * the entry to add it is `close` below. Nothing measures that today.
  */
 
 import { SQL } from "bun";
@@ -44,7 +46,8 @@ export interface TenantConnections {
   handleFor: (key: string) => Promise<SQL>;
   /** Every currently-listed tenant, with its handle. Skips one whose database refuses. */
   live: () => Promise<TenantHandle[]>;
-  close: () => void;
+  /** Ends every pool, including one still opening. */
+  close: () => Promise<void>;
 }
 
 /**
@@ -64,30 +67,48 @@ export function createTenantConnections(
   const lookup = deps.lookup ?? tenantByKey;
   const listAll = deps.listAll ?? listTenants;
   const connect = deps.connect ?? ((url: string) => new SQL(url));
-  const pools = new Map<string, SQL>();
+  const pools = new Map<string, Promise<SQL>>();
 
-  /**
-   * Cached by key, and the control-plane row is the only source that fills it.
-   * A key that resolved once keeps its handle: re-reading the row per request
-   * would put a control-plane query in front of every request, and the URL for
-   * a live tenant does not change under it.
-   */
-  async function handleFor(key: string): Promise<SQL> {
-    const held = pools.get(key);
-    if (held) return held;
+  /** Lookup, connect and probe. A refused probe ends the pool it opened. */
+  async function open(key: string): Promise<SQL> {
     const record = await lookup(key, control);
     if (!record) throw new UnknownTenant(key);
+    let db: SQL | undefined;
     try {
-      const db = connect(record.databaseUrl);
-      // Prove the connection before caching it, so a refused database raises
+      db = connect(record.databaseUrl);
+      // Prove the connection before handing it out, so a refused database raises
       // TenantUnreachable now rather than failing inside a route handler that
       // has already begun its work.
       await db`SELECT 1`;
-      pools.set(key, db);
       return db;
     } catch (cause) {
+      // The probe already failed, so an error from ending the pool adds nothing.
+      try {
+        await db?.end();
+      } catch {
+        // ignored
+      }
       throw new TenantUnreachable(key, cause);
     }
+  }
+
+  /**
+   * Cached by key, and the control-plane row is the only source that fills it.
+   * The map holds the promise of the whole open sequence, so concurrent first
+   * calls share one pool. A key that resolved once keeps its handle:
+   * re-reading the row per request would put a control-plane query in front of
+   * every request, and the URL for a live tenant does not change under it.
+   * A rejection removes the entry, so the next call retries.
+   */
+  function handleFor(key: string): Promise<SQL> {
+    const held = pools.get(key);
+    if (held) return held;
+    const opening: Promise<SQL> = open(key).catch((cause) => {
+      if (pools.get(key) === opening) pools.delete(key);
+      throw cause;
+    });
+    pools.set(key, opening);
+    return opening;
   }
 
   /**
@@ -108,5 +129,13 @@ export function createTenantConnections(
     return out;
   }
 
-  return { handleFor, live, close: () => pools.clear() };
+  async function close(): Promise<void> {
+    const held = [...pools.values()];
+    pools.clear();
+    const settled = await Promise.allSettled(held);
+    // A rejected entry opened no pool that survives, so only fulfilled ones end.
+    await Promise.allSettled(settled.map(async (s) => (s.status === "fulfilled" ? s.value.end() : undefined)));
+  }
+
+  return { handleFor, live, close };
 }
