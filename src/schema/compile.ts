@@ -11,7 +11,8 @@
  *
  * Deterministic (same authored body -> identical compiled body) and idempotent
  * (an already-compiled body is returned unchanged). Rejects a body that authors
- * the reserved cancellation identity.
+ * the reserved cancellation identity, and a body whose cancel-sink is not the
+ * one this pass injects.
  *
  * Returns the VALIDATED PARSE OUTPUT, never the input. The contract schemas
  * strip undeclared content and are also the deserializer every read goes
@@ -23,8 +24,9 @@
  * runs on BOTH compile branches, ahead of the `publishedProcessBody`-valid
  * early return: that placement is what makes a check unbypassable by a
  * hand-written body that merely satisfies `publishedProcessBody` (which
- * constrains only the cancel-sink count). See `harden-publish-validation`
- * design.md.
+ * constrains only the cancel-sink count). The early return then compares the
+ * body with its own recompile, which pins the sink itself. See
+ * `harden-publish-validation` design.md.
  */
 
 import { z } from "zod";
@@ -54,6 +56,8 @@ import {
   type Step,
 } from "./definition.js";
 import { computeDominatorSets, dominates } from "./step-graph.js";
+import { canonicalize } from "./canonical-json.js";
+import { stripCompiledContent } from "./strip-compiled.js";
 
 /** A duration-typed value outside the grammar, or a timer duration past the bound. */
 export interface DurationIssue {
@@ -1257,18 +1261,38 @@ export function compileProcessBody(body: ProcessBody): ProcessBody {
   const structural = structuralIssues(body);
   if (structural.length > 0) throw new CompileValidationError(structural);
 
-  // Idempotent: an already-compiled (published-valid) body is a no-op. A body
-  // that merely collides with the reserved identity is NOT published-valid and
-  // falls through to authored validation below, which rejects it.
+  // Idempotent: an already-compiled body returns unchanged. A body that merely
+  // collides with the reserved identity is NOT published-valid and falls
+  // through to authored validation below, which rejects it. A published-valid
+  // body only passes the sink-count rule, so it must also equal what this
+  // function would produce from its own stripped form: a hand-written sink of
+  // any other shape would otherwise ride through into the stored body.
   const compiled = publishedProcessBody.safeParse(body);
-  if (compiled.success) return compiled.data;
+  if (compiled.success) {
+    const expected = injectCancelSink(authoredProcessBody.parse(stripCompiledContent(compiled.data)));
+    if (canonicalize(expected) !== canonicalize(compiled.data)) {
+      const sinkIndex = compiled.data.workflow.steps.findIndex((s) => s.id === CANCEL_SINK_STEP_ID);
+      throw new CompileValidationError([
+        {
+          loc: `steps[${sinkIndex}]`,
+          value: CANCEL_SINK_STEP_ID,
+          message: "the cancel-sink differs from the one publish injects; remove it and let publish inject it",
+        },
+      ]);
+    }
+    return compiled.data;
+  }
 
   // The parse OUTPUT is what gets compiled, hashed and stored: the schemas strip
   // undeclared content, so returning the input instead would let an unknown key
   // into definitionHash that every read then strips back out, leaving the pin
   // unreproducible and its instances unrehydratable.
-  const parsed = authoredProcessBody.parse(body); // also rejects reserved-identity collisions
+  return injectCancelSink(authoredProcessBody.parse(body)); // also rejects reserved-identity collisions
+}
 
+/** Appends the engine-owned cancel-sink to a parsed authored body and, for a
+ * contracted process, the reserved outcome bound to it. */
+function injectCancelSink(parsed: ProcessBody): ProcessBody {
   const contracted = parsed.contract !== undefined;
 
   const sink: Step = {
