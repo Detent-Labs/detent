@@ -50,12 +50,12 @@
 
 - [x] 7.1 Delete the `widen-test-guards` entry from the audit index in `docs/decisions.md`. Verify that `git grep -n widen-test-guards docs/decisions.md` prints nothing.
 - [x] 7.2 Reword the TEST-1 entry in `docs/decisions.md` as resolved, and fix the count sentence of its section. Check `ROADMAP.md`, `README.md` and `docs/current-state.md` for a sentence the change made false.
-- [ ] 7.3 Run the antislop linter on every Markdown file this change touched. Fix each finding or add a targeted directive with a reason.
+- [x] 7.3 Run the antislop linter on every Markdown file this change touched. Fix each finding or add a targeted directive with a reason.
 
 ## 8. Verification
 
-- [ ] 8.1 Run `bun run typecheck` in the devcontainer. Record the exit status.
-- [ ] 8.2 Run `bun run lint` and `bun run build` in the devcontainer. Record both exit statuses.
-- [ ] 8.3 Run the full `bun test` with `DATABASE_URL` set, through `scripts/test-gated.sh`, with `OPENSPEC_TELEMETRY=0`. Record the summary lines and the gate's verdict.
-- [ ] 8.4 Run `bun run test:tz` in the devcontainer. Record its summary.
-- [ ] 8.5 On the host, run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`. Run the same with `whitespace.sh`. Record what each printed.
+- [x] 8.1 Run `bun run typecheck` in the devcontainer. Record the exit status.
+- [x] 8.2 Run `bun run lint` and `bun run build` in the devcontainer. Record both exit statuses.
+- [x] 8.3 Run the full `bun test` with `DATABASE_URL` set, through `scripts/test-gated.sh`, with `OPENSPEC_TELEMETRY=0`. Record the summary lines and the gate's verdict.
+- [x] 8.4 Run `bun run test:tz` in the devcontainer. Record its summary.
+- [x] 8.5 On the host, run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`. Run the same with `whitespace.sh`. Record what each printed.

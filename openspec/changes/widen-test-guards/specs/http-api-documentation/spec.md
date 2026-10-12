@@ -7,7 +7,7 @@
 A test SHALL read the route list that "OpenAPI document exists and covers the
 customer-facing surface" names. It SHALL assert that `docs/openapi.yaml` lists
 every route of that list, by method and path. A document that omits one route
-SHALL fail the test. The failure SHALL name the route.
+SHALL fail the test, and the test SHALL name that route.
 
 #### Scenario: Every required route has an entry
 
