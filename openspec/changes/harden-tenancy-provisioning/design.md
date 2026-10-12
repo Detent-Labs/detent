@@ -63,6 +63,11 @@ It cannot disagree with the first. `parseAuthIssuers` keeps `tenant`
 optional, because on-premise has no tenants. The check sits in `startTenancy`
 for the same reason: only SaaS mode runs it.
 
+`startTenancy` is exported. Its arguments are `(issuers, control =
+controlPlane(), deps = {})`. `deps` passes through to `createTenantConnections`. A test then
+drives the startup check and the pool shutdown with a test control plane and
+an injected `connect`, without `TENANT_CONTROL_PLANE_URL`.
+
 *Alternative:* make the Zod schema demand `tenant` whenever
 `TENANT_CONTROL_PLANE_URL` is set. Then `parseAuthIssuers` reads the SaaS
 flag, and a unit test of the parser depends on the environment.
@@ -76,9 +81,10 @@ retries. The probe's `catch` calls `db.end()` before it raises
 `TenantUnreachable`. It ignores an error from `end()`, because the probe
 already failed.
 
-`close()` becomes async. It empties the map, then ends every settled pool. A
-rejected entry has no pool to end. `startTenancy` returns the `close`, and the
-`stop` of `startHttpServer` awaits it after `engine.stop()`.
+`close()` becomes async. It empties the map and awaits every entry it held, so
+the close ends a pool that is still opening too. A rejected entry has no pool
+to end. `startTenancy` returns the `close`. The `stop` of `startHttpServer`
+awaits it after `engine.stop()`.
 
 *Alternative:* a lock around the open. A promise cache does the same job with
 no extra state.
@@ -121,3 +127,15 @@ stay. A URL with no credentials still works, since `URL` emits none.
 - [A pending-promise map hands every waiter the same rejection] → Each waiter
   raises `TenantUnreachable` for the same cause, as before. The entry is gone
   by the next tick.
+
+## Migration Plan
+
+The first server start after this change needs two things in a SaaS
+deployment. Each `AUTH_ISSUERS` entry gains a `tenant`. The control plane
+has no two rows with one `database_url`. The unique index builds on that
+start. No data moves and no rollback step exists. Reverting the code leaves
+the index, which does no harm.
+
+## Open Questions
+
+None. The owner settled both questions on 2026-10-12.

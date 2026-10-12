@@ -4,13 +4,13 @@
 
 - [ ] 1.1 Add `tenant?: string` to `IssuerConfig` and to `parseAuthIssuers`'s schema. Verify `test/auth-jwt.test.ts` parses an entry with and without `tenant`. Verify it rejects a numeric `tenant` with an error naming `AUTH_ISSUERS`.
 - [ ] 1.2 Give `tenantKeyOf` the optional issuer map and add `tenantsByIssuer`, per design decision 1. Verify `test/auth-jwt.test.ts` covers a mapped issuer and an unmapped one that returns `undefined`. Verify it covers a local token that still returns its claim, and an external token claiming another tenant.
-- [ ] 1.3 Pass the parsed issuers to `startTenancy`. Map `iss` in `resolveTenantDb` and `tenantOf`, and fail startup per design decision 2. Verify a new `test/tenancy-issuers.test.ts` shows startup failing for an issuer with no `tenant`. Verify it fails for an unlisted tenant, and that each message names the issuer. Verify an on-premise start ignores the field.
+- [ ] 1.3 Export `startTenancy` with its `issuers`, `control` and `deps` parameters. Map `iss` in `resolveTenantDb` and `tenantOf`, and fail startup per design decision 2. Pass the issuers parsed from `AUTH_ISSUERS` in `startHttpServer`. Verify a new `test/tenancy-issuers.test.ts` shows startup failing for an issuer with no `tenant`. Verify it fails for an unlisted tenant, and that each message names the issuer. Verify an on-premise start ignores the field.
 - [ ] 1.4 Document the `tenant` field in `docs/runbooks/deployment.md`, in the `AUTH_ISSUERS` row and in the paragraph on how a request finds its database. Verify both places say each entry needs a `tenant` in SaaS mode.
 
 ## 2. Connection pools (C-9)
 
 - [ ] 2.1 Cache the pending promise per key in `createTenantConnections`. End the pool when the probe fails, and make `close()` end every pool, per design decision 3. Correct the file comment "A pool opens lazily". Verify `test/tenancy-connections.test.ts` shows three concurrent `handleFor` calls opening one pool. Verify it shows a refused probe calling `end()` once and leaving no entry. Verify a retry opens a new pool, and `close()` ends every pool.
-- [ ] 2.2 Return `close` from `startTenancy` and await it in the `stop` of `startHttpServer`. Verify a test shows `stop()` ending the tenant pools after a request served one tenant.
+- [ ] 2.2 Return `close` from `startTenancy` and await it in the `stop` of `startHttpServer`. Verify `test/tenancy-issuers.test.ts` shows the returned `close` ending the pools of two tenants served through `resolveTenantDb`. Verify `stop` awaits it by a `startHttpServer` test in SaaS mode or by reading the line.
 
 ## 3. Provisioning (C-14, C-15)
 
