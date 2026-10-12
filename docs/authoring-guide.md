@@ -781,8 +781,8 @@ An action runs async only. Omit `execution` or write `"async"`; the value
 and an action cannot set one.
 
 An action may declare a retry policy. Its `maxAttempts` is a whole number from
-1 to 20. A body outside that range fails to parse. When you omit it, the
-default is 5.
+1 to 20. A body outside that range fails to parse. An action with no retry
+policy gets the default: 5 attempts with an exponential delay from one second.
 
 An exponential delay grows with each try and stops at one hour. A base delay
 above one hour stays as you wrote it. An action that keeps failing ends in the

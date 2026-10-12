@@ -386,7 +386,7 @@ export async function drainOutbox(
           // the ordinary suppression accounting below rather than writing under a
           // stale field id.
           const r = (await tx`UPDATE instances
-            SET body = jsonb_set(body, ARRAY['data', ${fid}::text],(${[val]}::jsonb) -> 0, true),
+            SET body = jsonb_set(body, ARRAY['data', ${fid}::text], (${[val]}::jsonb) -> 0, true),
                 resolve_state = 'pending'
             WHERE instance_id = ${row.instance_id} AND (body->>'status') = 'running'
               AND (body->>'version')::int = ${row.field_version}
