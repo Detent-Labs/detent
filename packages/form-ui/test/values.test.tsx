@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { isValidElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { FieldForm, FieldInput } from "../src/FieldForm.js";
+import { filterToEditable } from "../src/submit.js";
 import { datetimeInputValue, numberFromInput, textFromInput } from "../src/values.js";
 import type { ResolvedViewEntry, ResolvedViewField } from "../src/types.js";
 
@@ -83,6 +84,7 @@ describe("FieldInput: a cleared control reports null", () => {
       entry({ type: "string", format: "email" }),
       entry({ type: "string" }),
       entry({ type: "file" }),
+      entry({ type: { type: "plugin.thing", config: {} } }),
     ]) {
       expect(reported(field, "input", { value: "" })).toEqual([null]);
     }
@@ -250,6 +252,20 @@ describe("FieldForm: a datetime field converts for display only", () => {
 
   it("shows an unparsable value as stored", () => {
     expect(html("soon")).toContain('value="soon"');
+  });
+
+  it("submits an untouched zoned value unchanged", () => {
+    const stored = "2026-10-10T12:30:00Z";
+    const field = entry({ id: "f1", type: "string", format: "datetime" }, { value: stored });
+    const spy: unknown[][] = [];
+    renderToStaticMarkup(
+      <FieldForm fields={[field]} values={{ f1: stored }} onChange={(...args) => spy.push(args)} locale="en" />,
+    );
+    // Display conversion fires no change, so the form state keeps the stored value.
+    expect(spy).toEqual([]);
+    const submitted = filterToEditable({ f1: stored }, [field]);
+    expect(submitted.f1).toBe(stored);
+    expect(JSON.stringify(submitted)).toBe('{"f1":"2026-10-10T12:30:00Z"}');
   });
 
   it("does not convert a date field", () => {

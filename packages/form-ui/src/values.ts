@@ -1,7 +1,8 @@
 /**
  * How a control's raw DOM value becomes the value `FieldForm` reports through
  * `onChange`, and how a stored value becomes a control's raw value. Pure
- * functions, because this package's tests fire no DOM event.
+ * functions, so the mapping has one definition across every input branch and
+ * a unit test can reach it without a render.
  */
 
 /** A text-like control's value: an empty string means the participant cleared
