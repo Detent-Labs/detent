@@ -941,6 +941,7 @@ export const en = {
   "pathsView.empty": "This process has no path yet. Drag from a step on the canvas to make one.",
 
   "expression.placeholder": "CEL expression",
+  "mapping.unlistedKey": "(not in the list)",
   "plugin.typePlaceholder": "plugin type identifier",
   "plugin.selectType": "-- select type --",
   "plugin.unregisteredType": "(unregistered)",
