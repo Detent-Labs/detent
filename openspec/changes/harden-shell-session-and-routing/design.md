@@ -28,17 +28,19 @@ The comparison is a pure function in `session.ts`, `endedByStorageChange(held, s
 
 Alternatives: adopting the new session silently would switch the actor under unsaved studio work. A reload would drop that work as well and add a flash. Signing out is the same outcome a logout already has.
 
-**No write after sign-out.** A request that answers after the storage event must write nothing. `App` keeps the held session in a ref. A layout effect syncs it to the committed session. The storage handler and `logout` clear it at once, ahead of the render they queue. The hydration `then`, the profile page's `onSaved` and `logout` all read that ref and return when it no longer matches their session.
+**No write after sign-out.** A request that answers after the storage event must write nothing. `App` keeps the held session in a ref. A layout effect syncs it to the committed session. The storage handler and `logout` clear it at once, ahead of the render they queue. The hydration `then`, the profile page's `onSaved` and `logout` read that ref. Each returns when the ref no longer matches its session.
 
-A late 401 reaches `logout` through every area's `onUnauthorized`. `logout` returns early when the ref is empty, so it neither clears storage nor hides the notice. Otherwise it clears storage only through `clearIfHeld`, which compares the stored token with the held one. A stale tab therefore never removes the session another tab stored since.
+A late 401 reaches `logout` through every area's `onUnauthorized`. `logout` returns early when the ref is empty. Storage and the notice stay as they are. Otherwise it clears storage through `clearIfHeld`, which compares the stored token with the held one. A stale tab therefore leaves alone any session another tab stored since.
 
-**The notice is state in `App`, shown by `LoginScreen`.** `App` holds `endedElsewhere`. The storage handler sets it. `onLoggedIn` and `logout` clear it. `LoginScreen` takes an optional `notice` string. It always renders a `<div role="status">` between the title and the first field, and puts the notice `<p>` inside it only when `notice` is set. The wording is one catalog key, `login.sessionEndedElsewhere`, in EN and DE.
+**The notice is state in `App`, shown by `LoginScreen`.** `App` holds `endedElsewhere`. The storage handler sets it. `onLoggedIn` and `logout` clear it. `LoginScreen` takes an optional `notice` string. It always renders a `<div role="status">` between the title and the first field. The notice `<p>` goes inside it when `notice` has a value. The wording is one catalog key, `login.sessionEndedElsewhere`, in EN and DE.
 
 The region stays mounted so a screen reader announces text added to it, as the other status regions in `packages/web` do. An empty child of the form's flex column would add a gap. A `:empty` rule on the region pulls the bottom gap back, so the normal login screen keeps its layout. The `<p>` carries the rule, the padding and an 8px bottom margin.
 
-Shape, from `DESIGN.md`: the line borrows the warning callout. That means a 3px rule in the advisory role, 8px of padding before the text, and text in ink. It sits in place, above the form, so it is not a toast. It has no icon and no color beyond the rule, since a session end is information, not a refusal. A `role="status"` region reaches a screen reader without moving focus.
+Shape, from `DESIGN.md`: the line borrows the warning callout. That means a 3px rule in the advisory role, 8px of padding before the text, and text in ink. It sits in place, above the form, so it is not a toast. It has no icon and no color beyond the rule. A session end informs the actor and refuses nothing. A `role="status"` region reaches a screen reader without moving focus.
 
-**Time limit: `AbortSignal.timeout(5000)` on the fetch.** The signal also covers the body read. A response that sends headers and then stalls ends too. The existing `catch` already swallows an abort. The map stays empty, and the login screen renders from the builtin catalog. The value is an exported constant, `UI_STRINGS_TIMEOUT_MS`, and the function takes an optional override of it. A test then waits 20 ms, and a second test pins the constant at 5000. All build targets (`chrome114`, `safari17`, `firefox125`) support `AbortSignal.timeout`.
+**Time limit: `AbortSignal.timeout(5000)` on the fetch.** The signal also covers the body read. A response that sends headers and then stalls ends too. The existing `catch` already swallows an abort. The map stays empty, and the login screen renders from the builtin catalog.
+
+The value is an exported constant, `UI_STRINGS_TIMEOUT_MS`. The function takes an optional override of it. A test waits 20 ms, and a second test pins the constant at 5000. All build targets (`chrome114`, `safari17`, `firefox125`) support `AbortSignal.timeout`.
 
 The comment in `main.tsx` names the real targets from `vite.config.ts`. Those targets support top-level await. The IIFE stays anyway, because it keeps the override read out of module evaluation. The comment gives that reason only.
 
@@ -52,7 +54,7 @@ The address bar keeps the malformed URL. The area shows its default screen. Whet
 
 - The decision of the storage handler is a `bun:test` assertion on `endedByStorageChange`.
 - The routers' fallback is a `bun:test` assertion per router.
-- Two tabs, one logout, the other tab at `/login` with the notice is a smoke flow, `e2e/session-tabs.e2e.ts`. The listener wiring needs a DOM, and the flow needs no visual judgment. The smoke suite holds "at least" four flows, so a fifth needs no delta.
+- Two tabs, one logout, the other tab at `/login` with the notice is a smoke flow, `e2e/session-tabs.e2e.ts`. The listener wiring requires a DOM, and the flow requires no visual judgment. The smoke suite holds "at least" four flows, so a fifth does not need a delta.
 - Whether a browser keeps `%E0%A4%A` in `location.pathname` is a vendor behavior, so it is an entry in `docs/browser-checks.md`. A hung `/ui-strings` and the look of the notice go there too.
 
 ## Risks / Trade-offs
@@ -65,7 +67,7 @@ The address bar keeps the malformed URL. The area shows its default screen. Whet
 
 ## Migration Plan
 
-The change ships in one release with the browser bundle. It adds no stored state. A stored `web.session` keeps its shape. A tab opened before the release runs the old bundle until it reloads. Rollback is a revert of the bundle.
+The change ships in one release with the browser bundle. It stores no new state. A stored `web.session` keeps its shape. A tab opened before the release runs the old bundle until it reloads. Rollback is a revert of the bundle.
 
 ## Open Questions
 
