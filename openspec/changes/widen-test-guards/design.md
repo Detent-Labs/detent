@@ -46,7 +46,7 @@ See `proposal.md` for why. The facts below come from runs on 2026-10-12 at
   `PRE_CHANGE_HASHES`.
 - A scan of `src/engine/` beyond the two modules that the guard names today.
 - Coverage of the routes outside the table: `/livez`, `/readyz` and `/metrics`.
-  `/metrics` has its own bearer test in `test/http-disposition.test.ts`.
+  `/metrics` has its own bearer test in `test/metrics.test.ts`.
 
 ## Decisions
 
