@@ -53,11 +53,15 @@ version-body route.
 "+ add" SHALL pick the first child input field that no row holds. It SHALL
 stay disabled while the list is empty, exhausted, loading or failed. While the
 read loads or after it fails, a one-line note SHALL say so. A child with no
-`contract` or no `inputFields` SHALL get a note that it declares no input
-fields.
+`contract` or no `inputFields` SHALL get a note saying it declares no input
+fields. A child whose input fields all have a row SHALL get a note saying every
+input field has a row. The note region SHALL be a status region. The disabled
+"+ add" SHALL point at the note.
 
-The editor SHALL keep every stored key as stored. A stored key that the child
-does not list SHALL appear as its own marked option. The select therefore
+The editor SHALL keep every stored key as stored. Once the child's input
+fields have loaded, a stored key outside that list SHALL appear as its own
+marked option. Before then, a stored key shows without the mark,
+because the list is unknown. The select therefore
 never shows another key than the stored one. The author may remove that row or
 pick a listed key for it. The `outputMapping` editor keeps the calling
 process's fields as targets.
@@ -88,6 +92,18 @@ process's fields as targets.
 - **THEN** "+ add" stays disabled
 - **AND** a note says the child's input fields could not load
 - **AND** every stored `inputMapping` row stays as stored
+
+#### Scenario: A stored key while the list loads
+
+- **WHEN** a row has a stored key and the child's version body is still loading
+- **THEN** the row's select shows the stored key without a mark
+
+#### Scenario: Every input field has a row
+
+- **WHEN** the child lists two input fields and the `inputMapping` has a row for
+  each
+- **THEN** "+ add" stays disabled
+- **AND** a status note says every input field has a row
 
 #### Scenario: A stored key the child no longer lists
 
