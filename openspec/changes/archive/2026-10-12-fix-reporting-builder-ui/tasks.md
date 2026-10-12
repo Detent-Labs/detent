@@ -22,13 +22,13 @@
 
 - [x] 4.1 Add a walk of this change's three checks to `docs/browser-checks.md`. Verify that the prose gate reports no rise for the file.
 - [x] 4.2 Strike the `fix-reporting-builder-ui` entry from the audit index in `docs/decisions.md`. Verify with `git grep -n fix-reporting-builder-ui -- docs/decisions.md` that no entry remains.
-- [ ] 4.3 Run the browser walk of task 4.1 on the production build. Then run `/impeccable critique` and `/impeccable audit` against `/reporting/reports/new`. Verify that the report file prints each result.
+- [x] 4.3 Run the browser walk of task 4.1 on the production build. Then run `/impeccable critique` and `/impeccable audit` against `/reporting/reports/new`. Verify that the report file prints each result.
 
 ## 5. Verification
 
-- [ ] 5.1 Run `bun run typecheck`, then `bun run build`, then the full gated `bun test` with `DATABASE_URL` set. Verify that each prints a pass and that the gate accepts the run.
-- [ ] 5.2 Run `bun run test:tz` in the container. Verify that it prints no error.
-- [ ] 5.3 Run the antislop prose gate and the whitespace gate over the pushed range on the host. Verify that both exit 0.
+- [x] 5.1 Run `bun run typecheck`, then `bun run build`, then the full gated `bun test` with `DATABASE_URL` set. Verify that each prints a pass and that the gate accepts the run.
+- [x] 5.2 Run `bun run test:tz` in the container. Verify that it prints no error.
+- [x] 5.3 Run the antislop prose gate and the whitespace gate over the pushed range on the host. Verify that both exit 0.
 
 ## Workflow follow-up
 
