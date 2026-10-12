@@ -1219,6 +1219,10 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   dialog's heading (`panels/RemoveFieldDialog.tsx:116`) pass a replacer
   function, `() => label`.
 
+  The `packages/form-ui` site now passes a replacer too, in one pass:
+  `tabSwitchAnnouncement` (`packages/form-ui/src/tabs.ts`), fixed by
+  `fix-form-ui-empty-values`. The count below covers `packages/web/src` alone.
+
   Measured 2026-09-13, `packages/web/src` holds 54 `.replace("{` calls in 15
   files. Twelve pass a replacer function: the five removal fills, and seven in
   `panels/ChangeList.tsx`, `panels/ChangesView.tsx` and
@@ -1747,12 +1751,6 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   Vite. Anchors: `packages/web/src/areas/studio/panels/FieldMatrixGrid.tsx`,
   `packages/web/src/areas/studio/canvas/CanvasView.tsx`,
   `packages/web/vite.config.ts`.
-- **`fix-form-ui-empty-values` (F-3, F-8, F-14, F-16; medium)**: The package
-  form-ui and the engine disagree on cleared fields, the form accepts input
-  when no path is available, the tab announcement expands `$` patterns from
-  the label, and form-ui declares React 18 as its peer while the consumer
-  uses React 19. Anchors: `packages/form-ui/src/FieldForm.tsx`,
-  `packages/form-ui/src/tabs.ts`, `packages/form-ui/package.json`.
 - **`fix-admin-instance-and-outbox-screens` (F-2, F-9, F-10; medium)**: The
   instance header shows an expired claim and a stale `transitionSeq`, the
   header reports no armed timer once 201 timers run, and the outbox discards
@@ -1869,6 +1867,18 @@ LEAF-1, LOAD-1 and REFUSE-1 are local to this section.
   asks for a mono list at 12 pixels, which needs `parseDraftText` to return an
   array. A stale error also stays after an edit. One change per screen should
   take these together. The owner ruled that this change makes no layout change.
+
+## Open from fix-form-ui-empty-values (needs its own OpenSpec change)
+
+The final review of `fix-form-ui-empty-values` surfaced one gap outside that
+change's scope. The CLAIMVIEW tag is local to this section.
+
+- **CLAIMVIEW-1: a viewer who cannot claim sees inputs that accept typing.**
+  A viewer who is no candidate, or whose step another actor claimed, sees
+  editable inputs. The Task screen shows neither Save nor a path button.
+  `formIsReadonly` ignores claim state on purpose. The `end-user-app` spec
+  makes field editability independent of claim state, and finding F-8 kept
+  that rule. Covering the case needs a spec change and a third note cause.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 

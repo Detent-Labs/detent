@@ -502,6 +502,30 @@ describe("tabSwitchAnnouncement: the sentence a consumer reads out after an unch
   it("carries an authored tab label through as it stands", () => {
     expect(tabSwitchAnnouncement(sentences, "Prüfung & Freigabe", 2)).toContain("Prüfung & Freigabe");
   });
+
+  it("reads a replacement pattern in the label as plain text", () => {
+    const sentence = { one: "", many: "Opened the {tab} tab. {count} fields still need an entry." };
+    expect(tabSwitchAnnouncement(sentence, "Kosten $&", 2)).toBe("Opened the Kosten $& tab. 2 fields still need an entry.");
+    expect(tabSwitchAnnouncement(sentence, "Kosten $$", 2)).toBe("Opened the Kosten $$ tab. 2 fields still need an entry.");
+  });
+
+  it("does not search an inserted label for a placeholder", () => {
+    const sentence = { one: "", many: "Opened the {tab} tab. {count} fields still need an entry." };
+    expect(tabSwitchAnnouncement(sentence, "{count}", 2)).toBe("Opened the {count} tab. 2 fields still need an entry.");
+  });
+});
+
+describe("FieldForm: the readonly switch leaves the tab strip operable", () => {
+  it("renders every tab button enabled while the controls are disabled", () => {
+    const fields = [field("f1", "one"), field("f2", "two")];
+    const html = renderToStaticMarkup(
+      <FieldForm fields={fields} values={{}} onChange={noop} locale="en" tabs={TABS} activeTab="one" readonly />,
+    );
+    const buttons = html.match(/<button\b[^>]*>/g) ?? [];
+    expect(buttons.length).toBe(2);
+    for (const button of buttons) expect(button).not.toContain("disabled");
+    expect(html).toMatch(/<input\b[^>]*disabled=""/);
+  });
 });
 
 describe("openTabKey: the tab a drawn strip is showing", () => {

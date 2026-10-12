@@ -66,16 +66,16 @@ Declared directly in a `package.json` (root or a `packages/*` workspace).
 | `jose` | 6.2.4 | MIT |
 | `lucide-react` | 1.50.0 | ISC |
 | `oxlint` | 1.85.0 | MIT |
-| `react` | 19.2.8, 18.3.1 | MIT |
-| `react-dom` | 19.2.8, 18.3.1 | MIT |
+| `react` | 19.2.8 | MIT |
+| `react-dom` | 19.2.8 | MIT |
 | `typescript` | 7.0.2 | Apache-2.0 |
 | `vite` | 8.2.1 | MIT |
 | `zod` | 4.6.5 | MIT |
 
-`react` and `react-dom` resolve twice. `packages/web` declares `^19` and
-gets 19.2.8. `packages/form-ui` declares `^18` as a peer range and keeps
-18.3.1 under it. The two type packages resolve once. Both workspaces declare
-`@types/react` and `@types/react-dom` at `^19`.
+`react` and `react-dom` resolve once, at 19.2.8. `packages/web` declares
+`^19`, and `packages/form-ui` declares `^19` as a peer range. The two type
+packages resolve once too. Both workspaces declare `@types/react` and
+`@types/react-dom` at `^19`.
 
 ## Transitive dependencies
 

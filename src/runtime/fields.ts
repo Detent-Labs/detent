@@ -7,6 +7,7 @@
 
 import type { SQL } from "bun";
 import { newInstanceEventId } from "../engine/store.js";
+import { applyDataPatch } from "../engine/transition.js";
 import { buildGuardContext, evalGuard, evalFieldMap, type Actor } from "../cel/eval.js";
 import { displayNamesForUserIds } from "../auth/users.js";
 import { getGroupMembers, groupNamesForIds } from "../auth/groups.js";
@@ -502,6 +503,13 @@ function checkConstraints(
  * ordinary "create an empty instance, then fill in the first step's form via
  * `submitAndTransition`" flow — the same flow the expense-approval example's
  * "capture" step relies on, since it is also the initial step.
+ *
+ * `allowClear` (default false; only `submitAndTransition` sets it) reads a
+ * `null` value as the participant clearing that field. The key keeps the
+ * unknown-field and readonly-field checks, meets no type, option, constraint
+ * or rule check, and leaves the merged data the rules, the required check and
+ * the guard context read. Without it a `null` meets the type check as any
+ * other value does.
  */
 export async function validateSubmissionData(
   body: ProcessBody,
@@ -511,7 +519,7 @@ export async function validateSubmissionData(
   data: Record<string, Literal>,
   registry: DataSourceRegistry,
   db: SQL,
-  opts: { checkRequired: boolean; defaultedIds?: Set<string>; committedData?: Record<string, Literal> } = { checkRequired: true },
+  opts: { checkRequired: boolean; defaultedIds?: Set<string>; committedData?: Record<string, Literal>; allowClear?: boolean } = { checkRequired: true },
 ): Promise<ResolvedViewEntry[]> {
   const defaultedIds = opts.defaultedIds ?? new Set<string>();
   const resolved = await resolveFields(body, step, instance, actor, registry, db, opts.committedData);
@@ -522,7 +530,8 @@ export async function validateSubmissionData(
   const required = requiredFieldIds(resolved);
 
   const issues: SubmissionIssue[] = [];
-  const mergedData: Record<string, Literal> = { ...instance.data, ...data };
+  const allowClear = opts.allowClear === true;
+  const mergedData: Record<string, Literal> = allowClear ? applyDataPatch(instance.data, data) : { ...instance.data, ...data };
   const guardCtx = buildGuardContext(body, { ...instance, data: mergedData }, actor);
 
   for (const fieldId of Object.keys(data)) {
@@ -568,6 +577,7 @@ export async function validateSubmissionData(
       }
       continue;
     }
+    if (allowClear && value === null) continue; // a cleared key has no value to judge
     if (!typeMatches(rf.field, value)) {
       issues.push({ kind: "type-mismatch", fieldId: fieldId as FieldId, expected: expectedTypeLabel(rf.field) });
       continue; // skip further checks on a value of the wrong shape
@@ -587,7 +597,8 @@ export async function validateSubmissionData(
 
   if (opts.checkRequired) {
     for (const fieldId of required) {
-      if (mergedData[fieldId] === undefined) {
+      const v = mergedData[fieldId];
+      if (v === undefined || v === null || v === "") {
         issues.push({ kind: "required-missing", fieldId: fieldId as FieldId });
       }
     }
