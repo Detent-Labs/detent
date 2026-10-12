@@ -34,6 +34,7 @@ import {
   setPasswordById,
   setDisplayName,
   validateDisplayName,
+  emailAddressSchema,
   DISPLAY_NAME_MAX_LENGTH,
   SelfManagerError,
 } from "../auth/users.js";
@@ -212,6 +213,7 @@ export async function handleAdminCreateUser(req: Request, resolver: ActorResolve
     const body = (await readJson(req)) as { email?: unknown; password?: unknown; roles?: unknown };
     const email = requireNonBlank(body.email, "email").trim();
     const password = requireNonBlank(body.password, "password");
+    if (!emailAddressSchema.safeParse(email).success) throw new RequestShapeError("email must be a valid address");
     const roles = body.roles === undefined ? [] : parseRoles(body.roles);
 
     let created: Awaited<ReturnType<typeof createUser>>;
