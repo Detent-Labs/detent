@@ -3,7 +3,7 @@
  * `decodeURIComponent` throws a `URIError` on a malformed escape such as
  * `%E0%A4%A`; the wrapper returns `fallback` for that error alone and rethrows
  * every other one. Pure, with no React import, so the area routers stay
- * readable without React.
+ * importable without React.
  */
 export function safeMatch<R>(match: (path: string) => R, fallback: R): (path: string) => R {
   return (path) => {

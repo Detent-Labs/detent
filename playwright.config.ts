@@ -33,9 +33,10 @@ export default defineConfig({
   },
   projects: [
     {
-      // Logs in once and saves storageState, so the other four flows start
-      // authenticated without spending a login each — the login rate limit
-      // counts successful logins (design D2).
+      // Logs in once and saves storageState, so the flows that need a session
+      // start authenticated without spending a login each — the login rate
+      // limit counts successful logins (design D2). session-tabs is the one
+      // flow that logs in itself, twice, since it needs an empty storage.
       name: "setup",
       testMatch: "areas.e2e.ts",
       use: { ...devices["Desktop Chrome"] },

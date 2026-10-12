@@ -1,10 +1,10 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { matchShell, useLocation, areaHref, LOGIN_PATH, PROFILE_PATH, type NavigateOptions } from "./routing.js";
 import {
   loadSession,
   persistSession,
-  clearSession,
+  clearIfHeld,
   browserStorage,
   hydrateSession,
   needsHydration,
@@ -74,6 +74,15 @@ export function App() {
     loadLocale(browserStorage(), typeof navigator === "undefined" ? undefined : navigator.language),
   );
 
+  // The session this tab holds, as every late callback must see it: a layout
+  // effect moves it to the committed session, and the storage handler and
+  // `logout` clear it at once, ahead of the render they queue. A request that
+  // answers in that gap therefore finds no session to write or clear.
+  const heldSession = useRef(session);
+  useLayoutEffect(() => {
+    heldSession.current = session;
+  }, [session]);
+
   // Memoized: passed down as `onUnauthorized`/`onLogout` and, through EditScreen's
   // `load`, into a useCallback dependency array. An inline arrow here gets a new
   // identity on every render, and `App` re-renders on every `go()` call (including
@@ -81,22 +90,26 @@ export function App() {
   // editor's), which would re-fire `load`'s effect and refetch the draft,
   // discarding unsaved edits.
   const logout = useCallback(() => {
-    clearSession();
+    const held = heldSession.current;
+    // Already ended by a storage event: a late 401 must neither clear storage
+    // nor hide the notice.
+    if (!held) return;
+    heldSession.current = undefined;
+    // Never removes a newer session that another tab stored since.
+    clearIfHeld(held);
     setSession(undefined);
     setEndedElsewhere(false);
     go(LOGIN_PATH);
   }, [go]);
 
   // Another tab removed or replaced the stored session: this tab ends its own
-  // at once, client-side only, and adopts nothing. The ref spares the listener a
-  // re-registration on every session change and a stale closure. A tab already
-  // on the login screen holds no session, so it ignores the event.
-  const heldSession = useRef(session);
-  heldSession.current = session;
+  // at once, client-side only, and adopts nothing. A tab already on the login
+  // screen holds no session, so it ignores the event.
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
       if (e.key !== SESSION_STORAGE_KEY && e.key !== null) return;
       if (!endedByStorageChange(heldSession.current, loadSession())) return;
+      heldSession.current = undefined;
       setSession(undefined);
       setEndedElsewhere(true);
       go(LOGIN_PATH);
@@ -137,7 +150,7 @@ export function App() {
     let live = true;
     void fetchAccount(session.token)
       .then((account) => {
-        if (!live) return;
+        if (!live || heldSession.current?.token !== session.token) return;
         const hydrated = hydrateSession(session, account);
         setSession(hydrated);
         persistSession(hydrated);

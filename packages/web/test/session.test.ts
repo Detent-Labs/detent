@@ -6,6 +6,7 @@ import {
   hydrateSession,
   needsHydration,
   endedByStorageChange,
+  clearIfHeld,
   SESSION_STORAGE_KEY,
 } from "../src/shell/session.js";
 import { landingArea, mayEnter, permittedAreas } from "../src/shell/areas.js";
@@ -194,5 +195,26 @@ describe("endedByStorageChange", () => {
   it("ends nothing when this tab holds no session", () => {
     expect(endedByStorageChange(undefined, undefined)).toBe(false);
     expect(endedByStorageChange(undefined, session)).toBe(false);
+  });
+});
+
+describe("clearIfHeld", () => {
+  it("clears the stored session when it carries the held token", () => {
+    const storage = fakeStorage();
+    persistSession(session, storage);
+    expect(clearIfHeld(session, storage)).toBe(true);
+    expect(loadSession(storage)).toBeUndefined();
+  });
+
+  it("keeps a stored session that carries another token", () => {
+    const storage = fakeStorage();
+    const foreign = { ...session, token: "tok_other", actorId: "user_2" };
+    persistSession(foreign, storage);
+    expect(clearIfHeld(session, storage)).toBe(false);
+    expect(loadSession(storage)).toEqual(foreign);
+  });
+
+  it("clears nothing when nothing is stored", () => {
+    expect(clearIfHeld(session, fakeStorage())).toBe(false);
   });
 });

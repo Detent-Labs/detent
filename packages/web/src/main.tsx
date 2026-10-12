@@ -20,9 +20,8 @@ if (!root) throw new Error("missing #root element");
 //
 // The await sits inside an async IIFE rather than at module top level. The
 // build targets (chrome114, safari17, firefox125, in vite.config.ts) support
-// top-level await. The IIFE keeps the override read out of module evaluation:
-// the module throws synchronously on a missing #root, and the render must
-// follow the read.
+// top-level await. The IIFE stays so module evaluation does not wait on the
+// network read.
 void (async () => {
   await loadUiStringOverrides();
   createRoot(root).render(<App />);
