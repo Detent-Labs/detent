@@ -1774,9 +1774,6 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   `ROADMAP.md`, `README.md`, `CLAUDE.md`, two specs, line anchors in this
   file and several code comments state stale facts. Anchors:
   `docs/authoring-guide.md`, `ROADMAP.md`, `src/auth/authorize.ts`.
-- **`decide-developer-list-on-publish` (D-5; low)**: The Developer access list
-  has no effect on the two publish routes. Anchors:
-  `src/http/studio-routes.ts`, `src/http/routes.ts`.
 - **`postgres-login-rate-limit` (C-7; medium)**: The login lockout counts per
   email across all tenants, so a success in one tenant resets the window in
   another. Anchors: `src/auth/login.ts`.

@@ -20,6 +20,7 @@
  */
 import type { SQL } from "bun";
 import { sql } from "../engine/store.js";
+import { hasNoDraftAndNoPublishedVersion } from "../engine/drafts.js";
 import { getGroupsForMember } from "./groups.js";
 import { DEVELOPER_ROLE, AUTHOR_ROLE, OWNER_ROLE, ADMIN_ROLE, AuthorizationError } from "./authorize.js";
 import type { Actor } from "../cel/eval.js";
@@ -50,6 +51,34 @@ export async function matchesAccessList(actor: Actor, processId: ProcessId, kind
 
   if (kind === "reader") return true;
   return REQUIRED_ROLES[kind].some((role) => actor.roles.includes(role));
+}
+
+/**
+ * `ADMIN_ROLE`, or a match on that process's own Developer list
+ * (process-access-roles). Gates `GET`/`PUT`/`DELETE /drafts/:processId` and
+ * `POST /drafts/:processId/instances` for a process that already has a
+ * draft or a published version. On the branch where neither exists yet,
+ * `PUT` alone additionally checks `CREATE_ROLE`. `requirePublishListAccess`
+ * wraps it for both publish routes.
+ */
+export async function requireDeveloperListOrAdmin(actor: Actor, processId: ProcessId, db: SQL = sql): Promise<void> {
+  if (actor.roles.includes(ADMIN_ROLE)) return;
+  if (await matchesAccessList(actor, processId, "developer", db)) return;
+  throw new AuthorizationError(`actor '${actor.id}' is not on process '${processId}''s Developer list`);
+}
+
+/**
+ * The list check both publish routes run after `requirePermission`. A process
+ * with no draft and no published version has no Developer list yet, so the
+ * first publish passes; any other process needs `ADMIN_ROLE` or a Developer
+ * list match, the same rule the draft routes apply. Returns true exactly when
+ * the process is a first publish, so `POST /processes` can seed the list from
+ * the same answer.
+ */
+export async function requirePublishListAccess(actor: Actor, processId: ProcessId, db: SQL = sql): Promise<boolean> {
+  if (await hasNoDraftAndNoPublishedVersion(processId, db)) return true;
+  await requireDeveloperListOrAdmin(actor, processId, db);
+  return false;
 }
 
 /**

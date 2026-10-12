@@ -14,6 +14,10 @@
  *   those four instead need `requireDeveloperListOrAdmin`: `ADMIN_ROLE`
  *   bypasses `requireAuthoring` entirely there (matching `GET
  *   /processes/:processId/access` below), any other actor still needs both.
+ *   The publish route additionally needs `requirePublishListAccess` after
+ *   `requirePermission`: `ADMIN_ROLE` or a Developer list match, skipped for a
+ *   processId with no draft and no published version. `POST /processes`
+ *   (`routes.ts`) applies the same rule.
  * - `requireStudioRead` (those two OR templates) on the two template reads and
  *   the published version body.
  * - `await requirePermission(actor, "migrate", processId, db)` alone on the
@@ -56,10 +60,9 @@ import {
 import { createDefaultAssignmentRegistry } from "../engine/assignment-strategies.js";
 import { describeConfigSchema, type ConfigFieldDescriptor } from "../engine/config-descriptor.js";
 import type { ZodTypeAny } from "zod";
-import type { Actor } from "../cel/eval.js";
 import type { ActorResolver } from "../auth/resolve.js";
 import { requireRole, requirePermission, can, AuthorizationError, DEVELOPER_ROLE, TEMPLATES_ROLE, AUTHOR_ROLE, ADMIN_ROLE, CREATE_ROLE } from "../auth/authorize.js";
-import { addAccessPrincipal, deleteAccessPrincipal, getAccessLists, processesMatchingAccessList, matchesAccessList, type AccessKind } from "../auth/process-access.js";
+import { addAccessPrincipal, deleteAccessPrincipal, getAccessLists, processesMatchingAccessList, matchesAccessList, requireDeveloperListOrAdmin, requirePublishListAccess, type AccessKind } from "../auth/process-access.js";
 import { notFound, RequestShapeError, type HttpResult } from "./errors.js";
 import { route, readJson, parseVersion } from "./routes.js";
 import type { ProcessId, ProcessBody, MigrationSpec, Instance } from "../schema/definition.js";
@@ -96,22 +99,9 @@ function requireStudioRead(actor: { id: string; roles: readonly string[] }): voi
 }
 
 /**
- * `ADMIN_ROLE`, or a match on that process's own Developer list
- * (process-access-roles). Gates `GET`/`PUT`/`DELETE /drafts/:processId` and
- * `POST /drafts/:processId/instances` for a process that already has a
- * draft or a published version. On the branch where neither exists yet,
- * `PUT` alone additionally checks `CREATE_ROLE`.
- */
-async function requireDeveloperListOrAdmin(actor: Actor, processId: ProcessId, db: SQL): Promise<void> {
-  if (actor.roles.includes(ADMIN_ROLE)) return;
-  if (await matchesAccessList(actor, processId, "developer", db)) return;
-  throw new AuthorizationError(`actor '${actor.id}' is not on process '${processId}''s Developer list`);
-}
-
-/**
  * Narrowed to the actor's own Developer-listed processes
  * (process-access-roles) — `ADMIN_ROLE` sees every draft, same split as
- * `requireDeveloperListOrAdmin` above. `ADMIN_ROLE` bypasses `requireAuthoring`
+ * `requireDeveloperListOrAdmin` (`src/auth/process-access.ts`). `ADMIN_ROLE` bypasses `requireAuthoring`
  * at the gate too, the same carve-out `handleGetDraft`/`handleSaveDraft`
  * already apply on their "existing draft" branch: an admin-only actor (no
  * `DEVELOPER_ROLE`/`AUTHOR_ROLE`) still must reach this list. One query for
@@ -291,8 +281,10 @@ export async function handleCreateTestInstance(
  * nothing to accept beyond the process id. Needs an authoring role (either one)
  * and, separately, `PUBLISH_ROLE` — neither authoring role implies anything
  * else, so publishing from Studio stays gated exactly as publishing from
- * anywhere else. `publishBody` and the `base_version` stamp
- * run inside one `withTransaction` so a stamp failure can never leave a
+ * anywhere else. A process that already has a draft or a version also needs
+ * `ADMIN_ROLE` or a Developer list match (`requirePublishListAccess`).
+ * `publishBody` and the `base_version` stamp run inside one
+ * `withTransaction` so a stamp failure can never leave a
  * published version with an un-stamped draft — the publish itself would roll
  * back too, matching the "both or neither" a caller expects from one HTTP call.
  */
@@ -312,6 +304,7 @@ export async function handlePublishDraft(
     async (actor) => {
       requireAuthoring(actor);
       await requirePermission(actor, "publish", processId as ProcessId, db);
+      await requirePublishListAccess(actor, processId as ProcessId, db);
     },
     async (actor) => {
       const draft = await getDraft(processId as ProcessId, db);

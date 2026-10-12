@@ -8,8 +8,8 @@
 import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, initSchema } from "../src/engine/store.js";
 import { createGroup, setGroupMembers } from "../src/auth/groups.js";
-import { DEVELOPER_ROLE, OWNER_ROLE, ADMIN_ROLE, AuthorizationError } from "../src/auth/authorize.js";
-import { matchesAccessList, addAccessPrincipal, deleteAccessPrincipal } from "../src/auth/process-access.js";
+import { DEVELOPER_ROLE, AUTHOR_ROLE, OWNER_ROLE, ADMIN_ROLE, AuthorizationError } from "../src/auth/authorize.js";
+import { matchesAccessList, addAccessPrincipal, deleteAccessPrincipal, requirePublishListAccess } from "../src/auth/process-access.js";
 import type { ProcessId } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
 
@@ -22,8 +22,16 @@ beforeAll(async () => {
   if (DB) await initSchema();
 });
 beforeEach(async () => {
-  if (DB) await sql`TRUNCATE process_access_roles, groups`;
+  if (DB) await sql`TRUNCATE process_access_roles, groups, drafts`;
 });
+
+/** A process with a draft is past its first publish, so its Developer list applies. */
+async function addDraft(processId: ProcessId) {
+  await sql`
+    INSERT INTO drafts (process_id, body, layout, revision, updated_by, updated_at)
+    VALUES (${processId}, ${{}}, ${{}}, 0, 'user_creator', now())
+  `;
+}
 
 async function addToList(processId: ProcessId, kind: "developer" | "owner" | "reader", principal: string) {
   await sql`INSERT INTO process_access_roles (process_id, kind, principal) VALUES (${processId}, ${kind}, ${principal})`;
@@ -174,4 +182,60 @@ test.skipIf(!DB)("a Developer entry succeeds ahead of the role", async () => {
   // User without the required role does not match the list
   const targetActor: Actor = { id: targetId, roles: [] };
   expect(await matchesAccessList(targetActor, processId, "developer")).toBe(false);
+});
+
+test.skipIf(!DB)("requirePublishListAccess passes an admin off the list", async () => {
+  const processId = pid();
+  await addDraft(processId);
+  const admin: Actor = { id: "user_admin", roles: [ADMIN_ROLE] };
+
+  expect(await requirePublishListAccess(admin, processId, sql)).toBe(false);
+});
+
+test.skipIf(!DB)("requirePublishListAccess passes a first publish for an unlisted actor", async () => {
+  const processId = pid();
+  const stranger: Actor = { id: "user_stranger", roles: [AUTHOR_ROLE] };
+
+  expect(await requirePublishListAccess(stranger, processId, sql)).toBe(true);
+});
+
+test.skipIf(!DB)("requirePublishListAccess passes a listed actor", async () => {
+  const processId = pid();
+  await addDraft(processId);
+  await addToList(processId, "developer", "user_dev");
+  const dev: Actor = { id: "user_dev", roles: [AUTHOR_ROLE] };
+
+  expect(await requirePublishListAccess(dev, processId, sql)).toBe(false);
+});
+
+test.skipIf(!DB)("requirePublishListAccess passes a member of a listed group", async () => {
+  const processId = pid();
+  await addDraft(processId);
+  const group = await createGroup("publishers", { type: "global" }, sql);
+  await setGroupMembers(group.groupId, ["user_member"], sql);
+  await addToList(processId, "developer", group.groupId);
+  const member: Actor = { id: "user_member", roles: [AUTHOR_ROLE] };
+
+  expect(await requirePublishListAccess(member, processId, sql)).toBe(false);
+});
+
+test.skipIf(!DB)("requirePublishListAccess refuses an unlisted actor", async () => {
+  const processId = pid();
+  await addDraft(processId);
+  await addToList(processId, "developer", "user_dev");
+  const stranger: Actor = { id: "user_stranger", roles: [AUTHOR_ROLE] };
+
+  await expect(requirePublishListAccess(stranger, processId, sql)).rejects.toThrow(AuthorizationError);
+  await expect(requirePublishListAccess(stranger, processId, sql)).rejects.toThrow(
+    `actor 'user_stranger' is not on process '${processId}''s Developer list`,
+  );
+});
+
+test.skipIf(!DB)("requirePublishListAccess refuses a listed actor holding no authoring role", async () => {
+  const processId = pid();
+  await addDraft(processId);
+  await addToList(processId, "developer", "user_norole");
+  const noRole: Actor = { id: "user_norole", roles: [] };
+
+  await expect(requirePublishListAccess(noRole, processId, sql)).rejects.toThrow(AuthorizationError);
 });
