@@ -27,6 +27,7 @@ import {
   type ReportDraft,
 } from "./reportsLogic.js";
 import { describeCaughtError, toDateInput } from "./reportingLogic.js";
+import { useFail } from "../../../shell/useFail.js";
 import { useSettledKey } from "./debounce.js";
 import { ComparisonRow } from "./ComparisonRow.js";
 import { ColumnEditor } from "./ColumnEditor.js";
@@ -106,12 +107,14 @@ export function ReportBuilderScreen({
   locale,
   actorId,
   onSaved,
+  onUnauthorized,
 }: {
   reportId?: string;
   token: string;
   locale: UiLocale;
   actorId: string;
   onSaved: (reportId: string) => void;
+  onUnauthorized: () => void;
 }) {
   const [draft, setDraft] = useState<ReportDraft | undefined>(reportId ? undefined : undefined);
   const [owner, setOwner] = useState(actorId);
@@ -128,6 +131,13 @@ export function ReportBuilderScreen({
   // Every field type any response named, per process: a comparison that
   // empties the range keeps its own field's type.
   const [heldTypes, setHeldTypes] = useState<ProcessTypes | undefined>();
+  // One `fail` per request site: a 401 ends the session, any other error
+  // lands in that site's own state.
+  const failLoad = useFail(onUnauthorized, (err) => setLoadError(describeCaughtError(err)));
+  const failChoices = useFail(onUnauthorized, () => setChoices([]));
+  const failPreview = useFail(onUnauthorized, (err) => setPreviewError(describeCaughtError(err)));
+  const failSave = useFail(onUnauthorized, (err) => setSaveError(describeCaughtError(err)));
+  const failDownload = useFail(onUnauthorized, (err) => setDownloadError(describeCaughtError(err)));
 
   // Load the existing report, once, when editing.
   useEffect(() => {
@@ -143,12 +153,12 @@ export function ReportBuilderScreen({
         setProcessLabel(report.processId);
       })
       .catch((cause: unknown) => {
-        if (!cancelled) setLoadError(describeCaughtError(cause));
+        if (!cancelled) failLoad(cause);
       });
     return () => {
       cancelled = true;
     };
-  }, [reportId, token]);
+  }, [reportId, token, failLoad]);
 
   // Column choices track the process and the query axes that bound which
   // versions are in range — a status/date-range/comparison change can add or
@@ -167,13 +177,13 @@ export function ReportBuilderScreen({
         setHeldTypes((prev) => typesAfterResponse(prev, processId, next));
         setChoices(next);
       })
-      .catch(() => {
-        if (!cancelled) setChoices([]);
+      .catch((cause: unknown) => {
+        if (!cancelled) failChoices(cause);
       });
     return () => {
       cancelled = true;
     };
-  }, [settledKey, token]);
+  }, [settledKey, token, failChoices]);
 
   // One key per comparison row, so a removal never hands one row's text to
   // the next (`reportsLogic.ts::syncRowIds`).
@@ -195,6 +205,7 @@ export function ReportBuilderScreen({
           setProcessLabel(label);
           setDraft(emptyDraft(processId));
         }}
+        onUnauthorized={onUnauthorized}
       />
     );
   }
@@ -208,7 +219,7 @@ export function ReportBuilderScreen({
     const input = draftToInput(draft);
     previewReport({ processId: input.processId, query: input.query, columns: input.columns }, token)
       .then((result) => setPreview(result))
-      .catch((cause: unknown) => setPreviewError(describeCaughtError(cause)))
+      .catch(failPreview)
       .finally(() => setPreviewLoading(false));
   };
 
@@ -219,7 +230,7 @@ export function ReportBuilderScreen({
     const call = reportId ? updateReport(reportId, input, token) : createReport(input, token);
     call
       .then((report) => onSaved(report.reportId))
-      .catch((cause: unknown) => setSaveError(describeCaughtError(cause)))
+      .catch(failSave)
       .finally(() => setSaving(false));
   };
 
@@ -241,7 +252,7 @@ export function ReportBuilderScreen({
         anchor.click();
         URL.revokeObjectURL(url);
       })
-      .catch((cause: unknown) => setDownloadError(describeCaughtError(cause)))
+      .catch(failDownload)
       .finally(() => setDownloading(false));
   };
 

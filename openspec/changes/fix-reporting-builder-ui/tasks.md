@@ -8,10 +8,10 @@
 
 ## 2. Session end on 401
 
-- [ ] 2.1 Take `onUnauthorized` in `ReportingArea` and pass it to the picker, the three views, the report list and both builder routes. Verify with `bun run typecheck`.
-- [ ] 2.2 Build `fail = useFail(onUnauthorized, ...)` in `ProcessPickerScreen`, `CycleTimeScreen`, `BottleneckScreen`, `SlaScreen` and `ReportsListScreen`. Call it from each catch handler. Verify with `git grep -n describeCaughtError -- packages/web/src/areas/reporting/screens`. It may appear only inside the second argument of `useFail`, or in the builder code of task 2.3.
-- [ ] 2.3 Do the same in `ReportBuilderScreen` for its five request sites: load, column choices, preview, save and CSV download. Pass `onUnauthorized` to the embedded picker. Verify with the canary of task 2.4. The effect behavior needs the browser check of task 4.3, because a static test run cannot run it.
-- [ ] 2.4 Add a canary to `reporting-boundaries.test.ts`. `root.tsx` destructures `onUnauthorized`. Every `*Screen.tsx` file under `screens/` that imports `../api/client.js` calls `useFail(onUnauthorized`. Verify that the canary fails when one screen drops the call.
+- [x] 2.1 Take `onUnauthorized` in `ReportingArea` and pass it to the picker, the three views, the report list and both builder routes. Verify with `bun run typecheck`.
+- [x] 2.2 Build `fail = useFail(onUnauthorized, ...)` in `ProcessPickerScreen`, `CycleTimeScreen`, `BottleneckScreen`, `SlaScreen` and `ReportsListScreen`. Call it from each catch handler. Verify with `git grep -n describeCaughtError -- packages/web/src/areas/reporting/screens`. It may appear only inside the second argument of `useFail`, or in the builder code of task 2.3.
+- [x] 2.3 Do the same in `ReportBuilderScreen` for its five request sites: load, column choices, preview, save and CSV download. Pass `onUnauthorized` to the embedded picker. Verify with the canary of task 2.4. The effect behavior needs the browser check of task 4.3, because a static test run cannot run it.
+- [x] 2.4 Add a canary to `reporting-boundaries.test.ts`. `root.tsx` destructures `onUnauthorized`. Every `*Screen.tsx` file under `screens/` that imports `../api/client.js` calls `useFail(onUnauthorized`. Verify that the canary fails when one screen drops the call.
 
 ## 3. Failed column request
 

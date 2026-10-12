@@ -56,7 +56,7 @@ const styles = stylex.create({
  * here is now the shell's, read from one table (`shell/areas.ts`); the server's
  * `requireRole` on every `/reporting/*` route stays the enforcement.
  */
-export function ReportingArea({ session, locale, localPath, go, onLocaleChange, onLogout }: AreaRootProps) {
+export function ReportingArea({ session, locale, localPath, go, onLocaleChange, onLogout, onUnauthorized }: AreaRootProps) {
   const { route, navigate } = useAreaRoute<Route>("reporting", localPath, matchRoute, routePath, go);
   // Owned here, so it survives a view switch and a process switch alike.
   const [range, setRange] = useState<DateRange>(() => defaultRange());
@@ -131,6 +131,7 @@ export function ReportingArea({ session, locale, localPath, go, onLocaleChange, 
             setProcessLabel(label);
             navigate({ name: "view", view: "cycle-time", processId });
           }}
+          onUnauthorized={onUnauthorized}
         />
       ) : route.name === "reports" ? (
         <ReportsListScreen
@@ -139,6 +140,7 @@ export function ReportingArea({ session, locale, localPath, go, onLocaleChange, 
           actorId={session.actorId}
           onOpen={(reportId) => navigate({ name: "report", reportId })}
           onNew={() => navigate({ name: "newReport" })}
+          onUnauthorized={onUnauthorized}
         />
       ) : route.name === "newReport" ? (
         <ReportBuilderScreen
@@ -146,6 +148,7 @@ export function ReportingArea({ session, locale, localPath, go, onLocaleChange, 
           locale={locale}
           actorId={session.actorId}
           onSaved={(reportId) => navigate({ name: "report", reportId })}
+          onUnauthorized={onUnauthorized}
         />
       ) : route.name === "report" ? (
         <ReportBuilderScreen
@@ -154,6 +157,7 @@ export function ReportingArea({ session, locale, localPath, go, onLocaleChange, 
           locale={locale}
           actorId={session.actorId}
           onSaved={(reportId) => navigate({ name: "report", reportId })}
+          onUnauthorized={onUnauthorized}
         />
       ) : (
         <main {...stylex.props(styles.screen)}>
@@ -164,11 +168,32 @@ export function ReportingArea({ session, locale, localPath, go, onLocaleChange, 
               {t(locale, "range.invalid")}
             </p>
           ) : route.view === "cycle-time" ? (
-            <CycleTimeScreen processId={route.processId} range={range} token={session.token} baseLocale={BASE_LOCALE} locale={locale} />
+            <CycleTimeScreen
+              processId={route.processId}
+              range={range}
+              token={session.token}
+              baseLocale={BASE_LOCALE}
+              locale={locale}
+              onUnauthorized={onUnauthorized}
+            />
           ) : route.view === "bottleneck" ? (
-            <BottleneckScreen processId={route.processId} range={range} token={session.token} baseLocale={BASE_LOCALE} locale={locale} />
+            <BottleneckScreen
+              processId={route.processId}
+              range={range}
+              token={session.token}
+              baseLocale={BASE_LOCALE}
+              locale={locale}
+              onUnauthorized={onUnauthorized}
+            />
           ) : (
-            <SlaScreen processId={route.processId} range={range} token={session.token} baseLocale={BASE_LOCALE} locale={locale} />
+            <SlaScreen
+              processId={route.processId}
+              range={range}
+              token={session.token}
+              baseLocale={BASE_LOCALE}
+              locale={locale}
+              onUnauthorized={onUnauthorized}
+            />
           )}
         </main>
       )}
