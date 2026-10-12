@@ -6,7 +6,7 @@ import { collectUsedLocales } from "./localized-text";
 import { listProcesses, getVersionBody } from "../api/client.js";
 import { useRegistry } from "../panels/shared/useRegistry.js";
 import type { RegistryInfo } from "../api/types.js";
-import { collectChainingActionSites, resolveChainingTargets, syncLoadedTargets } from "./chainingFetch";
+import { collectChainingActionSites, resolveChainingTargets, syncLoadedTargets, type ChainingListing } from "./chainingFetch";
 
 const EMPTY_DRAFT: Draft = {};
 
@@ -96,15 +96,25 @@ export function DraftProvider({ children, initial, token }: { children: ReactNod
   const [loadedChainingTargets, setLoadedChainingTargets] = useState<Record<ActionId, ProcessBody>>({});
   const chainingFetchState = useRef<Map<string, "pending" | "done">>(new Map());
   const chainingBodyCache = useRef<Map<string, ProcessBody>>(new Map());
+  // One process list per mount, shared by every target id the effect resolves.
+  const chainingListing = useRef<ChainingListing>({});
   const draftRef = useRef(draft);
   draftRef.current = draft;
 
   useEffect(() => {
     const sites = collectChainingActionSites(draft);
-    resolveChainingTargets(sites, token, chainingFetchState.current, chainingBodyCache.current, { listProcesses, getVersionBody }, () => {
-      const currentSites = collectChainingActionSites(draftRef.current);
-      setLoadedChainingTargets(syncLoadedTargets(currentSites, chainingBodyCache.current));
-    });
+    resolveChainingTargets(
+      sites,
+      token,
+      chainingFetchState.current,
+      chainingBodyCache.current,
+      chainingListing.current,
+      { listProcesses, getVersionBody },
+      () => {
+        const currentSites = collectChainingActionSites(draftRef.current);
+        setLoadedChainingTargets(syncLoadedTargets(currentSites, chainingBodyCache.current));
+      },
+    );
     setLoadedChainingTargets(syncLoadedTargets(sites, chainingBodyCache.current));
   }, [draft, token]);
 

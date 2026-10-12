@@ -1,8 +1,17 @@
 import { describe, expect, it } from "bun:test";
 import type { ProcessBody } from "workflow-engine/schema";
 import { runValidation } from "../src/areas/studio/draft/validation.js";
-import { resolveChainingTargets, syncLoadedTargets } from "../src/areas/studio/draft/chainingFetch.js";
+import {
+  resolveChainingTargets,
+  syncLoadedTargets,
+  type ChainingFetchIO,
+  type ChainingListing,
+} from "../src/areas/studio/draft/chainingFetch.js";
 import type { Draft } from "../src/areas/studio/draft/types.js";
+
+// Lets every queued microtask of the fake IO settle: the async IIFE inside
+// resolveChainingTargets awaits more than three promises now.
+const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
 /**
  * Tasks 6.22/6.22a. `DraftProvider`'s own chaining-fetch effect
@@ -52,15 +61,13 @@ describe("chaining-target fetch dedup (task 6.22)", () => {
       },
     };
 
+    const listing: ChainingListing = {};
     let settledCount = 0;
-    resolveChainingTargets(sites, "token", fetchState, bodyCache, io, () => {
+    resolveChainingTargets(sites, "token", fetchState, bodyCache, listing, io, () => {
       settledCount++;
     });
 
-    // Let the queued microtasks (the async IIFE inside resolveChainingTargets) run.
-    await Promise.resolve();
-    await Promise.resolve();
-    await Promise.resolve();
+    await flush();
 
     expect(listProcessesCalls).toBe(1);
     expect(getVersionBodyCalls).toBe(1);
@@ -71,13 +78,14 @@ describe("chaining-target fetch dedup (task 6.22)", () => {
     // Dispatching an edit to an unrelated field re-runs the effect (the
     // caller re-derives `sites` from the current draft and calls this
     // function again), but the processId is already "done" — no new fetch.
-    resolveChainingTargets(sites, "token", fetchState, bodyCache, io, () => {
+    resolveChainingTargets(sites, "token", fetchState, bodyCache, listing, io, () => {
       settledCount++;
     });
-    await Promise.resolve();
+    await flush();
 
     expect(listProcessesCalls).toBe(1);
     expect(getVersionBodyCalls).toBe(1);
+    expect(settledCount).toBe(1);
   });
 
   it("syncLoadedTargets writes the shared body under both sites' own action ids", async () => {
@@ -91,15 +99,146 @@ describe("chaining-target fetch dedup (task 6.22)", () => {
       listProcesses: async () => [{ processId: "proc_shared", version: 1 }],
       getVersionBody: async () => targetBody(["field_x"]),
     };
-    resolveChainingTargets(sites, "token", fetchState, bodyCache, io, () => {});
-    await Promise.resolve();
-    await Promise.resolve();
-    await Promise.resolve();
+    resolveChainingTargets(sites, "token", fetchState, bodyCache, {}, io, () => {});
+    await flush();
 
     const targets = syncLoadedTargets(sites, bodyCache);
     expect(targets["action_a" as never]).toBeDefined();
     expect(targets["action_b" as never]).toBeDefined();
     expect(targets["action_a" as never]).toBe(targets["action_b" as never]);
+  });
+
+  it("a target the list lacks reads not-checked with no error", async () => {
+    const sites = [{ id: "action_a" as never, processId: "proc_missing" }];
+    const fetchState = new Map<string, "pending" | "done">();
+    const bodyCache = new Map<string, ProcessBody>();
+    const io = {
+      listProcesses: async () => [{ processId: "proc_other", version: 1 }],
+      getVersionBody: async () => targetBody([]),
+    };
+    resolveChainingTargets(sites, "token", fetchState, bodyCache, {}, io, () => {});
+    await flush();
+
+    expect(bodyCache.has("proc_missing")).toBe(false);
+    expect(syncLoadedTargets(sites, bodyCache)).toEqual({});
+  });
+});
+
+// Task 5.1: each keystroke in a process.start `processId` field yields a new
+// unseen id, so the effect calls `resolveChainingTargets` once per character
+// with the same fetchState, listing and bodyCache.
+describe("chaining-target fetch shares one process list (task 5.1)", () => {
+  const fullId = "proc_credit_check";
+
+  // Fake IO whose first `failList` list reads and first `failBody` body reads
+  // reject. The list holds `fullId` only.
+  function fakeIO({ failList = 0, failBody = 0 } = {}) {
+    const calls = { list: 0, body: [] as string[] };
+    const io: ChainingFetchIO = {
+      listProcesses: async () => {
+        if (++calls.list <= failList) throw new Error("down");
+        return [{ processId: fullId, version: 2 }];
+      },
+      getVersionBody: async (processId) => {
+        calls.body.push(processId);
+        if (calls.body.length <= failBody) throw new Error("down");
+        return targetBody(["field_x"]);
+      },
+    };
+    return { calls, io };
+  }
+
+  function typeId(
+    id: string,
+    state: { fetchState: Map<string, "pending" | "done">; bodyCache: Map<string, ProcessBody>; listing: ChainingListing },
+    io: ChainingFetchIO,
+    onSettled: () => void,
+  ) {
+    return Promise.all(
+      Array.from({ length: id.length }, (_, i) => id.slice(0, i + 1)).map(async (prefix) => {
+        resolveChainingTargets([{ id: "action_a" as never, processId: prefix }], "token", state.fetchState, state.bodyCache, state.listing, io, onSettled);
+        await flush();
+      }),
+    );
+  }
+
+  it("17 successive prefixes send one listProcesses and one getVersionBody", async () => {
+    const { calls, io } = fakeIO();
+    const state = { fetchState: new Map<string, "pending" | "done">(), bodyCache: new Map<string, ProcessBody>(), listing: {} as ChainingListing };
+    expect(fullId.length).toBe(17);
+
+    // Sequential, as the effect fires: each call comes after one more character.
+    for (let n = 1; n <= fullId.length; n++) {
+      resolveChainingTargets([{ id: "action_a" as never, processId: fullId.slice(0, n) }], "token", state.fetchState, state.bodyCache, state.listing, io, () => {});
+      await flush();
+    }
+
+    expect(calls.list).toBe(1);
+    expect(calls.body).toEqual([fullId]);
+    expect(state.bodyCache.has(fullId)).toBe(true);
+    expect(state.fetchState.get(fullId)).toBe("done");
+  });
+
+  it("17 prefixes issued before the list answers still send one listProcesses", async () => {
+    const { calls, io } = fakeIO();
+    const state = { fetchState: new Map<string, "pending" | "done">(), bodyCache: new Map<string, ProcessBody>(), listing: {} as ChainingListing };
+    await typeId(fullId, state, io, () => {});
+
+    expect(calls.list).toBe(1);
+    expect(calls.body).toEqual([fullId]);
+  });
+
+  it("an id the list lacks sends no body request and is marked done", async () => {
+    const { calls, io } = fakeIO();
+    const fetchState = new Map<string, "pending" | "done">();
+    let settled = 0;
+    resolveChainingTargets([{ id: "action_a" as never, processId: "proc_cred" }], "token", fetchState, new Map(), {}, io, () => settled++);
+    await flush();
+
+    expect(calls.list).toBe(1);
+    expect(calls.body).toEqual([]);
+    expect(fetchState.get("proc_cred")).toBe("done");
+    expect(settled).toBe(1);
+  });
+
+  it("a failed list read clears the holder and the next call reads the list again", async () => {
+    const { calls, io } = fakeIO({ failList: 1 });
+    const fetchState = new Map<string, "pending" | "done">();
+    const bodyCache = new Map<string, ProcessBody>();
+    const listing: ChainingListing = {};
+    const sites = [{ id: "action_a" as never, processId: fullId }];
+
+    resolveChainingTargets(sites, "token", fetchState, bodyCache, listing, io, () => {});
+    await flush();
+    expect(listing.current).toBeUndefined();
+    expect(fetchState.has(fullId)).toBe(false);
+    expect(calls.body).toEqual([]);
+
+    resolveChainingTargets(sites, "token", fetchState, bodyCache, listing, io, () => {});
+    await flush();
+    expect(calls.list).toBe(2);
+    expect(calls.body).toEqual([fullId]);
+    expect(fetchState.get(fullId)).toBe("done");
+  });
+
+  it("a failed body read leaves the id retryable without a second list read", async () => {
+    const { calls, io } = fakeIO({ failBody: 1 });
+    const fetchState = new Map<string, "pending" | "done">();
+    const bodyCache = new Map<string, ProcessBody>();
+    const listing: ChainingListing = {};
+    const sites = [{ id: "action_a" as never, processId: fullId }];
+
+    resolveChainingTargets(sites, "token", fetchState, bodyCache, listing, io, () => {});
+    await flush();
+    expect(fetchState.has(fullId)).toBe(false);
+    expect(bodyCache.has(fullId)).toBe(false);
+
+    resolveChainingTargets(sites, "token", fetchState, bodyCache, listing, io, () => {});
+    await flush();
+    expect(calls.list).toBe(1);
+    expect(calls.body).toEqual([fullId, fullId]);
+    expect(fetchState.get(fullId)).toBe("done");
+    expect(bodyCache.has(fullId)).toBe(true);
   });
 });
 

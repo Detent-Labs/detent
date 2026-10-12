@@ -22,8 +22,8 @@
 
 ## 5. The chaining fetch (E1-7)
 
-- [ ] 5.1 Give `resolveChainingTargets` the shared `listing` holder, filter by the list, and forget a failed read. Adapt `studio-draftProvider-chainingFetch.test.ts` to the new signature. Add a test that 17 prefixes send one list request.
-- [ ] 5.2 Hold the `listing` ref in `DraftProvider`. Test that a failed list read retries on the next call.
+- [x] 5.1 Give `resolveChainingTargets` the shared `listing` holder, filter by the list, and forget a failed read. Adapt `studio-draftProvider-chainingFetch.test.ts` to the new signature. Add a test that 17 prefixes send one list request.
+- [x] 5.2 Hold the `listing` ref in `DraftProvider`. Test that a failed list read retries on the next call.
 
 ## 6. Docs
 
