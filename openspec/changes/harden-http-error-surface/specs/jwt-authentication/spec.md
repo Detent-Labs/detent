@@ -6,8 +6,8 @@
 
 The local branch SHALL accept `HS256` only. The external branch SHALL accept
 the asymmetric algorithms only: `RS256`, `RS384`, `RS512`, `PS256`, `PS384`,
-`PS512`, `ES256`, `ES384`, `ES512` and `EdDSA`. A token signed with any other
-algorithm SHALL throw `ActorResolutionError`.
+`PS512`, `ES256`, `ES384`, `ES512`, `EdDSA` and `Ed25519`. A token signed with
+any other algorithm SHALL throw `ActorResolutionError`.
 
 #### Scenario: A locally-issued token signed with HS512
 

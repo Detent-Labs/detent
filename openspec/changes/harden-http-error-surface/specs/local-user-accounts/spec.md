@@ -6,7 +6,8 @@
 
 `POST /auth/login` SHALL answer `400` with `error.type` equal to
 `"request-shape"` when `email` has a NUL character. The check SHALL run
-before the try count and before any database query.
+before either rate-limit window records a try and before any database query.
+A refused request is not a try, so it adds nothing to either count.
 
 #### Scenario: A NUL byte in the email
 

@@ -12,7 +12,7 @@ See proposal.md for the five findings. The current state that shapes the fix:
   (`server.ts:901`). `docker/engine.Dockerfile` sets no `NODE_ENV`. Bun
   therefore runs in development mode. An uncaught throw answers its error
   page with the message embedded.
-- Eleven call sites pass `decodeCursor` an arity. The helper checks for an
+- Eight call sites pass `decodeCursor` an arity. The helper checks for an
   array of that many strings. The cursors hold four kinds of value. One is a
   Postgres `created_at::text` timestamp. Two are sequence numbers, cast to
   `int` and to `bigint`. The last is text compared as text.
@@ -48,6 +48,9 @@ See proposal.md for the five findings. The current state that shapes the fix:
 - A 404 for `NotFoundError`. The 500 stays, as the `http-wrapper` spec pins.
 - A rewrite of stored report dates. Validation leaves what the caller sent
   as it is.
+- The typed claim refusals (`not-assigned`, `not-a-candidate`,
+  `already-claimed`, `not-claimant`). They still separate a known instance
+  from an unknown one. WRITE-1 in `docs/decisions.md` keeps that open.
 
 ## Decisions
 
@@ -61,7 +64,11 @@ surprise and the static-asset path.
 `Bun.serve` also gets `development: false`, and the engine image sets
 `NODE_ENV=production` (owner ruling, 2026-10-12). The first stops the
 development page for a server that `bun run serve` starts. The second covers
-any other Bun code path that reads `NODE_ENV`.
+any other Bun code path that reads `NODE_ENV`. The dispatcher catch hides the
+symptom of both, so tests check the two settings at the text level.
+
+A throw inside `GET /metrics` now carries the CORS headers, which that route
+otherwise omits. The difference is harmless and the catch stays uniform.
 
 Alternatives: wrap only `handleLogin` in `guarded`, the audit's first
 suggestion. That fixes one route and leaves the next unguarded handler to
@@ -78,9 +85,10 @@ own mapping.
 
 `handleLogin` returns the existing 400 `request-shape` envelope when
 `body.email` includes `"\u0000"`. The check sits right after the type check
-and before `checkAndRecordAttempt`. No database query and no count follow.
-The count exists to slow password guessing. A request that cannot name an
-account guesses nothing.
+and before both rate-limit windows record a try. No database query and no
+count follow. The counts exist to slow password guessing. A request that
+cannot name an account guesses nothing. Such a request has no limit and
+costs no query.
 
 Alternative: strip the byte and go on. That would log a caller in as an email
 they did not type. Rejected.
@@ -95,9 +103,14 @@ committed. A failed read gets the mapped error, as every other read does.
 
 The local branch passes `algorithms: ["HS256"]` to `jwtVerify`. That is the
 only algorithm `login.ts` signs with. The external branch passes a module
-constant with the asymmetric algorithms, and `requiredClaims: ["exp"]`. jose
-6.2.4 supports both options. The existing catch already maps the error to
-`ActorResolutionError`.
+constant with the asymmetric algorithms, `Ed25519` included, and
+`requiredClaims: ["exp"]`. jose 6.2.4 supports both options. The existing
+catch already maps the error to `ActorResolutionError`.
+
+jose already refuses an HS* header on a remote key set. The external
+`algorithms` list is defense in depth against a later jose change. Its HMAC
+test is a regression guard and proves nothing about the option. The local
+HS512 test is the real proof.
 
 Alternative: a per-issuer `algorithms` field in `AUTH_ISSUERS`. That changes
 the environment contract for a case nobody has. Rejected.
@@ -112,7 +125,7 @@ The length of the array is the arity. Four kinds exist:
 | `timestamp` | an ISO-8601 instant, including Postgres's `timestamptz::text` form | listing cursors on `created_at`, outbox, timers |
 | `int32` | decimal digits, at most 2147483647 | the record's sequence (`::int`) |
 | `int64` | decimal digits, at most 9223372036854775807 | the admin audit sequence (`bigint`) |
-| `text` | any string | ids, names, emails, the record's `at` |
+| `text` | any string without a NUL character | ids, names, emails, the record's `at` |
 
 The apply task reads each call site's SQL cast and picks the kind from it. A
 position compared as text stays `text`.
@@ -127,6 +140,8 @@ The `timestamp` check lives in a new `src/instant.ts`, beside the check that
 2. `Date.parse` does not return `NaN`.
 3. The day exists in that month. `Date.parse` rolls `2026-02-30` over to
    March, and Postgres rejects it.
+4. The year is at least `0001`, and a numeric offset has hours of at most 15.
+   Postgres has no year 0 and admits offsets up to 15:59 only.
 
 The shape test comes first because the JavaScript parser accepts strings such
 as `"1"` that Postgres rejects. A probe in the lane container showed that Bun
@@ -156,9 +171,11 @@ reasons still answers 500 through `mapError`. The upgrade entry point is
   create, save, draft preview and column choices.
 - `buildInstanceWhere` asserts both bounds before it builds the fragment.
   This is the reject-on-read half of the owner's ruling. A stored report
-  with a bad bound answers 400 when it runs, for the owner and for every
-  viewer. There is no repair on save: a viewer cannot save, and nothing
-  deployed holds such a row.
+  with a bad bound answers 400 when it runs. The owner gets that answer, and
+  so does every viewer with `read` on the process. A member without `read`
+  keeps the empty table that `executeReport` returns before the query. There
+  is no repair on save, because a viewer cannot save and nothing deployed
+  holds such a row.
 
 The assertion in `buildInstanceWhere` also protects the `instance.query`
 data source and any later caller of the filter.

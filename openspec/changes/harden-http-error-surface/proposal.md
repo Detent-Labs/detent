@@ -36,9 +36,9 @@ unknown id. The JWT check names no algorithm list. It also accepts an external t
   and no longer answers 500.
 - `GET /instances` and the report routes share one instant check. A date that
   passes in one place cannot fail in the cast of another.
-- Claim, release and delegate on an unknown instance id answer the opaque 403
-  to every caller except an `ADMIN_ROLE` holder. Submit and form-draft save
-  already give that answer.
+- Claim, release and delegate on an unknown instance id answer 403 with type
+  `authorization` to every caller except an `ADMIN_ROLE` holder. Submit and
+  form-draft save already give that kind of answer.
 
 ## Capabilities
 
@@ -51,6 +51,8 @@ None.
 - `http-wrapper`: a route error always leaves through `mapError`, and the
   server never serves the development error page. The cursor requirement
   checks values. Claim, release and delegate refuse an unknown id with 403.
+- `instance-visibility-set`: claim, release and delegate refuse an unknown
+  instance to a stranger, at the Runtime API level.
 - `local-user-accounts`: a login email with a NUL byte answers 400.
 - `jwt-authentication`: the local branch fixes HS256. The external branch
   fixes an asymmetric list and needs `exp`.
@@ -68,5 +70,6 @@ None.
   `src/auth/groups.ts`, `src/auth/users.ts`, and a new `src/instant.ts`.
 - Image: `docker/engine.Dockerfile`.
 - Docs: `docs/openapi.yaml` gets the new 400 and 403 answers. The audit index
-  in `docs/decisions.md` strikes this change's entry.
+  in `docs/decisions.md` strikes this change's entry. `docs/current-state.md`
+  lists `src/instant.ts`.
 - No schema change, no definition contract change, no new dependency.

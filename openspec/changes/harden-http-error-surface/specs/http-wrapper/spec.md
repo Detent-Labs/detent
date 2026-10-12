@@ -71,7 +71,8 @@ that role may read any instance.
 A `cursor` query parameter SHALL pass a check before use. It is base64url of a
 JSON array of strings of the arity its route encodes. Each position SHALL
 also hold a value of the kind its route encodes. The kinds are a timestamp, a
-non-negative integer that fits its column, and plain text. A cursor that fails
+non-negative integer that fits its column, and plain text with no NUL
+character. A cursor that fails
 these checks SHALL raise `RequestShapeError` (400). That covers a failed
 decode, a failed parse, a different shape and a value of the wrong kind.
 
