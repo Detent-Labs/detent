@@ -31,7 +31,7 @@
 
 ## 5. Verification
 
-- [ ] 5.1 Run `bun run typecheck`, then `bun run build`, inside the devcontainer. Record the printed result in the run report.
-- [ ] 5.2 Run `sh scripts/test-gated.sh bun test` in the container with `OPENSPEC_TELEMETRY=0`. The container sets `DATABASE_URL`. Record the pass, fail and skip counts.
-- [ ] 5.3 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` on the host. Record the printed result.
-- [ ] 5.4 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh` on the host. Record the printed result.
+- [x] 5.1 Run `bun run typecheck`, then `bun run build`, inside the devcontainer. Record the printed result in the run report.
+- [x] 5.2 Run `sh scripts/test-gated.sh bun test` in the container with `OPENSPEC_TELEMETRY=0`. The container sets `DATABASE_URL`. Record the pass, fail and skip counts.
+- [x] 5.3 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` on the host. Record the printed result.
+- [x] 5.4 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh` on the host. Record the printed result.
