@@ -190,12 +190,11 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   ) WHERE field_version IS NULL`;
   // Re-resolution flag: a data-affecting writeback sets this to 'pending' so the
   // resolution worker re-drives automatic evaluation for a parked wait-state.
-  // Idempotent add + index for the worker's claim scan.
+  // Idempotent add; the worker's claim index sits below, after the status column.
   await db`ALTER TABLE instances ADD COLUMN IF NOT EXISTS resolve_state text NOT NULL DEFAULT 'idle'`;
   // Lease stamp for the resolution worker's claim: a 'claimed' row past its lease
   // is an abandoned (crashed) claim and is reclaimed by a later drain.
   await db`ALTER TABLE instances ADD COLUMN IF NOT EXISTS resolve_claimed_at timestamptz`;
-  await db`CREATE INDEX IF NOT EXISTS instances_resolve_idx ON instances (resolve_state)`;
   // Cancel-cascade sweep durability: 'idle' (never cancelled, or not yet attempted),
   // 'pending' (cancelled; the direct-child sweep has not completed without a
   // conflicted or failed child), 'done' (a sweep pass found zero conflicted/failed
@@ -345,6 +344,25 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   // Readers: buildInstanceWhere's shared startedBy filter, reached by the same
   // two reads, and the participant-facing GET /instances?scope=started route.
   await db`CREATE INDEX IF NOT EXISTS instances_started_by_col_idx ON instances (started_by)`;
+  // Reader: the resolution worker's claim (drainResolutions in
+  // src/engine/resolution.ts), which filters status = 'running' and orders by
+  // instance_id. It holds the marked rows only (pending or claimed), so a scan
+  // costs the live marks, not every instance the engine ever stored. Every
+  // commit that leaves an instance not running clears its mark (applyStepEntry,
+  // markFaulted), so a finished instance never enters it.
+  //
+  // The name differs from the dropped instances_resolve_idx on purpose.
+  // CREATE INDEX IF NOT EXISTS leaves an index of a given name alone whatever
+  // its definition, so reusing the name would strand every already-initialised
+  // database on the old index over (resolve_state). The DROP stays here
+  // permanently, for the reason the three expression-index drops above stay.
+  await db`CREATE INDEX IF NOT EXISTS instances_resolve_open_idx ON instances (instance_id) WHERE resolve_state <> 'idle'`;
+  await db`DROP INDEX IF EXISTS instances_resolve_idx`;
+  // Clear marks a finished instance carried before the commit paths cleared
+  // them. Runs after the index and the status column exist: the first run on an
+  // existing database rewrites the stale rows once, and every later run reads
+  // the partial index, which then holds the live marks only.
+  await db`UPDATE instances SET resolve_state = 'idle' WHERE resolve_state <> 'idle' AND status <> 'running'`;
   // Who took part in an instance (instance-visibility-set). One row per
   // (instance, principal); a principal is an actor id, a role string or a group
   // id — the same value kind assignment.candidates holds. created_at duplicates

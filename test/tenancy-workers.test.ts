@@ -18,9 +18,13 @@ const idleDb = (label: string): SQL => {
   return fn as unknown as SQL;
 };
 
-/** A handle whose every query throws, standing in for a database refusing the connection. */
+/**
+ * A handle whose every query throws, standing in for a database refusing the
+ * connection. The query rejects when awaited, as a real one does: a fragment
+ * built and nested into a statement (drainResolutions' claim) is never awaited.
+ */
 const refusingDb = (): SQL => {
-  const fn = () => Promise.reject(new Error("connection refused"));
+  const fn = () => ({ then: (_resolve: unknown, reject: (e: Error) => void) => reject(new Error("connection refused")) });
   return fn as unknown as SQL;
 };
 

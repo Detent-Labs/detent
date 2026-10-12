@@ -10,6 +10,7 @@ import {
   selectAutomaticPath,
   resolveAutomatic,
   executeManualTransition,
+  cancelInstance,
   startInstance,
   planStepEntry,
   applyStepEntry,
@@ -17,6 +18,7 @@ import {
   AutomaticCascadeLoop,
 } from "../src/engine/transition.js";
 import { drainResolutions } from "../src/engine/resolution.js";
+import { CANCEL_SINK_STEP_ID } from "../src/schema/definition.js";
 import type { ProcessBody, Instance, Step, HistoryEntry, InstanceEvent } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
 
@@ -232,6 +234,25 @@ test.skipIf(!DB)("a data-independent cascade loop parks the instance faulted and
   // The event carries the seq the instance rests at without advancing it.
   expect(faultEvent.transitionSeq).toBe(persistedSeq);
   expect("actions" in faultEvent).toBe(false);
+
+  // Each hop onto a running step marked the row 'pending'. The flip to faulted
+  // clears it in its own statement: nothing re-drives a faulted instance.
+  expect(await resolveState(i.instanceId)).toBe("idle");
+});
+
+test.skipIf(!DB)("cancelling a marked running instance leaves it cancelled with no re-resolution mark", async () => {
+  // The body is uncompiled, so it carries the cancel sink the publish pass would inject.
+  const body = mkBody([
+    step("step_a", { paths: [manualPath("path_at", "step_t")] }),
+    step("step_t", { terminal: true }),
+    step(CANCEL_SINK_STEP_ID, { terminal: true }),
+  ]);
+  const i = await createInstance(body, { processId: "proc_1" as Instance["processId"], version: 1 });
+  expect(await resolveState(i.instanceId)).toBe("pending"); // creation marks a running instance
+
+  await cancelInstance(i, body, actor);
+  expect(await statusOf(i.instanceId)).toBe("cancelled");
+  expect(await resolveState(i.instanceId)).toBe("idle");
 });
 
 test.skipIf(!DB)("startInstance advances an instance created on an automatic initial step", async () => {
@@ -246,6 +267,8 @@ test.skipIf(!DB)("startInstance advances an instance created on an automatic ini
   const entries = await histEntries(rested.instanceId);
   expect(entries).toHaveLength(1);
   expect(entries[0].cause).toBe("automatic");
+  // Creation marked the row 'pending'; the cascade's commit onto the terminal clears it.
+  expect(await resolveState(rested.instanceId)).toBe("idle");
 });
 
 // --- durable crash recovery: a commit whose in-process cascade never runs -----
@@ -281,16 +304,11 @@ test.skipIf(!DB)("a cascade interrupted after its first hop is durably resumed b
   const rested = await readInst(i.instanceId);
   expect(rested.currentStepId as string).toBe("step_t");
   expect(rested.status).toBe("completed");
-  // resolve_state itself may or may not settle to 'idle' in this same pass:
-  // the intermediate hop (step_g1 -> step_g2, still running) re-flags
-  // 'pending' as it commits, clobbering this pass's own 'claimed' marker, so
-  // its end-of-pass clear finds nothing to clear. Once the cascade then
-  // reaches the terminal step, status is no longer 'running', so the worker's
-  // claim query (`WHERE status = 'running'`) never revisits the row to settle
-  // the flag — it is left 'pending' permanently. Harmless: nothing else reads
-  // resolve_state, and a terminal instance is never re-resolved regardless of
-  // this column's value. See applyStepEntry's doc comment.
-  expect(await resolveState(i.instanceId)).toBe("pending");
+  // The intermediate hop (step_g1 -> step_g2, still running) re-flags 'pending'
+  // over this pass's 'claimed' marker. The last hop onto the terminal step then
+  // writes 'idle' in its own commit, so the finished instance carries no mark.
+  // See applyStepEntry's doc comment.
+  expect(await resolveState(i.instanceId)).toBe("idle");
 });
 
 test.skipIf(!DB)("a creation-time cascade interrupted before it runs is durably resumed by re-resolution", async () => {
@@ -310,12 +328,10 @@ test.skipIf(!DB)("a creation-time cascade interrupted before it runs is durably 
   expect(await resolveState(i.instanceId)).toBe("pending");
 
   // The state cascade completes in this one pass, exactly as the manual-hop
-  // case above; resolve_state is left permanently 'pending' for the same
-  // reason (the intermediate still-running hop re-flags it, and the worker
-  // never revisits the row once it's terminal) — see the comment there.
+  // case above, and the terminal commit leaves the mark 'idle'.
   expect(await drainResolutions(sql, () => body)).toBe(1);
   const rested = await readInst(i.instanceId);
   expect(rested.currentStepId as string).toBe("step_t");
   expect(rested.status).toBe("completed");
-  expect(await resolveState(i.instanceId)).toBe("pending");
+  expect(await resolveState(i.instanceId)).toBe("idle");
 });
