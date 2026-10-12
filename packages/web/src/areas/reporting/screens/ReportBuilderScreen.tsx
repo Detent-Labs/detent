@@ -121,6 +121,7 @@ export function ReportBuilderScreen({
   const [processLabel, setProcessLabel] = useState<string | undefined>();
   const [loadError, setLoadError] = useState<ClientError | undefined>();
   const [choices, setChoices] = useState<ColumnChoice[]>([]);
+  const [choicesError, setChoicesError] = useState<ClientError | undefined>();
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<ClientError | undefined>();
   const [preview, setPreview] = useState<ReportExecutionResult | undefined>();
@@ -134,7 +135,10 @@ export function ReportBuilderScreen({
   // One `fail` per request site: a 401 ends the session, any other error
   // lands in that site's own state.
   const failLoad = useFail(onUnauthorized, (err) => setLoadError(describeCaughtError(err)));
-  const failChoices = useFail(onUnauthorized, () => setChoices([]));
+  const failChoices = useFail(onUnauthorized, (err) => {
+    setChoices([]);
+    setChoicesError(describeCaughtError(err));
+  });
   const failPreview = useFail(onUnauthorized, (err) => setPreviewError(describeCaughtError(err)));
   const failSave = useFail(onUnauthorized, (err) => setSaveError(describeCaughtError(err)));
   const failDownload = useFail(onUnauthorized, (err) => setDownloadError(describeCaughtError(err)));
@@ -176,6 +180,7 @@ export function ReportBuilderScreen({
         if (cancelled) return;
         setHeldTypes((prev) => typesAfterResponse(prev, processId, next));
         setChoices(next);
+        setChoicesError(undefined);
       })
       .catch((cause: unknown) => {
         if (!cancelled) failChoices(cause);
@@ -325,6 +330,7 @@ export function ReportBuilderScreen({
             locale={locale}
           />
         ))}
+        {choicesError && <ErrorNote error={choicesError} locale={locale} />}
         <button
           type="button"
           className="btn btn-secondary"
@@ -344,6 +350,7 @@ export function ReportBuilderScreen({
         versionsInRange={versionsInRange}
         onChange={(columns) => setDraft({ ...draft, columns })}
         locale={locale}
+        choicesError={choicesError}
       />
 
       <ShareEditor

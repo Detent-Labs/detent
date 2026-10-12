@@ -11,8 +11,9 @@ import {
   usedFieldIds,
 } from "./reportsLogic.js";
 import { t } from "../catalog.js";
+import { ErrorNote } from "../components.js";
 import type { UiLocale } from "../../../i18n/locale.js";
-import type { ColumnChoice, ReportColumn } from "../api/types.js";
+import type { ClientError, ColumnChoice, ReportColumn } from "../api/types.js";
 
 /**
  * The ordered column list an author builds: a direct field reference, or a
@@ -138,18 +139,22 @@ export function ColumnEditor({
   versionsInRange,
   onChange,
   locale,
+  choicesError,
 }: {
   columns: ReportColumn[];
   choices: ColumnChoice[];
   versionsInRange: number[];
   onChange: (next: ReportColumn[]) => void;
   locale: UiLocale;
+  /** The failed column request, shown where the field picker would sit. */
+  choicesError?: ClientError;
 }) {
   const available = choices.filter((c) => !usedFieldIds(columns).has(c.fieldId));
 
   return (
     <section>
       <h2>{t(locale, "builder.columnsTitle")}</h2>
+      {choicesError && <ErrorNote error={choicesError} locale={locale} />}
       {columns.length === 0 ? (
         <p {...stylex.props(styles.empty)}>{t(locale, "builder.columnsEmpty")}</p>
       ) : (

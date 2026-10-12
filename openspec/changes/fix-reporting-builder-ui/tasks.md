@@ -16,7 +16,7 @@
 ## 3. Failed column request
 
 - [ ] 3.1 Keep the error of the column request in `choicesError` state and clear it on success. Show an `ErrorNote` above the "Add comparison" button. Verify in the browser check of task 4.3. A failing column request shows the note, and a later success removes it.
-- [ ] 3.2 Add the optional `choicesError` prop to `ColumnEditor` and show the same note under its heading. Verify with a static-render test in `reporting-columnEditor.test.tsx`. The section shows the note with the prop and no note without it.
+- [x] 3.2 Add the optional `choicesError` prop to `ColumnEditor` and show the same note under its heading. Verify with a static-render test in `reporting-columnEditor.test.tsx`. The section shows the note with the prop and no note without it.
 
 ## 4. Documentation and browser check
 
