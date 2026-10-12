@@ -60,6 +60,14 @@ export interface HandlerContext {
    * needing no database ignores it, the way `http.request` does.
    */
   db: SQL;
+  /**
+   * The assignment registry the engine runs with, the one that resolves a
+   * step's assignment strategy. Required, like `db`. A handler that starts or
+   * moves an instance passes this on and builds no registry of its own, so an
+   * operator-registered strategy resolves the same way in every path. No handler
+   * may fall back to another registry.
+   */
+  assignmentRegistry: AssignmentRegistry;
 }
 
 /** A registered handler plus its plugin config JSON Schema. */
@@ -135,7 +143,7 @@ export function describeTypeNames(registry: Registry | AssignmentRegistry | Data
 
 /**
  * The strategy type an author gets by default, and the only entry the built-in
- * `createDefaultAssignmentRegistry` below registers. It resolves through the
+ * `createStaticAssignmentRegistry` below registers. It resolves through the
  * `AssignmentRegistry` like any other type — no engine code branches on this
  * literal.
  */
@@ -188,14 +196,15 @@ export const staticAssignmentStrategyDef: AssignmentStrategyDef = {
 };
 
 /**
- * A registry pre-populated with the built-in `static` strategy. Homed here
- * rather than in host.ts (where the action and data-source defaults live)
- * because this resolver imports nothing — it reads its own config — so
- * registry.ts stays the leaf module it already was, and store.ts,
- * transition.ts and definitions.ts can all default a parameter to it without
+ * A registry pre-populated with the built-in `static` strategy alone. The
+ * org-aware set is `createDefaultAssignmentRegistry` in
+ * `assignment-strategies.ts`. Homed here rather than in host.ts (where the
+ * action and data-source defaults live) because this resolver imports
+ * nothing — it reads its own config — so registry.ts stays the leaf module it
+ * already was. The engine modules can then default a parameter to it without
  * closing an import cycle through host.ts.
  */
-export function createDefaultAssignmentRegistry(): AssignmentRegistry {
+export function createStaticAssignmentRegistry(): AssignmentRegistry {
   const reg = createAssignmentRegistry();
   reg.set(STATIC_ASSIGNMENT_STRATEGY_TYPE, staticAssignmentStrategyDef);
   return reg;

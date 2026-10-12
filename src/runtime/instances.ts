@@ -30,7 +30,7 @@ import type {
   LocaleCode,
   InstanceEvent,
 } from "../schema/definition.js";
-import { createDefaultAssignmentRegistry, resolveStepAssignment, type DataSourceRegistry, type AssignmentRegistry } from "../engine/registry.js";
+import { createStaticAssignmentRegistry, resolveStepAssignment, type DataSourceRegistry, type AssignmentRegistry } from "../engine/registry.js";
 import {
   getStore,
   parseInstance,
@@ -130,7 +130,7 @@ export async function createProcessInstance(
   registry: DataSourceRegistry,
   opts?: { version?: number; data?: Instance["data"]; fromDraft?: boolean },
   db: SQL = sql,
-  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
+  assignmentRegistry: AssignmentRegistry = createStaticAssignmentRegistry(),
 ): Promise<Instance> {
   const store = getStore(db);
   let version: number;
@@ -335,7 +335,7 @@ export async function submitAndTransition(
   actor: Actor,
   registry: DataSourceRegistry,
   db: SQL = sql,
-  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
+  assignmentRegistry: AssignmentRegistry = createStaticAssignmentRegistry(),
 ): Promise<Instance> {
   const store = getStore(db);
   const submitted = data as Record<string, Literal>;

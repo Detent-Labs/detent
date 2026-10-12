@@ -37,7 +37,7 @@ import {
   SPAWN_ACTION_TYPE,
   RETURN_ACTION_TYPE,
   CANCEL_CHILD_ACTION_TYPE,
-  createDefaultAssignmentRegistry,
+  createStaticAssignmentRegistry,
   outboxActorsOf,
   resolveStepAssignment,
   type AssignmentRegistry,
@@ -513,7 +513,7 @@ async function commitTransition(
   db: SQL,
   overrides?: Pick<StepEntryOpts, "status" | "timers" | "entryVersion" | "suppressSpawn" | "events">,
   extraFields?: Record<string, unknown>,
-  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
+  assignmentRegistry: AssignmentRegistry = createStaticAssignmentRegistry(),
 ): Promise<Instance> {
   const { assignment, unresolved } = await resolveStepAssignment(target, assignmentRegistry, assignmentContextFor(instance), db);
   // The seq and version this entry lands on, mirroring planStepEntry's own
@@ -571,7 +571,7 @@ export async function commitManualTransition(
   actor: Actor,
   db: SQL = sql,
   dataPatch?: Instance["data"],
-  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
+  assignmentRegistry: AssignmentRegistry = createStaticAssignmentRegistry(),
   events?: InstanceEvent[],
 ): Promise<Instance> {
   // Deliberately a no-op, not a throw: internal idempotent re-entry (e.g. a
@@ -628,7 +628,7 @@ export async function executeManualTransition(
   actor: Actor,
   db: SQL = sql,
   dataPatch?: Instance["data"],
-  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
+  assignmentRegistry: AssignmentRegistry = createStaticAssignmentRegistry(),
   events?: InstanceEvent[],
 ): Promise<Instance> {
   if (instance.status !== "running") return instance;
@@ -773,7 +773,7 @@ export async function startInstance(
   opts: { processId: Instance["processId"]; version: number },
   actor: Actor,
   db: SQL = sql,
-  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
+  assignmentRegistry: AssignmentRegistry = createStaticAssignmentRegistry(),
 ): Promise<Instance> {
   // The initial step's timers are armed atomically inside createInstance (a crash
   // between INSERT and a separate arming UPDATE would strand them). If resolveAutomatic
@@ -830,7 +830,7 @@ export async function executeAutomaticTransition(
   path: Path,
   body: ProcessBody,
   db: SQL = sql,
-  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
+  assignmentRegistry: AssignmentRegistry = createStaticAssignmentRegistry(),
 ): Promise<Instance> {
   const source = body.workflow.steps.find((s) => s.id === instance.currentStepId);
   if (!source) throw new Error(`current step not in body: ${instance.currentStepId}`);
@@ -890,7 +890,7 @@ export async function resolveAutomatic(
   body: ProcessBody,
   actor: Actor,
   db: SQL = sql,
-  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
+  assignmentRegistry: AssignmentRegistry = createStaticAssignmentRegistry(),
 ): Promise<Instance> {
   let current = instance;
   const seen = new Set<string>([current.currentStepId]);
@@ -932,7 +932,7 @@ export async function fireTimer(
   timerId: string,
   body: ProcessBody,
   db: SQL = sql,
-  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
+  assignmentRegistry: AssignmentRegistry = createStaticAssignmentRegistry(),
 ): Promise<Instance> {
   if (instance.status !== "running") return instance;
 

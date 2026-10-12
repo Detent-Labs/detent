@@ -4,11 +4,14 @@
  * DATABASE_URL is unset — a skip is visible, a false green is not.
  */
 import { test, expect, beforeAll } from "bun:test";
-import { sql, initSchema, loadInstance } from "../src/engine/store.js";
+import { sql, initSchema, loadInstance, createInstance } from "../src/engine/store.js";
 import { startInstance, commitManualTransition, cancelInstance } from "../src/engine/transition.js";
 import { publishBody } from "../src/engine/definitions.js";
 import { createDefaultRegistry } from "../src/engine/host.js";
-import { createDataSourceRegistry, type Registry as Reg } from "../src/engine/registry.js";
+import { createDataSourceRegistry, createStaticAssignmentRegistry, type Registry as Reg, type AssignmentRegistry } from "../src/engine/registry.js";
+import { createDefaultAssignmentRegistry, GROUP_MEMBERS_STRATEGY_TYPE, MANAGER_OF_STARTER_STRATEGY_TYPE } from "../src/engine/assignment-strategies.js";
+import { createUser, setManagerById } from "../src/auth/users.js";
+import { createGroup, setGroupMembers } from "../src/auth/groups.js";
 import { drainOutbox, deliver, type ClaimedRow } from "../src/engine/outbox.js";
 import { idempotencyKey } from "../src/engine/idempotency.js";
 import { INSTANCE_TRANSITION_ACTION_TYPE } from "../src/handlers/instance-transition.js";
@@ -294,11 +297,11 @@ test.skipIf(!DB)("a redelivery moves the target at most once", async () => {
     actors: null,
   };
 
-  await deliver(row, registry, sql);
+  await deliver(row, registry, sql, createStaticAssignmentRegistry());
   const afterFirst = await loadInstance(sql, target.instanceId);
   expect(afterFirst!.currentStepId as string).toBe("step_issued");
 
-  await deliver(row, registry, sql); // redelivery of the same physical row
+  await deliver(row, registry, sql, createStaticAssignmentRegistry()); // redelivery of the same physical row
   const afterSecond = await loadInstance(sql, target.instanceId);
   expect(afterSecond!.currentStepId as string).toBe("step_issued"); // unchanged
 
@@ -365,7 +368,7 @@ test.skipIf(!DB)("two genuinely concurrent deliveries for the same target: exact
   // Both deliveries load the target before either commits: a genuine race
   // through commitTransition's own OCC predicate, not the sequential
   // current-step check above.
-  const results = await Promise.allSettled([deliver(rowFor(doneA), registry, sql), deliver(rowFor(doneB), registry, sql)]);
+  const results = await Promise.allSettled([deliver(rowFor(doneA), registry, sql, createStaticAssignmentRegistry()), deliver(rowFor(doneB), registry, sql, createStaticAssignmentRegistry())]);
   const fulfilled = results.filter((r) => r.status === "fulfilled");
   const rejected = results.filter((r) => r.status === "rejected");
   expect(fulfilled).toHaveLength(1);
@@ -431,4 +434,124 @@ test.skipIf(!DB)("a target reached by the action continues along an automatic pa
   const after = await loadInstance(sql, target.instanceId);
   expect(after!.currentStepId as string).toBe("step_done");
   expect(after!.status).toBe("completed");
+});
+
+// --- the target's entered steps resolve assignment with the engine's strategies ----
+
+// step_shelf --path_issue(manual)--> step_issued, which carries `strategy` and
+// rests there on an unmet guard, so the target's candidates are the ones the
+// entered step resolved.
+const targetAssignedBody = (strategy: { type: string; config: Record<string, unknown> }, allowedGroups: string[] = []): ProcessBody =>
+  ({
+    key: "target_assigned", baseLocale: "en", label: { en: "Target Assigned" },
+    fields: [{ id: "field_go", key: "go", label: { en: "Go" }, type: "string" }],
+    ...(allowedGroups.length ? { allowedGroups } : {}),
+    workflow: {
+      initialStep: "step_shelf",
+      steps: [
+        { id: "step_shelf", key: "shelf", label: { en: "Shelf" }, type: "task",
+          paths: [{ id: "path_issue", key: "issue", label: "Issue", to: "step_issued", trigger: "manual" }] },
+        { id: "step_issued", key: "issued", label: { en: "Issued" }, type: "task", assignment: { strategy },
+          paths: [{ id: "path_wait", key: "wait", label: "Wait", to: "step_done", trigger: "automatic", priority: 1, guard: cel('data.go == "yes"') }] },
+        { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+// step_shelf --manual--> step_issued --automatic, guardless--> step_review,
+// which carries `strategy` and rests on an unmet guard.
+const targetAutoHopBody = (strategy: { type: string; config: Record<string, unknown> }): ProcessBody =>
+  ({
+    key: "target_auto_hop", baseLocale: "en", label: { en: "Target Auto Hop" },
+    fields: [{ id: "field_go", key: "go", label: { en: "Go" }, type: "string" }],
+    workflow: {
+      initialStep: "step_shelf",
+      steps: [
+        { id: "step_shelf", key: "shelf", label: { en: "Shelf" }, type: "task",
+          paths: [{ id: "path_issue", key: "issue", label: "Issue", to: "step_issued", trigger: "manual" }] },
+        { id: "step_issued", key: "issued", label: { en: "Issued" }, type: "task",
+          paths: [{ id: "path_auto", key: "auto", label: "Auto", to: "step_review", trigger: "automatic", priority: 1 }] },
+        { id: "step_review", key: "review", label: { en: "Review" }, type: "task", assignment: { strategy },
+          paths: [{ id: "path_wait", key: "wait", label: "Wait", to: "step_done", trigger: "automatic", priority: 1, guard: cel('data.go == "yes"') }] },
+        { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true },
+      ],
+    },
+  }) as unknown as ProcessBody;
+
+const unresolvedEvents = async (instanceId: string): Promise<InstanceEvent[]> => {
+  const r = (await sql`SELECT event FROM instance_events WHERE instance_id = ${instanceId} AND kind = 'assignment.unresolved'`) as
+    { event: unknown }[];
+  return r.map((x) => (typeof x.event === "string" ? JSON.parse(x.event) : x.event) as InstanceEvent);
+};
+
+const newUserId = async (label: string): Promise<string> =>
+  (await createUser(`it-${label}-${crypto.randomUUID()}@example.com`, "pw", [])).userId;
+
+/**
+ * Publish `targetBody_` with the full assignment registry, create the target
+ * (started by `startedBy` when given), submit an acting instance for it, and
+ * drain the outbox with `assignmentRegistry`. Returns the target afterwards.
+ */
+async function moveAssignedTarget(targetBody_: ProcessBody, assignmentRegistry: AssignmentRegistry, startedBy?: string) {
+  const registry = createDefaultRegistry();
+  const tv = await publishBody(pid("proc_it_asg_target"), targetBody_, registry, dataSourceReg, sql, createDefaultAssignmentRegistry());
+  const av = await publishBody(pid("proc_it_asg_actor"), actorBody(tv.processId, "path_issue"), registry, dataSourceReg);
+  const target = await createInstance(tv.definition, { processId: tv.processId, version: tv.version, ...(startedBy ? { startedBy } : {}) });
+  const started = await startInstance(av.definition, { processId: av.processId, version: av.version }, actor);
+  await commitManualTransition(started, "path_a_done", av.definition, actor, sql, { field_target_id: target.instanceId } as unknown as Instance["data"]);
+
+  await drainOutbox(sql, registry, undefined, undefined, undefined, assignmentRegistry);
+
+  return (await loadInstance(sql, target.instanceId))!;
+}
+
+async function groupWithTwoMembers(label: string) {
+  const a = await newUserId(`${label}-a`);
+  const b = await newUserId(`${label}-b`);
+  const group = await createGroup(`it-${label}-${crypto.randomUUID()}`, { type: "global" });
+  await setGroupMembers(group.groupId, [a, b]);
+  return { a, b, groupId: group.groupId };
+}
+
+const groupMembersBody = (groupId: string): ProcessBody =>
+  targetAssignedBody({ type: GROUP_MEMBERS_STRATEGY_TYPE, config: { groupId } }, [groupId]);
+
+test.skipIf(!DB)("the named path onto an org.group-members step holds the group's members as candidates", async () => {
+  const { a, b, groupId } = await groupWithTwoMembers("group");
+
+  const after = await moveAssignedTarget(groupMembersBody(groupId), createDefaultAssignmentRegistry());
+
+  expect(after.currentStepId as string).toBe("step_issued");
+  expect([...after.assignment!.candidates].sort()).toEqual([a, b].sort());
+  expect(await unresolvedEvents(after.instanceId)).toHaveLength(0);
+});
+
+// Negative control: the static-only registry alone resolves no `org.*`
+// strategy, so the same move resolves to nobody.
+test.skipIf(!DB)("the same move drained with the static registry resolves to no candidates and records the event", async () => {
+  const { groupId } = await groupWithTwoMembers("group-static");
+
+  const after = await moveAssignedTarget(groupMembersBody(groupId), createStaticAssignmentRegistry());
+
+  expect(after.currentStepId as string).toBe("step_issued");
+  expect(after.assignment!.candidates).toEqual([]);
+  const events = await unresolvedEvents(after.instanceId);
+  expect(events).toHaveLength(1);
+  expect(events[0]!.payload as Record<string, unknown>).toEqual({ stepId: "step_issued", reason: "no-candidates" });
+});
+
+test.skipIf(!DB)("an automatic hop onto an org.manager-of-starter step holds the starter's manager as candidate", async () => {
+  const boss = await newUserId("boss");
+  const anna = await newUserId("anna");
+  await setManagerById(anna, boss);
+
+  const after = await moveAssignedTarget(
+    targetAutoHopBody({ type: MANAGER_OF_STARTER_STRATEGY_TYPE, config: {} }),
+    createDefaultAssignmentRegistry(),
+    anna,
+  );
+
+  expect(after.currentStepId as string).toBe("step_review");
+  expect(after.assignment!.candidates).toEqual([boss]);
+  expect(await unresolvedEvents(after.instanceId)).toHaveLength(0);
 });

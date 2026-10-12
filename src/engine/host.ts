@@ -19,7 +19,7 @@ import {
   createRegistry,
   type Registry,
   createDataSourceRegistry,
-  createDefaultAssignmentRegistry,
+  createStaticAssignmentRegistry,
   type DataSourceRegistry,
   type AssignmentRegistry,
 } from "./registry.js";
@@ -300,7 +300,7 @@ function tenantContexts(shared: Registry, assignmentRegistry: AssignmentRegistry
 export function startEngine(
   db: SQL = sql,
   registry: Registry = createDefaultRegistry(),
-  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
+  assignmentRegistry: AssignmentRegistry = createStaticAssignmentRegistry(),
   tenants: TenantSource = singleTenantSource(db),
 ): { stop: () => void } {
   const contextFor = tenantContexts(registry, assignmentRegistry);
@@ -323,7 +323,7 @@ export function startEngine(
   };
 
   const workers = [
-    pollForever("outbox", eachTenant("outbox", (c) => drainOutbox(c.db, c.registry, deliver, CLAIM_LEASE_MS, c.resolveBody)), 500),
+    pollForever("outbox", eachTenant("outbox", (c) => drainOutbox(c.db, c.registry, deliver, CLAIM_LEASE_MS, c.resolveBody, assignmentRegistry)), 500),
     pollForever("resolution", eachTenant("resolution", (c) => drainResolutions(c.db, c.resolveBody, undefined, assignmentRegistry)), 500),
     pollForever("timers", eachTenant("timers", (c) => drainTimers(c.db, c.resolveBody, assignmentRegistry)), 500),
     ...(retentionDays !== undefined

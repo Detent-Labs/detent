@@ -24,12 +24,7 @@ import {
   type Instance,
   type ProcessBody,
 } from "../schema/definition.js";
-import {
-  createDefaultAssignmentRegistry,
-  PROCESS_START_ACTION_TYPE,
-  type HandlerContext,
-  type HandlerDef,
-} from "../engine/registry.js";
+import { PROCESS_START_ACTION_TYPE, type HandlerContext, type HandlerDef } from "../engine/registry.js";
 
 export { PROCESS_START_ACTION_TYPE };
 
@@ -42,10 +37,9 @@ async function processStartHandler(ctx: HandlerContext): Promise<unknown> {
   const config = processStartConfigSchema.parse(ctx.config);
   const startedId = `inst_${ctx.idempotencyKey}`;
   const { resolveBody, resolveLatest } = createDefinitionStore(ctx.db);
-  // One registry per delivery, shared by createSeededInstance and the
-  // drive-to-rest below — the earlier second construction duplicated an
-  // identical Map for no reason.
-  const assignmentRegistry = createDefaultAssignmentRegistry();
+  // The engine's own registry, shared by createSeededInstance and the
+  // drive-to-rest below.
+  const { assignmentRegistry } = ctx;
 
   let started: Instance;
   let startedBody: ProcessBody;

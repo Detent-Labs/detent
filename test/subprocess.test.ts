@@ -14,7 +14,7 @@ import { publishBody, createDefinitionStore } from "../src/engine/definitions.js
 import { registerSubprocessHandlers } from "../src/engine/subprocess.js";
 import { cancelInstance as apiCancelInstance } from "../src/runtime/api.js";
 import { CANCEL_ANY_ROLE } from "../src/auth/authorize.js";
-import { createAssignmentRegistry, type AssignmentRegistry, type HandlerContext } from "../src/engine/registry.js";
+import { createAssignmentRegistry, createStaticAssignmentRegistry, type AssignmentRegistry, type HandlerContext } from "../src/engine/registry.js";
 import { drainOutbox } from "../src/engine/outbox.js";
 import { drainResolutions } from "../src/engine/resolution.js";
 import { subprocessChildId } from "../src/engine/idempotency.js";
@@ -1967,6 +1967,7 @@ function spawnCtx(instanceId: string, subprocessStepId: string, parentSeq: numbe
     idempotencyKey: actionId,
     instanceId,
     db: sql,
+    assignmentRegistry: createStaticAssignmentRegistry(),
   };
 }
 
