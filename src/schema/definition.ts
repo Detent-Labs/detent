@@ -1529,6 +1529,13 @@ export const instance = z.object({
   // as a call-and-return link (cancel cascade, the subprocess return path)
   // reads this field.
   chainedFrom: instanceId.optional(),
+  // The child the current subprocess step visit waits for: the id the spawn
+  // derives for that entry. Nullable for the same reason as `assignment`: a
+  // commit leaving the step clears it through the shallow jsonb merge.
+  // `undefined` for an instance created on a non-subprocess step until its
+  // first commit, and for an instance stored before this field existed until
+  // its next commit. Outside `ProcessBody`, so no hash moves.
+  awaitedChild: instanceId.nullable().optional(),
   status: instanceStatus,
   startedAt: timestamp,
   startedBy: z.string().optional(),

@@ -30,7 +30,6 @@ const render = (technicalFieldIds: Set<string>) =>
     <FormEditorStrip
       row={row()}
       label="Amount"
-      stepId={"step_a" as never}
       ownStepIndex={0}
       written={() => 0}
       technicalFieldIds={technicalFieldIds}
@@ -74,7 +73,6 @@ describe("FormEditorStrip: dominance-scoped gating", () => {
       <FormEditorStrip
         row={{ ref: "field_amount" as never, required: true }}
         label="Amount"
-        stepId={"step_c" as never}
         ownStepIndex={ownStepIndex}
         written={written}
         technicalFieldIds={new Set()}
@@ -120,7 +118,6 @@ const renderTabbed = (over: { tabOptions?: typeof TABS; tabValue?: string; group
     <FormEditorStrip
       row={{ ref: "field_amount" as never, group: over.group }}
       label="Amount"
-      stepId={"step_a" as never}
       ownStepIndex={0}
       written={() => 1}
       technicalFieldIds={new Set()}
@@ -230,7 +227,6 @@ describe("the note strip on a tabbed form", () => {
       <DraftContext.Provider value={contextValue({ baseLocale: "en" } as unknown as Draft)}>
         <NoteEditorStrip
           row={{ kind: "note", text: { en: "Heads up" } }}
-          stepId={"step_a" as never}
           baseLocale="en"
           groupKeys={["approval"]}
           tabOptions={TABS}

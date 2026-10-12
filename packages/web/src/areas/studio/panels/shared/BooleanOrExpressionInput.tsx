@@ -11,8 +11,6 @@ interface Props {
    * not `value === true` — an absent `visible` renders ticked, matching
    * `resolveFields` (`src/runtime/fields.ts`). */
   flagKey: FlagKey;
-  /** The step this override sits on, for the condition builder's `child.*` operands. */
-  stepId?: string;
   onChange: (next: BoolOrExpr) => void;
   /** Forwarded to the mode select and the checkbox, so a caller with its own
    * roving-tabindex model (the field matrix's grid, `field-matrix-toolbar-
@@ -32,8 +30,11 @@ interface Props {
  * The chosen arm is remembered rather than read back off the value: the builder
  * writes `undefined` while a row is incomplete, and deriving the mode from that
  * would collapse the override to the checkbox mid-edit. See `overrideMode`.
+ *
+ * It hands `ConditionInput` no `stepId`, so the picker offers no `child.*`
+ * operand, whatever step the override sits on.
  */
-export function BooleanOrExpressionInput({ label, value, flagKey, stepId, onChange, tabIndex }: Props) {
+export function BooleanOrExpressionInput({ label, value, flagKey, onChange, tabIndex }: Props) {
   const [chosen, setChosen] = useState<OverrideMode | undefined>(undefined);
   const mode = overrideMode(value, chosen);
 
@@ -66,7 +67,7 @@ export function BooleanOrExpressionInput({ label, value, flagKey, stepId, onChan
           onChange={(e) => onChange(e.target.checked)}
         />
       ) : (
-        <ConditionInput value={isExpression(value) ? value : undefined} stepId={stepId} onChange={onChange} />
+        <ConditionInput value={isExpression(value) ? value : undefined} onChange={onChange} />
       )}
     </span>
   );

@@ -321,11 +321,21 @@ A migration whose target step id equals the instance's current step id SHALL sup
 the subprocess spawn.
 
 A parent parked at a subprocess step already has a live child. The spawn's
-idempotency is keyed on the transition sequence — the child id derives from the
-parent, that sequence, and the step id — so a migration advancing the sequence
-derives a **different** child id, misses the spawn handler's existence guard, and
-creates a second child alongside the live one. Idempotency protects redelivery of one
-commit, not a second commit onto one step.
+idempotency is keyed on the transition sequence. The child id derives from the
+parent, that sequence, and the step id. A migration advancing the sequence
+therefore derives a **different** child id. Unsuppressed, it would leave the step
+visit that owns the live child. It would cancel that child and spawn a replacement.
+
+Idempotency protects redelivery of one commit, not a second commit onto one step.
+
+<!-- antislop: allow sentence-length - the quoted requirement name sets the sentence length -->
+
+The suppressed migration SHALL also carry the parent's `awaitedChild` over
+unchanged while the target step is still a subprocess step. The sequence advanced.
+The carried value is the only record that the existing child is still awaited. A
+kept step id whose target is another step type leaves the subprocess step. That
+migration clears the field. It enqueues the cancellation when the field still names
+a child (see "A relocation off a subprocess step whose spawn is still queued commits").
 
 A migration that relocates the instance onto a subprocess step it was not on SHALL
 spawn normally: that is a genuine entry.
@@ -334,6 +344,13 @@ spawn normally: that is a genuine entry.
 
 - **WHEN** a parent parked at a subprocess step migrates onto the same step id
 - **THEN** no spawn is enqueued and the instance still has exactly one child
+
+#### Scenario: An identity migration keeps the child's return deliverable
+
+- **WHEN** a parent parked at a subprocess step migrates onto the same step id
+- **AND** the child then reaches a terminal step
+- **THEN** the migration leaves the parent's `awaitedChild` unchanged
+- **AND** the child's return drives the parent off the step
 
 #### Scenario: A relocation onto a subprocess step spawns a child
 
@@ -711,9 +728,10 @@ rather than being handled as a normal skip or silently remapped anyway.
 
 ### Requirement: A relocation off a subprocess step with a live child is deferred
 
-A migration that changes the step and vacates a **subprocess-typed** source step SHALL check whether
+A migration that vacates a **subprocess-typed** source step SHALL check whether
 that step has a live linked child, and SHALL skip the instance when one exists rather than commit the
-relocation. A child is **live** when its `status` is `running`, OR when it holds any undelivered outbox
+relocation. A migration vacates the step when the step id changes, and when a kept id's target
+is another step type. A child is **live** when its `status` is `running`, OR when it holds any undelivered outbox
 row — a terminal child whose `core.returnSubprocess` return has not yet delivered. The skip is
 transient: the instance keeps its pin and step, is recorded as a `migration.skipped` event with the
 `child-in-flight` reason, and is migrated by a later invocation once the child settles.
@@ -737,6 +755,14 @@ never on `parent.stepId`.
 - **WHEN** a parent parked at a subprocess step with a running child is relocated to a different step
 - **THEN** the instance is not migrated, keeps its pin and step, and is recorded as skipped with the
   `child-in-flight` reason
+
+#### Scenario: A kept step id with a new step type defers while the child runs
+
+<!-- antislop: allow passive-voice sentence-length - the WHEN/THEN phrasing matches the other scenarios in this spec -->
+- **WHEN** the plan keeps the step id of a parked subprocess step but the target
+  version declares it as another step type, and the child is running
+- **THEN** the instance is skipped with the `child-in-flight` reason
+- **AND** the migration cancels nothing
 
 #### Scenario: A terminal child with an undelivered return blocks the relocation
 
@@ -764,6 +790,8 @@ never on `parent.stepId`.
 
 Instances SHALL be selected by keyset pagination over the instance id, so that each
 batch strictly advances regardless of what happened to the previous one.
+
+<!-- antislop: allow synonym-rotation - an earlier scenario says cancels in the same window -->
 
 A bare limit over the source-version predicate does not terminate: an instance that
 is skipped, that loses a concurrency race, or that cannot be read all remain on the
@@ -816,3 +844,47 @@ the result is the only way an operator can act on them.
 - **WHEN** an instance loses a concurrency race during migration
 - **THEN** the result names it, it remains on the source version, and a later
   invocation migrates it
+
+### Requirement: A relocation off a subprocess step whose spawn is still queued commits
+
+A migration that relocates a parent off a subprocess step SHALL commit when the
+step has no live child. A spawn row that is `pending`, or `claimed` with an expired
+lease, does not block it. A live-claimed row still defers the migration as
+`pending-actions`. The relocation is a commit that leaves the step. It clears the
+parent's `awaitedChild` and enqueues the cancellation of that child. The queued
+spawn then finds the parent no longer awaiting its child and creates nothing.
+
+<!-- antislop: allow passive-voice sentence-length - the quoted requirement name sets the length and the passive form -->
+
+The live-child gate (see "A relocation off a subprocess step with a live child is
+deferred") still defers the migration while a child is live, and a migration SHALL
+NOT cancel a running child. The gate SHALL NOT widen to an undelivered spawn row.
+A dead-lettered spawn would then block the migration of the parent an operator
+wants to move.
+
+#### Scenario: A queued spawn does not block the relocation
+
+<!-- antislop: allow passive-voice - the WHEN/THEN phrasing matches the other scenarios in this spec -->
+- **WHEN** a parent whose spawn row is still pending is relocated off its
+  subprocess step by a migration
+- **THEN** the instance migrates, and it is not recorded as skipped
+
+#### Scenario: The late spawn creates no child
+
+<!-- antislop: allow passive-voice - the WHEN/THEN phrasing matches the other scenarios in this spec -->
+- **WHEN** the relocated parent's queued spawn is delivered afterwards
+- **THEN** no child instance exists for that visit, and the delivery succeeds
+
+#### Scenario: A running child still defers the relocation
+
+<!-- antislop: allow passive-voice - the WHEN/THEN phrasing matches the other scenarios in this spec -->
+- **WHEN** the spawn was delivered and its child is running, and the parent is
+  relocated off the step
+- **THEN** the instance is skipped with the `child-in-flight` reason, as before
+
+#### Scenario: A type flip with a settled child clears the awaited child
+
+<!-- antislop: allow passive-voice sentence-length - the WHEN/THEN phrasing matches the other scenarios in this spec -->
+- **WHEN** the plan keeps the step id of a parked subprocess step but the target
+  version declares it as another step type, and the child is settled
+- **THEN** the instance migrates and its `awaitedChild` is cleared

@@ -474,11 +474,11 @@ with the reserved `core.` prefix, in any of the five action positions
 (`onEntry`, `onExit`, `onCancel`, a path's `onPath`, a timer's
 `onFire.actions`) — regardless of which compile branch it takes.
 
-The reserved prefix names the engine-internal subprocess spawn and return
-handlers, which are synthesized at runtime and never stored in a body. An
-authored `core.*` action would reach that dispatch with author-chosen config
-and could drive an outcome, and an `outputMapping` writeback, into an instance
-of a different process.
+The reserved prefix names the engine-internal subprocess spawn, return and
+child-cancel handlers. The engine synthesizes them at runtime and never stores
+them in a body. An authored `core.*` action would reach that dispatch with author-chosen
+config. It could drive an outcome and an `outputMapping` writeback into an
+instance of a different process, or cancel an instance of one.
 
 The cancel-sink's reserved **identity** checks (its step id, its step key, and
 the reserved `cancelled` outcome) SHALL remain authored-body-only: a compiled

@@ -12,7 +12,7 @@ import { test, expect, beforeAll, beforeEach, spyOn } from "bun:test";
 import { sql, initSchema, createInstance } from "../src/engine/store.js";
 import { createDefaultAssignmentRegistry, resolveStepAssignment } from "../src/engine/registry.js";
 import { publishBody, createDefinitionStore } from "../src/engine/definitions.js";
-import { startInstance, executeManualTransition, claimStep } from "../src/engine/transition.js";
+import { startInstance, executeManualTransition, claimStep, CANCEL_CHILD_ACTION_TYPE } from "../src/engine/transition.js";
 import { drainOutbox } from "../src/engine/outbox.js";
 import { registerSubprocessHandlers } from "../src/engine/subprocess.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
@@ -1426,6 +1426,184 @@ test.skipIf(!DB)("subprocess: an instance skipped child-in-flight migrates on a 
   const res2 = await migrateInstances(p as Instance["processId"], 1, 2, sql);
   expect(res2.migrated).toEqual([parentId]);
   expect((await loadInstance(parentId))!.currentStepId as string).toBe("step_p_sub2");
+});
+
+// --- subprocess: the awaited child across a migration -------------------------
+
+// Parent v2 for the relocation and type-flip cases: a manual task step stands in
+// for the subprocess step, under `stepId`.
+function parentTaskBody(stepId: string): ProcessBody {
+  return {
+    key: "parent", label: { en: "Parent" }, baseLocale: "en",
+    fields: [f("marker", "string")],
+    workflow: { initialStep: "step_p_entry", steps: [
+      { id: "step_p_entry", key: "p_entry", label: { en: "Entry" }, type: "task", paths: [autoPath("path_p_task", stepId, 1)] },
+      { id: stepId, key: "p_task", label: { en: "Task" }, type: "task", paths: [manualPath("path_p_done", "step_p_done")] },
+      { id: "step_p_done", key: "p_done", label: { en: "Done" }, type: "task", terminal: true },
+    ] },
+  } as unknown as ProcessBody;
+}
+// Parent v2 with v1's structure and another label: every step id is kept.
+function parentRelabelledBody(childPid: string, childVersion: number): ProcessBody {
+  const body = parentSubBody(childPid, childVersion);
+  body.label = { en: "Parent v2" } as ProcessBody["label"];
+  return body;
+}
+
+const cancelRowTargets = async (id: string): Promise<string[]> =>
+  ((await sql`SELECT action->'config'->>'childId' AS child_id FROM outbox WHERE instance_id = ${id} AND action->>'type' = ${CANCEL_CHILD_ACTION_TYPE} ORDER BY transition_seq`) as
+    { child_id: string }[]).map((r) => r.child_id);
+const spawnRowStatuses = async (id: string): Promise<string[]> =>
+  ((await sql`SELECT status FROM outbox WHERE instance_id = ${id} AND action_id = 'action_spawn_step_p_sub' ORDER BY transition_seq`) as
+    { status: string }[]).map((r) => r.status);
+const childrenOf = async (id: string): Promise<number> =>
+  Number(((await sql`SELECT count(*) AS n FROM instances WHERE body->'parent'->>'instanceId' = ${id}`) as { n: number }[])[0].n);
+const skipEventsOf = async (id: string) => (await eventsOf(id)).filter((e) => e.kind === "migration.skipped");
+
+// Version 1 is parentSubBody over a waiting child, version 2 is `v2`, and `plan` is
+// registered for 1 -> 2. `start()` starts one parent on version 1 through the
+// engine; its spawn row stays pending until a drain. `unmatched` makes the child's
+// "done" outcome match no path, so a delivered return leaves the parent parked.
+async function parentWithPlan(v2: (childPid: string, childVersion: number) => ProcessBody, plan: MigrationSpec, unmatched = false) {
+  const cpid = CHILD_PID();
+  const p = pid();
+  const { registry } = engineRegistry();
+  const cv = await publishBody(cpid, childWaitBody(), reg, dataSourceReg);
+  const v1 = parentSubBody(cpid, cv.version);
+  if (unmatched) (v1.workflow.steps as any[])[1].paths[0].guard = cel('child.outcome == "never"');
+  await publishBody(p, v1, reg, dataSourceReg);
+  await publishBody(p, v2(cpid, cv.version), reg, dataSourceReg);
+  await registerMigrationPlan(p, 1, 2, plan);
+  const v1Body = (await createDefinitionStore(sql).resolveBody(p, 1))!;
+  const start = async () => {
+    const parent = await startInstance(v1Body, { processId: p, version: 1 }, actor);
+    return { parentId: parent.instanceId, childId: subprocessChildId(parent.instanceId, parent.transitionSeq, "step_p_sub") };
+  };
+  // Drives the child to its terminal step and drains its return.
+  const settle = async (childId: string) => {
+    const childBody = (await createDefinitionStore(sql).resolveBody(cpid, cv.version))!;
+    await executeManualTransition((await loadInstance(childId))!, "path_c_done", childBody, actor);
+    await drainAll(registry);
+  };
+  return { p, registry, start, settle };
+}
+const relocationPlan = { stepMap: { step_p_sub: "step_p_hold" } } as unknown as MigrationSpec;
+
+test.skipIf(!DB)("subprocess: a kept step id with a new step type defers while the child runs (child-in-flight)", async () => {
+  const { p, registry, start } = await parentWithPlan(() => parentTaskBody("step_p_sub"), {} as MigrationSpec);
+  const { parentId, childId } = await start();
+  await drainAll(registry); // the spawn creates the child, which waits
+  expect((await loadInstance(childId))!.status).toBe("running");
+
+  // The plan keeps the id of the parked subprocess step; the target declares a task step.
+  const logSpy = spyOn(console, "log").mockImplementation(() => {}); // appendSkip's warn line
+  const res = await migrateInstances(p, 1, 2, sql);
+  logSpy.mockRestore();
+  expect(res.skipped).toEqual([parentId]);
+  expect(res.migrated).toEqual([]);
+  expect((await skipEventsOf(parentId)).map((e) => e.payload.reason)).toEqual(["child-in-flight"]);
+  const parent = await loadInstance(parentId);
+  expect(parent!.version).toBe(1);
+  expect(parent!.currentStepId as string).toBe("step_p_sub");
+  expect(parent!.awaitedChild as string).toBe(childId);
+
+  // The migration cancels nothing, whatever a later drain delivers.
+  expect(await cancelRowTargets(parentId)).toEqual([]);
+  await drainAll(registry);
+  expect((await loadInstance(childId))!.status).toBe("running");
+});
+
+test.skipIf(!DB)("subprocess: a relocation off the step commits while its spawn row is pending, and the late spawn creates no child", async () => {
+  const { p, registry, start } = await parentWithPlan(() => parentTaskBody("step_p_hold"), relocationPlan);
+  const { parentId, childId } = await start();
+  expect(await spawnRowStatuses(parentId)).toEqual(["pending"]);
+  expect(await loadInstance(childId)).toBeUndefined();
+
+  const res = await migrateInstances(p, 1, 2, sql);
+  expect(res.migrated).toEqual([parentId]);
+  expect(res.skipped).toEqual([]);
+  expect(await skipEventsOf(parentId)).toHaveLength(0);
+  const migrated = await loadInstance(parentId);
+  expect(migrated!.version).toBe(2);
+  expect(migrated!.currentStepId as string).toBe("step_p_hold");
+  expect(migrated!.awaitedChild).toBeNull();
+  expect(await cancelRowTargets(parentId)).toEqual([childId]); // enqueued by the migration commit
+
+  await drainAll(registry); // the late spawn, then the cancel
+  expect(await loadInstance(childId)).toBeUndefined();
+  expect(await childrenOf(parentId)).toBe(0);
+  expect(await spawnRowStatuses(parentId)).toEqual(["delivered"]); // a success, not a failure
+  const after = await loadInstance(parentId);
+  expect(after!.status).toBe("running");
+  expect(after!.currentStepId as string).toBe("step_p_hold");
+});
+
+test.skipIf(!DB)("subprocess: a type flip with a settled child migrates and stores a null awaitedChild", async () => {
+  const { p, registry, start, settle } = await parentWithPlan(() => parentTaskBody("step_p_sub"), {} as MigrationSpec, true);
+  const { parentId, childId } = await start();
+  await drainAll(registry);
+  await settle(childId); // the child is terminal and its return delivered; the parent stays parked
+  expect((await loadInstance(parentId))!.currentStepId as string).toBe("step_p_sub");
+
+  const res = await migrateInstances(p, 1, 2, sql);
+  expect(res.migrated).toEqual([parentId]);
+  expect(await skipEventsOf(parentId)).toHaveLength(0);
+  const migrated = await loadInstance(parentId);
+  expect(migrated!.version).toBe(2);
+  expect(migrated!.currentStepId as string).toBe("step_p_sub"); // the same id, now a task step
+  expect(migrated!.awaitedChild).toBeNull(); // an explicit null, not undefined
+  expect(await cancelRowTargets(parentId)).toEqual([]);
+});
+
+test.skipIf(!DB)("subprocess: a running child defers the relocation while a pending spawn row does not", async () => {
+  const { p, registry, start } = await parentWithPlan(() => parentTaskBody("step_p_hold"), relocationPlan);
+  const withChild = await start();
+  await drainAll(registry); // this parent's spawn is delivered: its child runs
+  const withSpawnQueued = await start(); // this parent's spawn row stays pending
+  expect((await loadInstance(withChild.childId))!.status).toBe("running");
+  expect(await spawnRowStatuses(withSpawnQueued.parentId)).toEqual(["pending"]);
+
+  // One invocation over both: the gate must tell a running child from a queued spawn.
+  const logSpy = spyOn(console, "log").mockImplementation(() => {}); // appendSkip's warn line
+  const res = await migrateInstances(p, 1, 2, sql);
+  logSpy.mockRestore();
+  expect(res.skipped).toEqual([withChild.parentId]);
+  expect(res.migrated).toEqual([withSpawnQueued.parentId]);
+  expect((await skipEventsOf(withChild.parentId)).map((e) => e.payload.reason)).toEqual(["child-in-flight"]);
+  expect(await skipEventsOf(withSpawnQueued.parentId)).toHaveLength(0);
+
+  const kept = await loadInstance(withChild.parentId);
+  expect(kept!.version).toBe(1);
+  expect(kept!.currentStepId as string).toBe("step_p_sub");
+  expect(kept!.awaitedChild as string).toBe(withChild.childId);
+
+  // The migration cancels nothing: the running child survives every row a drain delivers.
+  expect(await cancelRowTargets(withChild.parentId)).toEqual([]);
+  await drainAll(registry);
+  expect((await loadInstance(withChild.childId))!.status).toBe("running");
+  expect(await loadInstance(withSpawnQueued.childId)).toBeUndefined();
+});
+
+test.skipIf(!DB)("subprocess: an identity migration keeps awaitedChild, so the existing child's return drives the parent off the step", async () => {
+  const { p, registry, start, settle } = await parentWithPlan(parentRelabelledBody, {} as MigrationSpec);
+  const { parentId, childId } = await start();
+  await drainAll(registry); // the spawn creates the child, which waits
+
+  const res = await migrateInstances(p, 1, 2, sql);
+  expect(res.migrated).toEqual([parentId]);
+  const migrated = await loadInstance(parentId);
+  expect(migrated!.version).toBe(2);
+  expect(migrated!.currentStepId as string).toBe("step_p_sub");
+  expect(migrated!.transitionSeq).toBe(2); // the sequence advanced: an id derived from it no longer names the child
+  expect(migrated!.awaitedChild as string).toBe(childId);
+  expect(await cancelRowTargets(parentId)).toEqual([]);
+
+  await settle(childId); // the child's "done" return matches the guard
+  const done = await loadInstance(parentId);
+  expect(done!.status).toBe("completed");
+  expect(done!.currentStepId as string).toBe("step_p_done");
+  expect(done!.awaitedChild).toBeNull();
+  expect(await childrenOf(parentId)).toBe(1);
 });
 
 // --- persistence: publish carries no rule; schema init is idempotent ----------

@@ -689,9 +689,9 @@ button a participant clicks to take it.
 A manual path waits for a person. The example gives `review` three of them:
 `approve`, `reject` and `escalate`.
 
-An automatic path fires by itself when its guard matches. A guard is a CEL
-expression. Two or more automatic paths on one step need a `priority` each,
-and the engine tries the lowest number first.
+An automatic path fires by itself when its guard matches, except on a
+subprocess step. A guard is a CEL expression. Two or more automatic paths on
+one step need a `priority` each, and the engine tries the lowest number first.
 
 The example gives `book` two automatic paths. `booked` has priority 1 and the
 guard `data.booking_status == 'booked'`. `booking-failed` has priority 2 and
@@ -707,6 +707,18 @@ answer from outside.
 
 An automatic path without a guard is the default. It must carry the highest
 priority number, so the engine tries it last.
+
+A subprocess step works differently. Its paths wait for the child. The
+engine tries none of them when the process enters the step, even a default.
+The child's return starts the evaluation, and each guard can then read
+`child.outcome`. In `examples/subprocess-loan-parent.json`, `check` has the
+guards `child.outcome == "approved"` and `child.outcome == "rejected"`.
+
+A default stays allowed on a subprocess step. It takes the outcome that no
+guard matches, such as `cancelled` from a child that someone cancelled.
+Without a default, an unmatched outcome leaves the process waiting on the
+step. The engine then records a `subprocess.outcome-unmatched` event. A guard
+that ignores `child` also waits for the return.
 
 The studio writes a guard for you. Its condition builder offers the catalog
 fields and emits the CEL. So this section tells you what the text means, not
@@ -866,6 +878,25 @@ A caller uses a subprocess step, which is a wait-state. The caller guards on
 `child.outcome`, never on a step id inside the child. That is the whole point
 of the contract. The child can change its steps freely, and the caller does
 not care.
+
+The process waits on that step while the child runs. Only the child's return,
+a timer, a migration or a cancel moves it off. A timer that names a target
+path forces that transition and cancels the running child. The child's
+`onCancel` actions run, and its own children cancel the same way. A timer
+path that leads back to the same step cancels the old child and starts a new
+one. A reminder timer moves nothing and cancels nothing.
+
+A migration that would move the process off the step skips the instance
+while the child runs, with the reason `child-in-flight`. It never cancels a
+running child. Keeping the step id but changing its type counts as moving
+off. A later migration run moves the process once the child settles. A
+queued spawn does not hold the migration back. The late spawn creates
+nothing.
+
+Publishing rejects `child` in a view entry's `visible`, `required` or
+`readonly` condition, also on a subprocess step. The form has no `child` in
+scope when it renders. A path guard and an `outputMapping` can read it. The
+studio's condition builder offers `child` operands in path guards only.
 
 For a worked pair, read `examples/subprocess-loan-parent.json` and
 `examples/subprocess-credit-check-child.json`.
@@ -1157,7 +1188,7 @@ A publication is immutable. Read the next chapter before you press it.
 ## After publish
 
 Publishing freezes the body. The version, its hash and every rule inside it
-stop changing. A running process rehydrates against exactly that body for the
+never change. A running process rehydrates against exactly that body for the
 rest of its life. Nobody can pull the ground out from under a process that is
 already halfway through.
 

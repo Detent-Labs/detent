@@ -173,6 +173,10 @@ function contextOperands(): Operand[] {
  * types it with `contractFieldSchema(childBody.fields, contract.outputFields)`,
  * so a key outside that set is a publish error — offering one would let the
  * builder author a guaranteed failure.
+ *
+ * Only a path guard on that step asks for them (`ConditionInput`'s `stepId`).
+ * The step's view overrides ask for none, because the runtime resolves a view
+ * flag with no child in scope and the authoring check rejects `child` there.
  */
 function childOperands(child: ProcessBody | undefined, locale: string): Operand[] {
   if (!child) return [];

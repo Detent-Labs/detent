@@ -19,6 +19,8 @@ import {
   GuardRefused,
   SPAWN_ACTION_TYPE,
   RETURN_ACTION_TYPE,
+  CANCEL_CHILD_ACTION_TYPE,
+  CANCEL_CHILD_ACTION_ID,
   type StepEntryOpts,
 } from "../src/engine/transition.js";
 import { idempotencyKey, subprocessChildId } from "../src/engine/idempotency.js";
@@ -193,6 +195,104 @@ test("without suppressSpawn, entering a subprocess target enqueues a spawn keyed
   const idAtAnotherSeq = subprocessChildId(from.instanceId, from.transitionSeq + 2, target.id as string);
   expect(idAtThisSeq).not.toBe(idAtAnotherSeq);
   expect(spawnRow!.idempotencyKey).toBe(idempotencyKey(from.instanceId, from.transitionSeq + 1, spawnRow!.actionId));
+});
+
+// --- awaitedChild and the leaving cancel row (pure) --------------------------------
+
+// The id an earlier visit's spawn derived. A plain id outside any body: the
+// planner reads the instance's field and never looks the left step up.
+const EARLIER_CHILD = "inst_earlier_visit_child";
+const cancelRows = (plan: ReturnType<typeof planStepEntry>) => plan.outbox.filter((r) => r.action.type === CANCEL_CHILD_ACTION_TYPE);
+
+test("entering a subprocess target records the child its spawn derives", () => {
+  const body = mkBody([subprocessTarget()]);
+  const target = body.workflow.steps[0]!;
+  const from = inst({ transitionSeq: 4 });
+  const plan = planStepEntry(from, target, body, baseOpts());
+  const spawn = plan.outbox.find((r) => r.action.type === SPAWN_ACTION_TYPE)!;
+  const { subprocessStepId, parentSeq } = spawn.action.config as { subprocessStepId: string; parentSeq: number };
+  expect(plan.instance.awaitedChild as string).toBe(subprocessChildId(from.instanceId, 5, "step_sub"));
+  expect(plan.instance.awaitedChild as string).toBe(subprocessChildId(from.instanceId, parentSeq, subprocessStepId));
+  expect(cancelRows(plan)).toHaveLength(0); // the instance awaited nothing before
+});
+
+test("a suppressed spawn onto a subprocess target carries the awaited child and cancels nothing", () => {
+  const body = mkBody([subprocessTarget()]);
+  const target = body.workflow.steps[0]!;
+  const from = inst({ currentStepId: "step_sub", transitionSeq: 4, awaitedChild: EARLIER_CHILD });
+  const plan = planStepEntry(from, target, body, { ...baseOpts(), cause: "migration", suppressSpawn: true, assignment: { carry: true } });
+  expect(plan.instance.awaitedChild as string).toBe(EARLIER_CHILD);
+  expect(plan.outbox).toHaveLength(0); // no spawn, no cancel
+});
+
+test("a suppressed spawn onto another step type clears the awaited child and cancels it", () => {
+  // A migration that keeps the step id but flips the step from subprocess to task.
+  const body = mkBody([step("step_sub", { paths: [manualPath("path_x", "step_sub")] })]);
+  const target = body.workflow.steps[0]!;
+  const from = inst({ currentStepId: "step_sub", transitionSeq: 4, awaitedChild: EARLIER_CHILD });
+  const plan = planStepEntry(from, target, body, { ...baseOpts(), cause: "migration", suppressSpawn: true, assignment: { carry: true } });
+  expect(plan.instance.awaitedChild).toBeNull();
+  const rows = cancelRows(plan);
+  expect(rows).toHaveLength(1);
+  expect(rows[0]!.action.config).toEqual({ childId: EARLIER_CHILD });
+});
+
+test("entering a step of another type with nothing awaited records null and cancels nothing", () => {
+  const body = simpleBody();
+  const target = body.workflow.steps.find((s) => (s.id as string) === "step_b")!;
+  const plan = planStepEntry(inst(), target, body, baseOpts());
+  expect(plan.instance.awaitedChild).toBeNull();
+  expect(cancelRows(plan)).toHaveLength(0);
+});
+
+test("a timer exit off a subprocess step enqueues one cancel row for the awaited child", () => {
+  const body = mkBody([step("step_late", { paths: [manualPath("path_x", "step_late")] })]);
+  const target = body.workflow.steps[0]!;
+  const from = inst({ currentStepId: "step_sub", transitionSeq: 2, awaitedChild: EARLIER_CHILD });
+  const plan = planStepEntry(from, target, body, { ...baseOpts(), pathId: "path_late" as HistoryEntry["pathId"], cause: "timer", actorId: undefined });
+  expect(plan.instance.awaitedChild).toBeNull();
+  const rows = cancelRows(plan);
+  expect(rows).toHaveLength(1);
+  expect(rows[0]).toEqual({
+    idempotencyKey: idempotencyKey(from.instanceId, 3, CANCEL_CHILD_ACTION_ID),
+    instanceId: from.instanceId,
+    transitionSeq: 3,
+    actionId: "action_cancel_awaited_child",
+    action: { id: "action_cancel_awaited_child", type: "core.cancelSubprocessChild", config: { childId: EARLIER_CHILD } },
+  });
+  expect(rows[0]!.action).not.toHaveProperty("retry"); // the default retry ceiling (design D3)
+});
+
+test("a migration relocation off a subprocess step enqueues one cancel row", () => {
+  const body = mkBody([step("step_other", { paths: [manualPath("path_x", "step_other")] })]);
+  const target = body.workflow.steps[0]!;
+  const from = inst({ currentStepId: "step_sub", transitionSeq: 2, awaitedChild: EARLIER_CHILD });
+  const plan = planStepEntry(from, target, body, { ...baseOpts(), pathId: null, cause: "migration", entryVersion: 2, assignment: { carry: true } });
+  expect(plan.instance.awaitedChild).toBeNull();
+  expect(cancelRows(plan).map((r) => r.action.config)).toEqual([{ childId: EARLIER_CHILD }]);
+});
+
+test("a cancel commit leaves the awaited child to the sweep and enqueues no cancel row", () => {
+  const body = mkBody([step("step_cancelled", { terminal: true })]);
+  const target = body.workflow.steps[0]!;
+  const from = inst({ currentStepId: "step_sub", transitionSeq: 2, awaitedChild: EARLIER_CHILD });
+  const plan = planStepEntry(from, target, body, { ...baseOpts(), pathId: null, cause: "cancel", status: "cancelled" });
+  expect(plan.instance.awaitedChild).toBeNull();
+  expect(cancelRows(plan)).toHaveLength(0);
+});
+
+test("an unsuppressed self-loop records the new visit's child and cancels the previous one", () => {
+  const body = mkBody([subprocessTarget()]);
+  const target = body.workflow.steps[0]!;
+  const previous = subprocessChildId("inst_x", 1, "step_sub");
+  const from = inst({ currentStepId: "step_sub", transitionSeq: 3, awaitedChild: previous });
+  const plan = planStepEntry(from, target, body, { ...baseOpts(), cause: "timer" });
+  const next = subprocessChildId("inst_x", 4, "step_sub");
+  expect(next).not.toBe(previous);
+  expect(plan.instance.awaitedChild as string).toBe(next);
+  expect(cancelRows(plan).map((r) => r.action.config)).toEqual([{ childId: previous }]);
+  const spawn = plan.outbox.find((r) => r.action.type === SPAWN_ACTION_TYPE)!;
+  expect((spawn.action.config as { parentSeq: number }).parentSeq).toBe(4);
 });
 
 // --- the subprocess return (pure) -------------------------------------------------
@@ -440,6 +540,65 @@ test.skipIf(!DB)("suppressSpawn enqueues no spawn row; the same commit without i
   await withTransaction(sql, (tx) => applyStepEntry(tx, planStepEntry(i2, target, child, baseOpts())));
   const spawns2 = (await sql`SELECT action_id FROM outbox WHERE instance_id = ${i2.instanceId} AND action->>'type' = ${SPAWN_ACTION_TYPE}`) as unknown[];
   expect(spawns2).toHaveLength(1);
+});
+
+const storedBody = async (instanceId: string): Promise<Record<string, unknown>> => {
+  const row = (await sql`SELECT body FROM instances WHERE instance_id = ${instanceId}`) as { body: unknown }[];
+  return (typeof row[0]!.body === "string" ? JSON.parse(row[0]!.body as string) : row[0]!.body) as Record<string, unknown>;
+};
+
+// A subprocess initial step, and a task step a timer could force the parent onto.
+const subInitialBody = (): ProcessBody =>
+  mkBody([
+    { ...subprocessTarget(), paths: [{ id: "path_late", key: "late", label: "Late", to: "step_late", trigger: "automatic" }] } as unknown as Step,
+    step("step_late", { paths: [manualPath("path_done", "step_done")] }),
+    step("step_done", { terminal: true }),
+  ], "step_sub");
+
+test.skipIf(!DB)("creation on a subprocess initial step stores the child id derived at sequence 0", async () => {
+  const body = subInitialBody();
+  const i = await createInstance(body, { processId: pid, version: 1 });
+  const derived = subprocessChildId(i.instanceId, 0, "step_sub");
+  expect(i.awaitedChild as string).toBe(derived);
+  expect((await storedBody(i.instanceId)).awaitedChild).toBe(derived);
+  // The id matches the one the creation-enqueued spawn derives from its own config.
+  const spawn = (await sql`SELECT action FROM outbox WHERE instance_id = ${i.instanceId} AND action->>'type' = ${SPAWN_ACTION_TYPE}`) as { action: unknown }[];
+  const cfg = ((typeof spawn[0]!.action === "string" ? JSON.parse(spawn[0]!.action as string) : spawn[0]!.action) as { config: { subprocessStepId: string; parentSeq: number } }).config;
+  expect(subprocessChildId(i.instanceId, cfg.parentSeq, cfg.subprocessStepId)).toBe(derived);
+});
+
+test.skipIf(!DB)("creation on any other initial step leaves awaitedChild absent", async () => {
+  const i = await createInstance(simpleBody(), { processId: pid, version: 1 });
+  expect(i.awaitedChild).toBeUndefined();
+  expect(await storedBody(i.instanceId)).not.toHaveProperty("awaitedChild");
+});
+
+test.skipIf(!DB)("a commit entering a subprocess step stores the derived child id", async () => {
+  const body = mkBody([step("step_a", { paths: [manualPath("path_ab", "step_sub")] }), subprocessTarget()]);
+  const i = await createInstance(body, { processId: pid, version: 1 });
+  const target = body.workflow.steps[1]!;
+  await withTransaction(sql, (tx) => applyStepEntry(tx, planStepEntry(i, target, body, baseOpts())));
+  expect((await storedBody(i.instanceId)).awaitedChild).toBe(subprocessChildId(i.instanceId, 1, "step_sub"));
+});
+
+test.skipIf(!DB)("a commit leaving a subprocess step stores null and enqueues the child's cancellation", async () => {
+  const body = subInitialBody();
+  const i = await createInstance(body, { processId: pid, version: 1 });
+  const awaited = i.awaitedChild as string;
+  const target = body.workflow.steps.find((s) => (s.id as string) === "step_late")!;
+  await withTransaction(sql, (tx) =>
+    applyStepEntry(tx, planStepEntry(i, target, body, { ...baseOpts(), pathId: "path_late" as HistoryEntry["pathId"], cause: "timer" })));
+
+  const stored = await storedBody(i.instanceId);
+  expect(stored).toHaveProperty("awaitedChild", null); // an explicit null, not a kept value
+  const rows = (await sql`SELECT idempotency_key, transition_seq, action FROM outbox
+    WHERE instance_id = ${i.instanceId} AND action->>'type' = ${CANCEL_CHILD_ACTION_TYPE}`) as
+    { idempotency_key: string; transition_seq: number; action: unknown }[];
+  expect(rows).toHaveLength(1);
+  expect(Number(rows[0]!.transition_seq)).toBe(1);
+  expect(rows[0]!.idempotency_key).toBe(idempotencyKey(i.instanceId, 1, CANCEL_CHILD_ACTION_ID));
+  const action = (typeof rows[0]!.action === "string" ? JSON.parse(rows[0]!.action as string) : rows[0]!.action) as { config: unknown };
+  expect(action.config).toEqual({ childId: awaited });
 });
 
 test.skipIf(!DB)("a terminal entry with a parent enqueues exactly one return row", async () => {

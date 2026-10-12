@@ -9,6 +9,8 @@ import { z } from "zod";
 import { checkActionRegistry } from "../src/engine/registry-check.js";
 import { createRegistry } from "../src/engine/registry.js";
 import { createDefaultRegistry } from "../src/engine/host.js";
+import { registerSubprocessHandlers } from "../src/engine/subprocess.js";
+import type { SQL } from "bun";
 import { processBody, type ProcessBody } from "../src/schema/definition.js";
 
 const action = (type: string, config: Record<string, unknown> = {}) => ({ id: "action_x", type, config });
@@ -148,6 +150,19 @@ test("a core.-prefixed action type registered with a configSchema is config-chec
   const issues = checkActionRegistry(bodyWithActions({ onEntry: [action("core.spawnSubprocess", { subprocessStepId: "step_a", parentSeq: "not-a-number" })] }), reg);
   expect(issues.length).toBe(1);
   expect(issues[0]!.loc).toContain("onEntry");
+});
+
+test("a forged config reaching the registered child-cancel handler fails on shape", () => {
+  // The registration the engine itself performs, closures only: no query runs.
+  const reg = createRegistry();
+  registerSubprocessHandlers(reg, {} as SQL, async () => undefined, async () => undefined);
+  const forged = checkActionRegistry(bodyWithActions({ onEntry: [action("core.cancelSubprocessChild", { childId: 42 })] }), reg);
+  expect(forged.length).toBe(1);
+  expect(forged[0]!.type).toBe("core.cancelSubprocessChild");
+  expect(forged[0]!.loc).toContain("onEntry");
+  const missing = checkActionRegistry(bodyWithActions({ onEntry: [action("core.cancelSubprocessChild", {})] }), reg);
+  expect(missing.length).toBe(1);
+  expect(checkActionRegistry(bodyWithActions({ onEntry: [action("core.cancelSubprocessChild", { childId: "inst_c" })] }), reg)).toEqual([]);
 });
 
 test("multiple invalid actions each produce their own issue, not just the first", () => {

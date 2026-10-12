@@ -27,10 +27,11 @@ Below the rows the builder SHALL show the CEL it produces, on a
 read-only line.
 
 That row's operand picker SHALL withhold `child.outcome` and
-`child.data`. It writes one expression across steps of mixed type. "A
-subprocess step offers the child's contract as operands" scopes those
-operands to a site on the subprocess step itself. The row keeps the
-CEL toggle presentation every view-override site takes.
+`child.data`. It writes one expression across steps of mixed type. The
+requirement "A subprocess step's path guards offer the child's contract as
+operands" scopes those operands. Only a path guard on the subprocess step
+itself offers them. The row keeps the CEL toggle presentation every
+view-override site takes.
 
 A timer deadline is not a condition and keeps its text input.
 
@@ -234,20 +235,20 @@ still reach every variable the engine registers.
 - **WHEN** a developer types `actor.id == "usr_x"` in the CEL surface
 - **THEN** the expression stays valid exactly as it is today
 
-### Requirement: A subprocess step offers the child's contract as operands
+### Requirement: A subprocess step's path guards offer the child's contract as operands
 
-A condition may sit on a subprocess step whose child resolved. The picker SHALL
-then offer `child.outcome`, carrying the child contract's declared outcomes as
-its values. It SHALL also offer `child.data.<key>`, over the child contract's
+A path guard on a subprocess step whose child resolved SHALL offer
+`child.outcome`, carrying the child contract's declared outcomes as its values.
+It SHALL also offer `child.data.<key>`, over the child contract's
 `outputFields` alone. The authoring check types `child.data` against those
 fields, so a key outside them would author a publish error.
 
-Both condition sites on such a step SHALL carry these operands. Those are the
-step's path guards and its three view overrides. The authoring check admits
-`child` at both.
+The view overrides on that step (`visible`, `required` and `readonly`)
+SHALL NOT offer these operands. The authoring check withholds `child` there,
+because the runtime resolves a view flag with no child in scope.
 
 When the child does not resolve, `child.outcome` SHALL fall back to a free-text
-value, and no `child.data.<key>` operand SHALL appear.
+value at the path guard. No `child.data.<key>` operand SHALL appear then.
 
 #### Scenario: A resolved child gives an outcome picker
 
@@ -256,11 +257,12 @@ value, and no `child.data.<key>` operand SHALL appear.
 - **THEN** `child.outcome` offers exactly the outcomes the child contract
   declares
 
-#### Scenario: A view override on a subprocess step reaches child too
+#### Scenario: A view override on a subprocess step offers no child operand
 
-- **WHEN** a developer opens the `visible` override of a view field on that same
-  subprocess step
-- **THEN** the picker offers `child.outcome` and `child.data.<key>` there as well
+- **WHEN** a developer opens a view field's `visible`, `required` or `readonly`
+  override on that same subprocess step
+- **OR** the developer opens a note's `visible` override
+- **THEN** the picker offers neither `child.outcome` nor `child.data.<key>`
 
 #### Scenario: Only the contract's output fields appear
 
@@ -270,8 +272,8 @@ value, and no `child.data.<key>` operand SHALL appear.
 #### Scenario: An unresolved child falls back to text
 
 - **WHEN** the subprocess step's child did not resolve
-- **THEN** `child.outcome` takes a free-text value, and no `child.data` operand
-  appears
+- **THEN** `child.outcome` takes a free-text value at the path guard, and no
+  `child.data` operand appears
 
 ### Requirement: Operators and value editors follow the operand type
 

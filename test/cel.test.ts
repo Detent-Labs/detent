@@ -200,11 +200,47 @@ test("rejects an unknown field reference in a step-level validation.rule", () =>
 
 // A step-level validation.rule runs during submission against
 // buildGuardContext, which registers no `child` — on a subprocess step
-// either, unlike that step's visible/required/readonly expressions.
+// either, like that step's visible/required/readonly flags below.
 test("rejects child.* in a step-level validation.rule on a subprocess step", () => {
   const issues = validateProcessBody(body({ steps: [ruleStep("child.outcome == 'ok'", "subprocess")] }));
   expect(issues.length).toBe(1);
   expect(msgs(issues).toLowerCase()).toContain("child");
+});
+
+// The flags resolve at render and at submission, against buildGuardContext, which
+// registers no `child`: the parked parent has no child result yet. A flag that
+// read it would always evaluate to false, so each is an unknown reference.
+const flagStep = (entry: Record<string, unknown>) => ({
+  id: "step_a",
+  key: "a",
+  label: { en: "A" },
+  type: "subprocess",
+  terminal: true,
+  view: { fields: [entry] },
+});
+
+const childFlag = { lang: "cel", src: "child.outcome == 'ok'" };
+
+test.each(["visible", "required", "readonly"])("rejects child.* in a view field's %s flag on a subprocess step", (flag) => {
+  const issues = validateProcessBody(body({ steps: [flagStep({ ref: "field_amount", [flag]: childFlag })] }));
+  expect(issues.length).toBe(1);
+  expect(issues[0]!.loc).toBe(`steps[0].view.fields[0].${flag}`);
+  expect(issues[0]!.message).toContain("Unknown variable: child");
+});
+
+test("rejects child.* in a note entry's visible flag on a subprocess step", () => {
+  const issues = validateProcessBody(
+    body({ steps: [flagStep({ kind: "note", text: { en: "Waiting" }, visible: childFlag })] }),
+  );
+  expect(issues.length).toBe(1);
+  expect(issues[0]!.loc).toBe("steps[0].view.fields[0].visible");
+  expect(issues[0]!.message).toContain("Unknown variable: child");
+});
+
+test("accepts a view flag over data on a subprocess step", () => {
+  const flag = { lang: "cel", src: "data.amount > 10" };
+  const entry = { ref: "field_amount", visible: flag, required: flag, readonly: flag };
+  expect(validateProcessBody(body({ steps: [flagStep(entry)] }))).toEqual([]);
 });
 
 test("rejects result in a step-level validation.rule", () => {

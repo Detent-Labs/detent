@@ -25,7 +25,7 @@ drives it through the subprocess return path.
 
 `process.start` is an ordinary, author-visible action type. It MUST NOT
 carry the `core.` prefix reserved for the engine-internal subprocess
-spawn/return pair. An author MAY place it at any action position an
+spawn, return and child-cancel handlers. An author MAY place it at any action position an
 authored body allows. That includes `onEntry`, `onExit`, `onCancel`, a
 path's `onPath`, and a timer's `onFire`. The publish-time action registry
 check covers it like any other action.
