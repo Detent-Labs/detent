@@ -29,7 +29,8 @@ word. `ROADMAP.md` carries stage-by-stage status.
   stays one JCS-hashed document nested by `id` and never becomes NDJSON.
   `historyByInstance` and `selectInRange` (`src/engine/reporting.ts:108` and
   `:98`) fully materialize a date range into memory today before returning a
-  JSON array. Worth building when stage 27's reporting-app (cycle time,
+  JSON array. A range above 20000 instances answers 400, so the buffer has a
+  ceiling. Worth building when stage 27's reporting-app (cycle time,
   bottlenecks, SLA) needs a downloadable or streamable export, or when a
   `selectInRange` result set gets large enough that the in-memory buffering
   is a measured problem, not speculatively before either happens. Needs its
@@ -1695,12 +1696,6 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   hung target stops the outbox for all tenants, and the admin outbox list has
   no index for its sort order. Anchors: `src/engine/resolution.ts`,
   `src/engine/retention.ts`, `src/engine/host.ts`.
-- **`harden-reporting-export-and-queries` (C-4 (= D-2), C-5, C-13, C-19;
-  medium)**: The CSV export does not neutralize formulas, report and CSV stop
-  at 50 rows, and the CSV does not say so, an editor can displace a report's
-  owner, and the aggregates load the whole range into memory. Anchors:
-  `src/runtime/reports.ts`, `src/engine/reporting.ts`,
-  `src/http/reporting-routes.ts`.
 - **`harden-tenancy-provisioning` (C-8, C-9, C-14, C-15; medium)**: In SaaS
   mode a token from an external identity provider never resolves to its
   tenant, tenant pools open more than once and never close, two tenants can

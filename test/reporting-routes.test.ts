@@ -14,7 +14,9 @@ import { REPORTS_ROLE, ADMIN_ROLE } from "../src/auth/authorize.js";
 import { publishBody } from "../src/engine/definitions.js";
 import type { Actor } from "../src/cel/eval.js";
 import type { ProcessBody, ProcessId } from "../src/schema/definition.js";
+import { REPORT_INSTANCE_CAP } from "../src/engine/reporting.js";
 import { clearInstanceAudit } from "./audit-cleanup.js";
+import { cloneInstances } from "./helpers/bulk-instances.js";
 
 const DB = !!process.env.DATABASE_URL;
 const reg = createRegistry();
@@ -244,3 +246,50 @@ test("OPTIONS on a reporting view route answers 204 permitting GET", async () =>
   expect(res.status).toBe(204);
   expect(res.headers.get("Access-Control-Allow-Methods")).toBe("GET");
 });
+
+/**
+ * The instance cap (REPORT_INSTANCE_CAP). One template instance is cloned in a
+ * single statement; the clones inherit its in-range `startedAt` from the body.
+ * The cap tests seed 20000 rows, so each one seeds once and asks every view.
+ */
+async function seedInRange(P: ProcessId, version: number, kind?: "test"): Promise<string> {
+  const inst = await createInstance(body("v1"), { processId: P, version, kind }, sql);
+  await sql`UPDATE instances SET body = body || ${{ startedAt: "2026-07-10T00:00:00.000Z" }}::jsonb WHERE instance_id = ${inst.instanceId}`;
+  return inst.instanceId;
+}
+
+test.skipIf(!DB)("a range holding more than 20000 instances gets 400 on every view", async () => {
+  const P = pid();
+  const v = await publishBody(P, body("v1"), reg, dataSourceReg);
+  const template = await seedInRange(P, v.version);
+  await cloneInstances(sql, template, REPORT_INSTANCE_CAP);
+  const [{ n: seeded }] = (await sql`SELECT count(*)::int AS n FROM instances WHERE process_id = ${P}`) as { n: number }[];
+  expect(seeded).toBe(REPORT_INSTANCE_CAP + 1);
+
+  for (const view of VIEWS) {
+    const res = await fetch(req(`http://x/reporting/${P}/${view}?${RANGE}`, adminReports));
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: { type: string } }).error.type).toBe("request-shape");
+  }
+}, 60_000);
+
+test.skipIf(!DB)("a range holding exactly 20000 instances gets 200, and a test instance does not count toward the cap", async () => {
+  const P = pid();
+  const v = await publishBody(P, body("v1"), reg, dataSourceReg);
+  const template = await seedInRange(P, v.version);
+  await cloneInstances(sql, template, REPORT_INSTANCE_CAP - 1);
+  const [{ n: seeded }] = (await sql`SELECT count(*)::int AS n FROM instances WHERE process_id = ${P}`) as { n: number }[];
+  expect(seeded).toBe(REPORT_INSTANCE_CAP);
+
+  for (const view of VIEWS) {
+    expect((await fetch(req(`http://x/reporting/${P}/${view}?${RANGE}`, adminReports))).status).toBe(200);
+  }
+
+  // One test-kind instance in the same range makes the row count 20001. The view still answers.
+  await seedInRange(P, v.version, "test");
+  const [{ n: withTest }] = (await sql`SELECT count(*)::int AS n FROM instances WHERE process_id = ${P}`) as { n: number }[];
+  expect(withTest).toBe(REPORT_INSTANCE_CAP + 1);
+  for (const view of VIEWS) {
+    expect((await fetch(req(`http://x/reporting/${P}/${view}?${RANGE}`, adminReports))).status).toBe(200);
+  }
+}, 120_000);

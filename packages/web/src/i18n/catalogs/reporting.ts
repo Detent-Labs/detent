@@ -54,7 +54,8 @@ export const en = {
   "error.failed": "Failed",
   "error.authorization": "You don't have permission to read this report.",
   "error.actorResolution": "Your session could not be resolved. Sign in again.",
-  "error.requestShape": "That request was malformed.",
+  "error.requestShape":
+    "That request was malformed, or its date range holds too many instances. Narrow the date range and try again.",
   "error.notFound": "Not found.",
   "error.conflict": "This was changed elsewhere. Refresh and try again.",
   "error.network": "Could not reach the server. Check your connection and try again.",
@@ -177,7 +178,8 @@ export const de: Record<keyof typeof en, string> = {
   "error.failed": "Fehlgeschlagen",
   "error.authorization": "Sie dürfen diesen Bericht nicht lesen.",
   "error.actorResolution": "Ihre Sitzung konnte nicht aufgelöst werden. Melden Sie sich erneut an.",
-  "error.requestShape": "Diese Anfrage war fehlerhaft.",
+  "error.requestShape":
+    "Diese Anfrage war fehlerhaft, oder ihr Zeitraum umfasst zu viele Instanzen. Grenzen Sie den Zeitraum ein und versuchen Sie es erneut.",
   "error.notFound": "Nicht gefunden.",
   "error.conflict": "Das wurde an anderer Stelle geändert. Laden Sie neu und versuchen Sie es erneut.",
   "error.network": "Der Server war nicht erreichbar. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.",

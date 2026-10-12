@@ -24,9 +24,11 @@ import {
   ReportOwnerInvariantError,
   type ReportColumn,
 } from "../src/runtime/api.js";
+import { REPORT_ROW_LIMIT } from "../src/runtime/reports.js";
 import type { ProcessBody, ProcessId, FieldId, Instance } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
 import { clearInstanceAudit } from "./audit-cleanup.js";
+import { cloneInstances } from "./helpers/bulk-instances.js";
 
 const DB = !!process.env.DATABASE_URL;
 const reg = createRegistry();
@@ -178,6 +180,87 @@ test.skipIf(!DB)("2.2 reassigning the owner to a non-editor is rejected", async 
   expect(raised).toBeInstanceOf(ReportOwnerInvariantError);
   const stillIntact = await getReport(created.reportId, owner, sql);
   expect(stillIntact?.owner).toBe(owner.id);
+});
+
+test.skipIf(!DB)("2.2 an editor who takes ownership while dropping the owner is rejected", async () => {
+  const PID = pid("owner_invariant_takeover");
+  await publishBody(PID, reportBody("owner3", []), reg, dataSourceReg);
+  const created = await createReport(owner, { processId: PID, name: "R", editors: [editorActor.id] }, sql);
+
+  let raised: unknown;
+  try {
+    await updateReport(created.reportId, editorActor, { owner: editorActor.id, editors: [editorActor.id] }, sql);
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(ReportOwnerInvariantError);
+  const stillIntact = await getReport(created.reportId, owner, sql);
+  expect(stillIntact?.owner).toBe(owner.id);
+  expect([...(stillIntact?.editors ?? [])].sort()).toEqual([editorActor.id, owner.id].sort());
+});
+
+test.skipIf(!DB)("2.2 an editor who drops the owner from editors without taking ownership is rejected", async () => {
+  const PID = pid("owner_invariant_editor_drop");
+  await publishBody(PID, reportBody("owner3b", []), reg, dataSourceReg);
+  const created = await createReport(owner, { processId: PID, name: "R", editors: [editorActor.id] }, sql);
+
+  let raised: unknown;
+  try {
+    await updateReport(created.reportId, editorActor, { editors: [editorActor.id] }, sql);
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(ReportOwnerInvariantError);
+  const stillIntact = await getReport(created.reportId, owner, sql);
+  expect(stillIntact?.owner).toBe(owner.id);
+  expect([...(stillIntact?.editors ?? [])].sort()).toEqual([editorActor.id, owner.id].sort());
+});
+
+test.skipIf(!DB)("2.2 the owner can hand over ownership with a list that leaves them out", async () => {
+  const PID = pid("owner_invariant_handover");
+  await publishBody(PID, reportBody("owner4", []), reg, dataSourceReg);
+  const created = await createReport(owner, { processId: PID, name: "R", editors: [editorActor.id] }, sql);
+
+  const updated = await updateReport(created.reportId, owner, { owner: editorActor.id, editors: [editorActor.id] }, sql);
+  expect(updated?.owner).toBe(editorActor.id);
+  expect(updated?.editors).toEqual([editorActor.id]);
+});
+
+test.skipIf(!DB)("2.2 an editor can take ownership while the former owner stays an editor", async () => {
+  const PID = pid("owner_invariant_takeover_keep");
+  await publishBody(PID, reportBody("owner4b", []), reg, dataSourceReg);
+  const created = await createReport(owner, { processId: PID, name: "R", editors: [editorActor.id] }, sql);
+
+  const updated = await updateReport(created.reportId, editorActor, { owner: editorActor.id, editors: [owner.id, editorActor.id] }, sql);
+  expect(updated?.owner).toBe(editorActor.id);
+  expect(updated?.editors).toContain(owner.id);
+});
+
+test.skipIf(!DB)("2.2 a new owner outside the current editors is rejected even when the same update adds them", async () => {
+  const PID = pid("owner_invariant_new_owner");
+  await publishBody(PID, reportBody("owner5", []), reg, dataSourceReg);
+  const created = await createReport(owner, { processId: PID, name: "R" }, sql);
+
+  let raised: unknown;
+  try {
+    await updateReport(created.reportId, owner, { owner: stranger.id, editors: [owner.id, stranger.id] }, sql);
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(ReportOwnerInvariantError);
+  const stillIntact = await getReport(created.reportId, owner, sql);
+  expect(stillIntact?.owner).toBe(owner.id);
+  expect(stillIntact?.editors).toEqual([owner.id]);
+});
+
+test.skipIf(!DB)("2.2 an editor's update that keeps the owner in editors is accepted", async () => {
+  const PID = pid("owner_invariant_editor_ok");
+  await publishBody(PID, reportBody("owner6", []), reg, dataSourceReg);
+  const created = await createReport(owner, { processId: PID, name: "R", editors: [editorActor.id] }, sql);
+
+  const updated = await updateReport(created.reportId, editorActor, { name: "Renamed", editors: [owner.id, editorActor.id, stranger.id] }, sql);
+  expect(updated?.owner).toBe(owner.id);
+  expect(updated?.name).toBe("Renamed");
 });
 
 test.skipIf(!DB)("2.3 report access is owner, editor or viewer, checked by membership", async () => {
@@ -552,16 +635,24 @@ test.skipIf(!DB)("3.6 a merge column on a redacted instance renders redacted, no
   expect(result?.rows[0]?.cells[0]).toEqual({ kind: "redacted" });
 });
 
-test.skipIf(!DB)("3.7 report execution reuses queryInstances's own bounding", async () => {
+test.skipIf(!DB)("3.7 report execution bounds its result at REPORT_ROW_LIMIT, one over trips truncation", async () => {
   const PID = pid("truncation");
   const v = await publishBody(PID, reportBody("truncation", []), reg, dataSourceReg);
-  // DEFAULT_LIST_LIMIT is 50 (private in src/runtime/api.ts) — one over it trips truncation.
-  for (let i = 0; i < 51; i++) await createInstance(v.definition, { processId: PID, version: v.version }, sql);
+  expect(REPORT_ROW_LIMIT).toBe(1000);
+  const first = await createInstance(v.definition, { processId: PID, version: v.version }, sql);
+  // One bulk insert: 1001 instances in all, one over the report row limit.
+  const clones = await cloneInstances(sql, first.instanceId, REPORT_ROW_LIMIT);
 
   const report = await createReport(owner, { processId: PID, name: "R", viewers: [admin.id] }, sql);
-  const result = await executeReport(report.reportId, admin, sql);
-  expect(result?.truncated).toBe(true);
-  expect(result?.rows).toHaveLength(50);
+  const over = await executeReport(report.reportId, admin, sql);
+  expect(over?.rows).toHaveLength(REPORT_ROW_LIMIT);
+  expect(over?.truncated).toBe(true);
+
+  // Removing one lands exactly on the bound: 1000 rows, nothing cut.
+  await sql`DELETE FROM instances WHERE instance_id = ${clones[0]!}`;
+  const exact = await executeReport(report.reportId, admin, sql);
+  expect(exact?.rows).toHaveLength(REPORT_ROW_LIMIT);
+  expect(exact?.truncated).toBe(false);
 });
 
 test.skipIf(!DB)("3.7 a result within the bound is not marked truncated", async () => {

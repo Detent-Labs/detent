@@ -2406,7 +2406,7 @@ restores the same process, filters, columns and share lists exactly,
 including the just-added viewer. Confirm this after a full page reload, not
 only from the in-memory state a save leaves behind.
 
-Push a process past the 50-instance execution bound and preview again. Pass:
+Push a process past the 1000-row report limit and preview again. Pass:
 a stated notice starts "This table is incomplete" and explains more
 instances matched than the table can show. The table never goes silently
 short with no explanation.
@@ -2433,6 +2433,29 @@ caught the "Add columnAdd" duplicate name, since fixed in
 `ColumnEditor.tsx`'s `FieldPicker`. Nor can either see a save that silently
 fails to persist a locally-added viewer. This walk confirms that round trip
 with a real reload, rather than trusting in-memory state.
+
+### Report row limit, CSV marker and range cap (`harden-reporting-export-and-queries`)
+
+Seed a process with 1100 running instances in range, for example by cloning
+one instance row in SQL. Log in as `demo-superuser@example.test` and build a
+report over that process with one column. Choose Preview table.
+
+Pass: the table holds 1000 rows. The notice "This table is incomplete" shows
+above it. Save the report and choose Download CSV. Pass: the file holds the
+header row, 1000 data rows and a last line that reads
+`(truncated: first 1000 rows only)`.
+
+Seed more clones until the process holds more than 20000 instances in range.
+Open the process's cycle-time view with the default range. Pass: the screen
+shows its failure note in place of the figures.
+
+The note names two causes: a malformed request, or a range with too many
+instances. It tells the reader to narrow the date range. Repeat in German. Pass: the
+German note says the same and fits the viewport without clipping.
+
+This check stays manual because it needs a real download and a real error
+render. `test/reporting-routes.test.ts` covers the 400 and
+`test/reporting-csv.test.ts` covers the marker line.
 
 ### The instance.query data source's purpose-built form
 

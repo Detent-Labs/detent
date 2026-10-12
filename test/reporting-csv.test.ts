@@ -78,3 +78,100 @@ test("a value carrying a comma, a quote or a newline is quoted per RFC 4180", ()
   expect(lines[2]).toBe('"He said ""hi"""');
   expect(lines[3]).toBe('"line1\nline2"');
 });
+
+test("a string value starting with a formula character gets one leading apostrophe", () => {
+  const starts = ["=1+1", "+1", "-x", "@x", "\tx", "\rx"];
+  const result: ReportExecutionResult = {
+    columns: [{ type: "field", fieldId: "name" as FieldId }],
+    rows: starts.map((value, i) => ({ instanceId: `inst_${i}` as InstanceId, cells: [{ kind: "value", value }] })),
+    truncated: false,
+  };
+  const csv = reportResultToCsv(result);
+  expect(csv).toBe("name\r\n'=1+1\r\n'+1\r\n'-x\r\n'@x\r\n'\tx\r\n\"'\rx\"\r\n");
+});
+
+test("a number, a boolean and a plain string keep their text", () => {
+  const result: ReportExecutionResult = {
+    columns: [{ type: "field", fieldId: "v" as FieldId }],
+    rows: [
+      { instanceId: "inst_1" as InstanceId, cells: [{ kind: "value", value: -5 }] },
+      { instanceId: "inst_2" as InstanceId, cells: [{ kind: "value", value: true }] },
+      { instanceId: "inst_3" as InstanceId, cells: [{ kind: "value", value: "a=b" }] },
+    ],
+    truncated: false,
+  };
+  expect(reportResultToCsv(result)).toBe("v\r\n-5\r\ntrue\r\na=b\r\n");
+});
+
+test("a merge cell holding a formula-like string gets the prefix", () => {
+  const result: ReportExecutionResult = {
+    columns: [{ type: "merge", fieldIds: ["a" as FieldId, "b" as FieldId], collisions: 0 }],
+    rows: [{ instanceId: "inst_1" as InstanceId, cells: [{ kind: "value", value: "-5", collision: false }] }],
+    truncated: false,
+  };
+  expect(reportResultToCsv(result).split("\r\n")[1]).toBe("'-5");
+});
+
+test("the three empty-cell markers carry no prefix", () => {
+  const result: ReportExecutionResult = {
+    columns: [{ type: "field", fieldId: "a" as FieldId }, { type: "field", fieldId: "b" as FieldId }, { type: "field", fieldId: "c" as FieldId }],
+    rows: [{ instanceId: "inst_1" as InstanceId, cells: [{ kind: "no-value" }, { kind: "not-in-version" }, { kind: "redacted" }] }],
+    truncated: false,
+  };
+  expect(reportResultToCsv(result)).toBe("a,b,c\r\n(no value),(not in this version),(redacted)\r\n");
+});
+
+test("a list value exports as text and gets the prefix when its first item starts a formula", () => {
+  const result: ReportExecutionResult = {
+    columns: [{ type: "field", fieldId: "tags" as FieldId }],
+    rows: [
+      { instanceId: "inst_1" as InstanceId, cells: [{ kind: "value", value: ["=1+1", "x"] }] },
+      { instanceId: "inst_2" as InstanceId, cells: [{ kind: "value", value: ["safe", "=1+1"] }] },
+      { instanceId: "inst_3" as InstanceId, cells: [{ kind: "value", value: ["=1+1"] }] },
+    ],
+    truncated: false,
+  };
+  const lines = reportResultToCsv(result).split("\r\n");
+  expect(lines[1]).toBe(`"'=1+1,x"`);
+  expect(lines[2]).toBe(`"safe,=1+1"`);
+  expect(lines[3]).toBe("'=1+1");
+});
+
+test("a number and a boolean stay raw even when their text starts with a formula character", () => {
+  const result: ReportExecutionResult = {
+    columns: [{ type: "field", fieldId: "v" as FieldId }],
+    rows: [
+      { instanceId: "inst_1" as InstanceId, cells: [{ kind: "value", value: -5 }] },
+      { instanceId: "inst_2" as InstanceId, cells: [{ kind: "value", value: false }] },
+    ],
+    truncated: false,
+  };
+  expect(reportResultToCsv(result)).toBe("v\r\n-5\r\nfalse\r\n");
+});
+
+test("a truncated result ends with the marker line, padded to the column count", () => {
+  const result: ReportExecutionResult = {
+    columns: [{ type: "field", fieldId: "a" as FieldId }, { type: "field", fieldId: "b" as FieldId }, { type: "field", fieldId: "c" as FieldId }],
+    rows: [{ instanceId: "inst_1" as InstanceId, cells: [{ kind: "value", value: 1 }, { kind: "value", value: 2 }, { kind: "value", value: 3 }] }],
+    truncated: true,
+  };
+  expect(reportResultToCsv(result)).toBe("a,b,c\r\n1,2,3\r\n(truncated: first 1000 rows only),,\r\n");
+});
+
+test("a truncated result with one column ends with the bare marker line", () => {
+  const result: ReportExecutionResult = {
+    columns: [{ type: "field", fieldId: "a" as FieldId }],
+    rows: [],
+    truncated: true,
+  };
+  expect(reportResultToCsv(result)).toBe("a\r\n(truncated: first 1000 rows only)\r\n");
+});
+
+test("a complete result has no marker line", () => {
+  const result: ReportExecutionResult = {
+    columns: [{ type: "field", fieldId: "a" as FieldId }],
+    rows: [{ instanceId: "inst_1" as InstanceId, cells: [{ kind: "value", value: 1 }] }],
+    truncated: false,
+  };
+  expect(reportResultToCsv(result)).not.toContain("truncated");
+});

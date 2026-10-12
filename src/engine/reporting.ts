@@ -15,6 +15,7 @@
 
 import type { SQL } from "bun";
 import { sql } from "./store.js";
+import { RequestShapeError } from "../errors.js";
 import { createDefinitionStore } from "./definitions.js";
 import {
   CANCEL_SINK_STEP_ID,
@@ -27,6 +28,13 @@ import {
   type ProcessId,
   type StepId,
 } from "../schema/definition.js";
+
+/**
+ * The most in-range instances one view loads. Each view parses every body and
+ * history entry of its range into memory, so a larger range is refused rather
+ * than answered from a sample that would bias every percentile and rate.
+ */
+export const REPORT_INSTANCE_CAP = 20000;
 
 /** Inclusive bounds on `instances.startedAt`, both required — the caller always sends them. */
 export type DateRange = { from: string; to: string };
@@ -92,6 +100,10 @@ function parseRow<T>(raw: unknown, parse: (v: unknown) => T): T {
  * (`toISOString()`), the same fixed-width form `started_at` is generated
  * from, so the text comparison ranges the same way a timestamptz comparison
  * would.
+ *
+ * Selects `REPORT_INSTANCE_CAP + 1` rows at most: the extra row proves the
+ * range holds more than the cap, and the check runs before any body parses.
+ * Throws `RequestShapeError`, which the HTTP layer answers with 400.
  */
 async function selectInRange(processId: ProcessId, range: DateRange, db: SQL): Promise<Instance[]> {
   const rows = (await db`
@@ -100,7 +112,13 @@ async function selectInRange(processId: ProcessId, range: DateRange, db: SQL): P
       AND kind <> 'test'
       AND started_at >= ${range.from}
       AND started_at <= ${range.to}
+    LIMIT ${REPORT_INSTANCE_CAP + 1}
   `) as { body: unknown }[];
+  if (rows.length > REPORT_INSTANCE_CAP) {
+    throw new RequestShapeError(
+      `The date range holds more than ${REPORT_INSTANCE_CAP} instances. Narrow the range and try again.`,
+    );
+  }
   return rows.map((r) => parseRow(r.body, (v) => instanceSchema.parse(v)));
 }
 
@@ -188,9 +206,15 @@ function traversalsOf(inst: Instance, entries: HistoryEntry[], body: ProcessBody
   return out;
 }
 
-/** Everything the three views share: in-range instances, their traversals, and the labelling body. */
+/**
+ * Everything the three views share: in-range instances, their history, their
+ * traversals, and the labelling body. `scan` reads history once; no view reads
+ * it again.
+ */
 type Scan = {
   instances: Instance[];
+  /** Every in-range instance's HistoryEntries in `transitionSeq` order. An instance with none has no key. */
+  history: Map<string, HistoryEntry[]>;
   traversals: Traversal[];
   /** Per resolved version, for timer lookups. */
   bodies: Map<number, ProcessBody>;
@@ -221,7 +245,7 @@ async function scan(processId: ProcessId, range: DateRange, db: SQL): Promise<Sc
     }
     traversals.push(...traversalsOf(inst, history.get(inst.instanceId) ?? [], body));
   }
-  return { instances, traversals, bodies, latest: latest.body, skipped };
+  return { instances, history, traversals, bodies, latest: latest.body, skipped };
 }
 
 function labelsOf(latest: ProcessBody): Map<StepId, StepLabel> {
@@ -258,11 +282,10 @@ export async function cycleTime(processId: ProcessId, range: DateRange, db: SQL 
   if (!s) return null;
 
   const completed = new Set(s.instances.filter((i) => i.status === "completed").map((i) => i.instanceId));
-  const history = await historyByInstance([...completed], db);
   const totals: number[] = [];
   for (const inst of s.instances) {
     if (!completed.has(inst.instanceId)) continue;
-    const entries = history.get(inst.instanceId) ?? [];
+    const entries = s.history.get(inst.instanceId) ?? [];
     const last = entries[entries.length - 1];
     if (!last) continue;
     totals.push(new Date(last.at).getTime() - new Date(inst.startedAt).getTime());
@@ -396,13 +419,12 @@ export async function sla(processId: ProcessId, range: DateRange, db: SQL = sql)
     else firedAt.set(key, [timerId]);
   }
 
-  // Re-walk per instance so a traversal can be matched to its own instance's events.
-  const history = await historyByInstance(ids, db);
+  // Walk per instance so a traversal can be matched to its own instance's events.
   const tally = new Map<StepId, { breached: number; traversals: number }>();
   for (const inst of s.instances) {
     const body = s.bodies.get(inst.version);
     if (!body) continue;
-    for (const t of traversalsOf(inst, history.get(inst.instanceId) ?? [], body)) {
+    for (const t of traversalsOf(inst, s.history.get(inst.instanceId) ?? [], body)) {
       if (!timerBearing.has(t.stepId)) continue;
       const row = tally.get(t.stepId) ?? { breached: 0, traversals: 0 };
       row.traversals++;
