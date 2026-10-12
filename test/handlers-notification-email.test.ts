@@ -1,12 +1,13 @@
 /**
- * notification.email action handler: pure unit tests against a locally started
- * Bun.listen fake SMTP server, no DATABASE_URL required. The handler's one
- * database read is address resolution, and `accountsDb` below stands in for the
- * pool — `local-user-accounts`' own suite covers the real query. Mirrors
- * handlers-http.test.ts's style — flat test(), no describe blocks. The one
- * exception is the end-to-end send, which needs a real SMTP endpoint and skips
- * without SMTP_HOST, the same way the DB-backed suites skip without
- * DATABASE_URL.
+ * notification.email action handler: unit tests against a locally started
+ * Bun.listen fake SMTP server. The handler's one database read is address
+ * resolution, and `accountsDb` below stands in for the pool —
+ * `local-user-accounts`' own suite covers the real query. Mirrors
+ * handlers-http.test.ts's style — flat test(), no describe blocks. Two tests
+ * are exceptions. The end-to-end send needs a real SMTP endpoint and skips
+ * without SMTP_HOST. The test that inserts an account row holding a CR/LF
+ * address through SQL needs a real database and skips without DATABASE_URL, the
+ * same way the DB-backed suites skip.
  */
 import { test, expect, spyOn } from "bun:test";
 import type { SQL } from "bun";

@@ -207,6 +207,9 @@ function requireNonBlank(value: unknown, label: string): string {
  * A duplicate email answers 409 from the column's own UNIQUE constraint. A
  * SELECT ahead of the insert would race a concurrent create for the same
  * address, and the constraint decides the outcome either way.
+ *
+ * An email that is not a valid address answers 400 before the write, by the
+ * same `emailAddressSchema` check `createUser` applies.
  */
 export async function handleAdminCreateUser(req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
   return route(req, resolver, db, (actor) => requireRole(actor, ADMIN_ROLE), async () => {

@@ -396,8 +396,9 @@ function clientName(from: string): string {
  * sessions inside the outbox's claim lease, and a lease that runs out retries
  * the row and resends the batches already delivered. Candidates come from a
  * publish-validated strategy, and the two shipped ones produce a configured list
- * or one manager. Raise or configure the batch size, or give each batch its own
- * outbox row, if a strategy ever resolves a directory group of thousands.
+ * or one manager. If a strategy ever resolves a directory group of thousands,
+ * make the batch size configurable for a relay that allows more, or enqueue one
+ * outbox row per batch.
  */
 function actorIdsFor(tokens: NotificationActorToken[], actors: OutboxActors | undefined): string[] {
   const ids: string[] = [];
@@ -459,10 +460,11 @@ async function notificationEmailHandler(ctx: HandlerContext): Promise<Notificati
   const recipients = await resolveRecipients(config, ctx);
 
   // No recipient resolved: send nothing and succeed. A step that resolved to no
-  // candidate already records an `assignment.unresolved` event, so dead-lettering
-  // here would report that same fact a second time and park a row an operator
-  // then discards by hand. The warning keeps the condition visible without that
-  // chore. The Message-ID is still built, so `result` keeps its declared shape
+  // candidate already records an `assignment.unresolved` event. When every
+  // resolved account held an invalid address, the per-account drop warnings keep
+  // that visible. Dead-lettering here would report the same fact a second time
+  // and park a row an operator then discards by hand. The warning keeps the
+  // condition visible without that chore. The Message-ID is still built, so `result` keeps its declared shape
   // for an Action.output mapping.
   if (recipients.length === 0) {
     log.warn("notification.email resolved no recipient", {
