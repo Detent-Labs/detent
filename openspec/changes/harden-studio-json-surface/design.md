@@ -6,7 +6,8 @@
 the only guard between a typed JSON text and `replace()`. Its one caller is
 `parseDraftText`, which `JsonView.apply` runs. It checks that the root is an
 object. It flags any top-level key outside `KNOWN_KEYS`. It checks the type of
-seven top-level keys. It checks nothing below the top level.
+eight top-level keys, `key` plus seven containers. It checks nothing below the
+top level.
 
 `processBody` declares eleven top-level keys and `KNOWN_KEYS` lists ten.
 `collaboration` is the missing one. The studio also reads containers below the
@@ -36,7 +37,11 @@ table approach below.
 
 - Business validation. A step with no path still applies and appears on Checks.
 - Leaf types, such as a `label` entry that is a number or a `priority` that is
-  a string. No studio code iterates those.
+  a string. The guard checks containers only, and React renders some leaves
+  directly. An object typed where a string belongs still passes the guard and
+  can unmount the studio on the next paint. Examples are a `contract.outcomes`
+  element that `ContractPanel` draws in `<span>{o}</span>`, a `fields[0].key`
+  that is an object, and a `LocalizedText` value that is an object.
 - A change to `src/schema/definition.ts` or to the layout of the JSON surface.
 - A check below a union. The children of a view entry, such as its
   `validation` object, stay unchecked.
@@ -139,6 +144,9 @@ studio stays mounted.
   the E1-1 case.
 - [`null` loaded before and now stops Apply] → The schema never admitted it.
   Task 1.4 greps `examples/` and the web tests for a body that relies on it.
+- [A wrong leaf type unmounts the studio] → The table stops at leaf types.
+  A leaf typed wrong passes Apply and fails on the next paint. A `ponytail:` comment on the table records the ceiling. An open entry in
+  `docs/decisions.md` carries the follow-up for a later change.
 - [The test reads Zod's internal definition API] → The same
   `_zod.def` access exists in `studio-changeSet.test.ts`. A Zod upgrade that
   renames it fails one named test.

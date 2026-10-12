@@ -1848,6 +1848,36 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   email across all tenants, so a success in one tenant resets the window in
   another. Anchors: `src/auth/login.ts`.
 
+## Open from harden-studio-json-surface (needs its own OpenSpec change)
+
+The final review of `harden-studio-json-surface` (2026-10-12) found two gaps
+that the change leaves open on purpose. The tags LEAF-1 and LOAD-1 are local to
+this section.
+
+- **LEAF-1: the guard checks containers only.** An object where a string
+  belongs passes Apply and unmounts the studio on render. Take a
+  `contract.outcomes` element that holds an object. `ContractPanel` renders it
+  in `<span>{o}</span>`, and React throws. A `fields[].key` and a
+  `LocalizedText` value that hold an object fail the same way. The `Shape`
+  table skips the elements of a `"strings"` list and checks no leaf. A later
+  change could add a checked-string kind and a union/leaf kind to `Shape`,
+  then add rows. Anchors: the `Shape` table and its `ponytail:` comment in
+  `packages/web/src/areas/studio/draft/load-guard.ts`,
+  `packages/web/src/areas/studio/panels/ContractPanel.tsx`,
+  `packages/web/src/areas/studio/draft/localized-text.ts`.
+
+- **LOAD-1: three paths load a body with no guard, and the server stores one
+  unchecked.** The guard runs only at Apply in the JSON surface. The reload in
+  `useDraftToolbarActions` (`panels/DraftToolbar.tsx`) calls `replace` with the
+  fetched body. The initial load in `EditScreen` (`screens/EditScreen.tsx`)
+  reads `getDraft` and hands the record to the store. The stash restore in the
+  same file, `restoreStash`, calls `replace` with the stored body. On the
+  server, `saveDraft` (`src/engine/drafts.ts`) checks the envelope and keeps
+  the body unparsed. A draft saved over HTTP with `"steps": {}` therefore
+  crashes the studio when an author opens it. A later change could run
+  `checkDraftShape` on each of the three paths and show the refusal in place of
+  the crash. Whether the server should refuse such a body is a separate call.
+
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 
 Each entry below names a cut somebody proposed, the reason a reviewer refused

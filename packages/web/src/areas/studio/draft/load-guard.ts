@@ -1,6 +1,6 @@
 /**
  * Load-time safety check only — deliberately looser than the contract and
- * never asked to express a business invariant (design.md decision 3). Its
+ * never asked to express a business invariant. Its
  * job is to stop a malformed body from crashing the editor with a
  * property-access-on-undefined before it becomes a Draft: a container of the
  * wrong type, `null` included, at any depth. A key may be absent, since a
@@ -13,11 +13,18 @@ export interface LoadGuardIssue {
 }
 
 /**
- * The containers below the top level. An `objects` entry names a key that
- * holds a plain object, and its value describes that object's own keys. An
- * `arrays` entry names a key that holds an array. A `Shape` value says every
- * element is a plain object with those children, and `"strings"` says the
- * guard skips the elements.
+ * The containers of a body, top level included. An `objects` entry names a
+ * key that holds a plain object, and its value describes that object's own
+ * keys. An `arrays` entry names a key that holds an array. A `Shape` value
+ * says every element is a plain object with those children, and `"strings"`
+ * says the guard skips the elements.
+ *
+ * ponytail: the table stops at containers. It does not descend below a union
+ * type, it checks no leaf type, and it skips the elements of a `"strings"`
+ * list. An object where a string or a LocalizedText value belongs, such as a
+ * `contract.outcomes` element or a `fields[].key`, still passes and unmounts
+ * the studio on render. Upgrade by adding a checked-string kind and a
+ * union/leaf kind to `Shape`, then add rows to `DRAFT_SHAPE`.
  */
 export type Shape = {
   objects?: Record<string, Shape>;

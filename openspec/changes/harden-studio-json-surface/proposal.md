@@ -59,7 +59,8 @@ None.
 - `packages/web/src/areas/studio/draft/load-guard.ts`: the key set and the
   container table.
 - `packages/web/test/`: `studio-load-guard.test.ts`, `studio-sectionsFor.test.ts`,
-  `studio-changeSet.test.ts`, and a comment in `studio-fieldRemoval.test.ts`.
+  `studio-changeSet.test.ts`, the helper `zodContainerPaths.ts`, and a comment
+  in `studio-fieldRemoval.test.ts`.
 - `openspec/specs/studio-json-view/spec.md`, through the delta spec.
 - `docs/decisions.md`: archive strikes the audit index entry for this change.
 - `src/schema/definition.ts`, the engine, the HTTP surface and
