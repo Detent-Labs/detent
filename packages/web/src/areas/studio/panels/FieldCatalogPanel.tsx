@@ -338,6 +338,17 @@ const styles = stylex.create({
     borderLeftColor: colors.advisory,
     paddingLeft: space.s2,
   },
+  // The key notice counts readers: an advisory, not a refusal. It keeps the
+  // advisory rule, reads in muted ink and sits close under the Key input.
+  studioNotice: {
+    color: colors.textMuted,
+    borderLeftWidth: 3,
+    borderLeftStyle: "solid",
+    borderLeftColor: colors.advisory,
+    paddingLeft: space.s2,
+    marginBlockStart: space.s1,
+    marginBlockEnd: 0,
+  },
   // The stale-column warning takes the whole line under the row instead of
   // squeezing beside three controls.
   studioWarningInMappingRow: {
@@ -418,6 +429,7 @@ function FieldKeyInput({ field, mutate, onChange, onWrite, describedBy }: FieldK
   return (
     <input
       type="text"
+      spellCheck={false}
       {...stylex.props(styles.studioMono)}
       value={typed ?? field.key ?? ""}
       aria-describedby={describedBy}
@@ -716,8 +728,9 @@ function FieldEditor({
   /** Deduped against the whole catalog, including every group's nested
    * children (design.md: `FieldDef.key` is one flat CEL namespace). A key
    * that a CEL expression reads, or that the base version holds, stays
-   * (`fieldCatalogLogic.ts::isFieldKeyLocked`). A group's label goes through `writeGroupLabel`, so the key it derives
-   * rewrites the view entries naming the old one. */
+   * (`fieldCatalogLogic.ts::isFieldKeyLocked`). A group's label goes through
+   * `writeGroupLabel`, so the key it derives rewrites the view entries naming
+   * the old one. */
   const updateLabel = (label: DraftField["label"]) => {
     if (field.type === "group" && fieldId !== undefined) {
       setDefinitionWrites((n) => n + 1);
@@ -828,7 +841,7 @@ function FieldEditor({
               />
             </label>
             {keyNotice !== undefined && fieldId !== undefined && (
-              <p id={fieldKeyNoticeId(fieldId)} {...stylex.props(styles.studioWarning)}>
+              <p id={fieldKeyNoticeId(fieldId)} {...stylex.props(styles.studioNotice)}>
                 {keyNotice}
               </p>
             )}

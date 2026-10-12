@@ -48,9 +48,10 @@ warning. FIELDS-17 and FIELDS-18 stay open.
 
 - The key input keeps its place, its mono face and its label in the field
   editor's definition zone.
-- A notice sits directly below it as a `studioWarning` paragraph. The zone
-  already uses that style for the label's translation gap. The notice carries
-  no new color, icon, control or motion.
+- A notice sits directly below it as a paragraph in muted ink with the
+  advisory rule. A reader count advises and refuses nothing, so it skips the
+  refusal red of the label's translation gap. The notice has no new color,
+  icon, control or motion.
 - A count above zero reads "Read by 3 expressions. The label no longer sets
   this key, and changing the key does not touch them."
 - A published field without readers reads "This field is in a published

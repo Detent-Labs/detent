@@ -14,7 +14,7 @@
 
 ## 3. The key input
 
-- [x] 3.1 Give the non-group `FieldKeyInput` the typed state and the commit on blur and Enter. Check: a test types each character, sees no write, then blurs and sees one write.
+- [x] 3.1 Give the non-group `FieldKeyInput` the typed state and the commit on blur and Enter. Check: a test types each character, sees no write, then blurs and sees one write. The browser check (5.4) covers the blur and Enter wiring itself.
 - [x] 3.2 Add the notice below the key input with `aria-describedby` and three catalog keys. Check: panel tests cover the count, the singular, the published-only case and no notice.
 - [x] 3.3 Mark `countKeyReaders` with a `ponytail:` comment. Check: `git grep -n 'ponytail:' -- packages/web/src/areas/studio/draft/key-readers.ts` finds it.
 

@@ -8,14 +8,12 @@ import {
   watchPublishedFieldIds,
 } from "../src/areas/studio/draft/publishedFields.js";
 
-/**
- * `PublishedFieldIdsProvider` fires its fetch from a `useEffect`, which
- * `renderToStaticMarkup` never runs, and this repo ships no DOM test library
- * (see `studio-draftProvider-chainingFetch.test.ts`). The fetch and its stale
- * guard live in `watchPublishedFieldIds`, a plain function over an injected
- * `fetchBody`. The effect only calls it, so these cases drive that function
- * the way the effect does: one watch per base version, cancelled on change.
- */
+// `PublishedFieldIdsProvider` fires its fetch from a `useEffect`, which
+// `renderToStaticMarkup` never runs, and this repo ships no DOM test library
+// (see `studio-draftProvider-chainingFetch.test.ts`). The fetch and its stale
+// guard live in `watchPublishedFieldIds`, a plain function over an injected
+// `fetchBody`. The effect only calls it, so these cases drive that function
+// the way the effect does: one watch per base version, cancelled on change.
 
 const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 

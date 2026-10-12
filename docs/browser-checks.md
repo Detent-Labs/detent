@@ -3596,7 +3596,10 @@ label no longer sets this key, and changing the key does not touch them."
 
 Type `qty` into Key, without leaving the input. Pass: the header bar shows no
 unsaved mark. Press Tab. Pass: the unsaved mark appears, and Key reads `qty`.
-The two guards still read `data.quantity`, as the notice says.
+
+The two guards still read `data.quantity`. The field now has no readers, so
+the notice reads "This field is in a published version. The label no longer
+sets its key."
 
 Type `quantity` back into Key and press Enter. Pass: Key reads `quantity`.
 Change the label to `Amount`. Pass: Key still reads `quantity`.

@@ -619,7 +619,7 @@ describe("the notice under a field's key input", () => {
     expect(keyInput(html)).not.toContain("aria-describedby");
   });
 
-  it("shows the typed key as the input's value, never the draft's", () => {
+  it("shows the draft's key while nothing is typed", () => {
     const html = renderKeyEditor(draftWithReaders([]), "field_amount", new Set());
     expect(keyInput(html)).toContain('value="amount"');
   });

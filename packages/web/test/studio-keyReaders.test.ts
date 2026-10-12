@@ -3,10 +3,10 @@ import type { FieldId } from "workflow-engine/schema";
 import { countKeyReaders } from "../src/areas/studio/draft/key-readers";
 import type { Draft } from "../src/areas/studio/draft/types";
 
-/** The expressions that read `data.<key>`, anywhere in the draft. One
- * expression counts once. Nothing is skipped: the field's own rule counts, and
- * so does a `process.start` mapping value inside a plugin `config`. Each case
- * builds only the parts of a draft it reads. */
+// The expressions that read `data.<key>`, anywhere in the draft. One
+// expression counts once. Nothing is skipped: the field's own rule counts, and
+// so does a `process.start` mapping value inside a plugin `config`. Each case
+// builds only the parts of a draft it reads.
 
 const cel = (src: string) => ({ lang: "cel" as const, src });
 

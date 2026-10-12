@@ -2,11 +2,9 @@ import { parseAst } from "workflow-engine/cel/check";
 import { isCelNode, memberPath, type CelNode } from "../panels/shared/conditionLogic";
 import type { Draft } from "./types";
 
-/**
- * The CEL expressions that read a field's key. `keyReader` tests one source
- * against a set of keys, and `countKeyReaders` counts the expressions in a
- * draft that read one key.
- */
+// The CEL expressions that read a field's key. `keyReader` tests one source
+// against a set of keys, and `countKeyReaders` counts the expressions in a
+// draft that read one key.
 
 /** The CEL nodes an argument holds: an operand, an argument list or a map entry. */
 function nodesIn(value: unknown): CelNode[] {
