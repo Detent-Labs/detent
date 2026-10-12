@@ -1,3 +1,5 @@
+import { safeMatch } from "../../shell/safeMatch.js";
+
 /**
  * Every view route carries the selected process, so the selection survives a
  * view switch by construction rather than by a state variable the router could
@@ -24,7 +26,9 @@ function isView(raw: string): raw is ViewName {
 }
 
 /** Pure — testable without a DOM. An unrecognized path falls back to the picker rather than a dead end. */
-export function matchRoute(path: string): Route {
+export const matchRoute = safeMatch(matchPath, { name: "picker" });
+
+function matchPath(path: string): Route {
   if (path === "/reports") return { name: "reports" };
   if (path === "/reports/new") return { name: "newReport" };
   const reportMatch = /^\/reports\/([^/]+)$/.exec(path);

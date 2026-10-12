@@ -251,3 +251,13 @@ describe("studio area entry", () => {
     expect(reaches(matchRoute("/").name, [AUTHOR_ROLE])).toBe(true);
   });
 });
+
+describe("the studio area's malformed address", () => {
+  it("falls back to the process list on a malformed escape", () => {
+    expect(matchRoute("/processes/%E0%A4%A/edit")).toEqual({ name: "processes" });
+  });
+
+  it("still decodes a valid escape", () => {
+    expect(matchRoute("/processes/proc%201/edit")).toEqual({ name: "edit", processId: "proc 1" });
+  });
+});

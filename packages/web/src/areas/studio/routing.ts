@@ -1,3 +1,5 @@
+import { safeMatch } from "../../shell/safeMatch.js";
+
 /** The six process-wide views, in rail order. `PANEL_VIEW_TAB` maps each
  * onto its tab, and `panelEntityCounts` still keys on this set; routing owns
  * it so neither needs an import from a component. */
@@ -72,7 +74,9 @@ export type Route =
  * consolidation. An unrecognized path falls back to the process list rather
  * than a dead end.
  */
-export function matchRoute(path: string): Route {
+export const matchRoute = safeMatch(matchPath, { name: "processes" });
+
+function matchPath(path: string): Route {
   if (path === "/tools") return { name: "tools" };
   if (path === "/templates") return { name: "templates" };
   // Matched before the plain edit route: a form-editor path is a sub-state

@@ -1,3 +1,5 @@
+import { safeMatch } from "../../shell/safeMatch.js";
+
 export type Route = { name: "tasks" } | { name: "task"; instanceId: string } | { name: "start" } | { name: "started" } | { name: "involved" };
 
 /**
@@ -5,7 +7,9 @@ export type Route = { name: "tasks" } | { name: "task"; instanceId: string } | {
  * before calling this and prepends it to what `routePath` returns. An
  * unrecognized path falls back to the inbox rather than a dead end.
  */
-export function matchRoute(path: string): Route {
+export const matchRoute = safeMatch(matchPath, { name: "tasks" });
+
+function matchPath(path: string): Route {
   if (path === "/start") return { name: "start" };
   if (path === "/started") return { name: "started" };
   if (path === "/involved") return { name: "involved" };

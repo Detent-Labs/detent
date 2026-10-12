@@ -1,3 +1,5 @@
+import { safeMatch } from "../../shell/safeMatch.js";
+
 export type Route =
   | { name: "instances" }
   | { name: "instance"; instanceId: string }
@@ -20,7 +22,9 @@ export type Route =
  * own `path` string argument, never from `location.search`, so this function
  * stays pure and DOM-free.
  */
-export function matchRoute(path: string): Route {
+export const matchRoute = safeMatch(matchPath, { name: "instances" });
+
+function matchPath(path: string): Route {
   if (path === "/outbox") return { name: "outbox" };
   if (path === "/timers") return { name: "timers" };
   if (path === "/users") return { name: "users" };
