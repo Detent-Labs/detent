@@ -28,9 +28,13 @@ The comparison is a pure function in `session.ts`, `endedByStorageChange(held, s
 
 Alternatives: adopting the new session silently would switch the actor under unsaved studio work. A reload would drop that work as well and add a flash. Signing out is the same outcome a logout already has.
 
-**No write after sign-out.** Once `session` is `undefined`, the hydration effect returns early and its cleanup sets `live = false`. A late `fetchAccount` result therefore cannot persist. The login screen has no locale picker bound to `changeLocale`, so no other path writes the old session.
+**No write after sign-out.** A request that answers after the storage event must write nothing. `App` keeps the held session in a ref. A layout effect syncs it to the committed session. The storage handler and `logout` clear it at once, ahead of the render they queue. The hydration `then`, the profile page's `onSaved` and `logout` all read that ref and return when it no longer matches their session.
 
-**The notice is state in `App`, shown by `LoginScreen`.** `App` holds `endedElsewhere`. The storage handler sets it. `onLoggedIn` and `logout` clear it. `LoginScreen` takes an optional `notice` string. It renders a `<p role="status">` between the title and the first field. The wording is one catalog key, `login.sessionEndedElsewhere`, in EN and DE.
+A late 401 reaches `logout` through every area's `onUnauthorized`. `logout` returns early when the ref is empty, so it neither clears storage nor hides the notice. Otherwise it clears storage only through `clearIfHeld`, which compares the stored token with the held one. A stale tab therefore never removes the session another tab stored since.
+
+**The notice is state in `App`, shown by `LoginScreen`.** `App` holds `endedElsewhere`. The storage handler sets it. `onLoggedIn` and `logout` clear it. `LoginScreen` takes an optional `notice` string. It always renders a `<div role="status">` between the title and the first field, and puts the notice `<p>` inside it only when `notice` is set. The wording is one catalog key, `login.sessionEndedElsewhere`, in EN and DE.
+
+The region stays mounted so a screen reader announces text added to it, as the other status regions in `packages/web` do. An empty child of the form's flex column would add a gap. A `:empty` rule on the region pulls the bottom gap back, so the normal login screen keeps its layout. The `<p>` carries the rule, the padding and an 8px bottom margin.
 
 Shape, from `DESIGN.md`: the line borrows the warning callout. That means a 3px rule in the advisory role, 8px of padding before the text, and text in ink. It sits in place, above the form, so it is not a toast. It has no icon and no color beyond the rule, since a session end is information, not a refusal. A `role="status"` region reaches a screen reader without moving focus.
 
