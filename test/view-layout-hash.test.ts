@@ -1,6 +1,7 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { describe, it, expect } from "bun:test";
 import { processBody, view, viewField } from "../src/schema/definition.js";
+import { compileProcessBody } from "../src/schema/compile.js";
 import { definitionHash } from "../src/schema/hash.js";
 import { canonicalize } from "../src/schema/canonical-json.js";
 
@@ -132,4 +133,29 @@ describe("view layout keys do not move definitionHash", () => {
     const laid = processBody.parse({ ...raw, workflow: { ...raw.workflow, steps } });
     expect(definitionHash(laid)).not.toBe(definitionHash(bare));
   });
+});
+
+// A versioned wrapper stores the hash of its compiled body, which is what
+// publish hashes. A bare body stores none, so its row in PRE_CHANGE_HASHES is
+// the only pin. Reading the directory means a new example cannot ship with a
+// stale hash, or with no pin at all.
+describe("every example pins its definitionHash", () => {
+  const files = readdirSync(new URL("../examples/", import.meta.url))
+    .filter((f) => f.endsWith(".json"))
+    .sort();
+
+  it("finds the example files", () => {
+    expect(files.length).toBeGreaterThan(0);
+  });
+
+  for (const file of files) {
+    it(`${file} carries a current hash or a PRE_CHANGE_HASHES row`, () => {
+      const raw = JSON.parse(readFileSync(new URL(`../examples/${file}`, import.meta.url), "utf8"));
+      if (typeof raw.definitionHash === "string") {
+        expect(raw.definitionHash).toBe(definitionHash(compileProcessBody(raw.definition)));
+      } else {
+        expect(Object.keys(PRE_CHANGE_HASHES)).toContain(file);
+      }
+    });
+  }
 });
