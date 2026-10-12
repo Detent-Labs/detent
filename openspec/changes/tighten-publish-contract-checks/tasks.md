@@ -2,9 +2,10 @@
 
 - [ ] 1.1 In `src/schema/compile.ts`, extract the sink injection into `injectCancelSink`. Verify: the existing compile tests pass.
 - [ ] 1.2 On the early branch, compare the body with the injection over its stripped form. Reject a difference with one located issue on the sink step. Verify: task 1.3 passes.
-- [ ] 1.3 In `test/compile.test.ts`, add tests that reject five bodies. The five hold a sink with another outcome, a non-terminal sink, and a sink with an action. They also hold a sink out of position and a missing reserved outcome. Verify: each fails with 1.2 reverted on a copy.
+- [ ] 1.3 In `test/compile-validation.test.ts`, add tests that reject five bodies. The five hold a sink with another outcome, a non-terminal sink, and a sink with an action. They also hold a sink out of position and a missing reserved outcome. Verify: each fails with 1.2 reverted on a copy.
 - [ ] 1.4 Add a test that publishes all nine files under `examples/` twice and gets byte-identical output. Verify: it passes.
 - [ ] 1.5 In `test/cancel.test.ts`, keep the lookalike test. Add an assertion that `compileProcessBody` rejects the same body. Verify: the new assertion passes.
+- [ ] 1.6 In `test/definitions.test.ts`, publish the lookalike sink body through `publishBody`. Verify: it throws `CompileValidationError` and stores no version.
 
 ## 2. Actions keep no unread key
 
@@ -16,7 +17,7 @@
 
 ## 3. Rules and documents
 
-- [ ] 3.1 Update `.claude/rules/authoring-invariants.md` and `.claude/rules/process-contract.md` for the exact-sink rule, the async-only enum and the removed key. Verify: each file states each rule once.
+- [ ] 3.1 Update `.claude/rules/authoring-invariants.md` and `.claude/rules/process-contract.md` for the exact-sink rule, the async-only enum and the removed key. Reword the sentence in `process-contract.md` that calls the derived key "the default". Verify: each file states each rule once.
 - [ ] 3.2 Update the Action section of `docs/authoring-guide.md`. Verify: it says `execution` is async only and never names `idempotencyKey`.
 - [ ] 3.3 Fix the comments in `definition.ts` and `compile.ts` that call the sink count the only check. Verify: `git grep "checks only the cancel-sink"` shows no stale claim.
 - [ ] 3.4 Strike the `tighten-publish-contract-checks` entry from the audit index in `docs/decisions.md`. Verify: `git grep tighten-publish-contract-checks docs/decisions.md` prints nothing.

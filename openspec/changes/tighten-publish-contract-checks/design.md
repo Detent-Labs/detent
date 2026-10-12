@@ -72,6 +72,14 @@ read. The hash of such a body shifts on re-publish, which no deployment sees.
 Honoring the key would need a per-instance template, since one constant would
 dedupe a delivery across all instances.
 
+**D6. The new rejection reuses the existing path.** The early branch throws
+`CompileValidationError`. `validateStructure` already catches it and reports
+`structural: "ran"`. `publishBody` rethrows it. The HTTP table maps it to a
+422 of type `compile-validation`. A publish-level test covers that path,
+because the unit test of `compileProcessBody` does not. Before this change,
+`validateStructure` ignored the Zod issues for a body that took the early
+return. That gap let the lookalike through.
+
 ## Risks / Trade-offs
 
 - An older compiler may have published a body with another sink label. That
@@ -80,3 +88,14 @@ dedupe a delivery across all instances.
   per publish, the cost of one authored compile.
 - The Studio flags `idempotencyKey` in old drafts as an unknown key → the
   author deletes the line.
+
+## Migration Plan
+
+No deployment runs this engine, so nothing migrates. The sweep edits two
+files under `examples/` in the same commit as the schema change. Rollback is
+a revert of that commit. A revert restores the old acceptance of a stray sink,
+the `"blocking"` value and the `idempotencyKey` key.
+
+## Open Questions
+
+None. The owner settled `idempotencyKey` and `execution` on 2026-10-12.

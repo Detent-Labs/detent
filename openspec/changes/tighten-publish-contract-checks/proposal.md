@@ -41,6 +41,8 @@ None.
 - `src/schema/compile.ts`: the idempotent branch, plus the extraction of the
   sink injection into a function both branches call.
 - `src/schema/definition.ts`: the `execution` enum and `action`.
+- `test/compile-validation.test.ts`, `test/cancel.test.ts` and
+  `test/definitions.test.ts`.
 - `examples/`, `packages/web/src/areas/studio/draft/changeSet.ts`, the Studio
   catalog, `docs/authoring-guide.md`, `.claude/rules/process-contract.md`,
   `.claude/rules/authoring-invariants.md`, and the audit index entry in
