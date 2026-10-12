@@ -465,8 +465,10 @@ after a substantial change lands.
   tests, because it cuts object diffs short.
 - **A full-suite run is the reliable signal; a single-file rerun is not.** The DB
   suites share one database and truncate in `beforeEach`, so back-to-back runs of
-  one file contend and fail spuriously. Read a verdict off a *named* test
-  failure, never off a pass count alone.
+  one file contend and fail spuriously. A second `bun test` on that database
+  rotates the probe role's password, so the running suite's privileges tests
+  fail (28P01). Read a verdict off a *named* test failure, never off a pass
+  count alone.
 - **The suite has its own database. The dev server keeps `DATABASE_URL`'s.**
   `bunfig.toml`'s `[test] preload` (`test/preload-db.ts`) appends `_test` to the
   database name for every `bun test` run, creates it on demand, and prints the

@@ -10,8 +10,8 @@
 # CLAUDE.md states that twice, in bold, which measures how easily it recurs.
 #
 # Two signals, both printed by test/preload-db.ts:
-#   line 56: `[test] database: <name>`
-#   line 58: `[test] DATABASE_URL unset`
+#   `[test] database: <name>`
+#   `[test] DATABASE_URL unset`
 # The gate matches those literals rather than inferring a database from silence.
 #
 # `bun test` closes each run with indented count lines and one `Ran` line:

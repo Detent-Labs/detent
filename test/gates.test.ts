@@ -9,10 +9,10 @@
  * stdout read back. Asserting on the shell source instead would pass while the
  * script misbehaves.
  *
- * No git, on purpose. The gate returns before its `git ls-files` probe on this
- * path, and `bun test` runs in the devcontainer, where /workspace is not a
- * usable repository — a linked worktree's `.git` is a file pointing outside the
- * mount.
+ * No git in the first case below, on purpose. The gate returns before its
+ * `git ls-files` probe on this path, and `bun test` runs in the devcontainer,
+ * where /workspace is not a usable repository — a linked worktree's `.git` is a
+ * file pointing outside the mount.
  *
  * No database either, so no `skipIf`. This runs everywhere the suite runs.
  */
@@ -180,7 +180,7 @@ async function run(
 ) {
   const proc = Bun.spawn(cmd, {
     cwd,
-    env: envWithoutGit(extraEnv),
+    env: envWithoutGit({ LC_ALL: "C", ...extraEnv }),
     stdin: new Blob([stdin]),
     stdout: "pipe",
     stderr: "pipe",
