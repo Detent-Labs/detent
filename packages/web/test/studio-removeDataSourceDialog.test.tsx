@@ -24,21 +24,36 @@ function renderDialog(over: { label?: string; reach?: Partial<DataSourceRemovalR
 
 const buttonTags = (html: string): string[] => html.match(/<button[^>]*>/g) ?? [];
 
+const headingOf = (html: string): string => /<h2[^>]*>(.*?)<\/h2>/.exec(html)?.[1] ?? "";
+const codeOf = (html: string): string[] => [...html.matchAll(/<code[^>]*>(.*?)<\/code>/g)].map((m) => m[1]);
+
 describe("RemoveDataSourceDialog's heading", () => {
-  it("names the source by its key, in curly quotes", () => {
-    expect(renderDialog({ label: "countries" })).toContain("Remove the data source “countries”?");
+  it("holds the question and no key", () => {
+    const heading = headingOf(renderDialog({ label: "countries" }));
+
+    expect(heading).toBe("Remove the data source?");
+    expect(heading).not.toContain("countries");
+  });
+});
+
+describe("RemoveDataSourceDialog's source fact row", () => {
+  it("names the source by its key inside code, first among the facts", () => {
+    const html = renderDialog({ label: "countries" });
+
+    expect(codeOf(html)).toEqual(["countries"]);
+    expect(html).toMatch(/<dl[^>]*><dt[^>]*>Data source<\/dt><dd[^>]*><code[^>]*>countries<\/code><\/dd>/);
   });
 
-  it("names an unnamed source by the rail's fallback word", () => {
-    expect(renderDialog({ label: "(unnamed data source)" })).toContain("Remove the data source “(unnamed data source)”?");
+  it("names an unnamed source by the rail's fallback word, not in code", () => {
+    const html = renderDialog({ label: "(unnamed data source)" });
+
+    expect(html).toContain("(unnamed data source)");
+    expect(codeOf(html)).toEqual([]);
   });
 
-  // A string replacement would expand `$&` into the matched `{source}`.
+  // A string replacement would expand `$&` into a matched placeholder.
   it("keeps a key holding a $ pattern as the author typed it", () => {
-    const html = renderDialog({ label: "cost$&" });
-
-    expect(html).toContain("Remove the data source “cost$&amp;”?");
-    expect(html).not.toContain("{source}");
+    expect(codeOf(renderDialog({ label: "cost$&" }))).toEqual(["cost$&amp;"]);
   });
 });
 
@@ -65,7 +80,7 @@ describe("RemoveDataSourceDialog's facts", () => {
   });
 
   it("names no field", () => {
-    expect(renderDialog()).not.toMatch(/<code/);
+    expect(codeOf(renderDialog({ label: "countries" }))).toEqual(["countries"]);
   });
 });
 
@@ -73,8 +88,22 @@ describe("RemoveDataSourceDialog's notes", () => {
   it("states what the removal clears and that the studio has no undo", () => {
     const html = renderDialog();
 
-    expect(html).toContain("Removing it also clears the data source and the column mappings from those fields.");
+    expect(html).toContain("Removing it also clears the data source from those fields.");
     expect(html).toContain("The studio has no undo.");
+  });
+
+  it("prints neither the mapping row nor the mapping note for a count of zero", () => {
+    const html = renderDialog({ reach: { fields: 3, columnMappings: 0 } });
+
+    expect(html).not.toContain("Column mappings on them");
+    expect(html).not.toContain("It also clears the column mappings on them.");
+  });
+
+  it("prints both the mapping row and the mapping note for a nonzero count", () => {
+    const html = renderDialog({ reach: { fields: 3, columnMappings: 2 } });
+
+    expect(html).toContain("Column mappings on them");
+    expect(html).toContain("It also clears the column mappings on them.");
   });
 });
 

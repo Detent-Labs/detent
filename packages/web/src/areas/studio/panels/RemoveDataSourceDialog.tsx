@@ -42,6 +42,9 @@ const styles = stylex.create({
     minWidth: 0,
     overflowWrap: "anywhere",
   },
+  studioMono: {
+    fontFamily: fonts.mono,
+  },
   dialogNote: {
     color: colors.textMuted,
     fontSize: "0.9rem",
@@ -86,8 +89,8 @@ interface Props {
  * divider box, and the `btn-secondary btn-destructive` confirming control,
  * never filled red.
  *
- * Counts only: the dialog names the source by its key and no field. A fact
- * row prints for a count above zero alone.
+ * Counts only: the first fact row names the source by its key in mono, and
+ * the dialog names no field. A count row prints for a count above zero alone.
  *
  * Cancel holds the initial focus, never the confirming control: the studio
  * has no undo, so a reflexive Enter on an opening dialog must not commit the
@@ -97,9 +100,9 @@ export function RemoveDataSourceDialog({ label, reach, triggerRef, onCancel, onC
   const { ref, declineRef } = useConfirmDialog(triggerRef);
   const dialogProps = stylex.props(styles.dialog);
 
-  // A replacer function, so a key holding a `$` pattern such as `$&` fills in
-  // as the author typed it.
-  const heading = t("dataSources.removeDialogHeading").replace("{source}", () => label);
+  // The caller already swapped an empty key for the unnamed word, which is
+  // prose and keeps the body face; a real key is a machine value and prints mono.
+  const isNamed = label !== t("panelsScreen.unnamedDataSource");
 
   return (
     <dialog
@@ -110,8 +113,12 @@ export function RemoveDataSourceDialog({ label, reach, triggerRef, onCancel, onC
       aria-describedby={`${FACTS_ID} ${NOTES_ID}`}
       onCancel={onCancel}
     >
-      <h2 id={HEADING_ID}>{heading}</h2>
+      <h2 id={HEADING_ID}>{t("dataSources.removeDialogHeading")}</h2>
       <dl id={FACTS_ID} {...stylex.props(styles.dialogFacts)}>
+        <dt {...stylex.props(styles.dialogFactsDt)}>{t("dataSources.removeDialogSourceTerm")}</dt>
+        <dd {...stylex.props(styles.dialogFactsDd)}>
+          {isNamed ? <code {...stylex.props(styles.studioMono)}>{label}</code> : label}
+        </dd>
         {reach.fields > 0 && (
           <>
             <dt {...stylex.props(styles.dialogFactsDt)}>{t("dataSources.removeDialogFieldsTerm")}</dt>
@@ -127,6 +134,9 @@ export function RemoveDataSourceDialog({ label, reach, triggerRef, onCancel, onC
       </dl>
       <div id={NOTES_ID}>
         <p {...stylex.props(styles.dialogNote)}>{t("dataSources.removeDialogNoteClears")}</p>
+        {reach.columnMappings > 0 && (
+          <p {...stylex.props(styles.dialogNote)}>{t("dataSources.removeDialogNoteClearsMappings")}</p>
+        )}
         <p {...stylex.props(styles.dialogNote)}>{t("dataSources.removeDialogNoteNoUndo")}</p>
       </div>
       <div {...stylex.props(styles.controls)}>
