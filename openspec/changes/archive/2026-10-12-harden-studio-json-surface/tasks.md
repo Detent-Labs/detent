@@ -15,10 +15,10 @@
 
 ## 3. Verification
 
-- [ ] 3.1 Run `bun run typecheck`, then `bun run build`. Record the printed result.
-- [ ] 3.2 Run the full suite in the container with `OPENSPEC_TELEMETRY=0` through `sh scripts/test-gated.sh bun test`. Record the pass, fail and skip counts.
-- [ ] 3.3 Run the antislop and whitespace gates over the pushed range on the host. Record both exit codes.
-- [ ] 3.4 Build for production. In a browser on this worktree's stack, reproduce E1-1 and E1-5 and see Apply work, then refuse. Run `/impeccable critique` and `/impeccable audit` on the JSON surface route.
+- [x] 3.1 Run `bun run typecheck`, then `bun run build`. Record the printed result.
+- [x] 3.2 Run the full suite in the container with `OPENSPEC_TELEMETRY=0` through `sh scripts/test-gated.sh bun test`. Record the pass, fail and skip counts.
+- [x] 3.3 Run the antislop and whitespace gates over the pushed range on the host. Record both exit codes.
+- [x] 3.4 Build for production. In a browser on this worktree's stack, reproduce E1-1 and E1-5 and see Apply work, then refuse. Run `/impeccable critique` and `/impeccable audit` on the JSON surface route.
 
 ## Workflow follow-up
 

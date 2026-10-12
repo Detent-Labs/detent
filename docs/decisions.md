@@ -1727,13 +1727,6 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   instance each return 500. The unknown-id answer must be the opaque 403,
   never a 404, as WRITE-1 states. Anchors: `src/auth/login.ts`, `src/auth/jwt.ts`,
   `src/pagination.ts`.
-- **`harden-studio-json-surface` (E1-1, E1-5, E1-13; medium)**: The JSON
-  surface refuses every apply once `collaboration` is set, a nested shape
-  mismatch passes its guard and crashes the studio area, and the guard tests
-  stay green when a schema key is missing. Anchors:
-  `packages/web/src/areas/studio/draft/load-guard.ts`,
-  `packages/web/src/areas/studio/screens/EditScreen.tsx`,
-  `packages/web/test/studio-load-guard.test.ts`.
 - **`fix-condition-and-path-builders` (E2-1, E2-6, E2-10, E2-14, E2-17;
   medium)**: A manual path keeps a hidden guard that hides its button at
   runtime, one "+ Add row" removes every `visible` override when the steps
