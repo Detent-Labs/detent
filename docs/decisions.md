@@ -1696,14 +1696,6 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   hung target stops the outbox for all tenants, and the admin outbox list has
   no index for its sort order. Anchors: `src/engine/resolution.ts`,
   `src/engine/retention.ts`, `src/engine/host.ts`.
-- **`fix-subprocess-step-editor` (E2-3, E2-4, E2-5, E2-12, E2-18; medium)**:
-  The subprocess editor offers parent fields as `inputMapping` keys and shows
-  "pinned" without writing it, a step kind switch leaves keys behind, the
-  mapping editor overwrites or drops rows, and the contract panel stores an
-  outcome untrimmed. Anchors:
-  `packages/web/src/areas/studio/panels/SubprocessSpecEditor.tsx`,
-  `packages/web/src/areas/studio/panels/shared/FieldExpressionMapEditor.tsx`,
-  `packages/web/src/areas/studio/draft/performedBy.ts`.
 - **`sync-studio-editor-state` (E2-8, E2-13, E2-15, E1-7; medium)**: Stale
   JSON text in the plugin editor lands in another entity, a cleared deadline
   leaves a timer with no input, a removed data source leaves field

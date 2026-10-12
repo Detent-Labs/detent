@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { colors, focus, fonts, space } from "form-ui/tokens.stylex";
 import type { Step } from "workflow-engine/schema";
@@ -8,12 +8,15 @@ import type { ProcessSummary } from "../api/types.js";
 import { useDraft } from "../draft/store";
 import { t, type CatalogKey } from "../catalog.js";
 import { updateInDraftArray } from "../draft/draft-array-crud";
-import { performedByFor, performedByPatch, type PerformedBy } from "../draft/performedBy";
+import { performedByEdit, performedByFor, performedByReach, outcomePatch, pressDecision, type PerformedBy } from "../draft/performedBy";
 import { assignmentWord, isCuratedAssignmentStrategy, stepKindPhrase, assignmentStrategyLabel } from "../draft/guided-labels";
 import { ActionListEditor } from "./ActionListEditor";
 import { SubprocessSpecEditor } from "./SubprocessSpecEditor";
+import { KindSwitchDialog } from "./KindSwitchDialog";
 import { PluginEnvelopeEditor } from "./shared/PluginEnvelopeEditor";
 import { useRegistry } from "./shared/useRegistry.js";
+import { useChildInputFields } from "./shared/useChildInputFields";
+import { childVersionFor } from "../draft/subprocessSpec";
 import { PathsPanel } from "./PathsPanel";
 import { TimersPanel } from "./TimersPanel";
 import { IssueItems, NotCheckedBadge } from "./shared/IssueList";
@@ -473,8 +476,18 @@ export function StepPage({
   const baseLocale = draft.baseLocale ?? "en";
   const registry = useRegistry(token);
   const [childLoadError, setChildLoadError] = useState<string | null>(null);
+  // The kind a press waits on while the dialog confirms, and the button that
+  // opened it. The edit does not remount that button, so focus returns to it.
+  const [pendingKind, setPendingKind] = useState<PerformedBy | null>(null);
+  const kindTriggerRef = useRef<HTMLButtonElement | null>(null);
 
   const index = steps.findIndex((s) => s.id === step?.id);
+
+  // The child's input fields feed the subprocess editor's inputMapping. The
+  // version is the pinned one, or the process's newest for latest-at-spawn. A
+  // step of another kind, or one with no process, leaves the hook idle.
+  const callSpec = step?.type === "subprocess" ? step.subprocess : undefined;
+  const childInputs = useChildInputFields(token, callSpec?.processId, childVersionFor(callSpec, processes));
 
   const loadChildFile = async (id: string | undefined, file: File | undefined) => {
     if (!id || !file) return;
@@ -680,7 +693,7 @@ export function StepPage({
                 ))}
               </select>
             ) : (
-              <input type="text" value={step.outcome ?? ""} onChange={(e) => updateStep({ outcome: e.target.value })} />
+              <input type="text" value={step.outcome ?? ""} onChange={(e) => updateStep(outcomePatch(e.target.value))} />
             )}
             <span {...stylex.props(styles.hint)}>{t("stepSections.outcomeHint")}</span>
           </label>
@@ -691,6 +704,7 @@ export function StepPage({
             <SubprocessSpecEditor
               value={step.subprocess}
               fields={fields}
+              childInputs={childInputs}
               onChange={(subprocess) => updateStep({ subprocess })}
               processes={[...processes]}
               contentLocale={contentLocale}
@@ -799,12 +813,31 @@ export function StepPage({
                 performedBy === option && styles.segmentedOptionPressed,
               )}
               aria-pressed={performedBy === option}
-              onClick={() => updateStep(performedByPatch(option) as Partial<DraftStep>)}
+              onClick={(e) => {
+                if (pressDecision(step, option) === "apply") {
+                  updateStep(performedByEdit(step, option) as Partial<DraftStep>);
+                  return;
+                }
+                kindTriggerRef.current = e.currentTarget;
+                setPendingKind(option);
+              }}
             >
               {stepKindPhrase(option)}
             </button>
           ))}
         </fieldset>
+        {pendingKind && (
+          <KindSwitchDialog
+            kind={pendingKind}
+            reach={performedByReach(step, pendingKind)}
+            triggerRef={kindTriggerRef}
+            onCancel={() => setPendingKind(null)}
+            onConfirm={() => {
+              updateStep(performedByEdit(step, pendingKind) as Partial<DraftStep>);
+              setPendingKind(null);
+            }}
+          />
+        )}
 
         {isInitialStep ? (
           <p {...stylex.props(styles.note)}>{t("stepSections.isInitialStep")}</p>
