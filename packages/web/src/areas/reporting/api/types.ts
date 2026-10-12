@@ -38,6 +38,7 @@ export type SlaView = {
 // Report/ReportColumn/ReportQuery/ReportExecutionResult shapes.
 // ============================================================
 
+/** `value` is `undefined` while the builder has nothing to write; `draftToInput` leaves such a comparison out. */
 export type DataComparison = { fieldId: string; operator: "eq" | "ne" | "in"; value: unknown };
 
 export type ReportQuery = {
@@ -73,7 +74,8 @@ export type ReportInput = {
 
 export type ReportPatch = Partial<Omit<ReportInput, "processId">> & { owner?: string };
 
-export type ColumnChoice = { fieldId: string; versions: number[] };
+/** `type` is the declared base type in the newest version that declares the field; a plugin-typed field carries none. */
+export type ColumnChoice = { fieldId: string; versions: number[]; type?: string };
 
 export type ReportCell =
   | { kind: "value"; value: unknown }

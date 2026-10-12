@@ -97,7 +97,17 @@ its placement.
 - See `process-contract.md`'s Extensibility section for the seven
   DB-resolving publish checks. A data source's `valueFromField` must resolve
   to a scalar field of the publishing process's own catalog
-  (`checkInstanceQueryValueFromField`, `src/engine/definitions.ts:224-240`).
+  (`checkInstanceQueryValueFromField`, `src/engine/definitions.ts:228-244`).
+- An `instance.query` comparison's literal must match the declared type of
+  its compared field. The literal is the entry's `value`, or each member of an
+  `in` list. A `null` literal is exempt, and so is a `valueFromField` entry,
+  which has no literal. Publish rejects a literal that no live target version
+  admits through `typeMatches`. A field retyped between two live versions stays
+  publishable while one of them admits the literal. The check is part of
+  `validateInstanceQueryReferences`, one of `publishBody`'s DB-resolving
+  checks. It reads the target's live versions, so it cannot sit in
+  `definition.ts` or `compile.ts`. This is the first criterion of
+  `definition-contract`: a hand-written body cannot bypass it.
 - `unmappableStep` present iff `onUnmappable === "route-to-step"`. Migration
   maps reference only valid ids.
 - `migrationSpec.fieldMap` is injective. Two sources targeting one field

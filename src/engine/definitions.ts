@@ -19,11 +19,15 @@ import { SQL } from "bun";
 import {
   processBody,
   collectFieldsDeep,
+  typeMatches,
+  expectedTypeLabel,
   type ProcessBody,
   type ProcessId,
   type ProcessVersion,
   type LocalizedText,
   type LocaleCode,
+  type FieldDef,
+  type Literal,
 } from "../schema/definition.js";
 import { DurationValidationError, CompileValidationError } from "../schema/compile.js";
 import { definitionHash, contractHash } from "../schema/hash.js";
@@ -254,6 +258,19 @@ async function liveVersionCounts(targetProcessId: ProcessId, db: SQL): Promise<{
   return rows.map((r) => ({ version: Number(r.version), runningCount: Number(r.cnt) }));
 }
 
+/** One literal a `where` entry compares against, with the location of the `value` (or `value[k]`) that holds it. */
+type ComparedLiteral = { loc: string; value: Literal };
+
+/**
+ * The literals of one `where` entry: its `value`, or each member of an `in`
+ * list. A `null` is exempt, and a `valueFromField` entry has no `value`, so
+ * both add nothing.
+ */
+function comparedLiterals(valueLoc: string, value: Literal | undefined): ComparedLiteral[] {
+  const members = Array.isArray(value) ? value.map((v, k) => ({ loc: `${valueLoc}[${k}]`, value: v })) : [{ loc: valueLoc, value }];
+  return members.filter((m): m is ComparedLiteral => m.value !== undefined && m.value !== null);
+}
+
 /**
  * 5.1 + 5.2 + 5.3: the DB-resolving checks over every `"instance.query"` data
  * source. Resolves `processId` against the target's published versions
@@ -263,7 +280,9 @@ async function liveVersionCounts(targetProcessId: ProcessId, db: SQL): Promise<{
  * against the versions of the target holding a live (running) instance:
  * reporting a `PublishFinding` for a reference not carried by every such
  * version, and rejecting outright when a compared field's declared type is
- * non-scalar in a version that does carry it. See `cross-process-validation`.
+ * non-scalar in a version that does carry it. It also rejects a compared
+ * literal that no carrying version admits through `typeMatches`: a literal of
+ * the wrong type never equals a stored value. See `cross-process-validation`.
  */
 async function validateInstanceQueryReferences(
   body: ProcessBody,
@@ -297,17 +316,26 @@ async function validateInstanceQueryReferences(
       if (resolved) versionBodies.set(c.version, resolved);
     }
 
-    type Ref = { kind: "step" | "field"; id: string; refLoc: string; isComparedField: boolean };
+    type Ref = { kind: "step" | "field"; id: string; refLoc: string; isComparedField: boolean; literals: ComparedLiteral[] };
     const refs: Ref[] = [];
-    (config.stepIds ?? []).forEach((id, si) => refs.push({ kind: "step", id, refLoc: `${loc}.config.stepIds[${si}]`, isComparedField: false }));
-    (config.where ?? []).forEach((w, wi) => refs.push({ kind: "field", id: w.fieldId, refLoc: `${loc}.config.where[${wi}].fieldId`, isComparedField: true }));
-    refs.push({ kind: "field", id: config.labelFieldId, refLoc: `${loc}.config.labelFieldId`, isComparedField: false });
+    (config.stepIds ?? []).forEach((id, si) => refs.push({ kind: "step", id, refLoc: `${loc}.config.stepIds[${si}]`, isComparedField: false, literals: [] }));
+    (config.where ?? []).forEach((w, wi) =>
+      refs.push({
+        kind: "field",
+        id: w.fieldId,
+        refLoc: `${loc}.config.where[${wi}].fieldId`,
+        isComparedField: true,
+        literals: comparedLiterals(`${loc}.config.where[${wi}].value`, w.value),
+      }),
+    );
+    refs.push({ kind: "field", id: config.labelFieldId, refLoc: `${loc}.config.labelFieldId`, isComparedField: false, literals: [] });
     Object.entries(config.attributes ?? {}).forEach(([key, id]) =>
-      refs.push({ kind: "field", id, refLoc: `${loc}.config.attributes.${key}`, isComparedField: false }),
+      refs.push({ kind: "field", id, refLoc: `${loc}.config.attributes.${key}`, isComparedField: false, literals: [] }),
     );
 
     for (const ref of refs) {
       const carrying: number[] = [];
+      const carryingFields: FieldDef[] = [];
       let nonScalarInCarrying = false;
       for (const [version, vBody] of versionBodies) {
         const carries =
@@ -318,6 +346,7 @@ async function validateInstanceQueryReferences(
         carrying.push(version);
         if (ref.isComparedField) {
           const field = collectFieldsDeep(vBody.fields).find((f) => (f.id as string) === ref.id)!;
+          carryingFields.push(field);
           if (isNonScalarFieldType(field.type)) nonScalarInCarrying = true;
         }
       }
@@ -329,6 +358,20 @@ async function validateInstanceQueryReferences(
         throw new CrossProcessValidationError(
           `data source '${dataSource.id}' at '${ref.refLoc}' compares field '${ref.id}', declared non-scalar in a live version of '${targetProcessId}'`,
         );
+      }
+
+      // A literal one carrying version admits can still match there, so a
+      // field retyped between two live versions stays publishable. A literal
+      // none admits never equals a stored value. A reference no live version
+      // carries has no field to test against, so it keeps the finding alone.
+      if (carryingFields.length > 0) {
+        for (const literal of ref.literals) {
+          if (carryingFields.some((field) => typeMatches(field, literal.value))) continue;
+          const declared = [...new Set(carryingFields.map((field) => expectedTypeLabel(field)))].join(", ");
+          throw new CrossProcessValidationError(
+            `data source '${dataSource.id}' at '${literal.loc}' compares field '${ref.id}' with ${JSON.stringify(literal.value)}, which no live version of '${targetProcessId}' admits (declared: ${declared})`,
+          );
+        }
       }
 
       const missingVersions = counts.filter((c) => !carrying.includes(c.version));

@@ -2445,6 +2445,123 @@ options match a real published catalog. This walk caught the labelFieldId
 picker's stale mark polluting its own accessible name. The fix moves the
 mark outside the `<label>`, in `InstanceQueryForm.tsx`.
 
+### The instance.query form writes typed literals
+
+Source: `type-data-comparison-literals` tasks 4.1-4.5.
+
+Publish a target process with a number field `priority`, a boolean field and
+a string field. Open the Data sources tab of a second draft. Add an
+`instance.query` data source there. Pick the target process.
+
+#### Typing keeps focus
+
+Add an attribute row and type `cost_center` without a click between keys.
+Pass: the key input keeps focus after each character. Add a comparison on
+`priority` and type `12`. Pass: the value input keeps focus too.
+
+#### A number reaches the JSON view as a number
+
+Keep `=` and type `1` on `priority`. Open the JSON surface. Pass: the
+comparison holds `"value": 1` without quotes.
+
+Type `abc` instead. Pass: the input keeps `abc`, and the row says the value is
+not a number. The JSON then holds neither `value` nor `valueFromField`.
+
+Pick the boolean field. Pass: a Yes/No choice replaces the text input, and Yes
+writes `true`.
+
+#### A removed row keeps its text to itself
+
+Type `abc` in a number row. Add a second row and pick the same number field on
+it. Remove the first row. Pass: the input of the second row is empty.
+
+#### The in list
+
+Switch the operator to `in`. Pass: the right-side choice offers the literal
+alone, and a hint names the comma. Type `1, 2`. Pass: the JSON holds `[1, 2]`.
+
+On the string field, type `a,b`. Pass: the input shows `a,b`, and the JSON
+holds `["a", "b"]`.
+
+#### The error row
+
+Stop the engine, or block `GET /processes/:id/versions` in the browser's
+network tools. Pick the target again. Pass: one error row stands under the
+process picker. The form marks no reference stale.
+
+The stored comparisons and attributes stay in sight. Each literal control
+refuses input. Each field select still shows its stored field id.
+
+Restore the route and pick another process. Pass: the error row disappears.
+
+#### The duplicate mark
+
+Add a second attribute row and type `cost_center` again. Pass: the later row
+shows the duplicate callout and keeps its text. The JSON keeps the earlier
+row's entry.
+
+Leave a row's key empty and press "+ Add attribute". Pass: a second row
+appears. Change `attributes` in the JSON surface and return to the form. Pass:
+the rows show the new attributes.
+
+`studio-instanceQueryForm.test.tsx` draws each catalog state through a static
+render. Such a render runs no event handler, so it cannot see focus or a
+committed keystroke.
+
+### The report builder writes typed comparison values
+
+Source: `type-data-comparison-literals` tasks 5.1-5.4.
+
+Publish a process with a number field `amount`, a boolean field and a string
+field. Start instances that hold `amount` 500 and other values. Open
+`/reporting/reports`, choose "New report" and pick that process. Keep the
+network tools open on the `POST /reporting/reports/columns` and
+`POST /reporting/reports/preview` requests.
+
+#### A number compares as a number
+
+Add a column for `amount`. Add a comparison on `amount`, keep "is" and type
+`500`. Press "Preview table". Pass: the request body holds `"value": 500`
+without quotes. The table shows the instances with 500 alone. Switch to "is
+not". Pass: those instances leave the table.
+
+#### The in list
+
+Switch the operator to "is one of". Pass: the hint names the comma. Type
+`500, 7`. Pass: the input keeps `500, 7`, and the preview body holds
+`[500, 7]`. On the string field, type `a,b`. Pass: the input shows `a,b`.
+
+#### The boolean choice
+
+Pick the boolean field. Pass: a Yes/No choice replaces the text input, with
+an empty choice first. Choose Yes. Pass: the preview body holds `true`.
+
+#### The incomplete row
+
+Add a comparison and leave its value empty. Pass: the row takes a dashed
+bottom border and shows no message. Press "Preview table". Pass: the preview
+request body omits that comparison. Type `abc` on `amount`. Pass: the input
+keeps `abc`, the row says the value is not a number, and the next preview
+omits the row.
+
+Type `abc` in a number row, add a second row, then remove the first row.
+Pass: the second row's input is empty.
+
+A saved report can hold a stored string such as `"abc"` on a number field.
+That row shows the "not a number" reason and still filters on `"abc"`. This
+is the expected state: the stored value stays until the owner retypes it.
+
+#### One column request per pause
+
+Clear the comparisons. Add a comparison on `amount` and type `12345` without
+a pause. Pass: the network tools list one column request after the last key.
+Pick another process from a fresh "New report". Pass: its first column
+request goes out at once.
+
+`reporting-comparisonRow.test.tsx` draws each row state through a static
+render, and `reporting-debounce.test.ts` drives the wait with a fake timer.
+Neither sees a real request body or a real keystroke.
+
 ### The instance.transition action's config form (`instance-transition-action`)
 
 Source: `instance-transition-action` tasks 4.1 and 7.5.

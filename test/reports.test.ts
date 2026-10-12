@@ -57,7 +57,7 @@ beforeEach(async () => {
 // a real transition.
 // ============================================================
 
-type FieldSpec = { id: string; key: string; type?: string; redactable?: boolean; fields?: FieldSpec[] };
+type FieldSpec = { id: string; key: string; type?: string | { type: string; config: Record<string, unknown> }; redactable?: boolean; fields?: FieldSpec[] };
 
 function fieldDef(f: FieldSpec): unknown {
   return {
@@ -374,6 +374,65 @@ test.skipIf(!DB)("3.4 column choices union every in-range version's catalog, tag
   const byId = new Map(choices.map((c) => [c.fieldId, c.versions]));
   expect(byId.get("field_old" as FieldId)).toEqual([v1.version]);
   expect(byId.get("field_common" as FieldId)?.sort()).toEqual([v1.version, v2.version].sort());
+});
+
+test.skipIf(!DB)("3.4 a column choice carries the declared base type of its field", async () => {
+  const PID = pid("column_type");
+  const v = await publishBody(PID, reportBody("column_type", [{ id: "field_n", key: "n", type: "number" }]), reg, dataSourceReg);
+  await createInstance(v.definition, { processId: PID, version: v.version, data: { field_n: 3 } as Instance["data"] }, sql);
+
+  const choices = await resolveReportColumnChoices(PID, {}, sql);
+  expect(choices.find((c) => c.fieldId === ("field_n" as FieldId))?.type).toBe("number");
+});
+
+test.skipIf(!DB)("3.4 the newest declaring version decides a column choice's type, and the choice still names both versions", async () => {
+  const PID = pid("column_type_newest");
+  const v1 = await publishBody(PID, reportBody("column_type_newest", [{ id: "field_a", key: "a", type: "string" }]), reg, dataSourceReg);
+  await createInstance(v1.definition, { processId: PID, version: v1.version, data: { field_a: "x" } as Instance["data"] }, sql);
+  const v2 = await publishBody(PID, reportBody("column_type_newest", [{ id: "field_a", key: "a", type: "number" }]), reg, dataSourceReg);
+  await createInstance(v2.definition, { processId: PID, version: v2.version, data: { field_a: 7 } as Instance["data"] }, sql);
+
+  const choice = (await resolveReportColumnChoices(PID, {}, sql)).find((c) => c.fieldId === ("field_a" as FieldId));
+  expect(choice?.type).toBe("number");
+  expect(choice?.versions).toEqual([v1.version, v2.version]);
+});
+
+test.skipIf(!DB)("3.4 a newer version's type wins in either direction, not only a later-sorting one", async () => {
+  const PID = pid("column_type_reverse");
+  const v1 = await publishBody(PID, reportBody("column_type_reverse", [{ id: "field_a", key: "a", type: "number" }]), reg, dataSourceReg);
+  await createInstance(v1.definition, { processId: PID, version: v1.version, data: { field_a: 7 } as Instance["data"] }, sql);
+  const v2 = await publishBody(PID, reportBody("column_type_reverse", [{ id: "field_a", key: "a", type: "string" }]), reg, dataSourceReg);
+  await createInstance(v2.definition, { processId: PID, version: v2.version, data: { field_a: "x" } as Instance["data"] }, sql);
+
+  const choice = (await resolveReportColumnChoices(PID, {}, sql)).find((c) => c.fieldId === ("field_a" as FieldId));
+  expect(choice?.type).toBe("string");
+});
+
+test.skipIf(!DB)("3.4 a version that drops the field does not decide its type", async () => {
+  const PID = pid("column_type_dropped");
+  const v1 = await publishBody(PID, reportBody("column_type_dropped", [{ id: "field_a", key: "a", type: "number" }]), reg, dataSourceReg);
+  await createInstance(v1.definition, { processId: PID, version: v1.version, data: { field_a: 7 } as Instance["data"] }, sql);
+  const v2 = await publishBody(PID, reportBody("column_type_dropped", []), reg, dataSourceReg);
+  await createInstance(v2.definition, { processId: PID, version: v2.version, data: {} }, sql);
+
+  const choice = (await resolveReportColumnChoices(PID, {}, sql)).find((c) => c.fieldId === ("field_a" as FieldId));
+  expect(choice?.type).toBe("number");
+  expect(choice?.versions).toEqual([v1.version]);
+});
+
+test.skipIf(!DB)("3.4 a plugin-typed field has no type key", async () => {
+  const PID = pid("column_type_plugin");
+  const v = await publishBody(
+    PID,
+    reportBody("column_type_plugin", [{ id: "field_p", key: "p", type: { type: "x.custom", config: {} } }]),
+    reg,
+    dataSourceReg,
+  );
+  await createInstance(v.definition, { processId: PID, version: v.version, data: { field_p: "v" } as Instance["data"] }, sql);
+
+  const choice = (await resolveReportColumnChoices(PID, {}, sql)).find((c) => c.fieldId === ("field_p" as FieldId));
+  expect(choice).toBeDefined();
+  expect(choice && "type" in choice).toBe(false);
 });
 
 test.skipIf(!DB)("3.4 a group container field is never offered as a column choice", async () => {

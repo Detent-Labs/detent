@@ -1,10 +1,10 @@
 /**
  * Publish-time cross-process validation over an `"instance.query"` data
- * source: `cross-process-validation`'s five requirements — processId
+ * source: `cross-process-validation`'s requirements — processId
  * resolvability, the step/field reference union (reports), the compared
  * field's declared type (rejects), the publishing actor's read grant on the
- * target, and the in-process `valueFromField` check. DB-backed; skips when
- * DATABASE_URL is unset.
+ * target, the in-process `valueFromField` check, and the type of each
+ * compared literal (rejects). DB-backed; skips when DATABASE_URL is unset.
  */
 import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, initSchema } from "../src/engine/store.js";
@@ -14,7 +14,8 @@ import { createDefaultDataSourceRegistry } from "../src/engine/host.js";
 import { createProcessInstance } from "../src/runtime/api.js";
 import { writeGrant } from "../src/auth/grants.js";
 import { AuthorizationError, ADMIN_ROLE } from "../src/auth/authorize.js";
-import type { ProcessBody, ProcessId } from "../src/schema/definition.js";
+import { publishedProcessBody, type ProcessBody, type ProcessId } from "../src/schema/definition.js";
+import { compileProcessBody } from "../src/schema/compile.js";
 import type { Actor } from "../src/cel/eval.js";
 import { clearInstanceAudit } from "./audit-cleanup.js";
 
@@ -336,4 +337,221 @@ test.skipIf(!DB)("a scalar valueFromField publishes, subject to the other checks
     defaultDsReg,
   );
   expect(result.version).toBeGreaterThan(0);
+});
+
+// ---- 5.6: a compared literal matches the declared type of its field (rejects) ----
+
+const WHERE_LOC = "dataSources[0].config.where";
+
+/** One field per declared type the literal check tells apart. `shiftType`, when given, adds field_t_shift with that declared type, so two versions can retype one field id. */
+const typedTargetBody = (shiftType?: unknown): ProcessBody => {
+  const fields: Record<string, unknown>[] = [
+    { id: "field_t_num", key: "num", label: { en: "Num" }, type: "number" },
+    { id: "field_t_flag", key: "flag", label: { en: "Flag" }, type: "boolean" },
+    { id: "field_t_text", key: "text", label: { en: "Text" }, type: "string" },
+    { id: "field_t_mail", key: "mail", label: { en: "Mail" }, type: "string", format: "email" },
+    { id: "field_t_plug", key: "plug", label: { en: "Plug" }, type: { type: "org.signature", config: {} } },
+  ];
+  if (shiftType !== undefined) fields.push({ id: "field_t_shift", key: "shift", label: { en: "Shift" }, type: shiftType });
+  return {
+    key: "typed",
+    label: { en: "Typed" },
+    baseLocale: "en",
+    fields,
+    workflow: {
+      initialStep: "step_a",
+      steps: [
+        { id: "step_a", key: "a", label: { en: "A" }, type: "task", paths: [{ id: "path_ab", key: "ab", label: "Ab", to: "step_b", trigger: "manual" }] },
+        { id: "step_b", key: "b", label: { en: "B" }, type: "task", terminal: true },
+      ],
+    },
+  } as unknown as ProcessBody;
+};
+
+/** A reader whose one data source compares the typed target with `where`. */
+const typedReaderBody = (where: Record<string, unknown>[]): ProcessBody => readerBody({ processId: TARGET_ID, where, labelFieldId: "field_t_text" });
+
+/** Publishes the typed target and starts one live instance of it. */
+async function publishTypedTargetWithInstance(shiftType?: unknown): Promise<void> {
+  await publishBody(TARGET_ID, typedTargetBody(shiftType), reg, defaultDsReg);
+  await createProcessInstance(TARGET_ID, actor, emptyDsReg);
+}
+
+async function raisedBy(run: () => Promise<unknown>): Promise<unknown> {
+  try {
+    await run();
+  } catch (e) {
+    return e;
+  }
+  return undefined;
+}
+
+test.skipIf(!DB)("a string literal on a number field fails the publish, naming the source, location, field, literal and declared type", async () => {
+  await publishTypedTargetWithInstance();
+
+  const raised = await raisedBy(() => publishBody(READER_ID, typedReaderBody([{ fieldId: "field_t_num", operator: "eq", value: "5" }]), reg, defaultDsReg));
+  expect(raised).toBeInstanceOf(CrossProcessValidationError);
+  const message = (raised as Error).message;
+  expect(message).toContain("'ds_iq'");
+  expect(message).toContain(`${WHERE_LOC}[0].value`);
+  expect(message).toContain("'field_t_num'");
+  expect(message).toContain('"5"');
+  expect(message).toContain("number");
+});
+
+test.skipIf(!DB)("a rejected literal persists no version of the reader", async () => {
+  await publishTypedTargetWithInstance();
+
+  const raised = await raisedBy(() => publishBody(READER_ID, typedReaderBody([{ fieldId: "field_t_num", operator: "eq", value: "5" }]), reg, defaultDsReg));
+  expect(raised).toBeInstanceOf(CrossProcessValidationError);
+  const rows = (await sql`SELECT COUNT(*)::int AS n FROM definitions WHERE process_id = ${READER_ID}`) as { n: number }[];
+  expect(rows[0].n).toBe(0);
+});
+
+test.skipIf(!DB)("a string literal on a boolean field fails the publish", async () => {
+  await publishTypedTargetWithInstance();
+
+  const raised = await raisedBy(() => publishBody(READER_ID, typedReaderBody([{ fieldId: "field_t_flag", operator: "eq", value: "true" }]), reg, defaultDsReg));
+  expect(raised).toBeInstanceOf(CrossProcessValidationError);
+  expect((raised as Error).message).toContain("boolean");
+});
+
+test.skipIf(!DB)("a number literal on a string field fails the publish", async () => {
+  await publishTypedTargetWithInstance();
+
+  const raised = await raisedBy(() => publishBody(READER_ID, typedReaderBody([{ fieldId: "field_t_text", operator: "ne", value: 5 }]), reg, defaultDsReg));
+  expect(raised).toBeInstanceOf(CrossProcessValidationError);
+});
+
+test.skipIf(!DB)("a string that fails the field's format fails the publish, and the message names the format", async () => {
+  await publishTypedTargetWithInstance();
+
+  const raised = await raisedBy(() => publishBody(READER_ID, typedReaderBody([{ fieldId: "field_t_mail", operator: "eq", value: "foo" }]), reg, defaultDsReg));
+  expect(raised).toBeInstanceOf(CrossProcessValidationError);
+  expect((raised as Error).message).toContain("email");
+});
+
+test.skipIf(!DB)("a literal of the declared type publishes, for each scalar type and a format", async () => {
+  await publishTypedTargetWithInstance();
+
+  const result = await publishBody(
+    READER_ID,
+    typedReaderBody([
+      { fieldId: "field_t_num", operator: "eq", value: 5 },
+      { fieldId: "field_t_flag", operator: "ne", value: true },
+      { fieldId: "field_t_text", operator: "eq", value: "x" },
+      { fieldId: "field_t_mail", operator: "eq", value: "a@example.com" },
+    ]),
+    reg,
+    defaultDsReg,
+  );
+  expect(result.version).toBeGreaterThan(0);
+  expect(result.findings).toEqual([]);
+});
+
+test.skipIf(!DB)("the check covers each member of an in list, naming the failing member", async () => {
+  await publishTypedTargetWithInstance();
+
+  const raised = await raisedBy(() => publishBody(READER_ID, typedReaderBody([{ fieldId: "field_t_num", operator: "in", value: [1, "two"] }]), reg, defaultDsReg));
+  expect(raised).toBeInstanceOf(CrossProcessValidationError);
+  const message = (raised as Error).message;
+  expect(message).toContain(`${WHERE_LOC}[0].value[1]`);
+  expect(message).toContain('"two"');
+});
+
+test.skipIf(!DB)("an in list of the declared type publishes", async () => {
+  await publishTypedTargetWithInstance();
+
+  const result = await publishBody(READER_ID, typedReaderBody([{ fieldId: "field_t_num", operator: "in", value: [1, 2, 3] }]), reg, defaultDsReg);
+  expect(result.version).toBeGreaterThan(0);
+});
+
+test.skipIf(!DB)("a null literal publishes on a number field, alone or inside an in list", async () => {
+  await publishTypedTargetWithInstance();
+
+  const result = await publishBody(
+    READER_ID,
+    typedReaderBody([
+      { fieldId: "field_t_num", operator: "eq", value: null },
+      { fieldId: "field_t_num", operator: "in", value: [1, null] },
+    ]),
+    reg,
+    defaultDsReg,
+  );
+  expect(result.version).toBeGreaterThan(0);
+});
+
+test.skipIf(!DB)("a plugin-typed field admits any literal", async () => {
+  await publishTypedTargetWithInstance();
+
+  const result = await publishBody(
+    READER_ID,
+    typedReaderBody([
+      { fieldId: "field_t_plug", operator: "eq", value: "anything" },
+      { fieldId: "field_t_plug", operator: "eq", value: 7 },
+    ]),
+    reg,
+    defaultDsReg,
+  );
+  expect(result.version).toBeGreaterThan(0);
+});
+
+test.skipIf(!DB)("a comparison reading valueFromField carries no literal, so this check raises nothing for it", async () => {
+  await publishTypedTargetWithInstance();
+
+  // field_r_dummy is a string of the reading process; field_t_num is a number of the target.
+  const result = await publishBody(READER_ID, typedReaderBody([{ fieldId: "field_t_num", operator: "eq", valueFromField: "field_r_dummy" }]), reg, defaultDsReg);
+  expect(result.version).toBeGreaterThan(0);
+});
+
+test.skipIf(!DB)("one live version admitting the literal is enough, and a literal no live version admits fails naming every declared type", async () => {
+  await publishTypedTargetWithInstance("string");
+  await publishBody(TARGET_ID, typedTargetBody("number"), reg, defaultDsReg);
+  await createProcessInstance(TARGET_ID, actor, emptyDsReg, { version: 2 });
+
+  const result = await publishBody(READER_ID, typedReaderBody([{ fieldId: "field_t_shift", operator: "eq", value: 5 }]), reg, defaultDsReg);
+  expect(result.version).toBeGreaterThan(0);
+
+  const raised = await raisedBy(() => publishBody(READER_ID, typedReaderBody([{ fieldId: "field_t_shift", operator: "eq", value: true }]), reg, defaultDsReg));
+  expect(raised).toBeInstanceOf(CrossProcessValidationError);
+  expect((raised as Error).message).toContain("string");
+  expect((raised as Error).message).toContain("number");
+});
+
+test.skipIf(!DB)("only a live version that declares the field can admit the literal", async () => {
+  await publishTypedTargetWithInstance("string");
+  await publishBody(TARGET_ID, typedTargetBody(), reg, defaultDsReg); // v2 drops field_t_shift
+  await createProcessInstance(TARGET_ID, actor, emptyDsReg, { version: 2 });
+
+  const admitted = await publishBody(READER_ID, typedReaderBody([{ fieldId: "field_t_shift", operator: "eq", value: "x" }]), reg, defaultDsReg);
+  expect(admitted.findings.map((f) => f.reference)).toContain("field_t_shift"); // v2 does not carry it
+
+  const raised = await raisedBy(() => publishBody(READER_ID, typedReaderBody([{ fieldId: "field_t_shift", operator: "eq", value: 5 }]), reg, defaultDsReg));
+  expect(raised).toBeInstanceOf(CrossProcessValidationError);
+});
+
+test.skipIf(!DB)("a compared field no live version carries reports the finding alone, whatever the literal", async () => {
+  await publishTypedTargetWithInstance();
+
+  const result = await publishBody(READER_ID, typedReaderBody([{ fieldId: "field_ghost", operator: "eq", value: 5 }]), reg, defaultDsReg);
+  expect(result.findings.map((f) => f.reference)).toEqual(["field_ghost"]);
+});
+
+test.skipIf(!DB)("a target with no live instance leaves the literal unchecked", async () => {
+  await publishBody(TARGET_ID, typedTargetBody(), reg, defaultDsReg); // no instance created
+
+  const result = await publishBody(READER_ID, typedReaderBody([{ fieldId: "field_t_num", operator: "eq", value: "5" }]), reg, defaultDsReg);
+  expect(result.version).toBeGreaterThan(0);
+  expect(result.findings.map((f) => f.reference)).toContain("field_t_num");
+});
+
+test.skipIf(!DB)("a hand-written body that satisfies the published schema cannot skip the check", async () => {
+  await publishTypedTargetWithInstance();
+
+  // Already compiled, so the compile pass takes its published-schema early return.
+  const handWritten = compileProcessBody(typedReaderBody([{ fieldId: "field_t_num", operator: "eq", value: "5" }]));
+  expect(publishedProcessBody.safeParse(handWritten).success).toBe(true);
+
+  const raised = await raisedBy(() => publishBody(READER_ID, handWritten, reg, defaultDsReg));
+  expect(raised).toBeInstanceOf(CrossProcessValidationError);
 });

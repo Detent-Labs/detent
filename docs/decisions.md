@@ -249,7 +249,7 @@ word. `ROADMAP.md` carries stage-by-stage status.
 - A subprocess-callable child's fields should stay inside its own
   `inputFields`. `.claude/rules/authoring-invariants.md` once stated that
   rule, but the code does not enforce it. Three sites read `inputFields`:
-  `src/engine/definitions.ts:501-505`, `src/schema/compile.ts:466-468` and
+  `src/engine/definitions.ts:544-548`, `src/schema/compile.ts:466-468` and
   `:1139`. Live specs stay silent on the rule too. Building it takes its own
   definition contract change.
 
@@ -1192,8 +1192,8 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
 - **FIELDS-17: two kept settings fail no check the draft ever runs.** A
   removal leaves a `valueFromField` or `instanceIdField` value that names a
   removed id, since both are plugin-config settings `fieldRemovalReach` only
-  counts. `checkInstanceQueryValueFromField` (`src/engine/definitions.ts:224`)
-  and `validateInstanceTransitionReferences` (`:373`) reject an unresolved
+  counts. `checkInstanceQueryValueFromField` (`src/engine/definitions.ts:228`)
+  and `validateInstanceTransitionReferences` (`:416`) reject an unresolved
   one, but only `publishBody` calls them. The studio's own checks rail,
   `draft/validation.ts::runValidation` (`:82`), calls `validateStructure` and
   `validateReferences` alone, so neither check runs before publish. Risk
@@ -1612,6 +1612,45 @@ this section.
   2026-10-11 the owner ruled that body out of scope for
   `close-instance-reads-on-write-paths`. No follow-up change is planned yet.
 
+## Open from type-data-comparison-literals (needs its own OpenSpec change)
+
+The final review of `type-data-comparison-literals` (2026-10-12) found two gaps
+that come from how two owner rulings meet. The tags LITERAL-1 and LITERAL-2
+are local to this section.
+
+- **LITERAL-1: the form writes a literal that publish rejects for a field with
+  a format.** `TargetRef` carries the declared `type` and no `format`.
+  `literalType` reads `type` alone, but `typeMatches` also checks the format.
+  The studio form therefore writes `1.5` on an `integer` field. It writes free
+  text on a `date`, `datetime`, `email` or `person` field. Publish rejects each
+  with a located message that names the declared type, so the author meets the
+  error at publish and not in the row. A later change could carry `format`
+  into `TargetRef` and check it in the row. The report builder has no publish
+  gate, by owner ruling. A format mismatch there matches nothing and reports
+  nothing.
+
+- **LITERAL-2: the form and the publish check read different versions.** The
+  form takes the type from the newest published version that declares the
+  field. Publish accepts a literal when any target version that holds a
+  running instance admits it. Take a field declared `string` in version 1,
+  which has running instances, and `number` in version 2, which has none yet.
+  The form shows a number input and writes `5`. Publish rejects `5` with
+  `(declared: string)`. The form cannot write `"5"`, so the author uses the
+  JSON surface. Each half follows its own spec. A real fix needs an OpenSpec
+  change that decides which version set the form reads.
+
+- **LITERAL-3: the studio data source editor scrolls sideways at 390 px.** The
+  browser check of the same change measured an inner `overflow-x: auto` box
+  with a content width of 494 px against a client width of 358 px. The widest
+  leaf is the target process select, whose options read
+  `key (proc_<uuid>)`. `main` has the same option text, so the overflow
+  predates the change. The rows the change added wrap at 494 px, not at the
+  viewport, so a reason sentence and the comma hint sit off screen until the
+  author scrolls the box. Capping the select and zeroing the fieldset
+  `min-inline-size` in the live DOM did not narrow it, so the cause sits higher
+  in the editor's layout. The fix belongs to a screen change under
+  `studio-app`, with `/impeccable adapt`.
+
 ## Open from the studio-path-row-field-order final review (one OpenSpec change per screen)
 
 The final whole-branch review for `studio-path-row-field-order` (2026-09-17)
@@ -1645,15 +1684,6 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   `createDefaultAssignmentRegistry`. Anchors:
   `src/handlers/process-start.ts`, `src/handlers/instance-transition.ts`,
   `src/engine/assignment-strategies.ts`.
-- **`type-data-comparison-literals` (E2-2, E2-9, E2-16, F-5; high)**: The
-  `instance.query` form and the report builder send every comparison value as
-  a string, the report builder offers no way to type a list for the
-  comparison `in`, the query form's attribute rows lose focus on each
-  keystroke, and a failed catalog fetch marks every reference as stale.
-  Anchors:
-  `packages/web/src/areas/studio/panels/shared/InstanceQueryForm.tsx`,
-  `packages/web/src/areas/reporting/screens/ReportBuilderScreen.tsx`,
-  `packages/web/src/areas/studio/panels/shared/useTargetProcessCatalog.ts`.
 - **`tighten-publish-contract-checks` (A-2, A-8; medium)**: The idempotent
   compile branch accepts a hand-written cancel sink of any shape, and publish
   stores `Action.execution` and `Action.idempotencyKey`, which nothing reads.

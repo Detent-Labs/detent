@@ -330,7 +330,7 @@ data sources the same way. The check runs after the hash-hit no-op
 return. A body published before the handler's registration stays valid
 on an identical re-publish. It throws the results in a fixed
 order: action registry, assignment registry, data source registry, then
-CEL (`definitions.ts:688-704`). The class
+CEL (`definitions.ts:731-747`). The class
 `DataSourceRegistryValidationError` also carries
 `checkInstanceQueryValueFromField`'s issues.
 
@@ -361,7 +361,10 @@ this order: `validateCrossProcess`, `validateSubprocessCycle`,
 `validateCrossProcessReadGrant`. The two `instance*References` checks
 also return the `PublishFinding`s the publish result carries. The check
 `validateCrossProcessReadGrant` runs only when the caller supplies an
-actor.
+actor. The check `validateInstanceQueryReferences` also rejects a
+comparison literal that no live target version admits through
+`typeMatches`. It reads those versions from the database, so it takes the
+publish-path placement.
 
 The cycle check, `validateSubprocessCycle`, walks the subprocess steps
 of the published body and of each child they reach. Each reference
