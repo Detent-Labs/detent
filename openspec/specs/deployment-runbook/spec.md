@@ -156,10 +156,9 @@ takes no lock, so two processes that run it together can fail.
 - **WHEN** an operator reads the runbook before starting a second engine
   process for one tenant
 - **THEN** the runbook states that a tenant may run more than one process
-- **AND** it names the login rate-limit windows as state each process keeps
-  on its own
-- **AND** it says that each added process raises the effective login
-  threshold, and that a restart clears the windows
+- **AND** it names no login rate-limit window as state a process keeps
+- **AND** the windows live in the tenant's database
+- **AND** a second process or a restart leaves the login thresholds alone
 
 #### Scenario: The state moves into the database
 
