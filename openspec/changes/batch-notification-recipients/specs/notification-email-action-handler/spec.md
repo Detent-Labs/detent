@@ -28,7 +28,7 @@ cannot duplicate. "A long recipient list sends in batches" defines the batch.
 
 - **WHEN** the server answers `450` to one `RCPT TO` of several
 - **THEN** the handler sends no `DATA`, and the delivery retries as transient
-- **AND** no address received a message on the first try
+- **AND** no address of the rejected batch received a message on the first try
 
 ## ADDED Requirements
 
@@ -106,6 +106,29 @@ accepted. The retry then sends the earlier batches again, and their repeated
 - **WHEN** the server accepts the first of two batches and answers `450` to a
   `RCPT TO` of the second
 - **THEN** the delivery retries as transient
+
+### Requirement: A batched delivery stops before it outlives the claim lease
+
+The outbox abandons a handler that outlives its 30-second claim lease. It
+then retries the row. The handler SHALL always start the first batch. It
+SHALL start a later batch only when that batch fits. A batch fits when the
+elapsed time plus its timeout bound stays within the lease. Otherwise the
+handler SHALL fail the delivery as transient and send nothing more.
+
+An abandoned handler would keep sending batches that the retry sends again.
+
+#### Scenario: A later batch that cannot fit stops the delivery
+
+- **WHEN** the resolved list needs two batches
+- **AND** the first batch takes longer than the lease minus the second
+  batch's timeout bound
+- **THEN** the handler opens no second session
+- **AND** the delivery fails as transient
+
+#### Scenario: A first batch always starts
+
+- **WHEN** the action declares a timeout longer than the claim lease
+- **THEN** the handler still starts the first batch
 
 ### Requirement: The handler drops a stored address that is no valid address
 

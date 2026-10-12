@@ -45,12 +45,18 @@ that the handler holds now. Alternative: send every batch in one session with
 that one session either delivers or stops, and one stalled session would hold
 every batch. Rejected.
 
-**The timeout bounds each session, not the delivery.** The spec already says
-"every SMTP session". The outbox deadline, derived from its claim lease,
-still bounds the delivery as a whole. A list of several hundred recipients
-over a slow relay can reach that deadline. The row then retries and resends
-the batches it already delivered. That costs the same as a later batch that
-fails.
+**The timeout bounds each session. A lease budget bounds the delivery.** The
+spec already says "every SMTP session". The outbox abandons a handler that
+outlives its claim lease, but it cannot cancel the handler. A handler that
+kept sending would deliver batches again on the retry.
+
+So the handler measures the time since the delivery began. It always starts batch one. It
+starts a later batch only when that time plus the batch's timeout bound
+stays within `CLAIM_LEASE_MS`. Otherwise it fails as transient.
+
+The lease also covers a claim batch of up to 100 rows. So the budget is an
+upper bound and no guarantee. The outbox exposes no remaining lease to a
+handler.
 
 **`Message-ID` takes a `-<n>` suffix for several batches.**
 A list of 100 or fewer keeps today's identifier, so no existing consumer
@@ -89,10 +95,14 @@ warning.
   earlier batches again. Their `Message-ID` values repeat, so a cooperating
   mail system dedupes. SMTP offers nothing better, and the owner accepted
   this cost.
-- A long list over a slow relay reaches the outbox deadline. The row retries
-  and duplicates the delivered batches. Groups of that size are rare. The
-  per-session bound keeps a stalled relay from holding the worker past the
-  lease.
+- A group too large for one lease never finishes. Each try sends the batches
+  that fit, then fails as transient, and the row dead-letters after its
+  attempts. The batches that went out repeat on every try. The `ponytail:`
+  mark names this ceiling. Splitting the work into one outbox row per batch
+  removes it and is a separate change.
+- `Message-ID` stays stable only while the recipient set stays stable. A
+  disabled account between two tries moves the batch boundaries. A list of
+  101 that drops to 100 loses its suffix.
 - `z.string().email()` is stricter than RFC 5321. It demands a dot in the
   domain. An operator cannot create an account at `admin@localhost` after
   this change. Every seed, test and script address ends in `.test` or `.com`.
