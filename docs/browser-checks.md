@@ -6033,6 +6033,9 @@ Open the dialog again from the option. Then press "Switch and remove".
 Pass: the step is a task step and the JSON surface shows no `subprocess` key on
 it.
 
+Pass: keyboard focus stands on the "A step someone works" option that opened
+the dialog.
+
 Pass: the Checks tab shows no issue "only a subprocess step may declare a
 subprocess spec".
 

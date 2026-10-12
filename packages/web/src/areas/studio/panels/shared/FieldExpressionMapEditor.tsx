@@ -23,6 +23,8 @@ interface FieldExpressionMapEditorProps {
   fields: readonly MapTargetField[];
   /** Disables "+ add" while the caller has no target list yet. */
   addDisabled?: boolean;
+  /** The id of an element that says why "+ add" is disabled. */
+  addDescribedBy?: string;
   onChange: (next: Partial<Record<FieldId, DraftOf<Expression>>>) => void;
 }
 
@@ -35,6 +37,7 @@ export function FieldExpressionMapEditor({
   mapping,
   fields,
   addDisabled,
+  addDescribedBy,
   onChange,
 }: FieldExpressionMapEditorProps) {
   const entries = Object.entries(mapping ?? {});
@@ -73,6 +76,7 @@ export function FieldExpressionMapEditor({
         type="button"
         className="btn btn-secondary"
         onClick={addEntry}
+        aria-describedby={addDescribedBy}
         disabled={addDisabled === true || nextTarget === undefined}
       >
         {addLabel}

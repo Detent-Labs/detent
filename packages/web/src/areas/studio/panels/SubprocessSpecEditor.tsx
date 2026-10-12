@@ -1,3 +1,4 @@
+import { useId } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { colors, space } from "form-ui/tokens.stylex";
 import type { Expression, FieldId, SubprocessSpec } from "workflow-engine/schema";
@@ -60,6 +61,7 @@ function childInputsNote(childInputs: ChildInputFields) {
 
 /** Call-and-return subprocess wiring on a `subprocess`-type step (design.md/CLAUDE.md "Subprocesses"). */
 export function SubprocessSpecEditor({ value, fields, childInputs, onChange, processes, contentLocale }: Props) {
+  const noteId = useId();
   const processId = value?.processId ?? "";
   // A stored id the list does not carry still has to keep its place in the
   // picker, or selecting the step would silently clear the call. It reads as
@@ -153,9 +155,13 @@ export function SubprocessSpecEditor({ value, fields, childInputs, onChange, pro
         mapping={value.inputMapping}
         fields={childInputs.fields}
         addDisabled={childInputs.status !== "ready" || childInputs.fields.length === 0}
+        addDescribedBy={note ? noteId : undefined}
         onChange={(next) => updateMapping("inputMapping", next)}
       />
-      {note && <p {...stylex.props(styles.note)}>{note}</p>}
+      {/* The region stays in the DOM, so a change from loading to failed is announced. */}
+      <div role="status" id={noteId}>
+        {note && <p {...stylex.props(styles.note)}>{note}</p>}
+      </div>
       <FieldExpressionMapEditor
         legend="outputMapping"
         addLabel={t("subprocess.addOutputMapping")}

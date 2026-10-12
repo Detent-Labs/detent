@@ -8,7 +8,8 @@
 import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { SubprocessSpecEditor } from "../src/areas/studio/panels/SubprocessSpecEditor.js";
-import { studioCatalog } from "../src/i18n/catalogs/studio.js";
+import { studioCatalog, type CatalogKey } from "../src/i18n/catalogs/studio.js";
+import type { ChildInputFields } from "../src/areas/studio/panels/shared/useChildInputFields.js";
 import type { ProcessSummary } from "../src/areas/studio/api/types.js";
 
 const PROCESSES: ProcessSummary[] = [
@@ -208,5 +209,31 @@ describe("the inputMapping editor", () => {
       expect(html).not.toContain(studioCatalog.en["subprocess.childInputsFailed"]);
       expect(html).not.toContain(studioCatalog.en["subprocess.childInputsNone"]);
     }
+  });
+});
+
+describe("the note as a live region", () => {
+  const addTag = (html: string) => html.match(/<button[^>]*>\+ Add input mapping<\/button>/)?.[0] ?? "";
+  const statusId = (html: string) => html.match(/<div[^>]*role="status"[^>]*>/)?.[0].match(/id="([^"]*)"/)?.[1];
+
+  it("wraps each note in role=status and points the disabled + add at it", () => {
+    const cases: [ChildInputFields, CatalogKey][] = [
+      [{ status: "loading", fields: [] }, "subprocess.childInputsLoading"],
+      [{ status: "failed", fields: [] }, "subprocess.childInputsFailed"],
+      [{ status: "ready", fields: [] }, "subprocess.childInputsNone"],
+    ];
+    for (const [childInputs, key] of cases) {
+      const html = renderWith(PINNED, childInputs);
+      const id = statusId(html);
+      expect(id).toBeTruthy();
+      expect(html).toContain(`>${studioCatalog.en[key]}</p>`);
+      expect(addTag(html)).toContain(`aria-describedby="${id}"`);
+    }
+  });
+
+  it("keeps the status region in the DOM, empty, when no note shows", () => {
+    const html = renderWith(PINNED, { status: "ready", fields: CHILD_FIELDS });
+    expect(statusId(html)).toBeTruthy();
+    expect(html).not.toContain("aria-describedby");
   });
 });
