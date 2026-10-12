@@ -1,6 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { shownConfig, type ConfigEdit } from "../src/areas/studio/panels/shared/pluginConfigText.js";
-import { deadlinePatch } from "../src/areas/studio/draft/timer-deadline.js";
+import { parsedConfigBase, shownConfig, type ConfigEdit } from "../src/areas/studio/panels/shared/pluginConfigText.js";
 
 /** `studio-plugin-config-form`: the raw JSON text follows the stored config. */
 
@@ -44,15 +43,15 @@ describe("shownConfig", () => {
   });
 });
 
-describe("deadlinePatch", () => {
-  it("writes an empty CEL expression for cleared text, so the timer keeps its deadline", () => {
-    const patch = deadlinePatch(undefined);
-    expect(patch).toEqual({ deadline: { lang: "cel", src: "" } });
-    expect("duration" in patch).toBe(false);
+describe("parsedConfigBase", () => {
+  it("reads the valid text `null` as the empty config, the way shownConfig reads a stored null", () => {
+    const edit: ConfigEdit = { text: "null", base: parsedConfigBase(null), error: null };
+    expect(edit.base).toBe("{}");
+    expect(shownConfig(edit, null)).toEqual({ text: "null", error: null });
   });
 
-  it("passes a typed expression through", () => {
-    const deadline = { lang: "cel" as const, src: "data.due_at" };
-    expect(deadlinePatch(deadline)).toEqual({ deadline });
+  it("stringifies any other parsed value as is", () => {
+    expect(parsedConfigBase({ listKey: "countries" })).toBe('{"listKey":"countries"}');
+    expect(parsedConfigBase([])).toBe("[]");
   });
 });

@@ -37,3 +37,21 @@ export const STEPS_RAIL_ADD_FIRST_ID = "studio-steps-rail-add-first";
 export function focusAfterStepRemove(remaining: number): string {
   return remaining > 0 ? STEPS_RAIL_CURRENT_ID : STEPS_RAIL_ADD_FIRST_ID;
 }
+
+/** The DOM ids of the step page's two walk buttons. The page remounts per step,
+ * so the button that was pressed is gone; a fixed id lets focus find its
+ * successor. */
+export const STEP_WALK_PREVIOUS_ID = "studio-step-walk-previous";
+export const STEP_WALK_NEXT_ID = "studio-step-walk-next";
+
+/**
+ * Where focus lands after a walk press: the control in the pressed direction
+ * while the walk goes on that way, else the opposite control, since the
+ * pressed one is now disabled. `furtherExists` reports whether the new page
+ * has a neighbour in the pressed direction.
+ */
+export function focusAfterWalk(pressed: "previous" | "next", furtherExists: boolean): string {
+  const same = pressed === "previous" ? STEP_WALK_PREVIOUS_ID : STEP_WALK_NEXT_ID;
+  const other = pressed === "previous" ? STEP_WALK_NEXT_ID : STEP_WALK_PREVIOUS_ID;
+  return furtherExists ? same : other;
+}

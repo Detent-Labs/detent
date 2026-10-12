@@ -3,6 +3,7 @@ import * as stylex from "@stylexjs/stylex";
 import { colors, focus, fonts, space } from "form-ui/tokens.stylex";
 import type { Step } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
+import { focusAfterWalk, STEP_WALK_NEXT_ID, STEP_WALK_PREVIOUS_ID } from "./stepRailRow.js";
 import type { DraftField } from "../draft/fields";
 import type { ProcessSummary } from "../api/types.js";
 import { useDraft } from "../draft/store";
@@ -483,6 +484,18 @@ export function StepPage({
 
   const index = steps.findIndex((s) => s.id === step?.id);
 
+  // The page remounts for the step it opens, which drops the focus the pressed
+  // walk button held. One animation frame later the new page's control in the
+  // same direction takes it, or the opposite one when that direction has ended.
+  const walkTo = (stepId: string, pressed: "previous" | "next") => {
+    onSelectStep(stepId);
+    requestAnimationFrame(() => {
+      const same = document.getElementById(pressed === "previous" ? STEP_WALK_PREVIOUS_ID : STEP_WALK_NEXT_ID);
+      const goesOn = same instanceof HTMLButtonElement && !same.disabled;
+      document.getElementById(focusAfterWalk(pressed, goesOn))?.focus();
+    });
+  };
+
   // The child's input fields feed the subprocess editor's inputMapping. The
   // version is the pinned one, or the process's newest for latest-at-spawn. A
   // step of another kind, or one with no process, leaves the hook idle.
@@ -872,16 +885,18 @@ export function StepPage({
         <button
           type="button"
           className="btn btn-secondary"
+          id={STEP_WALK_PREVIOUS_ID}
           disabled={previous === undefined}
-          onClick={() => previous !== undefined && onSelectStep(previous.id)}
+          onClick={() => previous !== undefined && walkTo(previous.id, "previous")}
         >
           {previous === undefined ? t("stepPage.previousNone") : t("stepPage.previous").replace("{step}", previous.label)}
         </button>
         <button
           type="button"
           className="btn btn-secondary"
+          id={STEP_WALK_NEXT_ID}
           disabled={next === undefined}
-          onClick={() => next !== undefined && onSelectStep(next.id)}
+          onClick={() => next !== undefined && walkTo(next.id, "next")}
         >
           {next === undefined ? t("stepPage.nextNone") : t("stepPage.next").replace("{step}", next.label)}
         </button>

@@ -9,8 +9,7 @@ import {
 } from "../src/areas/studio/draft/chainingFetch.js";
 import type { Draft } from "../src/areas/studio/draft/types.js";
 
-// Lets every queued microtask of the fake IO settle: the async IIFE inside
-// resolveChainingTargets awaits more than three promises now.
+// Lets every queued microtask of the fake IO settle.
 const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
 /**

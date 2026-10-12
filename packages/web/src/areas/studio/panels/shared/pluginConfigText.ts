@@ -16,3 +16,10 @@ export function shownConfig(edit: ConfigEdit | null, config: unknown): { text: s
   if (edit !== null && edit.base === JSON.stringify(stored)) return { text: edit.text, error: edit.error };
   return { text: JSON.stringify(stored, null, 2), error: null };
 }
+
+/** The `base` of an edit whose text parsed to `parsed`. `shownConfig` reads a
+ * stored `null` or absent config as `{}`, so the base reads it that way too:
+ * the valid text `null` then stays shown as typed. */
+export function parsedConfigBase(parsed: unknown): string {
+  return JSON.stringify(parsed ?? {});
+}

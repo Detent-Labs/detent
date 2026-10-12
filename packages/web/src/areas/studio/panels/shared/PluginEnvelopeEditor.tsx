@@ -5,7 +5,7 @@ import type { Plugin } from "workflow-engine/schema";
 import type { DraftOf } from "../../draft/types";
 import type { ConfigFieldDescriptor } from "../../api/types.js";
 import { t } from "../../catalog.js";
-import { shownConfig, type ConfigEdit } from "./pluginConfigText.js";
+import { parsedConfigBase, shownConfig, type ConfigEdit } from "./pluginConfigText.js";
 
 const styles = stylex.create({
   pluginField: {
@@ -217,7 +217,7 @@ export function PluginEnvelopeEditor({
   const commitConfig = (text: string) => {
     try {
       const parsed = JSON.parse(text);
-      setEdit({ text, base: JSON.stringify(parsed), error: null });
+      setEdit({ text, base: parsedConfigBase(parsed), error: null });
       onChange({ ...value, type: value?.type ?? "", config: parsed });
     } catch (e) {
       setEdit({ text, base: JSON.stringify(value?.config ?? {}), error: e instanceof Error ? e.message : t("common.invalidJson") });
