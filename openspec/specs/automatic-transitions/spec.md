@@ -21,6 +21,13 @@ guard holds against the frozen instance context. A guardless automatic path (the
 highest-priority else-branch) SHALL be taken only when no higher-priority guard
 matched. Evaluation SHALL stop at the first match.
 
+<!-- antislop: allow sentence-length - the sentence gives the reason the paths wait for the child -->
+
+A `subprocess` step is the one exception. The engine SHALL NOT evaluate its
+paths on entry, because its guards read the `child` namespace that exists only
+after the child returns. The child's return evaluates them (see
+`subprocess-execution`).
+
 #### Scenario: Higher-priority matching guard wins
 - **WHEN** an entered all-automatic step has two automatic paths, priority 1 with a guard that holds and priority 2 with a guard that also holds
 - **THEN** the engine takes the priority-1 path and does not evaluate the priority-2 path
@@ -33,12 +40,17 @@ matched. Evaluation SHALL stop at the first match.
 - **WHEN** every guarded automatic path on the step evaluates to false and the step carries a guardless default path
 - **THEN** the engine takes the guardless default path
 
+#### Scenario: A subprocess step takes no path on entry
+- **WHEN** an instance enters a subprocess step whose paths include a guardless default
+- **THEN** the engine takes no path, and the instance stays on that step
+
 ### Requirement: An all-automatic step with no matching path is a wait-state
 
 When an instance enters an all-automatic step and no path's guard holds and there
 is no guardless default, the engine SHALL NOT transition; the instance SHALL
 remain on that step (a wait-state, bounded elsewhere by a timer). This is distinct
-from a step that always resolves via its default.
+from a step that always resolves via its default. A subprocess step is the one
+exception: it waits for its child even when it carries a default.
 
 #### Scenario: No guard matches and no default exists
 - **WHEN** an entered all-automatic step has only guarded paths and none of their guards hold
@@ -66,8 +78,8 @@ After any commit that lands an instance on a step — a manual transition, an
 automatic transition, or instance creation on an automatic `initialStep` — the
 engine SHALL evaluate automatic paths repeatedly (a cascade of ordinary
 per-hop transitions) until the instance sits on a resting step: a manual step, an
-all-automatic step with no matching path, or a terminal step. An advance
-operation SHALL return only once the instance is at rest.
+all-automatic step with no matching path, a subprocess step, or a terminal step.
+An advance operation SHALL return only once the instance is at rest.
 
 Every commit that leaves the instance `running` SHALL durably mark it for
 automatic re-resolution, in the same transaction as the commit itself,
@@ -112,6 +124,10 @@ simply stops moving.
 #### Scenario: Creation on an automatic initial step advances immediately
 - **WHEN** an instance is created whose `initialStep` is all-automatic with a matching path
 - **THEN** the engine advances it past that step before returning it at rest
+
+#### Scenario: A cascade stops at a subprocess step
+- **WHEN** an automatic hop lands the instance on a subprocess step
+- **THEN** the advance operation returns with the instance on that step, without evaluating its paths
 
 #### Scenario: A migrated instance whose guard now matches is advanced
 
