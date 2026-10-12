@@ -28,7 +28,7 @@ The comparison is a pure function in `session.ts`, `endedByStorageChange(held, s
 
 Alternatives: adopting the new session silently would switch the actor under unsaved studio work. A reload would drop that work as well and add a flash. Signing out is the same outcome a logout already has.
 
-**No write after sign-out.** A request that answers after the storage event must write nothing. `App` keeps the held session in a ref. A layout effect syncs it to the committed session. The storage handler and `logout` clear it at once. They do so ahead of the render they queue. The hydration `then`, the profile page's `onSaved` and `logout` read that ref. Each returns when the ref no longer matches its session.
+**No write after sign-out.** A late reply must write nothing. `App` keeps the held session in a ref. A layout effect syncs it to the committed session. The storage handler and `logout` clear it at once. They do so ahead of the render they queue. The hydration `then`, the profile page's `onSaved` and `logout` read that ref. Each returns when the ref no longer matches its session.
 
 A late 401 reaches `logout` through every area's `onUnauthorized`. `logout` returns early when the ref is empty. Storage and the notice stay as they are. Otherwise it clears storage through `clearIfHeld`, which compares the stored token with the held one. A stale tab therefore leaves alone any session another tab stored since.
 
