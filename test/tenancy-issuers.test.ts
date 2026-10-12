@@ -32,7 +32,12 @@ function deps(listed: string[] = ["acme", "globex"]) {
     listAll: async () => records,
     connect: (url: string) => {
       const fn = () => Promise.resolve([]);
-      (fn as unknown as { url: string }).url = url;
+      const handle = fn as unknown as { url: string; ends: number; end: () => Promise<void> };
+      handle.url = url;
+      handle.ends = 0;
+      handle.end = async () => {
+        handle.ends += 1;
+      };
       return fn as unknown as SQL;
     },
   };
@@ -74,6 +79,19 @@ test("listed tenants start, and several issuers may serve one tenant", async () 
   expect(await urlOf(await requestFrom("https://login.acme.example/"))).toBe("postgres://host/acme");
   expect(await urlOf(await requestFrom("https://sso.acme.example/"))).toBe("postgres://host/acme");
   expect(await urlOf(await requestFrom("https://login.globex.example/"))).toBe("postgres://host/globex");
+});
+
+test("the returned close ends the pools of both tenants served", async () => {
+  const tenancy = await startTenancy(
+    [issuer("https://login.acme.example/", "acme"), issuer("https://login.globex.example/", "globex")],
+    control,
+    deps(),
+  );
+  const acme = (await tenancy.resolveTenantDb(await requestFrom("https://login.acme.example/"))) as unknown as { ends: number };
+  const globex = (await tenancy.resolveTenantDb(await requestFrom("https://login.globex.example/"))) as unknown as { ends: number };
+  expect([acme.ends, globex.ends]).toEqual([0, 0]);
+  await tenancy.close();
+  expect([acme.ends, globex.ends]).toEqual([1, 1]);
 });
 
 test("an external token claiming another tenant still reaches its issuer's tenant", async () => {

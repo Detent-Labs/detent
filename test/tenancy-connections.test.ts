@@ -18,14 +18,20 @@ const record = (key: string): TenantRecord => ({
   databaseUrl: `postgres://host/${key}`,
 });
 
-/** A stand-in handle that answers the connection probe and remembers its url. */
+/** A stand-in handle that answers the connection probe, remembers its url and counts `end()` calls. */
 const fakeDb = (url: string, refuse = false): SQL => {
   const fn = () => (refuse ? Promise.reject(new Error("connection refused")) : Promise.resolve([]));
-  (fn as unknown as { url: string }).url = url;
+  const handle = fn as unknown as { url: string; ends: number; end: () => Promise<void> };
+  handle.url = url;
+  handle.ends = 0;
+  handle.end = async () => {
+    handle.ends += 1;
+  };
   return fn as unknown as SQL;
 };
 
 const urlOf = (db: SQL): string => (db as unknown as { url: string }).url;
+const endsOf = (db: SQL): number => (db as unknown as { ends: number }).ends;
 
 function mapOver(keys: string[], refusing: string[] = [], onSkip?: (k: string, c: unknown) => void) {
   const records = keys.map(record);
@@ -95,6 +101,104 @@ test("a refused tenant is not cached, so a later attempt can still succeed", asy
   await expect(map.handleFor("acme")).rejects.toBeInstanceOf(TenantUnreachable);
   refuse = false;
   expect(urlOf(await map.handleFor("acme"))).toBe("postgres://host/acme");
+});
+
+/** A map whose `connect` records every handle it opens, in order. */
+function trackedMap(records: TenantRecord[], refuse: () => boolean = () => false, lookupGate?: Promise<void>) {
+  const opened: SQL[] = [];
+  const map = createTenantConnections(control, {
+    lookup: async (key) => {
+      await lookupGate;
+      return records.find((r) => r.key === key);
+    },
+    listAll: async () => records,
+    connect: (url) => {
+      const db = fakeDb(url, refuse());
+      opened.push(db);
+      return db;
+    },
+  });
+  return { map, opened };
+}
+
+test("three concurrent first calls open one pool and all receive it", async () => {
+  const { map, opened } = trackedMap([record("acme")]);
+  const [a, b, c] = await Promise.all([map.handleFor("acme"), map.handleFor("acme"), map.handleFor("acme")]);
+  expect(opened.length).toBe(1);
+  expect(a).toBe(opened[0]!);
+  expect(b).toBe(a);
+  expect(c).toBe(a);
+});
+
+test("a refused probe ends its pool once and leaves no entry", async () => {
+  const { map, opened } = trackedMap([record("acme")], () => true);
+  await expect(map.handleFor("acme")).rejects.toBeInstanceOf(TenantUnreachable);
+  expect(opened.length).toBe(1);
+  expect(endsOf(opened[0]!)).toBe(1);
+  // No entry: the next call opens again rather than replaying the rejection.
+  await expect(map.handleFor("acme")).rejects.toBeInstanceOf(TenantUnreachable);
+  expect(opened.length).toBe(2);
+});
+
+test("concurrent callers of a refused tenant all raise TenantUnreachable and share one pool", async () => {
+  const { map, opened } = trackedMap([record("acme")], () => true);
+  const results = await Promise.allSettled([map.handleFor("acme"), map.handleFor("acme")]);
+  expect(results.map((r) => r.status)).toEqual(["rejected", "rejected"]);
+  expect(opened.length).toBe(1);
+  expect(endsOf(opened[0]!)).toBe(1);
+});
+
+test("a retry after a refusal opens a new pool", async () => {
+  let refuse = true;
+  const { map, opened } = trackedMap([record("acme")], () => refuse);
+  await expect(map.handleFor("acme")).rejects.toBeInstanceOf(TenantUnreachable);
+  refuse = false;
+  const db = await map.handleFor("acme");
+  expect(opened.length).toBe(2);
+  expect(db).toBe(opened[1]!);
+  expect(endsOf(db)).toBe(0);
+});
+
+test("an unknown tenant leaves nothing cached", async () => {
+  const records: TenantRecord[] = [];
+  const { map, opened } = trackedMap(records);
+  await expect(map.handleFor("acme")).rejects.toBeInstanceOf(UnknownTenant);
+  records.push(record("acme"));
+  expect(urlOf(await map.handleFor("acme"))).toBe("postgres://host/acme");
+  expect(opened.length).toBe(1);
+});
+
+test("close() ends every pool it holds", async () => {
+  const { map, opened } = trackedMap([record("acme"), record("globex")]);
+  await map.handleFor("acme");
+  await map.handleFor("globex");
+  await map.close();
+  expect(opened.map(endsOf)).toEqual([1, 1]);
+  // The map is empty afterwards, so a later call opens a fresh pool.
+  await map.handleFor("acme");
+  expect(opened.length).toBe(3);
+});
+
+test("close() ends a pool that is still opening", async () => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const { map, opened } = trackedMap([record("acme")], () => false, gate);
+  const opening = map.handleFor("acme");
+  const closing = map.close();
+  release();
+  await closing;
+  const db = await opening;
+  expect(opened.length).toBe(1);
+  expect(endsOf(db)).toBe(1);
+});
+
+test("close() with a refused entry in the map still resolves", async () => {
+  const { map } = trackedMap([record("acme")], () => true);
+  const opening = map.handleFor("acme").catch(() => undefined);
+  await map.close();
+  await opening;
 });
 
 test("live() answers one handle per listed tenant", async () => {

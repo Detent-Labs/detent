@@ -451,6 +451,7 @@ export async function startTenancy(
   resolveTenantDb: (req: Request) => Promise<SQL>;
   tenantOf: (req: Request) => string | undefined;
   tenants: TenantSource;
+  close: () => Promise<void>;
 }> {
   await initControlPlane(control);
   const lookup = deps.lookup ?? tenantByKey;
@@ -478,6 +479,7 @@ export async function startTenancy(
     },
     tenantOf: (req) => tenantKeyOf(req.headers, byIssuer) ?? hostTenantKey(req),
     tenants: () => connections.live(),
+    close: () => connections.close(),
   };
 }
 
@@ -953,6 +955,7 @@ export async function startHttpServer(
     stop: async () => {
       await server.stop();
       engine.stop();
+      await tenancy?.close();
     },
   };
 }

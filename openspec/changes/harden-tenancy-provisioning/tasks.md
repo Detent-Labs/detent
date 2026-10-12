@@ -9,8 +9,8 @@
 
 ## 2. Connection pools (C-9)
 
-- [ ] 2.1 Cache the pending promise per key in `createTenantConnections`. End the pool when the probe fails, and make `close()` end every pool, per design decision 3. Correct the file comment "A pool opens lazily". Verify `test/tenancy-connections.test.ts` shows three concurrent `handleFor` calls opening one pool. Verify it shows a refused probe calling `end()` once and leaving no entry. Verify a retry opens a new pool, and `close()` ends every pool.
-- [ ] 2.2 Return `close` from `startTenancy` and await it in the `stop` of `startHttpServer`. Verify `test/tenancy-issuers.test.ts` shows the returned `close` ending the pools of two tenants served through `resolveTenantDb`. Verify `stop` awaits it by a `startHttpServer` test in SaaS mode or by reading the line.
+- [x] 2.1 Cache the pending promise per key in `createTenantConnections`. End the pool when the probe fails, and make `close()` end every pool, per design decision 3. Correct the file comment "A pool opens lazily". Verify `test/tenancy-connections.test.ts` shows three concurrent `handleFor` calls opening one pool. Verify it shows a refused probe calling `end()` once and leaving no entry. Verify a retry opens a new pool, and `close()` ends every pool.
+- [x] 2.2 Return `close` from `startTenancy` and await it in the `stop` of `startHttpServer`. Verify `test/tenancy-issuers.test.ts` shows the returned `close` ending the pools of two tenants served through `resolveTenantDb`. Verify `stop` awaits it by a `startHttpServer` test in SaaS mode or by reading the line.
 
 ## 3. Provisioning (C-14, C-15)
 
