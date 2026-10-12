@@ -11,6 +11,7 @@ import { useDataLists } from "./shared/useDataLists.js";
 import { IssueList } from "./shared/IssueList";
 import { DB_LIST_TYPE, keyOptions, listKeyOf, unknownListKeyWarning } from "./dataListKeysLogic.js";
 import { INSTANCE_QUERY_TYPE } from "./instanceQueryTypeLogic.js";
+import { removeDataSourceControlId } from "./dataSourceRailLogic.js";
 import { InstanceQueryForm } from "./shared/InstanceQueryForm.js";
 import { fieldsToRefs, type TargetRef } from "./shared/useTargetProcessCatalog.js";
 import type { ConfigFieldDescriptor } from "../api/types.js";
@@ -107,7 +108,12 @@ function DataSourceRow({ ds, listKeys, registryTypes, registrySchemas, token, ow
       )}
       {warning && <p {...stylex.props(styles.studioWarning)}>{warning}</p>}
       <IssueList entityId={ds.id} />
-      <button type="button" className="btn btn-secondary" onClick={onRemove}>
+      <button
+        id={ds.id === undefined ? undefined : removeDataSourceControlId(ds.id)}
+        type="button"
+        className="btn btn-secondary"
+        onClick={onRemove}
+      >
         {t("dataSources.removeDataSource")}
       </button>
     </div>
@@ -160,6 +166,7 @@ export function DataSourcesPanel({ token, selectedId, onAdd, onRemove }: Props) 
         <p className="empty">{t("dataSources.empty")}</p>
       ) : (
         <DataSourceRow
+          key={ds.id}
           ds={ds}
           listKeys={listKeys}
           registryTypes={registry?.dataSourceTypes}

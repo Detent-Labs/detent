@@ -76,6 +76,40 @@ function toOutboxRow(r: {
 }
 
 /**
+ * The outbox list's SELECT. `outbox_created_idx` serves its order and its keyset
+ * predicate, so a page reads `limit` rows however many delivered rows the table
+ * holds. Exported so the plan test explains the statement the list runs.
+ */
+export function outboxListSelect(
+  db: SQL,
+  statusArr: unknown,
+  instanceId: string | null,
+  cursorCreatedAt: unknown,
+  cursorKey: string | null,
+  limit: number,
+) {
+  // created_at::text (created_at_cursor) carries Postgres's full microsecond
+  // precision, unlike the driver's own Date conversion of the plain
+  // created_at column, which is only millisecond-precise. See
+  // fix-instance-list-cursor-precision's design.md — the same fix
+  // listInstances and listComments already apply.
+  return db`
+    SELECT idempotency_key, instance_id, transition_seq, action_id, action->>'type' AS action_type,
+           status, attempts, next_attempt_at, created_at, claimed_at, last_error,
+           created_at::text AS created_at_cursor
+    FROM outbox
+    WHERE (${statusArr}::text[] IS NULL OR status = ANY(${statusArr}))
+      AND (${instanceId}::text IS NULL OR instance_id = ${instanceId})
+      AND (
+        ${cursorCreatedAt}::timestamptz IS NULL
+        OR (created_at, idempotency_key) < (${cursorCreatedAt}::timestamptz, ${cursorKey})
+      )
+    ORDER BY created_at DESC, idempotency_key DESC
+    LIMIT ${limit}
+  `;
+}
+
+/**
  * Outbox rows filtered by `status[]`/`instanceId`, newest-first, keyset-paged
  * on `(created_at, idempotency_key)` — the same opaque cursor encoding
  * `listInstances` uses. Absent filters mean "unfiltered".
@@ -89,25 +123,7 @@ export async function listOutbox(
   const [cursorCreatedAt, cursorKey] = page.cursor ? decodeCursor(page.cursor, ["timestamp", "text"]) : [undefined, undefined];
   const statusArr = filter.status && filter.status.length > 0 ? db.array(filter.status, "TEXT") : null;
 
-  // created_at::text (created_at_cursor) carries Postgres's full microsecond
-  // precision, unlike the driver's own Date conversion of the plain
-  // created_at column, which is only millisecond-precise. See
-  // fix-instance-list-cursor-precision's design.md — the same fix
-  // listInstances and listComments already apply.
-  const rows = (await db`
-    SELECT idempotency_key, instance_id, transition_seq, action_id, action->>'type' AS action_type,
-           status, attempts, next_attempt_at, created_at, claimed_at, last_error,
-           created_at::text AS created_at_cursor
-    FROM outbox
-    WHERE (${statusArr}::text[] IS NULL OR status = ANY(${statusArr}))
-      AND (${filter.instanceId ?? null}::text IS NULL OR instance_id = ${filter.instanceId ?? null})
-      AND (
-        ${cursorCreatedAt ?? null}::timestamptz IS NULL
-        OR (created_at, idempotency_key) < (${cursorCreatedAt ?? null}::timestamptz, ${cursorKey ?? null})
-      )
-    ORDER BY created_at DESC, idempotency_key DESC
-    LIMIT ${limit + 1}
-  ` as unknown) as (Parameters<typeof toOutboxRow>[0] & { created_at_cursor: string })[];
+  const rows = (await outboxListSelect(db, statusArr, filter.instanceId ?? null, cursorCreatedAt ?? null, cursorKey ?? null, limit + 1) as unknown) as (Parameters<typeof toOutboxRow>[0] & { created_at_cursor: string })[];
 
   const hasMore = rows.length > limit;
   const pageRows = rows.slice(0, limit);

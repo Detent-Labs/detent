@@ -181,6 +181,10 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   // (matching drainOutbox's own lock order); without this index that scan and lock
   // sequentially scan the whole table.
   await db`CREATE INDEX IF NOT EXISTS outbox_instance_idx ON outbox (instance_id)`;
+  // The admin outbox list (`listOutbox` and its keyset page) orders by
+  // (created_at DESC, idempotency_key DESC). Delivered rows are never deleted, so
+  // without this index every page sorts the whole table.
+  await db`CREATE INDEX IF NOT EXISTS outbox_created_idx ON outbox (created_at DESC, idempotency_key DESC)`;
   // Backfill is exact, not best-effort: the pre-existing in-flight-actions check
   // always skipped migration entirely while any pending/claimed row existed, so
   // every outbox row present before this column existed still belongs to an
@@ -190,12 +194,11 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   ) WHERE field_version IS NULL`;
   // Re-resolution flag: a data-affecting writeback sets this to 'pending' so the
   // resolution worker re-drives automatic evaluation for a parked wait-state.
-  // Idempotent add + index for the worker's claim scan.
+  // Idempotent add; the worker's claim index sits below, after the status column.
   await db`ALTER TABLE instances ADD COLUMN IF NOT EXISTS resolve_state text NOT NULL DEFAULT 'idle'`;
   // Lease stamp for the resolution worker's claim: a 'claimed' row past its lease
   // is an abandoned (crashed) claim and is reclaimed by a later drain.
   await db`ALTER TABLE instances ADD COLUMN IF NOT EXISTS resolve_claimed_at timestamptz`;
-  await db`CREATE INDEX IF NOT EXISTS instances_resolve_idx ON instances (resolve_state)`;
   // Cancel-cascade sweep durability: 'idle' (never cancelled, or not yet attempted),
   // 'pending' (cancelled; the direct-child sweep has not completed without a
   // conflicted or failed child), 'done' (a sweep pass found zero conflicted/failed
@@ -281,10 +284,6 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   // SQL NULL and silently drop it under three-valued logic. The column
   // default backfills every pre-existing row to 'published' at ALTER time.
   await db`ALTER TABLE instances ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAULT 'published'`;
-  // The retention sweep's selection query filters on this column first (most
-  // rows are NULL forever, so a partial index stays small), then checks
-  // status/currentStepEnteredAt in memory over the reduced row set.
-  await db`CREATE INDEX IF NOT EXISTS instances_redacted_idx ON instances (redacted_at) WHERE redacted_at IS NULL`;
   // Six standardized Instance scalars, promoted out of the jsonb body into
   // real columns, on the redacted_at precedent above: the key stays in body
   // (parseInstance is unchanged), and the column is additive infrastructure
@@ -330,6 +329,10 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   await db`DROP INDEX IF EXISTS instances_selection_idx`;
   await db`DROP INDEX IF EXISTS instances_current_step_idx`;
   await db`DROP INDEX IF EXISTS instances_started_by_idx`;
+  // The old retention index covered every unredacted row, so with retention off
+  // it held the whole table. CREATE INDEX IF NOT EXISTS would leave a reused
+  // name alone, so the replacement has a new name and this DROP stays for good.
+  await db`DROP INDEX IF EXISTS instances_redacted_idx`;
   // Readers: the migration population scan and findOrphanKeys
   // (src/engine/migration.ts), liveVersionCounts (src/engine/definitions.ts),
   // selectInRange and the bottlenecks WIP query (src/engine/reporting.ts),
@@ -345,6 +348,33 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   // Readers: buildInstanceWhere's shared startedBy filter, reached by the same
   // two reads, and the participant-facing GET /instances?scope=started route.
   await db`CREATE INDEX IF NOT EXISTS instances_started_by_col_idx ON instances (started_by)`;
+  // Reader: sweepRetention (src/engine/retention.ts), which pages unredacted
+  // completed and cancelled instances by (entry time, instance_id). The key
+  // names started_at, the column; currentStepEnteredAt has no column, so it
+  // stays a jsonb expression. Text order equals time order because every
+  // writer emits toISOString(): the transition's `at` (transition.ts) and
+  // startedAt (store.ts). The sweep repeats the expression and the partial
+  // predicate verbatim, which is how the planner proves the index applies.
+  await db`CREATE INDEX IF NOT EXISTS instances_retention_idx ON instances ((COALESCE(body->>'currentStepEnteredAt', started_at)), instance_id) WHERE redacted_at IS NULL AND status IN ('completed', 'cancelled')`;
+  // Reader: the resolution worker's claim (drainResolutions in
+  // src/engine/resolution.ts), which filters status = 'running' and orders by
+  // instance_id. It holds the marked rows only (pending or claimed), so a scan
+  // costs the live marks, not every instance the engine ever stored. Every
+  // commit that leaves an instance not running clears its mark (applyStepEntry,
+  // markFaulted), and createInstance writes none for an instance created
+  // finished, so a finished instance never enters it.
+  //
+  // The name differs from the dropped instances_resolve_idx on purpose.
+  // CREATE INDEX IF NOT EXISTS leaves an index of a given name alone whatever
+  // its definition, so reusing the name would strand every already-initialised
+  // database on the old index over (resolve_state). The DROP stays here
+  // permanently, for the reason the three expression-index drops above stay.
+  await db`CREATE INDEX IF NOT EXISTS instances_resolve_open_idx ON instances (instance_id) WHERE resolve_state <> 'idle'`;
+  await db`DROP INDEX IF EXISTS instances_resolve_idx`;
+  // A mark on an instance that is not running has no reader. The first run on
+  // an existing database clears those marks once; every later run finds none.
+  // Runs after the index and the status column exist.
+  await db`UPDATE instances SET resolve_state = 'idle' WHERE resolve_state <> 'idle' AND status <> 'running'`;
   // Who took part in an instance (instance-visibility-set). One row per
   // (instance, principal); a principal is an actor id, a role string or a group
   // id — the same value kind assignment.candidates holds. created_at duplicates
@@ -1295,13 +1325,16 @@ export async function createInstance(
   // collide on the deterministic outbox key and fail the handler.
   await withTransaction(db, async (tx) => {
     await setAuditAttribution(tx, opts.startedBy ?? null, "creation");
-    // resolve_state starts 'pending', not the column's 'idle' default: both
+    // A running instance starts 'pending', not the column's 'idle' default: both
     // callers (startInstance, the subprocess spawn handler) immediately cascade
     // the instance they just created, and a crash between this INSERT and that
     // cascade's first hop would otherwise leave a cascade-eligible initial step
-    // unmarked — the same gap applyStepEntry closes for every later commit.
+    // unmarked — the same gap applyStepEntry closes for every later commit. An
+    // instance created already finished (a terminal initialStep) starts 'idle',
+    // as every commit that leaves an instance not running leaves it.
+    const resolveState = inst.status === "running" ? "pending" : "idle";
     const inserted = (await tx`INSERT INTO instances (instance_id, transition_seq, body, next_timer_at, resolve_state, kind)
-      VALUES (${inst.instanceId}, ${inst.transitionSeq}, ${inst}, ${minFireAt(timers)}, 'pending', ${inst.kind})
+      VALUES (${inst.instanceId}, ${inst.transitionSeq}, ${inst}, ${minFireAt(timers)}, ${resolveState}, ${inst.kind})
       ON CONFLICT (instance_id) DO NOTHING
       RETURNING instance_id`) as unknown[];
     if (inserted.length === 0) return;

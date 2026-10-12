@@ -6,7 +6,15 @@ import { describe, expect, it } from "bun:test";
 import type { Step } from "workflow-engine/schema";
 import type { DraftOf } from "../src/areas/studio/draft/types.js";
 import type { EditorIssue } from "../src/areas/studio/draft/issues.js";
-import { railRowIssues } from "../src/areas/studio/panels/stepRailRow.js";
+import {
+  focusAfterStepRemove,
+  focusAfterWalk,
+  railRowIssues,
+  STEPS_RAIL_ADD_FIRST_ID,
+  STEPS_RAIL_CURRENT_ID,
+  STEP_WALK_NEXT_ID,
+  STEP_WALK_PREVIOUS_ID,
+} from "../src/areas/studio/panels/stepRailRow.js";
 
 type DraftStep = DraftOf<Step>;
 
@@ -47,5 +55,47 @@ describe("railRowIssues", () => {
 
   it("counts no issue belonging to another step", () => {
     expect(railRowIssues([issue("step_elsewhere", "zod")], step).count).toBe(0);
+  });
+});
+
+describe("focusAfterStepRemove", () => {
+  it("names the current row while any step stays", () => {
+    expect(focusAfterStepRemove(3)).toBe(STEPS_RAIL_CURRENT_ID);
+    expect(focusAfterStepRemove(1)).toBe(STEPS_RAIL_CURRENT_ID);
+  });
+
+  it("names the first add control once the rail holds no row", () => {
+    expect(focusAfterStepRemove(0)).toBe(STEPS_RAIL_ADD_FIRST_ID);
+  });
+
+  it("names two different ids, so a press never lands on the wrong control", () => {
+    expect(STEPS_RAIL_CURRENT_ID).not.toBe(STEPS_RAIL_ADD_FIRST_ID);
+  });
+});
+
+describe("focusAfterWalk", () => {
+  it("keeps Next while the walk goes on forward from a middle step", () => {
+    expect(focusAfterWalk("next", true)).toBe(STEP_WALK_NEXT_ID);
+  });
+
+  it("keeps Previous while the walk goes on backward from a middle step", () => {
+    expect(focusAfterWalk("previous", true)).toBe(STEP_WALK_PREVIOUS_ID);
+  });
+
+  it("falls back to Previous when Next reaches the last step", () => {
+    expect(focusAfterWalk("next", false)).toBe(STEP_WALK_PREVIOUS_ID);
+  });
+
+  it("falls back to Next when Previous reaches the first step", () => {
+    expect(focusAfterWalk("previous", false)).toBe(STEP_WALK_NEXT_ID);
+  });
+
+  it("names the other control in a one-step walk, where no press can happen and no direction goes on", () => {
+    expect(focusAfterWalk("next", false)).not.toBe(STEP_WALK_NEXT_ID);
+    expect(focusAfterWalk("previous", false)).not.toBe(STEP_WALK_PREVIOUS_ID);
+  });
+
+  it("names two different ids", () => {
+    expect(STEP_WALK_PREVIOUS_ID).not.toBe(STEP_WALK_NEXT_ID);
   });
 });

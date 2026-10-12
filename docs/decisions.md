@@ -68,15 +68,16 @@ word. `ROADMAP.md` carries stage-by-stage status.
   `instance_id`, `transition_seq`, `body`, `resolve_state`,
   `resolve_claimed_at`, `cancel_sweep_state`, `next_timer_at`, `created_at`
   and `redacted_at`. Every other field of `Instance` lives inside the jsonb,
-  and six indexes stand in for eight of those keys. Three are expression
+  and seven indexes stand in for nine of those keys. Four are expression
   indexes over keys no column carries: `instances_claimed_by_idx` over
   `assignment.claimedBy`, `instances_candidates_idx` (GIN) over
-  `assignment.candidates`, and `instances_parent_idx` over
-  `parent.instanceId`. The other three are plain btrees over generated
+  `assignment.candidates`, `instances_parent_idx` over
+  `parent.instanceId`, and `instances_retention_idx` over
+  `currentStepEnteredAt`. The other three are plain btrees over generated
   columns: `instances_selection_col_idx` over
   `process_id`/`version`/`status`, `instances_current_step_col_idx` over
   `current_step_id` and `instances_started_by_col_idx` over `started_by`.
-  All six live in `initSchema` (`src/engine/store.ts`).
+  All seven live in `initSchema` (`src/engine/store.ts`).
 
   Change 1 (2026-08-30) promoted six of those keys into generated columns and
   left the three indexes over them in expression form. Change 3
@@ -825,10 +826,10 @@ four Low ones stay open.
   `bun audit` step.** The `check` job now runs `bun audit
   --audit-level=high` right after `bun install`. A high or critical
   advisory fails the job. Dependabot still covers version drift alone.
-- **PERF-1: fixed 500 ms polling per tenant.** `src/engine/host.ts:326`
+- **PERF-1: fixed 500 ms polling per tenant.** `src/engine/host.ts:384`
   runs `pollForever` for the outbox drain on a 500 ms loop wrapped in
-  `eachTenant`, with the resolution and timer sweeps beside it at `:327` and
-  `:328`. Risk (Low): at many tenants each cycle issues work proportional to tenant
+  `eachTenant`, with the resolution and timer sweeps beside it at `:385` and
+  `:386`. Risk (Low): at many tenants each cycle issues work proportional to tenant
   count whether or not any tenant holds a pending row. The review names a
   Postgres `LISTEN`/`NOTIFY` wake-up or one cross-tenant claim query as the
   replacement, once tenancy grows past a handful.
@@ -1154,17 +1155,6 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   that makes N + 2 tree walks and N scans of the check list. Risk
   (Informational): the cost grows with the square of the catalog's size and
   stays harmless at 51 entries.
-- **FIELDS-15: a step or data source removal reuses its own button for the
-  next entity.** `panels/DataSourcesPanel.tsx`'s `DataSourceRow` (`:161`) and
-  `screens/EditScreen.tsx`'s `<StepPage>` (`:952`) render with no `key`,
-  unlike the Fields tab's own `FieldEditor`, keyed by the field's id
-  (`panels/FieldCatalogPanel.tsx:1162`). A press on "Remove data source" or
-  "Remove this step" therefore keeps its own button element in the DOM.
-  `removeDataSource` (`panels/EntityTabs.tsx:692`) and `onRemoveStep`
-  (`screens/EditScreen.tsx:556`) each pick a neighbour, and the same button
-  then renders that neighbour's own remove control. This is a code reading;
-  no browser run has confirmed it. Risk (Medium): a second Enter or Space
-  removes a neighbour with no separate confirmation.
 - **FIELDS-16: two check messages call a removed field present.** A removal
   leaves a kept `org.actor-from-field` assignment setting that names the
   removed id, since `fieldRemovalReach` only counts a plugin setting
@@ -1675,19 +1665,6 @@ of `5f41cd8a`. Each fix change deletes its own entries in the commit that
 archives it, and `sweep-docs-drift-2026-10` re-points the line citations of
 other entries. C-4 merges D-2, and C-6 merges F-6.
 
-- **`bound-worker-scan-costs` (B-6, B-7, B-8, B-11; medium)**: The claim scan
-  and the retention sweep grow with every instance ever run, one tenant's
-  hung target stops the outbox for all tenants, and the admin outbox list has
-  no index for its sort order. Anchors: `src/engine/resolution.ts`,
-  `src/engine/retention.ts`, `src/engine/host.ts`.
-- **`sync-studio-editor-state` (E2-8, E2-13, E2-15, E1-7; medium)**: Stale
-  JSON text in the plugin editor lands in another entity, a cleared deadline
-  leaves a timer with no input, a removed data source leaves field
-  references dangling, and each keystroke in a `process.start` process id
-  fires a `GET /processes`. Anchors:
-  `packages/web/src/areas/studio/panels/shared/PluginEnvelopeEditor.tsx`,
-  `packages/web/src/areas/studio/panels/TimersPanel.tsx`,
-  `packages/web/src/areas/studio/draft/chainingFetch.ts`.
 - **`guard-field-key-renames` (E2-7; medium)**: A label change renames the
   field key, and the CEL expressions that read the old key keep it. Anchors:
   `packages/web/src/areas/studio/panels/FieldCatalogPanel.tsx`,
