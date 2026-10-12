@@ -24,7 +24,7 @@ not exist.
 - G-10: three tests assert too little. The body-size test accepts any status
   except 413. "freezing is per key" has no `expect`. The OpenAPI test checks one
   path and a count, while the spec lists 28 required routes.
-- A-6: seven invariants have no test that rejects a violating input. CLAUDE.md
+- A-6: ten invariants have no test that rejects a violating input. CLAUDE.md
   demands one for every invariant.
 - TEST-1: nothing asserts that every route refuses a request without
   credentials. A route added without a gate ships silently.
@@ -79,7 +79,7 @@ None.
   `test/compile-validation.test.ts`, and one new route-auth test file.
 - Data: two example wrappers, one line each.
 - Docs: `docs/decisions.md` strikes this change from the audit index. TEST-1
-  leaves the open list.
+  moves to resolved.
 - Pass floor: `scripts/gates/pass-floor.txt` stays. The new tests only widen
   its margin.
 - Deployment: none. No `src/` change, no definition-contract change.

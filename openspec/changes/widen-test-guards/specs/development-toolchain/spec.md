@@ -51,9 +51,9 @@ guard.
 
 A test SHALL fail when the behavior its name states is absent. An assertion
 that every outcome but one satisfies does not meet this. A test with an empty
-body does not meet it either. A test of a route's response SHALL pin the status
-and the `error.type`. A test of a list that a spec requires SHALL iterate that
-list.
+body does not meet it either. A test whose name claims how a route answers
+SHALL pin that answer's status and `error.type`. A test of a list that a spec
+requires SHALL iterate that list.
 
 #### Scenario: A missing route fails the body-size test
 

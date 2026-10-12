@@ -1,9 +1,10 @@
 /**
  * docs/openapi.yaml documents the customer-facing surface and names the
- * internal-only prefixes it deliberately leaves out. This asserts the second
- * half: a role-gated surface that exists only to back a frontend this repo
- * ships must not appear as a documented path, and must be named in the
- * exclusion note so a reader can tell its absence is a decision.
+ * internal-only prefixes it deliberately leaves out. This asserts both halves.
+ * The document lists every route the spec requires, under its path and method.
+ * A role-gated surface that exists only to back a frontend this repo ships must
+ * not appear as a documented path, and must be named in the exclusion note so a
+ * reader can tell its absence is a decision.
  *
  * Text-level, not a YAML parse: the document declares no dependency on a YAML
  * parser and the assertion does not need one.
@@ -16,11 +17,6 @@ const EXCLUDED = ["admin", "drafts", "migration-plans", "reporting", "templates"
 
 /** Path keys are the two-space-indented `  /foo/...:` entries under `paths:`. */
 const documentedPaths = [...DOC.matchAll(/^ {2}(\/[^\s:]*):/gm)].map((m) => m[1]!);
-
-test("the document declares at least the customer-facing paths", () => {
-  expect(documentedPaths).toContain("/auth/login");
-  expect(documentedPaths.length).toBeGreaterThan(10);
-});
 
 /** `:name` and `{name}` segments both become `{}`, so the spec and the document compare. */
 const normalise = (path: string) => path.replace(/:\w+|\{\w+\}/g, "{}");

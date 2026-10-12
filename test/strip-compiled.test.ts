@@ -32,8 +32,8 @@ describe("stripCompiledContent", () => {
   }
 
   test("removes the reserved outcome from a contracted process", () => {
-    // The only example carrying a contract, so the only one exercising the
-    // outcome half of the inverse.
+    // Needs an example whose contract declares the reserved outcome once
+    // compiled, so the outcome half of the inverse has something to remove.
     const compiled = compileProcessBody(readExample("subprocess-credit-check-child.json"));
     expect(compiled.contract?.outcomes).toContain("cancelled");
     expect(stripCompiledContent(compiled).contract?.outcomes).not.toContain("cancelled");

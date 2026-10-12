@@ -761,8 +761,9 @@ build.
 <!-- "Decided, not yet built" quotes an existing section heading verbatim. -->
 Four items on the Prioritized Action List of
 [`openspec/changes/archive/2026-08-18-code-review-record/CODE_REVIEW.md`](../openspec/changes/archive/2026-08-18-code-review-record/CODE_REVIEW.md)
-stood open. CQ-1, ARCH-1 and TEST-1 are resolved, and DEP-1 stays open. SEC-1 closed 2026-09-23 as
-`add-publish-cycle-check-and-cel-deadline`; see `docs/decisions-archive.md`.
+stood open. CQ-1, ARCH-1 and TEST-1 are resolved, and DEP-1 stays open.
+SEC-1 closed 2026-09-23 as `add-publish-cycle-check-and-cel-deadline`; see
+`docs/decisions-archive.md`.
 Each was re-checked against the tree on 2026-09-09. That review holds the
 reasoning and the recommended fix. The owner decided the other five on
 2026-09-23. See "Decided, not yet built" and "Accepted risks" above. This

@@ -24,7 +24,7 @@
 - [x] 4.3 Rewrite the route test in `test/openapi-exclusions.test.ts` per design D4. It reads the required-route paragraph of the spec and asserts each route in the document. Verify that it passes, and that the paragraph yields at least one route.
 - [x] 4.4 Prove the three tests on a copy. Make the body-size route answer 404. Make `registerMigrationPlan` accept a frozen key. Delete one path from a copy of `docs/openapi.yaml`. Record that each test fails.
 
-## 5. Seven invariants get a rejecting test (A-6)
+## 5. Ten invariants get a rejecting test (A-6)
 
 - [x] 5.1 Grep `test/` for an existing refusal test of each A-6 row, and record the result per row. A row that has one gets no new test.
 - [x] 5.2 Add one refusal test and its valid twin per remaining row, per design D5. The rows are in the list below. Verify that each new test passes.
@@ -49,7 +49,7 @@
 ## 7. The records
 
 - [x] 7.1 Delete the `widen-test-guards` entry from the audit index in `docs/decisions.md`. Verify that `git grep -n widen-test-guards docs/decisions.md` prints nothing.
-- [x] 7.2 Delete the TEST-1 entry from `docs/decisions.md`, and fix the count sentence of its section. Check `ROADMAP.md`, `README.md` and `docs/current-state.md` for a sentence the change made false.
+- [x] 7.2 Reword the TEST-1 entry in `docs/decisions.md` as resolved, and fix the count sentence of its section. Check `ROADMAP.md`, `README.md` and `docs/current-state.md` for a sentence the change made false.
 - [ ] 7.3 Run the antislop linter on every Markdown file this change touched. Fix each finding or add a targeted directive with a reason.
 
 ## 8. Verification
