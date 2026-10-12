@@ -190,30 +190,27 @@ test.skipIf(!DB)("a body resolver returning undefined leaves the instance claime
   expect((await readInst(inst.instanceId)).currentStepId as string).toBe("step_wait");
 });
 
-// --- a commit onto a terminal step does not (re-)flag; a suppressed writeback
-// touches nothing either; the dead flag from creation is simply never revisited -
+// --- a commit onto a terminal step clears the mark; a suppressed writeback
+// touches nothing either --------------------------------------------------------
 
-test.skipIf(!DB)("a commit onto a terminal step does not flag resolve_state, and a suppressed writeback adds nothing", async () => {
+test.skipIf(!DB)("a commit onto a terminal step clears resolve_state, and a suppressed writeback adds nothing", async () => {
   const body = terminalWriteBody();
   const inst = await createFrom(body); // resolve_state = 'pending' from creation (a fresh instance is always running)
   expect(await resolveState(inst.instanceId)).toBe("pending");
 
   await executeManualTransition(inst, "path_ae", body, actor); // enters terminal step_end -> completed
   expect((await readInst(inst.instanceId)).status).toBe("completed");
-  // The commit's resulting status is not `running`, so it leaves resolve_state
-  // exactly as it found it — here still 'pending' from creation, not cleared,
-  // because a completed instance can never again benefit from re-resolution and
-  // the worker's own claim query excludes it (`WHERE status = 'running'`).
-  expect(await resolveState(inst.instanceId)).toBe("pending");
+  // The commit's resulting status is not `running`, so it clears the 'pending'
+  // mark creation set: a completed instance can never again benefit from
+  // re-resolution and the claim excludes it (`WHERE status = 'running'`).
+  expect(await resolveState(inst.instanceId)).toBe("idle");
 
   expect(await drainOutbox(sql, reg)).toBe(1); // delivered but writeback suppressed (0 rows affected)
-  expect(await resolveState(inst.instanceId)).toBe("pending"); // suppressed writeback adds nothing, clears nothing
+  expect(await resolveState(inst.instanceId)).toBe("idle"); // suppressed writeback flags nothing
   expect(((await readInst(inst.instanceId)).data as Record<string, unknown>).field_go).toBeUndefined(); // data not written either
 
-  // The worker never revisits a non-running instance, so the dead flag is
-  // never cleared — harmless, since nothing else reads resolve_state.
   expect(await drainResolutions(sql, () => body)).toBe(0);
-  expect(await resolveState(inst.instanceId)).toBe("pending");
+  expect(await resolveState(inst.instanceId)).toBe("idle");
   expect((await readInst(inst.instanceId)).currentStepId as string).toBe("step_end");
 });
 
