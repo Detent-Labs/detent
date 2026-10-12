@@ -140,6 +140,12 @@ test("every ClientError type a report can meet answers a catalog value", () => {
   }
 });
 
+test("a request-shape error tells the reader to narrow the date range", () => {
+  const error = { type: "request-shape", message: "raw" } as const;
+  expect(describeError(error, "en")).toContain("Narrow the date range");
+  expect(describeError(error, "de")).toContain("Grenzen Sie den Zeitraum ein");
+});
+
 test("the same error reads differently in each locale", () => {
   const error = { type: "not-found", message: "raw" } as const;
   expect(describeError(error, "en")).not.toBe(describeError(error, "de"));
