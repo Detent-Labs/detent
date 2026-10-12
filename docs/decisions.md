@@ -1686,10 +1686,6 @@ of `5f41cd8a`. Each fix change deletes its own entries in the commit that
 archives it, and `sweep-docs-drift-2026-10` re-points the line citations of
 other entries. C-4 merges D-2, and C-6 merges F-6.
 
-- **`bind-instance-transition-target` (D-3; medium)**: The
-  `instance.transition` handler drives a target instance with system rights,
-  and participant data decides which instance that is. Anchors:
-  `src/handlers/instance-transition.ts`, `src/engine/definitions.ts`.
 - **`secret-references-in-action-config` (G-5; medium)**: Credentials for
   `http.request` sit in plain text in the immutable definition and in every
   outbox row. Anchors: `src/handlers/http.ts`, `src/engine/transition.ts`,

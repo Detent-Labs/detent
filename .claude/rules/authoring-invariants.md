@@ -41,7 +41,7 @@ per-field checks in one pass (`field-tree-check-consolidation`).
 Checks run in this order at publish. `validateStructure` runs durations,
 then the twelve structural checks, then Zod. A hash match then returns
 early. `validateReferences` runs the registry checks, then CEL. `publishBody`
-then runs its own seven DB-resolving checks.
+then runs its own eight DB-resolving checks.
 
 `process-contract.md` already states the meaning behind `validationMode`,
 `technical`, `redactable`, `format`/`control`, `Path.key`/`Path.label`, and
@@ -94,7 +94,7 @@ its placement.
   version. A `process.start` chain is exempt, since it is fire-and-forget
   rather than a wait-state reference. The `publishBody` check for this is
   `validateSubprocessCycle`; see `process-contract.md`.
-- See `process-contract.md`'s Extensibility section for the seven
+- See `process-contract.md`'s Extensibility section for the eight
   DB-resolving publish checks. A data source's `valueFromField` must resolve
   to a scalar field of the publishing process's own catalog
   (`checkInstanceQueryValueFromField`, `src/engine/definitions.ts:228-244`).
@@ -108,6 +108,20 @@ its placement.
   checks. It reads the target's live versions, so it cannot sit in
   `definition.ts` or `compile.ts`. This is the first criterion of
   `definition-contract`: a hand-written body cannot bypass it.
+- An `instance.transition` action's `instanceIdField` names a field bound to
+  a data source of type `"instance.query"` over the action's own `processId`.
+  Publish rejects a field with no `dataSource`, a fixed `options` list, a
+  source of another type, or a query over another process. The error is a
+  `CrossProcessValidationError` naming the action's location and the field.
+  The check is `validateInstanceTransitionReferences`, one of
+  `publishBody`'s DB-resolving checks. It runs after the hash-hit return, so
+  an identical re-publish of an older unbound body stays a no-op. The
+  submit-time option check then admits only an id the source offers.
+- The publishing actor holds `migrate` on every `instance.transition`
+  action's target process, the publishing process included. The global
+  developer role or a stored grant answers it. A Reader list entry does not.
+  The check is `validateInstanceTransitionWriteGrant`. It runs only when the
+  caller supplies an actor, like the read grant.
 - `unmappableStep` present iff `onUnmappable === "route-to-step"`. Migration
   maps reference only valid ids.
 - `migrationSpec.fieldMap` is injective. Two sources targeting one field

@@ -2624,14 +2624,19 @@ Pass: the generated form renders three text inputs. They are `processId`,
 the form.
 
 Fill all three. Name a published target process. Name a field of this process
-that holds an instance id. Name a manual path on the target's own step.
+bound to an `instance.query` data source over that target process. Name a
+manual path on the target's own step.
 
-Save the draft. Publish it. Pass: the publish succeeds.
+Save the draft. Publish it as an actor who holds `read` and `migrate` on the
+target process. Pass: the publish succeeds.
 
 Now change `pathId` to an id no live version of the target carries. Publish
 again. Pass: the header bar lists one finding line below the published-version
 line. That line names the action's location in the body, since an action
 carries no data source id to name instead.
+
+Last, unbind the field, save the draft, and publish again. Pass: the publish
+fails with a cross-process error naming the action's location and the field.
 
 `test/config-descriptor.test.ts` asserts the descriptor this form reads.
 `packages/web/test/studio-processHeaderBar-findingFallback.test.tsx` asserts

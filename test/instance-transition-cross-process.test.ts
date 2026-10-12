@@ -1,28 +1,28 @@
 /**
  * Publish-time cross-process validation over an `instance.transition` action:
- * `cross-process-validation`'s two ADDED requirements (processId
- * resolvability, the pathId reference union) plus the MODIFIED read-grant
- * requirement's `instance.transition` scenarios. DB-backed; skips when
- * DATABASE_URL is unset.
+ * `cross-process-validation`'s processId, pathId, instanceIdField binding and
+ * migrate requirements, plus the read-grant requirement's `instance.transition`
+ * scenarios. DB-backed; skips when DATABASE_URL is unset.
  */
 import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { sql, initSchema } from "../src/engine/store.js";
 import { publishBody, CrossProcessValidationError } from "../src/engine/definitions.js";
-import { createDataSourceRegistry } from "../src/engine/registry.js";
 import { createDefaultRegistry, createDefaultDataSourceRegistry } from "../src/engine/host.js";
+import { compileProcessBody } from "../src/schema/compile.js";
+import { definitionHash } from "../src/schema/hash.js";
 import { createProcessInstance } from "../src/runtime/api.js";
 import { writeGrant } from "../src/auth/grants.js";
-import { AuthorizationError, ADMIN_ROLE } from "../src/auth/authorize.js";
+import { AuthorizationError, ADMIN_ROLE, AUTHOR_ROLE, DEVELOPER_ROLE, can } from "../src/auth/authorize.js";
+import { addAccessPrincipal, matchesAccessList } from "../src/auth/process-access.js";
 import type { ProcessBody, ProcessId } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
 import { clearInstanceAudit } from "./audit-cleanup.js";
 
 const DB = !!process.env.DATABASE_URL;
 const reg = createDefaultRegistry(); // instance.transition registered, for publishBody's own registry check
-const dsReg = createDataSourceRegistry();
-// instance.query registered too, only for the combined-site-kinds test below —
-// every other test's body carries no data source, so the empty dsReg above stays their default.
-const defaultDsReg = createDefaultDataSourceRegistry();
+// instance.query registered: every instance.transition action's field binds to one.
+const dsReg = createDefaultDataSourceRegistry();
+const defaultDsReg = dsReg;
 const actor: Actor = { id: "user_1", roles: [] };
 const pid = (n: string) => n as ProcessId;
 
@@ -35,7 +35,7 @@ const targetV1Body = (): ProcessBody =>
     key: "target",
     label: { en: "Target" },
     baseLocale: "en",
-    fields: [],
+    fields: [{ id: "field_t_label", key: "label", label: { en: "Label" }, type: "string" }],
     workflow: {
       initialStep: "step_a",
       steps: [
@@ -56,7 +56,7 @@ const targetV2Body = (): ProcessBody =>
     key: "target",
     label: { en: "Target" },
     baseLocale: "en",
-    fields: [],
+    fields: [{ id: "field_t_label", key: "label", label: { en: "Label" }, type: "string" }],
     workflow: {
       initialStep: "step_a",
       steps: [
@@ -67,24 +67,39 @@ const targetV2Body = (): ProcessBody =>
     },
   }) as unknown as ProcessBody;
 
-/** One field (`field_target_id`) and one terminal step carrying the `instance.transition` action under test. */
-const actorBody = (config: Record<string, unknown>): ProcessBody =>
-  ({
+/**
+ * One field (`field_target_id`) and one terminal step carrying the
+ * `instance.transition` action under test. The field binds to an
+ * `instance.query` source over the action's own `processId` unless `bind`
+ * overrides the field's `dataSource`, the field's `options`, or the body's
+ * `dataSources`.
+ */
+type Bind = { dataSource?: string | null; options?: unknown[]; dataSources?: unknown[] };
+const queryDs = (processId: unknown) => ({ id: "ds_target", key: "target", type: "instance.query", config: { processId, labelFieldId: "field_t_label" } });
+const actorBody = (config: Record<string, unknown>, bind: Bind = {}): ProcessBody => {
+  const dataSource = bind.dataSource === undefined ? "ds_target" : bind.dataSource;
+  return {
     key: "actor",
     label: { en: "Actor" },
     baseLocale: "en",
-    fields: [{ id: "field_target_id", key: "target_id", label: { en: "Target Id" }, type: "string" }],
+    fields: [{
+      id: "field_target_id", key: "target_id", label: { en: "Target Id" }, type: "string",
+      ...(dataSource ? { dataSource } : {}),
+      ...(bind.options ? { options: bind.options } : {}),
+    }],
+    dataSources: bind.dataSources ?? [queryDs(config.processId)],
     workflow: {
       initialStep: "step_r",
       steps: [{ id: "step_r", key: "r", label: { en: "R" }, type: "task", terminal: true, onEntry: [{ id: "action_it", type: "instance.transition", config }] }],
     },
-  }) as unknown as ProcessBody;
+  } as unknown as ProcessBody;
+};
 
 beforeAll(async () => {
   if (DB) await initSchema();
 });
 beforeEach(async () => {
-  if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, definitions, permission_grants`;
+  if (DB) await sql`TRUNCATE outbox, instances, history_entries, instance_events, definitions, permission_grants, process_access_roles`;
   if (DB) await clearInstanceAudit();
 });
 
@@ -132,6 +147,93 @@ test.skipIf(!DB)("a declared instanceIdField publishes, subject to the other che
   expect(result.findings).toEqual([]);
 });
 
+// ---- instanceIdField binds to an instance.query source over the action's process ----
+
+const transitionConfig = (processId: string = TARGET_ID) => ({ processId, instanceIdField: "field_target_id", pathId: "path_ab" });
+
+async function publishRaising(body: ProcessBody): Promise<CrossProcessValidationError> {
+  let raised: unknown;
+  try {
+    await publishBody(ACTOR_ID, body, reg, dsReg);
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(CrossProcessValidationError);
+  return raised as CrossProcessValidationError;
+}
+
+const versionCount = async (processId: string): Promise<number> =>
+  Number(((await sql`SELECT count(*)::int AS n FROM definitions WHERE process_id = ${processId}`) as { n: number }[])[0].n);
+
+test.skipIf(!DB)("a field without a data source rejects the publish, naming the location and the field", async () => {
+  await publishBody(TARGET_ID, targetV1Body(), reg, dsReg);
+  const err = await publishRaising(actorBody(transitionConfig(), { dataSource: null, dataSources: [] }));
+  expect(err.message).toContain("onEntry");
+  expect(err.message).toContain("field_target_id");
+  expect(err.message).toContain("no data source");
+  expect(await versionCount(ACTOR_ID)).toBe(0);
+});
+
+test.skipIf(!DB)("a field with a fixed option list rejects the publish", async () => {
+  await publishBody(TARGET_ID, targetV1Body(), reg, dsReg);
+  const err = await publishRaising(
+    actorBody(transitionConfig(), { dataSource: null, dataSources: [], options: [{ value: "inst_x", label: { en: "X" } }] }),
+  );
+  expect(err.message).toContain("onEntry");
+  expect(err.message).toContain("field_target_id");
+  expect(await versionCount(ACTOR_ID)).toBe(0);
+});
+
+test.skipIf(!DB)("a field bound to another data source type rejects the publish", async () => {
+  await publishBody(TARGET_ID, targetV1Body(), reg, dsReg);
+  const err = await publishRaising(
+    actorBody(transitionConfig(), { dataSources: [{ id: "ds_target", key: "target", type: "db.list", config: { listKey: "products" } }] }),
+  );
+  expect(err.message).toContain("onEntry");
+  expect(err.message).toContain("field_target_id");
+  expect(err.message).toContain("db.list");
+  expect(await versionCount(ACTOR_ID)).toBe(0);
+});
+
+test.skipIf(!DB)("a field bound to a query over another process rejects the publish, naming both process ids", async () => {
+  const OTHER_ID = pid("proc_itcp_other");
+  await publishBody(TARGET_ID, targetV1Body(), reg, dsReg);
+  await publishBody(OTHER_ID, targetV1Body(), reg, dsReg);
+  const err = await publishRaising(actorBody(transitionConfig(), { dataSources: [queryDs(OTHER_ID)] }));
+  expect(err.message).toContain("onEntry");
+  expect(err.message).toContain("field_target_id");
+  expect(err.message).toContain(TARGET_ID);
+  expect(err.message).toContain(OTHER_ID);
+  expect(await versionCount(ACTOR_ID)).toBe(0);
+});
+
+test.skipIf(!DB)("a field bound to a query over the target process publishes", async () => {
+  await publishBody(TARGET_ID, targetV1Body(), reg, dsReg);
+  const result = await publishBody(ACTOR_ID, actorBody(transitionConfig()), reg, dsReg);
+  expect(result.version).toBe(1);
+});
+
+test.skipIf(!DB)("a self-targeting action with a bound field publishes", async () => {
+  const SELF = pid("proc_itcp_self_bound");
+  const result = await publishBody(SELF, actorBody(transitionConfig(SELF)), reg, dsReg);
+  expect(result.version).toBe(1);
+});
+
+test.skipIf(!DB)("a re-publish of an unbound body that an earlier version holds stays a no-op", async () => {
+  await publishBody(TARGET_ID, targetV1Body(), reg, dsReg);
+  const unbound = actorBody(transitionConfig(), { dataSource: null, dataSources: [] });
+  await publishRaising(unbound); // a fresh publish of this body fails the binding rule
+  // A row from before the rule: it reaches the table without the publish path.
+  const compiled = compileProcessBody(unbound);
+  await sql`INSERT INTO definitions (process_id, version, definition_hash, status, body)
+    VALUES (${ACTOR_ID}, 1, ${definitionHash(compiled)}, 'published', ${compiled})`;
+
+  const again = await publishBody(ACTOR_ID, unbound, reg, dsReg);
+  expect(again.version).toBe(1);
+  expect(again.findings).toEqual([]);
+  expect(await versionCount(ACTOR_ID)).toBe(1);
+});
+
 // ---- pathId reported against the versions holding live instances ----
 
 test.skipIf(!DB)("a path every live version carries reports nothing", async () => {
@@ -173,8 +275,9 @@ test.skipIf(!DB)("a target with no live instances reports the path", async () =>
   await publishBody(TARGET_ID, targetV1Body(), reg, dsReg); // no instances created
 
   const result = await publishBody(ACTOR_ID, actorBody({ processId: TARGET_ID, instanceIdField: "field_target_id", pathId: "path_ab" }), reg, dsReg);
-  expect(result.findings).toHaveLength(1);
-  expect(result.findings[0]).toMatchObject({ referenceKind: "path", reference: "path_ab", carriedByVersions: [], liveInstanceCountOutsideCarryingVersions: 0 });
+  const pathFindings = result.findings.filter((f) => f.referenceKind === "path"); // the bound source reports its own label field too
+  expect(pathFindings).toHaveLength(1);
+  expect(pathFindings[0]).toMatchObject({ reference: "path_ab", carriedByVersions: [], liveInstanceCountOutsideCarryingVersions: 0 });
 });
 
 // ---- the publishing actor's read grant on the target ----
@@ -191,22 +294,27 @@ test.skipIf(!DB)("an author without the read grant on an instance.transition tar
     raised = e;
   }
   expect(raised).toBeInstanceOf(AuthorizationError);
+  // The read check runs first, so the error names the read role, not migrate's.
+  expect((raised as AuthorizationError).message).toContain("system:admin");
 });
 
 test.skipIf(!DB)("an author holding the read grant publishes", async () => {
   await publishBody(TARGET_ID, targetV1Body(), reg, dsReg);
   await createProcessInstance(TARGET_ID, actor, dsReg);
   await writeGrant({ role: "itcp-reader", permission: "read", scope: { type: "process", config: { processId: TARGET_ID } } }, sql);
+  await writeGrant({ role: "itcp-reader", permission: "migrate", scope: { type: "process", config: { processId: TARGET_ID } } }, sql);
   const granted: Actor = { id: "user_granted", roles: ["itcp-reader"] };
 
   const result = await publishBody(ACTOR_ID, actorBody({ processId: TARGET_ID, instanceIdField: "field_target_id", pathId: "path_ab" }), reg, dsReg, sql, undefined, granted);
   expect(result.version).toBeGreaterThan(0);
 });
 
-test.skipIf(!DB)("the operator role short-circuits the grant, with no grant row present", async () => {
+// The operator role answers `read` alone; `migrate` needs the developer role
+// beside it, so this actor holds both.
+test.skipIf(!DB)("the operator role short-circuits the read grant, with no grant row present", async () => {
   await publishBody(TARGET_ID, targetV1Body(), reg, dsReg);
   await createProcessInstance(TARGET_ID, actor, dsReg);
-  const operatorActor: Actor = { id: "user_admin", roles: [ADMIN_ROLE] };
+  const operatorActor: Actor = { id: "user_admin", roles: [ADMIN_ROLE, DEVELOPER_ROLE] };
 
   const result = await publishBody(ACTOR_ID, actorBody({ processId: TARGET_ID, instanceIdField: "field_target_id", pathId: "path_ab" }), reg, dsReg, sql, undefined, operatorActor);
   expect(result.version).toBeGreaterThan(0);
@@ -224,16 +332,16 @@ test.skipIf(!DB)("a publish with no actor supplied skips the check", async () =>
  * `validateCrossProcessReadGrant` collects target `processId`s from two
  * loops — every `"instance.query"` data source, then every
  * `instance.transition` action — into one `Set` before checking. A body
- * naming the same target from BOTH loops exercises that merge: this is the
- * one shape the single-site-kind tests above cannot reach, since each of
- * them carries only one kind of site.
+ * naming the same target from BOTH loops exercises that merge. The binding
+ * rule makes every `instance.transition` body carry both site kinds, so this
+ * shape matches `actorBody` and stays as the named case of the merge.
  */
 const combinedSiteBody = (): ProcessBody =>
   ({
     key: "combined",
     label: { en: "Combined" },
     baseLocale: "en",
-    fields: [{ id: "field_target_id", key: "target_id", label: { en: "Target Id" }, type: "string" }],
+    fields: [{ id: "field_target_id", key: "target_id", label: { en: "Target Id" }, type: "string", dataSource: "ds_iq" }],
     dataSources: [{ id: "ds_iq", key: "iq", type: "instance.query", config: { processId: TARGET_ID, labelFieldId: "field_target_id" } }],
     workflow: {
       initialStep: "step_r",
@@ -262,14 +370,169 @@ test.skipIf(!DB)("publishing rejects a body naming one ungranted target from bot
     raised = e;
   }
   expect(raised).toBeInstanceOf(AuthorizationError);
+  expect((raised as AuthorizationError).message).toContain("system:admin");
 });
 
 test.skipIf(!DB)("an author holding the read grant publishes a body naming one target from both site kinds", async () => {
   await publishBody(TARGET_ID, targetV1Body(), reg, defaultDsReg);
   await createProcessInstance(TARGET_ID, actor, defaultDsReg);
   await writeGrant({ role: "itcp-reader-combined", permission: "read", scope: { type: "process", config: { processId: TARGET_ID } } }, sql);
+  await writeGrant({ role: "itcp-reader-combined", permission: "migrate", scope: { type: "process", config: { processId: TARGET_ID } } }, sql);
   const granted: Actor = { id: "user_granted_combined", roles: ["itcp-reader-combined"] };
 
   const result = await publishBody(ACTOR_ID, combinedSiteBody(), reg, defaultDsReg, sql, undefined, granted);
   expect(result.version).toBeGreaterThan(0);
+});
+
+// ---- the publishing actor's migrate grant on the target ----
+
+const grantOn = (role: string, permission: "read" | "migrate", processId: ProcessId) =>
+  writeGrant({ role, permission, scope: { type: "process", config: { processId } } }, sql);
+
+async function publishRaisingAs(processId: ProcessId, body: ProcessBody, who: Actor): Promise<AuthorizationError> {
+  let raised: unknown;
+  try {
+    await publishBody(processId, body, reg, dsReg, sql, undefined, who);
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(AuthorizationError);
+  return raised as AuthorizationError;
+}
+
+test.skipIf(!DB)("an author with read and no migrate on the target fails, naming the target and persisting no version", async () => {
+  await publishBody(TARGET_ID, targetV1Body(), reg, dsReg);
+  await grantOn("itcp-read-only", "read", TARGET_ID);
+  const readOnly: Actor = { id: "user_read_only", roles: ["itcp-read-only"] };
+
+  const err = await publishRaisingAs(ACTOR_ID, actorBody(transitionConfig()), readOnly);
+  expect(err.message).toContain(TARGET_ID);
+  expect(err.message).toContain("system:developer");
+  expect(await versionCount(ACTOR_ID)).toBe(0);
+});
+
+test.skipIf(!DB)("a self-targeting action needs migrate on the publishing process too", async () => {
+  const SELF = pid("proc_itcp_self_migrate");
+  await grantOn("itcp-self-read", "read", SELF);
+  const readOnly: Actor = { id: "user_self_read", roles: ["itcp-self-read"] };
+
+  const err = await publishRaisingAs(SELF, actorBody(transitionConfig(SELF)), readOnly);
+  expect(err.message).toContain(SELF);
+  expect(await versionCount(SELF)).toBe(0);
+
+  await grantOn("itcp-self-read", "migrate", SELF);
+  const result = await publishBody(SELF, actorBody(transitionConfig(SELF)), reg, dsReg, sql, undefined, readOnly);
+  expect(result.version).toBe(1);
+});
+
+test.skipIf(!DB)("the global developer role publishes an instance.transition body", async () => {
+  await publishBody(TARGET_ID, targetV1Body(), reg, dsReg);
+  await grantOn("itcp-dev-read", "read", TARGET_ID);
+  const developer: Actor = { id: "user_dev", roles: ["itcp-dev-read", DEVELOPER_ROLE] };
+
+  const result = await publishBody(ACTOR_ID, actorBody(transitionConfig()), reg, dsReg, sql, undefined, developer);
+  expect(result.version).toBe(1);
+});
+
+test.skipIf(!DB)("a stored migrate grant on the target publishes", async () => {
+  await publishBody(TARGET_ID, targetV1Body(), reg, dsReg);
+  await grantOn("itcp-migrator", "read", TARGET_ID);
+  await grantOn("itcp-migrator", "migrate", TARGET_ID);
+  const migrator: Actor = { id: "user_migrator", roles: ["itcp-migrator"] };
+
+  const result = await publishBody(ACTOR_ID, actorBody(transitionConfig()), reg, dsReg, sql, undefined, migrator);
+  expect(result.version).toBe(1);
+});
+
+test.skipIf(!DB)("a publish with no actor skips the migrate check", async () => {
+  await publishBody(TARGET_ID, targetV1Body(), reg, dsReg);
+
+  const result = await publishBody(ACTOR_ID, actorBody(transitionConfig()), reg, dsReg);
+  expect(result.version).toBe(1);
+});
+
+test.skipIf(!DB)("two actions naming one target fail once for that process", async () => {
+  await publishBody(TARGET_ID, targetV1Body(), reg, dsReg);
+  await grantOn("itcp-twice", "read", TARGET_ID);
+  const readOnly: Actor = { id: "user_twice", roles: ["itcp-twice"] };
+  const body = actorBody(transitionConfig());
+  const step = body.workflow.steps[0] as unknown as { onEntry: unknown[] };
+  step.onEntry.push({ id: "action_it_2", type: "instance.transition", config: transitionConfig() });
+
+  const err = await publishRaisingAs(ACTOR_ID, body, readOnly);
+  expect(err.message.split(TARGET_ID).length - 1).toBe(1);
+  expect(await versionCount(ACTOR_ID)).toBe(0);
+});
+
+test.skipIf(!DB)("a Reader list entry on the target does not stand in for migrate", async () => {
+  await publishBody(TARGET_ID, targetV1Body(), reg, dsReg);
+  await addAccessPrincipal({ id: "user_admin_acl", roles: [ADMIN_ROLE] }, TARGET_ID, "reader", "user_listed", sql);
+  const listed: Actor = { id: "user_listed", roles: [] };
+  expect(await can(listed, "read", TARGET_ID, sql)).toBe(true); // read arrives through the Reader list alone
+
+  const err = await publishRaisingAs(ACTOR_ID, actorBody(transitionConfig()), listed);
+  expect(err.message).toContain(TARGET_ID);
+  expect(await versionCount(ACTOR_ID)).toBe(0);
+});
+
+// Holding migrate without read still fails: the read gate covers instance.transition targets.
+test.skipIf(!DB)("an author with a stored migrate grant and no read on the target fails the read gate", async () => {
+  await publishBody(TARGET_ID, targetV1Body(), reg, dsReg);
+  await grantOn("itcp-migrate-only", "migrate", TARGET_ID);
+  const migrateOnly: Actor = { id: "user_migrate_only", roles: ["itcp-migrate-only"] };
+
+  const err = await publishRaisingAs(ACTOR_ID, actorBody(transitionConfig()), migrateOnly);
+  expect(err.message).toContain("system:admin");
+  expect(err.message).toContain(TARGET_ID);
+  expect(await versionCount(ACTOR_ID)).toBe(0);
+});
+
+test.skipIf(!DB)("an author with the developer role and no read on the target fails the read gate", async () => {
+  await publishBody(TARGET_ID, targetV1Body(), reg, dsReg);
+  const developer: Actor = { id: "user_dev_noread", roles: [DEVELOPER_ROLE] };
+
+  const err = await publishRaisingAs(ACTOR_ID, actorBody(transitionConfig()), developer);
+  expect(err.message).toContain("system:admin");
+  expect(await versionCount(ACTOR_ID)).toBe(0);
+});
+
+test.skipIf(!DB)("an author holding only the operator role has read and no migrate, and fails on migrate", async () => {
+  await publishBody(TARGET_ID, targetV1Body(), reg, dsReg);
+  const operator: Actor = { id: "user_operator_only", roles: [ADMIN_ROLE] };
+
+  const err = await publishRaisingAs(ACTOR_ID, actorBody(transitionConfig()), operator);
+  expect(err.message).toContain("system:developer");
+  expect(err.message).toContain(TARGET_ID);
+  expect(await versionCount(ACTOR_ID)).toBe(0);
+});
+
+test.skipIf(!DB)("a Developer list entry on the target does not stand in for migrate", async () => {
+  await publishBody(TARGET_ID, targetV1Body(), reg, dsReg);
+  await addAccessPrincipal({ id: "user_admin_acl_dev", roles: [ADMIN_ROLE] }, TARGET_ID, "developer", "user_dev_listed", sql);
+  await grantOn("itcp-dev-listed", "read", TARGET_ID);
+  // AUTHOR_ROLE satisfies the Developer list's role clause, so the list matches this actor.
+  const listed: Actor = { id: "user_dev_listed", roles: ["itcp-dev-listed", AUTHOR_ROLE] };
+  expect(await matchesAccessList(listed, TARGET_ID, "developer", sql)).toBe(true);
+
+  const err = await publishRaisingAs(ACTOR_ID, actorBody(transitionConfig()), listed);
+  expect(err.message).toContain("system:developer");
+  expect(await versionCount(ACTOR_ID)).toBe(0);
+});
+
+test.skipIf(!DB)("an instance.query source alone keeps the read gate: read without migrate publishes", async () => {
+  await publishBody(TARGET_ID, targetV1Body(), reg, dsReg);
+  await grantOn("itcp-query-only", "read", TARGET_ID);
+  const readOnly: Actor = { id: "user_query_only", roles: ["itcp-query-only"] };
+  // A body with an instance.query source over TARGET_ID and no instance.transition action.
+  const body = {
+    key: "querier",
+    label: { en: "Querier" },
+    baseLocale: "en",
+    fields: [{ id: "field_target_id", key: "target_id", label: { en: "Target Id" }, type: "string", dataSource: "ds_target" }],
+    dataSources: [queryDs(TARGET_ID)],
+    workflow: { initialStep: "step_r", steps: [{ id: "step_r", key: "r", label: { en: "R" }, type: "task", terminal: true }] },
+  } as unknown as ProcessBody;
+
+  const result = await publishBody(ACTOR_ID, body, reg, dsReg, sql, undefined, readOnly);
+  expect(result.version).toBe(1);
 });

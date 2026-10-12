@@ -7,20 +7,21 @@ import { test, expect, beforeAll } from "bun:test";
 import { sql, initSchema, loadInstance, createInstance } from "../src/engine/store.js";
 import { startInstance, commitManualTransition, cancelInstance } from "../src/engine/transition.js";
 import { publishBody } from "../src/engine/definitions.js";
-import { createDefaultRegistry } from "../src/engine/host.js";
-import { createDataSourceRegistry, createStaticAssignmentRegistry, type Registry as Reg, type AssignmentRegistry } from "../src/engine/registry.js";
+import { createDefaultRegistry, createDefaultDataSourceRegistry } from "../src/engine/host.js";
+import { createStaticAssignmentRegistry, type Registry as Reg, type AssignmentRegistry } from "../src/engine/registry.js";
 import { createDefaultAssignmentRegistry, GROUP_MEMBERS_STRATEGY_TYPE, MANAGER_OF_STARTER_STRATEGY_TYPE } from "../src/engine/assignment-strategies.js";
 import { createUser, setManagerById } from "../src/auth/users.js";
 import { createGroup, setGroupMembers } from "../src/auth/groups.js";
 import { drainOutbox, deliver, type ClaimedRow } from "../src/engine/outbox.js";
 import { idempotencyKey } from "../src/engine/idempotency.js";
+import { createProcessInstance, submitAndTransition, SubmissionValidationError } from "../src/runtime/api.js";
 import { INSTANCE_TRANSITION_ACTION_TYPE } from "../src/handlers/instance-transition.js";
-import type { ProcessBody, Instance, Action, InstanceEvent } from "../src/schema/definition.js";
+import type { ProcessBody, Instance, Action, InstanceEvent, PathId } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
 
 const DB = !!process.env.DATABASE_URL;
 const actor: Actor = { id: "user_1", roles: [] };
-const dataSourceReg = createDataSourceRegistry();
+const dataSourceReg = createDefaultDataSourceRegistry(); // instance.query: the acting field binds to one
 const cel = (src: string) => ({ lang: "cel", src });
 
 // step_shelf (initial) --path_issue(manual)--> step_issued (terminal).
@@ -126,14 +127,16 @@ const targetBodyAutoChain = (): ProcessBody =>
 // Actor: manual path from entry to a terminal step whose onEntry carries the
 // instance.transition action, naming `targetPid`/`pathId`. The acting instance
 // carries the target's own id under `field_target_id`.
-const actorBody = (targetPid: string, pathId: string): ProcessBody =>
+const actorBody = (targetPid: string, pathId: string, withView = false): ProcessBody =>
   ({
     key: "actor", baseLocale: "en", label: { en: "Actor" },
-    fields: [{ id: "field_target_id", key: "target_id", label: { en: "Target Id" }, type: "string" }],
+    fields: [{ id: "field_target_id", key: "target_id", label: { en: "Target Id" }, type: "string", dataSource: "ds_target" }],
+    dataSources: [{ id: "ds_target", key: "target", type: "instance.query", config: { processId: targetPid, labelFieldId: "field_target_id" } }],
     workflow: {
       initialStep: "step_a_entry",
       steps: [
         { id: "step_a_entry", key: "a_entry", label: { en: "Entry" }, type: "task",
+          ...(withView ? { view: { fields: [{ ref: "field_target_id" }] } } : {}),
           paths: [{ id: "path_a_done", key: "a_done", label: "A Done", to: "step_a_done", trigger: "manual" }] },
         { id: "step_a_done", key: "a_done", label: { en: "Done" }, type: "task", terminal: true,
           onEntry: [{ id: "action_it", type: INSTANCE_TRANSITION_ACTION_TYPE, config: { processId: targetPid, instanceIdField: "field_target_id", pathId } }] },
@@ -264,6 +267,82 @@ test.skipIf(!DB)("a target belonging to another process fails permanently, and n
   expect(row!.last_error as string).toContain("belongs to process"); // names both process ids
   expect((await loadInstance(sql, other.instanceId))!.currentStepId as string).toBe("step_shelf");
   expect((await loadInstance(sql, target.instanceId))!.currentStepId as string).toBe("step_shelf");
+});
+
+// --- the target shares the acting instance's kind ----
+
+/** Publish target + actor; create each instance with its own `kind`; submit the acting one. */
+async function setUpKinds(actingKind: Instance["kind"], targetKind: Instance["kind"]) {
+  const registry = createDefaultRegistry();
+  const tv = await publishBody(pid("proc_it_kind_target"), targetBody(), registry, dataSourceReg);
+  const av = await publishBody(pid("proc_it_kind_actor"), actorBody(tv.processId, "path_issue"), registry, dataSourceReg);
+  const target = await createInstance(tv.definition, { processId: tv.processId, version: tv.version, kind: targetKind });
+  const acting = await createInstance(av.definition, { processId: av.processId, version: av.version, kind: actingKind, startedBy: actor.id });
+  const done = await commitManualTransition(acting, "path_a_done", av.definition, actor, sql, { field_target_id: target.instanceId } as unknown as Instance["data"]);
+  await drainOutbox(sql, registry);
+  return { target, done };
+}
+
+test.skipIf(!DB)("a test instance cannot move a published one, and the delivery fails permanently naming both kinds", async () => {
+  const { target, done } = await setUpKinds("test", "published");
+
+  const row = await outboxRowFor(done.instanceId);
+  expect(row!.status).toBe("dead-letter");
+  expect(row!.attempts).toBe(1);
+  expect(row!.last_error as string).toContain("'published'");
+  expect(row!.last_error as string).toContain("'test'");
+  expect((await loadInstance(sql, target.instanceId))!.currentStepId as string).toBe("step_shelf"); // unmoved
+  expect(await transitionedByActionEvents(target.instanceId)).toHaveLength(0);
+});
+
+test.skipIf(!DB)("a published instance cannot move a test one, and the delivery fails permanently", async () => {
+  const { target, done } = await setUpKinds("published", "test");
+
+  const row = await outboxRowFor(done.instanceId);
+  expect(row!.status).toBe("dead-letter");
+  expect(row!.attempts).toBe(1);
+  expect(row!.last_error as string).toContain("kind");
+  expect((await loadInstance(sql, target.instanceId))!.currentStepId as string).toBe("step_shelf"); // unmoved
+  expect(await transitionedByActionEvents(target.instanceId)).toHaveLength(0);
+});
+
+test.skipIf(!DB)("two instances of one kind move normally", async () => {
+  for (const kind of ["published", "test"] as const) {
+    const { target, done } = await setUpKinds(kind, kind);
+    expect((await outboxRowFor(done.instanceId))!.status).toBe("delivered");
+    expect((await loadInstance(sql, target.instanceId))!.currentStepId as string).toBe("step_issued");
+  }
+});
+
+// --- the participant submits only an id the bound source offers ----
+
+test.skipIf(!DB)("a submitted id the bound source does not offer fails the option check and enqueues nothing; an offered id moves the target", async () => {
+  const registry = createDefaultRegistry();
+  const tv = await publishBody(pid("proc_it_opt_target"), targetBody(), registry, dataSourceReg);
+  const ov = await publishBody(pid("proc_it_opt_other"), targetBody(), registry, dataSourceReg);
+  const av = await publishBody(pid("proc_it_opt_actor"), actorBody(tv.processId, "path_issue", true), registry, dataSourceReg);
+  const target = await startInstance(tv.definition, { processId: tv.processId, version: tv.version }, { id: "user_other", roles: [] }); // started by someone else: the acting user cannot otherwise see it
+  const other = await startInstance(ov.definition, { processId: ov.processId, version: ov.version }, actor); // another process: the source never offers it
+  const acting = await createProcessInstance(av.processId, actor, dataSourceReg);
+
+  let raised: unknown;
+  try {
+    await submitAndTransition(acting.instanceId, "path_a_done" as PathId, { field_target_id: other.instanceId } as unknown as Instance["data"], actor, dataSourceReg);
+  } catch (e) {
+    raised = e;
+  }
+  expect(raised).toBeInstanceOf(SubmissionValidationError);
+  expect((raised as SubmissionValidationError).issues.some((i) => i.kind === "invalid-option" && i.fieldId === "field_target_id")).toBe(true);
+  expect(await outboxRowFor(acting.instanceId)).toBeUndefined(); // nothing enqueued
+  expect((await loadInstance(sql, acting.instanceId))!.currentStepId as string).toBe("step_a_entry"); // the acting instance did not commit
+  expect((await loadInstance(sql, other.instanceId))!.currentStepId as string).toBe("step_shelf");
+
+  const done = await submitAndTransition(acting.instanceId, "path_a_done" as PathId, { field_target_id: target.instanceId } as unknown as Instance["data"], actor, dataSourceReg);
+  expect(done.currentStepId as string).toBe("step_a_done");
+  await drainOutbox(sql, registry);
+  expect((await outboxRowFor(acting.instanceId))!.status).toBe("delivered");
+  expect((await loadInstance(sql, target.instanceId))!.currentStepId as string).toBe("step_issued");
+  expect((await loadInstance(sql, other.instanceId))!.currentStepId as string).toBe("step_shelf"); // untouched
 });
 
 test.skipIf(!DB)("a cancelled target does not move, and the delivery fails permanently", async () => {
