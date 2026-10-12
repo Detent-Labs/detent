@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
 import type { Expression } from "workflow-engine/schema";
@@ -180,6 +180,14 @@ export function ConditionInput({ value, onChange, stepId, placeholder, toggleVar
   const [celMode, setCelMode] = useState(condition === null);
 
   const unparseable = condition === null;
+  const showsCel = celMode || unparseable;
+
+  // The clear press unmounts the clear command, which would drop focus to
+  // <body>; the effect below runs once the next render has drawn the control
+  // to land on.
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [focusAfterClear, setFocusAfterClear] = useState(false);
+
   // While no row contributes, the draft may still hold a source: an unfinished
   // edit leaves it standing, and the readout says so.
   const preview = condition ? (toCel(condition, operands) ?? src) : src;
@@ -199,8 +207,15 @@ export function ConditionInput({ value, onChange, stepId, placeholder, toggleVar
   const clear = () => {
     setCondition({ joiner: "&&", rows: [] });
     seededFrom.current = { src: undefined, signature };
+    setFocusAfterClear(true);
     onChange(undefined);
   };
+
+  useEffect(() => {
+    if (!focusAfterClear) return;
+    setFocusAfterClear(false);
+    rootRef.current?.querySelector<HTMLElement>(showsCel ? "input.cel-input" : "button.condition-add")?.focus();
+  }, [focusAfterClear, showsCel]);
 
   // `btn btn-ghost` plus the compiled style, joined in one `className`: a
   // `className` written after a spread of `stylex.props` would replace it.
@@ -245,9 +260,9 @@ export function ConditionInput({ value, onChange, stepId, placeholder, toggleVar
       </button>
     );
 
-  if (celMode || unparseable) {
+  if (showsCel) {
     return (
-      <div {...stylex.props(styles.conditionInput)}>
+      <div ref={rootRef} {...stylex.props(styles.conditionInput)}>
         <ExpressionInput
           value={value}
           placeholder={placeholder}
@@ -269,7 +284,7 @@ export function ConditionInput({ value, onChange, stepId, placeholder, toggleVar
   }
 
   return (
-    <div {...stylex.props(styles.conditionInput)}>
+    <div ref={rootRef} {...stylex.props(styles.conditionInput)}>
       <ConditionBuilder condition={condition} operands={operands} onChange={commit} />
       <div {...stylex.props(styles.conditionFooter)}>
         <p {...stylex.props(styles.conditionReadout)}>

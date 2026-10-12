@@ -6,6 +6,7 @@ import type { FlagKey } from "./view-flags";
 import { isExpression, type BoolOrExpr } from "../panels/shared/overrideMode";
 import { draftFields } from "./fields";
 import { isDraftViewField } from "./view-layout";
+import { t } from "../catalog.js";
 
 /** One step whose view references the field, and which of `visible` /
  * `required` / `readonly` that step's view entry carries — regardless of
@@ -90,6 +91,12 @@ export function visibleClearSteps(state: FieldVisibleState): string[] | undefine
   if (state.kind === "divergent") return state.stepIds;
   if (state.kind === "uniform" && state.value !== undefined) return state.stepIds;
   return undefined;
+}
+
+/** The clear command's label: "Clear on" and every step it clears, in the
+ * order given. A function replacer keeps a `$` in a step label literal. */
+export function clearConditionLabel(stepLabels: string[]): string {
+  return t("fieldCatalog.conditionClear").replace("{steps}", () => stepLabels.join(", "));
 }
 
 /**

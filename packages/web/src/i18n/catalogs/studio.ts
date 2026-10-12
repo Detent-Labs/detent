@@ -253,6 +253,7 @@ export const en = {
   // A manual path's guard: the runtime offers the button only while it holds.
   "paths.manualGuardNote": "The participant sees this path's button only while the condition holds.",
   "paths.manualGuardHint": "guard (leave empty to always offer this path)",
+  "paths.automaticGuardHint": "guard (omit for the default/else path)",
 
   "timers.empty": "No timers.",
   "timers.addTimer": "+ Add timer",

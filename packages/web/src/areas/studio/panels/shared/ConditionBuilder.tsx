@@ -44,7 +44,14 @@ const styles = stylex.create({
   conditionRaw: {
     flex: "1 1 20ch",
     minWidth: 0,
+    maxWidth: "100%",
     fontFamily: fonts.mono,
+  },
+  // A select sizes to its longest option, which can outgrow a narrow column:
+  // the row's controls shrink to the row instead.
+  conditionControl: {
+    maxWidth: "100%",
+    minWidth: 0,
   },
   conditionFlag: {
     color: colors.refusal,
@@ -91,7 +98,12 @@ function ValueEditor({
 
   if (operand.celType === "bool") {
     return (
-      <select aria-label={label} value={boolChoiceOf(row.value)} onChange={(e) => onChange(boolValueOf(e.target.value))}>
+      <select
+        {...stylex.props(styles.conditionControl)}
+        aria-label={label}
+        value={boolChoiceOf(row.value)}
+        onChange={(e) => onChange(boolValueOf(e.target.value))}
+      >
         <option value="">{t("condition.selectValue")}</option>
         <option value="true">{t("condition.yes")}</option>
         <option value="false">{t("condition.no")}</option>
@@ -102,7 +114,12 @@ function ValueEditor({
   // A closed list: a select's options, an instance status, or a child outcome.
   if (operand.options?.length) {
     return (
-      <select aria-label={label} value={String(row.value ?? "")} onChange={(e) => onChange(e.target.value || undefined)}>
+      <select
+        {...stylex.props(styles.conditionControl)}
+        aria-label={label}
+        value={String(row.value ?? "")}
+        onChange={(e) => onChange(e.target.value || undefined)}
+      >
         <option value="">{t("condition.selectValue")}</option>
         {operand.options.map((o) => (
           <option key={o.value} value={o.value}>
@@ -115,6 +132,7 @@ function ValueEditor({
 
   return (
     <input
+      {...stylex.props(styles.conditionControl)}
       type={inputTypeFor(operand)}
       aria-label={label}
       placeholder={t("condition.valuePlaceholder")}
@@ -189,6 +207,7 @@ export function ConditionBuilder({ condition, operands, onChange }: Props) {
               ) : (
                 <>
                   <select
+                    {...stylex.props(styles.conditionControl)}
                     aria-label={t("condition.operandLabel")}
                     value={row.operand}
                     onChange={(e) => {
@@ -212,6 +231,7 @@ export function ConditionBuilder({ condition, operands, onChange }: Props) {
                   </select>
 
                   <select
+                    {...stylex.props(styles.conditionControl)}
                     aria-label={t("condition.operatorLabel")}
                     value={row.op}
                     onChange={(e) => updateRow(index, { ...row, op: e.target.value as CmpOp })}

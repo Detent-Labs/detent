@@ -42,6 +42,7 @@ import {
   applyRequiredOverride,
   applyTechnicalMarker,
   applyVisibleOverride,
+  clearConditionLabel,
   countTechnicalClearKeys,
   fieldRequiredOverrides,
   fieldUsage,
@@ -1000,14 +1001,7 @@ function FieldEditor({
                   value={visibleState.kind === "uniform" ? visibleState.value : undefined}
                   onChange={writeVisible}
                   toggleVariant="link"
-                  clearLabel={
-                    clearSteps
-                      ? t("fieldCatalog.conditionClear").replace(
-                          "{steps}",
-                          clearSteps.map((id) => usageStepLabel(usage, id)).join(", "),
-                        )
-                      : undefined
-                  }
+                  clearLabel={clearSteps ? clearConditionLabel(clearSteps.map((id) => usageStepLabel(usage, id))) : undefined}
                 />
               </>
             )}

@@ -9,6 +9,7 @@ import {
   applyRequiredOverride,
   needsTechnicalToggleConfirm,
   visibleClearSteps,
+  clearConditionLabel,
 } from "../src/areas/studio/draft/field-usage.js";
 import type { Draft } from "../src/areas/studio/draft/types.js";
 
@@ -195,6 +196,19 @@ describe("visibleClearSteps", () => {
     expect(visibleClearSteps(fieldVisibleOverrides(d, "field_vendor"))).toEqual(["step_a", "step_b"]);
     applyVisibleOverride(d, "field_vendor", undefined);
     expect(visibleClearSteps(fieldVisibleOverrides(d, "field_vendor"))).toBeUndefined();
+  });
+});
+
+describe("clearConditionLabel", () => {
+  it("names every step it clears, in order", () => {
+    expect(clearConditionLabel(["Draft Requisition", "Manager Approval", "Finance Review"])).toBe(
+      "Clear on Draft Requisition, Manager Approval, Finance Review",
+    );
+  });
+
+  it("keeps a $ in a step label literal", () => {
+    // A string replacement would read `$&` as the matched `{steps}`.
+    expect(clearConditionLabel(["Pay $& go", "Review"])).toBe("Clear on Pay $& go, Review");
   });
 });
 

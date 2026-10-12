@@ -158,6 +158,10 @@ const styles = stylex.create({
     paddingInline: space.s3,
     marginBlock: space.s2,
     marginInline: 0,
+    // The UA gives a fieldset `min-inline-size: min-content`, so a wide select
+    // inside would push it past a narrow column.
+    minInlineSize: 0,
+    minWidth: 0,
   },
   studioOnlyWhenLegend: {
     fontFamily: fonts.body,
@@ -335,7 +339,7 @@ export function PathsPanel({
               <p {...stylex.props(styles.note)}>{t("paths.manualGuardNote")}</p>
             )}
             <label>
-              {path.trigger === "automatic" ? "guard (omit for the default/else path)" : t("paths.manualGuardHint")}
+              {path.trigger === "automatic" ? t("paths.automaticGuardHint") : t("paths.manualGuardHint")}
               <ConditionInput
                 value={path.guard}
                 stepId={stepId}

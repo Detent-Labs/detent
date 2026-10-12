@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { Expression } from "workflow-engine/schema";
 import type { DraftOf } from "../src/areas/studio/draft/types.js";
@@ -76,5 +77,25 @@ describe("ConditionInput's clear command", () => {
 
   it("shows no clear command in the CEL footer without clearLabel", () => {
     expect(render({ lang: "cel", src: "data.amount >" })).not.toContain("Clear on");
+  });
+});
+
+describe("focus after the clear press", () => {
+  // The press unmounts the command itself. No harness here can press it, so
+  // this pins the wiring: the press raises a flag, and an effect moves focus
+  // to the control the next render draws, the add-row button in the builder
+  // or the CEL input in CEL mode.
+  const source = readFileSync(new URL("../src/areas/studio/panels/shared/ConditionInput.tsx", import.meta.url), "utf-8");
+
+  it("raises the flag in the clear handler", () => {
+    expect(source).toMatch(/const clear = \(\) => \{\n(?: {4}.*\n)*? {4}setFocusAfterClear\(true\);\n/);
+  });
+
+  it("lands on the add-row button, or on the CEL input in CEL mode", () => {
+    expect(source).toContain('querySelector<HTMLElement>(showsCel ? "input.cel-input" : "button.condition-add")?.focus()');
+  });
+
+  it("hangs the ref on both roots, so either surface can be searched", () => {
+    expect([...source.matchAll(/<div ref=\{rootRef\}/g)].length).toBe(2);
   });
 });
