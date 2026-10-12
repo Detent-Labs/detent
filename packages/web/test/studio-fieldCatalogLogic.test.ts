@@ -71,6 +71,24 @@ describe("nextFieldKey", () => {
 
     expect(nextFieldKey("", priorLabel, newLabel, "en", new Set())).toBe("");
   });
+
+  describe("with the lock", () => {
+    const priorLabel = mergeLocalizedTextEntry(undefined, "en", "Amount");
+    const newLabel = mergeLocalizedTextEntry(priorLabel, "en", "Total amount");
+
+    it("leaves a key that equals the prior derivation unchanged", () => {
+      expect(nextFieldKey("amount", priorLabel, newLabel, "en", new Set(), true)).toBeUndefined();
+    });
+
+    it("still derives for an empty key, which has neither reader nor publication", () => {
+      expect(nextFieldKey("", priorLabel, newLabel, "en", new Set(), true)).toBe("total_amount");
+    });
+
+    it("stays unlocked by default and when the sixth argument is false", () => {
+      expect(nextFieldKey("amount", priorLabel, newLabel, "en", new Set())).toBe("total_amount");
+      expect(nextFieldKey("amount", priorLabel, newLabel, "en", new Set(), false)).toBe("total_amount");
+    });
+  });
 });
 
 describe("droppedByKindChange", () => {

@@ -623,20 +623,8 @@ word. `ROADMAP.md` carries stage-by-stage status.
   before 1.0. Shape: `PATCH /account/me` takes the current and the new
   password. The account screen gets a field for it. Follow-up change:
   `password-floor-and-self-rotation`, shared with SEC-2.
-- **SEC-5: login rate limiting is per-process and in-memory.** Both windows
-  are `Map`s in process memory (`src/auth/login.ts:54` and `:61`), marked
-  `ponytail:` at `src/auth/login.ts:49`. That marker is the whole record: it
-  states the shortcut, its ceiling and its upgrade path, and no ledger file
-  and no push gate stand behind it. Risk: two replicas double every
-  threshold, and a restart clears both windows. The review names the
-  constraint a Postgres replacement must keep: one statement doing the check
-  and the increment together. A tenant may run more than one engine process
-  today; the runbook's "Running more than one engine process" section names
-  the login limiter as the process-local exception.
-
-  Decided 2026-09-23 (change `decide-security-findings-before-1-0`): build
-  before 1.0. Shape: one table. One statement checks and increments
-  together. Follow-up change: `postgres-login-rate-limit`.
+- **SEC-5 (closed as `postgres-login-rate-limit`)**: see
+  `docs/decisions-archive.md`.
 - **SEC-6: no ceiling on an instance's total attachment bytes.**
   `MAX_ATTACHMENT_BYTES` bounds one upload, 5 MiB by default
   (`src/http/routes.ts:99`, enforced at `:359`). `uploadAttachment`
@@ -715,7 +703,7 @@ build.
   A script that runs on the origin can read the token from `localStorage`
   and send it away. The attacker can then replay it from anywhere until it
   expires, up to eight hours (`TOKEN_LIFETIME_HOURS`,
-  `src/auth/login.ts:21`). An `HttpOnly` cookie would stop that theft. It
+  `src/auth/login.ts:23`). An `HttpOnly` cookie would stop that theft. It
   would still let such a script misuse the open session. The owner accepted
   this residual risk on 2026-09-23.
 - **SEC-8: attachment `contentType` is caller-supplied and echoed on
@@ -1301,6 +1289,43 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   1300x900 on the group "Personal details": each list names all 12 steps and
   wraps to five lines. Risk (Low): each zone's own control sits below five
   lines of the same names.
+- **FIELDS-26: a changed option value leaves CEL comparisons on the old
+  string.** A change or deletion of an option `value` on a field leaves every
+  CEL comparison such as `data.priority == "high"` on the old string. The
+  type check raises no error and the studio shows no message.
+  The key-rename guard (audit finding E2-7) locks the key against label
+  changes and counts the readers of a key. It leaves this gap open on purpose, since
+  finding a comparison needs a heuristic over CEL string literals, and that
+  heuristic gives false positives. Risk (Medium): a guard stops matching after
+  an option rename, and the path parks.
+
+  Upgrade entry: extend the reader walk in
+  `packages/web/src/areas/studio/draft/key-readers.ts` to report a string
+  literal compared with the field.
+- **FIELDS-27: a key notice names no reader and a rename leaves them
+  dangling.** The notice counts the expressions that read a key, names none
+  and offers no jump to them. The "Used in" column beside it has a "Show on
+  the canvas" pattern to copy. After a committed rename, the notice recomputes
+  for the new key and drops to no readers. An expression that now reads a key
+  no field has gets no message beyond the checks rail's unknown-variable
+  result. The key input has no Escape revert and no pending hint while the
+  typed text differs from the key. Risk (Medium): a rename silently strands
+  every guard that read the old key.
+
+  Upgrade entry: a "rename and rewrite readers" command can close all three
+  gaps. A rewrite would reuse the traversal of `removeFieldAndReferences`.
+- **FIELDS-28: the lock shows no notice while the base version loads or
+  fails.** Until the base version body has loaded, a field with a non-empty
+  key counts as published, so the label no longer sets its key. The notice
+  needs a confirmed publication, so it shows nothing. A failed fetch keeps
+  that state, and the error is swallowed. A new field in a draft with a base
+  version then derives `a` from the first letter and freezes. The empty-key
+  case still derives. Risk (Low): the key stops following the label with no
+  message.
+
+  Upgrade entry: surface the fetch state from
+  `packages/web/src/areas/studio/draft/publishedFields.tsx` and show a loading
+  or error sentence.
 
 ## Open from the 2026-09-13 Changes tab audit (one OpenSpec change per screen)
 
@@ -1677,11 +1702,6 @@ of `5f41cd8a`. Each fix change deletes its own entries in the commit that
 archives it, and `sweep-docs-drift-2026-10` re-points the line citations of
 other entries. C-4 merges D-2, and C-6 merges F-6.
 
-- **`guard-field-key-renames` (E2-7; medium)**: A label change renames the
-  field key, and the CEL expressions that read the old key keep it. Anchors:
-  `packages/web/src/areas/studio/panels/FieldCatalogPanel.tsx`,
-  `packages/web/src/areas/studio/panels/fieldCatalogLogic.ts`,
-  `packages/web/src/areas/studio/draft/deriveKey.ts`.
 - **`cut-studio-render-cost` (E2-11, E1-6, K-1; medium)**: Hidden tabs
   recompute on every keystroke, the canvas reparses every guard on each
   pointer move, and the studio chunk exceeds the 500 kB warning threshold of
@@ -1729,9 +1749,6 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   `ROADMAP.md`, `README.md`, `CLAUDE.md`, two specs, line anchors in this
   file and several code comments state stale facts. Anchors:
   `docs/authoring-guide.md`, `ROADMAP.md`, `src/auth/authorize.ts`.
-- **`postgres-login-rate-limit` (C-7; medium)**: The login lockout counts per
-  email across all tenants, so a success in one tenant resets the window in
-  another. Anchors: `src/auth/login.ts`.
 
 ## Open from harden-studio-json-surface (needs its own OpenSpec change)
 
