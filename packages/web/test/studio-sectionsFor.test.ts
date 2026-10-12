@@ -4,7 +4,34 @@
  * functions — no DOM, no rendering.
  */
 import { describe, expect, it } from "bun:test";
-import { sectionColumns, sectionsFor } from "../src/areas/studio/panels/sectionsFor.js";
+import { step } from "workflow-engine/schema";
+import type { PerformedBy } from "../src/areas/studio/draft/performedBy.js";
+import { sectionColumns, sectionsFor, type SectionName } from "../src/areas/studio/panels/sectionsFor.js";
+
+/**
+ * Where each key of the engine's `step` schema is edited on the step page
+ * (`panels/StepPage.tsx`): in one of its sections, or in the masthead. `onCancel`
+ * is edited beside `onExit`, and `outcome` in How the case ends.
+ */
+const STEP_KEY_SECTION: { readonly [key: string]: SectionName | "masthead" } = {
+  id: "masthead",
+  key: "masthead",
+  label: "masthead",
+  description: "masthead",
+  type: "masthead",
+  terminal: "masthead",
+  cancellable: "cancellable",
+  outcome: "howItEnds",
+  subprocess: "subprocess",
+  view: "form",
+  assignment: "assignment",
+  collaboration: "collaboration",
+  onEntry: "entry",
+  onExit: "exit",
+  onCancel: "exit",
+  timers: "timers",
+  paths: "paths",
+};
 
 describe("sectionsFor", () => {
   it("stands the eight task sections for a step someone works", () => {
@@ -49,6 +76,24 @@ describe("sectionsFor", () => {
     first.length = 0;
 
     expect(sectionsFor("participant")).toHaveLength(8);
+  });
+});
+
+describe("sectionsFor: the engine's step keys", () => {
+  it("maps every key of the step schema to a section or the masthead", () => {
+    const unmapped = Object.keys(step.shape).filter((key) => STEP_KEY_SECTION[key] === undefined);
+
+    expect(unmapped).toEqual([]);
+  });
+
+  it("maps no key to a section that no step kind stands", () => {
+    const kinds: PerformedBy[] = ["participant", "subprocess", "terminal"];
+    const stood = new Set<string>(kinds.flatMap((kind) => sectionsFor(kind)));
+    const unstood = Object.entries(STEP_KEY_SECTION)
+      .filter(([, section]) => section !== "masthead" && !stood.has(section))
+      .map(([key]) => key);
+
+    expect(unstood).toEqual([]);
   });
 });
 

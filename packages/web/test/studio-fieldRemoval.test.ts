@@ -726,11 +726,11 @@ describe("removeFieldAndReferences", () => {
   });
 });
 
-/** The JSON surface loads a draft whose nested containers can be `null`:
- * `draft/load-guard.ts::checkDraftShape` checks top-level keys only. Both
- * functions must treat a `null` container the way they already treat an
- * absent (`undefined`) one, and neither may write to one. */
-describe("field-removal tolerates a null container the JSON surface can load", () => {
+/** `draft/load-guard.ts::checkDraftShape` refuses a `null` container at every
+ * depth, so the JSON surface cannot load one. Both functions still treat a
+ * `null` container the way they treat an absent (`undefined`) one, and
+ * neither may write to one. */
+describe("field-removal tolerates a null container", () => {
   it("answers reach and completes the recipe when a step's view.fields is null", () => {
     const draft = draftOf({
       fields: [leaf("fld_amount", "amount")],
