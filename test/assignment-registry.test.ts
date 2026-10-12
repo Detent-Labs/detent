@@ -14,7 +14,7 @@ import {
   STATIC_ASSIGNMENT_STRATEGY_TYPE,
   createDataSourceRegistry,
   createAssignmentRegistry,
-  createDefaultAssignmentRegistry,
+  createStaticAssignmentRegistry,
 } from "../src/engine/registry.js";
 import { sql, initSchema } from "../src/engine/store.js";
 import { publishBody, AssignmentRegistryValidationError } from "../src/engine/definitions.js";
@@ -68,7 +68,7 @@ const bodyWithTwoBadAssignments = (): ProcessBody =>
 
 // --- pure: checkAssignmentRegistry ---------------------------------------------
 
-const assignmentReg = createDefaultAssignmentRegistry();
+const assignmentReg = createStaticAssignmentRegistry();
 
 test("a step declaring the static strategy with a valid candidates config passes", () => {
   const issues = checkAssignmentRegistry(bodyWithAssignment({ type: "static", config: { candidates: ["role_a"] } }), assignmentReg);

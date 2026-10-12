@@ -21,7 +21,7 @@ import type { StepKind } from "./createStep.js";
 /**
  * The assignment strategies the engine registers and this layer names.
  * `static` is registered in `src/engine/registry.ts`
- * (`createDefaultAssignmentRegistry`); the three `org.` types are registered
+ * (`createStaticAssignmentRegistry`); the three `org.` types are registered
  * in `src/engine/assignment-strategies.ts`. Neither module is on the engine's
  * exports map, so the four types are literals here rather than imports.
  *

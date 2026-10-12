@@ -36,7 +36,7 @@ import { collect, type RegistryIssue } from "./registry-check.js";
 import { sql } from "./store.js";
 import type { ResolveBody } from "./resolution.js";
 import {
-  createDefaultAssignmentRegistry,
+  createStaticAssignmentRegistry,
   describeTypeNames,
   PROCESS_START_ACTION_TYPE,
   INSTANCE_TRANSITION_ACTION_TYPE,
@@ -649,7 +649,7 @@ export async function publishBody(
   registry: Registry,
   dataSourceRegistry: DataSourceRegistry,
   db: SQL = sql,
-  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
+  assignmentRegistry: AssignmentRegistry = createStaticAssignmentRegistry(),
   // Trailing and optional so the ~25 existing callers compile unchanged. The
   // read-grant check in validateCrossProcessReadGrant runs only when a
   // caller supplies this — every authorization gate otherwise sits at the

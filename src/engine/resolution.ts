@@ -14,7 +14,7 @@
 import type { SQL } from "bun";
 import { sql } from "./store.js";
 import { resolveAutomatic } from "./transition.js";
-import { createDefaultAssignmentRegistry, type AssignmentRegistry } from "./registry.js";
+import { createStaticAssignmentRegistry, type AssignmentRegistry } from "./registry.js";
 import { definitionHash } from "../schema/hash.js";
 import { instance as instanceSchema, type Instance, type ProcessBody } from "../schema/definition.js";
 import { SYSTEM_ACTOR } from "../cel/eval.js";
@@ -52,7 +52,7 @@ export async function drainResolutions(
   db: SQL = sql,
   resolveBody: ResolveBody = () => undefined,
   leaseMs: number = CLAIM_LEASE_MS,
-  assignmentRegistry: AssignmentRegistry = createDefaultAssignmentRegistry(),
+  assignmentRegistry: AssignmentRegistry = createStaticAssignmentRegistry(),
 ): Promise<number> {
   // Claim fresh 'pending' rows plus 'claimed' rows past their lease (an abandoned
   // claim from a crashed pass). Stamp resolve_claimed_at so this claim can itself

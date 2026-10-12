@@ -20,7 +20,7 @@ import { createDefaultRegistry, createDefaultDataSourceRegistry } from "../src/e
 import {
   createRegistry,
   createDataSourceRegistry,
-  createDefaultAssignmentRegistry,
+  createStaticAssignmentRegistry,
   describeTypeNames,
   PROCESS_START_ACTION_TYPE,
   type RegistryDescription,
@@ -185,7 +185,7 @@ test("6.1b: actionTypeIssues and actionConfigIssues split with no duplicated not
     registryDescription,
     loadedChildren: {},
     targetsByLoc: {},
-    registries: { registry, assignmentRegistry: createDefaultAssignmentRegistry(), dataSourceRegistry: createDataSourceRegistry() },
+    registries: { registry, assignmentRegistry: createStaticAssignmentRegistry(), dataSourceRegistry: createDataSourceRegistry() },
   });
 
   expect(refs.actionTypeIssues.length).toBe(1);
@@ -237,7 +237,7 @@ describe("6.8: publishBody accepts and rejects exactly what it does today", () =
     // purchase-requisition.json names a custom assignment strategy no
     // default registry ships; only its resolvability at publish matters
     // here, not its runtime resolution.
-    const assignmentReg = createDefaultAssignmentRegistry();
+    const assignmentReg = createStaticAssignmentRegistry();
     assignmentReg.set("org.manager-of-starter", { resolve: async () => [] });
 
     // subprocess-loan-parent.json's own subprocess spec hardcodes its

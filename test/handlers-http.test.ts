@@ -16,7 +16,7 @@ import {
   HTTP_MAX_RESPONSE_BYTES,
 } from "../src/handlers/http.js";
 import { deliver, PermanentError, type ClaimedRow } from "../src/engine/outbox.js";
-import { createRegistry, type HandlerContext } from "../src/engine/registry.js";
+import { createRegistry, createStaticAssignmentRegistry, type HandlerContext } from "../src/engine/registry.js";
 
 /** http.request reads no database, so a stand-in handle satisfies the required field. */
 const noDb = (() => Promise.resolve([])) as unknown as SQL;
@@ -94,6 +94,7 @@ const ctxFor = (config: Record<string, unknown>, opts: { idempotencyKey?: string
   idempotencyKey: opts.idempotencyKey ?? "idem_1",
   instanceId: "inst_1",
   db: noDb,
+  assignmentRegistry: createStaticAssignmentRegistry(),
 });
 
 async function rejects(p: Promise<unknown>): Promise<unknown> {
@@ -294,7 +295,7 @@ test("an over-size response dead-letters via deliver(), the classification the o
         field_version: 1,
         actors: null,
       };
-      const err = await rejects(deliver(row, reg, noDb));
+      const err = await rejects(deliver(row, reg, noDb, createStaticAssignmentRegistry()));
       expect(err).toBeInstanceOf(PermanentError); // -> outbox dead-letters, never retries, writes no data
     },
   );
@@ -328,8 +329,8 @@ test("a retried delivery sends the same Idempotency-Key as the original", async 
         field_version: 1,
         actors: null,
       };
-      await deliver(row, reg, noDb);
-      await deliver({ ...row, attempts: row.attempts + 1 }, reg, noDb); // simulated retry
+      await deliver(row, reg, noDb, createStaticAssignmentRegistry());
+      await deliver({ ...row, attempts: row.attempts + 1 }, reg, noDb, createStaticAssignmentRegistry()); // simulated retry
       expect(requests).toHaveLength(2);
       const keyHeader = IDEMPOTENCY_HEADER.toLowerCase();
       expect(requests[0]!.headers[keyHeader]).toBe("idem_stable");

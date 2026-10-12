@@ -45,6 +45,17 @@ export function tenantKeyOf(credential: unknown): string | undefined {
 }
 const BEARER_PREFIX = "Bearer ";
 
+/** The local branch signs and verifies with one shared secret: HS256 only. */
+const LOCAL_ALGORITHMS = ["HS256"];
+
+/** An external issuer signs with a private key; no HMAC algorithm is accepted. */
+const EXTERNAL_ALGORITHMS = [
+  "RS256", "RS384", "RS512",
+  "PS256", "PS384", "PS512",
+  "ES256", "ES384", "ES512",
+  "EdDSA", "Ed25519",
+];
+
 /** One `AUTH_ISSUERS` entry: an externally-issued token verified via JWKS. */
 export interface IssuerConfig {
   iss: string;
@@ -112,7 +123,7 @@ export function jwtResolver(config: JwtResolverConfig): ActorResolver {
     try {
       if (iss === LOCAL_ISSUER) {
         if (!localKey) throw new ActorResolutionError(`unconfigured issuer: ${iss}`);
-        const { payload } = await jwtVerify(token, localKey, { issuer: LOCAL_ISSUER });
+        const { payload } = await jwtVerify(token, localKey, { issuer: LOCAL_ISSUER, algorithms: LOCAL_ALGORITHMS });
         const actor = toActor(payload, localRolesClaim);
         // Only `Actor.id` comes from this read. `roles` stays the token's own
         // claim, so a grant still reaches the actor at their next login and not
@@ -130,7 +141,12 @@ export function jwtResolver(config: JwtResolverConfig): ActorResolver {
         jwks = createRemoteJWKSet(new URL(issuerConfig.jwksUrl));
         jwksSets.set(issuerConfig.jwksUrl, jwks);
       }
-      const { payload } = await jwtVerify(token, jwks, { issuer: issuerConfig.iss, audience: issuerConfig.audience });
+      const { payload } = await jwtVerify(token, jwks, {
+        issuer: issuerConfig.iss,
+        audience: issuerConfig.audience,
+        algorithms: EXTERNAL_ALGORITHMS,
+        requiredClaims: ["exp"],
+      });
       return toActor(payload, issuerConfig.rolesClaim);
     } catch (err) {
       if (err instanceof ActorResolutionError) throw err;

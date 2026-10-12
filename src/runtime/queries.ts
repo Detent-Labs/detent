@@ -7,6 +7,7 @@
 import type { SQL } from "bun";
 import { sql } from "../engine/store.js";
 import { NotFoundError, RequestShapeError } from "../errors.js";
+import { parseInstant } from "../instant.js";
 import { decodeCursor } from "../pagination.js";
 import type { ProcessId, InstanceId, FieldId, Literal, Instance, InstanceStatus, LocaleCode, LocalizedText, AssignmentState, StepId } from "../schema/definition.js";
 import { DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, getStore, parseInstance, keysetPage, type Page, type DefinitionStore } from "./internal.js";
@@ -278,6 +279,9 @@ export type InstanceWhereFilter = Omit<InstanceListFilter, "includeDegraded" | "
  * `instance_id`, the table's own key.
  */
 export function buildInstanceWhere(filter: InstanceWhereFilter, db: SQL) {
+  // A stored report query reaches the `::timestamptz` casts below unchecked; a bad bound would raise there and answer 500.
+  if (filter.createdAfter !== undefined) parseInstant(filter.createdAfter, "createdAfter");
+  if (filter.createdBefore !== undefined) parseInstant(filter.createdBefore, "createdBefore");
   // The probe qualifies the outer key as `instances.instance_id`: the denial
   // table has a column of that name too. It binds `actor_id` first, the leading
   // column of the table's primary key `(actor_id, instance_id)`, so the planner
@@ -578,7 +582,7 @@ export async function listInstances(
   await assertNoNonScalarComparedField(filter, filter.dataWhere, db);
 
   const limit = Math.min(page.limit ?? DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT);
-  const [cursorCreatedAt, cursorInstanceId] = page.cursor ? decodeCursor(page.cursor, 2) : [undefined, undefined];
+  const [cursorCreatedAt, cursorInstanceId] = page.cursor ? decodeCursor(page.cursor, ["timestamp", "text"]) : [undefined, undefined];
 
   // created_at::text (created_at_cursor) carries Postgres's full microsecond
   // precision, unlike the driver's own Date conversion of the plain
