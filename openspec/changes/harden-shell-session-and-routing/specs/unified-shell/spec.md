@@ -55,7 +55,7 @@ A logout the actor chooses in this tab SHALL NOT show the line.
 
 ### Requirement: A malformed address resolves to the area's default route
 
-An address whose area path holds a malformed percent escape, such as `%E0%A4%A`, SHALL NOT throw while the shell renders. The `studio`, `admin` and `app` routers SHALL resolve such a path to their default route, as for an unknown path. The default routes are the process list, the instances list and the inbox.
+An address whose area path holds a malformed percent escape, such as `%E0%A4%A`, SHALL NOT throw while the shell renders. The `studio`, `admin`, `app` and `reporting` routers SHALL resolve such a path to their default route, as for an unknown path. The default routes are the process list, the instances list, the inbox and the process picker.
 
 #### Scenario: A malformed escape in a studio address
 
@@ -63,10 +63,10 @@ An address whose area path holds a malformed percent escape, such as `%E0%A4%A`,
 - **THEN** the studio area shows the process list
 - **AND** its error boundary shows no fallback
 
-#### Scenario: A malformed escape in an admin or app address
+#### Scenario: A malformed escape in an admin, app or reporting address
 
-- **WHEN** the address is `/admin/instances/%E0%A4%A` or `/app/tasks/%E0%A4%A`
-- **THEN** the area shows its default screen, the instances list or the inbox
+- **WHEN** the address is `/admin/instances/%E0%A4%A`, `/app/tasks/%E0%A4%A` or `/reporting/reports/%E0%A4%A`
+- **THEN** the area shows its default screen: the instances list, the inbox or the process picker
 
 #### Scenario: A valid escape still decodes
 
