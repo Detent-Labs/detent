@@ -21,7 +21,8 @@ function daysInMonth(year: number, month: number): number {
 /**
  * ponytail: knows no leap seconds and no time zone database. A value Postgres
  * rejects for those reasons still reaches the cast and answers 500 through
- * `mapError`. Upgrade entry point: this function.
+ * `mapError`. It also reads only the ISO `DateStyle` output of a
+ * `timestamptz::text` cursor. Upgrade entry point: this function.
  */
 export function isInstant(raw: string): boolean {
   const match = INSTANT_SHAPE.exec(raw);
@@ -32,9 +33,12 @@ export function isInstant(raw: string): boolean {
   // Postgres has no year 0, and admits numeric offsets up to 15:59 only.
   if (year < 1 || month < 1 || month > 12 || day < 1 || day > daysInMonth(year, month)) return false;
   if (match[5] !== undefined && Number(match[5]) > 15) return false;
-  // Date.parse rejects a bare `T…+HH` offset that Postgres writes, so give it `+HH:00`.
-  const parseable = raw.replace(" ", "T").replace(/(T.*[+-]\d{2})$/, "$1:00");
-  return !Number.isNaN(Date.parse(parseable));
+  return !Number.isNaN(instantMs(raw));
+}
+
+/** `Date.parse` of an accepted instant. Bun rejects a bare `T…±HH` offset that Postgres writes, so it gets `±HH:00`. */
+export function instantMs(raw: string): number {
+  return Date.parse(raw.replace(" ", "T").replace(/(T.*[+-]\d{2})$/, "$1:00"));
 }
 
 /** Returns `raw` when it is an ISO-8601 instant, else raises the 400 `label` names. */

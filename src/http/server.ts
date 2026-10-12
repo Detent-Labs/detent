@@ -857,10 +857,10 @@ export function createServer(
     return toRes(notFound(`no route: ${req.method} ${url.pathname}`));
   };
 
-  // The one net under every handler. A handler without a `guarded` of its own,
-  // `resolveTenantDb` and the static-asset path all land here, so a throw
-  // answers a message-free JSON 500 through `mapError` instead of reaching
-  // Bun's own error response. The CORS headers ride along, which the browser
+  // The one net under every handler. A handler without a `guarded` of its own
+  // and the static-asset path land here, so a throw answers a message-free
+  // JSON 500 through `mapError` instead of reaching Bun's own error response.
+  // The CORS headers ride along, which the browser
   // needs to read the 500; `GET /metrics` gains them on a throw too.
   return async (req: Request, server?: BunServer): Promise<Response> => {
     const origin = req.headers.get("Origin");

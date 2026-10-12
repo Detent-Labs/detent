@@ -15,8 +15,8 @@ COPY . .
 # dependency tree that drifts from the committed bun.lock.
 RUN bun install --production --frozen-lockfile
 
-# Bun answers an error with its development page, message and source excerpt
-# included, unless NODE_ENV=production.
+# The server already passes `development: false` to Bun.serve. This keeps
+# every other Bun code path that reads NODE_ENV out of development mode.
 ENV NODE_ENV=production
 
 # The base image already ships a non-root `bun` user (UID 1000); this

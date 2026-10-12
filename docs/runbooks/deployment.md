@@ -6,8 +6,8 @@ the two images. It points here for the rest.
 
 Two images exist. `docker/engine.Dockerfile` builds the engine. The engine
 reads its configuration from the container environment. The image sets
-`NODE_ENV=production`. Leave it set: without it, Bun answers an error with a
-development page that shows the message and a source excerpt.
+`NODE_ENV=production`. Leave it set. The server already turns off Bun's
+development mode, and the variable keeps every other Bun code path out of it.
 `docker/frontend.Dockerfile` builds the browser bundle behind nginx. That
 image reads one build argument and no runtime variable.
 

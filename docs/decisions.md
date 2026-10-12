@@ -1568,7 +1568,8 @@ this section.
 - **WRITE-1: the write routes still answer a caller who may not read with the
   instance's existence.** Claim, release and delegate answer 409
   `instance-not-running` for a finished instance. They answer 403
-  `authorization` for an unknown instance id, as the next paragraphs state. On a
+  `authorization` for an unknown instance id to a caller without `system:admin`,
+  as the next paragraphs state. On a
   running instance, claim answers the typed 403
   `not-assigned`, `not-a-candidate` or `already-claimed`. Release and delegate
   answer `not-claimant`. Submit and form-draft save answer `not-claimed` or

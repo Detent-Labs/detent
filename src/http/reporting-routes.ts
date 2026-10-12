@@ -36,7 +36,7 @@ import { instanceStatus, type ProcessId } from "../schema/definition.js";
 import type { ActorResolver } from "../auth/resolve.js";
 import type { Actor } from "../cel/eval.js";
 import { requireRole, requirePermission, REPORTS_ROLE } from "../auth/authorize.js";
-import { isInstant } from "../instant.js";
+import { instantMs, isInstant } from "../instant.js";
 import { RequestShapeError, notFound, type HttpResult, type HttpBinaryResult } from "./errors.js";
 import { route, readJson } from "./routes.js";
 
@@ -104,8 +104,8 @@ function parseRange(url: URL): DateRange {
   if (from === null || to === null) throw new RequestShapeError("both 'from' and 'to' are required");
   if (!isInstant(from)) throw new RequestShapeError(`'from' must be an ISO date, got '${from}'`);
   if (!isInstant(to)) throw new RequestShapeError(`'to' must be an ISO date, got '${to}'`);
-  const fromMs = Date.parse(from);
-  const toMs = Date.parse(to);
+  const fromMs = instantMs(from);
+  const toMs = instantMs(to);
   if (fromMs > toMs) throw new RequestShapeError("'from' must not be after 'to'");
   return { from: new Date(fromMs).toISOString(), to: new Date(toMs).toISOString() };
 }

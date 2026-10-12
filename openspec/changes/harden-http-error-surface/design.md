@@ -58,8 +58,8 @@ See proposal.md for the five findings. The current state that shapes the fix:
 
 The returned `fetch` closure wraps its whole body in a try. The catch builds
 `toResponse(mapError(err, ctx), allowedOrigins, origin)`. One place now
-covers `handleLogin`, every future unguarded handler, a `resolveTenantDb`
-surprise and the static-asset path.
+covers `handleLogin`, every future unguarded handler and the static-asset
+path.
 
 `Bun.serve` also gets `development: false`, and the engine image sets
 `NODE_ENV=production` (owner ruling, 2026-10-12). The first stops the

@@ -137,6 +137,16 @@ test.skipIf(!DB)("a range bound that Date.parse admits but Postgres would not ge
   }
 });
 
+test.skipIf(!DB)("a range bound with a bare hour offset is a valid instant on every view", async () => {
+  const P = pid();
+  await publishBody(P, body("v1"), reg, dataSourceReg);
+  // Date.parse rejects `T…+05` as written; the route must read the same instant isInstant accepted.
+  for (const view of VIEWS) {
+    const res = await fetch(req(`http://x/reporting/${P}/${view}?from=${encodeURIComponent("2026-01-01T00:00:00+05")}&to=${TO}`, adminReports));
+    expect(res.status).toBe(200);
+  }
+});
+
 test.skipIf(!DB)("an actor holding only the reports role gets 403 from an aggregate view with no read grant", async () => {
   const P = pid();
   await publishBody(P, body("v1"), reg, dataSourceReg);

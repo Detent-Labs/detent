@@ -12,7 +12,7 @@ import type { SQL } from "bun";
 import { createServer } from "../src/http/server.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import { devHeaderResolver } from "../src/auth/resolve.js";
-import { MAX_ATTEMPTS } from "../src/auth/login.js";
+import { MAX_ATTEMPTS, MAX_ADDRESS_ATTEMPTS } from "../src/auth/login.js";
 
 const SECRET = "http-error-path-secret-0123456789"; // >= 32 encoded bytes
 const ALLOWED_ORIGIN = "https://app.example.test";
@@ -60,11 +60,12 @@ test("a login email with a NUL byte answers a JSON 400 request-shape and runs no
   expect(body.error.message).not.toContain("x.ch"); // the value is not echoed
 });
 
-test("NUL-byte logins are never counted: MAX_ATTEMPTS + 1 identical requests all answer 400", async () => {
+test("NUL-byte logins count against neither window: more requests than either limit from one address all answer 400", async () => {
   const fetch = fetchWith(throwingDb);
-  for (let i = 0; i < MAX_ATTEMPTS + 1; i++) {
-    const res = await fetch(loginReq("count\u0000me@x.ch"));
-    expect(res.status).toBe(400);
+  // clientAddressOf reads the peer from the server argument; without one the address window is skipped.
+  const peer = { requestIP: () => ({ address: "203.0.113.77", family: "IPv4", port: 1 }) } as unknown as Parameters<typeof fetch>[1];
+  for (let i = 0; i < Math.max(MAX_ATTEMPTS, MAX_ADDRESS_ATTEMPTS) + 1; i++) {
+    expect((await fetch(loginReq("count\u0000me@x.ch"), peer)).status).toBe(400);
   }
 });
 
