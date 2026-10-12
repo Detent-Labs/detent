@@ -8,7 +8,7 @@ provider: the `auth_users` table, argon2id password hashing/verification
 `POST /auth/login` route and its 8-hour token issuance (signed for the
 `jwt-authentication` capability's local `"bps"` issuer), the generic-401
 non-disclosure rule shared by an unknown email, a wrong password and a
-disabled account, a per-email in-memory rate limiter on repeated login
+disabled account, a per-email, database-backed rate limiter on repeated login
 attempts, and the user-management CLI (`src/auth/cli.ts`). The engine does
 not become an identity provider: no registration, no self-service password
 reset, no MFA, no session store, no refresh tokens and no revocation list.
@@ -191,22 +191,26 @@ no state in which a login route is reachable without a signing key.
 
 ### Requirement: Repeated failed login attempts for one email are rate-limited
 
-`handleLogin` SHALL track login attempts per normalized email
-(`email.trim().toLowerCase()`) in a fixed window: each attempt is recorded
-optimistically, before its outcome is known, so the check for whether an
-email is currently blocked and the recording of the new attempt happen as
-one atomic step. After `MAX_ATTEMPTS` attempts recorded for an email within
-`WINDOW_MS`, further login requests for that email within the same window
-SHALL return `429` with `{ error: { type: "rate-limited", message } }` and
-SHALL NOT call `verifyLogin`. A successful login SHALL clear that email's
-recorded attempts entirely, so only unsuccessful attempts ever persist as
-counted state. The window SHALL reset (count starts over) once `WINDOW_MS`
-has elapsed since the window began, independent of whether the limit was
-reached. This limiter is per-process and in-memory, and it does not
-coordinate across multiple server processes. Normalization
-(trimming and lowercasing) SHALL apply only to the tracking key; the value
-passed to `verifyLogin` SHALL remain the request's original, unmodified
-`email` string.
+`handleLogin` SHALL track login tries per normalized email
+(`email.trim().toLowerCase()`) in a fixed window. It SHALL record each try
+before it knows the outcome. The check for a blocked email and the recording of
+the new try SHALL happen as one atomic step.
+
+After `MAX_ATTEMPTS` tries for an email within `WINDOW_MS`, further login
+requests for that email within the same window SHALL return `429` with
+`{ error: { type: "rate-limited", message } }`. They SHALL NOT call
+`verifyLogin`. A successful login SHALL clear that email's recorded tries
+entirely, so only failed tries persist as counted state. The window SHALL reset
+(the count starts over) once `WINDOW_MS` has elapsed since the window began,
+whatever the count reached.
+
+The windows SHALL live in the tenant's own database. Every server process of
+that tenant shares them, and a restart keeps them. A window of one tenant SHALL
+NOT count, block or clear a window of another.
+
+Normalization (trimming and lowercasing) SHALL apply only to the tracking key.
+The value passed to `verifyLogin` SHALL remain the request's original,
+unmodified `email` string.
 
 `handleLogin` SHALL apply a second window, keyed on the caller's address, with
 its own threshold and the same `WINDOW_MS`. A request SHALL pass both windows
@@ -218,8 +222,8 @@ against many accounts.
 
 `handleLogin` SHALL check the address window first, before the email window
 records anything. A caller past its address threshold therefore never reaches
-the email map. That is what stops one caller from filling that map. The
-memory-footprint requirement below rests on this ordering.
+the email window. That is what stops one caller from adding rows for many
+distinct emails. The expiry requirement below rests on this ordering.
 
 A successful login SHALL NOT clear the address window, though it clears the
 email one. Clearing it would let a caller who holds one valid account reset
@@ -251,75 +255,78 @@ without passing the proxy. Its peer is therefore the caller rather than the
 proxy. The server SHALL fall back to the peer, which counts that request
 rather than exempting it from the window.
 
+<!-- antislop: allow passive-voice -->
 #### Scenario: An email under the limit is unaffected
 
-- **WHEN** `POST /auth/login` is called with a wrong password for an email
-  fewer than `MAX_ATTEMPTS` times within the window
-- **THEN** each call still reaches `verifyLogin` and returns the existing
+- **WHEN** `POST /auth/login` receives a wrong password for an email fewer than
+  `MAX_ATTEMPTS` times within the window
+- **THEN** each request still reaches `verifyLogin` and returns the existing
   generic `401`
 
+<!-- antislop: allow passive-voice -->
 #### Scenario: An email over the limit is rejected without touching verifyLogin
 
 - **WHEN** `POST /auth/login` has already failed `MAX_ATTEMPTS` times for the
   same normalized email within the current window
-- **THEN** a further call for that email returns `429` with
-  `{ error: { type: "rate-limited", message } }`, and `verifyLogin` is not
-  invoked for that call
+- **THEN** a further request for that email returns `429` with
+  `{ error: { type: "rate-limited", message } }`
+- **AND** the request does not invoke `verifyLogin`
 
 #### Scenario: A successful login resets the counter
 
-- **WHEN** an email has some failed attempts recorded (fewer than
+- **WHEN** an email has some failed tries recorded (fewer than
   `MAX_ATTEMPTS`) and then logs in successfully
-- **THEN** the failed-attempt counter for that email is cleared, so a
-  subsequent wrong-password attempt is treated as the first failure of a new
-  window
+- **THEN** the login clears the failed-try counter for that email
+- **AND** a later wrong password counts as the first failure of a new window
 
 #### Scenario: The window rolls over
 
-- **WHEN** an email has reached `MAX_ATTEMPTS` failed attempts and `WINDOW_MS`
+- **WHEN** an email has reached `MAX_ATTEMPTS` failed tries and `WINDOW_MS`
   has since elapsed
-- **THEN** a further login attempt for that email is evaluated against
-  `verifyLogin` again (not rejected with `429`) and starts a new window
+- **THEN** a further login try for that email reaches `verifyLogin` again,
+  without a `429`, and starts a new window
 
+<!-- antislop: allow passive-voice trailing-negation -->
 #### Scenario: Rate limiting is keyed by email, not by request source
 
-- **WHEN** the same email is used to attempt login `MAX_ATTEMPTS` times from
-  different IP addresses within one window
-- **THEN** the next attempt for that email is rejected with `429` regardless
-  of which IP address it comes from
+- **WHEN** the same email tries to log in `MAX_ATTEMPTS` times from different
+  IP addresses within one window
+- **THEN** the next try for that email returns `429`, whatever IP address it
+  comes from
 
 #### Scenario: Case and whitespace variation in the submitted email do not bypass the limit
 
-- **WHEN** an email reaches `MAX_ATTEMPTS` failed attempts, and a further
-  request submits the same address with different letter casing or
-  surrounding whitespace (e.g. ` Foo@Bar.com` vs `foo@bar.com`)
-- **THEN** the further request is still rejected with `429`, and the email
-  value passed to `verifyLogin` is never altered by this normalization (an
-  account whose stored email contains uppercase characters is unaffected by
-  this requirement and continues to authenticate exactly as before this
-  change)
+- **WHEN** an email reaches `MAX_ATTEMPTS` failed tries
+- **AND** a further request submits the same address with other letter casing
+  or surrounding whitespace (for example ` Foo@Bar.com` against `foo@bar.com`)
+- **THEN** the further request still returns `429`
+- **AND** the email value passed to `verifyLogin` keeps its original form
+- **AND** an account whose stored email has uppercase characters
+  authenticates exactly as before
 
+<!-- antislop: allow passive-voice -->
 #### Scenario: One address trying many emails is limited
 
-- **WHEN** one address submits login attempts for many distinct
-  emails, past the per-address threshold, inside one window
-- **THEN** the next request from that address returns `429`, whatever email
-  it names, and `verifyLogin` is not invoked for it
+- **WHEN** one address submits login tries for many distinct emails, past the
+  per-address threshold, inside one window
+- **THEN** the next request from that address returns `429`, whatever email it
+  names, and `verifyLogin` does not run for it
 
+<!-- antislop: allow passive-voice -->
 #### Scenario: A spoofed forwarding header is ignored by default
 
 - **WHEN** `TRUST_PROXY` is unset and a caller sends a different
   `X-Forwarded-For` value on every request
-- **THEN** every one of those requests counts against the same peer address,
-  and the header changes nothing
+- **THEN** every one of those requests counts against the same peer address
 
 #### Scenario: A trusted proxy supplies the address
 
 - **WHEN** `TRUST_PROXY` is `1` and the request carries an
   `X-Forwarded-For` value
-- **THEN** the per-address window counts against that value, not against the
-  proxy's own address
+- **THEN** the per-address window counts against that value and not against
+  the proxy's own address
 
+<!-- antislop: allow passive-voice -->
 #### Scenario: Entries in front of the proxy's own are ignored
 
 - **WHEN** `TRUST_PROXY` is `1` and a caller sends
@@ -328,90 +335,69 @@ rather than exempting it from the window.
 - **THEN** the per-address window counts against the last entry, so the value
   the caller picked changes nothing
 
-### Requirement: Rate-limit tracking has a bounded memory footprint
+#### Scenario: An email of 6000 characters is an ordinary wrong password
 
-The tracking map SHALL NOT grow without bound in response to distinct
-submitted email values. `checkAndRecordAttempt` populates the map before any
-check of whether the corresponding account exists.
+- **WHEN** `POST /auth/login` receives an email of 6000 characters with a wrong
+  password
+- **THEN** the response is the existing generic `401`
+- **AND** the request counts toward that email's window like any other
 
-Before deciding on capacity, `checkAndRecordAttempt` SHALL remove every entry
-whose window started more than `WINDOW_MS` ago. Such an entry carries no
-information — it would reset on its next use. Removing it therefore costs
-nothing, and it reclaims the slots an intermittent caller left behind.
+#### Scenario: Two processes share one count
 
-This sweep SHALL run only on the path where a not-yet-tracked email meets a
-full map. It does not run on every request. It SHALL also stay inside the
-same synchronous, `await`-free function. This keeps check and increment
-atomic against concurrent requests for one email.
+- **WHEN** two server processes of one tenant together receive
+  `MAX_ATTEMPTS` wrong-password tries for one email inside one window
+- **THEN** the next try for that email, on either process, returns `429`
 
-The sweep can still leave the map full of live windows.
-`checkAndRecordAttempt` SHALL then evict the entry whose window started
-earliest. It SHALL track the new email in the slot that frees. It SHALL NOT
-refuse the request.
+#### Scenario: Concurrent attempts cannot all pass the check
 
-The earlier rule refused it, and gave a reason. Admitting untracked requests
-at capacity lets an unauthenticated caller disable the brute-force control
-for every account. The per-address window above removes the premise. One
-caller can no longer create 50,000 entries inside a window, because the
-address window stops that caller first.
+- **WHEN** more than `MAX_ATTEMPTS` tries for one email arrive at the same
+  moment, on one process or on several
+- **THEN** at most `MAX_ATTEMPTS` of them reach `verifyLogin`, and the rest
+  return `429`
 
-What refusal costs is now the larger harm. Every account whose email is not
-already tracked loses its login until the window rolls. Eviction costs at most
-one untracked try, for the least recently active email.
+#### Scenario: A restart keeps the windows
 
-The same reasoning bounds both directions. An evicted entry belongs to the
-oldest window, which is the entry closest to resetting on its own.
+- **WHEN** an email has reached `MAX_ATTEMPTS` failed tries and the server
+  process restarts inside the window
+- **THEN** the next try for that email returns `429`
 
-The per-address map SHALL carry the same bound, under its own capacity. It
-holds one entry per distinct address, and under `TRUST_PROXY` its key
-comes from a header. It therefore has the growth this requirement exists to
-stop. The email map's sweep, capacity check and earliest-window eviction SHALL
-apply to the address map too. This change therefore closes one unbounded map
-and does not open a second.
+#### Scenario: Two tenants share one email and one address
 
-#### Scenario: The address map is bounded the same way
+- **WHEN** tenants `acme` and `beta` each hold an account with the same email
+- **AND** `MAX_ATTEMPTS` wrong-password tries for that email arrive on
+  `beta`'s host
+- **THEN** a login on `acme`'s host for that email still reaches `verifyLogin`
+- **AND** a successful login on `acme`'s host leaves `beta`'s window alone
+- **AND** the next wrong-password try on `beta`'s host returns `429`
 
-- **WHEN** the per-address map holds its capacity in live windows, and a
-  request arrives from a not-yet-tracked address
-- **THEN** the sweep removes the expired entries. If the map is still full,
-  `checkAndRecordAttempt` evicts the entry with the earliest window start.
-  It tracks the new address in the slot that frees
+### Requirement: The rate-limit table drops expired rows
 
-#### Scenario: Expired entries are reclaimed before capacity is judged
+Each login request SHALL delete every row whose window has ended, before it
+checks a window. An ended row has no information, since its next use would
+start a new window.
 
-- **WHEN** the tracking map holds `MAX_TRACKED_EMAILS` entries of which some
-  windows have expired, and a login attempt arrives for a not-yet-tracked
-  email
-- **THEN** the expired entries are removed and the new email is tracked
-  normally, subject to the ordinary 5-per-15-minutes rule
+#### Scenario: An ended window leaves no row behind
 
-#### Scenario: A map full of live windows evicts the oldest
+- **WHEN** a window has ended, and a login try for another email arrives
+- **THEN** the ended window's row no longer exists after that try
 
-- **WHEN** the tracking map holds `MAX_TRACKED_EMAILS` entries whose windows
-  are all still live, and a login attempt arrives for a not-yet-tracked email
-- **THEN** `checkAndRecordAttempt` removes the entry with the earliest window
-  start and tracks the new email. The request reaches `verifyLogin`, subject
-  to the per-address window
+#### Scenario: A flood of distinct emails shrinks once it stops
 
-#### Scenario: Already-tracked emails are unaffected by capacity
+- **WHEN** a caller submits many distinct emails and then stops
+- **THEN** after `WINDOW_MS` and one further login try, none of those rows
+  remains
 
-- **WHEN** the tracking map is at `MAX_TRACKED_EMAILS` capacity
-- **THEN** login attempts for emails already present in the map continue to
-  be rate-limited normally
+### Requirement: A failure of the rate-limit check refuses the login
 
-#### Scenario: A flood cannot permanently disable the control
+`handleLogin` SHALL NOT call `verifyLogin` when it cannot read or write a
+window. The request SHALL fail with the existing `500` response. The check
+SHALL NOT lapse.
 
-- **WHEN** a caller fills the map with distinct email values and then stops
-- **THEN** after `WINDOW_MS` those entries no longer count toward capacity,
-  and the map returns to its ordinary state
+#### Scenario: The database is unavailable
 
-#### Scenario: A flood from one address is stopped before it fills the map
+- **WHEN** a login arrives and the database refuses the rate-limit query
+- **THEN** the response is `500` and `verifyLogin` is not invoked
 
-- **WHEN** one address submits distinct email values as fast as it can
-- **THEN** the per-address window rejects that caller once it passes the
-  per-address threshold. The map does not reach capacity from that caller
-
-<!-- antislop: allow passive-voice -->
 ### Requirement: Account administration is reachable over HTTP, and the CLI keeps its own path
 
 `src/auth/cli.ts` SHALL provide a command-line tool

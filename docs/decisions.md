@@ -623,20 +623,8 @@ word. `ROADMAP.md` carries stage-by-stage status.
   before 1.0. Shape: `PATCH /account/me` takes the current and the new
   password. The account screen gets a field for it. Follow-up change:
   `password-floor-and-self-rotation`, shared with SEC-2.
-- **SEC-5: login rate limiting is per-process and in-memory.** Both windows
-  are `Map`s in process memory (`src/auth/login.ts:54` and `:61`), marked
-  `ponytail:` at `src/auth/login.ts:49`. That marker is the whole record: it
-  states the shortcut, its ceiling and its upgrade path, and no ledger file
-  and no push gate stand behind it. Risk: two replicas double every
-  threshold, and a restart clears both windows. The review names the
-  constraint a Postgres replacement must keep: one statement doing the check
-  and the increment together. A tenant may run more than one engine process
-  today; the runbook's "Running more than one engine process" section names
-  the login limiter as the process-local exception.
-
-  Decided 2026-09-23 (change `decide-security-findings-before-1-0`): build
-  before 1.0. Shape: one table. One statement checks and increments
-  together. Follow-up change: `postgres-login-rate-limit`.
+- **SEC-5 (closed as `postgres-login-rate-limit`)**: see
+  `docs/decisions-archive.md`.
 - **SEC-6: no ceiling on an instance's total attachment bytes.**
   `MAX_ATTACHMENT_BYTES` bounds one upload, 5 MiB by default
   (`src/http/routes.ts:99`, enforced at `:359`). `uploadAttachment`
@@ -715,7 +703,7 @@ build.
   A script that runs on the origin can read the token from `localStorage`
   and send it away. The attacker can then replay it from anywhere until it
   expires, up to eight hours (`TOKEN_LIFETIME_HOURS`,
-  `src/auth/login.ts:21`). An `HttpOnly` cookie would stop that theft. It
+  `src/auth/login.ts:23`). An `HttpOnly` cookie would stop that theft. It
   would still let such a script misuse the open session. The owner accepted
   this residual risk on 2026-09-23.
 - **SEC-8: attachment `contentType` is caller-supplied and echoed on
@@ -1767,9 +1755,6 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   `ROADMAP.md`, `README.md`, `CLAUDE.md`, two specs, line anchors in this
   file and several code comments state stale facts. Anchors:
   `docs/authoring-guide.md`, `ROADMAP.md`, `src/auth/authorize.ts`.
-- **`postgres-login-rate-limit` (C-7; medium)**: The login lockout counts per
-  email across all tenants, so a success in one tenant resets the window in
-  another. Anchors: `src/auth/login.ts`.
 
 ## Open from harden-studio-json-surface (needs its own OpenSpec change)
 
