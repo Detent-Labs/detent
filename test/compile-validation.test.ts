@@ -1574,9 +1574,10 @@ describe("compile: a view entry's group names a group field the view carries", (
 });
 
 // tighten-publish-contract-checks: a body that already satisfies
-// publishedProcessBody takes compileProcessBody's early return, which checks
-// only the cancel-sink count. The early return must also pin the sink to what
-// publish injects, so a hand-written sink of another shape cannot ride through.
+// publishedProcessBody takes compileProcessBody's early return. That schema
+// counts cancel-sinks and validates nothing else, so the early return also pins
+// the sink to what publish injects: a hand-written sink of another shape
+// cannot ride through.
 describe("compile: the cancel-sink must match the engine's injection", () => {
   /** baseBody with a contract: step_b binds the declared outcome "approved". */
   const contractedBase = (): any => {

@@ -24,8 +24,8 @@
  * runs on BOTH compile branches, ahead of the `publishedProcessBody`-valid
  * early return: that placement is what makes a check unbypassable by a
  * hand-written body that merely satisfies `publishedProcessBody` (which
- * counts cancel-sinks and validates nothing else). The early return compares the
- * body with its own recompile, which pins the sink itself. See
+ * counts cancel-sinks and validates nothing else). The early return compares
+ * the body with its own recompile, which pins the sink itself. See
  * `harden-publish-validation` design.md.
  */
 

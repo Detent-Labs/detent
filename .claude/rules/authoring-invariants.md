@@ -29,11 +29,11 @@ placement also makes a check unbypassable.
 
 A hand-written body cannot skip it by only satisfying
 `publishedProcessBody`, since that schema counts cancel-sinks and
-validates nothing else about them. The read path cannot settle placement on its own. `definition.ts`
-also deserializes stored bodies. A tightened refinement there strands every
-instance already pinned to that body. Each body-resolving worker holds its
-own per-instance error boundary, so one stranded instance does not stop the
-others.
+validates nothing else about them. The read path cannot settle placement
+on its own. `definition.ts` also deserializes stored bodies. A tightened
+refinement there strands every instance already pinned to that body. Each
+body-resolving worker holds its own per-instance error boundary, so one
+stranded instance does not stop the others.
 
 `checkFieldTree` is one of the twelve structural checks and runs five
 per-field checks in one pass (`field-tree-check-consolidation`).
@@ -172,9 +172,12 @@ its placement.
 - A body that already carries a cancel-sink must equal the engine's own
   compile of its stripped form. The early return compares the two and
   throws a `CompileValidationError` located at `steps[<sink index>]` on a
-  mismatch. A sink with another outcome, a non-terminal sink, a sink with
-  actions, or a sink at another position fails there. A body whose
-  `contract.outcomes` lacks the reserved outcome fails the same way.
+  mismatch. A sink the schema accepts but the injection would not produce
+  fails there. Examples: another declared outcome, a non-terminal sink with
+  a path, an action on the sink, another position.
+- The comparison never sees a sink the schema already rejects. Such a sink
+  fails earlier with a Zod error. Examples are a non-terminal sink with no
+  path and a terminal sink with an undeclared outcome.
 - `Action.execution` accepts `"async"` or no value. The value `"blocking"`
   fails to parse, because the engine has no blocking delivery.
 - An action has no `idempotencyKey`. Publishing rejects one as an unknown

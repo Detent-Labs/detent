@@ -207,11 +207,11 @@ Zod refinements on `viewField` itself.
 `onExit(source)`, then `onPath`, then `onEntry(target)`. `CLAUDE.md`'s
 brief states the commit-then-dispatch outbox order; see it for the short
 form. The idempotency key is a deterministic UUIDv5 hash of
-`instanceId + transitionSeq + actionId`. The engine derives it, and an action
-has no authored key. The `transitionSeq` counter is
-monotonic per instance and doubles as the optimistic-concurrency token.
-An action's `execution` accepts async only. The engine reserves `blocking`
-and has not built it.
+`instanceId + transitionSeq + actionId`. The engine derives it, and an
+action has no authored key. The `transitionSeq` counter is monotonic per
+instance and doubles as the optimistic-concurrency token. An action's
+`execution` accepts async only. The engine reserves `blocking` and has not
+built it.
 
 Action results write back into `data` via `Action.output`, keyed by
 target `FieldId` and valued by a CEL expression over `result`. The
