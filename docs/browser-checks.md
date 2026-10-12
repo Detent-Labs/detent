@@ -2284,8 +2284,8 @@ Start two cases as the request owner. Claim Submit the Exit Notification and
 fill its required fields. Give the three fields a value, using answers that
 show them, and submit both cases.
 
-As the operator, claim Review the Exit Notification on each case. Fill the required
-`ticket_no` and `processed_by`. Choose Request clarification.
+As the operator, claim the Review step on each case.
+Fill the required `ticket_no` and `processed_by`. Choose Request clarification.
 
 Open the first case as the request owner and claim the Clarification step.
 Pass: the three controls hold the values.
