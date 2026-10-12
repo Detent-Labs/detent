@@ -121,7 +121,8 @@ the captured run does four jobs.
   `Ran` line add up to N. A renamed line breaks the sum, so the gate rejects
   it instead of reading zero skips.
 - It counts the `Ran` lines. The gate rejects a run with none, or with no
-  `pass` line, as unreadable.
+  `pass` line, as unreadable. It also rejects count lines that follow the last
+  `Ran` line, which a summary leaves when it loses its own `Ran` line.
 
 The `awk` program uses POSIX features only. It has no interval expression, no
 `gensub` and no array form of `match`, so mawk and gawk read it alike.

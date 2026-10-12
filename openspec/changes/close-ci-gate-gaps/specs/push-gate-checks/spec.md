@@ -54,10 +54,10 @@ A gate SHALL refuse a suite run that names no database. It SHALL also read the
 run's skip count and count a todo test as a skip. A count above the floor the
 repository records SHALL block the push.
 
-The gate SHALL refuse a run whose summary it cannot read. Three cases block
-the push. The run prints no `pass` line. The run prints no `Ran N tests` line.
-The counts do not add up to N. A renamed summary line would otherwise read as
-zero skips.
+The gate SHALL refuse a run whose summary it cannot read. Four cases block
+the push. The run prints no `pass` line, or no `Ran N tests` line. The counts do
+not add up to N. Count lines follow the last `Ran` line. A renamed summary line
+would otherwise read as zero skips.
 
 The gate SHALL also refuse a run that passes fewer tests than a second recorded
 floor. A run of far fewer tests than the suite holds proves less than it looks.
@@ -95,8 +95,9 @@ commit. The floor then moves in a reviewable line rather than a silent drift.
 
 #### Scenario: A summary the gate cannot read blocks the push
 
-- **WHEN** a captured run prints no `pass` line, no `Ran N tests` line, or counts
-  that do not add up to N
+- **WHEN** a captured run prints no `pass` line or no `Ran N tests` line
+- **OR** its counts do not add up to N
+- **OR** count lines follow its last `Ran` line
 - **THEN** the gate rejects the push and says it cannot read the summary
 
 #### Scenario: A shrunken run blocks the push
