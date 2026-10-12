@@ -105,6 +105,7 @@ export const en = {
   "outbox.discard": "Discard",
   "outbox.retryConfirm":
     "Retrying re-runs this action's side effect. A handler that honours the idempotency key (e.g. http.request's Idempotency-Key header) deduplicates it downstream — one that doesn't may repeat it. Continue?",
+  "outbox.discardConfirm": "Discarding is final. This action's side effect never goes out, and you cannot retry it afterwards. Continue?",
   "timers.title": "Timers",
   "timers.empty": "No pending timers.",
   "timers.colInstance": "Instance",
@@ -376,6 +377,8 @@ export const de: Record<keyof typeof en, string> = {
   "outbox.discard": "Verwerfen",
   "outbox.retryConfirm":
     "Ein erneuter Versuch führt den Seiteneffekt dieser Aktion noch einmal aus. Ein Handler, der den Idempotenzschlüssel beachtet (etwa der Idempotency-Key-Header von http.request), entdoppelt ihn beim Empfänger — einer ohne diese Beachtung wiederholt ihn. Fortfahren?",
+  "outbox.discardConfirm":
+    "Das Verwerfen ist endgültig. Der Seiteneffekt dieser Aktion wird nie ausgeführt, und ein erneuter Versuch ist danach nicht mehr möglich. Fortfahren?",
   "timers.title": "Timer",
   "timers.empty": "Keine offenen Timer.",
   "timers.colInstance": "Instanz",

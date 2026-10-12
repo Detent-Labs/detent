@@ -108,8 +108,9 @@ export async function discardOutboxRow(idempotencyKey: string, token: string): P
   return (await res.json()) as OutboxRow;
 }
 
-export async function listPendingTimers(token: string, opts: { limit?: number; cursor?: string } = {}): Promise<PendingTimerPage> {
+export async function listPendingTimers(token: string, opts: { instanceId?: string; limit?: number; cursor?: string } = {}): Promise<PendingTimerPage> {
   const query = new URLSearchParams();
+  if (opts.instanceId) query.set("instanceId", opts.instanceId);
   if (opts.limit !== undefined) query.set("limit", String(opts.limit));
   if (opts.cursor !== undefined) query.set("cursor", opts.cursor);
   return getJson<PendingTimerPage>(`/admin/timers?${query}`, token);

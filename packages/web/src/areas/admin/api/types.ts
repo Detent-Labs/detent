@@ -52,17 +52,20 @@ export interface InstancePage {
   cursor?: string;
 }
 
-/** Mirrors src/runtime/api.ts::InstanceView — the participant-facing view, unrestricted by role; the admin instance screen reads only its process/version/status/step fields. */
+/** Mirrors src/runtime/api.ts::InstanceView — the participant-facing view, unrestricted by role; the admin instance screen reads its process/version/status/step fields, `transitionSeq`, `assignment.claimedBy` and `baseLocale`. */
 export interface InstanceView {
   instanceId: string;
   processId: string;
   version: number;
   status: InstanceStatus;
   step: { id: string; key: string; label: LocalizedText; type: string };
+  transitionSeq: number;
+  baseLocale: LocaleCode;
+  assignment?: { candidates: string[]; claimedBy?: string; claimedAt?: string } | null;
   redactedAt?: string;
 }
 
-/** Mirrors src/engine/definitions.ts::ProcessSummary — the newest-version summary GET /processes returns per process. `baseLocale` is process-level and stable across versions, so this is also where the instance screen resolves a step label's active locale. */
+/** Mirrors src/engine/definitions.ts::ProcessSummary — the newest-version summary GET /processes returns per process. `baseLocale` is process-level and stable across versions. */
 export interface ProcessSummary {
   processId: string;
   version: number;
