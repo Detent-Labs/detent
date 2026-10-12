@@ -213,7 +213,9 @@ describe("the builder reads back every literal it writes", () => {
 
   it("an integer operand takes a safe integer only", () => {
     expect(celLiteral(9007199254740991, "int")).toBe("9007199254740991");
-    expect(celLiteral(9007199254740993, "int")).toBeUndefined();
+    // Built from text: a numeric literal past the safe range is a lint error,
+    // and it rounds to the same number this produces.
+    expect(celLiteral(Number("9007199254740993"), "int")).toBeUndefined();
     expect(celLiteral(1e21, "int")).toBeUndefined();
   });
 

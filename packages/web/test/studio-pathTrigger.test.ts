@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import type { Path, Step } from "workflow-engine/schema";
 import type { DraftOf } from "../src/areas/studio/draft/types.js";
 import { pathWithTrigger, triggerForNewPath } from "../src/areas/studio/draft/createPath.js";
+import { replaceAt, updateAt } from "../src/areas/studio/draft/list-ops.js";
 
 /**
  * `studio-canvas`: "A new path takes the trigger its source step already
@@ -76,6 +77,28 @@ describe("pathWithTrigger", () => {
   });
 });
 
+describe("a trigger switch written back into the step's path list", () => {
+  const list = [
+    { id: "path_1", key: "approve", label: "Approve", to: "step_b", trigger: "automatic", priority: 5, guard: GUARD },
+    { id: "path_2", key: "reject", label: "Reject", to: "step_c", trigger: "automatic", priority: 9 },
+  ] as unknown as DraftPath[];
+
+  it("ends without the priority key and keeps the guard, through replaceAt", () => {
+    const next = replaceAt(list, 0, pathWithTrigger(list[0]!, "manual"));
+
+    expect("priority" in next[0]!).toBe(false);
+    expect(next[0]!.guard).toEqual(GUARD);
+    expect(next[0]!.trigger).toBe("manual");
+    expect(next[1]).toBe(list[1]!);
+  });
+
+  it("would keep priority through updateAt's merge, which is why the step page replaces", () => {
+    const merged = updateAt(list, 0, pathWithTrigger(list[0]!, "manual"));
+
+    expect(merged[0]!.priority).toBe(5);
+  });
+});
+
 describe("the two surfaces that create a path", () => {
   const read = (file: string) => readFileSync(new URL(`../src/areas/studio/${file}`, import.meta.url), "utf-8");
 
@@ -91,7 +114,8 @@ describe("the two surfaces that create a path", () => {
   it("switch a path's trigger through pathWithTrigger on the step page", () => {
     const source = read("panels/PathsPanel.tsx");
 
-    expect(source).toContain('pathWithTrigger(path, "manual")');
-    expect(source).toContain('pathWithTrigger(path, "automatic")');
+    expect(source).toContain('replacePath(index, pathWithTrigger(path, "manual"))');
+    expect(source).toContain('replacePath(index, pathWithTrigger(path, "automatic"))');
+    expect(source).toContain("onChange(replaceAt(list, index, next))");
   });
 });

@@ -32,7 +32,9 @@ describe("guardedManualPathNotes", () => {
       operands,
     );
 
-    expect(notes).toEqual([{ pathId: "path_1", label: "Approve", condition: "Amount (amount) is greater than 1000" }]);
+    expect(notes).toEqual([
+      { pathId: "path_1", label: "Approve", condition: "Amount (amount) is greater than 1000", raw: false },
+    ]);
   });
 
   it("gives an unguarded manual path no note", () => {
@@ -61,7 +63,17 @@ describe("guardedManualPathNotes", () => {
       operands,
     );
 
-    expect(notes).toEqual([{ pathId: "path_1", label: "Approve", condition: "data.amount >" }]);
+    expect(notes).toEqual([{ pathId: "path_1", label: "Approve", condition: "data.amount >", raw: true }]);
+  });
+
+  it("marks a guard that parses but reads as no row as CEL text", () => {
+    const src = "size(data.amount) > 3";
+    const notes = guardedManualPathNotes(
+      step([{ id: "path_1", key: "approve", label: "Approve", to: "step_b", trigger: "manual", guard: { lang: "cel", src } }]),
+      operands,
+    );
+
+    expect(notes).toEqual([{ pathId: "path_1", label: "Approve", condition: src, raw: true }]);
   });
 
   it("keeps the step's own path order", () => {

@@ -8,6 +8,8 @@ export interface GuardedPathNote {
   /** The guard in the canvas edge's words, or its CEL text where the builder
    * cannot read it. */
   condition: string;
+  /** `condition` is the guard's CEL text, which prints in the mono face. */
+  raw: boolean;
 }
 
 /**
@@ -21,6 +23,8 @@ export function guardedManualPathNotes(step: DraftOf<Step>, operands: Operand[])
   return (step.paths ?? []).flatMap((path) => {
     if (path.trigger !== "manual") return [];
     const condition = edgeGuardLabel(path, operands);
-    return condition === undefined ? [] : [{ pathId: path.id, label: path.label ?? "", condition }];
+    if (condition === undefined) return [];
+    // `guardEdgeLabel` hands back the source itself when no row reads.
+    return [{ pathId: path.id, label: path.label ?? "", condition, raw: condition === path.guard?.src }];
   });
 }

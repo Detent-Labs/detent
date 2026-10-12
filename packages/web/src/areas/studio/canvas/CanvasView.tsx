@@ -32,6 +32,7 @@ import { drawnBox, hiddenStepIds, anchorBoxFor, type StepGroup } from "./groups"
 import { computeFit, MIN_SCALE, MAX_SCALE, FIT_GUTTER, type Fit } from "./fit";
 import { resolveDropGesture } from "./dropGesture";
 import { inlineRenamePatch } from "./inlineRename";
+import { pathName } from "./pathName";
 import { nextFocus, entryFocus, type ArrowKey, type Focus } from "./traversal";
 import { nextStepKey } from "../panels/stepsPanelLogic.js";
 import { buildOperands, edgeGuardLabel } from "../panels/shared/conditionLogic";
@@ -1131,35 +1132,6 @@ export function CanvasView({
     return parts.join(", ");
   };
 
-  /** A path's accessible name. The guard is a slot rather than an appended
-   * segment: every path either carries one or says it carries none. The
-   * trigger slot takes the schema's own enum value, which this catalog leaves
-   * untranslated on purpose.
-   *
-   * `guardText` is the readable guard the edge label already draws, and the
-   * caller passes it because the operands it rests on resolve per step. A
-   * reader would otherwise hear the CEL source, `data.amount > 1000`, while
-   * the readable string sits beside it under `aria-hidden`. `edgeGuardLabel`
-   * returns the source itself where nothing resolves, so the fallback holds. */
-  const pathName = (
-    path: NonNullable<(typeof steps)[number]["paths"]>[number],
-    source: (typeof steps)[number],
-    guardText: string | undefined,
-  ) => {
-    const parts = [
-      t("canvas.pathLabel")
-        .replace("{label}", path.label ?? "")
-        .replace("{source}", stepLabel(source))
-        .replace("{target}", stepLabel(steps.find((s) => s.id === path.to)))
-        .replace("{trigger}", path.trigger ?? t("canvas.pathLabelNoTrigger"))
-        .replace("{guard}", guardText ?? t("canvas.pathLabelNoGuard")),
-    ];
-    if (path.trigger === "automatic" && path.priority !== undefined) {
-      parts.push(t("canvas.pathLabelPriority").replace("{priority}", String(path.priority)));
-    }
-    return parts.join(", ");
-  };
-
   /**
    * The canvas's own keyboard. It binds on the `<svg>` rather than on
    * `.canvas-wrap`, which would also catch the toolbar's buttons.
@@ -1561,7 +1533,7 @@ export function CanvasView({
                 data-step-id={path.id !== undefined ? step.id : undefined}
                 role="button"
                 tabIndex={focus.kind === "path" && focus.pathId === path.id ? 0 : -1}
-                aria-label={pathName(path, step, guardText)}
+                aria-label={pathName(path, stepLabel(step), stepLabel(steps.find((s) => s.id === path.to)), guardText)}
                 // The press takes the roving stop, entered through the source,
                 // which is the end Up and Down walk from. A path with no id
                 // takes none: nothing can name it.

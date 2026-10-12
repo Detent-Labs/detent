@@ -166,6 +166,20 @@ describe("The preview's line for a guarded manual path", () => {
       })
       .transform(html);
     expect(inside).toBe(1);
+    // Words, not CEL: no mono element in the line.
+    expect(html).not.toContain("<code");
+  });
+
+  it("prints a guard the builder cannot read as CEL in a code element, inside the one sentence", () => {
+    const html = render(
+      step({
+        paths: [
+          { id: "path_1", key: "approve", label: "Approve", to: "step_b", trigger: "manual", guard: { lang: "cel", src: "size(data.amount) > 3" } },
+        ],
+      }),
+    );
+
+    expect(html).toMatch(/<li[^>]*>Approve: shown only when <code[^>]*>size\(data\.amount\) &gt; 3<\/code><\/li>/);
   });
 
   it("prints no line for an unguarded manual path", () => {

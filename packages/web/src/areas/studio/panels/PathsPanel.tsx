@@ -6,7 +6,7 @@ import type { Path, Step, StepId } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
 import type { DraftField } from "../draft/fields";
 import { newPath, pathWithTrigger, triggerForNewPath } from "../draft/createPath";
-import { removeAt, updateAt } from "../draft/list-ops";
+import { removeAt, replaceAt, updateAt } from "../draft/list-ops";
 import { t } from "../catalog.js";
 import { ConditionInput } from "./shared/ConditionInput";
 import { IssueList } from "./shared/IssueList";
@@ -235,7 +235,7 @@ export function PathsPanel({
   const updatePath = (index: number, patch: Partial<DraftPath>) => onChange(updateAt(list, index, patch));
   // A whole-path replace, not a patch: `updateAt` merges, so it cannot drop
   // the `priority` key a switch to manual removes.
-  const replacePath = (index: number, next: DraftPath) => onChange(list.map((p, i) => (i === index ? next : p)));
+  const replacePath = (index: number, next: DraftPath) => onChange(replaceAt(list, index, next));
 
   return (
     <div {...stylex.props(styles.pathsPanel)}>

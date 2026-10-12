@@ -4,6 +4,7 @@ import type { Path } from "workflow-engine/schema";
 import type { DraftOf } from "../src/areas/studio/draft/types.js";
 import type { DraftField } from "../src/areas/studio/draft/fields.js";
 import { buildOperands, edgeGuardLabel } from "../src/areas/studio/panels/shared/conditionLogic.js";
+import { pathName } from "../src/areas/studio/canvas/pathName.js";
 
 /**
  * `studio-condition-builder`: "A path's guard shows a plain-English summary on
@@ -52,12 +53,35 @@ describe("edgeGuardLabel", () => {
   });
 });
 
+describe("a path's accessible name", () => {
+  // `studio-canvas`, "A path is a focusable control": the name carries the
+  // guard for either trigger, in the edge label's words.
+  it("carries a manual path's readable guard, and no priority", () => {
+    const manual = path({ trigger: "manual", guard: GUARD });
+    const name = pathName(manual, "Intake", "Approved", edgeGuardLabel(manual, operands));
+
+    expect(name).toBe("Approve, from Intake to Approved, manual, Amount (amount) is greater than 1000");
+  });
+
+  it("carries an automatic path's readable guard and its priority", () => {
+    const automatic = path({ trigger: "automatic", priority: 2, guard: GUARD });
+    const name = pathName(automatic, "Intake", "Approved", edgeGuardLabel(automatic, operands));
+
+    expect(name).toContain("Amount (amount) is greater than 1000");
+    expect(name).toContain("2");
+  });
+});
+
 describe("the canvas edge", () => {
   const source = readFileSync(new URL("../src/areas/studio/canvas/CanvasView.tsx", import.meta.url), "utf-8");
 
   it("draws the label edgeGuardLabel gives, with no trigger condition of its own", () => {
     expect(source).toContain("edgeGuardLabel(path, operands)");
     expect(source).not.toMatch(/automaticGuarded \? guardText/);
+  });
+
+  it("names the edge with the same readable guard it draws", () => {
+    expect(source).toMatch(/aria-label=\{pathName\(path, [^\n]*, guardText\)\}/);
   });
 
   it("keeps the priority badge and the else marker automatic-only", () => {
