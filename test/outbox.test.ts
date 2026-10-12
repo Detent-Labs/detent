@@ -960,10 +960,10 @@ test.skipIf(!DB)("a handler that outlives the lease is abandoned when the lease 
   }
 
   // The claim's RETURNING order is not the created_at order, so the counter, not the row, names the first handler.
-  // The first handler leaves at most 80 ms of the 200 ms lease; the second needs 150 ms, so only a deadline of
-  // the lease that remains abandons it. A fresh 200 ms per row would let it finish and deliver.
+  // The first handler leaves at most 160 ms of the 400 ms lease; the second needs 300 ms, so only a deadline of
+  // the lease that remains abandons it. A fresh 400 ms per row would let it finish and deliver.
   const ran: string[] = [];
-  const sleeps = [120, 150];
+  const sleeps = [240, 300];
   const seam: DeliverFn = async (row) => {
     const sleep = sleeps[ran.length]!;
     ran.push(row.instance_id);
@@ -971,7 +971,7 @@ test.skipIf(!DB)("a handler that outlives the lease is abandoned when the lease 
     return {};
   };
 
-  await drainOutbox(sql, reg, seam, 200);
+  await drainOutbox(sql, reg, seam, 400);
   expect(ran).toHaveLength(2);
   const [first] = await rows(ran[0]!);
   const [second] = await rows(ran[1]!);
