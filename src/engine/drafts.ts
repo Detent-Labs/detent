@@ -171,7 +171,7 @@ export async function getDraft(processId: ProcessId, db: SQL = sql): Promise<Dra
  * — a direct, idempotent append against the transaction handle already in
  * hand, rather than the gated function.
  */
-async function appendCreatorAsDeveloper(tx: SQL, processId: ProcessId, principal: string): Promise<void> {
+export async function appendCreatorAsDeveloper(tx: SQL, processId: ProcessId, principal: string): Promise<void> {
   await tx`
     INSERT INTO process_access_roles (process_id, kind, principal) VALUES (${processId}, 'developer', ${principal})
     ON CONFLICT DO NOTHING
