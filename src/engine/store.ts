@@ -181,6 +181,10 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   // (matching drainOutbox's own lock order); without this index that scan and lock
   // sequentially scan the whole table.
   await db`CREATE INDEX IF NOT EXISTS outbox_instance_idx ON outbox (instance_id)`;
+  // The admin outbox list (`listOutbox` and its keyset page) orders by
+  // (created_at DESC, idempotency_key DESC). Delivered rows are never deleted, so
+  // without this index every page sorts the whole table.
+  await db`CREATE INDEX IF NOT EXISTS outbox_created_idx ON outbox (created_at DESC, idempotency_key DESC)`;
   // Backfill is exact, not best-effort: the pre-existing in-flight-actions check
   // always skipped migration entirely while any pending/claimed row existed, so
   // every outbox row present before this column existed still belongs to an
