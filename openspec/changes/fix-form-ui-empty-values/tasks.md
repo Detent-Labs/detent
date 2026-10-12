@@ -2,10 +2,10 @@
 
 ## 1. Engine: a null clears, a blank is missing
 
-- [ ] 1.1 Add `applyDataPatch` to `src/engine/transition.ts`. A `null` patch value deletes its key. Use it in `commitManualTransition`.
-- [ ] 1.2 Give `validateSubmissionData` the option `allowClear`. A `null` key skips value checks and leaves the merged data. Only `submitAndTransition` sets it.
-- [ ] 1.3 Count `undefined`, `null` and `""` as missing in the required check.
-- [ ] 1.4 Cover each `runtime-api` delta scenario in `test/runtime-api.test.ts`. The tests fail on the old code.
+- [x] 1.1 Add `applyDataPatch` to `src/engine/transition.ts`. A `null` patch value deletes its key. Use it in `commitManualTransition`.
+- [x] 1.2 Give `validateSubmissionData` the option `allowClear`. A `null` key skips value checks and leaves the merged data. Only `submitAndTransition` sets it.
+- [x] 1.3 Count `undefined`, `null` and `""` as missing in the required check.
+- [x] 1.4 Cover each `runtime-api` delta scenario in `test/runtime-api.test.ts`. The tests fail on the old code.
 
 ## 2. form-ui: null, read-only switch, datetime and announcement
 
