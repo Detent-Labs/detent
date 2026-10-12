@@ -929,16 +929,22 @@ export class DefinitionHashMismatch extends Error {
  * A DB-backed `resolveBody` with a process-local cache. Published versions are
  * immutable, so a cached body is never stale and the cache only grows. Each
  * entry keeps the hash its body was verified against, so a `pinHash` check on
- * a cache hit costs one string comparison.
+ * a cache hit costs one string comparison. A test instance's snapshot (a
+ * negative version) is never cached: every read of it queries the store.
  */
 export function createDefinitionStore(
   db: SQL = sql,
 ): { resolveBody: ResolveBody; resolveLatestByContract: ResolveLatestByContract; resolveLatest: ResolveLatest } {
   const cache = new Map<string, { body: ProcessBody; hash: string }>();
-  /** Check a parsed body against its row's hash, then cache it with that hash. */
-  const verifyAndCache = (processId: string, version: number, body: ProcessBody, rowHash: string): ProcessBody => {
+  /** Check a parsed body against its row's hash. */
+  const verify = (processId: string, version: number, body: ProcessBody, rowHash: string): ProcessBody => {
     const actual = definitionHash(body);
     if (actual !== rowHash) throw new DefinitionHashMismatch(processId, version, rowHash, actual, "body");
+    return body;
+  };
+  /** Verify a published body, then cache it with the hash it was verified against. */
+  const verifyAndCache = (processId: string, version: number, body: ProcessBody, rowHash: string): ProcessBody => {
+    verify(processId, version, body, rowHash);
     cache.set(`${processId}:${version}`, { body, hash: rowHash });
     return body;
   };
@@ -956,14 +962,15 @@ export function createDefinitionStore(
     // (draft-test-instances), never a real published version — those are
     // always positive, assigned monotonically at publish. The two identifier
     // spaces are disjoint, so this branch never reads `definitions` and the
-    // branch below never reads `draft_snapshots`. A test-instance's frozen
-    // body is immutable once written, the same as a published version's, so
-    // it is cached under the same rule.
+    // branch below never reads `draft_snapshots`. Each test-instance run adds
+    // a new identifier, so a cache entry per run would grow until a restart:
+    // this branch verifies the hash and the pin on every read and caches
+    // nothing.
     if (version < 0) {
       const rows = (await db`SELECT body, definition_hash FROM draft_snapshots
         WHERE process_id = ${processId} AND version = ${version} LIMIT 1`) as { body: unknown; definition_hash: string }[];
       if (rows.length === 0) return undefined;
-      const body = verifyAndCache(processId, version, parseBody(rows[0].body), rows[0].definition_hash);
+      const body = verify(processId, version, parseBody(rows[0].body), rows[0].definition_hash);
       checkPin(processId, version, rows[0].definition_hash, pinHash);
       return body;
     }

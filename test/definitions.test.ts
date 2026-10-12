@@ -491,6 +491,15 @@ test.skipIf(!DB)("a resolved body is cached and served without re-reading the st
   expect(queries).toBe(1);
 });
 
+test.skipIf(!DB)("a published version stays cached after one read, even once its row is gone", async () => {
+  const v = await publishBody(PID, waitBody("sayYes"), reg, dataSourceReg);
+  const { resolveBody } = createDefinitionStore();
+  const first = await resolveBody(PID, v.version);
+  expect(first).toBeDefined();
+  await sql`DELETE FROM definitions WHERE process_id = ${PID} AND version = ${v.version}`;
+  expect(await resolveBody(PID, v.version)).toBe(first);
+});
+
 // --- end-to-end: the store-backed worker path is live -------------------------
 
 test.skipIf(!DB)("a parked wait-state re-resolves against the store-resolved body", async () => {

@@ -179,6 +179,25 @@ test.skipIf(!DB)("resolveBody throws for a draft_snapshots row whose body no lon
   await expect(Promise.resolve().then(() => resolveBody(PID, version))).rejects.toBeInstanceOf(DefinitionHashMismatch);
 });
 
+test.skipIf(!DB)("a negative version is read from the store on every call, never cached", async () => {
+  const body = simpleBody();
+  const version = await createDraftSnapshot(PID, definitionHash(body), body, sql);
+  const { resolveBody } = createDefinitionStore();
+  expect(await resolveBody(PID, version)).toEqual(body);
+  await sql`DELETE FROM draft_snapshots WHERE process_id = ${PID} AND version = ${version}`;
+  expect(await resolveBody(PID, version)).toBeUndefined();
+});
+
+test.skipIf(!DB)("resolveBody checks the pin of a negative version on every call", async () => {
+  const body = simpleBody();
+  const hash = definitionHash(body);
+  const version = await createDraftSnapshot(PID, hash, body, sql);
+  const { resolveBody } = createDefinitionStore();
+  expect(await resolveBody(PID, version, hash)).toEqual(body);
+  await expect(Promise.resolve().then(() => resolveBody(PID, version, "0".repeat(64)))).rejects.toBeInstanceOf(DefinitionHashMismatch);
+  expect(await resolveBody(PID, version, hash)).toEqual(body);
+});
+
 test.skipIf(!DB)("resolveBody for a real, positive version behaves identically to before this change", async () => {
   const v = await publishBody(PID, simpleBody(), reg, dataSourceReg);
   const { resolveBody } = createDefinitionStore();

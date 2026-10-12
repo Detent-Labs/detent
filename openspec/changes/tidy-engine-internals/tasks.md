@@ -9,7 +9,7 @@
 
 ## 2. Draft snapshots stay out of the cache (C-12)
 
-- [ ] 2.1 Delete the cache write in the `version < 0` branch of `resolveBody`. A new test resolves a negative version, deletes its `draft_snapshots` row, and expects `undefined` on the next call. Another test expects a published version to stay cached after one read. Verify with the full gated suite.
+- [x] 2.1 Delete the cache write in the `version < 0` branch of `resolveBody`. A new test resolves a negative version, deletes its `draft_snapshots` row, and expects `undefined` on the next call. Another test expects a published version to stay cached after one read. Verify with the full gated suite.
 
 ## 3. Fold the retrofits into the CREATE TABLE statements (B-15)
 
