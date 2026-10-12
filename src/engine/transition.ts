@@ -42,6 +42,7 @@ import {
   resolveStepAssignment,
   type AssignmentRegistry,
 } from "./registry.js";
+import { NotFoundError } from "../errors.js";
 import { armStepTimers, minFireAt, type TimerDrop } from "./duration.js";
 import { deleteInstanceDraft } from "./instance-drafts.js";
 import { buildGuardContext, evalGuard, SYSTEM_ACTOR, type Actor } from "../cel/eval.js";
@@ -1054,7 +1055,7 @@ export class UnknownDelegateError extends Error {
 
 async function loadForClaim(tx: SQL, instanceId: string): Promise<Instance> {
   const rows = (await tx`SELECT body FROM instances WHERE instance_id = ${instanceId} FOR UPDATE`) as { body: unknown }[];
-  if (rows.length === 0) throw new Error(`instance not found: ${instanceId}`);
+  if (rows.length === 0) throw new NotFoundError(`instance not found: ${instanceId}`);
   return instanceSchema.parse(typeof rows[0].body === "string" ? JSON.parse(rows[0].body) : rows[0].body);
 }
 

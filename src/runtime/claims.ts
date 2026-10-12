@@ -13,9 +13,30 @@ import {
 } from "../engine/transition.js";
 import type { Actor } from "../cel/eval.js";
 import { knownUserIds } from "../auth/users.js";
-import { InstanceNotRunningError } from "../errors.js";
+import { ADMIN_ROLE, AuthorizationError } from "../auth/authorize.js";
+import { InstanceNotRunningError, NotFoundError } from "../errors.js";
 import type { InstanceId } from "../schema/definition.js";
 import { toWriteResult, type InstanceWriteResult } from "./internal.js";
+
+/**
+ * Runs an engine claim call and converts its `NotFoundError` (an id that
+ * resolves to no instance) into what the actor may see. An `ADMIN_ROLE`
+ * holder may read any instance, so the not-found answer tells that caller
+ * nothing new. Everyone else gets one authorization refusal that names the
+ * actor and the id and nothing else, so it does not reveal whether the id
+ * exists. Claim keeps its status-before-authority order for an instance that
+ * exists: only the engine's load of the row raises `NotFoundError` here.
+ */
+async function refuseUnknownInstance<T>(instanceId: InstanceId, actor: Actor, call: () => Promise<T>): Promise<T> {
+  try {
+    return await call();
+  } catch (err) {
+    if (err instanceof NotFoundError && !actor.roles.includes(ADMIN_ROLE)) {
+      throw new AuthorizationError(`actor '${actor.id}' may not act on instance '${instanceId}'`);
+    }
+    throw err;
+  }
+}
 
 /**
  * Claim the current step of a running instance. Thin delegation to the engine
@@ -32,7 +53,7 @@ import { toWriteResult, type InstanceWriteResult } from "./internal.js";
  * read — exact, not a separate unlocked check racing it.
  */
 export async function claimStep(instanceId: InstanceId, actor: Actor, db: SQL = sql): Promise<InstanceWriteResult> {
-  const updated = await engineClaimStep(instanceId, actor, db);
+  const updated = await refuseUnknownInstance(instanceId, actor, () => engineClaimStep(instanceId, actor, db));
   if (updated.status !== "running") throw new InstanceNotRunningError(updated.instanceId, updated.status);
   return toWriteResult(updated);
 }
@@ -44,7 +65,7 @@ export async function claimStep(instanceId: InstanceId, actor: Actor, db: SQL = 
  * write result.
  */
 export async function releaseClaim(instanceId: InstanceId, actor: Actor, db: SQL = sql): Promise<InstanceWriteResult> {
-  const updated = await engineReleaseClaim(instanceId, actor, db);
+  const updated = await refuseUnknownInstance(instanceId, actor, () => engineReleaseClaim(instanceId, actor, db));
   if (updated.status !== "running") throw new InstanceNotRunningError(updated.instanceId, updated.status);
   return toWriteResult(updated);
 }
@@ -76,7 +97,7 @@ export async function delegateClaim(instanceId: InstanceId, actor: Actor, toActo
     const known = await knownUserIds([actor.id, target], db);
     if (known.has(actor.id) && !known.has(target)) throw new UnknownDelegateError(target);
   };
-  const updated = await engineDelegateClaim(instanceId, actor, toActorId, db, validateTarget);
+  const updated = await refuseUnknownInstance(instanceId, actor, () => engineDelegateClaim(instanceId, actor, toActorId, db, validateTarget));
   if (updated.status !== "running") throw new InstanceNotRunningError(updated.instanceId, updated.status);
   return toWriteResult(updated);
 }
