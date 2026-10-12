@@ -2472,8 +2472,8 @@ writes `true`.
 
 #### A removed row keeps its text to itself
 
-Type `abc` in a number row. Add a second row, then remove the first. Pass: the
-input of the second row is empty.
+Type `abc` in a number row. Add a second row and pick the same number field on
+it. Remove the first row. Pass: the input of the second row is empty.
 
 #### The in list
 

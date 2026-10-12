@@ -1615,6 +1615,33 @@ this section.
   2026-10-11 the owner ruled that body out of scope for
   `close-instance-reads-on-write-paths`. No follow-up change is planned yet.
 
+## Open from type-data-comparison-literals (needs its own OpenSpec change)
+
+The final review of `type-data-comparison-literals` (2026-10-12) found two gaps
+that come from how two owner rulings meet. The tags LITERAL-1 and LITERAL-2
+are local to this section.
+
+- **LITERAL-1: the form writes a literal that publish rejects for a field with
+  a format.** `TargetRef` carries the declared `type` and no `format`.
+  `literalType` reads `type` alone, but `typeMatches` also checks the format.
+  The studio form therefore writes `1.5` on an `integer` field. It writes free
+  text on a `date`, `datetime`, `email` or `person` field. Publish rejects each
+  with a located message that names the declared type, so the author meets the
+  error at publish and not in the row. A later change could carry `format`
+  into `TargetRef` and check it in the row. The report builder has no publish
+  gate, by owner ruling. A format mismatch there matches nothing and reports
+  nothing.
+
+- **LITERAL-2: the form and the publish check read different versions.** The
+  form takes the type from the newest published version that declares the
+  field. Publish accepts a literal when any target version that holds a
+  running instance admits it. Take a field declared `string` in version 1,
+  which has running instances, and `number` in version 2, which has none yet.
+  The form shows a number input and writes `5`. Publish rejects `5` with
+  `(declared: string)`. The form cannot write `"5"`, so the author uses the
+  JSON surface. Each half follows its own spec. A real fix needs an OpenSpec
+  change that decides which version set the form reads.
+
 ## Open from the studio-path-row-field-order final review (one OpenSpec change per screen)
 
 The final whole-branch review for `studio-path-row-field-order` (2026-09-17)
