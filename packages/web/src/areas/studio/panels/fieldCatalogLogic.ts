@@ -75,6 +75,43 @@ export function labelChangePatch(
   return derivedKey === undefined ? { label } : { label, key: derivedKey };
 }
 
+/** What happens to a key input: the author types, or blur or Enter commits. */
+export type KeyInputEvent = { kind: "type"; text: string } | { kind: "commit" };
+
+/**
+ * One step of a key input. It holds the typed text until a commit, and
+ * `typed` is `undefined` while the input shows the field's own key. Typing
+ * only changes the text, and a commit hands back the key to write: `write`
+ * is `undefined` when nothing was typed or the text equals `currentKey`. A
+ * commit clears the typed text, so the blur that follows an Enter writes
+ * nothing.
+ */
+export function keyInputStep(
+  typed: string | undefined,
+  event: KeyInputEvent,
+  currentKey: string,
+): { typed: string | undefined; write?: string } {
+  if (event.kind === "type") return { typed: event.text };
+  if (typed === undefined || typed === currentKey) return { typed: undefined };
+  return { typed: undefined, write: typed };
+}
+
+/**
+ * The sentence under a field's key input, or `undefined` for none. `readers`
+ * counts the CEL expressions that read `data.<key>` (`countKeyReaders`) and
+ * `published` says the draft's base version holds the field. Readers win over
+ * publication. An empty key has neither, so it shows nothing.
+ */
+export function keyNoticeFor(key: string, readers: number, published: boolean): string | undefined {
+  if (key === "") return undefined;
+  if (readers === 1) return t("fieldCatalog.keyReadByOne");
+  if (readers > 1) return t("fieldCatalog.keyReadByMany").replace("{count}", () => String(readers));
+  return published ? t("fieldCatalog.keyPublished") : undefined;
+}
+
+/** The id a field's key notice takes, so its key input names it in `aria-describedby`. */
+export const fieldKeyNoticeId = (fieldId: string) => `studio-field-key-notice-${fieldId}`;
+
 /**
  * Which of a field's two presentation keys a switch to `kind` must drop.
  *

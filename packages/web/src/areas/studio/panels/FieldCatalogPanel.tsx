@@ -1,4 +1,4 @@
-import { Fragment, useState, type ReactNode } from "react";
+import { Fragment, useMemo, useState, type ReactNode } from "react";
 import * as stylex from "@stylexjs/stylex";
 import {
   FIELD_KINDS,
@@ -28,10 +28,14 @@ import { fieldLocaleGaps, missingTranslationWarning, resolveDraftLocalizedText, 
 import { flattenDraftFields } from "../draft/fields";
 import { writeGroupKey, writeGroupLabel } from "../draft/view-group-sync.js";
 import { usePublishedFieldIds } from "../draft/publishedFields.js";
+import { countKeyReaders } from "../draft/key-readers.js";
 import {
   ADD_FIRST_FIELD_ID,
   droppedByKindChange,
+  fieldKeyNoticeId,
   fieldLabelInputId,
+  keyInputStep,
+  keyNoticeFor,
   labelChangePatch,
   moveControlId,
   moveTargetsFor,
@@ -380,38 +384,44 @@ interface FieldKeyInputProps {
   /** Fires on a group key's commit, which bypasses `onChange`. `FieldEditor`
    * counts a definition-half write there, so its usage rows still tint. */
   onWrite?: () => void;
+  /** The id of the notice below the input, while one shows. */
+  describedBy?: string;
 }
 
 /**
  * The key input, inside `FieldEditor`'s definition half, for the selected
- * field at any nesting depth. A non-group field writes its key through
- * `onChange` on every keystroke.
+ * field at any nesting depth. It holds the typed text locally and commits it
+ * on blur or Enter, in one write, so typing writes nothing and a half-typed
+ * key never reaches the draft. Text equal to the field's key writes nothing.
  *
- * A group's key is what view entries store, so changing it rewrites them
- * (`view-group-sync.ts::writeGroupKey`). The input holds the typed text
- * locally and commits it on blur or Enter, in one `mutate`, so ordinary
- * typing never hands the rewrite a half-typed key. `field.id` finds the
+ * A non-group field writes `{ key }` through `onChange` and leaves every CEL
+ * expression that reads the old key as it stands. A group's key is what view
+ * entries store, so changing it rewrites them
+ * (`view-group-sync.ts::writeGroupKey`) in one `mutate`. `field.id` finds the
  * group inside the mutate's draft clone, at any depth.
  */
-function FieldKeyInput({ field, mutate, onChange, onWrite }: FieldKeyInputProps) {
+function FieldKeyInput({ field, mutate, onChange, onWrite, describedBy }: FieldKeyInputProps) {
   const [typed, setTyped] = useState<string | undefined>(undefined);
   const groupId = field.type === "group" ? field.id : undefined;
-  if (groupId === undefined) {
-    return <input type="text" {...stylex.props(styles.studioMono)} value={field.key ?? ""} onChange={(e) => onChange({ key: e.target.value })} />;
-  }
   const commit = () => {
-    if (typed === undefined) return;
-    setTyped(undefined);
-    if (typed === (field.key ?? "")) return;
+    const step = keyInputStep(typed, { kind: "commit" }, field.key ?? "");
+    setTyped(step.typed);
+    const next = step.write;
+    if (next === undefined) return;
+    if (groupId === undefined) {
+      onChange({ key: next });
+      return;
+    }
     onWrite?.();
-    mutate((d) => writeGroupKey(d, groupId, typed));
+    mutate((d) => writeGroupKey(d, groupId, next));
   };
   return (
     <input
       type="text"
       {...stylex.props(styles.studioMono)}
       value={typed ?? field.key ?? ""}
-      onChange={(e) => setTyped(e.target.value)}
+      aria-describedby={describedBy}
+      onChange={(e) => setTyped(keyInputStep(typed, { kind: "type", text: e.target.value }, field.key ?? "").typed)}
       onBlur={commit}
       onKeyDown={(e) => {
         if (e.key === "Enter") commit();
@@ -634,6 +644,11 @@ function FieldEditor({
 }: FieldEditorProps) {
   const { draft, mutate, contentLocale, validation } = useDraft();
   const published = usePublishedFieldIds();
+  // A group has no `data` entry, so no expression reads its key as one.
+  const keyReaders = useMemo(
+    () => (field.type === "group" ? 0 : countKeyReaders(draft, field.key ?? "")),
+    [draft, field.type, field.key],
+  );
 
   // How many times the definition half has been written since this field was
   // selected. It rides in the usage rows' React key, so each write remounts
@@ -711,6 +726,10 @@ function FieldEditor({
     }
     onChange(labelChangePatch(draft, field, label, baseLocale, published));
   };
+  const keyNotice =
+    field.type === "group"
+      ? undefined
+      : keyNoticeFor(field.key ?? "", keyReaders, fieldId !== undefined && published?.has(fieldId) === true);
   const usage = fieldId ? fieldUsage(draft, fieldId, contentLocale, baseLocale) : [];
   const visibleState = fieldId ? fieldVisibleOverrides(draft, fieldId) : ({ kind: "none" } as const);
   const requiredState = fieldId ? fieldRequiredOverrides(draft, fieldId) : ({ kind: "none" } as const);
@@ -800,8 +819,19 @@ function FieldEditor({
             )}
             <label {...stylex.props(styles.fieldRowLabel)}>
               {t("fieldCatalog.keyLabel")}
-              <FieldKeyInput field={field} mutate={mutate} onChange={onChange} onWrite={() => setDefinitionWrites((n) => n + 1)} />
+              <FieldKeyInput
+                field={field}
+                mutate={mutate}
+                onChange={onChange}
+                onWrite={() => setDefinitionWrites((n) => n + 1)}
+                describedBy={keyNotice === undefined || fieldId === undefined ? undefined : fieldKeyNoticeId(fieldId)}
+              />
             </label>
+            {keyNotice !== undefined && fieldId !== undefined && (
+              <p id={fieldKeyNoticeId(fieldId)} {...stylex.props(styles.studioWarning)}>
+                {keyNotice}
+              </p>
+            )}
             {fieldId !== undefined && (
               <MoveFieldControl
                 fieldId={fieldId}

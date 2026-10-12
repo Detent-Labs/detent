@@ -10,7 +10,7 @@ const EMPTY: ReadonlySet<string> = new Set();
  * while the base version loads and after its fetch failed, and the lock reads
  * `undefined` as locked. A draft with no base version holds an empty set.
  */
-const PublishedFieldIdsContext = createContext<ReadonlySet<string> | undefined>(EMPTY);
+export const PublishedFieldIdsContext = createContext<ReadonlySet<string> | undefined>(EMPTY);
 
 export type FetchVersionBody = (processId: string, version: number, token: string) => Promise<unknown>;
 
