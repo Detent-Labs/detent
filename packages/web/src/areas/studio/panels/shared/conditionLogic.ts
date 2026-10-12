@@ -251,10 +251,21 @@ export function memberPath(node: CelNode): string | undefined {
   return base === undefined ? undefined : `${base}.${name}`;
 }
 
-/** Exported for `ruleLogic.ts`'s reuse. */
+/**
+ * The parser returns an integer literal as a `bigint` and a negative literal
+ * as a `-_` node over the positive one. A `bigint` outside the safe range
+ * stays unread, so the comparison falls to a raw row instead of rounding.
+ * Exported for `ruleLogic.ts`'s reuse.
+ */
 export function literalOf(node: CelNode): string | number | boolean | undefined {
+  if (node.op === "-_" && isCelNode(node.args)) {
+    const inner = literalOf(node.args);
+    // `0 - inner` keeps `-0.0` at 0, which `-inner` would turn into -0.
+    return typeof inner === "number" ? 0 - inner : undefined;
+  }
   if (node.op !== "value") return undefined;
   const v = node.args;
+  if (typeof v === "bigint") return Number.isSafeInteger(Number(v)) ? Number(v) : undefined;
   return typeof v === "string" || typeof v === "number" || typeof v === "boolean" ? v : undefined;
 }
 
@@ -336,18 +347,23 @@ function celString(v: string): string {
  * A field carrying `format: "integer"` types as CEL `int` instead, and the
  * two do not mix: `data.anzahl > 3.0` fails the check against one. So an
  * `int` operand takes a bare integer, and a value with a decimal part is no
- * literal for it at all.
+ * literal for it at all. The reader takes only a safe integer back, so the
+ * writer offers no other.
+ *
+ * JavaScript prints a magnitude from 1e21 up with an exponent (`1e+21`), and
+ * `1e+21.0` is no CEL. That text is already a `double`, so it stays as it is.
  */
 export function celLiteral(value: string | number | boolean, celTypeName: string): string | undefined {
   if (celTypeName === "bool") return value === true || value === "true" ? "true" : "false";
   if (celTypeName === "int") {
     const n = typeof value === "number" ? value : Number(value);
-    return Number.isInteger(n) ? String(n) : undefined;
+    return Number.isSafeInteger(n) ? String(n) : undefined;
   }
   if (celTypeName === "double") {
     const n = typeof value === "number" ? value : Number(value);
     if (!Number.isFinite(n)) return undefined;
-    return Number.isInteger(n) ? `${n}.0` : String(n);
+    const text = String(n);
+    return Number.isInteger(n) && !text.includes("e") ? `${text}.0` : text;
   }
   return celString(String(value));
 }
