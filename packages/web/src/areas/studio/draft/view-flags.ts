@@ -122,9 +122,24 @@ export function writtenFieldCounts(body: Draft): WrittenAccessor {
     }
   }
 
+  // One cache per accessor, so it lives and dies with the draft this call read.
+  // The key leads with the digits of `ownStepIndex`, so a field id containing
+  // ":" cannot collide with another pair.
+  const cache = new Map<string, number>();
+
   return (fieldId: string, ownStepIndex: number): number => {
     if (contractWritten.has(fieldId) || columnMappingWritten.has(fieldId)) return Infinity;
 
+    const cacheKey = `${ownStepIndex}:${fieldId}`;
+    const cached = cache.get(cacheKey);
+    if (cached !== undefined) return cached;
+
+    const result = countWritten(fieldId, ownStepIndex);
+    cache.set(cacheKey, result);
+    return result;
+  };
+
+  function countWritten(fieldId: string, ownStepIndex: number): number {
     const ownStepId = steps[ownStepIndex]?.id;
     let editableCount = 0;
     let structural = false;
@@ -163,7 +178,7 @@ export function writtenFieldCounts(body: Draft): WrittenAccessor {
     }
 
     return structural ? Infinity : editableCount;
-  };
+  }
 }
 
 /** `writtenFieldCounts`'s accessor, collapsed to a per-step boolean:
