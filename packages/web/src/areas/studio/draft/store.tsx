@@ -113,10 +113,12 @@ export function DraftProvider({ children, initial, token }: { children: ReactNod
       { listProcesses, getVersionBody },
       () => {
         const currentSites = collectChainingActionSites(draftRef.current);
-        setLoadedChainingTargets(syncLoadedTargets(currentSites, chainingBodyCache.current));
+        setLoadedChainingTargets((prev) => syncLoadedTargets(currentSites, chainingBodyCache.current, prev));
       },
     );
-    setLoadedChainingTargets(syncLoadedTargets(sites, chainingBodyCache.current));
+    // `prev` back when nothing changed: a fresh `{}` per keystroke would
+    // rerun the validation memo below in a second render.
+    setLoadedChainingTargets((prev) => syncLoadedTargets(sites, chainingBodyCache.current, prev));
   }, [draft, token]);
 
   const usedLocales = useMemo(() => collectUsedLocales(draft), [draft]);

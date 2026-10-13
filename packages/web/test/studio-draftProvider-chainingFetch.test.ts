@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { readFileSync } from "node:fs";
 import type { ProcessBody } from "workflow-engine/schema";
 import { runValidation } from "../src/areas/studio/draft/validation.js";
 import {
@@ -120,6 +121,58 @@ describe("chaining-target fetch dedup (task 6.22)", () => {
 
     expect(bodyCache.has("proc_missing")).toBe(false);
     expect(syncLoadedTargets(sites, bodyCache)).toEqual({});
+  });
+});
+
+// `DraftProvider` syncs the targets on every draft change, and its validation
+// memo depends on the mapping's identity. An unchanged mapping keeps `prev`.
+describe("syncLoadedTargets keeps an unchanged mapping's identity", () => {
+  const body = targetBody(["field_x"]);
+  const other = targetBody(["field_y"]);
+  const bodyCache = new Map<string, ProcessBody>([
+    ["proc_a", body],
+    ["proc_b", other],
+  ]);
+  const one = [{ id: "action_a" as never, processId: "proc_a" }];
+  const two = [...one, { id: "action_b" as never, processId: "proc_b" }];
+
+  it("returns prev when the same ids map to the same bodies", () => {
+    const prev = syncLoadedTargets(one, bodyCache);
+    expect(syncLoadedTargets(one, bodyCache, prev)).toBe(prev);
+  });
+
+  it("returns prev for an empty mapping, the draft with no chaining site", () => {
+    const prev = syncLoadedTargets([], bodyCache);
+    expect(syncLoadedTargets([], bodyCache, prev)).toBe(prev);
+  });
+
+  it("returns a new mapping when a target is added", () => {
+    const prev = syncLoadedTargets(one, bodyCache);
+    const next = syncLoadedTargets(two, bodyCache, prev);
+    expect(next).not.toBe(prev);
+    expect(Object.keys(next).sort()).toEqual(["action_a", "action_b"]);
+  });
+
+  it("returns a new mapping when a target is removed", () => {
+    const prev = syncLoadedTargets(two, bodyCache);
+    const next = syncLoadedTargets(one, bodyCache, prev);
+    expect(next).not.toBe(prev);
+    expect(Object.keys(next)).toEqual(["action_a"]);
+  });
+
+  it("returns a new mapping when a site's body changes", () => {
+    const prev = syncLoadedTargets(one, bodyCache);
+    const retargeted = [{ id: "action_a" as never, processId: "proc_b" }];
+    const next = syncLoadedTargets(retargeted, bodyCache, prev);
+    expect(next).not.toBe(prev);
+    expect(next["action_a" as never]).toBe(other);
+  });
+
+  it("DraftProvider hands its previous state to every sync", () => {
+    const store = readFileSync(new URL("../src/areas/studio/draft/store.tsx", import.meta.url), "utf8");
+    const calls = store.match(/syncLoadedTargets\([^)]*\)/g) ?? [];
+    expect(calls.length).toBe(2);
+    for (const call of calls) expect(call).toContain(", prev)");
   });
 });
 

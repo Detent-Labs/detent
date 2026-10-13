@@ -1,7 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
-import { DraftProvider } from "../src/areas/studio/draft/store.js";
 import { FieldMatrixGrid } from "../src/areas/studio/panels/FieldMatrixGrid.js";
 import type { Draft } from "../src/areas/studio/draft/types.js";
 
@@ -47,9 +46,7 @@ const TECHNICAL: Draft = {
 
 const render = (draft: Draft, hideInert = false) =>
   renderToStaticMarkup(
-    <DraftProvider initial={draft} token="token">
-      <FieldMatrixGrid hideInert={hideInert} showBulkBadges={true} />
-    </DraftProvider>,
+    <FieldMatrixGrid draft={draft} mutate={() => {}} contentLocale="en" hideInert={hideInert} showBulkBadges={true} />,
   );
 
 describe("the field matrix's empty state", () => {

@@ -68,7 +68,7 @@ function renderHeader(findings: PublishFinding[]): string {
         lastSavedAt={undefined}
         publishResult={publishResult}
         conflict={false}
-        actions={{ saving: false, publishing: false, error: null, pendingDialog: null, resolveDialog: () => {}, save: () => {}, discard: () => {}, publish: () => {}, reload: () => {} }}
+        actions={{ saving: false, publishing: false, error: null, pendingDialog: null, resolveDialog: () => {}, save: () => {}, discard: () => {}, publish: () => {}, reload: () => {}, reportError: () => {} }}
         canPublish={true}
         baseVersion={null}
         validation={validation}

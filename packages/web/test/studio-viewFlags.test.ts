@@ -522,3 +522,78 @@ describe("checkUnwrittenTechnicalFields", () => {
     expect(checkUnwrittenTechnicalFields(b as Draft)).toHaveLength(0);
   });
 });
+
+describe("writtenFieldCounts: the per-accessor cache", () => {
+  /** chainBody() with an editable `field_vendor` entry on step_a, so the
+   * count for step_c (index 2) is 1: step_a dominates step_c. */
+  const withWriter = (): Draft => withViewField(chainBody(), "step_a", { ref: "field_vendor" });
+
+  /** Wraps the draft's `steps` array so each `entries()` call, the walk the
+   * accessor makes once per uncached pair, bumps `walks.count`. */
+  function countWalks(body: Draft): { body: Draft; walks: { count: number } } {
+    const walks = { count: 0 };
+    const steps = body.workflow!.steps!;
+    const counted = new Proxy(steps, {
+      get(target, prop, receiver) {
+        if (prop === "entries") walks.count += 1;
+        return Reflect.get(target, prop, receiver);
+      },
+    });
+    return { body: { ...body, workflow: { ...body.workflow!, steps: counted } }, walks };
+  }
+
+  it("returns the same number on every repeated call and walks the steps once per pair", () => {
+    const { body, walks } = countWalks(withWriter());
+    const written = writtenFieldCounts(body);
+    walks.count = 0;
+
+    const first = written("field_vendor", 2);
+    const repeats = [written("field_vendor", 2), written("field_vendor", 2), written("field_vendor", 2)];
+
+    expect(first).toBe(1);
+    expect(repeats).toEqual([1, 1, 1]);
+    expect(walks.count).toBe(1);
+
+    // A different pair is a different cache entry: one more walk, not zero.
+    expect(written("field_vendor", 0)).toBe(0);
+    expect(written("field_vendor", 0)).toBe(0);
+    expect(walks.count).toBe(2);
+  });
+
+  it("caches a zero result as well as a positive one", () => {
+    const { body, walks } = countWalks(chainBody());
+    const written = writtenFieldCounts(body);
+    walks.count = 0;
+    expect(written("field_vendor", 2)).toBe(0);
+    expect(written("field_vendor", 2)).toBe(0);
+    expect(walks.count).toBe(1);
+  });
+
+  it("matches a fresh accessor's answer for every pair", () => {
+    const body = withWriter();
+    const shared = writtenFieldCounts(body);
+    for (const fieldId of ["field_vendor", "field_nested", "field_missing"]) {
+      for (const stepIndex of [0, 1, 2, 7]) {
+        shared(fieldId, stepIndex);
+        expect(shared(fieldId, stepIndex)).toBe(writtenFieldCounts(body)(fieldId, stepIndex));
+      }
+    }
+  });
+
+  it("shares nothing between the accessors of two drafts", () => {
+    const withEntry = writtenFieldCounts(withWriter());
+    const without = writtenFieldCounts(chainBody());
+
+    // The same (fieldId, stepIndex) pair, asked of both: a module-level
+    // cache would hand the second accessor the first one's number.
+    expect(withEntry("field_vendor", 2)).toBe(1);
+    expect(without("field_vendor", 2)).toBe(0);
+    expect(withEntry("field_vendor", 2)).toBe(1);
+
+    // And the other way round, from a cold cache.
+    const without2 = writtenFieldCounts(chainBody());
+    const withEntry2 = writtenFieldCounts(withWriter());
+    expect(without2("field_vendor", 2)).toBe(0);
+    expect(withEntry2("field_vendor", 2)).toBe(1);
+  });
+});

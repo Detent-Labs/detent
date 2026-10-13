@@ -20,6 +20,7 @@ export const en = {
   "app.draftIncomplete":
     "Draft is not yet structurally valid — CEL, registry, duration, and cross-process checks are held back until it is (see the Zod issues below).",
   "app.leaveDraftConfirm": "Leave this draft? Unsaved edits will be lost.",
+  "app.screenLoading": "Loading the screen…",
   "app.processLegend": "Process",
 
   "draftToolbar.save": "Save",
@@ -313,6 +314,7 @@ export const en = {
   "formEditor.heading": "Form",
   "formEditor.back": "← Back to the process",
   "formEditor.stepNotFound": "This step no longer exists in the draft.",
+  "formEditor.loadFailed": "The form editor could not load. Your draft is unchanged: go back, save it, then reload the page.",
   "formEditor.navigateAwayKeepsChanges": "Every change is already in the draft. Save, Discard and Publish stay on the toolbar.",
   "formEditor.paletteLabel": "Catalog fields not on this form",
   "formEditor.paletteHeading": "Available fields",

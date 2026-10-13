@@ -71,6 +71,10 @@ export interface DraftToolbarActions {
   discard: () => void;
   publish: () => void;
   reload: () => void;
+  /** Routes an error the screen caught elsewhere through the same 401 rule
+   * and the same `error` banner. The Arrange command reports a layout library
+   * that failed to load through it. */
+  reportError: (err: unknown) => void;
 }
 
 /**
@@ -249,5 +253,6 @@ export function useDraftToolbarActions({
     discard,
     publish,
     reload: () => void reload(),
+    reportError: fail,
   };
 }

@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent } from "react";
+import { memo, useEffect, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
-import { useDraft } from "../draft/store";
+import type { Mutate } from "../draft/store";
+import type { Draft } from "../draft/types";
 import { t } from "../catalog.js";
 import { resolveDraftLocalizedText } from "../draft/localized-text";
 import { effectiveFlag, isFlagGated, setFlag, writtenFieldCounts, type FlagKey, type WrittenAccessor } from "../draft/view-flags";
@@ -477,6 +478,11 @@ function BulkBadges({
 }
 
 interface Props {
+  /** The draft the grid draws, as its wrapper reads it from the context. */
+  draft: Draft;
+  /** The draft writer, from the same context value as `draft`. */
+  mutate: Mutate;
+  contentLocale: string;
   /** Drops a step with no `view` from the grid's columns, per the panels
    * screen's "Hide inert columns" toggle. */
   hideInert?: boolean;
@@ -501,9 +507,22 @@ interface Props {
  * This component carries no toolbar, legend or count line — those belong to
  * `FieldMatrixPanel`, the panels-screen wrapper that renders this grid
  * inside itself (design.md decision 6).
+ *
+ * A `memo` component that reads no context: it re-renders only on its own
+ * state or a changed prop. The draft arrives as props on purpose. React 19
+ * propagates a context change lazily: when `FieldMatrixPanel` bails out under
+ * `HeldDraft`, React walks up past `HeldDraft`'s unchanged provider to the
+ * changed outer one. It then marks the first `DraftContext` reader below the
+ * panel for a render, with no value comparison. A grid that read the draft
+ * context therefore ran on every keystroke while hidden.
  */
-export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: Props) {
-  const { draft, mutate, contentLocale } = useDraft();
+export const FieldMatrixGrid = memo(function FieldMatrixGrid({
+  draft,
+  mutate,
+  contentLocale,
+  hideInert = false,
+  showBulkBadges = false,
+}: Props) {
   const baseLocale = draft.baseLocale ?? "en";
   const rows = useMemo(() => matrixRows(draft.fields), [draft.fields]);
   const allSteps = draft.workflow?.steps ?? [];
@@ -845,4 +864,4 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
       </div>
     </>
   );
-}
+});

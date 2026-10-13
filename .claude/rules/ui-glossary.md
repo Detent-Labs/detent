@@ -55,6 +55,10 @@ eleven bodies stay mounted at once, and `hidden` shows one. A body keeps its own
 half-typed state across a switch: an outcome name, a selected field.
 Unmounting on every switch would lose that state.
 
+A hidden field matrix and a hidden change list draw the last draft they drew
+while visible. The commit that reveals the tab draws the live draft. Typing on
+the Fields tab therefore costs the hidden matrix nothing.
+
 Save, Discard draft and Publish stand in the header bar's trailing cluster,
 ahead of the `⋮` menu. `panels/ProcessHeaderBar.tsx` renders them there. The
 *draft toolbar* retired: `DraftToolbar.tsx` no longer mounts, and only its

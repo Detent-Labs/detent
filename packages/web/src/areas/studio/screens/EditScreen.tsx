@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { Component, lazy, Suspense, useCallback, type ErrorInfo, useEffect, useMemo, useState, type ReactNode } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { layout, colors, focus, fonts, space } from "form-ui/tokens.stylex";
 import { DraftProvider, useDraft } from "../draft/store.js";
@@ -17,6 +17,7 @@ import { FieldsTab, DataSourcesTab } from "../panels/EntityTabs.js";
 import { ContractPanel } from "../panels/ContractPanel.js";
 import { FieldMatrixPanel } from "../panels/FieldMatrixPanel.js";
 import { ChangesView } from "../panels/ChangesView.js";
+import { HeldDraft } from "../draft/held-while-hidden.js";
 import { PathsView } from "../panels/PathsView.js";
 import { FormsTab } from "../panels/FormsTab.js";
 import { AccessPanel } from "../panels/AccessPanel.js";
@@ -54,7 +55,6 @@ import { moveTo } from "../draft/list-ops.js";
 import { JsonView } from "../panels/JsonView.js";
 import { describeCaughtError } from "../errors.js";
 import { useFail } from "../../../shell/useFail.js";
-import { FormEditorScreen } from "./FormEditorScreen.js";
 import { scrollKeyboardFocusIntoView } from "../focusScroll.js";
 import { resolveDraftLocalizedText } from "../draft/localized-text";
 import type { NavigateOptions } from "../../../shell/routing.js";
@@ -66,6 +66,48 @@ const NARROW = "@media (max-width: 64rem)";
 /** The Canvas tab's body: what a canvas bar drop resolves the live canvas
  * through, and what a press measures its centre against. */
 const CANVAS_BODY_ID = "studio-canvas-body";
+
+/** The form editor loads as its own chunk when a step's form first opens, so
+ * the process surface downloads none of it (`studio-app`). */
+const FormEditorScreen = lazy(() => import("./FormEditorScreen.js").then((m) => ({ default: m.FormEditorScreen })));
+
+/**
+ * Catches a failed form editor chunk inside the process surface. `lazy`
+ * rethrows the rejected import during render. Without this boundary the
+ * shell's own boundary replaces the whole area, unmounting `DraftProvider`
+ * with the unsaved draft in it. The fallback keeps the draft and offers the
+ * form editor's own way back.
+ *
+ * ponytail: no retry. `lazy` caches the rejected import, so reopening the form
+ * editor shows this banner again until the page reloads. A redeploy deletes
+ * the old chunk, so a retry would fail there anyway. Ceiling: a transient
+ * network drop also needs a reload, after a save. Upgrade: hold the `lazy`
+ * factory in state and mint a fresh one on a Retry control.
+ */
+export class FormEditorBoundary extends Component<{ onBack: () => void; children: ReactNode }, { failed: boolean }> {
+  override state = { failed: false };
+
+  static getDerivedStateFromError(): { failed: boolean } {
+    return { failed: true };
+  }
+
+  override componentDidCatch(error: Error, info: ErrorInfo): void {
+    console.error("studio: the form editor failed to load", error, info.componentStack);
+  }
+
+  override render(): ReactNode {
+    if (!this.state.failed) return this.props.children;
+    return (
+      <div {...stylex.props(styles.errorBanner, styles.errorBannerInEditScreen)} role="alert">
+        <span {...stylex.props(styles.errorBannerStamp)}>{t("error.failed")}</span>
+        <span {...stylex.props(styles.errorBannerMessage)}>{t("formEditor.loadFailed")}</span>
+        <button type="button" className="btn btn-secondary" onClick={this.props.onBack}>
+          {t("formEditor.back")}
+        </button>
+      </div>
+    );
+  }
+}
 
 const styles = stylex.create({
   studioScreen: {
@@ -126,6 +168,14 @@ const styles = stylex.create({
     marginBlockEnd: space.s3,
     marginInline: 0,
     color: colors.refusal,
+  },
+  // The waiting line while the form editor's chunk loads: one muted line where
+  // the editor will stand, the same line `ChangesView` prints while it reads.
+  screenLoading: {
+    marginBlock: 0,
+    color: colors.textMuted,
+    paddingBlock: space.s4,
+    paddingInline: 0,
   },
   // Every OTHER `.studio-error-banner` in this file renders as a direct
   // child of `.studio-edit-screen`'s own flex column, which used to zero a
@@ -503,9 +553,18 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
   // modal dialog instead (studio-publish, studio-app). An arrange is a local
   // layout edit the author can undo by moving a step back, and converting it
   // is the named follow-up, not this change.
-  const onArrange = () => {
+  // The confirmation runs before the layout library loads. A library that
+  // fails to load leaves the layout as it was and reports through the header
+  // bar's error banner (`studio-canvas`).
+  const onArrange = async () => {
     if (hasHandPlacedStep(steps as LayoutStep[], saveState.layout) && !confirm(t("canvas.arrangeConfirm"))) return;
-    const arranged = arrangeSteps(steps as LayoutStep[], groups, draft.workflow?.initialStep, saveState.layout);
+    let arranged: Record<string, Point>;
+    try {
+      arranged = await arrangeSteps(steps as LayoutStep[], groups, draft.workflow?.initialStep, saveState.layout);
+    } catch (e) {
+      actions.reportError(e);
+      return;
+    }
     setSaveState((s) => {
       const next: Record<string, unknown> = { ...s.layout, waypoints: {} };
       for (const [stepId, point] of Object.entries(arranged)) next[stepId] = snapToGrid(point);
@@ -937,12 +996,18 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
         {formStepId === undefined && stash && <RestoreNotice onRestore={restoreStash} onDiscard={discardStash} disabled={requestRunning} />}
         {formStepId !== undefined ? (
           formStep ? (
-            <FormEditorScreen
-              step={formStep}
-              index={formStepIndex}
-              fields={fields}
-              onBack={() => goToTab(formEditorReturnTab(formOrigin))}
-            />
+            // Local boundaries: the shell's own would replace the whole area,
+            // draft included, while the chunk loads or when it fails to load.
+            <FormEditorBoundary onBack={() => goToTab(formEditorReturnTab(formOrigin))}>
+              <Suspense fallback={<p {...stylex.props(styles.screenLoading)}>{t("app.screenLoading")}</p>}>
+                <FormEditorScreen
+                  step={formStep}
+                  index={formStepIndex}
+                  fields={fields}
+                  onBack={() => goToTab(formEditorReturnTab(formOrigin))}
+                />
+              </Suspense>
+            </FormEditorBoundary>
           ) : (
             <div {...stylex.props(styles.errorBanner, styles.errorBannerInEditScreen)} role="alert">
               <span {...stylex.props(styles.errorBannerStamp)}>{t("error.failed")}</span>
@@ -1057,7 +1122,15 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
                 }}
               />,
             )}
-            {tabPanel("matrix", <FieldMatrixPanel />)}
+            {/* The matrix derives from the whole draft. While hidden it reads
+                the draft it last drew, so typing on another tab skips it
+                (`studio-app`). */}
+            {tabPanel(
+              "matrix",
+              <HeldDraft visible={!jsonOpen && openTab === "matrix"}>
+                <FieldMatrixPanel />
+              </HeldDraft>,
+            )}
             {tabPanel("contract", <ContractPanel />)}
             {tabPanel(
               "changes",
@@ -1068,6 +1141,7 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
                 baseVersion={changesBaseVersion}
                 contentLocale={contentLocale}
                 onCount={onChangesCount}
+                visible={!jsonOpen && openTab === "changes"}
                 onOpenRow={(row) => {
                   // ponytail: the open command opens the owning tab and selects
                   // nothing inside it, so the author finds the entity there by

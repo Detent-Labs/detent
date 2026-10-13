@@ -1702,12 +1702,6 @@ of `5f41cd8a`. Each fix change deletes its own entries in the commit that
 archives it, and `sweep-docs-drift-2026-10` re-points the line citations of
 other entries. C-4 merges D-2, and C-6 merges F-6.
 
-- **`cut-studio-render-cost` (E2-11, E1-6, K-1; medium)**: Hidden tabs
-  recompute on every keystroke, the canvas reparses every guard on each
-  pointer move, and the studio chunk exceeds the 500 kB warning threshold of
-  Vite. Anchors: `packages/web/src/areas/studio/panels/FieldMatrixGrid.tsx`,
-  `packages/web/src/areas/studio/canvas/CanvasView.tsx`,
-  `packages/web/vite.config.ts`.
 - **`fix-studio-screen-races` (E1-8, E1-9, E1-10; low)**: Late responses
   overwrite a newer selection in the player and in Tools, the migration plan
   drops a duplicate mapping without a message, and "Create" on the Templates
@@ -1807,6 +1801,27 @@ change's scope. The CLAIMVIEW tag is local to this section.
   `formIsReadonly` ignores claim state on purpose. The `end-user-app` spec
   makes field editability independent of claim state, and finding F-8 kept
   that rule. Covering the case needs a spec change and a third note cause.
+
+## Open from cut-studio-render-cost (needs its own OpenSpec change)
+
+The change cut the Fields-tab keystroke from 17.0 to 19.5 ms down to 6.6 to
+9.3 ms. The owner's budget was 4 ms, and it is unmet. The RENDER tag is local
+to this section.
+
+- **RENDER-1: validation runs synchronously on every keystroke.** It costs
+  about 3.4 ms of the sync commit, in `DraftProvider`'s `useMemo`. The budget
+  cannot hold while that stays. Deferring it with `useDeferredValue` lets the
+  check results, the Checks badge and the publish gate read a draft one render
+  old. A change needs a `studio-app` delta and a test that Publish never reads
+  stale results.
+- **RENDER-2: two more bodies could take the same hold.** `ContractPanel`
+  takes no props and `PathsView` takes `draft` as a prop. Neither has a
+  measured cost. Profile them before adding the hold.
+- **RENDER-3: the new load paths read thin.** The Arrange failure banner says
+  "Something went wrong" and offers no retry. Arrange shows nothing while its
+  library loads. The loading line has no `role="status"`, names no screen, and
+  the form editor's loading line sits 16 px left of the editor. All five are polish
+  from the `/impeccable audit`, and none loses work.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 

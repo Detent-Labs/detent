@@ -134,15 +134,24 @@ export function resolveChainingTargets(
  * "loadedChainingTargets and chainingSiteStatus key by the action's own id"
  * decision. A site whose `processId` has no `bodyCache` entry yet is simply
  * omitted, reading not-checked.
+ *
+ * Given `prev`, it returns `prev` itself when the fresh mapping holds the
+ * same ids with the same body objects. `DraftProvider` runs this on every
+ * draft change, and its validation `useMemo` depends on the result's
+ * identity, so an unchanged mapping must not cost a second validation pass.
  */
 export function syncLoadedTargets(
   sites: readonly ChainingActionSite[],
   bodyCache: Map<string, ProcessBody>,
+  prev?: Record<ActionId, ProcessBody>,
 ): Record<ActionId, ProcessBody> {
   const next: Record<ActionId, ProcessBody> = {};
   for (const { id, processId } of sites) {
     const body = bodyCache.get(processId);
     if (body) next[id] = body;
   }
-  return next;
+  if (prev === undefined) return next;
+  const keys = Object.keys(next) as ActionId[];
+  const same = keys.length === Object.keys(prev).length && keys.every((id) => prev[id] === next[id]);
+  return same ? prev : next;
 }

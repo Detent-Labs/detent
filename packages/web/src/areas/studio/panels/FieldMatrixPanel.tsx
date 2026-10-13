@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { useDraft } from "../draft/store";
@@ -113,9 +113,13 @@ function countLine(declared: number, fields: number, steps: number, cells: numbe
  * toolbar (inert-column filter, count line, legend) and the column/row bulk
  * toggle badges the grid draws when `showBulkBadges` is set (design.md
  * decision 6, `field-matrix-toolbar-and-inline-editing`).
+ *
+ * A `memo` component with no props: it re-renders only on its own state or
+ * a new draft context value. `EditScreen` wraps it in `HeldDraft`, so a
+ * hidden matrix skips every keystroke on another tab.
  */
-export function FieldMatrixPanel() {
-  const { draft } = useDraft();
+export const FieldMatrixPanel = memo(function FieldMatrixPanel() {
+  const { draft, mutate, contentLocale } = useDraft();
   const [hideInert, setHideInert] = useState(false);
 
   const rows = matrixRows(draft.fields);
@@ -154,7 +158,9 @@ export function FieldMatrixPanel() {
           ))}
         </div>
       </div>
-      <FieldMatrixGrid hideInert={hideInert} showBulkBadges />
+      {/* The draft goes down as props, so the grid reads no context; see
+          `FieldMatrixGrid`'s own comment for why that matters under `HeldDraft`. */}
+      <FieldMatrixGrid draft={draft} mutate={mutate} contentLocale={contentLocale} hideInert={hideInert} showBulkBadges />
     </div>
   );
-}
+});
