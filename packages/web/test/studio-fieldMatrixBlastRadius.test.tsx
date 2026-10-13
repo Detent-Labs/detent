@@ -1,6 +1,5 @@
 import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { DraftProvider } from "../src/areas/studio/draft/store.js";
 import { FieldMatrixGrid } from "../src/areas/studio/panels/FieldMatrixGrid.js";
 import type { Draft } from "../src/areas/studio/draft/types.js";
 
@@ -40,9 +39,7 @@ const DRAFT: Draft = {
 };
 
 const html = renderToStaticMarkup(
-  <DraftProvider initial={DRAFT} token="token">
-    <FieldMatrixGrid showBulkBadges={true} />
-  </DraftProvider>,
+  <FieldMatrixGrid draft={DRAFT} mutate={() => {}} contentLocale="en" showBulkBadges={true} />,
 );
 
 /** Every `aria-label` the markup carries, in document order. */

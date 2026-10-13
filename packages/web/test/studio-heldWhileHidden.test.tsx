@@ -90,4 +90,15 @@ describe("the held bodies skip on an unchanged provider value", () => {
     expect(src).toMatch(/<HeldDraft visible=\{!jsonOpen && openTab === "matrix"\}>\s*<FieldMatrixPanel \/>\s*<\/HeldDraft>/);
     expect(src).toContain('visible={!jsonOpen && openTab === "changes"}');
   });
+
+  // React 19 propagates a context change lazily. A bail-out under HeldDraft
+  // walks up past HeldDraft's unchanged provider to the changed outer one,
+  // then forces a render on the first DraftContext reader below it. Only the
+  // panel may read the context, so the grid below it stays skipped.
+  it("FieldMatrixGrid reads no draft context; the panel hands it the draft", () => {
+    const read = (f: string) => readFileSync(new URL(`../src/areas/studio/panels/${f}`, import.meta.url), "utf8");
+    const grid = read("FieldMatrixGrid.tsx");
+    expect(grid).not.toMatch(/\buseDraft\b|\buseContext\b|\buse\(/);
+    expect(read("FieldMatrixPanel.tsx")).toMatch(/<FieldMatrixGrid draft=\{draft\} mutate=\{mutate\} contentLocale=\{contentLocale\}/);
+  });
 });

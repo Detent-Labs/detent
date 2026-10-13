@@ -119,7 +119,7 @@ function countLine(declared: number, fields: number, steps: number, cells: numbe
  * hidden matrix skips every keystroke on another tab.
  */
 export const FieldMatrixPanel = memo(function FieldMatrixPanel() {
-  const { draft } = useDraft();
+  const { draft, mutate, contentLocale } = useDraft();
   const [hideInert, setHideInert] = useState(false);
 
   const rows = matrixRows(draft.fields);
@@ -158,7 +158,9 @@ export const FieldMatrixPanel = memo(function FieldMatrixPanel() {
           ))}
         </div>
       </div>
-      <FieldMatrixGrid hideInert={hideInert} showBulkBadges />
+      {/* The draft goes down as props, so the grid reads no context; see
+          `FieldMatrixGrid`'s own comment for why that matters under `HeldDraft`. */}
+      <FieldMatrixGrid draft={draft} mutate={mutate} contentLocale={contentLocale} hideInert={hideInert} showBulkBadges />
     </div>
   );
 });

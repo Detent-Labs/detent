@@ -1,7 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
-import { DraftProvider } from "../src/areas/studio/draft/store.js";
 import { FieldMatrixGrid } from "../src/areas/studio/panels/FieldMatrixGrid.js";
 import type { Draft } from "../src/areas/studio/draft/types.js";
 
@@ -46,9 +45,7 @@ const DRAFT: Draft = {
 
 const render = (showBulkBadges: boolean) =>
   renderToStaticMarkup(
-    <DraftProvider initial={DRAFT} token="token">
-      <FieldMatrixGrid showBulkBadges={showBulkBadges} />
-    </DraftProvider>,
+    <FieldMatrixGrid draft={DRAFT} mutate={() => {}} contentLocale="en" showBulkBadges={showBulkBadges} />,
   );
 
 /** Elements the browser would put in the tab order: an explicit `tabindex="0"`,
