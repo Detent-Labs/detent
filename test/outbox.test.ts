@@ -769,17 +769,6 @@ test.skipIf(!DB)("a timer-fire-enqueued row is stamped with the instance's versi
   expect(reminderRow.field_version).toBe(1);
 });
 
-test.skipIf(!DB)("the backfill sets field_version from the instance's current version for a pre-existing row", async () => {
-  const body = threeActionBody();
-  const inst = await create(); // version 1
-  await executeManualTransition(inst, "path_ab", body, actor);
-  // Simulate a row that predates the column: clear field_version directly.
-  await sql`UPDATE outbox SET field_version = NULL WHERE instance_id = ${inst.instanceId}`;
-  await initSchema(); // idempotent; re-runs the backfill
-  const r = await rows(inst.instanceId);
-  expect(r.every((x) => x.field_version === 1)).toBe(true);
-});
-
 test.skipIf(!DB)("a creation-time subprocess-spawn row is stamped with the instance's version", async () => {
   const childPid = "proc_child_fv" as Instance["processId"];
   const childBody: ProcessBody = {

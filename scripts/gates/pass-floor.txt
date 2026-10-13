@@ -15,4 +15,10 @@
 #
 # Measured 2026-10-11, at 64c08161: 5206 pass, 1 skip, 0 fail, `Ran 5207 tests
 # across 269 files`, plus 20 pass in test:tz.
-5206
+#
+# Lowered by 5 in tidy-engine-internals task group 3, which deletes the five
+# tests that seeded an old-shaped database to assert a repair that initSchema
+# no longer makes: the three retired expression indexes (migration.test.ts),
+# the old resolve and redacted_at indexes and the resolve_state cleanup
+# (worker-scan-plans.test.ts), and the field_version backfill (outbox.test.ts).
+5201

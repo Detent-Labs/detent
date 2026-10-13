@@ -101,19 +101,6 @@ test.skipIf(!DB)("the resolution claim reads the marked rows through the partial
   expect(removedByFilter(nodes)).toBe(0);
 });
 
-test.skipIf(!DB)("initSchema clears the mark of an instance that is not running and keeps a running one's", async () => {
-  await sql`INSERT INTO instances (instance_id, transition_seq, body, resolve_state) VALUES
-    ('inst_done', 0, ${{ instanceId: "inst_done", ...instanceRow("completed") }}, 'pending'),
-    ('inst_gone', 0, ${{ instanceId: "inst_gone", ...instanceRow("cancelled") }}, 'claimed'),
-    ('inst_live', 0, ${{ instanceId: "inst_live", ...instanceRow("running") }}, 'pending')`;
-
-  await initSchema();
-
-  expect(await resolveStateOf("inst_done")).toBe("idle");
-  expect(await resolveStateOf("inst_gone")).toBe("idle");
-  expect(await resolveStateOf("inst_live")).toBe("pending");
-});
-
 test.skipIf(!DB)("an instance created on a terminal initialStep reads completed and carries no mark", async () => {
   const body = {
     baseLocale: "en",
@@ -145,14 +132,6 @@ test.skipIf(!DB)("an instance created on a running initialStep starts with a pen
 
   expect(inst.status).toBe("running");
   expect(await resolveStateOf(inst.instanceId)).toBe("pending");
-});
-
-test.skipIf(!DB)("initSchema drops the old full-column resolve index and leaves the partial one", async () => {
-  await sql`CREATE INDEX instances_resolve_idx ON instances (resolve_state)`;
-  await initSchema();
-  const names = ((await sql`SELECT indexname FROM pg_indexes WHERE tablename = 'instances'`) as { indexname: string }[]).map((r) => r.indexname);
-  expect(names).toContain("instances_resolve_open_idx");
-  expect(names).not.toContain("instances_resolve_idx");
 });
 
 // ============================================================
@@ -194,15 +173,6 @@ test.skipIf(!DB)("a retention tick with nothing eligible reads no instance row",
   expect(nodes.some((n) => n["Node Type"] === "Sort")).toBe(false);
   expect(removedByFilter(nodes)).toBe(0);
   for (const n of nodes.filter((n) => n["Relation Name"] === "instances")) expect(n["Actual Rows"]).toBe(0);
-});
-
-test.skipIf(!DB)("initSchema drops the old redacted_at index and leaves one retention index", async () => {
-  await sql`CREATE INDEX instances_redacted_idx ON instances (redacted_at) WHERE redacted_at IS NULL`;
-  await initSchema();
-  await initSchema();
-  const names = ((await sql`SELECT indexname FROM pg_indexes WHERE tablename = 'instances'`) as { indexname: string }[]).map((r) => r.indexname);
-  expect(names.filter((n) => n === "instances_retention_idx")).toHaveLength(1);
-  expect(names).not.toContain("instances_redacted_idx");
 });
 
 // ============================================================

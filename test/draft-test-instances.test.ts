@@ -81,8 +81,8 @@ test.skipIf(!DB)("instances.kind defaults every instance to 'published', and re-
   const rows = (await sql`SELECT kind FROM instances WHERE instance_id = ${inst.instanceId}`) as { kind: string }[];
   expect(rows[0]!.kind).toBe("published");
 
-  // Idempotent: re-running the migration does not error and does not disturb
-  // the already-backfilled row.
+  // Idempotent: re-running initSchema does not error and does not disturb the
+  // stored row.
   await initSchema();
   const rows2 = (await sql`SELECT kind FROM instances WHERE instance_id = ${inst.instanceId}`) as { kind: string }[];
   expect(rows2[0]!.kind).toBe("published");

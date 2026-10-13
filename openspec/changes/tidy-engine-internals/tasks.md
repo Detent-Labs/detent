@@ -13,11 +13,11 @@
 
 ## 3. Fold the retrofits into the CREATE TABLE statements (B-15)
 
-- [ ] 3.1 Move every `ADD COLUMN IF NOT EXISTS` into the `CREATE TABLE` of `outbox`, `instances`, `auth_users`, `data_lists` and `data_list_values`. Keep type, default and generation expression. Delete the `ALTER` statements. Verify with a search for `ADD COLUMN` over `src/` that prints nothing.
-- [ ] 3.2 Delete the `UPDATE outbox SET field_version` backfill and the `UPDATE instances SET resolve_state` cleanup. Delete the five `DROP INDEX IF EXISTS` lines and the comments that justify only them. Verify with a search for `DROP INDEX` over `src/` that prints nothing.
-- [ ] 3.3 Delete the tests that seed an old-shaped database to assert a repair. They sit in `test/migration.test.ts` around the three retired expression indexes and in `test/worker-scan-plans.test.ts` around `instances_resolve_idx` and `instances_redacted_idx`. Search `test/` for any other test of a column addition or a backfill.
-- [ ] 3.4 Add a test that two `initSchema` runs change no row. Add a test that `instances` without `redacted_at` and `auth_users` without its three optional columns stay as they are. Lower `scripts/gates/pass-floor.txt` by the number of deleted tests in the same commit. Verify with `sh scripts/test-gated.sh bun test` and compare the pass count with the new floor.
-- [ ] 3.5 Run the new `initSchema` on an empty database and on the lane's dev database. Confirm that the second run changes nothing. Verify by printing `\d outbox` and `\d instances` from both and comparing the column lists.
+- [x] 3.1 Move every `ADD COLUMN IF NOT EXISTS` into the `CREATE TABLE` of `outbox`, `instances`, `auth_users`, `data_lists` and `data_list_values`. Keep type, default and generation expression. Delete the `ALTER` statements. Verify with a search for `ADD COLUMN` over `src/` that prints nothing.
+- [x] 3.2 Delete the `UPDATE outbox SET field_version` backfill and the `UPDATE instances SET resolve_state` cleanup. Delete the five `DROP INDEX IF EXISTS` lines and the comments that justify only them. Verify with a search for `DROP INDEX` over `src/` that prints nothing.
+- [x] 3.3 Delete the tests that seed an old-shaped database to assert a repair. They sit in `test/migration.test.ts` around the three retired expression indexes and in `test/worker-scan-plans.test.ts` around `instances_resolve_idx` and `instances_redacted_idx`. Search `test/` for any other test of a column addition or a backfill.
+- [x] 3.4 Add a test that two `initSchema` runs change no row. Add a test that `instances` without `redacted_at` and `auth_users` without its three optional columns stay as they are. Lower `scripts/gates/pass-floor.txt` by the number of deleted tests in the same commit. Verify with `sh scripts/test-gated.sh bun test` and compare the pass count with the new floor.
+- [x] 3.5 Run the new `initSchema` on an empty database and on the lane's dev database. Confirm that the second run changes nothing. Verify by printing `\d outbox` and `\d instances` from both and comparing the column lists.
 
 ## 4. Quote the audit role (B-16)
 
