@@ -154,6 +154,50 @@ test.skipIf(!DB)("an instances table without redacted_at stays without it after 
   });
 }, SCRATCH_TIMEOUT_MS);
 
+// --- A role name with a double quote ---------------------------------------------
+
+// `GRANT ... TO "<role>"` with a bare interpolated name breaks on the `"`; the
+// grants have to name the same role through quote_ident instead.
+test.skipIf(!DB)("initSchema run as a role whose name has a double quote grants that role the audit privileges", async () => {
+  const suffix = crypto.randomUUID().replaceAll("-", "").slice(0, 12);
+  const role = `eng"role_${suffix}`;
+  const quoted = `"${role.replaceAll('"', '""')}"`;
+  const database = `schema_init_q_${suffix}`;
+  const password = crypto.randomUUID();
+  const admin = new SQL(urlFor("postgres"));
+  let engine: SQL | undefined;
+  try {
+    // Least privilege: a plain LOGIN role that owns the scratch database (CREATE on
+    // the database and on schema public) and holds ADMIN OPTION on detent_audit_owner,
+    // which lets initSchema grant itself the membership it needs. Neither SUPERUSER nor
+    // CREATEROLE. Identifiers cannot be bind parameters; every name here is generated.
+    await admin.unsafe(`CREATE ROLE ${quoted} LOGIN PASSWORD '${password}'`);
+    // The shared test database ran initSchema already, so detent_audit_owner exists.
+    await admin.unsafe(`GRANT detent_audit_owner TO ${quoted} WITH ADMIN OPTION`);
+    await admin.unsafe(`CREATE DATABASE "${database}" OWNER ${quoted}`);
+
+    const url = new URL(urlFor(database));
+    url.username = role;
+    url.password = password;
+    engine = new SQL(url.toString());
+    expect(((await engine`SELECT current_user`) as { current_user: string }[])[0].current_user).toBe(role);
+
+    await initSchema(engine);
+
+    const [held] = (await engine`
+      SELECT has_table_privilege(current_user, 'instance_audit', 'INSERT') AS can_insert,
+             has_table_privilege(current_user, 'instance_audit', 'SELECT') AS can_select,
+             has_function_privilege(current_user, 'redact_instance_fields(text, text, text, bigint, text[])', 'EXECUTE') AS can_redact
+    `) as { can_insert: boolean; can_select: boolean; can_redact: boolean }[];
+    expect(held).toEqual({ can_insert: true, can_select: true, can_redact: true });
+  } finally {
+    await engine?.close();
+    await admin.unsafe(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
+    await admin.unsafe(`DROP ROLE IF EXISTS ${quoted}`);
+    await admin.close();
+  }
+}, SCRATCH_TIMEOUT_MS);
+
 test.skipIf(!DB)("an auth_users table without its three optional columns stays without them after initSchema", async () => {
   await withScratchDatabase(async (scratch) => {
     await initSchema(scratch);

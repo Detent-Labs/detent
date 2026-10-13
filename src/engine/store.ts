@@ -607,7 +607,9 @@ async function initInstanceAudit(db: SQL): Promise<void> {
   // pinned search_path, which calls public.gen_random_bytes explicitly.
   await db`CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public`;
 
-  const engineRole = (await db`SELECT current_user`)[0].current_user as string;
+  // Already a quoted identifier (quote_ident doubles an embedded `"`); the two
+  // GRANT strings below splice it in without literal quotes.
+  const engineRole = (await db`SELECT quote_ident(current_user) AS role`)[0].role as string;
 
   // Postgres checks the CREATEROLE attribute before it checks whether the role
   // exists, so a bare duplicate_object guard alone would still raise 42501 on
@@ -950,13 +952,14 @@ async function initInstanceAudit(db: SQL): Promise<void> {
       // property, which belongs to the engine's role alone (design.md "Who
       // owns the audit relation").
       await tx`REVOKE EXECUTE ON FUNCTION redact_instance_fields(text, text, text, bigint, text[]) FROM PUBLIC`;
-      // engineRole is captured above via SELECT current_user, before this
-      // SET LOCAL ROLE — inside the block current_user reads as the owner
-      // role, and granting to current_user here would hand the owner's own
-      // privileges to itself while leaving the engine's role with none.
-      await tx.unsafe(`GRANT INSERT, SELECT ON instance_audit TO "${engineRole}"`);
+      // engineRole is captured above via SELECT quote_ident(current_user),
+      // before this SET LOCAL ROLE — inside the block current_user reads as the
+      // owner role, and granting to current_user here would hand the owner's own
+      // privileges to itself while leaving the engine's role with none. The
+      // value is already a quoted identifier.
+      await tx.unsafe(`GRANT INSERT, SELECT ON instance_audit TO ${engineRole}`);
       await tx.unsafe(
-        `GRANT EXECUTE ON FUNCTION redact_instance_fields(text, text, text, bigint, text[]) TO "${engineRole}"`,
+        `GRANT EXECUTE ON FUNCTION redact_instance_fields(text, text, text, bigint, text[]) TO ${engineRole}`,
       );
     });
   } catch (err) {

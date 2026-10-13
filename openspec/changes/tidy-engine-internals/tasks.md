@@ -21,7 +21,7 @@
 
 ## 4. Quote the audit role (B-16)
 
-- [ ] 4.1 Capture `quote_ident(current_user)` in `initInstanceAudit`. Drop the literal quotes from the two `GRANT` strings. A new test makes a login role whose name has a `"`, runs `initSchema` as that role, and expects the grants. Verify with the full gated suite.
+- [x] 4.1 Capture `quote_ident(current_user)` in `initInstanceAudit`. Drop the literal quotes from the two `GRANT` strings. A new test makes a login role whose name has a `"`, runs `initSchema` as that role, and expects the grants. Verify with the full gated suite.
 
 ## 5. Docs and index
 
