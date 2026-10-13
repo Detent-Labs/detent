@@ -15,6 +15,7 @@ import { createGroup, setGroupMembers } from "../src/auth/groups.js";
 import { drainOutbox, deliver, type ClaimedRow } from "../src/engine/outbox.js";
 import { idempotencyKey } from "../src/engine/idempotency.js";
 import { createProcessInstance, submitAndTransition, SubmissionValidationError } from "../src/runtime/api.js";
+import { definitionHash } from "../src/schema/hash.js";
 import { INSTANCE_TRANSITION_ACTION_TYPE } from "../src/handlers/instance-transition.js";
 import type { ProcessBody, Instance, Action, InstanceEvent, PathId } from "../src/schema/definition.js";
 import type { Actor } from "../src/cel/eval.js";
@@ -633,4 +634,24 @@ test.skipIf(!DB)("an automatic hop onto an org.manager-of-starter step holds the
   expect(after.currentStepId as string).toBe("step_review");
   expect(after.assignment!.candidates).toEqual([boss]);
   expect(await unresolvedEvents(after.instanceId)).toHaveLength(0);
+});
+
+// --- the handler pins the target it moves ----
+
+test.skipIf(!DB)("the delivery fails and the target stays put when the target's stored row no longer matches its pin", async () => {
+  const registry = createDefaultRegistry();
+  const { target, done, tv } = await setUp(targetBody(), "path_issue", registry);
+  // Replace the row's body and hash together: the row check passes, only the pin can tell.
+  const rows = (await sql`SELECT body FROM definitions WHERE process_id = ${tv.processId} AND version = ${tv.version}`) as { body: unknown }[];
+  const changed = { ...(rows[0].body as Record<string, unknown>), label: { en: "Restored" } } as unknown as ProcessBody;
+  await sql`UPDATE definitions SET body = ${JSON.stringify(changed)}::jsonb, definition_hash = ${definitionHash(changed)}
+    WHERE process_id = ${tv.processId} AND version = ${tv.version}`;
+
+  await drainOutbox(sql, registry);
+
+  const row = await outboxRowFor(done.instanceId);
+  expect(row!.status).not.toBe("delivered");
+  expect(row!.last_error as string).toContain("differs from row hash");
+  expect((await loadInstance(sql, target.instanceId))!.currentStepId as string).toBe("step_shelf"); // unmoved
+  expect(await transitionedByActionEvents(target.instanceId)).toHaveLength(0);
 });

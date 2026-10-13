@@ -17,12 +17,15 @@ write. They list users, create one, toggle `disabled`, assign roles, a manager
 and a display name, and set a password, all through the `system:admin`-gated
 `admin-user-management` capability. The CLI keeps its own email-keyed commands
 beside them.
-## Requirements
-<!-- antislop: allow passive-voice -->
-### Requirement: Local users are persisted in an auth_users table
 
-The engine creates an `auth_users` table in `initSchema`
-(`src/engine/store.ts`), alongside the other tables:
+## Requirements
+
+<!-- antislop: allow passive-voice -->
+
+### Requirement: Local users are persisted in an auth_users table from its creation
+
+The engine SHALL create an `auth_users` table in `initSchema`
+(`src/engine/store.ts`), beside the other tables:
 
 ```sql
 auth_users (
@@ -37,46 +40,41 @@ auth_users (
 )
 ```
 
-`Actor.id` SHALL equal `user_id`. `assignment.candidates`,
-`assignment.claimedBy` and `startedBy` SHALL carry that same value. The
-table SHALL stay additive: an installation that never sets an auth
-environment variable never touches it.
-
-A migration SHALL add `manager_user_id`, `display_name` and `locale` to an
-already-created table, since `CREATE TABLE IF NOT EXISTS` skips a table that
-exists already. That migration SHALL leave `NULL` in all three columns on
-every pre-existing row. The `manager-of-starter-assignment` capability
-defines what `manager_user_id` means. This capability defines what
-`display_name` means and how it resolves (see "A user's display name
-resolves to a non-empty value"). The `account-self-service` capability
-defines what `locale` means and how a caller sets it.
-
-#### Scenario: initSchema creates the table
+#### Scenario: initSchema creates the table with a unique email
 
 - **WHEN** `initSchema` runs against an empty database
 - **THEN** `auth_users` exists with a unique constraint on `email`
 
-#### Scenario: Email stays unique
+#### Scenario: A second account cannot reuse an email
 
-- **WHEN** someone creates a second user with an email already stored in
-  `auth_users`
+- **WHEN** someone creates a second user with an email that `auth_users` already holds
 - **THEN** the creation fails and no second row exists afterward
 
-#### Scenario: An existing database gains the manager and display-name columns
+### Requirement: An account's id is the actor id
 
-- **WHEN** `initSchema` runs against a database whose `auth_users`
-  predates the `manager_user_id` and `display_name` columns
-- **THEN** the table has `manager_user_id` and `display_name`, and every
-  pre-existing row holds `NULL` in both
+`Actor.id` SHALL equal `user_id`. `assignment.candidates`, `assignment.claimedBy` and `startedBy` SHALL carry that same value. The table SHALL stay additive: an installation that never sets an auth environment variable never touches it.
 
-#### Scenario: An existing database gains the locale column
+#### Scenario: A local account acts under its user id
 
-- **WHEN** `initSchema` runs against a database whose `auth_users`
-  predates the `locale` column
-- **THEN** the table has `locale`, and every pre-existing row holds `NULL`
-  in it
+- **WHEN** a local account logs in and starts an instance
+- **THEN** the actor's id and the instance's `startedBy` both equal the account's `user_id`
+
+### Requirement: auth_users declares its optional columns at creation
+
+The `CREATE TABLE` SHALL declare `manager_user_id`, `display_name` and `locale`. `initSchema` SHALL NOT add them to a table that exists already. The `manager-of-starter-assignment` capability defines `manager_user_id`. The `account-self-service` capability defines `locale`. A user's display name resolves as "A user's display name resolves to a non-empty value" states.
+
+#### Scenario: A new table has the manager, display-name and locale columns
+
+- **WHEN** `initSchema` runs against an empty database
+- **THEN** `auth_users` has `manager_user_id`, `display_name` and `locale`
+
+#### Scenario: A table that lacks those columns stays as it is
+
+- **WHEN** `initSchema` runs against a database whose `auth_users` has none of those three columns
+- **THEN** the table still has none of them
 
 <!-- antislop: allow passive-voice -->
+
 ### Requirement: Passwords are hashed with argon2id and verified against the stored hash
 
 `src/auth/users.ts` SHALL expose `createUser` and `verifyLogin`. `createUser`

@@ -83,7 +83,7 @@ function makeSpawnHandler(
     const existing = await loadInstance(db, childId);
     if (existing) {
       child = existing;
-      const resolved = await resolveBody(existing.processId, existing.version);
+      const resolved = await resolveBody(existing.processId, existing.version, existing.definitionHash);
       if (!resolved) throw new Error(`spawn: child body unresolved: ${existing.processId}@${existing.version}`);
       childBody = resolved;
     } else {
@@ -93,7 +93,7 @@ function makeSpawnHandler(
       // migration, a re-entry that awaits a newer child): nothing to create.
       if (parent.awaitedChild !== childId) return {};
 
-      const parentBody = await resolveBody(parent.processId, parent.version);
+      const parentBody = await resolveBody(parent.processId, parent.version, parent.definitionHash);
       if (!parentBody) throw new Error(`spawn: parent body unresolved: ${parent.processId}@${parent.version}`);
       const step = parentBody.workflow.steps.find((s) => s.id === subprocessStepId);
       if (!step?.subprocess) throw new Error(`spawn: not a subprocess step: ${subprocessStepId}`);
@@ -235,7 +235,7 @@ export function makeReturnHandler(
       // clears that field.
       if (parent.currentStepId !== parentStepId) return null;
 
-      const parentBody = await resolveBody(parent.processId, parent.version);
+      const parentBody = await resolveBody(parent.processId, parent.version, parent.definitionHash);
       if (!parentBody) throw new Error(`return: parent body unresolved: ${parent.processId}@${parent.version}`);
       const step = parentBody.workflow.steps.find((s) => s.id === parentStepId);
       // Parked at the linked step, and that step is not a subprocess step: a
@@ -244,7 +244,7 @@ export function makeReturnHandler(
 
       // child namespace: outcome + child data re-keyed fieldId -> key (reuse the
       // guard-context re-keying against the child's own body).
-      const childBody = await resolveBody(childInst.processId, childInst.version);
+      const childBody = await resolveBody(childInst.processId, childInst.version, childInst.definitionHash);
       if (!childBody) throw new Error(`return: child body unresolved: ${childInst.processId}@${childInst.version}`);
       const child = { outcome: childOutcome, data: buildGuardContext(childBody, childInst, SYSTEM_ACTOR).data };
 
@@ -349,7 +349,7 @@ function makeCancelChildHandler(db: SQL, resolveBody: ResolveBody): (ctx: Handle
     if (!child || child.parent?.instanceId !== ctx.instanceId) return {};
     if (child.status !== "running" && child.status !== "cancelled") return {};
 
-    const childBody = await resolveBody(child.processId, child.version);
+    const childBody = await resolveBody(child.processId, child.version, child.definitionHash);
     if (!childBody) throw new Error(`cancel child: child body unresolved: ${child.processId}@${child.version}`);
     await cancelInstance(child, childBody, SYSTEM_ACTOR, db, resolveBody);
 

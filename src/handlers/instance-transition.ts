@@ -97,7 +97,7 @@ async function instanceTransitionHandler(ctx: HandlerContext): Promise<unknown> 
   }
 
   const { resolveBody } = createDefinitionStore(ctx.db);
-  const targetBody = await resolveBody(target.processId, target.version);
+  const targetBody = await resolveBody(target.processId, target.version, target.definitionHash);
   if (!targetBody) {
     throw new PermanentError(`instance.transition: target instance body unresolved: ${target.processId}@${target.version}`);
   }

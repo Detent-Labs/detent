@@ -7,7 +7,7 @@
 import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { ZodError } from "zod";
 import { sql, initSchema, createInstance, createDraftSnapshot } from "../src/engine/store.js";
-import { publishBody, createDefinitionStore } from "../src/engine/definitions.js";
+import { publishBody, createDefinitionStore, DefinitionHashMismatch } from "../src/engine/definitions.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import {
   getInstanceView,
@@ -81,8 +81,8 @@ test.skipIf(!DB)("instances.kind defaults every instance to 'published', and re-
   const rows = (await sql`SELECT kind FROM instances WHERE instance_id = ${inst.instanceId}`) as { kind: string }[];
   expect(rows[0]!.kind).toBe("published");
 
-  // Idempotent: re-running the migration does not error and does not disturb
-  // the already-backfilled row.
+  // Idempotent: re-running initSchema does not error and does not disturb the
+  // stored row.
   await initSchema();
   const rows2 = (await sql`SELECT kind FROM instances WHERE instance_id = ${inst.instanceId}`) as { kind: string }[];
   expect(rows2[0]!.kind).toBe("published");
@@ -169,6 +169,33 @@ test.skipIf(!DB)("resolveBody resolves a negative version from a persisted draft
   const { resolveBody } = createDefinitionStore();
   const resolved = await resolveBody(PID, version);
   expect(resolved).toEqual(body);
+});
+
+test.skipIf(!DB)("resolveBody throws for a draft_snapshots row whose body no longer matches its hash", async () => {
+  const body = simpleBody();
+  const version = await createDraftSnapshot(PID, definitionHash(body), body, sql);
+  await sql`UPDATE draft_snapshots SET body = jsonb_set(body, '{label,en}', '"Edited"') WHERE process_id = ${PID} AND version = ${version}`;
+  const { resolveBody } = createDefinitionStore();
+  await expect(Promise.resolve().then(() => resolveBody(PID, version))).rejects.toBeInstanceOf(DefinitionHashMismatch);
+});
+
+test.skipIf(!DB)("a negative version is read from the store on every call, never cached", async () => {
+  const body = simpleBody();
+  const version = await createDraftSnapshot(PID, definitionHash(body), body, sql);
+  const { resolveBody } = createDefinitionStore();
+  expect(await resolveBody(PID, version)).toEqual(body);
+  await sql`DELETE FROM draft_snapshots WHERE process_id = ${PID} AND version = ${version}`;
+  expect(await resolveBody(PID, version)).toBeUndefined();
+});
+
+test.skipIf(!DB)("resolveBody checks the pin of a negative version on every call", async () => {
+  const body = simpleBody();
+  const hash = definitionHash(body);
+  const version = await createDraftSnapshot(PID, hash, body, sql);
+  const { resolveBody } = createDefinitionStore();
+  expect(await resolveBody(PID, version, hash)).toEqual(body);
+  await expect(Promise.resolve().then(() => resolveBody(PID, version, "0".repeat(64)))).rejects.toBeInstanceOf(DefinitionHashMismatch);
+  expect(await resolveBody(PID, version, hash)).toEqual(body);
 });
 
 test.skipIf(!DB)("resolveBody for a real, positive version behaves identically to before this change", async () => {

@@ -904,50 +904,96 @@ export async function listVersions(processId: ProcessId, db: SQL = sql): Promise
 }
 
 /**
+ * A stored body no longer hashes to its row's `definition_hash`, or a caller's
+ * pinned hash differs from the row's. Either way the body is not the one the
+ * pin names, so the store refuses to hand it out.
+ */
+export class DefinitionHashMismatch extends Error {
+  constructor(
+    readonly processId: string,
+    readonly version: number,
+    readonly expected: string,
+    readonly actual: string,
+    readonly reason: "body" | "pin",
+  ) {
+    super(
+      reason === "body"
+        ? `definition ${processId} v${version}: stored body hashes to ${actual}, row holds ${expected}`
+        : `definition ${processId} v${version}: pinned hash ${expected} differs from row hash ${actual}`,
+    );
+    this.name = "DefinitionHashMismatch";
+  }
+}
+
+/**
  * A DB-backed `resolveBody` with a process-local cache. Published versions are
- * immutable, so a cached body is never stale and the cache only grows.
+ * immutable, so a cached body is never stale and the cache only grows. Each
+ * entry keeps the hash its body was verified against, so a `pinHash` check on
+ * a cache hit costs one string comparison. A test instance's snapshot (a
+ * negative version) is never cached: every read of it queries the store.
  */
 export function createDefinitionStore(
   db: SQL = sql,
 ): { resolveBody: ResolveBody; resolveLatestByContract: ResolveLatestByContract; resolveLatest: ResolveLatest } {
-  const cache = new Map<string, ProcessBody>();
-  const resolveBody: ResolveBody = async (processId, version) => {
+  const cache = new Map<string, { body: ProcessBody; hash: string }>();
+  /** Check a parsed body against its row's hash. */
+  const verify = (processId: string, version: number, body: ProcessBody, rowHash: string): ProcessBody => {
+    const actual = definitionHash(body);
+    if (actual !== rowHash) throw new DefinitionHashMismatch(processId, version, rowHash, actual, "body");
+    return body;
+  };
+  /** Verify a published body, then cache it with the hash it was verified against. */
+  const verifyAndCache = (processId: string, version: number, body: ProcessBody, rowHash: string): ProcessBody => {
+    verify(processId, version, body, rowHash);
+    cache.set(`${processId}:${version}`, { body, hash: rowHash });
+    return body;
+  };
+  const checkPin = (processId: string, version: number, rowHash: string, pinHash: string | undefined): void => {
+    if (pinHash !== undefined && pinHash !== rowHash) throw new DefinitionHashMismatch(processId, version, pinHash, rowHash, "pin");
+  };
+  const resolveBody: ResolveBody = async (processId, version, pinHash) => {
     const key = `${processId}:${version}`;
     const hit = cache.get(key);
-    if (hit) return hit;
+    if (hit) {
+      checkPin(processId, version, hit.hash, pinHash);
+      return hit.body;
+    }
     // A negative version is a test-instance run's reserved identifier
     // (draft-test-instances), never a real published version — those are
     // always positive, assigned monotonically at publish. The two identifier
     // spaces are disjoint, so this branch never reads `definitions` and the
-    // branch below never reads `draft_snapshots`. A test-instance's frozen
-    // body is immutable once written, the same as a published version's, so
-    // it is cached under the same rule.
+    // branch below never reads `draft_snapshots`. Each test-instance run adds
+    // a new identifier, so a cache entry per run would grow until a restart:
+    // this branch verifies the hash and the pin on every read and caches
+    // nothing.
+    // ponytail: no cache for a test instance's body. Ceiling: one query per
+    // read of that body. Upgrade: a map bounded to negative versions only,
+    // evicting its oldest entry past a fixed size.
     if (version < 0) {
-      const rows = (await db`SELECT body FROM draft_snapshots
-        WHERE process_id = ${processId} AND version = ${version} LIMIT 1`) as { body: unknown }[];
+      const rows = (await db`SELECT body, definition_hash FROM draft_snapshots
+        WHERE process_id = ${processId} AND version = ${version} LIMIT 1`) as { body: unknown; definition_hash: string }[];
       if (rows.length === 0) return undefined;
-      const body = parseBody(rows[0].body);
-      cache.set(key, body);
+      const body = verify(processId, version, parseBody(rows[0].body), rows[0].definition_hash);
+      checkPin(processId, version, rows[0].definition_hash, pinHash);
       return body;
     }
-    const rows = (await db`SELECT body FROM definitions
-      WHERE process_id = ${processId} AND version = ${version} LIMIT 1`) as { body: unknown }[];
+    const rows = (await db`SELECT body, definition_hash FROM definitions
+      WHERE process_id = ${processId} AND version = ${version} LIMIT 1`) as { body: unknown; definition_hash: string }[];
     if (rows.length === 0) return undefined;
-    const body = parseBody(rows[0].body);
-    cache.set(key, body);
+    const body = verifyAndCache(processId, version, parseBody(rows[0].body), rows[0].definition_hash);
+    checkPin(processId, version, rows[0].definition_hash, pinHash);
     return body;
   };
   // ponytail: hash each candidate's contract on read (newest-first, stop at the
   // first match) rather than storing a contract-hash column — no migration, and
   // v1 has few versions per process. Add a persisted column if this ever scans hot.
   const resolveLatestByContract: ResolveLatestByContract = async (processId, contractRef) => {
-    const rows = (await db`SELECT version, body FROM definitions
-      WHERE process_id = ${processId} ORDER BY version DESC`) as { version: number; body: unknown }[];
+    const rows = (await db`SELECT version, definition_hash, body FROM definitions
+      WHERE process_id = ${processId} ORDER BY version DESC`) as { version: number; definition_hash: string; body: unknown }[];
     for (const row of rows) {
       const body = parseBody(row.body);
       if (body.contract && contractHash(body.contract) === contractRef) {
-        cache.set(`${processId}:${row.version}`, body);
-        return { version: Number(row.version), body };
+        return { version: Number(row.version), body: verifyAndCache(processId, Number(row.version), body, row.definition_hash) };
       }
     }
     return undefined;
@@ -955,12 +1001,11 @@ export function createDefinitionStore(
   // Newest published version for a processId, no contract filter. Mirrors
   // resolveLatestByContract minus the contractHash check.
   const resolveLatest: ResolveLatest = async (processId) => {
-    const rows = (await db`SELECT version, body FROM definitions
-      WHERE process_id = ${processId} ORDER BY version DESC LIMIT 1`) as { version: number; body: unknown }[];
+    const rows = (await db`SELECT version, definition_hash, body FROM definitions
+      WHERE process_id = ${processId} ORDER BY version DESC LIMIT 1`) as { version: number; definition_hash: string; body: unknown }[];
     if (rows.length === 0) return undefined;
-    const body = parseBody(rows[0].body);
-    cache.set(`${processId}:${rows[0].version}`, body);
-    return { version: Number(rows[0].version), body };
+    const version = Number(rows[0].version);
+    return { version, body: verifyAndCache(processId, version, parseBody(rows[0].body), rows[0].definition_hash) };
   };
   return { resolveBody, resolveLatestByContract, resolveLatest };
 }

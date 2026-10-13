@@ -2,12 +2,14 @@
  * Data retention & erasure (roadmap #20): redactInstance and the automatic
  * sweep. DB-backed cases hit Postgres and skip when DATABASE_URL is unset —
  * a skip is visible, a false green is not. Bodies are hand-crafted and
- * created directly via `createInstance` (no publish needed): neither
- * `redactInstance` nor `sweepRetention` resolves a process body.
+ * created directly via `createInstance`. `redactInstance` resolves the
+ * instance's pinned body to read its redactable fields, and `sweepRetention`
+ * redacts through it. Each case therefore publishes its body first.
  */
 import { test, expect, beforeAll, beforeEach, spyOn } from "bun:test";
 import { sql, initSchema, createInstance } from "../src/engine/store.js";
-import { publishBody } from "../src/engine/definitions.js";
+import { publishBody, DefinitionHashMismatch } from "../src/engine/definitions.js";
+import { definitionHash } from "../src/schema/hash.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
 import { findOrphanKeys, registerMigrationPlan, migrateInstances } from "../src/engine/migration.js";
 import { redactInstance, sweepRetention } from "../src/engine/retention.js";
@@ -453,4 +455,18 @@ test.skipIf(!DB)("an instance the sweep skips logs an error line carrying its id
   // The sweep still redacted the rest of the batch.
   expect(await rowRedactedAt(good.instanceId)).not.toBeNull();
   expect(await rowData(good.instanceId)).toEqual({});
+});
+
+test.skipIf(!DB)("redactInstance throws and clears nothing when the pinned version's stored row no longer matches the pin", async () => {
+  const i = await mk();
+  await setStatus(i.instanceId, "completed");
+  // Replace the row's body and hash together: the row check passes, only the pin can tell.
+  const rows = (await sql`SELECT body FROM definitions WHERE process_id = ${pid} AND version = ${i.version}`) as { body: unknown }[];
+  const changed = { ...(rows[0].body as Record<string, unknown>), label: { en: "Restored" } } as unknown as ProcessBody;
+  await sql`UPDATE definitions SET body = ${JSON.stringify(changed)}::jsonb, definition_hash = ${definitionHash(changed)}
+    WHERE process_id = ${pid} AND version = ${i.version}`;
+
+  await expect(redactInstance(i.instanceId, sql)).rejects.toBeInstanceOf(DefinitionHashMismatch);
+  expect(await rowRedactedAt(i.instanceId)).toBeNull(); // the transaction rolled back
+  expect(await rowData(i.instanceId)).toEqual({ field_x: "value" });
 });

@@ -7,7 +7,7 @@ import { test, expect, beforeAll, beforeEach } from "bun:test";
 import { SQL } from "bun";
 import { z } from "zod";
 import { sql, initSchema, createInstance, rehydrate } from "../src/engine/store.js";
-import { publishBody, createDefinitionStore, listProcesses, listVersions, CelValidationError, RegistryValidationError } from "../src/engine/definitions.js";
+import { publishBody, createDefinitionStore, DefinitionHashMismatch, listProcesses, listVersions, CelValidationError, RegistryValidationError } from "../src/engine/definitions.js";
 import { executeManualTransition } from "../src/engine/transition.js";
 import { drainOutbox } from "../src/engine/outbox.js";
 import { drainResolutions } from "../src/engine/resolution.js";
@@ -491,6 +491,15 @@ test.skipIf(!DB)("a resolved body is cached and served without re-reading the st
   expect(queries).toBe(1);
 });
 
+test.skipIf(!DB)("a published version stays cached after one read, even once its row is gone", async () => {
+  const v = await publishBody(PID, waitBody("sayYes"), reg, dataSourceReg);
+  const { resolveBody } = createDefinitionStore();
+  const first = await resolveBody(PID, v.version);
+  expect(first).toBeDefined();
+  await sql`DELETE FROM definitions WHERE process_id = ${PID} AND version = ${v.version}`;
+  expect(await resolveBody(PID, v.version)).toBe(first);
+});
+
 // --- end-to-end: the store-backed worker path is live -------------------------
 
 test.skipIf(!DB)("a parked wait-state re-resolves against the store-resolved body", async () => {
@@ -528,6 +537,107 @@ test.skipIf(!DB)("a due timer fires against the store-resolved body", async () =
   const after = (await sql`SELECT body FROM instances WHERE instance_id = ${inst.instanceId}`) as { body: Instance }[];
   const state = typeof after[0].body === "string" ? JSON.parse(after[0].body as unknown as string) : after[0].body;
   expect(state.currentStepId).toBe("step_done"); // timer bypassed the guard, took path_go
+});
+
+// --- hash verification on load and the caller's pin check ----------------------
+
+const WRONG_HASH = "0".repeat(64);
+const thrownBy = async (run: () => unknown): Promise<unknown> => {
+  try {
+    await run();
+  } catch (e) {
+    return e;
+  }
+  return undefined;
+};
+const editRowBody = (processId: string, version: number) =>
+  sql`UPDATE definitions SET body = jsonb_set(body, '{label,en}', '"Edited"') WHERE process_id = ${processId} AND version = ${version}`;
+/** Replace a row's body and its hash together: the row check passes, only a pin can tell. */
+async function restoreRowWithAnotherBody(processId: string, version: number): Promise<void> {
+  const rows = (await sql`SELECT body FROM definitions WHERE process_id = ${processId} AND version = ${version}`) as { body: unknown }[];
+  const changed = { ...(rows[0].body as Record<string, unknown>), label: { en: "Restored" } } as unknown as ProcessBody;
+  await sql`UPDATE definitions SET body = ${JSON.stringify(changed)}::jsonb, definition_hash = ${definitionHash(changed)}
+    WHERE process_id = ${processId} AND version = ${version}`;
+}
+
+test.skipIf(!DB)("resolveBody throws DefinitionHashMismatch for a row whose body was edited under an unchanged hash", async () => {
+  const v = await publishBody(PID, waitBody("sayYes"), reg, dataSourceReg);
+  await editRowBody(PID, v.version);
+  const error = await thrownBy(() => createDefinitionStore().resolveBody(PID, v.version));
+  expect(error).toBeInstanceOf(DefinitionHashMismatch);
+  expect((error as DefinitionHashMismatch).reason).toBe("body");
+  expect((error as DefinitionHashMismatch).expected).toBe(v.definitionHash);
+});
+
+test.skipIf(!DB)("a body that failed the hash check is not cached", async () => {
+  const v = await publishBody(PID, waitBody("sayYes"), reg, dataSourceReg);
+  await editRowBody(PID, v.version);
+  const { resolveBody } = createDefinitionStore();
+  await expect(resolveBody(PID, v.version)).rejects.toBeInstanceOf(DefinitionHashMismatch);
+  await expect(resolveBody(PID, v.version)).rejects.toBeInstanceOf(DefinitionHashMismatch);
+});
+
+test.skipIf(!DB)("resolveLatest throws DefinitionHashMismatch for an edited newest row", async () => {
+  const v = await publishBody(PID, waitBody("sayYes"), reg, dataSourceReg);
+  await editRowBody(PID, v.version);
+  await expect(createDefinitionStore().resolveLatest(PID)).rejects.toBeInstanceOf(DefinitionHashMismatch);
+});
+
+test.skipIf(!DB)("resolveLatest verifies only the row it returns", async () => {
+  const v1 = await publishBody(PID, waitBody("sayYes"), reg, dataSourceReg);
+  const v2 = await publishBody(PID, waitBody("sayNo"), reg, dataSourceReg);
+  await editRowBody(PID, v1.version); // an older row nobody asked for
+  const latest = await createDefinitionStore().resolveLatest(PID);
+  expect(latest?.version).toBe(v2.version);
+});
+
+test.skipIf(!DB)("resolveBody loads an unedited row and returns a body hashing to the row", async () => {
+  const v = await publishBody(PID, waitBody("sayYes"), reg, dataSourceReg);
+  const body = await createDefinitionStore().resolveBody(PID, v.version);
+  expect(body).toBeDefined();
+  expect(definitionHash(body!)).toBe(v.definitionHash);
+});
+
+test.skipIf(!DB)("resolveBody throws for a pinHash differing from the row, on a cache miss", async () => {
+  const v = await publishBody(PID, waitBody("sayYes"), reg, dataSourceReg);
+  const error = await thrownBy(() => createDefinitionStore().resolveBody(PID, v.version, WRONG_HASH));
+  expect(error).toBeInstanceOf(DefinitionHashMismatch);
+  expect((error as DefinitionHashMismatch).reason).toBe("pin");
+});
+
+test.skipIf(!DB)("resolveBody throws for a pinHash differing from the row, on a cache hit", async () => {
+  const v = await publishBody(PID, waitBody("sayYes"), reg, dataSourceReg);
+  const { resolveBody } = createDefinitionStore();
+  expect(await resolveBody(PID, v.version)).toBeDefined(); // fills the cache
+  await expect(resolveBody(PID, v.version, WRONG_HASH)).rejects.toBeInstanceOf(DefinitionHashMismatch);
+  expect(await resolveBody(PID, v.version, v.definitionHash)).toBeDefined();
+});
+
+test.skipIf(!DB)("resolveBody returns the body for a pinHash matching the row, on a miss and on a hit", async () => {
+  const v = await publishBody(PID, waitBody("sayYes"), reg, dataSourceReg);
+  const { resolveBody } = createDefinitionStore();
+  const miss = await resolveBody(PID, v.version, v.definitionHash);
+  const hit = await resolveBody(PID, v.version, v.definitionHash);
+  expect(definitionHash(miss!)).toBe(v.definitionHash);
+  expect(hit).toBe(miss);
+});
+
+test.skipIf(!DB)("a due timer whose instance pin differs from the stored row leaves the scan unfired", async () => {
+  const v = await publishBody(PID, waitTimerBody(), reg, dataSourceReg);
+  const body = (await createDefinitionStore().resolveBody(PID, v.version))!;
+  const inst = await createInstance(body, { processId: PID, version: v.version });
+  await executeManualTransition(inst, "path_ab", body, actor); // parks on step_wait, arms timer_t1
+  await sql`UPDATE instances SET
+    body = jsonb_set(body, '{timers,0,fireAt}', '"2020-01-01T00:00:00.000Z"'::jsonb),
+    next_timer_at = '2020-01-01T00:00:00.000Z'
+    WHERE instance_id = ${inst.instanceId}`;
+  await restoreRowWithAnotherBody(PID, v.version);
+
+  expect(await drainTimers(sql, createDefinitionStore().resolveBody)).toBe(0);
+  const row = (await sql`SELECT body, next_timer_at > now() AS pushed FROM instances WHERE instance_id = ${inst.instanceId}`) as { body: Instance | string; pushed: boolean }[];
+  const state = typeof row[0].body === "string" ? JSON.parse(row[0].body) : row[0].body;
+  expect(state.currentStepId).toBe("step_wait"); // not fired
+  expect(row[0].pushed).toBe(true); // out of the scan, not re-selected every pass
 });
 
 // --- listProcesses / listVersions ----------------------------------------------

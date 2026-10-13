@@ -74,10 +74,60 @@ export const sql: SQL = new Proxy(function sql() {} as unknown as SQL, {
 });
 
 export async function initSchema(db: SQL = sql): Promise<void> {
+  // Columns beyond the first three:
+  // resolve_state: re-resolution flag. A data-affecting writeback sets it to
+  // 'pending' so the resolution worker re-drives automatic evaluation for a
+  // parked wait-state.
+  // resolve_claimed_at: lease stamp for the resolution worker's claim. A
+  // 'claimed' row past its lease is an abandoned (crashed) claim and is
+  // reclaimed by a later drain.
+  // cancel_sweep_state: cancel-cascade sweep durability. 'idle' (never
+  // cancelled, or not yet attempted), 'pending' (cancelled; the direct-child
+  // sweep has not completed without a conflicted or failed child), 'done' (a
+  // sweep pass found zero conflicted/failed children). Read by instance_id
+  // only (cancelInstance's own resume check), never scanned by a worker, so no
+  // index.
+  // next_timer_at: timer scheduling, the min unfired fireAt of the current
+  // step's armed timers, maintained at every arm/disarm.
+  // created_at: instance listing's paging key. Runtime ids are UUIDv4 (see
+  // createInstance's ponytail note), so instance_id carries no time order on
+  // its own — a participant inbox ordered by it would be ordered arbitrarily.
+  // redacted_at: set once by redactInstance (src/engine/retention.ts); NULL
+  // means not redacted.
+  // kind: "published" (an instance created against a definitions row) or
+  // "test" (a draft-test-instances run, resolved via draft_snapshots below). A
+  // real column, not just a field of the jsonb body: every kind-exclusion
+  // predicate filters the stored row directly, and a body without a `kind` key
+  // would read as SQL NULL under `body->>'kind'` and drop out under
+  // three-valued logic.
+  // The last six are standardized Instance scalars, promoted out of the jsonb
+  // body into real columns: the key stays in body (parseInstance is
+  // unchanged), and the column is additive infrastructure a query MAY use
+  // instead of a jsonb ->> lookup. GENERATED ALWAYS ... STORED rather than a
+  // dual write: it cannot drift from body, which a second write path could.
+  // started_at is `text`, not `timestamptz` — verified against Postgres 16.15
+  // and 18.6 that `(body->>'startedAt')::timestamptz` raises "generation
+  // expression is not immutable" (the timestamptz input path reads session
+  // DateStyle/TimeZone). Every writer produces startedAt as
+  // `new Date().toISOString()`, a fixed-width ISO-8601 string in UTC, so a
+  // text column ranges and sorts the same way a timestamptz column would.
   await db`CREATE TABLE IF NOT EXISTS instances (
     instance_id text PRIMARY KEY,
     transition_seq integer NOT NULL,
-    body jsonb NOT NULL
+    body jsonb NOT NULL,
+    resolve_state text NOT NULL DEFAULT 'idle',
+    resolve_claimed_at timestamptz,
+    cancel_sweep_state text NOT NULL DEFAULT 'idle',
+    next_timer_at timestamptz,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    redacted_at timestamptz,
+    kind text NOT NULL DEFAULT 'published',
+    process_id text GENERATED ALWAYS AS ((body->>'processId')) STORED,
+    version integer GENERATED ALWAYS AS (((body->>'version')::integer)) STORED,
+    status text GENERATED ALWAYS AS ((body->>'status')) STORED,
+    current_step_id text GENERATED ALWAYS AS ((body->>'currentStepId')) STORED,
+    started_by text GENERATED ALWAYS AS ((body->>'startedBy')) STORED,
+    started_at text GENERATED ALWAYS AS ((body->>'startedAt')) STORED
   )`;
   await db`CREATE TABLE IF NOT EXISTS history_entries (
     id text PRIMARY KEY,
@@ -134,6 +184,32 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   await db`CREATE INDEX IF NOT EXISTS instance_attachments_instance_idx ON instance_attachments (instance_id, created_at, id)`;
   // Outbox: one row per enqueued trigger action. idempotency_key (PK) makes
   // re-enqueuing a replayed transition conflict instead of duplicating.
+  //
+  // claimed_at: claim/deliver/mark split. A claimed row carries a lease
+  // (claimed_at). status is free text, so the 'claimed' state needs no
+  // constraint change.
+  // event_id: outcome routing, the runtime record that enqueued this action.
+  // An InstanceEvent id when a reminder fire enqueued it, NULL when a
+  // transition did (its outcome is located by (instance_id, transition_seq),
+  // which identifies a transition exactly and an event not at all).
+  // field_version: lamination stamp, the instance's version at enqueue time,
+  // kept in lock-step by migrateOne (which locks and bumps every one of an
+  // instance's outbox rows atomically with the instance's own version bump).
+  // Lets a migration remap a safe row's Action.output field ids in place, and
+  // lets delivery detect (and suppress) a writeback whose instance has since
+  // migrated out from under it.
+  // last_error: denormalized copy of the failure message from the row's most
+  // recent delivery attempt, so an outbox listing is self-sufficient without a
+  // jsonb scan across history_entries/instance_events for the ActionOutcome
+  // that already carries it. Cleared to NULL on a successful delivery.
+  // actors: the actor ids the enqueuing instance held at that moment:
+  // assignment candidates, the claimant, the starter. Frozen, and NOT
+  // rewritten when the instance's assignment later changes — a handler naming
+  // a recipient by role (notification.email's `toActors`) must see the actors
+  // of the commit that enqueued the action. The resolution worker cascades
+  // automatic steps without waiting for this queue, so a delivery-time read of
+  // `instances` would name whoever holds a step the instance reached
+  // afterwards.
   await db`CREATE TABLE IF NOT EXISTS outbox (
     idempotency_key text PRIMARY KEY,
     instance_id text NOT NULL,
@@ -144,39 +220,14 @@ export async function initSchema(db: SQL = sql): Promise<void> {
     attempts integer NOT NULL DEFAULT 0,
     next_attempt_at timestamptz NOT NULL DEFAULT now(),
     created_at timestamptz NOT NULL DEFAULT now(),
-    delivered_at timestamptz
+    delivered_at timestamptz,
+    claimed_at timestamptz,
+    event_id text,
+    field_version integer,
+    last_error text,
+    actors jsonb
   )`;
-  // Claim/deliver/mark split: a claimed row carries a lease (claimed_at). status
-  // is free text, so the 'claimed' state needs no constraint change. Idempotent
-  // add so an existing outbox table gains the column.
-  await db`ALTER TABLE outbox ADD COLUMN IF NOT EXISTS claimed_at timestamptz`;
-  // Outcome routing: the runtime record that enqueued this action. An
-  // InstanceEvent id when a reminder fire enqueued it, NULL when a transition did
-  // (its outcome is located by (instance_id, transition_seq), which identifies a
-  // transition exactly and an event not at all). Idempotent add.
-  await db`ALTER TABLE outbox ADD COLUMN IF NOT EXISTS event_id text`;
   await db`CREATE INDEX IF NOT EXISTS outbox_claim_idx ON outbox (status, next_attempt_at)`;
-  // Lamination stamp: the instance's version at enqueue time, kept in lock-step by
-  // migrateOne (which locks and bumps every one of an instance's outbox rows
-  // atomically with the instance's own version bump). Lets a migration remap a
-  // safe row's Action.output field ids in place, and lets delivery detect (and
-  // suppress) a writeback whose instance has since migrated out from under it.
-  await db`ALTER TABLE outbox ADD COLUMN IF NOT EXISTS field_version integer`;
-  // Denormalized copy of the failure message from the row's most recent delivery
-  // attempt, so an outbox listing is self-sufficient without a jsonb scan across
-  // history_entries/instance_events for the ActionOutcome that already carries it.
-  // Cleared to NULL on a successful delivery. Idempotent add.
-  await db`ALTER TABLE outbox ADD COLUMN IF NOT EXISTS last_error text`;
-  // The actor ids the enqueuing instance held at that moment: assignment
-  // candidates, the claimant, the starter. Frozen, and NOT rewritten when the
-  // instance's assignment later changes — a handler naming a recipient by role
-  // (notification.email's `toActors`) must see the actors of the commit that
-  // enqueued the action. The resolution worker cascades automatic steps without
-  // waiting for this queue, so a delivery-time read of `instances` would name
-  // whoever holds a step the instance reached afterwards. NULL on every row
-  // predating this column, and nothing backfills it: no body published before
-  // it could name an actor recipient. Idempotent add.
-  await db`ALTER TABLE outbox ADD COLUMN IF NOT EXISTS actors jsonb`;
   // Migration locks an instance's undelivered outbox rows before its instance row
   // (matching drainOutbox's own lock order); without this index that scan and lock
   // sequentially scan the whole table.
@@ -185,29 +236,7 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   // (created_at DESC, idempotency_key DESC). Delivered rows are never deleted, so
   // without this index every page sorts the whole table.
   await db`CREATE INDEX IF NOT EXISTS outbox_created_idx ON outbox (created_at DESC, idempotency_key DESC)`;
-  // Backfill is exact, not best-effort: the pre-existing in-flight-actions check
-  // always skipped migration entirely while any pending/claimed row existed, so
-  // every outbox row present before this column existed still belongs to an
-  // instance sitting on the exact version that enqueued it.
-  await db`UPDATE outbox SET field_version = (
-    SELECT (body->>'version')::int FROM instances WHERE instances.instance_id = outbox.instance_id
-  ) WHERE field_version IS NULL`;
-  // Re-resolution flag: a data-affecting writeback sets this to 'pending' so the
-  // resolution worker re-drives automatic evaluation for a parked wait-state.
-  // Idempotent add; the worker's claim index sits below, after the status column.
-  await db`ALTER TABLE instances ADD COLUMN IF NOT EXISTS resolve_state text NOT NULL DEFAULT 'idle'`;
-  // Lease stamp for the resolution worker's claim: a 'claimed' row past its lease
-  // is an abandoned (crashed) claim and is reclaimed by a later drain.
-  await db`ALTER TABLE instances ADD COLUMN IF NOT EXISTS resolve_claimed_at timestamptz`;
-  // Cancel-cascade sweep durability: 'idle' (never cancelled, or not yet attempted),
-  // 'pending' (cancelled; the direct-child sweep has not completed without a
-  // conflicted or failed child), 'done' (a sweep pass found zero conflicted/failed
-  // children). Read by instance_id only (cancelInstance's own resume check), never
-  // scanned by a worker, so no index.
-  await db`ALTER TABLE instances ADD COLUMN IF NOT EXISTS cancel_sweep_state text NOT NULL DEFAULT 'idle'`;
-  // Timer scheduling: the min unfired fireAt of the current step's armed timers,
-  // maintained at every arm/disarm. The scheduler polls WHERE next_timer_at <= now().
-  await db`ALTER TABLE instances ADD COLUMN IF NOT EXISTS next_timer_at timestamptz`;
+  // The scheduler polls instances WHERE next_timer_at <= now().
   await db`CREATE INDEX IF NOT EXISTS instances_timer_idx ON instances (next_timer_at)`;
   // Definition store: one row per published version, keyed by (process_id, version).
   // Holds the frozen compiled body plus its pin metadata; the resolution/timer
@@ -251,13 +280,6 @@ export async function initSchema(db: SQL = sql): Promise<void> {
     applied_at timestamptz,
     PRIMARY KEY (process_id, from_version, to_version)
   )`;
-  // Instance listing's paging key. Runtime ids are UUIDv4 (see createInstance's
-  // ponytail note), so instance_id carries no time order on its own — a
-  // participant inbox ordered by it would be ordered arbitrarily. Idempotent add;
-  // a database created before this field existed gets `now()` for every
-  // pre-existing row, which orders that population among itself by instance_id
-  // (harmless pre-production, not a bug).
-  await db`ALTER TABLE instances ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now()`;
   await db`CREATE INDEX IF NOT EXISTS instances_created_idx ON instances (created_at DESC, instance_id DESC)`;
   // The inbox predicate ("claimed by me, or unclaimed and I am a candidate")
   // needs its own indexes over the jsonb-nested assignment fields:
@@ -273,44 +295,13 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   // cardinality, and the parent id alone reduces the scan to a handful of
   // rows. Readers: transition.ts::sweepCancelledChildren, migration.ts::migrateOne.
   await db`CREATE INDEX IF NOT EXISTS instances_parent_idx ON instances ((body->'parent'->>'instanceId'))`;
-  // Set once by redactInstance (src/engine/retention.ts); NULL means not
-  // redacted, the same convention every other additive instances column uses.
-  await db`ALTER TABLE instances ADD COLUMN IF NOT EXISTS redacted_at timestamptz`;
-  // "published" (an instance created against a definitions row) or "test" (a
-  // draft-test-instances run, resolved via draft_snapshots below). A real
-  // column, not just a field of the jsonb body: every kind-exclusion
-  // predicate filters the stored row directly, and a pre-existing row's body
-  // has no `kind` key at all — a `body->>'kind'` predicate would read that as
-  // SQL NULL and silently drop it under three-valued logic. The column
-  // default backfills every pre-existing row to 'published' at ALTER time.
-  await db`ALTER TABLE instances ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAULT 'published'`;
-  // Six standardized Instance scalars, promoted out of the jsonb body into
-  // real columns, on the redacted_at precedent above: the key stays in body
-  // (parseInstance is unchanged), and the column is additive infrastructure
-  // a query MAY use instead of a jsonb ->> lookup. GENERATED ALWAYS ... STORED
-  // rather than a dual write: it cannot drift from body, which a second
-  // write path could. startedAt is `text`, not `timestamptz` — verified
-  // against Postgres 16.15 and 18.6 that `(body->>'startedAt')::timestamptz`
-  // raises "generation expression is not immutable" (the timestamptz input
-  // path reads session DateStyle/TimeZone). Every writer produces startedAt
-  // as `new Date().toISOString()`, a fixed-width ISO-8601 string in UTC, so a
-  // text column ranges and sorts the same way a timestamptz column would.
-  await db`ALTER TABLE instances ADD COLUMN IF NOT EXISTS process_id text GENERATED ALWAYS AS ((body->>'processId')) STORED`;
-  await db`ALTER TABLE instances ADD COLUMN IF NOT EXISTS version integer GENERATED ALWAYS AS (((body->>'version')::integer)) STORED`;
-  await db`ALTER TABLE instances ADD COLUMN IF NOT EXISTS status text GENERATED ALWAYS AS ((body->>'status')) STORED`;
-  await db`ALTER TABLE instances ADD COLUMN IF NOT EXISTS current_step_id text GENERATED ALWAYS AS ((body->>'currentStepId')) STORED`;
-  await db`ALTER TABLE instances ADD COLUMN IF NOT EXISTS started_by text GENERATED ALWAYS AS ((body->>'startedBy')) STORED`;
-  await db`ALTER TABLE instances ADD COLUMN IF NOT EXISTS started_at text GENERATED ALWAYS AS ((body->>'startedAt')) STORED`;
   // Backs selectInRange's range predicate (src/engine/reporting.ts), rewritten
   // to filter on this column directly — the planner would not substitute this
   // index into a query still naming the original body->>'startedAt' expression.
   await db`CREATE INDEX IF NOT EXISTS instances_started_idx ON instances (started_at)`;
-  // Three plain btrees over the columns above, replacing the expression indexes
-  // that stood over the same keys (instances_selection_idx,
-  // instances_current_step_idx, instances_started_by_idx). They must sit after
-  // the ADD COLUMN statements: a fresh database has no column to index before
-  // them. Two runs at 200k rows, each comparing expression form against column
-  // form on one heap. The change's own benchmark: liveVersionCounts
+  // Three plain btrees over the generated columns. Two runs at 200k rows, each
+  // comparing expression form against column form on one heap. The change's own
+  // benchmark: liveVersionCounts
   // 1.549 -> 0.343 ms (an index-only scan becomes reachable), the orphan scan
   // 5.990 -> 2.816 ms, the migration scan 2.568 -> 1.548 ms, write overhead
   // +24.8% -> +17.1% at identical index size. The verification re-run, over a
@@ -319,20 +310,6 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   // how selective the process/status pair is, so neither run is the number to
   // quote alone. See the change rebuild-instance-expression-indexes.
   //
-  // The names differ from the three dropped ones on purpose. CREATE INDEX IF
-  // NOT EXISTS leaves an index of a given name alone whatever its definition,
-  // so reusing a name would strand every already-initialised database on the
-  // expression form. The DROPs stay here permanently: a database that has
-  // never run them reaches this code by the same path as one that has, and
-  // nothing builds the old names again, so two concurrent initSchema runs
-  // cannot race over them.
-  await db`DROP INDEX IF EXISTS instances_selection_idx`;
-  await db`DROP INDEX IF EXISTS instances_current_step_idx`;
-  await db`DROP INDEX IF EXISTS instances_started_by_idx`;
-  // The old retention index covered every unredacted row, so with retention off
-  // it held the whole table. CREATE INDEX IF NOT EXISTS would leave a reused
-  // name alone, so the replacement has a new name and this DROP stays for good.
-  await db`DROP INDEX IF EXISTS instances_redacted_idx`;
   // Readers: the migration population scan and findOrphanKeys
   // (src/engine/migration.ts), liveVersionCounts (src/engine/definitions.ts),
   // selectInRange and the bottlenecks WIP query (src/engine/reporting.ts),
@@ -363,18 +340,7 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   // commit that leaves an instance not running clears its mark (applyStepEntry,
   // markFaulted), and createInstance writes none for an instance created
   // finished, so a finished instance never enters it.
-  //
-  // The name differs from the dropped instances_resolve_idx on purpose.
-  // CREATE INDEX IF NOT EXISTS leaves an index of a given name alone whatever
-  // its definition, so reusing the name would strand every already-initialised
-  // database on the old index over (resolve_state). The DROP stays here
-  // permanently, for the reason the three expression-index drops above stay.
   await db`CREATE INDEX IF NOT EXISTS instances_resolve_open_idx ON instances (instance_id) WHERE resolve_state <> 'idle'`;
-  await db`DROP INDEX IF EXISTS instances_resolve_idx`;
-  // A mark on an instance that is not running has no reader. The first run on
-  // an existing database clears those marks once; every later run finds none.
-  // Runs after the index and the status column exist.
-  await db`UPDATE instances SET resolve_state = 'idle' WHERE resolve_state <> 'idle' AND status <> 'running'`;
   // Who took part in an instance (instance-visibility-set). One row per
   // (instance, principal); a principal is an actor id, a role string or a group
   // id — the same value kind assignment.candidates holds. created_at duplicates
@@ -412,32 +378,30 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   )`;
   // Project-local user accounts (src/auth/users.ts). user_id is the value used
   // as Actor.id — the same convention as assignment.candidates/claimedBy.
+  //
+  // manager_user_id: the account's manager, a pointer to one other account,
+  // never a tree. Read by the `org.manager-of-starter` assignment strategy
+  // (assignment-strategies.ts). The self-reference makes a pointer to no
+  // account unrepresentable; nothing deletes an account today, so ON DELETE
+  // SET NULL states an intent rather than a path that runs.
+  // display_name: the account's human-readable name (src/auth/users.ts).
+  // Nullable: a caller reads the resolved COALESCE(display_name, email), so a
+  // row without one shows its email until someone sets a value.
+  // locale: the account's own UI locale (src/http/account-routes.ts).
+  // Nullable: a browser that reads no value keeps its own localStorage
+  // preference. The value set is bounded by the route, not by a check
+  // constraint — a locale the frontend later adds must not make an
+  // already-stored row unreadable.
   await db`CREATE TABLE IF NOT EXISTS auth_users (
-    user_id       text PRIMARY KEY,
-    email         text UNIQUE NOT NULL,
-    password_hash text NOT NULL,
-    roles         text[] NOT NULL DEFAULT '{}',
-    disabled      boolean NOT NULL DEFAULT false
+    user_id         text PRIMARY KEY,
+    email           text UNIQUE NOT NULL,
+    password_hash   text NOT NULL,
+    roles           text[] NOT NULL DEFAULT '{}',
+    disabled        boolean NOT NULL DEFAULT false,
+    manager_user_id text REFERENCES auth_users(user_id) ON DELETE SET NULL,
+    display_name    text,
+    locale          text
   )`;
-  // The account's manager: a pointer to one other account, never a tree. Read by
-  // the `org.manager-of-starter` assignment strategy (assignment-strategies.ts).
-  // Its own statement, since CREATE TABLE IF NOT EXISTS does not touch a table
-  // that already exists. The self-reference makes a pointer to no account
-  // unrepresentable; nothing deletes an account today, so ON DELETE SET NULL
-  // states an intent rather than a path that runs.
-  await db`ALTER TABLE auth_users ADD COLUMN IF NOT EXISTS manager_user_id text REFERENCES auth_users(user_id) ON DELETE SET NULL`;
-  // The account's human-readable name (src/auth/users.ts). Nullable, and NULL on
-  // every pre-existing row: a caller reads the resolved COALESCE(display_name,
-  // email), so a row without one shows its email until someone sets a value. Its
-  // own statement for the same reason manager_user_id has one.
-  await db`ALTER TABLE auth_users ADD COLUMN IF NOT EXISTS display_name text`;
-  // The account's own UI locale (src/http/account-routes.ts). Nullable, and NULL
-  // on every pre-existing row: a browser that reads no value keeps its own
-  // localStorage preference. The value set is bounded by the route, not by a
-  // check constraint — a locale the frontend later adds must not make an
-  // already-stored row unreadable. Its own statement for the same reason
-  // manager_user_id has one.
-  await db`ALTER TABLE auth_users ADD COLUMN IF NOT EXISTS locale text`;
   // The login rate-limit windows (src/auth/login.ts): one row per window, scope
   // 'email' or 'address'. key = SHA-256 hex of the normalized email or the
   // caller address; the fixed length bounds the index row. No tenant column:
@@ -517,7 +481,6 @@ export async function initSchema(db: SQL = sql): Promise<void> {
     updated_by  text NOT NULL,
     updated_at  timestamptz NOT NULL DEFAULT now()
   )`;
-  await db`ALTER TABLE data_lists ADD COLUMN IF NOT EXISTS columns jsonb NOT NULL DEFAULT '[]'`;
   // A value is deactivated, never deleted: an instance that already holds one
   // must keep resolving its label (see the `heldValues` rule in host.ts). The
   // cascade therefore only fires when the whole list goes, which the delete
@@ -525,8 +488,7 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   // `attributes` holds this value's entry per declared column, as a JSON scalar
   // each. Postgres normalizes a jsonb object's key order, so the read side
   // walks the list's `columns` declaration and looks each key up here — never
-  // the reverse. Both new columns default to the empty case, so a deployment
-  // that predates them needs no backfill.
+  // the reverse. Both `columns` and `attributes` default to the empty case.
   await db`CREATE TABLE IF NOT EXISTS data_list_values (
     list_key   text NOT NULL REFERENCES data_lists (list_key) ON DELETE CASCADE,
     value      text NOT NULL,
@@ -538,7 +500,6 @@ export async function initSchema(db: SQL = sql): Promise<void> {
     updated_at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (list_key, value)
   )`;
-  await db`ALTER TABLE data_list_values ADD COLUMN IF NOT EXISTS attributes jsonb NOT NULL DEFAULT '{}'`;
   // Process templates: a reusable authored body a new process seeds from. Its
   // own table for the reason `drafts` has one — a template body in `definitions`
   // would make every read site of that table responsible for excluding it, and
@@ -659,7 +620,9 @@ async function initInstanceAudit(db: SQL): Promise<void> {
   // pinned search_path, which calls public.gen_random_bytes explicitly.
   await db`CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public`;
 
-  const engineRole = (await db`SELECT current_user`)[0].current_user as string;
+  // Already a quoted identifier (quote_ident doubles an embedded `"`); the two
+  // GRANT strings below splice it in without literal quotes.
+  const engineRole = (await db`SELECT quote_ident(current_user) AS role`)[0].role as string;
 
   // Postgres checks the CREATEROLE attribute before it checks whether the role
   // exists, so a bare duplicate_object guard alone would still raise 42501 on
@@ -1002,13 +965,14 @@ async function initInstanceAudit(db: SQL): Promise<void> {
       // property, which belongs to the engine's role alone (design.md "Who
       // owns the audit relation").
       await tx`REVOKE EXECUTE ON FUNCTION redact_instance_fields(text, text, text, bigint, text[]) FROM PUBLIC`;
-      // engineRole is captured above via SELECT current_user, before this
-      // SET LOCAL ROLE — inside the block current_user reads as the owner
-      // role, and granting to current_user here would hand the owner's own
-      // privileges to itself while leaving the engine's role with none.
-      await tx.unsafe(`GRANT INSERT, SELECT ON instance_audit TO "${engineRole}"`);
+      // engineRole is captured above via SELECT quote_ident(current_user),
+      // before this SET LOCAL ROLE — inside the block current_user reads as the
+      // owner role, and granting to current_user here would hand the owner's own
+      // privileges to itself while leaving the engine's role with none. The
+      // value is already a quoted identifier.
+      await tx.unsafe(`GRANT INSERT, SELECT ON instance_audit TO ${engineRole}`);
       await tx.unsafe(
-        `GRANT EXECUTE ON FUNCTION redact_instance_fields(text, text, text, bigint, text[]) TO "${engineRole}"`,
+        `GRANT EXECUTE ON FUNCTION redact_instance_fields(text, text, text, bigint, text[]) TO ${engineRole}`,
       );
     });
   } catch (err) {

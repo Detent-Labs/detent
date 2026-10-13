@@ -12,7 +12,9 @@ subprocess step takes no path on entry, and the child's return evaluates its
 paths. A cascade that re-enters a
 step is a non-terminating loop; the instance is parked `faulted` and the loop is
 surfaced.
+
 ## Requirements
+
 ### Requirement: Automatic paths are evaluated on step entry in priority order
 
 When an instance enters a step whose paths are `automatic`, the engine SHALL
@@ -243,13 +245,13 @@ SHALL be total and SHALL NOT throw for a definition that passed publish.
 - **WHEN** an automatic-path guard references a declared data-source result
 - **THEN** the reference is not a readable namespace; such a guard cannot have passed publish (it is a publish error), so no published definition reaches evaluation with one
 
-### Requirement: A finished instance has no re-resolution mark
+### Requirement: An instance that leaves running clears its own re-resolution mark
 
 A commit that leaves an instance not `running` SHALL clear its
 re-resolution mark. The clear happens in the same statement as the commit.
 This covers a terminal step, a `cancelled` override and the flip to `faulted`.
-`initSchema` SHALL clear the mark of every instance that is not `running`.
-The re-resolution claim then reads only instances that still move.
+`initSchema` SHALL run no cleanup of marks. The re-resolution claim then reads
+only instances that still move, because each instance clears its own mark.
 
 #### Scenario: A child that completes in its creation cascade has no mark
 
@@ -275,9 +277,8 @@ The re-resolution claim then reads only instances that still move.
   `faulted`
 - **THEN** the instance has no re-resolution mark
 
-#### Scenario: Initialisation clears a stale mark
+#### Scenario: Initialisation leaves every mark as it is
 
 - **WHEN** `initSchema` runs on a database where a `completed` instance and a
   `running` instance both carry a re-resolution mark
-- **THEN** the `completed` instance has no mark
-- **AND** the `running` instance keeps its mark
+- **THEN** both instances keep their mark

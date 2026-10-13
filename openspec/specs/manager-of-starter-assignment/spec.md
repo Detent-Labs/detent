@@ -6,49 +6,41 @@ Holds one manager pointer per local account. It also holds the built-in
 `org.manager-of-starter` assignment strategy that reads that pointer. A step then
 routes to the manager of the person who started the instance. It no longer routes
 to a list frozen into the definition.
+
 ## Requirements
-### Requirement: An account carries a manager pointer to one other account
 
-`auth_users` SHALL carry a nullable `manager_user_id` column, referencing
-`auth_users.user_id`. It SHALL name at most one other account. It SHALL NOT
-express a department, a deputy, a matrix, or any second hop.
+### Requirement: An account has a manager pointer to one other account from its creation
 
-The column SHALL be added by the existing `initSchema` DDL. The statement SHALL
-change an already-created table, so a database predating this change gains the
-column on the next start. Existing rows SHALL get `NULL`.
+`auth_users` SHALL carry a nullable `manager_user_id` column that references `auth_users.user_id`. It SHALL name at most one other account. It SHALL NOT express a department, a deputy, a matrix, or any second hop. The `CREATE TABLE` of `auth_users` in `initSchema` SHALL declare the column. `initSchema` SHALL NOT add it to a table that exists already.
 
-An account whose `manager_user_id` is `NULL` has no manager on record. That is a
-valid state rather than a failure. It SHALL NOT prevent login, listing, or any
-other account operation.
+#### Scenario: The column belongs to the new table
 
-A dangling pointer SHALL be unrepresentable. The column SHALL reference
-`auth_users.user_id`, so an id naming no account cannot be written.
+- **WHEN** `initSchema` runs against an empty database
+- **THEN** `auth_users` has a `manager_user_id` column, and a new account holds `NULL` in it
 
-A cycle between two accounts SHALL remain representable. Nothing traverses the
-pointer, so a cycle has no effect.
+### Requirement: An account with no manager stays usable
 
-#### Scenario: The column is added to an existing table
-
-- **WHEN** `initSchema` runs against a database whose `auth_users` predates this
-  change
-- **THEN** `auth_users` has a `manager_user_id` column and every existing row
-  holds `NULL`
-
-#### Scenario: A manager pointer round-trips
-
-- **WHEN** an account's manager is set to another existing account's `user_id`
-- **AND** that account is then read back
-- **THEN** the value read is the `user_id` that was written
-
-#### Scenario: A pointer to no account is refused
-
-- **WHEN** an account's manager is set to an id matching no `auth_users` row
-- **THEN** the write fails and that account's manager is unchanged
+An account whose `manager_user_id` is `NULL` has no manager on record. That is a valid state and no failure. It SHALL NOT prevent login, listing, or any other account operation.
 
 #### Scenario: An account with no manager is fully usable
 
-- **WHEN** an account whose `manager_user_id` is `NULL` logs in and is listed
-- **THEN** both succeed exactly as for an account created before this change
+- **WHEN** an account whose `manager_user_id` is `NULL` logs in and appears in the list
+- **THEN** both succeed, exactly as for an account that existed before this change
+
+### Requirement: A manager pointer cannot dangle
+
+A dangling pointer SHALL be unrepresentable. The column SHALL reference `auth_users.user_id`, so `auth_users` rejects an id that names no account. A cycle between two accounts SHALL stay representable. Nothing traverses the pointer, so a cycle has no effect.
+
+#### Scenario: A manager pointer round-trips
+
+- **WHEN** a caller sets an account's manager to another existing account's `user_id`
+- **AND** a caller then reads that account back
+- **THEN** the value read is the `user_id` that the caller wrote
+
+#### Scenario: A pointer to no account fails
+
+- **WHEN** a caller sets an account's manager to an id that matches no `auth_users` row
+- **THEN** the write fails and that account's manager stays as it was
 
 ### Requirement: The org.manager-of-starter strategy resolves the starter's manager
 

@@ -392,7 +392,7 @@ export async function submitAndTransition(
     throw err;
   }
 
-  const body = await store.resolveBody(committed.processId, committed.version);
+  const body = await store.resolveBody(committed.processId, committed.version, committed.definitionHash);
   if (!body) throw new NotFoundError(`no published body for process ${committed.processId} version ${committed.version}`);
   return resolveAutomatic(committed, body, actor, db, assignmentRegistry);
 }

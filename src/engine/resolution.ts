@@ -32,10 +32,13 @@ export const CLAIM_LEASE_MS = 30_000;
  * Resolve an instance's pinned frozen body. No definition store exists yet, so
  * this is injected. A resolver returning `undefined` leaves the instance flagged
  * for a later pass (the worker is inert in production until one is wired).
+ * A caller holding an instance passes its `definitionHash` as `pinHash`; the
+ * store throws when the stored row carries another hash.
  */
 export type ResolveBody = (
   processId: string,
   version: number,
+  pinHash?: string,
 ) => ProcessBody | undefined | Promise<ProcessBody | undefined>;
 
 function parseInstance(raw: unknown): Instance {

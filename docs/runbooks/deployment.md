@@ -212,10 +212,15 @@ process keeps state the engine enforces. The login rate-limit windows live in
 the tenant's `login_attempts` table. A second process or a restart changes no
 threshold the engine enforces.
 
-Start one process before the others, on a new database and after an
-upgrade that changes the schema. Start the rest only after the first one
-reports ready. Readiness is what `GET /readyz` reports. The startup
-schema step takes no lock. Two processes that run it together can fail.
+Start one process before the others on a new database. Do the same after
+an upgrade that adds a table or an index. Start the rest only after the
+first one reports ready. Readiness is what `GET /readyz` reports. The
+startup schema step takes no lock. Two processes that run it together
+can fail.
+
+The schema step creates missing tables and indexes only. It does not add
+a column to an existing table. For a database that predates a column,
+drop it, then seed or provision it again.
 
 In SaaS mode, with `TENANT_CONTROL_PLANE_URL` set, the server builds no
 schema at startup (`src/http/server.ts:893`). The provisioning command
@@ -322,7 +327,24 @@ tenant whose database is down reads 503. The first is the caller's to fix. The
 second is yours.
 
 Re-run the provisioning command's schema step after an upgrade that adds a
-column or a table, once per tenant database. The `login_attempts` table is
+table or an index, once per tenant database. The `login_attempts` table is
 one such addition. A tenant database without it answers every login with 500
 until its schema step runs. Every schema statement is idempotent, so a run
 against a current database changes nothing.
+
+The schema step creates missing tables and indexes only. It does not add a
+column to an existing table. If a missing column carries an index, the
+schema step fails at startup. Otherwise the first query that names the
+column fails, whether it reads or writes the column. A tenant database that
+predates a column needs five steps. The drop destroys the tenant's data, so
+dump the database first, as `docs/runbooks/backup-restore.md` describes.
+
+1. Stop every engine process that serves the tenant. A running process
+   holds open sessions that make the drop fail. It also keeps stale
+   handles for the old database.
+2. Drop the tenant's database.
+3. Delete the tenant's row from the `tenants` table of the control plane,
+   matching its `key` column. No command does this, so run the SQL
+   yourself. `add-tenant` refuses a key or a database that a row holds.
+4. Run `add-tenant` again, with the same key or a new one.
+5. Start the engine processes again after `add-tenant` finishes.

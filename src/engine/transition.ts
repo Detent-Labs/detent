@@ -65,7 +65,7 @@ export { SPAWN_ACTION_TYPE, RETURN_ACTION_TYPE, CANCEL_CHILD_ACTION_TYPE } from 
 export const CANCEL_CHILD_ACTION_ID = "action_cancel_awaited_child";
 
 /** Resolve an instance's frozen body from its pin. Injected (see resolution.ts ResolveBody). */
-type ResolveBodyFn = (processId: string, version: number) => Promise<ProcessBody | undefined> | ProcessBody | undefined;
+type ResolveBodyFn = (processId: string, version: number, pinHash?: string) => Promise<ProcessBody | undefined> | ProcessBody | undefined;
 
 export class GuardRefused extends Error {
   constructor(pathId: string) {
@@ -682,7 +682,7 @@ async function sweepCancelledChildren(
   for (const row of rows) {
     try {
       const child = instanceSchema.parse(typeof row.body === "string" ? JSON.parse(row.body) : row.body);
-      const childBody = await resolveBody(child.processId, child.version);
+      const childBody = await resolveBody(child.processId, child.version, child.definitionHash);
       if (!childBody) {
         result.failed.push(child.instanceId);
         continue;

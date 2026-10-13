@@ -70,7 +70,7 @@ export async function drainTimers(
     // pushing it would delay a timer this same read already knows is due.
     try {
       const inst = parseInstance(row.body);
-      const body = await resolveBody(inst.processId, inst.version);
+      const body = await resolveBody(inst.processId, inst.version, inst.definitionHash);
       if (!body) {
         await pushOutOfScan(db, row.instance_id, row.next_timer_at); // resolver miss: leave for a later pass
         continue;

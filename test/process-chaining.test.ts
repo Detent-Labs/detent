@@ -9,7 +9,8 @@
 import { test, expect, beforeAll } from "bun:test";
 import { sql, initSchema, createInstance } from "../src/engine/store.js";
 import { startInstance, commitManualTransition, cancelInstance } from "../src/engine/transition.js";
-import { publishBody, createDefinitionStore, CrossProcessValidationError, CelValidationError } from "../src/engine/definitions.js";
+import { publishBody, createDefinitionStore, CrossProcessValidationError, CelValidationError, DefinitionHashMismatch } from "../src/engine/definitions.js";
+import { definitionHash } from "../src/schema/hash.js";
 import { createDefaultRegistry } from "../src/engine/host.js";
 import { createDataSourceRegistry, createStaticAssignmentRegistry, RETURN_ACTION_TYPE, type Registry as Reg, type AssignmentRegistry } from "../src/engine/registry.js";
 import { createDefaultAssignmentRegistry, GROUP_MEMBERS_STRATEGY_TYPE, ACTOR_FROM_FIELD_STRATEGY_TYPE } from "../src/engine/assignment-strategies.js";
@@ -558,4 +559,60 @@ test.skipIf(!DB)("a process.start mapping a person into the org.actor-from-field
   expect(dataField(target, "field_t_approver")).toBe(approver);
   expect(target!.assignment!.candidates).toEqual([approver]);
   expect(await unresolvedEvents(startedId)).toHaveLength(0);
+});
+
+// --- DB: the process.start handler pins the instances it holds -----------------
+
+/** Replace a row's body and hash together: the row check passes, only a pin can tell. */
+async function restoreRowWithAnotherBody(processId: string, version: number): Promise<void> {
+  const rows = (await sql`SELECT body FROM definitions WHERE process_id = ${processId} AND version = ${version}`) as { body: unknown }[];
+  const changed = { ...(rows[0].body as Record<string, unknown>), label: { en: "Restored" } } as unknown as ProcessBody;
+  await sql`UPDATE definitions SET body = ${JSON.stringify(changed)}::jsonb, definition_hash = ${definitionHash(changed)}
+    WHERE process_id = ${processId} AND version = ${version}`;
+}
+
+/** A chain start parked at its action, with the handler context a delivery would build. */
+async function chainStartContext(tag: string) {
+  const { registry } = chainRegistry();
+  const tv = await publishBody(`proc_pc_pin_${tag}_t` as Instance["processId"], targetBody(), registry, dataSourceReg);
+  const av = await publishBody(`proc_pc_pin_${tag}_a` as Instance["processId"], actorBody(tv.processId), registry, dataSourceReg);
+  const started = await startInstance(av.definition, { processId: av.processId, version: av.version }, actor);
+  const done = await commitManualTransition(started, "path_a_done", av.definition, actor, sql, { field_a_amount: 500 } as unknown as Instance["data"]);
+  const config = { processId: tv.processId, inputMapping: { field_t_amount: cel("data.amount") } };
+  const ctx = {
+    action: { id: "action_chain", type: PROCESS_START_ACTION_TYPE, config } as unknown as Action,
+    config,
+    idempotencyKey: idempotencyKey(done.instanceId, done.transitionSeq, "action_chain"),
+    instanceId: done.instanceId,
+    db: sql,
+    assignmentRegistry: createStaticAssignmentRegistry(),
+  };
+  return { registry, tv, av, done, ctx, handler: registry.get(PROCESS_START_ACTION_TYPE)!.handler };
+}
+async function thrown(run: () => Promise<unknown>): Promise<unknown> {
+  try {
+    await run();
+  } catch (e) {
+    return e;
+  }
+  return undefined;
+}
+
+test.skipIf(!DB)("process.start throws when the acting instance's stored row no longer matches its pin", async () => {
+  const { av, ctx, handler } = await chainStartContext("acting");
+  await restoreRowWithAnotherBody(av.processId, av.version);
+  const error = await thrown(() => handler(ctx));
+  expect(error).toBeInstanceOf(DefinitionHashMismatch);
+  expect((error as DefinitionHashMismatch).reason).toBe("pin");
+  expect(await countChainedFrom(ctx.instanceId)).toBe(0);
+});
+
+test.skipIf(!DB)("a process.start redelivery throws when the started instance's stored row no longer matches its pin", async () => {
+  const { tv, ctx, handler } = await chainStartContext("started");
+  await handler(ctx); // creates the started instance
+  expect(await countChainedFrom(ctx.instanceId)).toBe(1);
+  await restoreRowWithAnotherBody(tv.processId, tv.version);
+  const error = await thrown(() => handler(ctx));
+  expect(error).toBeInstanceOf(DefinitionHashMismatch);
+  expect((error as DefinitionHashMismatch).reason).toBe("pin");
 });

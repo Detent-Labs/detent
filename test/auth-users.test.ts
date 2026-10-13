@@ -196,23 +196,16 @@ test.skipIf(!DB)("a user disabled via setDisabled fails verifyLogin exactly like
 // The manager pointer (manager-of-starter-assignment)
 // ============================================================
 
-test.skipIf(!DB)("initSchema adds manager_user_id, and an existing row holds NULL", async () => {
-  // The column ships as its own ALTER, since CREATE TABLE IF NOT EXISTS does not
-  // touch a table that already exists. Re-running initSchema over a populated
-  // table is the shape a deployed database upgrades through.
+test.skipIf(!DB)("a new account holds NULL in manager_user_id", async () => {
   const { userId } = await createUser("m1@example.com", "pw", []);
-  await initSchema();
   const rows = (await sql`SELECT manager_user_id FROM auth_users WHERE user_id = ${userId}`) as { manager_user_id: string | null }[];
   expect(rows[0]!.manager_user_id).toBeNull();
   const [listed] = (await listUsers()).items;
   expect(listed!.managerUserId).toBeUndefined();
 });
 
-test.skipIf(!DB)("initSchema adds locale, and an existing row holds NULL", async () => {
-  // Same shape as the manager_user_id migration above: its own ALTER, run over a
-  // table that already holds a row, which is how a deployed database upgrades.
+test.skipIf(!DB)("a new account holds NULL in locale", async () => {
   const { userId } = await createUser("loc1@example.com", "pw", []);
-  await initSchema();
   const rows = (await sql`SELECT locale FROM auth_users WHERE user_id = ${userId}`) as { locale: string | null }[];
   expect(rows[0]!.locale).toBeNull();
   expect((await getAccountById(userId))!.locale).toBeUndefined();
@@ -429,12 +422,8 @@ const storedDisplayName = async (userId: string): Promise<string | null> => {
   return rows[0]!.display_name;
 };
 
-test.skipIf(!DB)("initSchema adds display_name, and an existing row holds NULL", async () => {
-  // Its own ALTER, like manager_user_id: CREATE TABLE IF NOT EXISTS does not
-  // touch a table that already exists, so a deployed database picks the column
-  // up on the next run over its populated table.
+test.skipIf(!DB)("a new account without a display name holds NULL and lists under its email", async () => {
   const { userId } = await createUser("n1@example.com", "pw", []);
-  await initSchema();
   expect(await storedDisplayName(userId)).toBeNull();
   const [listed] = (await listUsers()).items;
   expect(listed!.displayName).toBe("n1@example.com");

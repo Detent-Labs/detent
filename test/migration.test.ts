@@ -1671,42 +1671,6 @@ test.skipIf(!DB)("schema init creates the current-step and started-by column ind
   expect(after).toEqual(before);
 });
 
-// rebuild-instance-expression-indexes: the three expression indexes over keys
-// Change 1 promoted to columns gave way to plain column indexes under NEW
-// names. CREATE INDEX IF NOT EXISTS leaves an index of a given name alone
-// whatever its definition, so a database initialised before that change keeps
-// the expression form unless initSchema drops it by name. This recreates the
-// old three by hand and asserts the drop.
-test.skipIf(!DB)("schema init drops the three expression indexes the column indexes replaced", async () => {
-  await initSchema();
-  await sql`CREATE INDEX IF NOT EXISTS instances_selection_idx
-    ON instances ((body->>'processId'), (body->>'version'), (body->>'status'))`;
-  await sql`CREATE INDEX IF NOT EXISTS instances_current_step_idx ON instances ((body->>'currentStepId'))`;
-  await sql`CREATE INDEX IF NOT EXISTS instances_started_by_idx ON instances ((body->>'startedBy'))`;
-  const seeded = (await sql`
-    SELECT indexname FROM pg_indexes
-    WHERE indexname IN ('instances_selection_idx', 'instances_current_step_idx', 'instances_started_by_idx')
-  `) as { indexname: string }[];
-  expect(seeded).toHaveLength(3); // the fixture itself has to hold, or the assertion below is vacuous
-
-  await initSchema();
-  const after = (await sql`
-    SELECT indexname FROM pg_indexes
-    WHERE indexname IN ('instances_selection_idx', 'instances_current_step_idx', 'instances_started_by_idx')
-  `) as { indexname: string }[];
-  expect(after).toEqual([]);
-  const rebuilt = (await sql`
-    SELECT indexname FROM pg_indexes
-    WHERE indexname IN ('instances_selection_col_idx', 'instances_current_step_col_idx', 'instances_started_by_col_idx')
-    ORDER BY indexname
-  `) as { indexname: string }[];
-  expect(rebuilt.map((r) => r.indexname)).toEqual([
-    "instances_current_step_col_idx",
-    "instances_selection_col_idx",
-    "instances_started_by_col_idx",
-  ]);
-});
-
 // rebuild-instance-expression-indexes: the readers that reach the three rebuilt
 // indexes name the generated columns, and have to keep naming them. Postgres
 // substitutes a plain index only into a query naming the column, so a predicate
