@@ -213,15 +213,15 @@ They are two `Map`s, one keyed by email and one by caller address. A
 second process keeps its own windows, so each added process raises the
 effective login threshold. A restart clears that process's windows.
 
-Start one process before the others on a new database. Start the rest
-only after the first one reports ready. Readiness is what `GET /readyz`
-reports. The startup schema step takes no lock. Two processes that run
-it together can fail.
+Start one process before the others on a new database. Do the same after
+an upgrade that adds a table or an index. Start the rest only after the
+first one reports ready. Readiness is what `GET /readyz` reports. The
+startup schema step takes no lock. Two processes that run it together
+can fail.
 
 The schema step creates missing tables and indexes only. It does not add
-a column to an existing table, so an upgrade has no start order. For a
-database that predates a column, drop it, then seed or provision it
-again.
+a column to an existing table. For a database that predates a column,
+drop it, then seed or provision it again.
 
 In SaaS mode, with `TENANT_CONTROL_PLANE_URL` set, the server builds no
 schema at startup (`src/http/server.ts:893`). The provisioning command
@@ -328,5 +328,11 @@ tenant whose database is down reads 503. The first is the caller's to fix. The
 second is yours.
 
 The schema step creates missing tables and indexes only. It does not add a
-column to an existing table. For a tenant database that predates a column,
-drop it, then provision it again.
+column to an existing table. A tenant database that predates a column
+needs three steps:
+
+1. Drop the tenant's database.
+2. Delete the tenant's row from the `tenants` table of the control plane,
+   matching its `key` column. No command does this, so run the SQL
+   yourself. `add-tenant` refuses a key or a database that a row holds.
+3. Run `add-tenant` again, with the same key or a new one.
