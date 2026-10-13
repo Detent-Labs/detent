@@ -95,6 +95,14 @@ unchanged, since `memo` costs nothing for a caller whose props change.
 `visible` is `!jsonOpen && openTab === "<tab>"`, the expression `FieldsTab`
 already receives.
 
+The first browser run found that `FieldMatrixGrid` still ran while hidden. React 19
+propagates a context change lazily. The panel bails out. React then walks up to
+the changed outer `DraftProvider`. It marks the first `DraftContext` reader
+below the panel, without comparing values. The held provider does not stop it.
+
+So the panel reads the draft and passes `draft`, `mutate` and `contentLocale`
+to the grid as props. The grid reads no context.
+
 Alternatives. `useDeferredValue(draft)` keeps the work and only moves it off the
 keystroke. The CPU cost stays, and a catch-up render follows every keystroke.
 Memoizing on draft subtrees fails because `structuredClone` breaks identity.
@@ -117,8 +125,11 @@ step in this change that touches a visible path.
   failure path and leaves the layout untouched.
 - `FormEditorScreen` loads through `React.lazy` in `EditScreen`. `PlayerScreen`
   does the same in `root.tsx`. Each sits inside a `Suspense` boundary local to
-  its site, with one new studio catalog key for the loading line. The studio catalog has no generic loading text today, only per-screen keys such as `changesView.loading`. The line follows the waiting-state rule in `design-language.md`: one line, no skeleton, no spinner. The nearest other boundary belongs
-  to the shell. It would replace the whole area, draft included, while the chunk
+  its site, with one new studio catalog key for the loading line. The studio catalog has
+  no generic loading text today, only per-screen keys such as
+  `changesView.loading`. The line follows the waiting-state rule in
+  `design-language.md`: one line, no skeleton, no spinner. The nearest other
+  boundary belongs to the shell. It would replace the whole area, draft included, while the chunk
   loads.
 
 Dagre alone brings the chunk to about 501 kB. Dagre, the form editor and the
@@ -129,7 +140,15 @@ Alternatives. Splitting `cel-js` or `zod` saves more, but both load on every
 screen. Splitting Versions, Templates, Tools and the migration plan saves about
 19 kB for four more `Suspense` sites. The owner ruled "nothing finer".
 
-### 4. E1-6 closes as measured
+### 4. Validation keeps its input identity
+
+The chaining effect in `DraftProvider` ran `syncLoadedTargets` on every draft
+change. Each run returned a fresh object. The validation `useMemo` then ran a
+second time per keystroke, for about 2.9 ms. Now `syncLoadedTargets` returns the
+previous object when the ids and bodies did not change. Validation results stay
+the same.
+
+### 5. E1-6 closes as measured
 
 A guard-label `useMemo` has to lift `edgeGuardLabel` out of the edge pass's
 render loop. The loop computes the label beside the route and the label
@@ -166,5 +185,43 @@ None. The owner rulings of 2026-10-12 settle the budget and the chunk split.
 
 ## Measured after
 
-The verification task fills this in. It records the same three rounds on the
-same example, the chunk table from `bun run build`, and the drag frame log.
+Production build, same machine and method as the baseline. IT Offboarding, 20
+characters typed into a Fields-tab label, two runs of three rounds each.
+
+| Round | Sync commit median, before | Sync commit median, after | Paint median, after |
+|---|---|---|---|
+| 1 | 19.5 ms | 8.95 and 9.30 ms | 20.0 ms |
+| 2 | 17.0 ms | 7.30 and 7.70 ms | 20.0 ms |
+| 3 | 17.1 ms | 6.60 and 6.95 ms | 20.0 ms |
+
+The sync commit fell by about 55 percent. The painted frame fell from 35 to
+40 ms to 20 ms. The 4 ms budget is **not met**.
+
+A CPU profile of the final build splits the remaining sync time. Validation takes 3.4 ms. The `describeChanges`
+call takes 1.3 ms. The Fields tab and the other mounted bodies take 2 to 3 ms.
+
+Validation runs synchronously in `DraftProvider`, so the budget cannot hold
+without deferring it. A deferral changes what the check results, the Checks badge
+and the publish gate read. It needs its own change.
+
+A hidden matrix and a hidden Changes panel record 0 DOM mutations and 0 renders
+per keystroke. The Fields panel records 270 to 545 mutations as the control. A
+selected matrix cell survives a round trip. The first frame after the switch
+draws the live draft.
+
+Canvas drag, 60-step mouse drag on the 12-step canvas: frame p50 10.5 to
+10.6 ms, p95 11.1 to 11.5 ms, 0 long tasks. This matches the baseline.
+
+Chunks from `bun run build`, with no Vite size warning:
+
+| Chunk | Size | gzip |
+|---|---|---|
+| studio root | 225.82 kB | 63.57 kB |
+| `EntityTabs`, shared by the root and the form editor | 246.14 kB | 68.88 kB |
+| `dagre.esm` | 46.53 kB | 15.82 kB |
+| `FormEditorScreen` | 23.83 kB | 7.06 kB |
+| `PlayerScreen` | 6.26 kB | 2.50 kB |
+
+The old single studio chunk weighed 548.04 kB. The largest chunk is now 246 kB.
+An author loads the root and `EntityTabs` on the first studio visit, 472 kB
+together. The other three load on demand.
