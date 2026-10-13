@@ -1823,6 +1823,11 @@ to this section.
 - **RENDER-2: two more bodies could take the same hold.** `ContractPanel`
   takes no props and `PathsView` takes `draft` as a prop. Neither has a
   measured cost. Profile them before adding the hold.
+- **RENDER-3: the new load paths read thin.** The Arrange failure banner says
+  "Something went wrong" and offers no retry. Arrange shows nothing while its
+  library loads. The loading line has no `role="status"`, names no screen, and
+  the form editor's loading line sits 16 px left of the editor. All five are polish
+  from the `/impeccable audit`, and none loses work.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 
