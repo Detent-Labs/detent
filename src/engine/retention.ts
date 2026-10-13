@@ -54,7 +54,7 @@ export async function redactInstance(
     // access to `definitions` (redactable-field-flag design.md "The
     // currently pinned version's catalog is the sole source of truth").
     const { resolveBody } = createDefinitionStore(tx);
-    const body = await resolveBody(inst.processId, inst.version);
+    const body = await resolveBody(inst.processId, inst.version, inst.definitionHash);
     if (!body) {
       throw new Error(`redactInstance: no published definition for ${inst.processId}@${inst.version}`);
     }

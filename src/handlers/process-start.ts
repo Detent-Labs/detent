@@ -51,7 +51,7 @@ async function processStartHandler(ctx: HandlerContext): Promise<unknown> {
   const existing = await loadInstance(ctx.db, startedId);
   if (existing) {
     started = existing;
-    const resolved = await resolveBody(existing.processId, existing.version);
+    const resolved = await resolveBody(existing.processId, existing.version, existing.definitionHash);
     if (!resolved) {
       throw new Error(`process.start: started instance body unresolved: ${existing.processId}@${existing.version}`);
     }
@@ -63,7 +63,7 @@ async function processStartHandler(ctx: HandlerContext): Promise<unknown> {
 
     const acting = await loadInstance(ctx.db, ctx.instanceId);
     if (!acting) throw new Error(`process.start: acting instance unresolved: ${ctx.instanceId}`);
-    const actingBody = await resolveBody(acting.processId, acting.version);
+    const actingBody = await resolveBody(acting.processId, acting.version, acting.definitionHash);
     if (!actingBody) {
       throw new Error(`process.start: acting instance body unresolved: ${acting.processId}@${acting.version}`);
     }

@@ -966,6 +966,9 @@ export function createDefinitionStore(
     // a new identifier, so a cache entry per run would grow until a restart:
     // this branch verifies the hash and the pin on every read and caches
     // nothing.
+    // ponytail: no cache for a test instance's body. Ceiling: one query per
+    // read of that body. Upgrade: a map bounded to negative versions only,
+    // evicting its oldest entry past a fixed size.
     if (version < 0) {
       const rows = (await db`SELECT body, definition_hash FROM draft_snapshots
         WHERE process_id = ${processId} AND version = ${version} LIMIT 1`) as { body: unknown; definition_hash: string }[];
