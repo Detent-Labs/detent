@@ -329,10 +329,15 @@ second is yours.
 
 The schema step creates missing tables and indexes only. It does not add a
 column to an existing table. A tenant database that predates a column
-needs three steps:
+needs five steps. The drop destroys the tenant's data, so dump the
+database first, as `docs/runbooks/backup-restore.md` describes.
 
-1. Drop the tenant's database.
-2. Delete the tenant's row from the `tenants` table of the control plane,
+1. Stop every engine process that serves the tenant. A running process
+   holds open sessions that make the drop fail. It also keeps stale
+   handles for the old database.
+2. Drop the tenant's database.
+3. Delete the tenant's row from the `tenants` table of the control plane,
    matching its `key` column. No command does this, so run the SQL
    yourself. `add-tenant` refuses a key or a database that a row holds.
-3. Run `add-tenant` again, with the same key or a new one.
+4. Run `add-tenant` again, with the same key or a new one.
+5. Start the engine processes again after `add-tenant` finishes.
