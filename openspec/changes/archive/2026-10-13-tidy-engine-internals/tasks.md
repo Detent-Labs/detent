@@ -31,11 +31,11 @@
 
 ## 6. Verification
 
-- [ ] 6.1 Run `bun run typecheck` in the devcontainer. Expect exit code 0.
-- [ ] 6.2 Run `bun run build` in the devcontainer. Expect exit code 0.
-- [ ] 6.3 Run the full `bun test` suite with `DATABASE_URL` set through `sh scripts/test-gated.sh bun test` and `OPENSPEC_TELEMETRY=0`. Read the pass, skip and fail counts.
-- [ ] 6.4 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` on the host. Read its exit code.
-- [ ] 6.5 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh` on the host. Read its exit code.
+- [x] 6.1 Run `bun run typecheck` in the devcontainer. Expect exit code 0.
+- [x] 6.2 Run `bun run build` in the devcontainer. Expect exit code 0.
+- [x] 6.3 Run the full `bun test` suite with `DATABASE_URL` set through `sh scripts/test-gated.sh bun test` and `OPENSPEC_TELEMETRY=0`. Read the pass, skip and fail counts.
+- [x] 6.4 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` on the host. Read its exit code.
+- [x] 6.5 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh` on the host. Read its exit code.
 
 ## Workflow follow-up
 
