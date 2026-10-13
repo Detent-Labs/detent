@@ -39,8 +39,8 @@ rows the tab lists.
 #### Scenario: The badge counts a hidden tab's rows
 
 - **WHEN** the author changes a field's label on the Fields tab
-- **THEN** the Changes count updates in the same commit. The change list shows
-  that row once the tab opens.
+- **THEN** the Changes count updates while the Fields tab stays open. The change
+  list shows that row once the tab opens.
 
 ### Requirement: The form editor and the player load when their screen opens
 
