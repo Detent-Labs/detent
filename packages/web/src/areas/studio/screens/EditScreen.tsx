@@ -17,6 +17,7 @@ import { FieldsTab, DataSourcesTab } from "../panels/EntityTabs.js";
 import { ContractPanel } from "../panels/ContractPanel.js";
 import { FieldMatrixPanel } from "../panels/FieldMatrixPanel.js";
 import { ChangesView } from "../panels/ChangesView.js";
+import { HeldDraft } from "../draft/held-while-hidden.js";
 import { PathsView } from "../panels/PathsView.js";
 import { FormsTab } from "../panels/FormsTab.js";
 import { AccessPanel } from "../panels/AccessPanel.js";
@@ -1057,7 +1058,15 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
                 }}
               />,
             )}
-            {tabPanel("matrix", <FieldMatrixPanel />)}
+            {/* The matrix derives from the whole draft. While hidden it reads
+                the draft it last drew, so typing on another tab skips it
+                (`studio-app`). */}
+            {tabPanel(
+              "matrix",
+              <HeldDraft visible={!jsonOpen && openTab === "matrix"}>
+                <FieldMatrixPanel />
+              </HeldDraft>,
+            )}
             {tabPanel("contract", <ContractPanel />)}
             {tabPanel(
               "changes",
@@ -1068,6 +1077,7 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
                 baseVersion={changesBaseVersion}
                 contentLocale={contentLocale}
                 onCount={onChangesCount}
+                visible={!jsonOpen && openTab === "changes"}
                 onOpenRow={(row) => {
                   // ponytail: the open command opens the owning tab and selects
                   // nothing inside it, so the author finds the entity there by

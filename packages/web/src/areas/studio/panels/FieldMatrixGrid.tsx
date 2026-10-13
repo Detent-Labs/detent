@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent } from "react";
+import { memo, useEffect, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { useDraft } from "../draft/store";
@@ -501,8 +501,11 @@ interface Props {
  * This component carries no toolbar, legend or count line — those belong to
  * `FieldMatrixPanel`, the panels-screen wrapper that renders this grid
  * inside itself (design.md decision 6).
+ *
+ * A `memo` component: its two props are booleans, so it re-renders only on
+ * its own state, a prop flip or a new draft context value.
  */
-export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: Props) {
+export const FieldMatrixGrid = memo(function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: Props) {
   const { draft, mutate, contentLocale } = useDraft();
   const baseLocale = draft.baseLocale ?? "en";
   const rows = useMemo(() => matrixRows(draft.fields), [draft.fields]);
@@ -845,4 +848,4 @@ export function FieldMatrixGrid({ hideInert = false, showBulkBadges = false }: P
       </div>
     </>
   );
-}
+});

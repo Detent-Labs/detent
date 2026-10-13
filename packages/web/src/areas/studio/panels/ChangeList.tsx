@@ -12,7 +12,7 @@
  * The open state is a set of row keys held here. A caller that stays mounted
  * keeps it across a recompute, and a key that leaves the list stops matching.
  */
-import { Fragment, useId, useState } from "react";
+import { Fragment, memo, useId, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
@@ -351,7 +351,9 @@ interface Props {
 // markup, folded or not, with no windowing. Ceiling: a very large diff, such
 // as hundreds of rows after an import, renders slowly. Upgrade: window the
 // rows, or mount a row's body only while it stands open (design D6, Risks).
-export function ChangeList({ rows, heading, onOpenRow }: Props) {
+// A `memo` component: `ChangesView` holds its props while the Changes tab is
+// hidden, so the list skips every keystroke on another tab.
+export const ChangeList = memo(function ChangeList({ rows, heading, onOpenRow }: Props) {
   const listId = useId();
   const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set());
   const allOpen = rows.length > 0 && rows.every((row) => open.has(row.key));
@@ -406,7 +408,7 @@ export function ChangeList({ rows, heading, onOpenRow }: Props) {
       </div>
     </div>
   );
-}
+});
 
 interface RowProps {
   row: ChangeRow;

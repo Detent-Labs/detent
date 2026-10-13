@@ -20,6 +20,7 @@ import { getVersionBody } from "../api/client.js";
 import { describeCaughtError } from "../errors.js";
 import { describeChanges, type ChangeRow } from "../draft/changeSet.js";
 import { ChangeList } from "./ChangeList.js";
+import { useHeldWhileHidden } from "../draft/held-while-hidden.js";
 import type { Draft } from "../draft/types.js";
 
 /**
@@ -90,9 +91,13 @@ interface Props {
   onCount: (count: number | undefined) => void;
   /** What a row's open command does. Without it no row offers one. */
   onOpenRow?: (row: ChangeRow) => void;
+  /** Whether the Changes tab is open. While it is not, the change list draws
+   * the rows it drew when last visible, and `onCount` still reports the live
+   * count. */
+  visible: boolean;
 }
 
-export function ChangesView({ processId, token, draft, baseVersion, contentLocale, onCount, onOpenRow }: Props) {
+export function ChangesView({ processId, token, draft, baseVersion, contentLocale, onCount, onOpenRow, visible }: Props) {
   const [state, setState] = useState<BaseState>({ kind: "idle" });
 
   useEffect(() => {
@@ -130,6 +135,13 @@ export function ChangesView({ processId, token, draft, baseVersion, contentLocal
     onCount(rows?.length);
   }, [rows, onCount]);
 
+  // The list's props as they stood when the tab was last visible. The held
+  // object keeps its identity while hidden, `onOpenRow` included, so the
+  // `memo` list skips. Nobody can press a hidden row, so the frozen closure
+  // never runs. A list that mounts hidden holds nothing until it first shows.
+  const heading = t("changeList.heading.base").replace("{version}", () => String(baseVersion));
+  const shown = useHeldWhileHidden({ rows, heading, onOpenRow }, visible);
+
   if (baseVersion === null) return <p {...stylex.props(styles.empty)}>{t("changesView.firstPublish")}</p>;
   if (state.kind === "loading") return <p {...stylex.props(styles.empty)}>{t("changesView.loading")}</p>;
   if (state.kind === "error")
@@ -139,9 +151,7 @@ export function ChangesView({ processId, token, draft, baseVersion, contentLocal
         <span {...stylex.props(styles.errorBannerMessage)}>{state.message}</span>
       </div>
     );
-  if (!rows) return null;
-  if (rows.length === 0) return <p {...stylex.props(styles.empty)}>{t("changesView.none")}</p>;
-
-  const heading = t("changeList.heading.base").replace("{version}", () => String(baseVersion));
-  return <ChangeList rows={rows} heading={heading} onOpenRow={onOpenRow} />;
+  if (!shown.rows) return null;
+  if (shown.rows.length === 0) return <p {...stylex.props(styles.empty)}>{t("changesView.none")}</p>;
+  return <ChangeList rows={shown.rows} heading={shown.heading} onOpenRow={shown.onOpenRow} />;
 }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { useDraft } from "../draft/store";
@@ -113,8 +113,12 @@ function countLine(declared: number, fields: number, steps: number, cells: numbe
  * toolbar (inert-column filter, count line, legend) and the column/row bulk
  * toggle badges the grid draws when `showBulkBadges` is set (design.md
  * decision 6, `field-matrix-toolbar-and-inline-editing`).
+ *
+ * A `memo` component with no props: it re-renders only on its own state or
+ * a new draft context value. `EditScreen` wraps it in `HeldDraft`, so a
+ * hidden matrix skips every keystroke on another tab.
  */
-export function FieldMatrixPanel() {
+export const FieldMatrixPanel = memo(function FieldMatrixPanel() {
   const { draft } = useDraft();
   const [hideInert, setHideInert] = useState(false);
 
@@ -157,4 +161,4 @@ export function FieldMatrixPanel() {
       <FieldMatrixGrid hideInert={hideInert} showBulkBadges />
     </div>
   );
-}
+});
