@@ -172,8 +172,11 @@ test.skipIf(!DB)("initSchema run as a role whose name has a double quote grants 
     // which lets initSchema grant itself the membership it needs. Neither SUPERUSER nor
     // CREATEROLE. Identifiers cannot be bind parameters; every name here is generated.
     await admin.unsafe(`CREATE ROLE ${quoted} LOGIN PASSWORD '${password}'`);
-    // The shared test database ran initSchema already, so detent_audit_owner exists.
-    await admin.unsafe(`GRANT detent_audit_owner TO ${quoted} WITH ADMIN OPTION`);
+    // Relies on detent_audit_owner already existing in the cluster: the shared test
+    // database ran initSchema. INHERIT FALSE keeps the owner's privileges on
+    // instance_audit and the redaction function from flowing to the role through
+    // this membership, so the has_*_privilege checks see only a direct grant.
+    await admin.unsafe(`GRANT detent_audit_owner TO ${quoted} WITH ADMIN TRUE, INHERIT FALSE`);
     await admin.unsafe(`CREATE DATABASE "${database}" OWNER ${quoted}`);
 
     const url = new URL(urlFor(database));
@@ -191,10 +194,11 @@ test.skipIf(!DB)("initSchema run as a role whose name has a double quote grants 
     `) as { can_insert: boolean; can_select: boolean; can_redact: boolean }[];
     expect(held).toEqual({ can_insert: true, can_select: true, can_redact: true });
   } finally {
-    await engine?.close();
-    await admin.unsafe(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
-    await admin.unsafe(`DROP ROLE IF EXISTS ${quoted}`);
-    await admin.close();
+    // Each step runs even when an earlier one throws.
+    await engine?.close().catch(() => undefined);
+    await admin.unsafe(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`).catch(() => undefined);
+    await admin.unsafe(`DROP ROLE IF EXISTS ${quoted}`).catch(() => undefined);
+    await admin.close().catch(() => undefined);
   }
 }, SCRATCH_TIMEOUT_MS);
 
