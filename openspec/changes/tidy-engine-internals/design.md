@@ -13,7 +13,7 @@ See `proposal.md` for the four audit findings. Three facts shape the approach.
 ## Goals / Non-Goals
 
 **Goals:**
-- Every path that resolves a body to write for an instance refuses a body that differs from the instance's pin. A read-only reader gets the row check and no pin.
+- Every path that resolves a body to write for an instance refuses a body that differs from the instance's pin. It passes the pin or compares the hash itself. A read-only reader gets the row check and no pin.
 - `initSchema` states each table once, in its `CREATE TABLE`.
 - No identifier reaches `tx.unsafe` unquoted.
 - The definition cache holds published bodies only.
@@ -35,7 +35,16 @@ The cost is one string comparison per call and one `definitionHash` per cache en
 
 `ResolveBody` in `resolution.ts` and `ResolveBodyFn` in `transition.ts` gain `pinHash?: string`. An injected test resolver that ignores the third argument stays valid. The pin sites are every place that holds an instance and writes for it. They are the timer worker, the spawn handler (existing child and parent), the return handler (parent and child), the cancel-child handler and `sweepCancelledChildren`. They also include the `instance.transition` handler (target), the `process.start` handler (acting instance, and the started instance on redelivery) and `redactInstance`. Redaction picks the fields to clear from the body, and it cannot be undone. The spawn's lookup of a child by `spec.processId` and `childVersion` passes no pin, because no instance exists yet. A mismatch throws inside the caller's existing error boundary. The timer worker pushes the row out of the scan and logs it. The outbox retries a handler.
 
-Read-only readers pass no pin: `runtime/queries.ts`, `engine/reporting.ts`, `outbox.ts` and `migration.ts`. They write nothing for the instance, so a body that differs from the pin cannot do harm through them. They still get the row check. Reporting reads many instances and tolerates a row rewritten under an old pin. `outbox.ts` resolves by `field_version`. An outbox row has no hash.
+Some writers check the pin another way, or have no instance hash to pass. A writer that holds an instance compares `definitionHash(body)` with the pin itself:
+
+- `resolution.ts` compares the hash explicitly.
+- `runtime/instances.ts` (submit, near line 364) throws `PinMismatch`.
+- `runtime/internal.ts` (`loadInstanceForRead`, near line 149) checks through `rehydrate`.
+- `runtime/instances.ts` (after the commit, near line 395) resolves the body of the instance it just committed. It passes `committed.definitionHash`.
+- `outbox.ts` (near line 349) resolves by `field_version`, because the row has no hash. It writes a writeback. It reads the body only for the field types that gate the write.
+- `migration.ts` (near line 587) resolves once per version. It compares each pinned instance's hash under lock (near line 396). It writes the migrated instances.
+
+Two readers write nothing and pass no pin: `runtime/queries.ts` and `engine/reporting.ts`. They still get the row check. Reporting reads many instances and tolerates a row rewritten under an old pin. The other callers have no instance. They are creation, plan registration, the studio routes and report definitions.
 
 **D2. Keep no negative version in the cache (C-12).** The `version < 0` branch returns the parsed body and sets no cache entry. Each read of a test instance's body costs one query by primary key. The D1 check runs on it each time. A Player run reads its body a few times per interaction, so the cost does not show. The alternative, an LRU for negatives, adds a data structure for a path with no measured cost. The pattern cache in `src/runtime/fields.ts` keys a `WeakMap` by body object. A fresh body per read recompiles its regular expressions, and the old entry goes with its body.
 
@@ -54,7 +63,7 @@ The six generated columns sit in `CREATE TABLE instances`, before the indexes th
 
 ## Risks / Trade-offs
 
-- [An older local `pgdata` lacks a column] → A missing indexed column (`redacted_at`, the generated columns) makes `initSchema` raise at startup. An index statement names that column. For any other column, the first query that reads it fails with "column does not exist". Drop `pgdata` and seed again. The proposal, the persistence delta spec and the report all say so. `CLAUDE.md` states that no deployment exists.
+- [An older local `pgdata` lacks a column] → A missing indexed column makes `initSchema` raise at startup, because an index statement names it. These are `redacted_at`, `next_timer_at`, `created_at`, `resolve_state` and the generated columns. For any other column, the first query that names it fails with "column does not exist". Drop `pgdata` and seed again. The proposal, the persistence delta spec and the report all say so. `CLAUDE.md` states that no deployment exists.
 - [A pin check refuses a body] → Only a body that differs from the instance's pin gets refused. `resolution.ts` already refuses it. The instance faults at the existing error boundary.
 - [Deleting the retrofits deletes tests] → The tests that build an old-shaped database and assert the repair go with the code. The same commit lowers `scripts/gates/pass-floor.txt` by the number deleted and names the tests.
 - [A column order differs between a fresh and an old database] → Nothing selects by position. Every query names its columns.

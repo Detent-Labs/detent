@@ -2,8 +2,9 @@
  * Data retention & erasure (roadmap #20): redactInstance and the automatic
  * sweep. DB-backed cases hit Postgres and skip when DATABASE_URL is unset —
  * a skip is visible, a false green is not. Bodies are hand-crafted and
- * created directly via `createInstance` (no publish needed): neither
- * `redactInstance` nor `sweepRetention` resolves a process body.
+ * created directly via `createInstance`. `redactInstance` resolves the
+ * instance's pinned body to read its redactable fields, and `sweepRetention`
+ * redacts through it. Each case therefore publishes its body first.
  */
 import { test, expect, beforeAll, beforeEach, spyOn } from "bun:test";
 import { sql, initSchema, createInstance } from "../src/engine/store.js";
