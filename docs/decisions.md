@@ -1707,12 +1707,6 @@ other entries. C-4 merges D-2, and C-6 merges F-6.
   percent escape in the address crashes the studio area. Anchors:
   `packages/web/src/shell/App.tsx`, `packages/web/src/main.tsx`,
   `packages/web/src/areas/studio/routing.ts`.
-- **`tidy-engine-internals` (B-9, B-15, B-16, C-12; low)**: Some readers skip
-  the pin hash check, `initSchema` carries backward migrations, reporting
-  queries the history twice, one `tx.unsafe` call inserts an unescaped role
-  name that no outside input controls, and the definition cache keeps every
-  draft snapshot until a restart. Anchors: `src/engine/timers.ts`, `src/engine/store.ts`,
-  `src/engine/definitions.ts`.
 - **`catalog-studio-literal-strings` (E2-19; low)**: Visible studio text sits
   as literals in the code instead of in the catalog. Anchors:
   `packages/web/src/areas/studio/panels/TimersPanel.tsx`,
