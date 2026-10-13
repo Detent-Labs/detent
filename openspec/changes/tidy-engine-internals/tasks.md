@@ -6,6 +6,7 @@
 - [x] 1.2 Add the optional `pinHash` argument to `ResolveBody` and `ResolveBodyFn`. Compare it with the stored hash on every call. A new test expects a throw for a pin that differs from the row. It covers a cache hit and a miss. Verify with the full gated suite.
 - [x] 1.3 Pass `inst.definitionHash` as `pinHash` in the timer worker, the spawn, return and cancel-child handlers, and `sweepCancelledChildren`. One new test per path uses a row with a changed hash. The timer test expects the row to leave the scan. The handler tests expect a throw. Verify with the full gated suite.
 - [x] 1.4 Check the nine tests that insert into `definitions` or `draft_snapshots` by hand. Fix any whose stored hash differs from its body's hash. Verify with the full gated suite.
+- [x] 1.5 Pass `definitionHash` as `pinHash` in the `instance.transition` handler, the `process.start` handler and `redactInstance`. One new test per site uses a row restored with another body and hash. Verify with the full gated suite.
 
 ## 2. Draft snapshots stay out of the cache (C-12)
 
@@ -14,7 +15,7 @@
 ## 3. Fold the retrofits into the CREATE TABLE statements (B-15)
 
 - [x] 3.1 Move every `ADD COLUMN IF NOT EXISTS` into the `CREATE TABLE` of `outbox`, `instances`, `auth_users`, `data_lists` and `data_list_values`. Keep type, default and generation expression. Delete the `ALTER` statements. Verify with a search for `ADD COLUMN` over `src/` that prints nothing.
-- [x] 3.2 Delete the `UPDATE outbox SET field_version` backfill and the `UPDATE instances SET resolve_state` cleanup. Delete the five `DROP INDEX IF EXISTS` lines and the comments that justify only them. Verify with a search for `DROP INDEX` over `src/` that prints nothing.
+- [x] 3.2 Delete the `UPDATE outbox SET field_version` backfill and the `UPDATE instances SET resolve_state` cleanup. Delete the five `DROP INDEX IF EXISTS` lines and the comments that justify only them. Verify with a search for `DROP INDEX` over `src/` that prints nothing. The `automatic-transitions`, `persistence` and `admin-operations-api` deltas reword the live text that required them.
 - [x] 3.3 Delete the tests that seed an old-shaped database to assert a repair. They sit in `test/migration.test.ts` around the three retired expression indexes and in `test/worker-scan-plans.test.ts` around `instances_resolve_idx` and `instances_redacted_idx`. Search `test/` for any other test of a column addition or a backfill.
 - [x] 3.4 Add a test that two `initSchema` runs change no row. Add a test that `instances` without `redacted_at` and `auth_users` without its three optional columns stay as they are. Lower `scripts/gates/pass-floor.txt` by the number of deleted tests in the same commit. Verify with `sh scripts/test-gated.sh bun test` and compare the pass count with the new floor.
 - [x] 3.5 Run the new `initSchema` on an empty database and on the lane's dev database. Confirm that the second run changes nothing. Verify by printing `\d outbox` and `\d instances` from both and comparing the column lists.

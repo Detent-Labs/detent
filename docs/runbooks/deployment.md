@@ -328,8 +328,9 @@ tenant whose database is down reads 503. The first is the caller's to fix. The
 second is yours.
 
 The schema step creates missing tables and indexes only. It does not add a
-column to an existing table. A tenant database that predates a column
-needs five steps. The drop destroys the tenant's data, so dump the
+column to an existing table. If a missing column carries an index, the
+schema step fails at startup. Otherwise the first query that reads the
+column fails. A tenant database that predates a column needs five steps. The drop destroys the tenant's data, so dump the
 database first, as `docs/runbooks/backup-restore.md` describes.
 
 1. Stop every engine process that serves the tenant. A running process

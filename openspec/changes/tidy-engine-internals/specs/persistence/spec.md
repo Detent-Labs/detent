@@ -176,6 +176,37 @@ empty string and defer an opaque connection error to whichever query runs first.
 - **THEN** it fails immediately with an error naming the variable, rather than
   failing later on an unrelated-looking query
 
+### Requirement: The worker scans and the admin outbox list have supporting indexes
+
+`initSchema` SHALL declare an index for each of three reads whose cost would
+otherwise follow the volume of instances or outbox rows ever stored. The
+resolution claim reads only instances that carry a re-resolution mark. The
+retention sweep reads only unredacted terminal instances, in entry-time order.
+The admin outbox list reads rows newest-first. `initSchema` SHALL drop no
+index of an earlier shape.
+
+#### Scenario: Initialisation creates the marked-instance index
+
+- **WHEN** `initSchema` runs
+- **THEN** a partial index over `instances (instance_id)` exists for rows whose
+  `resolve_state` differs from `idle`
+
+#### Scenario: Initialisation creates the retention index
+
+- **WHEN** `initSchema` runs
+- **THEN** a partial index over the entry time of `completed` and `cancelled`
+  instances with a `NULL` `redacted_at` exists, with `instance_id` as tie-break
+
+#### Scenario: Initialisation creates the outbox list index
+
+- **WHEN** `initSchema` runs
+- **THEN** an index over `outbox (created_at DESC, idempotency_key DESC)` exists
+
+#### Scenario: A second initialisation succeeds
+
+- **WHEN** the schema initialises twice
+- **THEN** the second run succeeds and all three indexes stay as they were
+
 ## REMOVED Requirements
 
 ### Requirement: Instance redaction state is a nullable column

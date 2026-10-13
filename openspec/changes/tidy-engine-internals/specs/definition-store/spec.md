@@ -13,9 +13,10 @@ instance rehydrating against it passes its pin check.
 
 When it loads a body, `resolveBody` SHALL hash the parsed body. It SHALL compare
 the result with the `definition_hash` of the row the body came from. A mismatch
-SHALL throw. A caller that holds an instance SHALL pass the instance's
-`definitionHash` as `pinHash`. `resolveBody` SHALL throw when `pinHash` differs
-from the row's `definition_hash`. That holds for a cached body and for a loaded one.
+SHALL throw. A caller that holds an instance and writes for it SHALL pass
+the instance's `definitionHash` as `pinHash`. A read-only reader MAY omit it.
+`resolveBody` SHALL throw when `pinHash` differs from the row's `definition_hash`.
+That holds for a cached body and for a loaded one.
 
 `version` identifiers occupy two disjoint spaces. A real published version is
 always a positive number, assigned monotonically by publish. A test-instance
