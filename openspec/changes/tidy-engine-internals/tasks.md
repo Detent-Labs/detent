@@ -25,8 +25,8 @@
 
 ## 5. Docs and index
 
-- [ ] 5.1 Strike this change's entry in the audit index of `docs/decisions.md`. Verify with a search for `tidy-engine-internals` in that index that finds no live entry.
-- [ ] 5.2 Correct `docs/runbooks/deployment.md`, which says to re-run the schema step after an upgrade that adds a column. State that `initSchema` does not add a column to an existing table. State that an operator provisions the database again. Verify with the prose gate on the host.
+- [x] 5.1 Strike this change's entry in the audit index of `docs/decisions.md`. Verify with a search for `tidy-engine-internals` in that index that finds no live entry.
+- [x] 5.2 Correct `docs/runbooks/deployment.md`, which says to re-run the schema step after an upgrade that adds a column. State that `initSchema` does not add a column to an existing table. State that an operator provisions the database again. Verify with the prose gate on the host.
 
 ## 6. Verification
 
