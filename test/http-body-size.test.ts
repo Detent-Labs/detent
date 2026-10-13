@@ -34,8 +34,10 @@ test.skipIf(!DB)("an ordinary-size request reaches the route handler", async () 
       body: JSON.stringify({ key: "small" }),
     });
     // Not a transport-level rejection: it reaches the route and fails on its
-    // own terms (a malformed process body), never on size.
-    expect(res.status).not.toBe(413);
+    // own terms. `{ key }` lacks `processId` and `body`, so the route answers
+    // 400 `request-shape`, never 413.
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: { type: string } }).error.type).toBe("request-shape");
   });
 });
 
@@ -47,7 +49,7 @@ test.skipIf(!DB)("a request body over the declared bound is refused before any r
     // refuses is Bun's business and has varied across versions: 1.3.11
     // answers 413, earlier lines reset the connection. Accept either — the
     // property under test is that the request is refused on size, which a
-    // route-level status (a publish body this malformed maps to 422) would
+    // route-level status (a publish body this malformed maps to 400) would
     // disprove.
     let refused: "reset" | number;
     try {

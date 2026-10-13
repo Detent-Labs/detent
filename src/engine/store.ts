@@ -402,6 +402,19 @@ export async function initSchema(db: SQL = sql): Promise<void> {
     display_name    text,
     locale          text
   )`;
+  // The login rate-limit windows (src/auth/login.ts): one row per window, scope
+  // 'email' or 'address'. key = SHA-256 hex of the normalized email or the
+  // caller address; the fixed length bounds the index row. No tenant column:
+  // tenancy here is database-per-tenant, so each tenant counts in its own
+  // table. The window_start index serves the per-request delete of expired rows.
+  await db`CREATE TABLE IF NOT EXISTS login_attempts (
+    scope        text        NOT NULL,
+    key          text        NOT NULL,
+    attempts     integer     NOT NULL,
+    window_start timestamptz NOT NULL,
+    PRIMARY KEY (scope, key)
+  )`;
+  await db`CREATE INDEX IF NOT EXISTS login_attempts_window_idx ON login_attempts (window_start)`;
   // Process-scoped permission grants (src/auth/grants.ts): one row maps a role
   // string to a permission and a scope, so any holder of that role gets that
   // permission over the process(es) the scope names. Read by

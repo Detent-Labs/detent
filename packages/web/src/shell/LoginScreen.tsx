@@ -30,14 +30,36 @@ const styles = stylex.create({
   error: {
     color: colors.refusal,
   },
+  // The live region stays mounted so the engine announces a change, not an
+  // arrival. Empty, it would add a second flex gap beside the form's own;
+  // `:empty` pulls one back, so the normal login screen keeps its layout.
+  status: {
+    marginBlockEnd: {
+      default: 0,
+      ":empty": `calc(-1 * ${space.s3})`,
+    },
+  },
+  // DESIGN.md's warning callout without its refusal text: a 3px rule in
+  // Advisory, 8px before the text, and the text in ink.
+  notice: {
+    margin: 0,
+    marginBlockEnd: space.s2,
+    color: colors.text,
+    borderLeftWidth: 3,
+    borderLeftStyle: "solid",
+    borderLeftColor: colors.advisory,
+    paddingLeft: space.s2,
+  },
 });
 
 interface LoginScreenProps {
   locale: UiLocale;
   onLoggedIn: (session: Session) => void;
+  /** A line above the first field, for what happened before this screen appeared. */
+  notice?: string;
 }
 
-export function LoginScreen({ locale, onLoggedIn }: LoginScreenProps) {
+export function LoginScreen({ locale, onLoggedIn, notice }: LoginScreenProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -76,6 +98,9 @@ export function LoginScreen({ locale, onLoggedIn }: LoginScreenProps) {
         }}
       >
         <h1>{t(locale, "login.title")}</h1>
+        <div role="status" {...stylex.props(styles.status)}>
+          {notice ? <p {...stylex.props(styles.notice)}>{notice}</p> : null}
+        </div>
         <label {...stylex.props(styles.formLabel)}>
           {t(locale, "login.email")}
           <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" />

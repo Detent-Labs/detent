@@ -1611,14 +1611,19 @@ step it enters. An automatic path shows its priority and its guard's CEL.
 
 A manual path with neither reads "No priority" and "No guard".
 
-Rename `quantity`'s label on the Fields tab, without saving. The key follows
-the label, so type `quantity` back into Key: a guard reads `data.quantity`.
-Open Changes. Pass: a Fields row stands folded under the Fields heading, its
-stamp reads Changed. Open that row.
+Choose `quantity` on the Fields tab. Pass: a notice under Key reads "Read by 2
+expressions. The label no longer sets this key, and changing the key does not
+touch them."
 
-Switch back to the Fields tab and rename `unit_price` too, without saving.
-Type `unit_price` back into its Key. Return to Changes. Pass: a second Fields row now stands beside the first,
-and `quantity`'s row still stands open. Its open set survives the
+Rename its label, without saving. Pass: Key still reads `quantity`, since two
+guards read `data.quantity`. Open Changes. Pass: a Fields row stands folded
+under the Fields heading, its stamp reads Changed. Open that row.
+
+Switch back to the Fields tab and rename `unit_price`'s label too, without
+saving. Pass: its notice reads "Read by 1 expression. The label no longer sets
+this key, and changing the key does not touch it." Key still reads
+`unit_price`. Return to Changes. Pass: a second Fields row now stands beside
+the first, and `quantity`'s row still stands open. Its open set survives the
 recompute: `ChangesView` stays mounted throughout.
 
 Save the draft. Add the `de` locale from the header's `⋮` menu, which makes
@@ -3617,6 +3622,32 @@ current mark.
 
 Focus, scroll position and the current mark need a live draft store and a
 real DOM.
+
+### The Key input commits on blur and warns about readers (`guard-field-key-renames`)
+
+Source: `guard-field-key-renames` tasks 5.4.
+
+Seed the database and open a `purchase-requisition` draft on the Fields tab.
+
+Choose `quantity`. Pass: a notice under Key reads "Read by 2 expressions. The
+label no longer sets this key, and changing the key does not touch them."
+
+Type `qty` into Key, without leaving the input. Pass: the header bar shows no
+unsaved mark. Press Tab. Pass: the unsaved mark appears, and Key reads `qty`.
+
+The two guards still read `data.quantity`. The field now has no readers, so
+the notice reads "This field is in a published version. The label no longer
+sets its key."
+
+Type `quantity` back into Key and press Enter. Pass: Key reads `quantity`.
+Change the label to `Amount`. Pass: Key still reads `quantity`.
+
+Choose `justification`, which no expression reads. Pass: the notice reads "This
+field is in a published version. The label no longer sets its key." Change the
+label to `Reason`. Pass: Key still reads `justification`.
+
+Add a new field with "+ Add field", then type a label into it. Pass: no notice
+shows under Key, and Key follows the label as it changes.
 
 ### Removing a field that reaches past the field catalog confirms first (`remove-field-takes-its-references`)
 
@@ -6252,3 +6283,36 @@ Pass: the typing sends no `GET /processes`. It sends one
 `GET /processes/proc_credit_check/versions/1` once the id is whole.
 
 Discard the draft.
+
+### The shell survives a malformed address, a hung boot read and a second tab
+
+Source: `harden-shell-session-and-routing` task 4.1.
+
+**1. A malformed escape in the address.** Log in. Open
+`/studio/processes/%E0%A4%A/edit` by typing it into the address bar.
+
+Pass: the studio shows the process list, with no "Something went wrong."
+fallback. The check settles what the unit tests cannot: whether the browser
+leaves the escape unchanged in `location.pathname`. `packages/web/test/` asserts
+the matchers. Repeat with `/admin/instances/%E0%A4%A`, `/app/tasks/%E0%A4%A`
+and `/reporting/reports/%E0%A4%A`. Each shows its area's default screen.
+
+**2. A `/ui-strings` read that never answers.** In the network panel, block
+the request URL `/ui-strings`, or throttle it to offline, then reload `/login`.
+Pass: the login screen appears with its built-in wording within about five
+seconds. The page never stays white.
+
+This stays manual because it needs a request that hangs rather than fails.
+`packages/web/test/i18n-overrides.test.ts` asserts the abort with a stub.
+
+**3. The look of the session notice.** Open `/login` in two tabs of one
+browser. Log in as an operator in tab A. Open `/app` in tab B. Log out in tab A.
+
+Pass: tab B shows the login screen on its own. A line above the first field
+reads "Your session ended in another tab." It stands beside a 3px rule in the
+advisory color, in the ink color, with no icon.
+
+Switch the language to German before the logout. Pass: the line reads in German
+and wraps without clipping at a 360px width. Log in again in tab B. Pass: the
+line disappears. `e2e/session-tabs.e2e.ts` asserts the sign-out and the text.
+This entry keeps only the visual judgment.

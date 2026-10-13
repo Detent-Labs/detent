@@ -106,3 +106,9 @@ describe("areaHref", () => {
     }
   });
 });
+
+describe("matchRoute on a malformed address", () => {
+  it("falls back to the inbox on a malformed escape", () => {
+    expect(matchRoute("/tasks/%E0%A4%A")).toEqual({ name: "tasks" });
+  });
+});

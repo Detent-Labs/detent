@@ -23,7 +23,7 @@ beforeAll(async () => {
   if (DB) await initSchema();
 });
 beforeEach(async () => {
-  if (DB) await sql`TRUNCATE auth_users, outbox, instances, history_entries, instance_events, definitions`;
+  if (DB) await sql`TRUNCATE auth_users, login_attempts, outbox, instances, history_entries, instance_events, definitions`;
   if (DB) await clearInstanceAudit();
 });
 

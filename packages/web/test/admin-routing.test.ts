@@ -87,3 +87,13 @@ describe("the admin area's per-screen role gate", () => {
     ]);
   });
 });
+
+describe("the admin area's malformed address", () => {
+  it("falls back to the instances list on a malformed escape", () => {
+    expect(matchRoute("/instances/%E0%A4%A")).toEqual({ name: "instances" });
+  });
+
+  it("still decodes a valid escape", () => {
+    expect(matchRoute("/instances/inst%201")).toEqual({ name: "instance", instanceId: "inst 1" });
+  });
+});

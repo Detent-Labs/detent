@@ -207,11 +207,10 @@ derives from whatever directory issues those tokens.
 
 ## Running more than one engine process
 
-A tenant may run more than one engine process against one database. One
-piece of state stays local to each process: the login rate-limit windows.
-They are two `Map`s, one keyed by email and one by caller address. A
-second process keeps its own windows, so each added process raises the
-effective login threshold. A restart clears that process's windows.
+A tenant may run more than one engine process against one database. No
+process keeps state the engine enforces. The login rate-limit windows live in
+the tenant's `login_attempts` table. A second process or a restart changes no
+threshold the engine enforces.
 
 Start one process before the others on a new database. Do the same after
 an upgrade that adds a table or an index. Start the rest only after the
@@ -326,6 +325,12 @@ Two answers are worth telling apart in a log. An unknown tenant reads 401, the
 answer a bad token gets, so nobody learns your tenant list by probing. A known
 tenant whose database is down reads 503. The first is the caller's to fix. The
 second is yours.
+
+Re-run the provisioning command's schema step after an upgrade that adds a
+table or an index, once per tenant database. The `login_attempts` table is
+one such addition. A tenant database without it answers every login with 500
+until its schema step runs. Every schema statement is idempotent, so a run
+against a current database changes nothing.
 
 The schema step creates missing tables and indexes only. It does not add a
 column to an existing table. If a missing column carries an index, the
