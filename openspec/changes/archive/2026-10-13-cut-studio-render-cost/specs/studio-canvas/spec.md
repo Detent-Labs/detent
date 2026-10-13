@@ -7,8 +7,8 @@
 The layout library the Arrange command runs SHALL load through a dynamic import
 when the command first runs. Opening the canvas SHALL NOT download it. The
 command SHALL keep the confirmation and the result the Arrange requirements
-state. A library that fails to load SHALL leave the layout as it was and SHALL
-show the author an error.
+state. A library that fails to load SHALL leave the layout as it was. The
+command SHALL then tell the author the load failed.
 
 #### Scenario: Opening the canvas does not load the layout library
 

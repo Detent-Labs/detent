@@ -26,6 +26,6 @@
 
 ## 5. Verification
 
-- [ ] 5.1 Run `bun run typecheck`, `bun run build`, then the full gated `bun test` with `DATABASE_URL` set. Verify that all three print green with the skip count in range.
-- [ ] 5.2 Run the prose and whitespace gates over the push range from the host. Verify that both print zero rising findings and zero whitespace faults.
-- [ ] 5.3 Run the browser check on the production build with `playwright-cli`. Run `/impeccable critique` and `/impeccable audit` on the Fields, Field matrix and Changes tabs. Verify that the form editor and the player open, and Arrange still lays out the canvas.
+- [x] 5.1 Run `bun run typecheck`, `bun run build`, then the full gated `bun test` with `DATABASE_URL` set. Verify that all three print green with the skip count in range.
+- [x] 5.2 Run the prose and whitespace gates over the push range from the host. Verify that both print zero rising findings and zero whitespace faults.
+- [x] 5.3 Run the browser check on the production build with `playwright-cli`. Run `/impeccable critique` and `/impeccable audit` on the Fields, Field matrix and Changes tabs. Verify that the form editor and the player open, and Arrange still lays out the canvas.
