@@ -1,4 +1,4 @@
-import dagre from "@dagrejs/dagre";
+import type * as Dagre from "@dagrejs/dagre";
 import { autoPlaceSteps, COLUMN_WIDTH, ROW_HEIGHT, type LayoutStep } from "./layout";
 import { NODE_SIZE, type Point } from "./geometry";
 import { drawnBox, groupOf, type Box, type StepGroup } from "./groups";
@@ -52,13 +52,20 @@ const groupNodeId = (groupId: string): string => `g:${groupId}`;
  * `dagre` as a single synthetic node, sized by its current box, and every
  * member then moves by the same delta as the group's own box
  * (design.md, Decision 3).
+ *
+ * `dagre` loads on the first call, as its own chunk, so opening the canvas
+ * downloads none of it (`studio-canvas`). A load that fails rejects the call
+ * before it computes anything. `loadDagre` exists so a test can make that load
+ * fail.
  */
-export function arrangeSteps(
+export async function arrangeSteps(
   steps: LayoutStep[],
   groups: StepGroup[],
   initialStepId: string | undefined,
   existingLayout: Record<string, unknown>,
-): Record<string, Point> {
+  loadDagre: () => Promise<typeof Dagre> = () => import("@dagrejs/dagre"),
+): Promise<Record<string, Point>> {
+  const dagre = await loadDagre();
   const resolved = resolvePositions(steps, initialStepId, existingLayout);
   const withId = steps.filter((s): s is LayoutStep & { id: string } => !!s.id);
 

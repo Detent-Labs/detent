@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { layout, colors, focus, fonts, space } from "form-ui/tokens.stylex";
 import { DraftProvider, useDraft } from "../draft/store.js";
@@ -55,7 +55,6 @@ import { moveTo } from "../draft/list-ops.js";
 import { JsonView } from "../panels/JsonView.js";
 import { describeCaughtError } from "../errors.js";
 import { useFail } from "../../../shell/useFail.js";
-import { FormEditorScreen } from "./FormEditorScreen.js";
 import { scrollKeyboardFocusIntoView } from "../focusScroll.js";
 import { resolveDraftLocalizedText } from "../draft/localized-text";
 import type { NavigateOptions } from "../../../shell/routing.js";
@@ -67,6 +66,10 @@ const NARROW = "@media (max-width: 64rem)";
 /** The Canvas tab's body: what a canvas bar drop resolves the live canvas
  * through, and what a press measures its centre against. */
 const CANVAS_BODY_ID = "studio-canvas-body";
+
+/** The form editor loads as its own chunk when a step's form first opens, so
+ * the process surface downloads none of it (`studio-app`). */
+const FormEditorScreen = lazy(() => import("./FormEditorScreen.js").then((m) => ({ default: m.FormEditorScreen })));
 
 const styles = stylex.create({
   studioScreen: {
@@ -127,6 +130,14 @@ const styles = stylex.create({
     marginBlockEnd: space.s3,
     marginInline: 0,
     color: colors.refusal,
+  },
+  // The waiting line while the form editor's chunk loads: one muted line where
+  // the editor will stand, the same line `ChangesView` prints while it reads.
+  screenLoading: {
+    marginBlock: 0,
+    color: colors.textMuted,
+    paddingBlock: space.s4,
+    paddingInline: 0,
   },
   // Every OTHER `.studio-error-banner` in this file renders as a direct
   // child of `.studio-edit-screen`'s own flex column, which used to zero a
@@ -504,9 +515,18 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
   // modal dialog instead (studio-publish, studio-app). An arrange is a local
   // layout edit the author can undo by moving a step back, and converting it
   // is the named follow-up, not this change.
-  const onArrange = () => {
+  // The confirmation runs before the layout library loads. A library that
+  // fails to load leaves the layout as it was and reports through the header
+  // bar's error banner (`studio-canvas`).
+  const onArrange = async () => {
     if (hasHandPlacedStep(steps as LayoutStep[], saveState.layout) && !confirm(t("canvas.arrangeConfirm"))) return;
-    const arranged = arrangeSteps(steps as LayoutStep[], groups, draft.workflow?.initialStep, saveState.layout);
+    let arranged: Record<string, Point>;
+    try {
+      arranged = await arrangeSteps(steps as LayoutStep[], groups, draft.workflow?.initialStep, saveState.layout);
+    } catch (e) {
+      actions.reportError(e);
+      return;
+    }
     setSaveState((s) => {
       const next: Record<string, unknown> = { ...s.layout, waypoints: {} };
       for (const [stepId, point] of Object.entries(arranged)) next[stepId] = snapToGrid(point);
@@ -938,12 +958,16 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
         {formStepId === undefined && stash && <RestoreNotice onRestore={restoreStash} onDiscard={discardStash} disabled={requestRunning} />}
         {formStepId !== undefined ? (
           formStep ? (
-            <FormEditorScreen
-              step={formStep}
-              index={formStepIndex}
-              fields={fields}
-              onBack={() => goToTab(formEditorReturnTab(formOrigin))}
-            />
+            // A local boundary: the shell's own would replace the whole area,
+            // draft included, while the chunk loads.
+            <Suspense fallback={<p {...stylex.props(styles.screenLoading)}>{t("app.screenLoading")}</p>}>
+              <FormEditorScreen
+                step={formStep}
+                index={formStepIndex}
+                fields={fields}
+                onBack={() => goToTab(formEditorReturnTab(formOrigin))}
+              />
+            </Suspense>
           ) : (
             <div {...stylex.props(styles.errorBanner, styles.errorBannerInEditScreen)} role="alert">
               <span {...stylex.props(styles.errorBannerStamp)}>{t("error.failed")}</span>

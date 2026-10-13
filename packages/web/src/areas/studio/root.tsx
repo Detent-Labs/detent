@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { lazy, Suspense, useEffect, useRef } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { Workflow, LayoutTemplate } from "lucide-react";
 import { matchRoute, routePath, ROUTE_ROLE, type Route } from "./routing.js";
@@ -6,13 +6,12 @@ import { useAreaRoute, PROFILE_PATH, type NavigateOptions } from "../../shell/ro
 import { t } from "./catalog.js";
 import { Chrome } from "../../shell/Chrome.js";
 import { navStyles } from "../../shell/navStyles.js";
-import { space } from "form-ui/tokens.stylex";
+import { colors, layout, space } from "form-ui/tokens.stylex";
 import { ProcessesScreen } from "./screens/ProcessesScreen.js";
 import { EditScreen } from "./screens/EditScreen.js";
 import { VersionsScreen } from "./screens/VersionsScreen.js";
 import { MigrationPlanScreen } from "./screens/MigrationPlanScreen.js";
 import { ToolsScreen } from "./screens/ToolsScreen.js";
-import { PlayerScreen } from "./screens/PlayerScreen.js";
 import { TemplatesScreen } from "./screens/TemplatesScreen.js";
 import type { AreaRootProps } from "../../shell/App.js";
 
@@ -20,8 +19,12 @@ import type { AreaRootProps } from "../../shell/App.js";
 // from `ROUTE_ROLE`, so the nav and the guard cannot disagree with the map.
 const TEMPLATES_ROLE = "system:templates";
 
-/** `.studio-empty-role` from `app.css`. */
+/** The player loads as its own chunk when it first opens, so no other studio
+ * screen downloads it (`studio-app`). */
+const PlayerScreen = lazy(() => import("./screens/PlayerScreen.js").then((m) => ({ default: m.PlayerScreen })));
+
 const styles = stylex.create({
+  // `.studio-empty-role` from `app.css`.
   emptyRole: {
     display: "flex",
     flexDirection: "column",
@@ -31,6 +34,16 @@ const styles = stylex.create({
     textAlign: "center",
     gap: space.s3,
     padding: space.s4,
+  },
+  // The waiting line while the player's chunk loads, in the player's own
+  // frame: one muted line where the screen will stand.
+  screenLoading: {
+    maxWidth: layout.capWide,
+    marginInline: "auto",
+    marginBlock: 0,
+    paddingTop: space.s4,
+    paddingInline: space.s3,
+    color: colors.textMuted,
   },
 });
 
@@ -216,7 +229,13 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
             />
           )}
           {route.name === "tools" && <ToolsScreen token={session.token} navigate={navigate} onUnauthorized={onUnauthorized} />}
-          {route.name === "play" && <PlayerScreen processId={route.processId} token={session.token} navigate={navigate} onUnauthorized={onUnauthorized} />}
+          {route.name === "play" && (
+            // A local boundary: the shell's own would replace the whole area
+            // while the chunk loads.
+            <Suspense fallback={<main {...stylex.props(styles.screenLoading)}>{t("app.screenLoading")}</main>}>
+              <PlayerScreen processId={route.processId} token={session.token} navigate={navigate} onUnauthorized={onUnauthorized} />
+            </Suspense>
+          )}
           {route.name === "templates" && <TemplatesScreen token={session.token} locale={locale} onUnauthorized={onUnauthorized} />}
         </>
       )}

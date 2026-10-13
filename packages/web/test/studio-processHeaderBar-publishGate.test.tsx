@@ -66,6 +66,7 @@ const noActions: DraftToolbarActions = {
   discard: () => {},
   publish: () => {},
   reload: () => {},
+  reportError: () => {},
 };
 
 const RAN = {
