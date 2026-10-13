@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { Component, lazy, Suspense, useCallback, type ErrorInfo, useEffect, useMemo, useState, type ReactNode } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { layout, colors, focus, fonts, space } from "form-ui/tokens.stylex";
 import { DraftProvider, useDraft } from "../draft/store.js";
@@ -70,6 +70,44 @@ const CANVAS_BODY_ID = "studio-canvas-body";
 /** The form editor loads as its own chunk when a step's form first opens, so
  * the process surface downloads none of it (`studio-app`). */
 const FormEditorScreen = lazy(() => import("./FormEditorScreen.js").then((m) => ({ default: m.FormEditorScreen })));
+
+/**
+ * Catches a failed form editor chunk inside the process surface. `lazy`
+ * rethrows the rejected import during render. Without this boundary the
+ * shell's own boundary replaces the whole area, unmounting `DraftProvider`
+ * with the unsaved draft in it. The fallback keeps the draft and offers the
+ * form editor's own way back.
+ *
+ * ponytail: no retry. `lazy` caches the rejected import, so reopening the form
+ * editor shows this banner again until the page reloads. A redeploy deletes
+ * the old chunk, so a retry would fail there anyway. Ceiling: a transient
+ * network drop also needs a reload, after a save. Upgrade: hold the `lazy`
+ * factory in state and mint a fresh one on a Retry control.
+ */
+export class FormEditorBoundary extends Component<{ onBack: () => void; children: ReactNode }, { failed: boolean }> {
+  override state = { failed: false };
+
+  static getDerivedStateFromError(): { failed: boolean } {
+    return { failed: true };
+  }
+
+  override componentDidCatch(error: Error, info: ErrorInfo): void {
+    console.error("studio: the form editor failed to load", error, info.componentStack);
+  }
+
+  override render(): ReactNode {
+    if (!this.state.failed) return this.props.children;
+    return (
+      <div {...stylex.props(styles.errorBanner, styles.errorBannerInEditScreen)} role="alert">
+        <span {...stylex.props(styles.errorBannerStamp)}>{t("error.failed")}</span>
+        <span {...stylex.props(styles.errorBannerMessage)}>{t("formEditor.loadFailed")}</span>
+        <button type="button" className="btn btn-secondary" onClick={this.props.onBack}>
+          {t("formEditor.back")}
+        </button>
+      </div>
+    );
+  }
+}
 
 const styles = stylex.create({
   studioScreen: {
@@ -958,16 +996,18 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
         {formStepId === undefined && stash && <RestoreNotice onRestore={restoreStash} onDiscard={discardStash} disabled={requestRunning} />}
         {formStepId !== undefined ? (
           formStep ? (
-            // A local boundary: the shell's own would replace the whole area,
-            // draft included, while the chunk loads.
-            <Suspense fallback={<p {...stylex.props(styles.screenLoading)}>{t("app.screenLoading")}</p>}>
-              <FormEditorScreen
-                step={formStep}
-                index={formStepIndex}
-                fields={fields}
-                onBack={() => goToTab(formEditorReturnTab(formOrigin))}
-              />
-            </Suspense>
+            // Local boundaries: the shell's own would replace the whole area,
+            // draft included, while the chunk loads or when it fails to load.
+            <FormEditorBoundary onBack={() => goToTab(formEditorReturnTab(formOrigin))}>
+              <Suspense fallback={<p {...stylex.props(styles.screenLoading)}>{t("app.screenLoading")}</p>}>
+                <FormEditorScreen
+                  step={formStep}
+                  index={formStepIndex}
+                  fields={fields}
+                  onBack={() => goToTab(formEditorReturnTab(formOrigin))}
+                />
+              </Suspense>
+            </FormEditorBoundary>
           ) : (
             <div {...stylex.props(styles.errorBanner, styles.errorBannerInEditScreen)} role="alert">
               <span {...stylex.props(styles.errorBannerStamp)}>{t("error.failed")}</span>

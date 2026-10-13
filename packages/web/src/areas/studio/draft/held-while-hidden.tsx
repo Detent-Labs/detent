@@ -26,9 +26,13 @@ export function useHeldWhileHidden<T>(value: T, visible: boolean): T {
 
 /**
  * Provides its subtree the draft context as it stood when `visible` was last
- * true. Every `useDraft()` below it reads the held value, so a hidden tab
- * body re-renders on no keystroke. Mutations still reach the live store: the
- * held value's `mutate` and `replace` dispatch to the same reducer.
+ * true. Every `useDraft()` below it reads the held value, but only a `memo`
+ * child directly under this provider skips a keystroke while hidden. React 19
+ * propagates a context change lazily: below a bailing-out `memo` child it
+ * still marks the first `DraftContext` reader for a render, with no value
+ * comparison. A deeper component that must skip takes the draft as props, as
+ * `FieldMatrixGrid` does. Mutations still reach the live store: the held
+ * value's `mutate` and `replace` dispatch to the same reducer.
  */
 export function HeldDraft({ visible, children }: { visible: boolean; children: ReactNode }) {
   const live = useContext(DraftContext);
