@@ -33,8 +33,8 @@ away and back.
 ### Requirement: The Changes tab computes its rows while hidden
 
 The Changes tab SHALL compute its change rows from the live draft whether or not
-the tab is visible. The tab row's Changes count SHALL always equal the number of
-rows the tab lists.
+the tab is visible. The tab row's Changes count SHALL equal the number of those
+rows.
 
 #### Scenario: The badge counts a hidden tab's rows
 

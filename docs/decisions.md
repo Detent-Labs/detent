@@ -1808,6 +1808,22 @@ change's scope. The CLAIMVIEW tag is local to this section.
   makes field editability independent of claim state, and finding F-8 kept
   that rule. Covering the case needs a spec change and a third note cause.
 
+## Open from cut-studio-render-cost (needs its own OpenSpec change)
+
+The change cut the Fields-tab keystroke from 17.0 to 19.5 ms down to 6.6 to
+9.3 ms. The owner's budget was 4 ms, and it is unmet. The RENDER tag is local
+to this section.
+
+- **RENDER-1: validation runs synchronously on every keystroke.** It costs
+  about 3.4 ms of the sync commit, in `DraftProvider`'s `useMemo`. The budget
+  cannot hold while that stays. Deferring it with `useDeferredValue` lets the
+  check results, the Checks badge and the publish gate read a draft one render
+  old. A change needs a `studio-app` delta and a test that Publish never reads
+  stale results.
+- **RENDER-2: two more bodies could take the same hold.** `ContractPanel`
+  takes no props and `PathsView` takes `draft` as a prop. Neither has a
+  measured cost. Profile them before adding the hold.
+
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 
 Each entry below names a cut somebody proposed, the reason a reviewer refused
