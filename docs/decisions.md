@@ -1702,12 +1702,6 @@ of `5f41cd8a`. Each fix change deletes its own entries in the commit that
 archives it, and `sweep-docs-drift-2026-10` re-points the line citations of
 other entries. C-4 merges D-2, and C-6 merges F-6.
 
-- **`cut-studio-render-cost` (E2-11, E1-6, K-1; medium)**: Hidden tabs
-  recompute on every keystroke, the canvas reparses every guard on each
-  pointer move, and the studio chunk exceeds the 500 kB warning threshold of
-  Vite. Anchors: `packages/web/src/areas/studio/panels/FieldMatrixGrid.tsx`,
-  `packages/web/src/areas/studio/canvas/CanvasView.tsx`,
-  `packages/web/vite.config.ts`.
 - **`fix-studio-screen-races` (E1-8, E1-9, E1-10; low)**: Late responses
   overwrite a newer selection in the player and in Tools, the migration plan
   drops a duplicate mapping without a message, and "Create" on the Templates
