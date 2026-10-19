@@ -167,11 +167,9 @@ export function ToolsScreen({ token, navigate, onUnauthorized }: ToolsScreenProp
     (source: string) => {
       const isCurrent = catalogGate.next();
       setCatalogSource(source);
+      setFields([]);
       setCatalogError(undefined);
-      if (!source) {
-        setFields([]);
-        return;
-      }
+      if (!source) return;
       const fetchBody = source === "draft" ? getDraft(processId, token).then((d) => d?.body) : getVersionBody(processId, Number(source), token);
       fetchBody
         .then((body: unknown) => {

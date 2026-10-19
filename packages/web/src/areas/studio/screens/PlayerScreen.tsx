@@ -176,6 +176,7 @@ export function PlayerScreen({ processId, token, navigate, onUnauthorized }: Pla
   const loadRecord = useCallback(
     (id: string) => {
       const isCurrent = recordGate.next();
+      setRecordCursor(undefined);
       getInstanceRecord(id, token, { limit: RECORD_PAGE_LIMIT })
         .then((page) => {
           if (!isCurrent()) return;
