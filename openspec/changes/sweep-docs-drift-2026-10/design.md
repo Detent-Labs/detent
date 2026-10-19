@@ -98,8 +98,8 @@ behavior the code already has.
 
 ### D4. Spec deltas (H-10, D-9, persistence)
 
-The deltas under `specs/` hold the exact text. The `authorization` and
-`admin-operations-api` deltas name the data list exception wherever a
+The deltas under `specs/` hold the exact text. The `authorization`,
+`admin-operations-api` and `admin-user-management` deltas name the data list exception wherever a
 requirement claims every `/admin/*` route needs `ADMIN_ROLE`.
 
 - **The Purpose, by hand.** The `authorization` Purpose says "five fixed role
@@ -109,7 +109,7 @@ requirement claims every `/admin/*` route needs `ADMIN_ROLE`.
   route is role-gated holds, since the data list roles count as reserved
   roles too.
 - **Kept on purpose.** `admin-user-management` and `admin-operations-api`
-  say "like every other `/admin/*` route" in nine requirements. Each
+  say "like every other `/admin/*` route" in eight requirements. Each
   compares an account route or an outbox route with its neighbours. Each
   of those routes does need `system:admin`. The comparison is loose but not false
   for the route it describes, so those requirements stay as they are.

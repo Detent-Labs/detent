@@ -348,8 +348,9 @@ An operator grants studio access through the existing
 
 #### Scenario: No existing caller loses a route
 
-- **WHEN** an account holding `system:developer` calls a studio route that
-  no access list and no template-write rule gates
+- **WHEN** an account holding `system:developer` calls a studio route whose
+  only gate is a role `system:developer` satisfies, such as `GET /registry`,
+  `GET /templates` or a migration-plan route
 - **THEN** the engine authorizes the request, whatever list the account
   stands on
 
@@ -474,12 +475,16 @@ is what a set of independent tests already does.
 #### Scenario: Each studio route calls requireRole directly
 
 - **WHEN** a reader reads `src/http/studio-routes.ts`
-- **THEN** each handler calls `requireRole` or `requirePermission` itself, with
-  no policy abstraction between them
+- **THEN** each role-gated handler calls `requireRole` or `requirePermission`
+  itself, with no policy abstraction between them
 - **AND** the two template writes call `requireRole` with `TEMPLATES_ROLE`,
   while the four draft routes call the `requireAuthoring` helper beside it
 - **AND** the publish route, the two migration-plan routes and the orphan-key
   route await `requirePermission` with their fixed permission
+- **AND** the three `/processes/:processId/access` routes and
+  `GET /processes/access/mine` take no role gate
+- **AND** `src/auth/process-access.ts` authorizes the two access writes, and
+  the access read checks `ADMIN_ROLE` or the Developer list inline
 
 #### Scenario: The permission map does not extend
 
