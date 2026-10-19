@@ -254,35 +254,45 @@ export function MigrationSpecEditor({ rows, catalogs, onChange }: Props) {
 
       <Section legend={t("migrationForm.transformsLegend")} hint={t("migrationForm.transformsHint")}>
         {rows.transforms.length === 0 && <p {...stylex.props(styles.studioEmpty)}>{t("migrationForm.noRows")}</p>}
-        {rows.transforms.map((row, index) => (
-          <div {...stylex.props(styles.studioMapRow)} key={row.rowId}>
-            <EntryPicker
-              value={row.target}
-              entries={catalogs.target.fields}
-              label={t("migrationForm.targetLabel")}
-              invalid={false}
-              onChange={(id) => setTransforms(rows.transforms.map((r, i) => (i === index ? { ...r, target: id } : r)))}
-            />
-            <span {...stylex.props(styles.studioMapArrow)} aria-hidden="true">
-              ←
-            </span>
-            <input
-              {...stylex.props(styles.studioMapExpression)}
-              type="text"
-              spellCheck={false}
-              autoComplete="off"
-              aria-label={t("migrationForm.expressionLabel")}
-              placeholder={t("migrationForm.expressionPlaceholder")}
-              value={row.src}
-              onChange={(e) =>
-                setTransforms(rows.transforms.map((r, i) => (i === index ? { ...r, src: e.target.value } : r)))
-              }
-            />
-            <button type="button" className="btn btn-secondary" onClick={() => setTransforms(rows.transforms.filter((_, i) => i !== index))}>
-              {t("migrationForm.removeRow")}
-            </button>
-          </div>
-        ))}
+        {rows.transforms.map((row, index) => {
+          const rowIssues = issuesFor(row.rowId);
+          const errorId = rowIssues.length > 0 ? `transforms-error-${row.rowId}` : undefined;
+          return (
+            <div {...stylex.props(styles.studioMapRow)} key={row.rowId}>
+              <EntryPicker
+                value={row.target}
+                entries={catalogs.target.fields}
+                label={t("migrationForm.targetLabel")}
+                describedBy={errorId}
+                invalid={rowIssues.length > 0}
+                onChange={(id) => setTransforms(rows.transforms.map((r, i) => (i === index ? { ...r, target: id } : r)))}
+              />
+              <span {...stylex.props(styles.studioMapArrow)} aria-hidden="true">
+                ←
+              </span>
+              <input
+                {...stylex.props(styles.studioMapExpression)}
+                type="text"
+                spellCheck={false}
+                autoComplete="off"
+                aria-label={t("migrationForm.expressionLabel")}
+                placeholder={t("migrationForm.expressionPlaceholder")}
+                value={row.src}
+                onChange={(e) =>
+                  setTransforms(rows.transforms.map((r, i) => (i === index ? { ...r, src: e.target.value } : r)))
+                }
+              />
+              <button type="button" className="btn btn-secondary" onClick={() => setTransforms(rows.transforms.filter((_, i) => i !== index))}>
+                {t("migrationForm.removeRow")}
+              </button>
+              {errorId && (
+                <p {...stylex.props(styles.studioMapError)} id={errorId}>
+                  {rowIssues.map((i) => i.message).join("; ")}
+                </p>
+              )}
+            </div>
+          );
+        })}
         <button
           type="button"
           className="btn btn-secondary"
