@@ -9,7 +9,7 @@
 
 - [x] 2.1 Rewrite the authorization sentence of `GET /instances/{instanceId}` and every comment and attachment 403 line per design.md, with the requirement name.
 - [x] 2.2 Name the stored grant in `POST /processes` and `POST /instances/{instanceId}/cancel`. Add the cancellable-step condition to cancel. Keep the response text `close-instance-reads-on-write-paths` wrote.
-- [x] 2.3 In the header, name the four routes outside the Runtime API Layer and the SaaS-mode 401 and 503. Drop "Unauthenticated" from the `observability` tag.
+- [x] 2.3 In the header, state that every instance route uses the Runtime API Layer. Name the SaaS-mode 401 and 503, and the three routes that skip them. Drop "Unauthenticated" from the `observability` tag.
 
 ## 3. Verification
 

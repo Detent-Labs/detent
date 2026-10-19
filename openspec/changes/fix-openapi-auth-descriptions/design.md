@@ -26,7 +26,9 @@ A claim held by another actor answers 403 with type `not-claimant`
 
 `src/http/server.ts` answers 401 `actor-resolution` for an unknown or
 missing tenant in SaaS mode, and 503 `tenant-unreachable` when the
-tenant's database is down. It answers both ahead of any route.
+tenant's database is down. It answers both before the matched route's
+handler runs. `GET /livez`, `GET /readyz` and `GET /metrics` answer before
+tenant resolution and never send them.
 
 ## Goals / Non-Goals
 
@@ -48,9 +50,11 @@ instance admits its starter alone. The statement then names the governing requir
 `openspec/specs/authorization/spec.md`:
 <!-- antislop: allow passive-voice -- a requirement name, quoted verbatim -->
 `Reading one instance is authorized by relationship to it`. The comment and attachment entries
-keep their existing pointer to `GET /instances/{instanceId}`, and only
-their 403 lines change. The alternative was the full rule per route. It
-repeats one rule six times and drifts, which CQ-2 warns against.
+keep their existing pointer to `GET /instances/{instanceId}`. Only their 403
+lines change. Each becomes a short pointer at that rule. The `GET` entry
+alone states the rule, and its own 403 is one short line. The alternative was
+the full rule per route. It repeats one rule six times and drifts, which CQ-2
+warns against.
 
 **A grant gets named, with a pointer to its requirement.** `POST /processes`
 and `POST …/cancel` name "a stored grant over the process". Each points at
@@ -61,9 +65,10 @@ A row per route would repeat one fact 28 times. The header sentence names both
 types. The per-route status lists stay within the set the existing
 requirement allows.
 
-**The header lists the routes outside the Runtime API Layer.** `GET /livez`,
-`GET /readyz`, `GET /metrics` and `GET /ui-strings` read no instance state
-through `src/runtime/api.ts`. The header names them as the exception.
+**The header claims the Runtime API Layer for instance routes only.** Every
+`/instances*` route and `POST /processes/{processId}/instances` calls
+`src/runtime/api.ts`. Login, the account routes and the process publish and
+list routes call other modules, so the header makes no claim about them.
 
 **No new test.** `widen-test-guards` already strengthened
 `test/openapi-exclusions.test.ts` (G-10). A text assertion per sentence

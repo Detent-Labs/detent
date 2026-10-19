@@ -19,16 +19,16 @@ info:
     frontends directly, not a customer integration. Each exclusion is named
     rather than left implicit, so its absence reads as a decision.
 
-    Every route runs through the Runtime API Layer (`src/runtime/api.ts`),
-    except `GET /livez`, `GET /readyz`, `GET /metrics` and `GET /ui-strings`,
-    which read no instance state through it.
+    Every instance route runs through the Runtime API Layer
+    (`src/runtime/api.ts`).
     An unauthenticated request to any route below `POST /auth/login`,
     `GET /livez`, `GET /readyz`, and `GET /ui-strings` gets 401.
     `GET /metrics` is also 401
     without a token, but its token is `METRICS_TOKEN`, not an actor's JWT.
-    In SaaS mode, any route can answer 401 `actor-resolution` for an unknown
-    or missing tenant, and 503 `tenant-unreachable` when the tenant's
-    database is down.
+    In SaaS mode, any route except `GET /livez`, `GET /readyz` and
+    `GET /metrics` can answer 401 `actor-resolution` for an unknown or
+    missing tenant, and 503 `tenant-unreachable` when the tenant's database
+    is down. Those three answer before tenant resolution.
     A request lacking a required
     reserved role gets 403. A malformed request body gets 400 (request
     shape) or 422 (field-level validation). `POST /processes` is the one
@@ -410,17 +410,17 @@ paths:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "403":
           description: >-
-            The actor is not `system:admin`, and no relationship admits them
-            to the instance. They are not the claimant or an eligible
-            candidate, and not its starter or a principal-set participant,
-            or a visibility revocation names them. A test instance refuses
-            everyone but its starter and `system:admin`.
+            No relationship in the rule above admits the actor. A non-admin
+            gets the same answer for an instance that does not exist.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "500":
-          description: The instance does not exist. Also covers any unrecognized server-side failure.
+          description: >-
+            The instance does not exist and the caller holds `system:admin`.
+            Any other caller gets the 403 above for a missing instance. Also
+            covers any unrecognized server-side failure.
           content:
             application/json:
               schema:
@@ -781,17 +781,18 @@ paths:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "403":
           description: >-
-            The actor is not `system:admin`, and no relationship admits them
-            to the instance. They are not the claimant or an eligible
-            candidate, and not its starter or a principal-set participant,
-            or a visibility revocation names them. A test instance refuses
-            everyone but its starter and `system:admin`.
+            The rule `GET /instances/{instanceId}` states does not admit the
+            actor. A non-admin gets the same answer for an instance that does
+            not exist.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "500":
-          description: The instance does not exist. Also covers any unrecognized server-side failure.
+          description: >-
+            The instance does not exist and the caller holds `system:admin`.
+            Any other caller gets the 403 above for a missing instance. Also
+            covers any unrecognized server-side failure.
           content:
             application/json:
               schema:
@@ -826,17 +827,18 @@ paths:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "403":
           description: >-
-            The actor is not `system:admin`, and no relationship admits them
-            to the instance. They are not the claimant or an eligible
-            candidate, and not its starter or a principal-set participant,
-            or a visibility revocation names them. A test instance refuses
-            everyone but its starter and `system:admin`.
+            The rule `GET /instances/{instanceId}` states does not admit the
+            actor. A non-admin gets the same answer for an instance that does
+            not exist.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "500":
-          description: The instance does not exist. Also covers any unrecognized server-side failure.
+          description: >-
+            The instance does not exist and the caller holds `system:admin`.
+            Any other caller gets the 403 above for a missing instance. Also
+            covers any unrecognized server-side failure.
           content:
             application/json:
               schema:
@@ -894,17 +896,18 @@ paths:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "403":
           description: >-
-            The actor is not `system:admin`, and no relationship admits them
-            to the instance. They are not the claimant or an eligible
-            candidate, and not its starter or a principal-set participant,
-            or a visibility revocation names them. A test instance refuses
-            everyone but its starter and `system:admin`.
+            The rule `GET /instances/{instanceId}` states does not admit the
+            actor. A non-admin gets the same answer for an instance that does
+            not exist.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "500":
-          description: The instance does not exist. Also covers any unrecognized server-side failure.
+          description: >-
+            The instance does not exist and the caller holds `system:admin`.
+            Any other caller gets the 403 above for a missing instance. Also
+            covers any unrecognized server-side failure.
           content:
             application/json:
               schema:
@@ -942,17 +945,18 @@ paths:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "403":
           description: >-
-            The actor is not `system:admin`, and no relationship admits them
-            to the instance. They are not the claimant or an eligible
-            candidate, and not its starter or a principal-set participant,
-            or a visibility revocation names them. A test instance refuses
-            everyone but its starter and `system:admin`.
+            The rule `GET /instances/{instanceId}` states does not admit the
+            actor. A non-admin gets the same answer for an instance that does
+            not exist.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "500":
-          description: The instance does not exist. Also covers any unrecognized server-side failure.
+          description: >-
+            The instance does not exist and the caller holds `system:admin`.
+            Any other caller gets the 403 above for a missing instance. Also
+            covers any unrecognized server-side failure.
           content:
             application/json:
               schema:
@@ -1001,11 +1005,9 @@ paths:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "403":
           description: >-
-            The actor is not `system:admin`, and no relationship admits them
-            to the instance. They are not the claimant or an eligible
-            candidate, and not its starter or a principal-set participant,
-            or a visibility revocation names them. A test instance refuses
-            everyone but its starter and `system:admin`.
+            The rule `GET /instances/{instanceId}` states does not admit the
+            actor. A non-admin gets the same answer for an instance that does
+            not exist.
           content:
             application/json:
               schema:
@@ -1013,7 +1015,9 @@ paths:
         "500":
           description: >-
             The attachment does not exist, or belongs to a different
-            instance than `instanceId`. Also covers any unrecognized
+            instance than `instanceId`. Also the instance does not exist and
+            the caller holds `system:admin`; any other caller gets the 403
+            above for a missing instance. Also covers any unrecognized
             server-side failure.
           content:
             application/json:
@@ -1058,8 +1062,8 @@ paths:
           description: >-
             The actor holds neither `system:cancel-any` nor a stored `cancel`
             grant over the process, and either did not start this instance or
-            started it while its current step's effective `cancellable` is
-            false. A starter whom a revocation names, with no live
+            started it and the instance runs on a step whose effective
+            `cancellable` is false. A starter whom a revocation names, with no live
             assignment on the instance, also gets this response once the
             instance has finished: the 200 above would tell them its status.
           content:

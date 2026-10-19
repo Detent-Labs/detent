@@ -23,8 +23,9 @@ reads a 403 where the code answers 200, and misses two query values. The
   stored grant beside the role. The cancel entry also names the starter's
   cancellable-step condition.
 - The `observability` tag no longer says "Unauthenticated".
-- The document header names the four routes outside the Runtime API Layer,
-  and states the SaaS-mode 401 and 503 answers once.
+- The document header says every instance route runs through the Runtime API
+  Layer. It states the SaaS-mode 401 and 503 answers once, and names the
+  three routes that never send them.
 
 ## Capabilities
 
