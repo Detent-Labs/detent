@@ -117,8 +117,8 @@ export function SubprocessSpecEditor({ value, fields, childInputs, onChange, pro
   return (
     <fieldset className="subprocess-spec">
       <legend>
-          <KeyCaption text={t("subprocess.legend")} jsonKey="subprocess" />
-        </legend>
+        <KeyCaption text={t("subprocess.legend")} jsonKey="subprocess" />
+      </legend>
       {processPicker}
 
       <label {...stylex.props(styles.field)}>

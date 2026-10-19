@@ -129,16 +129,22 @@ Three node shapes fail it:
 - A string or template literal that holds a letter. It fails as a JSX child,
   and as either branch of a conditional or logical child.
 - A string literal as the value of a caption attribute. These are `label`,
-  `legend`, `placeholder`, `title`, `aria-label`, `addLabel`, `removeLabel`
-  and `hint`.
+  `legend`, `placeholder`, `title`, `aria-label`, `addLabel`, `removeLabel`,
+  `hint` and `text`, the prop `KeyCaption` and `NotCheckedBadge` take.
 
 Three exemptions keep legal values out of the report. An `<option>` whose
 text equals its own `value` prints a JSON enum value. A string literal equal
 to a studio catalog key names a key, as `CollaborationControl`'s `legend`
 does. A named allow-list holds `CEL` (a language name) and `v` (the prefix
-before a mono version number). The test
-also asserts that a planted literal in an inline source fails, so a parser
-change cannot silence it.
+before a mono version number). The allow-list matches the trimmed text. The
+test also asserts that a planted literal in an inline source fails, so a
+parser change cannot silence it.
+
+Two rules narrow the scan. JSX text and a JSX attribute string decode
+entities before the letter test, so `&gt;` passes and `&Uuml;` fails. A
+template part that sits between two expressions drops a leading or trailing
+comma and space before the allow-list match. The version list in
+`ProcessHeaderBar.tsx` needs that, because it leaves `, v` between two values.
 
 Alternative: a regex scan. Rejected: `a > b && c < d` matches a JSX text
 pattern, and multi-line text escapes a line regex.

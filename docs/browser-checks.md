@@ -6361,7 +6361,8 @@ Open a step with a timer. Pass: the timer's captions read Description, "When
 it fires" with no mono name, and "Path it takes when it fires". The last one
 carries `onFire.targetPath` and wraps without clipping at a 360px width.
 
-On the Data sources tab, add a source of a type with a generated form.
-Choose a type that declares a minimum length of 3. Type two characters.
-Pass: the message under the field reads "Enter at least 3 characters." in the
-error color. Type a third character. Pass: the message goes.
+On the Steps tab, open a step and add an action under "Actions on entry".
+Choose the type `notification.email`. In the `to` field, type `nobody` on one
+line. Pass: the message under the field reads "Enter a valid email address."
+in the error color. Replace the line with `a@example.com`. Pass: the message
+goes.
