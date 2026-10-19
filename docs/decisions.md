@@ -254,6 +254,13 @@ word. `ROADMAP.md` carries stage-by-stage status.
   `src/engine/definitions.ts:544-548`, `src/schema/compile.ts:466-468` and
   `:1139`. Live specs stay silent on the rule too. Building it takes its own
   definition contract change.
+- An assignment resolver can outlive its deadline while the row lock stays
+  held. The submit path and the subprocess return both resolve an assignment
+  on the locked transaction's connection. A resolver past its deadline leaves
+  its query running there. Nobody has measured whether the commit then waits
+  for it with the row lock held. `resolveStepAssignment`
+  (`src/engine/registry.ts`) and `commitTransition`
+  (`src/engine/transition.ts`) point here.
 
 ## Decided, not yet built (each needs its own OpenSpec change)
 - **A non-studio surface for a pure Owner, and write-time eligibility
@@ -289,15 +296,16 @@ word. `ROADMAP.md` carries stage-by-stage status.
   `ROADMAP.md` stage 40 carries it in full. The seam shipped 2026-08-15 as
   `process-scoped-permission-seam`, and the storage half shipped 2026-08-16
   as `process-scoped-permission-grants`. `can(actor, permission, processId,
-  db)` and `requirePermission` sit in `src/auth/authorize.ts` over three
-  permissions; `src/auth/grants.ts` holds the `permission_grants` table's SQL
+  db)` and `requirePermission` sit in `src/auth/authorize.ts` over the
+  `Permission` values the `authorization` spec lists: `publish`, `cancel`,
+  `migrate`, `read` and `visibility`; `src/auth/grants.ts` holds the `permission_grants` table's SQL
   behind them, and three `system:admin`-gated routes administer a grant.
   Nobody was blocked by the seam alone, and no account gained or lost access
   the day storage landed: an installation that writes no grant row keeps
   every answer it had.
 
-  Three pieces stayed open, each its own later OpenSpec change. Two still
-  are.
+  Three pieces stayed open, each its own later OpenSpec change. Only the
+  filter still is.
 
   The `scope=all` filter and the reporting aggregates turn a gate into a
   query predicate. That reaches `instance-query`, not `authorization`.
@@ -341,8 +349,8 @@ word. `ROADMAP.md` carries stage-by-stage status.
 
   A draft-scoped `"author"` permission would let an installation limit who
   sees and edits which draft. `drafts.process_id` is scopeable — it is the
-  table's own key, named from `PUT /drafts/:processId`'s first save — but
-  every author reaches every draft today.
+  table's own key, named from `PUT /drafts/:processId`'s first save. That
+  piece closed through the `process-access-roles` Developer list.
 
   The third piece closed 2026-08-19 as `scope-migration-plan-visibility`.
   The web areas reading `actor.roles` directly was framed as a gap across
@@ -786,15 +794,6 @@ section records that nothing else tracks the one still open.
   is a split into sibling modules re-exported from `api.ts`, so no import site
   changes. `api.ts` is now a 117-line barrel; `src/runtime/queries.ts`, the
   new largest module, holds 651 lines.
-- **Not from that review: `src/schema/compile.ts:1218` miscounts its own
-  list.** The doc comment on `structuralIssues` names five checks that read
-  the body duck-typed, then calls the remainder four. The list returns twelve
-  checks, so seven remain: `checkFieldTree`, `checkViewFieldPatterns`,
-  `checkIdResolution`, `checkLengthBounds`, `checkRedactableFields`,
-  `checkGroupReference` and `checkActorFromFieldReference`. The comment at
-  `:1247`, inside `compileProcessBody`, already says twelve. Risk: a reader
-  trusts the smaller number and misses three checks. The 2026-09-09 documentation
-  audit found it; the next change inside that file carries the fix.
 
 <!-- antislop: allow trailing-negation -->
 <!-- "Decided, not yet built" quotes an existing section heading verbatim. -->
