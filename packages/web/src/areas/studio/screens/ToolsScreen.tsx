@@ -145,11 +145,11 @@ export function ToolsScreen({ token, navigate, onUnauthorized }: ToolsScreenProp
       setCatalogSource("");
       setFields([]);
       setCatalogError(undefined);
-      if (!id) {
-        setVersions([]);
-        setHasDraft(false);
-        return;
-      }
+      // The catalog picker lists only the chosen process's sources, so the
+      // previous process's list must not stay selectable while this one loads.
+      setVersions([]);
+      setHasDraft(false);
+      if (!id) return;
       Promise.all([listVersions(id, token), getDraft(id, token)])
         .then(([vs, draft]) => {
           if (!isCurrent()) return;
