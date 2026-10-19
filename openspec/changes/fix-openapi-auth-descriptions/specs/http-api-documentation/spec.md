@@ -44,9 +44,11 @@ value an enumerated parameter accepts.
 
 ### Requirement: The document header states the SaaS-mode tenant answers
 
-The document header SHALL state once that, in SaaS mode, any route can
+The document header SHALL state once that, in SaaS mode, a route can
 answer 401 for an unknown or missing tenant. The same sentence SHALL name
-the 503 a route answers when the tenant's database is down.
+the 503 a route answers when the tenant's database is down. The header
+SHALL name the routes that answer before the tenant lookup and never send
+either status.
 
 #### Scenario: A reader checks the SaaS-mode answers
 
