@@ -259,7 +259,8 @@ separate. `requireRole` SHALL stay exported and SHALL stay synchronous.
 
 `ADMIN_ROLE` SHALL gate every `/admin/*` route except the data list routes,
 and, additionally, `GET /instances/:instanceId/record`. The
-`system:datalists` requirement below gates the data list routes. The `scope=mine` listing SHALL remain open to
+`system:datalists` requirement below gates the data list routes. The
+`scope=mine` listing SHALL remain open to
 every authenticated actor. An actor holding no reserved role therefore still
 participates fully in the instances it is a candidate for.
 

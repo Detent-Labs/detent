@@ -13,8 +13,9 @@ access implied.
 
 The engine SHALL store, per process, three lists: Developer, Owner and
 Reader. Each list SHALL hold zero or more entries. Each entry SHALL be a
-`user_xxx` id or a `group_xxx` id, the same principal shape
-`instance_principals` already uses.
+non-empty actor id or group id, the same principal shape
+`instance_principals` already uses. The engine SHALL NOT require a
+`user_` or `group_` prefix, because a JWT actor's id is its `sub` claim.
 
 The lists SHALL NOT live in `ProcessBody`. They SHALL NOT enter
 `definitionHash`. A process's access lists SHALL stay the same across a
@@ -32,6 +33,13 @@ itself. They do not name who reaches one pinned version of it.
 - **WHEN** an author publishes a new version of a process that already
   carries Developer, Owner and Reader entries
 - **THEN** all three lists hold the same entries after the publish
+
+#### Scenario: The engine stores an entry without a prefix
+
+- **WHEN** a Developer adds the entry `auth0|42` to a process's Developer list
+- **THEN** the engine stores the entry
+- **AND** an actor whose id is `auth0|42` and who holds `system:developer`
+  matches it
 
 ### Requirement: Matching a principal resolves from the actor's credential
 

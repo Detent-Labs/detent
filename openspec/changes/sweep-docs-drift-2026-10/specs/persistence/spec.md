@@ -5,8 +5,9 @@
 Outside SaaS mode, `startHttpServer` SHALL run `initSchema` against its
 database before it begins accepting requests. In SaaS mode the provisioning
 command builds each tenant database's schema instead. The requirement "Each
-tenant database carries the whole schema from its creation" states that rule. The user-administration CLI SHALL run `initSchema` before
-executing a command. Every statement in `initSchema` is idempotent:
+tenant database carries the whole schema from its creation" states that rule.
+The user-administration CLI SHALL run `initSchema` before executing a command.
+Every statement in `initSchema` is idempotent:
 `CREATE ... IF NOT EXISTS` for a relation or index, `CREATE OR REPLACE` for a
 function, and `DROP ... IF EXISTS` before `CREATE TRIGGER`. A `DO` block
 guards a role's creation on `pg_roles`, and `GRANT` is idempotent by nature.
