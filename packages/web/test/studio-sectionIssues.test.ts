@@ -4,15 +4,14 @@
  * rendering.
  *
  * The load-bearing case is the one `studio-step-page` states outright: an
- * issue stands at exactly one section. The masthead's own total comes from
- * `stepIssueCount`, so the cases assert against that function rather than
- * against a second copy of its rule.
+ * issue stands at exactly one section. The masthead filters its own issues in
+ * `panels/StepPage.tsx`: those the step owns that no section claims. The cases
+ * here assert the section map alone.
  */
 import { describe, expect, it } from "bun:test";
 import type { Step } from "workflow-engine/schema";
 import type { DraftOf } from "../src/areas/studio/draft/types.js";
 import type { EditorIssue } from "../src/areas/studio/draft/issues.js";
-import { stepIssueCount } from "../src/areas/studio/draft/panel-rail.js";
 import { sectionsFor } from "../src/areas/studio/panels/sectionsFor.js";
 import { issuesBySection, sectionOfIssue } from "../src/areas/studio/panels/sectionIssues.js";
 
@@ -126,11 +125,10 @@ describe("issuesBySection", () => {
     expect(bySection.get("entry")).toBeUndefined();
   });
 
-  it("leaves the step's own total untouched, so the masthead still counts what a section prints", () => {
+  it("holds every issue the step owns across its sections", () => {
     const issues = [issue("path", "path_1"), issue("action", "act_entry")];
 
     expect([...issuesBySection(step, issues, PARTICIPANT).values()].flat()).toHaveLength(2);
-    expect(stepIssueCount(issues, step)).toBe(2);
   });
 
   it("counts no issue belonging to another step", () => {

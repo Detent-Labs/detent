@@ -2,11 +2,9 @@ import { describe, expect, it } from "bun:test";
 import {
   flattenRailFields,
   issueCountForEntityId,
-  issueCountForEntityType,
   issueCountForSource,
   panelEntityCounts,
   stepEntityIds,
-  stepIssueCount,
 } from "../src/areas/studio/draft/panel-rail.js";
 import type { DraftField } from "../src/areas/studio/draft/fields.js";
 import type { EditorIssue } from "../src/areas/studio/draft/issues.js";
@@ -86,24 +84,6 @@ describe("flattenRailFields", () => {
   });
 });
 
-describe("issueCountForEntityType", () => {
-  it("counts only the view's own entity type", () => {
-    const issues = [issue("field", LEAF), issue("field", OUTER), issue("dataSource", "ds_1"), issue("contract", "contract")];
-    expect(issueCountForEntityType(issues, "field")).toBe(2);
-    expect(issueCountForEntityType(issues, "dataSource")).toBe(1);
-    expect(issueCountForEntityType(issues, "contract")).toBe(1);
-  });
-
-  it("reads zero for a view with no issue", () => {
-    expect(issueCountForEntityType([issue("field", LEAF)], "contract")).toBe(0);
-  });
-
-  it("surfaces a field-anchored view finding under the Fields view, technical-field-marker's finding included", () => {
-    const issues = [issue("field", LEAF, "view")];
-    expect(issueCountForEntityType(issues, "field")).toBe(1);
-  });
-});
-
 const step = {
   id: STEP,
   key: "review",
@@ -129,34 +109,11 @@ describe("stepEntityIds", () => {
   });
 });
 
-describe("stepIssueCount", () => {
-  // The invariant this rejects: a count filtered on the step's own entityId
-  // alone. `resolveLoc` resolves a guard's issue to the PATH, so that count
-  // reads zero here and the section index reports a clean step.
-  it("counts an issue that resolved to the step's own path", () => {
-    expect(stepIssueCount([issue("path", PATH)], step)).toBe(1);
-  });
-
-  it("counts issues on the step, a path, a timer and an action together", () => {
-    const issues = [issue("step", STEP), issue("path", PATH), issue("timer", TIMER), issue("action", FIRE_ACTION)];
-    expect(stepIssueCount(issues, step)).toBe(4);
-  });
-
-  it("ignores an issue belonging to another step", () => {
-    const other = "step_00000000-0000-4000-8000-0000000000c1";
-    expect(stepIssueCount([issue("step", other), issue("field", LEAF)], step)).toBe(0);
-  });
-
-  it("reads zero for a step with no issue", () => {
-    expect(stepIssueCount([], step)).toBe(0);
-  });
-});
-
 describe("issueCountForSource", () => {
   it("counts only issues with the given source", () => {
     // A `checkViewFlags` finding and an engine finding can share `entityType:
-    // "step"`, the exact collision `issueCountForEntityType` cannot resolve
-    // for the field matrix's rail badge.
+    // "step"`, a collision an `entityType` filter cannot resolve for the
+    // field matrix's rail badge.
     const issues = [
       issue("step", STEP, "view"),
       issue("step", STEP, "cel"),
