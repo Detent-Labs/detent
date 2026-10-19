@@ -197,7 +197,7 @@ export function createAssignmentRegistry(): AssignmentRegistry {
 export const staticAssignmentConfigSchema = z.object({ candidates: z.array(z.string()) });
 
 /** The built-in `static` entry: its configured list, verbatim, with no CEL evaluation and no dynamic lookup. */
-export const staticAssignmentStrategyDef: AssignmentStrategyDef = {
+const staticAssignmentStrategyDef: AssignmentStrategyDef = {
   configSchema: staticAssignmentConfigSchema,
   resolve: async (ctx) => (ctx.config as { candidates?: string[] }).candidates ?? [],
 };

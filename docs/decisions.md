@@ -1679,11 +1679,6 @@ of `5f41cd8a`. Each fix change deletes its own entries in the commit that
 archives it, and `sweep-docs-drift-2026-10` re-points the line citations of
 other entries. C-4 merges D-2, and C-6 merges F-6.
 
-- **`remove-dead-exports` (B-14, C-18, D-10, E1-12, E2-20, F-15; low)**:
-  Exports in the engine, tenancy, handlers, studio, reporting and form-ui
-  have no importer, and some functions and arguments have no caller.
-  Anchors: `src/engine/assignment-strategies.ts`, `src/tenancy/store.ts`,
-  `packages/web/src/areas/reporting/api/client.ts`.
 - **`fix-openapi-auth-descriptions` (H-1, H-2, H-3; low)**: The file
   `docs/openapi.yaml` describes `GET /instances` in part, allows a candidate
   without a claim to submit, which the code refuses, and states other auth
