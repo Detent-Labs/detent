@@ -24,6 +24,7 @@ import type { Route } from "../routing.js";
 import { describeError, describeCaughtError } from "../errors.js";
 import { t } from "../catalog.js";
 import { is401, useFail } from "../../../shell/useFail.js";
+import { createLatestGate } from "../../../shell/latestGate.js";
 
 interface PlayerScreenProps {
   processId: string;
@@ -168,18 +169,25 @@ export function PlayerScreen({ processId, token, navigate, onUnauthorized }: Pla
   // what a submission that opened nothing leaves behind.
   const [tabSwitch, setTabSwitch] = useState<TabSwitch | undefined>(undefined);
   const failRecord = useFail(onUnauthorized, (e) => setRecordError(describeCaughtError(e)));
+  // A reload starts a generation, so a record page still in flight for the
+  // previous one writes nothing when it lands.
+  const [recordGate] = useState(createLatestGate);
 
   const loadRecord = useCallback(
     (id: string) => {
+      const isCurrent = recordGate.next();
       getInstanceRecord(id, token, { limit: RECORD_PAGE_LIMIT })
         .then((page) => {
+          if (!isCurrent()) return;
           setRecord(page.items);
           setRecordCursor(page.cursor);
           setRecordError(undefined);
         })
-        .catch(failRecord);
+        .catch((e: unknown) => {
+          if (isCurrent()) failRecord(e);
+        });
     },
-    [token, failRecord],
+    [token, failRecord, recordGate],
   );
 
   const applyView = useCallback(
@@ -323,13 +331,17 @@ export function PlayerScreen({ processId, token, navigate, onUnauthorized }: Pla
 
   const loadMoreRecord = useCallback(() => {
     if (!instanceId || !recordCursor) return;
+    const isCurrent = recordGate.current();
     getInstanceRecord(instanceId, token, { limit: RECORD_PAGE_LIMIT, cursor: recordCursor })
       .then((page) => {
+        if (!isCurrent()) return;
         setRecord((prev) => [...prev, ...page.items]);
         setRecordCursor(page.cursor);
       })
-      .catch(failRecord);
-  }, [instanceId, recordCursor, token, failRecord]);
+      .catch((e: unknown) => {
+        if (isCurrent()) failRecord(e);
+      });
+  }, [instanceId, recordCursor, token, failRecord, recordGate]);
 
   return (
     <main {...stylex.props(styles.studioScreen, styles.studioPlayerScreen)}>
