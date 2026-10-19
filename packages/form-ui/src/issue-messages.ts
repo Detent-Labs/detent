@@ -54,12 +54,12 @@ const MESSAGES: Record<string, Record<string, string>> = {
 
 /**
  * `issue.kind` resolved to a localized sentence, falling back through
- * `locale` -> `baseLocale` -> the raw `kind` — so a kind with no catalog
- * entry degrades to today's behavior (the discriminator text) rather than
+ * `locale` -> English -> the raw `kind` — so a kind with no catalog entry
+ * degrades to today's behavior (the discriminator text) rather than
  * rendering nothing or throwing.
  */
-export function issueMessage(issue: SubmissionIssue, locale: LocaleCode, baseLocale: LocaleCode = locale): string {
-  const loc = (locale in MESSAGES ? locale : baseLocale in MESSAGES ? baseLocale : "en") as "en" | "de";
+export function issueMessage(issue: SubmissionIssue, locale: LocaleCode): string {
+  const loc = (locale in MESSAGES ? locale : "en") as "en" | "de";
   if (issue.kind === "constraint") return constraintMessage(issue, loc);
   if (issue.kind === "type-mismatch") return typeMismatchMessage(issue, loc);
   return MESSAGES[loc][issue.kind] ?? MESSAGES.en[issue.kind] ?? issue.kind;
@@ -73,11 +73,11 @@ const ISSUE_COUNT: Record<string, { one: string; many: string }> = {
 /**
  * A tab's own issue count, as text — "2 issues". The tab strip's stamp names
  * the count where a screen reader reaches it, so the color the stamp draws in
- * carries no state on its own. Falls back through `locale` -> `baseLocale` ->
- * English, the way `issueMessage` does.
+ * carries no state on its own. Falls back from `locale` to English, the way
+ * `issueMessage` does.
  */
-export function issueCountText(count: number, locale: LocaleCode, baseLocale: LocaleCode = locale): string {
-  const loc = locale in ISSUE_COUNT ? locale : baseLocale in ISSUE_COUNT ? baseLocale : "en";
+export function issueCountText(count: number, locale: LocaleCode): string {
+  const loc = locale in ISSUE_COUNT ? locale : "en";
   const words = ISSUE_COUNT[loc] ?? ISSUE_COUNT.en!;
   return `${count} ${count === 1 ? words.one : words.many}`;
 }
