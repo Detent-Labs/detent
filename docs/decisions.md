@@ -1702,13 +1702,6 @@ of `5f41cd8a`. Each fix change deletes its own entries in the commit that
 archives it, and `sweep-docs-drift-2026-10` re-points the line citations of
 other entries. C-4 merges D-2, and C-6 merges F-6.
 
-- **`fix-studio-screen-races` (E1-8, E1-9, E1-10; low)**: Late responses
-  overwrite a newer selection in the player and in Tools, the migration plan
-  drops a duplicate mapping without a message, and "Create" on the Templates
-  screen overwrites a template with the same key. Anchors:
-  `packages/web/src/areas/studio/screens/PlayerScreen.tsx`,
-  `packages/web/src/areas/studio/screens/migrationPlanLogic.ts`,
-  `packages/web/src/areas/studio/screens/TemplatesScreen.tsx`.
 - **`catalog-studio-literal-strings` (E2-19; low)**: Visible studio text sits
   as literals in the code instead of in the catalog. Anchors:
   `packages/web/src/areas/studio/panels/TimersPanel.tsx`,
