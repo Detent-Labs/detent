@@ -23,15 +23,15 @@
 
 ## 5. Verification
 
-- [ ] 5.1 Run `bun run typecheck` in the devcontainer. Expect exit code 0.
-- [ ] 5.2 Run `bun run build` in the devcontainer. Expect exit code 0.
-- [ ] 5.3 Run the full `bun test` suite with `DATABASE_URL` set through `sh scripts/test-gated.sh bun test` and `OPENSPEC_TELEMETRY=0`. Read the pass, skip and fail counts.
-- [ ] 5.4 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` on the host. Read its exit code.
-- [ ] 5.5 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh` on the host. Read its exit code.
-- [ ] 5.6 Do a browser check on the production bundle. Delay one Player record answer and one Tools catalog answer with a route intercept. Confirm that each screen drops it.
-- [ ] 5.7 In the browser, add two field-map rows with one source and read both errors. Press Create on an existing template key and cancel the prompt.
+- [x] 5.1 Run `bun run typecheck` in the devcontainer. Expect exit code 0.
+- [x] 5.2 Run `bun run build` in the devcontainer. Expect exit code 0.
+- [x] 5.3 Run the full `bun test` suite with `DATABASE_URL` set through `sh scripts/test-gated.sh bun test` and `OPENSPEC_TELEMETRY=0`. Read the pass, skip and fail counts.
+- [x] 5.4 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` on the host. Read its exit code.
+- [x] 5.5 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh` on the host. Read its exit code.
+- [x] 5.6 Do a browser check on the production bundle. Delay one Player record answer and one Tools catalog answer with a route intercept. Confirm that each screen drops it.
+- [x] 5.7 In the browser, add two field-map rows with one source and read both errors. Press Create on an existing template key and cancel the prompt.
 - [x] 5.8 Add one entry to `docs/browser-checks.md` for the delayed-answer check in 5.6 and one for the template prompt in 5.7. Check them with the prose gate in 5.4.
-- [ ] 5.9 Run `/impeccable critique` and `/impeccable audit` against the templates and migration-plan screens.
+- [x] 5.9 Run `/impeccable critique` and `/impeccable audit` against the templates and migration-plan screens.
 
 ## Workflow follow-up
 
