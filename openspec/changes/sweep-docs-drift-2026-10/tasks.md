@@ -2,20 +2,20 @@
 
 ## 1. The authoring guide
 
-- [ ] 1.1 Apply design.md D1 (H-4, H-5, H-6, B-13) to `docs/authoring-guide.md`. Verify with a search for each old anchor, which finds nothing.
-- [ ] 1.2 Run the antislop linter on `docs/authoring-guide.md`. Verify the count does not rise over `origin/main`.
+- [x] 1.1 Apply design.md D1 (H-4, H-5, H-6, B-13) to `docs/authoring-guide.md`. Verify with a search for each old anchor, which finds nothing.
+- [x] 1.2 Run the antislop linter on `docs/authoring-guide.md`. Verify the count does not rise over `origin/main`.
 
 ## 2. ROADMAP.md and the roadmap history
 
-- [ ] 2.1 Apply design.md D2's Stage 40 and count fixes to `ROADMAP.md`. Verify with a search for each old anchor.
-- [ ] 2.2 Move Stage 63 to the Done table and its prose to `docs/roadmap-history.md`. Verify `ROADMAP.md` lists no stage 63 under Open stages.
-- [ ] 2.3 Run the antislop linter on both files. Verify neither count rises over `origin/main`.
+- [x] 2.1 Apply design.md D2's Stage 40 and count fixes to `ROADMAP.md`. Verify with a search for each old anchor.
+- [x] 2.2 Move Stage 63 to the Done table and its prose to `docs/roadmap-history.md`. Verify `ROADMAP.md` lists no stage 63 under Open stages.
+- [x] 2.3 Run the antislop linter on both files. Verify neither count rises over `origin/main`.
 
 ## 3. README.md and CLAUDE.md
 
-- [ ] 3.1 Apply design.md D3's two `README.md` fixes. Verify the handler list matches `src/engine/host.ts`.
-- [ ] 3.2 Apply design.md D3's layout rows and audit pointer to `CLAUDE.md`. Verify each named path exists.
-- [ ] 3.3 Run the antislop linter on both files. Verify neither count rises over `origin/main`.
+- [x] 3.1 Apply design.md D3's two `README.md` fixes. Verify the handler list matches `src/engine/host.ts`.
+- [x] 3.2 Apply design.md D3's layout rows and audit pointer to `CLAUDE.md`. Verify each named path exists.
+- [x] 3.3 Run the antislop linter on both files. Verify neither count rises over `origin/main`.
 
 ## 4. Code comments
 
