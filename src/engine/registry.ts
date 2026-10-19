@@ -232,9 +232,9 @@ function resolutionTimeoutMs(): number {
  * What `resolveStepAssignment` answers: the state to write, plus the reason it
  * produced no candidate. The CALLER records that reason as an
  * `assignment.unresolved` event, inside the transaction committing the entry.
- * This function holds no transaction handle and, on three of the four paths,
- * runs before one opens — appending here could commit an event beside a
- * rolled-back entry.
+ * This function opens no transaction of its own. Most paths call it before the
+ * entry's transaction opens, and the two locked paths pass theirs in as `db`.
+ * Appending here could commit an event beside a rolled-back entry.
  */
 export interface ResolvedAssignment {
   assignment: Instance["assignment"];

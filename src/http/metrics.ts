@@ -3,10 +3,10 @@
  * database on every scrape (no in-process aggregation — see design.md,
  * "in-process counters ... reset on process restart and lie"). Framework-
  * agnostic like `handleLivez` and `handleReadyz` in `server.ts`, but returns
- * `HttpBinaryResult`, not `HttpResult`: `server.ts`'s `toResponse` always `JSON.stringify`s an
- * `HttpResult` body, which would corrupt exposition text. `HttpBinaryResult`
- * is the same type attachment download already uses for a non-JSON success
- * response (`errors.ts`'s `HttpBinaryResult` doc comment).
+ * `HttpBinaryResult`, not `HttpResult`: `server.ts`'s `toResponse` always
+ * `JSON.stringify`s an `HttpResult` body, which would corrupt exposition text.
+ * `HttpBinaryResult` is the same type attachment download already uses for a
+ * non-JSON success response (`errors.ts`'s `HttpBinaryResult` doc comment).
  */
 import type { SQL } from "bun";
 import { countOutboxByStatus, getTimerLagStats, countInstancesByStatus } from "../engine/admin-queries.js";

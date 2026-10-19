@@ -584,9 +584,8 @@ export async function initSchema(db: SQL = sql): Promise<void> {
   // Process access roles: per-process developer/owner/reader principal lists.
   // Keyed by (process_id, kind, principal), with kind in ('developer', 'owner',
   // 'reader'). Each principal is a non-empty actor id or group id, never a role
-  // string. No foreign key to
-  // definitions or drafts — a process id can have access-roles rows before either
-  // table carries it.
+  // string. No foreign key to definitions or drafts — a process id can have
+  // access-roles rows before either table carries it.
   await db`CREATE TABLE IF NOT EXISTS process_access_roles (
     process_id text NOT NULL,
     kind       text NOT NULL CHECK (kind IN ('developer', 'owner', 'reader')),
