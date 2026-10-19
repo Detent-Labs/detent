@@ -28,10 +28,10 @@
 
 ## 6. decisions.md and the deployment runbook
 
-- [ ] 6.1 Apply design.md D6's H-7, A-9d and B-10 edits to `docs/decisions.md`.
-- [ ] 6.2 Re-point every line citation in `docs/decisions.md` per design.md D6. List each dropped or reworded citation in the SDD ledger.
-- [ ] 6.3 Prove the hand-run schema command against the devcontainer's database. Then apply D6's runbook edits to `docs/runbooks/deployment.md`.
-- [ ] 6.4 Run the antislop linter on both files. Verify neither count rises over `origin/main`.
+- [x] 6.1 Apply design.md D6's H-7, A-9d and B-10 edits to `docs/decisions.md`.
+- [x] 6.2 Re-point every line citation in `docs/decisions.md` per design.md D6. List each dropped or reworded citation in the SDD ledger.
+- [x] 6.3 Prove the hand-run schema command against the devcontainer's database. Then apply D6's runbook edits to `docs/runbooks/deployment.md`.
+- [x] 6.4 Run the antislop linter on both files. Verify neither count rises over `origin/main`.
 
 ## 7. Verification
 
