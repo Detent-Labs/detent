@@ -19,12 +19,12 @@
 
 ## 4. Code comments
 
-- [ ] 4.1 Apply design.md D5 to the comments in `src/` and `scripts/`. Change no code token.
-- [ ] 4.2 Verify with `git diff` that every changed line sits inside a comment.
+- [x] 4.1 Apply design.md D5 to the comments in `src/` and `scripts/`. Change no code token.
+- [x] 4.2 Verify with `git diff` that every changed line sits inside a comment.
 
 ## 5. The process access entry test
 
-- [ ] 5.1 Add the test design.md D4 names to `test/http-process-access.test.ts`. Verify it passes in the full suite run of 7.2.
+- [x] 5.1 Add the test design.md D4 names to `test/http-process-access.test.ts`. Verify it passes in the full suite run of 7.2.
 
 ## 6. decisions.md and the deployment runbook
 
