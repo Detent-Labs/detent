@@ -27,8 +27,8 @@ word. `ROADMAP.md` carries stage-by-stage status.
   per-instance records, one row per entry in the `history_entries` table —
   the shape NDJSON is built for, unlike the process definition itself, which
   stays one JCS-hashed document nested by `id` and never becomes NDJSON.
-  `historyByInstance` and `selectInRange` (`src/engine/reporting.ts:108` and
-  `:98`) fully materialize a date range into memory today before returning a
+  `historyByInstance` and `selectInRange` (`src/engine/reporting.ts:125` and
+  `:108`) fully materialize a date range into memory today before returning a
   JSON array. A range above 20000 instances answers 400, so the buffer has a
   ceiling. Worth building when stage 27's reporting-app (cycle time,
   bottlenecks, SLA) needs a downloadable or streamable export, or when a
@@ -37,14 +37,14 @@ word. `ROADMAP.md` carries stage-by-stage status.
   own `reporting-app` spec delta when it lands.
 
   The same buffer-then-return shape holds for `listOutbox`
-  (`src/engine/admin-queries.ts:83`), an append-only delivery log the same
+  (`src/engine/admin-queries.ts:117`), an append-only delivery log the same
   way the history table is: one row per delivery attempt, no nested
   structure. An admin "download the outbox" debugging export is the same
   NDJSON shape as the history export above and would land in
   `admin-operations-api` when built, on the same trigger: a concrete
   downloadable-export ask, not a speculative one.
 
-  `migrateInstances` (`src/engine/migration.ts:557`) is the weaker case.
+  `migrateInstances` (`src/engine/migration.ts:567`) is the weaker case.
   It already keyset-paginates instances and buffers outcomes into one
   in-memory `MigrationResult` (`migrated`/`skipped`/`conflicted`/`failed`
   id arrays), not a per-instance record stream, and nothing today asks for
@@ -177,7 +177,7 @@ word. `ROADMAP.md` carries stage-by-stage status.
   2026-09-13 critique and audit. Name the fix: one `DESIGN.md` "Dialogs"
   decision, applied to all three dialogs.
 - `NotFoundError` is served as HTTP 500 where most APIs answer 404. The
-  mapping sits at `src/http/errors.ts:95`, and the header comment at `:10-16`
+  mapping sits at `src/http/errors.ts:97`, and the header comment at `:11-16`
   calls it the one exception carved out of the message-free fallback. The
   2026-08-01 code review rated it Medium as its ARCH-1: a request for a
   nonexistent instance raises the 5xx rate, so an alert built on that rate
@@ -189,7 +189,7 @@ word. `ROADMAP.md` carries stage-by-stage status.
   The live spec pins the mapping at three sites.
   `openspec/specs/http-wrapper/spec.md:215` holds the status-table row,
   `http-wrapper/spec.md:242` the scenario that maps a typed not-found error
-  to 500, and `http-wrapper/spec.md:1665` the attachment requirement. Moving
+  to 500, and `http-wrapper/spec.md:1770` the attachment requirement. Moving
   to 404 is a contract change for every consumer plus a spec change at all
   three sites, so it needs its own OpenSpec change. Nothing here decides it.
 - The `richtext` format. A multiline string is still a string, and nothing
@@ -202,7 +202,7 @@ word. `ROADMAP.md` carries stage-by-stage status.
   the first of those. D7 and D20 of the record archived beside
   `field-model-type-format-control` state this.
 - The `image` and `signature` formats. Both refine a `file`, and a `file` is
-  opaque today: `JS_TYPE` maps it to `"any"` at `src/schema/definition.ts:407`.
+  opaque today: `JS_TYPE` maps it to `"any"` at `src/schema/definition.ts:438`.
   A format over an unbuilt type buys nothing. Both wait until a file field
   carries a value the engine can read. D20 of the record archived beside
   `field-model-type-format-control` states this.
@@ -227,10 +227,10 @@ word. `ROADMAP.md` carries stage-by-stage status.
   supplies the options, and not to the field that binds to that source. A
   change that builds one starts at the data source, never at `FieldDef`. S4
   of the record archived beside `field-model-type-format-control` states it.
-- `docs/current-state.md:482` said the Runtime API Layer "has no
+- The pre-trim `docs/current-state.md` said the Runtime API Layer "has no
   assignment/claim enforcement". `requireSubmitAuthority` in
-  `src/runtime/instances.ts:273` enforces both today, called from
-  `submitAndTransition` and its sibling at `:333` and `:368`. The line was
+  `src/runtime/instances.ts:309` enforces both today, called from
+  `submitAndTransition` and its sibling at `:336` and `:410`. The line was
   wrong as a statement of the present. Fixing it settled a question the
   document had never answered: whether it describes the tree as it stands,
   or collects dated stage records that stay true of their stage. Several
@@ -251,8 +251,8 @@ word. `ROADMAP.md` carries stage-by-stage status.
 - A subprocess-callable child's fields should stay inside its own
   `inputFields`. `.claude/rules/authoring-invariants.md` once stated that
   rule, but the code does not enforce it. Three sites read `inputFields`:
-  `src/engine/definitions.ts:544-548`, `src/schema/compile.ts:466-468` and
-  `:1139`. Live specs stay silent on the rule too. Building it takes its own
+  `src/engine/definitions.ts:595-599`, `src/schema/compile.ts:471-473` and
+  `:1154-1155`. Live specs stay silent on the rule too. Building it takes its own
   definition contract change.
 - An assignment resolver can outlive its deadline while the row lock stays
   held. The submit path and the subprocess return both resolve an assignment
@@ -286,7 +286,7 @@ word. `ROADMAP.md` carries stage-by-stage status.
   with an off-spec weight; this file's own entry below names each one.
   Deferred 2026-09-02 — we do not need Archivo yet. When it lands, self-host
   the woff2: the build-time CSP is `default-src 'self'` with no `font-src`
-  (`packages/web/vite.config.ts:26`), so a self-hosted file needs no CSP change
+  (`packages/web/csp.ts:22`), so a self-hosted file needs no CSP change
   and no `frontend-security-headers` delta, while a Google Fonts link would
   need `style-src` and `font-src` additions plus that delta. It changes the
   type of every screen in all four areas, so it needs its own OpenSpec change,
@@ -318,8 +318,8 @@ word. `ROADMAP.md` carries stage-by-stage status.
   area access and data scope are two questions, and one role answering
   both makes every later narrowing impossible. The three reporting
   aggregates (`handleReportingCycleTime`, `handleReportingBottleneck` and
-  `handleReportingSla`, `src/http/reporting-routes.ts:141`, `:145` and
-  `:149`) each already take a `processId`, so `requireRole(actor,
+  `handleReportingSla`, `src/http/reporting-routes.ts:161`, `:165` and
+  `:169`) each already take a `processId`, so `requireRole(actor,
   REPORTS_ROLE)` there becomes the role plus `read` on that process.
 
   That file has grown since this was written. `instance-data-tables` put
@@ -336,7 +336,7 @@ word. `ROADMAP.md` carries stage-by-stage status.
 
   The work is not the default. It is that a process-scoped grant cannot
   gate a query naming no process: `requireRole(actor, ADMIN_ROLE)` at
-  `src/http/routes.ts:481` answers yes or no without one, and
+  `src/http/routes.ts:479` answers yes or no without one, and
   `requirePermission` needs one. Two answers exist.
 
   Keep it a gate, and
@@ -367,7 +367,7 @@ word. `ROADMAP.md` carries stage-by-stage status.
   is built, not pending: the identity provider is the authority on who
   someone is and which groups they hold, and the installation is the
   authority on what a group may do inside it. `claimToRoles`
-  (`src/auth/jwt.ts:81`) passes an issuer's claim through verbatim, so
+  (`src/auth/jwt.ts:113`) passes an issuer's claim through verbatim, so
   `Actor.roles` needed no new shape. A grant maps a role string to a
   permission and a scope, `{ type: "process", config: { processId } }` the
   only type shipped. Encoding the scope into the grant's own name
@@ -378,7 +378,7 @@ word. `ROADMAP.md` carries stage-by-stage status.
   `auth_users.roles` stays a `TEXT[]`.
 
   `openspec/changes/archive/2026-08-27-process-read-permission/` has
-  applied the `read` permission piece above: `src/auth/authorize.ts:78`'s
+  applied the `read` permission piece above: `src/auth/authorize.ts:85`'s
   `Permission` type now admits `read`, mapped to `ADMIN_ROLE`.
 - **CEL-readable data-source results.** Runtime option-list resolution for
   `field.dataSource` is DONE (see `openspec/specs/data-source-resolution/`) — but `src/cel/check.ts`
@@ -455,11 +455,11 @@ word. `ROADMAP.md` carries stage-by-stage status.
 - **The studio's six remaining `confirm()` prompts.**
   `studio-publish-gate-and-report` converted the two on the publish path to
   the application's own modal dialog. The others stay:
-  `root.tsx:86`, `EditScreen.tsx`'s arrange gate,
+  `packages/web/src/areas/studio/root.tsx:95`, `EditScreen.tsx`'s arrange gate,
   `ProcessesScreen.tsx`'s draft discard, `TemplatesScreen.tsx`'s template
   discard, and two in `FieldCatalogPanel.tsx`. Two hardcode English rather
   than reading the catalog, in `ProcessesScreen.tsx` and
-  `TemplatesScreen.tsx`. The navigation prompt at `root.tsx:86` is the odd one
+  `TemplatesScreen.tsx`. The navigation prompt at `packages/web/src/areas/studio/root.tsx:95` is the odd one
   out: `studio-app` states the `confirm()`/`t()` pattern for it as a
   requirement, so converting it rewrites that requirement and every scenario
   under it. The other five belong to `studio-form-editor` and `studio-app`, and
@@ -494,18 +494,18 @@ word. `ROADMAP.md` carries stage-by-stage status.
   settled the shape on 2026-08-23: a dedicated Name column before Email,
   display only, with no editor on the screen. The API side is already done.
   `GET /admin/users` returns the resolved `displayName`
-  (`src/auth/users.ts:151-152`), and
+  (`src/auth/users.ts:163-164`), and
   `openspec/specs/admin-user-management/spec.md:18` pins it in the list body.
   The web client drops the field: the `UserSummary` mirror omits it
-  (`packages/web/src/areas/admin/api/types.ts:110`) and `UsersScreen.tsx`
+  (`packages/web/src/areas/admin/api/types.ts:113-120`) and `UsersScreen.tsx`
   renders five columns (`:394`).
 
   Three files change. The mirror gains `displayName: string`, the screen gains
   a `<th>`, a per-row `<td>` and an em-dash placeholder on the create row, and
   the password editor row's `colSpan` grows from 5 to 6
-  (`packages/web/src/areas/admin/screens/UsersScreen.tsx:606`). One catalog
+  (`packages/web/src/areas/admin/screens/UsersScreen.tsx:609`). One catalog
   key, `users.colName`, lands in the en and de maps of
-  `packages/web/src/i18n/catalogs/admin.ts:119` and `:384`, both reading
+  `packages/web/src/i18n/catalogs/admin.ts:120` and `:393`, both reading
   "Name". The delta belongs to `admin-app`, and `admin-operations-api` stays
   unchanged, since the API already ships the field. Editing a name stays on
   the profile page and `PATCH /admin/users/:userId/name`.
@@ -516,19 +516,19 @@ word. `ROADMAP.md` carries stage-by-stage status.
   email. Building it waits on the owner's go-ahead.
 - **The hand-rolled router in `src/http/server.ts` reimplements
   `Bun.serve({ routes })`.** Finding 11 of the ponytail audit, verified at the
-  code on 2026-09-10. The `Route` type sits at `src/http/server.ts:229`, `seg`
-  at `:302` and `match` at `:335`. The OPTIONS branch at `:799` collects the
+  code on 2026-09-10. The `Route` type sits at `src/http/server.ts:234`, `seg`
+  at `:307` and `match` at `:340`. The OPTIONS branch at `:849-852` collects the
   allowed methods by filtering the same table. `Bun.serve` takes
-  `{ fetch, port, maxRequestBodySize }` at `src/http/server.ts:884`, with no
-  `routes` key. Two facts make the cut risky. `createServer` at `:522`
+  `{ fetch, port, maxRequestBodySize }` at `src/http/server.ts:951`, with no
+  `routes` key. Two facts make the cut risky. `createServer` at `:559`
   returns the `fetch` function itself, and the test suite drives that return
   value directly. The per-request tenant resolve runs inside the dispatch
-  path, at `:809-811`. The rewrite needs an OpenSpec change of its own; this
+  path, at `:859-862`. The rewrite needs an OpenSpec change of its own; this
   entry records the finding and leaves its shape open.
-- **Three requirements in `studio-canvas` still say "palette".** Lines 648,
-  1772 and 1781, in "The traversal is a total function over a deep-partial
-  draft" and "A step node prints the step's label, centred and resolved for
-  the content locale". The `studio-canvas-bar` change of 2026-09-10 deleted
+- **Three requirements in `studio-canvas` still say "palette".** Lines 679,
+  1827 and 1836, in "The canvas is keyboard-operable, and traversal follows
+  the paths" and "The masthead's step key auto-derives from the step label".
+  The `studio-canvas-bar` change of 2026-09-10 deleted
   that control and its component. Its delta declares "edit rail" the older
   word for the bar's add controls, and says nothing about "palette", so those
   three lines name something the spec no longer defines. The sync left them
@@ -537,21 +537,21 @@ word. `ROADMAP.md` carries stage-by-stage status.
   prose ratchet. A sweep of the stale word wants its own change, together
   with the six requirements that still say "edit rail".
 - **Retired UI words still sit in live specs and in the studio catalog.**
-  `openspec/specs/studio-app/spec.md:631` and
-  `openspec/specs/studio-canvas/spec.md:1080`, `:2972` and `:3020` still
+  `openspec/specs/studio-app/spec.md:841` and
+  `openspec/specs/studio-canvas/spec.md:1113`, `:3005` and `:3053` still
   read "panels screen", "ribbon", "bench", "steps register", "configuration
-  pane" and "inspector". `studio-canvas/spec.md:2078` names an "edit rail"
+  pane" and "inspector". `studio-canvas/spec.md:2110` names an "edit rail"
   and a `canvas/EditRail.tsx` that no longer exists.
 
   Two dead catalog keys, `ribbon.expand` and `ribbon.collapse`, sit at
-  `packages/web/src/i18n/catalogs/studio.ts:754-755`. One displayed string
-  says "finding" where the rest of the UI says "issue" (`studio.ts:488`). A
+  `packages/web/src/i18n/catalogs/studio.ts:839-840`. One displayed string
+  says "finding" where the rest of the UI says "issue" (`studio.ts:558`). A
   spec sweep and a catalog cleanup each want their own OpenSpec change.
 - **The glossary and the live spec name the Access tab differently.**
   `.claude/rules/ui-glossary.md` names it "Access tab", over
-  `panels/AccessPanel.tsx`. `openspec/specs/studio-app/spec.md:4285`,
-  `:4287` and `:4305` say "Access surface" instead, and so does the catalog
-  comment at `packages/web/src/i18n/catalogs/studio.ts:964`. This change
+  `panels/AccessPanel.tsx`. `openspec/specs/studio-app/spec.md:4675`,
+  `:4677` and `:4695` say "Access surface" instead, and so does the catalog
+  comment at `packages/web/src/i18n/catalogs/studio.ts:1062`. This change
   leaves the spec and the comment as they stand. A spec sweep to match the
   glossary wants its own OpenSpec change.
 - **Five literal `#726e6e` sites want the new `colors.dormant` role.**
@@ -571,19 +571,19 @@ word. `ROADMAP.md` carries stage-by-stage status.
   carries a dormant stamp and washes on hover shares that gap. `DESIGN.md`
   pins `#726e6e`, so retuning the tone is a design change of its own.
 - **Two more components read a primitive directly instead of a role.**
-  `packages/form-ui/src/FieldForm.tsx:204-205` sets a tab's issue stamp
+  `packages/form-ui/src/FieldForm.tsx:205-206` sets a tab's issue stamp
   with `colors.refusal700` and `colors.paper50`, both primitives.
-  `packages/web/src/areas/studio/canvas/CanvasView.tsx:303` and `:313` set
+  `packages/web/src/areas/studio/canvas/CanvasView.tsx:304` and `:314` set
   the terminal/initial stamp circle and its text with `colors.neutral900`,
   also a primitive. Neither site moved in a design change yet. Each is
   separate from the `#726e6e` entry above.
 - **Ten sites set an off-spec weight on the written face.**
   `.claude/rules/design-language.md` allows only 800 and 400 there. Three
   sites set 500:
-  `packages/web/src/areas/reporting/screens/BottleneckScreen.tsx:39`,
-  `CycleTimeScreen.tsx:69` and `SlaScreen.tsx:40`. Four table headers set
-  600: `BottleneckScreen.tsx:35`, `CycleTimeScreen.tsx:65`,
-  `SlaScreen.tsx:36` and `ReportTable.tsx:57`.
+  `packages/web/src/areas/reporting/screens/BottleneckScreen.tsx:40`,
+  `CycleTimeScreen.tsx:70` and `SlaScreen.tsx:41`. Four table headers set
+  600: `BottleneckScreen.tsx:36`, `CycleTimeScreen.tsx:66`,
+  `SlaScreen.tsx:37` and `ReportTable.tsx:57`.
 
   Two picker labels set 600: `ProcessPickerScreen.tsx:54` and
   `ReportsListScreen.tsx:65`. So does
@@ -607,9 +607,9 @@ word. `ROADMAP.md` carries stage-by-stage status.
     200% zoom on a desktop window is no phone width.
 - **SEC-2: no password floor on any write path.** `requireNonBlank` is the
   whole check on `POST /admin/users/:userId/password`
-  (`src/http/admin-routes.ts:253`), and the route comment states the position
-  at `:242`. `createUser` (`src/auth/users.ts:65`), `setPassword` (`:139`) and
-  `setPasswordById` (`:235`) apply nothing either. Risk: a one-character
+  (`src/http/admin-routes.ts:259`), and the route comment states the position
+  at `:248`. `createUser` (`src/auth/users.ts:74`), `setPassword` (`:151`) and
+  `setPasswordById` (`:247`) apply nothing either. Risk: a one-character
   password reaches storage for an account that may hold `system:admin`. The
   review recommends a length-only floor in `src/auth/users.ts`, shared by both
   routes and the CLI.
@@ -635,7 +635,7 @@ word. `ROADMAP.md` carries stage-by-stage status.
   `docs/decisions-archive.md`.
 - **SEC-6: no ceiling on an instance's total attachment bytes.**
   `MAX_ATTACHMENT_BYTES` bounds one upload, 5 MiB by default
-  (`src/http/routes.ts:99`, enforced at `:359`). `uploadAttachment`
+  (`src/http/routes.ts:86`, enforced at `:369`). `uploadAttachment`
   (`src/runtime/attachments.ts:44`) inserts the row without an aggregate. Risk: one
   credentialed actor can grow an instance's stored bytes without bound. The
   review puts this storage bound ahead of a general rate limit: one aggregate
@@ -646,10 +646,10 @@ word. `ROADMAP.md` carries stage-by-stage status.
   `SUM` inside `uploadAttachment`'s transaction, under the instance row
   lock, so two concurrent uploads cannot both pass. Over the limit answers
   the same status as the per-file limit, 400 today (`RequestShapeError`,
-  `src/http/routes.ts:359`, mapped at `src/http/errors.ts:90`). Follow-up
+  `src/http/routes.ts:370`, mapped at `src/http/errors.ts:90`). Follow-up
   change: `instance-attachment-byte-ceiling`.
 - **SEC-9: a role reduction waits for the issued token to expire.**
-  `src/auth/jwt.ts:115-124` checks `isActiveAccount` on every locally issued
+  `src/auth/jwt.ts:148-156` checks `isActiveAccount` on every locally issued
   token and reads roles from the token's own claim, and the comment there
   points at the `admin-user-management` spec. Disabling an account ends its
   session at the next request, while removing one role leaves the old set
@@ -657,7 +657,7 @@ word. `ROADMAP.md` carries stage-by-stage status.
   revokes `system:admin` from an account that stays active waits for that
   expiry.
 
-  The per-request check, `isActiveUser` (`src/auth/users.ts:115`), reads
+  The per-request check, `isActiveUser` (`src/auth/users.ts:127`), reads
   only the account's `disabled` flag. Re-enabling the account therefore
   revives the old token with its old roles. The zero-code method is to keep the account disabled
   until its last issued token expires, up to eight hours, and then re-enable
@@ -673,7 +673,7 @@ word. `ROADMAP.md` carries stage-by-stage status.
 - **`initSchema` takes no lock at startup.** `initSchema`
   (`src/engine/store.ts:76`) runs its `CREATE ... IF NOT EXISTS` statements
   with no lock, and the server calls it at startup
-  (`src/http/server.ts:893`). Two processes that start together against a
+  (`src/http/server.ts:940`). Two processes that start together against a
   new or upgraded schema can race on those statements. One process that
   finishes startup first leaves the others no table to add. The runbook's
   "Running more than one engine process" section names the workaround
@@ -715,9 +715,9 @@ build.
   would still let such a script misuse the open session. The owner accepted
   this residual risk on 2026-09-23.
 - **SEC-8: attachment `contentType` is caller-supplied and echoed on
-  download.** The upload schema at `src/http/routes.ts:111` constrains it to
-  `MIME_TOKEN_PAIR` (`:108`), and the download handler at `:394` returns it
-  as `Content-Type` through `toBinaryResponse` (`src/http/server.ts:200`).
+  download.** The upload schema at `src/http/routes.ts:113` constrains it to
+  `MIME_TOKEN_PAIR` (`:112`), and the download handler at `:394` returns it
+  as `Content-Type` through `toBinaryResponse` (`src/http/server.ts:201`).
   Every binary response carries `X-Content-Type-Options: nosniff`, and
   `BINARY_ROUTES` gives this route `Content-Disposition: attachment`, so a
   stored `text/html` downloads rather than renders. Risk (Low): a later change that drops one of those layers turns a
@@ -728,7 +728,7 @@ build.
   layers stop a stored file from rendering, starting with the download
   route's own bearer-header requirement, so a plain link cannot open it.
   The API response carries `X-Content-Type-Options: nosniff` and
-  `Content-Disposition: attachment` (`src/http/server.ts:200-212`), guarded
+  `Content-Disposition: attachment` (`src/http/server.ts:201-214`), guarded
   by `test/http-disposition.test.ts`. The SPA fetches the file and saves it
   through `<a download>`
   (`packages/web/src/areas/app/screens/TaskScreen.tsx:404-412`) and revokes
@@ -741,7 +741,7 @@ build.
   `.devcontainer/docker-compose.yml` sets `ALLOW_INSECURE_DEV_AUTH: "1"` at
   `:47` and `POSTGRES_PASSWORD: postgres` at `:92`. Both serve a disposable
   local stack, the server prints `AUTH DISABLED` at startup
-  (`src/http/server.ts:406`) whenever the first applies, and the production
+  (`src/http/server.ts:409`) whenever the first applies, and the production
   image in `docker/engine.Dockerfile` inherits neither. Risk (Informational): a stack
   started from the compose file outside the devcontainer runs with auth
   disabled. The review recorded it for completeness and recommends nothing.
@@ -805,13 +805,13 @@ the anchor that holds today. The owner decided the other three on
 2026-09-23. See "Decided, not yet built" and "Accepted risks" above. The
 four Low ones stay open.
 - **ARCH-2: `BINARY_ROUTES` is a hand-kept ledger.** The
-  list sits at `src/http/server.ts:268`, and `test/http-disposition.test.ts`
+  list sits at `src/http/server.ts:273`, and `test/http-disposition.test.ts`
   drives every declared entry. TEST-1 above covers the review's second
   ledger, the per-handler role checks. Risk (Low, narrowed): a binary route added and never
   declared ships without `Content-Disposition`, and no test notices. That
   one case is all that remains of the finding.
 - **CQ-2: doc comments duplicate facts held elsewhere.** The header of
-  `src/auth/authorize.ts` states which role admits which route at `:28-44`,
+  `src/auth/authorize.ts` states which role admits which route at `:30-61`,
   while the route table in `src/http/server.ts` and each handler's own check
   are where that is true. Risk (Low): a rename in `src/http/server.ts` leaves
   the header wrong, and no gate covers it. The review's fix is to name where
@@ -833,7 +833,7 @@ four Low ones stay open.
   Postgres `LISTEN`/`NOTIFY` wake-up or one cross-tenant claim query as the
   replacement, once tenancy grows past a handful.
 - **PERF-2: one query per refused permission check.** `can()` at
-  `src/auth/authorize.ts:118` short-circuits on the global role before any
+  `src/auth/authorize.ts:126` short-circuits on the global role before any
   query, so the common paths cost nothing. Risk (Low): a burst of refused requests
   from one actor issues one grant query each. The review calls it documented
   and correctly bounded, and recommends nothing.
@@ -874,7 +874,7 @@ recorded rather than fixed. The RAIL tags are local to this section.
   the rail takes the full width and caps its height at 20rem.
 - **RAIL-7: below 64rem the Steps tab nests three scroll boxes.** The rail
   stands over the step page, and the step page scrolls on its own
-  (`panels/StepPage.tsx:35`). The tab body scrolls around both. Measured
+  (`panels/StepPage.tsx:45`). The tab body scrolls around both. Measured
   2026-09-24 at 400x800: the tab body scrolls 161px and the rail 352px. The
   step page scrolls 2698px inside a box 244px tall. Risk (Medium): a wheel
   or a swipe moves whichever box sits under it, and the step page shows
@@ -891,13 +891,13 @@ recorded rather than fixed. The RAIL tags are local to this section.
   Risk (Informational): a long label wraps on a wide screen and fits on a
   narrow one.
 - **A canvas removal drops keyboard focus, and nothing announces it.**
-  `deleteSelection` (`packages/web/src/areas/studio/screens/EditScreen.tsx:568`)
+  `deleteSelection` (`packages/web/src/areas/studio/screens/EditScreen.tsx:678`)
   clears the selection. The pressed control unmounts with it, so focus lands on
   `<body>` and the next Tab reaches Fit to view. Remove steps behaved this way
   before Remove step joined it. Risk: a keyboard or screen-reader user loses
   their place after every removal (WCAG 2.4.3, and 4.1.3 for the silence). The
   fix moves focus to the canvas's own tab stop, which
-  `packages/web/src/areas/studio/canvas/CanvasView.tsx:767` already reassigns,
+  `packages/web/src/areas/studio/canvas/CanvasView.tsx:768-776` already reassigns,
   and announces the removal in a polite live region.
 - **The canvas bar's caret menu ignores the arrow keys.** The panel carries
   `role="menu"` (`packages/web/src/areas/studio/canvas/CanvasBar.tsx:376`), and
@@ -908,8 +908,8 @@ recorded rather than fixed. The RAIL tags are local to this section.
   pointer, or a Tab back to the canvas bar's own control.
 - **CANVAS-1: at 400px the canvas clips the Arrange ring by 2px.** The
   canvas's own toolbar sits 8px inside the canvas, in one row that never
-  wraps (`canvas/CanvasView.tsx:79`). The canvas clips at its padding edge,
-  with `overflow: hidden` (`:69`). Measured 2026-09-24 at 400x800: Fit to
+  wraps (`canvas/CanvasView.tsx:80`). The canvas clips at its padding edge,
+  with `overflow: hidden` (`:70`). Measured 2026-09-24 at 400x800: Fit to
   view, Rounded corners and Arrange fill the row, and Arrange's ring runs
   2px past the right edge. The canvas scrolls nothing, so the scroll-box
   rule of `studio-focus-ring-clipping` does not reach it. Risk (Low): the
@@ -926,10 +926,10 @@ recorded rather than fixed. The RAIL tags are local to this section.
   `.claude/rules/ui-glossary.md` keeps *palette* for the form editor's field
   list alone.
 - **Cancel instance commits on one press, touches Refresh, and drops focus.**
-  `doCancel` (`packages/web/src/areas/admin/screens/InstanceScreen.tsx:275`)
-  asks nothing, while `doRedact` at `:288` confirms first. Cancel instance also
+  `doCancel` (`packages/web/src/areas/admin/screens/InstanceScreen.tsx:250`)
+  asks nothing, while `doRedact` at `:262` confirms first. Cancel instance also
   ends where Refresh begins, a 0px gap that reads as one segmented control. The
-  press disables the focused button, which the refresh then unmounts (`:382`),
+  press disables the focused button, which the refresh then unmounts (`:357`),
   so focus drops to the document. Risk: one stray press cancels a running case.
 - **The accent carries two meanings on the instance screen.** The RUNNING
   stamp's 2px outline and Cancel instance's 1px outline sit about 110px apart.
@@ -937,20 +937,20 @@ recorded rather than fixed. The RAIL tags are local to this section.
   the tension sits in `DESIGN.md` itself.
 - **`.btn-ghost` text falls under 4.5:1 on its own washes.** The draft
   confirmation dialog's Cancel carries it
-  (`packages/web/src/areas/studio/panels/ProcessHeaderBar.tsx:544`). Its accent
+  (`packages/web/src/areas/studio/panels/ProcessHeaderBar.tsx:588`). Its accent
   text reads 3.90:1 hovered and 3.44:1 pressed in light, and 4.15:1 pressed in
   dark. `destructive-buttons-show-the-accent` cleared the same shortfall for
   `.btn-destructive` with `--color-accent-on-muted`, and this one wants the
   same treatment. The removal dialog's Cancel
   (`packages/web/src/areas/studio/panels/RemoveFieldDialog.tsx:204`) and the
   field catalog's Remove field trigger
-  (`packages/web/src/areas/studio/panels/FieldCatalogPanel.tsx:926`) carry the
+  (`packages/web/src/areas/studio/panels/FieldCatalogPanel.tsx:973`) carry the
   same class. Both read 4.53:1 at rest, 3.90:1 hovered and 3.45:1 pressed, in
   light.
 - **Remove step and the field catalog's Remove field trigger have no
-  destructive treatment.** `packages/web/src/areas/studio/panels/StepPage.tsx:740`
+  destructive treatment.** `packages/web/src/areas/studio/panels/StepPage.tsx:776`
   renders `btn btn-secondary` and commits at once.
-  `packages/web/src/areas/studio/panels/FieldCatalogPanel.tsx:926` renders
+  `packages/web/src/areas/studio/panels/FieldCatalogPanel.tsx:973` renders
   `btn btn-ghost` and opens `RemoveFieldDialog` instead. `DESIGN.md` asks that
   a destructive action stay outlined in the accent. The field catalog's
   trigger also reads "Remove field" on every entity, group included; its own
@@ -970,40 +970,41 @@ recorded rather than fixed. The RAIL tags are local to this section.
   measurement read 56.9s on the seeded `purchase_requisition` v3. Another
   watched eight `GET /drafts/<id>` polls answer 404 over 7.5s. The button
   disables for that whole wait, but nothing signals how much longer it runs.
-- **Two browser-check entries name retired UI.** `docs/browser-checks.md:897`
-  and `:926` still name the configuration pane and the ribbon bar.
+- **Browser-check entries name retired UI.** Twelve lines of
+  `docs/browser-checks.md`, from `:152` to `:3144`, still name the
+  configuration pane or the ribbon bar.
   `.claude/rules/ui-glossary.md` retired both words with the process surface.
 - **STEP-1: at 1280px a condition row runs under the next section.** The
   critique of `authoring-command-ink-advisory-role` measured it on
   2026-09-14. The IT Offboarding draft's first path had a condition row.
   - The "Only when" fieldset keeps the default `min-inline-size: min-content`
-    (`panels/PathsPanel.tsx:290`). The row's field select takes its longest
-    option's width, 647px (`panels/shared/ConditionBuilder.tsx:194`). The
+    (`panels/PathsPanel.tsx:332`). The row's field select takes its longest
+    option's width, 647px (`panels/shared/ConditionBuilder.tsx:209`). The
     fieldset then ends at x=1028, past the Path to section's edge at x=863.
   - The On exit section covers the row's last 107px, its remove control
     included. At 1600px the row fits.
   - Risk (Medium): a pointer cannot reach the row's remove control at 1280px,
     and the dashed box runs under another section.
 - **STEP-2: the guard's label wraps the whole condition builder.** One
-  `<label>` holds the guard text and the builder (`panels/PathsPanel.tsx:302`).
+  `<label>` holds the guard text and the builder (`panels/PathsPanel.tsx:348`).
   - Before a row exists, "+ Add row" is that label's first labelable control
-    (`panels/shared/ConditionBuilder.tsx:161`). Measured 2026-09-14, a click on
+    (`panels/shared/ConditionBuilder.tsx:176`). Measured 2026-09-14, a click on
     the label's own text added a row. The button's accessible name then reads
     every word inside the label, from "guard" to "Developer view".
   - An empty row's hint links to no control. The value input has no
-    `aria-describedby` pointing at it (`:233`).
+    `aria-describedby` pointing at it (`:134`).
   - Risk (Medium): a stray click adds a row, and a screen reader hears a name
     without the visible words (WCAG 2.5.3 and 1.3.1).
 - **STEP-3: three literal sizes sit off the type ramp.** The detector flagged
   them on 2026-09-14. The step page's `hint` sets written text at 0.8rem
-  (`panels/StepPage.tsx:153`). A condition row's remove glyph sets 1.1rem
-  (`panels/shared/ConditionBuilder.tsx:53`). The header bar's name sets 1rem,
-  where the Headline role asks 1.25rem (`panels/ProcessHeaderBar.tsx:34`).
+  (`panels/StepPage.tsx:164`). A condition row's remove glyph sets 1.1rem
+  (`panels/shared/ConditionBuilder.tsx:63`). The header bar's name sets 1rem,
+  where the Headline role asks 1.25rem (`panels/ProcessHeaderBar.tsx:39`).
   - Four more flags on the step page mark mono machine values at 0.8rem.
     The Hierarchy in `DESIGN.md` allows that size for them.
   - Risk (Low): type drifts outside the roles `DESIGN.md` names.
 - **STEP-5: a step's description takes a one-line input.** The masthead's
-  description uses `LocalizedTextInput` (`panels/StepPage.tsx:772`), which
+  description uses `LocalizedTextInput` (`panels/StepPage.tsx:808`), which
   renders an `<input>`. Measured 2026-09-24 at 1300x900, IT Offboarding's
   first step holds an 857-character description. The 944px input shows
   about a sixth of it. Risk (Low): the author edits a paragraph through a
@@ -1022,20 +1023,20 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
 `panels/`, `draft/` and `screens/` start at `packages/web/src/areas/studio/`.
 
 - **FIELDS-3: below 64rem a short window leaves the editor a strip.** The
-  rail stacks above the editor, capped at 20rem (`panels/EntityTabs.tsx:76`).
+  rail stacks above the editor, capped at 20rem (`panels/EntityTabs.tsx:90`).
   Measured 2026-09-13: the editor pane stands 105px tall at 900x720, and 18px
   at 420x720 with its heading cut off. Measured 2026-09-26 at 400x800, "+ Add
   field" raises the FIELDS-8 banner, and the pane shrinks to 8px. The new
   label input and its ring, 42px, then clip at both edges. No 2px rule
   separates the two scroll regions: the rail drops its right-hand border
-  there (`:73`). Risk (Medium): the rail keeps its 20rem and the editor gets
+  there (`:87`). Risk (Medium): the rail keeps its 20rem and the editor gets
   what remains.
 - **FIELDS-4 (resolved by `studio-focus-ring-clipping`): the entity rail and
   the editor pane clip the focus ring.** This
   is RAIL-3 on the Fields tab. The shell's 2px ring at a 2px offset
   (`packages/web/src/shell/global.css:37`) loses its edge against both scroll
-  boxes (`panels/EntityTabs.tsx:60`, `:77`). On the chosen entry the ring and
-  the 3px current mark (`:114`) share one accent. Risk (Low): the ring still
+  boxes (`panels/EntityTabs.tsx:73`, `:86`). On the chosen entry the ring and
+  the 3px current mark (`:128`) share one accent. Risk (Low): the ring still
   meets WCAG 2.4.7.
 - **FIELDS-5: the Validation disclosure takes its count as its name.** Its
   `<summary>` prints `({carried.length})` alone
@@ -1045,18 +1046,18 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
 - **FIELDS-6: the entity rail is a flat list of tab stops.** IT Offboarding's
   rail holds 51 entries plus "+ Add field". That makes 52 tab stops, with no
   arrow keys and no filter. Its landmark is a `nav` named "Editors"
-  (`panelsScreen.railLabel`, `packages/web/src/i18n/catalogs/studio.ts:463`).
+  (`panelsScreen.railLabel`, `packages/web/src/i18n/catalogs/studio.ts:534`).
   An entry's check badge reads "1 issues" for one check
-  (`panels/EntityTabs.tsx:312`), from the key `panelsScreen.issueMark`
-  (`packages/web/src/i18n/catalogs/studio.ts:466`). Risk (Low): a keyboard
+  (`panels/EntityTabs.tsx:326`), from the key `panelsScreen.issueMark`
+  (`packages/web/src/i18n/catalogs/studio.ts:537`). Risk (Low): a keyboard
   user presses Tab up to 52 times to cross the rail.
 - **FIELDS-7: the Fields tab's headings and checks lack structure.** The
   outline jumps from the header bar's `h1` to the field's `h3`. They sit at
-  `panels/ProcessHeaderBar.tsx:749` and `panels/FieldCatalogPanel.tsx:1157`,
-  with zone headings at `h4` (`:574`). A zone's check list (`:577`) sits above
+  `panels/ProcessHeaderBar.tsx:793` and `panels/FieldCatalogPanel.tsx:1205`,
+  with zone headings at `h4` (`:599`). A zone's check list (`:602`) sits above
   its controls, and neither `aria-invalid` nor `aria-describedby` ties a check
-  to its control. The zone heading marks a check by colour alone (`:260`,
-  `:574`). Risk (Medium): the heading levels skip, a check names no control,
+  to its control. The zone heading marks a check by colour alone (`:267`,
+  `:599`). Risk (Medium): the heading levels skip, a check names no control,
   and colour alone marks a zone (WCAG 1.3.1 and 1.4.1).
 
   Since `forms-card-legend`, the Forms tab's card labels stand at `h2` under
@@ -1068,81 +1069,81 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   removal left then, and a JSON-view edit can still write today — showed
   `view ref does not resolve: field_0fb5a2c4-0022-…`, an id the author can no
   longer look up. Adding an empty field raises the banner at
-  `screens/EditScreen.tsx:843` before the author types. The banner reads
+  `screens/EditScreen.tsx:967` before the author types. The banner reads
   `Draft is not yet structurally valid — CEL, registry, duration, and cross-process checks are held back until it is (see the Zod issues below)`,
   and it pushes the page down 35px at 1400px and 99px at 900px. The messages
-  come from `src/schema/definition.ts:990`, `src/schema/compile.ts:629` and
-  `src/schema/definition.ts:1071`, and the "ZOD" label from
-  `panels/shared/IssueList.tsx:45`. Risk (Medium): an author reads Zod, CEL
+  come from `src/schema/definition.ts:1014`, `src/schema/compile.ts:612` and
+  `src/schema/definition.ts:1095`, and the "ZOD" label from
+  `panels/shared/IssueList.tsx:44`. Risk (Medium): an author reads Zod, CEL
   grammar and raw ids where a plain sentence belongs.
 - **FIELDS-9: a group's editor leads with zones a group cannot use.** Its
   definition half shows "Where values come from"
-  (`panels/FieldCatalogPanel.tsx:835`). It also shows a disabled "Default
-  value" (`:886`), "Validation" (`:890`) and a disabled Technical checkbox
-  (`:819`). Its effect half shows "A participant must fill this in" (`:1028`)
+  (`panels/FieldCatalogPanel.tsx:882`). It also shows a disabled "Default
+  value" (`:933`), "Validation" (`:937`) and a disabled Technical checkbox
+  (`:863`). Its effect half shows "A participant must fill this in" (`:1076`)
   and up to 12 "Show on the canvas" buttons. Each button's accessible name
-  omits its step (`:961`). The group's one action, the zone "Fields inside
-  this group" (`:901`), comes after "Validation". Measured 2026-09-13 at
+  omits its step (`:1008`). The group's one action, the zone "Fields inside
+  this group" (`:948`), comes after "Validation". Measured 2026-09-13 at
   1400x900, its heading sits at y=1078, 200px below the pane's bottom.
 
   The zone's body looks the same for 18 fields and for none, and its button
-  (`:902`) names no group. A screen reader also reads the "+" leading its
+  (`:949`) names no group. A screen reader also reads the "+" leading its
   label. A nested field's editor names its group only in the move control's
-  value (`:534`). Risk (Medium): the group's one action sits out of view,
+  value (`:556`). Risk (Medium): the group's one action sits out of view,
   behind controls a group cannot use.
 
   This item needs the owner's call before any change. The zone's place after
   "Validation" is a `studio-app` requirement
-  (`openspec/specs/studio-app/spec.md:2572`). The Non-Goals of
+  (`openspec/specs/studio-app/spec.md:3146`). The Non-Goals of
   `group-child-own-editor` keep "Where values come from" and "Validation" on a
   group's editor
   (`openspec/changes/archive/2026-09-13-group-child-own-editor/design.md:94`).
   That design also records the owner's own anti-goal "no breadcrumb in the
   heading" (`:69`).
 - **FIELDS-10: the field editor's type drifts from `DESIGN.md`.** Measured
-  2026-09-13, the field's `h3` computes weight 700, where `DESIGN.md:318`
+  2026-09-13, the field's `h3` computes weight 700, where `DESIGN.md:324`
   allows 800 and 400. Its `panelHeading` style
-  (`panels/FieldCatalogPanel.tsx:80`) sets no weight. Field labels compute
+  (`panels/FieldCatalogPanel.tsx:87`) sets no weight. Field labels compute
   14.4px, sentence case, in ink (`:102`), where the Label role is 11px
-  uppercase tracked slate (`DESIGN.md:333`). Zone headings compute 14.4px at
-  800 in ink (`panels/FieldCatalogPanel.tsx:254`), and none takes the Title
-  role (`DESIGN.md:327`). The Remove field button
-  (`panels/FieldCatalogPanel.tsx:926`) is an accent ghost
+  uppercase tracked slate (`DESIGN.md:339`). Zone headings compute 14.4px at
+  800 in ink (`panels/FieldCatalogPanel.tsx:257`), and none takes the Title
+  role (`DESIGN.md:333`). The Remove field button
+  (`panels/FieldCatalogPanel.tsx:973`) is an accent ghost
   (`packages/web/src/shell/tokens.css:221`), and its text starts 5px right of
   the column's flush-left edge. Risk (Low): the field editor sets type outside
   the roles `DESIGN.md` names.
 - **FIELDS-11: a nested plugin-typed field's length check lands on another field.**
-  The engine's `collectPluginTypeSites` (`src/schema/compile.ts:737`) locates
+  The engine's `collectPluginTypeSites` (`src/schema/compile.ts:715`) locates
   it as `fields[i].type.type`. There `i` is the flat `collectFieldsDeep` index
-  (`:752`, over `src/schema/definition.ts:374`). The studio's `resolveLoc`
+  (`:727`, over `src/schema/definition.ts:379`). The studio's `resolveLoc`
   (`draft/issues.ts:87`) reads `fields[i]` as a top-level index and follows
   `fields[i].fields[j]` chains (`:121`). The compile pass's other field-tree
   checks write that chain through `walkFieldsIndexed`
-  (`src/schema/compile.ts:225`). Risk (Low): the check shows on an unrelated
+  (`src/schema/compile.ts:223`). Risk (Low): the check shows on an unrelated
   field or on the process. The fix touches `src/`.
 - **FIELDS-12: the Checks tab opens the Fields tab without the field.** A
   check row calls `openTabFromRow(tabForIssue(issue.entityType))`
-  (`screens/EditScreen.tsx:1023`). That function takes a tab alone (`:769`),
-  and `FieldsTab` accepts no selected field (`:970`). The spec
+  (`screens/EditScreen.tsx:1166`). That function takes a tab alone (`:891`),
+  and `FieldsTab` accepts no selected field (`:1104`). The spec
   `studio-process-tabs` asks for that field to open selected
-  (`openspec/specs/studio-process-tabs/spec.md:209`). Risk (Medium): the
+  (`openspec/specs/studio-process-tabs/spec.md:263-264`). Risk (Medium): the
   author lands on the Fields tab and must find the field in the entity rail.
 - **FIELDS-13 (narrowed): two `docs/browser-checks.md` passages still walk
   a Values tab.** `.claude/rules/ui-glossary.md` already dropped the "field
   tabs" row this finding once named, since the field editor now has two
-  halves and no tab set (`panels/FieldCatalogPanel.tsx:608`,
-  `openspec/specs/studio-app/spec.md:2564`), and it edits a field at any
-  depth. `docs/browser-checks.md:1881-1889` and `:2369` still describe a
+  halves and no tab set (`panels/FieldCatalogPanel.tsx:632-634`,
+  `openspec/specs/studio-app/spec.md:3136-3138`), and it edits a field at any
+  depth. `docs/browser-checks.md:2201-2213` and `:2928` still describe a
   Values tab that does not exist. Risk (Low): a browser check walks a
   control that is not there. The next change that touches this screen must
   rewrite both passages.
 - **FIELDS-14: `FieldsTab` walks the field tree once per rail entry.** Each
   call of `FieldsTab` walks the whole tree twice, in `flattenRailFields` and
-  `flattenDraftFields` (`panels/EntityTabs.tsx:353`, `:354`). Each rail entry
-  then walks it once more through `parentIdOf` (`:595`,
-  `panels/fieldCatalogLogic.ts:252`), top-level entries included. Each entry
+  `flattenDraftFields` (`panels/EntityTabs.tsx:367`, `:368`). Each rail entry
+  then walks it once more through `parentIdOf` (`:609`,
+  `panels/fieldCatalogLogic.ts:330`), top-level entries included. Each entry
   also scans the whole check list for its badge count
-  (`panels/EntityTabs.tsx:585`, `draft/panel-rail.ts:104`). For N entries
+  (`panels/EntityTabs.tsx:599`, `draft/panel-rail.ts:98-99`). For N entries
   that makes N + 2 tree walks and N scans of the check list. Risk
   (Informational): the cost grows with the square of the catalog's size and
   stays harmless at 51 entries.
@@ -1150,20 +1151,20 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   leaves a kept `org.actor-from-field` assignment setting that names the
   removed id, since `fieldRemovalReach` only counts a plugin setting
   (`draft/field-removal.ts`, the `pluginSettings` kind).
-  `checkActorFromFieldReference` (`src/schema/compile.ts:538`) then reports
-  the field as one that `does not declare format: "person"` (`:555`),
+  `checkActorFromFieldReference` (`src/schema/compile.ts:524`) then reports
+  the field as one that `does not declare format: "person"` (`:540`),
   wording that still assumes the field exists. A stored dangling view entry
   — the shape an unfixed field removal once left — reaches
-  `checkViewGroupReferences`'s third clause (`src/schema/compile.ts:1046`)
+  `checkViewGroupReferences`'s third clause (`src/schema/compile.ts:1015`)
   the same way. With no catalog parent left for the id, the check reports
-  `the catalog holds this field at the top level` (`:1054`), naming a field
+  `the catalog holds this field at the top level` (`:1031`), naming a field
   the catalog no longer holds. Risk (Medium): both messages read as a field
   to fix, when the field is already gone.
 - **FIELDS-17: two kept settings fail no check the draft ever runs.** A
   removal leaves a `valueFromField` or `instanceIdField` value that names a
   removed id, since both are plugin-config settings `fieldRemovalReach` only
   counts. `checkInstanceQueryValueFromField` (`src/engine/definitions.ts:228`)
-  and `validateInstanceTransitionReferences` (`:416`) reject an unresolved
+  and `validateInstanceTransitionReferences` (`:424`) reject an unresolved
   one, but only `publishBody` calls them. The studio's own checks rail,
   `draft/validation.ts::runValidation` (`:82`), calls `validateStructure` and
   `validateReferences` alone, so neither check runs before publish. Risk
@@ -1185,7 +1186,7 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   `$'` and `` $` `` instead of inserting the label as literal text. A label
   reading `Cost $&` turns into the literal text `Cost {field}` inside the
   rendered sentence. This change fixed the removal sentences. Both
-  `removalAnnouncement` (`panels/fieldCatalogLogic.ts:347`) and the removal
+  `removalAnnouncement` (`panels/fieldCatalogLogic.ts:425`) and the removal
   dialog's heading (`panels/RemoveFieldDialog.tsx:116`) pass a replacer
   function, `() => label`.
 
@@ -1198,19 +1199,19 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   `panels/ChangeList.tsx`, `panels/ChangesView.tsx` and
   `screens/VersionsScreen.tsx`. The other 42 pass a string, in 10 files. Six
   calls split across lines, and two lines carry two calls each:
-  `EntityTabs.tsx`'s move sentences (`:556`, `:557`). The grep
+  `EntityTabs.tsx`'s move sentences (`:570`, `:571`). The grep
   `git grep -n '\.replace("{' -- packages/web/src` therefore matches 46 lines.
 
   Two helpers build the placeholder in a template literal, which that grep
   misses. The admin area's `tFill`
   (`packages/web/src/areas/admin/catalog.ts:17`) passes a string to
-  `replaceAll`. The helper `fill` (`draft/changeSet.ts:171`) passes a replacer
+  `replaceAll`. The helper `fill` (`draft/changeSet.ts:172`) passes a replacer
   function. Risk (Low): one replacer function closes every site that still
   passes a string: `.replace("{field}", () => label)`.
 - **FIELDS-20: a second identical move announces nothing.** `moveField`
-  (`panels/EntityTabs.tsx:536`) writes its sentence straight into the shared
-  live region (`:554`), a pattern that predates this change. `removeField`
-  (`:510`) empties the region first and writes on the next animation frame
+  (`panels/EntityTabs.tsx:550`) writes its sentence straight into the shared
+  live region (`:568`), a pattern that predates this change. `removeField`
+  (`:524`) empties the region first and writes on the next animation frame
   instead. That step matters when one removal sentence repeats, since two
   different sentences announce without it. Two unnamed fields moved into the
   same group, one after another, still produce one sentence twice: the live
@@ -1221,7 +1222,7 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   dismissal no dialog has.** Its "Publishing confirms in a modal dialog that
   names the version and its immutability" requirement names "a backdrop
   dismissal" among the close routes that return focus
-  (`openspec/specs/studio-publish/spec.md:320`). A native modal has no such
+  (`openspec/specs/studio-publish/spec.md:350`). A native modal has no such
   route. Measured on 2026-09-13: a backdrop click leaves the Publish and the
   Discard draft dialogs open. Risk (Low): the requirement asks for a route
   no dialog offers.
@@ -1234,7 +1235,7 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   plugin settings keep their text." and "Check each one before you publish."
   (`panels/RemoveFieldDialog.tsx:192-193`). It names no expression and no
   setting, and no later screen lists them all
-  (`openspec/specs/studio-app/spec.md:4100-4102`).
+  (`openspec/specs/studio-app/spec.md:4527-4529`).
   A kept CEL read, or a kept `process.start` mapping value, surfaces later as
   an unknown-key result on the Checks tab.
   A kept `valueFromField` or `instanceIdField` setting fails the way FIELDS-17
@@ -1265,7 +1266,7 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   field. Either needs a `studio-app` change.
 - **FIELDS-24: Remove field sits flush against "+ Add field".** Measured at
   1440x900: Remove field `[344, 802, 101×37]`, "+ Add field"
-  `[344, 839, 109×37]`, 0px apart; `panels/FieldCatalogPanel.tsx:279-285`
+  `[344, 839, 109×37]`, 0px apart; `panels/FieldCatalogPanel.tsx:283-293`
   draws the 2px rule above Remove field only. A field with no reach leaves
   on one press (`panels/EntityTabs.tsx:482-485`), and a freshly added field
   always has no reach. A double click removes a field, then opens the
@@ -1276,7 +1277,7 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   them, or move Remove field into the field's own heading row.
 - **FIELDS-25: the effect half prints one step list twice.** "Only ask this
   when" and "Ask for this" each open with "Writes to:" and the full step list
-  (`panels/FieldCatalogPanel.tsx:976`, `:1013`). Measured 2026-09-24 at
+  (`panels/FieldCatalogPanel.tsx:1023`, `:1061`). Measured 2026-09-24 at
   1300x900 on the group "Personal details": each list names all 12 steps and
   wraps to five lines. Risk (Low): each zone's own control sits below five
   lines of the same names.
@@ -1329,7 +1330,7 @@ tags are local to this section; paths under `panels/` and `screens/` start at
 
 - **CHANGES-2 (resolved by `studio-focus-ring-clipping`): every tab body
   clips the edge of a focus ring.** The tab body
-  scrolls and sets no inline padding (`screens/EditScreen.tsx:183`). The
+  scrolls and sets no inline padding (`screens/EditScreen.tsx:237`). The
   shell's 2px ring at a 2px offset (`packages/web/src/shell/global.css:37`)
   loses its edge against either side of that box. On the Changes tab it cuts
   the Expand all command's right edge, and at 400px the open command's left
@@ -1349,26 +1350,26 @@ tags are local to this section; paths under `panels/` and `screens/` start at
   those strings.
 - **CHANGES-4: no studio waiting line reaches a screen reader.** Each one is a
   plain paragraph with no live region. The Changes tab's line sits at
-  `panels/ChangesView.tsx:135`, and the Versions screen's two at
-  `screens/VersionsScreen.tsx:268` and `:349`. The process surface, the
+  `panels/ChangesView.tsx:146`, and the Versions screen's two at
+  `screens/VersionsScreen.tsx:277` and `:358`. The process surface, the
   Processes screen, the Tools screen and the migration plan screen draw
   theirs the same way. Risk (Low): a screen reader hears nothing while a
   body loads (WCAG 4.1.3).
 - **CHANGES-5: the header bar's open `⋮` menu panel loses hit points to
   tab-body content.** Its panel sets `zIndex: 1`
-  (`panels/ProcessHeaderBar.tsx:198`). The review measured this
+  (`panels/ProcessHeaderBar.tsx:199`). The review measured this
   2026-09-13, identical with and without `visually-hidden-text-page-bounds`:
   at 1280x720 on the Field matrix tab, an `elementFromPoint` sweep lost 15
   of 36 hit points to the grid's sticky headers, which set `zIndex: 2` and
-  `zIndex: 3` (`panels/FieldMatrixGrid.tsx:81`, `:96`). At 400x800 on the
+  `zIndex: 3` (`panels/FieldMatrixGrid.tsx:82`, `:97`). At 400x800 on the
   Canvas tab, the same sweep lost 5 of 30 hit points to the canvas toolbar,
-  which sets `zIndex: 1` later in tree order (`canvas/CanvasView.tsx:83`).
+  which sets `zIndex: 1` later in tree order (`canvas/CanvasView.tsx:84`).
   Neither element stood confirmed as the cause. Risk (Medium): a click
   meant for the open menu can land on tab-body content instead.
 - **CHANGES-6: the participant Task screen scrolls sideways at 400px.** The
   `visually-hidden-text-page-bounds` audit met it on the app area's Task
   screen. Its claim row sets `display: "flex"` with no `flexWrap`
-  (`packages/web/src/areas/app/screens/TaskScreen.tsx:108`,
+  (`packages/web/src/areas/app/screens/TaskScreen.tsx:113`,
   `styles.taskActions`). A claimed step fills that row with Release, the
   delegate input, Delegate to, Save and Discard case.
 
@@ -1450,10 +1451,10 @@ only the marks the miniature draws. The required count stands beside it.
   classes and no `btn`. Its ground reads `rgb(240, 240, 240)` in light and
   `rgb(107, 107, 107)` in dark, the browser's own button face. The form
   editor's pressed column option loses its box and weight the same way.
-  - The sites are `screens/EditScreen.tsx:839`, `:1076` and `:1092`, and
-    `screens/FormEditorScreen.tsx:1339`, `:1409` and `:1425-1426`. The rest sit at
-    `screens/VersionsScreen.tsx:263`, `screens/ToolsScreen.tsx:189`,
-    `screens/PlayerScreen.tsx:335` and `screens/MigrationPlanScreen.tsx:281`.
+  - The sites are `screens/EditScreen.tsx:963`, `:1220` and `:1236`, and
+    `screens/FormEditorScreen.tsx:1332`, `:1402` and `:1418-1419`. The rest sit at
+    `screens/VersionsScreen.tsx:263`, `screens/ToolsScreen.tsx:199`,
+    `screens/PlayerScreen.tsx:349` and `screens/MigrationPlanScreen.tsx:281`.
   - Risk (Medium): the back link draws a gray box on every dark studio
     screen. The unpressed column option looks pressed. The fix joins the
     literal classes into the spread, as the strip's `ghost` helper does.
@@ -1484,14 +1485,14 @@ tags are local to this section. Paths under `panels/` and `screens/` start at
 
 - **TONE-1: the missing-translation message takes two looks.** The step page
   draws `missingTranslationWarning` beside a 2px refusal rule, its `warning`
-  block (`panels/StepPage.tsx:140`). Three other sites draw the same message
+  block (`panels/StepPage.tsx:149`). Three other sites draw the same message
   beside the 3px advisory rule. Those are the header bar's `warning` block
-  (`panels/ProcessHeaderBar.tsx:62`) and the field catalog's `studioWarning`
-  (`panels/FieldCatalogPanel.tsx:327`). The form editor's `studioWarning`
+  (`panels/ProcessHeaderBar.tsx:63`) and the field catalog's `studioWarning`
+  (`panels/FieldCatalogPanel.tsx:334`). The form editor's `studioWarning`
   (`screens/FormEditorScreen.tsx:122`) is the third.
   - Two more 3px rules mix refusal at 55%. The checks rail draws one in
     `checksGroupHeldBack` (`panels/ChecksRail.tsx:52`). The timers panel draws
-    the other in `refusal` (`panels/TimersPanel.tsx:54`).
+    the other in `refusal` (`panels/TimersPanel.tsx:56`).
   - Risk (Low): an author meets one message in two tones on one process
     surface, so the tone stops telling a warning from a refusal.
 - **TONE-2: the advisory role sits close to two neighbours.** The change's
@@ -1538,7 +1539,7 @@ Paths under `panels/` and `screens/` start at `packages/web/src/areas/studio/`.
   stay, 32px clear of the edge fade. This is CHANGES-2 on the tab row. Risk
   (Low): the ring still meets WCAG 2.4.7.
 - **BAR-1: the process name input takes its placeholder as its name.** The
-  input has no label (`panels/ProcessHeaderBar.tsx:750`). Its accessible name
+  input has no label (`panels/ProcessHeaderBar.tsx:794-796`). Its accessible name
   read "(untitled process)" while it held IT Offboarding. Risk (Medium): a
   screen reader announces an untitled process on every draft (WCAG 4.1.2).
 - **KEYS-1: the form editor still wraps a long key above 80rem.** Three
@@ -1860,7 +1861,7 @@ audit of 2026-09-10.
 15. **A shared changed-file collector for `prose.sh` and `whitespace.sh`.**
     Rejected 2026-08-05. Only `prose.sh` runs `git diff --name-status -M`, and
     it does so to read a renamed file's baseline at its old path.
-    [`scripts/gates/prose.sh:74`, `scripts/gates/whitespace.sh:44`]
+    [`scripts/gates/prose.sh:83`, `scripts/gates/whitespace.sh:55`]
 16. **Delete the unused registry seams.** Rejected. That set is
     `devHeaderResolver`, the action `Registry`, the `DataSourceRegistry`, the
     `AssignmentRegistry`'s multi-strategy handlers, `exampleRegistry.ts` with
@@ -1991,7 +1992,7 @@ audit of 2026-09-10.
     `ES2022` to `ES2024` repo-wide. That blast radius is disproportionate.
     [`src/engine/reporting.ts`, `groupMs`]
 40. **Finding 40, drop `JwtResolverConfig.localRolesClaim`.** Rejected
-    2026-08-16. A call at `test/auth-jwt.test.ts:109` passes
+    2026-08-16. A call at `test/auth-jwt.test.ts:121` passes
     `localRolesClaim: "groups"`. The `?? "roles"` fallback inside
     `jwtResolver` is a default rather than dead code. [`src/auth/jwt.ts`,
     `JwtResolverConfig.localRolesClaim`]
