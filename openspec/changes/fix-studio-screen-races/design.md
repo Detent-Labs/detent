@@ -54,6 +54,10 @@ the click turns the late page stale. A hand-written `useRef` counter like
   catalog fetch for the old process stale, which is correct, since that
   catalog belongs to the old process. A stale answer writes neither
   `versions`, `hasDraft`, `fields` nor `catalogError`.
+- Tools: `selectProcess` clears `versions` and `hasDraft` at once, before
+  its request. Otherwise the catalog picker offers the old process's
+  versions while the new list loads. A pick there would start a catalog
+  request and turn the new version list stale for good.
 - The gate lives in `useState(createLatestGate)`, the form the admin
   screens already use.
 
