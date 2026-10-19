@@ -24,13 +24,13 @@
 
 ## 5. Verification
 
-- [ ] 5.1 Run `bun run typecheck` in the devcontainer. Expect exit code 0.
-- [ ] 5.2 Run `bun run build` in the devcontainer. Expect exit code 0.
-- [ ] 5.3 Run the full `bun test` suite with `DATABASE_URL` set through `sh scripts/test-gated.sh bun test` and `OPENSPEC_TELEMETRY=0`. Read the pass, skip and fail counts.
-- [ ] 5.4 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` on the host. Read its exit code.
-- [ ] 5.5 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh` on the host. Read its exit code.
-- [ ] 5.6 Do a browser check on the production bundle. Read the new captions on the Paths tab, a timer, a plugin envelope and the header bar menu. Enter a too-short plugin config value and read the message.
-- [ ] 5.7 Run `/impeccable critique` and `/impeccable audit` against the Steps tab and the Paths tab.
+- [x] 5.1 Run `bun run typecheck` in the devcontainer. Expect exit code 0.
+- [x] 5.2 Run `bun run build` in the devcontainer. Expect exit code 0.
+- [x] 5.3 Run the full `bun test` suite with `DATABASE_URL` set through `sh scripts/test-gated.sh bun test` and `OPENSPEC_TELEMETRY=0`. Read the pass, skip and fail counts.
+- [x] 5.4 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` on the host. Read its exit code.
+- [x] 5.5 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh` on the host. Read its exit code.
+- [x] 5.6 Do a browser check on the production bundle. Read the new captions on the Paths tab, a timer, a plugin envelope and the header bar menu. Enter a too-short plugin config value and read the message.
+- [x] 5.7 Run `/impeccable critique` and `/impeccable audit` against the Steps tab and the Paths tab.
 
 ## Workflow follow-up
 
