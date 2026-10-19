@@ -223,7 +223,7 @@ a column to an existing table. For a database that predates a column,
 drop it, then seed or provision it again.
 
 In SaaS mode, with `TENANT_CONTROL_PLANE_URL` set, the server builds no
-schema at startup (`src/http/server.ts:893`). The provisioning command
+schema at startup (`src/http/server.ts:940`). The provisioning command
 builds each tenant's schema instead. The startup rule above therefore
 covers a single-tenant start.
 
@@ -326,15 +326,23 @@ answer a bad token gets, so nobody learns your tenant list by probing. A known
 tenant whose database is down reads 503. The first is the caller's to fix. The
 second is yours.
 
-Re-run the provisioning command's schema step after an upgrade that adds a
-table or an index, once per tenant database. The `login_attempts` table is
-one such addition. A tenant database without it answers every login with 500
-until its schema step runs. Every schema statement is idempotent, so a run
-against a current database changes nothing.
+Re-run the schema step after an upgrade that adds a table or an index, once
+per tenant database. The tenancy CLI has only `add-tenant` and
+`list-tenants`, and `add-tenant` refuses a key it already holds. No command
+re-runs the schema step for an existing tenant. Run it by hand from the
+repository root instead:
+
+```sh
+DATABASE_URL=<tenant-url> bun -e "await (await import('./src/engine/store.ts')).initSchema(); process.exit(0)"
+```
+
+The `login_attempts` table is one such addition. A tenant database without
+it answers every login with 500 until its schema step runs. Every schema
+statement is idempotent, so a run against a current database changes nothing.
 
 The schema step creates missing tables and indexes only. It does not add a
 column to an existing table. If a missing column carries an index, the
-schema step fails at startup. Otherwise the first query that names the
+schema step fails when it runs. Otherwise the first query that names the
 column fails, whether it reads or writes the column. A tenant database that
 predates a column needs five steps. The drop destroys the tenant's data, so
 dump the database first, as `docs/runbooks/backup-restore.md` describes.

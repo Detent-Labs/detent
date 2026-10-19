@@ -161,8 +161,8 @@ export const timestamp = z.string();
 
 // ============================================================
 // Expression: CEL, pure and total, no now(). Guards read data / instance /
-// actor / named data sources, plus child.outcome + child.data in a subprocess
-// step. `result` is scoped only to an Action.output mapping, never to guards.
+// actor, plus child.outcome + child.data in a subprocess step's path guards.
+// `result` is scoped only to an Action.output mapping, never to guards.
 // ============================================================
 
 export const expression = z.object({
@@ -178,9 +178,10 @@ export const literal: z.ZodType<Literal> = z.lazy(() =>
 );
 
 // ============================================================
-// Plugin envelope. Core validates only this shape; each plugin ships its own
-// JSON Schema, resolved via a type -> { config schema, output schema } registry
-// at publish time. A breaking plugin change takes a new `type` identity.
+// Plugin envelope. Core validates only this shape. Three registries (actions,
+// data sources, assignment strategies) resolve `type` and check `config`
+// against the plugin's own schema at publish time. A breaking plugin change
+// takes a new `type` identity.
 // ============================================================
 
 export const plugin = z.object({

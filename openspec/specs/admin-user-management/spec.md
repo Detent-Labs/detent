@@ -428,12 +428,14 @@ The route SHALL return 200 with the updated row on success. It SHALL return
   credential whose `roles` does not include `system:admin`
 - **THEN** the response is 403 and no row changes
 
+<!-- Why: the heading below must match the live requirement heading byte for byte. -->
+<!-- antislop: allow synonym-rotation -->
 ### Requirement: An operator can create a user account over HTTP
 
 `src/auth/users.ts` SHALL expose the existing `createUser(email, password,
 roles, displayName, db)`, unchanged. `POST /admin/users` SHALL expose it,
-gated by `system:admin`. Every other `/admin/*` route enforces that role
-through the same `requireRole` check.
+gated by `system:admin`. Every other `/admin/*` route except the data list
+routes enforces that role through the same `requireRole` check.
 
 The request body SHALL be `{ email: string, password: string, roles?:
 string[] }`. `email` and `password` SHALL each be non-empty after trimming.
