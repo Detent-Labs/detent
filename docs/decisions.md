@@ -1667,25 +1667,6 @@ are local to this section.
   in the editor's layout. The fix belongs to a screen change under
   `studio-app`, with `/impeccable adapt`.
 
-## Open from the 2026-10-10 audit (one OpenSpec change each)
-
-The audit of 2026-10-10 sits in
-[`AUDIT.md`](../openspec/changes/archive/2026-10-10-audit-record/AUDIT.md),
-with one report per area under
-[`reports/`](../openspec/changes/archive/2026-10-10-audit-record/reports/).
-Each finding keeps its full text under the same id in `AUDIT.md` and in
-`reports/<area>.md`. Every line number in the record is a historical anchor
-of `5f41cd8a`. Each fix change deletes its own entries in the commit that
-archives it, and `sweep-docs-drift-2026-10` re-points the line citations of
-other entries. C-4 merges D-2, and C-6 merges F-6.
-
-- **`sweep-docs-drift-2026-10` (H-4, H-5, H-6, H-7, H-8, H-9, H-10, H-11,
-  H-12, A-7, A-9, B-10, B-13, D-9, G-13; medium)**: The authoring guide
-  promises that a group change reaches a waiting step, and the guide,
-  `ROADMAP.md`, `README.md`, `CLAUDE.md`, two specs, line anchors in this
-  file and several code comments state stale facts. Anchors:
-  `docs/authoring-guide.md`, `ROADMAP.md`, `src/auth/authorize.ts`.
-
 ## Open from harden-studio-json-surface (needs its own OpenSpec change)
 
 The final review and the browser check of `harden-studio-json-surface`
