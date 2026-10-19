@@ -1003,14 +1003,6 @@ recorded rather than fixed. The RAIL tags are local to this section.
   - Four more flags on the step page mark mono machine values at 0.8rem.
     The Hierarchy in `DESIGN.md` allows that size for them.
   - Risk (Low): type drifts outside the roles `DESIGN.md` names.
-- **STEP-4: four action lists take a JSON key as their legend.** The step
-  page passes `"onEntry"`, `"onExit"` and `"onCancel"` as literal labels
-  (`panels/StepPage.tsx:525`, `:642`, `:650`). The Paths section passes
-  `"onPath"` the same way (`panels/PathsPanel.tsx:332`). Each prints in the
-  written face, under a section heading that already reads "On entry" or
-  "On exit". None of the four comes from the studio catalog. Risk (Low): the
-  author reads a machine key in the prose face, and a UI-string override
-  cannot reach it.
 - **STEP-5: a step's description takes a one-line input.** The masthead's
   description uses `LocalizedTextInput` (`panels/StepPage.tsx:772`), which
   renders an `<input>`. Measured 2026-09-24 at 1300x900, IT Offboarding's
@@ -1675,21 +1667,6 @@ are local to this section.
   in the editor's layout. The fix belongs to a screen change under
   `studio-app`, with `/impeccable adapt`.
 
-## Open from the studio-path-row-field-order final review (one OpenSpec change per screen)
-
-The final whole-branch review for `studio-path-row-field-order` (2026-09-17)
-found one gap outside that change's own scope.
-
-- **The path row's `label`/`key`/`to` field captions are literal text.**
-  `PathsPanel.tsx`'s `fieldLabelText`-styled `<span>`s read the bare words
-  `label` (`panels/PathsPanel.tsx:223`), `key` (`:231`) and `to` (`:240`).
-  They skip the catalog. Every other string this file renders calls `t()`,
-  among them `t("paths.selectTargetStep")`, `t("paths.newPathTargetLabel")`,
-  `t("paths.triggeredByLabel")`, `t("paths.removePath")` and
-  `t("paths.addPath")`. The three captions predate `studio-path-row-field-order`,
-  which only re-wrapped the existing bare text into styled spans; they are
-  now more visible as prominent field labels instead of small inline text.
-
 ## Open from the 2026-10-10 audit (one OpenSpec change each)
 
 The audit of 2026-10-10 sits in
@@ -1702,11 +1679,6 @@ of `5f41cd8a`. Each fix change deletes its own entries in the commit that
 archives it, and `sweep-docs-drift-2026-10` re-points the line citations of
 other entries. C-4 merges D-2, and C-6 merges F-6.
 
-- **`catalog-studio-literal-strings` (E2-19; low)**: Visible studio text sits
-  as literals in the code instead of in the catalog. Anchors:
-  `packages/web/src/areas/studio/panels/TimersPanel.tsx`,
-  `packages/web/src/areas/studio/panels/SubprocessSpecEditor.tsx`,
-  `packages/web/src/areas/studio/panels/shared/PluginEnvelopeEditor.tsx`.
 - **`remove-dead-exports` (B-14, C-18, D-10, E1-12, E2-20, F-15; low)**:
   Exports in the engine, tenancy, handlers, studio, reporting and form-ui
   have no importer, and some functions and arguments have no caller.
