@@ -1,3 +1,5 @@
+import { t } from "../catalog.js";
+
 /**
  * The `"db.list"` picker's rules, kept out of React so they can be tested.
  *
@@ -26,7 +28,7 @@ export function unknownListKeyWarning(type: string | undefined, config: unknown,
   if (type !== DB_LIST_TYPE || knownKeys === undefined) return undefined;
   const listKey = listKeyOf(config);
   if (listKey === "" || knownKeys.includes(listKey)) return undefined;
-  return `No data list '${listKey}' exists on this server. Publishing still works; the field's options stay empty until an operator creates it.`;
+  return t("dataSources.unknownListWarning").replace("{list}", () => listKey);
 }
 
 /** The keys to offer, with the draft's own key kept even when the server does not report it — so choosing does not silently drop it. */

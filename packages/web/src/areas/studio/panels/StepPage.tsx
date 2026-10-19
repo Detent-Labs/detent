@@ -21,6 +21,7 @@ import { childVersionFor } from "../draft/subprocessSpec";
 import { PathsPanel } from "./PathsPanel";
 import { TimersPanel } from "./TimersPanel";
 import { IssueItems, NotCheckedBadge } from "./shared/IssueList";
+import { KeyCaption } from "./shared/KeyCaption";
 import { LocalizedTextInput } from "./shared/LocalizedTextInput";
 import { parseChildProcessJson } from "../draft/io";
 import { missingTranslationWarning } from "../draft/localized-text";
@@ -556,7 +557,7 @@ export function StepPage({
       case "entry":
         return (
           <ActionListEditor
-            label="onEntry"
+            label={<KeyCaption text={t("steps.onEntryLegend")} jsonKey="onEntry" />}
             actions={step.onEntry}
             fields={fields}
             registryTypes={registry?.actionTypes}
@@ -673,7 +674,7 @@ export function StepPage({
         return (
           <>
             <ActionListEditor
-              label="onExit"
+              label={<KeyCaption text={t("steps.onExitLegend")} jsonKey="onExit" />}
               actions={step.onExit}
               fields={fields}
               registryTypes={registry?.actionTypes}
@@ -681,7 +682,7 @@ export function StepPage({
               onChange={(onExit) => updateStep({ onExit })}
             />
             <ActionListEditor
-              label="onCancel"
+              label={<KeyCaption text={t("steps.onCancelLegend")} jsonKey="onCancel" />}
               actions={step.onCancel}
               fields={fields}
               registryTypes={registry?.actionTypes}
@@ -735,7 +736,7 @@ export function StepPage({
                 </p>
               ) : (
                 <>
-                  <NotCheckedBadge label="cross-process" />
+                  <NotCheckedBadge text={t("issues.crossProcessNotChecked")} />
                   <input type="file" accept="application/json" onChange={(e) => loadChildFile(step.id, e.target.files?.[0])} />
                 </>
               )}

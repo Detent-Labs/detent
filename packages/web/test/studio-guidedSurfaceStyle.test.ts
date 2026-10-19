@@ -189,8 +189,8 @@ describe("the path row's label leads key, both stacked, and the target select is
   it("renders the label field before the key field, both in the masthead's stacked pattern", () => {
     const source = stripComments(read(FILE));
 
-    const labelIndex = source.indexOf("fieldLabelText)}>label</span>");
-    const keyIndex = source.indexOf("fieldLabelText)}>key</span>");
+    const labelIndex = source.indexOf("paths.labelCaption");
+    const keyIndex = source.indexOf("paths.keyCaption");
 
     expect(labelIndex).toBeGreaterThan(-1);
     expect(keyIndex).toBeGreaterThan(-1);
@@ -200,7 +200,7 @@ describe("the path row's label leads key, both stacked, and the target select is
   it("gives the key field's control the mono treatment the masthead gives a step's own key", () => {
     const source = stripComments(read(FILE));
 
-    const keyIndex = source.indexOf("fieldLabelText)}>key</span>");
+    const keyIndex = source.indexOf("paths.keyCaption");
     const keyFieldBlock = source.slice(keyIndex, source.indexOf("</label>", keyIndex));
 
     expect(keyFieldBlock).toMatch(/styles\.monoInput/);

@@ -6339,3 +6339,30 @@ Create.
 Pass: a confirmation names the key. Cancel it. Pass: the network panel shows
 no `PUT /templates/...`, and the form keeps the key and the source. Press
 Create again and confirm. Pass: the list shows the replaced template.
+
+### Studio: captions with a JSON name, and a plugin config message (`catalog-studio-literal-strings`)
+
+Source: `catalog-studio-literal-strings` task 4.2. The guard test
+`packages/web/test/studio-panels-literal-text.test.ts` asserts that no panel
+holds a literal. This walk covers what it cannot judge: the look of the mono
+name beside the plain words. It needs a draft with a step that has an
+automatic path, a timer and an action.
+
+On the Paths tab, read one path row. Pass: the three captions read Label, Key
+and Goes to. After each one comes `label`, `key` or `to` in the mono face,
+muted, in lower case, after one space. The caption sits in an uppercase
+tracked label, so check that the mono name keeps its own case.
+
+Switch the path to automatic. Pass: the caption above the number input reads
+"Order among automatic paths", then `priority` in mono. The legend over the
+action list reads "Actions when the path fires", then `onPath`.
+
+Open a step with a timer. Pass: the timer's captions read Description, "When
+it fires" with no mono name, and "Path it takes when it fires". The last one
+carries `onFire.targetPath` and wraps without clipping at a 360px width.
+
+On the Steps tab, open a step and add an action under "Actions on entry".
+Choose the type `notification.email`. In the `to` field, type `nobody` on one
+line. Pass: the message under the field reads "Enter a valid email address."
+in the error color. Replace the line with `a@example.com`. Pass: the message
+goes.
