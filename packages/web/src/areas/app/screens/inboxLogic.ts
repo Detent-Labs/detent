@@ -41,7 +41,7 @@ export function sortItems(items: InstanceSummary[], sort: SortKey, locale: UiLoc
   return copy;
 }
 
-export interface InboxGroup {
+interface InboxGroup {
   processId?: string;
   label?: string;
   items: InstanceSummary[];
