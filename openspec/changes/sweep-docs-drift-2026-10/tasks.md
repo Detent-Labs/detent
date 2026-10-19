@@ -35,9 +35,9 @@
 
 ## 7. Verification
 
-- [ ] 7.1 Run `bun run typecheck` and `bun run build` in the devcontainer.
-- [ ] 7.2 Run the full gated suite with `DATABASE_URL` set: `sh scripts/test-gated.sh bun test`.
-- [ ] 7.3 On the host, pipe `sh scripts/gates/range.sh < /dev/null` into `prose.sh`, then into `whitespace.sh`.
+- [x] 7.1 Run `bun run typecheck` and `bun run build` in the devcontainer.
+- [x] 7.2 Run the full gated suite with `DATABASE_URL` set: `sh scripts/test-gated.sh bun test`.
+- [x] 7.3 On the host, pipe `sh scripts/gates/range.sh < /dev/null` into `prose.sh`, then into `whitespace.sh`.
 
 ## Workflow follow-up
 
