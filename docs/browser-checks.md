@@ -6316,3 +6316,26 @@ Switch the language to German before the logout. Pass: the line reads in German
 and wraps without clipping at a 360px width. Log in again in tab B. Pass: the
 line disappears. `e2e/session-tabs.e2e.ts` asserts the sign-out and the text.
 This entry keeps only the visual judgment.
+
+### Studio: a late answer and a template replacement (`fix-studio-screen-races`)
+
+**1. A late answer changes nothing.** Open the Player on
+`purchase_requisition`. Create two instances and note both ids. Delay every
+`GET /instances/<first id>/record` by three seconds with a route intercept.
+Open the first instance by id, then the second at once.
+
+Pass: after the delay, the record pane still shows the second instance's
+entries. Repeat on `/studio/tools`. Delay the version body of one version,
+choose it, then choose the draft. Pass: the scratchpad checks against the
+draft's fields after the delay.
+
+This stays manual because no test mounts these screens.
+`packages/web/test/shell-latestGate.test.ts` asserts the gate itself.
+
+**2. A create over an existing key asks first.** On `/studio/templates`,
+type the key of a template the list already shows. Choose a source and press
+Create.
+
+Pass: a confirmation names the key. Cancel it. Pass: the network panel shows
+no `PUT /templates/...`, and the form keeps the key and the source. Press
+Create again and confirm. Pass: the list shows the replaced template.
