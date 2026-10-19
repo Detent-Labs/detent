@@ -74,7 +74,7 @@ export function adminUrlFor(databaseUrl: string): string {
   return admin.toString();
 }
 
-export interface ProvisionOptions {
+interface ProvisionOptions {
   key: string;
   name: string;
   databaseUrl: string;

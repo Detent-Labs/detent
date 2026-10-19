@@ -28,7 +28,7 @@ export interface TenantRecord {
  * follow. The server bootstrap reads it once at startup to decide the mode;
  * every later read is this one.
  */
-export function controlPlaneUrl(): string | undefined {
+function controlPlaneUrl(): string | undefined {
   return process.env.TENANT_CONTROL_PLANE_URL || undefined;
 }
 

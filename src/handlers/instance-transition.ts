@@ -36,7 +36,6 @@ export const instanceTransitionConfigSchema = z.object({
   instanceIdField: z.string(),
   pathId: z.string(),
 });
-export type InstanceTransitionConfig = z.infer<typeof instanceTransitionConfigSchema>;
 
 /**
  * The redelivery guard (`runtime-events`'s "A redelivery moves the target at
