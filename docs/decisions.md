@@ -525,7 +525,7 @@ word. `ROADMAP.md` carries stage-by-stage status.
   value directly. The per-request tenant resolve runs inside the dispatch
   path, at `:859-862`. The rewrite needs an OpenSpec change of its own; this
   entry records the finding and leaves its shape open.
-- **Three requirements in `studio-canvas` still say "palette".** Lines 679,
+- **Three lines in `studio-canvas` still say "palette".** Lines 679,
   1827 and 1836, in "The canvas is keyboard-operable, and traversal follows
   the paths" and "The masthead's step key auto-derives from the step label".
   The `studio-canvas-bar` change of 2026-09-10 deleted
@@ -585,8 +585,8 @@ word. `ROADMAP.md` carries stage-by-stage status.
   600: `BottleneckScreen.tsx:36`, `CycleTimeScreen.tsx:66`,
   `SlaScreen.tsx:37` and `ReportTable.tsx:57`.
 
-  Two picker labels set 600: `ProcessPickerScreen.tsx:54` and
-  `ReportsListScreen.tsx:65`. So does
+  Two picker labels set 600: `ProcessPickerScreen.tsx:55` and
+  `ReportsListScreen.tsx:66`. So does
   `packages/web/src/areas/studio/screens/MigrationPlanScreen.tsx:108`
   (`surfaceToggleTabSelected`). None moved in a design change yet; a later
   UI change would fix all ten. The `#726e6e` entry above tracks the same
@@ -731,7 +731,7 @@ build.
   `Content-Disposition: attachment` (`src/http/server.ts:201-214`), guarded
   by `test/http-disposition.test.ts`. The SPA fetches the file and saves it
   through `<a download>`
-  (`packages/web/src/areas/app/screens/TaskScreen.tsx:404-412`) and revokes
+  (`packages/web/src/areas/app/screens/TaskScreen.tsx:404-410`) and revokes
   the blob URL right after the click. The SPA's own CSP does not reach the
   download response. An allowlist would turn each new file type into a
   configuration change instead. Residual risk: the

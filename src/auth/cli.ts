@@ -1,9 +1,9 @@
 /**
  * User administration CLI. Every command below has an HTTP route too — see
  * `src/http/admin-routes.ts` (`GET /admin/users`, `POST /admin/users`, `POST
- * /admin/users/:userId/password`, `POST /admin/users/:id/disable`, `POST
- * /admin/users/:id/enable`, `PATCH /admin/users/:id/roles`, `PATCH
- * /admin/users/:id/manager`, `PATCH /admin/users/:id/name`). The CLI stays:
+ * /admin/users/:userId/password`, `POST /admin/users/:userId/disable`, `POST
+ * /admin/users/:userId/enable`, `PATCH /admin/users/:userId/roles`, `PATCH
+ * /admin/users/:userId/manager`, `PATCH /admin/users/:userId/name`). The CLI stays:
  * `set-roles` and `set-manager` key on the email a human types, and the CLI is
  * the recovery path when no account holds `system:admin`. Usage:
  *
