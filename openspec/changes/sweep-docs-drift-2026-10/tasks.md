@@ -43,3 +43,4 @@
 
 - Delete this change's entry and the emptied audit index section in `docs/decisions.md` when it archives.
 - After the last merge of `main`, re-check the citations in any file that merge touched.
+- At sync, change the `authorization` Purpose by hand, per design.md D4.

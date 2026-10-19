@@ -27,12 +27,14 @@ the plan, because each earlier merge moved the line citations in
   section names a command that does not exist (handed over from #30).
 - `docs/decisions.md`: re-point every line citation and remove the
   resolved A-9 entry. Correct H-7's two sentences. Add one open entry for
-  B-10's unmeasured lock effect. Remove the audit index's last entry with
+  B-10's unmeasured lock effect. The archive commit removes the audit
+  index's last entry with
   its section.
 - Code comments only, no behavior: `src/http/metrics.ts`,
   `src/auth/authorize.ts`, `src/schema/canonical-json.ts`,
   `src/schema/definition.ts`, `src/cel/check.ts`, `src/engine/registry.ts`,
   `src/engine/transition.ts`, `src/auth/cli.ts`, `src/http/routes.ts`,
+  `src/auth/process-access.ts`, `src/engine/store.ts`,
   `scripts/dev-webhook-sink.ts` and `scripts/e2e.ts`.
 - Spec deltas make the contradicting lines agree with the code. They cover
   H-10, the D-9 spec half, and the `persistence` callers paragraph.
@@ -51,12 +53,15 @@ None.
   `system:author`.
 - `process-access-roles`: a list entry is a non-empty actor id or group
   id (owner ruling, 2026-10-19).
+- `admin-operations-api`: the operator-role requirement names the data list
+  routes as its one exception.
 - `persistence`: the server builds the schema at start outside SaaS mode,
   and the stale "exactly two callers" paragraph goes.
 
 ## Impact
 
-Markdown under `docs/`, `ROADMAP.md`, `README.md`, `CLAUDE.md`, three live
-specs, and comments in eleven source and script files. One test in
+Markdown under `docs/`, `ROADMAP.md`, `README.md`, `CLAUDE.md`, four live
+specs, and comments in thirteen source and script files. The sync step
+changes the `authorization` Purpose by hand. One test in
 `test/http-process-access.test.ts` pins an unprefixed entry. No code path,
 API, schema or dependency changes.

@@ -299,18 +299,28 @@ existing `src/auth/cli.ts set-roles`.
 
 ### Requirement: The developer role gates the authoring surface
 
-`DEVELOPER_ROLE` SHALL admit every studio route. The `process-access-roles`
-Developer list narrows that on seven routes. They are the four draft routes,
-the two publish routes and the drafts list. On them a non-admin caller SHALL
-stand on the process's Developer list. `DEVELOPER_ROLE` SHALL be the only
-role the two migration-plan routes and the orphan-key scan admit. Every other
-studio route SHALL admit `system:author` as well. The three studio reads the
+`DEVELOPER_ROLE` SHALL admit every studio route except five. The
+`system:templates` requirement below gates the two template writes. The
+`process-access-roles` lists gate the three `/processes/:processId/access`
+routes.
+
+The `process-access-roles` Developer list narrows seven more routes: the four
+draft routes, the two publish routes and the drafts list. The rule takes
+hold once a process has a draft or a published version. From then on, a
+non-admin caller on one of the six process routes SHALL stand on its
+Developer list. The drafts list SHALL return to a non-admin only the drafts
+whose Developer list names them.
+
+Of the reserved roles, only `DEVELOPER_ROLE` SHALL admit the two
+migration-plan routes and the orphan-key scan. A stored `migrate` grant
+admits a caller there too. Every other studio route that `DEVELOPER_ROLE`
+admits SHALL admit `system:author` as well. The three studio reads the
 `system:templates` requirement below names SHALL admit that role too.
 
 `DEVELOPER_ROLE` SHALL NOT grant any operation the other reserved roles gate.
 Publishing a process body SHALL keep its separate need for `system:publish`.
-The operator reads and the `/admin/*` routes SHALL keep their need for
-`system:admin`.
+The operator reads and the `/admin/*` routes other than the data list routes
+SHALL keep their need for `system:admin`.
 
 An operator grants studio access through the existing
 `src/auth/cli.ts set-roles`.
@@ -325,7 +335,7 @@ An operator grants studio access through the existing
 #### Scenario: A developer does not thereby gain publish or admin rights
 
 - **WHEN** an actor holding only `system:developer` calls `POST /processes` or
-  an `/admin/*` route
+  an `/admin/*` route other than a data list read
 - **THEN** the response is 403
 
 #### Scenario: The developer role alone reaches the migration routes
@@ -339,7 +349,7 @@ An operator grants studio access through the existing
 #### Scenario: No existing caller loses a route
 
 - **WHEN** an account holding `system:developer` calls a studio route that
-  the Developer list does not scope
+  no access list and no template-write rule gates
 - **THEN** the engine authorizes the request, whatever list the account
   stands on
 
@@ -360,3 +370,126 @@ the power to cancel instances or to publish a process.
 #### Scenario: An admin does not inherit data list write access
 - **WHEN** an actor holding only `system:admin` writes a data list
 - **THEN** the route answers with an authorization error
+
+### Requirement: A grant names a role, never an individual account
+
+A grant SHALL map a role string to a permission and a scope. It SHALL NOT name
+one account. One row therefore covers every holder of that role. The holder may
+get the role from `auth_users.roles` or from an external issuer's claim.
+
+The identity provider stays the authority on who someone is and which groups
+they hold. The installation stays the authority on what a group may do inside
+it. `Actor.roles` SHALL keep its `string[]` shape, and `auth_users.roles` SHALL
+keep its `TEXT[]` shape. A sync from Active Directory or Entra ID therefore
+does not need a new field.
+
+A grant's role SHALL be free text. The engine SHALL NOT need the `system:`
+prefix on it. It SHALL NOT need any account to hold that role today. A grant
+written ahead of the directory sync that creates the group is valid and inert.
+
+An external issuer's claim value reaches `actor.roles` verbatim, through
+`claimToRoles` in `src/auth/jwt.ts`. Entra ID's `groups` claim emits object
+ids by default. A grant to such a group therefore names the object id, and
+the listing shows that id. That is a concern for a later operator screen.
+The store makes no rule of it.
+
+The reserved `system:*` roles SHALL keep their exact meaning. They serve the cases
+that are genuinely installation-wide. Account administration, the outbox and
+the timer views stay behind `system:admin`. A scoped grant is a second and
+narrower
+thing beside them. It SHALL NOT replace one, and no migration SHALL rewrite a
+role anybody already holds.
+
+#### Scenario: One grant covers every holder of a role
+
+- **WHEN** the store holds one grant of `"publish"` to `"finance-authors"`
+  scoped to a process, and two accounts hold `"finance-authors"`
+- **THEN** `can` answers true for both, over that process
+
+#### Scenario: A business role takes a grant
+
+- **WHEN** an operator writes a grant whose role is `"finance-authors"`, with
+  no `system:` prefix
+- **THEN** the store accepts it
+
+#### Scenario: A grant for a role nobody holds admits nobody
+
+- **WHEN** the store holds a grant to a role no account and no token claim
+  carries
+- **THEN** `can` answers false for every actor
+
+#### Scenario: A grant grants no installation-wide access
+
+- **WHEN** an actor's only permission comes from a grant of `"publish"` scoped
+  to one process
+- **THEN** every `/admin/*` route, every `/reporting/*` route and every studio
+  route answers `403` for that actor, unchanged
+
+<!-- Why: the header below has to match the requirement heading in the live
+     spec, byte for byte. Its wording predates the permission seam. -->
+<!-- antislop: allow passive-voice trailing-negation -->
+### Requirement: Authorization is checked directly at each gated operation, not through an extension point
+
+This capability gates six kinds of operation:
+
+- publishing a process body
+- cancelling an arbitrary instance
+- reading the unfiltered instance listing
+- reading an instance's record
+- every `/admin/*` route
+- every studio route
+
+No plugin envelope, registry, or
+configurable policy SHALL exist for authorization. Each gated operation calls
+`requireRole` or `requirePermission` directly. Each passes its own fixed role
+constant or permission. The engine already follows that pattern for the single
+`"static"` check on `Step.assignment.strategy.type`.
+
+`requirePermission` SHALL NOT weaken that rule. It reads the same
+`Actor.roles`, in the same module, and one table of stored rows beside them. It
+resolves five fixed permissions through one compile-time map. It reaches no
+registry. It loads no code. A caller SHALL NOT be able to add a permission,
+replace the map, or supply a policy.
+
+A grant is plain data. It names a role, one of the five
+fixed permissions, and a scope. It has no expression, no ordering, no priority
+and no deny form. Two grants over one process combine by answering true, which
+is what a set of independent tests already does.
+
+#### Scenario: No authorization plugin registry exists
+
+- **WHEN** a reader reads the engine's `Registry`, `DataSourceRegistry` and
+  `AssignmentRegistry` extension points
+- **THEN** no authorization or permission registry stands alongside them
+
+#### Scenario: Each admin route calls requireRole directly
+
+- **WHEN** a reader reads `src/http/admin-routes.ts`
+- **THEN** each handler calls `requireRole` itself, with no policy abstraction
+  between them
+- **AND** each handler passes `ADMIN_ROLE`, except the data list handlers,
+  which pass `DATALISTS_ROLE`
+- **AND** a data list read admits either authoring role before that call
+
+#### Scenario: Each studio route calls requireRole directly
+
+- **WHEN** a reader reads `src/http/studio-routes.ts`
+- **THEN** each handler calls `requireRole` or `requirePermission` itself, with
+  no policy abstraction between them
+- **AND** the two template writes call `requireRole` with `TEMPLATES_ROLE`,
+  while the four draft routes call the `requireAuthoring` helper beside it
+- **AND** the publish route, the two migration-plan routes and the orphan-key
+  route await `requirePermission` with their fixed permission
+
+#### Scenario: The permission map does not extend
+
+- **WHEN** a reader reads the `PERMISSION_ROLE` map
+- **THEN** it is a module constant covering exactly five permissions
+- **AND** no exported function adds an entry to it
+
+<!-- antislop: allow negation-habit - OpenSpec matches a MODIFIED block's scenario names against the live spec, so this heading keeps its wording -->
+#### Scenario: A grant carries no policy
+
+- **WHEN** an operator writes a grant
+- **THEN** it names a role, a permission and a scope, and nothing else
+- **AND** no grant denies a permission the global role already admits

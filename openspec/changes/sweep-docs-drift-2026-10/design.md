@@ -6,7 +6,7 @@ See proposal.md for the motivation. Each item below names a site at
 `origin/main` `4c270032`, the fact that contradicts it, and the new text.
 Line numbers move as tasks land. An implementer therefore finds each site
 by a quoted anchor phrase. The full audit text for each ID sits in
-`tmp/audit-2026-10-10/reports/` (H, A, B, D, G).
+`openspec/changes/archive/2026-10-10-audit-record/`.
 
 Every task is prose: Markdown or a comment. No code path changes, and no
 rule in `src/schema/definition.ts` changes. The one test added pins
@@ -98,17 +98,37 @@ behavior the code already has.
 
 ### D4. Spec deltas (H-10, D-9, persistence)
 
-The deltas under `specs/` hold the exact text. Two neighbouring texts stay
-as they are. The `authorization` Purpose calls every `/admin/*` route
-role-gated. That holds, since the data list roles count as reserved roles too.
-The `instance-visibility-set` backfill requirement describes
-`scripts/backfill-instance-principals.ts`, which still exists. The report
-records that handed-over question.
+The deltas under `specs/` hold the exact text. The `authorization` and
+`admin-operations-api` deltas name the data list exception wherever a
+requirement claims every `/admin/*` route needs `ADMIN_ROLE`.
+
+- **The Purpose, by hand.** The `authorization` Purpose says "five fixed role
+  strings". A delta cannot reach a Purpose, so the sync step changes
+  `openspec/specs/authorization/spec.md` by hand. The phrase becomes "a
+  fixed set of reserved role strings". Its claim that every `/admin/*`
+  route is role-gated holds, since the data list roles count as reserved
+  roles too.
+- **Kept on purpose.** `admin-user-management` and `admin-operations-api`
+  say "like every other `/admin/*` route" in nine requirements. Each
+  compares an account route or an outbox route with its neighbours. Each
+  of those routes does need `system:admin`. The comparison is loose but not false
+  for the route it describes, so those requirements stay as they are.
+- **Kept on purpose.** The `instance-visibility-set` backfill requirement
+  describes `scripts/backfill-instance-principals.ts`, which still exists.
+  The report records that handed-over question.
+- **Kept on purpose.** No doc or spec claims that `stripCompiledContent`
+  returns a contract with no `outcomes` key. The handed-over item from #26
+  therefore stays as it is.
+- **The persistence SaaS sentence.** It points at an existing
+  requirement, "Each tenant database carries the whole schema from its
+  creation". It states nothing that requirement does not, so it gets no
+  scenario of its own.
 
 `test/http-process-access.test.ts` gains one test. A Developer writes the
-entry `auth0|42` and reads it back unchanged. It pins the
-`process-access-roles` scenario "The engine stores an entry without a
-prefix".
+entry `auth0|42` and reads it back unchanged. An actor with id `auth0|42`
+who holds `system:developer` then gets 200 from
+`GET /processes/:processId/access`. It pins the `process-access-roles`
+scenario "The engine stores an entry without a prefix".
 
 ### D5. Code comments (H-12, A-7, A-9, B-10, D-9, G-13, handed over)
 
@@ -120,6 +140,18 @@ prefix".
 - **`src/auth/authorize.ts` `ADMIN_ROLE`.** Its doc stops claiming every
   `/admin/*` route. It calls the constant the operator role, and points to
   the `authorization` spec for what it gates.
+- **`src/auth/authorize.ts` `DEVELOPER_ROLE`.** Its doc drops "Admits every
+  studio route" and "the ONLY role". It points to the `authorization` spec,
+  which names the access lists and the `migrate` grant.
+- **`src/auth/authorize.ts` `DATALISTS_ROLE`.** Its doc names both authoring
+  roles for reads, `DEVELOPER_ROLE` and `AUTHOR_ROLE`.
+- **`src/http/routes.ts` visibility doc.** The anchor "every `/admin/*`
+  route calls `requireRole` with `ADMIN_ROLE`" names the data list
+  exception, as the `authorization` delta does.
+- **Principal shape (D-9).** Two comments say an access-list entry is a
+  `user_xxx` or `group_xxx` id: `src/auth/process-access.ts` and the
+  `process_access_roles` comment in `src/engine/store.ts`. Both become "a
+  non-empty actor id or group id, never a role string".
 - **`src/schema/canonical-json.ts`.** The header says a body carries
   integers and non-integers both: `fieldValidation.min`/`max`, a literal
   `default`, `Path.priority`. RFC 8785 serializes a number the way
@@ -133,8 +165,9 @@ prefix".
   `config` at publish. Comments only.
 - **`src/cel/check.ts`.** The `ponytail:` that waits for "the registry"
   names file and plugin field types only, and drops data sources. Its
-  ceiling: a plugin field type has no CEL type. Its upgrade entry: a type
-  descriptor on the field registry.
+  upgrade entry is `celType` in `src/cel/check.ts`. A plugin field type
+  needs a field-type registry the engine does not have yet. A `file` value
+  needs a CEL shape for an attachment reference.
 - **B-10 sites.** Three comments say the subprocess return alone resolves
   an assignment under the row lock. Two sit in `src/engine/registry.ts`:
   the `AssignmentContext` doc and the `resolveStepAssignment` doc. One
@@ -150,7 +183,7 @@ prefix".
   local BPS user or change its password". It names `POST /admin/users` and
   `POST /admin/users/:userId/password` in its route list. The CLI stays
   the recovery path when no account holds `system:admin`.
-  `src/auth/users.ts` needs no edit once this lands.
+  `src/auth/users.ts` stays as it is once this lands.
 - **G-13.** `scripts/dev-webhook-sink.ts` drops the sentence anchored "the
   compose healthcheck's own path".
 - **`src/http/routes.ts` grant sentence (from #33).** Find the anchor
@@ -169,7 +202,7 @@ prefix".
   `Permission` values the `authorization` spec lists.
 - **A-9d.** Delete the entry that asks `compile.ts` to say "the remaining
   seven". It now does.
-- **B-10.** Add one open entry. The submit path and the subprocess return
+- **B-10.** Add one entry under the file's open questions. The submit path and the subprocess return
   both resolve an assignment on the locked transaction's connection. A
   resolver past its deadline leaves its query running there. Nobody has
   measured whether the commit then waits for it with the row lock held.
@@ -178,7 +211,8 @@ prefix".
   holds what the prose claims. Where the claim no longer holds anywhere,
   reword the sentence or drop the number. The report lists each such case.
 - **The citation table.** A table of 258 citations, checked at
-  `4c270032`, sits in the session scratchpad. It is a hint only.
+  `4c270032`, sits under `.superpowers/sdd/sweep-docs-drift-2026-10/`. It
+  is a hint only.
 - **Known special cases.** `current-state.md:482` is gone, so drop the
   number. The CSP moved to `packages/web/csp.ts`. The bare `root.tsx`
   means `packages/web/src/areas/studio/root.tsx`. The "palette" entry's
@@ -186,8 +220,8 @@ prefix".
   becomes the line of `if (!tenancy) await initSchema(db);`.
 - **Audit index.** The `sweep-docs-drift-2026-10` entry is the last one
   under "Open from the 2026-10-10 audit". Earlier changes removed their
-  entries outright. Delete this entry and the now-empty section, heading
-  and intro included.
+  entries outright. The archive commit deletes this entry and the
+  now-empty section, heading and intro included.
 - **Runbook anchor.** `docs/runbooks/deployment.md`'s `server.ts:893`
   citation gets the same new line.
 - **Runbook upgrade path.** The paragraph anchored "Re-run the
@@ -197,10 +231,11 @@ prefix".
   tenant. Give the hand-run below instead, once per tenant database.
 
   ```sh
-  DATABASE_URL=<tenant-url> bun -e "await (await import('./src/engine/store.ts')).initSchema()"
+  DATABASE_URL=<tenant-url> bun -e "await (await import('./src/engine/store.ts')).initSchema(); process.exit(0)"
   ```
 - **Proof of the hand-run.** The implementer runs it once against the
-  devcontainer's own database before writing it down.
+  devcontainer's own database before writing it down. The process must
+  exit by itself.
 - **Runbook failure point.** The anchor "fails at startup" becomes "fails
   when the schema step runs".
 

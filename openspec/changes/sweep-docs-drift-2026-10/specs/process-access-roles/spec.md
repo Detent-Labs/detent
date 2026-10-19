@@ -29,4 +29,5 @@ itself. They do not name who reaches one pinned version of it.
 
 - **WHEN** a Developer adds the entry `auth0|42` to a process's Developer list
 - **THEN** the engine stores the entry
-- **AND** an actor whose id is `auth0|42` matches it
+- **AND** an actor whose id is `auth0|42` and who holds `system:developer`
+  matches it
