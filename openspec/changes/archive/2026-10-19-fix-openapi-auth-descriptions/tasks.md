@@ -15,7 +15,7 @@
 
 - [x] 3.1 Run `bun run typecheck` and `bun run build` in the devcontainer.
 - [x] 3.2 Run the full gated suite: `sh scripts/test-gated.sh bun test` with `DATABASE_URL` set.
-- [ ] 3.3 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` and the same pipe into `whitespace.sh`, on the host.
+- [x] 3.3 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` and the same pipe into `whitespace.sh`, on the host.
 
 ## Workflow follow-up
 

@@ -1679,12 +1679,6 @@ of `5f41cd8a`. Each fix change deletes its own entries in the commit that
 archives it, and `sweep-docs-drift-2026-10` re-points the line citations of
 other entries. C-4 merges D-2, and C-6 merges F-6.
 
-- **`fix-openapi-auth-descriptions` (H-1, H-2, H-3; low)**: The file
-  `docs/openapi.yaml` describes `GET /instances` in part, allows a candidate
-  without a claim to submit, which the code refuses, and states other auth
-  rules that lag the code.
-  Anchors: `docs/openapi.yaml`, `src/http/routes.ts`,
-  `src/runtime/internal.ts`.
 - **`sweep-docs-drift-2026-10` (H-4, H-5, H-6, H-7, H-8, H-9, H-10, H-11,
   H-12, A-7, A-9, B-10, B-13, D-9, G-13; medium)**: The authoring guide
   promises that a group change reaches a waiting step, and the guide,
