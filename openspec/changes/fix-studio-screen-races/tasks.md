@@ -14,7 +14,7 @@
 
 - [x] 3.1 In `screens/migrationPlanLogic.ts`, `checkPlan` reports two `fieldMap` rows with one source, two `stepMap` rows with one source, and two `transforms` rows with one target. Every row in a collision gets the error. Set the function's doc comment to the new rule count.
 - [x] 3.2 In `panels/MigrationSpecEditor.tsx`, a transforms row draws its errors the way a map row does: `describedBy`, `invalid` and the error paragraph.
-- [x] 3.3 In `test/studio-migrationPlanLogic.test.ts`, add one test per new rule that rejects a colliding pair, and one test that passes two distinct rows. Verify with the full suite in group 5.
+- [x] 3.3 In `test/studio-migrationPlanLogic.test.ts`, add one test per new rule that rejects a colliding pair. Add one test that passes two distinct rows. Verify with the full suite in group 5.
 
 ## 4. Templates: confirm a replacement (E1-10)
 
