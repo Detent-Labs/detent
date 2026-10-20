@@ -19,8 +19,8 @@ published at <https://spdx.org/licenses/> (e.g. `.../MIT.html`,
 ## Container images
 
 Pulled by `docker/engine.Dockerfile`, `docker/frontend.Dockerfile`, and
-`scripts/dev-pod.sh` (the Pod spec it generates). Not npm packages, so `bun.lock` does not
-list them.
+`scripts/dev-pod.sh` (the Pod spec it generates). Not npm packages, so
+`bun.lock` does not list them.
 
 ### Base images for the shipped production containers
 

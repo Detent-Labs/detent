@@ -160,12 +160,13 @@ test("two worktrees sharing a directory basename under different parents derive 
 });
 
 /** `sh scripts/dev-pod.sh spec` run in `cwd`: the raw text and its parse. */
-async function podSpec(cwd: string): Promise<{ text: string; pod: any }> {
+async function podSpec(cwd: string): Promise<{ text: string; pod: any; stderr: string }> {
   const proc = Bun.spawn(["sh", POD_SCRIPT, "spec"], { cwd, env: { ...process.env }, stdout: "pipe", stderr: "pipe" });
   const exitCode = await proc.exited;
   const text = await new Response(proc.stdout).text();
-  if (exitCode !== 0) throw new Error(`dev-pod.sh spec in ${cwd} failed: ${await new Response(proc.stderr).text()}`);
-  return { text, pod: Bun.YAML.parse(text) };
+  const stderr = await new Response(proc.stderr).text();
+  if (exitCode !== 0) throw new Error(`dev-pod.sh spec in ${cwd} failed: ${stderr}`);
+  return { text, pod: Bun.YAML.parse(text), stderr };
 }
 
 function container(pod: any, name: string): any {
@@ -188,6 +189,12 @@ test("the main checkout's spec names the pod workflow-engine", async () => {
   expect(pod.kind).toBe("Pod");
   expect(pod.metadata.name).toBe("workflow-engine");
   expect(pod.spec.containers.map((c: any) => c.name).sort()).toEqual(["app", "db", "mailpit"]);
+});
+
+test("generating the spec writes nothing to stderr (a backtick in a heredoc comment would run as a command)", async () => {
+  const main = await mainRepo();
+  const { stderr } = await podSpec(main);
+  expect(stderr).toBe("");
 });
 
 test("the spec carries the derived PORT_VITE, and CORS_ALLOWED_ORIGINS carries both localhost forms", async () => {

@@ -82,8 +82,8 @@ spec:
           value: $(q workflow-engine@example.test)
         # The http.request egress policy; unset denies every outbound target.
         # localhost:8080 is scripts/dev-webhook-sink.ts, the target of
-        # examples/expense-approval.json's `book` and `escalated_review` steps
-        # and examples/purchase-requisition.json's `issue_po` step. A change
+        # examples/expense-approval.json's 'book' and 'escalated_review' steps
+        # and examples/purchase-requisition.json's 'issue_po' step. A change
         # that points an example or a script at a new host adds it here in the
         # same commit.
         - name: $(q HTTP_ACTION_ALLOWED_HOSTS)
@@ -111,8 +111,9 @@ spec:
       image: $(q docker.io/library/postgres:latest)
       imagePullPolicy: $(q IfNotPresent)
       # args, not command, so the image's entrypoint still runs initdb on a
-      # fresh volume. A runtime GUC, applied on every start whenever the
-      # volume was first initialized. Every timestamp column is timestamptz
+      # fresh volume. A runtime GUC override, not an initdb-time default: it
+      # takes effect on every start regardless of when the volume was first
+      # initialized. Every timestamp column is timestamptz
       # (src/engine/store.ts), an absolute UTC instant either way; this changes
       # only how the server logs and untyped-timestamp casts display.
       args: [$(q postgres), $(q -c), $(q log_timezone=Europe/Zurich), $(q -c), $(q timezone=Europe/Zurich)]
@@ -131,8 +132,8 @@ spec:
           value: $(q --auth-host=scram-sha-256)
       # Floating image tag on purpose: pre-1.0 tracks the latest release.
       # The mount is the parent of PGDATA, not PGDATA itself, so a major bump
-      # lands its own `<major>/docker` subdirectory inside this volume. A
-      # mount on `.../data` makes the next major exit 1 at startup; the data
+      # lands its own '<major>/docker' subdirectory inside this volume. A
+      # mount on '.../data' makes the next major exit 1 at startup; the data
       # is not lost, but the pod will not come up.
       volumeMounts:
         - name: $(q pgdata)
