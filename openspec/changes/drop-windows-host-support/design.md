@@ -6,9 +6,9 @@ See proposal.md for the motivation. Measured on 2026-10-20, with
 `git grep -i` over the tree outside `openspec/changes/archive` and the two
 history documents. The Windows references fall into three kinds:
 
-1. **Host support.** `scripts/dev-up.ps1` and `scripts/preflight.ps1`, the
-   README sentences that point at them and at Git Bash, the CLAUDE.md
-   convention for the Windows permission analyzer, and the MSYS clause in
+1. **Host support.** `scripts/dev-up.ps1` and `scripts/preflight.ps1`. The
+   README sentences that point at them and at Git Bash. The CLAUDE.md
+   convention for the Windows permission analyzer. The MSYS clause in
    CLAUDE.md's whitespace explanation.
 2. **A Windows rationale for a rule that still holds.** The `127.0.0.1`
    address in `docs/browser-checks.md`, in the CORS comment in
@@ -39,16 +39,16 @@ history documents. The Windows references fall into three kinds:
 - Check 6. The user ruled on 2026-10-20 that it gets its own change after
   `devcontainer-on-podman` archives. Its Windows branch stays until then.
 - Any UI file. `CanvasBar.tsx`'s comment is a measurement record, and a UI
-  edit would pull in the design-skill process for no behavior change.
+  change would pull in the design-skill process for no behavior change.
 
 ## Decisions
 
 ### D1. Keep the analyzer convention, drop its Windows parts
 
-The CLAUDE.md bullet "No `cd` prefix, no shell variable, and no
-whitespace-only argument" opens with "On this Windows host the permission
-analyzer reads every operand as a possible path". Its three sub-rules each
-name an analyzer message. They are:
+The CLAUDE.md bullet has the title "No `cd` prefix, no shell variable, and
+no whitespace-only argument". It opens with "On this Windows host the
+permission analyzer reads every operand as a possible path". Each of its three
+sub-rules names an analyzer message. They are:
 
 - `Contains simple_expansion`
 - the "cd-compound" refusal
@@ -57,8 +57,8 @@ name an analyzer message. They are:
 Only the third is Windows-specific: Cygwin exists only there. The first two
 come from Claude Code's own check on compound shell commands, which runs on
 every platform. This session ran in bypass-permissions mode, where that check
-does not run, so its prompt-free use of `cd` chains and variables proves
-nothing either way.
+does not run. Its prompt-free use of `cd` chains and variables therefore
+proves nothing either way.
 
 The bullet stays with a platform-neutral lead-in and its first two
 sub-rules. The Cygwin sub-rule goes, and with it "and no whitespace-only

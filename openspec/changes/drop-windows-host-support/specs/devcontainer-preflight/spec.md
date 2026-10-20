@@ -5,7 +5,7 @@
 ### Requirement: Both bring-up scripts carry the same preflight contract
 
 **Reason**: It binds `scripts/preflight.ps1` and `scripts/dev-up.ps1` to the
-shell scripts. Both PowerShell entry points are deleted with Windows host
+shell scripts. This change deletes both PowerShell entry points with Windows host
 support. Its idempotency rule carries over unchanged into "The bring-up and
 the preflight stay idempotent".
 
@@ -14,7 +14,7 @@ the preflight stay idempotent".
 
 ### Requirement: The PowerShell bring-up script delegates its flow to the shell script
 
-**Reason**: `scripts/dev-up.ps1` is deleted with Windows host support.
+**Reason**: This change deletes `scripts/dev-up.ps1` with Windows host support.
 
 **Migration**: Run `bash scripts/dev-up.sh` directly.
 

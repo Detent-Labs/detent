@@ -37,7 +37,7 @@ Each of these costs a reader time and states something false about this host.
     the repository's content, not the host.
   - The CR check in the whitespace gate and `.gitattributes`' `eol=lf`.
   - Portability notes inside gate scripts.
-  - Measurement records that name the browser and OS they were taken on.
+  - Measurement records that name the browser and OS of the measurement.
   - The generated `openspec-onboard` skill.
 
 ## Capabilities
@@ -48,13 +48,13 @@ None.
 
 ### Modified Capabilities
 
-- `devcontainer-preflight`: the two requirements about the PowerShell
-  delegators are removed. The idempotency rule one of them carried survives
-  as a requirement of its own.
-- `development-toolchain`: "The devcontainer permits every frontend dev
-  origin" and "The manual checklist states its address and its one conflict"
-  justify the `127.0.0.1` address by the loopback binding instead of by
-  Windows.
+- `devcontainer-preflight`: the change removes the two requirements about
+  the PowerShell delegators. The idempotency rule one of them carried
+  survives as a requirement of its own.
+- `development-toolchain`: two requirements justify the `127.0.0.1` address
+  by the loopback binding instead of by Windows:
+  - "The devcontainer permits every frontend dev origin"
+  - "The manual checklist states its address and its one conflict"
 
 ## Impact
 
@@ -62,5 +62,5 @@ None.
 - Docs: `README.md`, `CLAUDE.md`, `docs/browser-checks.md`.
 - Comment: `scripts/dev-pod.sh`.
 - Ordering: stacks on `rename-devcontainer-dir`. The manual-checklist delta
-  is written against the text `devcontainer-on-podman` leaves behind, so
-  this change archives after both.
+  targets the text `devcontainer-on-podman` leaves behind, so this change
+  archives after both.
