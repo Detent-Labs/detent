@@ -13,7 +13,7 @@
  * Reader match needs no role at all. The identity check is deliberately kept
  * separate from `actorPrincipals` (which folds `actor.roles` into the same
  * set as the id and groups): `process_access_roles.principal` only ever
- * holds a `user_xxx`/`group_xxx` id, never a role string, so mixing roles
+ * holds a non-empty actor id or group id, never a role string, so mixing roles
  * into the set being matched against the list would blur "matched by
  * identity" and "holds the required role" into one check where this function
  * needs them kept apart.

@@ -10,6 +10,7 @@ import { deriveKey, shouldAutoDeriveKey } from "../draft/deriveKey.js";
 import { ContentLocaleBadge, AddLocaleControl } from "./shared/ContentLocaleSwitcher.js";
 import { LocalizedTextInput } from "./shared/LocalizedTextInput.js";
 import { IssueList } from "./shared/IssueList.js";
+import { KeyCaption } from "./shared/KeyCaption.js";
 import { useConfirmDialog } from "./shared/confirmDialog.js";
 import { checksDotState, groupChecksBySource } from "../draft/checksRail.js";
 import { publishAvailability, nextVersionLabel } from "../screens/draftToolbarState.js";
@@ -902,7 +903,7 @@ export function ProcessHeaderBar({
               <div {...stylex.props(styles.headerBarMenuGroupFirst)}>
                 <span {...stylex.props(styles.headerBarMenuLabel)}>{t("headerBar.menuGroupDraft")}</span>
                 <label {...stylex.props(styles.headerBarMenuRow)}>
-                  key
+                  <KeyCaption text={t("headerBar.keyCaption")} jsonKey="key" />
                   <input
                     type="text"
                     disabled={!structureActive}
@@ -919,7 +920,7 @@ export function ProcessHeaderBar({
                     precedes the first localized value it governs (same
                     ordering the old ProcessHeader fieldset used). */}
                 <label {...stylex.props(styles.headerBarMenuRow)}>
-                  baseLocale
+                  <KeyCaption text={t("headerBar.baseLocaleCaption")} jsonKey="baseLocale" />
                   <input
                     type="text"
                     disabled={!structureActive}

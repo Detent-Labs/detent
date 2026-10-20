@@ -172,8 +172,10 @@ export const STATIC_ASSIGNMENT_STRATEGY_TYPE = "static";
  * landed: a strategy used to reach the shared pool itself. Under one database
  * per tenant a handle bound when the registry was built resolves every tenant's
  * manager against one directory, and the wrong actor lands in the wrong inbox.
- * It is a plain handle, never a transaction: resolution runs before the entry's
- * own transaction opens on three of its four paths.
+ * It is a plain handle on most paths: resolution runs before the entry's own
+ * transaction opens. Two paths pass their locked transaction instead,
+ * `submitAndTransition` in `src/runtime/instances.ts` and the subprocess
+ * return. There the resolver's query runs on the transaction's own connection.
  */
 export interface AssignmentContext {
   config: Record<string, unknown>;
@@ -197,7 +199,7 @@ export function createAssignmentRegistry(): AssignmentRegistry {
 export const staticAssignmentConfigSchema = z.object({ candidates: z.array(z.string()) });
 
 /** The built-in `static` entry: its configured list, verbatim, with no CEL evaluation and no dynamic lookup. */
-export const staticAssignmentStrategyDef: AssignmentStrategyDef = {
+const staticAssignmentStrategyDef: AssignmentStrategyDef = {
   configSchema: staticAssignmentConfigSchema,
   resolve: async (ctx) => (ctx.config as { candidates?: string[] }).candidates ?? [],
 };
@@ -230,9 +232,9 @@ function resolutionTimeoutMs(): number {
  * What `resolveStepAssignment` answers: the state to write, plus the reason it
  * produced no candidate. The CALLER records that reason as an
  * `assignment.unresolved` event, inside the transaction committing the entry.
- * This function holds no transaction handle and, on three of the four paths,
- * runs before one opens — appending here could commit an event beside a
- * rolled-back entry.
+ * This function opens no transaction of its own. Most paths call it before the
+ * entry's transaction opens, and the two locked paths pass theirs in as `db`.
+ * Appending here could commit an event beside a rolled-back entry.
  */
 export interface ResolvedAssignment {
   assignment: Instance["assignment"];
@@ -262,14 +264,15 @@ export interface ResolvedAssignment {
  * publish-time `checkAssignmentRegistry` already rejects one, so this is
  * defensive only, mirroring `resolveFields`' unresolved-ref handling.
  *
- * The deadline bounds every path, which is what makes the subprocess return's
- * carve-out safe. That one path resolves while holding the parent's row lock,
- * since it derives the step it enters from the row it read `FOR UPDATE`, so an
- * unbounded resolver there would hold the lock against every other writer of
- * that instance. `Promise.race` does not cancel the loser and does not need to:
- * the orphaned query holds a different pool connection, so the caller returns
- * and its transaction commits and releases the lock on time. A late answer is
- * ignored.
+ * The deadline bounds every path, including the two that resolve while holding
+ * the instance's row lock. `submitAndTransition` in `src/runtime/instances.ts`
+ * passes its locked transaction. The subprocess return passes its own too,
+ * since it derives the step it enters from the row it read `FOR UPDATE`. On
+ * both, the resolver's query runs on the transaction's own connection.
+ * `Promise.race` does not cancel the loser. The deadline returns control to the
+ * caller, and a late answer is ignored. Nobody has measured what the orphaned
+ * query does to the lock's duration; `docs/decisions.md` records that open
+ * question.
  */
 export async function resolveStepAssignment(
   step: Step,

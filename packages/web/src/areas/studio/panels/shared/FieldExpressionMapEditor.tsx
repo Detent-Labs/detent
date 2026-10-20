@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { Expression, FieldId } from "workflow-engine/schema";
 import type { DraftOf } from "../../draft/types";
 import { t } from "../../catalog.js";
@@ -14,7 +15,7 @@ import {
 } from "./fieldExpressionMapLogic";
 
 interface FieldExpressionMapEditorProps {
-  legend: string;
+  legend: ReactNode;
   addLabel: string;
   removeLabel: string;
   placeholder?: string;

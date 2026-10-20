@@ -179,7 +179,7 @@ export async function groupNamesForIds(groupIds: string[], db: SQL = sql): Promi
  * unprecedented `?` existence operator. An absent or empty `allowedGroups`
  * array yields no match, the same as a plain string array.
  */
-export async function referencingPublishedProcesses(groupId: string, db: SQL = sql): Promise<string[]> {
+async function referencingPublishedProcesses(groupId: string, db: SQL = sql): Promise<string[]> {
   const rows = (await db`
     SELECT process_id AS "processId"
     FROM definitions

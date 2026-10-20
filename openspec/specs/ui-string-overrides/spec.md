@@ -169,6 +169,15 @@ This holds for a rebuilt screen exactly as it holds for a new one. A string
 carried over from a screen's earlier version SHALL keep its key or take a new
 one. It SHALL NOT become a literal on the way.
 
+A field caption is author-facing text. It SHALL read as plain words from the
+catalog. A caption can name a JSON property of the definition. The
+property's name SHALL then follow the plain words in the mono face. That name
+is an engine value and has no catalog key.
+
+A validation message, a warning and a badge are author-facing text too. Each
+SHALL be one whole catalog sentence, with any number or name filled into a
+placeholder.
+
 Two kinds of text are outside this rule. Authored content belongs to the
 draft and follows `authored-content-localization`. That kind covers a field
 label, a process name and a step name. The second kind is an engine value
@@ -192,6 +201,26 @@ such values, and neither carries a catalog key of its own.
 - **WHEN** a studio screen renders a draft's own field label
 - **THEN** that text comes from the draft, not from the studio catalog, and
   the override mechanism does not cover it
+
+#### Scenario: A caption names its JSON property in mono
+
+- **WHEN** an author opens an automatic path on the Paths tab
+- **THEN** the priority input's caption reads the catalog's plain words
+- **AND** the property name `priority` follows them in the mono face
+
+#### Scenario: A plugin config message is a catalog sentence
+
+- **WHEN** a plugin config field declares a minimum length of 3
+- **AND** an author enters two characters
+- **THEN** the message under the field is the catalog sentence for a minimum
+  length, with 3 filled in
+
+#### Scenario: A literal caption in a studio panel fails the suite
+
+- **WHEN** a developer adds a text node or a literal caption to a studio
+  panel component
+- **AND** the text is not a named machine value
+- **THEN** the full test suite fails and names the file and the text
 
 ### Requirement: The override read stops after five seconds
 

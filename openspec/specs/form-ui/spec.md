@@ -675,36 +675,24 @@ compiled or hand-written, SHALL select on it.
 - **AND** no compiled or hand-written rule in the bundle selects on a
   `data-columns` or `data-span` attribute
 
-### Requirement: Path-submit buttons accept a style prop for their wrapper
+### Requirement: Path-submit buttons keep their own wrapper layout
 
-`PathButtons` SHALL accept an optional style prop for its wrapper
-element. It composes after the component's own default wrapper style. A
-caller MAY thereby extend or override that layout, so `form-ui` need not
-declare a variant on its own behalf. This prop does not touch the button
-element's className.
+`PathButtons` SHALL draw its wrapper with the layout `form-ui` declares for
+it. It SHALL take no prop that changes that layout.
 
-`PathButtons`' button element SHALL keep a plain, literal className for
-the shared control style it does not own. `form-ui` SHALL NOT declare a
-compiled style for that class.
+Its button element SHALL keep a plain, literal class name for the shared
+control style. `form-ui` SHALL NOT declare a compiled style for that class.
 
-#### Scenario: A caller extends the wrapper's style
+#### Scenario: The wrapper uses the form-ui layout
 
-- **WHEN** a caller renders `PathButtons` and passes a style
-- **THEN** the rendered wrapper carries both the component's own compiled
-  style and the caller's, with the caller's applied after it
+- **WHEN** a caller renders `PathButtons`
+- **THEN** the wrapper carries the compiled layout `form-ui` declares, and
+  no other style
 
-#### Scenario: The default wrapper needs no caller-supplied style
-
-- **WHEN** a caller renders `PathButtons` with no style prop
-- **THEN** the wrapper renders with `form-ui`'s own default layout, exactly
-  as it did before this change
-
-#### Scenario: The button's shared control class stays literal
+#### Scenario: The button's control class stays literal
 
 - **WHEN** `PathButtons` renders a submit button
-- **THEN** the button element carries the same literal control className
-  it carried before this change
-- **AND** the new style prop leaves that className unaffected
+- **THEN** the button element carries the literal `btn btn-primary` class
 
 ### Requirement: A standalone boolean checkbox renders at its intrinsic size, flush left
 
