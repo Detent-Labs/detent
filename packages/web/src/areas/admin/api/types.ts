@@ -5,7 +5,7 @@ export type { LocalizedText, LocaleCode };
 
 export type InstanceStatus = "running" | "completed" | "cancelled" | "faulted";
 
-export type InstanceKind = "published" | "test";
+type InstanceKind = "published" | "test";
 
 /** Mirrors src/runtime/api.ts::InstanceSummary — never the `data` payload. */
 export interface InstanceSummary {
@@ -209,7 +209,7 @@ export interface DataListPage {
  * new option lists but still resolves for an instance that holds it, which is
  * why the editor marks it rather than hiding it.
  */
-export interface DataListValue {
+interface DataListValue {
   value: string;
   label: Record<string, string>;
   /** One entry per declared column the value fills, typed by that column. */

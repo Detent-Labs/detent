@@ -3,7 +3,7 @@
  * (give-the-example-a-reachable-target). Answers every request with `200`
  * and echoes the JSON request body back as the response body, so an
  * `Action.output` expression reads a value the process definition itself
- * sent. `GET /healthz` is answered by the same catch-all.
+ * sent.
  *
  * Run inside the devcontainer:
  *   bun run scripts/dev-webhook-sink.ts

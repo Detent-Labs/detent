@@ -41,7 +41,7 @@ export class TenantUnreachable extends Error {
   }
 }
 
-export interface TenantConnections {
+interface TenantConnections {
   /** The handle for `key`, opening it on first use. Raises `UnknownTenant` or `TenantUnreachable`. */
   handleFor: (key: string) => Promise<SQL>;
   /** Every currently-listed tenant, with its handle. Skips one whose database refuses. */

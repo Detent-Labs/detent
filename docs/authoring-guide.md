@@ -53,8 +53,8 @@ The example has key `expense_approval`, label `Expense Approval`, and
 
 A process may declare `cancellable: false` to prevent participant-initiated
 cancellation of running instances. Where absent, the default is `true`. This
-blocks only participants; operators and actors with reserved roles remain
-authorized regardless.
+blocks only participants. An actor holding `system:cancel-any`, or a `cancel`
+grant over the process, can still cancel.
 
 Publishing adds a hidden final step that receives cancellations, so write the
 body without one. A body that carries such a step other than the exact one
@@ -552,7 +552,8 @@ A step may declare `cancellable` to override the process-wide default for that
 step alone. A step that declares nothing inherits the process's value. A
 step may be more permissive (step `true` on a process `false`) or more
 restrictive (step `false` on a process `true`). This governs participant
-cancellation only; operators and reserved roles remain authorized regardless.
+cancellation only. An actor holding `system:cancel-any`, or a `cancel` grant
+over the process, can still cancel.
 
 ### View
 
@@ -920,7 +921,9 @@ a forcing timer that takes the `escalate` path, and `book` carries one at `P1D`
 that takes `booking-failed`.
 
 A duration uses weeks, days, hours, minutes and seconds. Months and years are
-not allowed, because their length depends on the calendar.
+not allowed, because their length depends on the calendar. A day is exactly 24
+hours and a week exactly 168. Across a daylight-saving switch, a `P1D` timer
+therefore fires one hour off the wall-clock time it started at.
 
 Studio words a `duration` as a **Time limit**. That control reads a number and
 a unit, over hours, days and weeks. It writes the ISO-8601 string the body
@@ -1054,7 +1057,7 @@ Your installation may list no template. Somebody holding `system:templates`
 creates them on Studio's **Templates** screen, from a published version of a
 process.
 
-Studio's own area nav carries **Save**, **Discard draft** and **Publish**.
+Studio's own header bar carries **Save**, **Discard draft** and **Publish**.
 Those three stand there whatever you have open.
 
 A draft opens on one screen. A tab row over the body holds eleven tabs.
@@ -1138,7 +1141,7 @@ own column count, and it answers no click. Under the fields it draws one
 control per manual path, so you read the buttons a participant will press.
 
 The editor writes into the draft as you work. It has no Save button of its
-own: the area nav's Save, Discard draft and Publish still govern what
+own: the header bar's Save, Discard draft and Publish still govern what
 persists.
 
 An end step usually shows a readonly summary. A step early in the process
@@ -1214,9 +1217,11 @@ Use delegation for the one-off case.
 member list of one group, an operator administers on the admin Groups screen.
 Its config carries one key, `groupId`.
 
-Unlike the two strategies above, this list is NOT frozen at step entry. A
-membership change made after the instance enters the step still reaches it,
-with no republish.
+Like the two strategies above, this list resolves at step entry. A
+membership change reaches the next entry with no republish. An instance
+already waiting keeps the list it entered with. For a one-off change, use
+delegation or send the instance through the step again. The
+`group-based-assignment` capability states the rule.
 
 Declare the group's id in the process's own `allowedGroups` list too. A
 `groupId` a step references that is missing from `allowedGroups` fails at

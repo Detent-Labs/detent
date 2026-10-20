@@ -47,7 +47,7 @@ interface LooseBody {
 
 const LOADING: TargetCatalogState = { catalog: undefined, error: false };
 
-export function flattenFields(fields: LooseField[]): LooseField[] {
+function flattenFields(fields: LooseField[]): LooseField[] {
   return fields.flatMap((f) => [f, ...(f.fields ? flattenFields(f.fields) : [])]);
 }
 

@@ -17,6 +17,18 @@ describe("unknownListKeyWarning", () => {
     expect(warning).toContain("ghost");
   });
 
+  it("is the catalog sentence with the list key filled in", () => {
+    expect(unknownListKeyWarning(DB_LIST_TYPE, { listKey: "ghost" }, ["cost_centres"])).toBe(
+      "The server has no data list 'ghost'. Publishing still works. The field's options stay empty until an operator creates the list.",
+    );
+  });
+
+  it("leaves no placeholder behind and keeps a dollar sign in the key literal", () => {
+    const warning = unknownListKeyWarning(DB_LIST_TYPE, { listKey: "a$&b" }, [])!;
+    expect(warning).toContain("'a$&b'");
+    expect(warning).not.toContain("{");
+  });
+
   it("says nothing about a key the server reports", () => {
     expect(unknownListKeyWarning(DB_LIST_TYPE, { listKey: "cost_centres" }, ["cost_centres"])).toBeUndefined();
   });
