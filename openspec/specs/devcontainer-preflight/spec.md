@@ -33,7 +33,7 @@ to change, and the line it needs.
 - **WHEN** check 3 fails because the server process carries no
   `AUTH_JWT_SECRET`
 - **THEN** the output names the command that restarts the server with the
-  secret from `.devcontainer/.auth-secret`
+  secret from `container/.auth-secret`
 
 #### Scenario: A port that does not answer
 

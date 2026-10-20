@@ -17,7 +17,9 @@ health. It also covers how configuration reaches it: runtime environment
 variables for the engine, build arguments for the frontends. Vite inlines
 its env at build time, so a container runtime env var would arrive too
 late to matter.
+
 ## Requirements
+
 ### Requirement: The engine image runs a production build with no development dependencies
 
 `docker/engine.Dockerfile` SHALL install workspace dependencies with `bun
@@ -225,7 +227,7 @@ name that occurs below the root as well SHALL therefore carry the `**/` prefix.
 This covers `**/node_modules`, `**/dist`, `**/.git`, `**/test` and `**/.env`.
 The bare form of any of these is an error, whatever else the file holds.
 
-The file SHALL also exclude four root-only paths: `.devcontainer`, `docs`,
+The file SHALL also exclude four root-only paths: `container`, `docs`,
 `openspec`, and the scratch directory `tmp`. It SHALL exclude the two agent
 worktree roots, `.claude` and `.worktrees`. Each of those holds a full copy of
 the source per running agent. A context that keeps them varies by machine
@@ -241,7 +243,7 @@ out of a published image.
 - **WHEN** `docker build` runs for the engine image or the frontend image
 - **THEN** the build context holds none of `node_modules`, `dist`, `.git`,
   `test` or `.env` at any depth
-- **AND** it holds none of `.devcontainer`, `docs`, `openspec`, `tmp`,
+- **AND** it holds none of `container`, `docs`, `openspec`, `tmp`,
   `.claude` or `.worktrees` at the root
 
 #### Scenario: A nested dependency directory

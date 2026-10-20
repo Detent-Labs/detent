@@ -6,6 +6,7 @@
 Defines the project's standard runtime, package manager, test runner and
 typecheck tool. Also defines how a contributor installs, tests, typechecks and
 builds the project.
+
 ## Requirements
 
 ### Requirement: Bun is the standard toolchain
@@ -348,7 +349,7 @@ as `push-gate-checks` specifies.
 
 Two properties come with it. `DATABASE_URL` is already set there, so the
 DB-backed suites run instead of skipping. The Bun version is the one
-`BUN_VERSION` pins in `.devcontainer/Dockerfile`, so a push cannot pass under
+`BUN_VERSION` pins in `container/Dockerfile`, so a push cannot pass under
 a different runtime than the project's.
 
 The silent-skip hazard is why placement matters. The DB-backed suites are
