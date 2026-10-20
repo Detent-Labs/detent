@@ -34,8 +34,8 @@
 
 ## 6. Fresh bring-up on the host
 
-- [ ] 6.1 Remove what the Compose-era stack left on this machine: the `workflow-engine_pgdata` volume and any remaining `workflow-engine-*-1` container or `workflow-engine_default` network. Then run `sh scripts/dev-pod.sh down`, remove the `workflow-engine-pgdata` volume, and run `bash scripts/dev-up.sh` once, from no pod and no volume. Verify that the first run exits 0 and that `preflight (serve): all checks passed` prints.
-- [ ] 6.2 Verify the published addresses from the host: `curl` on `127.0.0.1:$PORT_APP/livez` and `127.0.0.1:$PORT_MAILPIT/` both answer 200, and `ss -ltn` shows those ports bound on `127.0.0.1` only.
+- [x] 6.1 Remove what the Compose-era stack left on this machine: the `workflow-engine_pgdata` volume and any remaining `workflow-engine-*-1` container or `workflow-engine_default` network. Then run `sh scripts/dev-pod.sh down`, remove the `workflow-engine-pgdata` volume, and run `bash scripts/dev-up.sh` once, from no pod and no volume. Verify that the first run exits 0 and that `preflight (serve): all checks passed` prints.
+- [x] 6.2 Verify the published addresses from the host: `curl` on `127.0.0.1:$PORT_APP/livez` and `127.0.0.1:$PORT_MAILPIT/` both answer 200, and `ss -ltn` shows those ports bound on `127.0.0.1` only.
 
 ## 7. Verification
 
