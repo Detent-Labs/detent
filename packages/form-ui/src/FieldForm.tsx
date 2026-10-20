@@ -288,7 +288,7 @@ const NATIVE_INPUT_TYPE: Record<string, string | undefined> = {
 };
 
 /** Separates an option's label from its attributes, and each attribute from the next. */
-export const OPTION_ATTRIBUTE_SEPARATOR = " · ";
+const OPTION_ATTRIBUTE_SEPARATOR = " · ";
 
 /**
  * An option's visible text: its label, then the attribute values its data-list

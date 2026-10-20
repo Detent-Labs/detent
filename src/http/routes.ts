@@ -580,10 +580,11 @@ export async function handleCancel(instanceId: string, req: Request, resolver: A
  *
  * These sit under `/instances/:instanceId/visibility*` rather than `/admin/*`
  * on purpose. The `authorization` capability states that every `/admin/*`
- * route calls `requireRole` with `ADMIN_ROLE`, and these three call
- * `requirePermission` with the process-scoped `"visibility"` instead — the
- * same shape `handleCancel` above already uses. Putting them under `/admin/*`
- * would contradict that rule for no gain.
+ * route calls `requireRole` with `ADMIN_ROLE`, except the data list routes,
+ * which take `DATALISTS_ROLE`. These three call `requirePermission` with the
+ * process-scoped `"visibility"` instead — the same shape `handleCancel` above
+ * already uses. Putting them under `/admin/*` would contradict that rule for
+ * no gain.
  *
  * The gate lives in the Runtime API Layer, not here, because the permission
  * names a process and only the loaded instance knows which one.
@@ -633,8 +634,8 @@ export async function handleGrantVisibility(instanceId: string, req: Request, re
  *
  * Resolves the actor through the same `ActorResolver` seam every other route
  * uses, and additionally requires the `"publish"` permission on the resolved
- * actor (`src/auth/authorize.ts`), which maps to `PUBLISH_ROLE` today —
- * publish carries no other use for the actor value.
+ * actor (`src/auth/authorize.ts`), which maps to `PUBLISH_ROLE` or a stored
+ * publish grant for the process.
  *
  * A process that already has a draft or a published version also needs
  * `ADMIN_ROLE` or a Developer list match, as `POST /drafts/:processId/publish`
@@ -667,8 +668,8 @@ export async function handlePublish(
       throw new RequestShapeError("request body must be { processId: string, body: ProcessBody }");
     }
     // The shape check proves only that this is a string; the `proc_` prefix is
-    // publishBody's to enforce. `can` ignores the value today, and a scoped
-    // grant later must not read it as an id the store already holds.
+    // publishBody's to enforce. `can` reads the value as an untrusted id: a
+    // lookup over an unknown id answers false.
     const processId = parsed.processId as ProcessId;
     await requirePermission(actor, "publish", processId, db);
     // The list check also reports whether this is a first publish (no draft, no

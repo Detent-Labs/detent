@@ -14,7 +14,7 @@ export function buildRunConfirmation(processId: string, fromVersion: number, toV
   return tFill(locale, "migrations.runConfirm", { process: processId, from: fromVersion, to: toVersion });
 }
 
-export interface MigrationBucket {
+interface MigrationBucket {
   key: keyof MigrationResult;
   label: string;
   ids: string[];

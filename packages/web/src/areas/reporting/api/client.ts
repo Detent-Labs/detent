@@ -68,14 +68,6 @@ export async function updateReport(reportId: string, patch: ReportPatch, token: 
   return (await res.json()) as Report;
 }
 
-export async function deleteReport(reportId: string, token: string): Promise<void> {
-  await request(`/reporting/reports/${encodeURIComponent(reportId)}`, token, { method: "DELETE" });
-}
-
-export function executeReport(reportId: string, token: string): Promise<ReportExecutionResult> {
-  return get(`/reporting/reports/${encodeURIComponent(reportId)}/table`, token);
-}
-
 /** The raw CSV bytes as a `Blob`, auth carried on the bearer header — a plain `<a href>` cannot, so the caller drives the download itself. */
 export async function downloadReportCsv(reportId: string, token: string): Promise<Blob> {
   const res = await request(`/reporting/reports/${encodeURIComponent(reportId)}/table.csv`, token);

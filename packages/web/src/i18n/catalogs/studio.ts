@@ -1,12 +1,13 @@
 /**
- * UI-chrome only (proposal.md scope): headings, buttons, empty-state prose,
- * badges, explanatory hints. Deliberately NOT translated: raw contract
- * vocabulary shown as a bare field label ("key", "label", "type", "guard",
- * "versionBinding", "visible"/"required"/"readonly"/"group", ...) and
- * literal schema enum values ("manual", "automatic", "task", "subprocess") —
- * translating those would decouple the on-screen word from the JSON
- * property/value it names, which defeats the point for a structural JSON
- * editor.
+ * Every author-facing string on a studio screen: headings, buttons, empty-state
+ * prose, captions, legends, validation messages, warnings and badges.
+ * Deliberately NOT translated: literal schema enum values ("manual",
+ * "automatic", "task", "subprocess") that an option prints as its own value.
+ *
+ * A field caption reads as plain words from this catalog. When it names a JSON
+ * property of the definition, the property's name follows the plain words in
+ * the mono face, through `panels/shared/KeyCaption.tsx`. That name is an engine
+ * value and has no key here (`ui-string-overrides`).
  *
  * The guided-vocabulary layer (`studio-guided-vocabulary`) carves out the
  * authoring controls an author with no JSON meets: a step's kind, its
@@ -216,6 +217,11 @@ export const en = {
   "dataSources.removeDialogCancel": "Cancel",
   "dataSources.pickListKey": "Pick a data list",
   "dataSources.dataListLabel": "data list",
+  "dataSources.keyCaption": "Key",
+  "dataSources.pluginLegend": "Data source plugin",
+  // `{list}` is the data list key the draft names.
+  "dataSources.unknownListWarning":
+    "The server has no data list '{list}'. Publishing still works. The field's options stay empty until an operator creates the list.",
 
   "instanceQuery.process": "target process",
   "instanceQuery.pickProcess": "-- select a process --",
@@ -251,6 +257,9 @@ export const en = {
   "steps.crossProcessLegend": "cross-process check (checkSubprocessChildRefs)",
   "steps.crossProcessChecked": "checked against loaded child —",
   "steps.unload": "unload",
+  "steps.onEntryLegend": "Actions on entry",
+  "steps.onExitLegend": "Actions on exit",
+  "steps.onCancelLegend": "Actions on cancel",
   "steps.loadChildError": "failed to load child process JSON",
   "steps.pathsHeading": "Paths",
   "steps.timersHeading": "Timers",
@@ -268,6 +277,11 @@ export const en = {
   "paths.manualGuardNote": "The participant sees this path's button only while the condition holds.",
   "paths.manualGuardHint": "guard (leave empty to always offer this path)",
   "paths.automaticGuardHint": "guard (omit for the default/else path)",
+  "paths.labelCaption": "Label",
+  "paths.keyCaption": "Key",
+  "paths.toCaption": "Goes to",
+  "paths.priorityCaption": "Order among automatic paths",
+  "paths.onPathLegend": "Actions when the path fires",
 
   "timers.empty": "No timers.",
   "timers.addTimer": "+ Add timer",
@@ -275,6 +289,11 @@ export const en = {
   "timers.durationOption": "A time limit",
   "timers.deadlineOption": "A deadline a condition computes (CEL)",
   "timers.reminderOption": "(reminder — no transition)",
+  "timers.descriptionCaption": "Description",
+  "timers.kindCaption": "When it fires",
+  "timers.deadlineCaption": "Deadline (CEL)",
+  "timers.targetPathCaption": "Path it takes when it fires (skips that path's condition)",
+  "timers.onFireActionsLegend": "Actions when it fires",
 
   // The time-limit control: a number and a unit over `Timer.duration`
   // (`studio-guided-vocabulary`). It writes the ISO-8601 duration the
@@ -416,6 +435,10 @@ export const en = {
   "subprocess.processLabel": "Which process it calls",
   "subprocess.selectProcess": "(choose a process)",
   "subprocess.unknownProcess": "(a process you cannot open)",
+  "subprocess.legend": "Subprocess",
+  "subprocess.contractRefCaption": "Child contract hash",
+  "subprocess.inputMappingLegend": "Values passed to the child",
+  "subprocess.outputMappingLegend": "Values copied back from the child",
   "subprocess.bindingLegend": "Which version it calls",
   "subprocess.bindingPinned": "Always this exact version",
   "subprocess.bindingLatest": "The newest version whose contract still matches",
@@ -430,6 +453,8 @@ export const en = {
   "subprocess.noteAllMapped": "Every input field of the called process is mapped.",
 
   "contentLocale.legend": "Content locale",
+  // A locale option that has gaps. `{locale}` is the code, `{count}` the number of missing entries.
+  "contentLocale.optionGap": "{locale} — {count} missing",
   "contentLocale.invalid": "invalid locale code",
   "contentLocale.addPlaceholder": "add locale (e.g. de)",
   "contentLocale.add": "+ add locale",
@@ -709,6 +734,8 @@ export const en = {
   "headerBar.saved": "Saved",
   "headerBar.lastSaved": "Last saved",
   "headerBar.published": "Published",
+  "headerBar.keyCaption": "Key",
+  "headerBar.baseLocaleCaption": "Base language",
   "headerBar.findingPrefix": "Stale reference in",
   "headerBar.findingCarriedBy": "carried by",
   "headerBar.findingLiveElsewhere": "live instance(s) elsewhere",
@@ -756,7 +783,10 @@ export const en = {
   "jsonView.label": "Draft body (JSON)",
   "jsonView.apply": "Apply",
 
-  "issues.notChecked": "not checked",
+  // A badge for a check the browser holds back. Each is one whole sentence.
+  "issues.registryNotChecked": "Registry config: not checked",
+  "issues.chainingNotChecked": "Chaining target: not checked",
+  "issues.crossProcessNotChecked": "Cross-process references: not checked",
 
   "canvas.fitToView": "Fit to view",
   "canvas.arrange": "Arrange",
@@ -977,6 +1007,18 @@ export const en = {
   "plugin.switchToJson": "Edit as JSON",
   "plugin.switchToForm": "Edit as form",
   "plugin.fieldRequired": "required",
+  "plugin.typeCaption": "Type",
+  "plugin.configCaption": "Settings (JSON)",
+  "plugin.descriptionCaption": "Description",
+  // Config field messages. `{n}` is a number, `{values}` a comma-separated list.
+  "plugin.minLength": "Enter at least {n} characters.",
+  "plugin.maxLength": "Enter at most {n} characters.",
+  "plugin.min": "Enter {n} or more.",
+  "plugin.max": "Enter {n} or less.",
+  "plugin.minItems": "Add at least {n} item(s).",
+  "plugin.maxItems": "Keep at most {n} item(s).",
+  "plugin.invalidEmail": "Enter a valid email address.",
+  "plugin.allowedValues": "Choose from: {values}",
   "plugin.arrayHint": "one per line",
 
   "migrationPlan.back": "← Back to versions",
@@ -1003,6 +1045,7 @@ export const en = {
   "migrationForm.transformsHint":
     "Compute a target field from the pre-migration data. The server type-checks each expression on save.",
   "migrationForm.unmappableLegend": "onUnmappable",
+  "migrationForm.unmappableCaption": "Policy",
   "migrationForm.unmappableHint":
     "What happens to an instance sitting on a step the target version does not declare.",
   "migrationForm.sourceLabel": "Source",

@@ -205,6 +205,107 @@ describe("checkPlan", () => {
     );
   });
 
+  it("reports two fieldMap rows with one source on every offending row", () => {
+    const first = nextRowId();
+    const second = nextRowId();
+    const issues = checkPlan(
+      {
+        ...EMPTY_ROWS,
+        fieldMap: [
+          { rowId: first, from: FIELD_B, to: FIELD_B },
+          { rowId: second, from: FIELD_B, to: FIELD_C },
+        ],
+      },
+      catalogs,
+    );
+    expect(issues.filter((i) => i.message === "two rows map this source; the plan keeps only one")).toEqual([
+      { rowId: first, message: "two rows map this source; the plan keeps only one" },
+      { rowId: second, message: "two rows map this source; the plan keeps only one" },
+    ]);
+  });
+
+  it("reports two stepMap rows with one source on every offending row", () => {
+    const first = nextRowId();
+    const second = nextRowId();
+    const issues = checkPlan(
+      {
+        ...EMPTY_ROWS,
+        stepMap: [
+          { rowId: first, from: STEP_A, to: STEP_B },
+          { rowId: second, from: STEP_A, to: STEP_B },
+        ],
+      },
+      catalogs,
+    );
+    expect(issues).toEqual([
+      { rowId: first, message: "two rows map this source; the plan keeps only one" },
+      { rowId: second, message: "two rows map this source; the plan keeps only one" },
+    ]);
+  });
+
+  it("reports two transforms rows with one target on every offending row", () => {
+    const first = nextRowId();
+    const second = nextRowId();
+    const issues = checkPlan(
+      {
+        ...EMPTY_ROWS,
+        transforms: [
+          { rowId: first, target: FIELD_C, src: "data.count" },
+          { rowId: second, target: FIELD_C, src: "data.when" },
+        ],
+      },
+      catalogs,
+    );
+    expect(issues).toEqual([
+      { rowId: first, message: "two transforms target this field; the plan keeps only one" },
+      { rowId: second, message: "two transforms target this field; the plan keeps only one" },
+    ]);
+  });
+
+  it("passes rows with distinct sources and distinct transform targets", () => {
+    const issues = checkPlan(
+      {
+        ...EMPTY_ROWS,
+        stepMap: [
+          { rowId: nextRowId(), from: STEP_A, to: STEP_B },
+          { rowId: nextRowId(), from: STEP_B, to: STEP_B },
+        ],
+        fieldMap: [
+          { rowId: nextRowId(), from: FIELD_B, to: FIELD_B },
+          { rowId: nextRowId(), from: FIELD_A, to: FIELD_A },
+        ],
+        transforms: [
+          { rowId: nextRowId(), target: FIELD_B, src: "data.count" },
+          { rowId: nextRowId(), target: FIELD_C, src: "data.when" },
+        ],
+      },
+      catalogs,
+    );
+    expect(issues).toEqual([]);
+  });
+
+  it("ignores rows whose source or target is empty", () => {
+    const issues = checkPlan(
+      {
+        ...EMPTY_ROWS,
+        stepMap: [
+          { rowId: nextRowId(), from: "", to: "" },
+          { rowId: nextRowId(), from: "", to: "" },
+        ],
+        fieldMap: [
+          { rowId: nextRowId(), from: "", to: "" },
+          { rowId: nextRowId(), from: "", to: "" },
+        ],
+        transforms: [
+          { rowId: nextRowId(), target: "", src: "" },
+          { rowId: nextRowId(), target: "", src: "" },
+        ],
+      },
+      catalogs,
+    );
+    expect(issues).toEqual([]);
+  });
+
   it("reports a CEL type mismatch on its row", () => {
     const rowId = nextRowId();
     const issues = checkPlan({ ...EMPTY_ROWS, fieldMap: [{ rowId, from: FIELD_B, to: FIELD_C }] }, catalogs);

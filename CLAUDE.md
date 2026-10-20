@@ -22,8 +22,7 @@ form editor, plugin config, path guards and view overrides, migration plans and
 templates. Three sites keep a raw input on purpose: a timer deadline must infer
 to `string`, an `Action.output` value reads `result` alone, and the JSON surface
 is the escape hatch for what no builder expresses. That direction relaxes none
-of the definition contract rules. Every authoring surface produces the same
-JSON definition.
+of the definition contract rules. Every authoring surface produces the same JSON definition.
 
 The paradigm is a state-based finite-state machine: Steps (states) connected by
 explicit Paths (transitions). This is NOT BPMN token flow. Three roles share one
@@ -215,18 +214,19 @@ carries the reasoning.
 container/        Dockerfile; scripts/dev-pod.sh generates the Pod spec
 src/schema/       the definition contract (Zod) and its compile helpers
 src/cel/          CEL checking and evaluation
-src/engine/       executor: store, outbox, transitions, timers, subprocess,
-                  drafts, migration
+src/engine/       executor: store, outbox, transitions, timers, subprocess, drafts, migration
 src/runtime/      Runtime API Layer (api.ts barrel)
 src/http/         REST/JSON wrapper over Bun.serve, one route file per surface
 src/auth/         ActorResolver seam, local accounts, login, roles, CLI
+src/tenancy/      SaaS control plane: provisioning, tenant connections, CLI
 src/handlers/     action handlers
 packages/web/     the one browser package: shell, api, i18n, the four areas
 packages/form-ui/ the shared step-form renderer; stays its own package
 examples/ test/ e2e/  example definitions, bun:test suites, smoke flows
+deploy/           engine and frontend images, nginx.conf
+scripts/ docs/ openspec/  tooling and push gates; documentation; live specs and changes
 package.json      Bun workspace root and the engine's exports map
 ```
-`docs/current-state.md` holds the per-subsystem detail.
 
 ## Where the rest is documented
 - `.claude/rules/`: `process-contract.md` (the definition contract in full),
@@ -237,7 +237,7 @@ package.json      Bun workspace root and the engine's exports map
 - `docs/decisions.md`: open questions, decided-but-unbuilt work, open review
   findings, refused simplifications. `docs/decisions-archive.md`: the reasoning
   once a decision ships, moved there word for word. The dated reviews sit in
-  `openspec/changes/archive/2026-08-18-code-review-record/`.
+  `openspec/changes/archive/` (`2026-08-18-code-review-record/`, `2026-10-10-audit-record/`).
 - `docs/authoring-guide.md`: teaches the definition contract to process authors.
 - `ROADMAP.md`: stage status (DONE / NOT STARTED), open stages in full, one
   table row per finished stage. `docs/roadmap-history.md` says what each

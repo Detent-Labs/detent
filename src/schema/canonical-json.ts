@@ -1,8 +1,9 @@
 /**
  * Canonical JSON per RFC 8785 (JCS): object keys sorted lexicographically,
- * arrays in order, no insignificant whitespace. A ProcessBody carries only
- * strings, integers, booleans, null, arrays and objects — for which JSON's own
- * number/string forms already match JCS.
+ * arrays in order, no insignificant whitespace. A ProcessBody carries integers
+ * and non-integers both (`fieldValidation.min`/`max`, a literal `default`,
+ * `Path.priority`). RFC 8785 serializes a number the way ECMAScript does, and
+ * `JSON.stringify` already does that, so no extra number handling is needed.
  *
  * Its own module, and in the package's `exports` map, so the studio's version
  * diff compares bodies by the same rule `definitionHash` defines identity by:
@@ -10,9 +11,6 @@
  * of a body's identity. `hash.ts` cannot serve that directly — it imports
  * `node:crypto`, which does not belong in a browser bundle. One canonicalizer
  * for engine and editor, the same reason the CEL library is shared.
- *
- * ponytail: full RFC-8785 number canonicalization (exponent/precision) only
- * matters if a non-integer number ever enters a ProcessBody; add it then.
  */
 export function canonicalize(v: unknown): string {
   if (v === null || typeof v !== "object") return JSON.stringify(v);

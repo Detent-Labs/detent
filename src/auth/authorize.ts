@@ -8,11 +8,12 @@
  * `Step.assignment.strategy.type`, which resolves against the injected
  * `AssignmentRegistry`. No role implies another.
  *
- * `can`/`requirePermission` at the bottom are the process-scoped seam. Seven
- * gated operations name one process; each asks through those two rather than
- * through a bare `requireRole`, so a later change to how a grant is stored
- * moves this module alone. Still not an extension point: four fixed
- * permissions in a module-private map, no registry, nothing configurable.
+ * `can`/`requirePermission` at the bottom are the process-scoped seam. The
+ * gated operations that name one process each ask through those two rather
+ * than through a bare `requireRole`, so a later change to how a grant is
+ * stored moves this module alone. Still not an extension point: a fixed set
+ * of permissions in a module-private map, no registry, nothing configurable.
+ * The `authorization` spec states how many operations and permissions exist.
  *
  * `can` runs two tests: the global role, then a stored grant. `"read"` runs a
  * third, the process's Reader list (`matchesAccessList` in
@@ -30,13 +31,13 @@ import { hasGrant } from "./grants.js";
 export const PUBLISH_ROLE = "system:publish";
 /** Required to call `POST /instances/:id/cancel`. */
 export const CANCEL_ANY_ROLE = "system:cancel-any";
-/** Required for `scope=all` on `GET /instances`, `GET /instances/:id/record`, and every `/admin/*` route. */
+/** The operator role. The `authorization` spec states what it gates. */
 export const ADMIN_ROLE = "system:admin";
-/** Admits every studio route (`/drafts/*`), and is the ONLY role admitting the two migration-plan routes and the orphan-key scan. Implies nothing else — publishing still separately requires `system:publish`. */
+/** The developer role. The `authorization` spec names the routes it admits, the process access lists that narrow them, and the `migrate` grant. Implies nothing else — publishing still separately requires `system:publish`. */
 export const DEVELOPER_ROLE = "system:developer";
 /** Required for every `/reporting/*` route. Implies nothing else: a process owner holding only this cannot publish, administer users, or read the operator's instance list. */
 export const REPORTS_ROLE = "system:reports";
-/** Required to write a data list (`/admin/data-lists/*`); reads also accept `DEVELOPER_ROLE`, so the studio can offer the existing keys. Implies nothing else: staff who maintain cost centres must not gain the power to cancel instances. */
+/** Required to write a data list (`/admin/data-lists/*`); reads also accept `DEVELOPER_ROLE` and `AUTHOR_ROLE`, so the studio can offer the existing keys. Implies nothing else: staff who maintain cost centres must not gain the power to cancel instances. */
 export const DATALISTS_ROLE = "system:datalists";
 /** Required to write a process template (`PUT`/`DELETE /templates/:key`); reads also accept `DEVELOPER_ROLE` and `AUTHOR_ROLE`, so every author can seed a process from one. Implies nothing else: staff who curate templates must not gain the power to publish a process. */
 export const TEMPLATES_ROLE = "system:templates";

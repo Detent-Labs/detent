@@ -17,7 +17,7 @@ interface StorageLike {
   setItem(key: string, value: string): void;
 }
 
-export interface LocaleSyncDeps {
+interface LocaleSyncDeps {
   /** The signed-in session, or `undefined` before login. This is the whole decision. */
   session: Session | undefined;
   storage: StorageLike | undefined;
