@@ -7,7 +7,7 @@
  * Three shapes matter, and each has a case below.
  *
  * A directory holding no repository is the violating input: it is what
- * `docker/engine.Dockerfile` installs from, since `.dockerignore` excludes
+ * `deploy/engine.Dockerfile` installs from, since `.dockerignore` excludes
  * `.git`. The script must exit 0 there, or the production image stops
  * building.
  *

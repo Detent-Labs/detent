@@ -45,7 +45,7 @@ test("the policy carries the minimum required directives", () => {
  * header. A directive here that the browser ignores reads as protection and
  * gives none, so re-adding any of the three must fail this test.
  * `frame-ancestors` now ships from `src/http/static.ts` and
- * `docker/nginx.conf`.
+ * `deploy/nginx.conf`.
  */
 test("the meta policy carries no directive a meta tag ignores", () => {
   delete process.env.VITE_API_URL;

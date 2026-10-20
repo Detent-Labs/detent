@@ -4,7 +4,7 @@
 # BUN_VERSION -- bump both together, deliberately. The -slim variant ships
 # the same non-root `bun` user (UID 1000) as the default tag, at a
 # fraction of the size.
-FROM oven/bun:1.3.11-slim
+FROM docker.io/oven/bun:1.3.11-slim
 
 WORKDIR /app
 

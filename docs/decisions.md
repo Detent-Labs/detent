@@ -734,7 +734,7 @@ build.
   to `"1"` and `POSTGRES_PASSWORD` to `postgres`. Both serve a disposable
   local stack, the server prints `AUTH DISABLED` at startup
   (`src/http/server.ts:406`) whenever the first applies, and the production
-  image in `docker/engine.Dockerfile` inherits neither. Risk (Informational): a pod
+  image in `deploy/engine.Dockerfile` inherits neither. Risk (Informational): a pod
   played from the generated spec outside the devcontainer runs with auth
   disabled. The review recorded it for completeness and recommends nothing.
 

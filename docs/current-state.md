@@ -118,7 +118,7 @@ attachments and form drafts.
 A thin REST and JSON layer exposes the runtime, with one route file per
 audience. It also serves the built browser app with its security headers.
 
-- Paths: `src/http/`, `src/errors.ts`, `docker/nginx.conf`,
+- Paths: `src/http/`, `src/errors.ts`, `deploy/nginx.conf`,
   `docs/openapi.yaml`
 - Specs: `http-wrapper`, `http-route-handling-consolidation`,
   `http-api-documentation`, `web-asset-serving`, `frontend-security-headers`
@@ -310,6 +310,6 @@ engine it starts uses a database of its own.
 Two images serve the engine and the frontend. The runbooks cover
 deployment, backup and restore. A seed script fills a new database.
 
-- Paths: `docker/`, `docs/runbooks/`, `scripts/seed.ts`
+- Paths: `deploy/`, `docs/runbooks/`, `scripts/seed.ts`
 - Specs: `production-docker-images`, `deployment-runbook`,
   `backup-restore-runbook`, `database-seed-script`

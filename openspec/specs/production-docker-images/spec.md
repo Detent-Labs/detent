@@ -7,9 +7,9 @@ construction: it mounts the workspace and runs `sleep infinity`. Before
 this capability, no image existed that a deployment could run.
 
 This spec is the build contract for the four production images this repo
-ships. One is for the engine (`docker/engine.Dockerfile`). One is for
+ships. One is for the engine (`deploy/engine.Dockerfile`). One is for
 each frontend package, `app`/`admin`/`studio`
-(`docker/frontend.Dockerfile`, parameterized by a `PACKAGE` build arg
+(`deploy/frontend.Dockerfile`, parameterized by a `PACKAGE` build arg
 rather than three near-duplicate files).
 
 It covers what each image runs as, what it exposes, and how it reports

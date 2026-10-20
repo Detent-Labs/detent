@@ -218,19 +218,19 @@ CI runs the same suite in a job of its own, beside `check`.
 ## Deploy
 
 Two production images exist: one for the engine, one for the frontend.
-`docker/engine.Dockerfile` and `docker/frontend.Dockerfile` build them.
+`deploy/engine.Dockerfile` and `deploy/frontend.Dockerfile` build them.
 The engine can also serve the frontend itself from `WEB_ROOT`, which is
 the single-origin alternative to running the nginx image. The devcontainer uses neither one;
 it stays dev-only.
 
 ```bash
 # Engine
-docker build -f docker/engine.Dockerfile -t workflow-engine .
+docker build -f deploy/engine.Dockerfile -t workflow-engine .
 
 # The frontend: one bundle covering every area.
 # VITE_API_URL is a build arg only: Vite inlines it at build time, so a
 # container runtime env var set later has no effect on the result.
-docker build -f docker/frontend.Dockerfile \
+docker build -f deploy/frontend.Dockerfile \
   --build-arg VITE_API_URL=https://api.example.com \
   -t web .
 ```
