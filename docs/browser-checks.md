@@ -6305,3 +6305,53 @@ Switch the language to German before the logout. Pass: the line reads in German
 and wraps without clipping at a 360px width. Log in again in tab B. Pass: the
 line disappears. `e2e/session-tabs.e2e.ts` asserts the sign-out and the text.
 This entry keeps only the visual judgment.
+
+### Studio: a late answer and a template replacement (`fix-studio-screen-races`)
+
+**1. A late answer changes nothing.** Open the Player on
+`purchase_requisition`. Create two instances and note both ids. Delay every
+`GET /instances/<first id>/record` by three seconds with a route intercept.
+Open the first instance by id, then the second at once.
+
+Pass: after the delay, the record pane still shows the second instance's
+entries. Repeat on `/studio/tools`. Delay the version body of one version,
+choose it, then choose the draft. Pass: the scratchpad checks against the
+draft's fields after the delay.
+
+This stays manual because no test mounts these screens.
+`packages/web/test/shell-latestGate.test.ts` asserts the gate itself.
+
+**2. A create over an existing key asks first.** On `/studio/templates`,
+type the key of a template the list already shows. Choose a source and press
+Create.
+
+Pass: a confirmation names the key. Cancel it. Pass: the network panel shows
+no `PUT /templates/...`, and the form keeps the key and the source. Press
+Create again and confirm. Pass: the list shows the replaced template.
+
+### Studio: captions with a JSON name, and a plugin config message (`catalog-studio-literal-strings`)
+
+Source: `catalog-studio-literal-strings` task 4.2. The guard test
+`packages/web/test/studio-panels-literal-text.test.ts` asserts that no panel
+holds a literal. This walk covers what it cannot judge: the look of the mono
+name beside the plain words. It needs a draft with a step that has an
+automatic path, a timer and an action.
+
+On the Paths tab, read one path row. Pass: the three captions read Label, Key
+and Goes to. After each one comes `label`, `key` or `to` in the mono face,
+muted, in lower case, after one space. The caption sits in an uppercase
+tracked label, so check that the mono name keeps its own case.
+
+Switch the path to automatic. Pass: the caption above the number input reads
+"Order among automatic paths", then `priority` in mono. The legend over the
+action list reads "Actions when the path fires", then `onPath`.
+
+Open a step with a timer. Pass: the timer's captions read Description, "When
+it fires" with no mono name, and "Path it takes when it fires". The last one
+carries `onFire.targetPath` and wraps without clipping at a 360px width.
+
+On the Steps tab, open a step and add an action under "Actions on entry".
+Choose the type `notification.email`. In the `to` field, type `nobody` on one
+line. Pass: the message under the field reads "Enter a valid email address."
+in the error color. Replace the line with `a@example.com`. Pass: the message
+goes.

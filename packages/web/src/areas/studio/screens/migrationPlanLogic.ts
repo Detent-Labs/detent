@@ -5,7 +5,7 @@
  * (studio-migration-plan-form spec).
  *
  * The server still owns validation at `PUT /migration-plans/...`. `checkPlan`
- * below covers only the three rules the browser can evaluate from the two
+ * below covers only the six rules the browser can evaluate from the two
  * version bodies it already holds.
  */
 import { celType } from "workflow-engine/cel/check";
@@ -221,29 +221,50 @@ export interface RowIssue {
   message: string;
 }
 
+/** How often each non-empty key occurs. The plan holds one JSON key once, so a count above 1 names a row the save drops. */
+function countKeys(keys: readonly string[]): Map<string, number> {
+  const count = new Map<string, number>();
+  for (const key of keys) if (key !== "") count.set(key, (count.get(key) ?? 0) + 1);
+  return count;
+}
+
 /**
- * The three rules the browser can evaluate. Everything else stays on the server:
+ * The six rules the browser can evaluate. Everything else stays on the server:
  * `transforms` needs CEL type inference, and the identity-carried type check is a
- * whole-catalog rule with no row to attach to.
+ * whole-catalog rule with no row to attach to. Three of the six cover rows the
+ * plan cannot hold, which the server never sees (two rows with one source, or
+ * one transform target, save as one entry).
  */
 export function checkPlan(rows: PlanRows, catalogs: Catalogs): RowIssue[] {
   const issues: RowIssue[] = [];
 
-  const targetCount = new Map<string, number>();
-  for (const row of rows.fieldMap) if (row.to !== "") targetCount.set(row.to, (targetCount.get(row.to) ?? 0) + 1);
+  const targetCount = countKeys(rows.fieldMap.map((r) => r.to));
+  const fieldSourceCount = countKeys(rows.fieldMap.map((r) => r.from));
+  const stepSourceCount = countKeys(rows.stepMap.map((r) => r.from));
+  const transformTargetCount = countKeys(rows.transforms.map((r) => r.target));
+  const sourceCollision = "two rows map this source; the plan keeps only one";
 
   for (const row of rows.fieldMap) {
     if (row.to !== "" && (targetCount.get(row.to) ?? 0) > 1)
       issues.push({ rowId: row.rowId, message: "two sources target this field; fieldMap must be injective" });
+    if (row.from !== "" && (fieldSourceCount.get(row.from) ?? 0) > 1)
+      issues.push({ rowId: row.rowId, message: sourceCollision });
     const from = catalogs.source.fields.find((f) => f.id === row.from);
     const to = catalogs.target.fields.find((f) => f.id === row.to);
     if (from && to && from.celType !== to.celType)
       issues.push({ rowId: row.rowId, message: `type ${from.celType} does not match target type ${to.celType}` });
   }
 
-  for (const row of rows.stepMap)
+  for (const row of rows.stepMap) {
+    if (row.from !== "" && (stepSourceCount.get(row.from) ?? 0) > 1)
+      issues.push({ rowId: row.rowId, message: sourceCollision });
     if (row.to === CANCEL_SINK)
       issues.push({ rowId: row.rowId, message: "the reserved cancel-sink step is not a valid target" });
+  }
+
+  for (const row of rows.transforms)
+    if (row.target !== "" && (transformTargetCount.get(row.target) ?? 0) > 1)
+      issues.push({ rowId: row.rowId, message: "two transforms target this field; the plan keeps only one" });
 
   if (rows.unmappableStep === CANCEL_SINK)
     issues.push({ rowId: UNMAPPABLE_ROW_ID, message: "the reserved cancel-sink step is not a valid target" });

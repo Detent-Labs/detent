@@ -1,6 +1,6 @@
 import type { Session } from "./session.js";
 
-export interface AccountName {
+interface AccountName {
   text: string;
   mono: boolean;
 }

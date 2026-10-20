@@ -11,7 +11,7 @@ import { isArea, type Area } from "./areas.js";
  * ROADMAP.md item 12 assumed all four would be rewritten; stripping the prefix
  * here is what makes that unnecessary.
  */
-export type ShellLocation =
+type ShellLocation =
   | { kind: "login" }
   | { kind: "profile" }
   | { kind: "root" }

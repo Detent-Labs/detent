@@ -100,7 +100,8 @@ function isJsonObject(v: unknown): v is Record<string, unknown> {
 // drafts.ts is a module boundary in its own right, so this bound exists to
 // hold for a caller that does not arrive over HTTP too.
 // Exported for templates.ts: a template seeds a draft, so one bound covers both
-// and a body cannot be legal as one and oversized as the other.
+// and a body cannot be legal as one and oversized as the other. Also read by
+// instance-drafts.ts, so the two draft tables share one bound.
 export const MAX_DRAFT_ENVELOPE_BYTES = 8 * 1024 * 1024; // 8 MiB
 
 /**

@@ -100,6 +100,26 @@ test.skipIf(!DB)("a listed Developer adds an entry to the Developer list", async
   expect(rows.map((r) => r.principal)).toContain("user_new");
 });
 
+test.skipIf(!DB)("an entry without a user_ or group_ prefix is stored and matches the actor with that id", async () => {
+  const processId = pid();
+  await addToList(processId, "developer", "user_dev");
+  const dev: Actor = { id: "user_dev", roles: [DEVELOPER_ROLE] };
+
+  const put = await fetch(authedReq(`http://x/processes/${processId}/access`, "PUT", dev, { kind: "developer", principal: "auth0|42" }));
+  expect(put.status).toBe(200);
+  expect(await put.json()).toEqual({ kind: "developer", principal: "auth0|42" });
+
+  const rows = (await sql`SELECT principal FROM process_access_roles WHERE process_id = ${processId} AND kind = 'developer'`) as { principal: string }[];
+  expect(rows.map((r) => r.principal)).toContain("auth0|42");
+
+  // The JWT actor's id is its `sub` claim, so it carries no prefix.
+  const jwtActor: Actor = { id: "auth0|42", roles: [DEVELOPER_ROLE] };
+  const get = await fetch(authedReq(`http://x/processes/${processId}/access`, "GET", jwtActor));
+  expect(get.status).toBe(200);
+  const lists = (await get.json()) as { developer: string[] };
+  expect(lists.developer).toContain("auth0|42");
+});
+
 test.skipIf(!DB)("a listed Developer adds an entry to the Owner list", async () => {
   const processId = pid();
   await addToList(processId, "developer", "user_dev");

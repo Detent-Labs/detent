@@ -10,9 +10,7 @@ import type { SQL } from "bun";
 import { sql } from "./store.js";
 import type { InstanceId, StepId } from "../schema/definition.js";
 import { RequestShapeError } from "../errors.js";
-import { parseJsonb } from "./drafts.js";
-
-export const MAX_DRAFT_ENVELOPE_BYTES = 8 * 1024 * 1024; // 8 MiB
+import { MAX_DRAFT_ENVELOPE_BYTES, parseJsonb } from "./drafts.js";
 
 export type InstanceDraft = {
   instanceId: InstanceId;

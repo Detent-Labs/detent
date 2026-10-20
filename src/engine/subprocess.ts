@@ -309,11 +309,12 @@ export function makeReturnHandler(
         await appendInstanceEvent(tx, event);
         return null; // stay parked (bounded by a step timer, if declared)
       }
-      // The one path that resolves under a row lock: the parked step and the
-      // matched path are both derived from the row read `FOR UPDATE` above, so
-      // hoisting resolution above the lock would need an optimistic pre-read
-      // plus a sequence re-check on entry. No resolver shipped today performs
-      // I/O, so the lock is held no longer than before.
+      // One of two paths that resolve under a row lock (`submitAndTransition`
+      // is the other): the parked step and the matched path are both derived
+      // from the row read `FOR UPDATE` above, so hoisting resolution above the
+      // lock would need an optimistic pre-read plus a sequence re-check on
+      // entry. The resolution deadline bounds the wait; see
+      // `registry.ts::resolveStepAssignment`.
       const committed = await executeAutomaticTransition(parked, path, parentBody, tx, assignmentRegistry);
       return { committed, parentBody };
     });

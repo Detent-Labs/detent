@@ -7,7 +7,7 @@ import type { BaseFieldType, FieldControl, FieldFormat, Plugin, LocalizedText, F
  * Player, the end-user app) so a form renders identically everywhere.
  */
 
-export interface WireField {
+interface WireField {
   id: string;
   key: string;
   label: LocalizedText;

@@ -72,7 +72,7 @@ export const groupMembersConfigSchema = z.object({ groupId: z.string() }).strict
  * `groupId` naming no group to `[]`, so this strategy raises nothing of its
  * own.
  */
-export const groupMembersStrategyDef: AssignmentStrategyDef = {
+const groupMembersStrategyDef: AssignmentStrategyDef = {
   configSchema: groupMembersConfigSchema,
   resolve: async (ctx) => {
     const { groupId } = ctx.config as { groupId: string };
@@ -103,7 +103,7 @@ export const actorFromFieldConfigSchema = z.object({ fieldId: z.string() }).stri
  * check (`compile.ts::checkActorFromFieldReference`) is what catches the
  * authoring mistake ahead of that.
  */
-export const actorFromFieldStrategyDef: AssignmentStrategyDef = {
+const actorFromFieldStrategyDef: AssignmentStrategyDef = {
   configSchema: actorFromFieldConfigSchema,
   resolve: async (ctx) => {
     const { fieldId } = ctx.config as { fieldId: string };
