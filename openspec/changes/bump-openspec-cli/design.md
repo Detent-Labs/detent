@@ -26,12 +26,19 @@ report. It runs in the container, as CLAUDE.md requires for all tooling.
 1.14.3 is the version every change of 2026-10-20 validated against on the
 host. Matching it removes the disagreement without a new unknown.
 
-### D2. The full suite is the compatibility check
+### D2. A known-bad change proves the parse
 
-`--json` output may differ between 1.9.0 and 1.14.3. The review-check
-script's tests drive real changes through it. A green full suite on the
-rebuilt image shows the script still parses the output, and running the
-script over this change shows it end to end.
+`--json` output may differ between 1.9.0 and 1.14.3. The full suite does not
+show whether the script still reads it: `test/openspec-review-check.test.ts`
+drops every `openspec validate` line (`ownFindings`), because the CLI is not
+installed everywhere. A valid change proves nothing either, since a misread
+also prints no finding.
+
+The check therefore runs the script against a change with a known error, in a
+copy of `openspec/` under the scratch directory: a delta that MODIFIES a
+requirement header its base spec lacks. The CLI reports that as an ERROR, so
+the script must print a Critical from `openspec validate`. The suite still
+covers the script's own checks.
 
 ## Risks / Trade-offs
 

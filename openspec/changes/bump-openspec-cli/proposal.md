@@ -29,6 +29,7 @@ None. No spec states the CLI version, so this change sets `skip_specs: true`.
 ## Impact
 
 - `container/Dockerfile`.
-- `test/openspec-review-check.test.ts` runs the CLI through the review-check
-  script, so the full suite exercises the new version.
+- `test/openspec-review-check.test.ts` covers the review-check script's own
+  checks; a run against a known-bad change in a scratch copy proves the script
+  still reads the new CLI's output (design D2).
 - Ordering: stacks on `rename-docker-dir`.

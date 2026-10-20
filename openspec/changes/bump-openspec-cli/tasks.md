@@ -3,7 +3,7 @@
 ## 1. Pin the CLI
 
 - [ ] 1.1 Set `ENV OPENSPEC_VERSION=1.14.3` in `container/Dockerfile` (design D1). Run `sh scripts/dev-pod.sh up` so the image rebuilds and the pod replays. Verify that `sh scripts/dev-exec.sh openspec --version` prints `1.14.3` and that `bash scripts/preflight.sh core` passes.
-- [ ] 1.2 Run `sh scripts/dev-exec.sh env OPENSPEC_TELEMETRY=0 bun run scripts/openspec-review-check.ts bump-openspec-cli` and record its output (design D2).
+- [ ] 1.2 Per design D2, copy `openspec/` into the scratch directory, add a change there whose delta MODIFIES a requirement header absent from its base spec, and run the review-check script with that copy as its working directory, in the container. Verify that it prints a Critical from `openspec validate`. Then run `sh scripts/dev-exec.sh env OPENSPEC_TELEMETRY=0 bun run scripts/openspec-review-check.ts bump-openspec-cli` in the repository and record both outputs.
 
 ## 2. Verification
 
