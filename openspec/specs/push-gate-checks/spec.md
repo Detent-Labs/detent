@@ -178,7 +178,7 @@ floor. A run of far fewer tests than the suite holds proves less than it looks.
 The pass count alone is not evidence. The DB-backed suites are `test.skipIf(!DB)`
 at hundreds of sites. They are most of the suite. A run without `DATABASE_URL`
 skips all of them. It then prints a green that looks genuine. `CLAUDE.md` states
-this twice, in bold, which measures how easily it recurs.
+this as a bold rule of its own, because it recurs.
 
 Both floors SHALL live in tracked files beside the gate. A change that
 legitimately adds a skipped test SHALL raise the skip floor in the same commit.
