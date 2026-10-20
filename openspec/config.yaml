@@ -38,8 +38,8 @@ context: |
   install`), and test runner (`bun test`); typecheck via `tsc --noEmit`.
   `bun run check` runs `lint` (oxlint) first, then typecheck, build and test.
   Datastore is PostgreSQL, accessed via Bun's native `Bun.sql`. Tooling runs in
-  the devcontainer (Node 22 base + Bun, plus a Postgres service tracking the
-  latest release).
+  the devcontainer (Node 22 base + Bun, plus a Postgres container tracking the
+  latest release, all in one Podman pod played from a generated Pod spec).
 
   Process: spec-driven via OpenSpec. Every non-trivial change goes through an
   OpenSpec change (propose -> specs/tasks -> implement -> verify -> archive),

@@ -147,6 +147,12 @@ restarts the container (Context), so the threshold must exceed any first-boot
 init by a wide margin. Two minutes does, since the init measured about two
 seconds.
 
+The `db` container also sets `POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256`.
+Inside one pod the `app` container reaches Postgres over `127.0.0.1`, which
+initdb trusts by default, so without it any password logs in. It applies only
+when a volume is first initialized, so a volume from the Compose era must not
+be reused.
+
 `up` then polls `podman healthcheck run` on each container, once a second,
 for up to 120 seconds. Polling `podman healthcheck run` needs neither a
 systemd healthcheck timer nor `wait --condition` support, so it behaves alike

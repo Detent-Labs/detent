@@ -290,7 +290,7 @@ a frozen lockfile. Then it runs the same checks plus a dependency audit. The
 suite uses its own database.
 
 - Paths: `.devcontainer/`, `.githooks/`, `scripts/gates/`,
-  `scripts/preflight.sh`, `.github/workflows/check.yml`, `bunfig.toml`,
+  `scripts/dev-pod.sh`, `scripts/dev-exec.sh`, `scripts/preflight.sh`, `.github/workflows/check.yml`, `bunfig.toml`,
   `test/preload-db.ts`
 - Specs: `development-toolchain`, `push-gate-checks`,
   `devcontainer-preflight`, `worktree-isolation`

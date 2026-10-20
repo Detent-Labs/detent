@@ -87,24 +87,30 @@ delegates a task, comments on an instance and edits a personal profile. See
 ## Develop
 
 Bun is the runtime, package manager, and test runner. Everything runs inside the
-dev container (`.devcontainer/`), never on the host.
+dev container (`.devcontainer/`), never on the host. The dev container is one
+Podman pod per checkout, so Podman is the requirement. Install Podman 4.9 or
+newer (rootless works). Docker is not supported, and neither is a Compose
+provider.
 
 Bring the whole stack up with one command: `bash scripts/dev-up.sh`, or
 `pwsh scripts/dev-up.ps1` on Windows. Both need Git Bash, which Git for
 Windows ships. The PowerShell path runs the same preflight script.
 
-That one command starts
-the
-containers, installs dependencies, seeds the demo processes and users, and
+That one command builds the app image, plays the pod (`app`, `db` and
+`mailpit`), waits for every container's probe, installs dependencies, seeds the demo processes and users, and
 starts the HTTP server. A preflight check runs last, confirming the whole
 stack answers before it prints the login. The same preflight gates every
 push: `.githooks/pre-push` runs its `core` profile first. Run either
 profile standalone with `bash scripts/preflight.sh core|serve`. The `.ps1`
 entry point takes the same two profiles and runs that same script.
 
+Run these inside the `app` container. From the host, prefix each with
+`sh scripts/dev-exec.sh`, which takes the command and nothing else:
+`sh scripts/dev-exec.sh bun run typecheck`.
+
 ```bash
 bun install
-DATABASE_URL=postgres://postgres:postgres@db:5432/workflow_engine bun test   # bun:test suites
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/workflow_engine bun test   # bun:test suites
 bun run typecheck                                                            # tsc --noEmit (Bun does not typecheck)
 bun run build                                                                # vite build, the frontend's production bundle
 bun run check                                                                # lint, typecheck, build, the suite, then the timezone test
@@ -115,6 +121,33 @@ at over 500 sites — the majority of the suite. Without it they skip silently,
 not loudly. A bare `bun test` then reports a pass count that omits most of what
 the suite tests. Inside the dev container the variable is already set, which is
 the second reason to run there.
+
+The bring-up writes the pod's spec to `.devcontainer/pod.yaml`, which git
+ignores, and prints the three host ports. Every port binds to `127.0.0.1`.
+`sh scripts/dev-pod.sh down` removes the pod and keeps the database volume.
+`sh scripts/dev-pod.sh spec` prints the spec and calls no `podman`.
+
+#### Moving from the Compose stack
+
+A machine that ran the Compose stack still holds its containers, network and
+volume. Remove them once. The old volume must not be reused. A Postgres
+volume first initialized under Compose trusts every connection the pod's
+containers open over `127.0.0.1`, because the pod sets
+`POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256` only when it initializes a
+fresh volume.
+
+```sh
+podman rm -f --ignore workflow-engine-app-1 workflow-engine-db-1 workflow-engine-mailpit-1
+podman network rm --force --ignore workflow-engine_default
+podman volume rm --force workflow-engine_pgdata
+```
+
+On Docker, run `docker rm -f`, `docker network rm` and `docker volume rm` on
+the same names. Development data reseeds on the
+next `bash scripts/dev-up.sh`. A linked worktree used its own project name,
+`detent-<base>-<cksum>` in place of `workflow-engine`; remove its
+`-app-1`, `-db-1` and `-mailpit-1` containers, its `_default` network and its
+`_pgdata` volume the same way.
 
 This repository used to run no CI beyond `.githooks/pre-push`, by
 deliberate choice. This change reverses that choice.
@@ -149,7 +182,7 @@ the startup call finds them already there and skips them —
 
 `bun run serve` refuses to start unless you configure authentication. It needs
 one of `AUTH_JWT_SECRET`, `AUTH_ISSUERS` or `ALLOW_INSECURE_DEV_AUTH=1`. The
-devcontainer sets the third one (`.devcontainer/docker-compose.yml`). That one
+devcontainer sets the third one in the Pod spec `scripts/dev-pod.sh` generates. That one
 belongs nowhere else. `docs/runbooks/deployment.md` gives all three with their
 defaults, and every other variable too.
 
