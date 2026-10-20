@@ -30,7 +30,7 @@ tree is named `deploy`.
 
 - Renaming the capability `production-docker-images`.
 - Changing any Dockerfile instruction other than the `COPY` source of
-  `nginx.conf`.
+  `nginx.conf` and the registry host of the `FROM` images.
 - Rewording `docker build` in the runbook or the specs.
 
 ## Decisions
@@ -39,11 +39,19 @@ tree is named `deploy`.
 
 `git mv docker deploy` keeps `git log --follow` working for each Dockerfile.
 
-### D2. Two edits of a file are not a behavior change
+### D2. Two kinds of Dockerfile edit, no behavior change
 
 `deploy/frontend.Dockerfile`'s `COPY` line names the new path of
-`nginx.conf`. Without it the frontend image does not build. The image itself
-is unchanged.
+`nginx.conf`. Without it the frontend image does not build.
+
+The three `FROM` lines gain the registry host `docker.io/`. This host has no
+system `registries.conf`, and short names resolve here only through a
+per-user drop-in added on 2026-10-20 that leaves after the merge. A fresh
+Podman host would refuse `oven/bun:1.3.11-slim`. Docker resolves the full
+name to the same image, so both images are unchanged.
+
+The edits under `packages/web` change comments only and no UI, so they need
+no design-skill pass.
 
 `test/http-error-path.test.ts` reads `../docker/engine.Dockerfile`. It reads
 the new path, and the suite proves the read.

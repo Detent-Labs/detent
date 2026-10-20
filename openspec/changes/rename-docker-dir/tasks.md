@@ -2,8 +2,8 @@
 
 ## 1. Move the directory and its readers
 
-- [ ] 1.1 Run `git mv docker deploy` per design D1. In `deploy/frontend.Dockerfile`, change the `COPY` source to `deploy/nginx.conf`. In `test/http-error-path.test.ts`, read `../deploy/engine.Dockerfile` (design D2). Verify with `git status --short` showing the three renames and `ls -A docker` failing.
-- [ ] 1.2 Build both images on this host per design D3 (dependencies installed): `podman build -f deploy/engine.Dockerfile -t workflow-engine:rename-check .` and `podman build -f deploy/frontend.Dockerfile -t workflow-frontend:rename-check .`. Record both exit statuses. Then remove both tags with `podman rmi`.
+- [ ] 1.1 Run `git mv docker deploy` per design D1. In `deploy/frontend.Dockerfile`, change the `COPY` source to `deploy/nginx.conf`. In both Dockerfiles, prefix each `FROM` image with `docker.io/` (design D2). In `test/http-error-path.test.ts`, read `../deploy/engine.Dockerfile` (design D2). Verify with `git status --short` showing the three renames and `ls -A docker` failing.
+- [ ] 1.2 Build both images on this host per design D3 (dependencies installed): `podman build -f deploy/engine.Dockerfile -t workflow-engine:rename-check .` and `podman build -f deploy/frontend.Dockerfile --build-arg VITE_API_URL=https://api.example.com -t workflow-frontend:rename-check .`. Record both exit statuses, and verify that `grep -n '^FROM' deploy/*.Dockerfile` shows a registry host on every line. Then remove both tags with `podman rmi`.
 
 ## 2. Documents and comments
 
