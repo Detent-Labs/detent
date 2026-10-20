@@ -107,6 +107,10 @@ Dockerfile retag the image the main checkout's next `up` replays. The layer
 cache stays shared, so an unchanged Dockerfile builds in seconds in every
 worktree.
 
+The image name derives from `DEV_POD` with each `_` mapped to `-` and runs
+of `-` squeezed, because an image repository name admits `_` only between two
+alphanumerics. Pod, container and volume names keep `DEV_POD` as it is.
+
 ### D4. One exec helper
 
 `scripts/dev-exec.sh` runs `podman exec -w /workspace "$DEV_POD-app" "$@"`

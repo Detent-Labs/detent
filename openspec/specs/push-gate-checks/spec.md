@@ -84,10 +84,10 @@ scope until it passes. The change SHALL record what the narrowing leaves out.
 
 A gate that needs only git and a shell SHALL run on the host. It runs before the
 hook starts the container checks. A gate that needs Bun SHALL run inside the
-devcontainer, through the `docker compose exec` the hook already uses.
+devcontainer, through the `podman exec` the hook already uses.
 
-A container gate SHALL reach the Compose project the derivation
-`worktree-isolation` specifies, and SHALL NOT name one itself.
+A container gate SHALL reach the pod the derivation `worktree-isolation`
+specifies, and SHALL NOT name a pod or a container itself.
 
 Host placement buys two things. A contributor with a stopped container still gets
 those findings. The checks that cost milliseconds run before the ones that cost
@@ -112,7 +112,7 @@ typecheck and the suite, for this reason.
 #### Scenario: A container gate reaches the pushing checkout
 
 - **WHEN** a container gate runs from a linked worktree
-- **THEN** it execs into that worktree's Compose project, not another
+- **THEN** it execs into that worktree's own `app` container, not another
   checkout's
 
 ### Requirement: The lockfile matches the manifests
@@ -461,10 +461,11 @@ The gate SHALL read tracked files only. Untracked local state and ignored files
 carry machine paths by design.
 
 Some tracked paths describe a container filesystem rather than a contributor's
-machine. `.devcontainer/devcontainer.json` mounts a volume at `/home/node/.claude`.
-The gate SHALL exclude those paths, and the change SHALL name each exclusion.
-Without the exclusion this gate lands red, which the arrives-green requirement
-forbids.
+machine. The devcontainer image's `node` user and `root` are container users.
+Archived changes quote `/home/node/.claude`, the mount a retired
+`devcontainer.json` declared. The gate SHALL exclude those paths, and the
+change SHALL name each exclusion. Without the exclusion this gate lands red,
+which the arrives-green requirement forbids.
 
 #### Scenario: A container filesystem path raises no finding
 
