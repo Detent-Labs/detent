@@ -63,7 +63,7 @@ definition. The short form, true in every session:
 - The opaque `id` anchors every stored reference and all persisted instance state. A `key`
   is a slug with two readers. CEL reads a field as `data.<key>`. A view entry's `group`
   names a group field's `key`, and its `tab` names a key in the same view's `tabs`. A
-  `label` is text for the reader.
+  `label` is display text.
 - `definitionHash` is the JCS hash of `ProcessBody` only. Published versions are
   immutable; instances pin `{processId, version, definitionHash}`.
 - All conditions are CEL, `{ lang: "cel", src }`. CEL is pure and total, has no
@@ -130,7 +130,7 @@ Five project facts the dispatch must carry, because the skill cannot know them:
 - **A ruling stops at the definition contract.** The skill rules on and ledgers
   ambiguities itself. The file `src/schema/definition.ts` and the rules a delta spec
   states need their own OpenSpec change, never a ruling.
-- **The controller owns the branch.** Add the worktree or branch before Task 1. No
+- **The controller owns the branch.** Create the worktree or branch before Task 1. No
   subagent calls `EnterWorktree`, since one call re-pins every sibling.
 - **`tasks.md`'s headings don't match the skill's `task-brief` script.**
   OpenSpec's `## N. <group>` format isn't `### Task N`, so the script finds
@@ -155,7 +155,7 @@ printed instead of a bare "ran it".
   says so and exits 0. Run the gate rather than its probes by hand. Plain
   `git diff --check` misses CRLF, since `.gitattributes` sets `eol=lf`. The script reads
   `git ls-files --eol`.
-- A real browser, for any UI change. Green tests do not see an alert dialog rendered
+- A real browser, for any UI change. Green tests do not see an error dialog rendered
   behind a modal, a stale result row, or an `/admin/*` route collision. All three shipped
   past a green suite here. `docs/browser-checks.md` holds what stays manual.
   `development-toolchain`'s split rule picks one of three homes: a `bun:test` assertion,
