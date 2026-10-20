@@ -1,10 +1,5 @@
-# Normalize line endings, avoid CRLF/LF churn between Windows and other OSes
+# Normalize line endings to LF in the repository and the worktree
 * text=auto eol=lf
-
-# Never diff/merge lockfiles as text
-package-lock.json -diff
-pnpm-lock.yaml -diff
-yarn.lock -diff
 
 # Treat as binary
 *.png binary
