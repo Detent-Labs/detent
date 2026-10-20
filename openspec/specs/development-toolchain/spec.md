@@ -209,8 +209,9 @@ of them can then call the engine's HTTP wrapper from a browser, with no
 per-contributor setting change.
 
 It SHALL list the `http://127.0.0.1:<port>` origin of that same dev server too.
-The manual checklist mandates that address under Windows. A browser following
-it sends an origin the first form does not cover. One browser package therefore
+The manual checklist mandates that address. The bring-up publishes every port
+on the IPv4 loopback address alone. A browser following the checklist sends an
+origin the first form does not cover. One browser package therefore
 contributes two entries.
 
 In a checkout whose host address differs from the listening port, the
@@ -927,8 +928,9 @@ word for word.
 `docs/browser-checks.md` SHALL open with the operating rules a manual run
 needs.
 
-It SHALL name `127.0.0.1` as the address, never `localhost`. Under Windows
-`localhost` resolves to `::1`, and the connection hangs. The port itself is
+It SHALL name `127.0.0.1` as the address, never `localhost`. The bring-up
+binds every published port on the IPv4 loopback address alone, and `localhost`
+can resolve to `::1` first, where nothing listens. The port itself is
 per checkout. The bring-up publishes the ports `worktree-isolation` derives,
 through the Pod spec it generates. It prints them at the end of its run. The
 checklist SHALL say so, and SHALL name the generated spec.
