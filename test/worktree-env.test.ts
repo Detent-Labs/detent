@@ -260,6 +260,18 @@ test("no SMTP, Postgres or webhook sink port is published", async () => {
   expect(container(pod, "db").ports).toBeUndefined();
 });
 
+/**
+ * The app container shares the pod's loopback address with the database, and
+ * initdb trusts 127.0.0.1 by default. Without scram on host lines any
+ * password authenticates, and the privileges suite's retired-password test
+ * fails on a fresh volume.
+ */
+test("the db container's initdb requires a password over TCP", async () => {
+  const main = await mainRepo();
+  const db = container((await podSpec(main)).pod, "db");
+  expect(envValue(db, "POSTGRES_INITDB_ARGS")).toBe("--auth-host=scram-sha-256");
+});
+
 test("the db probe connects over TCP to the loopback address", async () => {
   const main = await mainRepo();
   const db = container((await podSpec(main)).pod, "db");

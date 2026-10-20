@@ -107,6 +107,12 @@ spec:
           value: $(q postgres)
         - name: $(q POSTGRES_DB)
           value: $(q workflow_engine)
+        # initdb trusts 127.0.0.1 by default. The app container shares the
+        # pod's loopback address, so without this every TCP connection it
+        # opens would skip the password check. Applies when initdb runs, on
+        # a fresh volume.
+        - name: $(q POSTGRES_INITDB_ARGS)
+          value: $(q --auth-host=scram-sha-256)
       # The parent of PGDATA, not PGDATA itself, so a major bump lands its
       # own subdirectory inside this volume.
       volumeMounts:
