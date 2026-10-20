@@ -34,12 +34,12 @@ drops every `openspec validate` line (`ownFindings`), because the CLI is not
 installed everywhere. A valid change proves nothing either, since a misread
 also prints no finding.
 
-The check therefore runs the script against a change with a known error, in a
-copy of `openspec/` under the scratch directory: a delta whose requirement
-carries no `#### Scenario:`. The CLI reports that as an ERROR, so the script
-must print a Critical from `openspec validate`. A MODIFIED header absent from
-the base spec does not serve: 1.14.3 reports it as INFO, measured on
-2026-10-20, and only the script's own header check turns it into a Critical.
+The check therefore runs the script against a change with a known error. It
+uses a copy of `openspec/` under the scratch directory and a delta whose
+requirement has no `#### Scenario:`. The CLI reports that as an ERROR, so the
+script must print a Critical from `openspec validate`. A MODIFIED header absent
+from the base spec does not serve. 1.14.3 reports it as INFO, measured on
+2026-10-20. Only the script's own header check turns it into a Critical.
 The suite still covers the script's own checks.
 
 ## Risks / Trade-offs

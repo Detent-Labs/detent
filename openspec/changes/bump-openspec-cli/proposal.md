@@ -6,8 +6,8 @@
 runs 1.14.3 since 2026-10-20. `scripts/openspec-review-check.ts` validates a
 change inside the container with 1.9.0, while a session validates it on the
 host with 1.14.3. The two can disagree. On 2026-10-20 the host CLI rejected a
-MODIFIED requirement that omitted a base scenario, and the changes of that day
-were shaped by it. Whether 1.9.0 runs the same check was never measured.
+MODIFIED requirement that omitted a base scenario. That rejection shaped the
+changes of that day. Nobody measured whether 1.9.0 runs the same check.
 
 ## What Changes
 
@@ -30,6 +30,6 @@ None. No spec states the CLI version, so this change sets `skip_specs: true`.
 
 - `container/Dockerfile`.
 - `test/openspec-review-check.test.ts` covers the review-check script's own
-  checks; a run against a known-bad change in a scratch copy proves the script
-  still reads the new CLI's output (design D2).
+  checks. A run against a known-bad change in a scratch copy proves the script
+  reads the new CLI's output (design D2).
 - Ordering: stacks on `rename-docker-dir`.

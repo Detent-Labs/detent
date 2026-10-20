@@ -3,7 +3,7 @@
 ## 1. Pin the CLI
 
 - [x] 1.1 Set `ENV OPENSPEC_VERSION=1.14.3` in `container/Dockerfile` (design D1). Run `sh scripts/dev-pod.sh up` so the image rebuilds and the pod replays. Verify that `sh scripts/dev-exec.sh openspec --version` prints `1.14.3` and that `bash scripts/preflight.sh core` passes.
-- [x] 1.2 Per design D2, copy `openspec/` into the scratch directory, add a change there whose delta carries a requirement with no `#### Scenario:` (an ERROR in 1.14.3; a MODIFIED header absent from the base is only INFO there), and run the review-check script with that copy as its working directory, in the container. Verify that it prints a Critical from `openspec validate`. Then run `sh scripts/dev-exec.sh env OPENSPEC_TELEMETRY=0 bun run scripts/openspec-review-check.ts bump-openspec-cli` in the repository and record both outputs.
+- [x] 1.2 Per design D2, copy `openspec/` into the scratch directory. Add a change there whose delta has a requirement with no `#### Scenario:`. That is an ERROR in 1.14.3, while a MODIFIED header absent from the base is only INFO there. Run the review-check script in the container with that copy as its working directory. Verify that it prints a Critical from `openspec validate`. Then run `sh scripts/dev-exec.sh env OPENSPEC_TELEMETRY=0 bun run scripts/openspec-review-check.ts bump-openspec-cli` in the repository and record both outputs.
 
 ## 2. Verification
 
@@ -16,4 +16,4 @@
 
 - Run `openspec-review-change`; then start apply without asking (owner's rule).
 - Archive last, after the five stacked changes below it.
-- No push until the user says the new machine is set up.
+- No push until the user confirms the new machine is ready.
