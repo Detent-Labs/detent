@@ -117,7 +117,7 @@ none of the four checks below. Finish verify → sync → archive before
 `superpowers:finishing-a-development-branch`'s merge/PR menu, since the archive
 step belongs before a push.
 
-Four project facts the dispatch must carry, because the skill cannot know them:
+Five project facts the dispatch must carry, because the skill cannot know them:
 - **The brief is thin.** A `tasks.md` checkbox line is not a task brief. Hand
   each implementer the task text plus the change's `design.md` and its delta
   spec under `openspec/changes/<name>/specs/`. Exact values live in those
@@ -141,7 +141,7 @@ Call a change done only after all four checks pass. Report what each one
 printed, not that you ran it.
 - `bun run typecheck`, then `bun run build`, then the **full** `bun test` with
   `DATABASE_URL` set (both rules under Conventions apply). `bun run check` runs
-  `lint`, the three, then `test:tz`, the reporting logic test under
+  `lint`, typecheck, build and the suite, then `test:tz`, the reporting logic test under
   `TZ=Europe/Zurich`.
 - When writing a `tasks.md` Verification task, keep `bun test` (and any
   other phrase `scripts/openspec-review-check.ts` string-matches) on one

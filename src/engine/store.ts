@@ -37,7 +37,7 @@ import { SPAWN_ACTION_TYPE, outboxActorsOf } from "./registry.js";
  * `bun:test` suites do exactly that at module scope, gated behind
  * `test.skipIf(!DATABASE_URL)` at the individual test, not the import. An
  * eager throw here would fail that `import` itself, for every such suite,
- * turning a documented graceful skip (see CLAUDE.md) into a crash.
+ * turning a documented silent skip (see CLAUDE.md) into a crash.
  */
 let realSql: SQL | undefined;
 function getSql(): SQL {
