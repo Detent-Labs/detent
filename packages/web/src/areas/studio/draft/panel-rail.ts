@@ -2,7 +2,7 @@ import type { Step } from "workflow-engine/schema";
 import type { DraftOf } from "./types";
 import type { DraftField } from "./fields";
 import { isDraftViewField, type DraftViewEntry } from "./view-layout";
-import type { EditorIssue, EntityType, IssueSource } from "./issues";
+import type { EditorIssue, IssueSource } from "./issues";
 import type { PanelView } from "../routing";
 
 type DraftStep = DraftOf<Step>;
@@ -78,29 +78,23 @@ export function flattenRailFields(fields: DraftField[] | undefined): RailFieldRo
   return rows;
 }
 
-/** How many issues the rail's own view carries. One `EntityType` per view:
- * `field` for Fields, `dataSource` for Data sources, `contract` for Contract. */
-export function issueCountForEntityType(issues: readonly EditorIssue[], entityType: EntityType): number {
-  return issues.filter((i) => i.entityType === entityType).length;
-}
-
 /** The field matrix's own issue count, filtered by `source` rather than
  * `entityType`: `checkViewFlags` issues carry `entityType: "step"`, the same
  * type every other per-step issue (a path's CEL issue, an action's registry
- * issue) already carries, so `issueCountForEntityType` cannot isolate them.
+ * issue) already carries, so an `entityType` filter cannot isolate them.
  *
  * Since technical-field-marker, the `view` source also holds
  * `checkUnwrittenTechnicalFields`' finding, which anchors on the field
  * (`entityType: "field"`) rather than a step. This count therefore
  * over-reports by one per such field, with nothing in the grid to point at —
- * an accepted trade-off (design.md Risks). The field catalog's own
- * `issueCountForEntityType` badge surfaces that finding correctly. */
+ * an accepted trade-off (design.md Risks). The field catalog's per-row mark,
+ * `issueCountForEntityId`, surfaces that finding correctly. */
 export function issueCountForSource(issues: readonly EditorIssue[], source: IssueSource): number {
   return issues.filter((i) => i.source === source).length;
 }
 
-/** How many issues resolved to one specific entity — a rail sub-list row's own
- * per-entity mark, beside `issueCountForEntityType`'s per-view total. */
+/** How many issues resolved to one specific entity — an entity rail row's own
+ * per-entity mark. */
 export function issueCountForEntityId(issues: readonly EditorIssue[], entityId: string): number {
   return issues.filter((i) => i.entityId === entityId).length;
 }
@@ -138,11 +132,4 @@ export function stepEntityIds(step: DraftStep): string[] {
     pushActions(timer.onFire?.actions);
   }
   return ids;
-}
-
-/** One issue count for the selected step as a whole — the step and everything
- * under it. See `stepEntityIds` for why the step's own id is not enough. */
-export function stepIssueCount(issues: readonly EditorIssue[], step: DraftStep): number {
-  const ids = new Set(stepEntityIds(step));
-  return issues.filter((i) => ids.has(i.entityId)).length;
 }

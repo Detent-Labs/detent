@@ -103,7 +103,7 @@ const DATA_LIST_COLUMN_KEY_FORMAT = /^[a-z_][a-z0-9_]*$/;
  * target field's declared type rather than coercing it, and a text-only store
  * would make `data.price > 10` compare a string against a number.
  */
-export const dataListColumn = z.object({
+const dataListColumn = z.object({
   key: z.string().regex(DATA_LIST_COLUMN_KEY_FORMAT).max(MAX_KEY_LENGTH),
   label: z.string().min(1),
   type: z.enum(["string", "number", "boolean"]),

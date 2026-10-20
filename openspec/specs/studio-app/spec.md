@@ -16,6 +16,7 @@ the `process-drafts` capability for the server-side store and routes this
 frontend calls, and the `authorization` capability for the `system:developer`
 role its shell checks (presentationally) and every studio route enforces
 (authoritatively).
+
 ## Requirements
 
 ### Requirement: Studio is a workspace package that reaches the engine only through its two sanctioned boundaries
@@ -67,6 +68,7 @@ the role authoritatively.
 
 <!-- antislop: allow synonym-rotation -->
 <!-- A MODIFIED header cannot change, so the header keeps the base words. -->
+
 ### Requirement: Leaving the edit screen with unsaved changes prompts first
 
 Every control that navigates away from an open draft SHALL check the dirty
@@ -367,6 +369,7 @@ The publish dialog reports a refusal the same way.
 
 <!-- antislop: allow sentence-length run-ons passive-voice -->
 <!-- Base wording stays verbatim in a MODIFIED block. -->
+
 ### Requirement: Studio authenticates with the existing login and session mechanism
 
 <!-- antislop: allow sentence-length run-ons passive-voice -->
@@ -712,6 +715,7 @@ capability's requirement on the studio's testable logic states that pattern.
 
 <!-- Why: `edit` names the route; a change names a draft mutation. -->
 <!-- antislop: allow synonym-rotation -->
+
 ### Requirement: Editing is a canvas-primary surface, with the process-wide views on a routed screen
 
 The `/processes/:id/edit` screen SHALL carry over the editor's Draft model
@@ -833,6 +837,7 @@ version number and `definitionHash`.
 
 <!-- The heading repeats the live spec's wording verbatim, so a delta can match it. -->
 <!-- antislop: allow synonym-rotation -->
+
 ### Requirement: The panels screen is a routed sub-state of the edit screen
 
 The eleven tabs SHALL sit on a routed surface, not behind a dialog. The path
@@ -931,6 +936,7 @@ body, and no empty band sits below it.
 <!-- The heading repeats the live spec's wording verbatim, so a delta can match it. -->
 
 <!-- antislop: allow synonym-rotation -->
+
 ### Requirement: The panels screen keeps every change and states so
 
 <!-- antislop: allow synonym-rotation -->
@@ -1265,6 +1271,7 @@ empty-key field did before.
 
 <!-- The heading repeats the live spec's wording verbatim, so a delta can match it. -->
 <!-- antislop: allow synonym-rotation -->
+
 ### Requirement: The panels screen's Changes view shows what a publish would change
 
 The Changes tab SHALL state the difference between the draft and the version the
@@ -1449,6 +1456,7 @@ The Changes tab SHALL print its number of rows as its own count.
 <!-- The heading repeats the live spec's wording verbatim, so a delta can match it. -->
 
 <!-- antislop: allow synonym-rotation -->
+
 ### Requirement: The panels screen's Paths view lists every path in the process
 
 The Paths tab SHALL carry one row per path across the whole draft. The five
@@ -2146,6 +2154,7 @@ fact about the field, not about any one cell.
 - **THEN** that row header carries no technical-field marker
 
 <!-- antislop: allow synonym-rotation -->
+
 ### Requirement: Column and row headers offer bulk flag toggles on the panels screen
 
 The Field matrix tab mounts the only field matrix, and this requirement covers
@@ -2285,6 +2294,7 @@ wherever they carry a bulk badge.
   `required` badge
 
 <!-- antislop: allow synonym-rotation -->
+
 ### Requirement: The panels screen's field matrix toolbar filters inert columns and reports coverage
 
 The Field matrix tab mounts the only field matrix, and this requirement covers
@@ -2353,6 +2363,7 @@ none. The note itself still counts as no entry and occupies no cell.
 <!-- The heading repeats the live spec's wording verbatim, so a delta can match it. -->
 
 <!-- antislop: allow synonym-rotation -->
+
 ### Requirement: The panels screen's field matrix toolbar explains its marks with a legend
 
 The Field matrix tab mounts the only field matrix, and this requirement covers
@@ -2526,6 +2537,7 @@ grid.
   tab order
 
 <!-- antislop: allow synonym-rotation -->
+
 ### Requirement: The field matrix's rail entry counts field entries and view findings
 
 The `studio-process-tabs` capability gives the Field matrix tab no entity count.
@@ -2670,6 +2682,7 @@ locale key. One character typed into any text field is enough.
 
 <!-- antislop: allow sentence-length run-ons passive-voice em-dash -->
 <!-- Base wording stays verbatim in a MODIFIED block. -->
+
 ### Requirement: A save conflict is surfaced and resolved by reloading, never merged
 
 <!-- antislop: allow sentence-length run-ons passive-voice em-dash -->
@@ -2750,6 +2763,7 @@ make.
 - **AND** Publish raises no save-first note
 
 <!-- antislop: allow passive-voice -->
+
 ### Requirement: Studio's testable logic is extracted from its components
 
 Following `packages/web/src/areas/app/screens/inboxLogic.ts`, the logic
@@ -3005,6 +3019,7 @@ rule rejects a tree it exists to admit.
 - **THEN** the note's strip shows the warning beside its text input
 
 <!-- antislop: allow synonym-rotation -->
+
 ### Requirement: The panels screen and its process-wide views render from compiled styles
 
 Four tabs carry a process-wide subject this requirement covers. They are the
@@ -4862,3 +4877,31 @@ SHALL keep the draft it holds.
 - **WHEN** the author opens the player for a draft
 - **THEN** the browser requests the player's chunk, and the player renders once
   the chunk arrives
+
+### Requirement: Creating a template over an existing key asks first
+
+The templates screen SHALL ask for a confirmation before a create whose key
+matches a template in the loaded list. The engine replaces a template that
+has the same key, and a template keeps no earlier version. A confirmation
+SHALL let the create go ahead. A cancel SHALL send no request and SHALL keep
+the typed key and the chosen source in the form.
+
+A create with a key the list does not hold SHALL NOT ask.
+
+#### Scenario: A create over an existing key asks before the request
+
+- **WHEN** a curator types the key `approval`, which the list already holds,
+  and presses Create
+- **THEN** the screen asks for a confirmation before it calls the engine
+
+#### Scenario: A cancelled replacement sends nothing
+
+- **WHEN** the curator cancels that confirmation
+- **THEN** the screen sends no request and the stored template stays as it
+  was
+- **AND** the form keeps the key and the source
+
+#### Scenario: A new key creates without a prompt
+
+- **WHEN** a curator types a key the list does not hold and presses Create
+- **THEN** the screen creates the template and asks nothing

@@ -81,9 +81,12 @@ free to vary.
 
 ### Requirement: Starting the server creates the schema
 
-`startHttpServer` SHALL run `initSchema` against its database before it begins
-accepting requests, and the user-administration CLI SHALL do the same before
-executing a command. Every statement in `initSchema` is idempotent:
+Outside SaaS mode, `startHttpServer` SHALL run `initSchema` against its
+database before it begins accepting requests. In SaaS mode the provisioning
+command builds each tenant database's schema instead. The requirement "Each
+tenant database carries the whole schema from its creation" states that rule.
+The user-administration CLI SHALL run `initSchema` before executing a command.
+Every statement in `initSchema` is idempotent:
 `CREATE ... IF NOT EXISTS` for a relation or index, `CREATE OR REPLACE` for a
 function, and `DROP ... IF EXISTS` before `CREATE TRIGGER`. A `DO` block
 guards a role's creation on `pg_roles`, and `GRANT` is idempotent by nature.
@@ -97,12 +100,6 @@ role that owns them, under `SET LOCAL ROLE`. `initSchema` SHALL run no
 raises again on a run after the ownership is already correct. A
 `CREATE OR REPLACE FUNCTION` raises the same way. The second run's
 no-op therefore SHALL hold for a non-superuser role too.
-
-Today `initSchema` has exactly two non-test callers. They are its own definition
-and the demo script. `bun run serve` is a first-class documented script. It
-fails at request time with a relation-does-not-exist error. That happens against
-any database that has not had the test suite or the demo script run against it.
-`add-user` fails the same way on a fresh database.
 
 The shared database client SHALL fail at construction when `DATABASE_URL` is
 unset. The error SHALL name that variable. The client SHALL NOT build from an

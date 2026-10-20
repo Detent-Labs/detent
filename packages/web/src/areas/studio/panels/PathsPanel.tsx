@@ -10,6 +10,7 @@ import { removeAt, replaceAt, updateAt } from "../draft/list-ops";
 import { t } from "../catalog.js";
 import { ConditionInput } from "./shared/ConditionInput";
 import { IssueList } from "./shared/IssueList";
+import { KeyCaption } from "./shared/KeyCaption";
 import { ActionListEditor } from "./ActionListEditor";
 import type { ConfigFieldDescriptor } from "../api/types.js";
 
@@ -251,7 +252,9 @@ export function PathsPanel({
         >
           <div {...stylex.props(styles.labelKeyRow)}>
             <label {...stylex.props(styles.fieldLabel)}>
-              <span {...stylex.props(styles.fieldLabelText)}>label</span>
+              <span {...stylex.props(styles.fieldLabelText)}>
+                <KeyCaption text={t("paths.labelCaption")} jsonKey="label" />
+              </span>
               <input
                 type="text"
                 value={path.label ?? ""}
@@ -259,7 +262,9 @@ export function PathsPanel({
               />
             </label>
             <label {...stylex.props(styles.fieldLabel)}>
-              <span {...stylex.props(styles.fieldLabelText)}>key</span>
+              <span {...stylex.props(styles.fieldLabelText)}>
+                <KeyCaption text={t("paths.keyCaption")} jsonKey="key" />
+              </span>
               <input
                 type="text"
                 {...stylex.props(styles.monoInput)}
@@ -269,7 +274,9 @@ export function PathsPanel({
             </label>
           </div>
           <label {...stylex.props(styles.fieldLabel)}>
-            <span {...stylex.props(styles.fieldLabelText)}>to</span>
+            <span {...stylex.props(styles.fieldLabelText)}>
+              <KeyCaption text={t("paths.toCaption")} jsonKey="to" />
+            </span>
             <span {...stylex.props(styles.selectWrap)}>
               <select
                 {...stylex.props(styles.select)}
@@ -326,7 +333,7 @@ export function PathsPanel({
             <legend {...stylex.props(styles.studioOnlyWhenLegend)}>{t("condition.onlyWhenHeading")}</legend>
             {path.trigger === "automatic" ? (
               <label>
-                priority
+                <KeyCaption text={t("paths.priorityCaption")} jsonKey="priority" />
                 <input
                   type="number"
                   value={path.priority ?? ""}
@@ -350,7 +357,7 @@ export function PathsPanel({
           </fieldset>
 
           <ActionListEditor
-            label="onPath"
+            label={<KeyCaption text={t("paths.onPathLegend")} jsonKey="onPath" />}
             actions={path.onPath}
             onChange={(onPath) => updatePath(index, { onPath })}
             fields={fields}

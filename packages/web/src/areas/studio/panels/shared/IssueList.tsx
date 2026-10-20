@@ -2,7 +2,6 @@ import * as stylex from "@stylexjs/stylex";
 import { colors, fonts } from "form-ui/tokens.stylex";
 import type { EditorIssue } from "../../draft/issues";
 import { useDraft } from "../../draft/store";
-import { t } from "../../catalog.js";
 
 const styles = stylex.create({
   /** An issue's source, the machine-matched category the check came from:
@@ -56,10 +55,7 @@ export function IssueList({ entityId }: { entityId: string | undefined }) {
   return <IssueItems issues={validation.issues.filter((i) => i.entityId === entityId)} />;
 }
 
-export function NotCheckedBadge({ label }: { label: string }) {
-  return (
-    <span className="badge badge-not-checked">
-      {label}: {t("issues.notChecked")}
-    </span>
-  );
+/** `text` is the whole sentence, from the catalog, so none joins from two parts. */
+export function NotCheckedBadge({ text }: { text: string }) {
+  return <span className="badge badge-not-checked">{text}</span>;
 }

@@ -78,7 +78,8 @@ function render(path: Record<string, unknown>): string {
   );
 }
 
-const PRIORITY_INPUT = /<label>priority<input/;
+// The caption: plain words, then the JSON property in a mono `<code>` (`ui-string-overrides`).
+const PRIORITY_INPUT = /<label>Order among automatic paths <code[^>]*>priority<\/code><input/;
 const NOTE = "The participant sees this path&#x27;s button only while the condition holds.";
 
 describe("a manual path with a guard", () => {

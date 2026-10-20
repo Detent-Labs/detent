@@ -11,6 +11,7 @@ import { t } from "../catalog.js";
 import { processLabel } from "../draft/guided-labels.js";
 import { specForProcess } from "../draft/subprocessSpec";
 import { FieldExpressionMapEditor } from "./shared/FieldExpressionMapEditor";
+import { KeyCaption } from "./shared/KeyCaption";
 import { nextUnusedTarget } from "./shared/fieldExpressionMapLogic";
 import type { ChildInputFields } from "./shared/useChildInputFields";
 
@@ -99,7 +100,9 @@ export function SubprocessSpecEditor({ value, fields, childInputs, onChange, pro
   if (!value) {
     return (
       <fieldset className="subprocess-spec">
-        <legend>subprocess</legend>
+        <legend>
+          <KeyCaption text={t("subprocess.legend")} jsonKey="subprocess" />
+        </legend>
         {processPicker}
       </fieldset>
     );
@@ -113,7 +116,9 @@ export function SubprocessSpecEditor({ value, fields, childInputs, onChange, pro
 
   return (
     <fieldset className="subprocess-spec">
-      <legend>subprocess</legend>
+      <legend>
+        <KeyCaption text={t("subprocess.legend")} jsonKey="subprocess" />
+      </legend>
       {processPicker}
 
       <label {...stylex.props(styles.field)}>
@@ -145,13 +150,13 @@ export function SubprocessSpecEditor({ value, fields, childInputs, onChange, pro
         </label>
       ) : (
         <label>
-          contractRef (child contract hash)
+          <KeyCaption text={t("subprocess.contractRefCaption")} jsonKey="contractRef" />
           <input type="text" value={value.contractRef ?? ""} onChange={(e) => update({ contractRef: e.target.value })} />
         </label>
       )}
 
       <FieldExpressionMapEditor
-        legend="inputMapping"
+        legend={<KeyCaption text={t("subprocess.inputMappingLegend")} jsonKey="inputMapping" />}
         addLabel={t("subprocess.addInputMapping")}
         removeLabel={t("subprocess.removeMappingEntry")}
         mapping={value.inputMapping}
@@ -166,7 +171,7 @@ export function SubprocessSpecEditor({ value, fields, childInputs, onChange, pro
         {note && <p {...stylex.props(styles.note)}>{note}</p>}
       </div>
       <FieldExpressionMapEditor
-        legend="outputMapping"
+        legend={<KeyCaption text={t("subprocess.outputMappingLegend")} jsonKey="outputMapping" />}
         addLabel={t("subprocess.addOutputMapping")}
         removeLabel={t("subprocess.removeMappingEntry")}
         mapping={value.outputMapping}

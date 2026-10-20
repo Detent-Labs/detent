@@ -82,7 +82,7 @@ export async function listProcesses(token: string): Promise<ProcessSummary[]> {
   return getJson<ProcessSummary[]>("/processes", token);
 }
 
-export interface OutboxListParams {
+interface OutboxListParams {
   status?: string[];
   instanceId?: string;
   limit?: number;
