@@ -42,5 +42,7 @@ to change, and the line it needs.
 
 - **WHEN** check 5 fails in a linked worktree
 - **THEN** the printed seed command execs into that worktree's own `app`
-  container, and does not name a pod or a container literally
+  container
+- **AND** the command takes the container's name from the derivation, never
+  from a fixed name
 
