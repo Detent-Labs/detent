@@ -26,7 +26,7 @@ so a bare `container` entry in `.dockerignore` matches the root alone.
   prose word "devcontainer" name the dev container, not the directory.
 - Touching archived changes. They record the path as it was.
 - A migration helper for other machines. This repository has one development
-  machine today. The README line covers anyone else.
+  machine today. The README's migration subsection covers anyone else.
 
 ## Decisions
 

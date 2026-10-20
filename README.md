@@ -151,6 +151,14 @@ next `bash scripts/dev-up.sh`. A linked worktree used its own project name,
 `-app-1`, `-db-1` and `-mailpit-1` containers, its `_default` network and its
 `_pgdata` volume the same way.
 
+A clone that still has `.devcontainer/` moves its login secret before the next
+bring-up, so existing logins stay valid. The next `bash scripts/dev-up.sh`
+regenerates the Pod spec at its new path.
+
+```sh
+mv .devcontainer/.auth-secret container/ 2>/dev/null; rm -rf .devcontainer
+```
+
 This repository used to run no CI beyond `.githooks/pre-push`, by
 deliberate choice. This change reverses that choice.
 `.github/workflows/check.yml` runs the same checks on GitHub's own

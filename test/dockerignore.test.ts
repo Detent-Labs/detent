@@ -25,6 +25,8 @@ import { join, resolve } from "node:path";
 const REPO_ROOT = resolve(import.meta.dir, "..");
 const DOCKERIGNORE_PATH = resolve(REPO_ROOT, ".dockerignore");
 
+// "container" is the root directory holding the dev image recipe. The recurring-name check makes any nested
+// directory named `container` fail this file loudly: rename it, or anchor the entry.
 const REQUIRED_ENTRIES = ["**/node_modules", "**/.git", "**/.env", ".claude", ".worktrees", "container"];
 
 function parsePatterns(text: string): string[] {
