@@ -56,3 +56,33 @@ sh scripts/dev-exec.sh env VITE_API_URL=http://127.0.0.1:<PORT_APP> sh -c 'cd pa
 Nothing publishes an extra port of your own. A port the generated spec does
 not cover means a change to `scripts/dev-pod.sh`. Never hand-edit
 `container/pod.yaml`: the next `up` overwrites it.
+
+## Running the suite
+
+Run the full suite from the host in one call:
+```
+rtk test sh scripts/dev-exec.sh sh scripts/test-gated.sh bun test
+```
+Inside the container, run `sh scripts/test-gated.sh bun test`. Run the full
+suite either way, since a subset run fails the pass floor.
+`scripts/test-gated.sh` runs the command, prints its full output, then runs
+`scripts/gates/silent-green.sh` over that output. The exit code is the suite's
+own, or 1 when the suite exits 0 and the gate rejects the run.
+
+**The host call filters through rtk.** It runs on the host and stays optional,
+since the runner also works without it. Measured on 2026-09-30 with rtk 0.50.0
+and 4997 tests: a green run prints 6 lines and 87 characters, against 5581
+lines and 523110 characters raw. A red run keeps each failing test's name, its
+diff and its stack lines.
+
+**Exit 1 with `0 fail` means the gate rejected the run.** The filter hides the
+rejection text. The last line names the full log under `rtk/tee/`, and that
+log holds the rejection.
+
+**Three traps in the host call.**
+- Keep `bun test` as literal words at the end of the call. `rtk test` picks
+  its filter from them, and without them a red run loses every name and diff.
+- Never pass `sh -c '...'` to `rtk test`. It splits the script at spaces, so
+  `rtk test sh -c 'exit 3'` prints nothing and exits 0. It does not forward
+  stdin either.
+- Do not use `rtk err` for tests, because it cuts object diffs short.

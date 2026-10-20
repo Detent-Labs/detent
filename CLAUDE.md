@@ -3,54 +3,47 @@
 
 ## What this is
 A workflow/BPM platform written in TypeScript. It runs structured, form- and
-approval-driven business processes with explicit states.
+approval-driven business processes with explicit states. The product is the
+engine plus its browser UI (`packages/web`). Four areas serve the participant,
+the operator, the developer and the process owner. Two of those words are domain
+terms here and carry no synonym: an **operator** is the admin area's audience,
+and an authoring **surface** is what the studio presents.
 
-The product is the engine plus its browser UI (`packages/web`). Four areas serve
-the participant, the operator, the developer and the process owner. Two of those
-words are domain terms here and carry no synonym: an **operator** is the admin
-area's audience, and an authoring **surface** is what the studio presents.
+The engine stays headless and API-first behind that UI, with no UI dependency.
+`packages/web` reaches it only over the HTTP wrapper and the exports map. That
+property is load-bearing: an integration drives a process with no browser at
+all. Do not let a UI concern leak into `src/`.
 
-The engine itself stays headless and API-first behind that UI. It carries no UI
-dependency. `packages/web` reaches it only over the HTTP wrapper and the
-exports map. That property is load-bearing: an integration drives a process
-with no browser at all. Do not let a UI concern leak into `src/`.
-
-Direction: no-code and low-code process authoring (`ROADMAP.md` stage 27, DONE
-a–f). The two words name two things. No-code is the target for what the
-builders cover: an author types no CEL and no JSON. Low-code is what stays
-underneath permanently: the JSON surface, the CEL input and hand-authored bodies
-stay first-class.
-
-The builders cover the canvas, the form editor, plugin config, path guards and
-view overrides, migration plans and templates. Three sites keep a raw input on
-purpose: a timer deadline must infer to `string`, an `Action.output` value reads
-`result` alone, and the JSON surface is the escape hatch for what no builder
-expresses. That direction relaxes none of the definition contract rules. Every
-authoring surface produces the same JSON definition.
+Direction: no-code and low-code process authoring (`ROADMAP.md` stage 27).
+No-code is the target for what the builders cover: an author types no CEL and
+no JSON. Low-code stays underneath permanently: the JSON surface, the CEL input
+and hand-authored bodies stay first-class. The builders cover the canvas, the
+form editor, plugin config, path guards and view overrides, migration plans and
+templates. Three sites keep a raw input on purpose: a timer deadline must infer
+to `string`, an `Action.output` value reads `result` alone, and the JSON surface
+is the escape hatch for what no builder expresses. That direction relaxes none
+of the definition contract rules. Every authoring surface produces the same
+JSON definition.
 
 The paradigm is a state-based finite-state machine: Steps (states) connected by
-explicit Paths (transitions). This is NOT BPMN token flow.
-
-Three roles share one artifact, the serialized JSON process definition: the
-engine executes it, the studio builds it on a canvas, and hand-authoring writes
-it directly as JSON (rare). That definition is the definition contract between
-engine and studio. `src/schema/definition.ts` is that definition contract,
-expressed as TypeScript types. The word `contract` alone names something else
-here, the `ProcessContract` a subprocess declares. Write `definition contract`
-whenever the whole JSON definition is meant.
+explicit Paths (transitions). This is NOT BPMN token flow. Three roles share one
+artifact, the serialized JSON process definition: the engine executes it, the
+studio builds it on a canvas, and hand-authoring writes it directly as JSON
+(rare). That definition is the definition contract between engine and studio;
+`src/schema/definition.ts` expresses it as TypeScript types. The word
+`contract` alone names the `ProcessContract` a subprocess declares. Write
+`definition contract` whenever the whole JSON definition is meant.
 
 ### Stage: pre-1.0, with nothing deployed to preserve
-No deployment runs this engine. No stored instance pins a version somebody else
-depends on, and no definition under `examples/` is a customer's. A proposal is
-therefore never wrong merely because it conflicts with today's definition
-contract, Zod schema or invariant set. Changing one of those costs an OpenSpec
-change and a sweep of `examples/`, the tests and `docs/authoring-guide.md`.
-Where the right shape needs a contract change, propose the contract change.
-
-Two things this does not loosen. The runtime rules still hold at runtime: a
-published version stays immutable and an instance still pins
-`{processId, version, definitionHash}`, because the engine's own correctness
-rests on it. And the mechanical gates below stay non-negotiable.
+No deployment runs this engine, no stored instance pins a version somebody
+else depends on, and no definition under `examples/` is a customer's. A
+proposal is therefore never wrong merely because it conflicts with today's
+definition contract, Zod schema or invariant set. Changing one costs an
+OpenSpec change and a sweep of `examples/`, the tests and
+`docs/authoring-guide.md`. Where the right shape needs a contract change,
+propose it. Two things stay: at runtime a published version is immutable and an
+instance pins `{processId, version, definitionHash}`, since the engine's
+correctness rests on it; and the mechanical gates below stay non-negotiable.
 
 ### Hard v1 boundaries (do not cross without a deliberate decision)
 - Exactly one active step per instance (single FSM). No parallelism, no
@@ -81,78 +74,64 @@ definition. The short form, true in every session:
   `{ type, config }` and resolve through a registry at PUBLISH time.
 
 ## Change workflow (OpenSpec)
-This repo is spec-driven via OpenSpec (`openspec/`). Every non-trivial change —
-new capability, definition contract or schema change, tooling or infra switch —
-goes through an OpenSpec change, not a direct edit: propose -> generate
-specs/tasks -> implement -> verify -> archive. Start one with the `openspec-*`
-skills (`openspec-new-change`, or `openspec-propose` for a full proposal in
-one step); `openspec-apply-change` implements tasks and
-`openspec-archive-change` closes it. The project context OpenSpec shows the AI
-when generating artifacts lives in `openspec/config.yaml` (`context:`) — keep
-it current.
+Every non-trivial change (new capability, definition contract or schema change,
+tooling or infra switch) goes through an OpenSpec change in `openspec/`, not a
+direct edit: propose -> generate specs/tasks -> implement -> verify -> archive.
+The `openspec-*` skills drive it: `openspec-new-change` or `openspec-propose`,
+`openspec-apply-change`, `openspec-archive-change`. Keep the project context in
+`openspec/config.yaml` (`context:`) current.
 
-**`.claude/commands/opsx/` stays deleted.** The skills above are the set to
-keep; the commands under that directory once mirrored eleven of them and
-carried no instruction the skills lack. `openspec update` regenerates the
-directory with no opt-out flag. If a run of it puts the eleven files back,
-delete `.claude/commands/opsx/` again.
+**`.claude/commands/opsx/` stays deleted.** The skills are the set to keep.
+`openspec update` regenerates that directory with no opt-out flag; delete it
+again after such a run.
 
 **A trivial fix touches one file, no spec and no test.** It skips the cycle.
 Everything else is a change, whatever it looked like at first glance. Count the
-files before you call something a one-liner. A self-declared "one-liner" here
-touched four files and a spec.
+files before you call something a one-liner.
 
-**A UI change is never trivial.** A screen touches its area, the area's i18n
-catalog, and often the shell or the tokens. It gets a change, and that change
-writes its delta against the capability spec of the area it touches:
-`end-user-app` for
-`areas/app/`, `admin-app` for `areas/admin/`, `reporting-app` for
-`areas/reporting/`, `unified-shell` for shell, login, routing and chrome,
-`form-ui` for the renderer. Studio work goes to the specific capability —
-`studio-canvas`, `studio-json-view`, `studio-form-editor`, `studio-publish` and
-the rest — and `studio-app` keeps the frame, navigation and process list.
-`spa-accessibility`, `ui-string-overrides` and `authored-content-localization`
-cut across all of them. A screen that needs new data adds the API-side spec too,
-`instance-query` or `admin-operations-api` for example.
+**A UI change is never trivial.** A screen touches its area, its i18n catalog,
+and often the shell or the tokens. Its change writes its delta against the
+capability spec of the area it touches: `end-user-app` for `areas/app/`,
+`admin-app` for `areas/admin/`, `reporting-app` for `areas/reporting/`,
+`unified-shell` for shell, login, routing and chrome, `form-ui` for the
+renderer. Studio work goes to the specific capability (`studio-canvas`,
+`studio-json-view`, `studio-form-editor`, `studio-publish` and the rest), and
+`studio-app` keeps the frame, navigation and process list. `spa-accessibility`,
+`ui-string-overrides` and `authored-content-localization` cut across all of
+them. A screen that needs new data adds the API-side spec too, `instance-query`
+or `admin-operations-api` for example.
 
 **No phase inside the cycle is optional.** Do not propose skipping the spec or
 the plan phase. That holds for `openspec-propose` and for the brainstorming
 skill. Run the `openspec-review-change` skill before `openspec-apply-change`,
-every time. Resolve
-every finding it reports first. Apply starts at zero open findings. That review
-keeps finding real errors: a missed second consumer of `GET /instances`, a
-design resting on a false `InstanceView.assignment` premise, a migration
-ordering derived from files nobody read.
+every time. Resolve every finding it reports first. Apply starts at zero open
+findings.
 
 ### Apply runs on subagent-driven-development
-The apply phase does not run as an inline loop inside the session's own
-context. `openspec-apply-change` step 6 is replaced by
-`superpowers:subagent-driven-development`, with the change's `tasks.md` as its
-plan file: one fresh implementer subagent per task, a task reviewer after each,
-a fix loop capped at five rounds, a ledger under `.superpowers/sdd/`, and one
-whole-branch review at the end. Every other phase stays OpenSpec's — propose,
-review, verify, archive. The skill's final review is not one of the four checks
-below and replaces none of them.
-
-Finish verify → sync → archive before reaching for
-`superpowers:finishing-a-development-branch`'s merge/PR menu. That skill
-doesn't know this repo's archive step belongs before a push.
+`superpowers:subagent-driven-development` replaces `openspec-apply-change` step
+6, not an inline loop. The change's `tasks.md` is its plan file: one fresh
+implementer subagent per task, a task reviewer after each, a fix loop capped at
+five rounds, a ledger under `.superpowers/sdd/`, and one whole-branch review at
+the end. Every other phase stays OpenSpec's. The skill's final review replaces
+none of the four checks below. Finish verify → sync → archive before
+`superpowers:finishing-a-development-branch`'s merge/PR menu, since the archive
+step belongs before a push.
 
 Four project facts the dispatch must carry, because the skill cannot know them:
 - **The brief is thin.** A `tasks.md` checkbox line is not a task brief. Hand
   each implementer the task text plus the change's `design.md` and its delta
   spec under `openspec/changes/<name>/specs/`. Exact values live in those
   files, never in the dispatch prose.
-- **No single-file test rerun.** The DB suites share one database and truncate
-  in `beforeEach`, so back-to-back runs of one file fail spuriously. An
-  implementer runs the full `bun test` with `DATABASE_URL` set, in the
-  devcontainer, and reads its verdict off a named failure.
+- **No single-file test rerun** (see Conventions). An implementer runs the full
+  `bun test` with `DATABASE_URL` set, in the devcontainer, and reads its
+  verdict off a named failure.
 - **A ruling stops at the definition contract.** The skill decides ambiguities
   itself and ledgers them. That authority ends at `src/schema/definition.ts`
   and at any rule a delta spec states: those need their own OpenSpec change,
   never a ruling.
 - **The controller owns the branch.** Create the worktree or branch before
-  Task 1. No subagent calls `EnterWorktree` — one call re-pins every sibling.
+  Task 1. No subagent calls `EnterWorktree`, since one call re-pins every
+  sibling.
 - **`tasks.md`'s headings don't match the skill's `task-brief` script.**
   OpenSpec's `## N. <group>` format isn't `### Task N`, so the script finds
   nothing. Cut per-group briefs by hand with `awk` on `## N.` instead.
@@ -161,44 +140,36 @@ Four project facts the dispatch must carry, because the skill cannot know them:
 Call a change done only after all four checks pass. Report what each one
 printed, not that you ran it.
 - `bun run typecheck`, then `bun run build`, then the **full** `bun test` with
-  `DATABASE_URL` set. `bun run check` runs `lint`, then the three, then
-  `test:tz`, the reporting logic test under `TZ=Europe/Zurich`. Both rules under
-  Conventions apply. A green without the variable is not evidence. A single-file
-  rerun is not the signal.
+  `DATABASE_URL` set (both rules under Conventions apply). `bun run check` runs
+  `lint`, the three, then `test:tz`, the reporting logic test under
+  `TZ=Europe/Zurich`.
 - When writing a `tasks.md` Verification task, keep `bun test` (and any
   other phrase `scripts/openspec-review-check.ts` string-matches) on one
   unwrapped line. A Markdown line wrap silently defeats the match and
   reports a false Critical.
-- The antislop linter, on every Markdown file the change touched. Run the same
-  check the push gate runs, over the same range: `sh scripts/gates/range.sh <
-  /dev/null | sh scripts/gates/prose.sh`. The empty-range fallback to
-  `origin/main..HEAD` lives in `scripts/gates/range.sh`, not in `prose.sh`
-  itself — `prose.sh` reads its ranges on stdin, and an empty list checks
-  nothing, says so, and exits 0.
-- Trailing whitespace, blank-at-eof, and CRLF. Run the same check the push gate
-  runs, over the same range: `sh scripts/gates/range.sh < /dev/null | sh
-  scripts/gates/whitespace.sh`. The `< /dev/null` belongs on `range.sh`, which
-  falls back to `origin/main..HEAD`. Handing `whitespace.sh` an empty stdin
-  checks nothing. Run the gate rather than its probes by hand. Plain
-  `git diff --check` misses CRLF, since `.gitattributes` sets `eol=lf`. The
-  script reads `git ls-files --eol`.
+- The antislop linter, on every Markdown file the change touched, and the
+  trailing whitespace, blank-at-eof and CRLF check. Run each the way the push
+  gate does, over the same range:
+  `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`, and the
+  same with `whitespace.sh`. The `< /dev/null` belongs on `range.sh`, which
+  falls back to `origin/main..HEAD`. Both gates read their ranges on stdin; an
+  empty stdin checks nothing, and `prose.sh` says so and exits 0. Run the gate
+  rather than its probes by hand. Plain `git diff --check` misses CRLF, since
+  `.gitattributes` sets `eol=lf`. The script reads `git ls-files --eol`.
 - A real browser, for any UI change. Green tests do not see an error dialog
   rendered behind a modal, a stale result row, or an `/admin/*` route
   collision. All three shipped past a green suite here. `docs/browser-checks.md`
   holds what stays manual; `development-toolchain`'s split rule decides
   among three homes: a `bun:test` assertion, an `e2e/` smoke flow, or a
-  checklist entry here.
+  checklist entry there.
 
 ## Enforced mechanically. Do not re-litigate these.
-
-`.githooks/pre-push` runs the gates below on every push. Each one covers a defect
-class this repository produced two or more times. Each names the rule it broke,
-the files that broke it, and the command that repairs them.
-
-Do not argue these down, weaken a pattern to make a push pass, or raise a
-threshold to clear a red gate. Repair the file instead. Where a gate is wrong
-about a specific line, silence it in place and say why, the way the antislop
-directives already work.
+`.githooks/pre-push` runs the gates below on every push. Each covers a defect
+class that recurred here, and names the rule broken, the files and the repair
+command. Do not argue these down, weaken a pattern to make a push pass, or
+raise a threshold to clear a red gate. Repair the file instead. Where a gate is
+wrong about a specific line, silence it in place and say why, the way the
+antislop directives already work.
 
 | Rule | Script | Rejects |
 |---|---|---|
@@ -210,171 +181,102 @@ directives already work.
 
 The first three need only git and a shell, so they run on the host and report
 even when the container is down. The last two run in the devcontainer.
-
-Two properties are worth knowing before a push. `--no-verify` bypasses the hook,
-and so disables every gate at once, never just the one in the way. The skip floor
-in `scripts/gates/skip-floor.txt` is a ratchet: raise it only in the commit that
-adds the skip, with a row naming what the increase covers. A todo test counts as
-a skip.
-
-`no-silent-green` reads the whole summary of the run. The pass floor in
-`scripts/gates/pass-floor.txt` sets the least number of passing tests. A run
-that passes fewer tests than the floor fails the gate. A change that deletes
-tests on purpose lowers the floor in the same commit. The gate also rejects a
-run whose summary it cannot read. That means no `pass` line, no `Ran N tests`
-line, counts that do not match N, or count lines after the last `Ran` line.
+`--no-verify` bypasses the hook, and so disables every gate at once, never just
+the one in the way. The skip floor in `scripts/gates/skip-floor.txt` is a
+ratchet: raise it only in the commit that adds the skip, with a row naming what
+the increase covers. A todo test counts as a skip. The pass floor in
+`scripts/gates/pass-floor.txt` sets the least number of passing tests; a run
+below it fails the gate. A change that deletes tests on purpose lowers it in the
+same commit. `no-silent-green` also rejects a summary it cannot read: no `pass`
+line, no `Ran N tests` line, counts that do not match N, or count lines after
+the last `Ran` line.
 
 ### Prose debt: what the ratchet permits
-
 `changed-markdown-prose` is a ratchet too. It compares a file's antislop finding
 count at the pushed range's base against the count at its tip. It blocks only a
 rise. A file already carrying findings passes, as long as the push adds none.
-
-The live specs under `openspec/specs/` carry thousands of old findings, some
-files hundreds each. A whole-file gate would make a one-requirement sync into
-any of them pay that whole debt.
+The live specs under `openspec/specs/` carry thousands of old findings, and a
+whole-file gate would make a one-requirement sync pay that whole debt.
 
 Clearing a touched file's debt stays the norm where it is cheap. That norm is
-advisory. The ratchet is the mechanical floor. The gate blocks a file getting
-worse. It does not demand that a file get better.
+advisory; the ratchet is the mechanical floor. It blocks a file getting worse
+and does not demand that it get better. An `allow-file` directive lowers the
+count, so the gate permits one. Prefer the targeted form,
+`<!-- antislop: allow <rule> -->` next to the line it excuses, with a sentence
+saying why. A blanket directive silences rules nobody re-examines.
 
-An `allow-file` directive lowers the count, so the gate permits one. Prefer the
-targeted form, `<!-- antislop: allow <rule> -->` next to the line it excuses,
-with a sentence saying why. A blanket directive at the top of a file silences
-rules nobody re-examines afterwards.
-
-`bbf37d1` put a six-rule `allow-file` line at the top of this file, and it is
-still there. That line is the pattern to avoid. Copy the targeted form instead.
-
-Four defect classes recur here and have no gate, on purpose. Stale UI state after
-a mutation needs a browser, which is why the browser check above stays. Orphaned
-exports after a refactor need real TypeScript reference analysis, since a grep
-detector flags 76 of 786 exports. Stale roadmap status has no reliable mapping
-from a change name to a stage line. Off-by-one bounds has one instance and no
-general detector. `openspec/changes/archive/*gate-recurring-defects*/design.md`
+Four defect classes recur with no gate, on purpose: stale UI state after a
+mutation (the browser check covers it), orphaned exports, stale roadmap status
+and off-by-one bounds. `openspec/changes/archive/*gate-recurring-defects*/design.md`
 carries the reasoning.
 
 ## Repository layout
 ```
-container/                 Dockerfile (Node 22 + Bun); the Pod spec is generated by scripts/dev-pod.sh (Postgres latest)
-package.json               Bun workspace root (workspaces: packages/*);
-                            engine package's exports map (./schema,
-                             ./schema/canonical-json, ./schema/strip-compiled,
-                             ./cel/check, ./schema/compile,
-                             ./schema/step-graph, ./engine/registry,
-                             ./engine/registry-check, ./validate)
-tsconfig.json              strict; NodeNext ESM; covers src + test
-src/schema/definition.ts   Zod schemas = the definition contract; TS types via z.infer; invariants included
-src/engine/                executor: instance store, outbox, transitions, timers, subprocess, drafts,
-                            definitions, migration, admin queries
-src/runtime/               Runtime API Layer: api.ts barrel, plus internal, fields,
-                            instances, claims, queries, reports, record, visibility,
-                            comments, attachments
-src/http/                  REST/JSON wrapper over Bun.serve; one route file
-                            per surface (routes.ts, admin-routes.ts,
-                            studio-routes.ts, reporting-routes.ts,
-                            account-routes.ts) beside server.ts, static.ts,
-                            metrics.ts, errors.ts. The ui-strings routes sit
-                            in admin-routes.ts, /livez and /readyz in
-                            server.ts
-src/auth/                  ActorResolver seam (dev-header + JWT), local accounts, login, roles, CLI
-src/handlers/              action handlers; http.request, notification.email, process.start and
-                            instance.transition ship
-examples/                  serialized example definitions
-test/                      bun:test suites; tests run inside the container
-packages/web/              the ONE browser package (React + Vite). One build, one login, one session,
-                            one address; the engine serves it from WEB_ROOT. Talks to the engine only
-                            over the HTTP wrapper and the exports map.
-  src/shell/                prefix routing, session, LoginScreen,
-                            ErrorBoundary, Chrome, tokens.css, global.css
-  src/api/                  API_BASE, AppClientError, parseErrorBody, request, login, errorText
-  src/i18n/                 locale selection and persistence; chrome/area catalogs stay per area
-  src/areas/app/            participant: My tasks, one task, Start a
-                            process, Cases I started, Cases I took part in
-                            (Login is the shell's)
-  src/areas/admin/          operator: instances, merged record, outbox,
-                            timers, users, migrations, groups, data lists,
-                            UI strings
-  src/areas/studio/         developer: drafts, the process surface's eleven
-                            tabs (canvas, steps, fields, data sources, paths,
-                            forms, field matrix, contract, changes, checks,
-                            access), form editor, JSON surface, publish,
-                            versions+diff, migration-plan authoring,
-                            Templates, Tools, Player
-  src/areas/reporting/      process owner: cycle time, bottlenecks, SLA,
-                            saved reports (builder, preview, CSV, sharing)
-packages/form-ui/          shared step-form renderer (source-only, no build step); consumed by both
-                            the studio area's Player and the app area, so what an author previews is
-                            what a participant gets. Stays its own package.
+container/        Dockerfile; scripts/dev-pod.sh generates the Pod spec
+src/schema/       the definition contract (Zod) and its compile helpers
+src/cel/          CEL checking and evaluation
+src/engine/       executor: store, outbox, transitions, timers, subprocess,
+                  drafts, migration
+src/runtime/      Runtime API Layer (api.ts barrel)
+src/http/         REST/JSON wrapper over Bun.serve, one route file per surface
+src/auth/         ActorResolver seam, local accounts, login, roles, CLI
+src/handlers/     action handlers
+packages/web/     the one browser package: shell, api, i18n, the four areas
+packages/form-ui/ the shared step-form renderer; stays its own package
+examples/ test/ e2e/  example definitions, bun:test suites, smoke flows
+package.json      Bun workspace root and the engine's exports map
 ```
+`docs/current-state.md` holds the per-subsystem detail.
 
 ## Where the rest is documented
-- `.claude/rules/process-contract.md` — the load-bearing definition contract
-  rules, in full.
-- `.claude/rules/authoring-invariants.md` — what the validation layer enforces.
-- `.claude/rules/ui-glossary.md` — the one word for each part of the UI, and the
-  domain term each rendering word maps to.
-- `docs/current-state.md` — per-subsystem index: what each part of the tree
-  does, its paths, and the spec capabilities that own its rules. It names no
-  exported symbol, so a rename elsewhere leaves every entry correct.
-- `docs/decisions.md` — open questions, what is decided but not yet built,
-  every open code-review finding under its own heading, and refused
-  simplifications.
-  `openspec/changes/archive/2026-08-18-code-review-record/` — the four dated reviews.
-- `docs/decisions-archive.md` — the reasoning behind a decision once it ships,
-  moved out of `docs/decisions.md` word for word.
-- `docs/authoring-guide.md` — teaches the definition contract to process authors.
-- `ROADMAP.md` — stage-by-stage status (DONE / NOT STARTED). Open stages in
-  full; one table row per finished stage.
-- `docs/roadmap-history.md` — what each finished stage was, under the same
-  number. Read it only for a stage the table sends you to.
-- `README.md` — the entry point: install, develop, deploy, and a status grid.
-- `PRODUCT.md` — who the four audiences are, and what the product commits to.
-- `THIRDPARTY.md` — the dependency and license notice. Regenerate it with
+- `.claude/rules/`: `process-contract.md` (the definition contract in full),
+  `authoring-invariants.md` (what validation enforces), `ui-glossary.md` (one
+  word per UI part).
+- `docs/current-state.md`: per-subsystem index of paths and owning specs. It
+  names no exported symbol, so a rename elsewhere leaves every entry correct.
+- `docs/decisions.md`: open questions, decided-but-unbuilt work, open review
+  findings, refused simplifications. `docs/decisions-archive.md`: the reasoning
+  once a decision ships, moved there word for word. The dated reviews sit in
+  `openspec/changes/archive/2026-08-18-code-review-record/`.
+- `docs/authoring-guide.md`: teaches the definition contract to process authors.
+- `ROADMAP.md`: stage status (DONE / NOT STARTED), open stages in full, one
+  table row per finished stage. `docs/roadmap-history.md` says what each
+  finished stage was; read it only for a stage the table sends you to.
+- `README.md` (install, develop, deploy), `PRODUCT.md` (the four audiences).
+- `THIRDPARTY.md`: the license notice. Regenerate it with
   `bun run scripts/thirdparty.ts --write` after any dependency change.
-- `docs/openapi.yaml` — the customer-facing HTTP surface, route by route. It
-  names every excluded route too.
-- `docs/runbooks/deployment.md` — what a deployment configures before it runs
-  either image.
-- `docs/runbooks/backup-restore.md` — the dump and restore steps. One database
+- `docs/openapi.yaml`: the customer-facing HTTP surface, excluded routes too.
+- `docs/runbooks/`: deployment configuration; backup and restore. One database
   per tenant, so dump each one.
-- `openspec/changes/archive/2026-08-30-field-model-type-format-control/field-model-redesign.md` — a design record, not a spec. What the
-  2026-08-30 session settled about the field model.
-- `DESIGN.md` — the design tokens the detector reads, and what each one means.
-- `docs/browser-checks.md` — the browser checks that stay manual, per screen.
+- `openspec/changes/archive/2026-08-30-field-model-type-format-control/field-model-redesign.md`:
+  the field model design record, not a spec.
+- `DESIGN.md` (the design tokens the detector reads), `docs/browser-checks.md`
+  (manual browser checks).
 
-For "what does X do" prefer the knowledge graph below over any of them — the
-code is the source of truth, those files are the map.
+For "what does X do" prefer the knowledge graph below over any of them. The
+code is the source of truth; those files are the map.
 
 ## Codebase memory (knowledge graph)
-Index the repo into codebase-memory-mcp with `index_repository` in `full` mode.
-That covers the engine, the Runtime API Layer, the HTTP/auth layers and both
-frontend packages. The indexer reads its exclusions from `.gitignore`, so it
-skips `node_modules` and `packages/web/dist` without configuration.
-
-The index is per-machine local state, not repository state. Nothing in the repo
-carries it, and no setup step builds it. Check with `list_projects` before you
-trust a graph query. Treat an absent project as "index it now", not as "the
-graph says no". Resolve the `project` arg from that same `list_projects` call,
-matching on root_path; the slug is machine-specific, never hardcode it.
-
-Entry points: `search_graph` (find symbols), `get_code_snippet` (read a body),
-`trace_path` (callers/callees, `mode=calls|data_flow|cross_service` — useful
-across the engine↔runtime↔web boundary), `query_graph` (Cypher),
-`get_architecture`, `search_code` (graph-augmented text search). Prefer the
-graph over Read/grep for "who calls X" / "what does Y touch" questions that span
-more than a file or two. The index goes stale as code changes: `detect_changes`
-shows impact since a ref; re-run `index_repository` (full, not incremental)
-after a substantial change lands.
+Index the repo into codebase-memory-mcp with `index_repository` in `full` mode;
+the indexer reads its exclusions from `.gitignore`. The index is per-machine
+local state, not repository state. Nothing in the repo carries it, and no setup
+step builds it. Check with `list_projects` before you trust a graph query. Treat
+an absent project as "index it now", not as "the graph says no". Resolve the
+`project` arg from that same `list_projects` call, matching on root_path; the
+slug is machine-specific, never hardcode it. Prefer the graph over Read/grep for
+"who calls X" / "what does Y touch" questions that span more than a file or two
+(`search_graph`, `trace_path`, `get_code_snippet`, `query_graph`). The index
+goes stale as code changes: `detect_changes` shows impact since a ref; re-run
+`index_repository` (full, not incremental) after a substantial change lands.
 
 ## Conventions
 - TypeScript strict, ESM.
 - **`tmp/` is shared across every worktree, so keep scratch files out of it.**
-  Orca links one `tmp/` into each worktree it creates. Two agents that both
-  write `tmp/t.log` read each other's result, which is the silent-green defect
-  class again. Scratch goes in the session scratchpad. `tmp/` holds only what
-  the worktrees share: the deploy stack, `Detent Design Language.dc.html`, and
-  the task brief a new worktree reads at `tmp/briefs/<change-name>.md`.
+  Each worktree links the same `tmp/`, so two agents writing one file there
+  read each other's result. Scratch goes in the session scratchpad. `tmp/`
+  holds only what the worktrees share: the deploy stack, the design-language
+  reference, and the task brief a new worktree reads at
+  `tmp/briefs/<change-name>.md`.
 - A deliberate shortcut in `src/` or `packages/` carries a `ponytail:` comment
   naming the shortcut, its ceiling and the upgrade entry point. The roll-up is
   `git grep -n 'ponytail:' -- src packages`; no ledger file and no gate back
@@ -384,82 +286,54 @@ after a substantial change lands.
   OpenSpec cycle at three points. In the proposal, `/impeccable shape <screen>`
   decides UX and layout before any code exists. Its result belongs in the
   change's `design.md`. During apply, the design detector hook runs by itself
-  after every edit under `packages/web/**`. At the browser check the
-  verification gate already demands, run `/impeccable critique <route>` and
-  `/impeccable audit <route>` against the changed screen.
+  after every edit under `packages/web/**`. At the browser check, run
+  `/impeccable critique <route>` and `/impeccable audit <route>` against the
+  changed screen.
   - `audit` covers the a11y, responsive and performance checks
     `docs/browser-checks.md` otherwise leaves to hand. It replaces no browser
-    check that needs a human eye; it sharpens the pass that already happens.
-  - `init` and `document` ran once, in `8a0f52e`, and do not repeat per change.
-    Run `extract` when a pattern appears a second time, and `doctor` when
-    `DESIGN.md` drifts from the code.
-  - The skill installs per machine, the way `antislop` does. `.gitignore`
-    excludes `.claude/skills/impeccable/` and both settings files, and the
-    detector hook lives in `.claude/settings.local.json`. A fresh machine or
-    worktree therefore edits UI with no detector until somebody runs
+    check that needs a human eye.
+  - `init` and `document` do not repeat per change. Run `extract` when a
+    pattern appears a second time, and `doctor` when `DESIGN.md` drifts.
+  - The skill installs per machine. `.gitignore` excludes it and both settings
+    files, and its detector hook lives in `.claude/settings.local.json`. A fresh
+    machine or worktree has no detector until somebody runs
     `/impeccable hooks on` there.
   - For UI/UX work also pull in the installed Vercel skills
     (`web-design-guidelines`, `vercel-react-best-practices`,
-    `vercel-composition-patterns`) — do not default to plain React/CSS choices.
+    `vercel-composition-patterns`). Do not default to plain React/CSS choices.
     Prefer semantic HTML5 elements (`<nav>`, `<main>`, `<button>`,
     `<dialog>`, ...) over generic `<div>`/`<span>` soup.
   - The token and value authority is `DESIGN.md`. The prose rules live in
     `.claude/rules/design-language.md`, which loads for `packages/web/**`,
-    `packages/form-ui/**` and `DESIGN.md`. The file `tmp/Detent Design
-    Language.dc.html` is an untracked visual reference that may lag the
-    other two.
-- Bun is the runtime, package manager, and test runner. Use `bun`, not npm/pnpm:
-  `bun install`, `bun test`. Typechecking stays with `tsc --noEmit` (`bun run
-  typecheck`) — Bun does not typecheck. `BUN_VERSION` in
+    `packages/form-ui/**` and `DESIGN.md`. The untracked design-language file
+    under `tmp/` is a visual reference that may lag the other two.
+- Bun is the runtime, package manager, and test runner; use `bun`, not npm/pnpm.
+  Typechecking stays with `tsc --noEmit` (`bun run typecheck`). `BUN_VERSION` in
   `container/Dockerfile` pins the version. All tooling (Bun, tsc, tests, dev
-  server, lint) runs inside the dev container, never on the host. Host runs
-  caused a Bun version drift past the Dockerfile pin, and a stray host-side
-  Vite process answering `localhost:5173` beside the container's. Claude Code
-  itself may run on the host and reach the container through
-  `sh scripts/dev-exec.sh <cmd>`.
-  - Running commands inside the devcontainer (the pod, the exec helper,
-    exposing a dev server port): see the `devcontainer-exec` skill.
+  server, lint) runs inside the dev container, never on the host. Claude Code
+  may run on the host and reach the container through
+  `sh scripts/dev-exec.sh <cmd>`. The `devcontainer-exec` skill covers the pod,
+  the exec helper, dev server ports, and the mechanics of a suite run.
 - **No `cd` prefix and no shell variable, in any Bash command.** The Bash tool
-  already starts in the repository root. Claude Code's permission analyzer reads
-  every operand as a possible path, and each habit below sends a safe command to
-  manual approval.
+  already starts in the repository root. Claude Code's permission analyzer
+  sends either habit to manual approval.
   - A `cd` chain holding any `$VAR` loses the working directory, reported as
     `Contains simple_expansion`. Drop the `cd`. Pass absolute paths outside the
     repository and relative ones inside it.
-  - A variable draws the same refusal with no `cd` at all, and the message
-    still says "cd-compound". Run the command that produces a value, read it,
-    and paste it literally into a second call.
-- PostgreSQL is the datastore. The engine reaches it via Bun's native `Bun.sql`
-  (no client dependency); `DATABASE_URL` is the connection convention, set by the
-  devcontainer's Pod spec.
+  - A variable draws the same refusal with no `cd` at all ("cd-compound").
+    Run the command that produces a value, read it, and paste it literally
+    into a second call.
+- PostgreSQL is the datastore, reached via Bun's native `Bun.sql` (no client
+  dependency). `DATABASE_URL` is the connection convention, set by the Pod spec.
 - **Run `bun test` with `DATABASE_URL` set, always.** The DB-backed suites are
-  `test.skipIf(!DB)` and make up most of the suite. Without the variable
-  they skip *silently* and report a green that proves almost nothing. Check the
-  skip count, not just the pass count. Outside the devcontainer, point it at
-  the major the Pod spec's `postgres:latest` currently resolves to, with
-  the Pod spec's credentials. Don't just remember to check by
-  eye: `scripts/test-gated.sh` runs the command, prints its full output, and
-  then runs `scripts/gates/silent-green.sh` over that output. It gives the
-  same checks the push gate runs, before pushing instead of at push time. From
-  the host, in one call:
-  `rtk test sh scripts/dev-exec.sh sh scripts/test-gated.sh bun test`.
-- **The host call filters through rtk.** It runs on the host and stays
-  optional, since the runner also works without it. Inside the devcontainer,
-  run the full suite with `sh scripts/test-gated.sh bun test`, since a subset
-  run fails the pass floor. The exit code is the suite's own, or 1 when the
-  suite exits 0 and the gate rejects the run. Measured on 2026-09-30
-  with rtk 0.50.0 and 4997 tests: a green run prints 6 lines and 87
-  characters, against 5581 lines and 523110 characters raw. A red run keeps
-  each failing test's name, its diff and its stack lines.
-- **Exit 1 with `0 fail` means the gate rejected the run.** The filter hides
-  the rejection text. The last line names the full log under `rtk/tee/`, and
-  that log holds the rejection.
-- **Three traps in the host call.** Keep `bun test` as literal words at the
-  end of the call. `rtk test` picks its filter from them, and without them a
-  red run loses every name and diff. Never pass `sh -c '...'` to `rtk test`.
-  It splits the script at spaces, so `rtk test sh -c 'exit 3'` prints nothing
-  and exits 0. It does not forward stdin either. Do not use `rtk err` for
-  tests, because it cuts object diffs short.
+  `test.skipIf(!DB)` and make up most of the suite. Without the variable they
+  skip *silently* and report a green that proves almost nothing. Check the skip
+  count, not just the pass count. Outside the devcontainer, point it at the
+  major the Pod spec's `postgres:latest` resolves to, with its credentials.
+  `scripts/test-gated.sh` runs the push gate's checks before the push. From the
+  host, in one call:
+  `rtk test sh scripts/dev-exec.sh sh scripts/test-gated.sh bun test`. Exit 1
+  with `0 fail` means the gate rejected the run (see `devcontainer-exec`).
 - **A full-suite run is the reliable signal; a single-file rerun is not.** The DB
   suites share one database and truncate in `beforeEach`, so back-to-back runs of
   one file contend and fail spuriously. A second `bun test` on that database
@@ -472,31 +346,29 @@ after a substantial change lands.
   name it chose. The split closes two measured hazards: a `bun test` run wipes
   demo state mid-demo (its `beforeEach` truncates `definitions`, `instances`,
   `outbox`, `auth_users` and more), and a running `bun run serve` corrupts test
-  runs (its outbox poller claims rows the suite is driving — 3 red runs of 20
+  runs (its outbox poller claims rows the suite is driving: 3 red runs of 20
   with a dev server up, 0 of 20 with none). Do not point a server or a seed at
   the `_test` database. Do not remove the preload to "simplify" the setup.
 - **Never mutate, stash, or check out the shared working tree to test something.**
-  Mutation testing (revert a line, confirm a named test fails) is the right
-  technique and must happen on a copy: the tree usually holds uncommitted work,
-  and a leftover mutation reads to the next reviewer as a real defect.
+  Mutation testing (revert a line, confirm a named test fails) is right, on a
+  copy: the tree usually holds uncommitted work, and a leftover mutation reads
+  to the next reviewer as a real defect.
 - **Never use `git stash`, not for mutation testing and not otherwise.** The
-  agents share this tree. A stash nobody else expects hides work that was never
-  committed. Commit to a branch instead.
+  agents share this tree, and a stash hides uncommitted work from them. Commit
+  to a branch instead.
 - **Keep a local merge into `main` a fast-forward.** A post-commit hook
-  rewrites `VERSION` on every commit; a stray uncommitted bump (or another
-  session's staged file in the shared checkout) blocks a real three-way
-  merge but never a fast-forward. Before merging: add no commit of your own
-  to `main` first, and `git checkout -- VERSION` to discard its local bump
-  instead of committing it — that keeps `main` at the true merge-base.
+  rewrites `VERSION` on every commit. A stray uncommitted bump, or another
+  session's staged file, blocks a three-way merge but never a fast-forward.
+  Add no commit of your own to `main` first, and discard the local bump with
+  `git checkout -- VERSION` rather than committing it.
 - **A history rewrite states its branch list first.** Before `git filter-branch`
   or `git filter-repo`, print `git branch -a` and name the refs the rewrite will
   touch. Exclude every backup branch explicitly, or the rewrite takes the backup
   too and leaves no untouched copy.
 - Comments state facts, not process history. Concise and technically precise.
 - The definition contract is the foundation. Change the schema (definition.ts /
-  the Zod source) deliberately, never as a casual side effect of another task.
-  Deliberately means its own OpenSpec change with the rule delta written down.
-  It does not mean never. See the stage note above.
+  the Zod source) deliberately, never as a side effect of another task: its own
+  OpenSpec change with the rule delta written down. It does not mean never.
 - A new `ProcessBody` or `Step` field has hand-kept mirrors in the studio that no
   type check ties to the schema, so a grep for schema consumers misses them.
   Update them in the same change: `KNOWN_KEYS` in `load-guard.ts`,

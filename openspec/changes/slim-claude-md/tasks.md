@@ -2,12 +2,12 @@
 
 ## 1. Move the test mechanics into the skill
 
-- [ ] 1.1 Add a "Running the suite" section to `.claude/skills/devcontainer-exec/SKILL.md` per design D2. It carries `CLAUDE.md`'s paragraphs "The host call filters through rtk", "Exit 1 with `0 fail` means the gate rejected the run" and "Three traps in the host call" (with the 2026-09-30 measurement), unchanged in substance. Verify that `grep -n -E 'rtk/tee|sh -c .exit 3.|rtk err' .claude/skills/devcontainer-exec/SKILL.md` prints the three trap lines.
+- [x] 1.1 Add a "Running the suite" section to `.claude/skills/devcontainer-exec/SKILL.md` per design D2. It carries `CLAUDE.md`'s paragraphs "The host call filters through rtk", "Exit 1 with `0 fail` means the gate rejected the run" and "Three traps in the host call" (with the 2026-09-30 measurement), unchanged in substance. Verify that `grep -n -E 'rtk/tee|sh -c .exit 3.|rtk err' .claude/skills/devcontainer-exec/SKILL.md` prints the three trap lines.
 
 ## 2. Slim `CLAUDE.md`
 
-- [ ] 2.1 Rewrite `CLAUDE.md` section by section per design D1, leaving line 1 (the `allow-file` directive) in place. Every rule stays; the anecdotes, the repository layout block and the moved test mechanics go. Verify with `wc -l CLAUDE.md` printing at most 380, and record the count. Where the number and a rule conflict, keep the rule and say so.
-- [ ] 2.2 Verify that every cited statement in design's citation table still holds, one grep per row:
+- [x] 2.1 Rewrite `CLAUDE.md` section by section per design D1, leaving line 1 (the `allow-file` directive) in place. Every rule stays; the anecdotes, the repository layout block and the moved test mechanics go. Verify with `wc -l CLAUDE.md` printing at most 380, and record the count. Where the number and a rule conflict, keep the rule and say so.
+- [x] 2.2 Verify that every cited statement in design's citation table still holds, one grep per row:
   - `grep -n -F '/admin/*' CLAUDE.md` (the three-defect sentence)
   - `grep -n -i 'real browser' CLAUDE.md`
   - `grep -n -E '3 red runs of 20|0 of 20' CLAUDE.md`
@@ -22,7 +22,7 @@
   - `grep -n -F '**operator**' CLAUDE.md`
 
   Record each hit. A row with no hit sends 2.1 back.
-- [ ] 2.3 Read the full `git diff` of `CLAUDE.md` once and classify every removed line as history or rule (design Risks). A removed rule goes back in. Record the classification in the task report.
+- [x] 2.3 Read the full `git diff` of `CLAUDE.md` once and classify every removed line as history or rule (design Risks). A removed rule goes back in. Record the classification in the task report.
 
 ## 3. Repoint stale citations
 
