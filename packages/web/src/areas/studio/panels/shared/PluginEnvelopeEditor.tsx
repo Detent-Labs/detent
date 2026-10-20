@@ -4,7 +4,8 @@ import { space } from "form-ui/tokens.stylex";
 import type { Plugin } from "workflow-engine/schema";
 import type { DraftOf } from "../../draft/types";
 import type { ConfigFieldDescriptor } from "../../api/types.js";
-import { t } from "../../catalog.js";
+import { t, type CatalogKey } from "../../catalog.js";
+import { KeyCaption } from "./KeyCaption";
 import { parsedConfigBase, shownConfig, type ConfigEdit } from "./pluginConfigText.js";
 
 const styles = stylex.create({
@@ -28,7 +29,7 @@ const styles = stylex.create({
 type DraftPlugin = DraftOf<Plugin>;
 
 interface Props {
-  label: string;
+  label: ReactNode;
   value: DraftPlugin | undefined;
   onChange: (next: DraftPlugin) => void;
   typePlaceholder?: string;
@@ -65,29 +66,37 @@ interface Props {
   };
 }
 
+/** A catalog sentence with its placeholders filled. The function replacer keeps a `$` in a value literal. */
+function fill(key: CatalogKey, values: Record<string, string | number>): string {
+  let text: string = t(key);
+  for (const [name, value] of Object.entries(values)) text = text.replace(`{${name}}`, () => String(value));
+  return text;
+}
+
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function validateField(descriptor: ConfigFieldDescriptor, value: unknown): string | undefined {
+/** The message under one generated config field, or `undefined` when the value holds. */
+export function validateField(descriptor: ConfigFieldDescriptor, value: unknown): string | undefined {
   const isEmpty = value === undefined || value === null || value === "" || (Array.isArray(value) && value.length === 0);
   if (descriptor.required && isEmpty) return t("plugin.fieldRequired");
   if (isEmpty) return undefined;
   if (descriptor.kind === "string" && typeof value === "string") {
-    if (descriptor.minLength !== undefined && value.length < descriptor.minLength) return `min ${descriptor.minLength} chars`;
-    if (descriptor.maxLength !== undefined && value.length > descriptor.maxLength) return `max ${descriptor.maxLength} chars`;
-    if (descriptor.format === "email" && !EMAIL_RE.test(value)) return "invalid email";
+    if (descriptor.minLength !== undefined && value.length < descriptor.minLength) return fill("plugin.minLength", { n: descriptor.minLength });
+    if (descriptor.maxLength !== undefined && value.length > descriptor.maxLength) return fill("plugin.maxLength", { n: descriptor.maxLength });
+    if (descriptor.format === "email" && !EMAIL_RE.test(value)) return t("plugin.invalidEmail");
   }
   if (descriptor.kind === "number" && typeof value === "number") {
-    if (descriptor.min !== undefined && value < descriptor.min) return `min ${descriptor.min}`;
-    if (descriptor.max !== undefined && value > descriptor.max) return `max ${descriptor.max}`;
+    if (descriptor.min !== undefined && value < descriptor.min) return fill("plugin.min", { n: descriptor.min });
+    if (descriptor.max !== undefined && value > descriptor.max) return fill("plugin.max", { n: descriptor.max });
   }
   if (descriptor.kind === "string-array" && Array.isArray(value)) {
-    if (descriptor.minItems !== undefined && value.length < descriptor.minItems) return `at least ${descriptor.minItems} item(s)`;
-    if (descriptor.maxItems !== undefined && value.length > descriptor.maxItems) return `at most ${descriptor.maxItems} item(s)`;
-    if (descriptor.format === "email" && value.some((v) => typeof v === "string" && !EMAIL_RE.test(v))) return "invalid email";
+    if (descriptor.minItems !== undefined && value.length < descriptor.minItems) return fill("plugin.minItems", { n: descriptor.minItems });
+    if (descriptor.maxItems !== undefined && value.length > descriptor.maxItems) return fill("plugin.maxItems", { n: descriptor.maxItems });
+    if (descriptor.format === "email" && value.some((v) => typeof v === "string" && !EMAIL_RE.test(v))) return t("plugin.invalidEmail");
     // The checkbox group below cannot produce a value outside the set, but the
     // raw JSON path can, and an author switches between the two freely.
     if (descriptor.enumValues && value.some((v) => !descriptor.enumValues!.includes(v as string))) {
-      return `allowed: ${descriptor.enumValues.join(", ")}`;
+      return fill("plugin.allowedValues", { values: descriptor.enumValues.join(", ") });
     }
   }
   return undefined;
@@ -250,7 +259,7 @@ export function PluginEnvelopeEditor({
     <fieldset className="plugin-envelope">
       <legend>{label}</legend>
       <label>
-        type
+        <KeyCaption text={t("plugin.typeCaption")} jsonKey="type" />
         {selectableTypes ? (
           <select
             value={currentType}
@@ -307,7 +316,7 @@ export function PluginEnvelopeEditor({
       ) : (
         <>
           <label>
-            config (JSON)
+            <KeyCaption text={t("plugin.configCaption")} jsonKey="config" />
             <textarea rows={3} value={configText} onChange={(e) => commitConfig(e.target.value)} />
           </label>
           {configError && (
@@ -324,7 +333,7 @@ export function PluginEnvelopeEditor({
       )}
 
       <label>
-        description
+        <KeyCaption text={t("plugin.descriptionCaption")} jsonKey="description" />
         <input
           type="text"
           value={value?.description ?? ""}

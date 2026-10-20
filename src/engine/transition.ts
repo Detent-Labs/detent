@@ -487,13 +487,15 @@ export async function applyStepEntry(tx: SQL, plan: StepEntryPlan, extraFields?:
  * a connection and the instance's row lock are held. `withTransaction` joins an
  * already-open transaction through a savepoint rather than starting a second
  * one, so "outside the transaction" holds only where `db` is a plain
- * connection. The subprocess return is the one caller that passes a transaction
- * handle instead: it derives the step it enters from the row it read under
+ * connection. Two callers pass a transaction handle instead:
+ * `submitAndTransition` in `src/runtime/instances.ts` and the subprocess
+ * return. The return derives the step it enters from the row it read under
  * `SELECT ... FOR UPDATE`, so hoisting resolution above that lock would need an
  * optimistic pre-read plus a sequence re-check that must still fall back to
  * resolving under the lock when the re-check fails. The resolution deadline
- * bounds that hold instead (`registry.ts::resolveStepAssignment`), so a fallible
- * resolver cannot keep the parent's row locked past it.
+ * (`registry.ts::resolveStepAssignment`) returns control to the caller on both
+ * paths. Nobody has measured how long the lock then stays held; see
+ * `docs/decisions.md`.
  *
  * A resolution that produced no candidate is recorded as an
  * `assignment.unresolved` event here, in the same transaction as the entry —

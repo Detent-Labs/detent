@@ -177,10 +177,9 @@ about one line, silence it in place and say why, as the antislop directives do.
 | `frozen-lockfile` | `gates/lockfile.sh` | a manifest the committed `bun.lock` cannot satisfy |
 | `no-silent-green` | `gates/silent-green.sh` | a suite run with no database, too many skips or todos, too few passes, or a summary it cannot read |
 
-The first three need only git and a shell. They run and report on the host, even
-with the container down. The last two run in the devcontainer. The `--no-verify`
-flag bypasses the hook and disables every gate at once, never just the one in
-the way.
+The first three need only git and a shell. They run and report on the host, even with
+the container down. The last two run in the devcontainer. The `--no-verify` flag
+bypasses the hook and disables every gate at once, never just the one in the way.
 
 The skip floor in `scripts/gates/skip-floor.txt` is a ratchet. Raise it only in
 the commit that adds the skip, with a row naming what the increase covers. A
@@ -220,10 +219,13 @@ src/engine/       executor: store, outbox, transitions, timers, subprocess, draf
 src/runtime/      Runtime API Layer (api.ts barrel)
 src/http/         REST/JSON wrapper over Bun.serve, one route file per surface
 src/auth/         ActorResolver seam, local accounts, login, roles, CLI
+src/tenancy/      SaaS control plane: provisioning, tenant connections, CLI
 src/handlers/     action handlers
 packages/web/     the one browser package: shell, api, i18n, the four areas
 packages/form-ui/ the shared step-form renderer; stays its own package
 examples/ test/ e2e/  example definitions, bun:test suites, smoke flows
+deploy/           engine and frontend images, nginx.conf
+scripts/ docs/ openspec/  tooling and push gates; documentation; live specs and changes
 package.json      Bun workspace root and the engine's exports map
 ```
 
@@ -236,7 +238,7 @@ package.json      Bun workspace root and the engine's exports map
 - `docs/decisions.md`: open questions, decided-but-unbuilt work, open review
   findings, refused simplifications. `docs/decisions-archive.md`: the reasoning
   once a decision ships, moved there word for word. The dated reviews sit in
-  `openspec/changes/archive/2026-08-18-code-review-record/`.
+  `openspec/changes/archive/` (`2026-08-18-code-review-record/`, `2026-10-10-audit-record/`).
 - `docs/authoring-guide.md`: teaches the definition contract to process authors.
 - `ROADMAP.md`: stage status (DONE / NOT STARTED), open stages in full, one
   table row per finished stage. The file `docs/roadmap-history.md` says what
@@ -245,8 +247,8 @@ package.json      Bun workspace root and the engine's exports map
 - `THIRDPARTY.md`: the license notice. Regenerate it with
   `bun run scripts/thirdparty.ts --write` after any dependency change.
 - `docs/openapi.yaml`: the customer-facing HTTP surface, excluded routes too.
-- `docs/runbooks/`: deployment configuration; backup and restore, one dump per
-  tenant database.
+- `docs/runbooks/`: deployment configuration; backup and restore, one dump per tenant
+  database.
 - `openspec/changes/archive/2026-08-30-field-model-type-format-control/field-model-redesign.md`:
   the field model design record. It states no requirement.
 - `DESIGN.md` (the design tokens the detector reads), `docs/browser-checks.md`
@@ -281,13 +283,12 @@ shows impact since a ref. After a substantial change lands, re-run
   naming the shortcut, its ceiling and the upgrade entry point. The roll-up is
   `git grep -n 'ponytail:' -- src packages`; no ledger file and no gate back
   it. `openspec/specs/push-gate-checks/spec.md` states the rule.
-- **UI work in `packages/web` or `packages/form-ui` goes through the design skills
-  first.** The `impeccable` skill owns visual direction. It enters the cycle at three
-  points. In the proposal, `/impeccable shape <screen>` decides UX and layout before any
-  code exists. Its result goes in `design.md`. During apply, the design detector hook runs
-  by itself after every `Edit` or `Write` under `packages/web/**`. At the browser check,
-  run `/impeccable critique <route>` and `/impeccable audit <route>` on the screen under
-  test.
+- **UI work in `packages/web` or `packages/form-ui` goes through the design skills first.**
+  The `impeccable` skill owns visual direction. It enters the cycle at three points. In the
+  proposal, `/impeccable shape <screen>` decides UX and layout before any code exists. Its
+  result goes in `design.md`. During apply, the design detector hook runs by itself after
+  every `Edit` or `Write` under `packages/web/**`. At the browser check, run `/impeccable
+  critique <route>` and `/impeccable audit <route>` on the screen under test.
   - `audit` covers the a11y, responsive and performance checks
     `docs/browser-checks.md` otherwise leaves to hand. It replaces no browser
     check that needs a human eye.
@@ -326,8 +327,8 @@ shows impact since a ref. After a substantial change lands, re-run
   dependency). `DATABASE_URL` is the connection convention, set by the Pod spec.
 - **Run `bun test` with `DATABASE_URL` set, always.** The DB-backed suites are
   `test.skipIf(!DB)` and make up most of the suite. Without the variable they skip
-  *silently* and report a green that proves almost nothing. Check the skip count as well
-  as the pass count.
+  *silently* and report a green that proves almost nothing. Check the skip count as
+  well as the pass count.
 - Outside the devcontainer, point `DATABASE_URL` at the major the Pod spec's
   `postgres:latest` resolves to. Use its credentials. The script `scripts/test-gated.sh`
   runs the push gate's checks before the push. From the host, in one call:
@@ -367,8 +368,7 @@ shows impact since a ref. After a substantial change lands, re-run
 - Comments state facts concisely and precisely, and omit process history.
 - The definition contract is the foundation. Change the schema (definition.ts /
   the Zod source) deliberately, never as a side effect of another task. It gets
-  its own OpenSpec change with the rule delta written down. It does not mean
-  never.
+  its own OpenSpec change with the rule delta written down. It does not mean never.
 - A new `ProcessBody` or `Step` field has hand-kept mirrors in the studio. No type check
   ties them to the schema, so a grep for schema consumers misses them. Extend them in the
   same change. That means `KNOWN_KEYS` in `load-guard.ts`, `PROPERTY_WORDS` and

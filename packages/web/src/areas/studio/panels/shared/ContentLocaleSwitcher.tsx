@@ -59,7 +59,7 @@ export function ContentLocaleBadge() {
         const gaps = localeGapCount(draft, code);
         return (
           <option key={code} value={code}>
-            {gaps > 0 ? `${code} — ${gaps} missing` : code}
+            {gaps > 0 ? t("contentLocale.optionGap").replace("{locale}", () => code).replace("{count}", () => String(gaps)) : code}
           </option>
         );
       })}

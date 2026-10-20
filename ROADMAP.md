@@ -45,7 +45,7 @@ Specs: `development-toolchain`, `devcontainer-preflight`, `worktree-isolation`,
 ## Open stages
 
 40. **Permission model rework: SEAM, STORAGE AND MIGRATION-PLAN VISIBILITY
-    DONE. FILTER AND DRAFT SCOPE NOT BUILT.** Raised 2026-08-15 in
+    DONE. DRAFT SCOPE DONE. FILTER NOT BUILT.** Raised 2026-08-15 in
     conversation. A design pass ran the
     same day and took the decisions below. Nobody was blocked by the seam
     alone, and the storage half landed 2026-08-16 as
@@ -66,9 +66,9 @@ Specs: `development-toolchain`, `devcontainer-preflight`, `worktree-isolation`,
     `scope=all`, admitting a grant holder who names the process, with no
     result-set predicate over the processes a grant covers and no change to
     the three reporting routes. A draft-scoped `"author"` permission would
-    let a multi-team installation limit who sees and edits which draft.
-    Today every author reaches every draft. That one stays open too.
-    `tmp/open-work-priority.md` tracks both.
+    have let a multi-team installation limit who sees and edits which draft.
+    The `process-access-roles` Developer list closed that piece instead.
+    `tmp/open-work-priority.md` tracks the filter.
 
     The third piece closed 2026-08-19 as `scope-migration-plan-visibility`.
     An audit of every client-side role check in `packages/web` found the
@@ -94,12 +94,14 @@ Specs: `development-toolchain`, `devcontainer-preflight`, `worktree-isolation`,
     `src/auth/authorize.ts`, over three permissions at the time: `"publish"`,
     `"cancel"` and `"migrate"`. A private `PERMISSION_ROLE` map answers each
     one with the global role that gates it today, so no actor gained or lost
-    access. `process-read-permission` later widened the seam to four
-    permissions, adding `"read"` (mapped to `ADMIN_ROLE`) and moving the
-    `scope=all` instance listing onto it when the request names a
-    `processId` — see below.
+    access. `process-read-permission` later widened the seam by `"read"`
+    (mapped to `ADMIN_ROLE`) and moved the `scope=all` instance listing onto
+    it when the request names a `processId` — see below. Per-instance
+    visibility later added `"visibility"`, also mapped to `ADMIN_ROLE`. The
+    `authorization` spec lists today's set.
 
-    Six call sites now ask through the seam. Four swapped one call for another.
+    Six call sites asked through the seam at the time. Four swapped one call for
+    another.
     Two did not, and each taught something the design had not stated.
 
     The publish route reads its target `processId` out of the request body, so
@@ -132,14 +134,14 @@ Specs: `development-toolchain`, `devcontainer-preflight`, `worktree-isolation`,
     Two more join the constraints at the end: a scope type must enumerate to
     a process-id set, and the web areas read role strings.
 
-    Every role today is global. `src/auth/authorize.ts` declares eight
-    constants and `requireRole` reads one line: does `Actor.roles` contain the
+    Every role was global at the time. `src/auth/authorize.ts` declared eight
+    constants and `requireRole` read one line: does `Actor.roles` contain the
     string. No role implies another, by decision. So an author who may publish
     the expense process holds `system:publish`, and that role admits every
     other process too. `system:cancel-any` cancels any instance of any process.
     A grant for one process cannot be written down.
 
-    **The eight `system:*` roles keep their exact meaning.** They serve the
+    **The `system:*` roles of the time keep their exact meaning.** They serve the
     cases that are genuinely installation-wide. User administration, the outbox
     and the timer views belong to the installation, and `system:admin` keeps
     them. A scoped grant is a second and narrower thing beside them. It never
@@ -191,7 +193,7 @@ Specs: `development-toolchain`, `devcontainer-preflight`, `worktree-isolation`,
     at the price of Entra ID P1 for group assignment. A later operator screen
     settles how a GUID displays.
 
-    The eight constants split into three groups under those decisions.
+    At the time, the constants split into three groups under those decisions.
 
     The first group scopes cleanly, because the process is known at the call
     site. Publish reads it from the body. Cancel reads it from the loaded
@@ -213,10 +215,9 @@ Specs: `development-toolchain`, `devcontainer-preflight`, `worktree-isolation`,
     id to name. That was wrong. `drafts.process_id` is the table's key, and
     the studio names the id in `PUT /drafts/:processId` from the first save.
     So `system:author` and `system:developer` are scopeable on the four draft
-    routes, and a draft-scoped `"author"` permission is where a multi-team
-    installation gains the most: without it, every author sees and edits every
-    draft. That is its own change. It moves the four draft call sites and
-    filters the drafts list.
+    routes. A multi-team installation gains the most there. That piece closed
+    through the `process-access-roles` Developer list, which scopes the four
+    draft routes and filters the drafts list.
 
     Five constraints hold for any build. A scoped grant carries the opaque
     process `id`, never the `key`, since the contract lets a key change and
@@ -267,43 +268,6 @@ Specs: `development-toolchain`, `devcontainer-preflight`, `worktree-isolation`,
     author asks for the control rather than the JSON.
 
     Specs: `definition-contract`, `runtime-api`, `cel-expressions`.
-
-63. **StyleX styling model for `packages/web`/`packages/form-ui`: PHASES 0-5
-    DONE.** `stylex-phase-0-tooling` installed the
-    compiler, split `tokens.css`'s element rules into `global.css`, moved
-    the design-token module to `packages/form-ui`, gave `bun test` a
-    stub-preload story, and migrated the shell header and register tab as
-    the pilot. `stylex-phase-1-form-ui` migrated `packages/form-ui`'s field
-    renderer and `PathButtons`, deleted `form-ui.css` and its package
-    export, and gave `PathButtons` a `style` prop for its wrapper.
-    `stylex-phase-2-areas` migrated the shell's remaining nav wrapper and
-    the shell, app, admin and reporting areas' own stylesheets. Each area's
-    file now carries only its reduced-motion reset block. `stylex-phase-3-studio`
-    migrated every studio screen outside `canvas/`; `app.css` then carried
-    only its `canvas/`-owned rules, the reduced-motion block, and
-    `.studio-dialog::backdrop`, which stays literal permanently since
-    `::backdrop` fails a real `@stylexjs/unplugin` build. `stylex-phase-4-canvas`
-    migrated `canvas/CanvasView.tsx` and `canvas/EditRail.tsx`; `app.css`
-    now carries only the reduced-motion block and `.studio-dialog::backdrop`.
-    Two class names stay literal by that change's own mandate:
-    `canvas-node` and `panzoom-exclude`. Full reasoning, the measured
-    evaluation and the six-phase plan sit in phase 0's `design.md`, at
-    `openspec/changes/archive/2026-09-03-stylex-phase-0-tooling/design.md`.
-
-    `stylex-phase-5-cleanup` deleted `shell.css` and the four areas'
-    `app.css` files, closing the migration. `global.css` now carries
-    every rule they still held: the shell's flex frame, one deduped
-    `prefers-reduced-motion` block, and `.studio-dialog::backdrop`.
-    `.btn`/`.app-back` stay literal in `tokens.css` permanently, with no
-    further phase to convert their last consumer. Each phase is its own
-    OpenSpec change against `web-styling`.
-
-    Reopen triggers: two consecutive StyleX releases that each cost a build
-    fix reopen the compiler-version pin. A phase whose measured effort
-    argues for a split reopens the one-change-per-phase plan.
-
-    Specs: `web-styling`, `development-toolchain`, `unified-shell`,
-    `form-ui`.
 
 ## Done
 
@@ -371,6 +335,7 @@ Stage detail: `docs/roadmap-history.md`. Same numbers, same order.
 | 60 | Per-instance visibility: a took-part screen over `scope=visible` | `involved-cases-screen` | `end-user-app` |
 | 61 | The studio's publish gate, its confirmation dialogs and its failure report | `studio-publish-gate-and-report` | `process-drafts`, `spa-error-reporting`, `studio-app`, `studio-publish` |
 | 62 | One tabbed process surface for a draft, and the plain-language authoring vocabulary over it | `studio-guided-surface` | `studio-app`, `studio-canvas`, `studio-checks-rail`, `studio-form-editor`, `studio-forms-overview`, `studio-guided-vocabulary`, `studio-json-view`, `studio-process-tabs`, `studio-publish`, `studio-step-page` |
+| 63 | StyleX styling model for `packages/web` and `packages/form-ui` | `stylex-phase-0-tooling`, `stylex-phase-1-form-ui`, `stylex-phase-2-areas`, `stylex-phase-3-studio`, `stylex-phase-4-canvas`, `stylex-phase-5-cleanup` | `web-styling`, `development-toolchain`, `unified-shell`, `form-ui` |
 
 ## Changes with no stage
 

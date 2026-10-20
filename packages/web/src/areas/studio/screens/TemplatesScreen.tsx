@@ -125,11 +125,18 @@ export function TemplatesScreen({ token, locale, onUnauthorized }: TemplatesScre
   const create = async () => {
     const source = sources.find((s) => sourceValue(s.source) === selected)?.source;
     if (!source) return;
+    const key = templateKey.trim();
+    if (
+      items.some((item) => item.templateKey === key) &&
+      !confirm(`A template "${key}" exists. Replace it with this version? You lose the old template body.`)
+    ) {
+      return;
+    }
     setCreating(true);
     setError(undefined);
     try {
       const { body, layout } = await readSource(source, token);
-      await saveTemplate(templateKey.trim(), body, layout, token);
+      await saveTemplate(key, body, layout, token);
       setTemplateKey("");
       setSelected("");
       await load();

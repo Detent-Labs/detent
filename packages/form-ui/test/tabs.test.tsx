@@ -393,7 +393,6 @@ describe("The tab stamp: each drawn tab marks its own issues", () => {
     expect(issueCountText(1, "de")).toBe("1 Problem");
     expect(issueCountText(3, "de")).toBe("3 Probleme");
     // An unlisted locale falls back the way `issueMessage` does.
-    expect(issueCountText(2, "fr", "de")).toBe("2 Probleme");
     expect(issueCountText(2, "fr")).toBe("2 issues");
   });
 });

@@ -128,14 +128,18 @@ part of a stored plan the author never edited.
 ### Requirement: The form reports what the browser can check, before the save
 
 The form SHALL show an inline error for a rule it can evaluate from the
-two bodies it already holds. Three rules qualify:
+two bodies it already holds. Six rules qualify:
 
 - a `fieldMap` that maps two sources onto one target;
+- two `fieldMap` rows with one source;
+- two `stepMap` rows with one source;
+- two `transforms` rows with one target;
 - a `fieldMap` pair whose CEL types disagree;
 - a `stepMap` value or an `unmappableStep` naming the reserved cancel-sink
   step.
 
-The type rule SHALL compare CEL types, not declared field types. Two fields
+The type rule SHALL compare CEL types. It SHALL ignore the declared field
+types. Two fields
 sharing one declared type can still disagree, because a `format` moves the CEL
 type. A `{type: "number", format: "integer"}` field reports `int`. A plain
 `number` field reports `double`. A check over the declared type alone would
@@ -143,14 +147,35 @@ miss that pair. It would also flag `file` against a plugin type, which the
 server accepts, since both report `dyn`.
 
 The form SHALL show each error at the row it applies to. The server keeps
-every check it runs today. The form adds no rule the server does not
-already enforce.
+every check it runs today. The form adds only rules the server already
+enforces, with one exception.
+
+The plan holds each source as one JSON key. It holds each transform target
+the same way. Two rows with one key save as one entry. The server never
+sees the second row. The three rules for those rows SHALL mark every row in
+the collision. The form then never drops a row without a warning.
 
 #### Scenario: The form reports a non-injective field map at the row
 
 - **WHEN** two field-map rows target the same field
 - **THEN** the form shows an error on the offending rows before the
   developer saves
+
+#### Scenario: The form reports two field-map rows with one source
+
+- **WHEN** two field-map rows read `fld_amount`, one onto `fld_total` and
+  one onto `fld_sum`
+- **THEN** the form shows an error on both rows before the developer saves
+
+#### Scenario: The form reports two step-map rows with one source
+
+- **WHEN** two step-map rows read the same source step
+- **THEN** the form shows an error on both rows
+
+#### Scenario: The form reports two transforms with one target
+
+- **WHEN** two transforms rows name the same target field
+- **THEN** the form shows an error on both rows
 
 #### Scenario: The form reports a type mismatch at the row
 

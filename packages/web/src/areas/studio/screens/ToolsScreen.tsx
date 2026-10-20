@@ -9,6 +9,7 @@ import type { Route } from "../routing.js";
 import { describeCaughtError } from "../errors.js";
 import { t } from "../catalog.js";
 import { useFail } from "../../../shell/useFail.js";
+import { createLatestGate } from "../../../shell/latestGate.js";
 
 const styles = stylex.create({
   studioScreen: {
@@ -109,6 +110,9 @@ export function ToolsScreen({ token, navigate, onUnauthorized }: ToolsScreenProp
   const [expression, setExpression] = useState("");
   const failLoad = useFail(onUnauthorized, (e) => setLoadError(describeCaughtError(e)));
   const failCatalog = useFail(onUnauthorized, (e) => setCatalogError(describeCaughtError(e)));
+  // A process or catalog choice starts a generation, so an answer for an
+  // earlier choice writes nothing when it lands.
+  const [catalogGate] = useState(createLatestGate);
 
   const load = useCallback(() => {
     let cancelled = false;
@@ -136,36 +140,40 @@ export function ToolsScreen({ token, navigate, onUnauthorized }: ToolsScreenProp
 
   const selectProcess = useCallback(
     (id: string) => {
+      const isCurrent = catalogGate.next();
       setProcessId(id);
       setCatalogSource("");
       setFields([]);
       setCatalogError(undefined);
-      if (!id) {
-        setVersions([]);
-        setHasDraft(false);
-        return;
-      }
+      // The catalog picker lists only the chosen process's sources, so the
+      // previous process's list must not stay selectable while this one loads.
+      setVersions([]);
+      setHasDraft(false);
+      if (!id) return;
       Promise.all([listVersions(id, token), getDraft(id, token)])
         .then(([vs, draft]) => {
+          if (!isCurrent()) return;
           setVersions(vs);
           setHasDraft(!!draft);
         })
-        .catch(failCatalog);
+        .catch((e: unknown) => {
+          if (isCurrent()) failCatalog(e);
+        });
     },
-    [token, failCatalog],
+    [token, failCatalog, catalogGate],
   );
 
   const selectCatalog = useCallback(
     (source: string) => {
+      const isCurrent = catalogGate.next();
       setCatalogSource(source);
+      setFields([]);
       setCatalogError(undefined);
-      if (!source) {
-        setFields([]);
-        return;
-      }
+      if (!source) return;
       const fetchBody = source === "draft" ? getDraft(processId, token).then((d) => d?.body) : getVersionBody(processId, Number(source), token);
       fetchBody
         .then((body: unknown) => {
+          if (!isCurrent()) return;
           // Both `DraftRecord.body` and `getVersionBody`'s result are opaque,
           // unparsed JSON client-side (same convention `JsonView`/
           // `migrationPlanLogic` already follow) — this reads out only the
@@ -174,9 +182,11 @@ export function ToolsScreen({ token, navigate, onUnauthorized }: ToolsScreenProp
           const rawFields = typeof body === "object" && body !== null ? (body as { fields?: unknown }).fields : undefined;
           setFields(Array.isArray(rawFields) ? (rawFields as FieldDef[]) : []);
         })
-        .catch(failCatalog);
+        .catch((e: unknown) => {
+          if (isCurrent()) failCatalog(e);
+        });
     },
-    [processId, token, failCatalog],
+    [processId, token, failCatalog, catalogGate],
   );
 
   const checkResult = useMemo(() => {

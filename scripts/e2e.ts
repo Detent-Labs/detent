@@ -137,7 +137,7 @@ interface EngineHandle {
 // `main`'s own `finally` clears it once `stopEngine` returns there.
 let runningEngine: EngineHandle | undefined;
 
-/** The port from `log.info("HTTP server listening", { port })` (src/log.ts, src/http/server.ts:903), or `undefined` while that line has not arrived yet. Parses each line as JSON rather than matching a number out of free text — the design's own risk note names this as the one place the server's log format matters. */
+/** The port from `log.info("HTTP server listening", { port })` (src/log.ts, src/http/server.ts:953), or `undefined` while that line has not arrived yet. Parses each line as JSON rather than matching a number out of free text — the design's own risk note names this as the one place the server's log format matters. */
 function boundPort(text: string): number | undefined {
   for (const line of text.split("\n")) {
     if (!line.includes('"HTTP server listening"')) continue;

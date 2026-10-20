@@ -11,6 +11,7 @@ import { maxTimeLimitCount, timeLimitDuration, timeLimitInRange, timeLimitParts,
 import { t, type CatalogKey } from "../catalog.js";
 import { ExpressionInput } from "./shared/ExpressionInput";
 import { IssueList } from "./shared/IssueList";
+import { KeyCaption } from "./shared/KeyCaption";
 import { ActionListEditor } from "./ActionListEditor";
 import type { ConfigFieldDescriptor } from "../api/types.js";
 
@@ -170,7 +171,7 @@ export function TimersPanel({ timers, paths, fields, onChange, registryTypes, re
         return (
           <div className="timer-row" key={timer.id ?? index}>
             <label>
-              description
+              <KeyCaption text={t("timers.descriptionCaption")} jsonKey="description" />
               <input
                 type="text"
                 value={timer.description ?? ""}
@@ -179,7 +180,7 @@ export function TimersPanel({ timers, paths, fields, onChange, registryTypes, re
             </label>
 
             <label>
-              kind
+              <KeyCaption text={t("timers.kindCaption")} />
               <select
                 value={mode}
                 onChange={(e) => {
@@ -196,13 +197,13 @@ export function TimersPanel({ timers, paths, fields, onChange, registryTypes, re
               <TimeLimitInput value={timer.duration} onChange={(duration) => updateTimer(index, { duration })} />
             ) : (
               <label>
-                deadline
+                <KeyCaption text={t("timers.deadlineCaption")} jsonKey="deadline" />
                 <ExpressionInput value={timer.deadline} onChange={(deadline) => updateTimer(index, deadlinePatch(deadline))} />
               </label>
             )}
 
             <label>
-              onFire targetPath (bypasses the target path's guard)
+              <KeyCaption text={t("timers.targetPathCaption")} jsonKey="onFire.targetPath" />
               <select
                 value={timer.onFire?.targetPath ?? ""}
                 onChange={(e) =>
@@ -224,7 +225,7 @@ export function TimersPanel({ timers, paths, fields, onChange, registryTypes, re
             </label>
 
             <ActionListEditor
-              label="onFire actions"
+              label={<KeyCaption text={t("timers.onFireActionsLegend")} jsonKey="onFire.actions" />}
               actions={timer.onFire?.actions}
               onChange={(actions) => updateTimer(index, { onFire: { ...timer.onFire, actions } })}
               fields={fields}
