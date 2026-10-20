@@ -82,13 +82,22 @@ quotes the committed pre-fix pattern list verbatim.
 - [A local tool still reads `.devcontainer/`] → Nothing outside the
   repository does on this machine. The orphaned directory holds only
   gitignored files, and a task removes it.
+- [A clone that has not migrated shows `.devcontainer/.auth-secret` and
+  `server.log` as untracked, and `git add -A` commits the secret] →
+  `.gitignore` keeps one `.devcontainer/` line, commented as the retired
+  directory.
 
 ## Migration Plan
 
 1. Implement and verify on the stacked branch.
-2. Archive `devcontainer-on-podman` first, then this change.
-3. Merge both branches into `main` as fast-forwards, in that order.
-4. Rollback: revert this change's commits. Move `container/.auth-secret` back
+2. Run verify, sync and archive for `devcontainer-on-podman` on its own
+   branch. Its artifacts name `.devcontainer/`, so a verify on this branch
+   would report the renamed paths as mismatches.
+3. Rebase `rename-devcontainer-dir` onto the archived
+   `devcontainer-on-podman` (local, unpushed), then verify and archive this
+   change.
+4. Merge both branches into `main` as fast-forwards, in that order.
+5. Rollback: revert this change's commits. Move `container/.auth-secret` back
    if logins should survive the revert.
 
 ## Open Questions
