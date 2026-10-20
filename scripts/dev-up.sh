@@ -19,7 +19,7 @@ cd "$(dirname "$0")/.."
 SUPERUSER_EMAIL="demo-superuser@example.test"
 SUPERUSER_PASSWORD="seed-demo-password"
 SUPERUSER_ROLES="system:publish,system:cancel-any,system:admin,system:developer,system:author,system:reports,system:datalists,system:templates"
-SECRET_FILE=".devcontainer/.auth-secret"
+SECRET_FILE="container/.auth-secret"
 
 echo "==> Starting the pod ($DEV_POD: $PORT_APP, $PORT_VITE, $PORT_MAILPIT)"
 sh scripts/dev-pod.sh up
@@ -49,9 +49,9 @@ sleep 1
 # captured, so the server's structured logs (src/log.ts) went nowhere.
 # Redirecting to a file under /workspace makes them readable both inside
 # the container and on the host (bind mount), e.g. `tail -f
-# .devcontainer/server.log`.
+# container/server.log`.
 podman exec -d -e AUTH_JWT_SECRET="$SECRET" -w /workspace "$DEV_POD-app" \
-  bash -c 'bun run serve > .devcontainer/server.log 2>&1'
+  bash -c 'bun run serve > container/server.log 2>&1'
 sleep 2
 
 echo "==> Confirming the stack is ready"

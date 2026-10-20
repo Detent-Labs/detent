@@ -25,7 +25,7 @@ import { join, resolve } from "node:path";
 const REPO_ROOT = resolve(import.meta.dir, "..");
 const DOCKERIGNORE_PATH = resolve(REPO_ROOT, ".dockerignore");
 
-const REQUIRED_ENTRIES = ["**/node_modules", "**/.git", "**/.env", ".claude", ".worktrees"];
+const REQUIRED_ENTRIES = ["**/node_modules", "**/.git", "**/.env", ".claude", ".worktrees", "container"];
 
 function parsePatterns(text: string): string[] {
   return text

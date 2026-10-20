@@ -614,7 +614,7 @@ test("the home-path gate rejects a machine path beside a container path", async 
 
 test("the home-path gate passes a container path", async () => {
   const container = ["", "home", "node", ".claude"].join("/");
-  const file = ".devcontainer/Dockerfile";
+  const file = "container/Dockerfile";
   await scanPaths({ [file]: `"target": "${container}"\n` }, expectNoFinding);
 });
 

@@ -2,7 +2,7 @@
 # scripts/dev-pod.sh — this checkout's devcontainer pod, through `podman kube play`.
 #
 #   sh scripts/dev-pod.sh spec   print the Pod spec to stdout; calls no podman
-#   sh scripts/dev-pod.sh up     build the app image, write .devcontainer/pod.yaml,
+#   sh scripts/dev-pod.sh up     build the app image, write container/pod.yaml,
 #                                play it when needed, wait until every container
 #                                passes its probe
 #   sh scripts/dev-pod.sh down   remove the pod; the database volume stays
@@ -31,7 +31,7 @@ fi
 # Pod, container and volume names keep DEV_POD as it is; the image name maps
 # every `_` to `-` and squeezes each run of `-` to one.
 APP_IMAGE="localhost/$(printf '%s' "$DEV_POD" | sed -e 's/_/-/g' -e 's/--*/-/g')-app:latest"
-POD_YAML="$DEV_POD_TOPLEVEL/.devcontainer/pod.yaml"
+POD_YAML="$DEV_POD_TOPLEVEL/container/pod.yaml"
 
 # A double-quoted YAML scalar. A checkout path may hold a space, a `:` or a
 # `#`, and each of those breaks a plain scalar.
@@ -189,7 +189,7 @@ EOF
 
 up() {
   echo "==> Building $APP_IMAGE"
-  podman build -q -t "$APP_IMAGE" -f "$DEV_POD_TOPLEVEL/.devcontainer/Dockerfile" "$DEV_POD_TOPLEVEL/.devcontainer" >/dev/null
+  podman build -q -t "$APP_IMAGE" -f "$DEV_POD_TOPLEVEL/container/Dockerfile" "$DEV_POD_TOPLEVEL/container" >/dev/null
 
   _new_spec=$(spec)
   _replay=""
