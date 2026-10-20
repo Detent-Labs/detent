@@ -11,8 +11,8 @@
 
 ## 2. Bring-up and preflight
 
-- [ ] 2.1 Rewrite `scripts/dev-up.sh` per design D5 and the `devcontainer-preflight` delta: run `sh scripts/dev-pod.sh up` (which waits for the database), then run install, seed, superuser setup and the server start through `scripts/dev-exec.sh`, with `podman exec -d` for the server. Drop the override and ports-file logic. Keep the final address printout. Verify that a re-run against a prepared pod passes and leaves the pod's container ids unchanged.
-- [ ] 2.2 Rewrite `scripts/preflight.sh` per design D7: check 1 asks `podman info` and prints `podman info` as the command that shows the cause, check 2 runs `podman healthcheck run` on each container, checks 3 and 5 exec through Podman, and the check 5 repair command runs through `scripts/dev-exec.sh`. Keep check 6 unchanged. Verify `bash scripts/preflight.sh serve` passes against the running pod, and that `core` fails at check 2 with the bring-up command after `sh scripts/dev-pod.sh down`.
+- [x] 2.1 Rewrite `scripts/dev-up.sh` per design D5 and the `devcontainer-preflight` delta: run `sh scripts/dev-pod.sh up` (which waits for the database), then run install, seed, superuser setup and the server start through `scripts/dev-exec.sh`, with `podman exec -d` for the server. Drop the override and ports-file logic. Keep the final address printout. Verify that a re-run against a prepared pod passes and leaves the pod's container ids unchanged.
+- [x] 2.2 Rewrite `scripts/preflight.sh` per design D7: check 1 asks `podman info` and prints `podman info` as the command that shows the cause, check 2 runs `podman healthcheck run` on each container, checks 3 and 5 exec through Podman, and the check 5 repair command runs through `scripts/dev-exec.sh`. Keep check 6 unchanged. Verify `bash scripts/preflight.sh serve` passes against the running pod, and that `core` fails at check 2 with the bring-up command after `sh scripts/dev-pod.sh down`.
 
 ## 3. Push hook, gates and CI
 
