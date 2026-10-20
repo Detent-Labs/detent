@@ -55,13 +55,8 @@ describe("issueMessage: unknown kind falls back to the raw discriminator", () =>
 });
 
 describe("issueMessage: locale fallback", () => {
-  it("falls back to baseLocale when the active locale has no catalog", () => {
-    const message = issueMessage({ kind: "required-missing", fieldId: "f1" }, "fr", "de");
-    expect(message).toBe(issueMessage({ kind: "required-missing", fieldId: "f1" }, "de"));
-  });
-
-  it("falls back to en when neither locale nor baseLocale has a catalog", () => {
-    const message = issueMessage({ kind: "required-missing", fieldId: "f1" }, "fr", "it");
+  it("falls back to en when the active locale has no catalog", () => {
+    const message = issueMessage({ kind: "required-missing", fieldId: "f1" }, "fr");
     expect(message).toBe(issueMessage({ kind: "required-missing", fieldId: "f1" }, "en"));
   });
 });

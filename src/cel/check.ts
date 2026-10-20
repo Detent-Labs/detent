@@ -55,8 +55,9 @@ const CHILD_SCHEMA = { outcome: "string", data: "dyn" } as const; // child.data 
  * author carries: integer division truncates, and an expression mixing an
  * integer field with a decimal field finds no overload.
  *
- * ponytail: dyn for file / plugin field types / data sources until their plugin
- * output schemas are formalized; add real types when the registry lands.
+ * ponytail: dyn for file and plugin field types. A plugin field type needs a
+ * field-type registry the engine does not have yet, and a file value needs a
+ * CEL shape for an attachment reference. Upgrade entry: `celType` below.
  */
 export function celType(field: Pick<FieldDef, "type" | "format">): string {
   const t = field.type;

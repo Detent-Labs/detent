@@ -19,11 +19,16 @@ info:
     frontends directly, not a customer integration. Each exclusion is named
     rather than left implicit, so its absence reads as a decision.
 
-    Every route runs through the Runtime API Layer (`src/runtime/api.ts`).
+    Every instance route runs through the Runtime API Layer
+    (`src/runtime/api.ts`).
     An unauthenticated request to any route below `POST /auth/login`,
     `GET /livez`, `GET /readyz`, and `GET /ui-strings` gets 401.
     `GET /metrics` is also 401
     without a token, but its token is `METRICS_TOKEN`, not an actor's JWT.
+    In SaaS mode, any route except `GET /livez`, `GET /readyz` and
+    `GET /metrics` can answer 401 `actor-resolution` for an unknown or
+    missing tenant, and 503 `tenant-unreachable` when the tenant's database
+    is down. Those three answer before tenant resolution.
     A request lacking a required
     reserved role gets 403. A malformed request body gets 400 (request
     shape) or 422 (field-level validation). `POST /processes` is the one
@@ -50,7 +55,7 @@ tags:
   - name: health
     description: Unauthenticated liveness/readiness probes for orchestration.
   - name: observability
-    description: Unauthenticated Prometheus scrape target.
+    description: Prometheus scrape target. Needs the `METRICS_TOKEN` bearer token.
   - name: ui-strings
     description: Unauthenticated read of a deployment's own UI wording.
 
@@ -106,9 +111,12 @@ paths:
       operationId: publishProcess
       summary: Publish a process definition
       description: >-
-        Requires the `system:publish` role. The check reads the `processId`
-        the body carries, so it runs after the request-shape check: a caller
-        lacking the role whose body is malformed reads 400, not 403.
+        Requires the `publish` permission over the `processId` the body
+        carries: the `system:publish` role, or a stored grant over that
+        process. The requirement "A process-scoped gate asks one function
+        over two tests" in `openspec/specs/authorization/spec.md` governs the
+        check. It runs after the request-shape check: a caller lacking the
+        permission whose body is malformed reads 400, not 403.
         A process that already has a draft or a published version also needs
         the `system:admin` role or a place on that process's Developer list,
         with `system:developer` or `system:author`. A first publish of a new
@@ -141,7 +149,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "403":
-          description: The actor lacks the `system:publish` role, or the process already exists and the actor is neither `system:admin` nor on its Developer list.
+          description: The actor holds neither the `system:publish` role nor a stored `publish` grant over the process, or the process already exists and the actor is neither `system:admin` nor on its Developer list.
           content:
             application/json:
               schema:
@@ -262,19 +270,34 @@ paths:
         that instance while they hold the claim on its current step, or are
         a candidate on its current step and nobody holds the claim. A
         `system:admin` holder keeps every instance they started.
+        `scope=visible` is open to any authenticated actor too. It lists
+        the instances whose principal set holds the caller, by id, role or
+        group, minus those a visibility revocation names the caller for,
+        unless the caller holds a live assignment on the current step.
         `scope=all`, and an omitted `scope` alike, require the
-        `system:admin` role.
+        `system:admin` role. With a `processId`, they require the `read`
+        permission over that process instead: the `system:admin` role, a
+        stored `read` grant, or a place on the process's Reader list.
       parameters:
         - name: scope
           in: query
           schema:
             type: string
-            enum: [mine, started, all]
+            enum: [mine, started, all, visible]
           description: Omitted means `all`.
         - name: processId
           in: query
           schema:
             type: string
+          description: With `scope=all` or an omitted `scope`, it changes the gate from the `system:admin` role to the `read` permission over this process.
+        - name: kind
+          in: query
+          schema:
+            type: string
+            enum: [published, test]
+          description: >-
+            Keeps one kind of instance. A test instance reaches only the
+            `scope=all` result, whatever the `kind` value.
         - name: status
           in: query
           style: form
@@ -334,7 +357,7 @@ paths:
                 $ref: "#/components/schemas/InstanceSummaryPage"
         "400":
           description: >-
-            An invalid `limit`/`status`/`version`/`createdAfter`/`createdBefore`/`cursor`
+            An invalid `scope`/`kind`/`limit`/`status`/`version`/`createdAfter`/`createdBefore`/`cursor`
             value, a `version` with no `processId`, `scope=mine` combined with
             `assignedTo`, or `scope=started` combined with `startedBy`.
           content:
@@ -348,7 +371,10 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "403":
-          description: "`scope=all` (or an omitted `scope`) without the `system:admin` role."
+          description: >-
+            `scope=all` (or an omitted `scope`) without the `system:admin`
+            role or, when a `processId` accompanies it, without the `read`
+            permission over that process.
           content:
             application/json:
               schema:
@@ -360,9 +386,13 @@ paths:
       operationId: getInstanceView
       summary: Resolve a display-ready view of one instance
       description: >-
-        No reserved-role requirement. Visible to `system:admin`, the
-        instance's starter, the current step's claimant, or an eligible
-        assignment candidate.
+        No reserved-role requirement. Visible to `system:admin`, the current
+        step's claimant or an eligible assignment candidate, and the
+        instance's starter or a participant in its principal set, unless a
+        visibility revocation names them. Beside `system:admin`, a test
+        instance admits its starter alone. The requirement "Reading one
+        instance is authorized by relationship to it" in
+        `openspec/specs/authorization/spec.md` governs the rule.
       parameters:
         - $ref: "#/components/parameters/instanceId"
       responses:
@@ -379,13 +409,18 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "403":
-          description: The actor is neither admin, starter, claimant, nor an eligible candidate.
+          description: >-
+            No relationship in the rule above admits the actor. A non-admin
+            gets the same answer for an instance that does not exist.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "500":
-          description: The instance does not exist. Also covers any unrecognized server-side failure.
+          description: >-
+            The instance does not exist and the caller holds `system:admin`.
+            Any other caller gets the 403 above for a missing instance. Also
+            covers any unrecognized server-side failure.
           content:
             application/json:
               schema:
@@ -397,8 +432,9 @@ paths:
       operationId: submitInstance
       summary: Submit field data and trigger a manual transition
       description: >-
-        No reserved-role requirement; the claimant, or an eligible candidate
-        on an unclaimed step, may submit. A `null` value for a field in
+        No reserved-role requirement. On a step with an assignment the
+        current claimant alone may submit. On a step without one, the
+        instance's starter or a `system:admin` holder may. A `null` value for a field in
         `data` clears that field: the key leaves the instance data, and no
         type, option, constraint or rule check runs for it. An unknown or
         readonly key is still refused, `null` or not. A required field counts
@@ -436,11 +472,13 @@ paths:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "403":
           description: >-
-            The actor is not the claimant, or not an eligible candidate on an
-            unclaimed step. Type `authorization` also answers an instance that
-            does not exist when the actor lacks `system:admin`, and a
-            non-running instance the actor may not read. Its message does not
-            tell these cases apart.
+            The actor is not the claimant, or on an unassigned step is neither
+            the starter nor a `system:admin` holder. On a step with an
+            assignment, type `not-claimed` answers when nobody holds the claim,
+            and type `not-claimant` when another actor holds it. Type
+            `authorization` also answers an instance that does not exist when
+            the actor lacks `system:admin`, and a non-running instance the
+            actor may not read. Its message does not tell these cases apart.
           content:
             application/json:
               schema:
@@ -742,13 +780,19 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "403":
-          description: The actor is neither admin, starter, claimant, nor an eligible candidate.
+          description: >-
+            The rule `GET /instances/{instanceId}` states does not admit the
+            actor. A non-admin gets the same answer for an instance that does
+            not exist.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "500":
-          description: The instance does not exist. Also covers any unrecognized server-side failure.
+          description: >-
+            The instance does not exist and the caller holds `system:admin`.
+            Any other caller gets the 403 above for a missing instance. Also
+            covers any unrecognized server-side failure.
           content:
             application/json:
               schema:
@@ -782,13 +826,19 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "403":
-          description: The actor is neither admin, starter, claimant, nor an eligible candidate.
+          description: >-
+            The rule `GET /instances/{instanceId}` states does not admit the
+            actor. A non-admin gets the same answer for an instance that does
+            not exist.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "500":
-          description: The instance does not exist. Also covers any unrecognized server-side failure.
+          description: >-
+            The instance does not exist and the caller holds `system:admin`.
+            Any other caller gets the 403 above for a missing instance. Also
+            covers any unrecognized server-side failure.
           content:
             application/json:
               schema:
@@ -845,13 +895,19 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "403":
-          description: The actor is neither admin, starter, claimant, nor an eligible candidate.
+          description: >-
+            The rule `GET /instances/{instanceId}` states does not admit the
+            actor. A non-admin gets the same answer for an instance that does
+            not exist.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "500":
-          description: The instance does not exist. Also covers any unrecognized server-side failure.
+          description: >-
+            The instance does not exist and the caller holds `system:admin`.
+            Any other caller gets the 403 above for a missing instance. Also
+            covers any unrecognized server-side failure.
           content:
             application/json:
               schema:
@@ -888,13 +944,19 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "403":
-          description: The actor is neither admin, starter, claimant, nor an eligible candidate.
+          description: >-
+            The rule `GET /instances/{instanceId}` states does not admit the
+            actor. A non-admin gets the same answer for an instance that does
+            not exist.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "500":
-          description: The instance does not exist. Also covers any unrecognized server-side failure.
+          description: >-
+            The instance does not exist and the caller holds `system:admin`.
+            Any other caller gets the 403 above for a missing instance. Also
+            covers any unrecognized server-side failure.
           content:
             application/json:
               schema:
@@ -942,7 +1004,10 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "403":
-          description: The actor is neither admin, starter, claimant, nor an eligible candidate.
+          description: >-
+            The rule `GET /instances/{instanceId}` states does not admit the
+            actor. A non-admin gets the same answer for an instance that does
+            not exist.
           content:
             application/json:
               schema:
@@ -950,7 +1015,9 @@ paths:
         "500":
           description: >-
             The attachment does not exist, or belongs to a different
-            instance than `instanceId`. Also covers any unrecognized
+            instance than `instanceId`. Also the instance does not exist and
+            the caller holds `system:admin`; any other caller gets the 403
+            above for a missing instance. Also covers any unrecognized
             server-side failure.
           content:
             application/json:
@@ -963,9 +1030,14 @@ paths:
       operationId: cancelInstance
       summary: Cancel a running instance
       description: >-
-        Requires the `system:cancel-any` role, or that the actor started
-        the instance (`startedBy === actor.id`). Cancel authority is not read
-        authority, so the body is the write result and never the instance.
+        Requires the `cancel` permission over the instance's process: the
+        `system:cancel-any` role, or a stored grant over that process. The
+        requirement "A process-scoped gate asks one function over two tests"
+        in `openspec/specs/authorization/spec.md` governs that check. Failing
+        it, the actor who started the instance (`startedBy === actor.id`) may
+        still cancel, but only while the current step's effective
+        `cancellable` is true. Cancel authority is not read authority, so the
+        body is the write result and never the instance.
       parameters:
         - $ref: "#/components/parameters/instanceId"
       responses:
@@ -988,8 +1060,10 @@ paths:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "403":
           description: >-
-            The actor holds neither `system:cancel-any` nor starter status on
-            this instance. A starter whom a revocation names, with no live
+            The actor holds neither `system:cancel-any` nor a stored `cancel`
+            grant over the process, and either did not start this instance or
+            started it and the instance runs on a step whose effective
+            `cancellable` is false. A starter whom a revocation names, with no live
             assignment on the instance, also gets this response once the
             instance has finished: the 200 above would tell them its status.
           content:

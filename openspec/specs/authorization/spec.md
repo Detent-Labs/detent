@@ -15,10 +15,10 @@ started, without the reserved role" below.
 Built on top of `actor-resolution`/`jwt-authentication`/`local-user-accounts`:
 those capabilities establish *who* the caller is; this one decides whether
 that identity may perform an administrative, operator-facing, or authoring
-operation. Deliberately minimal — five fixed role strings, checked directly
-at each call site that needs one, with no policy engine, role hierarchy, or
-pluggable extension point. See the `http-wrapper` capability for how the
-resulting `403` surfaces over HTTP.
+operation. Deliberately minimal — a fixed set of reserved role strings,
+checked directly at each call site that needs one, with no policy engine,
+role hierarchy, or pluggable extension point. See the `http-wrapper`
+capability for how the resulting `403` surfaces over HTTP.
 
 ## Requirements
 
@@ -260,7 +260,7 @@ Nine gates SHALL await `requirePermission` in place of a bare `requireRole`:
 
 Those three sit under `/instances/:instanceId/visibility*`, beside
 `handleCancel`, not under `/admin/*`. An `/admin/*` route calls `requireRole`
-with `ADMIN_ROLE`, and the rule below keeps that true.
+with a fixed role, and the rule below keeps that true.
 
 The tenth site is `cancelInstance`. It awaits `can` where it holds a loaded
 instance. The requirement named "An instance's starter may cancel it without
@@ -268,7 +268,8 @@ the reserved role" states that placement.
 
 Every operation whose target is not one process SHALL keep the gate it has:
 
-- every `/admin/*` route calls `requireRole` with `ADMIN_ROLE`
+- every `/admin/*` route calls `requireRole` with `ADMIN_ROLE`, except the
+  data list routes, which the `system:datalists` requirement below gates
 - every `/reporting/*` route calls `requireRole` with `REPORTS_ROLE`
 - the two template writes call `requireRole` with `TEMPLATES_ROLE`
 - the four draft routes call `requireAuthoring`, the two-role helper in
@@ -288,9 +289,9 @@ separate. `requireRole` SHALL stay exported and SHALL stay synchronous.
 
 - **WHEN** a reader reads the exports of `src/auth/authorize.ts`
 - **THEN** it exports `can` and `requirePermission`
-- **AND** the `Permission` type admits `"publish"`, `"cancel"`, `"migrate"` and
-  `"read"`
-- **AND** the `Permission` type admits no fifth value
+- **AND** the `Permission` type admits `"publish"`, `"cancel"`, `"migrate"`,
+  `"read"` and `"visibility"`
+- **AND** the `Permission` type admits no sixth value
 
 #### Scenario: A global role holder passes
 
@@ -490,7 +491,7 @@ The identity provider stays the authority on who someone is and which groups
 they hold. The installation stays the authority on what a group may do inside
 it. `Actor.roles` SHALL keep its `string[]` shape, and `auth_users.roles` SHALL
 keep its `TEXT[]` shape. A sync from Active Directory or Entra ID therefore
-needs no new field.
+does not need a new field.
 
 A grant's role SHALL be free text. The engine SHALL NOT need the `system:`
 prefix on it. It SHALL NOT need any account to hold that role today. A grant
@@ -499,10 +500,10 @@ written ahead of the directory sync that creates the group is valid and inert.
 An external issuer's claim value reaches `actor.roles` verbatim, through
 `claimToRoles` in `src/auth/jwt.ts`. Entra ID's `groups` claim emits object
 ids by default. A grant to such a group therefore names the object id, and
-the listing shows that id. That is a display concern for a later operator screen,
-not a rule of the store.
+the listing shows that id. That is a concern for a later operator screen.
+The store makes no rule of it.
 
-The eight `system:*` roles SHALL keep their exact meaning. They serve the cases
+The reserved `system:*` roles SHALL keep their exact meaning. They serve the cases
 that are genuinely installation-wide. Account administration, the outbox and
 the timer views stay behind `system:admin`. A scoped grant is a second and
 narrower
@@ -536,7 +537,7 @@ role anybody already holds.
 
 <!-- Why: the header below has to match the requirement heading in the live
      spec, byte for byte. Its wording predates the permission seam. -->
-<!-- antislop: allow passive-voice -->
+<!-- antislop: allow passive-voice trailing-negation -->
 ### Requirement: Authorization is checked directly at each gated operation, not through an extension point
 
 This capability gates six kinds of operation:
@@ -560,8 +561,8 @@ resolves five fixed permissions through one compile-time map. It reaches no
 registry. It loads no code. A caller SHALL NOT be able to add a permission,
 replace the map, or supply a policy.
 
-A grant is data, not policy. It names a role, one of the five fixed
-permissions, and a scope. It carries no expression, no ordering, no priority
+A grant is plain data. It names a role, one of the five
+fixed permissions, and a scope. It has no expression, no ordering, no priority
 and no deny form. Two grants over one process combine by answering true, which
 is what a set of independent tests already does.
 
@@ -574,18 +575,25 @@ is what a set of independent tests already does.
 #### Scenario: Each admin route calls requireRole directly
 
 - **WHEN** a reader reads `src/http/admin-routes.ts`
-- **THEN** each handler calls `requireRole(actor, ADMIN_ROLE)` itself, with no
-  policy abstraction between them
+- **THEN** each handler calls `requireRole` itself, with no policy abstraction
+  between them
+- **AND** each handler passes `ADMIN_ROLE`, except the data list handlers,
+  which pass `DATALISTS_ROLE`
+- **AND** a data list read admits either authoring role before that call
 
 #### Scenario: Each studio route calls requireRole directly
 
 - **WHEN** a reader reads `src/http/studio-routes.ts`
-- **THEN** each handler calls `requireRole` or `requirePermission` itself, with
-  no policy abstraction between them
+- **THEN** each role-gated handler calls `requireRole` or `requirePermission`
+  itself, with no policy abstraction between them
 - **AND** the two template writes call `requireRole` with `TEMPLATES_ROLE`,
   while the four draft routes call the `requireAuthoring` helper beside it
 - **AND** the publish route, the two migration-plan routes and the orphan-key
   route await `requirePermission` with their fixed permission
+- **AND** the three `/processes/:processId/access` routes and
+  `GET /processes/access/mine` take no role gate
+- **AND** `src/auth/process-access.ts` authorizes the two access writes, and
+  the access read checks `ADMIN_ROLE` or the Developer list inline
 
 #### Scenario: The permission map does not extend
 
@@ -593,6 +601,7 @@ is what a set of independent tests already does.
 - **THEN** it is a module constant covering exactly five permissions
 - **AND** no exported function adds an entry to it
 
+<!-- antislop: allow negation-habit - OpenSpec matches a MODIFIED block's scenario names against the live spec, so this heading keeps its wording -->
 #### Scenario: A grant carries no policy
 
 - **WHEN** an operator writes a grant
@@ -749,8 +758,10 @@ rule. The role test and the grant test sit outside it.
 
 ### Requirement: The operator role gates the operator-facing reads and routes
 
-`ADMIN_ROLE` SHALL gate every `/admin/*` route and, additionally, `GET
-/instances/:instanceId/record`. The `scope=mine` listing SHALL remain open to
+`ADMIN_ROLE` SHALL gate every `/admin/*` route except the data list routes,
+and, additionally, `GET /instances/:instanceId/record`. The
+`system:datalists` requirement below gates the data list routes. The
+`scope=mine` listing SHALL remain open to
 every authenticated actor. An actor holding no reserved role therefore still
 participates fully in the instances it is a candidate for.
 
@@ -1006,29 +1017,43 @@ granted via `src/auth/cli.ts set-roles`.
 
 ### Requirement: The developer role gates the authoring surface
 
-`DEVELOPER_ROLE` SHALL admit every studio route. It SHALL be the only role the
-two migration-plan routes and the orphan-key scan admit. Every other studio
-route SHALL admit `system:author` as well. The three studio reads the
+`DEVELOPER_ROLE` SHALL admit every studio route except five. The
+`system:templates` requirement below gates the two template writes. The
+`process-access-roles` lists gate the three `/processes/:processId/access`
+routes.
+
+The `process-access-roles` Developer list narrows seven more routes: the four
+draft routes, the two publish routes and the drafts list. The rule takes
+hold once a process has a draft or a published version. From then on, a
+non-admin caller on one of the six process routes SHALL stand on its
+Developer list. The drafts list SHALL return to a non-admin only the drafts
+whose Developer list names them.
+
+Of the reserved roles, only `DEVELOPER_ROLE` SHALL admit the two
+migration-plan routes and the orphan-key scan. A stored `migrate` grant
+admits a caller there too. Every other studio route that `DEVELOPER_ROLE`
+admits SHALL admit `system:author` as well. The three studio reads the
 `system:templates` requirement below names SHALL admit that role too.
 
 `DEVELOPER_ROLE` SHALL NOT grant any operation the other reserved roles gate.
 Publishing a process body SHALL keep its separate need for `system:publish`.
-The operator reads and the `/admin/*` routes SHALL keep their need for
-`system:admin`.
+The operator reads and the `/admin/*` routes other than the data list routes
+SHALL keep their need for `system:admin`.
 
-No route loses a caller. Every account holding `system:developer` reaches
-exactly what it reached before. An operator grants studio access through the
-existing `src/auth/cli.ts set-roles`.
+An operator grants studio access through the existing
+`src/auth/cli.ts set-roles`.
 
 #### Scenario: A developer reaches the authoring surface
 
 - **WHEN** an actor holding `system:developer` calls a studio route
+- **AND** the actor stands on the Developer list of the process the route names
 - **THEN** the engine authorizes the request
 
+<!-- antislop: allow long-words - OpenSpec matches a MODIFIED block's scenario names against the live spec, so this heading keeps its wording -->
 #### Scenario: A developer does not thereby gain publish or admin rights
 
 - **WHEN** an actor holding only `system:developer` calls `POST /processes` or
-  an `/admin/*` route
+  an `/admin/*` route other than a data list read
 - **THEN** the response is 403
 
 #### Scenario: The developer role alone reaches the migration routes
@@ -1041,9 +1066,11 @@ existing `src/auth/cli.ts set-roles`.
 
 #### Scenario: No existing caller loses a route
 
-- **WHEN** this change lands
-- **THEN** every account holding `system:developer` still reaches every studio
-  route it reached beforehand
+- **WHEN** an account holding `system:developer` calls a studio route whose
+  only gate is a role `system:developer` satisfies, such as `GET /registry`,
+  `GET /templates` or a migration-plan route
+- **THEN** the engine authorizes the request, whatever list the account
+  stands on
 
 ### Requirement: The reports role gates every reporting route
 
@@ -1142,8 +1169,9 @@ the process, or with `ADMIN_ROLE`.
 ### Requirement: A system:datalists role gates data list maintenance
 
 `system:datalists` SHALL gate every data list write route. It SHALL admit the
-data list reads together with `system:developer`, the second so the studio can
-offer the existing keys as a choice.
+data list reads together with the two authoring roles. Those are
+`system:developer` and `system:author`, so the studio can offer the existing
+keys as a choice.
 
 The narrow grant is the point. Staff who maintain value lists must not gain
 the power to cancel instances or to publish a process.

@@ -82,7 +82,7 @@ describe("ActionListEditor's registry badge", () => {
     const action: DraftAction = { id: "action_a" as never, type: "http.request", config: {} };
     const html = renderRow(action, baseValidation({ issues: [] }));
 
-    expect(html).toContain("registry config");
+    expect(html).toContain("Registry config: not checked");
     expect(html).toContain("badge-not-checked");
   });
 
@@ -95,7 +95,7 @@ describe("ActionListEditor's registry badge", () => {
       }),
     );
 
-    expect(html).not.toContain("registry config");
+    expect(html).not.toContain("Registry config");
     expect(html).toContain("not registered");
   });
 });

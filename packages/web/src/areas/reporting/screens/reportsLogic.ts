@@ -292,10 +292,6 @@ export function isPartialCoverage(choice: ColumnChoice, versionsInRange: number[
   return versionsInRange.some((v) => !choice.versions.includes(v));
 }
 
-export function fieldLabel(fieldId: string, choices: ColumnChoice[]): string {
-  return choices.find((c) => c.fieldId === fieldId)?.fieldId ?? fieldId;
-}
-
 // ------------------------------------------------------------ sharing
 
 /** The owner can never be removed from `editors` — the invariant the engine also enforces; the UI blocks the control before a request is even sent (spec: "Removing the owner from editors is prevented in the UI"). */

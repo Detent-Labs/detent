@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { Action, Expression, FieldId } from "workflow-engine/schema";
 import { PROCESS_START_ACTION_TYPE } from "workflow-engine/engine/registry";
 import type { DraftOf } from "../draft/types";
@@ -14,7 +15,7 @@ import { t } from "../catalog.js";
 type DraftAction = DraftOf<Action>;
 
 interface Props {
-  label: string;
+  label: ReactNode;
   actions: DraftAction[] | undefined;
   onChange: (next: DraftAction[]) => void;
   fields: DraftField[];
@@ -118,8 +119,8 @@ function ActionRow({
         onChange={setOutput}
       />
 
-      {!hasRegistryIssue && <NotCheckedBadge label="registry config" />}
-      {isChainingSite && !chainingChecked && <NotCheckedBadge label="chaining target" />}
+      {!hasRegistryIssue && <NotCheckedBadge text={t("issues.registryNotChecked")} />}
+      {isChainingSite && !chainingChecked && <NotCheckedBadge text={t("issues.chainingNotChecked")} />}
       <IssueList entityId={action.id} />
 
       <button type="button" className="btn btn-secondary" onClick={onRemove}>
