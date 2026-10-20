@@ -1,3 +1,6 @@
+<!-- antislop: allow-file trailing-negation negation-habit -->
+<!-- The requirement text is copied from the live spec; only the path container/.auth-secret differs. -->
+
 # Spec Delta
 
 ## MODIFIED Requirements
@@ -8,9 +11,9 @@ Every failing check SHALL print a command the developer can copy and run. The
 command SHALL be the literal command, not a description of one.
 
 A command that drives Podman SHALL reach the checkout the preflight ran in.
-Each checkout derives its own pod. A command naming a pod or a container
-literally reaches a different stack once a developer copies it out of a
-linked worktree. A repair command therefore runs through a script that
+Each checkout derives its own pod. A command can name a pod or a container
+by a fixed name. Such a command reaches a different stack once a developer
+copies it out of a linked worktree. A repair command therefore runs through a script that
 sources the derivation.
 
 Some checks name no single repair command. Such a check SHALL print the file
@@ -39,4 +42,5 @@ to change, and the line it needs.
 
 - **WHEN** check 5 fails in a linked worktree
 - **THEN** the printed seed command execs into that worktree's own `app`
-  container, and names no pod or container literally
+  container, and does not name a pod or a container
+

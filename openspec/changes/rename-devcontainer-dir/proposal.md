@@ -6,7 +6,7 @@
 `devcontainer-on-podman` removed the two files that tool needed,
 `devcontainer.json` and the Compose file. What remains is the image recipe
 for the `app` container and the pod's local state. The hidden directory now
-names a tool this repository no longer serves, and a reader looking for the
+names a tool this repository no longer serves. A reader looking for the
 container setup does not find it in the root listing.
 
 ## What Changes

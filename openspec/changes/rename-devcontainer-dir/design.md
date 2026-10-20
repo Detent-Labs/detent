@@ -10,7 +10,7 @@ directory holds one tracked file, `Dockerfile`, and three gitignored ones:
   `pod.yaml`.
 - `scripts/dev-up.sh` keeps the secret and the server log there.
 
-Measured on 2026-10-20: no other directory in the tree is named `container`,
+Measured on 2026-10-20: the tree has no other directory called `container`,
 so a bare `container` entry in `.dockerignore` matches the root alone.
 
 ## Goals / Non-Goals
@@ -23,7 +23,7 @@ so a bare `container` entry in `.dockerignore` matches the root alone.
 **Non-Goals:**
 
 - Renaming the concept. `devcontainer-preflight`, `devcontainer-exec` and the
-  prose word "devcontainer" name the dev container, not the directory.
+  prose word "devcontainer" name the dev container. They do not name the directory.
 - Touching archived changes. They record the path as it was.
 - A migration helper for other machines. This repository has one development
   machine today. The README's migration subsection covers anyone else.
@@ -45,17 +45,17 @@ name, and `dev/`, which says less about what the directory holds.
 history visible through `git log --follow`. The three gitignored files move
 with `mv` on this machine.
 
-Moving `.auth-secret` keeps existing logins valid, since `dev-up.sh` would
-otherwise generate a new key. `pod.yaml` needs no move: the next `up` finds
+Moving `.auth-secret` keeps existing logins valid. Without it, `dev-up.sh`
+would make a new key. `pod.yaml` does not need a move. The next `up` finds
 no spec at the new path, writes one, and replays the pod. `server.log` moves
 only for continuity.
 
-### D3. Spec deltas assume `devcontainer-on-podman` is synced
+### D3. Spec deltas assume `devcontainer-on-podman` has synced
 
 The base specs still carry the Compose-era text until `devcontainer-on-podman`
 archives. That archive waits on its CI run.
 
-The deltas here are written against the text that change's deltas leave
+This change's deltas target the text that the other change's deltas leave
 behind. The `devcontainer-preflight` block is that change's MODIFIED version,
 with the path replaced. This change therefore archives strictly after
 `devcontainer-on-podman`.

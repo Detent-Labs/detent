@@ -1,3 +1,6 @@
+<!-- antislop: allow-file negation-habit -->
+<!-- The "holds no slash" sentence is copied from the live spec. -->
+
 # Spec Delta
 
 ## MODIFIED Requirements
