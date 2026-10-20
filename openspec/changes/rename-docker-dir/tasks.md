@@ -7,8 +7,8 @@
 
 ## 2. Documents and comments
 
-- [x] 2.1 Replace the path in `README.md`, `docs/runbooks/deployment.md`, `docs/current-state.md`, `docs/decisions.md`, `THIRDPARTY.md`, `scripts/enable-hooks.sh`, `packages/web/csp.ts`, `packages/web/test/vite-config.test.ts` and `test/enable-hooks.test.ts`. Keep `docker build` as a command wherever it appears. Edit the Purpose paragraph of `openspec/specs/production-docker-images/spec.md` to name `deploy/engine.Dockerfile` and `deploy/frontend.Dockerfile`. Verify with `git grep -n -E '(^|[^a-z_.-])docker/' -- . ':!openspec/changes'` printing only lines from base specs that this change's deltas replace.
-- [ ] 2.2 Run the antislop linter on every Markdown file this change touched, if it is installed. Fix each finding or add a targeted directive with a reason. If it is absent, leave this task open and say so.
+- [x] 2.1 Replace the path in `README.md`, `docs/runbooks/deployment.md`, `docs/current-state.md`, `docs/decisions.md`, `THIRDPARTY.md`, `scripts/enable-hooks.sh`, `packages/web/csp.ts`, `packages/web/test/vite-config.test.ts` and `test/enable-hooks.test.ts`. Keep `docker build` as a command wherever it appears. Change the Purpose paragraph of `openspec/specs/production-docker-images/spec.md` to name `deploy/engine.Dockerfile` and `deploy/frontend.Dockerfile`. Verify with `git grep -n -E '(^|[^a-z_.-])docker/' -- . ':!openspec/changes'` printing only lines from base specs that this change's deltas replace.
+- [x] 2.2 Run the antislop linter on every Markdown file this change touched. Fix each finding or add a targeted directive with a reason. If the linter is absent, leave this task open and say so.
 
 ## 3. Verification
 
@@ -22,4 +22,4 @@
 - Run `openspec-review-change` and resolve every finding; then start apply without asking (owner's rule).
 - Apply runs in the main checkout after `slim-claude-md`'s apply finishes there; rebase this branch onto its tip first.
 - Archive last, after the four changes below it.
-- No push until the user says the new machine is set up.
+- No push until the user confirms the new machine is ready.

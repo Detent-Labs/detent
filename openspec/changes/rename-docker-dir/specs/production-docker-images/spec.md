@@ -1,3 +1,5 @@
+<!-- antislop: allow-file sentence-length synonym-rotation passive-voice negation-habit -->
+<!-- The requirement text is copied from the live spec; only the docker/ to deploy/ path differs. -->
 # Spec Delta
 
 ## MODIFIED Requirements

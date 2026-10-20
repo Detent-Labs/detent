@@ -3,16 +3,15 @@
 ## Why
 
 The repository holds two directories of container recipes with names that do
-not say what separates them. `container/` holds the development image of the
-`app` container in the dev pod. `docker/` holds the production images a
-deployment runs: `engine.Dockerfile`, `frontend.Dockerfile` and `nginx.conf`.
+not say what separates them. The directory `container/` holds the development
+image of the `app` container in the dev pod. The directory `docker/` holds the
+production images a deployment runs: `engine.Dockerfile`, `frontend.Dockerfile` and `nginx.conf`.
 
-The name `docker/` names a tool, not a purpose. Since 2026-10-20 the
-development host runs Podman, which builds those same files once their base
-images carry a registry host, so the tool name says nothing true about the
-directory. `deploy/` states what the files are
-for, and it reads against `container/` at a glance: one is for development,
-the other for deployment.
+The name `docker/` names a tool. Since 2026-10-20 the development host runs
+Podman. Podman builds those same files once their base images carry a
+registry host. The tool name therefore says nothing true about the directory. The
+name `deploy/` states what the files are for. It reads against `container/`
+at a glance: one is for development, the other for deployment.
 
 ## What Changes
 
@@ -46,7 +45,7 @@ None.
 
 - `production-docker-images`: four requirements name the Dockerfiles at
   `deploy/` instead of `docker/`. The Purpose paragraph follows as a direct
-  edit of the main spec, since a delta cannot change a Purpose.
+  change to the main spec, since a delta cannot change a Purpose.
 - `deployment-runbook`: "The runbook lists every environment variable the
   engine reads" names `deploy/frontend.Dockerfile`.
 
