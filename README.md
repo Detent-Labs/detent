@@ -95,16 +95,16 @@ provider.
 Bring the whole stack up with one command: `bash scripts/dev-up.sh`.
 
 That one command builds the app image, plays the pod (`app`, `db` and
-`mailpit`), waits for every container's probe, installs dependencies, seeds the demo processes and users, and
-starts the HTTP server. A preflight check runs last, confirming the whole
+`mailpit`). It waits for every container's probe. It installs dependencies, seeds the
+demo processes and users, and starts the HTTP server. A preflight check runs last, confirming the whole
 stack answers before it prints the login. The same preflight gates every
 push: `.githooks/pre-push` runs its `core` profile first. Run either
 profile standalone with `bash scripts/preflight.sh core|serve`.
 
 Each line of the block below runs inside the `app` container. From the
-host, prefix the line with `sh scripts/dev-exec.sh`, which takes a command
-and its arguments and nothing else, so no `NAME=value` assignment in front:
-`sh scripts/dev-exec.sh bun run typecheck`.
+host, prefix the line with `sh scripts/dev-exec.sh`. That script takes a command
+and its arguments and nothing else, so put no `NAME=value` assignment in front.
+Example: `sh scripts/dev-exec.sh bun run typecheck`.
 
 ```bash
 bun install
@@ -114,7 +114,7 @@ bun run build        # vite build, the frontend's production bundle
 bun run check        # lint, typecheck, build, the suite, then the timezone test
 ```
 
-`DATABASE_URL` must be set. The database-backed suites carry
+Set `DATABASE_URL`. The database-backed suites carry
 `test.skipIf(!DATABASE_URL)` at over 500 sites — the majority of the suite.
 Without it they skip silently, not loudly. A bare `bun test` then reports a
 pass count that omits most of what the suite tests. The `app` container sets
@@ -129,9 +129,9 @@ ignores, and prints the three host ports. Every port binds to `127.0.0.1`.
 #### Moving from the Compose stack
 
 A machine that ran the Compose stack still holds its containers, network and
-volume. Remove them once. The old volume must not be reused. A Postgres
+volume. Remove them once. Do not reuse the old volume. A Postgres
 volume first initialized under Compose trusts every connection the pod's
-containers open over `127.0.0.1`, because the pod sets
+containers open over `127.0.0.1`. The pod sets
 `POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256` only when it initializes a
 fresh volume.
 
@@ -144,7 +144,7 @@ podman volume rm workflow-engine_pgdata 2>/dev/null || true
 On Docker, run `docker rm -f`, `docker network rm` and `docker volume rm` on
 the same names. Development data reseeds on the
 next `bash scripts/dev-up.sh`. A linked worktree used its own project name,
-`detent-<base>-<cksum>` in place of `workflow-engine`; remove its
+`detent-<base>-<cksum>` in place of `workflow-engine`. Remove its
 `-app-1`, `-db-1` and `-mailpit-1` containers, its `_default` network and its
 `_pgdata` volume the same way.
 

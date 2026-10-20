@@ -37,7 +37,7 @@ variable gets it through `env`:
 sh scripts/dev-exec.sh env SEED_ALLOW=1 bun run seed
 ```
 
-`DATABASE_URL` is set in the `app` container and points at
+The `app` container sets `DATABASE_URL`, which points at
 `localhost:5432`. The three containers share one network namespace, so every
 address between them is `localhost`. DB-backed tests work without extra setup once
 they run through `dev-exec.sh`.
@@ -66,7 +66,7 @@ rtk test sh scripts/dev-exec.sh sh scripts/test-gated.sh bun test
 ```
 Inside the container, run `sh scripts/test-gated.sh bun test`. Run the full
 suite either way, since a subset run fails the pass floor.
-`scripts/test-gated.sh` runs the command, prints its full output, then runs
+The script `scripts/test-gated.sh` runs the command, prints its full output, then runs
 `scripts/gates/silent-green.sh` over that output. The exit code is the suite's
 own, or 1 when the suite exits 0 and the gate rejects the run.
 

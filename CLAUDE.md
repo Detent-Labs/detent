@@ -10,10 +10,10 @@ the operator, the developer and the process owner. Two of those words are domain
 terms here and carry no synonym: an **operator** is the admin area's audience,
 and an authoring **surface** is what the studio presents.
 
-The engine stays headless and API-first behind that UI, with no UI dependency.
-`packages/web` reaches it only over the HTTP wrapper and the exports map. That
-property is load-bearing: an integration drives a process with no browser at
-all. Do not let a UI concern leak into `src/`.
+The engine stays headless and API-first behind that UI, with no UI dependency. The UI in
+`packages/web` reaches it only over the HTTP wrapper and the exports map. That property is
+load-bearing: an integration drives a process with no browser at all. Do not let a UI
+concern leak into `src/`.
 
 Direction: no-code and low-code process authoring (`ROADMAP.md` stage 27).
 No-code is the target for what the builders cover: an author types no CEL and
@@ -60,19 +60,18 @@ Full detail in `.claude/rules/process-contract.md` and
 `src/schema`, `src/engine`, `src/cel`, `src/validate.ts`, the studio area,
 `examples/` or `openspec/`. Read them before proposing any change to the JSON
 definition. The short form, true in every session:
-- The opaque `id` anchors every stored reference and all persisted instance
-  state. A `key` is a slug with two readers. CEL reads a field as
-  `data.<key>`. A view entry's `group` names a group field's `key`, and its
-  `tab` names a key in the same view's `tabs`. A `label` is display text.
+- The opaque `id` anchors every stored reference and all persisted instance state. A `key`
+  is a slug with two readers. CEL reads a field as `data.<key>`. A view entry's `group`
+  names a group field's `key`, and its `tab` names a key in the same view's `tabs`. A
+  `label` is text for the reader.
 - `definitionHash` is the JCS hash of `ProcessBody` only. Published versions are
   immutable; instances pin `{processId, version, definitionHash}`.
 - All conditions are CEL, `{ lang: "cel", src }`. CEL is pure and total, has no
   `now()`, and a raising guard means "no match", never a throw.
 - State commits first, side effects dispatch after via a transactional outbox
   (at-least-once + idempotency key = effectively-once).
-- A step's paths are all-manual XOR all-automatic. Among 2+ automatic paths,
-  `priority` is required and unique; at most one guardless default, at the
-  highest priority.
+- A step's paths are all-manual XOR all-automatic. Among 2+ automatic paths, every path
+  needs a unique `priority`; at most one guardless default, at the highest priority.
 - Plugins (actions, data sources, assignment strategies) sit behind
   `{ type, config }` and resolve through a registry at PUBLISH time.
 
@@ -91,17 +90,18 @@ regenerates it with no opt-out flag; delete it after each run.
 Everything else is a change, whatever it looked like at first glance. Count the
 files before you call something a one-liner.
 
-**A UI change is never trivial.** Each screen touches its area, its i18n
-catalog, often the shell or tokens. Its change writes its delta against the
-capability spec of the area it touches: `end-user-app` for `areas/app/`,
-`admin-app` for `areas/admin/`, `reporting-app` for `areas/reporting/`,
-`unified-shell` for shell, login, routing and chrome, `form-ui` for the
-renderer. Studio work goes to the specific capability (`studio-canvas`,
-`studio-json-view`, `studio-form-editor`, `studio-publish` and the rest), and
-`studio-app` keeps the frame, navigation and process list. `spa-accessibility`,
-`ui-string-overrides` and `authored-content-localization` cut across all of
-them. A screen that needs new data adds the API-side spec too, `instance-query`
-or `admin-operations-api` for example.
+**A UI change is never trivial.** Each screen touches its area, its i18n catalog, often
+the shell or tokens. Its change writes its delta against the capability spec of the area
+it touches. Use `end-user-app` for `areas/app/`, `admin-app` for `areas/admin/`,
+`reporting-app` for `areas/reporting/`, `unified-shell` for shell, login, routing and
+chrome, `form-ui` for the renderer. Studio work goes to the specific capability
+(`studio-canvas`, `studio-json-view`, `studio-form-editor`, `studio-publish` and the
+rest). The capability `studio-app` keeps the frame, navigation and process list. Three
+capabilities cut across all of them: `spa-accessibility`, `ui-string-overrides` and
+`authored-content-localization`.
+
+A screen that needs new data adds the API-side spec too, `instance-query` or
+`admin-operations-api` for example.
 
 **No phase inside the cycle is optional.** Do not propose skipping the spec or
 the plan phase. That holds for `openspec-propose` and for the brainstorming
@@ -128,10 +128,10 @@ Five project facts the dispatch must carry, because the skill cannot know them:
   `bun test` with `DATABASE_URL` set, in the devcontainer, and reads its
   verdict off a named failing test.
 - **A ruling stops at the definition contract.** The skill rules on and ledgers
-  ambiguities itself. `src/schema/definition.ts` and the rules a delta spec
+  ambiguities itself. The file `src/schema/definition.ts` and the rules a delta spec
   states need their own OpenSpec change, never a ruling.
-- **The controller owns the branch.** Create the worktree or branch before Task
-  1. No subagent calls `EnterWorktree`, since one call re-pins every sibling.
+- **The controller owns the branch.** Add the worktree or branch before Task 1. No
+  subagent calls `EnterWorktree`, since one call re-pins every sibling.
 - **`tasks.md`'s headings don't match the skill's `task-brief` script.**
   OpenSpec's `## N. <group>` format isn't `### Task N`, so the script finds
   nothing. Cut per-group briefs by hand with `awk` on `## N.` instead.
@@ -140,30 +140,31 @@ Five project facts the dispatch must carry, because the skill cannot know them:
 Call a change done only after all four checks pass. Report the output each one
 printed instead of a bare "ran it".
 - `bun run typecheck`, then `bun run build`, then the **full** `bun test` with
-  `DATABASE_URL` set (both Conventions rules on `bun test` apply). `bun run check` runs
-  `lint`, typecheck, build and the suite, then `test:tz`, the reporting logic
-  test under `TZ=Europe/Zurich`.
+  `DATABASE_URL` set. Both Conventions rules on `bun test` apply. `bun run check` runs
+  `lint`, typecheck, build and the suite, then `test:tz`, the reporting logic test under
+  `TZ=Europe/Zurich`.
 - In a `tasks.md` Verification task, keep `bun test` (and any other phrase
   `scripts/openspec-review-check.ts` string-matches) on one unwrapped line. A
   line wrap silently defeats the match and reports a false Critical.
-- The antislop linter, on every Markdown file the change touched, and the
-  trailing whitespace, blank-at-eof and CRLF check. Run each the way the push
-  gate does, over the same range:
-  `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`, and the
-  same with `whitespace.sh`. The `< /dev/null` belongs on `range.sh`, which
-  falls back to `origin/main..HEAD`. Both gates read their ranges on stdin; an
-  empty stdin checks nothing, and `prose.sh` says so and exits 0. Run the gate
-  rather than its probes by hand. Plain `git diff --check` misses CRLF, since
-  `.gitattributes` sets `eol=lf`. The script reads `git ls-files --eol`.
-- A real browser, for any UI change. Green tests do not see an error dialog
-  rendered behind a modal, a stale result row, or an `/admin/*` route collision.
-  All three shipped past a green suite here. `docs/browser-checks.md` holds what
-  stays manual. `development-toolchain`'s split rule picks one of three homes: a
-  `bun:test` assertion, an `e2e/` smoke flow, or a checklist entry there.
+- The antislop linter, on every Markdown file the change touched, and the trailing
+  whitespace, blank-at-eof and CRLF check. Run each the way the push gate does, over the
+  same range: `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`, and the
+  same with `whitespace.sh`. The `< /dev/null` belongs on `range.sh`, which falls back to
+  `origin/main..HEAD`.
+- Both gates read their ranges on stdin. An empty stdin checks nothing, and `prose.sh`
+  says so and exits 0. Run the gate rather than its probes by hand. Plain
+  `git diff --check` misses CRLF, since `.gitattributes` sets `eol=lf`. The script reads
+  `git ls-files --eol`.
+- A real browser, for any UI change. Green tests do not see an alert dialog rendered
+  behind a modal, a stale result row, or an `/admin/*` route collision. All three shipped
+  past a green suite here. `docs/browser-checks.md` holds what stays manual.
+  `development-toolchain`'s split rule picks one of three homes: a `bun:test` assertion,
+  an `e2e/` smoke flow, or a checklist entry there.
 
 ## Enforced mechanically. Do not re-litigate these.
 `.githooks/pre-push` runs the gates below on every push. Each covers a defect class
 that recurred here, and names the rule broken, the files and the repair command.
+
 Do not argue these down. Do not weaken a pattern to make a push pass, or raise a
 threshold to clear a red gate. Repair the file instead. Where a gate is wrong
 about one line, silence it in place and say why, as the antislop directives do.
@@ -225,7 +226,6 @@ packages/form-ui/ the shared step-form renderer; stays its own package
 examples/ test/ e2e/  example definitions, bun:test suites, smoke flows
 package.json      Bun workspace root and the engine's exports map
 ```
-`docs/current-state.md` holds the per-subsystem detail.
 
 ## Where the rest lives
 - `.claude/rules/`: `process-contract.md` (the definition contract in full),
@@ -281,13 +281,13 @@ shows impact since a ref. After a substantial change lands, re-run
   naming the shortcut, its ceiling and the upgrade entry point. The roll-up is
   `git grep -n 'ponytail:' -- src packages`; no ledger file and no gate back
   it. `openspec/specs/push-gate-checks/spec.md` states the rule.
-- **UI work in `packages/web` or `packages/form-ui` goes through the design
-  skills first.** The `impeccable` skill owns visual direction. It enters the
-  cycle at three points. In the proposal, `/impeccable shape <screen>` decides
-  UX and layout before any code exists. Its result goes in `design.md`. During
-  apply, the design detector hook runs by itself after every Edit or Write under
-  `packages/web/**`. At the browser check, run `/impeccable critique <route>`
-  and `/impeccable audit <route>` on the changed screen.
+- **UI work in `packages/web` or `packages/form-ui` goes through the design skills
+  first.** The `impeccable` skill owns visual direction. It enters the cycle at three
+  points. In the proposal, `/impeccable shape <screen>` decides UX and layout before any
+  code exists. Its result goes in `design.md`. During apply, the design detector hook runs
+  by itself after every `Edit` or `Write` under `packages/web/**`. At the browser check,
+  run `/impeccable critique <route>` and `/impeccable audit <route>` on the screen under
+  test.
   - `audit` covers the a11y, responsive and performance checks
     `docs/browser-checks.md` otherwise leaves to hand. It replaces no browser
     check that needs a human eye.
@@ -306,13 +306,13 @@ shows impact since a ref. After a substantial change lands, re-run
     `.claude/rules/design-language.md`, which loads for `packages/web/**`,
     `packages/form-ui/**` and `DESIGN.md`. The untracked design-language file
     under `tmp/` is a visual reference that may lag the other two.
-- Bun is the runtime, package manager, and test runner. Use `bun` and never
-  npm or pnpm. Typechecking stays with `tsc --noEmit` (`bun run typecheck`).
-  `BUN_VERSION` in `container/Dockerfile` pins the version. All tooling (Bun,
-  tsc, tests, dev server, lint) runs inside the dev container,
-  never on the host. Claude Code may run on the host and reach the container
-  through `sh scripts/dev-exec.sh <cmd>`. The `devcontainer-exec` skill covers
-  the pod, the exec helper, dev server ports, and the mechanics of a suite run.
+- Bun is the runtime, package manager, and test runner. Use `bun` and never npm or pnpm.
+  Typechecking stays with `tsc --noEmit` (`bun run typecheck`). `BUN_VERSION` in
+  `container/Dockerfile` pins the version. All tooling (Bun, tsc, tests, dev server, lint)
+  runs inside the dev container, never on the host. Claude Code may run on the host and
+  reach the container through `sh scripts/dev-exec.sh <cmd>`. The `devcontainer-exec`
+  skill covers the pod, the exec helper, dev server ports, and the mechanics of a suite
+  run.
 - **No `cd` prefix and no shell variable, in any Bash command.** The Bash tool
   already starts in the repository root. Claude Code's permission analyzer
   sends either habit to manual approval.
@@ -325,30 +325,30 @@ shows impact since a ref. After a substantial change lands, re-run
 - PostgreSQL is the datastore, reached via Bun's native `Bun.sql` (no driver
   dependency). `DATABASE_URL` is the connection convention, set by the Pod spec.
 - **Run `bun test` with `DATABASE_URL` set, always.** The DB-backed suites are
-  `test.skipIf(!DB)` and make up most of the suite. Without the variable they
-  skip *silently* and report a green that proves almost nothing. Check the skip
-  count as well as the pass count. Outside the devcontainer, point it at the
-  major the Pod spec's `postgres:latest` resolves to, with its credentials.
-  `scripts/test-gated.sh` runs the push gate's checks before the push. From the
-  host, in one call:
-  `rtk test sh scripts/dev-exec.sh sh scripts/test-gated.sh bun test`. Exit 1
-  with `0 fail` means the gate rejected the run (see `devcontainer-exec`).
+  `test.skipIf(!DB)` and make up most of the suite. Without the variable they skip
+  *silently* and report a green that proves almost nothing. Check the skip count as well
+  as the pass count.
+- Outside the devcontainer, point `DATABASE_URL` at the major the Pod spec's
+  `postgres:latest` resolves to. Use its credentials. The script `scripts/test-gated.sh`
+  runs the push gate's checks before the push. From the host, in one call:
+  `rtk test sh scripts/dev-exec.sh sh scripts/test-gated.sh bun test`. Exit 1 with
+  `0 fail` means the gate rejected the run (see `devcontainer-exec`).
 - **A full-suite run is the reliable signal; a single-file rerun is not.** The
   DB suites share one database. Each truncates in `beforeEach`, so back-to-back
   runs of one file contend and fail spuriously. A second `bun test` on that
   database rotates the probe role's password, so the running suite's privileges
   tests fail (28P01). Read a verdict off a *named* failing test, never a pass
   count alone.
-- **The suite has its own database. The dev server keeps `DATABASE_URL`'s.**
-  `bunfig.toml`'s `[test] preload` (`test/preload-db.ts`) appends `_test` to the
-  database name for every `bun test` run, creates it on demand, and prints the
-  name it chose. The split closes two measured hazards. First, a `bun test` run
-  wipes demo state mid-demo: its `beforeEach` truncates `definitions`,
-  `instances`, `outbox`, `auth_users` and more. Second, a running
-  `bun run serve` corrupts test runs. Its outbox poller claims rows the suite
-  is driving: 3 red runs of 20 with a dev server up, 0 of 20 with none. Do not
-  point a server or a seed at the `_test` database. Do not drop the preload
-  to "simplify" the setup.
+- **The suite has its own database. The dev server keeps `DATABASE_URL`'s.** The
+  `[test] preload` in `bunfig.toml` (`test/preload-db.ts`) appends `_test` to the database
+  name in every `bun test` run. It prints the name it chose and creates the database on
+  demand. The split closes two measured hazards. First, a `bun test` run wipes demo state
+  mid-demo: its `beforeEach` truncates `definitions`, `instances`, `outbox`, `auth_users`
+  and more.
+- **A running `bun run serve` also corrupts test runs.** Its outbox poller claims rows the
+  suite is driving. Measured: 3 red runs of 20 with a dev server up, 0 of 20 with none. Do
+  not point a server or a seed at the `_test` database. Do not drop the preload to
+  "simplify" the setup.
 - **Never mutate, stash, or run `git checkout` on the shared working tree to
   test something.** Mutation testing belongs on a copy. It reverts a line and
   confirms that a named test fails. The tree usually holds uncommitted work. A
@@ -369,12 +369,12 @@ shows impact since a ref. After a substantial change lands, re-run
   the Zod source) deliberately, never as a side effect of another task. It gets
   its own OpenSpec change with the rule delta written down. It does not mean
   never.
-- A new `ProcessBody` or `Step` field has hand-kept mirrors in the studio. No
-  type check ties them to the schema, so a grep for schema consumers misses
-  them. Extend them in the same change: `KNOWN_KEYS` in `load-guard.ts`,
-  `PROPERTY_WORDS` and `OWNED_LISTS` in `changeSet.ts`, the section arrays in
-  `sectionsFor.ts`, and every test that lists expected keys or sections. A
-  `toContain` loop in such a test stays green when its list goes stale.
+- A new `ProcessBody` or `Step` field has hand-kept mirrors in the studio. No type check
+  ties them to the schema, so a grep for schema consumers misses them. Extend them in the
+  same change. That means `KNOWN_KEYS` in `load-guard.ts`, `PROPERTY_WORDS` and
+  `OWNED_LISTS` in `changeSet.ts`, the section arrays in `sectionsFor.ts` and every test
+  that lists expected keys or sections. A `toContain` loop inside such a test stays green
+  when its list goes stale.
 - An OpenSpec change that changes a rule `docs/authoring-guide.md` states must
   change the guide in the same commit.
 - Every invariant that lands ships with a test that rejects a violating input.
