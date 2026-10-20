@@ -29,7 +29,7 @@ every push. A non-zero exit blocks the push.
 numbered stage: it gates every stage below instead of adding a
 capability.
 
-A preflight now runs first. It names which of six ordered devcontainer
+A preflight now runs first. It names which of five ordered devcontainer
 preconditions is missing, instead of the push failing on a symptom.
 
 Every git worktree checkout derives its own pod name and ports

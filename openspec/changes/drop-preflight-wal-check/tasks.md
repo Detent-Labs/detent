@@ -2,8 +2,8 @@
 
 ## 1. Remove check 6
 
-- [ ] 1.1 In `scripts/preflight.sh`, delete check 6: the comment block that opens "Check 6", the `shopt -s nullglob` line it needs, and the WAL loop with its Windows branch. Change the header's usage line `core:  checks 1, 2, 6` to `core:  checks 1, 2`. Keep checks 1 to 5 and the final `preflight (<profile>): all checks passed` line unchanged. Verify with `grep -n -E 'WAL|check 6|FileShare|powershell|cygpath' scripts/preflight.sh` printing nothing, `grep -n 'checks 1, 2,' scripts/preflight.sh` printing nothing, `bash scripts/preflight.sh core` and `bash scripts/preflight.sh serve` both passing, and `bash -n scripts/preflight.sh` clean.
-- [ ] 1.2 In `ROADMAP.md`, change "six ordered devcontainer preconditions" to "five ordered devcontainer preconditions". Verify with `grep -n 'five ordered' ROADMAP.md`.
+- [x] 1.1 In `scripts/preflight.sh`, delete check 6: the comment block that opens "Check 6", the `shopt -s nullglob` line it needs, and the WAL loop with its Windows branch. Change the header's usage line `core:  checks 1, 2, 6` to `core:  checks 1, 2`. Keep checks 1 to 5 and the final `preflight (<profile>): all checks passed` line unchanged. Verify with `grep -n -E 'WAL|check 6|FileShare|powershell|cygpath' scripts/preflight.sh` printing nothing, `grep -n 'checks 1, 2,' scripts/preflight.sh` printing nothing, `bash scripts/preflight.sh core` and `bash scripts/preflight.sh serve` both passing, and `bash -n scripts/preflight.sh` clean.
+- [x] 1.2 In `ROADMAP.md`, change "six ordered devcontainer preconditions" to "five ordered devcontainer preconditions". Verify with `grep -n 'five ordered' ROADMAP.md`.
 - [ ] 1.3 Run the antislop linter on every Markdown file this change touched, if it is installed. Fix each finding or add a targeted directive with a reason. If it is absent, leave this task open and say so.
 
 ## 2. Verification

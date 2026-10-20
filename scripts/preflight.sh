@@ -6,7 +6,7 @@
 # (add-devcontainer-preflight) for the full contract.
 #
 # Usage: bash scripts/preflight.sh <core|serve>
-#   core:  checks 1, 2, 6 — preconditions of any work in the container.
+#   core:  checks 1, 2 — preconditions of any work in the container.
 #   serve: core plus checks 3, 4, 5 — preconditions of a browser session.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -71,41 +71,5 @@ if [ "$PROFILE" = "serve" ]; then
     "check 5 failed: the database holds no seed data" \
     "sh scripts/dev-exec.sh env SEED_ALLOW=1 bun run seed"
 fi
-
-# Check 6: no stale codebase-memory WAL file holds a lock. Warns rather than
-# blocks: the index is per-machine local state (see CLAUDE.md), and this
-# lock probe detects a hold only where the OS enforces mandatory file locks.
-# ponytail: Windows-only detection ceiling; Linux/macOS locks are advisory,
-# so a held lock there passes silently. Upgrade if that ever costs something.
-#
-# A zero-length WAL is skipped before the probe. SQLite zeroes the WAL on a
-# checkpoint, so such a file holds no unrecovered frame and the database
-# behind it is complete -- the opposite of the stale WAL this check looks
-# for. Without that skip the check warns on every run, since the editor's own
-# codebase-memory-mcp holds the index open and a live handle refuses the
-# FileShare.None probe below.
-shopt -s nullglob
-for wal in "$HOME"/.cache/codebase-memory-mcp/*.db-wal; do
-  [ -s "$wal" ] || continue
-  db="${wal%-wal}"
-  case "$(uname -s)" in
-    MINGW*|MSYS*|CYGWIN*)
-      # MSYS/Cygwin's own `<>` redirection does not trigger a Win32 sharing
-      # violation, so the probe shells out to .NET, which does.
-      winpath="$(cygpath -w "$db")"
-      LOCKED=$(powershell.exe -NoProfile -Command \
-        "try { (New-Object System.IO.FileStream('$winpath','Open','ReadWrite','None')).Close(); exit 0 } catch { exit 1 }" \
-        >/dev/null 2>&1; echo $?)
-      ;;
-    *)
-      ( exec 3<>"$db" ) 2>/dev/null
-      LOCKED=$?
-      ;;
-  esac
-  if [ "$LOCKED" != "0" ]; then
-    echo "preflight: check 6 warning: $db is locked by another process" >&2
-    echo "  Close whatever holds codebase-memory-mcp's index, then re-run." >&2
-  fi
-done
 
 echo "preflight ($PROFILE): all checks passed"
