@@ -6,6 +6,8 @@ See proposal.md for the motivation. Measured on 2026-10-20 on branch
 `drop-windows-host-support`: `CLAUDE.md` holds 508 lines, 4,679 words and
 32,499 bytes. Its sections:
 
+<!-- antislop: allow passive-voice - the table names the old file's headings as measured -->
+
 | Section | Lines | Kind |
 |---|---|---|
 | What this is | 4–41 | rules and domain terms |
@@ -21,9 +23,11 @@ See proposal.md for the motivation. Measured on 2026-10-20 on branch
 
 Statements that other files cite, all of which must survive:
 
+<!-- antislop: allow negation-habit - a cell quotes a live requirement heading -->
+
 | Cited by | Statement |
 |---|---|
-| `development-toolchain` "A browser check lands in one of three homes" | a real browser for any UI change; a running HTTP server corrupts test runs |
+| `development-toolchain` "A browser check lands in one of three homes" | a real browser for any UI change. A running HTTP server corrupts test runs |
 | `http-wrapper` (`BINARY_ROUTES`), `unified-shell` (router coverage) | the `/admin/*` route collision is one of three defects that passed a green suite |
 | `push-gate-checks` "The suite cannot report a silent green" | the silent skip without `DATABASE_URL` |
 | `push-gate-checks` "Pushed text carries no CR byte …" | `git diff --check` misses CRLF under `eol=lf` |
@@ -49,7 +53,7 @@ Statements that other files cite, all of which must survive:
 
 **Non-Goals:**
 
-- Changing any rule. This change moves and cuts words, not behavior.
+- Changing any rule. This change moves and cuts words and leaves behavior alone.
 - Moving anecdotes to another document. Each rule's origin lives in git
   history and in the archived change that introduced it. A second copy would
   drift.
@@ -63,7 +67,7 @@ Statements that other files cite, all of which must survive:
 Each section maps to one action:
 
 - **What this is.** Keep the domain terms (operator, surface, definition
-  contract, `contract`), headless engine, the FSM paradigm, and the
+  contract, `contract`) and the headless engine. Keep the FSM paradigm and the
   no-code/low-code split with its three raw-input sites. Tighten the prose.
 - **Stage, v1 boundaries, definition contract.** Keep as they are.
 - **Change workflow.**
@@ -85,8 +89,8 @@ Each section maps to one action:
   container directory, `src/` and its subdirectories in one line each,
   `packages/web` and `packages/form-ui`, `examples/`, `test/`, `e2e/`. Then a
   pointer: `docs/current-state.md` holds the per-subsystem detail.
-- **Where the rest is documented.** Keep the list and shorten each entry to
-  its purpose.
+- **Where the rest lives.** Keep the list and shorten each entry to its
+  purpose. The heading takes the active voice.
 - **Codebase memory.** Keep the rules: index per machine, check
   `list_projects`, resolve the slug, prefer the graph for cross-file questions,
   re-index after big changes. Cut the tool catalogue to one line.
@@ -105,17 +109,17 @@ Each section maps to one action:
 
 The `devcontainer-exec` skill already owns how to run commands in the pod. It
 gains a "Running the suite" section with the moved paragraphs, unchanged in
-substance. `CLAUDE.md` keeps the rule and names the skill for the mechanics.
+substance. The file `CLAUDE.md` keeps the rule and names the skill for the mechanics.
 
 ### D3. The `allow-file` line goes only with a linter run
 
 Removing line 1 raises the file's antislop count by every finding it
 silenced. The prose gate blocks a rising count. The gate skips on this
-machine while the linter is absent, so the removal cannot be verified here.
+machine while the linter is absent, so nobody can verify the removal here.
 
-The removal therefore sits in its own task. It runs the linter, fixes each
-finding or places a targeted `<!-- antislop: allow <rule> -->` with a reason,
-and stays open while the linter is missing. The rest of the change does not
+The removal therefore sits in its own task. It runs the linter and fixes each
+finding or places a targeted `<!-- antislop: allow <rule> -->` with a reason.
+It stays open while the linter is missing. The rest of the change does not
 wait for it.
 
 ### D4. Repoint stale citations
@@ -147,8 +151,8 @@ no design-skill pass.
 
 ## Risks / Trade-offs
 
-- [A cut sentence turns out to carry a rule] → The citation table and a task
-  that greps each cited statement guard the known readers. The diff review
+- [A cut sentence turns out to carry a rule] → The citation table guards the
+  known readers. So does a task that greps each cited statement. The diff review
   reads every removed line against "rule or history?".
 - [`CLAUDE.md` merges with the stacked changes' edits] → This branch sits on
   top of all three. Archive it last.

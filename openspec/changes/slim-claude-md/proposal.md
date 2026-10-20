@@ -5,9 +5,9 @@
 `CLAUDE.md` loads in full into every session: 508 lines, about 32 KB, roughly
 8,000 tokens. Much of that weight is not a rule.
 
-- Anecdotes record how a rule arose: "a self-declared one-liner touched four
-  files", the three errors the review once found, run counts and dated
-  measurements.
+- Anecdotes record how a rule arose. Examples are "a self-declared one-liner
+  touched four files", the three errors the review once found, run counts and
+  dated measurements.
 - Two blocks duplicate other documents. The 55-line repository layout mirrors
   `docs/current-state.md`. The `rtk` mechanics of a test run (filter, exit
   code, three traps, a 2026-09-30 measurement) only matter while running tests.
@@ -48,7 +48,7 @@ it no longer holds:
   - the prose-debt norm;
   - the reserved term "authoring surface".
 - The file-wide `allow-file` line gives way to targeted directives. That step
-  needs the antislop linter, so it waits until the linter is installed.
+  needs the antislop linter, so it waits until somebody installs the linter.
 - Nine code comments that cite missing `CLAUDE.md` content point at the
   document that holds it, or lose the pointer.
 - `push-gate-checks` stops counting how often `CLAUDE.md` repeats a rule.

@@ -2,7 +2,7 @@
 
 ## 1. Move the test mechanics into the skill
 
-- [x] 1.1 Add a "Running the suite" section to `.claude/skills/devcontainer-exec/SKILL.md` per design D2. It carries `CLAUDE.md`'s paragraphs "The host call filters through rtk", "Exit 1 with `0 fail` means the gate rejected the run" and "Three traps in the host call" (with the 2026-09-30 measurement), unchanged in substance. Verify that `grep -n -E 'rtk/tee|sh -c .exit 3.|rtk err' .claude/skills/devcontainer-exec/SKILL.md` prints the three trap lines.
+- [x] 1.1 Add a "Running the suite" section to `.claude/skills/devcontainer-exec/SKILL.md` per design D2. It carries three `CLAUDE.md` paragraphs, unchanged in substance. One is "The host call filters through rtk". Another is "Exit 1 with `0 fail` means the gate rejected the run". The third is "Three traps in the host call", with the 2026-09-30 measurement. Verify that `grep -n -E 'rtk/tee|sh -c .exit 3.|rtk err' .claude/skills/devcontainer-exec/SKILL.md` prints the three trap lines.
 
 ## 2. Slim `CLAUDE.md`
 
@@ -28,10 +28,10 @@
 
 - [x] 3.1 Apply design D4 to `scripts/gates/whitespace.sh`, `scripts/gates/silent-green.sh`, `test/compile-validation.test.ts`, `test/definitions.test.ts`, `.githooks/post-commit`, `src/http/routes.ts`, `src/runtime/record.ts`, `packages/web/src/areas/studio/draft/issues.ts` and `packages/web/src/areas/studio/panels/SubprocessSpecEditor.tsx`. Verify that `git grep -n 'CLAUDE.md' -- scripts test src packages .githooks` lists only pointers whose content `CLAUDE.md` holds, and that `sh scripts/dev-exec.sh bun test test/gates.test.ts` passes.
 
-## 4. Remove the file-wide directive
+## 4. Delete the file-wide directive
 
-- [ ] 4.1 Per design D3, if the antislop linter is installed: delete line 1 of `CLAUDE.md`, run the linter on the file, and fix each finding or place a targeted `<!-- antislop: allow <rule> -->` with a one-sentence reason next to the line. Verify that `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` reports no rise for `CLAUDE.md`. If the linter is absent, leave this task open and say so.
-- [ ] 4.2 Run the antislop linter on every other Markdown file this change touched (the skill, this change's artifacts), if it is installed. Fix each finding or add a targeted directive with a reason. If it is absent, leave this task open and say so.
+- [x] 4.1 Per design D3, run this task once the antislop linter is on the machine. Delete line 1 of `CLAUDE.md`. Run the linter on the file. Fix each finding or place a targeted `<!-- antislop: allow <rule> -->` with a one-sentence reason next to the line. Verify that `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` reports no rise for `CLAUDE.md`. If the linter is absent, leave this task open and say so.
+- [x] 4.2 Run the antislop linter on every other Markdown file this change touched: the skill and this change's artifacts. Fix each finding or add a targeted directive with a reason. If the linter is absent, leave this task open and say so.
 
 ## 5. Verification
 
@@ -44,4 +44,4 @@
 
 - Run `openspec-review-change` and resolve every finding; then start apply without asking (owner's rule).
 - Archive last, after `devcontainer-on-podman`, `rename-devcontainer-dir` and `drop-windows-host-support`.
-- No push until the user says the new machine is set up.
+- No push until the user says the new machine is ready.
