@@ -92,17 +92,14 @@ Podman pod per checkout, so Podman is the requirement. Install Podman 4.9 or
 newer (rootless works). Docker is not supported, and neither is a Compose
 provider.
 
-Bring the whole stack up with one command: `bash scripts/dev-up.sh`, or
-`pwsh scripts/dev-up.ps1` on Windows. Both need Git Bash, which Git for
-Windows ships. The PowerShell path runs the same preflight script.
+Bring the whole stack up with one command: `bash scripts/dev-up.sh`.
 
 That one command builds the app image, plays the pod (`app`, `db` and
 `mailpit`), waits for every container's probe, installs dependencies, seeds the demo processes and users, and
 starts the HTTP server. A preflight check runs last, confirming the whole
 stack answers before it prints the login. The same preflight gates every
 push: `.githooks/pre-push` runs its `core` profile first. Run either
-profile standalone with `bash scripts/preflight.sh core|serve`. The `.ps1`
-entry point takes the same two profiles and runs that same script.
+profile standalone with `bash scripts/preflight.sh core|serve`.
 
 Each line of the block below runs inside the `app` container. From the
 host, prefix the line with `sh scripts/dev-exec.sh`, which takes a command

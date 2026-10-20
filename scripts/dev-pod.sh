@@ -61,8 +61,8 @@ spec:
       env:
         - name: $(q DATABASE_URL)
           value: $(q "postgres://postgres:postgres@localhost:5432/workflow_engine")
-        # Both localhost and 127.0.0.1 forms: the manual checklist mandates
-        # the second address under Windows.
+        # Both localhost and 127.0.0.1 forms: every published port binds
+        # 127.0.0.1 alone, and localhost can resolve to ::1 first.
         - name: $(q CORS_ALLOWED_ORIGINS)
           value: $(q "http://localhost:$PORT_VITE,http://127.0.0.1:$PORT_VITE")
         # The published host port of the dev server; vite.config.ts points

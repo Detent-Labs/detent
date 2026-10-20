@@ -180,8 +180,8 @@ printed, not that you ran it.
   scripts/gates/whitespace.sh`. The `< /dev/null` belongs on `range.sh`, which
   falls back to `origin/main..HEAD`. Handing `whitespace.sh` an empty stdin
   checks nothing. Run the gate rather than its probes by hand. Plain
-  `git diff --check` misses CRLF, since `.gitattributes` sets `eol=lf`, and MSYS
-  grep strips the CR before matching. The script reads `git ls-files --eol`.
+  `git diff --check` misses CRLF, since `.gitattributes` sets `eol=lf`. The
+  script reads `git ls-files --eol`.
 - A real browser, for any UI change. Green tests do not see an error dialog
   rendered behind a modal, a stale result row, or an `/admin/*` route
   collision. All three shipped past a green suite here. `docs/browser-checks.md`
@@ -419,18 +419,16 @@ after a substantial change lands.
   `sh scripts/dev-exec.sh <cmd>`.
   - Running commands inside the devcontainer (the pod, the exec helper,
     exposing a dev server port): see the `devcontainer-exec` skill.
-- **No `cd` prefix, no shell variable, and no whitespace-only argument, in any
-  Bash command.** The Bash tool already starts in the repository root. On this
-  Windows host the permission analyzer reads every operand as a possible path,
-  and each habit below sends a safe command to manual approval.
+- **No `cd` prefix and no shell variable, in any Bash command.** The Bash tool
+  already starts in the repository root. Claude Code's permission analyzer reads
+  every operand as a possible path, and each habit below sends a safe command to
+  manual approval.
   - A `cd` chain holding any `$VAR` loses the working directory, reported as
     `Contains simple_expansion`. Drop the `cd`. Pass absolute paths outside the
     repository and relative ones inside it.
   - A variable draws the same refusal with no `cd` at all, and the message
     still says "cd-compound". Run the command that produces a value, read it,
     and paste it literally into a second call.
-  - `tr '\n' ' '` and `paste -sd' '` pass a lone space, which the analyzer
-    denies as a Cygwin symlink. Join lines with `xargs echo`.
 - PostgreSQL is the datastore. The engine reaches it via Bun's native `Bun.sql`
   (no client dependency); `DATABASE_URL` is the connection convention, set by the
   devcontainer's Pod spec.

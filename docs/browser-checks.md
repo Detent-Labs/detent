@@ -12,8 +12,9 @@ like. Each names the change that first asked for it.
 
 ## Before you start
 
-**Address.** Use `127.0.0.1`, not `localhost`. Under Windows, `localhost`
-resolves to `::1` and the connection hangs.
+**Address.** Use `127.0.0.1`, not `localhost`. Every published port binds the
+IPv4 loopback address alone. `localhost` can resolve to `::1` first, where
+nothing listens, and the connection hangs.
 
 The port is per checkout. `bash scripts/dev-up.sh` derives this checkout's
 own ports, per `worktree-isolation`. It publishes them through the Pod spec
