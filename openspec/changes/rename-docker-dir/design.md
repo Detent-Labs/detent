@@ -11,7 +11,7 @@ outside the archive found it in:
 - `docker/frontend.Dockerfile` itself, which copies `docker/nginx.conf`;
 - three docs (`README.md`, `docs/runbooks/deployment.md`,
   `docs/current-state.md`), `docs/decisions.md` and `THIRDPARTY.md`;
-- three comments (`scripts/enable-hooks.sh`, `packages/web/csp.ts`,
+- four comments (`scripts/enable-hooks.sh`, `packages/web/csp.ts`,
   `packages/web/test/vite-config.test.ts`, `test/enable-hooks.test.ts`);
 - one test that reads the file, `test/http-error-path.test.ts`.
 
