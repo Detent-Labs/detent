@@ -52,7 +52,7 @@ rests on it. The mechanical gates below stay non-negotiable.
 - Exactly one active step per instance (single FSM). No parallelism, no
   AND-split/join, no multi-instance steps.
 - Subprocesses are synchronous call-and-return only. No fan-out.
-- Async action execution (post-commit). `blocking` stays reserved and unbuilt.
+- Actions execute async (post-commit). `blocking` stays reserved and unbuilt.
 
 ## The definition contract in brief
 Full detail in `.claude/rules/process-contract.md` and
@@ -117,7 +117,7 @@ after each. A fix loop caps at five rounds. A ledger sits under
 
 Every other phase stays OpenSpec's. The skill's final review replaces none of
 the four checks below. Finish verify → sync → archive before the merge/PR menu
-of `superpowers:finishing-a-development-branch`: archiving precedes a push.
+of `superpowers:finishing-a-development-branch`, since the archive step must come before a push.
 
 Five project facts the dispatch must carry, because the skill cannot know them:
 - **The brief is thin.** A `tasks.md` checkbox line is not a task brief. Hand
@@ -127,9 +127,9 @@ Five project facts the dispatch must carry, because the skill cannot know them:
 - **No single-file test rerun** (see Conventions). An implementer runs the full
   `bun test` with `DATABASE_URL` set, in the devcontainer, and reads its
   verdict off a named failing test.
-- **A ruling stops at the definition contract.** The skill decides and ledgers
-  ambiguities itself. That authority ends at `src/schema/definition.ts` and at
-  any rule a delta spec states. Those need their own OpenSpec change.
+- **A ruling stops at the definition contract.** The skill rules on and ledgers
+  ambiguities itself. `src/schema/definition.ts` and the rules a delta spec
+  states need their own OpenSpec change, never a ruling.
 - **The controller owns the branch.** Create the worktree or branch before Task
   1. No subagent calls `EnterWorktree`, since one call re-pins every sibling.
 - **`tasks.md`'s headings don't match the skill's `task-brief` script.**
@@ -137,10 +137,10 @@ Five project facts the dispatch must carry, because the skill cannot know them:
   nothing. Cut per-group briefs by hand with `awk` on `## N.` instead.
 
 ## Verification (the gate before "done")
-Call a change done only after all four checks pass. Report what each one
-printed; running it proves nothing.
+Call a change done only after all four checks pass. Report the output each one
+printed instead of a bare "ran it".
 - `bun run typecheck`, then `bun run build`, then the **full** `bun test` with
-  `DATABASE_URL` set (see Conventions). `bun run check` runs
+  `DATABASE_URL` set (both Conventions rules on `bun test` apply). `bun run check` runs
   `lint`, typecheck, build and the suite, then `test:tz`, the reporting logic
   test under `TZ=Europe/Zurich`.
 - In a `tasks.md` Verification task, keep `bun test` (and any other phrase
@@ -162,7 +162,7 @@ printed; running it proves nothing.
   `bun:test` assertion, an `e2e/` smoke flow, or a checklist entry there.
 
 ## Enforced mechanically. Do not re-litigate these.
-`.githooks/pre-push` runs the gates below on every push. Each covers a bug class
+`.githooks/pre-push` runs the gates below on every push. Each covers a defect class
 that recurred here, and names the rule broken, the files and the repair command.
 Do not argue these down. Do not weaken a pattern to make a push pass, or raise a
 threshold to clear a red gate. Repair the file instead. Where a gate is wrong
@@ -205,7 +205,7 @@ count, so the gate permits one. Prefer the targeted form,
 `<!-- antislop: allow <rule> -->` next to the line it excuses, with a sentence
 saying why. A blanket directive silences rules nobody re-examines.
 
-Four bug classes recur with no gate, on purpose. They are stale UI state after
+Four defect classes recur with no gate, on purpose. They are stale UI state after
 a mutation, orphaned exports, stale roadmap status and off-by-one bounds. The
 browser check covers the first. The reasoning lives in
 `openspec/changes/archive/*gate-recurring-defects*/design.md`.
@@ -244,7 +244,7 @@ package.json      Bun workspace root and the engine's exports map
 - `README.md` (install, develop, deploy), `PRODUCT.md` (the four audiences).
 - `THIRDPARTY.md`: the license notice. Regenerate it with
   `bun run scripts/thirdparty.ts --write` after any dependency change.
-- `docs/openapi.yaml`: the public HTTP surface, excluded routes too.
+- `docs/openapi.yaml`: the customer-facing HTTP surface, excluded routes too.
 - `docs/runbooks/`: deployment configuration; backup and restore, one dump per
   tenant database.
 - `openspec/changes/archive/2026-08-30-field-model-type-format-control/field-model-redesign.md`:
@@ -285,7 +285,7 @@ shows impact since a ref. After a substantial change lands, re-run
   skills first.** The `impeccable` skill owns visual direction. It enters the
   cycle at three points. In the proposal, `/impeccable shape <screen>` decides
   UX and layout before any code exists. Its result goes in `design.md`. During
-  apply, the design detector hook runs after every file write under
+  apply, the design detector hook runs by itself after every Edit or Write under
   `packages/web/**`. At the browser check, run `/impeccable critique <route>`
   and `/impeccable audit <route>` on the changed screen.
   - `audit` covers the a11y, responsive and performance checks
@@ -352,7 +352,7 @@ shows impact since a ref. After a substantial change lands, re-run
 - **Never mutate, stash, or run `git checkout` on the shared working tree to
   test something.** Mutation testing belongs on a copy. It reverts a line and
   confirms that a named test fails. The tree usually holds uncommitted work. A
-  leftover mutation reads to the next reviewer as a real bug.
+  leftover mutation reads to the next reviewer as a real defect.
 - **Never use `git stash`, not for mutation testing and not otherwise.** Agents
   share this tree. A stash hides uncommitted work from them. Commit to a branch.
 - **Keep a local merge into `main` a fast-forward.** A post-commit hook
