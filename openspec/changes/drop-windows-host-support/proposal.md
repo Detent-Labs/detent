@@ -8,8 +8,8 @@ Windows host:
 
 - two PowerShell entry points that delegate to the shell scripts;
 - README lines that send a contributor to Git Bash;
-- CLAUDE.md rules for a permission analyzer that only Claude Code on Windows
-  applied;
+- CLAUDE.md wording that ties a permission-analyzer convention to Windows,
+  plus one rule only Cygwin needs;
 - two rationales that justify a still-valid rule with a Windows-only cause.
 
 Each of these costs a reader time and states something false about this host.
@@ -20,10 +20,10 @@ Each of these costs a reader time and states something false about this host.
   Windows host has no supported entry point afterwards.
 - `README.md` drops the PowerShell and Git Bash sentences from the bring-up
   section.
-- `CLAUDE.md` drops the "No `cd` prefix, no shell variable, and no
-  whitespace-only argument" convention and its three sub-rules. Each one
-  worked around Claude Code's Windows permission analyzer. CLAUDE.md also
-  drops the MSYS clause from the whitespace-gate explanation.
+- `CLAUDE.md` keeps its permission-analyzer convention with a
+  platform-neutral lead-in. It drops the Windows framing and the Cygwin
+  sub-rule, which was the only Windows-specific one. CLAUDE.md also drops
+  the MSYS clause from the whitespace-gate explanation.
 - The `127.0.0.1`-not-`localhost` rule stays, with a reason that holds on
   this host. The bring-up publishes every port on the IPv4 loopback address
   alone, and `localhost` can resolve to `::1` first, where nothing listens.

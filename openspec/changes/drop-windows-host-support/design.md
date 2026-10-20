@@ -43,7 +43,7 @@ history documents. The Windows references fall into three kinds:
 
 ## Decisions
 
-### D1. Drop the analyzer convention whole
+### D1. Keep the analyzer convention, drop its Windows parts
 
 The CLAUDE.md bullet "No `cd` prefix, no shell variable, and no
 whitespace-only argument" opens with "On this Windows host the permission
@@ -54,8 +54,15 @@ name an analyzer message. They are:
 - the "cd-compound" refusal
 - a Cygwin symlink denial
 
-On this host the session ran `cd` chains and shell variables throughout
-2026-10-20 without one such refusal. The bullet goes, with no replacement.
+Only the third is Windows-specific: Cygwin exists only there. The first two
+come from Claude Code's own check on compound shell commands, which runs on
+every platform. This session ran in bypass-permissions mode, where that check
+does not run, so its prompt-free use of `cd` chains and variables proves
+nothing either way.
+
+The bullet stays with a platform-neutral lead-in and its first two
+sub-rules. The Cygwin sub-rule goes, and with it "and no whitespace-only
+argument" in the bullet's title, which only that sub-rule explained.
 
 ### D2. The `127.0.0.1` rule's new cause is the loopback binding
 

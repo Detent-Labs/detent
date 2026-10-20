@@ -3,7 +3,7 @@
 ## 1. Remove the Windows host support
 
 - [ ] 1.1 Delete `scripts/dev-up.ps1` and `scripts/preflight.ps1` with `git rm`. In `README.md`, drop the `pwsh scripts/dev-up.ps1` and Git Bash sentences and the `.ps1` profile sentence from the bring-up section, so the section names `bash scripts/dev-up.sh` and `bash scripts/preflight.sh core|serve` alone. Verify with `git grep -n -E '\.ps1|pwsh|Git Bash|Git for Windows' -- README.md scripts` printing nothing.
-- [ ] 1.2 In `CLAUDE.md`, delete the convention bullet that opens "**No `cd` prefix, no shell variable, and no whitespace-only argument**" with its three sub-bullets (design D1), and drop the clause "and MSYS grep strips the CR before matching" from the whitespace-gate paragraph, leaving that sentence grammatical. Verify with `git grep -n -i -E 'windows|msys|cygwin|simple_expansion|cd-compound' CLAUDE.md` printing nothing.
+- [ ] 1.2 In `CLAUDE.md`, keep the convention bullet that opens "**No `cd` prefix, no shell variable, and no whitespace-only argument**" but rewrite its lead-in to "Claude Code's permission analyzer reads every operand as a possible path, and each habit below sends a safe command to manual approval." Delete only its third sub-bullet, the `tr '\n' ' '` / Cygwin-symlink rule, and drop "and no whitespace-only argument" from the bullet's title (design D1). Drop the clause "and MSYS grep strips the CR before matching" from the whitespace-gate paragraph, leaving that sentence grammatical. Verify with `git grep -n -i -E 'windows|msys|cygwin' CLAUDE.md` printing nothing and `git grep -n -E 'simple_expansion|cd-compound' CLAUDE.md` still printing the two kept sub-rules.
 
 ## 2. Restate the `127.0.0.1` rule's cause
 
@@ -16,6 +16,8 @@
 - [ ] 3.2 With the dev server stopped, run the full `bun test` with `DATABASE_URL` set through `sh scripts/dev-exec.sh sh scripts/test-gated.sh bun test`. Record the summary lines and the gate's verdict, then restart the server with `bash scripts/dev-up.sh`.
 - [ ] 3.3 Run `sh scripts/dev-exec.sh bun run test:tz`. Record its summary.
 - [ ] 3.4 On the host, run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`, the same with `whitespace.sh`, then `sh scripts/gates/machine-paths.sh`. Record what each printed.
+
+- [ ] 3.5 Run `bash scripts/dev-up.sh` twice and `bash scripts/preflight.sh core` twice. Verify that both second runs pass and that the pod's container ids (`podman ps --filter pod=workflow-engine --format '{{.ID}} {{.Names}}'`) are unchanged across the second `dev-up.sh`, per the ADDED requirement "The bring-up and the preflight stay idempotent".
 
 ## Workflow follow-up
 
