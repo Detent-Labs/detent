@@ -16,19 +16,24 @@
 - The file contradicts itself. Line 1 silences six antislop rules file-wide,
   and line 246 names that line as the pattern to avoid.
 
-Three code comments and one spec sentence also cite `CLAUDE.md` content that
+Nine code comments and one spec sentence also cite `CLAUDE.md` content that
 it no longer holds:
 
 - `scripts/gates/whitespace.sh` says `CLAUDE.md` names a `grep -lI` probe.
 - `test/compile-validation.test.ts` and `test/definitions.test.ts` point at
   precedents that live elsewhere.
-- `push-gate-checks` says `CLAUDE.md` states the `DATABASE_URL` rule "twice,
-  in bold".
+- `.githooks/post-commit` cites a "never amend" rule `CLAUDE.md` lacks.
+- `src/http/routes.ts`, `src/runtime/record.ts`, and two studio files under
+  `packages/web` point at sections that moved to
+  `.claude/rules/process-contract.md`.
+- `push-gate-checks` and `scripts/gates/silent-green.sh` say `CLAUDE.md`
+  states the `DATABASE_URL` rule "twice, in bold".
 
 ## What Changes
 
 - `CLAUDE.md` keeps every rule and drops the history behind it. The target is
-  at most 280 lines.
+  at most 380 lines, about a quarter less. Where the number and a rule
+  conflict, the rule wins.
   - The repository layout shrinks to a top-level map and a pointer to
     `docs/current-state.md`.
   - The `rtk` and test-run mechanics move into the `devcontainer-exec` skill,
@@ -44,8 +49,8 @@ it no longer holds:
   - the reserved term "authoring surface".
 - The file-wide `allow-file` line gives way to targeted directives. That step
   needs the antislop linter, so it waits until the linter is installed.
-- Three code comments that cite missing `CLAUDE.md` content point at the
-  document that holds it.
+- Nine code comments that cite missing `CLAUDE.md` content point at the
+  document that holds it, or lose the pointer.
 - `push-gate-checks` stops counting how often `CLAUDE.md` repeats a rule.
 
 ## Capabilities
@@ -63,7 +68,10 @@ None.
 
 - Docs: `CLAUDE.md`, `.claude/skills/devcontainer-exec/SKILL.md`.
 - Comments: `scripts/gates/whitespace.sh`, `scripts/gates/silent-green.sh`,
-  `test/compile-validation.test.ts`, `test/definitions.test.ts`.
+  `test/compile-validation.test.ts`, `test/definitions.test.ts`,
+  `.githooks/post-commit`, `src/http/routes.ts`, `src/runtime/record.ts`,
+  `packages/web/src/areas/studio/draft/issues.ts`,
+  `packages/web/src/areas/studio/panels/SubprocessSpecEditor.tsx`.
 - Ordering: stacks on `drop-windows-host-support`. Both that change and
   `rename-devcontainer-dir` edit `CLAUDE.md`, so this change archives after
   them.

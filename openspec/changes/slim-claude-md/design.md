@@ -31,12 +31,19 @@ Statements that other files cite, all of which must survive:
 | `definition-store`, `studio-plugin-config-form` (comments) | "authoring surface" is a reserved domain term |
 | `scripts/gates/lockfile.sh`, `scripts/dev-up.sh` | tooling runs in the container, never on the host |
 | `scripts/preflight.sh` | the codebase-memory index is per-machine state |
+| `.claude/rules/process-contract.md` | "The definition contract in brief": `definitionHash`, CEL shape, commit-then-dispatch |
+| `.claude/rules/ui-glossary.md` | operator and surface as reserved domain terms |
+| `docs/browser-checks.md` (lines 3, 43) | the real-browser rule; the server poller that claims suite rows |
+| `openspec/config.yaml` (line 122) | no single-file rerun of the DB suites |
+| `src/engine/store.ts` (line 40) | the graceful skip without `DATABASE_URL` |
 
 ## Goals / Non-Goals
 
 **Goals:**
 
-- `CLAUDE.md` at most 280 lines, with every rule kept.
+- `CLAUDE.md` at most 380 lines, with every rule kept. A section-by-section
+  estimate of D1 lands near 370. Where the number and a rule conflict, the
+  rule wins, and the report records the real count.
 - Every row of the citation table above still true.
 - No code comment that points at `CLAUDE.md` for content it lacks.
 
@@ -125,6 +132,18 @@ pointer:
   `validateDurations` placement.
 - `test/definitions.test.ts`'s "CLAUDE.md's documented-correct path" loses the
   pointer and keeps the sentence. No document states that path.
+- `.githooks/post-commit`'s "never amend, see CLAUDE.md" loses the pointer
+  and keeps the sentence.
+- Four code comments point at `.claude/rules/process-contract.md` instead,
+  which holds each section they name:
+  - `packages/web/src/areas/studio/draft/issues.ts` ("Identity")
+  - `packages/web/src/areas/studio/panels/SubprocessSpecEditor.tsx`
+    ("Subprocesses")
+  - `src/http/routes.ts` ("Hashing / versioning")
+  - `src/runtime/record.ts` ("Runtime record")
+
+The edits under `packages/web` change comments only and no UI, so they need
+no design-skill pass.
 
 ## Risks / Trade-offs
 

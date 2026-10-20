@@ -6,7 +6,7 @@
 
 ## 2. Slim `CLAUDE.md`
 
-- [ ] 2.1 Rewrite `CLAUDE.md` section by section per design D1, leaving line 1 (the `allow-file` directive) in place. Every rule stays; the anecdotes, the repository layout block and the moved test mechanics go. Verify with `wc -l CLAUDE.md` printing at most 280.
+- [ ] 2.1 Rewrite `CLAUDE.md` section by section per design D1, leaving line 1 (the `allow-file` directive) in place. Every rule stays; the anecdotes, the repository layout block and the moved test mechanics go. Verify with `wc -l CLAUDE.md` printing at most 380, and record the count. Where the number and a rule conflict, keep the rule and say so.
 - [ ] 2.2 Verify that every cited statement in design's citation table still holds, one grep per row:
   - `grep -n -F '/admin/*' CLAUDE.md` (the three-defect sentence)
   - `grep -n -i 'real browser' CLAUDE.md`
@@ -18,13 +18,15 @@
   - `grep -n -i 'authoring \*\*surface\*\*' CLAUDE.md`
   - `grep -n -i 'never on the host' CLAUDE.md`
   - `grep -n -i 'per-machine' CLAUDE.md`
+  - `grep -n -i 'definition contract in brief' CLAUDE.md`
+  - `grep -n -F '**operator**' CLAUDE.md`
 
   Record each hit. A row with no hit sends 2.1 back.
 - [ ] 2.3 Read the full `git diff` of `CLAUDE.md` once and classify every removed line as history or rule (design Risks). A removed rule goes back in. Record the classification in the task report.
 
 ## 3. Repoint stale citations
 
-- [ ] 3.1 Apply design D4 to `scripts/gates/whitespace.sh`, `scripts/gates/silent-green.sh`, `test/compile-validation.test.ts` and `test/definitions.test.ts`. Verify that `git grep -n 'CLAUDE.md' -- scripts test` lists only pointers whose content `CLAUDE.md` holds, and that `sh scripts/dev-exec.sh bun test test/gates.test.ts` passes.
+- [ ] 3.1 Apply design D4 to `scripts/gates/whitespace.sh`, `scripts/gates/silent-green.sh`, `test/compile-validation.test.ts`, `test/definitions.test.ts`, `.githooks/post-commit`, `src/http/routes.ts`, `src/runtime/record.ts`, `packages/web/src/areas/studio/draft/issues.ts` and `packages/web/src/areas/studio/panels/SubprocessSpecEditor.tsx`. Verify that `git grep -n 'CLAUDE.md' -- scripts test src packages .githooks` lists only pointers whose content `CLAUDE.md` holds, and that `sh scripts/dev-exec.sh bun test test/gates.test.ts` passes.
 
 ## 4. Remove the file-wide directive
 
