@@ -53,7 +53,7 @@ to change, and the line it needs.
 
 The preflight SHALL carry a `core` profile and a `serve` profile.
 
-The `core` profile SHALL cover checks 1, 2 and 6. These are the preconditions
+The `core` profile SHALL cover checks 1 and 2. These are the preconditions
 of any work in the container, including a test run.
 
 The `serve` profile SHALL cover the `core` profile plus checks 3, 4 and 5.
@@ -96,43 +96,6 @@ SHALL NOT fail because the container environment carries
   `/auth/login` route
 - **THEN** check 3 fails and names the restart command
 
-### Requirement: The WAL check warns rather than blocks
-
-The codebase-memory index is per-machine local state. It sits outside the
-repository, under a path that carries the username. It drives no engine
-behavior and no test.
-
-Check 6 SHALL print a warning and SHALL NOT fail the preflight. It SHALL
-resolve the path at run time rather than carry a hardcoded one. A missing
-index directory SHALL pass, not fail.
-
-Check 6 SHALL warn only for a WAL file that carries content. A WAL file of
-zero length SHALL pass without a warning and without a lock probe. That holds
-whether or not a process holds the database open.
-
-A zero-length WAL means the writer checkpointed it. No unrecovered write is
-pending, which is the opposite of the stale WAL this check looks for. The
-tooling that reads the index runs beside the preflight on a developer machine.
-A held lock alone therefore does not tell a live reader from a dead one.
-
-#### Scenario: A locked WAL file that carries content
-
-- **WHEN** check 6 finds a WAL file of non-zero length that another process
-  holds
-- **THEN** the preflight warns, names the command that clears the lock, and
-  still exits zero on that check alone
-
-#### Scenario: A zero-length WAL file held by a live process
-
-- **WHEN** check 6 finds a WAL file of zero length whose database another
-  process holds open
-- **THEN** the check passes without a warning
-
-#### Scenario: No index on this machine
-
-- **WHEN** check 6 finds no codebase-memory directory
-- **THEN** the check passes without a warning
-
 ### Requirement: Every service declares a healthcheck
 
 Check 2 reports a container as healthy. Podman reports a health state only for
@@ -162,7 +125,7 @@ Each probe's threshold SHALL therefore cover a first-boot database init.
 - **THEN** the database probe fails, and passes only once the final server
   accepts a TCP connection
 
-### Requirement: The preflight checks six preconditions in a fixed order
+### Requirement: The preflight checks five preconditions in a fixed order
 
 The preflight SHALL check these preconditions, in this order:
 
@@ -171,7 +134,6 @@ The preflight SHALL check these preconditions, in this order:
 3. The HTTP server process carries `AUTH_JWT_SECRET`.
 4. Every published port answers on the host.
 5. The development database holds its schema and seed data.
-6. No stale codebase-memory WAL file holds a lock.
 
 The order runs cheapest-first and cause-before-symptom. The preflight SHALL
 stop at the first blocking failure.
@@ -190,7 +152,7 @@ stop at the first blocking failure.
 #### Scenario: Every precondition holds
 
 - **WHEN** the preflight runs against a fully prepared pod
-- **THEN** it reports each of the six checks as passed and exits zero
+- **THEN** it reports each of the five checks as passed and exits zero
 
 ### Requirement: The bring-up waits for the database before it seeds
 
