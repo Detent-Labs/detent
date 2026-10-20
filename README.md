@@ -87,34 +87,74 @@ delegates a task, comments on an instance and edits a personal profile. See
 ## Develop
 
 Bun is the runtime, package manager, and test runner. Everything runs inside the
-dev container (`.devcontainer/`), never on the host.
+dev container (`container/`), never on the host. The dev container is one
+Podman pod per checkout, so Podman is the requirement. Install Podman 4.9 or
+newer (rootless works). Docker is not supported, and neither is a Compose
+provider.
 
-Bring the whole stack up with one command: `bash scripts/dev-up.sh`, or
-`pwsh scripts/dev-up.ps1` on Windows. Both need Git Bash, which Git for
-Windows ships. The PowerShell path runs the same preflight script.
+Bring the whole stack up with one command: `bash scripts/dev-up.sh`.
 
-That one command starts
-the
-containers, installs dependencies, seeds the demo processes and users, and
-starts the HTTP server. A preflight check runs last, confirming the whole
+That one command builds the app image, plays the pod (`app`, `db` and
+`mailpit`). It waits for every container's probe. It installs dependencies, seeds the
+demo processes and users, and starts the HTTP server. A preflight check runs last, confirming the whole
 stack answers before it prints the login. The same preflight gates every
 push: `.githooks/pre-push` runs its `core` profile first. Run either
-profile standalone with `bash scripts/preflight.sh core|serve`. The `.ps1`
-entry point takes the same two profiles and runs that same script.
+profile standalone with `bash scripts/preflight.sh core|serve`.
+
+Each line of the block below runs inside the `app` container. From the
+host, prefix the line with `sh scripts/dev-exec.sh`. That script takes a command
+and its arguments and nothing else, so put no `NAME=value` assignment in front.
+Example: `sh scripts/dev-exec.sh bun run typecheck`.
 
 ```bash
 bun install
-DATABASE_URL=postgres://postgres:postgres@db:5432/workflow_engine bun test   # bun:test suites
-bun run typecheck                                                            # tsc --noEmit (Bun does not typecheck)
-bun run build                                                                # vite build, the frontend's production bundle
-bun run check                                                                # lint, typecheck, build, the suite, then the timezone test
+bun test             # bun:test suites; the container sets DATABASE_URL
+bun run typecheck    # tsc --noEmit (Bun does not typecheck)
+bun run build        # vite build, the frontend's production bundle
+bun run check        # lint, typecheck, build, the suite, then the timezone test
 ```
 
-Set `DATABASE_URL`. The database-backed suites carry `test.skipIf(!DATABASE_URL)`
-at over 500 sites — the majority of the suite. Without it they skip silently,
-not loudly. A bare `bun test` then reports a pass count that omits most of what
-the suite tests. Inside the dev container the variable is already set, which is
-the second reason to run there.
+Set `DATABASE_URL`. The database-backed suites carry
+`test.skipIf(!DATABASE_URL)` at over 500 sites — the majority of the suite.
+Without it they skip silently, not loudly. A bare `bun test` then reports a
+pass count that omits most of what the suite tests. The `app` container sets
+the variable, which is the second reason to run there. Outside it, set the
+variable on the same line as the command.
+
+The bring-up writes the pod's spec to `container/pod.yaml`, which git
+ignores, and prints the three host ports. Every port binds to `127.0.0.1`.
+`sh scripts/dev-pod.sh down` removes the pod and keeps the database volume.
+`sh scripts/dev-pod.sh spec` prints the spec and calls no `podman`.
+
+#### Moving from the Compose stack
+
+A machine that ran the Compose stack still holds its containers, network and
+volume. Remove them once. Do not reuse the old volume. A Postgres
+volume first initialized under Compose trusts every connection the pod's
+containers open over `127.0.0.1`. The pod sets
+`POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256` only when it initializes a
+fresh volume.
+
+```sh
+podman rm -f workflow-engine-app-1 workflow-engine-db-1 workflow-engine-mailpit-1 2>/dev/null || true
+podman network rm workflow-engine_default 2>/dev/null || true
+podman volume rm workflow-engine_pgdata 2>/dev/null || true
+```
+
+On Docker, run `docker rm -f`, `docker network rm` and `docker volume rm` on
+the same names. Development data reseeds on the
+next `bash scripts/dev-up.sh`. A linked worktree used its own project name,
+`detent-<base>-<cksum>` in place of `workflow-engine`. Remove its
+`-app-1`, `-db-1` and `-mailpit-1` containers, its `_default` network and its
+`_pgdata` volume the same way.
+
+A clone that still has `.devcontainer/` moves its login secret before the next
+bring-up, so existing logins stay valid. The next `bash scripts/dev-up.sh`
+regenerates the Pod spec at its new path.
+
+```sh
+mv .devcontainer/.auth-secret container/ 2>/dev/null; rm -rf .devcontainer
+```
 
 This repository used to run no CI beyond `.githooks/pre-push`, by
 deliberate choice. This change reverses that choice.
@@ -149,7 +189,7 @@ the startup call finds them already there and skips them —
 
 `bun run serve` refuses to start unless you configure authentication. It needs
 one of `AUTH_JWT_SECRET`, `AUTH_ISSUERS` or `ALLOW_INSECURE_DEV_AUTH=1`. The
-devcontainer sets the third one (`.devcontainer/docker-compose.yml`). That one
+devcontainer sets the third one in the Pod spec `scripts/dev-pod.sh` generates. That one
 belongs nowhere else. `docs/runbooks/deployment.md` gives all three with their
 defaults, and every other variable too.
 
@@ -178,19 +218,19 @@ CI runs the same suite in a job of its own, beside `check`.
 ## Deploy
 
 Two production images exist: one for the engine, one for the frontend.
-`docker/engine.Dockerfile` and `docker/frontend.Dockerfile` build them.
+`deploy/engine.Dockerfile` and `deploy/frontend.Dockerfile` build them.
 The engine can also serve the frontend itself from `WEB_ROOT`, which is
 the single-origin alternative to running the nginx image. The devcontainer uses neither one;
 it stays dev-only.
 
 ```bash
 # Engine
-docker build -f docker/engine.Dockerfile -t workflow-engine .
+docker build -f deploy/engine.Dockerfile -t workflow-engine .
 
 # The frontend: one bundle covering every area.
 # VITE_API_URL is a build arg only: Vite inlines it at build time, so a
 # container runtime env var set later has no effect on the result.
-docker build -f docker/frontend.Dockerfile \
+docker build -f deploy/frontend.Dockerfile \
   --build-arg VITE_API_URL=https://api.example.com \
   -t web .
 ```

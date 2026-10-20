@@ -1,10 +1,10 @@
 # Production image for the engine. Single-stage: Bun runs TypeScript
 # directly, so there is no build tool to strip out of a later stage.
-# oven/bun:1.3.11-slim pins the same version as .devcontainer/Dockerfile's
+# oven/bun:1.3.11-slim pins the same version as container/Dockerfile's
 # BUN_VERSION -- bump both together, deliberately. The -slim variant ships
 # the same non-root `bun` user (UID 1000) as the default tag, at a
 # fraction of the size.
-FROM oven/bun:1.3.11-slim
+FROM docker.io/oven/bun:1.3.11-slim
 
 WORKDIR /app
 

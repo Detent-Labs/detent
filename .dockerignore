@@ -3,7 +3,7 @@
 **/.git
 **/test
 **/.env
-.devcontainer
+container
 .claude
 .worktrees
 docs

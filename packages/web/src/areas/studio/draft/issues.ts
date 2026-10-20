@@ -81,7 +81,7 @@ function tokenize(loc: string): Token[] {
  * `onEntry[i]` in `registry-check.ts` and `compile.ts`). This walks tokens
  * tolerantly rather than pattern-matching one exact shape, and resolves to the
  * DEEPEST entity actually found — an id, since ids are the sole reference
- * anchor (CLAUDE.md "Identity"), never an array position that array edits can
+ * anchor (.claude/rules/process-contract.md "Identity"), never an array position that array edits can
  * invalidate.
  */
 export function resolveLoc(

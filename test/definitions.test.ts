@@ -418,7 +418,7 @@ test.skipIf(!DB)("an instance created from the publish return value rehydrates",
   const { resolveBody } = createDefinitionStore();
   const resolved = (await resolveBody(PID, v.version))!;
 
-  // CLAUDE.md's documented-correct path: create from the body publish returned.
+  // The documented-correct path: create from the body publish returned.
   const inst = await createInstance(v.definition, { processId: PID, version: v.version });
   const re = await rehydrate(inst.instanceId, resolved); // throws PinMismatch if the pin disagrees
   expect(re.instanceId).toBe(inst.instanceId);

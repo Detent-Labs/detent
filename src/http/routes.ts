@@ -626,7 +626,7 @@ export async function handleGrantVisibility(instanceId: string, req: Request, re
 
 /**
  * Publish an authored body. `processId` is not part of the hashed
- * `ProcessBody` (see CLAUDE.md's hashing/versioning section), so the request
+ * `ProcessBody` (see "Hashing / versioning" in .claude/rules/process-contract.md), so the request
  * carries it as a sibling field: the caller decides identity — the same
  * `processId` across two calls is a new version of one process, a fresh one
  * mints a new process. Validates against the server's own `registry`, never

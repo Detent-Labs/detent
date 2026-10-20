@@ -1,0 +1,47 @@
+# Tasks
+
+## 1. Move the test mechanics into the skill
+
+- [x] 1.1 Add a "Running the suite" section to `.claude/skills/devcontainer-exec/SKILL.md` per design D2. It carries three `CLAUDE.md` paragraphs, unchanged in substance. One is "The host call filters through rtk". Another is "Exit 1 with `0 fail` means the gate rejected the run". The third is "Three traps in the host call", with the 2026-09-30 measurement. Verify that `grep -n -E 'rtk/tee|sh -c .exit 3.|rtk err' .claude/skills/devcontainer-exec/SKILL.md` prints the three trap lines.
+
+## 2. Slim `CLAUDE.md`
+
+- [x] 2.1 Rewrite `CLAUDE.md` section by section per design D1, leaving line 1 (the `allow-file` directive) in place. Every rule stays; the anecdotes, the repository layout block and the moved test mechanics go. Verify with `wc -l CLAUDE.md` printing at most 380, and record the count. Where the number and a rule conflict, keep the rule and say so.
+- [x] 2.2 Verify that every cited statement in design's citation table still holds, one grep per row:
+  - `grep -n -F '/admin/*' CLAUDE.md` (the three-defect sentence)
+  - `grep -n -i 'real browser' CLAUDE.md`
+  - `grep -n -E '3 red runs of 20|0 of 20' CLAUDE.md`
+  - `grep -n -F 'DATABASE_URL' CLAUDE.md` (one bold rule)
+  - `grep -n -F 'git diff --check' CLAUDE.md`
+  - `grep -n -i 'every Markdown file' CLAUDE.md`
+  - `grep -n -i 'cheap' CLAUDE.md`
+  - `grep -n -i 'authoring \*\*surface\*\*' CLAUDE.md`
+  - `grep -n -i 'never on the host' CLAUDE.md`
+  - `grep -n -i 'per-machine' CLAUDE.md`
+  - `grep -n -i 'definition contract in brief' CLAUDE.md`
+  - `grep -n -F '**operator**' CLAUDE.md`
+
+  Record each hit. A row with no hit sends 2.1 back.
+- [x] 2.3 Read the full `git diff` of `CLAUDE.md` once and classify every removed line as history or rule (design Risks). A removed rule goes back in. Record the classification in the task report.
+
+## 3. Repoint stale citations
+
+- [x] 3.1 Apply design D4 to `scripts/gates/whitespace.sh`, `scripts/gates/silent-green.sh`, `test/compile-validation.test.ts`, `test/definitions.test.ts`, `.githooks/post-commit`, `src/http/routes.ts`, `src/runtime/record.ts`, `packages/web/src/areas/studio/draft/issues.ts` and `packages/web/src/areas/studio/panels/SubprocessSpecEditor.tsx`. Verify that `git grep -n 'CLAUDE.md' -- scripts test src packages .githooks` lists only pointers whose content `CLAUDE.md` holds, and that `sh scripts/dev-exec.sh bun test test/gates.test.ts` passes.
+
+## 4. Delete the file-wide directive
+
+- [x] 4.1 Per design D3, run this task once the antislop linter is on the machine. Delete line 1 of `CLAUDE.md`. Run the linter on the file. Fix each finding or place a targeted `<!-- antislop: allow <rule> -->` with a one-sentence reason next to the line. Verify that `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` reports no rise for `CLAUDE.md`. If the linter is absent, leave this task open and say so.
+- [x] 4.2 Run the antislop linter on every other Markdown file this change touched: the skill and this change's artifacts. Fix each finding or add a targeted directive with a reason. If the linter is absent, leave this task open and say so.
+
+## 5. Verification
+
+- [x] 5.1 Run `sh scripts/dev-exec.sh bun run typecheck`, `sh scripts/dev-exec.sh bun run lint` and `sh scripts/dev-exec.sh bun run build`. Record each exit status.
+- [x] 5.2 With the dev server stopped, run the full `bun test` with `DATABASE_URL` set through `sh scripts/dev-exec.sh sh scripts/test-gated.sh bun test`. Record the summary lines and the gate's verdict, then restart the server with `bash scripts/dev-up.sh`.
+- [x] 5.3 Run `sh scripts/dev-exec.sh bun run test:tz`. Record its summary.
+- [x] 5.4 On the host, run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`, the same with `whitespace.sh`, then `sh scripts/gates/machine-paths.sh`. Record what each printed.
+
+## Workflow follow-up
+
+- Run `openspec-review-change` and resolve every finding; then start apply without asking (owner's rule).
+- Archive last, after `devcontainer-on-podman`, `rename-devcontainer-dir` and `drop-windows-host-support`.
+- No push until the user says the new machine is ready.

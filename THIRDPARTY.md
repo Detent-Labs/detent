@@ -18,9 +18,9 @@ published at <https://spdx.org/licenses/> (e.g. `.../MIT.html`,
 
 ## Container images
 
-Pulled by `docker/engine.Dockerfile`, `docker/frontend.Dockerfile`, and
-`.devcontainer/docker-compose.yml`. Not npm packages, so `bun.lock` does not
-list them.
+Pulled by `deploy/engine.Dockerfile`, `deploy/frontend.Dockerfile`, and
+`scripts/dev-pod.sh` (the Pod spec it generates). Not npm packages, so
+`bun.lock` does not list them.
 
 ### Base images for the shipped production containers
 
@@ -69,7 +69,7 @@ Declared directly in a `package.json` (root or a `packages/*` workspace).
 | `react` | 19.2.8 | MIT |
 | `react-dom` | 19.2.8 | MIT |
 | `typescript` | 7.0.2 | Apache-2.0 |
-| `vite` | 8.2.1 | MIT |
+| `vite` | 8.3.4 | MIT |
 | `zod` | 4.6.5 | MIT |
 
 `react` and `react-dom` resolve once, at 19.2.8. `packages/web` declares

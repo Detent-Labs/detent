@@ -6,7 +6,9 @@ reads before it runs the engine image or the frontend image. It names every
 environment variable those images read, and the operational rules this
 repository states nowhere else. No engine code backs this capability, the
 same way `backup-restore-runbook` backs none.
+
 ## Requirements
+
 ### Requirement: The runbook lists every environment variable the engine reads
 
 The runbook SHALL carry one table row for every environment variable the
@@ -21,7 +23,7 @@ say what to set instead.
 The table SHALL also cover every build argument either image takes. Each row
 SHALL say which kind it is. A build argument fixes a value into the built
 bundle, where a runtime variable does not. An operator needs to know which
-kind they set. The argument `VITE_API_URL` in `docker/frontend.Dockerfile` is
+kind they set. The argument `VITE_API_URL` in `deploy/frontend.Dockerfile` is
 one of them.
 
 The table SHALL cover at minimum the twenty variables `src/` reads today.

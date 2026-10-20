@@ -4,11 +4,11 @@ What a deployment configures before it runs either image. This runbook is the
 one home for that list. `README.md` carries the commands that build and run
 the two images. It points here for the rest.
 
-Two images exist. `docker/engine.Dockerfile` builds the engine. The engine
+Two images exist. `deploy/engine.Dockerfile` builds the engine. The engine
 reads its configuration from the container environment. The image sets
 `NODE_ENV=production`. Leave it set. The server already turns off Bun's
 development mode, and the variable keeps every other Bun code path out of it.
-`docker/frontend.Dockerfile` builds the browser bundle behind nginx. That
+`deploy/frontend.Dockerfile` builds the browser bundle behind nginx. That
 image reads one build argument and no runtime variable.
 
 ## Runtime variables the engine reads
@@ -125,7 +125,7 @@ the same name changes nothing afterwards.
 
 | Argument | Image | What it controls | Mandatory | Default | Unsafe default, and what to set |
 |---|---|---|---|---|---|
-| `VITE_API_URL` | `docker/frontend.Dockerfile` | The address the browser bundle sends its API requests to. It also names the one origin the bundle's `connect-src` policy permits. | No. | Unset. Then every request goes to the origin that served the bundle. | |
+| `VITE_API_URL` | `deploy/frontend.Dockerfile` | The address the browser bundle sends its API requests to. It also names the one origin the bundle's `connect-src` policy permits. | No. | Unset. Then every request goes to the origin that served the bundle. | |
 
 The engine image takes no build argument.
 

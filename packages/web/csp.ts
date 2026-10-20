@@ -12,7 +12,7 @@ import type { Plugin } from "vite";
  * `<meta http-equiv>`, so one here would read as protection and give none. The
  * framing rule now ships as a response header from both paths that serve this
  * bundle: `SECURITY_HEADERS` in `src/http/static.ts` for the engine, and the
- * `add_header` directives in `docker/nginx.conf` for the frontend image. That
+ * `add_header` directives in `deploy/nginx.conf` for the frontend image. That
  * header carries `frame-ancestors` alone, so the two policies restrict disjoint
  * directives and a browser enforcing both breaks no page.
  */

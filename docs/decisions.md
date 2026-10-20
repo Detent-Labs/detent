@@ -240,8 +240,8 @@ word. `ROADMAP.md` carries stage-by-stage status.
   symbol claim and describes the tree as it stands.
 - `THIRDPARTY.md:36` lists `postgres:16` as the deployment's database image,
   and `:44` repeats "the deployment pins 16". No tracked file states that
-  pin: the devcontainer compose runs `postgres:latest`, the deployment
-  runbook names no image, and the compose stack that does pin it lives
+  pin: the devcontainer's Pod spec runs `postgres:latest`, the deployment
+  runbook names no image, and the stack that does pin it lives
   untracked under `tmp/`. `scripts/thirdparty.ts` does not generate the
   container tables. Either the pin gets a tracked source or the row says
   where it comes from.
@@ -738,12 +738,12 @@ build.
   saved blob carries the caller's type and the app's origin, and a later
   inline preview of it would render stored HTML there and reopen SEC-8.
 - **SEC-10: development defaults.**
-  `.devcontainer/docker-compose.yml` sets `ALLOW_INSECURE_DEV_AUTH: "1"` at
-  `:47` and `POSTGRES_PASSWORD: postgres` at `:92`. Both serve a disposable
+  The Pod spec `scripts/dev-pod.sh` generates sets `ALLOW_INSECURE_DEV_AUTH`
+  to `"1"` and `POSTGRES_PASSWORD` to `postgres`. Both serve a disposable
   local stack, the server prints `AUTH DISABLED` at startup
   (`src/http/server.ts:409`) whenever the first applies, and the production
-  image in `docker/engine.Dockerfile` inherits neither. Risk (Informational): a stack
-  started from the compose file outside the devcontainer runs with auth
+  image in `deploy/engine.Dockerfile` inherits neither. Risk (Informational): a pod
+  played from the generated spec outside the devcontainer runs with auth
   disabled. The review recorded it for completeness and recommends nothing.
 
   Accepted 2026-09-23 (change `decide-security-findings-before-1-0`): the

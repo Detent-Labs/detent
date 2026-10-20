@@ -12,44 +12,31 @@ like. Each names the change that first asked for it.
 
 ## Before you start
 
-**Address.** Use `127.0.0.1`, not `localhost`. Under Windows, `localhost`
-resolves to `::1` and the connection hangs.
+**Address.** Use `127.0.0.1`, not `localhost`. Every published port binds the
+IPv4 loopback address alone. `localhost` can resolve to `::1` first, where
+nothing listens, and the connection hangs.
 
-`bash scripts/dev-up.sh` derives this checkout's own port, per
-`worktree-isolation`. It publishes that port into the gitignored,
-machine-generated `.devcontainer/docker-compose.ports.yml`.
+The port is per checkout. `bash scripts/dev-up.sh` derives this checkout's
+own ports, per `worktree-isolation`. It publishes them through the Pod spec
+it generates, the gitignored `container/pod.yaml`, and prints them at the
+end of its run. The spec binds each port to `127.0.0.1` on the host. A linked
+worktree then never collides with the main checkout's ports. The engine
+serves the frontend bundle from `WEB_ROOT` on the published engine port.
 
-A linked worktree then never collides with the main checkout's ports.
+Source `scripts/worktree-env.sh` to read a port back. It prints the derived
+`PORT_APP` into the shell you source it into.
 
-Source `scripts/worktree-env.sh` to read the port back. It prints the
-derived `PORT_APP` into the shell you source it into.
-
-The gitignored `.devcontainer/docker-compose.override.yml` stays the
-contributor's own, for an extra binding of their own. A literal `3001:3000`
-there would eventually collide with another worktree's derived port.
-Publish one with a two-line override only for a binding the generated file
-does not cover:
-
-```yaml
-services:
-  app:
-    ports:
-      - "127.0.0.1:3001:3000"
-```
-
-The `127.0.0.1:` host_ip prefix is load-bearing on Windows: without it
-Docker binds `[::]`, and the browser meets a connection reset. The engine
-then serves the frontend bundle from `WEB_ROOT` on whichever host port you
-chose. That is `3001` in the snippet above.
+Nothing publishes an extra port of your own. A port the generated spec does
+not cover means a change to `scripts/dev-pod.sh`.
 
 **Build the bundle first.** The engine serves `packages/web/dist`, a build
 output the repository does not track. `resolveWebRoot`
 (`src/http/static.ts:143-153`) falls back to that path and returns
 `undefined` when it is absent. An unbuilt bundle answers every navigation
-with a JSON 404, not a page. Build it first, inside the devcontainer:
+with a JSON 404, not a page. Build it first, inside the pod's `app` container:
 
 ```sh
-bun run --filter './packages/web' build
+sh scripts/dev-exec.sh bun run --filter './packages/web' build
 ```
 
 **No overlap.** Run no `bun test` while a manual run is active. The dev
@@ -81,12 +68,15 @@ clean database. Run it before working through the checklist by hand.
 Source: `per-worktree-devcontainer-stacks` task 5.7.
 
 Use a linked worktree, not the main checkout. Run `bash scripts/dev-up.sh`
-first. Read its derived port with
-`. scripts/worktree-env.sh && echo $PORT_VITE`.
+first. Its `Ready:` lines print the engine address, whose port is
+`PORT_APP`, and the frontend address, whose port is `PORT_VITE`. Neither
+variable exists inside the container, so the command below takes the engine
+port as a literal number.
 
-Start the frontend dev server inside the container:
+Start the frontend dev server inside the container, pointed at this
+worktree's engine:
 ```
-cd packages/web && bun run dev -- --host 0.0.0.0
+sh scripts/dev-exec.sh env VITE_API_URL=http://127.0.0.1:<PORT_APP> sh -c 'cd packages/web && bun run dev -- --host 0.0.0.0'
 ```
 Open `http://127.0.0.1:<PORT_VITE>/` in the browser. Edit a file under
 `packages/web/src/` and save it.

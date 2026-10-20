@@ -575,8 +575,8 @@ describe("compile: idempotent re-publish survives every new check", () => {
 // Every new check is write-path only (compileProcessBody), never a Zod
 // refinement on processBody/processVersion. A body that would violate one of
 // them — as if it had been published before the check existed — must still
-// PARSE on read, so its pinned instances stay rehydratable. See CLAUDE.md's
-// duration-bound precedent for the same argument.
+// PARSE on read, so its pinned instances stay rehydratable. See the `validateDurations`
+// placement in .claude/rules/authoring-invariants.md for the same argument.
 describe("compile: a body violating a new check still reads (no new Zod refinement)", () => {
   const stored = (mutate: (b: any) => void): unknown => {
     const wrapper = structuredClone(example);

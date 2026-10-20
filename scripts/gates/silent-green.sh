@@ -7,7 +7,7 @@
 # The pass count alone is not evidence. The DB-backed suites are
 # test.skipIf(!DB) at hundreds of sites, and they are most of the suite. A run
 # without DATABASE_URL skips all of them and prints a green that looks genuine.
-# CLAUDE.md states that twice, in bold, which measures how easily it recurs.
+# CLAUDE.md makes that a bold rule of its own, which measures how easily it recurs.
 #
 # Two signals, both printed by test/preload-db.ts:
 #   `[test] database: <name>`

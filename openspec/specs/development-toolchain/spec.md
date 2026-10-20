@@ -6,6 +6,7 @@
 Defines the project's standard runtime, package manager, test runner and
 typecheck tool. Also defines how a contributor installs, tests, typechecks and
 builds the project.
+
 ## Requirements
 
 ### Requirement: Bun is the standard toolchain
@@ -102,7 +103,7 @@ checkout's container reports on files the push does not carry. Its result then
 says nothing about the branch it gates.
 
 The hook SHALL take the container's identity from the derivation
-`worktree-isolation` specifies. It SHALL NOT name a Compose project itself.
+`worktree-isolation` specifies. It SHALL NOT name a pod or a container itself.
 The same rule holds for every gate the hook runs inside the container.
 
 This refines the container placement "Every push runs the toolchain's checks
@@ -208,8 +209,9 @@ of them can then call the engine's HTTP wrapper from a browser, with no
 per-contributor setting change.
 
 It SHALL list the `http://127.0.0.1:<port>` origin of that same dev server too.
-The manual checklist mandates that address under Windows. A browser following
-it sends an origin the first form does not cover. One browser package therefore
+The manual checklist mandates that address. The bring-up publishes every port
+on the IPv4 loopback address alone. A browser following the checklist sends an
+origin the first form does not cover. One browser package therefore
 contributes two entries.
 
 In a checkout whose host address differs from the listening port, the
@@ -348,7 +350,7 @@ as `push-gate-checks` specifies.
 
 Two properties come with it. `DATABASE_URL` is already set there, so the
 DB-backed suites run instead of skipping. The Bun version is the one
-`BUN_VERSION` pins in `.devcontainer/Dockerfile`, so a push cannot pass under
+`BUN_VERSION` pins in `container/Dockerfile`, so a push cannot pass under
 a different runtime than the project's.
 
 The silent-skip hazard is why placement matters. The DB-backed suites are
@@ -668,104 +670,6 @@ upgrade a deliberate commit, which re-runs the hash test over `examples/`.
 - **THEN** each `examples/` body still hashes to the value the test records,
   and no recorded value changes
 
-### Requirement: The devcontainer provides an SMTP catcher
-
-The devcontainer SHALL run an SMTP catcher service alongside the existing
-Postgres service. The catcher SHALL come from a pinned off-the-shelf image
-with no custom build. The engine service SHALL depend on it and SHALL receive
-`SMTP_HOST`, `SMTP_PORT`, and `SMTP_FROM` pointing at it.
-
-The shared compose file SHALL declare no `ports` entry for it. The Postgres
-service already follows that rule. The bring-up publishes the catcher's web
-interface instead, at the port `worktree-isolation` derives, into
-`.devcontainer/docker-compose.ports.yml`. The bring-up generates that file and
-git ignores it, so the shared file still has no team-wide host
-binding. A contributor who
-wants an extra binding of their own adds it to the gitignored
-`docker-compose.override.yml`, on the loopback address.
-
-This gives the `notification.email` handler's end-to-end test a real SMTP
-endpoint to send to. It follows the same "real dependency, not a mock"
-pattern the DB-backed suites already use against the Postgres service. The
-test that sends a message SHALL skip when `SMTP_HOST` is unset, matching the
-existing `test.skipIf(!DB)` convention. It SHALL read the delivered message
-back over the catcher's own HTTP API, inside the compose network. It
-therefore never depends on a host binding.
-
-#### Scenario: The engine can send mail inside the devcontainer
-
-- **WHEN** a contributor starts the devcontainer and runs the test suite
-- **THEN** `SMTP_HOST` and `SMTP_PORT` are already set, and the end-to-end
-  send test delivers a message to the catcher instead of skipping
-
-#### Scenario: The shared compose file publishes no port for the catcher
-
-- **WHEN** a reader inspects the tracked `docker-compose.yml`
-- **THEN** the catcher service declares no `ports` entry, exactly like the
-  Postgres service
-
-#### Scenario: A contributor inspects a delivered message
-
-- **WHEN** a contributor opens the catcher's web interface at the address the
-  bring-up printed
-- **THEN** they read a delivered message there
-
-#### Scenario: A run without SMTP_HOST skips instead of failing
-
-- **WHEN** the test suite runs outside the devcontainer with `SMTP_HOST`
-  unset
-- **THEN** the end-to-end send test skips, and the config-validation and
-  failure-classification tests still run
-
-### Requirement: The devcontainer runs a webhook sink
-
-The devcontainer SHALL run a service that answers an `http.request` action.
-The service SHALL answer every request with `200`. It SHALL echo a JSON
-request body back as its own response body. An `Action.output` expression
-then reads a value the process definition sent.
-
-The service SHALL run inside the `app` container, as a script tracked in
-`scripts/`. It SHALL NOT run as a separate compose service, and it SHALL NOT
-add a third-party image to the stack.
-
-The service declares no healthcheck of its own, unlike the standalone
-service this requirement replaces. It runs inside `app`, which already
-declares one healthcheck for the container as a whole. A second, sink-only
-healthcheck would contend with it for no added coverage.
-
-A contributor who wants to reach it from the host publishes the port in
-their own gitignored `docker-compose.override.yml`, against the `app`
-container.
-
-#### Scenario: The shipped example books through the sink
-
-- **WHEN** a contributor seeds the devcontainer database and walks
-  `examples/expense-approval.json` from capture through review and approval
-- **THEN** the `book` step's `http.request` action reaches the sink, the sink
-  echoes the authored booking status, and `Action.output` writes it into
-  `booking_status`
-- **AND** the instance leaves `book` over its `booked` path and reaches a
-  terminal step
-
-#### Scenario: The escalation webhook reaches a target that answers
-
-- **WHEN** an `expense_approval` instance enters `escalated_review`
-- **THEN** the `http.request` action on that step's `onEntry` receives a `200`
-  and the outbox row succeeds
-
-#### Scenario: A contributor reads what the sink received
-
-- **WHEN** the sink answers a request
-- **THEN** it writes the method and the path to stdout, where
-  `docker compose logs app` shows them
-
-#### Scenario: The shared compose file publishes no port for the sink
-
-- **WHEN** a contributor reads the tracked `docker-compose.yml`
-- **THEN** the file declares no separate `webhook-sink` service, and the
-  `app` service declares no `ports` entry for the sink it now runs
-  internally
-
 ### Requirement: Every action type the shipped examples name resolves in the default registry
 
 Every action `type` that a file under `examples/` names SHALL resolve in
@@ -793,9 +697,10 @@ there hides a type the server cannot dispatch.
 
 The devcontainer's `HTTP_ACTION_ALLOWED_HOSTS` value SHALL hold the host of
 every `http.request` target the repository's own examples and scripts name.
-Today that is one host, `localhost:8080`, the port the in-container sink
-(the sink the previous requirement describes) listens on. An entry carries
-its port whenever the port is not the scheme default, because
+Today that is one host, `localhost:8080`. It is the port the in-container
+sink listens on, the sink that "The devcontainer pod runs a webhook sink"
+describes.
+An entry carries its port whenever the port is not the scheme default, because
 `egressRefusal` compares `URL.host`.
 
 The list SHALL hold no host that no target names. A stale entry permits egress
@@ -1023,20 +928,14 @@ word for word.
 `docs/browser-checks.md` SHALL open with the operating rules a manual run
 needs.
 
-It SHALL name `127.0.0.1` as the address, never `localhost`. Under Windows
-`localhost` resolves to `::1`, and the connection hangs. The port itself is a
-per-machine choice. Git ignores `.devcontainer/docker-compose.override.yml`, so
-no number in this file binds every contributor. The checklist SHALL give the
-two-line snippet that publishes one, suggesting the mapping
-`127.0.0.1:3001:3000`. It
-SHALL also say the engine serves the bundle from `WEB_ROOT`.
+It SHALL name `127.0.0.1` as the address, never `localhost`. The bring-up
+binds every published port on the IPv4 loopback address alone, and `localhost`
+can resolve to `::1` first, where nothing listens. The port itself is
+per checkout. The bring-up publishes the ports `worktree-isolation` derives,
+through the Pod spec it generates. It prints them at the end of its run. The
+checklist SHALL say so, and SHALL name the generated spec.
 
-The bring-up now publishes the ports `worktree-isolation` derives for the
-checkout. It writes them into `.devcontainer/docker-compose.ports.yml`, a file
-of its own. Compose reads that file beside the contributor's override, where
-one exists. The checklist SHALL say so.
-It SHALL keep the hand-written snippet for a contributor who wants a binding of
-their own. The override file stays theirs.
+It SHALL also say the engine serves the bundle from `WEB_ROOT`.
 
 It SHALL state that a contributor must build the frontend bundle first. The
 engine serves `packages/web/dist`, a build output the repository does not
@@ -1052,14 +951,14 @@ Each entry SHALL name the change that first asked for it.
 #### Scenario: A contributor opens an area
 
 - **WHEN** a contributor follows the checklist
-- **THEN** the file gives `127.0.0.1`, not `localhost`, and the snippet that
-  publishes the contributor's own port
+- **THEN** the file gives `127.0.0.1`, not `localhost`, and says the bring-up
+  prints the port
 
 #### Scenario: A reader learns where the port comes from
 
 - **WHEN** a contributor reads the operating rules
 - **THEN** the file names the bring-up as what publishes the ports, and names
-  the generated ports file
+  the generated Pod spec
 
 #### Scenario: A manual run needs a build
 
@@ -1440,3 +1339,90 @@ The scenarios below name the invariants that carry this test.
 - **WHEN** an authored body carries a step with the reserved cancel-sink `key`
   and another id
 - **THEN** validation refuses the body
+
+### Requirement: The devcontainer pod provides an SMTP catcher
+
+The devcontainer pod SHALL run an SMTP catcher container beside the Postgres
+container. The catcher SHALL come from a pinned off-the-shelf image with no
+custom build. The `app` container SHALL receive `SMTP_HOST`, `SMTP_PORT` and
+`SMTP_FROM` pointing at it. The containers of one pod share the loopback
+address, so `SMTP_HOST` names `localhost`. The generated Pod spec SHALL
+publish the catcher's web interface alone, at the derived port, on the
+loopback address.
+
+#### Scenario: The engine can send mail inside the devcontainer
+
+- **WHEN** a contributor starts the devcontainer and runs the test suite
+- **THEN** `SMTP_HOST` and `SMTP_PORT` are already set, and the end-to-end
+  send test delivers a message to the catcher instead of skipping
+
+#### Scenario: The Pod spec publishes the catcher's web interface alone
+
+- **WHEN** a reader inspects the generated Pod spec
+- **THEN** the catcher publishes its web interface on the loopback address
+- **AND** no container publishes an SMTP or a Postgres port
+
+#### Scenario: A contributor inspects a delivered message
+
+- **WHEN** a contributor opens the catcher's web interface at the address the
+  bring-up printed
+- **THEN** they read a delivered message there
+
+### Requirement: The mail test round-trips through the catcher
+
+The `notification.email` handler's end-to-end test SHALL send a real message
+to the catcher. It follows the pattern of a real dependency instead of a mock.
+The DB-backed suites use that pattern against Postgres. It SHALL skip when `SMTP_HOST` is
+unset, matching the `test.skipIf(!DB)` convention. It SHALL read the message
+back over the catcher's HTTP API inside the pod. So it never depends on a
+host binding.
+
+#### Scenario: A run without SMTP_HOST skips instead of failing
+
+- **WHEN** the test suite runs outside the devcontainer with `SMTP_HOST`
+  unset
+- **THEN** the end-to-end send test skips, and the config-validation and
+  failure-classification tests still run
+
+#### Scenario: The test reads the message inside the pod
+
+- **WHEN** the end-to-end send test runs in the devcontainer
+- **THEN** it reads the delivered message from the catcher's API on
+  `localhost`, with no host port involved
+
+### Requirement: The devcontainer pod runs a webhook sink
+
+The devcontainer SHALL run a service that answers an `http.request` action
+with `200`. The service SHALL echo a JSON request body back as its response
+body. So an `Action.output` expression reads a value the definition sent. The service
+SHALL run inside the `app` container as a script tracked in `scripts/`. It
+SHALL NOT run as a separate container, add a third-party image, or declare a
+probe of its own. The generated Pod spec SHALL publish no host port for it.
+
+#### Scenario: The shipped example books through the sink
+
+- **WHEN** a contributor seeds the devcontainer database and walks
+  `examples/expense-approval.json` from capture through review and approval
+- **THEN** the `book` step's `http.request` action reaches the sink, the sink
+  echoes the authored booking status, and `Action.output` writes it into
+  `booking_status`
+- **AND** the instance leaves `book` over its `booked` path and reaches a
+  terminal step
+
+#### Scenario: The escalation webhook reaches a target that answers
+
+- **WHEN** an `expense_approval` instance enters `escalated_review`
+- **THEN** the `http.request` action on that step's `onEntry` receives a `200`
+  and the outbox row succeeds
+
+#### Scenario: A contributor reads what the sink received
+
+- **WHEN** the sink answers a request
+- **THEN** it writes the method and the path to stdout, where `podman logs`
+  on this checkout's `app` container shows them
+
+#### Scenario: The Pod spec publishes no port for the sink
+
+- **WHEN** a contributor reads the generated Pod spec
+- **THEN** it declares no separate sink container, and the `app` container
+  publishes no host port for the sink it runs internally

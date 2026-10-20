@@ -8,7 +8,7 @@
 #
 # Three cases end here without an error:
 #   - no git on the PATH        (the production image's base has none)
-#   - no repository around      (docker/engine.Dockerfile COPYs a tree whose
+#   - no repository around      (deploy/engine.Dockerfile COPYs a tree whose
 #                                .git .dockerignore excluded)
 #   - git answers               (the ordinary case, including a worktree)
 #

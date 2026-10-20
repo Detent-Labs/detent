@@ -1,52 +1,89 @@
 ---
 name: devcontainer-exec
-description: Run commands (bun, tsc, tests) inside this project's devcontainer via docker compose when the devcontainer CLI isn't available, including the Windows Git Bash path-rewriting fix and how to expose a dev server port to the host browser.
+description: Run commands (bun, tsc, tests) inside this project's devcontainer pod through scripts/dev-exec.sh, bring the pod up with scripts/dev-up.sh, and expose a dev server port to the host browser.
 ---
 
-Source `scripts/worktree-env.sh` first, in the same shell as the compose
-call: `. scripts/worktree-env.sh`. It derives this checkout's own
-`COMPOSE_PROJECT_NAME`, `PORT_APP`, `PORT_VITE` and `PORT_MAILPIT` from the
-worktree's path (worktree-isolation). A linked worktree then never reaches
-the main checkout's containers or database.
+The devcontainer is one Podman pod per checkout, played from a generated Pod
+spec by `podman kube play`. Its containers are `app`, `db` and `mailpit`.
+`scripts/worktree-env.sh` derives the pod name (`DEV_POD`) and the host ports
+(`PORT_APP`, `PORT_VITE`, `PORT_MAILPIT`) from the worktree's path
+(worktree-isolation). A linked worktree then never reaches the main
+checkout's containers or database.
 
-Without the `devcontainer` CLI, drive it via `docker compose`. `bash
-scripts/dev-up.sh` starts the stack (`app` + `db` + `mailpit`; `app`'s
-default command is `sleep infinity`). It also generates
-`.devcontainer/docker-compose.ports.yml`, the last `-f` in every command
-below. Add `-f .devcontainer/docker-compose.override.yml` before it only
-where this checkout keeps one.
-
-Run every command through:
+Start the pod from the host:
 ```
-docker compose -f .devcontainer/docker-compose.yml \
-  [-f .devcontainer/docker-compose.override.yml] \
-  -f .devcontainer/docker-compose.ports.yml exec -w /workspace app <cmd>
+bash scripts/dev-up.sh
 ```
-The `app` service's default container workdir is `/`, not `/workspace`, so
-every command needs `-w /workspace`. An `exec`/`ps`/`logs` call needs no
-`-f` at all past the base file. The sourced `COMPOSE_PROJECT_NAME` alone
-resolves this checkout's own container.
-
-On Windows Git Bash, prefix such commands with `MSYS_NO_PATHCONV=1`. Git
-Bash otherwise rewrites the Unix-style `/workspace` path into a Windows path
-before Docker sees it, producing `Cwd must be an absolute path` errors.
-
-`DATABASE_URL` is already wired into the `app` service's environment
-(pointing at the `db` service by container name). DB-backed tests need no
-extra setup once running through `exec`.
-
-`bash scripts/dev-up.sh` publishes this checkout's derived ports
-(`PORT_APP`, `PORT_VITE`, `PORT_MAILPIT`) into
-`.devcontainer/docker-compose.ports.yml` and prints them. To view a dev
-server from the host browser, run it from inside the container:
+It builds the app image, plays the pod and waits for every container's probe.
+It then installs dependencies, seeds the demo data and starts the HTTP
+server. It
+prints the three ports at the end. Re-running it leaves a pod that already
+runs the current spec alone. To manage the pod without the rest:
 ```
-cd packages/web && bun run dev -- --host 0.0.0.0
+sh scripts/dev-pod.sh up      # build, write container/pod.yaml, play, wait
+sh scripts/dev-pod.sh down    # remove the pod; the database volume stays
+sh scripts/dev-pod.sh spec    # print the Pod spec; calls no podman
 ```
-In a linked worktree, point it at that checkout's own engine:
-`VITE_API_URL=http://127.0.0.1:$PORT_APP`.
 
-A hand-written `.devcontainer/docker-compose.override.yml` is for an extra
-binding of the contributor's own. A literal `5173:5173` there collides with
-the main checkout's port. Never add port publishing to the shared
-`docker-compose.yml`. That's a personal convenience, not a team-wide
-default.
+Run every command in the `app` container through `scripts/dev-exec.sh`:
+```
+sh scripts/dev-exec.sh bun run typecheck
+sh scripts/dev-exec.sh sh scripts/test-gated.sh bun test
+```
+The helper sources the derivation, then runs `podman exec -w /workspace
+$DEV_POD-app <cmd>`. It takes no flags. A command that needs an environment
+variable gets it through `env`:
+```
+sh scripts/dev-exec.sh env SEED_ALLOW=1 bun run seed
+```
+
+The `app` container sets `DATABASE_URL`, which points at
+`localhost:5432`. The three containers share one network namespace, so every
+address between them is `localhost`. DB-backed tests work without extra setup once
+they run through `dev-exec.sh`.
+
+The pod publishes this checkout's derived ports on `127.0.0.1` only. To view
+a dev server from the host browser, run it inside the container:
+```
+sh scripts/dev-exec.sh sh -c 'cd packages/web && bun run dev -- --host 0.0.0.0'
+```
+In a linked worktree, point it at that checkout's own engine. `PORT_APP`
+exists only on the host. Take the number from the bring-up printout and pass
+it through `env`:
+```
+sh scripts/dev-exec.sh env VITE_API_URL=http://127.0.0.1:<PORT_APP> sh -c 'cd packages/web && bun run dev -- --host 0.0.0.0'
+```
+
+Nothing publishes an extra port of your own. A port the generated spec does
+not cover means a change to `scripts/dev-pod.sh`. Never hand-edit
+`container/pod.yaml`: the next `up` overwrites it.
+
+## Running the suite
+
+Run the full suite from the host in one call:
+```
+rtk test sh scripts/dev-exec.sh sh scripts/test-gated.sh bun test
+```
+Inside the container, run `sh scripts/test-gated.sh bun test`. Run the full
+suite either way, since a subset run fails the pass floor.
+The script `scripts/test-gated.sh` runs the command, prints its full output, then runs
+`scripts/gates/silent-green.sh` over that output. The exit code is the suite's
+own, or 1 when the suite exits 0 and the gate rejects the run.
+
+**The host call filters through rtk.** It runs on the host and stays optional.
+The runner also works without it. Measured on 2026-09-30 with rtk 0.50.0 and
+4997 tests, a green run prints 6 lines and 87 characters. The raw output has
+5581 lines and 523110 characters. A red run keeps each failing test's name, its
+diff and its stack lines.
+
+**Exit 1 with `0 fail` means the gate rejected the run.** The filter hides the
+rejection text. The last line names the full log under `rtk/tee/`, and that
+log holds the rejection.
+
+**Three traps in the host call.**
+- Keep `bun test` as literal words at the end of the call. `rtk test` picks
+  its filter from them. Without them a red run loses every name and diff.
+- Never pass `sh -c '...'` to `rtk test`. It splits the script at spaces, so
+  `rtk test sh -c 'exit 3'` prints nothing and exits 0. It does not forward
+  stdin either.
+- Do not use `rtk err` for tests, because it cuts object diffs short.

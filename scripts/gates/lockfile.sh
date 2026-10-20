@@ -14,8 +14,7 @@
 # what proves the committed lockfile agrees with every manifest.
 #
 # Container placement, never the host. CLAUDE.md's Conventions forbid a host
-# Bun, and MSYS_NO_PATHCONV=1 stops Git Bash rewriting /workspace before Docker
-# sees it.
+# Bun; scripts/dev-exec.sh reaches this checkout's own pod.
 #
 # Scope, measured: this gate catches a manifest change the committed lockfile
 # cannot satisfy, such as a dependency with no entry in it. It does not fire on
@@ -25,21 +24,17 @@
 set -e
 
 . "$(dirname "$0")/_lib.sh"
-. "$(dirname "$0")/../worktree-env.sh"
 
 RULE=frozen-lockfile
-COMPOSE="docker compose -f .devcontainer/docker-compose.yml"
 
-if MSYS_NO_PATHCONV=1 $COMPOSE exec -T -w /workspace app \
-     bun install --frozen-lockfile > /dev/null 2>&1; then
+if sh scripts/dev-exec.sh bun install --frozen-lockfile > /dev/null 2>&1; then
   exit 0
 fi
 
 reject "$RULE"
 echo "  bun.lock does not agree with the manifests. The install output:" >&2
-MSYS_NO_PATHCONV=1 $COMPOSE exec -T -w /workspace app \
-  bun install --frozen-lockfile 2>&1 | sed 's/^/    /' >&2 || true
+sh scripts/dev-exec.sh bun install --frozen-lockfile 2>&1 | sed 's/^/    /' >&2 || true
 echo "Regenerate the lockfile in the container, then commit it:" >&2
-echo "  . scripts/worktree-env.sh && $COMPOSE exec -T -w /workspace app bun install" >&2
+echo "  sh scripts/dev-exec.sh bun install" >&2
 no_verify_note
 exit 1

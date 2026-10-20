@@ -84,10 +84,10 @@ scope until it passes. The change SHALL record what the narrowing leaves out.
 
 A gate that needs only git and a shell SHALL run on the host. It runs before the
 hook starts the container checks. A gate that needs Bun SHALL run inside the
-devcontainer, through the `docker compose exec` the hook already uses.
+devcontainer, through the `podman exec` the hook already uses.
 
-A container gate SHALL reach the Compose project the derivation
-`worktree-isolation` specifies, and SHALL NOT name one itself.
+A container gate SHALL reach the pod the derivation `worktree-isolation`
+specifies, and SHALL NOT name a pod or a container itself.
 
 Host placement buys two things. A contributor with a stopped container still gets
 those findings. The checks that cost milliseconds run before the ones that cost
@@ -112,8 +112,8 @@ typecheck and the suite, for this reason.
 #### Scenario: A container gate reaches the pushing checkout
 
 - **WHEN** a container gate runs from a linked worktree
-- **THEN** it execs into that worktree's Compose project, not another
-  checkout's
+- **THEN** it execs into that worktree's own `app` container
+- **AND** it does not exec into another checkout's container
 
 ### Requirement: The lockfile matches the manifests
 
@@ -178,7 +178,7 @@ floor. A run of far fewer tests than the suite holds proves less than it looks.
 The pass count alone is not evidence. The DB-backed suites are `test.skipIf(!DB)`
 at hundreds of sites. They are most of the suite. A run without `DATABASE_URL`
 skips all of them. It then prints a green that looks genuine. `CLAUDE.md` states
-this twice, in bold, which measures how easily it recurs.
+this as a bold rule of its own, because it recurs.
 
 Both floors SHALL live in tracked files beside the gate. A change that
 legitimately adds a skipped test SHALL raise the skip floor in the same commit.
@@ -461,10 +461,11 @@ The gate SHALL read tracked files only. Untracked local state and ignored files
 carry machine paths by design.
 
 Some tracked paths describe a container filesystem rather than a contributor's
-machine. `.devcontainer/devcontainer.json` mounts a volume at `/home/node/.claude`.
-The gate SHALL exclude those paths, and the change SHALL name each exclusion.
-Without the exclusion this gate lands red, which the arrives-green requirement
-forbids.
+machine. The devcontainer image's `node` user and `root` are container users.
+Archived changes quote `/home/node/.claude`, the mount a retired
+`devcontainer.json` declared. The gate SHALL exclude those paths, and the
+change SHALL name each exclusion. Without the exclusion this gate lands red,
+which the arrives-green requirement forbids.
 
 #### Scenario: A container filesystem path raises no finding
 

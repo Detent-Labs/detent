@@ -81,13 +81,10 @@ jobs:
         with:
           persist-credentials: false
 
-      # A runner is always the main checkout's own worktree, so this
-      # resolves to the established name — sourced anyway so the exec steps
-      # below never drift from what `up` started (worktree-isolation).
+      # A runner is always the main checkout's own worktree, so dev-pod.sh
+      # and dev-exec.sh derive the same pod name (worktree-isolation).
       - name: Start the devcontainer stack
-        run: |
-          . scripts/worktree-env.sh
-          docker compose -f .devcontainer/docker-compose.yml up -d --wait
+        run: sh scripts/dev-pod.sh up
 
       # The job's first install, so no step before it can rewrite bun.lock.
       # A plain `bun install` re-resolves the manifests and writes the
@@ -109,18 +106,14 @@ jobs:
       # time, with a comment naming the package and the reason. None is
       # excused today.
       - name: bun audit
-        run: |
-          . scripts/worktree-env.sh
-          docker compose -f .devcontainer/docker-compose.yml exec -T -w /workspace app bun audit --audit-level=high
+        run: sh scripts/dev-exec.sh bun audit --audit-level=high
 
       # No pipe into tee: `cmd | tee` returns tee's exit status, not bun's,
       # the same reason .githooks/pre-push captures this way.
       - name: bun run check
         run: |
-          . scripts/worktree-env.sh
           set +e
-          docker compose -f .devcontainer/docker-compose.yml exec -T -w /workspace app \
-            bun run check > "$RUNNER_TEMP/check-out.txt" 2>&1
+          sh scripts/dev-exec.sh bun run check > "$RUNNER_TEMP/check-out.txt" 2>&1
           status=$?
           cat "$RUNNER_TEMP/check-out.txt"
           exit $status
@@ -143,35 +136,24 @@ jobs:
           persist-credentials: false
 
       - name: Start the devcontainer stack
-        run: |
-          . scripts/worktree-env.sh
-          docker compose -f .devcontainer/docker-compose.yml up -d --wait
+        run: sh scripts/dev-pod.sh up
 
       # No gate step in this job, so the install is frozen itself.
       - name: bun install --frozen-lockfile
-        run: |
-          . scripts/worktree-env.sh
-          docker compose -f .devcontainer/docker-compose.yml exec -T -w /workspace app bun install --frozen-lockfile
+        run: sh scripts/dev-exec.sh bun install --frozen-lockfile
 
-      # A `docker compose exec` runs as root in this container, so the
+      # A `podman exec` runs as root in this container, so the
       # browser's system libraries install with no `sudo` (design D5).
       - name: Install the Playwright browser
-        run: |
-          . scripts/worktree-env.sh
-          docker compose -f .devcontainer/docker-compose.yml exec -T -w /workspace app \
-            bunx playwright install --with-deps chromium
+        run: sh scripts/dev-exec.sh bunx playwright install --with-deps chromium
 
       - name: bun run build
-        run: |
-          . scripts/worktree-env.sh
-          docker compose -f .devcontainer/docker-compose.yml exec -T -w /workspace app bun run build
+        run: sh scripts/dev-exec.sh bun run build
 
       - name: bun run e2e
-        run: |
-          . scripts/worktree-env.sh
-          docker compose -f .devcontainer/docker-compose.yml exec -T -w /workspace app bun run e2e
+        run: sh scripts/dev-exec.sh bun run e2e
 
-      # test-results/ lands under the bind-mounted /workspace (docker-compose.yml),
+      # test-results/ lands under the bind-mounted /workspace (the pod spec),
       # so a failed flow's trace reaches the host path this action reads.
       - name: Upload the failed run's traces
         if: failure()

@@ -75,7 +75,7 @@ test("Bun.serve runs with development off", async () => {
 });
 
 test("the engine image sets NODE_ENV=production before it drops to the bun user", async () => {
-  const dockerfile = await Bun.file(new URL("../docker/engine.Dockerfile", import.meta.url)).text();
+  const dockerfile = await Bun.file(new URL("../deploy/engine.Dockerfile", import.meta.url)).text();
   const env = dockerfile.indexOf("ENV NODE_ENV=production");
   expect(env).toBeGreaterThan(-1);
   expect(env).toBeLessThan(dockerfile.indexOf("USER bun"));

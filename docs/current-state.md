@@ -118,7 +118,7 @@ attachments and form drafts.
 A thin REST and JSON layer exposes the runtime, with one route file per
 audience. It also serves the built browser app with its security headers.
 
-- Paths: `src/http/`, `src/errors.ts`, `docker/nginx.conf`,
+- Paths: `src/http/`, `src/errors.ts`, `deploy/nginx.conf`,
   `docs/openapi.yaml`
 - Specs: `http-wrapper`, `http-route-handling-consolidation`,
   `http-api-documentation`, `web-asset-serving`, `frontend-security-headers`
@@ -289,8 +289,8 @@ The pre-push hook runs the gates and a lint-first check. Hosted CI installs with
 a frozen lockfile. Then it runs the same checks plus a dependency audit. The
 suite uses its own database.
 
-- Paths: `.devcontainer/`, `.githooks/`, `scripts/gates/`,
-  `scripts/preflight.sh`, `.github/workflows/check.yml`, `bunfig.toml`,
+- Paths: `container/`, `.githooks/`, `scripts/gates/`,
+  `scripts/dev-pod.sh`, `scripts/dev-exec.sh`, `scripts/preflight.sh`, `.github/workflows/check.yml`, `bunfig.toml`,
   `test/preload-db.ts`
 - Specs: `development-toolchain`, `push-gate-checks`,
   `devcontainer-preflight`, `worktree-isolation`
@@ -310,6 +310,6 @@ engine it starts uses a database of its own.
 Two images serve the engine and the frontend. The runbooks cover
 deployment, backup and restore. A seed script fills a new database.
 
-- Paths: `docker/`, `docs/runbooks/`, `scripts/seed.ts`
+- Paths: `deploy/`, `docs/runbooks/`, `scripts/seed.ts`
 - Specs: `production-docker-images`, `deployment-runbook`,
   `backup-restore-runbook`, `database-seed-script`

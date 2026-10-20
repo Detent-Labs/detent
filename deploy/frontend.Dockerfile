@@ -1,7 +1,7 @@
 # Production image for one of the frontend SPAs (app/admin/studio/reporting),
 # `packages/web`, the one package that produces a bundle. Genuinely multi-stage: Bun and Vite
 # build the assets, but nginx serves them, and nginx cannot run either.
-FROM oven/bun:1.3.11-slim AS build
+FROM docker.io/oven/bun:1.3.11-slim AS build
 
 WORKDIR /app
 
@@ -20,11 +20,11 @@ RUN bun run --filter "./packages/web" build
 
 # nginx-unprivileged: non-root by default, listens on 8080, no manual
 # reconfiguration needed to match the engine image's non-root USER bun.
-FROM nginxinc/nginx-unprivileged:alpine
+FROM docker.io/nginxinc/nginx-unprivileged:alpine
 
 
 COPY --from=build /app/packages/web/dist /usr/share/nginx/html
-COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
+COPY deploy/nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 8080
 
