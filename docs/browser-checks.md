@@ -17,7 +17,7 @@ resolves to `::1` and the connection hangs.
 
 The port is per checkout. `bash scripts/dev-up.sh` derives this checkout's
 own ports, per `worktree-isolation`. It publishes them through the Pod spec
-it generates, the gitignored `.devcontainer/pod.yaml`, and prints them at the
+it generates, the gitignored `container/pod.yaml`, and prints them at the
 end of its run. The spec binds each port to `127.0.0.1` on the host. A linked
 worktree then never collides with the main checkout's ports. The engine
 serves the frontend bundle from `WEB_ROOT` on the published engine port.

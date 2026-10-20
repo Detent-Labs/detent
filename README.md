@@ -87,7 +87,7 @@ delegates a task, comments on an instance and edits a personal profile. See
 ## Develop
 
 Bun is the runtime, package manager, and test runner. Everything runs inside the
-dev container (`.devcontainer/`), never on the host. The dev container is one
+dev container (`container/`), never on the host. The dev container is one
 Podman pod per checkout, so Podman is the requirement. Install Podman 4.9 or
 newer (rootless works). Docker is not supported, and neither is a Compose
 provider.
@@ -124,7 +124,7 @@ pass count that omits most of what the suite tests. The `app` container sets
 the variable, which is the second reason to run there. Outside it, set the
 variable on the same line as the command.
 
-The bring-up writes the pod's spec to `.devcontainer/pod.yaml`, which git
+The bring-up writes the pod's spec to `container/pod.yaml`, which git
 ignores, and prints the three host ports. Every port binds to `127.0.0.1`.
 `sh scripts/dev-pod.sh down` removes the pod and keeps the database volume.
 `sh scripts/dev-pod.sh spec` prints the spec and calls no `podman`.

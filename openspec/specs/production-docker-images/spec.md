@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The devcontainer image (`.devcontainer/Dockerfile`) is dev-only by
+The devcontainer image (`container/Dockerfile`) is dev-only by
 construction: it mounts the workspace and runs `sleep infinity`. Before
 this capability, no image existed that a deployment could run.
 

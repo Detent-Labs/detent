@@ -19,7 +19,7 @@ installs dependencies, seeds the demo data and starts the HTTP server. It
 prints the three ports at the end. Re-running it leaves a pod that already
 runs the current spec alone. To manage the pod without the rest:
 ```
-sh scripts/dev-pod.sh up      # build, write .devcontainer/pod.yaml, play, wait
+sh scripts/dev-pod.sh up      # build, write container/pod.yaml, play, wait
 sh scripts/dev-pod.sh down    # remove the pod; the database volume stays
 sh scripts/dev-pod.sh spec    # print the Pod spec; calls no podman
 ```
@@ -55,4 +55,4 @@ sh scripts/dev-exec.sh env VITE_API_URL=http://127.0.0.1:<PORT_APP> sh -c 'cd pa
 
 Nothing publishes an extra port of your own. A port the generated spec does
 not cover means a change to `scripts/dev-pod.sh`. Never hand-edit
-`.devcontainer/pod.yaml`: the next `up` overwrites it.
+`container/pod.yaml`: the next `up` overwrites it.

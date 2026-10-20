@@ -289,7 +289,7 @@ The pre-push hook runs the gates and a lint-first check. Hosted CI installs with
 a frozen lockfile. Then it runs the same checks plus a dependency audit. The
 suite uses its own database.
 
-- Paths: `.devcontainer/`, `.githooks/`, `scripts/gates/`,
+- Paths: `container/`, `.githooks/`, `scripts/gates/`,
   `scripts/dev-pod.sh`, `scripts/dev-exec.sh`, `scripts/preflight.sh`, `.github/workflows/check.yml`, `bunfig.toml`,
   `test/preload-db.ts`
 - Specs: `development-toolchain`, `push-gate-checks`,
