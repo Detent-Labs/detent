@@ -3,8 +3,8 @@
 ## Context
 
 See proposal.md for the motivation. After `devcontainer-on-podman`, the
-directory holds one tracked file, `Dockerfile`, and three gitignored ones:
-`pod.yaml`, `.auth-secret` and `server.log`. Two scripts read the path:
+directory holds one tracked file, `Dockerfile`. It holds three gitignored
+files: `pod.yaml`, `.auth-secret` and `server.log`. Two scripts read the path:
 
 - `scripts/dev-pod.sh` uses it as the image build context and to locate
   `pod.yaml`.
@@ -82,8 +82,8 @@ quotes the committed pre-fix pattern list verbatim.
 - [A local tool still reads `.devcontainer/`] → Nothing outside the
   repository does on this machine. The orphaned directory holds only
   gitignored files, and a task removes it.
-- [A clone that has not migrated shows `.devcontainer/.auth-secret` and
-  `server.log` as untracked, and `git add -A` commits the secret] →
+- [An unmigrated clone shows `.devcontainer/.auth-secret` and
+  `server.log` as untracked. `git add -A` then commits the secret] →
   `.gitignore` keeps one `.devcontainer/` line, commented as the retired
   directory.
 

@@ -11,8 +11,8 @@ history documents. The Windows references fall into three kinds:
    convention for the Windows permission analyzer. The MSYS clause in
    CLAUDE.md's whitespace explanation.
 2. **A Windows rationale for a rule that still holds.** The `127.0.0.1`
-   address in `docs/browser-checks.md`, in the CORS comment in
-   `scripts/dev-pod.sh`, and in two `development-toolchain` requirements.
+   address appears in `docs/browser-checks.md`, the CORS comment in
+   `scripts/dev-pod.sh` and two `development-toolchain` requirements.
 3. **Content guards and records.**
    - the Windows path spellings of `no-machine-paths`
    - the CR check of the whitespace gate and `.gitattributes`

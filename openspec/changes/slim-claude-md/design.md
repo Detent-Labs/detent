@@ -85,15 +85,15 @@ Each section maps to one action:
   - Drop the `bbf37d1` sentence. It describes the `allow-file` line, which D3
     removes.
   - Cut the four ungated defect classes to one sentence and its pointer.
-- **Repository layout.** Replace it with a 10–12 line top-level map: the
-  container directory, `src/` and its subdirectories in one line each,
-  `packages/web` and `packages/form-ui`, `examples/`, `test/`, `e2e/`. Then a
-  pointer: `docs/current-state.md` holds the per-subsystem detail.
+- **Repository layout.** Replace it with a 10–12 line top-level map.
+  The map lists the container directory and `src/` with its subdirectories in
+  one line each. It lists `packages/web`, `packages/form-ui`, `examples/`,
+  `test/` and `e2e/`. Then a pointer: `docs/current-state.md` holds the per-subsystem detail.
 - **Where the rest lives.** Keep the list and shorten each entry to its
   purpose. The heading takes the active voice.
-- **Codebase memory.** Keep the rules: index per machine, check
-  `list_projects`, resolve the slug, prefer the graph for cross-file questions,
-  re-index after big changes. Cut the tool catalogue to one line.
+- **Codebase memory.** Keep these rules: index per machine, check
+  `list_projects`, resolve the slug. Prefer the graph for cross-file
+  questions, and re-index after big changes. Cut the tool catalogue to one line.
 - **Conventions.**
   - Keep every rule.
   - Move the `rtk` paragraphs, the exit-1-with-`0 fail` meaning, the three

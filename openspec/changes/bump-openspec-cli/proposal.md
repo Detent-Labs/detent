@@ -3,9 +3,11 @@
 ## Why
 
 `container/Dockerfile` pins the OpenSpec CLI at 1.9.0. The development host
-runs 1.14.3 since 2026-10-20. `scripts/openspec-review-check.ts` validates a
+runs 1.14.3 since 2026-10-20. The script `scripts/openspec-review-check.ts` validates a
 change inside the container with 1.9.0, while a session validates it on the
-host with 1.14.3. The two can disagree. On 2026-10-20 the host CLI rejected a
+host with 1.14.3.
+
+The two can disagree. On 2026-10-20 the host CLI rejected a
 MODIFIED requirement that omitted a base scenario. That rejection shaped the
 changes of that day. Nobody measured whether 1.9.0 runs the same check.
 

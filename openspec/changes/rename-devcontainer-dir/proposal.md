@@ -2,7 +2,7 @@
 
 ## Why
 
-`.devcontainer/` is the directory name VS Code's Dev Containers support reads.
+VS Code's Dev Containers support reads the `.devcontainer/` name.
 `devcontainer-on-podman` removed the two files that tool needed,
 `devcontainer.json` and the Compose file. What remains is the image recipe
 for the `app` container and the pod's local state. The hidden directory now

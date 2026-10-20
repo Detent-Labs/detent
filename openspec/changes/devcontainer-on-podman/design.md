@@ -66,8 +66,8 @@ alternatives:
 
 ### D2. A generator prints the Pod spec; the bring-up writes it to a gitignored file
 
-`scripts/dev-pod.sh spec` prints the Pod YAML to stdout. It is POSIX sh, it
-sources `scripts/worktree-env.sh`, and it reads `git rev-parse --show-toplevel`
+`scripts/dev-pod.sh spec` prints the Pod YAML to stdout. It is POSIX sh. It
+sources `scripts/worktree-env.sh` and reads `git rev-parse --show-toplevel`
 for the `hostPath`. `scripts/dev-pod.sh up` writes that output to
 `.devcontainer/pod.yaml` (gitignored) and plays it. `down` tears it down.
 
@@ -77,7 +77,7 @@ the `no-machine-paths` gate rejects a home path in a tracked file. The
 `kube play --publish` overrides ports but not env or volumes.
 
 `spec` calls no `podman`. The tests run inside the container, where no Podman
-exists, and they read `spec`'s output in place of the Compose file.
+exists. They read `spec`'s output in place of the Compose file.
 
 Every image name carries its registry host: `docker.io/library/postgres:latest`,
 `docker.io/axllent/mailpit:v1.27`, `localhost/$DEV_POD-app:latest`. Podman
@@ -95,7 +95,7 @@ plain YAML scalar.
 `worktree-env.sh` exports `DEV_POD` in place of `COMPOSE_PROJECT_NAME`. The
 derivation stays the same: `workflow-engine` in a main checkout, and
 `detent-<base>-<cksum>` in a linked worktree. kube play names a container
-`<pod>-<container>`, so the containers are `$DEV_POD-app`, `$DEV_POD-db` and
+`<pod>-<container>`. The containers are therefore `$DEV_POD-app`, `$DEV_POD-db` and
 `$DEV_POD-mailpit`. The claim is `$DEV_POD-pgdata`, which gives the volume
 that name. The established volume becomes `workflow-engine-pgdata`, with a
 hyphen. It cannot collide with Compose's old `workflow-engine_pgdata`.
@@ -115,7 +115,7 @@ alphanumerics. Pod, container and volume names keep `DEV_POD` as it is.
 
 `scripts/dev-exec.sh` runs `podman exec -w /workspace "$DEV_POD-app" "$@"`
 after it sources the derivation. A caller that needs an env variable uses
-`env NAME=value cmd`. The helper takes no flags of its own, so its argv is the
+`env NAME=value cmd`. The helper takes no flags of its own. Its argv is the
 command and nothing else. `podman exec` allocates no TTY by default, which
 suits the hook and CI. It is the one place that knows the container name and
 the workdir. The CLAUDE.md host test call becomes:
@@ -146,8 +146,10 @@ Each container declares a `livenessProbe`:
 - `mailpit`: `/mailpit readyz`
 - `app`: `bun --version`
 
-All three use `initialDelaySeconds: 30`, `periodSeconds: 5`,
-`timeoutSeconds: 3` and `failureThreshold: 24`. kube play maps them to the
+All three use these values: `initialDelaySeconds: 30`,
+`periodSeconds: 5`, `timeoutSeconds: 3`, `failureThreshold: 24`.
+
+kube play maps them to the
 health check's StartPeriod, Interval, Timeout and Retries, with on-failure
 action `restart` (Context). A failing probe restarts the container once its
 failing streak reaches 24, and that must never happen during a first-boot

@@ -15,7 +15,7 @@ outside the archive found it in:
   `packages/web/test/vite-config.test.ts`, `test/enable-hooks.test.ts`);
 - one test that reads the file, `test/http-error-path.test.ts`.
 
-CI builds neither production image, and no script runs `docker build`.
+CI builds neither production image. No script runs `docker build`.
 `.dockerignore` does not name the directory, and no other directory in the
 tree has the name `deploy`.
 
@@ -59,9 +59,9 @@ the new path, and the suite proves the read.
 ### D3. A build check stands in for the missing CI build
 
 No automated check builds either image. A task builds both with
-`podman build` on this host and records the result, the way the
+`podman build` on this host and records the result. The
 `production-docker-images` requirement "Both images build on a working tree
-with dependencies installed" describes.
+with dependencies installed" describes the method.
 
 ## Risks / Trade-offs
 

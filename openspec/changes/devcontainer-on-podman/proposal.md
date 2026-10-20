@@ -21,9 +21,9 @@ Podman's, and this change fixes it too.
 - **BREAKING** Podman replaces Docker Compose as the only container path.
   This covers the devcontainer stack locally, in the pre-push hook, and in
   CI. `.devcontainer/docker-compose.yml` goes away.
-- A tracked generator prints this checkout's Pod spec: `app`, `db` and
-  `mailpit` in one pod, with this checkout's path, ports and pod name filled
-  in. The bring-up writes the spec to a gitignored file and runs it with
+- A tracked generator prints this checkout's Pod spec. It holds `app`, `db`
+  and `mailpit` in one pod, with this checkout's path, ports and pod name
+  filled in. The bring-up writes the spec to a gitignored file and runs it with
   `podman kube play`.
 - The containers of one pod share `localhost`. `DATABASE_URL` and `SMTP_HOST`
   name `localhost` instead of the Compose service names `db` and `mailpit`.
@@ -58,8 +58,8 @@ None.
 ### Modified Capabilities
 
 - `worktree-isolation`: the derived identity names a Podman pod instead of a
-  Compose project. The `devcontainer.json` exemption and the compose-file
-  `name:` fallback are dropped. The bring-up no longer reads a contributor's
+  Compose project. The change drops the `devcontainer.json` exemption and the compose-file
+  `name:` fallback. The bring-up no longer reads a contributor's
   override file.
 - `devcontainer-preflight`: check 1 asks Podman instead of the Docker daemon.
   Check 2 reads each pod container's health. Repair commands reach the pod.

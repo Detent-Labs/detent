@@ -28,8 +28,9 @@ host. Matching it removes the disagreement without a new unknown.
 
 ### D2. A known-bad change proves the parse
 
-`--json` output may differ between 1.9.0 and 1.14.3. The full suite does not
-show whether the script still reads it: `test/openspec-review-check.test.ts`
+`--json` output may differ between 1.9.0 and 1.14.3. The full suite cannot
+show if the script still reads it.
+The reason: `test/openspec-review-check.test.ts`
 drops every `openspec validate` line (`ownFindings`), because the CLI is not
 installed everywhere. A valid change proves nothing either, since a misread
 also prints no finding.
@@ -40,6 +41,7 @@ requirement has no `#### Scenario:`. The CLI reports that as an ERROR, so the
 script must print a Critical from `openspec validate`. A MODIFIED header absent
 from the base spec does not serve. 1.14.3 reports it as INFO, measured on
 2026-10-20. Only the script's own header check turns it into a Critical.
+
 The suite still covers the script's own checks.
 
 ## Risks / Trade-offs

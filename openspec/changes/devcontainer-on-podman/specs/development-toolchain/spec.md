@@ -143,7 +143,7 @@ operator reads the dead-letter view.
 ### Requirement: The devcontainer provides an SMTP catcher
 
 **Reason**: It specifies the catcher as a Compose service, with its ports in
-`docker-compose.ports.yml` and an override file, and two of its scenarios
+`docker-compose.ports.yml` and an override file. Two of its scenarios
 read the tracked `docker-compose.yml`. This change retires all three. "The
 devcontainer pod provides an SMTP catcher" and "The mail test round-trips
 through the catcher" carry its behavior.
