@@ -26,7 +26,11 @@ if [ -z "$DEV_POD_TOPLEVEL" ]; then
   exit 1
 fi
 
-APP_IMAGE="localhost/$DEV_POD-app:latest"
+# An image repository name admits `_` only between two alphanumerics, while
+# DEV_POD may keep one anywhere (a worktree named `fix_` yields `detent-fix_-…`).
+# Pod, container and volume names keep DEV_POD as it is; the image name maps
+# every `_` to `-` and squeezes each run of `-` to one.
+APP_IMAGE="localhost/$(printf '%s' "$DEV_POD" | sed -e 's/_/-/g' -e 's/--*/-/g')-app:latest"
 POD_YAML="$DEV_POD_TOPLEVEL/.devcontainer/pod.yaml"
 
 # A double-quoted YAML scalar. A checkout path may hold a space, a `:` or a
@@ -102,10 +106,18 @@ spec:
       volumeMounts:
         - name: $(q workspace)
           mountPath: $(q /workspace)
+      # The three probes share these timings. kube play maps them to the
+      # health check's StartPeriod 30s, Interval 5s, Timeout 3s, Retries 24,
+      # with on-failure action restart. A failure inside the start period
+      # does not count toward the failing streak, and that holds for the
+      # manual healthcheck runs the bring-up polls with too. 30s covers a
+      # first-boot initdb, measured at about two seconds, with wide margin.
       livenessProbe:
         exec:
           command: [$(q bun), $(q --version)]
+        initialDelaySeconds: 30
         periodSeconds: 5
+        timeoutSeconds: 3
         failureThreshold: 24
     - name: $(q db)
       image: $(q docker.io/library/postgres:latest)
@@ -143,7 +155,9 @@ spec:
       livenessProbe:
         exec:
           command: [$(q pg_isready), $(q -h), $(q 127.0.0.1), $(q -U), $(q postgres)]
+        initialDelaySeconds: 30
         periodSeconds: 5
+        timeoutSeconds: 3
         failureThreshold: 24
     - name: $(q mailpit)
       image: $(q docker.io/axllent/mailpit:v1.27)
@@ -158,7 +172,9 @@ spec:
       livenessProbe:
         exec:
           command: [$(q /mailpit), $(q readyz)]
+        initialDelaySeconds: 30
         periodSeconds: 5
+        timeoutSeconds: 3
         failureThreshold: 24
   volumes:
     - name: $(q workspace)
@@ -192,7 +208,13 @@ up() {
 
   if [ -n "$_replay" ]; then
     echo "==> Playing $DEV_POD ($_replay)"
-    podman kube play --replace "$POD_YAML" >/dev/null
+    # A failed play leaves no pod.yaml, so the next up replays rather than
+    # taking a half-played pod for the current spec.
+    if ! podman kube play --replace "$POD_YAML" >/dev/null; then
+      rm -f "$POD_YAML"
+      echo "dev-pod.sh: podman kube play failed for $POD_YAML" >&2
+      exit 1
+    fi
   elif [ "$(podman pod inspect --format '{{.State}}' "$DEV_POD")" != "Running" ]; then
     echo "==> Starting $DEV_POD"
     podman pod start "$DEV_POD" >/dev/null
@@ -200,6 +222,10 @@ up() {
     echo "==> $DEV_POD already runs this spec and image"
   fi
 
+  # Each manual healthcheck run counts like a timer run: past the start
+  # period, a failure advances the streak that triggers a restart at 24.
+  # Polling at the probe period, 5s, keeps the streak no faster than the
+  # timer alone would drive it.
   _wait=${DEV_POD_WAIT_SECONDS:-120}
   _deadline=$(( $(date +%s) + _wait ))
   _pending="db mailpit app"
@@ -217,7 +243,7 @@ up() {
       done
       exit 1
     fi
-    sleep 1
+    sleep 5
   done
   echo "==> $DEV_POD is healthy"
 }

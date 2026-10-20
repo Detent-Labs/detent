@@ -104,23 +104,25 @@ push: `.githooks/pre-push` runs its `core` profile first. Run either
 profile standalone with `bash scripts/preflight.sh core|serve`. The `.ps1`
 entry point takes the same two profiles and runs that same script.
 
-Run these inside the `app` container. From the host, prefix each with
-`sh scripts/dev-exec.sh`, which takes the command and nothing else:
+Each line of the block below runs inside the `app` container. From the
+host, prefix the line with `sh scripts/dev-exec.sh`, which takes a command
+and its arguments and nothing else, so no `NAME=value` assignment in front:
 `sh scripts/dev-exec.sh bun run typecheck`.
 
 ```bash
 bun install
-DATABASE_URL=postgres://postgres:postgres@localhost:5432/workflow_engine bun test   # bun:test suites
-bun run typecheck                                                            # tsc --noEmit (Bun does not typecheck)
-bun run build                                                                # vite build, the frontend's production bundle
-bun run check                                                                # lint, typecheck, build, the suite, then the timezone test
+bun test             # bun:test suites; the container sets DATABASE_URL
+bun run typecheck    # tsc --noEmit (Bun does not typecheck)
+bun run build        # vite build, the frontend's production bundle
+bun run check        # lint, typecheck, build, the suite, then the timezone test
 ```
 
-Set `DATABASE_URL`. The database-backed suites carry `test.skipIf(!DATABASE_URL)`
-at over 500 sites — the majority of the suite. Without it they skip silently,
-not loudly. A bare `bun test` then reports a pass count that omits most of what
-the suite tests. Inside the dev container the variable is already set, which is
-the second reason to run there.
+`DATABASE_URL` must be set. The database-backed suites carry
+`test.skipIf(!DATABASE_URL)` at over 500 sites — the majority of the suite.
+Without it they skip silently, not loudly. A bare `bun test` then reports a
+pass count that omits most of what the suite tests. The `app` container sets
+the variable, which is the second reason to run there. Outside it, set the
+variable on the same line as the command.
 
 The bring-up writes the pod's spec to `.devcontainer/pod.yaml`, which git
 ignores, and prints the three host ports. Every port binds to `127.0.0.1`.
@@ -137,9 +139,9 @@ containers open over `127.0.0.1`, because the pod sets
 fresh volume.
 
 ```sh
-podman rm -f --ignore workflow-engine-app-1 workflow-engine-db-1 workflow-engine-mailpit-1
-podman network rm --force --ignore workflow-engine_default
-podman volume rm --force workflow-engine_pgdata
+podman rm -f workflow-engine-app-1 workflow-engine-db-1 workflow-engine-mailpit-1 2>/dev/null || true
+podman network rm workflow-engine_default 2>/dev/null || true
+podman volume rm workflow-engine_pgdata 2>/dev/null || true
 ```
 
 On Docker, run `docker rm -f`, `docker network rm` and `docker volume rm` on

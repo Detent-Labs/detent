@@ -313,3 +313,22 @@ test("a worktree path holding a space, a colon, a hash, a quote and a backslash 
   const { pod } = await podSpec(linked);
   expect(pod.spec.volumes.find((v: any) => v.name === "workspace").hostPath.path).toBe(toplevel);
 });
+
+/**
+ * The pod, container and volume names keep DEV_POD verbatim, but an image
+ * repository name admits `_` only between two alphanumerics. A worktree
+ * directory named `fix_` or `_x` keeps that `_` beside a `-` in DEV_POD, and
+ * `podman build -t` rejects the result as an invalid reference format.
+ */
+test("a worktree name that yields an underscore still produces a valid app image reference", async () => {
+  const main = await mainRepo();
+  for (const [dirName, branch] of [["fix_", "fix-branch"], ["_x", "x-branch"], ["a__b", "ab-branch"]] as const) {
+    const linked = await linkedWorktree(main, dirName, branch);
+    const vars = await sourceEnv(linked);
+    expect(vars.DEV_POD).toContain("_");
+    const image: string = container((await podSpec(linked)).pod, "app").image;
+    const [repo, tag] = image.split(":");
+    expect(tag).toBe("latest");
+    for (const component of repo!.split("/")) expect(component).toMatch(/^[a-z0-9]+(?:[._-][a-z0-9]+)*$/);
+  }
+});

@@ -52,4 +52,5 @@
 - After apply: verify, sync the delta specs, archive, then merge.
 - After merge, on this machine: remove the Docker Compose stop-gap
   (`~/.local/bin/docker-compose`, `~/.docker/cli-plugins/docker-compose`,
-  `~/.config/containers/containers.conf`).
+  `~/.config/containers/containers.conf`,
+  `~/.config/containers/registries.conf.d/00-docker-hub.conf`).

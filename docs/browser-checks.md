@@ -67,12 +67,15 @@ clean database. Run it before working through the checklist by hand.
 Source: `per-worktree-devcontainer-stacks` task 5.7.
 
 Use a linked worktree, not the main checkout. Run `bash scripts/dev-up.sh`
-first. Read its derived port with
-`. scripts/worktree-env.sh && echo $PORT_VITE`.
+first. Its `Ready:` lines print the engine address, whose port is
+`PORT_APP`, and the frontend address, whose port is `PORT_VITE`. Neither
+variable exists inside the container, so the command below takes the engine
+port as a literal number.
 
-Start the frontend dev server inside the container:
+Start the frontend dev server inside the container, pointed at this
+worktree's engine:
 ```
-sh scripts/dev-exec.sh sh -c 'cd packages/web && bun run dev -- --host 0.0.0.0'
+sh scripts/dev-exec.sh env VITE_API_URL=http://127.0.0.1:<PORT_APP> sh -c 'cd packages/web && bun run dev -- --host 0.0.0.0'
 ```
 Open `http://127.0.0.1:<PORT_VITE>/` in the browser. Edit a file under
 `packages/web/src/` and save it.

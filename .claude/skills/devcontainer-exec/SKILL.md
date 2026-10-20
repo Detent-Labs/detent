@@ -46,8 +46,12 @@ a dev server from the host browser, run it inside the container:
 ```
 sh scripts/dev-exec.sh sh -c 'cd packages/web && bun run dev -- --host 0.0.0.0'
 ```
-In a linked worktree, point it at that checkout's own engine:
-`VITE_API_URL=http://127.0.0.1:$PORT_APP`.
+In a linked worktree, point it at that checkout's own engine. `PORT_APP`
+exists only on the host, so take the number from the bring-up printout and
+pass it through `env`:
+```
+sh scripts/dev-exec.sh env VITE_API_URL=http://127.0.0.1:<PORT_APP> sh -c 'cd packages/web && bun run dev -- --host 0.0.0.0'
+```
 
 Nothing publishes an extra port of your own. A port the generated spec does
 not cover means a change to `scripts/dev-pod.sh`. Never hand-edit

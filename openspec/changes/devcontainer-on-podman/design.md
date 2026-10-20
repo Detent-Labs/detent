@@ -142,10 +142,12 @@ Each container declares a `livenessProbe`:
 - `mailpit`: `/mailpit readyz`
 - `app`: `bun --version`
 
-All three use `periodSeconds: 5` and `failureThreshold: 24`. A failing probe
-restarts the container (Context), so the threshold must exceed any first-boot
-init by a wide margin. Two minutes does, since the init measured about two
-seconds.
+All three use `initialDelaySeconds: 30`, `periodSeconds: 5`,
+`timeoutSeconds: 3` and `failureThreshold: 24`. kube play maps them to the
+health check's StartPeriod, Interval, Timeout and Retries, with on-failure
+action `restart` (Context). A failing probe restarts the container once its
+failing streak reaches 24, and that must never happen during a first-boot
+init. The init measured about two seconds.
 
 The `db` container also sets `POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256`.
 Inside one pod the `app` container reaches Postgres over `127.0.0.1`, which
@@ -153,12 +155,20 @@ initdb trusts by default, so without it any password logs in. It applies only
 when a volume is first initialized, so a volume from the Compose era must not
 be reused.
 
-`up` then polls `podman healthcheck run` on each container, once a second,
-for up to 120 seconds. Polling `podman healthcheck run` needs neither a
-systemd healthcheck timer nor `wait --condition` support, so it behaves alike
-on every Podman version and host. The poll runs the probe immediately rather
-than waiting for its period. CI calls `up` too, so the wait replaces
-`compose up --wait`.
+`up` then polls `podman healthcheck run` on each pending container every
+5 seconds, the probe period, for up to 120 seconds (`DEV_POD_WAIT_SECONDS`).
+Polling `podman healthcheck run` needs neither a systemd healthcheck timer
+nor `wait --condition` support, so it behaves alike on every Podman version
+and host. CI calls `up` too, so the wait replaces `compose up --wait`.
+
+A manual `podman healthcheck run` counts toward the failing streak exactly
+like a timer run. So the poll alone would not keep a restart away: polled
+once a second, a database still initializing reaches 24 failures in about
+20 seconds, not two minutes. Two settings keep the streak below the
+threshold during init. Inside the 30-second start period a failure does not
+advance the streak, manual runs included (measured on Podman 6.1.4: four
+failing manual runs left the streak at 0). Past it, the 5-second poll at
+most doubles the timer's rate, so 24 failures take at least a minute.
 
 ### D7. Preflight mapping
 
