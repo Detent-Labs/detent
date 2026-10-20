@@ -14,9 +14,9 @@ Every failing check SHALL print a command the developer can copy and run. The
 command SHALL be the literal command, not a description of one.
 
 A command that drives Podman SHALL reach the checkout the preflight ran in.
-Each checkout derives its own pod. A command naming a pod or a container
-literally reaches a different stack once a developer copies it out of a
-linked worktree. A repair command therefore runs through a script that
+Each checkout derives its own pod. A command can name a pod or a container
+by a fixed name. Such a command reaches a different stack once a developer
+copies it out of a linked worktree. A repair command therefore runs through a script that
 sources the derivation.
 
 Some checks name no single repair command. Such a check SHALL print the file
@@ -45,7 +45,7 @@ to change, and the line it needs.
 
 - **WHEN** check 5 fails in a linked worktree
 - **THEN** the printed seed command execs into that worktree's own `app`
-  container, and names no pod or container literally
+  container, and does not name a pod or a container
 
 ### Requirement: The preflight carries two profiles
 
@@ -230,12 +230,17 @@ Each probe's threshold SHALL therefore cover a first-boot database init.
 
 ### Requirement: The preflight checks six preconditions in a fixed order
 
-The preflight SHALL check, in this order: 1. Podman answers. 2. every
-container of this checkout's pod runs and reports healthy. 3. the HTTP server
-process carries `AUTH_JWT_SECRET`. 4. every published port answers on the
-host. 5. the development database holds its schema and seed data. 6. no stale
-codebase-memory WAL file holds a lock. The order runs cheapest-first and
-cause-before-symptom. The preflight SHALL stop at the first blocking failure.
+The preflight SHALL check these preconditions, in this order:
+
+1. Podman answers.
+2. Every container of this checkout's pod runs and reports healthy.
+3. The HTTP server process carries `AUTH_JWT_SECRET`.
+4. Every published port answers on the host.
+5. The development database holds its schema and seed data.
+6. No stale codebase-memory WAL file holds a lock.
+
+The order runs cheapest-first and cause-before-symptom. The preflight SHALL
+stop at the first blocking failure.
 
 #### Scenario: Podman does not answer
 
@@ -257,7 +262,7 @@ cause-before-symptom. The preflight SHALL stop at the first blocking failure.
 
 The bring-up SHALL wait until the database probe passes before it runs any
 step that connects to the database. Those steps are the seed and the
-superuser setup. The wait SHALL be bounded. When the bound expires, the
+superuser setup. The wait SHALL have a bound. When the bound expires, the
 bring-up SHALL fail, name the database container, and print the command that
 shows its log.
 

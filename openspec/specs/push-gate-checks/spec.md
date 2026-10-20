@@ -112,8 +112,8 @@ typecheck and the suite, for this reason.
 #### Scenario: A container gate reaches the pushing checkout
 
 - **WHEN** a container gate runs from a linked worktree
-- **THEN** it execs into that worktree's own `app` container, not another
-  checkout's
+- **THEN** it execs into that worktree's own `app` container
+- **AND** it does not exec into another checkout's container
 
 ### Requirement: The lockfile matches the manifests
 

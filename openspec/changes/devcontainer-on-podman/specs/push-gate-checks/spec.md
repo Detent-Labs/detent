@@ -2,6 +2,7 @@
 
 ## MODIFIED Requirements
 
+<!-- antislop: allow negation-habit - a MODIFIED heading must match the live spec's wording exactly -->
 ### Requirement: A gate that needs no container runs on the host
 
 A gate that needs only git and a shell SHALL run on the host. It runs before the
@@ -34,8 +35,8 @@ typecheck and the suite, for this reason.
 #### Scenario: A container gate reaches the pushing checkout
 
 - **WHEN** a container gate runs from a linked worktree
-- **THEN** it execs into that worktree's own `app` container, not another
-  checkout's
+- **THEN** it execs into that worktree's own `app` container
+- **AND** it does not exec into another checkout's container
 
 ### Requirement: No tracked file carries an absolute home-directory path
 

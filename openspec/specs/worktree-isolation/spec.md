@@ -12,13 +12,15 @@ checkout derives, what the main checkout keeps, and how a collision surfaces.
 
 The repository SHALL carry one script. It derives two values from the checkout
 it runs in. Those are the pod name and the host ports. Every caller in this
-repository that starts, inspects or execs into the devcontainer pod SHALL read
-those values from that script. No caller SHALL name a pod, a container or a
+repository SHALL read those values from that script. This covers a caller that
+starts, inspects or execs into the devcontainer pod.
+
+No caller SHALL name a pod, a container or a
 port itself. A caller sources the script and reads the values as environment
 variables.
 
-No caller is exempt. The Pod spec the bring-up runs is generated from the
-script's values, so no tracked file carries a pod name or a port that a caller
+No caller is exempt. The script's values generate the Pod spec that the
+bring-up runs. So no tracked file carries a pod name or a port that a caller
 could reach without sourcing the script.
 
 The script SHALL be sourceable by a POSIX shell. Two of its callers declare
@@ -31,7 +33,7 @@ rather than a directory, so that test answers false inside a real repository.
 In a main checkout the script SHALL return the established pod name,
 `workflow-engine`, and the established ports. A clone then behaves as it
 always has. A hosted CI runner clones rather than adding a worktree, so it
-needs no knowledge of this capability.
+does not need to know about this capability.
 
 In a linked worktree the script SHALL return a pod name and a port set of
 its own. The worktree's absolute path alone determines both. The same worktree
@@ -43,8 +45,9 @@ The path, rather than its last component, is what the derivation reads. This
 repository holds worktrees under two parents. Two worktrees sharing a basename
 under different parents SHALL derive different pod names.
 
-The pod name SHALL satisfy what Podman accepts for a pod, a container name
-derived from it, and a volume name derived from it. The derived name holds
+The pod name SHALL satisfy what Podman accepts for a pod. It SHALL also
+satisfy what Podman accepts for a container name and a volume name derived
+from it. The derived name holds
 lowercase letters, digits, hyphens and underscores only. A directory name here
 routinely carries capitals, so the script lowercases what it reads and
 replaces every other character. The name must also start with a letter or a

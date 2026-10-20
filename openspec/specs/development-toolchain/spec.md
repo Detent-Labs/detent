@@ -695,8 +695,9 @@ there hides a type the server cannot dispatch.
 
 The devcontainer's `HTTP_ACTION_ALLOWED_HOSTS` value SHALL hold the host of
 every `http.request` target the repository's own examples and scripts name.
-Today that is one host, `localhost:8080`, the port the in-container sink
-(the sink "The devcontainer pod runs a webhook sink" describes) listens on.
+Today that is one host, `localhost:8080`. It is the port the in-container
+sink listens on, the sink that "The devcontainer pod runs a webhook sink"
+describes.
 An entry carries its port whenever the port is not the scheme default, because
 `egressRefusal` compares `URL.host`.
 
@@ -928,9 +929,10 @@ needs.
 It SHALL name `127.0.0.1` as the address, never `localhost`. Under Windows
 `localhost` resolves to `::1`, and the connection hangs. The port itself is
 per checkout. The bring-up publishes the ports `worktree-isolation` derives,
-through the Pod spec it generates, and prints them at the end of its run. The
-checklist SHALL say so, and SHALL name the generated spec. It SHALL also say
-the engine serves the bundle from `WEB_ROOT`.
+through the Pod spec it generates. It prints them at the end of its run. The
+checklist SHALL say so, and SHALL name the generated spec.
+
+It SHALL also say the engine serves the bundle from `WEB_ROOT`.
 
 It SHALL state that a contributor must build the frontend bundle first. The
 engine serves `packages/web/dist`, a build output the repository does not
@@ -1354,8 +1356,8 @@ loopback address.
 #### Scenario: The Pod spec publishes the catcher's web interface alone
 
 - **WHEN** a reader inspects the generated Pod spec
-- **THEN** the catcher publishes its web interface on the loopback address,
-  and no container publishes an SMTP or a Postgres port
+- **THEN** the catcher publishes its web interface on the loopback address
+- **AND** no container publishes an SMTP or a Postgres port
 
 #### Scenario: A contributor inspects a delivered message
 
@@ -1366,10 +1368,10 @@ loopback address.
 ### Requirement: The mail test round-trips through the catcher
 
 The `notification.email` handler's end-to-end test SHALL send a real message
-to the catcher. It follows the "real dependency, not a mock" pattern the
-DB-backed suites use against Postgres. It SHALL skip when `SMTP_HOST` is
+to the catcher. It follows the pattern of a real dependency instead of a mock.
+The DB-backed suites use that pattern against Postgres. It SHALL skip when `SMTP_HOST` is
 unset, matching the `test.skipIf(!DB)` convention. It SHALL read the message
-back over the catcher's HTTP API inside the pod, so it never depends on a
+back over the catcher's HTTP API inside the pod. So it never depends on a
 host binding.
 
 #### Scenario: A run without SMTP_HOST skips instead of failing
@@ -1388,8 +1390,8 @@ host binding.
 ### Requirement: The devcontainer pod runs a webhook sink
 
 The devcontainer SHALL run a service that answers an `http.request` action
-with `200` and echoes a JSON request body back as its response body, so an
-`Action.output` expression reads a value the definition sent. The service
+with `200`. The service SHALL echo a JSON request body back as its response
+body. So an `Action.output` expression reads a value the definition sent. The service
 SHALL run inside the `app` container as a script tracked in `scripts/`. It
 SHALL NOT run as a separate container, add a third-party image, or declare a
 probe of its own. The generated Pod spec SHALL publish no host port for it.

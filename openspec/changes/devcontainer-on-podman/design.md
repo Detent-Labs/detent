@@ -2,9 +2,9 @@
 
 ## Context
 
-See proposal.md for the motivation. The facts below were measured on
-2026-10-20 on the development host: Arch Linux, rootless Podman 6.1.4, crun,
-netavark, and the overlay storage driver.
+See proposal.md for the motivation. The facts below come from measurements
+on 2026-10-20 on the development host. The host runs Arch Linux, rootless
+Podman 6.1.4, crun, netavark, and the overlay storage driver.
 
 Today `.devcontainer/docker-compose.yml` defines three services, `app`, `db`
 and `mailpit`. `scripts/dev-up.sh` adds a generated
@@ -21,7 +21,7 @@ A prototype pod built with `podman kube play` showed the following:
 - `hostPort` with `hostIP: 127.0.0.1` publishes on the loopback address only.
 - A `hostPath` volume bind-mounts the checkout. In rootless mode, container
   root maps to the host user, so files the container writes belong to the
-  host user. No `userns` setting is needed.
+  host user. The pod does not need a `userns` setting.
 - A `persistentVolumeClaim` creates a named Podman volume of the claim's name.
 - `podman exec -d` detaches, which `podman-compose` failed to do.
 - A `startupProbe` turns into a placeholder healthcheck, `exit 0`. A
@@ -53,8 +53,8 @@ A prototype pod built with `podman kube play` showed the following:
 
 ### D1. `podman kube play` over the alternatives
 
-The user chose `podman kube play` on 2026-10-20. Three alternatives were
-considered:
+The user chose `podman kube play` on 2026-10-20. The design weighed three
+alternatives:
 
 - **Quadlets.** systemd units manage long-lived services well. They fit
   short-lived per-worktree stacks and a CI runner poorly, and they need
@@ -83,8 +83,8 @@ Every image name carries its registry host: `docker.io/library/postgres:latest`,
 `docker.io/axllent/mailpit:v1.27`, `localhost/$DEV_POD-app:latest`. Podman
 resolves a short name only through `unqualified-search-registries`. This host
 has no `/etc/containers/registries.conf` at all. Compose's short names worked
-here only through a per-user drop-in added on 2026-10-20, which a fresh
-machine or a CI runner need not carry.
+here only through a per-user drop-in added on 2026-10-20. A fresh machine or
+a CI runner need not carry that drop-in.
 
 Every string scalar in the spec is double-quoted, with `"` and `\` escaped. A
 checkout path may hold a space, a `:` or a `#`, and each of those breaks a
@@ -93,7 +93,7 @@ plain YAML scalar.
 ### D3. Names
 
 `worktree-env.sh` exports `DEV_POD` in place of `COMPOSE_PROJECT_NAME`. The
-derivation is unchanged: `workflow-engine` in a main checkout, and
+derivation stays the same: `workflow-engine` in a main checkout, and
 `detent-<base>-<cksum>` in a linked worktree. kube play names a container
 `<pod>-<container>`, so the containers are `$DEV_POD-app`, `$DEV_POD-db` and
 `$DEV_POD-mailpit`. The claim is `$DEV_POD-pgdata`, which gives the volume
@@ -107,8 +107,8 @@ Dockerfile retag the image the main checkout's next `up` replays. The layer
 cache stays shared, so an unchanged Dockerfile builds in seconds in every
 worktree.
 
-The image name derives from `DEV_POD` with each `_` mapped to `-` and runs
-of `-` squeezed, because an image repository name admits `_` only between two
+The image name derives from `DEV_POD`. Each `_` maps to `-` and runs of `-`
+squeeze, because an image repository name admits `_` only between two
 alphanumerics. Pod, container and volume names keep `DEV_POD` as it is.
 
 ### D4. One exec helper
@@ -133,10 +133,10 @@ runs now. It replays with `kube play --replace` in three cases:
 - the new spec differs from `.devcontainer/pod.yaml`,
 - the `app` container's image id differs from the freshly built image's.
 
-Otherwise it starts a stopped pod with `podman pod start`, or leaves a running
-one alone. That keeps a running dev server and an open exec session alive
-across a re-run. `podman build` is cached, so the build costs seconds when
-nothing changed.
+Otherwise it starts a stopped pod with `podman pod start`. It leaves a running
+pod alone. That keeps a running dev server and an open exec session alive
+across a re-run. The command `podman build` caches its layers, so the build costs seconds
+when nothing changed.
 
 ### D6. Readiness
 
@@ -156,8 +156,8 @@ init. The init measured about two seconds.
 The `db` container also sets `POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256`.
 Inside one pod the `app` container reaches Postgres over `127.0.0.1`, which
 initdb trusts by default, so without it any password logs in. It applies only
-when a volume is first initialized, so a volume from the Compose era must not
-be reused.
+when a volume is first initialized. Do not reuse a volume from the Compose
+era.
 
 `up` then polls `podman healthcheck run` on each pending container every
 5 seconds, the probe period, for up to 120 seconds (`DEV_POD_WAIT_SECONDS`).
@@ -166,12 +166,13 @@ nor `wait --condition` support, so it behaves alike on every Podman version
 and host. CI calls `up` too, so the wait replaces `compose up --wait`.
 
 A manual `podman healthcheck run` counts toward the failing streak exactly
-like a timer run. So the poll alone would not keep a restart away: polled
+like a timer run. So the poll alone would not keep a restart away. Polled
 once a second, a database still initializing reaches 24 failures in about
-20 seconds, not two minutes. Two settings keep the streak below the
-threshold during init. Inside the 30-second start period a failure does not
-advance the streak, manual runs included (measured on Podman 6.1.4: four
-failing manual runs left the streak at 0). Past it, the 5-second poll at
+20 seconds. That is far short of two minutes.
+
+Two settings keep the streak below the threshold during init. Inside the 30-second start period a failure does
+not advance the streak. This holds for manual runs too (measured on Podman
+6.1.4: four failing manual runs left the streak at 0). Past it, the 5-second poll at
 most doubles the timer's rate, so 24 failures take at least a minute.
 
 ### D7. Preflight mapping
@@ -198,8 +199,9 @@ before.
 
 `.devcontainer/docker-compose.yml` goes. So does
 `.devcontainer/devcontainer.json`: its Compose reference has no Pod
-equivalent in the Dev Containers format. The `.gitignore` entries for the
-override and ports files are replaced by one for `.devcontainer/pod.yaml`.
+equivalent in the Dev Containers format. One `.gitignore` entry for
+`.devcontainer/pod.yaml` replaces the entries for the override and ports
+files.
 
 ## Risks / Trade-offs
 
@@ -213,11 +215,10 @@ override and ports files are replaced by one for `.devcontainer/pod.yaml`.
 - [The probe restart kills a slow first init] → The threshold is two minutes
   against a measured two-second init.
 - [A contributor still on Docker loses the stack] → Proposal marks it
-  **BREAKING**. README names Podman as the requirement and the old Compose
-  cleanup.
-- [`--replace` on a changed spec kills a running dev server] → `up` replays
-  only when the spec or the image changed. `dev-up.sh` restarts the server
-  anyway.
+  **BREAKING**. README names Podman as the requirement. It also names the old
+  Compose cleanup.
+- [`--replace` kills a running dev server] → `up` replays
+  only on a changed spec or image. `dev-up.sh` restarts the server anyway.
 
 ## Migration Plan
 
@@ -228,10 +229,10 @@ override and ports files are replaced by one for `.devcontainer/pod.yaml`.
    `workflow-engine-{app,db,mailpit}-1`), their network, and the
    `workflow-engine_pgdata` volume. README states the commands. Development
    data reseeds.
-3. Rollback: revert the merge. The Compose file returns, and the Podman pod
-   can be removed with `sh scripts/dev-pod.sh down` before reverting.
+3. Rollback: revert the merge. The Compose file returns. Before reverting,
+   remove the Podman pod with `sh scripts/dev-pod.sh down`.
 
 ## Open Questions
 
-None. The CI Podman behavior is a verification step in tasks, not an open
+None. The CI Podman behavior is a verification step in tasks. It is no open
 design choice.

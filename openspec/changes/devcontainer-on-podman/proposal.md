@@ -3,24 +3,24 @@
 ## Why
 
 The development machine now runs Arch Linux with rootless Podman and no Docker
-daemon. The devcontainer stack is written for Docker Compose. Podman's own
+daemon. The devcontainer stack targets Docker Compose. Podman's own
 Compose provider, `podman-compose`, drops the `-d` from `exec -d`, so
 `scripts/dev-up.sh` hangs at the server start. Keeping Compose would mean a
 second tool on every machine, installed only to translate one YAML file for
 Podman. Podman already describes a multi-container stack natively, as a
 Kubernetes Pod that `podman kube play` runs.
 
-The bring-up also carries a race. On a fresh database volume it seeds while
-Postgres still runs its init server, and the seed fails with `Connection
-closed`. A second run passes. The race was measured twice on 2026-10-20, once
-under `podman-compose` and once under Docker Compose. It is not Podman's, and
-this change fixes it too.
+The bring-up also has a race. On a fresh database volume, the seed runs
+while Postgres still runs its init server. The seed then fails with
+`Connection closed`. A second run passes. Two runs on 2026-10-20 showed the
+race, once under `podman-compose` and once under Docker Compose. It is not
+Podman's, and this change fixes it too.
 
 ## What Changes
 
-- **BREAKING** Podman replaces Docker Compose as the only container path for
-  the devcontainer stack: locally, in the pre-push hook, and in CI.
-  `.devcontainer/docker-compose.yml` goes away.
+- **BREAKING** Podman replaces Docker Compose as the only container path.
+  This covers the devcontainer stack locally, in the pre-push hook, and in
+  CI. `.devcontainer/docker-compose.yml` goes away.
 - A tracked generator prints this checkout's Pod spec: `app`, `db` and
   `mailpit` in one pod, with this checkout's path, ports and pod name filled
   in. The bring-up writes the spec to a gitignored file and runs it with
@@ -29,8 +29,8 @@ this change fixes it too.
   name `localhost` instead of the Compose service names `db` and `mailpit`.
 - One exec helper runs a command in this checkout's `app` container. The
   pre-push hook, the container gates, the preflight's repair commands, CI,
-  the `devcontainer-exec` skill and `CLAUDE.md` all call it, instead of each
-  spelling out a `docker compose exec` line.
+  the `devcontainer-exec` skill and `CLAUDE.md` all call it. None spells out
+  a `docker compose exec` line.
 - `scripts/worktree-env.sh` exports a pod name in place of
   `COMPOSE_PROJECT_NAME`. The main checkout keeps `workflow-engine`. A linked
   worktree keeps its derived name and port offset.
@@ -67,13 +67,18 @@ None.
   liveness probes. A new requirement makes the bring-up wait for the database
   before it seeds.
 - `development-toolchain`: the push-gate and manual-checklist requirements
-  name the pod and the generated Pod spec instead of the Compose project and
-  the ports and override files. The SMTP-catcher and webhook-sink
-  requirements are removed and replaced by pod-based ones: "The devcontainer
-  pod provides an SMTP catcher", "The mail test round-trips through the
-  catcher" and "The devcontainer pod runs a webhook sink". The HTTP-target
-  requirement now names the sink requirement it points to, instead of "the
-  previous requirement".
+  name the pod and the generated Pod spec. They no longer name the Compose
+  project or the ports and override files. The change removes the
+  SMTP-catcher and webhook-sink requirements.
+
+  Three pod-based requirements replace them:
+
+  - "The devcontainer pod provides an SMTP catcher"
+  - "The mail test round-trips through the catcher"
+  - "The devcontainer pod runs a webhook sink"
+
+  The HTTP-target requirement now names the sink requirement it points to.
+  It no longer says "the previous requirement".
 - `push-gate-checks`: the container gates exec through the pod. The
   machine-path exclusion stops citing `devcontainer.json`.
 
@@ -94,7 +99,7 @@ None.
   `ROADMAP.md`, `.env.example`, `openspec/config.yaml`,
   `scripts/dev-webhook-sink.ts`, `.claude/skills/devcontainer-exec/SKILL.md`,
   `.gitignore`.
-- Contributor machines: Podman is required, and Docker Compose is no longer
-  used. Old Compose containers and the `workflow-engine_pgdata` volume are
-  orphaned. Development data is reseedable, so the README names the cleanup
-  command.
+- Contributor machines: contributors need Podman and stop using Docker
+  Compose. Old Compose containers and the `workflow-engine_pgdata` volume
+  stay behind as orphans. Development data is reseedable, so the README
+  names the cleanup command.
