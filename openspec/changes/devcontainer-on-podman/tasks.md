@@ -39,11 +39,11 @@
 
 ## 7. Verification
 
-- [ ] 7.1 Run `bun run typecheck` in the devcontainer. Record the exit status.
-- [ ] 7.2 Run `bun run lint` and `bun run build` in the devcontainer. Record both exit statuses.
-- [ ] 7.3 Run the full `bun test` with `DATABASE_URL` set, through `sh scripts/dev-exec.sh sh scripts/test-gated.sh bun test`. Record the summary lines and the gate's verdict.
-- [ ] 7.4 Run `bun run test:tz` in the devcontainer. Record its summary.
-- [ ] 7.5 On the host, run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`. Run the same with `whitespace.sh`, then run `sh scripts/gates/machine-paths.sh`. Record what each printed.
+- [x] 7.1 Run `bun run typecheck` in the devcontainer. Record the exit status.
+- [x] 7.2 Run `bun run lint` and `bun run build` in the devcontainer. Record both exit statuses.
+- [x] 7.3 Run the full `bun test` with `DATABASE_URL` set, through `sh scripts/dev-exec.sh sh scripts/test-gated.sh bun test`. Record the summary lines and the gate's verdict.
+- [x] 7.4 Run `bun run test:tz` in the devcontainer. Record its summary.
+- [x] 7.5 On the host, run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`. Run the same with `whitespace.sh`, then run `sh scripts/gates/machine-paths.sh`. Record what each printed.
 - [ ] 7.6 Push the branch and let CI run. Record the `check` and `e2e` job results. A red e2e install step takes design's fallback (`sudo podman`), recorded in design.md.
 
 ## Workflow follow-up
