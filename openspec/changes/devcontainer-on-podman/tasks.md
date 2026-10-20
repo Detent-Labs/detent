@@ -16,9 +16,9 @@
 
 ## 3. Push hook, gates and CI
 
-- [ ] 3.1 Replace the `docker compose` calls in `.githooks/pre-push` and `scripts/gates/lockfile.sh` with `scripts/dev-exec.sh`, including the repair command `lockfile.sh` prints. Update the comments that name Compose or Git Bash path rewriting. Verify with `sh scripts/gates/lockfile.sh` exiting 0 against the running pod.
-- [ ] 3.2 Update `.github/workflows/check.yml` per design D8. Both jobs start the stack with `sh scripts/dev-pod.sh up`, and every exec step runs through `sh scripts/dev-exec.sh`. Keep the step names `test/gates.test.ts` reads. Update the comments that name `docker compose` or `docker-compose.yml`. Verify that the workflow tests in `test/gates.test.ts` pass.
-- [ ] 3.3 In `test/gates.test.ts`, point `PLAIN_INSTALL` at the new exec form. Replace the `.devcontainer/devcontainer.json` label in the container-path test with a tracked path that survives this change. Update the comment in `scripts/gates/machine-paths.sh` per the `push-gate-checks` delta. Verify that the gates tests pass.
+- [x] 3.1 Replace the `docker compose` calls in `.githooks/pre-push` and `scripts/gates/lockfile.sh` with `scripts/dev-exec.sh`, including the repair command `lockfile.sh` prints. Update the comments that name Compose or Git Bash path rewriting. Verify with `sh scripts/gates/lockfile.sh` exiting 0 against the running pod.
+- [x] 3.2 Update `.github/workflows/check.yml` per design D8. Both jobs start the stack with `sh scripts/dev-pod.sh up`, and every exec step runs through `sh scripts/dev-exec.sh`. Keep the step names `test/gates.test.ts` reads. Update the comments that name `docker compose` or `docker-compose.yml`. Verify that the workflow tests in `test/gates.test.ts` pass.
+- [x] 3.3 In `test/gates.test.ts`, point `PLAIN_INSTALL` at the new exec form. Replace the `.devcontainer/devcontainer.json` label in the container-path test with a tracked path that survives this change. Update the comment in `scripts/gates/machine-paths.sh` per the `push-gate-checks` delta. Verify that the gates tests pass.
 
 ## 4. Remove the Compose files
 

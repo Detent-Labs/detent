@@ -26,8 +26,9 @@
 # that no pushed range covers, and the scan costs one `git grep`.
 #
 # Some tracked paths name a container filesystem rather than a contributor's
-# machine. .devcontainer/devcontainer.json mounts /home/node/.claude, and the
-# documents that explain that mount quote the same path. The denylist below
+# machine. Archived changes quote /home/node/.claude, the mount a retired
+# devcontainer.json declared, and the documents that explain that mount quote
+# the same path. The denylist below
 # neutralizes those users before the pattern runs, so a line carrying a real
 # machine path beside a container path still fails.
 #

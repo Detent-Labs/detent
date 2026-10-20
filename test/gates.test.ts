@@ -614,7 +614,7 @@ test("the home-path gate rejects a machine path beside a container path", async 
 
 test("the home-path gate passes a container path", async () => {
   const container = ["", "home", "node", ".claude"].join("/");
-  const file = ".devcontainer/devcontainer.json";
+  const file = ".devcontainer/Dockerfile";
   await scanPaths({ [file]: `"target": "${container}"\n` }, expectNoFinding);
 });
 
@@ -798,7 +798,7 @@ test("the real workflow breaks none of the workflow rules", async () => {
   expect(workflowProblems(workflow, raw)).toEqual([]);
 });
 
-const PLAIN_INSTALL = "docker compose exec -T -w /workspace app bun install";
+const PLAIN_INSTALL = "sh scripts/dev-exec.sh bun install";
 
 const WORKFLOW_FIXTURES: [string, (workflow: Workflow) => void, string[]][] = [
   [
