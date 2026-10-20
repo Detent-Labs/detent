@@ -22,7 +22,7 @@
 
 ## 4. Remove the Compose files
 
-- [ ] 4.1 Delete `.devcontainer/docker-compose.yml` and `.devcontainer/devcontainer.json`. Move the comments that still apply into `scripts/dev-pod.sh`: the PGDATA-parent reasoning, the webhook sink, `ALLOW_INSECURE_DEV_AUTH`, the egress allowlist and the timezone GUC. Update `THIRDPARTY.md`'s note about where the Postgres and Mailpit images come from. Verify with `git grep -n -i -E 'docker[ -]compose|devcontainer\.json' -- . ':!openspec/changes/archive' ':!openspec/changes/devcontainer-on-podman'` listing no file outside the specs this change's deltas replace.
+- [x] 4.1 Delete `.devcontainer/docker-compose.yml` and `.devcontainer/devcontainer.json`. Move the comments that still apply into `scripts/dev-pod.sh`: the PGDATA-parent reasoning, the webhook sink, `ALLOW_INSECURE_DEV_AUTH`, the egress allowlist and the timezone GUC. Update `THIRDPARTY.md`'s note about where the Postgres and Mailpit images come from. Verify with `git grep -n -i -E 'docker[ -]compose|devcontainer\.json' -- . ':!openspec/changes/archive' ':!openspec/changes/devcontainer-on-podman'` listing no file outside the specs this change's deltas replace.
 
 ## 5. Documentation
 

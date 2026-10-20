@@ -49,7 +49,9 @@ spec:
       imagePullPolicy: $(q Never)
       # Backgrounds scripts/dev-webhook-sink.ts, then idles. args, not
       # command, so the image's entrypoint still runs. Re-runs on every
-      # container start, so the sink survives a stop and start.
+      # container start, so the sink survives a stop and start. The probe
+      # below proves the runtime answers; it does not check the sink, whose
+      # crash surfaces as a refused http.request delivery.
       args: [$(q sh), $(q -c), $(q "bun run scripts/dev-webhook-sink.ts & sleep infinity")]
       workingDir: $(q /workspace)
       env:
@@ -63,20 +65,31 @@ spec:
         # its hot-reload client at it.
         - name: $(q PORT_VITE)
           value: $(q "$PORT_VITE")
-        # Disables authentication and trusts X-Actor-* headers verbatim.
-        # Devcontainer only.
+        # The container sets no AUTH_JWT_SECRET or AUTH_ISSUERS, so the server
+        # would refuse to start. This is the written-down opt-in: it disables
+        # authentication and trusts X-Actor-Id and X-Actor-Roles verbatim.
+        # Devcontainer only; never set it in a deployment that real user data
+        # reaches.
         - name: $(q ALLOW_INSECURE_DEV_AUTH)
           value: $(q 1)
+        # Mailpit's SMTP listener: no auth, no TLS. The notification.email
+        # end-to-end test skips when SMTP_HOST is unset.
         - name: $(q SMTP_HOST)
           value: $(q localhost)
         - name: $(q SMTP_PORT)
           value: $(q 1025)
         - name: $(q SMTP_FROM)
           value: $(q workflow-engine@example.test)
-        # localhost:8080 is scripts/dev-webhook-sink.ts, the target the
-        # examples' http.request actions name.
+        # The http.request egress policy; unset denies every outbound target.
+        # localhost:8080 is scripts/dev-webhook-sink.ts, the target of
+        # examples/expense-approval.json's `book` and `escalated_review` steps
+        # and examples/purchase-requisition.json's `issue_po` step. A change
+        # that points an example or a script at a new host adds it here in the
+        # same commit.
         - name: $(q HTTP_ACTION_ALLOWED_HOSTS)
           value: $(q localhost:8080)
+        # The sink speaks plain HTTP, which the https: rule would otherwise
+        # refuse. Devcontainer only, like ALLOW_INSECURE_DEV_AUTH.
         - name: $(q HTTP_ACTION_ALLOW_INSECURE)
           value: $(q 1)
       ports:
@@ -98,7 +111,10 @@ spec:
       image: $(q docker.io/library/postgres:latest)
       imagePullPolicy: $(q IfNotPresent)
       # args, not command, so the image's entrypoint still runs initdb on a
-      # fresh volume. A runtime GUC, applied on every start.
+      # fresh volume. A runtime GUC, applied on every start whenever the
+      # volume was first initialized. Every timestamp column is timestamptz
+      # (src/engine/store.ts), an absolute UTC instant either way; this changes
+      # only how the server logs and untyped-timestamp casts display.
       args: [$(q postgres), $(q -c), $(q log_timezone=Europe/Zurich), $(q -c), $(q timezone=Europe/Zurich)]
       env:
         - name: $(q POSTGRES_USER)
@@ -113,8 +129,11 @@ spec:
         # a fresh volume.
         - name: $(q POSTGRES_INITDB_ARGS)
           value: $(q --auth-host=scram-sha-256)
-      # The parent of PGDATA, not PGDATA itself, so a major bump lands its
-      # own subdirectory inside this volume.
+      # Floating image tag on purpose: pre-1.0 tracks the latest release.
+      # The mount is the parent of PGDATA, not PGDATA itself, so a major bump
+      # lands its own `<major>/docker` subdirectory inside this volume. A
+      # mount on `.../data` makes the next major exit 1 at startup; the data
+      # is not lost, but the pod will not come up.
       volumeMounts:
         - name: $(q pgdata)
           mountPath: $(q /var/lib/postgresql)
@@ -128,7 +147,9 @@ spec:
     - name: $(q mailpit)
       image: $(q docker.io/axllent/mailpit:v1.27)
       imagePullPolicy: $(q IfNotPresent)
-      # 1025 is SMTP and stays inside the pod; 8025 is the web interface.
+      # Catches every message notification.email sends; caught mail is not
+      # persisted. 1025 is SMTP and stays inside the pod; 8025 is the web
+      # interface.
       ports:
         - containerPort: 8025
           hostPort: $PORT_MAILPIT
