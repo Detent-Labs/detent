@@ -61,7 +61,7 @@ function childInputsNote(childInputs: ChildInputFields, mappedKeys: readonly str
   }
 }
 
-/** Call-and-return subprocess wiring on a `subprocess`-type step (design.md/CLAUDE.md "Subprocesses"). */
+/** Call-and-return subprocess wiring on a `subprocess`-type step (design.md, .claude/rules/process-contract.md "Subprocesses"). */
 export function SubprocessSpecEditor({ value, fields, childInputs, onChange, processes, contentLocale }: Props) {
   const noteId = useId();
   const processId = value?.processId ?? "";

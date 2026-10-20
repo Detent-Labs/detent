@@ -26,7 +26,7 @@
 
 ## 3. Repoint stale citations
 
-- [ ] 3.1 Apply design D4 to `scripts/gates/whitespace.sh`, `scripts/gates/silent-green.sh`, `test/compile-validation.test.ts`, `test/definitions.test.ts`, `.githooks/post-commit`, `src/http/routes.ts`, `src/runtime/record.ts`, `packages/web/src/areas/studio/draft/issues.ts` and `packages/web/src/areas/studio/panels/SubprocessSpecEditor.tsx`. Verify that `git grep -n 'CLAUDE.md' -- scripts test src packages .githooks` lists only pointers whose content `CLAUDE.md` holds, and that `sh scripts/dev-exec.sh bun test test/gates.test.ts` passes.
+- [x] 3.1 Apply design D4 to `scripts/gates/whitespace.sh`, `scripts/gates/silent-green.sh`, `test/compile-validation.test.ts`, `test/definitions.test.ts`, `.githooks/post-commit`, `src/http/routes.ts`, `src/runtime/record.ts`, `packages/web/src/areas/studio/draft/issues.ts` and `packages/web/src/areas/studio/panels/SubprocessSpecEditor.tsx`. Verify that `git grep -n 'CLAUDE.md' -- scripts test src packages .githooks` lists only pointers whose content `CLAUDE.md` holds, and that `sh scripts/dev-exec.sh bun test test/gates.test.ts` passes.
 
 ## 4. Remove the file-wide directive
 

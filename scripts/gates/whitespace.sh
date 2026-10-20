@@ -11,10 +11,10 @@
 # CRLF worktree file on `git add` and the diff sees pure LF. CLAUDE.md records
 # that trap.
 #
-# CLAUDE.md also names `grep -lI $'\r'` as the worktree probe. That command
-# finds nothing in Git Bash: MSYS grep opens a file in text mode and strips the
-# CR before matching. Measured on a file `file(1)` reports as CRLF. This gate
-# asks git instead, through `git ls-files --eol`, which also catches `w/mixed`.
+# `grep -lI $'\r'` as a worktree probe finds nothing in Git Bash: MSYS grep
+# opens a file in text mode and strips the CR before matching. Measured on a
+# file `file(1)` reports as CRLF. This gate asks git instead, through
+# `git ls-files --eol`, which also catches `w/mixed`.
 #
 # Range scope, not tree scope, on purpose. 1312 tracked files carry CRLF today.
 # A tree-wide check would land red and cost every other gate to --no-verify.

@@ -19,7 +19,7 @@ export type InstanceRecordElement = { kind: "transition"; entry: HistoryEntry } 
  * its `InstanceEvent` rows into one chronologically ordered, discriminated
  * sequence, ordered `transitionSeq` ascending then `at` ascending (an event
  * never advances the sequence and may share one with a transition or with
- * other events — see CLAUDE.md's runtime-record section). The merge and its
+ * other events — see "Runtime record" in .claude/rules/process-contract.md). The merge and its
  * ordering rule live here, not with callers: exporting two unmerged arrays
  * would export the ordering rule to every consumer instead. An unknown
  * instance has written nothing, so its record is an empty sequence, not an

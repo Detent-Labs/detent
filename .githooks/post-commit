@@ -15,7 +15,7 @@
 #
 # The new commit's own hash (and its own bump) can't be known until after it
 # exists, so this hook leaves VERSION modified but uncommitted rather than
-# amending (this repo's convention: never amend, see CLAUDE.md). The next
+# amending (this repo's convention: never amend). The next
 # commit picks it up.
 
 subject=$(git log -1 --pretty=%s | tr '[:upper:]' '[:lower:]')
