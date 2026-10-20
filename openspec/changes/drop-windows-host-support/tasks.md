@@ -12,12 +12,12 @@
 
 ## 3. Verification
 
-- [ ] 3.1 Run `sh scripts/dev-exec.sh bun run typecheck`, `sh scripts/dev-exec.sh bun run lint` and `sh scripts/dev-exec.sh bun run build`. Record each exit status.
-- [ ] 3.2 With the dev server stopped, run the full `bun test` with `DATABASE_URL` set through `sh scripts/dev-exec.sh sh scripts/test-gated.sh bun test`. Record the summary lines and the gate's verdict, then restart the server with `bash scripts/dev-up.sh`.
-- [ ] 3.3 Run `sh scripts/dev-exec.sh bun run test:tz`. Record its summary.
-- [ ] 3.4 On the host, run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`, the same with `whitespace.sh`, then `sh scripts/gates/machine-paths.sh`. Record what each printed.
+- [x] 3.1 Run `sh scripts/dev-exec.sh bun run typecheck`, `sh scripts/dev-exec.sh bun run lint` and `sh scripts/dev-exec.sh bun run build`. Record each exit status.
+- [x] 3.2 With the dev server stopped, run the full `bun test` with `DATABASE_URL` set through `sh scripts/dev-exec.sh sh scripts/test-gated.sh bun test`. Record the summary lines and the gate's verdict, then restart the server with `bash scripts/dev-up.sh`.
+- [x] 3.3 Run `sh scripts/dev-exec.sh bun run test:tz`. Record its summary.
+- [x] 3.4 On the host, run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`, the same with `whitespace.sh`, then `sh scripts/gates/machine-paths.sh`. Record what each printed.
 
-- [ ] 3.5 Run `bash scripts/dev-up.sh` twice and `bash scripts/preflight.sh core` twice. Verify that both second runs pass and that the pod's container ids (`podman ps --filter pod=workflow-engine --format '{{.ID}} {{.Names}}'`) are unchanged across the second `dev-up.sh`, per the ADDED requirement "The bring-up and the preflight stay idempotent".
+- [x] 3.5 Run `bash scripts/dev-up.sh` twice and `bash scripts/preflight.sh core` twice. Verify that both second runs pass and that the pod's container ids (`podman ps --filter pod=workflow-engine --format '{{.ID}} {{.Names}}'`) are unchanged across the second `dev-up.sh`, per the ADDED requirement "The bring-up and the preflight stay idempotent".
 
 ## Workflow follow-up
 
