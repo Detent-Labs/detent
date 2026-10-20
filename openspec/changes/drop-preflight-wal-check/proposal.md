@@ -5,10 +5,12 @@
 Preflight check 6 warns when a codebase-memory WAL file carries content and
 another process holds it locked. The probe opens the database read-write
 (`( exec 3<>"$db" )`). That open fails only where the OS enforces mandatory
-file locks, which is Windows, and the check's Windows branch shells out to
+file locks, which is Windows. The check's Windows branch shells out to
 PowerShell for exactly that reason. On Linux and macOS locks are advisory, so
 the open always succeeds and the check never warns. Its own `ponytail:`
-comment names that ceiling. The development host has run Linux since
+comment names that ceiling.
+
+The development host has run Linux since
 2026-10-20, and the `drop-windows-host-support` change left this check for a
 change of its own.
 
@@ -27,10 +29,11 @@ None.
 
 ### Modified Capabilities
 
-- `devcontainer-preflight`: "The WAL check warns rather than blocks" and "The
-  preflight checks six preconditions in a fixed order" are removed; "The
-  preflight checks five preconditions in a fixed order" is added; "The
-  preflight carries two profiles" drops check 6 from `core`.
+- `devcontainer-preflight`:
+  - removes "The WAL check warns rather than blocks"
+  - removes "The preflight checks six preconditions in a fixed order"
+  - adds "The preflight checks five preconditions in a fixed order"
+  - drops check 6 from `core` in "The preflight carries two profiles"
 
 ## Impact
 

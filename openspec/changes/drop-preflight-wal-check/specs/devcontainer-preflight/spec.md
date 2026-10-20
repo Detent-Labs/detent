@@ -9,8 +9,8 @@ enforces mandatory file locks, which is Windows. On Linux and macOS locks are
 advisory, so the probe always succeeds and the check never warns. The
 development host has run Linux since 2026-10-20.
 
-**Migration**: None. A stale index is repaired by re-running
-`index_repository`, which CLAUDE.md's codebase-memory section already names.
+**Migration**: None. Re-running `index_repository` repairs a stale index.
+CLAUDE.md's codebase-memory section already names that command.
 
 ### Requirement: The preflight checks six preconditions in a fixed order
 
@@ -25,12 +25,16 @@ and their repair commands.
 
 ### Requirement: The preflight checks five preconditions in a fixed order
 
-The preflight SHALL check, in this order: 1. Podman answers. 2. every
-container of this checkout's pod runs and reports healthy. 3. the HTTP server
-process carries `AUTH_JWT_SECRET`. 4. every published port answers on the
-host. 5. the development database holds its schema and seed data. The order
-runs cheapest-first and cause-before-symptom. The preflight SHALL stop at the
-first blocking failure.
+The preflight SHALL check these preconditions, in this order:
+
+1. Podman answers.
+2. Every container of this checkout's pod runs and reports healthy.
+3. The HTTP server process carries `AUTH_JWT_SECRET`.
+4. Every published port answers on the host.
+5. The development database holds its schema and seed data.
+
+The order runs cheapest-first and cause-before-symptom. The preflight SHALL
+stop at the first blocking failure.
 
 #### Scenario: Podman does not answer
 
