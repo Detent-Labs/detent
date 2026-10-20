@@ -1,9 +1,9 @@
 /**
- * `openspec/changes/per-worktree-devcontainer-stacks`: each checkout derives
- * its own Compose project name and host ports from
- * `scripts/worktree-env.sh`, in the shape `test/enable-hooks.test.ts` already
- * uses — a temporary repository, plus a linked worktree via `git worktree
- * add`.
+ * `worktree-isolation`: each checkout derives its own pod name and host ports
+ * from `scripts/worktree-env.sh`, and `scripts/dev-pod.sh spec` turns them
+ * into the Pod spec the bring-up plays. Both run in the shape
+ * `test/enable-hooks.test.ts` already uses — a temporary repository, plus a
+ * linked worktree via `git worktree add`.
  *
  * The real checkout this suite runs from cannot stand in for either shape.
  * Inside the devcontainer, `.git` may point at a host path the container
@@ -14,12 +14,12 @@
  * No database, so no `skipIf`. These run everywhere the suite runs.
  */
 import { test, expect, afterEach } from "bun:test";
-import { mkdtempSync, rmSync, readFileSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 const SCRIPT = resolve(import.meta.dir, "../scripts/worktree-env.sh");
-const COMPOSE_FILE = resolve(import.meta.dir, "../.devcontainer/docker-compose.yml");
+const POD_SCRIPT = resolve(import.meta.dir, "../scripts/dev-pod.sh");
 
 const temps: string[] = [];
 
@@ -36,10 +36,10 @@ afterEach(() => {
   while (temps.length) rmSync(temps.pop()!, { recursive: true, force: true });
 });
 
-type Vars = { COMPOSE_PROJECT_NAME: string; PORT_APP: string; PORT_VITE: string; PORT_MAILPIT: string };
+type Vars = { DEV_POD: string; PORT_APP: string; PORT_VITE: string; PORT_MAILPIT: string };
 
 async function sourceEnv(cwd: string): Promise<Vars> {
-  const proc = Bun.spawn(["sh", "-c", `. "${SCRIPT}" && printf 'COMPOSE_PROJECT_NAME=%s\\nPORT_APP=%s\\nPORT_VITE=%s\\nPORT_MAILPIT=%s\\n' "$COMPOSE_PROJECT_NAME" "$PORT_APP" "$PORT_VITE" "$PORT_MAILPIT"`], {
+  const proc = Bun.spawn(["sh", "-c", `. "${SCRIPT}" && printf 'DEV_POD=%s\\nPORT_APP=%s\\nPORT_VITE=%s\\nPORT_MAILPIT=%s\\n' "$DEV_POD" "$PORT_APP" "$PORT_VITE" "$PORT_MAILPIT"`], {
     cwd,
     env: { ...process.env },
     stdout: "pipe",
@@ -85,7 +85,7 @@ async function linkedWorktree(main: string, dirName: string, branch: string): Pr
 test("a main checkout keeps the established identity", async () => {
   const main = await mainRepo();
   const vars = await sourceEnv(main);
-  expect(vars.COMPOSE_PROJECT_NAME).toBe("workflow-engine");
+  expect(vars.DEV_POD).toBe("workflow-engine");
   expect(vars.PORT_APP).toBe("3100");
   expect(vars.PORT_VITE).toBe("5173");
   expect(vars.PORT_MAILPIT).toBe("8025");
@@ -96,7 +96,7 @@ test("a subdirectory of a main checkout keeps that same identity", async () => {
   const sub = join(main, "src", "deep");
   await Bun.write(join(sub, ".keep"), "");
   const vars = await sourceEnv(sub);
-  expect(vars.COMPOSE_PROJECT_NAME).toBe("workflow-engine");
+  expect(vars.DEV_POD).toBe("workflow-engine");
   expect(vars.PORT_APP).toBe("3100");
 });
 
@@ -104,23 +104,23 @@ test("a linked worktree derives an identity distinct from main's", async () => {
   const main = await mainRepo();
   const linked = await linkedWorktree(main, "linked", "linked-branch");
   const vars = await sourceEnv(linked);
-  expect(vars.COMPOSE_PROJECT_NAME).not.toBe("workflow-engine");
+  expect(vars.DEV_POD).not.toBe("workflow-engine");
   expect(vars.PORT_APP).not.toBe("3100");
-  expect(vars.COMPOSE_PROJECT_NAME.startsWith("detent-")).toBe(true);
+  expect(vars.DEV_POD.startsWith("detent-")).toBe(true);
 });
 
-test("a worktree directory name carrying capitals derives a lowercase project name", async () => {
+test("a worktree directory name carrying capitals derives a lowercase pod name", async () => {
   const main = await mainRepo();
   const linked = await linkedWorktree(main, "CapitalWorktree", "capital-branch");
   const vars = await sourceEnv(linked);
-  expect(vars.COMPOSE_PROJECT_NAME).toBe(vars.COMPOSE_PROJECT_NAME.toLowerCase());
-  expect(vars.COMPOSE_PROJECT_NAME).not.toMatch(/[A-Z]/);
+  expect(vars.DEV_POD).toBe(vars.DEV_POD.toLowerCase());
+  expect(vars.DEV_POD).not.toMatch(/[A-Z]/);
 });
 
 test("no repository answers: the script exports the established identity and the caller keeps running", async () => {
   const dir = tempDir();
   const vars = await sourceEnv(dir);
-  expect(vars.COMPOSE_PROJECT_NAME).toBe("workflow-engine");
+  expect(vars.DEV_POD).toBe("workflow-engine");
   expect(vars.PORT_APP).toBe("3100");
 });
 
@@ -149,31 +149,53 @@ test("two worktrees the derivation maps to different offsets get different port 
   expect(a!.PORT_MAILPIT).not.toBe(b!.PORT_MAILPIT);
 });
 
-test("two worktrees sharing a directory basename under different parents derive different project names", async () => {
+test("two worktrees sharing a directory basename under different parents derive different pod names", async () => {
   const mainA = await mainRepo();
   const mainB = await mainRepo();
   const linkedA = await linkedWorktree(mainA, "shared-name", "branch-a");
   const linkedB = await linkedWorktree(mainB, "shared-name", "branch-b");
   const varsA = await sourceEnv(linkedA);
   const varsB = await sourceEnv(linkedB);
-  expect(varsA.COMPOSE_PROJECT_NAME).not.toBe(varsB.COMPOSE_PROJECT_NAME);
+  expect(varsA.DEV_POD).not.toBe(varsB.DEV_POD);
 });
 
-test("the established COMPOSE_PROJECT_NAME matches docker-compose.yml's name: attribute", async () => {
+/** `sh scripts/dev-pod.sh spec` run in `cwd`: the raw text and its parse. */
+async function podSpec(cwd: string): Promise<{ text: string; pod: any }> {
+  const proc = Bun.spawn(["sh", POD_SCRIPT, "spec"], { cwd, env: { ...process.env }, stdout: "pipe", stderr: "pipe" });
+  const exitCode = await proc.exited;
+  const text = await new Response(proc.stdout).text();
+  if (exitCode !== 0) throw new Error(`dev-pod.sh spec in ${cwd} failed: ${await new Response(proc.stderr).text()}`);
+  return { text, pod: Bun.YAML.parse(text) };
+}
+
+function container(pod: any, name: string): any {
+  const found = pod.spec.containers.find((c: any) => c.name === name);
+  if (!found) throw new Error(`the spec declares no ${name} container`);
+  return found;
+}
+
+function envValue(c: any, name: string): string | undefined {
+  return c.env?.find((e: any) => e.name === name)?.value;
+}
+
+function hostPorts(pod: any): any[] {
+  return pod.spec.containers.flatMap((c: any) => c.ports ?? []);
+}
+
+test("the main checkout's spec names the pod workflow-engine", async () => {
   const main = await mainRepo();
-  const vars = await sourceEnv(main);
-  const compose = readFileSync(COMPOSE_FILE, "utf8");
-  const match = compose.match(/^name:\s*(\S+)\s*$/m);
-  expect(match?.[1]).toBe(vars.COMPOSE_PROJECT_NAME);
+  const { pod } = await podSpec(main);
+  expect(pod.kind).toBe("Pod");
+  expect(pod.metadata.name).toBe("workflow-engine");
+  expect(pod.spec.containers.map((c: any) => c.name).sort()).toEqual(["app", "db", "mailpit"]);
 });
 
-test("the established PORT_VITE matches docker-compose.yml's PORT_VITE default, and CORS_ALLOWED_ORIGINS carries both localhost forms", async () => {
+test("the spec carries the derived PORT_VITE, and CORS_ALLOWED_ORIGINS carries both localhost forms", async () => {
   const main = await mainRepo();
   const vars = await sourceEnv(main);
-  const compose = readFileSync(COMPOSE_FILE, "utf8");
-  expect(compose).toContain(`PORT_VITE: \${PORT_VITE:-${vars.PORT_VITE}}`);
-  expect(compose).toContain(`http://localhost:\${PORT_VITE`);
-  expect(compose).toContain(`http://127.0.0.1:\${PORT_VITE`);
+  const app = container((await podSpec(main)).pod, "app");
+  expect(envValue(app, "PORT_VITE")).toBe(vars.PORT_VITE);
+  expect(envValue(app, "CORS_ALLOWED_ORIGINS")).toBe(`http://localhost:${vars.PORT_VITE},http://127.0.0.1:${vars.PORT_VITE}`);
 });
 
 /**
@@ -186,16 +208,89 @@ test("the established PORT_VITE matches docker-compose.yml's PORT_VITE default, 
  * intact in the volume, unread, while the stack refuses to come up.
  *
  * So a revert here takes the devcontainer down rather than losing data. These
- * asserts catch it before that, since bring-up is manual and nothing else
- * reads this file.
+ * asserts catch it before that, since bring-up is manual.
  */
-test("the db service mounts the parent of PGDATA, so a major bump keeps its data", () => {
-  const compose = readFileSync(COMPOSE_FILE, "utf8");
-  expect(compose).toContain("- pgdata:/var/lib/postgresql\n");
-  expect(compose).not.toContain("/var/lib/postgresql/data");
+test("the db container mounts the pgdata claim at the parent of PGDATA, so a major bump keeps its data", async () => {
+  const main = await mainRepo();
+  const { pod, text } = await podSpec(main);
+  const db = container(pod, "db");
+  expect(db.volumeMounts).toEqual([{ name: "pgdata", mountPath: "/var/lib/postgresql" }]);
+  const claim = pod.spec.volumes.find((v: any) => v.name === "pgdata");
+  expect(claim.persistentVolumeClaim.claimName).toBe("workflow-engine-pgdata");
+  expect(text).not.toContain("/var/lib/postgresql/data");
 });
 
-test("the db service tracks the latest PostgreSQL release", () => {
-  const compose = readFileSync(COMPOSE_FILE, "utf8");
-  expect(compose).toContain("image: postgres:latest");
+test("the db container tracks the latest PostgreSQL release", async () => {
+  const main = await mainRepo();
+  const db = container((await podSpec(main)).pod, "db");
+  expect(db.image).toBe("docker.io/library/postgres:latest");
+});
+
+test("every image names its registry host", async () => {
+  const main = await mainRepo();
+  const { pod } = await podSpec(main);
+  for (const c of pod.spec.containers) {
+    const firstSegment = c.image.split("/")[0];
+    expect(c.image.includes("/") && (firstSegment === "localhost" || firstSegment.includes("."))).toBe(true);
+  }
+});
+
+test("the db container passes its server flags as args, so the entrypoint still runs initdb", async () => {
+  const main = await mainRepo();
+  const db = container((await podSpec(main)).pod, "db");
+  expect(db.command).toBeUndefined();
+  expect(db.args).toEqual(["postgres", "-c", "log_timezone=Europe/Zurich", "-c", "timezone=Europe/Zurich"]);
+});
+
+test("every published port binds 127.0.0.1", async () => {
+  const main = await mainRepo();
+  const ports = hostPorts((await podSpec(main)).pod);
+  expect(ports.length).toBe(3);
+  for (const p of ports) {
+    expect(p.hostPort).toBeDefined();
+    expect(p.hostIP).toBe("127.0.0.1");
+  }
+});
+
+test("no SMTP, Postgres or webhook sink port is published", async () => {
+  const main = await mainRepo();
+  const { pod } = await podSpec(main);
+  const published = hostPorts(pod).map((p: any) => p.containerPort);
+  for (const internal of [1025, 5432, 8080]) expect(published).not.toContain(internal);
+  expect(container(pod, "db").ports).toBeUndefined();
+});
+
+test("the db probe connects over TCP to the loopback address", async () => {
+  const main = await mainRepo();
+  const db = container((await podSpec(main)).pod, "db");
+  const cmd: string[] = db.livenessProbe.exec.command;
+  expect(cmd[0]).toBe("pg_isready");
+  expect(cmd[cmd.indexOf("-h") + 1]).toBe("127.0.0.1");
+});
+
+test("a linked worktree's spec carries that worktree's pod name, ports, path and CORS origins", async () => {
+  const main = await mainRepo();
+  const linked = await linkedWorktree(main, "linked", "linked-branch");
+  const vars = await sourceEnv(linked);
+  const toplevel = await git(linked, "rev-parse", "--show-toplevel");
+  const { pod } = await podSpec(linked);
+  expect(vars.DEV_POD).not.toBe("workflow-engine");
+  expect(pod.metadata.name).toBe(vars.DEV_POD);
+  expect(container(pod, "app").image).toBe(`localhost/${vars.DEV_POD}-app:latest`);
+  const byContainerPort = Object.fromEntries(hostPorts(pod).map((p: any) => [p.containerPort, String(p.hostPort)]));
+  expect(byContainerPort).toEqual({ 3000: vars.PORT_APP, 5173: vars.PORT_VITE, 8025: vars.PORT_MAILPIT });
+  expect(pod.spec.volumes.find((v: any) => v.name === "workspace").hostPath.path).toBe(toplevel);
+  expect(pod.spec.volumes.find((v: any) => v.name === "pgdata").persistentVolumeClaim.claimName).toBe(`${vars.DEV_POD}-pgdata`);
+  const app = container(pod, "app");
+  expect(envValue(app, "PORT_VITE")).toBe(vars.PORT_VITE);
+  expect(envValue(app, "CORS_ALLOWED_ORIGINS")).toBe(`http://localhost:${vars.PORT_VITE},http://127.0.0.1:${vars.PORT_VITE}`);
+});
+
+test("a worktree path holding a space, a colon, a hash, a quote and a backslash reads back exactly", async () => {
+  const main = await mainRepo();
+  const linked = await linkedWorktree(main, 'odd path #1: "q" \\b', "odd-branch");
+  const toplevel = await git(linked, "rev-parse", "--show-toplevel");
+  expect(toplevel).toContain(" ");
+  const { pod } = await podSpec(linked);
+  expect(pod.spec.volumes.find((v: any) => v.name === "workspace").hostPath.path).toBe(toplevel);
 });
