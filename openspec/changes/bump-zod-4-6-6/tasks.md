@@ -2,10 +2,10 @@
 
 ## 1. Bump the pin
 
-- [ ] 1.1 Set `zod` to `4.6.6` in `package.json` and `packages/web/package.json` (design D1). Leave the peer range in `packages/form-ui/package.json`. Verify with `grep -n '"zod"'` over the three manifests.
-- [ ] 1.2 Run `sh scripts/dev-exec.sh bun install` (design D2). Verify that `bun.lock` holds one `zod` entry, at 4.6.6, and that `sh scripts/dev-exec.sh sh scripts/gates/lockfile.sh` exits 0.
-- [ ] 1.3 Run `sh scripts/dev-exec.sh bun run scripts/thirdparty.ts --write`. Verify that `THIRDPARTY.md` lists `zod` 4.6.6 and changes nothing else.
-- [ ] 1.4 Run `sh scripts/dev-exec.sh bun audit --audit-level=high`. It exits 0.
+- [x] 1.1 Set `zod` to `4.6.6` in `package.json` and `packages/web/package.json` (design D1). Leave the peer range in `packages/form-ui/package.json`. Verify with `grep -n '"zod"'` over the three manifests.
+- [x] 1.2 Run `sh scripts/dev-exec.sh bun install` (design D2). Verify that `bun.lock` holds one `zod` entry, at 4.6.6, and that `sh scripts/dev-exec.sh sh scripts/gates/lockfile.sh` exits 0.
+- [x] 1.3 Run `sh scripts/dev-exec.sh bun run scripts/thirdparty.ts --write`. Verify that `THIRDPARTY.md` lists `zod` 4.6.6 and changes nothing else.
+- [x] 1.4 Run `sh scripts/dev-exec.sh bun audit --audit-level=high`. It exits 0.
 
 ## 2. Verification
 
