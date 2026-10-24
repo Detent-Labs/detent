@@ -150,7 +150,7 @@ printed instead of a bare "ran it".
   whitespace, blank-at-eof and CRLF check. Run each the way the push gate does, over the
   same range: `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`, and the
   same with `whitespace.sh`. The `< /dev/null` belongs on `range.sh`, which falls back to
-  `origin/main..HEAD`. The prose gate skips `docs/articles/`, where WTFM writes help articles.
+  `origin/main..HEAD`. Skip `docs/articles/` for the antislop check; the whitespace check still covers it.
 - Both gates read their ranges on stdin. An empty stdin checks nothing, and `prose.sh`
   says so and exits 0. Run the gate rather than its probes by hand. Plain
   `git diff --check` misses CRLF, since `.gitattributes` sets `eol=lf`. The script reads
