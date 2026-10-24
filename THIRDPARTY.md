@@ -70,7 +70,7 @@ Declared directly in a `package.json` (root or a `packages/*` workspace).
 | `react-dom` | 19.2.8 | MIT |
 | `typescript` | 7.0.2 | Apache-2.0 |
 | `vite` | 8.3.4 | MIT |
-| `zod` | 4.6.5 | MIT |
+| `zod` | 4.6.6 | MIT |
 
 `react` and `react-dom` resolve once, at 19.2.8. `packages/web` declares
 `^19`, and `packages/form-ui` declares `^19` as a peer range. The two type
