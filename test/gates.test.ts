@@ -393,6 +393,103 @@ test("a fallback range inside main leaves the gates with nothing to check", asyn
 });
 
 /**
+ * `openspec/changes/exclude-wtfm-articles-from-prose-gate`: the prose gate skips
+ * Markdown under `docs/articles/`, where WTFM writes generated help articles.
+ *
+ * `withFakeLinter` writes a short Python linter inside `.git`, which no commit
+ * tracks. It prints one line per input line holding `SLOP` and exits 1 when it
+ * printed any, the exit-code contract the gate's `lint_at` reads. Counts then
+ * come out exact without the real linter.
+ */
+const FAKE_LINTER = [
+  "import sys",
+  "hits = [l for l in open(sys.argv[2]) if 'SLOP' in l]",
+  "for l in hits:",
+  "    print('finding: ' + l.strip())",
+  "sys.exit(1 if hits else 0)",
+  "",
+].join("\n");
+
+async function withFakeLinter(repo: Repo) {
+  const path = join(repo.dir, ".git", "fake-linter.py");
+  await writeFile(path, FAKE_LINTER);
+  return { ANTISLOP: path };
+}
+
+test("a rising count under docs/articles/ passes the prose gate", async () => {
+  await withRepo(async (repo) => {
+    const env = await withFakeLinter(repo);
+    const base = await repo.commit({
+      "docs/articles/a.md": "Clean line.\n",
+      "notes.md": "Clean line.\n",
+    });
+    const tip = await repo.commit({ "docs/articles/a.md": "Clean line.\nSLOP one.\n" });
+    const articles = await repo.gate(PROSE, `${base}..${tip}\n`, env);
+
+    expect(articles.exitCode).toBe(0);
+    expect(articles.stderr).toBe("");
+
+    // Control: the same rise outside docs/articles/ still blocks.
+    const tip2 = await repo.commit({ "notes.md": "Clean line.\nSLOP one.\n" });
+    const notes = await repo.gate(PROSE, `${tip}..${tip2}\n`, env);
+
+    expect(notes.exitCode).toBe(1);
+    expect(notes.stderr).toContain("changed-markdown-prose");
+    expect(notes.stderr).toContain("notes.md");
+  });
+});
+
+test("one range with the same rise in both places blocks only the file outside docs/articles/", async () => {
+  await withRepo(async (repo) => {
+    const env = await withFakeLinter(repo);
+    const base = await repo.commit({
+      "docs/articles/a.md": "Clean line.\n",
+      "notes.md": "Clean line.\n",
+    });
+    const tip = await repo.commit({
+      "docs/articles/a.md": "Clean line.\nSLOP one.\n",
+      "notes.md": "Clean line.\nSLOP one.\n",
+    });
+    const { exitCode, stderr } = await repo.gate(PROSE, `${base}..${tip}\n`, env);
+
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain("notes.md");
+    expect(stderr).not.toContain("docs/articles");
+  });
+});
+
+test("a file with findings moved out of docs/articles/ lints as new and blocks", async () => {
+  await withRepo(async (repo) => {
+    const env = await withFakeLinter(repo);
+    const base = await repo.commit({ "docs/articles/a.md": "SLOP one.\n" });
+    const git = (...args: string[]) =>
+      run(["git", "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", ...args], repo.dir);
+    await mkdir(join(repo.dir, "docs/guides"), { recursive: true });
+    expect((await git("mv", "docs/articles/a.md", "docs/guides/a.md")).exitCode).toBe(0);
+    expect((await git("commit", "-q", "-m", "move")).exitCode).toBe(0);
+    const tip = (await git("rev-parse", "HEAD")).stdout.trim();
+    const { exitCode, stderr } = await repo.gate(PROSE, `${base}..${tip}\n`, env);
+
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain("docs/guides/a.md");
+    expect(stderr).toContain("0 findings");
+  });
+});
+
+// Control: passes on the old scripts. The whitespace gate still covers the path.
+test("a trailing space in a new docs/articles/ file still blocks the whitespace gate", async () => {
+  await withRepo(async (repo) => {
+    const base = await repo.commit({ "a.txt": "one\n" });
+    const tip = await repo.commit({ "docs/articles/new.md": "Trailing \n" });
+    const { exitCode, stderr } = await repo.gate(WHITESPACE, `${base}..${tip}\n`);
+
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain("pushed-whitespace");
+    expect(stderr).toContain("docs/articles/new.md");
+  });
+});
+
+/**
  * The silent-green gate reads a captured run from a file. `silentGreen` writes
  * the text into a temporary directory and runs the real gate on it. No git and
  * no database take part, so the cases run everywhere the suite runs.

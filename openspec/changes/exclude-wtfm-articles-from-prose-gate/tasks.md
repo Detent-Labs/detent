@@ -2,10 +2,10 @@
 
 ## 1. Gate and tests
 
-- [ ] 1.1 In `test/gates.test.ts`, add a fake linter helper per design.md. Add a case: a rising count under `docs/articles/` passes, and the same rise in `notes.md` in that range blocks. Confirm the case fails on the unchanged script.
-- [ ] 1.2 Add a case where a file with findings moves out of `docs/articles/`. The gate must reject the push. Add a case where the whitespace gate rejects a trailing space in a new `docs/articles/` file.
-- [ ] 1.3 In `scripts/gates/prose.sh`, add the pathspec `':(exclude)docs/articles/'` to the diff call. Extend the header comment with the exclusion and its reason. Verify that the three new cases pass in the full suite run of group 3.
-- [ ] 1.4 In `docs/decisions.md` entry 15, re-point `scripts/gates/prose.sh:83` to the diff call's new line. Verify with `sed -n <n>p scripts/gates/prose.sh`.
+- [x] 1.1 In `test/gates.test.ts`, add a fake linter helper per design.md. Add a case: a rising count under `docs/articles/` passes, and the same rise in `notes.md` in that range blocks. Confirm the case fails on the unchanged script.
+- [x] 1.2 Add a case where a file with findings moves out of `docs/articles/`. The gate must reject the push. Add a case where the whitespace gate rejects a trailing space in a new `docs/articles/` file.
+- [x] 1.3 In `scripts/gates/prose.sh`, add the pathspec `':(exclude)docs/articles/'` to the diff call. Extend the header comment with the exclusion and its reason. Verify that the three new cases pass in the full suite run of group 3.
+- [x] 1.4 In `docs/decisions.md` entry 15, re-point `scripts/gates/prose.sh:83` to the diff call's new line. Verify with `sed -n <n>p scripts/gates/prose.sh`.
 
 ## 2. Documentation
 
