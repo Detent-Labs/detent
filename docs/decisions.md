@@ -1842,7 +1842,7 @@ audit of 2026-09-10.
 15. **A shared changed-file collector for `prose.sh` and `whitespace.sh`.**
     Rejected 2026-08-05. Only `prose.sh` runs `git diff --name-status -M`, and
     it does so to read a renamed file's baseline at its old path.
-    [`scripts/gates/prose.sh:83`, `scripts/gates/whitespace.sh:55`]
+    [`scripts/gates/prose.sh:90`, `scripts/gates/whitespace.sh:55`]
 16. **Delete the unused registry seams.** Rejected. That set is
     `devHeaderResolver`, the action `Registry`, the `DataSourceRegistry`, the
     `AssignmentRegistry`'s multi-strategy handlers, `exampleRegistry.ts` with

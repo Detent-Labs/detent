@@ -89,3 +89,6 @@ packages/web/.impeccable
 .github/agents/impeccable-*
 .github/skills/impeccable/
 .github/hooks/impeccable.json
+
+# WTFM project analysis and local state
+.rtfm/

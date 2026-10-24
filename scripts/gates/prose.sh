@@ -20,6 +20,13 @@
 # .gitattributes normalizes CRLF on `git add`, so only the worktree still holds
 # the CR. Prose carries no such asymmetry.
 #
+# One path is exempt: Markdown under docs/articles/. WTFM writes generated end-user
+# help articles there, and a person does not author them. The ratchet would block
+# a regeneration that adds a finding nobody wrote. The diff call carries the
+# pathspec ':(exclude)docs/articles/'. Git applies it before rename detection, so a
+# file moved out of the folder reads as an addition with a base count of zero. The
+# whitespace gate still covers the folder.
+#
 # A rename keeps its baseline: the base count is read at the old path. Archiving
 # a change renames every artifact in it, so this is a routine case, not an edge.
 #
@@ -80,7 +87,7 @@ while IFS= read -r range; do
   [ -n "$range" ] || continue
 
   rc=0
-  git diff --name-status -M --diff-filter=d "$range" -- '*.md' > "$diff_out" 2> "$diff_err" || rc=$?
+  git diff --name-status -M --diff-filter=d "$range" -- '*.md' ':(exclude)docs/articles/' > "$diff_out" 2> "$diff_err" || rc=$?
   if [ "$rc" -ne 0 ]; then
     bad_range "$RULE" "$range" "$diff_err"
   fi
@@ -97,7 +104,7 @@ done < "$ranges"
 sort -u "$pairs" -o "$pairs"
 
 if [ ! -s "$pairs" ]; then
-  echo "gate '$RULE': the push changes no Markdown, nothing to check."
+  echo "gate '$RULE': the push changes no Markdown outside docs/articles/, nothing to check."
   exit 0
 fi
 

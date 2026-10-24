@@ -305,6 +305,12 @@ adds or changes. It SHALL run the linter twice per file. The first run reads the
 file's content at the range's base commit. The second reads its content at the
 range's tip. A tip count above the base count SHALL block the push.
 
+One path is exempt. The gate SHALL skip every Markdown file under
+`docs/articles/`. WTFM writes generated help articles for end users there. The
+owner exempted that output from the ratchet on 2026-10-24. The whitespace gate
+SHALL still cover the path. A file moved out of `docs/articles/` has no
+baseline, so the gate SHALL lint it as a new file.
+
 Both sides SHALL read committed content. A push ships commits, and a worktree
 can hold edits the push does not send.
 
@@ -327,8 +333,9 @@ of one instead of zero would let a new file carry a finding through.
 The gate SHALL print both counts when it blocks a push. It SHALL also print the
 findings the linter reports for the pushed version.
 
-`CLAUDE.md` already requires this check on every Markdown file a change touches. A
-person runs it today. Commit 78f4964 records a delta that shipped without it.
+`CLAUDE.md` already requires this check on every Markdown file a change touches
+outside `docs/articles/`. A person runs it today. Commit 78f4964 records a delta
+that shipped without it.
 
 A whole-file check does not survive contact with this repository. The live specs
 under `openspec/specs/` hold 3166 findings across 52 of 80 files. None of them
@@ -339,7 +346,7 @@ That happened on 2026-08-04. A change synced one requirement into
 `development-toolchain/spec.md` and paid a 28-finding prose rewrite. All 28
 findings predated it.
 
-The ratchet is the mechanical floor, not the whole rule. Clearing a touched
+The ratchet is only the mechanical floor. Clearing a touched
 file's debt stays the norm where it is cheap, and `CLAUDE.md` states it. The
 gate blocks a file getting worse. It does not demand that a file get better.
 
@@ -403,6 +410,26 @@ gate. A named skip costs one check. A bypassed hook costs every check.
 
 - **WHEN** the pushed range changes no Markdown file
 - **THEN** the gate reports nothing to check and the push proceeds
+
+#### Scenario: A new finding under docs/articles/ does not block the push
+
+- **WHEN** the pushed range raises the finding count of a Markdown file under
+  `docs/articles/`
+- **THEN** the gate runs no linter on that file and the push proceeds
+- **AND** the same rise in a Markdown file outside `docs/articles/` still blocks
+  the push
+
+#### Scenario: An article with a trailing space still blocks the push
+
+- **WHEN** the pushed range adds a file under `docs/articles/` with a trailing
+  space
+- **THEN** the whitespace gate rejects the push
+
+#### Scenario: A file moved out of docs/articles/ lints as new
+
+- **WHEN** the pushed range moves a Markdown file that carries findings out of
+  `docs/articles/`
+- **THEN** the gate reads a base count of zero for it and rejects the push
 
 ### Requirement: A range git cannot read stops the gates
 

@@ -150,7 +150,7 @@ printed instead of a bare "ran it".
   whitespace, blank-at-eof and CRLF check. Run each the way the push gate does, over the
   same range: `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`, and the
   same with `whitespace.sh`. The `< /dev/null` belongs on `range.sh`, which falls back to
-  `origin/main..HEAD`.
+  `origin/main..HEAD`. Skip `docs/articles/` for the antislop check; the whitespace check still covers it.
 - Both gates read their ranges on stdin. An empty stdin checks nothing, and `prose.sh`
   says so and exits 0. Run the gate rather than its probes by hand. Plain
   `git diff --check` misses CRLF, since `.gitattributes` sets `eol=lf`. The script reads
@@ -172,7 +172,7 @@ about one line, silence it in place and say why, as the antislop directives do.
 | Rule | Script | Rejects |
 |---|---|---|
 | `pushed-whitespace` | `gates/whitespace.sh` | a CR byte, a trailing space, a blank line at EOF, in the pushed range |
-| `changed-markdown-prose` | `gates/prose.sh` | a rising antislop finding count in the Markdown the push changes |
+| `changed-markdown-prose` | `gates/prose.sh` | a rising antislop finding count in the Markdown the push changes, except `docs/articles/` |
 | `no-machine-paths` | `gates/machine-paths.sh` | an absolute home-directory path in a tracked file |
 | `frozen-lockfile` | `gates/lockfile.sh` | a manifest the committed `bun.lock` cannot satisfy |
 | `no-silent-green` | `gates/silent-green.sh` | a suite run with no database, too many skips or todos, too few passes, or a summary it cannot read |
