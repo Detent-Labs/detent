@@ -9,10 +9,10 @@
 
 ## 2. Verification
 
-- [ ] 2.1 Run `bun run typecheck`, `bun run lint` and `bun run build` in the devcontainer. Each exits 0.
-- [ ] 2.2 Run the full `bun test` with `DATABASE_URL` set, through `scripts/test-gated.sh` in the devcontainer. It reports 0 fail and the gate accepts the run.
-- [ ] 2.3 Run `sh scripts/dev-exec.sh bun run test:tz`. It reports 0 fail.
-- [ ] 2.4 On the host, run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`, the same with `whitespace.sh`, then `sh scripts/gates/machine-paths.sh`. Each exits 0.
+- [x] 2.1 Run `bun run typecheck`, `bun run lint` and `bun run build` in the devcontainer. Each exits 0.
+- [x] 2.2 Run the full `bun test` with `DATABASE_URL` set, through `scripts/test-gated.sh` in the devcontainer. It reports 0 fail and the gate accepts the run.
+- [x] 2.3 Run `sh scripts/dev-exec.sh bun run test:tz`. It reports 0 fail.
+- [x] 2.4 On the host, run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh`, the same with `whitespace.sh`, then `sh scripts/gates/machine-paths.sh`. Each exits 0.
 
 ## Workflow follow-up
 
