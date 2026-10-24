@@ -383,12 +383,6 @@
 
     "web/form-ui": ["form-ui@file:packages/form-ui", { "dependencies": { "workflow-engine": "file:../.." }, "devDependencies": { "@stylexjs/stylex": "0.19.1", "@types/react": "^19", "@types/react-dom": "^19" }, "peerDependencies": { "@stylexjs/stylex": "0.19.1", "react": "^19", "react-dom": "^19", "zod": "^4.4.3" } }],
 
-    "web/workflow-engine": ["workflow-engine@root:", {}],
-
     "web/form-ui/workflow-engine": ["workflow-engine@file:.", {}],
-
-    "web/workflow-engine/form-ui": ["form-ui@workspace:packages/form-ui"],
-
-    "web/workflow-engine/form-ui/workflow-engine": ["workflow-engine@root:", {}],
   }
 }
