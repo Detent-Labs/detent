@@ -13,10 +13,10 @@
 
 ## 3. Verification
 
-- [ ] 3.1 Run `bun run typecheck`, then `bun run build`. Both exit 0.
-- [ ] 3.2 Run the full `bun test` with `DATABASE_URL` set, through `scripts/test-gated.sh` in the devcontainer. It reports 0 fail and the gate accepts the run.
-- [ ] 3.3 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` on the host. Run the same with `whitespace.sh`. Both exit 0.
-- [ ] 3.4 Run `openspec validate exclude-wtfm-articles-from-prose-gate --strict`. It passes.
+- [x] 3.1 Run `bun run typecheck`, then `bun run build`. Both exit 0.
+- [x] 3.2 Run the full `bun test` with `DATABASE_URL` set, through `scripts/test-gated.sh` in the devcontainer. It reports 0 fail and the gate accepts the run.
+- [x] 3.3 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` on the host. Run the same with `whitespace.sh`. Both exit 0.
+- [x] 3.4 Run `openspec validate exclude-wtfm-articles-from-prose-gate --strict`. It passes.
 
 ## Workflow follow-up
 
