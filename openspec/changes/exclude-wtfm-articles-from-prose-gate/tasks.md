@@ -9,7 +9,7 @@
 
 ## 2. Documentation
 
-- [ ] 2.1 In `CLAUDE.md`, extend the `changed-markdown-prose` row of the gate table with the `docs/articles/` exclusion. Exempt the path in the Verification bullet on the antislop linter too. Verify with the prose gate of group 3.
+- [x] 2.1 In `CLAUDE.md`, extend the `changed-markdown-prose` row of the gate table with the `docs/articles/` exclusion. Exempt the path in the Verification bullet on the antislop linter too. Verify with the prose gate of group 3.
 
 ## 3. Verification
 
