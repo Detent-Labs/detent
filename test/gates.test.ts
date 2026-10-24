@@ -436,6 +436,7 @@ test("a rising count under docs/articles/ passes the prose gate", async () => {
     expect(notes.exitCode).toBe(1);
     expect(notes.stderr).toContain("changed-markdown-prose");
     expect(notes.stderr).toContain("notes.md");
+    expect(notes.stderr).toContain("finding: SLOP one.");
   });
 });
 
@@ -454,6 +455,7 @@ test("one range with the same rise in both places blocks only the file outside d
 
     expect(exitCode).toBe(1);
     expect(stderr).toContain("notes.md");
+    expect(stderr).toContain("finding: SLOP one.");
     expect(stderr).not.toContain("docs/articles");
   });
 });

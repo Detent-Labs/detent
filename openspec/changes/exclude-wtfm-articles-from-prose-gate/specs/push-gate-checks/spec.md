@@ -38,8 +38,8 @@ The gate SHALL print both counts when it blocks a push. It SHALL also print the
 findings the linter reports for the pushed version.
 
 `CLAUDE.md` already requires this check on every Markdown file a change touches
-outside `docs/articles/`. A
-person runs it today. Commit 78f4964 records a delta that shipped without it.
+outside `docs/articles/`. A person runs it today. Commit 78f4964 records a delta
+that shipped without it.
 
 A whole-file check does not survive contact with this repository. The live specs
 under `openspec/specs/` hold 3166 findings across 52 of 80 files. None of them

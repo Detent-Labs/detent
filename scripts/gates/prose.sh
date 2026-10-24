@@ -104,7 +104,7 @@ done < "$ranges"
 sort -u "$pairs" -o "$pairs"
 
 if [ ! -s "$pairs" ]; then
-  echo "gate '$RULE': the push changes no Markdown, nothing to check."
+  echo "gate '$RULE': the push changes no Markdown outside docs/articles/, nothing to check."
   exit 0
 fi
 
