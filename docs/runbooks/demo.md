@@ -101,8 +101,9 @@ server copies `deploy/demo/` from the same checkout.
 The build needs outbound HTTPS to GitHub and the npm registry. It loads the
 single vCPU while the demo keeps running.
 
-<!-- antislop: allow passive-voice -->
-Measured build time on the demo server: to be recorded by the test deploy.
+On 2026-10-29 the demo server built a cold image in 39 s, base image pull
+included. A warm build took 21 s. Available memory fell to about 990 MB of
+1971 MB in both builds, and neither touched swap.
 
 Two marker files steer the script. A missing `~/.config/detent/engine.env` means the
 secrets do not exist yet. A missing `~/.config/detent/seeded` means the demo is
