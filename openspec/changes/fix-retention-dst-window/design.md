@@ -82,8 +82,9 @@ Each uses a fixed instant 30 days after a Europe/Zurich change has started:
 
 Each test creates one instance at `now - 30 d - 60 s` and one at
 `now - 30 d + 60 s`. The sweep must redact the first and leave the second.
-Against the old code each test fails. The old code ignores the passed
-`now`, so the real clock, which is later, also selects the inside instance.
+The old code ignores the passed `now` and reads the real clock. The two
+instances sit two minutes apart, so the real cutoff selects both of them or
+neither. Either way one assertion fails.
 The existing boundary test keeps the real clock.
 
 ## Risks / Trade-offs
@@ -93,7 +94,7 @@ The existing boundary test keeps the real clock.
   of skew instead of adding one.
 - [A call site passes a stale `now`] → Only tests pass it. `host.ts` keeps
   `sweepRetention(c.db, retentionDays)`, and the default reads the clock per
-  tick.
+  tick. The call in `test/instance-audit.test.ts` stays unchanged too.
 
 ## Migration Plan
 

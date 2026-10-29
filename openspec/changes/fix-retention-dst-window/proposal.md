@@ -33,14 +33,13 @@ None.
 
 ### Modified Capabilities
 
-- `data-retention`: "The sweep redacts only eligible completed and cancelled
-  instances" states what one retention day measures, and adds a
-  daylight-saving scenario.
+- `data-retention`: adds "One retention day measures 24 hours of elapsed
+  time", with a daylight-saving scenario.
 
 ## Impact
 
 - `src/engine/retention.ts`, `test/retention.test.ts`,
-  `test/worker-scan-plans.test.ts`.
+  `test/worker-scan-plans.test.ts`, `docs/runbooks/deployment.md`.
 - No HTTP, schema or definition contract change. The `DATA_RETENTION_DAYS`
   variable keeps its name, type and validation.
 - With the sweep on, a redaction can move by up to one hour. That happens

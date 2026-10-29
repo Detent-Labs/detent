@@ -20,6 +20,7 @@
   - both new tests from 1.1
   - "sweepRetention selects an instance just outside the window and not one just inside it"
   - "a retention tick with nothing eligible reads no instance row"
+- [ ] 1.5 In `docs/runbooks/deployment.md`, change the `DATA_RETENTION_DAYS` row's description to "The age, in days of 24 hours, at which the sweep redacts a terminal instance. A positive integer." Verify with `grep -n 'days of 24 hours' docs/runbooks/deployment.md`.
 
 ## 2. Verification
 
