@@ -89,12 +89,12 @@ export async function redactInstance(
  * position `(lastEntry, lastId)`, oldest entry first. The entry time is
  * `currentStepEnteredAt`, falling back to `startedAt` for an instance that
  * predates that key — without the fallback, the oldest instances (exactly the
- * ones retention exists to bound) would never become eligible. The engine
- * computes the cutoff from its own clock, as `Date.toISOString()` text, so the
- * comparison follows time order and a day counts 24 hours whatever the session
- * time zone. The partial predicate and the entry expression repeat `instances_retention_idx`
- * verbatim, so the planner proves the index applies and a tick with nothing
- * eligible reads no instance row. `faulted` instances are excluded: a fault is
+ * ones retention exists to bound) would never become eligible. `cutoff` is
+ * `Date.toISOString()` text, the form of every stored entry time, so the text
+ * comparison follows time order. The partial predicate and the entry expression
+ * repeat `instances_retention_idx` verbatim, so the planner proves the index
+ * applies and a tick with nothing eligible reads no instance row. `faulted`
+ * instances are excluded: a fault is
  * an anomaly an operator may still need to inspect, not a normal completion.
  * Exported so the plan test explains the statement the worker runs.
  */
@@ -114,7 +114,9 @@ export function retentionSelect(db: SQL, cutoff: string, lastEntry: string, last
  * than selecting every eligible instance in one unbounded query. The keyset
  * advances past every row it returns, redacted or failed. A failed row stays
  * unredacted, so the next tick selects it again, and it never hides the rows
- * behind it.
+ * behind it. The cutoff sits `days` times 24 hours before `now`, the engine
+ * clock unless a test passes a fixed instant, so no session time zone or
+ * daylight-saving change moves it. One cutoff holds for every batch of the tick.
  */
 export async function sweepRetention(db: SQL, days: number, now: number = Date.now()): Promise<void> {
   const cutoff = new Date(now - days * DAY_MS).toISOString();
