@@ -53,6 +53,7 @@ lists after it) name these changes that can reach this repo:
 
 The four pins move together, as the engine Dockerfile's comment demands. A
 split would let CI and the deploy image run different runtimes.
+Both deploy images built on 1.4.4 on 2026-10-29. The `bun` user is uid 1000.
 
 ### D2. Relock with the new runtime, keep lockfile version 1
 
@@ -105,3 +106,9 @@ None. Every check passed on 1.4.4 without a change.
 ## Open Questions
 
 None.
+- [Bun 1.4 verifies TLS certificates by default] → The SMTP upgrade in
+  `src/handlers/notification-email.ts` sets no CA. A relay with a self-signed or
+  private-CA certificate now fails the handshake where 1.3.11 delivered. The
+  stricter default is the safer one, so the code stays. Deployers give the
+  relay a certificate that a public CA signs, or one the runtime trusts. The dev
+  Mailpit offers no STARTTLS, so the dev stack stays on the plain path.

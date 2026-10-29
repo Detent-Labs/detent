@@ -10,7 +10,7 @@
   - Verify with `git grep -n '1\.3\.11' -- container deploy THIRDPARTY.md` printing nothing.
 - [x] 1.2 With no dev server running, run `sh scripts/dev-pod.sh up` on the host. Then `sh scripts/dev-exec.sh bun --version` must print `1.4.4`.
 
-## 2. Migrate the lockfile and repair the breakage
+## 2. Relock @types/bun and repair the breakage
 
 - [x] 2.1 Set `@types/bun` to `^1.4.4` in `package.json`. Run `sh scripts/dev-exec.sh bun install` (design.md D2):
   - `bun.lock` keeps `"lockfileVersion": 1` and holds `@types/bun@1.4.4`.

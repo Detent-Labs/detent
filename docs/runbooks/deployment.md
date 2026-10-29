@@ -35,7 +35,7 @@ default is safe for a deployment.
 | `HTTP_SECRET_ENV_ALLOWLIST` | A comma-separated list of the variables a reference may read. With many tenants (`TENANT_CONTROL_PLANE_URL` set), write each entry as `tenant:NAME`. An entry without a tenant has no effect there. One tenant ignores an entry with a colon. Each `NAME` matches `[A-Z][A-Z0-9_]*`. | Yes, for a definition using a header reference. | Unset. That refuses every reference. | |
 | `TENANT_CONTROL_PLANE_URL` | The control-plane connection string. Its presence turns SaaS mode on. | No | Unset, which runs one tenant on `DATABASE_URL`. | Read "Serving many tenants" below first. |
 | `HTTP_ACTION_ALLOW_INSECURE` | `1` permits a plain-HTTP target. | No | Unset. Then `https` alone. | `1` sends the request in the clear. Give the target a TLS certificate instead. |
-| `SMTP_HOST` | The relay the `notification.email` action connects to. | Yes, for a definition using `notification.email`. | None. | |
+| `SMTP_HOST` | The relay the `notification.email` action connects to. | Yes, for a definition using `notification.email`. | None. | STARTTLS needs a trusted certificate. Self-signed fails. |
 | `SMTP_PORT` | The relay's port. | No | `587` | |
 | `SMTP_USER` | The `AUTH PLAIN` username. Its presence needs a relay that offers STARTTLS. | No | Unset, which sends no credential. | |
 | `SMTP_PASSWORD` | The `AUTH PLAIN` password. | No | Unset, which sends an empty password beside `SMTP_USER`. | |
