@@ -10,8 +10,8 @@
 `deploy/engine.Dockerfile` SHALL build the browser bundle in a separate build
 stage. The final stage SHALL copy only the built `packages/web/dist` from it.
 The copy SHALL land in the directory the engine's default `WEB_ROOT` resolves
-to. The final stage SHALL set no `WEB_ROOT` itself. The final stage SHALL still install production dependencies
-only, so no build tool reaches the image.
+to. The final stage SHALL set no `WEB_ROOT` itself. The final stage SHALL still
+install production dependencies only, so no build tool reaches the image.
 
 #### Scenario: The image serves the shell
 
