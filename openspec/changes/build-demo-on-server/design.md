@@ -45,7 +45,8 @@ directory is missing. Each deploy then runs `git -C ~/detent/repo fetch
 ### D3. The server builds and prunes
 
 The script runs `podman build --format docker -t localhost/detent-engine:demo
--f deploy/engine.Dockerfile ~/detent/repo` over SSH. It prints the build's
+-f ~/detent/repo/deploy/engine.Dockerfile ~/detent/repo` over SSH. The SSH
+command runs in the home directory, so the file path is absolute. It prints the build's
 duration from two `date +%s` readings, since `time` is no builtin in every
 shell and `/usr/bin/time` is not installed. Then it runs `podman image prune
 -f`. The prune also drops the cached build stage, so each

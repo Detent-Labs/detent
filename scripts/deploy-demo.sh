@@ -12,8 +12,8 @@ fi
 target=$1
 
 # Every ssh call below shares one TCP connection. The demo host's
-# network drops port 22 for minutes when new connections follow the image
-# upload in quick succession.
+# network drops port 22 for minutes when new connections follow each other
+# in quick succession.
 control_dir=$(mktemp -d)
 trap 'command ssh -o ControlPath="$control_dir/cm" -O exit "$target" 2>/dev/null; rm -rf "$control_dir"' EXIT
 ssh() { command ssh -o ControlMaster=auto -o ControlPath="$control_dir/cm" -o ControlPersist=120 "$@"; }
