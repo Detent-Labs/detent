@@ -10,12 +10,12 @@
 
 ## 2. The demo definition
 
-- [ ] 2.1 Create the units of design.md D2 under `deploy/demo/`, plus `detent-demo-reset.service` and `detent-demo-reset.timer` from D4.
-- [ ] 2.2 Create `deploy/demo/Caddyfile`. It serves `detent.org` and proxies every request to `localhost:3000`.
-- [ ] 2.3 Create `deploy/demo/engine.env.example` with the D3 table, secrets as placeholders. Create `deploy/demo/setup.sh` and `deploy/demo/reset.sh` as D3 and D4 state. Both start with `set -eu`, and `sh -n` passes on each.
-- [ ] 2.4 Create `scripts/deploy-demo.sh` as design.md D5 states. It has no absolute home path, and `sh -n` passes.
-- [ ] 2.5 Add `test/demo-deployment.test.ts` with the rules of design.md D6, first part, each with a breaking fixture.
-- [ ] 2.6 Run `QUADLET_UNIT_DIRS=deploy/demo /usr/lib/podman/quadlet -dryrun -user` on the host. It prints a generated service for each unit and no error.
+- [x] 2.1 Create the units of design.md D2 under `deploy/demo/`, plus `detent-demo-reset.service` and `detent-demo-reset.timer` from D4.
+- [x] 2.2 Create `deploy/demo/Caddyfile`. It serves `detent.org` and proxies every request to `localhost:3000`.
+- [x] 2.3 Create `deploy/demo/engine.env.example` with the D3 table, secrets as placeholders. Create `deploy/demo/setup.sh` and `deploy/demo/reset.sh` as D3 and D4 state. Both start with `set -eu`, and `sh -n` passes on each.
+- [x] 2.4 Create `scripts/deploy-demo.sh` as design.md D5 states. It has no absolute home path, and `sh -n` passes.
+- [x] 2.5 Add `test/demo-deployment.test.ts` with the rules of design.md D6, first part, each with a breaking fixture.
+- [x] 2.6 Run `QUADLET_UNIT_DIRS=deploy/demo /usr/lib/podman/quadlet -dryrun -user` on the host. It prints a generated service for each unit and no error.
 
 ## 3. Documentation and cleanup
 
