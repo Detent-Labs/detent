@@ -30,7 +30,7 @@ question to "the first Dependabot run". That run has now settled it.
   workspace directory has none. One group holds the four React packages.
 - One branch takes seven of the eight bumps and a regenerated `bun.lock`:
   `react` and `react-dom` 19.3.1, `@types/react` and `@types/react-dom` 19.3.0,
-  `@vitejs/plugin-react` 6.1.2, `vite` 8.3.5, `@dagrejs/dagre` 3.1.2,
+  `@vitejs/plugin-react` 6.1.2, `vite` 8.3.5, `@dagrejs/dagre` 3.1.3,
   `lucide-react` 1.61.0 and `@playwright/test` 1.64.1.
 - `THIRDPARTY.md` follows the new versions.
 - `@types/bun` stays at 1.3.14. The runtime is Bun 1.3.11, and types for 1.4
