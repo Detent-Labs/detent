@@ -2,13 +2,13 @@
 
 ## 1. Pin Bun 1.4.4 and rebuild the devcontainer
 
-- [ ] 1.1 Change the four pins of design.md D1:
+- [x] 1.1 Change the four pins of design.md D1:
   - `container/Dockerfile`: `ENV BUN_VERSION=1.4.4`.
   - `deploy/engine.Dockerfile`: `FROM docker.io/oven/bun:1.4.4-slim`, and the tag in its comment.
   - `deploy/frontend.Dockerfile`: `FROM docker.io/oven/bun:1.4.4-slim AS build`.
   - `THIRDPARTY.md`: the runtime image row reads `oven/bun:1.4.4-slim`.
   - Verify with `git grep -n '1\.3\.11' -- container deploy THIRDPARTY.md` printing nothing.
-- [ ] 1.2 With no dev server running, run `sh scripts/dev-pod.sh up` on the host. Then `sh scripts/dev-exec.sh bun --version` must print `1.4.4`.
+- [x] 1.2 With no dev server running, run `sh scripts/dev-pod.sh up` on the host. Then `sh scripts/dev-exec.sh bun --version` must print `1.4.4`.
 
 ## 2. Migrate the lockfile and repair the breakage
 

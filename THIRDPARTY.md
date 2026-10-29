@@ -26,7 +26,7 @@ Pulled by `deploy/engine.Dockerfile`, `deploy/frontend.Dockerfile`, and
 
 | Image | Software | License |
 |---|---|---|
-| `oven/bun:1.3.11-slim` | Bun runtime | MIT |
+| `oven/bun:1.4.4-slim` | Bun runtime | MIT |
 | `nginxinc/nginx-unprivileged:alpine` | nginx | BSD-2-Clause ("nginx license") |
 
 ### External services the deployment connects to, not bundled

@@ -6,7 +6,7 @@ FROM mcr.microsoft.com/devcontainers/typescript-node:22
 # Bun is the project standard: runtime, package manager, and test runner. Installed
 # system-wide (/usr/local/bin/bun) so every user has it on PATH. BUN_VERSION is
 # pinned for reproducible builds; bump it deliberately.
-ENV BUN_VERSION=1.3.11
+ENV BUN_VERSION=1.4.4
 RUN curl -fsSL https://bun.sh/install | BUN_INSTALL=/usr/local bash -s "bun-v${BUN_VERSION}"
 
 # typescript-language-server backs LSP code intelligence (go-to-def, hover,
