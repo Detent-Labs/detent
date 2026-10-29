@@ -233,6 +233,29 @@ test.skipIf(!DB)("sweepRetention selects an instance just outside the window and
   expect(await rowRedactedAt(inside.instanceId)).toBeNull();
 });
 
+// A fixed `now` places a Europe/Zurich daylight-saving change inside the
+// 30-day window, whatever today's date is.
+async function expectBoundaryAt(now: number): Promise<void> {
+  const outside = await mk();
+  await setStatus(outside.instanceId, "completed");
+  await setEnteredAt(outside.instanceId, new Date(now - 30 * DAY_MS - 60_000).toISOString());
+  const inside = await mk();
+  await setStatus(inside.instanceId, "completed");
+  await setEnteredAt(inside.instanceId, new Date(now - 30 * DAY_MS + 60_000).toISOString());
+
+  await sweepRetention(sql, 30, now);
+  expect(await rowRedactedAt(outside.instanceId)).not.toBeNull();
+  expect(await rowRedactedAt(inside.instanceId)).toBeNull();
+}
+
+test.skipIf(!DB)("sweepRetention keeps its boundary when the window holds the autumn clock change", async () => {
+  await expectBoundaryAt(Date.parse("2026-11-01T12:00:00.000Z"));
+});
+
+test.skipIf(!DB)("sweepRetention keeps its boundary when the window holds the spring clock change", async () => {
+  await expectBoundaryAt(Date.parse("2027-04-10T12:00:00.000Z"));
+});
+
 test.skipIf(!DB)("a failing instance ahead in entry-time order hides none behind it, and the next tick selects it again", async () => {
   // The failing instance entered first, so it leads the keyset, and it holds
   // the highest instance_id of the three, so entry order and id order diverge.

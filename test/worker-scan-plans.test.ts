@@ -164,7 +164,7 @@ async function seedRetentionBulk() {
 
 test.skipIf(!DB)("a retention tick with nothing eligible reads no instance row", async () => {
   await seedRetentionBulk();
-  const nodes = await planNodes(retentionSelect(sql, RETENTION_DAYS, "", ""));
+  const nodes = await planNodes(retentionSelect(sql, new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString(), "", ""));
 
   // The index keys on the entry time, so the cutoff bounds the scan. A form that
   // casts the entry time on every unredacted row reads them all.

@@ -25,7 +25,7 @@ default is safe for a deployment.
 | `AUTH_ISSUERS` | A JSON array of `{iss, jwksUrl, audience, rolesClaim}`. It accepts tokens an external issuer signs. A token needs an `exp` claim and an asymmetric algorithm: RS, PS, ES or EdDSA. In SaaS mode each entry also needs a `tenant`, and an `iss` may appear once. | One of three, see below. | None. | |
 | `ALLOW_INSECURE_DEV_AUTH` | `1` disables authentication. The engine then trusts the actor headers as sent. | One of three. | Unset. | Never `1` here. Configure `AUTH_JWT_SECRET` or `AUTH_ISSUERS` instead. |
 | `CORS_ALLOWED_ORIGINS` | A comma-separated origin list for the CORS headers. | No | Unset, which emits no CORS header. | The value `*` allows every origin. Name the origins the browser bundle answers from. |
-| `DATA_RETENTION_DAYS` | The age at which the sweep deletes a terminal instance. A positive integer. | No | Unset, which runs no sweep. | |
+| `DATA_RETENTION_DAYS` | The age, in days of 24 hours, at which the sweep redacts a terminal instance. A positive integer. | No | Unset, which runs no sweep. | |
 | `LOG_LEVEL` | The emission threshold: `debug`, `info`, `warn` or `error`. | No | `info` | |
 | `MAX_ATTACHMENT_BYTES` | The size bound on one decoded upload. A positive integer. | No | `5242880`, which is 5 MiB. | |
 | `ASSIGNMENT_RESOLUTION_TIMEOUT_MS` | The deadline an assignment resolver gets. A positive number. | No | `5000` | |
