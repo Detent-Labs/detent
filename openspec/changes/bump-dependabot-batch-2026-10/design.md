@@ -30,8 +30,8 @@ See proposal.md. Today's state:
 | `@playwright/test` | 1.63.0 | 1.64.1 | `^1.64.1` |
 
 The target column holds the versions the open Dependabot pull requests name.
-`@dagrejs/dagre` is the one exception. #92 names 3.1.2, and the install
-resolved the newer patch 3.1.3 inside `^3.1.2`.
+The one exception is `@dagrejs/dagre`. Pull request #92 names 3.1.2, and the
+install resolved the newer patch 3.1.3 inside `^3.1.2`.
 
 ## Goals / Non-Goals
 
