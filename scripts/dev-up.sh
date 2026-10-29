@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # One-command devcontainer bring-up: start this checkout's pod (and wait for
 # every container's probe, the database's included), install deps, seed the
-# example processes + demo users, ensure a demo-superuser with all eight
-# system:* roles, and (re)start the HTTP server. Safe to re-run — every step
+# example processes + demo users, ensure a demo-superuser with every
+# system:* role, and (re)start the HTTP server. Safe to re-run — every step
 # is idempotent, a pod that already runs the current spec and image is left
 # alone, and the JWT signing secret is generated once and reused, so restarts
 # don't invalidate existing logins.
@@ -18,7 +18,8 @@ cd "$(dirname "$0")/.."
 
 SUPERUSER_EMAIL="demo-superuser@example.test"
 SUPERUSER_PASSWORD="seed-demo-password"
-SUPERUSER_ROLES="system:publish,system:cancel-any,system:admin,system:developer,system:author,system:reports,system:datalists,system:templates"
+# Every role src/auth/authorize.ts reserves, in its order.
+SUPERUSER_ROLES="system:publish,system:cancel-any,system:admin,system:developer,system:reports,system:datalists,system:templates,system:author,system:create,system:owner"
 SECRET_FILE="container/.auth-secret"
 
 echo "==> Starting the pod ($DEV_POD: $PORT_APP, $PORT_VITE, $PORT_MAILPIT)"
