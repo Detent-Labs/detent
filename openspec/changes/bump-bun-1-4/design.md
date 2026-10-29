@@ -91,7 +91,7 @@ None yet. Task 2.3 fills this list.
 ## Migration Plan
 
 1. Rebuild the devcontainer on the branch, migrate, repair, verify.
-2. Sync and archive, push, merge on green CI.
+2. Archive, push, merge on green CI. With `skip_specs` there is nothing to sync.
 3. Rollback: revert the merge, then `sh scripts/dev-pod.sh up` rebuilds 1.3.11.
 
 ## Open Questions

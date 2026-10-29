@@ -14,7 +14,7 @@
 
 - [ ] 2.1 Set `@types/bun` to `^1.4.4` in `package.json`. Run `sh scripts/dev-exec.sh bun install` (design.md D2):
   - `bun.lock` holds `"lockfileVersion": 2` and `@types/bun@1.4.4`.
-  - Compare every other locked version against the pre-change `bun.lock`. Report any that moved.
+  - Extract the `name@version` pairs from the old and the new `bun.lock` and compare the two sets. Report every pair besides `@types/bun` and `bun-types` that moved.
   - On the host, `sh scripts/gates/lockfile.sh` exits 0.
 - [ ] 2.2 Run `sh scripts/dev-exec.sh bun run scripts/thirdparty.ts --write`. `THIRDPARTY.md` changes only for `@types/bun`, `bun-types` and the runtime image row.
 - [ ] 2.3 Run typecheck, lint, build, the full suite as in task 3.2, and `test:tz`. Repair each failure as design.md D3 states, and record it under design.md's "Repairs". Repeat until all five pass.
