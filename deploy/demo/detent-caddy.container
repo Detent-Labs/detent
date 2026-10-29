@@ -1,0 +1,17 @@
+[Unit]
+Description=Detent demo reverse proxy
+
+[Container]
+Image=docker.io/library/caddy:2
+ContainerName=detent-caddy
+Pod=detent-demo.pod
+Volume=detent-caddy-data.volume:/data
+Volume=detent-caddy-config.volume:/config
+Volume=%h/detent/Caddyfile:/etc/caddy/Caddyfile:ro
+
+[Service]
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

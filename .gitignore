@@ -46,10 +46,6 @@ container/pod.yaml
 container/.auth-secret
 container/server.log
 
-# Retired directory name. A stale clone still holds its secret, log and Pod spec
-# here; this keeps them out of git.
-.devcontainer/
-
 # temp files
 tmp/
 scratch/

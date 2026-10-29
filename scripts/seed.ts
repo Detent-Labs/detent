@@ -12,8 +12,9 @@
  * `examples/employee-onboarding.json`'s `instance.query` data source) — each
  * always publishes under that exact id, never a script-minted one.
  *
- * Demo account passwords are fixed and known. This is for local development
- * only — never point this script at a shared or production database.
+ * Demo account passwords are fixed and known. They apply to local development
+ * and to the public demo (docs/runbooks/demo.md) — never point this script at
+ * any other shared or production database.
  *
  * Run inside the devcontainer (DATABASE_URL must be set), with the explicit
  * opt-in that confirms the target is a local database:

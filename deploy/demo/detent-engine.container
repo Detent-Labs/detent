@@ -1,0 +1,17 @@
+[Unit]
+Description=Detent demo engine
+After=detent-db.service
+Wants=detent-db.service
+
+[Container]
+Image=localhost/detent-engine:demo
+ContainerName=detent-engine
+Pod=detent-demo.pod
+EnvironmentFile=%h/.config/detent/engine.env
+
+[Service]
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

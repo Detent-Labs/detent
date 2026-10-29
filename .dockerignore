@@ -9,3 +9,5 @@ container
 docs
 openspec
 tmp
+.superpowers
+**/.env.*

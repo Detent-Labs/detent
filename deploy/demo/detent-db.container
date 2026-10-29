@@ -1,0 +1,18 @@
+[Unit]
+Description=Detent demo database
+
+[Container]
+Image=docker.io/library/postgres:18
+ContainerName=detent-db
+Pod=detent-demo.pod
+Volume=detent-pgdata.volume:/var/lib/postgresql
+EnvironmentFile=%h/.config/detent/db.env
+Environment=POSTGRES_DB=workflow_engine
+Environment=POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256
+
+[Service]
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

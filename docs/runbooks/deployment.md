@@ -278,6 +278,7 @@ which no other gate does.
 ## Related
 
 - `docs/runbooks/backup-restore.md` covers the database dump and the restore.
+- `docs/runbooks/demo.md` covers the public demo server.
 - `README.md` carries the commands that build and run the two images.
 
 ## Serving many tenants

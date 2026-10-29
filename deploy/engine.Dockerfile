@@ -1,9 +1,25 @@
-# Production image for the engine. Single-stage: Bun runs TypeScript
-# directly, so there is no build tool to strip out of a later stage.
+# Production image for the engine and the browser bundle it serves. Two
+# stages: the build stage holds Vite and the full install, the final stage
+# keeps the production install and the built `packages/web/dist` only.
 # oven/bun:1.4.4-slim pins the same version as container/Dockerfile's
 # BUN_VERSION -- bump both together, deliberately. The -slim variant ships
 # the same non-root `bun` user (UID 1000) as the default tag, at a
 # fraction of the size.
+FROM docker.io/oven/bun:1.4.4-slim AS build
+
+WORKDIR /app
+
+COPY . .
+
+# Full install, not --production: vite and @vitejs/plugin-react are
+# devDependencies the bundle build needs. This stage sets neither
+# NODE_ENV nor USER.
+RUN bun install --frozen-lockfile
+
+# No VITE_API_URL: the engine serves the bundle, so the browser calls the
+# API on its own origin.
+RUN bun run --filter "./packages/web" build
+
 FROM docker.io/oven/bun:1.4.4-slim
 
 WORKDIR /app
@@ -14,6 +30,11 @@ COPY . .
 # typescript in the final image). --frozen-lockfile refuses to resolve a
 # dependency tree that drifts from the committed bun.lock.
 RUN bun install --production --frozen-lockfile
+
+COPY --from=build /app/packages/web/dist /app/packages/web/dist
+
+# The server serves the shell from this directory with no WEB_ROOT set:
+# resolveWebRoot's default (src/http/static.ts) lands on it.
 
 # The server already passes `development: false` to Bun.serve. This keeps
 # every other Bun code path that reads NODE_ENV out of development mode.
