@@ -84,9 +84,9 @@ fixture deletes the group and expects it. The `Update` type in the test gains
 an optional `groups` record.
 
 The rule runs only when a root `bun` entry exists. Without one, "no bun entry
-for /" already names the fault. The fixture "an npm entry in place of the root
-bun entry" then keeps its two expected messages, since `expectProblems`
-compares the whole list.
+for /" already reports it. `expectProblems` compares the whole list. The fixture
+"an npm entry in place of the root bun entry" therefore keeps its two expected
+messages.
 
 ### D3. Bump through the devcontainer, then regenerate the notice
 
