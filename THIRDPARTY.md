@@ -53,26 +53,26 @@ Declared directly in a `package.json` (root or a `packages/*` workspace).
 
 | Package | Version | License |
 |---|---|---|
-| `@dagrejs/dagre` | 3.1.1 | MIT |
+| `@dagrejs/dagre` | 3.1.3 | MIT |
 | `@marcbachmann/cel-js` | 8.0.0 | MIT |
 | `@panzoom/panzoom` | 4.6.2 | MIT |
-| `@playwright/test` | 1.63.0 | Apache-2.0 |
+| `@playwright/test` | 1.64.1 | Apache-2.0 |
 | `@stylexjs/stylex` | 0.19.1 | MIT |
 | `@stylexjs/unplugin` | 0.19.1 | MIT |
 | `@types/bun` | 1.3.14 | MIT |
-| `@types/react` | 19.2.18 | MIT |
-| `@types/react-dom` | 19.2.4 | MIT |
-| `@vitejs/plugin-react` | 6.0.5 | MIT |
+| `@types/react` | 19.3.0 | MIT |
+| `@types/react-dom` | 19.3.0 | MIT |
+| `@vitejs/plugin-react` | 6.1.2 | MIT |
 | `jose` | 6.2.4 | MIT |
-| `lucide-react` | 1.50.0 | ISC |
+| `lucide-react` | 1.61.0 | ISC |
 | `oxlint` | 1.85.0 | MIT |
-| `react` | 19.2.8 | MIT |
-| `react-dom` | 19.2.8 | MIT |
+| `react` | 19.3.1 | MIT |
+| `react-dom` | 19.3.1 | MIT |
 | `typescript` | 7.0.2 | Apache-2.0 |
-| `vite` | 8.3.4 | MIT |
+| `vite` | 8.3.5 | MIT |
 | `zod` | 4.6.6 | MIT |
 
-`react` and `react-dom` resolve once, at 19.2.8. `packages/web` declares
+`react` and `react-dom` resolve once, at 19.3.1. `packages/web` declares
 `^19`, and `packages/form-ui` declares `^19` as a peer range. The two type
 packages resolve once too. Both workspaces declare `@types/react` and
 `@types/react-dom` at `^19`.

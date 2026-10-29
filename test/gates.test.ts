@@ -767,11 +767,16 @@ const DEPENDABOT = resolve(import.meta.dir, "../.github/dependabot.yml");
 type Step = { name?: string; uses?: string; run?: string; with?: Record<string, unknown> };
 type Job = { permissions?: unknown; steps?: Step[] };
 type Workflow = { permissions?: unknown; jobs?: Record<string, Job> };
-type Update = { "package-ecosystem"?: string; directory?: string };
+type Update = {
+  "package-ecosystem"?: string;
+  directory?: string;
+  groups?: Record<string, { patterns?: string[] }>;
+};
 type Dependabot = { updates: Update[] };
 
 const READ_ONLY = JSON.stringify({ contents: "read" });
-const BUN_DIRECTORIES = ["/", "/packages/form-ui", "/packages/web"];
+const BUN_DIRECTORIES = ["/"];
+const REACT_PACKAGES = ["react", "react-dom", "@types/react", "@types/react-dom"];
 
 function workflowProblems(workflow: Workflow, raw: string): string[] {
   const problems: string[] = [];
@@ -841,6 +846,25 @@ function dependabotProblems(config: Dependabot): string[] {
       (update) => update["package-ecosystem"] === "bun" && update.directory === directory,
     );
     if (!found) problems.push(`no bun entry for ${directory}`);
+  }
+  if (updates.filter((update) => update["package-ecosystem"] === "bun" && update.directory === "/").length > 1) {
+    problems.push("more than one bun entry for /");
+  }
+  for (const update of updates) {
+    if (update["package-ecosystem"] === "bun" && !BUN_DIRECTORIES.includes(update.directory ?? "")) {
+      problems.push(`a bun entry for ${update.directory}`);
+    }
+  }
+  const root = updates.find(
+    (update) => update["package-ecosystem"] === "bun" && update.directory === "/",
+  );
+  if (
+    root &&
+    !Object.values(root.groups ?? {}).some((group) =>
+      REACT_PACKAGES.every((name) => group.patterns?.includes(name)),
+    )
+  ) {
+    problems.push("no group holds react, react-dom, @types/react and @types/react-dom");
   }
   if (!updates.some((update) => update["package-ecosystem"] === "github-actions")) {
     problems.push("no github-actions entry");
@@ -1050,18 +1074,25 @@ const DEPENDABOT_FIXTURES: [string, (config: Dependabot) => void, string[]][] = 
     ["the npm ecosystem for /docs"],
   ],
   [
-    "no entry for packages/form-ui",
+    "a bun entry for packages/web",
     (c) => {
-      c.updates = c.updates.filter((u) => u.directory !== "/packages/form-ui");
+      c.updates.push({ "package-ecosystem": "bun", directory: "/packages/web" });
     },
-    ["no bun entry for /packages/form-ui"],
+    ["a bun entry for /packages/web"],
   ],
   [
-    "no entry for packages/web",
+    "two bun entries for /",
     (c) => {
-      c.updates = c.updates.filter((u) => u.directory !== "/packages/web");
+      c.updates.push({ "package-ecosystem": "bun", directory: "/" });
     },
-    ["no bun entry for /packages/web"],
+    ["more than one bun entry for /"],
+  ],
+  [
+    "no react group on the root bun entry",
+    (c) => {
+      delete c.updates[0].groups;
+    },
+    ["no group holds react, react-dom, @types/react and @types/react-dom"],
   ],
   [
     "no github-actions entry",

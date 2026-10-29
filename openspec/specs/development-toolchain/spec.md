@@ -1168,17 +1168,31 @@ with a comment that names the release.
 - **THEN** the reference ends in a 40-character commit sha
 - **AND** a comment on the line names the release that sha belongs to
 
-### Requirement: Dependabot updates the lockfile the install reads
+### Requirement: Dependabot updates the root lockfile from one bun entry
 
-`.github/dependabot.yml` SHALL declare the `bun` package ecosystem for each
-directory that holds a manifest the root `bun.lock` covers. It SHALL NOT declare
-the `npm` ecosystem for those directories. The `github-actions` ecosystem stays.
+`.github/dependabot.yml` SHALL declare the `bun` package ecosystem for the root
+directory, whose `bun.lock` covers every workspace manifest. It SHALL NOT declare
+a `bun` entry for a workspace directory. It SHALL NOT declare the `npm`
+ecosystem. The `github-actions` ecosystem stays.
 
-#### Scenario: Every manifest directory uses the bun ecosystem
+The root `bun` entry SHALL hold one group that names `react`, `react-dom`,
+`@types/react` and `@types/react-dom`. The four then share one pull request.
+
+#### Scenario: Only the root carries a bun entry
 
 - **WHEN** a contributor reads `.github/dependabot.yml`
-- **THEN** the root, `packages/form-ui` and `packages/web` each appear with `package-ecosystem: "bun"`
+- **THEN** exactly one entry declares `package-ecosystem: "bun"`, with `directory: "/"`
 - **AND** no entry names `npm`
+
+#### Scenario: A workspace directory entry is rejected
+
+- **WHEN** `.github/dependabot.yml` gains a `bun` entry for `/packages/web`
+- **THEN** the Dependabot rule test fails and names that directory
+
+#### Scenario: React and its DOM renderer share one pull request
+
+- **WHEN** a contributor reads the root `bun` entry
+- **THEN** one group lists `react`, `react-dom`, `@types/react` and `@types/react-dom`
 
 ### Requirement: The test preload leaves no standing credential
 
