@@ -2,7 +2,7 @@
 
 ## 1. One root bun entry with a React group
 
-- [ ] 1.1 In `test/gates.test.ts`, change the Dependabot rules as design.md D1 and D2 state:
+- [x] 1.1 In `test/gates.test.ts`, change the Dependabot rules as design.md D1 and D2 state:
   - `BUN_DIRECTORIES` becomes `["/"]`.
   - `dependabotProblems` reports `a bun entry for <directory>` for each `bun` entry outside `/`.
   - It reports `no group holds react, react-dom, @types/react and @types/react-dom` when no group on the root `bun` entry lists all four.
@@ -10,7 +10,7 @@
   - Replace the two fixtures that delete a member entry. One new fixture adds a `/packages/web` `bun` entry.
   - Add one fixture that deletes the group from the root entry.
   - Run the full suite as in task 3.2. "the real Dependabot file breaks none of the Dependabot rules" must fail by name on the unchanged file.
-- [ ] 1.2 In `.github/dependabot.yml`, delete the `/packages/form-ui` and `/packages/web` entries. Add the `react` group from design.md D2 to the root entry. Run the full suite as in task 3.2. Every test named "the Dependabot rules reject …" must pass, and so must the real-file test.
+- [x] 1.2 In `.github/dependabot.yml`, delete the `/packages/form-ui` and `/packages/web` entries. Add the `react` group from design.md D2 to the root entry. Run the full suite as in task 3.2. Every test named "the Dependabot rules reject …" must pass, and so must the real-file test.
 
 ## 2. Land the seven bumps
 

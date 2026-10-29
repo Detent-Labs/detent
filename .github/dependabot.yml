@@ -4,14 +4,13 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
-  - package-ecosystem: "bun"
-    directory: "/packages/form-ui"
-    schedule:
-      interval: "weekly"
-  - package-ecosystem: "bun"
-    directory: "/packages/web"
-    schedule:
-      interval: "weekly"
+    groups:
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
