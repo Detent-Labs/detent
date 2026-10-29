@@ -16,6 +16,7 @@ import { deleteInstanceDraft } from "./instance-drafts.js";
 import { createDefinitionStore } from "./definitions.js";
 
 const BATCH = 500;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 export async function redactInstance(
   instanceId: InstanceId,
@@ -88,21 +89,20 @@ export async function redactInstance(
  * position `(lastEntry, lastId)`, oldest entry first. The entry time is
  * `currentStepEnteredAt`, falling back to `startedAt` for an instance that
  * predates that key — without the fallback, the oldest instances (exactly the
- * ones retention exists to bound) would never become eligible. The cutoff is
- * built in SQL in the form of `Date.toISOString()`, so the text comparison
- * follows time order. The cutoff string is truncated to the millisecond. The
- * partial predicate and the entry expression repeat `instances_retention_idx`
+ * ones retention exists to bound) would never become eligible. The engine
+ * computes the cutoff from its own clock, as `Date.toISOString()` text, so the
+ * comparison follows time order and a day counts 24 hours whatever the session
+ * time zone. The partial predicate and the entry expression repeat `instances_retention_idx`
  * verbatim, so the planner proves the index applies and a tick with nothing
  * eligible reads no instance row. `faulted` instances are excluded: a fault is
  * an anomaly an operator may still need to inspect, not a normal completion.
  * Exported so the plan test explains the statement the worker runs.
  */
-export function retentionSelect(db: SQL, days: number, lastEntry: string, lastId: string) {
+export function retentionSelect(db: SQL, cutoff: string, lastEntry: string, lastId: string) {
   return db`SELECT instance_id, COALESCE(body->>'currentStepEnteredAt', started_at) AS entry FROM instances
     WHERE redacted_at IS NULL
       AND status IN ('completed', 'cancelled')
-      AND COALESCE(body->>'currentStepEnteredAt', started_at)
-        < to_char((now() - make_interval(days => ${days})) AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
+      AND COALESCE(body->>'currentStepEnteredAt', started_at) < ${cutoff}
       AND (COALESCE(body->>'currentStepEnteredAt', started_at), instance_id) > (${lastEntry}::text, ${lastId}::text)
     ORDER BY COALESCE(body->>'currentStepEnteredAt', started_at), instance_id
     LIMIT ${BATCH}`;
@@ -116,11 +116,12 @@ export function retentionSelect(db: SQL, days: number, lastEntry: string, lastId
  * unredacted, so the next tick selects it again, and it never hides the rows
  * behind it.
  */
-export async function sweepRetention(db: SQL, days: number): Promise<void> {
+export async function sweepRetention(db: SQL, days: number, now: number = Date.now()): Promise<void> {
+  const cutoff = new Date(now - days * DAY_MS).toISOString();
   let lastEntry = "";
   let lastId = "";
   for (;;) {
-    const rows = (await retentionSelect(db, days, lastEntry, lastId)) as { instance_id: string; entry: string }[];
+    const rows = (await retentionSelect(db, cutoff, lastEntry, lastId)) as { instance_id: string; entry: string }[];
     if (rows.length === 0) break;
     for (const { instance_id: id, entry } of rows) {
       lastEntry = entry; // keyset advances regardless of outcome, matching migrateInstances
