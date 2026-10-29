@@ -30,10 +30,10 @@ and reaches the server over SSH as `detent`.
 
    ```sh
    adduser detent
-   mkdir -p /home/detent/.ssh
-   cp /home/debian/.ssh/authorized_keys /home/detent/.ssh/
-   chown -R detent:detent /home/detent/.ssh
-   chmod 700 /home/detent/.ssh && chmod 600 /home/detent/.ssh/authorized_keys
+   mkdir -p ~detent/.ssh
+   cp ~debian/.ssh/authorized_keys ~detent/.ssh/
+   chown -R detent:detent ~detent/.ssh
+   chmod 700 ~detent/.ssh && chmod 600 ~detent/.ssh/authorized_keys
    loginctl enable-linger detent
    ```
 
