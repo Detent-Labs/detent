@@ -44,14 +44,20 @@ directory is missing. Each deploy then runs `git -C ~/detent/repo fetch
 
 ### D3. The server builds and prunes
 
-The script runs `podman build --format docker -t localhost/detent-engine:demo
--f ~/detent/repo/deploy/engine.Dockerfile ~/detent/repo` over SSH. The SSH
-command runs in the home directory, so the file path is absolute. It prints the build's
-duration from two `date +%s` readings, since `time` is no builtin in every
-shell and `/usr/bin/time` is not installed. Then it runs `podman image prune
--f`. The prune also drops the cached build stage, so each
-build installs dependencies again. That trades build time for disk on a 20 GB
-server. The test deploy measures both a cold build and a warm one.
+The script runs this build over SSH:
+
+```
+podman build --format docker -t localhost/detent-engine:demo -f ~/detent/repo/deploy/engine.Dockerfile ~/detent/repo
+```
+
+The SSH command runs in the home directory, so the file path is absolute.
+The script prints the build's duration from two `date +%s` readings. The
+shell may lack a `time` builtin, and `/usr/bin/time` is not installed.
+
+Then it runs `podman image prune -f`. The prune also drops the cached build
+stage, so each build installs dependencies again. That trades build time for
+disk on a 20 GB server. The test deploy measures both a cold build and a warm
+one.
 
 ### D4. Files come from the checkout
 
