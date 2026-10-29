@@ -96,6 +96,12 @@ None. Every check passed on 1.4.4 without a change.
   outside them stays possible until a later run finds it.
 - [A later Bun moves `bun.lock` to version 2] → The rewrite lands as its own
   diff. The `frozen-lockfile` gate checks it.
+- [Bun 1.4 verifies TLS certificates by default] → The SMTP upgrade in
+  `src/handlers/notification-email.ts` sets no CA. A relay with a self-signed or
+  private-CA certificate now fails the handshake where 1.3.11 delivered. The
+  stricter default is the safer one, so the code stays. Deployers give the
+  relay a certificate that a public CA signs, or one the runtime trusts. The dev
+  Mailpit offers no STARTTLS, so the dev stack stays on the plain path.
 
 ## Migration Plan
 
@@ -106,9 +112,3 @@ None. Every check passed on 1.4.4 without a change.
 ## Open Questions
 
 None.
-- [Bun 1.4 verifies TLS certificates by default] → The SMTP upgrade in
-  `src/handlers/notification-email.ts` sets no CA. A relay with a self-signed or
-  private-CA certificate now fails the handshake where 1.3.11 delivered. The
-  stricter default is the safer one, so the code stays. Deployers give the
-  relay a certificate that a public CA signs, or one the runtime trusts. The dev
-  Mailpit offers no STARTTLS, so the dev stack stays on the plain path.
