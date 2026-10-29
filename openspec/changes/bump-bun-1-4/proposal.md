@@ -42,5 +42,6 @@ None. No spec names a Bun version. `development-toolchain` says only that
   `deploy/frontend.Dockerfile`, `package.json`, `bun.lock`, `THIRDPARTY.md`,
   plus the source and test files design.md names after the first suite run.
 - Every contributor rebuilds the devcontainer with `sh scripts/dev-pod.sh up`.
-  The `bun.lock` format stays the one Bun 1.3 reads.
+  `bun.lock` keeps `lockfileVersion: 1`, the format Bun 1.3.11 wrote. A
+  rollback reverts it with the merge.
 - Merging lets Dependabot close #90 as up to date.

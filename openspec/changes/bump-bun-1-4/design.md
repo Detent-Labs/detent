@@ -60,7 +60,8 @@ After the devcontainer rebuild, `sh scripts/dev-exec.sh bun install` locks
 `@types/bun` 1.4.4 and writes `bun.lock` back as `lockfileVersion: 1`. That is
 the format Bun 1.4.4 writes for an existing lockfile. The task checks that no
 other locked version moves. The `frozen-lockfile` gate then runs against the
-relocked file.
+relocked file. The 1.4.4 install also drops three self-referential
+`web/workflow-engine*` workspace entries, which name no third-party code.
 
 The change does not force version 2. A fresh lockfile would move 34 locked
 versions. A header set to 2 by hand would claim a format Bun did not write.
