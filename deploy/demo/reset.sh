@@ -2,6 +2,17 @@
 # Resets the demo to the seed state. Runs as `detent`, nightly from the timer.
 set -eu
 
+# TCP on purpose: the first-boot initdb server listens on the unix socket only.
+waited=0
+until podman exec detent-db pg_isready -h localhost -U postgres -q 2>/dev/null; do
+  if [ "$waited" -ge 120 ]; then
+    echo "reset.sh: Postgres did not accept connections within 120 s" >&2
+    exit 1
+  fi
+  sleep 2
+  waited=$((waited + 2))
+done
+
 systemctl --user stop detent-engine.service
 podman exec detent-db dropdb -U postgres --if-exists --force workflow_engine
 podman exec detent-db createdb -U postgres workflow_engine

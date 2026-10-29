@@ -37,7 +37,8 @@ function checkEnv(text: string): string[] {
   const got: Record<string, string> = {};
   for (const l of lines) {
     const i = l.indexOf("=");
-    got[l.slice(0, i)] = l.slice(i + 1);
+    const k = l.slice(0, i);
+    if (!FORBIDDEN_ENV.some((f) => k.startsWith(f))) got[k] = l.slice(i + 1);
   }
   if (JSON.stringify(got) !== JSON.stringify(EXPECTED_ENV)) {
     problems.push("the template does not hold exactly the D3 variables and values");
@@ -56,10 +57,20 @@ function checkNoLatest(units: Record<string, string>): string[] {
     .map(([n]) => `${n} names a latest or untagged image`);
 }
 
+function section(text: string, name: string): string {
+  const m = new RegExp(`^\\[${name}\\]\\n([\\s\\S]*?)(?=^\\[|$(?![\\s\\S]))`, "m").exec(text);
+  return m?.[1] ?? "";
+}
+
 function checkContainerUnit(name: string, text: string): string[] {
   const problems: string[] = [];
-  if (!/^ContainerName=detent-[a-z]+$/m.test(text)) problems.push(`${name} sets no ContainerName`);
-  if (!/^Restart=on-failure$/m.test(text)) problems.push(`${name} sets no Restart=on-failure`);
+  const want = name.replace(/\.container$/, "");
+  if (!new RegExp(`^ContainerName=${want}$`, "m").test(section(text, "Container"))) {
+    problems.push(`${name} sets no ContainerName=${want}`);
+  }
+  const service = section(text, "Service");
+  if (!/^Restart=on-failure$/m.test(service)) problems.push(`${name} sets no Restart=on-failure in [Service]`);
+  if (!/^RestartSec=5$/m.test(service)) problems.push(`${name} sets no RestartSec=5 in [Service]`);
   return problems;
 }
 
@@ -69,7 +80,11 @@ const checkCaddy = (t: string) => [
   ...(/^detent\.org\b.*\{/m.test(t) ? [] : ["the Caddyfile does not name detent.org"]),
   ...(/reverse_proxy localhost:3000\b/.test(t) ? [] : ["the Caddyfile does not proxy to localhost:3000"]),
 ];
-const checkReset = (t: string) => (/SEED_ALLOW=1/.test(t) ? [] : ["reset.sh does not set SEED_ALLOW=1"]);
+const checkReset = (t: string) => [
+  ...(/-e SEED_ALLOW=1 detent-engine/.test(t) ? [] : ["reset.sh does not set SEED_ALLOW=1"]),
+  ...(/pg_isready -h localhost\b.*\n[\s\S]*dropdb/.test(t) ? [] : ["reset.sh does not wait for pg_isready over TCP before dropdb"]),
+  ...(/^set -eu$/m.test(t) ? [] : ["reset.sh does not start with set -eu"]),
+];
 const checkTimer = (t: string) => (/^OnCalendar=\*-\*-\* /m.test(t) ? [] : ["the timer does not run daily"]);
 
 test("the shipped template, units, Caddyfile, reset script and timer satisfy every rule", () => {
@@ -107,9 +122,19 @@ test("a latest or untagged image is rejected", () => {
   expect(checkNoLatest(untagged)).toEqual(["detent-db.container names a latest or untagged image"]);
 });
 
-test("a container unit without ContainerName or Restart is rejected", () => {
-  expect(checkContainerUnit("u", DB.replace(/^ContainerName=.*\n/m, ""))).toEqual(["u sets no ContainerName"]);
-  expect(checkContainerUnit("u", DB.replace(/^Restart=.*\n/m, ""))).toEqual(["u sets no Restart=on-failure"]);
+test("a container unit without ContainerName, Restart or RestartSec is rejected", () => {
+  expect(checkContainerUnit("detent-db.container", DB.replace(/^ContainerName=.*\n/m, ""))).toEqual([
+    "detent-db.container sets no ContainerName=detent-db",
+  ]);
+  expect(checkContainerUnit("detent-db.container", DB.replace("detent-db\n", "other\n"))).toEqual([
+    "detent-db.container sets no ContainerName=detent-db",
+  ]);
+  expect(checkContainerUnit("detent-db.container", DB.replace(/^Restart=.*\n/m, ""))).toEqual([
+    "detent-db.container sets no Restart=on-failure in [Service]",
+  ]);
+  expect(checkContainerUnit("detent-db.container", DB.replace("RestartSec=5", "RestartSec=1"))).toEqual([
+    "detent-db.container sets no RestartSec=5 in [Service]",
+  ]);
 });
 
 test("a pod without WantedBy=default.target is rejected", () => {
@@ -126,7 +151,20 @@ test("a Caddyfile for another host or port is rejected", () => {
 });
 
 test("a reset script that does not seed with SEED_ALLOW=1 is rejected", () => {
-  expect(checkReset(RESET.replace("SEED_ALLOW=1", "SEED=1"))).not.toEqual([]);
+  expect(checkReset(RESET.replace("SEED_ALLOW=1", "SEED=1"))).toEqual(["reset.sh does not set SEED_ALLOW=1"]);
+});
+
+test("a reset script without the TCP pg_isready wait before dropdb is rejected", () => {
+  const msg = ["reset.sh does not wait for pg_isready over TCP before dropdb"];
+  expect(checkReset(RESET.replace("pg_isready -h localhost", "pg_isready"))).toEqual(msg);
+  expect(checkReset(RESET.replace(/pg_isready/g, "true"))).toEqual(msg);
+});
+
+test("the setup, reset and deploy scripts start with set -eu", async () => {
+  const setup = await read("setup.sh");
+  const deploy = await Bun.file(new URL("../scripts/deploy-demo.sh", import.meta.url)).text();
+  for (const t of [setup, RESET, deploy]) expect(/^set -eu$/m.test(t)).toBe(true);
+  expect(checkReset(RESET.replace("set -eu", "set -e"))).toEqual(["reset.sh does not start with set -eu"]);
 });
 
 test("a timer that does not run daily is rejected", () => {

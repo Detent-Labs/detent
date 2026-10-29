@@ -12,6 +12,7 @@ Environment=POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256
 
 [Service]
 Restart=on-failure
+RestartSec=5
 
 [Install]
 WantedBy=default.target

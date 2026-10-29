@@ -66,13 +66,13 @@ targets one origin, so the demo uses it.
 
 ### D2. One Quadlet pod with three containers
 
-`deploy/demo/` holds these units for `~/.config/containers/systemd/`:
+`deploy/demo/` holds these Quadlet units for `~/.config/containers/systemd/`:
 
 | File | Content |
 |---|---|
 | `detent-demo.pod` | `PublishPort=80:80` and `PublishPort=443:443` |
 | `detent-db.container` | `docker.io/library/postgres:18`, `Pod=detent-demo.pod`, volume `detent-pgdata.volume` at `/var/lib/postgresql`, `EnvironmentFile=%h/.config/detent/db.env`, `POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256` |
-| `detent-engine.container` | `localhost/detent-engine:demo`, `Pod=detent-demo.pod`, `EnvironmentFile=%h/.config/detent/engine.env`, ordered after the database |
+| `detent-engine.container` | `localhost/detent-engine:demo`, `Pod=detent-demo.pod`, `EnvironmentFile=%h/.config/detent/engine.env`, `Wants=` and `After=detent-db.service` |
 | `detent-caddy.container` | `docker.io/library/caddy:2`, `Pod=detent-demo.pod`, volumes `detent-caddy-data.volume` and `detent-caddy-config.volume`, the `Caddyfile` mounted read-only from `%h/detent/Caddyfile` |
 | `*.volume` | one unit per named volume |
 
@@ -80,10 +80,16 @@ Each `.container` unit sets `ContainerName=` to `detent-db`, `detent-engine`
 or `detent-caddy`. Quadlet would otherwise name it `systemd-<unit>`, and the
 reset script addresses the containers by name.
 
-Each `.container` unit sets `Restart=on-failure` in its `[Service]` section.
-On a first boot the engine can start before Postgres accepts connections, and
-`initSchema` then fails. The restart retries it. The pod unit carries
-`[Install]` with `WantedBy=default.target`, so the pod starts at boot.
+Each `.container` unit sets `Restart=on-failure` and `RestartSec=5` in its
+`[Service]` section. On a first boot the engine can start before Postgres
+accepts connections, and `initSchema` then fails. The restart retries it, and
+the five-second delay keeps the retries under systemd's start limit. Each
+container unit and the pod unit carry `[Install]` with
+`WantedBy=default.target`. Starting the pod service starts no container, so
+the containers need their own entry to start at boot.
+
+The reset service and timer are plain systemd units. Quadlet does not read
+them. They sit in `deploy/demo/systemd/` and go to `~/.config/systemd/user/`.
 
 The engine reaches Postgres at `localhost:5432` inside the pod. Caddy proxies
 to `localhost:3000`. The units use `%h`, so no absolute home path lands in a
@@ -96,7 +102,8 @@ tracked file.
 only when they do not exist. It writes a random Postgres password into both and
 a random `AUTH_JWT_SECRET` into `engine.env`. Each secret is 64 hex characters
 from `/dev/urandom`, so it is safe inside `DATABASE_URL` as written. It copies every other line from
-`deploy/demo/engine.env.example`. It also enables `detent-demo-reset.timer`.
+`deploy/demo/engine.env.example`. It also runs `systemctl --user enable --now detent-demo-reset.timer`, and it
+fails when only one of the two files exists.
 
 `engine.env.example` sets these values and no others:
 
@@ -115,14 +122,17 @@ from `/dev/urandom`, so it is safe inside `DATABASE_URL` as written. It copies e
 
 `deploy/demo/reset.sh` runs as `detent`, in this order:
 
-1. `systemctl --user stop detent-engine.service`
-2. `podman exec detent-db dropdb -U postgres --if-exists --force workflow_engine`,
+1. Wait for `podman exec detent-db pg_isready -h localhost -U postgres`, for at
+   most 120 s. The `-h localhost` flag forces TCP, since the server that `initdb` runs
+   at first boot listens on the unix socket only.
+2. `systemctl --user stop detent-engine.service`
+3. `podman exec detent-db dropdb -U postgres --if-exists --force workflow_engine`,
    then `createdb -U postgres workflow_engine`
-3. `systemctl --user start detent-engine.service`, then poll `/readyz` with
+4. `systemctl --user start detent-engine.service`, then poll `/readyz` with
    `podman exec detent-engine bun -e` and a `fetch`, for at most 120 s. A plain
    `podman build` writes the OCI format, which drops the image's `HEALTHCHECK`,
    so the reset does not rely on it.
-4. `podman exec -e SEED_ALLOW=1 detent-engine bun run scripts/seed.ts`
+5. `podman exec -e SEED_ALLOW=1 detent-engine bun run scripts/seed.ts`
 
 `detent-demo-reset.service` runs the script. `detent-demo-reset.timer` fires
 it at `*-*-* 03:00:00 UTC` with `Persistent=true`. The first deploy runs the
@@ -131,18 +141,25 @@ script once, so the demo starts seeded.
 ### D5. The deploy script builds locally and ships over SSH
 
 `scripts/deploy-demo.sh <ssh-target>` takes the target as its one argument,
-for example `detent@detent.org`. It refuses a dirty tree. Then it runs:
+for example `detent@detent.org`. It refuses a dirty tree. The guard ignores
+`VERSION`, which the post-commit hook leaves modified. Then it runs:
 
 1. `podman build --format docker -t localhost/detent-engine:demo -f deploy/engine.Dockerfile .`.
    The Docker format keeps the image's `HEALTHCHECK`, so `podman ps` shows
    the engine's health.
 2. `podman save localhost/detent-engine:demo | ssh <target> podman load`
-3. Run `mkdir -p ~/.config/containers/systemd ~/detent` over SSH. Then copy the units to the first, and the `Caddyfile` plus the
-   two scripts to the second, over `scp`.
-4. On the server: `systemctl --user daemon-reload`, then
-   `systemctl --user restart detent-demo-pod.service`.
-5. On the first deploy only, when `~/.config/detent/engine.env` is missing:
-   run `setup.sh` before step 4 and `reset.sh` after it.
+3. Run `mkdir -p` over SSH for `~/.config/containers/systemd`,
+   `~/.config/systemd/user` and `~/detent`. Then copy over `scp`. The Quadlet
+   units go to the first directory. The reset service and timer go to the
+   second. The `Caddyfile`, the template and the two scripts go to the third.
+4. Test over SSH whether `~/.config/detent/engine.env` is missing. Exit 0 means
+   a first deploy. Exit 1 means a later one. Any other exit, such as the 255 of
+   a failed connection, aborts the script. On a first deploy, run `setup.sh`.
+5. On the server: `systemctl --user daemon-reload`, then
+   `systemctl --user restart` for `detent-demo-pod.service`, `detent-db.service`,
+   `detent-engine.service` and `detent-caddy.service`. The container units bind
+   to the pod, but starting the pod starts none of them.
+6. On a first deploy only, run `reset.sh`.
 
 ### D6. Tests lint the definition
 
