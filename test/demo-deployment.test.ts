@@ -103,7 +103,14 @@ const checkDeploy = (t: string) => [
   ...(/quadlet -dryrun -user/.test(t) && t.indexOf("quadlet -dryrun") < t.indexOf("systemctl --user daemon-reload")
     ? []
     : ["deploy-demo.sh does not run the server's Quadlet dry-run before the restart"]),
-  ...(/podman image prune -f/.test(t) ? [] : ["deploy-demo.sh does not prune images after the load"]),
+  ...(/podman image prune -f/.test(t) && t.indexOf("podman build") < t.indexOf("podman image prune")
+    ? []
+    : ["deploy-demo.sh does not prune images after the build"]),
+  ...(/git branch -r --contains/.test(t) && t.indexOf("git branch -r --contains") < t.indexOf('ssh "$target"')
+    ? []
+    : ["deploy-demo.sh does not refuse a commit no remote branch contains before it contacts the server"]),
+  ...(/^ssh "\$target" '?podman build .*~\/detent\/repo'?$/m.test(t) ? [] : ["deploy-demo.sh does not build with podman build on the server from ~/detent/repo"]),
+  ...(/podman (save|load)/.test(t) ? ["deploy-demo.sh ships an image with podman save or podman load"] : []),
 ];
 const checkTimer = (t: string) => (/^OnCalendar=\*-\*-\* /m.test(t) ? [] : ["the timer does not run daily"]);
 
@@ -227,6 +234,31 @@ test("a deploy script that skips the pull, the seeded check, the dry-run or the 
     "deploy-demo.sh does not run the server's Quadlet dry-run before the restart",
   ]);
   expect(checkDeploy(DEPLOY.replace(/^ssh .*image prune.*\n/m, ""))).toEqual([
-    "deploy-demo.sh does not prune images after the load",
+    "deploy-demo.sh does not prune images after the build",
   ]);
+});
+
+test("a deploy script that prunes before the build is rejected", () => {
+  const prune = /^ssh "\$target" podman image prune -f\n/m;
+  const moved = DEPLOY.replace(prune, "").replace(/^(ssh "\$target" 'podman build)/m, 'ssh "$target" podman image prune -f\n$1');
+  expect(checkDeploy(moved)).toEqual(["deploy-demo.sh does not prune images after the build"]);
+});
+
+test("a deploy script that does not check for a pushed commit before ssh is rejected", () => {
+  const msg = ["deploy-demo.sh does not refuse a commit no remote branch contains before it contacts the server"];
+  expect(checkDeploy(DEPLOY.replace("git branch -r --contains", "git branch --contains"))).toEqual(msg);
+  const check = DEPLOY.replace("# The server can build only", 'ssh "$target" true\n# The server can build only');
+  expect(checkDeploy(check)).toEqual(msg);
+});
+
+test("a deploy script that builds anywhere but on the server is rejected", () => {
+  const msg = ["deploy-demo.sh does not build with podman build on the server from ~/detent/repo"];
+  expect(checkDeploy(DEPLOY.replace(/^ssh "\$target" 'podman build/m, "podman build"))).toEqual(msg);
+  expect(checkDeploy(DEPLOY.replace("engine.Dockerfile ~/detent/repo'", "engine.Dockerfile .'"))).toEqual(msg);
+});
+
+test("a deploy script that ships an image with podman save or load is rejected", () => {
+  const msg = ["deploy-demo.sh ships an image with podman save or podman load"];
+  expect(checkDeploy(`${DEPLOY}podman save x | ssh h podman load\n`)).toEqual(msg);
+  expect(checkDeploy(`${DEPLOY}ssh h podman load\n`)).toEqual(msg);
 });

@@ -86,15 +86,26 @@ data directory.
 - **WHEN** the server pulls a newer Postgres image
 - **THEN** it stays on the pinned major version, and the volume stays readable
 
-### Requirement: The engine image builds off the server
+### Requirement: The server builds the engine image from a pushed commit
 
-`scripts/deploy-demo.sh` SHALL build the engine image on the machine that runs
-it. It SHALL ship the image to the server over SSH. The server SHALL NOT build
-an image.
+`scripts/deploy-demo.sh` SHALL deploy the commit the operator has checked out,
+and SHALL refuse a commit that no remote branch contains. The server SHALL keep
+a checkout of the repository and move it to exactly that commit. The server
+SHALL build the engine image from that checkout. The operator's machine SHALL
+NOT build or upload an image. The units and scripts the server runs SHALL come
+from the same checkout.
 
 #### Scenario: A later deploy
 
-- **WHEN** the operator runs `scripts/deploy-demo.sh` with a new commit checked
-  out
-- **THEN** the server loads the new image and restarts the pod, and runs no
-  build
+- **WHEN** the operator runs `scripts/deploy-demo.sh` with a pushed commit
+  checked out
+- **THEN** the server checks out that commit, builds the image and restarts
+  the pod
+- **AND** no image crosses the network from the operator's machine
+
+#### Scenario: An unpushed commit
+
+- **WHEN** the operator runs `scripts/deploy-demo.sh` on a commit that no
+  remote branch contains
+- **THEN** the script stops before it contacts the server, and names the
+  reason
