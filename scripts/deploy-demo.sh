@@ -29,8 +29,8 @@ sha=$(git rev-parse HEAD)
 case $sha in
   *[!0-9a-f]*|'') echo "deploy-demo.sh: HEAD is not a commit hash: $sha" >&2; exit 1 ;;
 esac
-git fetch --quiet
-if [ -z "$(git branch -r --contains "$sha")" ]; then
+git fetch --quiet --prune origin
+if [ -z "$(git branch -r --contains "$sha" --list 'origin/*')" ]; then
   echo "deploy-demo.sh: commit $sha is on no remote branch; push it first" >&2
   exit 1
 fi
