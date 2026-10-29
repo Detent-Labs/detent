@@ -59,6 +59,11 @@ After the devcontainer rebuild, `sh scripts/dev-exec.sh bun install` rewrites
 checks that no other locked version moves. The `frozen-lockfile` gate then
 runs against the migrated file.
 
+Measured on 1.4.4, `bun install` keeps an existing v1 lockfile at v1. Only a
+fresh lockfile comes out as v2, and a fresh resolve moves 34 locked versions.
+The header therefore moves to 2 by hand. Bun 1.4.4 reads that file under the
+v2 checks and writes it back unchanged.
+
 ### D3. Repair what breaks, smallest change first
 
 The first full suite on 1.4.4 lists the failures by name. Each one gets the
@@ -75,7 +80,7 @@ built app through Playwright on 1.4.4. No screen moves, so
 
 ## Repairs
 
-None yet. Task 2.3 fills this list.
+None. Every check passed on 1.4.4 without a change.
 
 ## Risks / Trade-offs
 
