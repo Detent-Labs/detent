@@ -6,6 +6,7 @@
   - `BUN_DIRECTORIES` becomes `["/"]`.
   - `dependabotProblems` reports `a bun entry for <directory>` for each `bun` entry outside `/`.
   - It reports `no group holds react, react-dom, @types/react and @types/react-dom` when no group on the root `bun` entry lists all four.
+  - The group rule runs only when a root `bun` entry exists (design.md D2). The fixture "an npm entry in place of the root bun entry" keeps its two expected messages.
   - Replace the two fixtures that delete a member entry. One new fixture adds a `/packages/web` `bun` entry.
   - Add one fixture that deletes the group from the root entry.
   - Run the full suite as in task 3.2. "the real Dependabot file breaks none of the Dependabot rules" must fail by name on the unchanged file.

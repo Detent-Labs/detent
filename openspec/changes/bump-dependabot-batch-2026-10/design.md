@@ -83,6 +83,11 @@ is `no group holds react, react-dom, @types/react and @types/react-dom`. A
 fixture deletes the group and expects it. The `Update` type in the test gains
 an optional `groups` record.
 
+The rule runs only when a root `bun` entry exists. Without one, "no bun entry
+for /" already names the fault. The fixture "an npm entry in place of the root
+bun entry" then keeps its two expected messages, since `expectProblems`
+compares the whole list.
+
 ### D3. Bump through the devcontainer, then regenerate the notice
 
 The four rows with a manifest change get it first. Then `bun update` with the

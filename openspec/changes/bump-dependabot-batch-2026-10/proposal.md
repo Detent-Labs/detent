@@ -7,8 +7,8 @@ merge on its own:
 
 - #89, #91 and #92 change `packages/web/package.json` and leave `bun.lock`
   alone. The `frozen-lockfile` gate rejects each one.
-- #50 bumps `react` and #93 bumps `react-dom`. React needs both at one version,
-  so each pull request alone fails.
+- #50 bumps `react` and #93 bumps `react-dom`. Each fails the same gate on its
+  own. React ships the two together, and neither installs cleanly alone.
 - #94 failed only on the retention test that `fix-retention-dst-window`
   repaired.
 
