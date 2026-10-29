@@ -72,7 +72,7 @@ Declared directly in a `package.json` (root or a `packages/*` workspace).
 | `vite` | 8.3.5 | MIT |
 | `zod` | 4.6.6 | MIT |
 
-`react` and `react-dom` resolve once, at 19.2.8. `packages/web` declares
+`react` and `react-dom` resolve once, at 19.3.1. `packages/web` declares
 `^19`, and `packages/form-ui` declares `^19` as a peer range. The two type
 packages resolve once too. Both workspaces declare `@types/react` and
 `@types/react-dom` at `^19`.

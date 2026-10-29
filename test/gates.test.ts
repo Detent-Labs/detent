@@ -847,6 +847,9 @@ function dependabotProblems(config: Dependabot): string[] {
     );
     if (!found) problems.push(`no bun entry for ${directory}`);
   }
+  if (updates.filter((update) => update["package-ecosystem"] === "bun" && update.directory === "/").length > 1) {
+    problems.push("more than one bun entry for /");
+  }
   for (const update of updates) {
     if (update["package-ecosystem"] === "bun" && !BUN_DIRECTORIES.includes(update.directory ?? "")) {
       problems.push(`a bun entry for ${update.directory}`);
@@ -1076,6 +1079,13 @@ const DEPENDABOT_FIXTURES: [string, (config: Dependabot) => void, string[]][] = 
       c.updates.push({ "package-ecosystem": "bun", directory: "/packages/web" });
     },
     ["a bun entry for /packages/web"],
+  ],
+  [
+    "two bun entries for /",
+    (c) => {
+      c.updates.push({ "package-ecosystem": "bun", directory: "/" });
+    },
+    ["more than one bun entry for /"],
   ],
   [
     "no react group on the root bun entry",

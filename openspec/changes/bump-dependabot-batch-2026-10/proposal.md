@@ -44,8 +44,10 @@ None.
 
 ### Modified Capabilities
 
-- `development-toolchain`: "Dependabot updates the lockfile the install reads"
-  names the root as the one `bun` directory and requires the React group.
+- `development-toolchain`: the delta removes "Dependabot updates the lockfile
+  the install reads". It adds "Dependabot updates the root lockfile from one
+  bun entry". The new requirement names the root as the one `bun` directory.
+  It also requires the React group.
 
 ## Impact
 
