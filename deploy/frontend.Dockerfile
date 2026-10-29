@@ -1,7 +1,7 @@
 # Production image for one of the frontend SPAs (app/admin/studio/reporting),
 # `packages/web`, the one package that produces a bundle. Genuinely multi-stage: Bun and Vite
 # build the assets, but nginx serves them, and nginx cannot run either.
-FROM docker.io/oven/bun:1.3.11-slim AS build
+FROM docker.io/oven/bun:1.4.4-slim AS build
 
 WORKDIR /app
 
