@@ -10,6 +10,14 @@ if [ "$#" -ne 1 ]; then
 fi
 target=$1
 
+# Every ssh and scp call below shares one TCP connection. The demo host's
+# network drops port 22 for minutes when new connections follow the image
+# upload in quick succession.
+control_dir=$(mktemp -d)
+trap 'command ssh -o ControlPath="$control_dir/cm" -O exit "$target" 2>/dev/null; rm -rf "$control_dir"' EXIT
+ssh() { command ssh -o ControlMaster=auto -o ControlPath="$control_dir/cm" -o ControlPersist=120 "$@"; }
+scp() { command scp -o ControlMaster=auto -o ControlPath="$control_dir/cm" -o ControlPersist=120 "$@"; }
+
 # The post-commit hook leaves VERSION modified on purpose.
 if [ -n "$(git status --porcelain -- . ':!VERSION')" ]; then
   echo "deploy-demo.sh: the working tree is dirty; commit or remove the changes first" >&2
