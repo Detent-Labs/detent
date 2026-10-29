@@ -14,15 +14,15 @@
 
 ## 2. Land the seven bumps
 
-- [ ] 2.1 Change the manifests to the design.md table's "Manifest change" column. Change `vite`, `@dagrejs/dagre` and `lucide-react` in `packages/web/package.json`. Change `@playwright/test` in `package.json`. Leave `@types/bun` at `^1.3.14`.
-- [ ] 2.2 Run the two commands of design.md D3 in the devcontainer:
+- [x] 2.1 Change the manifests to the design.md table's "Manifest change" column. Change `vite`, `@dagrejs/dagre` and `lucide-react` in `packages/web/package.json`. Change `@playwright/test` in `package.json`. Leave `@types/bun` at `^1.3.14`.
+- [x] 2.2 Run the two commands of design.md D3 in the devcontainer:
   - `sh scripts/dev-exec.sh bun update react react-dom @types/react @types/react-dom @vitejs/plugin-react`
   - `sh scripts/dev-exec.sh bun install`
   - Restore any manifest range that `bun update` rewrote. `git diff -- package.json packages/*/package.json` must show only the four lines from 2.1.
   - `bun.lock` must hold every target version from the design.md table, and `@types/bun@1.3.14`.
   - On the host, `sh scripts/gates/lockfile.sh` must exit 0.
-- [ ] 2.3 Run `sh scripts/dev-exec.sh bun run scripts/thirdparty.ts --write`. `git diff --stat THIRDPARTY.md` must show changes only for the bumped packages and their new transitive entries.
-- [ ] 2.4 Run `sh scripts/dev-exec.sh bun audit --audit-level=high`. Record its exit status.
+- [x] 2.3 Run `sh scripts/dev-exec.sh bun run scripts/thirdparty.ts --write`. `git diff --stat THIRDPARTY.md` must show changes only for the bumped packages and their new transitive entries.
+- [x] 2.4 Run `sh scripts/dev-exec.sh bun audit --audit-level=high`. Record its exit status.
 
 ## 3. Verification
 
