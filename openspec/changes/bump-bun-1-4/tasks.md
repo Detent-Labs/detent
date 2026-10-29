@@ -13,7 +13,7 @@
 ## 2. Migrate the lockfile and repair the breakage
 
 - [x] 2.1 Set `@types/bun` to `^1.4.4` in `package.json`. Run `sh scripts/dev-exec.sh bun install` (design.md D2):
-  - `bun.lock` holds `"lockfileVersion": 2` and `@types/bun@1.4.4`.
+  - `bun.lock` keeps `"lockfileVersion": 1` and holds `@types/bun@1.4.4`.
   - Extract the `name@version` pairs from the old and the new `bun.lock` and compare the two sets. Report every pair besides `@types/bun` and `bun-types` that moved.
   - On the host, `sh scripts/gates/lockfile.sh` exits 0.
 - [x] 2.2 Run `sh scripts/dev-exec.sh bun run scripts/thirdparty.ts --write`. `THIRDPARTY.md` changes only for `@types/bun`, `bun-types` and the runtime image row.

@@ -18,8 +18,10 @@ The tag `oven/bun:1.4.4-slim` exists on Docker Hub since 2026-10-22.
 The Bun 1.4 release notes (`bun.com/blog/bun-v1.4`, "Upgrading to 1.4" and the
 lists after it) name these changes that can reach this repo:
 
-- `bun.lock` becomes `lockfileVersion: 2`. A v1 lockfile loads, and
-  `bun install` migrates it.
+- A new `bun.lock` is `lockfileVersion: 2`. The notes say `bun install`
+  migrates a v1 lockfile. In a measured run, 1.4.4 keeps an existing v1
+  lockfile at v1. Only a fresh lockfile is v2, and a fresh one would move 34 locked
+  versions.
 - `Bun.YAML` follows YAML 1.2. `test/gates.test.ts` parses the CI workflow and
   `dependabot.yml` with it.
 - `toContain()` compares with `===` instead of `Object.is`.
@@ -52,17 +54,17 @@ lists after it) name these changes that can reach this repo:
 The four pins move together, as the engine Dockerfile's comment demands. A
 split would let CI and the deploy image run different runtimes.
 
-### D2. Migrate the lockfile with the new runtime
+### D2. Relock with the new runtime, keep lockfile version 1
 
-After the devcontainer rebuild, `sh scripts/dev-exec.sh bun install` rewrites
-`bun.lock` to `lockfileVersion: 2` and locks `@types/bun` 1.4.4. The task
-checks that no other locked version moves. The `frozen-lockfile` gate then
-runs against the migrated file.
+After the devcontainer rebuild, `sh scripts/dev-exec.sh bun install` locks
+`@types/bun` 1.4.4 and writes `bun.lock` back as `lockfileVersion: 1`. That is
+the format Bun 1.4.4 writes for an existing lockfile. The task checks that no
+other locked version moves. The `frozen-lockfile` gate then runs against the
+relocked file.
 
-Measured on 1.4.4, `bun install` keeps an existing v1 lockfile at v1. Only a
-fresh lockfile comes out as v2, and a fresh resolve moves 34 locked versions.
-The header therefore moves to 2 by hand. Bun 1.4.4 reads that file under the
-v2 checks and writes it back unchanged.
+The change does not force version 2. A fresh lockfile would move 34 locked
+versions. A header set to 2 by hand would claim a format Bun did not write.
+Dependabot's bun updater may also not read version 2 yet.
 
 ### D3. Repair what breaks, smallest change first
 
@@ -90,12 +92,12 @@ None. Every check passed on 1.4.4 without a change.
 - [A Rust-port regression hits a path no test covers] → The suite covers the
   engine and the HTTP layer. The CI `e2e` job covers the built app. A gap
   outside them stays possible until a later run finds it.
-- [A contributor on an old devcontainer cannot read `bun.lock` v2] → One
-  machine runs this repo, and the rebuild is one command.
+- [A later Bun moves `bun.lock` to version 2] → The rewrite lands as its own
+  diff. The `frozen-lockfile` gate checks it.
 
 ## Migration Plan
 
-1. Rebuild the devcontainer on the branch, migrate, repair, verify.
+1. Rebuild the devcontainer on the branch, relock, repair, verify.
 2. Archive, push, merge on green CI. With `skip_specs` there is nothing to sync.
 3. Rollback: revert the merge, then `sh scripts/dev-pod.sh up` rebuilds 1.3.11.
 

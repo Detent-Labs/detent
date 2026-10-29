@@ -17,7 +17,8 @@ the upgrade has to close.
 - `deploy/engine.Dockerfile` and `deploy/frontend.Dockerfile` build from
   `oven/bun:1.4.4-slim`.
 - `package.json` declares `@types/bun` `^1.4.4`.
-- `bun.lock` moves to the lockfile format Bun 1.4 writes, `lockfileVersion: 2`.
+- `bun.lock` locks `@types/bun` 1.4.4. Bun 1.4.4 keeps its existing format,
+  `lockfileVersion: 1`.
 - `THIRDPARTY.md` follows the new runtime image and `@types/bun`.
 - Code and tests that Bun 1.4 breaks get the smallest repair the release notes
   point to. design.md lists each one.
@@ -41,5 +42,5 @@ None. No spec names a Bun version. `development-toolchain` says only that
   `deploy/frontend.Dockerfile`, `package.json`, `bun.lock`, `THIRDPARTY.md`,
   plus the source and test files design.md names after the first suite run.
 - Every contributor rebuilds the devcontainer with `sh scripts/dev-pod.sh up`.
-  A Bun 1.3 binary may refuse the migrated `bun.lock`.
+  The `bun.lock` format stays the one Bun 1.3 reads.
 - Merging lets Dependabot close #90 as up to date.
