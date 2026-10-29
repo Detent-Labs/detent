@@ -188,29 +188,6 @@ before.
 - **WHEN** a first publish through `POST /processes` fails validation
 - **THEN** the process's Developer list stays empty
 
-### Requirement: A rollout migration seeds every existing process's Developer list
-
-The change that ships this capability SHALL run a one-time migration. For
-every process that already carries a draft or a published version, the
-migration SHALL add every account holding `system:developer` or
-`system:author` to that process's Developer list.
-
-The migration SHALL be idempotent. A second run does not add a duplicate
-entry. A second run changes nothing the first run already covered
-correctly.
-
-#### Scenario: An existing process keeps every current author's access
-
-- **WHEN** the migration runs over a process with three accounts holding
-  `system:developer` or `system:author`
-- **THEN** all three accounts match that process's Developer list afterward
-
-#### Scenario: A second migration run changes nothing
-
-- **WHEN** the migration runs a second time over an already-migrated process
-- **THEN** the process's Developer list holds the same entries it held
-  before the second run
-
 ### Requirement: The Developer list gates both publish routes
 
 `POST /drafts/:processId/publish` and `POST /processes` SHALL refuse an actor

@@ -338,31 +338,6 @@ instance's set is rewritten.
 - **WHEN** a reader supplies an actor id belonging to another actor
 - **THEN** the match uses the credential's own actor, not the supplied id
 
-### Requirement: Existing instances are backfilled once
-
-The change SHALL derive a principal set for every instance that exists before
-the set does. It SHALL derive it from four sources:
-
-- the instance's starter
-- its current assignment candidates
-- its claimant
-- the acting actor recorded on each history entry
-
-Without the backfill every pre-existing instance would carry an empty set and be
-invisible to every reader. The backfill SHALL be idempotent, so a second run
-adds nothing.
-
-#### Scenario: A pre-existing instance gains its historical actors
-
-- **WHEN** the backfill runs over an instance whose history records actor A as
-  having taken a transition
-- **THEN** A is a principal of that instance
-
-#### Scenario: The backfill is idempotent
-
-- **WHEN** the backfill runs a second time
-- **THEN** no instance's principal set changes
-
 ### Requirement: Every branch of the read carries the whole filter set
 
 The read resolves one bounded, ordered lookup per principal and merges them.
@@ -464,16 +439,14 @@ The list and the direct read SHALL agree on the participation ground. An
 instance the visible scope returns to an actor by a principal match SHALL open
 for that actor. One it withholds on that ground SHALL refuse them.
 
-Three cases sit outside that guarantee. A test instance never reaches a
+Two cases sit outside that guarantee. A test instance never reaches a
 participant list, and its starter still opens it. The live-assignment ground
-carries its own predicate on each side, and the two do not match today. The
-starter ground has no SQL form at all, so the list omits an instance the
-backfill never reached.
+carries its own predicate on each side, and the two do not match today.
 
 #### Scenario: A past participant opens the instance
 
 - **WHEN** an actor was a candidate on a step the instance has since left
-- **AND** that actor holds no claim and no candidacy on the current step
+- **AND** that actor has no claim and no candidacy on the current step
 - **THEN** `getInstanceView` returns the view
 
 #### Scenario: A group member opens the instance
@@ -485,13 +458,13 @@ backfill never reached.
 #### Scenario: A revoked participant is refused
 
 - **WHEN** an administrator has revoked the actor from the instance
-- **AND** the actor holds no claim and no candidacy on the current step
+- **AND** the actor has no claim and no candidacy on the current step
 - **THEN** `getInstanceView` throws `AuthorizationError`
 
 #### Scenario: A revoked starter is refused
 
 - **WHEN** an administrator has revoked the instance's starter
-- **AND** the starter holds no claim and no candidacy on the current step
+- **AND** the starter has no claim and no candidacy on the current step
 - **THEN** `getInstanceView` throws `AuthorizationError`
 
 #### Scenario: A live assignment outranks the revocation on the direct read
