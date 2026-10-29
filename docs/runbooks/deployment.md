@@ -144,67 +144,6 @@ The seed script creates demo accounts with a fixed, published password. One of
 them holds `system:admin`. `.dockerignore` excludes no part of `scripts/`, so
 the script reaches the engine image. Leave `SEED_ALLOW` unset in a deployment.
 
-## The instance-visibility backfill
-
-Run once, after deploying the engine that first carries
-`instance_principals`:
-
-```
-bun run scripts/backfill-instance-principals.ts
-```
-
-The engine records who took part in an instance from that deploy onward. Every
-instance created before it carries nothing. `GET /instances?scope=visible`
-therefore returns none of them to the people who worked them.
-
-The script derives a set from what the engine already stored:
-
-- the starter
-- the current step's candidates and claimant
-- the acting actor on each history entry
-
-Run it after the deploy, not before. The relation has to exist, and the engine
-has to be appending already. Otherwise the script skips every instance created
-in between.
-
-It is idempotent and it never deletes. A second run writes nothing, an
-interrupted run is safe to repeat, and neither needs downtime.
-
-It cannot recover a candidate on a step an instance has already left who never
-acted. Nothing recorded that. Those readers stay unseen until the instance
-moves again.
-
-One consequence belongs on an operator's radar rather than in the script.
-Redaction now deletes an instance's visibility rows, and the scheduled
-`DATA_RETENTION_DAYS` sweep redacts in bulk. Every instance that sweep touches
-leaves its participants' lists at once, with no notice to them.
-
-## The process-access-roles rollout migration
-
-Run once, after deploying the engine that first carries
-`process_access_roles`, and before that deploy's draft routes start
-refusing an unlisted developer:
-
-```
-bun run scripts/backfill-process-access-roles.ts
-```
-
-Every account holding `system:developer` or `system:author` joins one
-Developer list. That list belongs to every process that already carries a
-draft or a published version. Skipping this step locks every such account
-out of every process it did not itself write. That lockout starts once
-the deploy's draft-route gate goes live.
-
-It is idempotent. A second run adds nothing a first run already covered,
-and an interrupted run is safe to repeat.
-
-The script reads standing from `auth_users.roles` alone. A deployment may
-instead resolve roles from each caller's own JWT, with no local account
-row per actor. Such a deployment gets zero inserts from this script.
-Nobody exists in `auth_users` for it to read. It needs its own seed of
-`process_access_roles` before the same deploy's gate goes live. That seed
-derives from whatever directory issues those tokens.
-
 ## Running more than one engine process
 
 A tenant may run more than one engine process against one database. No

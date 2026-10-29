@@ -2,10 +2,10 @@
 
 ## 1. Delete the backfills
 
-- [ ] 1.1 Delete `scripts/backfill-instance-principals.ts`, `scripts/backfill-process-access-roles.ts` and `test/backfill-process-access-roles.test.ts`. Delete the `backfill-process-access-roles` line from `package.json`.
-- [ ] 1.2 Delete the sections "The instance-visibility backfill" and "The process-access-roles rollout migration" from `docs/runbooks/deployment.md`. Keep the sections before and after them intact.
-- [ ] 1.3 In `scripts/gates/pass-floor.txt`, change the integer from 5201 to 5199. Add a note line above it that names the two deleted tests, as design.md D3 states.
-- [ ] 1.4 Verify with `git grep -n -i 'backfill-instance-principals\|backfill-process-access-roles\|backfillProcessAccessRoles' -- . ':!openspec/changes'`. It prints nothing.
+- [x] 1.1 Delete `scripts/backfill-instance-principals.ts`, `scripts/backfill-process-access-roles.ts` and `test/backfill-process-access-roles.test.ts`. Delete the `backfill-process-access-roles` line from `package.json`.
+- [x] 1.2 Delete the sections "The instance-visibility backfill" and "The process-access-roles rollout migration" from `docs/runbooks/deployment.md`. Keep the sections before and after them intact.
+- [x] 1.3 In `scripts/gates/pass-floor.txt`, change the integer from 5201 to 5199. Add a note line above it that names the two deleted tests, as design.md D3 states.
+- [x] 1.4 Verify with `git grep -n -i 'backfill-instance-principals\|backfill-process-access-roles\|backfillProcessAccessRoles' -- . ':!openspec/changes'`. It prints nothing.
 
 ## 2. Verification
 

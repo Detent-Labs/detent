@@ -21,4 +21,9 @@
 # no longer makes: the three retired expression indexes (migration.test.ts),
 # the old resolve and redacted_at indexes and the resolve_state cleanup
 # (worker-scan-plans.test.ts), and the field_version backfill (outbox.test.ts).
-5201
+#
+# Lowered by 2 in drop-pre-green-start-backfills task group 1, which deletes
+# test/backfill-process-access-roles.test.ts and its two tests: "an existing
+# process keeps every current author's access" and "a second migration run
+# changes nothing".
+5199
