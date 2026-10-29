@@ -1,7 +1,8 @@
 /**
  * `openspec/changes/deploy-demo-on-podman`, D1: `deploy/engine.Dockerfile`
  * builds the browser bundle in a `build` stage and the final stage carries
- * only `packages/web/dist`, with `WEB_ROOT` pointing at it. `checkEngineImage`
+ * only `packages/web/dist` at the path `resolveWebRoot` defaults to, with no
+ * `WEB_ROOT` of its own. `checkEngineImage`
  * returns one message per broken rule; each rule has a mutated copy of the
  * Dockerfile text that breaks it.
  *
@@ -30,17 +31,16 @@ function checkEngineImage(text: string): string[] {
   if (!new RegExp(`^COPY --from=build ${DIST} ${DIST}$`, "m").test(final)) {
     problems.push("the final stage does not copy packages/web/dist from the build stage");
   }
-  if (!new RegExp(`^ENV WEB_ROOT=${DIST}$`, "m").test(final)) {
-    problems.push("the final stage does not set WEB_ROOT to the copied bundle");
+  if (/^ENV WEB_ROOT\b/m.test(final)) {
+    problems.push("the final stage sets WEB_ROOT");
   }
   if (!/^RUN bun install --production --frozen-lockfile$/m.test(final)) {
     problems.push("the final stage does not install production dependencies only");
   }
-  const webRoot = final.indexOf("ENV WEB_ROOT=");
   const copy = final.indexOf("COPY --from=build");
   const user = final.indexOf("USER bun");
-  if (copy === -1 || webRoot === -1 || user === -1 || copy > user || webRoot > user) {
-    problems.push("the bundle copy and WEB_ROOT must come before USER bun");
+  if (copy === -1 || user === -1 || copy > user) {
+    problems.push("the bundle copy must come before USER bun");
   }
   return problems;
 }
@@ -63,18 +63,9 @@ test("a final stage that copies from a stage other than build is rejected", () =
   );
 });
 
-test("a final stage without WEB_ROOT is rejected", () => {
-  const broken = DOCKERFILE.replace(/^ENV WEB_ROOT=.*\n/m, "");
-  expect(checkEngineImage(broken)).toContain(
-    "the final stage does not set WEB_ROOT to the copied bundle",
-  );
-});
-
-test("a WEB_ROOT pointing elsewhere is rejected", () => {
-  const broken = DOCKERFILE.replace("ENV WEB_ROOT=/app/packages/web/dist", "ENV WEB_ROOT=/srv/www");
-  expect(checkEngineImage(broken)).toContain(
-    "the final stage does not set WEB_ROOT to the copied bundle",
-  );
+test("a final stage that sets WEB_ROOT is rejected", () => {
+  const broken = DOCKERFILE.replace("ENV NODE_ENV=production", `ENV WEB_ROOT=${DIST}\nENV NODE_ENV=production`);
+  expect(checkEngineImage(broken)).toEqual(["the final stage sets WEB_ROOT"]);
 });
 
 test("a final stage with a full install is rejected", () => {
@@ -85,7 +76,7 @@ test("a final stage with a full install is rejected", () => {
 });
 
 test("a single-stage Dockerfile is rejected", () => {
-  const broken = DOCKERFILE.replace(" AS build", "").replace(/^FROM .*\n/m, "").replace(/^FROM /m, "FROM ");
+  const broken = DOCKERFILE.replace(" AS build", "").replace(/^FROM .*\n/m, "");
   expect(checkEngineImage(broken).length).toBeGreaterThan(0);
 });
 
@@ -94,9 +85,15 @@ test("NODE_ENV in the build stage is rejected", () => {
   expect(checkEngineImage(broken)).toContain("the build stage sets NODE_ENV or USER");
 });
 
-test("WEB_ROOT after USER bun is rejected", () => {
-  const broken = DOCKERFILE.replace(/^ENV WEB_ROOT=.*\n/m, "").replace("USER bun", "USER bun\nENV WEB_ROOT=/app/packages/web/dist");
-  expect(checkEngineImage(broken)).toContain("the bundle copy and WEB_ROOT must come before USER bun");
+test("a bundle copy after USER bun is rejected", () => {
+  const copy = DOCKERFILE.match(/^COPY --from=build .*\n/m)![0];
+  const broken = DOCKERFILE.replace(copy, "").replace("USER bun\n", `USER bun\n${copy}`);
+  expect(checkEngineImage(broken)).toEqual(["the bundle copy must come before USER bun"]);
+});
+
+test("USER in the build stage is rejected", () => {
+  const broken = DOCKERFILE.replace("WORKDIR /app", "USER bun\nWORKDIR /app");
+  expect(checkEngineImage(broken)).toContain("the build stage sets NODE_ENV or USER");
 });
 
 test("a build stage that does not build the web package is rejected", () => {

@@ -55,7 +55,9 @@ See proposal.md. Facts this design rests on:
 context, runs `bun install --frozen-lockfile` and
 `bun run --filter "./packages/web" build`. The final stage keeps today's
 steps and adds `COPY --from=build /app/packages/web/dist /app/packages/web/dist`
-and `ENV WEB_ROOT=/app/packages/web/dist`, before `USER bun`. The final
+before `USER bun`. It sets no `WEB_ROOT`, because the default of `resolveWebRoot`
+(`src/http/static.ts`) resolves to that directory. The live spec allows
+`NODE_ENV` as the one variable the image sets. The final
 `bun install --production --frozen-lockfile` stays. `ENV NODE_ENV=production`
 stays before `USER bun`; `test/http-error-path.test.ts` checks that order on
 the first match, so the build stage must not set either.
@@ -136,10 +138,13 @@ fails when only one of the two files exists.
 6. `podman exec detent-engine bun run src/auth/cli.ts add-user` creates
    `demo-superuser@example.test` with the password `seed-demo-password` and
    every reserved `system:*` role from `src/auth/authorize.ts`.
+7. Touch `~/.config/detent/seeded`. This is the last step, so the file proves
+   the whole reset finished.
 
 `detent-demo-reset.service` runs the script. `detent-demo-reset.timer` fires
-it at `*-*-* 03:00:00 UTC` with `Persistent=true`. The first deploy runs the
-script once, so the demo starts seeded.
+it at `*-*-* 03:00:00 UTC` with `Persistent=true`. The service runs
+`/bin/sh %h/detent/reset.sh`, so the file keeps working without an exec bit. The deploy runs the
+script while `seeded` is absent, so the demo starts seeded.
 
 ### D5. The deploy script builds locally and ships over SSH
 
@@ -150,19 +155,27 @@ for example `detent@detent.org`. It refuses a dirty tree. The guard ignores
 1. `podman build --format docker -t localhost/detent-engine:demo -f deploy/engine.Dockerfile .`.
    The Docker format keeps the image's `HEALTHCHECK`, so `podman ps` shows
    the engine's health.
-2. `podman save localhost/detent-engine:demo | ssh <target> podman load`
+2. `podman save localhost/detent-engine:demo | ssh <target> podman load`, then
+   `podman image prune -f` on the server, which removes the previous image.
 3. Run `mkdir -p` over SSH for `~/.config/containers/systemd`,
    `~/.config/systemd/user` and `~/detent`. Then copy over `scp`. The Quadlet
    units go to the first directory. The reset service and timer go to the
    second. The `Caddyfile`, the template and the two scripts go to the third.
-4. Test over SSH whether `~/.config/detent/engine.env` is missing. Exit 0 means
-   a first deploy. Exit 1 means a later one. Any other exit, such as the 255 of
-   a failed connection, aborts the script. On a first deploy, run `setup.sh`.
-5. On the server: `systemctl --user daemon-reload`, then
+4. Test over SSH whether `~/.config/detent/engine.env` is missing. Exit 0 runs
+   `setup.sh`. Exit 1 skips it. Any other exit aborts the script, such as the
+   255 of a failed connection. The same test on `~/.config/detent/seeded`
+   marks a deploy that owes a reset.
+5. Run `podman pull` on the server for `docker.io/library/postgres:18` and
+   `docker.io/library/caddy:2`. The first start then stays inside the unit's
+   start timeout. Each deploy also takes the current patch level. The
+   server's Quadlet dry-run (`/usr/libexec/podman/quadlet -dryrun -user`) runs
+   next, and a failure aborts the script before the restart.
+6. On the server: `systemctl --user daemon-reload`, then
    `systemctl --user restart` for `detent-demo-pod.service`, `detent-db.service`,
    `detent-engine.service` and `detent-caddy.service`. The container units bind
    to the pod, but starting the pod starts none of them.
-6. On a first deploy only, run `reset.sh`.
+7. When `seeded` was absent, run `reset.sh`. A first deploy that failed at the
+   restart or in the reset therefore seeds on the re-run.
 
 ### D6. Tests lint the definition
 
@@ -176,27 +189,37 @@ rules:
 - The pod unit carries `WantedBy=default.target`.
 - The database unit mounts `/var/lib/postgresql`.
 - The `Caddyfile` names `detent.org` and proxies to `localhost:3000`.
-- `reset.sh` sets `SEED_ALLOW=1`, and the timer runs daily.
+- `reset.sh` sets `SEED_ALLOW=1` and gives the superuser every role in
+  `src/auth/authorize.ts`. It writes the `seeded` marker last.
+- The timer runs daily, and the service runs the script through `/bin/sh`.
+- `deploy-demo.sh` pulls both images before the restart. It also runs the
+  server's dry-run before the restart, prunes after the load and checks the
+  `seeded` marker.
 
 A second test checks D1 against `deploy/engine.Dockerfile`. The final stage
-copies the bundle and sets `WEB_ROOT`. Each rule in both tests gets a fixture
+copies the bundle and sets no `WEB_ROOT`. Each rule in both tests gets a fixture
 that breaks it.
 
 ### D7. The Quadlet generator checks the units
 
 `/usr/lib/podman/quadlet -dryrun -user` runs over `deploy/demo/` on the
-developer machine. After the first deploy,
-`/usr/libexec/podman/quadlet -dryrun -user` runs on the server too, since the
-server's Podman is older.
+developer machine. `/usr/libexec/podman/quadlet -dryrun -user` runs on the
+server in every deploy, before the restart. The server's Podman is older.
 
 ## Risks / Trade-offs
 
-- [A visitor fills the 20 GB disk with uploads] → Uploads stop at 1 MiB, and
-  the nightly reset frees the space. A determined visitor can still upload
-  many files in one day. The runbook names `df -h` and a manual `reset.sh` as
-  the response.
-- [A visitor changes a demo password] → Other visitors lose that login until
-  the reset. That is the price of known logins.
+- [A visitor fills the 20 GB disk] → Uploads stop at 1 MiB. Every JSON route
+  accepts bodies up to 8 MiB (`MAX_REQUEST_BODY_SIZE` in `src/http/server.ts`),
+  so drafts and form data grow the database faster.
+- [A process starts itself] → The validator accepts a `process.start` action
+  that starts its own process. The outbox then grows the database with no
+  human in the loop.
+- [A full disk stops Postgres] → The manual reset then fails. The runbook names
+  `df -h`, the manual reset and a fallback that removes the pgdata volume. A
+  watchdog or an hourly reset is a follow-up. Nobody has built it.
+- [A visitor wrecks the logins] → The admin login can disable every demo
+  account or change its password. A visitor can also put any text on the
+  public login page with `PUT /admin/ui-strings`. Both last until the next reset.
 - [2 GB of RAM runs short] → The runbook adds a 2 GB swap file during
   preparation. The image builds stay off the server.
 - [Podman 5.4 rejects a key Podman 6.1 accepts] → D7 runs the generator on

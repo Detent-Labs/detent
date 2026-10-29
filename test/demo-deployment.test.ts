@@ -21,6 +21,10 @@ const POD = UNITS["detent-demo.pod"];
 const CADDY = await read("Caddyfile");
 const RESET = await read("reset.sh");
 const TIMER = await read("systemd/detent-demo-reset.timer");
+const SERVICE = await read("systemd/detent-demo-reset.service");
+const DEPLOY = await Bun.file(new URL("../scripts/deploy-demo.sh", import.meta.url)).text();
+const AUTHORIZE = await Bun.file(new URL("../src/auth/authorize.ts", import.meta.url)).text();
+const ROLES = [...AUTHORIZE.matchAll(/^export const \w+_ROLE = "(system:[a-z-]+)";$/gm)].map((m) => m[1]!);
 
 const EXPECTED_ENV = {
   DATABASE_URL: "postgres://postgres:<generated>@localhost:5432/workflow_engine",
@@ -85,6 +89,21 @@ const checkReset = (t: string) => [
   ...(/pg_isready -h localhost\b.*\n[\s\S]*dropdb/.test(t) ? [] : ["reset.sh does not wait for pg_isready over TCP before dropdb"]),
   ...(/^set -eu$/m.test(t) ? [] : ["reset.sh does not start with set -eu"]),
   ...(/scripts\/seed\.ts[^\n]*\n[\s\S]*add-user demo-superuser@example\.test/.test(t) ? [] : ["reset.sh does not create demo-superuser after the seed"]),
+  ...(superuserRoles(t).length === ROLES.length && ROLES.every((r) => superuserRoles(t).includes(r))
+    ? []
+    : ["reset.sh does not give demo-superuser every role in src/auth/authorize.ts"]),
+  ...(/\n(touch|: >) "?\$HOME\/\.config\/detent\/seeded"?\s*$/.test(t) ? [] : ["reset.sh does not write the seeded marker as its last step"]),
+];
+const superuserRoles = (t: string) => (/^roles="([^"]*)"$/m.exec(t)?.[1] ?? "").split(",").filter(Boolean);
+const checkDeploy = (t: string) => [
+  ...(/podman pull docker\.io\/library\/postgres:18 docker\.io\/library\/caddy:2/.test(t) && t.indexOf("podman pull") < t.indexOf("systemctl --user daemon-reload")
+    ? []
+    : ["deploy-demo.sh does not pull the postgres and caddy images before the restart"]),
+  ...(/test ! -e ~\/\.config\/detent\/seeded/.test(t) ? [] : ["deploy-demo.sh does not check the seeded marker"]),
+  ...(/quadlet -dryrun -user/.test(t) && t.indexOf("quadlet -dryrun") < t.indexOf("systemctl --user daemon-reload")
+    ? []
+    : ["deploy-demo.sh does not run the server's Quadlet dry-run before the restart"]),
+  ...(/podman image prune -f/.test(t) ? [] : ["deploy-demo.sh does not prune images after the load"]),
 ];
 const checkTimer = (t: string) => (/^OnCalendar=\*-\*-\* /m.test(t) ? [] : ["the timer does not run daily"]);
 
@@ -98,6 +117,8 @@ test("the shipped template, units, Caddyfile, reset script and timer satisfy eve
   expect(checkDbMount(DB)).toEqual([]);
   expect(checkCaddy(CADDY)).toEqual([]);
   expect(checkReset(RESET)).toEqual([]);
+  expect(checkDeploy(DEPLOY)).toEqual([]);
+  expect(SERVICE).toMatch(/^ExecStart=\/bin\/sh %h\/detent\/reset\.sh$/m);
   expect(checkTimer(TIMER)).toEqual([]);
 });
 
@@ -161,7 +182,8 @@ test("a reset script that creates demo-superuser before the seed or not at all i
   const lines = RESET.trimEnd().split("\n");
   const seed = lines.findIndex((l) => l.includes("scripts/seed.ts"));
   const [seedLine] = lines.splice(seed, 1);
-  expect(checkReset([...lines, seedLine].join("\n"))).toEqual(msg);
+  lines.splice(lines.findIndex((l) => l.includes("add-user")) + 1, 0, seedLine!);
+  expect(checkReset(lines.join("\n"))).toEqual(msg);
 });
 
 test("a reset script without the TCP pg_isready wait before dropdb is rejected", () => {
@@ -179,4 +201,32 @@ test("the setup, reset and deploy scripts start with set -eu", async () => {
 
 test("a timer that does not run daily is rejected", () => {
   expect(checkTimer(TIMER.replace("*-*-* 03:00:00", "Mon *-*-* 03:00:00"))).not.toEqual([]);
+});
+
+test("a reset script that drops a role from the superuser is rejected", () => {
+  expect(ROLES).toHaveLength(10);
+  const msg = ["reset.sh does not give demo-superuser every role in src/auth/authorize.ts"];
+  expect(checkReset(RESET.replace(",system:owner", ""))).toEqual(msg);
+  expect(checkReset(RESET.replace("system:create,", ""))).toEqual(msg);
+});
+
+test("a reset script that writes the seeded marker before the superuser or not at all is rejected", () => {
+  const msg = ["reset.sh does not write the seeded marker as its last step"];
+  expect(checkReset(RESET.replace(/touch .*seeded"\n/, ""))).toEqual(msg);
+  expect(checkReset(`${RESET}echo done\n`)).toEqual(msg);
+});
+
+test("a deploy script that skips the pull, the seeded check, the dry-run or the prune is rejected", () => {
+  expect(checkDeploy(DEPLOY.replace(/^ssh "\$target" podman pull .*\n/m, ""))).toEqual([
+    "deploy-demo.sh does not pull the postgres and caddy images before the restart",
+  ]);
+  expect(checkDeploy(DEPLOY.replace("detent/seeded", "detent/other"))).toEqual([
+    "deploy-demo.sh does not check the seeded marker",
+  ]);
+  expect(checkDeploy(DEPLOY.replace(/^ssh .*quadlet.*\n/m, ""))).toEqual([
+    "deploy-demo.sh does not run the server's Quadlet dry-run before the restart",
+  ]);
+  expect(checkDeploy(DEPLOY.replace(/^ssh .*image prune.*\n/m, ""))).toEqual([
+    "deploy-demo.sh does not prune images after the load",
+  ]);
 });

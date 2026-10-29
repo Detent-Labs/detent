@@ -33,8 +33,8 @@ RUN bun install --production --frozen-lockfile
 
 COPY --from=build /app/packages/web/dist /app/packages/web/dist
 
-# The server serves the shell and assets from this directory.
-ENV WEB_ROOT=/app/packages/web/dist
+# The server serves the shell from this directory with no WEB_ROOT set:
+# resolveWebRoot's default (src/http/static.ts) lands on it.
 
 # The server already passes `development: false` to Bun.serve. This keeps
 # every other Bun code path that reads NODE_ENV out of development mode.

@@ -34,3 +34,7 @@ podman exec -e SEED_ALLOW=1 detent-engine bun run scripts/seed.ts
 # Every reserved role in src/auth/authorize.ts. The seed's per-role accounts hold one each.
 roles="system:publish,system:cancel-any,system:admin,system:developer,system:reports,system:datalists,system:templates,system:author,system:create,system:owner"
 podman exec detent-engine bun run src/auth/cli.ts add-user demo-superuser@example.test seed-demo-password "$roles"
+
+# Last step: the deploy script runs this script again while the marker is absent.
+mkdir -p "$HOME/.config/detent"
+touch "$HOME/.config/detent/seeded"

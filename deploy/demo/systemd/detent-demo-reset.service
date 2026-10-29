@@ -3,4 +3,4 @@ Description=Reset the Detent demo to the seed state
 
 [Service]
 Type=oneshot
-ExecStart=%h/detent/reset.sh
+ExecStart=/bin/sh %h/detent/reset.sh

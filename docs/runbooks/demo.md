@@ -93,25 +93,27 @@ sh scripts/deploy-demo.sh detent@detent.org
 
 The script refuses a dirty tree and ignores `VERSION`. It builds the engine
 image locally, ships it over SSH and copies `deploy/demo/` to the server.
-A missing `~/.config/detent/engine.env` marks a first deploy.
+Two marker files steer it. A missing `~/.config/detent/engine.env` means the
+secrets do not exist yet. A missing `~/.config/detent/seeded` means the demo is
+not seeded.
 
-On a first deploy it runs `setup.sh`. That script writes the two secret files with mode 600 and
-enables the nightly reset timer. Next it reloads systemd and restarts the pod and
-its three containers. A first deploy then runs `reset.sh` once. The demo starts
-seeded.
+When `engine.env` is missing, the script runs `setup.sh`. That script writes
+the two secret files with mode 600 and enables the nightly reset timer.
 
-The server's Podman is older than the developer machine's. After the first
-deploy, check the Quadlet units with the server's own generator:
+Next the script pulls the Postgres and Caddy images and runs the server's
+Quadlet generator. A bad unit file aborts the deploy here. Then it reloads
+systemd and restarts the pod and its three containers.
 
-```sh
-ssh detent@detent.org /usr/libexec/podman/quadlet -dryrun -user
-```
+When `seeded` is missing, the script runs `reset.sh`. That script writes
+`seeded` as its last step. A first deploy that fails part-way therefore seeds on
+the re-run.
 
 ## Later deploy
 
-Run the same command. The secret files exist, so the script skips `setup.sh`
-and `reset.sh`. It ships the new image and files, then restarts the pod and the
-containers. The data stays until the next reset.
+Run the same command. Both markers exist, so the script skips `setup.sh` and
+`reset.sh`. It ships the new image and files and prunes the old image on the
+server. Then it restarts the pod and the containers. The data stays until the
+next reset.
 
 ## Manual reset
 
@@ -132,8 +134,8 @@ ssh detent@detent.org systemctl --user list-timers detent-demo-reset.timer
 
 ## Known logins
 
-`scripts/seed.ts` creates one account per reserved role. `reset.sh` adds a
-superuser that holds all of them. Each uses the password
+`scripts/seed.ts` creates one account per reserved role. The script `reset.sh`
+adds a superuser that holds all of them. Every account uses the password
 `seed-demo-password`.
 
 | Login | Role |
@@ -151,12 +153,18 @@ superuser that holds all of them. Each uses the password
 | `demo-owner@example.test` | `system:owner` |
 
 A visitor who changes a password locks that login for the other visitors until
-the next reset.
+the next reset. A visitor with the admin login can do worse. That login can
+disable or re-password every demo account within a minute. It can also
+override interface wording with `PUT /admin/ui-strings`, and the public login
+page shows that text. Each effect lasts until the next reset. Run the manual
+reset to undo it.
 
 ## Disk is filling
 
-Uploads stop at 1 MiB each, but a visitor can still upload many files in one
-day. Check the disk:
+Uploads stop at 1 MiB each. Every JSON route accepts a body of up to 8 MiB
+(`MAX_REQUEST_BODY_SIZE` in `src/http/server.ts`), so drafts and form data fill
+the disk faster. A process whose `process.start` action starts itself grows the
+database with no visitor at work. Check the disk:
 
 ```sh
 ssh detent@detent.org df -h
@@ -164,6 +172,20 @@ ssh detent@detent.org df -h
 
 When the disk runs short, run the manual reset. It drops the database and frees
 the space.
+
+A full disk can leave Postgres unable to start, and then the reset times out.
+In that case remove the database volume and start again:
+
+```sh
+ssh detent@detent.org systemctl --user stop detent-engine.service detent-db.service
+ssh detent@detent.org podman volume rm systemd-detent-pgdata
+ssh detent@detent.org systemctl --user start detent-db.service
+ssh detent@detent.org 'sh ~/detent/reset.sh'
+```
+
+The volume name is `systemd-` plus the unit name. Check it with
+`podman volume ls`. A watchdog or an hourly reset is a follow-up. Nothing
+builds it yet.
 
 ## Rollback
 
