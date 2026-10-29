@@ -42,5 +42,6 @@ None.
 
 ## Impact
 
-- The five files above, `package.json` and `scripts/gates/pass-floor.txt`.
+- The three deleted files, `docs/runbooks/deployment.md`, `package.json` and
+  `scripts/gates/pass-floor.txt`.
 - No engine, HTTP or definition contract behavior changes.
