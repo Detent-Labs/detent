@@ -76,6 +76,15 @@ targets one origin, so the demo uses it.
 | `detent-caddy.container` | `docker.io/library/caddy:2`, `Pod=detent-demo.pod`, volumes `detent-caddy-data.volume` and `detent-caddy-config.volume`, the `Caddyfile` mounted read-only from `%h/detent/Caddyfile` |
 | `*.volume` | one unit per named volume |
 
+Each `.container` unit sets `ContainerName=` to `detent-db`, `detent-engine`
+or `detent-caddy`. Quadlet would otherwise name it `systemd-<unit>`, and the
+reset script addresses the containers by name.
+
+Each `.container` unit sets `Restart=on-failure` in its `[Service]` section.
+On a first boot the engine can start before Postgres accepts connections, and
+`initSchema` then fails. The restart retries it. The pod unit carries
+`[Install]` with `WantedBy=default.target`, so the pod starts at boot.
+
 The engine reaches Postgres at `localhost:5432` inside the pod. Caddy proxies
 to `localhost:3000`. The units use `%h`, so no absolute home path lands in a
 tracked file.
@@ -85,7 +94,8 @@ tracked file.
 `deploy/demo/setup.sh` runs once on the server as `detent`. It creates
 `~/.config/detent/db.env` and `~/.config/detent/engine.env` with mode 600, and
 only when they do not exist. It writes a random Postgres password into both and
-a random `AUTH_JWT_SECRET` into `engine.env`. It copies every other line from
+a random `AUTH_JWT_SECRET` into `engine.env`. Each secret is 64 hex characters
+from `/dev/urandom`, so it is safe inside `DATABASE_URL` as written. It copies every other line from
 `deploy/demo/engine.env.example`. It also enables `detent-demo-reset.timer`.
 
 `engine.env.example` sets these values and no others:
@@ -108,8 +118,10 @@ a random `AUTH_JWT_SECRET` into `engine.env`. It copies every other line from
 1. `systemctl --user stop detent-engine.service`
 2. `podman exec detent-db dropdb -U postgres --if-exists --force workflow_engine`,
    then `createdb -U postgres workflow_engine`
-3. `systemctl --user start detent-engine.service`, then wait until
-   `podman healthcheck run detent-engine` succeeds, for at most 120 s
+3. `systemctl --user start detent-engine.service`, then poll `/readyz` with
+   `podman exec detent-engine bun -e` and a `fetch`, for at most 120 s. A plain
+   `podman build` writes the OCI format, which drops the image's `HEALTHCHECK`,
+   so the reset does not rely on it.
 4. `podman exec -e SEED_ALLOW=1 detent-engine bun run scripts/seed.ts`
 
 `detent-demo-reset.service` runs the script. `detent-demo-reset.timer` fires
@@ -121,10 +133,12 @@ script once, so the demo starts seeded.
 `scripts/deploy-demo.sh <ssh-target>` takes the target as its one argument,
 for example `detent@detent.org`. It refuses a dirty tree. Then it runs:
 
-1. `podman build -t localhost/detent-engine:demo -f deploy/engine.Dockerfile .`
+1. `podman build --format docker -t localhost/detent-engine:demo -f deploy/engine.Dockerfile .`.
+   The Docker format keeps the image's `HEALTHCHECK`, so `podman ps` shows
+   the engine's health.
 2. `podman save localhost/detent-engine:demo | ssh <target> podman load`
-3. Copy the units to `~/.config/containers/systemd/`, and the `Caddyfile` plus
-   the two scripts to `~/detent/`, over `scp`.
+3. Run `mkdir -p ~/.config/containers/systemd ~/detent` over SSH. Then copy the units to the first, and the `Caddyfile` plus the
+   two scripts to the second, over `scp`.
 4. On the server: `systemctl --user daemon-reload`, then
    `systemctl --user restart detent-demo-pod.service`.
 5. On the first deploy only, when `~/.config/detent/engine.env` is missing:
@@ -132,14 +146,21 @@ for example `detent@detent.org`. It refuses a dirty tree. Then it runs:
 
 ### D6. Tests lint the definition
 
-A new `test/demo-deployment.test.ts` reads the files in `deploy/demo/`. It
-checks the D3 table against the template: secrets as placeholders,
-the four forbidden variables absent. It checks that no unit names a `latest`
-tag, that the database unit mounts `/var/lib/postgresql`, and that the
-`Caddyfile` names `detent.org` and proxies to `localhost:3000`. It checks that
-`reset.sh` sets `SEED_ALLOW=1` and that the timer runs daily. A second test
-checks D1 against `deploy/engine.Dockerfile`: the final stage copies the
-bundle and sets `WEB_ROOT`. Each rule gets a fixture that breaks it.
+A new `test/demo-deployment.test.ts` reads the files in `deploy/demo/`. Its
+rules:
+
+- The template matches the D3 table. Secrets hold placeholders, and the four
+  forbidden variables are absent.
+- No unit names a `latest` tag.
+- Each container unit sets `ContainerName=` and `Restart=on-failure`.
+- The pod unit carries `WantedBy=default.target`.
+- The database unit mounts `/var/lib/postgresql`.
+- The `Caddyfile` names `detent.org` and proxies to `localhost:3000`.
+- `reset.sh` sets `SEED_ALLOW=1`, and the timer runs daily.
+
+A second test checks D1 against `deploy/engine.Dockerfile`. The final stage
+copies the bundle and sets `WEB_ROOT`. Each rule in both tests gets a fixture
+that breaks it.
 
 ### D7. The Quadlet generator checks the units
 

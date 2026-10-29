@@ -19,7 +19,7 @@
 
 ## 3. Documentation and cleanup
 
-- [ ] 3.1 Write `docs/runbooks/demo.md`. It covers the server preparation the operator ran and a 2 GB swap file. It covers the first deploy, a later deploy and a manual reset. It names the known demo logins and the disk-fill response from design.md Risks.
+- [ ] 3.1 Write `docs/runbooks/demo.md`. It covers the server preparation the operator ran and a 2 GB swap file. It covers the first deploy, a later deploy and a manual reset. It names the known demo logins and the disk-fill response from design.md Risks. It links to `deployment.md` for what each variable means. It restates none of them.
 - [ ] 3.2 In `docs/runbooks/deployment.md`, add a link to `demo.md` under "Related".
 - [ ] 3.3 In `README.md`, delete the migration note for an old `.devcontainer/` clone. In `.gitignore`, delete the `.devcontainer/` line. Keep `test/dockerignore.test.ts` as it is.
 - [ ] 3.4 In `scripts/seed.ts`, change the header comment. The known passwords now apply to local development and to the public demo.
