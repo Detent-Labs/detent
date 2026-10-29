@@ -2,9 +2,9 @@
 
 ## 1. The engine image carries the bundle
 
-- [ ] 1.1 Change `deploy/engine.Dockerfile` as design.md D1 states. Keep every comment true, and keep `ENV NODE_ENV=production` before `USER bun`.
-- [ ] 1.2 Add a test that reads `deploy/engine.Dockerfile`, as design.md D6 states in its second part. It checks that the final stage copies `packages/web/dist` from the `build` stage and sets `WEB_ROOT`. Each rule gets a fixture that breaks it.
-- [ ] 1.3 On the host, run `podman build -t localhost/detent-engine:check -f deploy/engine.Dockerfile .`. Confirm both facts below, then delete the image with `podman rmi localhost/detent-engine:check`:
+- [x] 1.1 Change `deploy/engine.Dockerfile` as design.md D1 states. Keep every comment true, and keep `ENV NODE_ENV=production` before `USER bun`.
+- [x] 1.2 Add a test that reads `deploy/engine.Dockerfile`, as design.md D6 states in its second part. It checks that the final stage copies `packages/web/dist` from the `build` stage and sets `WEB_ROOT`. Each rule gets a fixture that breaks it.
+- [x] 1.3 On the host, run `podman build -t localhost/detent-engine:check -f deploy/engine.Dockerfile .`. Confirm both facts below, then delete the image with `podman rmi localhost/detent-engine:check`:
   - `podman run --rm --entrypoint ls localhost/detent-engine:check /app/packages/web/dist/index.html` succeeds.
   - `podman run --rm --entrypoint sh localhost/detent-engine:check -c 'test ! -e /app/node_modules/vite'` exits 0.
 
