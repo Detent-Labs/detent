@@ -40,7 +40,7 @@ The root `bun` entry SHALL hold one group that names `react`, `react-dom`,
 - **WHEN** `.github/dependabot.yml` gains a `bun` entry for `/packages/web`
 - **THEN** the Dependabot rule test fails and names that directory
 
-#### Scenario: React and its DOM renderer update together
+#### Scenario: React and its DOM renderer share one pull request
 
 - **WHEN** a contributor reads the root `bun` entry
 - **THEN** one group lists `react`, `react-dom`, `@types/react` and `@types/react-dom`
