@@ -2,9 +2,9 @@
 
 ## 1. Build on the server
 
-- [ ] 1.1 Change `scripts/deploy-demo.sh` as design.md D1 to D4 state. Keep the dirty-tree guard, the shared SSH connection, the 0/1/255 handling and the order of the later steps. `sh -n` passes.
-- [ ] 1.2 In `test/demo-deployment.test.ts`, add the three `checkDeploy` rules of design.md D5, each with a breaking fixture. Reword the prune rule's message to "after the build".
-- [ ] 1.3 In `docs/runbooks/demo.md`, describe the new deploy flow. The operator's machine needs only `git` and SSH. Leave a placeholder line for the measured build times. The test deploy fills it.
+- [x] 1.1 Change `scripts/deploy-demo.sh` as design.md D1 to D4 state. Keep the dirty-tree guard, the shared SSH connection, the 0/1/255 handling and the order of the later steps. `sh -n` passes.
+- [x] 1.2 In `test/demo-deployment.test.ts`, add the three `checkDeploy` rules of design.md D5, each with a breaking fixture. Reword the prune rule's message to "after the build".
+- [x] 1.3 In `docs/runbooks/demo.md`, describe the new deploy flow. The operator's machine needs only `git` and SSH. Leave a placeholder line for the measured build times. The test deploy fills it.
 
 ## 2. Verification
 

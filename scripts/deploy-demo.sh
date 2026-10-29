@@ -1,6 +1,7 @@
 #!/bin/sh
-# scripts/deploy-demo.sh <ssh-target> — builds the engine image here, ships it
-# and deploy/demo/ to the demo server, and restarts the pod. Example target:
+# scripts/deploy-demo.sh <ssh-target> — deploys the checked-out, pushed commit:
+# the server fetches it into ~/detent/repo, builds the engine image there, copies
+# deploy/demo/ from the checkout and restarts the pod. Example target:
 # detent@detent.org. POSIX sh only.
 set -eu
 
@@ -10,13 +11,12 @@ if [ "$#" -ne 1 ]; then
 fi
 target=$1
 
-# Every ssh and scp call below shares one TCP connection. The demo host's
+# Every ssh call below shares one TCP connection. The demo host's
 # network drops port 22 for minutes when new connections follow the image
 # upload in quick succession.
 control_dir=$(mktemp -d)
 trap 'command ssh -o ControlPath="$control_dir/cm" -O exit "$target" 2>/dev/null; rm -rf "$control_dir"' EXIT
 ssh() { command ssh -o ControlMaster=auto -o ControlPath="$control_dir/cm" -o ControlPersist=120 "$@"; }
-scp() { command scp -o ControlMaster=auto -o ControlPath="$control_dir/cm" -o ControlPersist=120 "$@"; }
 
 # The post-commit hook leaves VERSION modified on purpose.
 if [ -n "$(git status --porcelain -- . ':!VERSION')" ]; then
@@ -24,15 +24,29 @@ if [ -n "$(git status --porcelain -- . ':!VERSION')" ]; then
   exit 1
 fi
 
-podman build --format docker -t localhost/detent-engine:demo -f deploy/engine.Dockerfile .
-podman save localhost/detent-engine:demo | ssh "$target" podman load
-ssh "$target" podman image prune -f
+# The server can build only a commit the remote holds.
+sha=$(git rev-parse HEAD)
+case $sha in
+  *[!0-9a-f]*|'') echo "deploy-demo.sh: HEAD is not a commit hash: $sha" >&2; exit 1 ;;
+esac
+git fetch --quiet
+if [ -z "$(git branch -r --contains "$sha")" ]; then
+  echo "deploy-demo.sh: commit $sha is on no remote branch; push it first" >&2
+  exit 1
+fi
 
 ssh "$target" 'mkdir -p ~/.config/containers/systemd ~/.config/systemd/user ~/detent'
+ssh "$target" 'test -d ~/detent/repo/.git || git clone --quiet https://github.com/Detent-Labs/detent.git ~/detent/repo'
+ssh "$target" "git -C ~/detent/repo fetch --quiet origin && git -C ~/detent/repo checkout --quiet --detach $sha"
+
+# The image build loads the server's single vCPU; the duration comes from two date readings.
+build_start=$(date +%s)
+ssh "$target" 'podman build --format docker -t localhost/detent-engine:demo -f ~/detent/repo/deploy/engine.Dockerfile ~/detent/repo'
+echo "deploy-demo.sh: server build took $(($(date +%s) - build_start)) s"
+ssh "$target" podman image prune -f
+
 # Quadlet units, plain systemd units, then the files the units mount or run.
-scp deploy/demo/*.pod deploy/demo/*.container deploy/demo/*.volume "$target:.config/containers/systemd/"
-scp deploy/demo/systemd/* "$target:.config/systemd/user/"
-scp deploy/demo/Caddyfile deploy/demo/engine.env.example deploy/demo/setup.sh deploy/demo/reset.sh "$target:detent/"
+ssh "$target" 'cd ~/detent/repo/deploy/demo && cp *.pod *.container *.volume ~/.config/containers/systemd/ && cp systemd/* ~/.config/systemd/user/ && cp Caddyfile engine.env.example setup.sh reset.sh ~/detent/'
 
 # test exits 0 when the file is absent, 1 when present; ssh itself exits 255.
 rc=0

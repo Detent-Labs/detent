@@ -25,7 +25,7 @@ and reaches the server over SSH as `detent`.
 
    The version is 5.4.x.
 
-2. Create the service account. It has no sudo, holds the same SSH key and
+2. Add the service account. It has no sudo, holds the same SSH key and
    lingers:
 
    ```sh
@@ -84,16 +84,27 @@ certificate.
 
 ## First deploy
 
-Run this on the developer machine, from a clean tree. The machine needs Podman
-and SSH access to the server as `detent`:
+Run this on the developer machine, from a clean tree with a pushed commit
+checked out. The machine needs `git` and SSH access to the server as `detent`:
 
 ```sh
 sh scripts/deploy-demo.sh detent@detent.org
 ```
 
-The script refuses a dirty tree and ignores `VERSION`. It builds the engine
-image locally, ships it over SSH and copies `deploy/demo/` to the server.
-Two marker files steer it. A missing `~/.config/detent/engine.env` means the
+The script refuses a dirty tree and ignores `VERSION`. It also refuses a commit
+that no remote branch contains, before it contacts the server. On the first run
+the server clones `https://github.com/Detent-Labs/detent.git` into
+`~/detent/repo`. Each deploy fetches there, checks out the pushed commit and
+builds the engine image on the server. No image crosses the network. The
+server copies `deploy/demo/` from the same checkout.
+
+The build needs outbound HTTPS to GitHub and the npm registry. It loads the
+single vCPU while the demo keeps running.
+
+<!-- antislop: allow passive-voice -->
+Measured build time on the demo server: to be recorded by the test deploy.
+
+Two marker files steer the script. A missing `~/.config/detent/engine.env` means the
 secrets do not exist yet. A missing `~/.config/detent/seeded` means the demo is
 not seeded.
 
@@ -111,8 +122,8 @@ the re-run.
 ## Later deploy
 
 Run the same command. Both markers exist, so the script skips `setup.sh` and
-`reset.sh`. It ships the new image and files and prunes the old image on the
-server. Then it restarts the pod and the containers. The data stays until the
+`reset.sh`. The server builds the new commit, prunes the old image and copies
+the files from the checkout. Then it restarts the pod and the containers. The data stays until the
 next reset.
 
 ## Manual reset
