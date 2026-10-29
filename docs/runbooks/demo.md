@@ -92,7 +92,7 @@ sh scripts/deploy-demo.sh detent@detent.org
 ```
 
 The script refuses a dirty tree and ignores `VERSION`. It also refuses a commit
-that no remote branch contains, before it contacts the server. On the first run
+that no branch on `origin` contains, before it contacts the server. On the first run
 the server clones `https://github.com/Detent-Labs/detent.git` into
 `~/detent/repo`. Each deploy fetches there, checks out the pushed commit and
 builds the engine image on the server. No image crosses the network. The
@@ -138,11 +138,16 @@ The script drops the database, starts the engine again and seeds it.
 ## Checking state
 
 ```sh
-ssh detent@detent.org systemctl --user status detent-demo-pod.service
-ssh detent@detent.org podman ps
+ssh detent@detent.org 'systemctl --user status detent-demo-pod.service; podman ps'
 ssh detent@detent.org journalctl --user -u detent-engine.service
 ssh detent@detent.org systemctl --user list-timers detent-demo-reset.timer
 ```
+
+The host's network drops port 22 for about five minutes after a few SSH
+connections in quick succession. A deploy followed at once by two or three
+checks is enough. The deploy script shares one connection for that reason.
+After a deploy, wait a minute before the next `ssh`. Join the checks into one
+call, as the first line above does. When the port stays closed, wait it out.
 
 ## Known logins
 
