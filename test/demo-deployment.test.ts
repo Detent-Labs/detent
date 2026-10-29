@@ -84,6 +84,7 @@ const checkReset = (t: string) => [
   ...(/-e SEED_ALLOW=1 detent-engine/.test(t) ? [] : ["reset.sh does not set SEED_ALLOW=1"]),
   ...(/pg_isready -h localhost\b.*\n[\s\S]*dropdb/.test(t) ? [] : ["reset.sh does not wait for pg_isready over TCP before dropdb"]),
   ...(/^set -eu$/m.test(t) ? [] : ["reset.sh does not start with set -eu"]),
+  ...(/scripts\/seed\.ts[^\n]*\n[\s\S]*add-user demo-superuser@example\.test/.test(t) ? [] : ["reset.sh does not create demo-superuser after the seed"]),
 ];
 const checkTimer = (t: string) => (/^OnCalendar=\*-\*-\* /m.test(t) ? [] : ["the timer does not run daily"]);
 
@@ -152,6 +153,15 @@ test("a Caddyfile for another host or port is rejected", () => {
 
 test("a reset script that does not seed with SEED_ALLOW=1 is rejected", () => {
   expect(checkReset(RESET.replace("SEED_ALLOW=1", "SEED=1"))).toEqual(["reset.sh does not set SEED_ALLOW=1"]);
+});
+
+test("a reset script that creates demo-superuser before the seed or not at all is rejected", () => {
+  const msg = ["reset.sh does not create demo-superuser after the seed"];
+  expect(checkReset(RESET.replace("add-user demo-superuser", "add-user demo-other"))).toEqual(msg);
+  const lines = RESET.trimEnd().split("\n");
+  const seed = lines.findIndex((l) => l.includes("scripts/seed.ts"));
+  const [seedLine] = lines.splice(seed, 1);
+  expect(checkReset([...lines, seedLine].join("\n"))).toEqual(msg);
 });
 
 test("a reset script without the TCP pg_isready wait before dropdb is rejected", () => {

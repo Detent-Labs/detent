@@ -12,7 +12,8 @@ restates none of them.
 
 The server runs Debian 13 with 1 vCPU, 2 GB of RAM and a 20 GB disk. The image's
 admin account is `debian`, with passwordless sudo. Run steps 1 to 6 as root
-(`sudo -i`). Later steps run as `detent`.
+(`sudo -i`) on the server. Every later command runs on the developer machine
+and reaches the server over SSH as `detent`.
 
 1. Upgrade the system and install the packages:
 
@@ -36,8 +37,9 @@ admin account is `debian`, with passwordless sudo. Run steps 1 to 6 as root
    loginctl enable-linger detent
    ```
 
-   A non-interactive `ssh detent@... systemctl --user` needs three parts. Lingering keeps the user manager running. `pam_systemd`
-   and the `dbus-user-session` package give the session a user bus.
+   A non-interactive `ssh detent@... systemctl --user` needs three parts.
+   Lingering keeps the user manager running. The `pam_systemd` module and the
+   `dbus-user-session` package give the session a user bus.
 
 3. Let a rootless container bind ports 80 and 443, and open the firewall:
 
@@ -77,11 +79,13 @@ admin account is `debian`, with passwordless sudo. Run steps 1 to 6 as root
    ```
 
 DNS: `detent.org` has A and AAAA records that point at the server. `www.detent.org`
-has no record. Caddy fetches its certificate on the first request.
+has no record. The first start can take a minute while Caddy obtains the
+certificate.
 
 ## First deploy
 
-Run this on the developer machine, from a clean tree:
+Run this on the developer machine, from a clean tree. The machine needs Podman
+and SSH access to the server as `detent`:
 
 ```sh
 sh scripts/deploy-demo.sh detent@detent.org
@@ -112,7 +116,7 @@ containers. The data stays until the next reset.
 ## Manual reset
 
 ```sh
-ssh detent@detent.org sh ~/detent/reset.sh
+ssh detent@detent.org 'sh ~/detent/reset.sh'
 ```
 
 The script drops the database, starts the engine again and seeds it.
@@ -128,11 +132,13 @@ ssh detent@detent.org systemctl --user list-timers detent-demo-reset.timer
 
 ## Known logins
 
-`scripts/seed.ts` creates one account per reserved role. Each uses the password
+`scripts/seed.ts` creates one account per reserved role. `reset.sh` adds a
+superuser that holds all of them. Each uses the password
 `seed-demo-password`.
 
 | Login | Role |
 |---|---|
+| `demo-superuser@example.test` | every `system:*` role |
 | `demo-publish@example.test` | `system:publish` |
 | `demo-cancel-any@example.test` | `system:cancel-any` |
 | `demo-admin@example.test` | `system:admin` |
@@ -161,10 +167,11 @@ the space.
 
 ## Rollback
 
-Stop the pod:
+Stop the reset timer and the pod. The timer would otherwise restart the engine
+at 03:00 UTC:
 
 ```sh
-ssh detent@detent.org systemctl --user stop detent-demo-pod.service
+ssh detent@detent.org systemctl --user stop detent-demo-reset.timer detent-demo-pod.service
 ```
 
 ## Related

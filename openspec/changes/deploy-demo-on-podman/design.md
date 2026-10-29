@@ -133,6 +133,9 @@ fails when only one of the two files exists.
    `podman build` writes the OCI format, which drops the image's `HEALTHCHECK`,
    so the reset does not rely on it.
 5. `podman exec -e SEED_ALLOW=1 detent-engine bun run scripts/seed.ts`
+6. `podman exec detent-engine bun run src/auth/cli.ts add-user` creates
+   `demo-superuser@example.test` with the password `seed-demo-password` and
+   every reserved `system:*` role from `src/auth/authorize.ts`.
 
 `detent-demo-reset.service` runs the script. `detent-demo-reset.timer` fires
 it at `*-*-* 03:00:00 UTC` with `Persistent=true`. The first deploy runs the
