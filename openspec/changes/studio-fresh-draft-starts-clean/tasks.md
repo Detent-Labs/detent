@@ -30,17 +30,17 @@ Paths under `screens/`, `draft/` and `panels/` sit in `packages/web/src/areas/st
 
 ## 4. The checks rail's start state (studio-checks-rail)
 
-- [ ] 4.1 In `panels/ChecksRail.tsx`, render the D5 start state from `noStepYet`. With no open issue, only the sentence shows.
-- [ ] 4.2 With `noStepYet` and an open issue, the sentence stands first and the groups follow. The all-clear state stays hidden.
-- [ ] 4.3 Give `draft/checksRail.ts::checksDotState` the `noStepYet` argument of D5. It returns `clear` when no group holds an issue.
-- [ ] 4.4 Pass `validation.noStepYet` to `checksDotState` in `screens/EditScreen.tsx` and in `panels/ProcessHeaderBar.tsx`.
-- [ ] 4.5 In `packages/web/test/studio-checksRail.test.ts`, assert `clear` for the start state, and `blocker` once an issue is open.
-- [ ] 4.6 In `packages/web/test/studio-checksRail-publishVerdict.test.tsx`, test three renders: sentence alone, sentence above groups, and no all-clear.
+- [x] 4.1 In `panels/ChecksRail.tsx`, render the D5 start state from `noStepYet`. With no open issue, only the sentence shows.
+- [x] 4.2 With `noStepYet` and an open issue, the sentence stands first and the groups follow. The all-clear state stays hidden.
+- [x] 4.3 Give `draft/checksRail.ts::checksDotState` the `noStepYet` argument of D5. It returns `clear` when no group holds an issue.
+- [x] 4.4 Pass `validation.noStepYet` to `checksDotState` in `screens/EditScreen.tsx` and in `panels/ProcessHeaderBar.tsx`.
+- [x] 4.5 In `packages/web/test/studio-checksRail.test.ts`, assert `clear` for the start state, and `blocker` once an issue is open.
+- [x] 4.6 In `packages/web/test/studio-checksRail-publishVerdict.test.tsx`, test three renders: sentence alone, sentence above groups, and no all-clear.
 
 ## 5. The banner gate (studio-process-tabs)
 
-- [ ] 5.1 In `screens/EditScreen.tsx`, gate the banner on the D4 predicate in place of `!validation.zodValid`.
-- [ ] 5.2 The predicate tests in 3.11 cover the gate. No test in `packages/web/test` reads `draftIncomplete` today.
+- [x] 5.1 In `screens/EditScreen.tsx`, gate the banner on the D4 predicate in place of `!validation.zodValid`.
+- [x] 5.2 The predicate tests in 3.11 cover the gate. No test in `packages/web/test` reads `draftIncomplete` today.
 
 ## 6. Publish in the start state (studio-publish)
 

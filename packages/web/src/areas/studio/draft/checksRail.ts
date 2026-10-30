@@ -110,9 +110,12 @@ export type ChecksDotState = "blocker" | "advisory" | "clear";
  * is an engine validator, so one open entry there blocks.
  *
  * A held-back group takes the blocker state, never the clear one. Its checks
- * have not run, so nothing yet says the draft would publish.
+ * have not run, so nothing yet says the draft would publish. The one
+ * exception is a draft with no step (`noStepYet`) and no open issue: nothing
+ * has run because nothing exists to check, so the count reads clear.
  */
-export function checksDotState(groups: readonly CheckGroup[]): ChecksDotState {
+export function checksDotState(groups: readonly CheckGroup[], noStepYet = false): ChecksDotState {
+  if (noStepYet && groups.every((g) => g.issues.length === 0)) return "clear";
   if (groups.some((g) => g.heldBack || (g.source !== "view" && g.issues.length > 0))) return "blocker";
   return groups.some((g) => g.issues.length > 0) ? "advisory" : "clear";
 }

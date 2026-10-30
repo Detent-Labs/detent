@@ -717,7 +717,7 @@ export function ProcessHeaderBar({
   // The blocking verdict the publish dialog states, from the same groups the
   // area nav's Checks control reads. The `view` group holds the studio's own
   // findings and refuses no publish, so an advisory draft names no refusal.
-  const blocked = checksDotState(groupChecksBySource(validation)) === "blocker";
+  const blocked = checksDotState(groupChecksBySource(validation), validation.noStepYet) === "blocker";
 
   useEffect(() => {
     if (!menuOpen) return;

@@ -75,3 +75,42 @@ describe("The checks rail's all-clear box", () => {
     expect(html).not.toContain("publish permission");
   });
 });
+
+describe("The checks rail's start state", () => {
+  const stepless: ValidationResult = {
+    ...clear,
+    zodValid: false,
+    noStepYet: true,
+    dimensions: { ...clear.dimensions, duration: "not-run", structural: "not-run" },
+  };
+  const SENTENCE = "No step yet. Add the first step on the Canvas or the Steps tab.";
+
+  it("renders the sentence alone, with no group and no validator name", () => {
+    const html = renderToStaticMarkup(<ChecksRail validation={stepless} canPublish={true} />);
+
+    expect(html).toContain(SENTENCE);
+    expect(html).not.toContain("checksGroup");
+    expect(html).not.toContain("Held back");
+    expect(html).not.toContain("zod");
+    expect(html).not.toContain("Invalid input");
+  });
+
+  it("puts the sentence above the groups when an issue is open", () => {
+    const withIssue: ValidationResult = {
+      ...stepless,
+      issues: [{ entityType: "process", entityId: "process", message: "The process needs a name.", source: "zod", loc: "" }],
+    };
+    const html = renderToStaticMarkup(<ChecksRail validation={withIssue} canPublish={true} />);
+
+    expect(html).toContain(SENTENCE);
+    expect(html).toContain("The process needs a name.");
+    expect(html.indexOf(SENTENCE)).toBeLessThan(html.indexOf("The process needs a name."));
+  });
+
+  it("never renders the all-clear box", () => {
+    const html = renderToStaticMarkup(<ChecksRail validation={stepless} canPublish={true} />);
+
+    expect(html).not.toContain("No open issues.");
+    expect(html).not.toContain("ready to publish");
+  });
+});

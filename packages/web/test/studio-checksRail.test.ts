@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import type { ActionId, ProcessBody } from "workflow-engine/schema";
 import type { RegistryDescription } from "workflow-engine/engine/registry";
-import { allChecksClear, groupChecksBySource } from "../src/areas/studio/draft/checksRail.js";
+import { allChecksClear, checksDotState, groupChecksBySource } from "../src/areas/studio/draft/checksRail.js";
 import { runValidation } from "../src/areas/studio/draft/validation.js";
 import type { ValidationResult } from "../src/areas/studio/draft/validation.js";
 import type { Draft } from "../src/areas/studio/draft/types.js";
@@ -333,4 +333,22 @@ it("6.21 a Zod-valid, uncompilable draft holds back CEL and registry, distinguis
   expect(groups.find((g) => g.source === "structural")!.issues.length).toBeGreaterThan(0);
   expect(groups.find((g) => g.source === "cel")!.heldBack).toBe(true);
   expect(groups.find((g) => g.source === "registry")!.heldBack).toBe(true);
+});
+
+describe("checksDotState in the start state", () => {
+  const stepless = { zodValid: false, noStepYet: true, dimensions: { duration: "not-run", structural: "not-run" } } as const;
+
+  it("reads clear when no step exists and no group holds an issue", () => {
+    expect(checksDotState(groupChecksBySource(validation({ ...stepless })), true)).toBe("clear");
+  });
+
+  it("reads blocker without the start-state argument, since held-back groups block", () => {
+    expect(checksDotState(groupChecksBySource(validation({ ...stepless })))).toBe("blocker");
+  });
+
+  it("reads blocker once an issue is open", () => {
+    const issues = [{ entityType: "process", entityId: "process", message: "m", source: "zod", loc: "" }] as const;
+    const v = validation({ ...stepless, issues: [...issues] });
+    expect(checksDotState(groupChecksBySource(v), true)).toBe("blocker");
+  });
 });
