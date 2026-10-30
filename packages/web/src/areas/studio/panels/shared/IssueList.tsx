@@ -41,7 +41,13 @@ export function IssueItems({ issues, style }: { issues: EditorIssue[]; style?: s
     <ul className={["issue-list", stylex.props(style).className].filter(Boolean).join(" ")}>
       {issues.map((issue, i) => (
         <li key={i} className={`issue issue-${issue.source}`}>
-          <span {...stylex.props(styles.issueSourceLabel)}>{issue.source}</span> {issue.message}
+          {issue.plain ? (
+            issue.message
+          ) : (
+            <>
+              <span {...stylex.props(styles.issueSourceLabel)}>{issue.source}</span> {issue.message}
+            </>
+          )}
         </li>
       ))}
     </ul>

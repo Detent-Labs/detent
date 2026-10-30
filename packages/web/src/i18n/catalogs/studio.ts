@@ -32,6 +32,7 @@ export const en = {
   "draftToolbar.publish": "Publish",
   "draftToolbar.publishing": "Publishing…",
   "draftToolbar.publishUnavailable": "Needs the publish permission for this process",
+  "draftToolbar.publishNeedsStep": "Publish needs a first step",
   // Beside Publish while the draft's worst open issue is a blocker. The
   // control stays available: the click still opens the confirmation dialog,
   // which states the same warning (`studio-publish`).
@@ -769,6 +770,7 @@ export const en = {
   // The validation verdict alone. The rail runs checks; it holds no
   // permission, so it says nothing here about who may publish.
   "checksRail.allClear": "No open issues.",
+  "checksRail.noStepYet": "No step yet. Add the first step on the Canvas or the Steps tab.",
   // The permission verdict, from the loaded draft's own `canPublish` report.
   // One of the two follows the sentence above, inside the same box.
   "checksRail.clearReadyToPublish": "This draft is ready to publish.",
@@ -785,6 +787,7 @@ export const en = {
 
   // A badge for a check the browser holds back. Each is one whole sentence.
   "issues.registryNotChecked": "Registry config: not checked",
+  "issues.processNeedsName": "The process needs a name. Type it in the name field at the top of the page.",
   "issues.chainingNotChecked": "Chaining target: not checked",
   "issues.crossProcessNotChecked": "Cross-process references: not checked",
 

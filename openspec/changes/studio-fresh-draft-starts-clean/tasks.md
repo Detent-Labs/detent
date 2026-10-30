@@ -15,18 +15,18 @@ Paths under `screens/`, `draft/` and `panels/` sit in `packages/web/src/areas/st
 
 ## 3. Recognize the two start gaps (studio-checks-rail)
 
-- [ ] 3.1 Add `draft/startGaps.ts` with the start-gap test of D2 and the name-gap test of D3.
-- [ ] 3.2 Add the banner predicate of D4 to `draft/startGaps.ts`. It reads `validation.issues` alone.
-- [ ] 3.3 Add the optional `noStepYet` to `ValidationResult` in `draft/validation.ts`.
-- [ ] 3.4 Add the optional `plain` to `EditorIssue` in `draft/issues.ts`.
-- [ ] 3.5 In `draft/validation.ts::runValidation`, drop the start gap and set `noStepYet`. Give the name gap its catalog sentence and `plain: true`.
-- [ ] 3.6 Add the three D7 keys to `i18n/catalogs/studio.ts`, with the exact texts from `design.md`.
-- [ ] 3.7 In `panels/shared/IssueList.tsx`, `IssueItems` prints no source label for a `plain` issue.
-- [ ] 3.8 Add `packages/web/test/studio-startGaps.test.ts`. Feed it real `validateStructure` output from five bodies.
-- [ ] 3.9 Use the D1 body and D1 plus a field with no `type`. Add D1 with one named end step.
-- [ ] 3.10 Add that body once more with the process named. Add D1 with the unnamed task step `newStep` mints.
-- [ ] 3.11 In that file, assert `noStepYet`, the issue count, the sentence and `plain` for each body. Also assert the banner predicate for each.
-- [ ] 3.12 In `packages/web/test/studio-issueList.test.tsx`, add a test: a `plain` issue renders its message with no source label.
+- [x] 3.1 Add `draft/startGaps.ts` with the start-gap test of D2 and the name-gap test of D3.
+- [x] 3.2 Add the banner predicate of D4 to `draft/startGaps.ts`. It reads `validation.issues` alone.
+- [x] 3.3 Add the optional `noStepYet` to `ValidationResult` in `draft/validation.ts`.
+- [x] 3.4 Add the optional `plain` to `EditorIssue` in `draft/issues.ts`.
+- [x] 3.5 In `draft/validation.ts::runValidation`, drop the start gap and set `noStepYet`. Give the name gap its catalog sentence and `plain: true`.
+- [x] 3.6 Add the three D7 keys to `i18n/catalogs/studio.ts`, with the exact texts from `design.md`.
+- [x] 3.7 In `panels/shared/IssueList.tsx`, `IssueItems` prints no source label for a `plain` issue.
+- [x] 3.8 Add `packages/web/test/studio-startGaps.test.ts`. Feed it real `validateStructure` output from five bodies.
+- [x] 3.9 Use the D1 body and D1 plus a field with no `type`. Add D1 with one named end step.
+- [x] 3.10 Add that body once more with the process named. Add D1 with the unnamed task step `newStep` mints.
+- [x] 3.11 In that file, assert `noStepYet`, the issue count, the sentence and `plain` for each body. Also assert the banner predicate for each.
+- [x] 3.12 In `packages/web/test/studio-issueList.test.tsx`, add a test: a `plain` issue renders its message with no source label.
 
 ## 4. The checks rail's start state (studio-checks-rail)
 
