@@ -62,16 +62,16 @@ Paths under `screens/`, `draft/` and `panels/` sit in `packages/web/src/areas/st
 
 ## 8. Verification
 
-- [ ] 8.1 Run `bun run typecheck` in the devcontainer. Expect exit code 0.
-- [ ] 8.2 Run `bun run build` in the devcontainer. Expect exit code 0.
-- [ ] 8.3 Run the full suite: `rtk test sh scripts/dev-exec.sh sh scripts/test-gated.sh bun test`, with `OPENSPEC_TELEMETRY=0`.
-- [ ] 8.4 Read the pass, skip and fail counts off that run. Name any failing test.
-- [ ] 8.5 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` on the host. Read its exit code.
-- [ ] 8.6 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh` on the host. Read its exit code.
-- [ ] 8.7 On the production bundle, create an empty process. Check: no banner, no "zod" text, Checks reads 0, and Publish states its reason.
-- [ ] 8.8 Add an end step and name it. Check: the name sentence stands beside the name, with no banner.
-- [ ] 8.9 Type a process name. Check: the sentence leaves. Add a task step. Check: the banner returns, as Risks states.
-- [ ] 8.10 Run `/impeccable critique` and `/impeccable audit` on `/studio/processes/<id>/edit/canvas` for a fresh draft.
+- [x] 8.1 Run `bun run typecheck` in the devcontainer. Expect exit code 0.
+- [x] 8.2 Run `bun run build` in the devcontainer. Expect exit code 0.
+- [x] 8.3 Run the full suite: `rtk test sh scripts/dev-exec.sh sh scripts/test-gated.sh bun test`, with `OPENSPEC_TELEMETRY=0`.
+- [x] 8.4 Read the pass, skip and fail counts off that run. Name any failing test.
+- [x] 8.5 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` on the host. Read its exit code.
+- [x] 8.6 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh` on the host. Read its exit code.
+- [x] 8.7 On the production bundle, create an empty process. Check: no banner, no "zod" text, Checks reads 0, and Publish states its reason.
+- [x] 8.8 Add an end step and name it. Check: the name sentence stands beside the name, with no banner.
+- [x] 8.9 Type a process name. Check: the sentence leaves. Add a task step. Check: the banner returns, as Risks states.
+- [x] 8.10 Run `/impeccable critique` and `/impeccable audit` on `/studio/processes/<id>/edit/canvas` for a fresh draft.
 
 ## Workflow follow-up
 
