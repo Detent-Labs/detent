@@ -243,7 +243,7 @@ The recommendation was B.
 
 **Owner's decision: A, improved.**
 
-The tab row stays the architecture, and the eleven tabs may change. No
+The tab row stays the architecture, and the eleven tabs are not sacred. No
 Views menu appears.
 
 ### D2. The tab cut
@@ -261,7 +261,7 @@ Changes.**
 
 The tab row reads Map · Steps · Fields · Forms · Checks · Settings.
 
-Changes moves into the Publish dialog ("N changes since vK · open") and onto
+Changes moves into the Publish dialog (`N changes since vK · show`) and onto
 the Versions screen. Test (the Player) stays a header button and a `⋮`
 entry. The owner sees the case for a Test tab and may revisit it.
 
@@ -339,7 +339,7 @@ Options page: https://claude.ai/artifact/WsPYZF6Kf2NvmUMP794Vuw
 
 The owner confirmed four points as proposed:
 
-- The process list prints names as links, no hash, and the actor's name.
+- The process list prints names as links, no hash, and the actor's `displayName`.
 - The condition builder prints a sentence in place of the CEL readout.
 - The vocabulary table below applies.
 - The Map keeps labelled stamps and gains a tooltip on the connect handle.
