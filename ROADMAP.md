@@ -269,6 +269,75 @@ Specs: `development-toolchain`, `devcontainer-preflight`, `worktree-isolation`,
 
     Specs: `definition-contract`, `runtime-api`, `cel-expressions`.
 
+64. **Studio UI overhaul: NOT STARTED.** Decided 2026-10-30 in a design
+    session with the owner. The concept reworks how an author handles steps
+    and fields in the studio. The owner weights that authoring loop above
+    canvas gestures, navigation chrome and safety prompts. The canvas is the
+    map: it shows and selects, and editing happens in the guided step list.
+    The tab row stays, cut to Map, Steps, Fields, Forms, Checks and Settings.
+
+    The owner confirmed seven principles:
+
+    1. One subject at a time. The studio shows one step, one field or one way
+       out, with the rest folded. Density is never the goal.
+    2. The author's words only. Every label is a sentence a non-developer
+       understands. A key, an id, CEL or a validator name appears only after
+       the author opens the Developer view.
+    3. Create where it is used. A field is created, named and placed in one
+       move inside the form. The catalog is a consequence, not a
+       prerequisite.
+    4. A change happens once. Renaming, retyping or removing a thing updates
+       every place that refers to it, and the studio says in one sentence
+       what it touched.
+    5. A check result is a sentence at the spot. It stands at the control it
+       concerns and says what to do. The Checks tab is only the sum.
+    6. Progress is visible. Every section says whether it is done. A new
+       process starts clean, never with errors.
+    7. The canvas is the map, not the editor. It shows and selects. Editing
+       happens in the guided step list.
+
+    Sixteen changes deliver it, most value at least risk first. Each ships
+    alone and leaves the studio usable. Needs names the change it builds on.
+
+    1. `studio-fresh-draft-starts-clean`. Needs: none. Resolves: B2, a new
+       process opens on raw Zod messages.
+    2. `studio-vocabulary-no-key-echo`. Needs: none. Resolves: M1 in part,
+       m4, retired words in the catalog.
+    3. `studio-selects-show-labels`. Needs: 2. Resolves: M2, umlauts in
+       derived keys.
+    4. `studio-condition-sentence`. Needs: 2. Resolves: M7, the CEL readout
+       under the condition builder.
+    5. `studio-map-labels`. Needs: 4. Resolves: c1, M3 in part.
+    6. `studio-form-editor-names-fields`. Needs: 2. Resolves: B1, M5.
+    7. `studio-field-key-follows-name`. Needs: 4. Resolves: B3, the
+       guard-field-key-renames entry.
+    8. `studio-process-list-names`. Needs: none. Resolves: M9, c2.
+    9. `studio-six-tabs`. Needs: 2. Resolves: D2, m5, M10 in part, M6.
+    10. `studio-step-accordion`. Needs: 9. Resolves: M1, M13, RAIL-6,
+        RAIL-7.
+    11. `studio-field-card`. Needs: 9 and 7. Resolves: m3, M10.
+    12. `studio-checks-by-subject`. Needs: 10. Resolves: M4, the 22 failure
+        renders in part.
+    13. `studio-one-dialog-form`. Needs: 10. Resolves: D7, DRAFT-1, the six
+        `confirm()` prompts, the dialog presentation gaps, the keyboard trap.
+    14. `studio-header-two-rows`. Needs: 9. Resolves: m1, m2.
+    15. `studio-draft-autosave-and-save-points`. Needs: 14. Resolves: D6.
+    16. `studio-condition-builder-expansion`. Needs: 4. Resolves: the
+        condition builder deferrals of stage 27b.
+
+    The record `docs/studio-ui-concept.md` holds the inventory and the
+    findings. It also holds the options shown and the owner's choice for each
+    decision. It moves into the archive of change 1 when this stage closes.
+    No change in the list touches `src/schema/definition.ts`. Two touch the
+    API outside the body and the hash. Change 8 adds the actor's display
+    name to the draft list, and change 15 adds save points.
+
+    Specs: `studio-app`, `studio-canvas`, `studio-checks-rail`,
+    `studio-condition-builder`, `studio-form-editor`, `studio-forms-overview`,
+    `studio-guided-vocabulary`, `studio-process-tabs`, `studio-publish`,
+    `studio-step-page`, `studio-player`, `process-drafts`,
+    `process-version-inspection`, `spa-accessibility`, `cel-expressions`.
+
 ## Done
 
 Stage detail: `docs/roadmap-history.md`. Same numbers, same order.
