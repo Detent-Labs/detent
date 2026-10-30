@@ -306,6 +306,26 @@ describe("publishAvailability (studio-publish: the client gate reads the engine'
   });
 });
 
+describe("publishAvailability with no step yet (studio-fresh-draft-starts-clean)", () => {
+  it("a permitted draft with no step is unavailable and names the missing step", () => {
+    expect(publishAvailability(true, false, true)).toEqual({
+      available: false,
+      reasonKey: "draftToolbar.publishNeedsStep",
+    });
+  });
+
+  it("the permission reason wins over the missing step", () => {
+    expect(publishAvailability(false, false, true)).toEqual({
+      available: false,
+      reasonKey: "draftToolbar.publishUnavailable",
+    });
+  });
+
+  it("a draft with a step is available again", () => {
+    expect(publishAvailability(true, false, false)).toEqual({ available: true });
+  });
+});
+
 describe("nextVersionLabel (studio-publish: the dialog names a valid version label)", () => {
   it("increments a published base version", () => {
     expect(nextVersionLabel(3)).toBe("v4");

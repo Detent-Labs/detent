@@ -362,6 +362,7 @@ const PUBLISH_REASON_ID = "studio-publish-reason";
 export function PublishNavControl({
   canPublish,
   blocked,
+  noStepYet = false,
   publishing,
   onPublish,
   triggerRef,
@@ -370,11 +371,13 @@ export function PublishNavControl({
   /** True when the draft's worst open issue is a blocker. Adds a hidden
    * reason; it leaves the control available and operable. */
   blocked: boolean;
+  /** True when the draft has no step yet. Makes the control unavailable. */
+  noStepYet?: boolean;
   publishing: boolean;
   onPublish: () => void;
   triggerRef?: RefObject<HTMLButtonElement | null>;
 }) {
-  const gate = publishAvailability(canPublish, blocked);
+  const gate = publishAvailability(canPublish, blocked, noStepYet);
   return (
     <button
       ref={triggerRef}
@@ -411,8 +414,16 @@ export function PublishNavControl({
  * The function is pure over two booleans the header bar already holds, and a
  * threaded prop would let the button's reason and this line's reason drift.
  */
-export function PublishReasonLine({ canPublish, blocked }: { canPublish: boolean; blocked: boolean }) {
-  const gate = publishAvailability(canPublish, blocked);
+export function PublishReasonLine({
+  canPublish,
+  blocked,
+  noStepYet = false,
+}: {
+  canPublish: boolean;
+  blocked: boolean;
+  noStepYet?: boolean;
+}) {
+  const gate = publishAvailability(canPublish, blocked, noStepYet);
   if (!gate.reasonKey) return null;
   return (
     <span
@@ -849,7 +860,7 @@ export function ProcessHeaderBar({
         {/* The cluster's leading item, so the reason reads on the row's own
             baseline beside the state it explains, wraps with the controls it
             belongs to, and leaves the row's 2px bottom border whole. */}
-        <PublishReasonLine canPublish={canPublish} blocked={blocked} />
+        <PublishReasonLine canPublish={canPublish} blocked={blocked} noStepYet={validation.noStepYet} />
 
         <div {...stylex.props(styles.draftActions)}>
           <button type="button" className="btn btn-secondary" disabled={actions.saving} onClick={actions.save}>
@@ -861,6 +872,7 @@ export function ProcessHeaderBar({
           <PublishNavControl
             canPublish={canPublish}
             blocked={blocked}
+            noStepYet={validation.noStepYet}
             publishing={actions.publishing}
             onPublish={actions.publish}
             triggerRef={publishTriggerRef}

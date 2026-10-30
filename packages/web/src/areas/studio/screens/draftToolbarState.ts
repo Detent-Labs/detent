@@ -48,7 +48,10 @@ export interface PublishAvailability {
    * unavailable control always carries one. An available control carries the
    * blocked reason too, so a blocking issue reads before the click rather
    * than only inside the dialog the click opens. */
-  reasonKey?: "draftToolbar.publishUnavailable" | "draftToolbar.publishBlockedReason";
+  reasonKey?:
+    | "draftToolbar.publishUnavailable"
+    | "draftToolbar.publishNeedsStep"
+    | "draftToolbar.publishBlockedReason";
 }
 
 /**
@@ -67,9 +70,18 @@ export interface PublishAvailability {
  * reason. The two reasons never compete for the one span: the early return
  * below answers the permission first, and reaches `blocked` only once the
  * permission holds.
+ *
+ * `noStepYet` is whether the draft has no step. Such a draft cannot publish,
+ * so the control is unavailable with its own reason. The order is fixed:
+ * permission, then the missing step, then `blocked`.
  */
-export function publishAvailability(canPublish: boolean | undefined, blocked: boolean): PublishAvailability {
+export function publishAvailability(
+  canPublish: boolean | undefined,
+  blocked: boolean,
+  noStepYet = false,
+): PublishAvailability {
   if (canPublish !== true) return { available: false, reasonKey: "draftToolbar.publishUnavailable" };
+  if (noStepYet) return { available: false, reasonKey: "draftToolbar.publishNeedsStep" };
   if (blocked) return { available: true, reasonKey: "draftToolbar.publishBlockedReason" };
   return { available: true };
 }

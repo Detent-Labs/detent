@@ -44,12 +44,12 @@ Paths under `screens/`, `draft/` and `panels/` sit in `packages/web/src/areas/st
 
 ## 6. Publish in the start state (studio-publish)
 
-- [ ] 6.1 Give `screens/draftToolbarState.ts::publishAvailability` the optional `noStepYet = false` of D6. The permission answer stays first.
-- [ ] 6.2 Give `PublishNavControl` and `PublishReasonLine` a `noStepYet` prop. `ProcessHeaderBar` passes `validation.noStepYet` to both.
-- [ ] 6.3 The new reason takes the muted tone the permission reason uses. Verify with the render tests in 6.5.
-- [ ] 6.4 In `packages/web/test/studio-draftToolbarState.test.ts`, cover three cases: no step, no step without permission, and a draft with a step.
-- [ ] 6.5 In `packages/web/test/studio-processHeaderBar-publishGate.test.tsx`, a stepless draft renders Publish with `aria-disabled` and the reason.
-- [ ] 6.6 In the same file, activating that Publish control sends no request and opens no dialog.
+- [x] 6.1 Give `screens/draftToolbarState.ts::publishAvailability` the optional `noStepYet = false` of D6. The permission answer stays first.
+- [x] 6.2 Give `PublishNavControl` and `PublishReasonLine` a `noStepYet` prop. `ProcessHeaderBar` passes `validation.noStepYet` to both.
+- [x] 6.3 The new reason takes the muted tone the permission reason uses. Verify with the render tests in 6.5.
+- [x] 6.4 In `packages/web/test/studio-draftToolbarState.test.ts`, cover three cases: no step, no step without permission, and a draft with a step.
+- [x] 6.5 In `packages/web/test/studio-processHeaderBar-publishGate.test.tsx`, a stepless draft renders Publish with `aria-disabled` and the reason.
+- [x] 6.6 In the same file, activating that Publish control sends no request and opens no dialog.
 
 ## 7. Docs
 
