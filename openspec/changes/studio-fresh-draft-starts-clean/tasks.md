@@ -8,10 +8,10 @@ Paths under `screens/`, `draft/` and `panels/` sit in `packages/web/src/areas/st
 
 ## 2. Seed every list empty (studio-app)
 
-- [ ] 2.1 In `screens/processListLogic.ts::seededDraftInput`, return the D1 body from `design.md` for the empty choice. Keep `layout: {}` and `revision: 0`.
-- [ ] 2.2 Rewrite the comment in `draft/chainingFetch.ts` that quotes the old `{ baseLocale: "en" }` seed. It names the new seeded body.
-- [ ] 2.3 In `packages/web/test/studio-processListLogic.test.ts`, expect the D1 body. Add a test: `validateStructure` on it reports one Zod issue, at `workflow.initialStep`.
-- [ ] 2.4 In `packages/web/test/studio-processesScreen-createGate.test.tsx`, cite "A new process mints a prefixed id client-side in one write". Verify both tests in group 8.
+- [x] 2.1 In `screens/processListLogic.ts::seededDraftInput`, return the D1 body from `design.md` for the empty choice. Keep `layout: {}` and `revision: 0`.
+- [x] 2.2 Rewrite the comment in `draft/chainingFetch.ts` that quotes the old `{ baseLocale: "en" }` seed. It names the new seeded body.
+- [x] 2.3 In `packages/web/test/studio-processListLogic.test.ts`, expect the D1 body. Add a test: `validateStructure` on it reports one Zod issue, at `workflow.initialStep`.
+- [x] 2.4 In `packages/web/test/studio-processesScreen-createGate.test.tsx`, cite "A new process mints a prefixed id client-side in one write". Verify both tests in group 8.
 
 ## 3. Recognize the two start gaps (studio-checks-rail)
 

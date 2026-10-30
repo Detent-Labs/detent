@@ -57,8 +57,10 @@ export interface CreateDraftInput {
 const NEW_PROCESS_BASE_LOCALE = "en";
 
 /**
- * The body a new draft starts from. Without a `seedVersion` it declares only
- * `baseLocale`, the `+ New process` case. With one, it is that published
+ * The body a new draft starts from. Without a `seedVersion` every list stands
+ * in place and empty (`key`, `label`, `fields`, `workflow.steps`) beside
+ * `baseLocale`, the `+ New process` case. Only `workflow.initialStep` is
+ * absent, since no value is valid before a step exists. With one, it is that published
  * version read back and stripped of the compile pass's cancel-sink injection,
  * since a draft holds the authored shape — stamped with the version it came
  * from so the Versions screen can diff against it. A published body carries
@@ -75,7 +77,13 @@ export async function seededDraftInput(
   seedVersion: number | undefined,
   readBody: (version: number) => Promise<unknown>,
 ): Promise<CreateDraftInput> {
-  if (seedVersion === undefined) return { body: { baseLocale: NEW_PROCESS_BASE_LOCALE }, layout: {}, revision: 0 };
+  if (seedVersion === undefined) {
+    return {
+      body: { key: "", label: {}, baseLocale: NEW_PROCESS_BASE_LOCALE, fields: [], workflow: { steps: [] } },
+      layout: {},
+      revision: 0,
+    };
+  }
   const published = (await readBody(seedVersion)) as ProcessBody;
   return { body: stripCompiledContent(published), layout: {}, revision: 0, baseVersion: seedVersion };
 }

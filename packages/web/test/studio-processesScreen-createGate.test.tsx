@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { ProcessesScreen } from "../src/areas/studio/screens/ProcessesScreen.js";
 
 /**
- * studio-app spec, "Creating a new process mints a prefixed id client-side":
+ * studio-app spec, "A new process mints a prefixed id client-side in one write":
  * the `/processes` screen offers the create-new-process action only to an
  * actor holding `system:create`. Presentational only — the authoritative
  * check sits on `PUT /drafts/:processId` (process-drafts).

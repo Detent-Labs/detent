@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { authoredProcessBody } from "workflow-engine/schema";
+import { validateStructure } from "workflow-engine/validate";
 import {
   createInFlightGuard,
   deriveProcessRows,
@@ -115,10 +116,14 @@ describe("seededDraftInput", () => {
     workflow: { steps: [{ id: "step_a" }, { id: "step_cancel_sink", key: "cancel_sink" }] },
   });
 
-  it("returns a base-locale-only draft and no base version without a seed version", async () => {
+  it("returns a draft with every list empty and no base version without a seed version", async () => {
     let reads = 0;
     const input = await seededDraftInput(undefined, async () => (reads++, compiledBody()));
-    expect(input).toEqual({ body: { baseLocale: "en" }, layout: {}, revision: 0 });
+    expect(input).toEqual({
+      body: { key: "", label: {}, baseLocale: "en", fields: [], workflow: { steps: [] } },
+      layout: {},
+      revision: 0,
+    });
     expect(reads).toBe(0);
   });
 
@@ -128,9 +133,15 @@ describe("seededDraftInput", () => {
   it("seeds a body that reports no missing baseLocale", async () => {
     const input = await seededDraftInput(undefined, async () => compiledBody());
     const parsed = authoredProcessBody.safeParse(input.body);
-    expect(parsed.success).toBe(false); // still missing key/label/fields/workflow
+    expect(parsed.success).toBe(false); // still missing workflow.initialStep
     const paths = parsed.error!.issues.map((i) => i.path.join("."));
     expect(paths).not.toContain("baseLocale");
+  });
+
+  it("seeds a body whose one Zod issue is the missing workflow.initialStep", async () => {
+    const input = await seededDraftInput(undefined, async () => compiledBody());
+    const { zodIssues } = validateStructure(input.body);
+    expect(zodIssues.map((i) => i.path)).toEqual([["workflow", "initialStep"]]);
   });
 
   it("returns the stripped published body stamped with its version", async () => {
