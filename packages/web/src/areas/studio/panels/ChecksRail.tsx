@@ -35,6 +35,12 @@ const styles = stylex.create({
     marginBlockStart: 0,
     marginInline: 0,
   },
+  checksRailStart: {
+    color: colors.textMuted,
+    paddingBlock: space.s3,
+    paddingInline: 0,
+    marginBlock: 0,
+  },
   checksGroup: {
     paddingBlock: space.s2,
     paddingInline: 0,
@@ -156,6 +162,9 @@ export function ChecksRail({ validation, canPublish, onOpenIssue, narrowedTo, on
     : validation;
   const groups = groupChecksBySource(shown);
   const clear = allChecksClear(groups);
+  // A draft with no step: one sentence when nothing is open, else the sentence
+  // first and the groups under it.
+  const startOnly = validation.noStepYet === true && groups.every((g) => g.issues.length === 0);
 
   return (
     <aside {...stylex.props(styles.checksRail)} aria-label={t("checksRail.heading")}>
@@ -179,7 +188,10 @@ export function ChecksRail({ validation, canPublish, onOpenIssue, narrowedTo, on
             {t(canPublish ? "checksRail.clearReadyToPublish" : "checksRail.clearNeedsPublishPermission")}
           </p>
         )}
-        {groups.map((group) => (
+        {validation.noStepYet === true && (
+          <p {...stylex.props(styles.checksRailStart)}>{t("checksRail.noStepYet")}</p>
+        )}
+        {(startOnly ? [] : groups).map((group) => (
           <section key={group.source} {...stylex.props(styles.checksGroup)}>
             {/* The source name is the same untranslated machine value
                 IssueList already prints in its own label — a category this

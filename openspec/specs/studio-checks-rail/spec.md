@@ -14,6 +14,10 @@ The Checks tab SHALL carry the full grouped rail, per the
 every entry in the loaded draft's `validation.issues[]`. The rail SHALL group
 entries by `source`: zod, structural, CEL, registry, duration, and view.
 
+A draft with no step yet holds one Zod issue that is not an entry: the
+missing first step. This capability's start-state requirement covers that
+draft.
+
 The first five sources are engine validators. The studio runs each one
 unmodified, and reports what it returns. The sixth holds the studio's own
 findings, over a draft the engine would publish. It needs its own name for
@@ -40,12 +44,17 @@ row in the rail opens the tab that owns its subject, per the
 #### Scenario: A Zod-invalid draft's issues show in their own group
 
 - **WHEN** the loaded draft fails Zod validation (`zodValid` is false)
+- **AND** it holds at least one step
 - **THEN** the Checks tab prints those issues under a `zod` group
+<!-- antislop: allow trailing-negation -->
+<!-- Copied from the live spec; held back and empty are the two states the scenario contrasts. -->
 - **AND** the structural, CEL, registry, duration, and view groups read held
   back, not empty
 
 ### Requirement: The rail reflects the held-back state of a structurally invalid draft
 
+<!-- antislop: allow sentence-length -->
+<!-- Copied from the live spec; a sentence opening on a code span merges with its neighbour in the count. -->
 `validateStructure` (`src/validate.ts`) reports the duration and structural
 dimensions as not run when the Zod parse fails and the compile pass raised
 no duration or structural issue. CEL and registry checks do not run until the
@@ -53,6 +62,11 @@ draft compiles. The field `dimensions.structural` reads `"ran"`
 both when the structural checks pass cleanly and when they run and
 raise a structural issue. That field alone cannot tell the two states
 apart.
+
+This requirement governs a draft that holds at least one step. It also
+governs a draft with no step that carries some other open issue. A draft
+with no step and no other open issue shows the start state alone. This
+capability's start-state requirement covers it.
 
 The checks rail SHALL show the CEL and registry groups as held back
 whenever the structural dimension did not run. It SHALL also show them
@@ -117,6 +131,7 @@ three needs a compiled body.
 #### Scenario: A Zod-invalid draft shows every group held back
 
 - **WHEN** the loaded draft is not Zod-valid
+- **AND** it holds at least one step
 - **AND** the compile pass raised no structural issue
 - **THEN** the checks rail shows the structural, CEL, registry, duration
   and view groups as held back
@@ -189,6 +204,79 @@ three needs a compiled body.
 - **AND** the CEL group's own issue list has no entry for that site
 - **AND** the group never presents that site as a clear pass
 - **AND** a visible control beside that action shows the not-checked state
+
+### Requirement: A draft with no step yet shows a start state
+
+A draft whose step list is empty SHALL read as a start state. Its missing
+first step SHALL NOT count as an open issue. The Checks count then reads 0.
+
+With no other open issue, the rail SHALL show one sentence and no group.
+That sentence names where to add the first step. The all-clear state SHALL
+stay hidden. With some other open issue, the sentence SHALL stand first and
+the groups SHALL follow.
+
+#### Scenario: A fresh empty draft shows the start sentence alone
+
+- **WHEN** an author opens the Checks tab on a draft the empty choice just
+  seeded
+- **THEN** the rail shows one sentence
+- **AND** that sentence names the Canvas and the Steps tab as the places to
+  add the first step
+- **AND** it shows no group, held back or clear
+- **AND** it does not show its all-clear state
+- **AND** the Checks tab's count reads 0 in its ordinary color and weight
+
+#### Scenario: The start state ends with the first step
+
+- **WHEN** an author adds the first step to a draft in the start state
+- **THEN** the start sentence leaves the rail
+- **AND** the rail shows its groups under its other requirements
+
+#### Scenario: Removing the last step returns the start state
+
+- **WHEN** an author removes the only step of a draft
+- **THEN** the rail shows the start sentence again
+
+#### Scenario: Another open issue keeps its group beside the start sentence
+
+- **WHEN** a draft with no step also carries an open Zod issue of another
+  kind
+- **THEN** the start sentence stands first
+- **AND** that issue shows under the `zod` group, and the other groups read
+  held back
+
+#### Scenario: No line names the validator in the start state
+
+- **WHEN** the rail or the header bar renders a draft in the start state
+- **THEN** no text reads "zod" or "Invalid input"
+
+### Requirement: An unnamed process reads one sentence at its name
+
+A draft that holds a step but no base-locale name SHALL report that gap as
+one open issue. The issue SHALL read as one sentence: the process needs a
+name. The sentence SHALL name the field at the top of the page. It SHALL
+stand in the header bar beside the name. There it SHALL print no source label. It
+SHALL count as a blocker, and the rail SHALL list it in the `zod` group.
+
+#### Scenario: A stepped, unnamed draft shows the name sentence
+
+- **WHEN** a draft holds one named end step, and its own name is empty in
+  the base locale
+- **THEN** the header bar shows the sentence that the process needs a name
+- **AND** no source label stands beside it there
+- **AND** no text reads "missing baseLocale"
+
+#### Scenario: The name sentence counts as a blocker
+
+- **WHEN** a draft holds one named end step, and its own name is empty in
+  the base locale
+- **THEN** the Checks tab's count reads 1 and carries the blocker color
+- **AND** the rail lists the same sentence in its `zod` group
+
+#### Scenario: Typing a name clears the sentence
+
+- **WHEN** an author types a name into the header bar's name field
+- **THEN** the sentence leaves the header bar and the rail
 
 ### Requirement: Every publish blocker is visible in the rail with all groups clear
 

@@ -269,7 +269,7 @@ Specs: `development-toolchain`, `devcontainer-preflight`, `worktree-isolation`,
 
     Specs: `definition-contract`, `runtime-api`, `cel-expressions`.
 
-64. **Studio UI overhaul: NOT STARTED.** Decided 2026-10-30 in a design
+64. **Studio UI overhaul: CHANGE 1 DONE, REST NOT STARTED.** Decided 2026-10-30 in a design
     session with the owner. The concept reworks how an author handles steps
     and fields in the studio. The owner weights that authoring loop above
     canvas gestures, navigation chrome and safety prompts. The canvas is the
@@ -300,7 +300,7 @@ Specs: `development-toolchain`, `devcontainer-preflight`, `worktree-isolation`,
     alone and leaves the studio usable. Needs names the change it builds on.
 
     1. `studio-fresh-draft-starts-clean`. Needs: none. Resolves: B2, a new
-       process opens on raw Zod messages.
+       process opens on raw Zod messages. Shipped 2026-10-30.
     2. `studio-vocabulary-no-key-echo`. Needs: none. Resolves: M1 in part,
        m4, retired words in the catalog.
     3. `studio-selects-show-labels`. Needs: 2. Resolves: M2, umlauts in

@@ -48,4 +48,11 @@ describe("An issue's source label", () => {
   it("renders nothing at all for an empty issue set", () => {
     expect(renderToStaticMarkup(<IssueItems issues={[]} />)).toBe("");
   });
+
+  it("renders a plain issue's message with no source label", () => {
+    const html = renderToStaticMarkup(<IssueItems issues={[issue({ message: "The process needs a name.", plain: true })]} />);
+
+    expect(html).toContain("The process needs a name.");
+    expect(html).not.toContain("<span");
+  });
 });

@@ -1079,6 +1079,9 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   `src/schema/definition.ts:1095`, and the "ZOD" label from
   `panels/shared/IssueList.tsx:44`. Risk (Medium): an author reads Zod, CEL
   grammar and raw ids where a plain sentence belongs.
+
+  Since `studio-fresh-draft-starts-clean` the process-name message reads a
+  sentence, and the field-label part stays open.
 - **FIELDS-9: a group's editor leads with zones a group cannot use.** Its
   definition half shows "Where values come from"
   (`panels/FieldCatalogPanel.tsx:882`). It also shows a disabled "Default
@@ -1760,6 +1763,23 @@ to this section.
   library loads. The loading line has no `role="status"`, names no screen, and
   the form editor's loading line sits 16 px left of the editor. All five are polish
   from the `/impeccable audit`, and none loses work.
+
+## Open from studio-fresh-draft-starts-clean (needs its own OpenSpec change)
+
+The change's final review parked three findings. The START tag is local to
+this section.
+
+- **START-1: the name input is not tied to the name sentence.** The input has
+  no `aria-describedby` and no `aria-invalid`. Its accessible name is its
+  placeholder. Change 12 maps each message to its subject, so it should bind
+  each message to its input.
+- **START-2: an unavailable Publish shows a dim focus ring.** The shared
+  `.btn` rule sets 0.45 opacity on `aria-disabled`, so the ring drops to about
+  2:1 contrast. Every fresh draft now shows it. The fix belongs in the shared
+  `.btn` rule.
+- **START-3: the name sentence names no locale.** It misleads when
+  `baseLocale` is not `en`. An author who typed an English name still reads
+  "The process needs a name". Change 12's message map should carry the locale.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 

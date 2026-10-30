@@ -6356,3 +6356,27 @@ Choose the type `notification.email`. In the `to` field, type `nobody` on one
 line. Pass: the message under the field reads "Enter a valid email address."
 in the error color. Replace the line with `a@example.com`. Pass: the message
 goes.
+
+### Studio: a fresh draft starts clean (`studio-fresh-draft-starts-clean`)
+
+Source: `studio-fresh-draft-starts-clean` tasks 8.7 to 8.9. The bun tests
+assert the logic. This walk covers what they cannot judge: the banner
+position and the look of the sentences. Use the production bundle.
+
+**1. An empty process opens clean.** On `/studio`, press **+ New process**
+and choose **Empty process**. Pass: no banner stands above the tabs. No text
+on the page reads "zod". The Checks tab's count reads 0.
+
+The reason line beside Publish states "Publish needs a first step". The Checks
+tab body shows "No step yet. Add the first
+step on the Canvas or the Steps tab."
+
+**2. A name sentence stands beside the name.** Add an end step and give it a
+name. Leave the process unnamed. Pass: "The process needs a name. Type it in the name field
+at the top of the page." stands beside the name field. No banner appears.
+
+**3. The sentence leaves with the name.** Type a process name. Pass: the
+sentence leaves.
+
+**4. The banner returns with a task step.** Add a task step. Pass: the
+banner returns. The change's design expects this.

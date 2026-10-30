@@ -54,6 +54,9 @@ export interface EditorIssue {
    * placing a check inside one entity needs the part that resolution drops.
    * The Fields view's zones read it through `panels/fieldCheckZone.ts`. */
   loc: string;
+  /** The message is one whole sentence for a person, so a list prints it with
+   * no source label. */
+  plain?: true;
 }
 
 interface Token {

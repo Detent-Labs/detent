@@ -1053,6 +1053,9 @@ draft. A template gives you a prepared body to change. A template is a
 snapshot taken when somebody created it. Editing the template later changes
 nothing you already started from it.
 
+A new draft opens with no warning. Its Checks tab says where to add the first
+step, and Publish waits until the draft holds one.
+
 Your installation may list no template. Somebody holding `system:templates`
 creates them on Studio's **Templates** screen, from a published version of a
 process.

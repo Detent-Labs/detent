@@ -420,6 +420,62 @@ describe("The Publish control's permission gate", () => {
   });
 });
 
+describe("The Publish control on a draft with no step yet", () => {
+  const cls = (html: string) => /class="([^"]*)"/.exec(html)?.[1];
+
+  it("renders unavailable, with the reason on the muted line the control points at", () => {
+    const control = renderToStaticMarkup(
+      <PublishNavControl canPublish={true} blocked={false} noStepYet={true} publishing={false} onPublish={() => {}} />,
+    );
+    const reason = renderToStaticMarkup(<PublishReasonLine canPublish={true} blocked={false} noStepYet={true} />);
+
+    expect(control).toContain('aria-disabled="true"');
+    expect(control).not.toContain('disabled=""');
+    expect(reason).toContain("Publish needs a first step");
+    const described = /aria-describedby="([^"]+)"/.exec(control);
+    expect(described).not.toBeNull();
+    expect(reason).toContain(`id="${described![1]}"`);
+  });
+
+  it("takes the muted style of the permission reason, not the blocked one", () => {
+    const needsStep = cls(renderToStaticMarkup(<PublishReasonLine canPublish={true} blocked={false} noStepYet={true} />));
+    const denied = cls(renderToStaticMarkup(<PublishReasonLine canPublish={false} blocked={false} />));
+    const blocked = cls(renderToStaticMarkup(<PublishReasonLine canPublish={true} blocked={true} />));
+
+    expect(needsStep).toBe(denied);
+    expect(needsStep).not.toBe(blocked);
+  });
+
+  it("names only the permission reason when the actor also lacks the permission", () => {
+    const reason = renderToStaticMarkup(<PublishReasonLine canPublish={false} blocked={false} noStepYet={true} />);
+
+    expect(reason).toContain("Needs the publish permission for this process");
+    expect(reason).not.toContain("Publish needs a first step");
+  });
+
+  it("sends no request and opens no dialog when activated", () => {
+    let published = 0;
+    const button = PublishNavControl({
+      canPublish: true,
+      blocked: false,
+      noStepYet: true,
+      publishing: false,
+      onPublish: () => published++,
+    });
+    (button.props as { onClick: () => void }).onClick();
+
+    expect(published).toBe(0);
+  });
+
+  it("offers the control again once a step exists", () => {
+    const html = renderToStaticMarkup(
+      <PublishNavControl canPublish={true} blocked={false} noStepYet={false} publishing={false} onPublish={() => {}} />,
+    );
+
+    expect(html).not.toContain("aria-disabled");
+  });
+});
+
 /**
  * `studio-header-menu-merge`: the `⋮` menu now carries what the tab row's
  * own overflow menu used to (JSON surface, Versions, Player), so this

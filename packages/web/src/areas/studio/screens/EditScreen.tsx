@@ -31,6 +31,7 @@ import type { DraftRecord, PublishResult } from "../api/types.js";
 import { DEFAULT_TAB, type ProcessTab, type Route } from "../routing.js";
 import { formEditorReturnTab, processTabCounts, tabForChangeGroup, tabForIssue } from "../draft/process-tabs.js";
 import { checksDotState, groupChecksBySource } from "../draft/checksRail.js";
+import { showsStructuralBanner } from "../draft/startGaps.js";
 import { initialSaveState, type DraftSaveState } from "./draftSaveLogic.js";
 import { isDraftDirty } from "./draftToolbarState.js";
 import { CanvasView } from "../canvas/CanvasView.js";
@@ -870,7 +871,7 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
   const counts = processTabCounts(draft, validation.issues, changesCount);
   // The Checks tab's own count reads this color when the draft's worst open
   // issue is a blocker (`studio-process-tabs`); no other tab's count does.
-  const checksBlocked = checksDotState(groupChecksBySource(validation)) === "blocker";
+  const checksBlocked = checksDotState(groupChecksBySource(validation), validation.noStepYet) === "blocker";
   const goToTab = (target: ProcessTab) => {
     // The narrowing belongs to one visit to the Checks tab. Leaving it drops
     // the filter, so a later press on the Checks control opens the whole list.
@@ -964,7 +965,7 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
             &larr; Back to processes
           </button>
         </nav>
-        {!validation.zodValid && <p {...stylex.props(styles.draftIncomplete)}>{t("app.draftIncomplete")}</p>}
+        {showsStructuralBanner(validation) && <p {...stylex.props(styles.draftIncomplete)}>{t("app.draftIncomplete")}</p>}
         {/* Renders on both surfaces (studio-json-view: the content-locale
             switcher "SHALL remain visible and usable regardless of which
             surface is active") — only its "Process, saved with the draft" menu
