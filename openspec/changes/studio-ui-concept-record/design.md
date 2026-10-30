@@ -117,7 +117,8 @@ High finding on one observation.
 example in the vocabulary table, the way-out row `Freigeben → Abschluss`,
 becomes an English pair. The record passes antislop with exit 0; it is a
 new file with base 0. Sentences stay under 20 words and paragraphs under
-six sentences. A table cell is not a sentence.
+six sentences. Antislop scores a table row as one sentence, so long rows
+split into several.
 
 ## Risks / Trade-offs
 

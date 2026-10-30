@@ -3,7 +3,7 @@
 ## Why
 
 A design session on 2026-10-30 produced a complete studio UI concept. It
-holds an inventory of the studio today and the owner's rating of 30 findings.
+holds an inventory of the studio today and the owner's rating of 26 findings.
 It holds six pattern references with the owner's reaction. It holds seven
 design principles the owner confirmed and eight decisions (D1 to D8). It
 holds a vocabulary table and an ordered list of 16 changes.

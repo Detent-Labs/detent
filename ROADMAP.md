@@ -318,7 +318,7 @@ Specs: `development-toolchain`, `devcontainer-preflight`, `worktree-isolation`,
     11. `studio-field-card`. Needs: 9 and 7. Resolves: m3, M10.
     12. `studio-checks-by-subject`. Needs: 10. Resolves: M4, the 22 failure
         renders in part.
-    13. `studio-one-dialog-form`. Needs: 10. Resolves: D7, the six
+    13. `studio-one-dialog-form`. Needs: 10. Resolves: D7, DRAFT-1, the six
         `confirm()` prompts, the dialog presentation gaps, the keyboard trap.
     14. `studio-header-two-rows`. Needs: 9. Resolves: m1, m2.
     15. `studio-draft-autosave-and-save-points`. Needs: 14. Resolves: D6.

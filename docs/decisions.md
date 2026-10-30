@@ -888,11 +888,11 @@ recorded rather than fixed. The RAIL tags are local to this section.
   button does work, through a native browser confirm. Risk (High): the studio
   has no undo, so an author who means to drop a draft keeps it, and the next
   session reads that draft as current work.
+  Risk (Informational): a long label wraps on a wide screen and fits on a
+  narrow one.
 
   A re-check on 2026-10-30 did not reproduce it. The entry stays open until a
   second check or a found cause closes it.
-  Risk (Informational): a long label wraps on a wide screen and fits on a
-  narrow one.
 - **A canvas removal drops keyboard focus, and nothing announces it.**
   `deleteSelection` (`packages/web/src/areas/studio/screens/EditScreen.tsx:678`)
   clears the selection. The pressed control unmounts with it, so focus lands on
