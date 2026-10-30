@@ -1049,7 +1049,9 @@ changeable. Nothing you do to a draft affects a running process.
 Studio lists your processes. Open one, or start a new one.
 
 **+ New process** asks what to start from. **Empty process** gives you a blank
-draft. A template gives you a prepared body to change. A template is a
+draft. A new draft opens with no check result.
+Publish waits until the draft holds a first step. A template gives you a
+prepared body to change. A template is a
 snapshot taken when somebody created it. Editing the template later changes
 nothing you already started from it.
 

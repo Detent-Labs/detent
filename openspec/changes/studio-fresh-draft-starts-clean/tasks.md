@@ -53,12 +53,12 @@ Paths under `screens/`, `draft/` and `panels/` sit in `packages/web/src/areas/st
 
 ## 7. Docs
 
-- [ ] 7.1 In `docs/authoring-guide.md`, add one sentence after "Empty process". A new draft opens with no check result.
-- [ ] 7.2 The same sentence says that Publish waits for a first step. Check the guide with the prose gate in 8.5.
-- [ ] 7.3 In `docs/decisions.md`, add a line to FIELDS-8: the process-name message now reads a sentence, and the field-label part stays open.
-- [ ] 7.4 Add one entry to `docs/browser-checks.md` for the fresh-draft walk in 8.7.
-- [ ] 7.5 In `ROADMAP.md` stage 64, set the status to `CHANGE 1 DONE, REST NOT STARTED`.
-- [ ] 7.6 In the same stage, mark item 1 shipped as `studio-fresh-draft-starts-clean`, as stages 40 and 43 do.
+- [x] 7.1 In `docs/authoring-guide.md`, add one sentence after "Empty process". A new draft opens with no check result.
+- [x] 7.2 The same sentence says that Publish waits for a first step. Check the guide with the prose gate in 8.5.
+- [x] 7.3 In `docs/decisions.md`, add a line to FIELDS-8: the process-name message now reads a sentence, and the field-label part stays open.
+- [x] 7.4 Add one entry to `docs/browser-checks.md` for the fresh-draft walk in 8.7.
+- [x] 7.5 In `ROADMAP.md` stage 64, set the status to `CHANGE 1 DONE, REST NOT STARTED`.
+- [x] 7.6 In the same stage, mark item 1 shipped as `studio-fresh-draft-starts-clean`, as stages 40 and 43 do.
 
 ## 8. Verification
 

@@ -1079,6 +1079,9 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   `src/schema/definition.ts:1095`, and the "ZOD" label from
   `panels/shared/IssueList.tsx:44`. Risk (Medium): an author reads Zod, CEL
   grammar and raw ids where a plain sentence belongs.
+
+  Since `studio-fresh-draft-starts-clean` the process-name message reads a
+  sentence, and the field-label part stays open.
 - **FIELDS-9: a group's editor leads with zones a group cannot use.** Its
   definition half shows "Where values come from"
   (`panels/FieldCatalogPanel.tsx:882`). It also shows a disabled "Default
