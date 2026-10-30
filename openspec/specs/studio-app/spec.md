@@ -528,27 +528,15 @@ discard its draft. Discarding SHALL need a confirmation and SHALL call
 - **THEN** the list shows every process, regardless of that actor's own
   Developer or Owner lists
 
-### Requirement: Creating a new process mints a prefixed id client-side
+### Requirement: A new process mints a prefixed id client-side in one write
 
-Creating a process SHALL mint a `proc_`-prefixed UUIDv4 id in the browser.
-It SHALL use the minting path the Draft model already uses for every other
-entity kind. That path generates `${prefix}_${crypto.randomUUID()}` and
-parses it through the contract's own branded id schema. Creating SHALL then
-write the row with a `PUT /drafts/:processId` at `revision = 0`. There SHALL
-be no separate create-then-save round trip and no server-side id allocation.
-
-The `/processes` screen SHALL offer the create-new-process action only to an
-actor holding `CREATE_ROLE`. This is a presentational check alone. The
-`PUT /drafts/:processId` call it issues carries the authoritative check, per
-`process-drafts`.
-
-Creating SHALL first offer a choice of starting body. The empty choice SHALL
-seed the body the studio seeds today. The template choice SHALL seed the body
-and the layout of a template the author picks. The picker SHALL list the
-templates the account may read.
-
-A process seeded from a template SHALL claim no base version, because a
-template is no published version.
+Creating a process SHALL mint a `proc_` id in the browser as
+`${prefix}_${crypto.randomUUID()}`, a UUIDv4. It SHALL parse that id through
+the contract's branded id schema, the path every other entity kind uses. It
+SHALL write the row with one `PUT /drafts/:processId` at `revision = 0`.
+There SHALL be no create-then-save round trip and no server-side id. The
+`/processes` screen SHALL offer the action only to an actor holding
+`CREATE_ROLE`, as a presentational check.
 
 #### Scenario: A new process is one round trip
 
@@ -556,10 +544,40 @@ template is no published version.
 - **THEN** the browser issues exactly one `PUT /drafts/:processId`, with
   `revision` 0, and the process id carries the `proc_` prefix
 
-#### Scenario: The empty choice behaves as before
+#### Scenario: The screen hides the create action without the create role
+
+- **WHEN** an actor holds `system:developer` but not `CREATE_ROLE`
+- **THEN** the `/processes` screen offers no create-new-process action
+
+#### Scenario: The create role check is presentational alone
+
+- **WHEN** a client skips the screen and sends `PUT /drafts/:processId` for
+  an actor without `CREATE_ROLE`
+- **THEN** the write path's own check answers, per `process-drafts`
+
+### Requirement: The empty choice seeds every list empty
+
+Creating SHALL first offer a choice of starting body. The picker SHALL list
+the templates the account may read. The empty choice SHALL seed every list
+in place and empty. A template start SHALL seed that template's body and
+layout. A process seeded from a template SHALL claim no base version,
+because a template is no published version.
+
+#### Scenario: The empty choice seeds every list empty
 
 - **WHEN** an author creates a new process and picks the empty choice
-- **THEN** the draft body declares the base locale and nothing else
+- **THEN** the draft body holds `key` as an empty string, `label` as an
+  empty object, and `baseLocale` as `"en"`
+- **AND** it holds `fields` as an empty array and `workflow.steps` as an
+  empty array
+- **AND** it has no `workflow.initialStep` and no other key
+
+#### Scenario: A fresh empty draft reports one gap alone
+
+- **WHEN** the engine's own structural validation reads the body the empty
+  choice seeds
+- **THEN** it reports exactly one Zod issue, the missing
+  `workflow.initialStep`
 
 #### Scenario: The template choice seeds body and layout
 
@@ -572,11 +590,6 @@ template is no published version.
 - **WHEN** an author creates a new process while no template exists
 - **THEN** the picker offers the empty choice and states that no template
   exists
-
-#### Scenario: The screen hides the create action without the create role
-
-- **WHEN** an actor holds `system:developer` but not `CREATE_ROLE`
-- **THEN** the `/processes` screen offers no create-new-process action
 
 ### Requirement: Creating a draft for a published process starts from the latest published version
 
