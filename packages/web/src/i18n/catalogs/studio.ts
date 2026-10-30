@@ -785,9 +785,11 @@ export const en = {
   "jsonView.label": "Draft body (JSON)",
   "jsonView.apply": "Apply",
 
+  // The process has no name in its base locale. One whole sentence.
+  "issues.processNeedsName": "The process needs a name. Type it in the name field at the top of the page.",
+
   // A badge for a check the browser holds back. Each is one whole sentence.
   "issues.registryNotChecked": "Registry config: not checked",
-  "issues.processNeedsName": "The process needs a name. Type it in the name field at the top of the page.",
   "issues.chainingNotChecked": "Chaining target: not checked",
   "issues.crossProcessNotChecked": "Cross-process references: not checked",
 

@@ -411,7 +411,7 @@ export function PublishNavControl({
  * reason keeps the muted tone: it names a fact about the actor instead.
  *
  * `publishAvailability` runs here a second time rather than taking a prop.
- * The function is pure over two booleans the header bar already holds, and a
+ * The function is pure over three booleans the header bar already holds, and a
  * threaded prop would let the button's reason and this line's reason drift.
  */
 export function PublishReasonLine({

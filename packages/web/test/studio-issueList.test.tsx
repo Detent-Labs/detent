@@ -53,7 +53,6 @@ describe("An issue's source label", () => {
     const html = renderToStaticMarkup(<IssueItems issues={[issue({ message: "The process needs a name.", plain: true })]} />);
 
     expect(html).toContain("The process needs a name.");
-    expect(html).not.toContain(">zod</span>");
     expect(html).not.toContain("<span");
   });
 });

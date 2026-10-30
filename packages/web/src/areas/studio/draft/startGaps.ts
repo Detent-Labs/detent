@@ -11,11 +11,17 @@ function pathIs(issue: ZodIssueShape, ...path: string[]): boolean {
   return issue.path.length === path.length && path.every((seg, i) => issue.path[i] === seg);
 }
 
-/** A draft with no step has no `initialStep`, and the engine reports that as a
- * type error. Studio reads it as a start state, not an issue. */
-export function isStartGap(draft: Draft, issue: ZodIssueShape): boolean {
+/** True when the draft's step list is an empty array. */
+export function hasNoSteps(draft: Draft): boolean {
   const steps = draft.workflow?.steps;
-  return Array.isArray(steps) && steps.length === 0 && issue.code === "invalid_type" && pathIs(issue, "workflow", "initialStep");
+  return Array.isArray(steps) && steps.length === 0;
+}
+
+/** A draft with no step has no resolvable `initialStep`. The engine reports
+ * that as a type error or as an unresolved reference. Studio reads every issue
+ * at `workflow.initialStep` as part of the start state, not as an issue. */
+export function isStartGap(draft: Draft, issue: ZodIssueShape): boolean {
+  return hasNoSteps(draft) && pathIs(issue, "workflow", "initialStep");
 }
 
 /** The process's own `label` lacks its base-locale entry: the process has no name. */

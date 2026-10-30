@@ -1764,6 +1764,23 @@ to this section.
   the form editor's loading line sits 16 px left of the editor. All five are polish
   from the `/impeccable audit`, and none loses work.
 
+## Open from studio-fresh-draft-starts-clean (needs its own OpenSpec change)
+
+The change's final review parked three findings. The START tag is local to
+this section.
+
+- **START-1: the name input is not tied to the name sentence.** The input has
+  no `aria-describedby` and no `aria-invalid`. Its accessible name is its
+  placeholder. Change 12 maps each message to its subject, so it should bind
+  each message to its input.
+- **START-2: an unavailable Publish shows a dim focus ring.** The shared
+  `.btn` rule sets 0.45 opacity on `aria-disabled`, so the ring drops to about
+  2:1 contrast. Every fresh draft now shows it. The fix belongs in the shared
+  `.btn` rule.
+- **START-3: the name sentence names no locale.** It misleads when
+  `baseLocale` is not `en`. An author who typed an English name still reads
+  "The process needs a name". Change 12's message map should carry the locale.
+
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 
 Each entry below names a cut somebody proposed, the reason a reviewer refused

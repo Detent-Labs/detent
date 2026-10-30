@@ -113,4 +113,19 @@ describe("The checks rail's start state", () => {
     expect(html).not.toContain("No open issues.");
     expect(html).not.toContain("ready to publish");
   });
+
+  it("draws the sentence as plain text, not in the all-clear box's class", () => {
+    const classOf = (html: string, text: string): string => {
+      const m = html.match(new RegExp(`<p class="([^"]*)"[^>]*>${text}`));
+      return m ? m[1] : "";
+    };
+    const start = renderToStaticMarkup(<ChecksRail validation={stepless} canPublish={true} />);
+    const allClear = renderToStaticMarkup(<ChecksRail validation={clear} canPublish={true} />);
+    const startClass = classOf(start, "No step yet");
+    const clearClass = classOf(allClear, "No open issues");
+
+    expect(startClass).not.toBe("");
+    expect(clearClass).not.toBe("");
+    expect(startClass).not.toBe(clearClass);
+  });
 });

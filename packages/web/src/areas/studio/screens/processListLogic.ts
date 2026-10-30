@@ -60,8 +60,8 @@ const NEW_PROCESS_BASE_LOCALE = "en";
  * The body a new draft starts from. Without a `seedVersion` every list stands
  * in place and empty (`key`, `label`, `fields`, `workflow.steps`) beside
  * `baseLocale`, the `+ New process` case. Only `workflow.initialStep` is
- * absent, since no value is valid before a step exists. With one, it is that published
- * version read back and stripped of the compile pass's cancel-sink injection,
+ * absent, since no value is valid before a step exists. With one, it is that
+ * published version read back and stripped of the compile pass's cancel-sink injection,
  * since a draft holds the authored shape — stamped with the version it came
  * from so the Versions screen can diff against it. A published body carries
  * its own `baseLocale` (it could not have reached publish otherwise) and

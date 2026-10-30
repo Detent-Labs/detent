@@ -5,7 +5,7 @@ import { PROCESS_START_ACTION_TYPE, type RegistryDescription } from "workflow-en
 import type { Draft } from "./types";
 import { resolveLoc, type EditorIssue, type IssueSource } from "./issues";
 import { t } from "../catalog.js";
-import { isProcessNameGap, isStartGap } from "./startGaps";
+import { hasNoSteps, isProcessNameGap, isStartGap } from "./startGaps";
 import { checkViewFlags, checkUnwrittenTechnicalFields } from "./view-flags";
 
 function pushIssues(
@@ -52,7 +52,7 @@ export interface ValidationResult {
    * site absent from this record, or reading "not-checked", never counts as
    * a clear pass in the CEL group. */
   chainingSiteStatus: Record<ActionId, "checked" | "not-checked">;
-  /** True only while the draft has no step yet. Absent otherwise. */
+  /** True while the draft's step list is empty. Absent otherwise. */
   noStepYet?: boolean;
 }
 
@@ -92,16 +92,13 @@ export function runValidation(
   const structure = validateStructure(draft);
   const zodValid = structure.zodIssues.length === 0;
   const issues: EditorIssue[] = [];
-  let noStepYet = false;
+  const noStepYet = hasNoSteps(draft);
 
   for (const issue of structure.zodIssues) {
     // Zod v4 widened an issue path to `PropertyKey[]`. A JSON body carries
     // no symbol key, so a symbol segment addresses nothing here.
     const path = issue.path.filter((seg): seg is string | number => typeof seg !== "symbol");
-    if (isStartGap(draft, issue)) {
-      noStepYet = true;
-      continue;
-    }
+    if (isStartGap(draft, issue)) continue;
     const nameGap = isProcessNameGap(issue);
     issues.push({
       ...resolveLoc(draft, path),

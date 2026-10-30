@@ -96,10 +96,13 @@ not choose.
 
 ### D2. The studio recognizes the start state
 
-The function `runValidation` checks two conditions. The draft's `workflow.steps` is an
-array of length 0. A Zod issue sits at the exact path `workflow.initialStep`
-with code `invalid_type`. When both hold, that issue becomes no
-`EditorIssue`, and `ValidationResult` carries `noStepYet: true`. The field
+The function `runValidation` reads one condition. The draft's
+`workflow.steps` is an array of length 0. Then every Zod issue at the exact
+path `workflow.initialStep` becomes no `EditorIssue`, and `ValidationResult`
+carries `noStepYet: true`. A missing and a dangling `initialStep` both
+count.
+
+A draft with no `workflow` key is no start state. The field
 is optional, and an absent value reads false. About 14 test fixtures hold a
 `ValidationResult` literal, and none of them needs to change.
 
@@ -203,8 +206,9 @@ requirements in `studio-checks-rail`.
 
 ## Risks / Trade-offs
 
-- [The first task step brings the banner back] → Two Zod refinements
-  raise it. One reads a step with no way out, one a step with no name.
+- [The first new step brings the banner back] → Any new step starts
+  unnamed, so the step-name refinement raises it. The step may be an end,
+  a call or a task. The task step adds the missing way out too.
   The calm start lasts until the first "Add step". Change 14 narrows the
   banner to real blockers. Change 12 maps the step messages to sentences.
 - [Change 12 supersedes `plain` and the name mapping] → Its own message

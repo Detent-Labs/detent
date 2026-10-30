@@ -35,6 +35,12 @@ const styles = stylex.create({
     marginBlockStart: 0,
     marginInline: 0,
   },
+  checksRailStart: {
+    color: colors.textMuted,
+    paddingBlock: space.s3,
+    paddingInline: 0,
+    marginBlock: 0,
+  },
   checksGroup: {
     paddingBlock: space.s2,
     paddingInline: 0,
@@ -183,7 +189,7 @@ export function ChecksRail({ validation, canPublish, onOpenIssue, narrowedTo, on
           </p>
         )}
         {validation.noStepYet === true && (
-          <p {...stylex.props(styles.checksRailClear)}>{t("checksRail.noStepYet")}</p>
+          <p {...stylex.props(styles.checksRailStart)}>{t("checksRail.noStepYet")}</p>
         )}
         {(startOnly ? [] : groups).map((group) => (
           <section key={group.source} {...stylex.props(styles.checksGroup)}>

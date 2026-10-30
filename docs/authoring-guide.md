@@ -1049,11 +1049,12 @@ changeable. Nothing you do to a draft affects a running process.
 Studio lists your processes. Open one, or start a new one.
 
 **+ New process** asks what to start from. **Empty process** gives you a blank
-draft. A new draft opens with no check result.
-Publish waits until the draft holds a first step. A template gives you a
-prepared body to change. A template is a
+draft. A template gives you a prepared body to change. A template is a
 snapshot taken when somebody created it. Editing the template later changes
 nothing you already started from it.
+
+A new draft opens with no warning. Its Checks tab says where to add the first
+step, and Publish waits until the draft holds one.
 
 Your installation may list no template. Somebody holding `system:templates`
 creates them on Studio's **Templates** screen, from a published version of a

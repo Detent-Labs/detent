@@ -15,8 +15,8 @@ export interface ChainingActionSite {
  * `ProcessBody` and calls `body.workflow.steps.forEach(...)` with no
  * optional chaining. A brand-new `+ New process` draft seeds every list empty
  * (`{ key: "", label: {}, baseLocale: "en", fields: [], workflow: { steps: [] } }`,
- * `processListLogic.ts::seededDraftInput`'s no-`seedVersion` branch). A draft
- * stored earlier, or one edited on the JSON surface, can still lack `workflow`
+ * `processListLogic.ts::seededDraftInput`'s no-`seedVersion` branch). A stored
+ * draft, or one edited on the JSON surface, can lack `workflow`
  * or any other key, and `EditScreen.tsx` passes the draft straight into
  * `DraftProvider`. A `collect()`-shaped walk would throw the instant its
  * effect runs against such a draft, so this walk mirrors `resolveLoc`'s own

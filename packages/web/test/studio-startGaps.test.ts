@@ -27,7 +27,7 @@ describe("the start gaps of a fresh draft", () => {
   it("keeps another Zod issue of a stepless draft and its banner", () => {
     const v = run({ ...d1(), fields: [{ id: "field_00000000-0000-4000-8000-000000000001", key: "a", label: { en: "A" } }] });
     expect(v.noStepYet).toBe(true);
-    expect(v.issues.length).toBeGreaterThan(0);
+    expect(v.issues.map((i) => i.loc)).toEqual(["fields[0].type"]);
     expect(v.issues.every((i) => i.loc !== "workflow.initialStep")).toBe(true);
     expect(showsStructuralBanner(v)).toBe(true);
   });
@@ -53,8 +53,26 @@ describe("the start gaps of a fresh draft", () => {
     const step = newStep("task", { en: "" });
     const v = run({ ...d1(), workflow: { initialStep: step.id, steps: [step] } });
     expect(v.noStepYet).toBeUndefined();
-    expect(v.issues.find((i) => i.loc === "label")?.plain).toBe(true);
-    expect(v.issues.some((i) => i.source === "zod" && !i.plain)).toBe(true);
+    expect(v.issues).toHaveLength(3);
+    const name = v.issues.find((i) => i.loc === "label");
+    expect(name?.plain).toBe(true);
+    expect(name?.message).toBe(t("issues.processNeedsName"));
+    expect(v.issues.filter((i) => i.source === "zod" && !i.plain)).toHaveLength(2);
     expect(showsStructuralBanner(v)).toBe(true);
+  });
+
+  it("reads a stepless draft with a dangling initialStep as a start state", () => {
+    const v = run({ ...d1(), workflow: { steps: [], initialStep: "step_00000000-0000-4000-8000-000000000009" } });
+    expect(v.noStepYet).toBe(true);
+    expect(v.issues.some((i) => i.loc === "workflow.initialStep")).toBe(false);
+    expect(v.issues.every((i) => i.plain === true)).toBe(true);
+    expect(showsStructuralBanner(v)).toBe(false);
+  });
+
+  it("returns the start state when the last step is removed", () => {
+    const v = run({ ...d1(), workflow: { steps: [], initialStep: undefined } });
+    expect(v.noStepYet).toBe(true);
+    expect(v.issues).toHaveLength(0);
+    expect(showsStructuralBanner(v)).toBe(false);
   });
 });
