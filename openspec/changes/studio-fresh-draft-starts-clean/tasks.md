@@ -4,7 +4,7 @@ Paths under `screens/`, `draft/` and `panels/` sit in `packages/web/src/areas/st
 
 ## 1. Setup
 
-- [ ] 1.1 Run `/impeccable hooks on` in this worktree. Probe `hook.mjs` once, so the detector runs after each edit under `packages/web/**`.
+- [x] 1.1 Run `/impeccable hooks on` in this worktree. Probe `hook.mjs` once, so the detector runs after each edit under `packages/web/**`.
 
 ## 2. Seed every list empty (studio-app)
 
