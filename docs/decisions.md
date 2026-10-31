@@ -1803,7 +1803,7 @@ this section.
   - In `openspec/specs/studio-canvas/spec.md`, "Canvas tab" stands at
     `:1115`, `:1146`, `:1154`, `:1161`, `:1172`, `:1179` and `:1190`. It
     also stands at `:1201`, `:1204`, `:1206`, `:1218`, `:1227`, `:1233` and
-    `:1237`. The last six sites are `:1276`, `:1357`, `:1436`, `:1623`,
+    `:1237`. The last seven sites are `:1276`, `:1357`, `:1436`, `:1623`,
     `:3055`, `:3066` and `:3160`.
   - In the same spec, "Paths tab" stands at `:273`, `:1623` and `:3030`.
 

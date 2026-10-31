@@ -63,7 +63,7 @@ context: |
   compared as a change list, migration-plan authoring, a
   registry/CEL-scratchpad Tools screen, a Player beside the merged instance
   record, and a Templates screen
-  holding the reusable bodies a new process seeds from. The canvas tab keeps
+  holding the reusable bodies a new process seeds from. The map tab keeps
   drag-to-move and drag-to-connect; the steps tab pairs a numbered rail with
   one step page. Studio routes admit `system:author` or `system:developer`.
   Tools stays behind `system:developer` alone, migration-plan authoring

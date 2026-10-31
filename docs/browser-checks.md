@@ -1585,50 +1585,43 @@ step, the row carries `aria-current`, and its node reads as selected.
 Resize to 1000px wide. Pass: the steps register collapses to a disclosure
 above the configuration pane, and no column clips.
 
-### The Changes and Paths panels views (`studio-step-bench`, `changes-tab-entity-change-list`)
+### The change list in the publish dialog and on Versions (`studio-step-bench`, `changes-tab-entity-change-list`)
 
 Source: `studio-step-bench` tasks 3.1 and 3.2; `changes-tab-entity-change-list`
 task 6.1.
 
-Seed the database and open a draft on the structure surface.
-
-Open Paths from the steps register's foot. Pass: `purchase-requisition` gives
-22 rows over five columns. Each row names the step the path leaves and the
-step it enters. An automatic path shows its priority and its guard's CEL.
-
-A manual path with neither reads "No priority" and "No guard".
+Seed the database and open a draft of `purchase-requisition`.
 
 Choose `quantity` on the Fields tab. Pass: a notice under Key reads "Read by 2
 expressions. The label no longer sets this key, and changing the key does not
 touch them."
 
 Rename its label, without saving. Pass: Key still reads `quantity`, since two
-guards read `data.quantity`. Open Changes. Pass: a Fields row stands folded
-under the Fields heading, its stamp reads Changed. Open that row.
+guards read `data.quantity`. Press Publish, then Show in the dialog's Changes
+row. Pass: a Fields row stands folded under the Fields heading, its stamp
+reads Changed. Press Cancel.
 
-Switch back to the Fields tab and rename `unit_price`'s label too, without
-saving. Pass: its notice reads "Read by 1 expression. The label no longer sets
-this key, and changing the key does not touch it." Key still reads
-`unit_price`. Return to Changes. Pass: a second Fields row now stands beside
-the first, and `quantity`'s row still stands open. Its open set survives the
-recompute: `ChangesView` stays mounted throughout.
+Back on the Fields tab, rename `unit_price`'s label too, without saving. Pass:
+its notice reads "Read by 1 expression. The label no longer sets this key,
+and changing the key does not touch it." Key still reads `unit_price`.
 
-Save the draft. Add the `de` locale from the header's `⋮` menu, which makes
-German the content locale. Give `quantity`
-a German label, `Menge`, and publish. Rename `quantity`'s German label to
-`Anzahl`, without saving, then open Changes again. Pass: `quantity`'s row
-reads `Menge` before and `Anzahl` after. Both read as German, since the
-content locale reads the `de` entry on both sides now.
+Press Publish, then Show again. Pass: a second Fields row now stands beside
+the first. Press Cancel.
 
-Publish the rest of the draft from the header menu. Pass: the view
-refetches with no reload, and it reports that the draft matches the
-version just published.
+Save the draft. On the Settings tab's Process view, add the `de` locale. That
+makes German the content locale. Give `quantity` the German label `Menge`.
+Publish.
 
-Narrow the window to 1024px wide with Paths open. Pass: the table scrolls
-inside its own view. Neither the page nor the screen scrolls sideways.
+Rename `quantity`'s German label to `Anzahl`, without saving. Press Publish,
+then Show. Pass: `quantity`'s row reads `Menge` before and `Anzahl` after.
+Both read as German, since the content locale reads the `de` entry on both
+sides now. Press Cancel. Save the draft.
 
-Switch the account menu's Language to German. Pass: both views still read
-English. The studio catalog carries English only, the same finding the two
+Open Versions from the `⋮` menu. Pass: it opens on the draft's changes, and
+`quantity`'s row reads `Menge` before and `Anzahl` after.
+
+Switch the account menu's Language to German. Pass: the dialog's change list
+and the Versions screen still read English. The studio catalog carries English only, the same finding the two
 walks above already made.
 
 ### The Versions screen: A as before, a waiting line, and a fetch failure (`changes-tab-entity-change-list`)
@@ -1701,14 +1694,15 @@ async (page) => {
       open: tab.getAttribute("aria-selected") === "true",
       leading: b.left - r.left,
       trailing: r.left + row.clientWidth - b.right,
+      atEnd: row.scrollWidth - row.clientWidth - row.scrollLeft <= 1,
     };
   });
 }
 ```
 
-Pass: `focused` and `open` read true. Pass: `leading` and `trailing` each
-read 31 or more. Settings then stands whole in view and 32px clear of the
-edge, to within one pixel.
+Pass: `focused` and `open` read true. Pass: `atEnd` reads true, `leading`
+reads 31 or more and `trailing` reads -1 or more. Settings, the last tab,
+stands whole in view, with the row at its end.
 
 ### `useFail`: no refetch loop
 
@@ -1807,9 +1801,8 @@ input took a sharp corner, and the checks rail read clean throughout.
 
 Source: `ponytail-studio-small-cuts` task 5.1.
 
-Open a draft's canvas edit screen (`purchase_requisition`). Open the process
-header's `⋮` menu. Type into the `baseLocale` control: first `d` alone, then
-complete it to `de`.
+Open a draft of `purchase_requisition`. Open Settings, Process view. Type
+into Base language: first `d` alone, then complete it to `de`.
 
 Pass: after `d`, the content-locale switcher still reads `en` selected. A
 `d` option appears in the list, but selection stays put. After `de`, the
@@ -2003,8 +1996,8 @@ proves nothing, so repeat the Access view step.
 appears, and the screen returns to the process list.
 
 **8. A 401 on a clean draft.** Open the draft and change nothing. The Save
-button stays disabled, so force the 401 on another request. Open the Access
-tab. Make `PUT /processes/:id/access` answer 401 with a playwright route.
+button stays disabled, so force the 401 on another request. Open Settings,
+then Access. Make `PUT /processes/:id/access` answer 401 with a playwright route.
 
 Type any text into the Developer list's add box and press Add. Pass: the login
 screen appears.
@@ -2019,14 +2012,14 @@ notice puts its message and both buttons in one row. The message wraps at the
 tab after either button. Only a live render at a real width shows the first.
 Only a keyboard pass shows the second.
 
-### Selecting a path shows the source step's Paths section with the row highlighted
+### Selecting a path shows the source step's Ways out section with the row highlighted
 
 Source: `redesign-step-inspector`, `studio-step-bench`.
 
 On the canvas, select a step. Then click one of its outgoing path edges. A
 guard label works as a click target.
 
-Pass: the step page switches to the path's source step. The Paths section
+Pass: the step page switches to the path's source step. The Ways out section
 stands open with its body. The selected path's own row shows a highlight
 border, distinct from the section's other rows.
 
@@ -2364,7 +2357,7 @@ observe it.
 Open a draft with at least two named steps on the canvas.
 
 Drag a connect handle from one named step to another. Pass: the new path
-appears in the configuration pane's Paths section with a derived `label` reading
+appears in the step page's Ways out section with a derived `label` reading
 `"<source step> → <target step>"`, and a non-empty `key`.
 
 Drag a connect handle from a step to empty canvas. Pass: the gesture creates
@@ -5269,9 +5262,9 @@ returns an object, so an empty printout means it threw.
    holds one value, equal to `forms.scrollLeft`. Forms opens again and stands
    whole in view, and the row jumps with no animated scroll.
 6. Walk the row by keyboard. The function focuses Forms and presses the right
-   arrow key twice. Pass: `focused` reads true for Settings, and `leading`
-   and `trailing` each read 31 or more. Focus stands on Settings, whole in
-   view and 32px clear of the edge, to within one pixel.
+   arrow key twice. Pass: `focused` and `atEnd` read true for Settings,
+   `leading` reads 31 or more and `trailing` reads -1 or more. Focus stands
+   on Settings, the last tab, whole in view with the row at its end.
 7. Press a tab through `run-code`. The function scrolls the row to its start
    and waits two animation frames. It presses 12px inside the row's trailing
    edge with `page.mouse.down()` and `page.mouse.up()`.
