@@ -1,9 +1,9 @@
 import { safeMatch } from "../../shell/safeMatch.js";
 
-/** The six names the retired `edit/panels/:view` address carried.
- * `PANEL_VIEW_TARGET` maps each onto the place that holds it now, and
- * `panelEntityCounts` still keys on this set; routing owns it so neither
- * needs an import from a component. */
+/** The six names the retired `edit/panels/:view` address carried, the
+ * matcher's own vocabulary for that address. `PANEL_VIEW_TARGET` maps five
+ * onto the place that holds them now; the matcher sends `changes` to the
+ * Versions screen. */
 export type PanelView = "fields" | "dataSources" | "contract" | "matrix" | "changes" | "paths";
 
 export const PANEL_VIEWS: PanelView[] = ["fields", "dataSources", "contract", "matrix", "changes", "paths"];

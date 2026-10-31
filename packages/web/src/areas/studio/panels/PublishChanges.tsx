@@ -11,7 +11,7 @@
  * opening. A failed read never blocks the publish: the sentence states it and
  * the dialog's two controls work as before.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
 import type { ProcessBody } from "workflow-engine/schema";
 import { stripCompiledContent } from "workflow-engine/schema/strip-compiled";
@@ -78,6 +78,9 @@ interface Props {
 export function PublishChanges({ processId, token, baseVersion, draft, contentLocale }: Props) {
   const [base, setBase] = useState<BaseState>({ kind: "idle" });
   const [open, setOpen] = useState(false);
+  // The summary reads "Show" or "Hide" alone; the sentence's id names what it
+  // shows, so a screen reader hears the count with it.
+  const sentenceId = useId();
 
   useEffect(() => {
     if (baseVersion === null) {
@@ -120,11 +123,11 @@ export function PublishChanges({ processId, token, baseVersion, draft, contentLo
   return (
     <>
       <dt {...stylex.props(styles.dt)}>{t("draftToolbar.publishDialogChanges")}</dt>
-      <dd {...stylex.props(styles.dd, quiet && styles.quiet)}>{changesSentence(state, baseVersion)}</dd>
+      <dd id={sentenceId} {...stylex.props(styles.dd, quiet && styles.quiet)}>{changesSentence(state, baseVersion)}</dd>
       {state.kind === "loaded" && rows.length > 0 && (
         <dd {...stylex.props(styles.listEntry)}>
           <details open={open} onToggle={(e) => setOpen(e.currentTarget.open)}>
-            <summary {...stylex.props(styles.summary)}>
+            <summary aria-describedby={sentenceId} {...stylex.props(styles.summary)}>
               {t(open ? "draftToolbar.publishDialogChangesHide" : "draftToolbar.publishDialogChangesShow")}
             </summary>
             <ChangeList rows={rows} heading={t("changeList.heading.base").replace("{version}", () => String(baseVersion))} />

@@ -257,8 +257,8 @@ Enter on a focused step opens it on the Steps tab's step page.
 
 ## Process Studio: tabs and the form editor
 
-One tab row holds every part of a draft, from steps and fields to access and
-checks. The form editor lays out each step's view.
+One tab row holds every part of a draft, from the map to the settings. The
+form editor lays out each step's view.
 
 - Paths: `packages/web/src/areas/studio/panels/`
 - Specs: `studio-process-tabs`, `studio-step-page`, `studio-forms-overview`,

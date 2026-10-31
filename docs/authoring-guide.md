@@ -1063,11 +1063,12 @@ process.
 Studio's own header bar carries **Save**, **Discard draft** and **Publish**.
 Those three stand there whatever you have open.
 
-A draft opens on one screen. A tab row over the body holds eleven tabs.
-These ten are this guide's chapters: Canvas, Steps, Fields, Data sources,
-Paths, Forms, Field matrix, Contract, Changes and Checks. The eleventh,
-Access, manages who holds standing on the process, a `process-access-roles`
-concern outside what this guide teaches.
+A draft opens on one screen. A tab row over the body holds six tabs: Map,
+Steps, Fields, Forms, Checks and Settings. Map draws the process on a canvas.
+Fields holds two views, **Catalog** and **Where fields appear**. Settings
+holds four: **Process**, **Where values come from**, **What it takes in and
+gives back** and **Access**. The Access view manages who holds standing on
+the process, a `process-access-roles` concern outside what this guide teaches.
 
 Checks reads as a plain count, like any other tab, until something blocks a
 publish. Then the count itself turns red. Open the tab to see what Studio
@@ -1087,7 +1088,8 @@ Give each field a key that matches `/^[a-z_][a-z0-9_]*$/`. A guard reads it as
 `data.<key>`, and the key must survive that.
 
 Does a field take its options from somewhere else? Declare that source on
-the **Data sources** tab. Then point the field at it.
+the **Settings** tab, in its **Where values come from** view. Then point the
+field at it.
 
 ### 3. Add the steps
 
@@ -1152,7 +1154,7 @@ usually demands the fields it collects.
 
 ### 5. Draw the paths
 
-Pick a step on the Steps tab and open its **Path to** section. Add one path
+Pick a step on the Steps tab and open its **Ways out** section. Add one path
 per exit, and pick its target step.
 
 Decide manual or automatic for the whole step at once, because a step must not
@@ -1272,8 +1274,8 @@ outlives whoever holds it.
 
 ### 8. Declare a contract, if another process will call this one
 
-Open the **Contract** tab. Name the input fields, the output fields and the
-outcomes. Then bind every end step to an outcome.
+Open the **Settings** tab and its **What it takes in and gives back** view.
+Name the input fields, the output fields and the outcomes. Then bind every end step to an outcome.
 
 Skip this step when nothing calls your process.
 
@@ -1296,7 +1298,8 @@ that breaks a rule. Four examples:
 - an unknown action type
 - a step with no exit
 
-A publication is immutable. Read the next chapter before you press it.
+The publish dialog counts the changes since the base version and lists each
+one on request. A publication is immutable. Read the next chapter before you press it.
 
 ## After publish
 

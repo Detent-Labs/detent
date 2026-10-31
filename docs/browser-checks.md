@@ -134,15 +134,15 @@ turns a node drag into a canvas pan.
 Source: stage 36. It replaced the shared modal's own four points. The routed
 screen makes all four moot: no backdrop, no focus trap, no Close.
 
-Open a draft in Studio. Choose Fields in the canvas rail's Process section.
-Pass: the panels screen opens, the canvas is gone, and the address bar reads
-`/studio/processes/<id>/edit/panels/fields`.
+Open a draft in Studio and choose the Fields tab. Pass: the Fields body
+opens, the canvas is gone, and the address bar reads
+`/studio/processes/<id>/edit/fields`.
 
 Read the third column. Pass: it lists every open check, grouped, in full. It
 is not the one-line summary the ribbon bar shows.
 
-Type a name into the Contract view's outcome input without adding it. Switch
-to Fields, then back. Pass: the typed text is still there. A remount would
+Open Settings, then What it takes in and gives back. Type a name into its
+outcome input without adding it. Switch to Fields, then back. Pass: the typed text is still there. A remount would
 have dropped it.
 
 Reload the browser on that view. Pass: the same view reopens, not the canvas.
@@ -334,7 +334,7 @@ DOM at all. Nothing there can observe either side of the race.
 
 Source: `studio-canvas-bar` tasks 7.1, 7.2, 8.3, 9.3, 9.4.
 
-Seed the database and open a draft on the Canvas tab.
+Seed the database and open a draft on the Map tab.
 
 Select nothing, then one step, then several steps, then a selection
 matching one group. Do it in a window wide enough for the row. Pass: the bar
@@ -428,7 +428,7 @@ confirms the real DOM wires that text to the bar as that test expects.
 
 Source: `tighter-canvas-bar` tasks 5.1 to 5.6.
 
-Seed the database. Open a draft on the Canvas tab. The canvas region carries
+Seed the database. Open a draft on the Map tab. The canvas region carries
 the id `studio-canvas-body`, and the bar is its previous sibling. Read the
 bar's height and the region's top edge from those two elements. Read Add
 step's own height beside them, as the positive control.
@@ -1411,11 +1411,8 @@ reads "Decision", disabled.
      names an unrelated rendering bug the rule also conflates it with. -->
 ### The field matrix (`field-matrix-toolbar-and-inline-editing`)
 
-Open Studio, `purchase-requisition`, the canvas rail's Process section.
-Pass: a fourth row, Field matrix, sits below Contract, reading 54 as its
-count.
-
-Open the field matrix. Pass: 22 rows, `line_item` drawn as a group header
+Open Studio, `purchase-requisition`, at `/edit/fields/matrix`, the Fields
+tab's Where fields appear view. Pass: 22 rows, `line_item` drawn as a group header
 over its four children, indented once. Pass: 13 columns, in the process's
 own step order. Pass: three columns hatch. They are `approval_routing`,
 `issue_po` and `receipt_check`, the three steps with no view at all. Each
@@ -1639,10 +1636,12 @@ walks above already made.
 Source: `changes-tab-entity-change-list` task 6.1.
 
 Seed the database. The seed publishes `laptop_inventory` as version 1, with no
-contract. Create its draft from the process list. On the Contract tab, tick
-"this process is subprocess-callable" and add the outcome `issued`. On the
-Steps tab, open the Issued end step and choose `issued` as its outcome. Save,
-and publish version 2.
+contract. Create its draft from the process list. Open Settings, then What it
+takes in and gives back. Tick "this process is subprocess-callable" and add
+the outcome `issued`.
+
+On the Steps tab, open the Issued end step and choose `issued` as its
+outcome. Save, and publish version 2.
 
 Open the Versions screen. Mark version 1 as side A and version 2 as side B,
 then choose Diff selected. Pass: a waiting line stands while both bodies
@@ -1666,7 +1665,7 @@ Reload the screen. With playwright-cli's `route` command, mock `GET
 Choose Diff selected again. Pass: one waiting line stands, then the error
 banner takes its place.
 
-### Keyboard focus hand-off from a Checks row and a Changes row (`changes-tab-entity-change-list`)
+### Keyboard focus hand-off from a Checks row (`changes-tab-entity-change-list`)
 
 Source: `changes-tab-entity-change-list` task 6.1; `studio-narrow-widths` task
 5.32.
@@ -1678,33 +1677,23 @@ stands open.
 
 Return to the Checks tab and press Enter on the process-level row. Pass:
 focus stays on the Checks tab's own button. A process-level issue names no
-tab. Arrow to the Paths button and press Enter. Pass: focus moves to Paths,
-and Paths stands open.
+tab. Arrow to the Settings button and press Enter. Pass: focus moves to
+Settings, and Settings stands open.
 
-Open Changes with at least one unsaved field rename, and reach its row's own
-open command by keyboard. Press Enter on it. Pass: focus lands on the Fields
-tab's own button in the tab row, and Fields stands open.
-
-Open Changes again, with the same unsaved rename, in a window 400px wide.
-Scroll the tab row to its end before you press the open command. Under
-`playwright-cli`, this `run-code` function does both, then reads the Fields
-tab against the row. The command reads "Open … in the Fields tab".
+Give the draft a data source with no key, so the Checks tab lists a data
+source row. Open Checks in a window 400px wide and scroll the tab row to its
+start. Reach the data source row by keyboard and press Enter. Pass: focus
+lands on the Settings tab's own button, and Settings stands open on Where
+values come from. Under `playwright-cli`, this `run-code` function reads the
+Settings tab against the row.
 
 ```js
 async (page) => {
-  await page.setViewportSize({ width: 400, height: 800 });
   const twoFrames = () => page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
-  await page.evaluate(() => {
-    const row = document.querySelector('[role="tablist"][aria-label="Process surface"]');
-    row.scrollLeft = row.scrollWidth - row.clientWidth;
-  });
-  await twoFrames();
-  await page.getByRole("button", { name: /in the Fields tab$/ }).first().focus();
-  await page.keyboard.press("Enter");
   await twoFrames();
   return page.evaluate(() => {
     const row = document.querySelector('[role="tablist"][aria-label="Process surface"]');
-    const tab = document.getElementById("studio-tab-fields");
+    const tab = document.getElementById("studio-tab-settings");
     const r = row.getBoundingClientRect();
     const b = tab.getBoundingClientRect();
     return {
@@ -1718,8 +1707,8 @@ async (page) => {
 ```
 
 Pass: `focused` and `open` read true. Pass: `leading` and `trailing` each
-read 31 or more. Fields then stands whole in view and 32px clear of the edge,
-to within one pixel.
+read 31 or more. Settings then stands whole in view and 32px clear of the
+edge, to within one pixel.
 
 ### `useFail`: no refetch loop
 
@@ -1771,7 +1760,7 @@ tool that dispatches trusted pointer events, e.g. `playwright-cli`.
 Source: `panels-list-and-detail` tasks 6.5-6.6.
 
 Open a draft with many fields (`purchase_requisition`, 29 rail entries, one
-data source) and go to `/edit/panels/fields`.
+data source) and go to `/edit/fields`.
 
 Pass: the rail lists 29 entries under Fields. Nine stand at the top level:
 eight groups and the plain field `po_status`. The other twenty sit inside
@@ -1797,9 +1786,9 @@ Click "Remove field". Pass: no dialog opens, since the new field has no
 reach. The field `invoice`, the top-level entry just before it, becomes
 selected, with keyboard focus on its rail entry.
 
-Open the Data sources view. Pass: the Fields sub-list disappears, and a Data
-sources sub-list appears in its place. The two never show at once. The new
-sub-list lists `approved_vendors` and an "+ Add data source" entry.
+Open Settings, then Where values come from. Pass: the Fields rail leaves, and
+the data sources rail stands in its place. The two never stand at once. The
+new rail lists `approved_vendors` and an "+ Add data source" entry.
 
 Click "+ Add data source". Pass: a new "(unnamed data source)" appears,
 selected at once. Click "Remove data source". Pass: `approved_vendors`, the
@@ -1879,7 +1868,8 @@ on purpose.
 change a field's label and do not save. Pass: the header bar reads "Unsaved
 changes".
 
-Open the `⋮` menu and choose "Manage assignment groups for this process".
+Open Settings, then Access, and choose "Manage assignment groups for this
+process".
 Pass: the browser's native prompt `Leave this draft? Unsaved edits will be lost.`
 appears. Cancel keeps the screen and the new label.
 
@@ -1907,7 +1897,7 @@ to `/profile` with no prompt. Open the draft once more and choose "Log out".
 Pass: the browser returns to `/login` with no prompt.
 
 **3. A layout-only change.** Open `/studio/processes/<id>/edit` on the
-Canvas tab. Drag one step to a new position and change nothing else. Pass: the
+Map tab. Drag one step to a new position and change nothing else. Pass: the
 header bar reads "Unsaved changes".
 
 Choose "Back to processes". Pass: the native prompt appears. Cancel it.
@@ -1949,7 +1939,7 @@ context, log in as `demo-developer@example.test`, password
 `seed-demo-password`. Read `actor.id` from the `POST /auth/login` response in
 the network log.
 
-In the first context, open the draft's Access tab. Type that id into the
+In the first context, open the draft's Settings tab and its Access view. Type that id into the
 Developer list's add box and press Add. Pass: the id appears in the Developer
 list. Without it, the second account meets a refusal screen at the end of this
 check.
@@ -2005,9 +1995,9 @@ draft.
 Pass: the header bar renders for that account, which proves it may open the
 draft. Only then read the notice. Pass: no notice appears, because the stored
 copy belongs to the first actor. A refusal screen instead of the header bar
-proves nothing, so repeat the Access tab step.
+proves nothing, so repeat the Access view step.
 
-**7. Discard draft after a drag.** Drag a step on the Canvas tab. Choose
+**7. Discard draft after a drag.** Drag a step on the Map tab. Choose
 "Discard draft" in the header bar. The application's own dialog,
 "Discard this draft", opens. Confirm it. Pass: no native browser prompt
 appears, and the screen returns to the process list.
@@ -2182,7 +2172,7 @@ closed.
 Source: `field-catalog-editor-rework` task 6.5.
 
 Open a draft with several fields (`purchase_requisition`) and go to
-`/edit/panels/fields`.
+`/edit/fields`.
 
 Pass: the rail lists each field by its resolved label alone. No row prints
 a key.
@@ -2255,7 +2245,8 @@ browser drives, which those two files cannot observe.
 
 ### The field matrix's checkbox colors (`field-matrix-checkbox-colors`)
 
-Open `purchase_requisition`'s draft, the Field matrix tab.
+Open `purchase_requisition`'s draft at `/edit/fields/matrix`, the Fields
+tab's Where fields appear view.
 Pass: the legend's seventh line reads "Each checkbox's color names its own
 flag:" followed by three swatches. They read Asked, Required and Read-only.
 
@@ -2385,8 +2376,8 @@ Drop a step from the expanded ribbon's palette onto an existing path. Pass: the
 retargeted path keeps its own `key`/`label` unchanged. The new path from
 the dropped step carries the "unnamed step" placeholder on its source side.
 
-Open a step's Paths tab and use "add path" without choosing a target
-first. Pass: "add path" stays disabled, and clicking it creates no path
+On the Steps tab, open a step's Ways out section. Use "add path" without
+choosing a target first. Pass: "add path" stays disabled, and clicking it creates no path
 even if forced. Choose a target in the new selector, then click "add path".
 Pass: a new path appears with a derived `key`/`label` matching the chosen
 source and target step. The target selector resets to no selection
@@ -2525,8 +2516,8 @@ render. `test/reporting-routes.test.ts` covers the 400 and
 
 Source: `instance-query-data-source` tasks 6.1-6.5.
 
-Open a draft's Data sources panel (Process links -> "Data sources" ->
-"+ Add data source"). Select `instance.query` in the type picker. Pass: the
+Open a draft's Where values come from view, on the Settings tab. Press
+"+ Add data source". Select `instance.query` in the type picker. Pass: the
 purpose-built form replaces both the generated form and the raw JSON
 textarea, for this type alone. Switch the type to `db.list` and back. Pass:
 `db.list`'s own dedicated list-key picker still renders untouched.
@@ -2587,7 +2578,8 @@ mark outside the `<label>`, in `InstanceQueryForm.tsx`.
 Source: `type-data-comparison-literals` tasks 4.1-4.5.
 
 Publish a target process with a number field `priority`, a boolean field and
-a string field. Open the Data sources tab of a second draft. Add an
+a string field. Open Settings, then Where values come from, on a second
+draft. Add an
 `instance.query` data source there. Pick the target process.
 
 #### Typing keeps focus
@@ -3251,8 +3243,8 @@ match what `app.css` declared before this change. Switch between the
 field catalog, data sources, contract and field matrix views. Pass:
 each view keeps its own edit state across the switch.
 
-Open the Changes and Paths views in turn. Pass: each renders with no
-console error.
+Open the Versions screen, then the publish dialog's Changes row, in turn.
+Pass: each renders with no console error.
 
 Open each of the four dialogs in turn. Two open from the header
 bar's `⋮` menu, publish-confirm and discard-confirm. Two open from
@@ -3365,7 +3357,7 @@ Throughout: zero console errors, in every area.
 
 Source: `studio-field-authoring-surface` task 9.3.
 
-Open `purchase_requisition`'s draft at `/edit/panels/fields`. The rail lists
+Open `purchase_requisition`'s draft at `/edit/fields`. The rail lists
 29 rows: nine top-level entries (eight groups and the plain field
 `po_status`) and twenty children spread across those eight groups.
 
@@ -3476,7 +3468,7 @@ control.
 
 Source: `fields-rail-kind-icons` task 4.2.
 
-Open `it_offboarding`'s draft at `/edit/panels/fields`. The rail lists 51
+Open `it_offboarding`'s draft at `/edit/fields`. The rail lists 51
 rows: 7 groups and 44 fields.
 
 Pass: every field row leads with an 18px icon ahead of its label, and no
@@ -3501,10 +3493,10 @@ None of the 51 rows carries a select of any kind. No row offers a keyboard
 route to move a field. The Fields view's move gesture walk above covers
 that route through the editor instead.
 
-Open the Data sources tab on the same draft. Pass: its rail column also
-measures 20rem, the width the Fields tab's now holds too. Check the
-computed width in devtools, or confirm the two tabs' rails share one right
-edge.
+Open Settings, then Where values come from, on the same draft. Pass: its
+rail column also measures 20rem, the width the Catalog view's holds too.
+Check the computed width in devtools, or confirm the two rails share one
+right edge.
 
 Repeat the icon and tooltip checks with the OS or browser color scheme set
 to dark. Pass: every icon renders in the muted-text role. The label keeps
@@ -3663,15 +3655,15 @@ Click "Remove field" again. Click "Cancel". Pass: the dialog closes. The draft
 still holds "Processing (Fabrikam)" and its 18 fields. Focus returns to "Remove
 field" on the group's own editor.
 
-Open the Canvas tab, then the Fields tab, so the browser's Back has a known
+Open the Map tab, then the Fields tab, so the browser's Back has a known
 destination. Choose "Processing (Fabrikam)". Click "Remove field". With the dialog
-open, press the browser's Back. Pass: the Canvas tab shows, and the page holds
+open, press the browser's Back. Pass: the Map tab shows, and the page holds
 no `dialog[open]`.
 
 Press the browser's Forward. Pass: the Fields tab shows with no dialog open,
 and the entity rail still lists "Processing (Fabrikam)".
 
-Click the Canvas tab in the tab row, then the Fields tab. Pass: each tab opens
+Click the Map tab in the tab row, then the Fields tab. Pass: each tab opens
 on its click. A tab click adds a history entry and drops any Forward entry, so
 the clicks come after the Forward. No `bun:test` case can hold the pending
 removal from outside the tab, so this step is the check.
@@ -3735,12 +3727,12 @@ compiled away and 80 of them asked for something that should paint. The suite
 now bans both keys at the source. It cannot see a border, since the harness
 lays out nothing and resolves no custom property.
 
-Open the studio's Field matrix tab on a process with several fields. Pass: the
+Open the Fields tab's Where fields appear view on a process with several fields. Pass: the
 legend's three swatches each draw a 10px box with a 1px frame and a fill. Scroll
 the grid sideways and down. Pass: the sticky row and column headers carry a
 solid fill, and no cell shows through them.
 
-Open the Canvas tab. A step node is an SVG group. It paints by stroke and
+Open the Map tab. A step node is an SVG group. It paints by stroke and
 fill, so no CSS border reaches it. What this change restored here is the frame
 around the canvas itself. Pass: the viewport draws a 1px frame and the muted
 fill under its dot grid.
@@ -3766,7 +3758,7 @@ A bulk press cannot be undone, and the badge said nothing about its reach. It
 also read two states over three-state data. A column with some cells set then
 looked exactly like a column with none.
 
-Open the studio's Field matrix tab on a process whose steps disagree about a
+Open the Fields tab's Where fields appear view on a process whose steps disagree about a
 flag. The process `expense_approval` does. Pass: some badges draw filled in
 the flag's color. Some draw as an outline in that color. Some draw a plain
 neutral outline. The seeded process shows nine of the middle kind.
@@ -3805,7 +3797,7 @@ draft and Publish, and the area nav stands empty. The tab row's Checks count
 reads in the tab row's ordinary color, the same as every other tab's count.
 
 Introduce a blocking issue (an unreachable step works) without leaving the
-Paths tab. Pass: the Checks tab's count turns to the refusal color. It
+Steps tab. Pass: the Checks tab's count turns to the refusal color. It
 stays visible without switching tabs, while every other tab's count stays
 as it was. Switch to the dark scheme and repeat. Pass: the color still
 reads well against the tab row's ground, and no light-mode value leaks
@@ -3825,11 +3817,10 @@ away from the tab row hears the transition through a live region. A compiled
 class hashes, so no markup assertion can name a weight. An announcement needs
 a real assistive technology to judge.
 
-Open a draft with no open issue, on the Canvas tab. The Paths tab has no
-control that introduces one, since it is a read-only overview. Add a step
-from the canvas bar. Leave it unconnected, so it leads nowhere.
+Open a draft with no open issue, on the Map tab. Add a step from the canvas
+bar. Leave it unconnected, so it leads nowhere.
 
-Pass: the Checks count turns bold as well as red, while the Canvas tab stays
+Pass: the Checks count turns bold as well as red, while the Map tab stays
 open. Every other tab's count keeps its ordinary weight. Switch to the dark
 scheme and repeat.
 
@@ -3855,9 +3846,9 @@ steps to the `⋮` menu trigger, then to the open tab. No other tab takes a
 stop. Press Tab again. Pass: focus leaves the row entirely, reaching whatever
 follows it.
 
-Focus the Canvas tab. Press the right arrow key nine times, then once more.
-Pass: focus walks to Checks and then wraps back to Canvas. The left arrow key
-wraps the other way. Pass: no tab opens along the way, and the Canvas body
+Focus the Map tab. Press the right arrow key five times, then once more.
+Pass: focus walks to Settings and then wraps back to Map. The left arrow key
+wraps the other way. Pass: no tab opens along the way, and the Map body
 stays.
 
 Focus a tab the row does not have open. Press Enter. Pass: that tab opens and
@@ -3948,7 +3939,7 @@ across two lines. Watch for the defect: one line cut mid-glyph with no
 ellipsis. That reads as a name rather than as a truncation. It was the state
 before `overflow-wrap: anywhere` landed.
 
-Edit a step's label on the Steps tab, then switch back to Canvas. Pass: a
+Edit a step's label on the Steps tab, then switch back to Map. Pass: a
 label the clamp cut carries its tooltip. Watch for the defect: no tooltip on
 a visibly cut label. Every tab body stays mounted and the hidden one is
 `display: none`. The canvas therefore lays out at zero while the Steps tab
@@ -4218,7 +4209,7 @@ Pass: the dialog's Discard draft reads a transparent background. The browser's
 own grey button fill showed there before this change. Pass: the border alone
 sets it apart from Cancel, and the two still read as two controls.
 
-**Canvas bar.** On the Canvas tab, click one step. The bar shows Remove step.
+**Canvas bar.** On the Map tab, click one step. The bar shows Remove step.
 Shift-click a second step, and the same control reads Remove steps. Read it
 under both labels. Fit to view is the plain control.
 
@@ -4583,8 +4574,8 @@ database, then sign in as `demo-superuser@example.test`, password
 `seed-demo-password`. In the Processes list, find "IT Offboarding" and choose
 "Create draft". Under `playwright-cli`, pass `-s=advisory-role` on every call.
 
-1. Open the header bar's `⋮` menu, named "More actions". Type `de` into its
-   add-locale control, the input reading "add locale (e.g. de)". Then choose
+1. Open the Settings tab's Process view. Type `de` into its add-locale
+   control, the input reading "add locale (e.g. de)". Then choose
    "+ add locale". Pass: the warning callout beside the process name draws its
    3px rule in `rgb(226, 90, 64)` light and `rgb(255, 151, 131)` dark.
 2. Open the Steps tab and choose "Submit the Exit Notification" in the steps
@@ -4592,7 +4583,8 @@ database, then sign in as `demo-superuser@example.test`, password
    for the first way out's trigger. Under "Only when", choose "+ Add row"
    and leave the row's value empty. Pass: the row's dashed border reads the
    same two colors as the first step.
-3. Open the Changes tab, which lists the path the second step changed. Hover
+3. Press Show in the publish dialog's Changes row, which lists the path the
+   second step changed. Hover
    "Expand all" and hold it down, in both schemes. After each read, move the
    pointer off the control with `page.mouse.move`, then call
    `page.mouse.up()`. Pass: its text reads ink both times, in the values of
@@ -4734,7 +4726,8 @@ See this file's "Before you start" section for the build and the address.
 Seed the database and sign in as `demo-superuser@example.test`, password
 `seed-demo-password`. In the Processes list, find the row "IT Offboarding"
 and choose "Create draft". Studio opens the draft at
-`/studio/processes/<id>/edit`. Choose the Field matrix tab.
+`/studio/processes/<id>/edit`. Choose the Fields tab, then Where fields
+appear.
 
 1. Resize the window to 1440x900. Pass: the grid's bottom edge sits on the
    tab body's own bottom edge. The tab body itself holds still, with no
@@ -4756,14 +4749,14 @@ and choose "Create draft". Studio opens the draft at
    "IT Offboarding" row, then accept the browser's confirm. The header bar's
    own "Discard draft" does not work, so do not use it here. See the
    `docs/decisions.md` entry DRAFT-1.
-6. Find the row "Access Request" and choose "Create draft". Open its Field
-   matrix tab at 1440x1200. First confirm the grid's own height sits between
+6. Find the row "Access Request" and choose "Create draft". Open its Where
+   fields appear view at 1440x1200. First confirm the grid's own height sits between
    384px and the height under the toolbar. Pass: the grid's own frame ends
    right under its last row. The grid draws no vertical scrollbar.
 7. Discard the "Access Request" draft the same way step 5 discarded the
    first one.
-8. Find the row "Laptop Inventory" and choose "Create draft". Open its Field
-   matrix tab at 1440x900. This step comes from
+8. Find the row "Laptop Inventory" and choose "Create draft". Open its Where
+   fields appear view at 1440x900. This step comes from
    `field-matrix-short-grid-frame`, for a grid shorter than the 24rem floor.
    Pass: the grid's frame ends right under its last row, with no empty band
    inside it.
@@ -4806,7 +4799,7 @@ See this file's "Before you start" section for the build and the address.
 Seed the database and sign in as `demo-superuser@example.test`, password
 `seed-demo-password`.
 
-Open the IT Offboarding draft on the Canvas tab
+Open the IT Offboarding draft on the Map tab
 (`docs/browser-checks.md:3251`). Add a step from the canvas bar. Leave it
 unconnected, so the Checks tab counts a blocker. Narrow the window to
 400px. Run the probe on every tab in turn. A reload drops the unsaved step,
@@ -4816,17 +4809,18 @@ Pass: `scrollWidth` equals `clientWidth` on every tab. The Checks tab's
 hidden "blocking a publish" text scrolled the page to 900–912 of 400 before
 this change. Measured 2026-09-13 at 400x800: 400/400 on all ten tabs.
 
-Open the Fields tab, then the Changes tab. Choose "Expand all" there to open
-every row. Resize to 1280x720 and run the probe on both tabs.
+Open the Fields tab, then the Versions screen, which opens on the draft's
+changes. Choose "Expand all" there to open every row. Resize to 1280x720 and
+run the probe on both.
 
 Pass: `scrollHeight` equals `clientHeight` on both. The Fields rail
 scrolled the page to 2306 of 720 before this change. Measured 2026-09-13:
 720/720 on both.
 
-Narrow the window to 400x800 and run the probe on both tabs again.
+Narrow the window to 400x800 and run the probe on both again.
 
 Pass: `scrollHeight` equals `clientHeight` there too. The Fields rail
-reached 2539 of 800 before this change, and the Changes tab's hidden
+reached 2539 of 800 before this change, and the change list's hidden
 "Before:"/"After:" text reached 849 of 800. Measured 2026-09-13: 800/800 on
 both.
 
@@ -4929,7 +4923,7 @@ async (page) => {
    press, then wait for the edit screen. Pass: the log lists one `PUT` to
    `/drafts/<id>`. Before that `PUT` it lists one `GET` of
    `/processes/<id>/versions/<v>`. The `GET` of that URL after the edit
-   screen opens is the Changes tab's base read.
+   screen opens is the editor's own base read, `draft/publishedFields.tsx`.
 4. Take the delay off. Under `playwright-cli`, a `run-code` call to
    `page.unroute("**/drafts/*")` does that. Edit the process label. Press
    Save. Pass: the header bar reads "Saved". No conflict banner shows.
@@ -5260,34 +5254,33 @@ returns an object, so an empty printout means it threw.
      stop at both ends. Both edges fade.
    - Pass: at the end it runs `to right` from one transparent stop. The
      leading edge fades alone.
-3. Open the draft at `/edit/canvas` in a 1440px window. Pass: `wide` reads
+3. Open the draft at `/edit/map` in a 1440px window. Pass: `wide` reads
    `none`. The function then opens Forms with a click, and narrows the window
    to 400px. Pass: `narrow` reads 31 or more for `leading` and `trailing`, so
    the Forms tab stands whole in view.
-4. Make the draft differ from its base version. Type into the process name in
-   the header bar. Press Save. Pass: the header bar reads "Saved".
-   - The function opens `/studio/processes/<id>/edit/checks` in a 400x800
-     window. It waits until the Changes tab's count prints.
+4. The function opens `/studio/processes/<id>/edit/settings` in a 400x800
+   window. It waits until the Steps tab's count prints.
    - Pass: `atEnd` reads true, `leading` reads 31 or more and `trailing` reads
-     -1 or more. The Checks tab stands whole in view, with the row at its end.
-5. The function opens `/edit/forms` at 400px, then opens Canvas with a click.
+     -1 or more. The Settings tab stands whole in view, with the row at its
+     end.
+5. The function opens `/edit/forms` at 400px, then opens Map with a click.
    It then presses the browser's Back button. Pass: `forms.open` reads true,
    and its `leading` and `trailing` each read 31 or more. Pass: `scrolls`
    holds one value, equal to `forms.scrollLeft`. Forms opens again and stands
    whole in view, and the row jumps with no animated scroll.
 6. Walk the row by keyboard. The function focuses Forms and presses the right
-   arrow key three times. Pass: `focused` reads true for Changes, and
-   `leading` and `trailing` each read 31 or more. Focus stands on Changes,
-   whole in view and 32px clear of the edge, to within one pixel.
+   arrow key twice. Pass: `focused` reads true for Settings, and `leading`
+   and `trailing` each read 31 or more. Focus stands on Settings, whole in
+   view and 32px clear of the edge, to within one pixel.
 7. Press a tab through `run-code`. The function scrolls the row to its start
    and waits two animation frames. It presses 12px inside the row's trailing
    edge with `page.mouse.down()` and `page.mouse.up()`.
-   - Pass: `point.tab` reads `studio-tab-dataSources`, so `elementFromPoint`
-     reads Data sources at that point.
+   - Pass: `point.tab` reads a tab's id, so `elementFromPoint` finds the tab
+     partly past the trailing edge at that point.
    - Pass: `during`, the row's `scrollLeft` read between down and up, equals
      `point.scrollLeft`, its value before the press.
    - Pass: `after.open` reads true, and its `leading` and `trailing` each read
-     31 or more. Data sources then opens and stands whole in view.
+     31 or more. That tab then opens and stands whole in view.
 8. At 400px, the function sets the row's `scrollLeft` to 0 and waits two
    animation frames. It focuses Fields and presses Enter. Pass: `scrollLeft`
    still reads 0. Pass: `open` reads true, so Fields is open.
@@ -5393,7 +5386,7 @@ Step 3:
 ```js
 async (page) => {
   await page.setViewportSize({ width: 1440, height: 800 });
-  await page.goto(page.url().replace(/\/edit.*$/, "/edit/canvas"));
+  await page.goto(page.url().replace(/\/edit.*$/, "/edit/map"));
   await page.waitForLoadState("networkidle");
   await page.evaluate(() => window.twoFrames());
   const wide = await page.evaluate(() => getComputedStyle(window.tabRow()).maskImage);
@@ -5405,16 +5398,16 @@ async (page) => {
 }
 ```
 
-Step 4, after the Save:
+Step 4:
 
 ```js
 async (page) => {
   await page.setViewportSize({ width: 400, height: 800 });
-  await page.goto(page.url().replace(/\/edit.*$/, "/edit/checks"));
-  await page.waitForFunction(() => document.getElementById("studio-tab-changes")?.children.length > 1);
+  await page.goto(page.url().replace(/\/edit.*$/, "/edit/settings"));
+  await page.waitForFunction(() => document.getElementById("studio-tab-steps")?.children.length > 1);
   await page.waitForLoadState("networkidle");
   await page.evaluate(() => window.twoFrames());
-  return page.evaluate(() => window.tabRowProbe("checks"));
+  return page.evaluate(() => window.tabRowProbe("settings"));
 }
 ```
 
@@ -5425,7 +5418,7 @@ async (page) => {
   await page.setViewportSize({ width: 400, height: 800 });
   await page.goto(page.url().replace(/\/edit.*$/, "/edit/forms"));
   await page.waitForLoadState("networkidle");
-  await page.locator("#studio-tab-canvas").click();
+  await page.locator("#studio-tab-map").click();
   await page.evaluate(() => window.twoFrames());
   await page.evaluate(() => {
     window.rowScrolls = [];
@@ -5446,9 +5439,9 @@ Step 6:
 ```js
 async (page) => {
   await page.locator("#studio-tab-forms").focus();
-  for (let i = 0; i < 3; i += 1) await page.keyboard.press("ArrowRight");
+  for (let i = 0; i < 2; i += 1) await page.keyboard.press("ArrowRight");
   await page.evaluate(() => window.twoFrames());
-  return page.evaluate(() => window.tabRowProbe("changes"));
+  return page.evaluate(() => window.tabRowProbe("settings"));
 }
 ```
 
@@ -5474,7 +5467,8 @@ async (page) => {
   const during = await page.evaluate(() => window.tabRow().scrollLeft);
   await page.mouse.up();
   await page.evaluate(() => window.twoFrames());
-  return { point, during, after: await page.evaluate(() => window.tabRowProbe("dataSources")) };
+  const opened = point.tab.replace("studio-tab-", "");
+  return { point, during, after: await page.evaluate((tab) => window.tabRowProbe(tab), opened) };
 }
 ```
 
@@ -5591,7 +5585,7 @@ Step 13 sets the Steps button's width back as well:
 async (page) => {
   await page.setViewportSize({ width: 400, height: 800 });
   await page.goto(page.url().replace(/\/edit.*$/, "/edit/forms"));
-  await page.waitForFunction(() => document.getElementById("studio-tab-changes")?.children.length > 1);
+  await page.waitForFunction(() => document.getElementById("studio-tab-steps")?.children.length > 1);
   await page.waitForLoadState("networkidle");
   await page.evaluate(() => {
     window.tabRow().scrollLeft = 0;
@@ -5618,8 +5612,7 @@ async (page) => {
 Source: `instance-cancel-behavior` task 8.1.
 
 Author a process, fresh or from an existing draft. Clear the process-wide
-Cancellable checkbox, in the header bar's `⋮` menu, "Process, saved with the
-draft" group. It has no per-step override. Its first step is then
+cancellable checkbox on the Settings tab's Process view. It has no per-step override. Its first step is then
 non-cancellable for its own starter already. The author account may lack
 `system:publish`. Switch to one that has it for that single click.
 
@@ -5827,16 +5820,16 @@ grip's contrast at about 5.8:1 against its row background, past WCAG's
 ### Studio scroll boxes show the whole focus ring (`studio-focus-ring-clipping`)
 
 Open Studio, a draft of `it_offboarding`. Work through the Steps tab, the
-Fields tab and the Changes tab. Then narrow the window to 400px for the tab
-row check.
+Fields tab and the Versions screen. Then narrow the window to 400px for the
+tab row check.
 
 Tab to the Steps rail's first row. Pass: the ring's left and top edges sit
 flush on the rail's own edges. Open the Fields tab and tab to the entity
 rail's first entry, then into the editor pane's first control. Pass: both
 rings sit fully inside their own box.
 
-Open the Changes tab and tab to the Expand/Collapse all command. Pass: its
-ring's right edge sits inside the tab body. These are the four boxes
+Open the Versions screen and tab to the Expand/Collapse all command. Pass:
+its ring's right edge sits inside the screen's own box. These are the four boxes
 design.md's own table names: `StepsRail.tsx`'s `rail`, `EntityTabs.tsx`'s
 `rail` and `editor`, and `EditScreen.tsx`'s `tabBody`. Each now pads by
 `focus.reach`, the token sum of the ring's 2px width and its 2px offset.
@@ -5855,10 +5848,9 @@ its left edge. Its inline padding now reaches `focus.reach`, matching the
 fix for RAIL-3 and FIELDS-4. The form tab strip's row, `FormTabStrip.tsx`'s
 `row`, clipped "Add a tab" on its right edge and took the same fix.
 
-The change list's row (`ChangeList.tsx`'s `body`) pulled its ring past the
-Changes tab body's left edge at 400px. Its own `openCommandFlush` negative
-margin pulled the "Open …" text 5px past that edge. The row's own
-`paddingInlineStart` now restores that room below 40rem. Three boxes,
+The change list's row (`ChangeList.tsx`'s `body`) pulled its ring past its
+host's left edge at 400px. Its own `paddingInlineStart` now keeps that room
+below 40rem. Three boxes,
 `ChecksRail`, `FormsTab` and `FormEditorScreen`, already pad past the
 ring's reach on their own. The step page's own `page` box sets no block
 padding. Its first and last controls still clear the ring, through the
@@ -5910,7 +5902,7 @@ Pass: the "Only when" heading and the row stay on screen.
 
 Pass: no `priority` input shows.
 
-Pass: the Canvas tab draws the path's edge with a label for the row and no
+Pass: the Map tab draws the path's edge with a label for the row and no
 priority badge.
 
 Pass: the preview in that step's form editor, from the Forms tab, names the
@@ -5920,19 +5912,19 @@ Pass: "Withdraw" has no condition line in that preview.
 
 #### A half-built row writes nothing (E2-6)
 
-Open a draft of `purchase_requisition`. On the Field matrix tab, find the
-`cost_center` row and clear the "visible" box under Manager Approval. Open
-`Cost Center` on the Fields tab. Its "Only ask this when" zone says the
+Open a draft of `purchase_requisition`. On the Fields tab's Where fields
+appear view, find the `cost_center` row and clear the "visible" box under
+Manager Approval. Open `Cost Center` on the Catalog view. Its "Only ask this when" zone says the
 steps disagree and names Manager Approval.
 
 Pass: a "Clear on <steps>" command stands in the footer beside "Edit as CEL".
 It names every step that asks for the field.
 
-Press "+ Add row". Return to the Field matrix tab.
+Press "+ Add row". Return to Where fields appear.
 
 Pass: the "visible" box under Manager Approval is still clear.
 
-Back on the Fields tab, press "Remove row". Return to the Field matrix tab.
+Back on the Catalog view, press "Remove row". Return to Where fields appear.
 
 Pass: the "visible" box under Manager Approval is still clear.
 
@@ -6020,7 +6012,7 @@ Open Studio at `/studio`. Seed the examples first, so the process list holds
 Start a new draft. Give it a task step as its initial step. On the Fields tab,
 add a text field `applicant_name` and a number field `requested_amount`.
 
-On the Canvas tab, add a subprocess step from the canvas bar. Add a path from
+On the Map tab, add a subprocess step from the canvas bar. Add a path from
 the initial step to it. Select the subprocess step on the Steps tab. Open
 "Which process it calls".
 
@@ -6136,9 +6128,10 @@ time limits, exit actions or cancel actions. Press "An end" on it.
 
 Pass: the step becomes an end step at once and no dialog opens.
 
-#### The Contract tab trims an outcome (E2-18)
+#### The contract view trims an outcome (E2-18)
 
-Open a draft of `credit_check` and its Contract tab. Under outcomes, type
+Open a draft of `credit_check`, its Settings tab and What it takes in and
+gives back. Under outcomes, type
 ` approved ` with a space on each side and press "+ Add outcome".
 
 Pass: the list still holds one `approved` and the JSON surface stores
@@ -6164,7 +6157,7 @@ on the admin Data lists screen. Reload the draft after the lists exist.
 
 #### The JSON text follows the config (E2-8)
 
-Open the Data sources tab and select `countries`. Its "config (JSON)"
+Open Settings, then Where values come from, and select `countries`. Its "config (JSON)"
 textarea reads `{}`.
 
 Pick `countries` in the "data list" select.
@@ -6203,7 +6196,7 @@ Pass: the number and unit controls show, reading 1 and hours.
 
 #### A data source removal clears its references (E2-15, FIELDS-15)
 
-On the Data sources tab, add a data source and press "Remove data source".
+On Where values come from, add a data source and press "Remove data source".
 
 Pass: it leaves at once, with no dialog, and the focus lands on a rail row.
 
@@ -6386,7 +6379,7 @@ Fields tab, open the same field. Pass: the "Ask for this" checkbox reads
 Required.
 
 Read the legend on the Forms tab. Pass: it reads Required. Read the legend on
-the Field matrix tab. Pass: its color entry reads Asked, Required and
+the Where fields appear view. Pass: its color entry reads Asked, Required and
 Read-only.
 
 ### Studio: the process list names its rows (`studio-process-list-names`)
@@ -6448,3 +6441,82 @@ click. Cancel it.
 Offboarding" row. Pass: the browser's confirm reads "Discard the draft of
 “IT Offboarding”? You lose its unpublished edits." Accept it. Pass: the Draft
 cell reads "No draft".
+
+### Six tabs, the sub-row and the Settings tab (`studio-six-tabs`)
+
+Source: `studio-six-tabs` tasks 6.7 to 6.10a. The bun tests pin the route
+matcher, the tab model and the strings. A layout, a reload, a focus move and
+a scroll box need a real browser.
+
+See this file's "Before you start" section for the build and the address.
+Seed the database and sign in as `demo-superuser@example.test`, password
+`seed-demo-password`. In the Processes list, find the row "IT Offboarding"
+and choose "Create draft".
+
+**1. The row.** Read the tab row. Pass: it reads Map, Steps, Fields, Forms,
+Checks and Settings, in that order. Map stands open, and the canvas fills its
+body.
+
+**2. Where fields appear.** Open Fields. Pass: a sub-row reads Catalog and
+Where fields appear, and Catalog stands open. Choose Where fields appear.
+Pass: the address ends in `/edit/fields/matrix`.
+
+Reload the page. Pass: the same view opens again. Resize the window to
+1440x900. Pass: the grid's bottom edge sits on the tab body's own bottom edge.
+
+**3. Settings.** Open Settings. Pass: a sub-row reads Process, Where values
+come from, What it takes in and gives back, and Access. Process stands open.
+Pass: the Process view prints no key and no process id.
+
+Open the Process view's Developer view. Pass: the key input and the process
+id stand there, in the mono face. Open each of the other three views in turn.
+Pass: each view opens its own editor, and the sub-row marks the open entry.
+
+**4. The data sources rail.** Open Where values come from in a 1280x600
+window. Add data sources until the rail runs past its box. Scroll the rail.
+Pass: the rail scrolls inside its own box, and the editor beside it holds
+still.
+
+**5. The retired addresses.** Load each address below on the draft, in turn.
+Pass: each one lands on the place beside it.
+
+| Address | Lands on |
+|---|---|
+| `/edit/canvas` | Map |
+| `/edit/paths` | Steps |
+| `/edit/matrix` | Fields, Where fields appear |
+| `/edit/dataSources` | Settings, Where values come from |
+| `/edit/contract` | Settings, What it takes in and gives back |
+| `/edit/access` | Settings, Access |
+| `/edit/changes` | the Versions screen |
+
+Repeat with `/edit/panels/paths`, `/edit/panels/matrix`,
+`/edit/panels/dataSources`, `/edit/panels/contract` and
+`/edit/panels/changes`. Pass: each one lands where its `/edit/` twin lands.
+
+**6. A check about a path.** On the Steps tab, open a step's Ways out section.
+Clear one way out's key in its Developer view. Open Checks. Reach the row
+that names that way out by keyboard.
+
+Press Enter. Pass: Steps opens on the owning step, with that way out
+selected. Pass: focus stands on the Steps tab's own button in the tab row.
+
+**7. The publish dialog's Changes row.** Restore the way out's key. Rename one
+field's label on the Catalog view, then press Publish. Pass: the dialog's
+facts list carries a Changes row reading "1 change since version K". K is the
+draft's base version. Pass: focus opens on Cancel.
+
+Press Shift+Tab. Pass: focus lands on the row's Show summary, so the summary
+is a tab stop between the facts and Cancel. Read the summary's accessible
+description in devtools. Pass: it reads the Changes row's sentence.
+
+Press Enter. Pass: the summary reads Hide, and the change list names the
+renamed field in one row. Press Cancel.
+
+**8. Versions.** Press Save. Open the `⋮` menu and choose Versions. Pass: the
+draft's change list stands under the table with no press, and it names the
+renamed field.
+
+Go back to the process list and choose "Discard draft" on the "IT
+Offboarding" row. Accept the browser's confirm. The header bar's own "Discard
+draft" does not work, per DRAFT-1 in `docs/decisions.md`.

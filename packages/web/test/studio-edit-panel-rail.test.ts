@@ -2,7 +2,6 @@ import { describe, expect, it } from "bun:test";
 import {
   flattenRailFields,
   issueCountForEntityId,
-  panelEntityCounts,
   stepEntityIds,
 } from "../src/areas/studio/draft/panel-rail.js";
 import type { DraftField } from "../src/areas/studio/draft/fields.js";
@@ -117,28 +116,5 @@ describe("issueCountForEntityId", () => {
 
   it("reads zero for an entity with no issue", () => {
     expect(issueCountForEntityId([issue("field", LEAF)], OUTER)).toBe(0);
-  });
-});
-
-describe("panelEntityCounts", () => {
-  it("counts the matrix's live cells as the total field-entry count across every step, a note raising none of it", () => {
-    const draft = {
-      fields: [{ id: LEAF, key: "city", type: "string" }],
-      dataSources: [],
-      contract: { outcomes: [] },
-      workflow: {
-        steps: [
-          { view: { fields: [{ ref: LEAF }, { ref: LEAF }, { kind: "note", text: { en: "Note" } }] } },
-          { view: { fields: [{ ref: LEAF }] } },
-          {},
-        ],
-      },
-    } as any;
-    expect(panelEntityCounts(draft).matrix).toBe(3);
-  });
-
-  it("reads zero for a draft with no view entries anywhere", () => {
-    const draft = { fields: [], dataSources: [], contract: {}, workflow: { steps: [{}, {}] } } as any;
-    expect(panelEntityCounts(draft).matrix).toBe(0);
   });
 });

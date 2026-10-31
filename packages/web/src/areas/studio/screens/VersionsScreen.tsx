@@ -217,6 +217,11 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized }: V
       });
     return () => {
       cancelled = true;
+      // The compare this load started belongs to the same process and token:
+      // taking the next number drops its late answer, and the waiting line
+      // it raised goes with it.
+      latestCompare.current++;
+      setWaiting(false);
     };
   }, [processId, token, failLoad, compareWithBase]);
 
@@ -366,7 +371,7 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized }: V
           </div>
         </>
       )}
-      {/* A diff or export failure reports where the change list would appear, as the Changes tab's does. */}
+      {/* A diff or export failure reports where the change list would appear. */}
       {error && (
         <div {...stylex.props(styles.errorBanner)} role="alert">
           <span {...stylex.props(styles.errorBannerStamp)}>{t("error.failed")}</span>
