@@ -53,7 +53,7 @@ import { isExpression, type BoolOrExpr } from "../panels/shared/overrideMode";
 import { effectiveFlag, gatedKeys, setFlag, writtenFieldCounts, type FlagKey, type WrittenAccessor } from "../draft/view-flags";
 import { PanelsRailFieldRow } from "../panels/EntityTabs";
 import { flattenRailFields } from "../draft/panel-rail";
-import { fieldKindIcon, fieldKindLabel, fieldKindWord } from "../draft/field-type-labels";
+import { fieldKindIcon, fieldKindLabel, fieldKindWord, isUnmatchedKind } from "../draft/field-type-labels";
 import { FormPreview } from "../panels/FormPreview";
 import { FormTabStrip, formTabDomId, formTabPanelDomId } from "../panels/FormTabStrip";
 import { scrollKeyboardFocusIntoView } from "../focusScroll.js";
@@ -422,6 +422,13 @@ const styles = stylex.create({
     flex: "auto",
     minWidth: 0,
   },
+  // The raw `{type, format, control}` triple no curated kind names: a machine
+  // value (design-language rule 4).
+  formCardKindRaw: {
+    fontFamily: fonts.mono,
+    textTransform: "none",
+    letterSpacing: "normal",
+  },
   // A card in the naming variant: the input takes the first row beside the
   // edge, and the move and Remove controls wrap onto a second row.
   formCardNaming: {
@@ -620,11 +627,12 @@ function displayLabel(label: DraftLocalizedText, contentLocale: string, baseLoca
 }
 
 /** A card's kind line: the kind's icon and its name, the words the Fields
- * tab's entity rail prints for the field. */
+ * tab's entity rail prints for the field. A triple no kind names prints its
+ * raw members, a machine value: mono, with no case transform. */
 function CardKindLine({ field }: { field: DraftField }) {
   const KindIcon = fieldKindIcon(field);
   return (
-    <span {...stylex.props(styles.formCardLabelRole, styles.formCardKind)}>
+    <span {...stylex.props(styles.formCardLabelRole, styles.formCardKind, isUnmatchedKind(field) && styles.formCardKindRaw)}>
       <KindIcon size={18} strokeWidth={1.75} aria-hidden="true" />
       {fieldKindWord(field)}
     </span>
@@ -976,12 +984,10 @@ interface Props {
   fields: DraftField[];
   /** Returns to the tab that opened the editor: the breadcrumb's first crumb. */
   onBack: () => void;
-  /** The tab that opened the editor, which the first crumb names. Absent
-   * reads as Steps. */
-  originTab?: ProcessTab;
-  /** Opens the step's page on the Steps tab: the breadcrumb's step crumb.
-   * Absent falls back to `onBack`. */
-  onOpenStep?: () => void;
+  /** The tab that opened the editor, which the first crumb names. */
+  originTab: ProcessTab;
+  /** Opens the step's page on the Steps tab: the breadcrumb's step crumb. */
+  onOpenStep: () => void;
 }
 
 /**
@@ -1545,14 +1551,14 @@ export function FormEditorScreen({ step, index, fields, onBack, originTab, onOpe
           <ol {...stylex.props(styles.crumbs)}>
             <li {...stylex.props(styles.crumb)}>
               <button type="button" {...stylex.props(styles.crumbControl)} onClick={onBack}>
-                {t(`tabs.${originTab ?? "steps"}` as const)}
+                {t(`tabs.${originTab}` as const)}
               </button>
             </li>
             <li {...stylex.props(styles.crumb)}>
               <span aria-hidden="true" {...stylex.props(styles.crumbSeparator)}>
                 ›
               </span>
-              <button type="button" {...stylex.props(styles.crumbControl)} onClick={onOpenStep ?? onBack}>
+              <button type="button" {...stylex.props(styles.crumbControl)} onClick={onOpenStep}>
                 {stepLabel}
               </button>
             </li>
@@ -1567,7 +1573,7 @@ export function FormEditorScreen({ step, index, fields, onBack, originTab, onOpe
           </ol>
         </nav>
         <h2 id="form-editor-heading" {...stylex.props(styles.formEditorHeading)}>
-          {t("formEditor.heading").replace("{step}", stepLabel)}
+          {t("formEditor.heading").replace("{step}", () => stepLabel)}
         </h2>
       </header>
 

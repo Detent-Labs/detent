@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { DraftField } from "../src/areas/studio/draft/fields.js";
 import type { Draft } from "../src/areas/studio/draft/types.js";
@@ -127,6 +128,7 @@ describe("FieldCatalogPanel", () => {
           onAdd={NOOP}
           onRemove={NOOP}
           onShowStep={NOOP}
+          onOpenForm={NOOP}
           onMoveField={NOOP}
         />
       </DraftContext.Provider>,
@@ -162,6 +164,7 @@ describe("FieldCatalogPanel", () => {
           onAdd={NOOP}
           onRemove={NOOP}
           onShowStep={NOOP}
+          onOpenForm={NOOP}
           onMoveField={NOOP}
         />
       </DraftContext.Provider>,
@@ -193,6 +196,7 @@ describe("FieldCatalogPanel", () => {
           onAdd={NOOP}
           onRemove={NOOP}
           onShowStep={NOOP}
+          onOpenForm={NOOP}
           onMoveField={NOOP}
         />
       </DraftContext.Provider>,
@@ -217,6 +221,7 @@ describe("FieldCatalogPanel", () => {
           onAdd={NOOP}
           onRemove={NOOP}
           onShowStep={NOOP}
+          onOpenForm={NOOP}
           onMoveField={NOOP}
         />
       </DraftContext.Provider>,
@@ -239,6 +244,7 @@ describe("FieldCatalogPanel", () => {
           onAdd={NOOP}
           onRemove={NOOP}
           onShowStep={NOOP}
+          onOpenForm={NOOP}
           onMoveField={NOOP}
         />
       </DraftContext.Provider>,
@@ -266,6 +272,7 @@ describe("FieldCatalogPanel", () => {
           onAdd={NOOP}
           onRemove={NOOP}
           onShowStep={NOOP}
+          onOpenForm={NOOP}
           onMoveField={NOOP}
         />
       </DraftContext.Provider>,
@@ -292,6 +299,7 @@ describe("FieldCatalogPanel", () => {
           onAdd={NOOP}
           onRemove={NOOP}
           onShowStep={NOOP}
+          onOpenForm={NOOP}
           onMoveField={NOOP}
         />
       </DraftContext.Provider>,
@@ -321,6 +329,7 @@ describe("FieldCatalogPanel", () => {
             onAdd={NOOP}
             onRemove={NOOP}
             onShowStep={NOOP}
+            onOpenForm={NOOP}
             onMoveField={NOOP}
           />
         </DraftContext.Provider>,
@@ -362,6 +371,7 @@ describe("the Fields tab's \"Only ask this when\" row", () => {
           onAdd={NOOP}
           onRemove={NOOP}
           onShowStep={NOOP}
+          onOpenForm={NOOP}
           onMoveField={NOOP}
         />
       </DraftContext.Provider>,
@@ -520,6 +530,7 @@ function renderKeyEditor(draft: Draft, selectedId: string, published: ReadonlySe
           onAdd={NOOP}
           onRemove={NOOP}
           onShowStep={NOOP}
+          onOpenForm={NOOP}
           onMoveField={NOOP}
         />
       </DraftContext.Provider>
@@ -679,5 +690,59 @@ describe("the notice under a field's key input", () => {
   it("shows the draft's key while nothing is typed", () => {
     const html = renderKeyEditor(draftWithReaders([]), "field_amount", new Set());
     expect(keyInput(html)).toContain('value="amount"');
+  });
+});
+
+/**
+ * The effect half's empty-state route (`studio-app`: "The effect half states
+ * its own empty state"). It opens the form editor for the first step a person
+ * works, `firstWorkedStepId` (`studio-performedBy.test.ts` covers the pick),
+ * and stands absent where no such step exists. A static render fires no
+ * click, so the press's target is pinned at the source: the route calls
+ * `onOpenForm` with that step, while the used-in rows keep `onShowStep`.
+ */
+describe("the effect half's route to a step's form", () => {
+  const ROUTE = "Put this field on a step";
+  const step = (id: string, extra: object = {}) => ({ id, key: id, label: { en: id }, type: "task", ...extra });
+  const draftOf = (initialStep: string, steps: object[]): Draft =>
+    ({ baseLocale: "en", fields: [fld("field_a", "a")], workflow: { initialStep, steps } }) as unknown as Draft;
+  const render = (draft: Draft) =>
+    renderToStaticMarkup(
+      <DraftContext.Provider value={contextValue(draft)}>
+        <FieldCatalogPanel
+          token="test-token"
+          selectedId="field_a"
+          onAdd={NOOP}
+          onRemove={NOOP}
+          onShowStep={NOOP}
+          onOpenForm={NOOP}
+          onMoveField={NOOP}
+        />
+      </DraftContext.Provider>,
+    );
+  const source = readFileSync(new URL("../src/areas/studio/panels/FieldCatalogPanel.tsx", import.meta.url).pathname, "utf8");
+
+  it("opens the form of the first step a person works", () => {
+    const html = render(draftOf("step_a", [step("step_a"), step("step_b", { terminal: true })]));
+    const emptyAt = source.indexOf('t("fieldCatalog.usedInEmpty")');
+    const emptyState = source.slice(emptyAt, source.indexOf('t("fieldCatalog.effectEmptyRoute")', emptyAt));
+
+    expect(html).toContain(`>${ROUTE}</button>`);
+    expect(source).toContain("const routeStepId = firstWorkedStepId(draft);");
+    expect(emptyState).toContain("onClick={() => onOpenForm(routeStepId)}");
+    expect(emptyState).not.toContain("onShowStep(");
+  });
+
+  it("skips an initial step that calls another process", () => {
+    const html = render(draftOf("step_a", [step("step_a", { type: "subprocess" }), step("step_b")]));
+
+    expect(html).toContain(`>${ROUTE}</button>`);
+  });
+
+  it("offers no route where no step is one a person works", () => {
+    const html = render(draftOf("step_a", [step("step_a", { type: "subprocess" }), step("step_b", { terminal: true })]));
+
+    expect(html).toContain("No step asks for this field yet.");
+    expect(html).not.toContain(ROUTE);
   });
 });

@@ -35,6 +35,9 @@ interface Props {
   /** True while the Fields tab stands open and the JSON surface does not. */
   visible: boolean;
   onShowStep: (stepId: string) => void;
+  /** Opens the form editor for one step: the field catalog's empty-state
+   * route. */
+  onOpenForm: (stepId: string) => void;
 }
 
 /**
@@ -46,7 +49,7 @@ interface Props {
  * The matrix derives from the whole draft. While hidden it reads the draft it
  * last drew, so typing in the catalog skips it (`studio-app`).
  */
-export function FieldsTabViews({ view, onOpenView, token, visible, onShowStep }: Props) {
+export function FieldsTabViews({ view, onOpenView, token, visible, onShowStep, onOpenForm }: Props) {
   const catalogHidden = view !== "catalog";
   const matrixHidden = view !== "matrix";
   return (
@@ -68,7 +71,7 @@ export function FieldsTabViews({ view, onOpenView, token, visible, onShowStep }:
         hidden={catalogHidden}
         {...stylex.props(styles.view, catalogHidden && styles.viewHidden)}
       >
-        <FieldsTab token={token} visible={visible && view === "catalog"} onShowStep={onShowStep} />
+        <FieldsTab token={token} visible={visible && view === "catalog"} onShowStep={onShowStep} onOpenForm={onOpenForm} />
       </div>
       <div
         id={subTabPanelDomId("fields", "matrix")}

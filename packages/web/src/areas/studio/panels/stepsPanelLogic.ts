@@ -1,7 +1,6 @@
 import type { Collaboration } from "workflow-engine/schema";
 import { deriveKey, dedupeKey, shouldAutoDeriveKey } from "../draft/deriveKey.js";
 import { resolveDraftLocalizedText, type DraftLocalizedText } from "../draft/localized-text.js";
-import { isDraftViewField, type DraftViewEntry } from "../draft/view-layout.js";
 
 /**
  * A step's label edit's whole key decision (design.md: "Extract the step-key
@@ -31,12 +30,6 @@ export function nextStepKey(
 
   const newDerived = deriveKey(resolveDraftLocalizedText(newLabel, baseLocale, baseLocale) ?? "");
   return dedupeKey(newDerived, siblingKeys);
-}
-
-/** How many of the catalog's fields a step's view configures — field entries
- * alone. A note occupies no catalog row, so it raises this count by none. */
-export function configuredFieldCount(fields: DraftViewEntry[] | undefined): number {
-  return (fields ?? []).filter(isDraftViewField).length;
 }
 
 /**

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ProcessTab } from "../src/areas/studio/routing.js";
 import type { ValidationResult } from "../src/areas/studio/draft/validation.js";
@@ -21,6 +22,7 @@ const FULL_NAME = "field_00000000-0000-4000-8000-0000000000e2";
 const UNNAMED = "field_00000000-0000-4000-8000-0000000000e3";
 const UNNAMED_GROUP = "field_00000000-0000-4000-8000-0000000000e4";
 const REASON = "field_00000000-0000-4000-8000-0000000000e5";
+const RAW = "field_00000000-0000-4000-8000-0000000000e6";
 
 function validation(): ValidationResult {
   return {
@@ -83,10 +85,17 @@ function draftWith(fields: Field[], entries: Entry[]): Draft {
   } as unknown as Draft;
 }
 
-function render(draft: Draft, { contentLocale = "en", originTab }: { contentLocale?: string; originTab?: ProcessTab } = {}): string {
+function render(draft: Draft, { contentLocale = "en", originTab = "steps" }: { contentLocale?: string; originTab?: ProcessTab } = {}): string {
   return renderToStaticMarkup(
     <DraftContext.Provider value={contextValue(draft, contentLocale)}>
-      <FormEditorScreen step={draft.workflow!.steps![0]!} index={0} fields={draftFields(draft)} onBack={() => {}} originTab={originTab} />
+      <FormEditorScreen
+        step={draft.workflow!.steps![0]!}
+        index={0}
+        fields={draftFields(draft)}
+        onBack={() => {}}
+        originTab={originTab}
+        onOpenStep={() => {}}
+      />
     </DraftContext.Provider>,
   );
 }
@@ -226,6 +235,30 @@ describe("A placed field's card prints its label and its kind", () => {
 
     expect(card).toContain(">Note<");
   });
+
+  // Design-language rule 4: a triple no curated kind names prints as its raw
+  // members, a machine value. The stylex stub renders a style's key as its
+  // class, so the markup names the compiled style and the source pins what it
+  // declares.
+  it("prints a triple no kind names in mono, and a named kind in the Label role alone", () => {
+    const raw = draftWith(
+      [
+        { id: RAW, key: "contact", type: "string", format: "email", control: "multiline", label: { en: "Contact" } },
+        { id: AMOUNT, key: "amount", type: "number", label: { en: "Amount" } },
+      ],
+      [{ ref: RAW }, { ref: AMOUNT }],
+    );
+    const canvas = canvasHtml(render(raw));
+    const source = readFileSync(new URL("../src/areas/studio/screens/FormEditorScreen.tsx", import.meta.url), "utf-8");
+    const start = source.indexOf("  formCardKindRaw: {");
+    const rule = source.slice(start, source.indexOf("\n  },", start));
+
+    expect(start).toBeGreaterThan(-1);
+    expect(rule).toContain("fontFamily: fonts.mono");
+    expect(rule).toContain('textTransform: "none"');
+    expect(cardBlock(canvas, ">Contact<")).toMatch(/<span class="[^"]*formCardKindRaw[^"]*"><svg[\s\S]*?<\/svg>string \/ email \/ multiline<\/span>/);
+    expect(cardBlock(canvas, ">Amount<")).not.toContain("formCardKindRaw");
+  });
 });
 
 describe("The breadcrumb leads out of the form editor", () => {
@@ -245,6 +278,13 @@ describe("The breadcrumb leads out of the form editor", () => {
 
   it("names the Forms tab first after a Forms card opened the editor", () => {
     expect(headerHtml(render(draft, { originTab: "forms" }))).toMatch(/<button type="button"[^>]*>Forms<\/button>/);
+  });
+
+  it("prints a dollar pattern in the step's label verbatim in the title", () => {
+    const dollar = draftWith([], []);
+    dollar.workflow!.steps![0]!.label = { en: "Pay $& now" };
+
+    expect(headerHtml(render(dollar))).toMatch(/<h2[^>]*>The form for Pay \$&amp; now<\/h2>/);
   });
 
   it("titles the editor with the step's label, never its key", () => {

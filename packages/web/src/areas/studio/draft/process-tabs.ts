@@ -126,3 +126,16 @@ export function checkTarget(
 export function formEditorReturnTab(openedFrom: ProcessTab | undefined): ProcessTab {
   return openedFrom ?? "steps";
 }
+
+/**
+ * The open tab (`studio-process-tabs`: "On the form editor's address, the tab
+ * row SHALL stand Steps current. An open from a Forms card SHALL stand Forms
+ * current until the author leaves the editor").
+ *
+ * While the route carries a form step, the editor stands inside the origin
+ * tab's body, so that tab stands current whatever tab the route names.
+ * Otherwise the route's own tab does.
+ */
+export function surfaceTab(routeTab: ProcessTab, formStepId: string | undefined, formOrigin: ProcessTab | undefined): ProcessTab {
+  return formStepId !== undefined ? formEditorReturnTab(formOrigin) : routeTab;
+}

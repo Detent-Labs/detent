@@ -152,7 +152,7 @@ function tabbedDraft(order: ["review", "decision"] | ["decision", "review"]): Dr
 function render(draft: Draft = DRAFT): string {
   return renderToStaticMarkup(
     <DraftContext.Provider value={contextValue(draft)}>
-      <FormEditorScreen step={draft.workflow!.steps![0]!} index={0} fields={draftFields(draft)} onBack={() => {}} />
+      <FormEditorScreen step={draft.workflow!.steps![0]!} index={0} fields={draftFields(draft)} onBack={() => {}} originTab="steps" onOpenStep={() => {}} />
     </DraftContext.Provider>,
   );
 }

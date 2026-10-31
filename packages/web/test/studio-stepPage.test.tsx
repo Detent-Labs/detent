@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { Step } from "workflow-engine/schema";
 import type { DraftOf, Draft } from "../src/areas/studio/draft/types.js";
 import type { EditorIssue } from "../src/areas/studio/draft/issues.js";
+import type { DraftField } from "../src/areas/studio/draft/fields.js";
 import type { ValidationResult } from "../src/areas/studio/draft/validation.js";
 import { DraftContext, type DraftContextValue, type Mutate } from "../src/areas/studio/draft/store.js";
 import { updateInDraftArray } from "../src/areas/studio/draft/draft-array-crud.js";
@@ -74,6 +75,7 @@ function draftWith(step: DraftStep, initialStep = "step_a"): Draft {
 
 interface Over {
   step?: DraftStep;
+  fields?: DraftField[];
   draft?: Draft;
   issues?: EditorIssue[];
   stepNumber?: number;
@@ -86,7 +88,7 @@ function render(over: Over = {}): string {
   return renderToStaticMarkup(
     <DraftContext.Provider value={contextValue(over.draft ?? draftWith(step), over.issues ?? [])}>
       <StepPage
-        fields={[]}
+        fields={over.fields ?? []}
         token="t"
         step={step}
         stepNumber={over.stepNumber ?? 1}
@@ -398,5 +400,49 @@ describe("The step page's two columns", () => {
     for (const file of ["panels/StepPage.tsx", "panels/StepsRail.tsx", "screens/EditScreen.tsx", "panels/EntityTabs.tsx"]) {
       expect(readFileSync(SRC + file, "utf8")).toContain(breakpoint);
     }
+  });
+});
+
+/**
+ * The Form section (`studio-step-page`: "The Form section states the form's
+ * size in words", "The Form section opens the step's form"). It counts field
+ * entries as a Forms card counts them, and its control reads the card's own
+ * words.
+ */
+describe("The step page's Form section", () => {
+  const field = (n: number) => ({ id: `field_${n}`, key: `f${n}`, label: { en: `F${n}` }, type: "string" }) as unknown as DraftField;
+  const fields = [1, 2, 3, 4].map(field);
+  const withView = (entries: unknown[]) => ({ ...TASK_STEP, view: { fields: entries } }) as unknown as DraftStep;
+  /** The section's sentence and its control, side by side. */
+  const summary = (html: string) => /<span>([^<]*)<\/span><button type="button" class="btn btn-secondary">([^<]*)<\/button>/.exec(html)?.slice(1);
+
+  it("states four fields, one required, and offers to open the form", () => {
+    const step = withView([{ ref: "field_1", required: true }, { ref: "field_2" }, { ref: "field_3" }, { ref: "field_4" }]);
+
+    expect(summary(render({ step, fields }))).toEqual(["4 fields, 1 required", "Open the form"]);
+  });
+
+  it("states one field beside three notes", () => {
+    const note = { kind: "note", text: { en: "Read me" } };
+    const step = withView([{ ref: "field_1" }, note, note, note]);
+
+    expect(summary(render({ step, fields }))).toEqual(["1 field", "Open the form"]);
+  });
+
+  it("reads No fields yet and offers to start the form on a step with no view", () => {
+    expect(summary(render({ fields }))).toEqual(["No fields yet", "Start the form"]);
+  });
+
+  it("reads No fields yet on a view of notes alone", () => {
+    const step = withView([{ kind: "note", text: { en: "Read me" } }]);
+
+    expect(summary(render({ step, fields }))).toEqual(["No fields yet", "Start the form"]);
+  });
+
+  it("prints no count of the whole catalog", () => {
+    const html = render({ step: withView([{ ref: "field_1" }]), fields });
+
+    expect(html).not.toContain("/ 4");
+    expect(html).not.toContain("fields configured");
   });
 });

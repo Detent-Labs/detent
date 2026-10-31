@@ -24,7 +24,7 @@ import { getDraft, listProcesses } from "../api/client.js";
 import { useFetchOnce } from "../panels/shared/useFetchOnce.js";
 import type { DraftRecord, PublishResult } from "../api/types.js";
 import { DEFAULT_TAB, FIELDS_VIEWS, SETTINGS_VIEWS, type ProcessTab, type Route, type TabView } from "../routing.js";
-import { checkTarget, formEditorReturnTab, processTabCounts, type CheckTarget } from "../draft/process-tabs.js";
+import { checkTarget, formEditorReturnTab, processTabCounts, surfaceTab, type CheckTarget } from "../draft/process-tabs.js";
 import { checksDotState, groupChecksBySource } from "../draft/checksRail.js";
 import { showsStructuralBanner } from "../draft/startGaps.js";
 import { initialSaveState, type DraftSaveState } from "./draftSaveLogic.js";
@@ -246,6 +246,11 @@ const styles = stylex.create({
     padding: focus.reach,
     scrollPadding: focus.reach,
   },
+  // The wrapper around a tab's own body. It takes no box of its own, so the
+  // body lays out in the tab body's column exactly as a direct child would.
+  tabBodyContent: {
+    display: "contents",
+  },
   tabBodyHidden: {
     display: "none",
   },
@@ -277,8 +282,8 @@ const styles = stylex.create({
 
 interface EditScreenProps {
   processId: string;
-  /** The `edit` route's optional sub-states. `formStepId` renders in place of
-   * the tab row and its body. `tab` names the open tab, Map when the
+  /** The `edit` route's optional sub-states. `formStepId` renders the form
+   * editor under the tab row, in its origin tab's body. `tab` names the open tab, Map when the
    * address names none, and `view` the open tab's view, its first when the
    * address names none. The form editor wins when both arrive, which
    * `routePath` already encodes. `stepId` is a one-shot canvas target ("Show
@@ -386,15 +391,20 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
   // none, and the overflow entry names its state either way (design.md's open
   // question).
   const [jsonOpen, setJsonOpen] = useState(false);
-  // The tab that opened the form editor, so leaving it returns there
-  // (`studio-forms-overview`, `studio-form-editor`). The editor's address
-  // carries no tab of its own, and this surface stays mounted across the
-  // move, so the origin lives here rather than in the address.
+  // The tab that opened the form editor: the editor stands in its body, and
+  // leaving returns there (`studio-forms-overview`, `studio-form-editor`).
+  // The editor's address carries no tab of its own, and this surface stays
+  // mounted across the move, so the origin lives here rather than in the
+  // address. Leaving the editor clears it, so a later Back onto the editor's
+  // address stands Steps current.
   const [formOrigin, setFormOrigin] = useState<ProcessTab | undefined>(undefined);
   // The step the Checks tab is narrowed to, set by a Forms card's badge and
   // cleared by the rail's own "show every check" control.
   const [checksStepId, setChecksStepId] = useState<string | undefined>(undefined);
-  const openTab = tab ?? DEFAULT_TAB;
+  // The open tab. On the form editor's address it is the tab the editor
+  // stands in, so the tab row, every tab body and every `visible` prop read
+  // the editor's place (`studio-process-tabs`).
+  const openTab = surfaceTab(tab ?? DEFAULT_TAB, formStepId, formOrigin);
   // The view a tab with a sub-row shows: the address's view while that tab is
   // open and holds it, otherwise the tab's first view.
   const viewOf = <V extends TabView>(owner: ProcessTab, views: readonly V[]): V =>
@@ -594,6 +604,19 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
     onSelectStep(steps.some((s) => s.id === stepId) ? stepId : undefined);
     navigate({ name: "edit", processId }, { replace: true });
   }, [stepId]);
+
+  // The form editor's address, on a direct load as on an open: the editor's
+  // step becomes the selected one, so the step crumb and a return to Steps
+  // land on it. An unknown id selects nothing; the editor's panel says the
+  // step no longer exists. An address with no form step means the author
+  // left the editor, which drops the origin it stood under.
+  useEffect(() => {
+    if (formStepId === undefined) {
+      setFormOrigin(undefined);
+      return;
+    }
+    if (steps.some((s) => s.id === formStepId)) onSelectStep(formStepId);
+  }, [formStepId]);
 
   // The whole set at once: a shift-click's toggle and a marquee's release. A
   // path belongs to one step, so a set write drops any selected path.
@@ -926,19 +949,60 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
           entityIds: stepEntityIds(checksNarrowStep),
         };
 
-  /** Opens the form editor for one step, remembering the tab it opened from. */
+  /** Opens the form editor for one step, remembering the tab it opened from,
+   * and selects that step. */
   const openFormEditor = (target: string, from: ProcessTab) => {
     setFormOrigin(from);
+    onSelectStep(target);
     navigate({ name: "edit", processId, formStepId: target });
+  };
+  /** Leaves the form editor for the tab it stands in. */
+  const leaveFormEditor = () => goToTab(formEditorReturnTab(formOrigin));
+  /** The breadcrumb's step crumb: the step's own page on the Steps tab. */
+  const openFormStep = () => {
+    if (formStepId !== undefined) onSelectStep(formStepId);
+    goToTab("steps");
   };
   const processLabel =
     resolveDraftLocalizedText(draft.label, contentLocale, baseLocale) ?? t("headerBar.unnamedProcess");
 
+  // The form editor, or the banner for a step the draft no longer holds. It
+  // stands in the open tab's panel while the address carries a form step.
+  const formEditor =
+    formStepId === undefined ? null : formStep ? (
+      // Local boundaries: the shell's own would replace the whole area,
+      // draft included, while the chunk loads or when it fails to load.
+      <FormEditorBoundary onBack={() => leaveFormEditor()}>
+        <Suspense fallback={<p {...stylex.props(styles.screenLoading)}>{t("app.screenLoading")}</p>}>
+          <FormEditorScreen
+            step={formStep}
+            index={formStepIndex}
+            fields={fields}
+            onBack={() => leaveFormEditor()}
+            originTab={openTab}
+            onOpenStep={openFormStep}
+          />
+        </Suspense>
+      </FormEditorBoundary>
+    ) : (
+      <div {...stylex.props(styles.errorBanner, styles.errorBannerInEditScreen)} role="alert">
+        <span {...stylex.props(styles.errorBannerStamp)}>{t("error.failed")}</span>
+        <span {...stylex.props(styles.errorBannerMessage)}>{t("formEditor.stepNotFound")}</span>
+      </div>
+    );
+
   /** One tab body. Every one of the six renders; five hide. `hidden` is the
    * mechanism, so a hidden body leaves both the tab order and the
-   * accessibility tree while keeping its own state. */
+   * accessibility tree while keeping its own state.
+   *
+   * The form editor stands in the open tab's panel, ahead of that tab's own
+   * body, which stays mounted under `hidden` and keeps its half-typed state
+   * (`studio-form-editor`: "The form editor opens under the tab row"). The
+   * body's wrapper renders on every tab at every moment, so opening the
+   * editor never moves the body in the tree and never remounts it. */
   const tabPanel = (target: ProcessTab, body: ReactNode) => {
     const hide = jsonOpen || target !== openTab;
+    const editorHere = formEditor !== null && target === openTab;
     return (
       <div
         id={tabPanelDomId(target)}
@@ -959,7 +1023,10 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
         onFocusCapture={scrollKeyboardFocusIntoView}
         {...stylex.props(styles.tabBody, hide && styles.tabBodyHidden)}
       >
-        {body}
+        {editorHere && formEditor}
+        <div hidden={editorHere} {...stylex.props(styles.tabBodyContent, editorHere && styles.tabBodyHidden)}>
+          {body}
+        </div>
       </div>
     );
   };
@@ -999,169 +1066,148 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
           onVersions={() => navigate({ name: "versions", processId })}
           onPlayer={() => navigate({ name: "play", processId })}
         />
-        {/* Either button moves focus to the open tab, so the notice waits while a
-            form editor, which has no tab row, is open. */}
-        {formStepId === undefined && stash && <RestoreNotice onRestore={restoreStash} onDiscard={discardStash} disabled={requestRunning} />}
-        {formStepId !== undefined ? (
-          formStep ? (
-            // Local boundaries: the shell's own would replace the whole area,
-            // draft included, while the chunk loads or when it fails to load.
-            <FormEditorBoundary onBack={() => goToTab(formEditorReturnTab(formOrigin))}>
-              <Suspense fallback={<p {...stylex.props(styles.screenLoading)}>{t("app.screenLoading")}</p>}>
-                <FormEditorScreen
-                  step={formStep}
-                  index={formStepIndex}
-                  fields={fields}
-                  onBack={() => goToTab(formEditorReturnTab(formOrigin))}
-                />
-              </Suspense>
-            </FormEditorBoundary>
-          ) : (
-            <div {...stylex.props(styles.errorBanner, styles.errorBannerInEditScreen)} role="alert">
-              <span {...stylex.props(styles.errorBannerStamp)}>{t("error.failed")}</span>
-              <span {...stylex.props(styles.errorBannerMessage)}>{t("formEditor.stepNotFound")}</span>
-            </div>
-          )
-        ) : (
-          <div {...stylex.props(styles.surface)}>
-            <ProcessTabRow
-              open={openTab}
-              counts={counts}
-              checksBlocked={checksBlocked}
-              onOpen={goToTab}
-              jsonOpen={jsonOpen}
-            />
-            {/* The JSON surface stands in place of every tab body, never beside
-                one: no draft-body-writing control may stay reachable while it is
-                open (`studio-json-view`). The six bodies below stay mounted and
-                hidden, and a `hidden` subtree reaches neither the tab order nor
-                the accessibility tree. */}
-            {jsonOpen && <JsonView draft={draft} onApply={replace} />}
+        {/* Either button moves focus to the open tab, which the tab row holds
+            over the form editor too. */}
+        {stash && <RestoreNotice onRestore={restoreStash} onDiscard={discardStash} disabled={requestRunning} />}
+        <div {...stylex.props(styles.surface)}>
+          <ProcessTabRow
+            open={openTab}
+            counts={counts}
+            checksBlocked={checksBlocked}
+            onOpen={goToTab}
+            jsonOpen={jsonOpen}
+          />
+          {/* The JSON surface stands in place of every tab body, never beside
+              one: no draft-body-writing control may stay reachable while it is
+              open (`studio-json-view`). The six bodies below stay mounted and
+              hidden, and a `hidden` subtree reaches neither the tab order nor
+              the accessibility tree. */}
+          {jsonOpen && <JsonView draft={draft} onApply={replace} />}
 
-            {tabPanel(
-              "map",
-              <>
-                {/* The canvas bar, then the canvas filling the body it leaves.
-                    `styles.tabBody` is a column flex, so the bar stacks above
-                    the canvas and holds its own height whatever the selection
-                    carries. No band stands over the canvas, and no control
-                    changes its height (`studio-canvas`). */}
-                <CanvasBar
-                  onAddStep={onCanvasBarAddStep}
-                  onDrop={onCanvasBarDrop}
-                  onDragMove={onCanvasBarDragMove}
+          {tabPanel(
+            "map",
+            <>
+              {/* The canvas bar, then the canvas filling the body it leaves.
+                  `styles.tabBody` is a column flex, so the bar stacks above
+                  the canvas and holds its own height whatever the selection
+                  carries. No band stands over the canvas, and no control
+                  changes its height (`studio-canvas`). */}
+              <CanvasBar
+                onAddStep={onCanvasBarAddStep}
+                onDrop={onCanvasBarDrop}
+                onDragMove={onCanvasBarDragMove}
+                selectedStepIds={selectedStepIds}
+                unconnected={unconnected}
+                onDeleteSelection={deleteSelection}
+                groups={groups}
+                onGroupsChange={onGroupsChange}
+              />
+              <div id={CANVAS_BODY_ID} {...stylex.props(styles.canvasRegion)}>
+                <CanvasView
+                  layout={saveState.layout}
+                  onMoveStep={onMoveCanvasPosition}
+                  onArrange={onArrange}
                   selectedStepIds={selectedStepIds}
-                  unconnected={unconnected}
-                  onDeleteSelection={deleteSelection}
+                  onSelectStep={onSelectStep}
+                  onSelectSteps={onSelectSteps}
+                  onOpenStepPage={() => goToTab("steps")}
+                  selectedPathId={selectedPathId}
+                  edgeStyle={edgeStyle}
+                  onEdgeStyleChange={onEdgeStyleChange}
+                  waypoints={waypoints}
+                  onWaypointsChange={onWaypointsChange}
                   groups={groups}
                   onGroupsChange={onGroupsChange}
+                  insertTargetPathId={insertTargetPathId}
+                  visible={!jsonOpen && openTab === "map"}
                 />
-                <div id={CANVAS_BODY_ID} {...stylex.props(styles.canvasRegion)}>
-                  <CanvasView
-                    layout={saveState.layout}
-                    onMoveStep={onMoveCanvasPosition}
-                    onArrange={onArrange}
-                    selectedStepIds={selectedStepIds}
-                    onSelectStep={onSelectStep}
-                    onSelectSteps={onSelectSteps}
-                    onOpenStepPage={() => goToTab("steps")}
-                    selectedPathId={selectedPathId}
-                    edgeStyle={edgeStyle}
-                    onEdgeStyleChange={onEdgeStyleChange}
-                    waypoints={waypoints}
-                    onWaypointsChange={onWaypointsChange}
-                    groups={groups}
-                    onGroupsChange={onGroupsChange}
-                    insertTargetPathId={insertTargetPathId}
-                    visible={!jsonOpen && openTab === "map"}
-                  />
-                </div>
-              </>,
-            )}
+              </div>
+            </>,
+          )}
 
-            {/* The Steps tab: the numbered rail beside one wide step page
-                (`studio-step-page`). */}
-            {tabPanel(
-              "steps",
-              <div {...stylex.props(styles.stepsTab)}>
-                <StepsRail
-                  currentStepId={pageStepId}
-                  onSelectStep={(target) => onSelectStep(target)}
-                  onMove={onMoveStep}
-                  onAddStep={onAddStep}
-                />
-                <StepPage
-                  key={pageStep?.id ?? "none"}
-                  fields={fields}
-                  token={token}
-                  step={pageStep}
-                  stepNumber={pageIndex + 1}
-                  previous={walkNeighbour(pageIndex - 1)}
-                  next={walkNeighbour(pageIndex + 1)}
-                  onSelectStep={(target) => onSelectStep(target)}
-                  onRemoveStep={onRemoveStep}
-                  selectedPathId={selectedPathId}
-                  navigate={(target) => openFormEditor(target, "steps")}
-                  processes={processes ?? []}
-                />
-              </div>,
-            )}
+          {/* The Steps tab: the numbered rail beside one wide step page
+              (`studio-step-page`). */}
+          {tabPanel(
+            "steps",
+            <div {...stylex.props(styles.stepsTab)}>
+              <StepsRail
+                currentStepId={pageStepId}
+                onSelectStep={(target) => onSelectStep(target)}
+                onMove={onMoveStep}
+                onAddStep={onAddStep}
+              />
+              <StepPage
+                key={pageStep?.id ?? "none"}
+                fields={fields}
+                token={token}
+                step={pageStep}
+                stepNumber={pageIndex + 1}
+                previous={walkNeighbour(pageIndex - 1)}
+                next={walkNeighbour(pageIndex + 1)}
+                onSelectStep={(target) => onSelectStep(target)}
+                onRemoveStep={onRemoveStep}
+                selectedPathId={selectedPathId}
+                navigate={(target) => openFormEditor(target, "steps")}
+                processes={processes ?? []}
+              />
+            </div>,
+          )}
 
-            {/* The Fields tab: the catalog and the field matrix, two views
-                under one sub-row. */}
-            {tabPanel(
-              "fields",
-              <FieldsTabViews
-                view={fieldsView}
-                onOpenView={(next) => goToTab("fields", next)}
-                token={token}
-                visible={!jsonOpen && openTab === "fields"}
-                onShowStep={(target) => navigate({ name: "edit", processId, stepId: target })}
-              />,
-            )}
-            {/* The Forms tab: one plate per step that declares a view
-                (`studio-forms-overview`). A plate's control opens the form
-                editor, and its badge opens Checks on that step alone. */}
-            {tabPanel(
-              "forms",
-              <FormsTab
-                onOpenForm={(target) => openFormEditor(target, "forms")}
-                onOpenChecks={(target) => {
-                  setChecksStepId(target);
-                  navigate({ name: "edit", processId, tab: "checks" });
-                }}
-              />,
-            )}
-            {/* The one place the full grouped rail stands. A row opens the tab
-                that owns its subject (`studio-process-tabs`). */}
-            {tabPanel(
-              "checks",
-              <ChecksRail
-                validation={validation}
-                canPublish={canPublish}
-                narrowedTo={checksNarrowedTo}
-                onShowEvery={() => setChecksStepId(undefined)}
-                onOpenIssue={(issue) => openTabFromRow(checkTarget(issue, steps))}
-              />,
-            )}
-            {/* The Settings tab: the process's own settings, its data
-                sources, its contract and its access lists, four views under
-                one sub-row. */}
-            {tabPanel(
-              "settings",
-              <SettingsTab
-                view={settingsView}
-                onOpenView={(next) => goToTab("settings", next)}
-                token={token}
-                roles={roles}
-                processId={processId}
-                go={go}
-                visible={!jsonOpen && openTab === "settings"}
-                onUnauthorized={stashOnUnauthorized}
-              />,
-            )}
-          </div>
-        )}
+          {/* The Fields tab: the catalog and the field matrix, two views
+              under one sub-row. */}
+          {tabPanel(
+            "fields",
+            <FieldsTabViews
+              view={fieldsView}
+              onOpenView={(next) => goToTab("fields", next)}
+              token={token}
+              visible={!jsonOpen && openTab === "fields"}
+              onShowStep={(target) => navigate({ name: "edit", processId, stepId: target })}
+              onOpenForm={(target) => openFormEditor(target, "steps")}
+            />,
+          )}
+          {/* The Forms tab: one plate per step that declares a view
+              (`studio-forms-overview`). A plate's control opens the form
+              editor, and its badge opens Checks on that step alone. */}
+          {tabPanel(
+            "forms",
+            <FormsTab
+              onOpenForm={(target) => openFormEditor(target, "forms")}
+              onOpenChecks={(target) => {
+                setChecksStepId(target);
+                navigate({ name: "edit", processId, tab: "checks" });
+              }}
+            />,
+          )}
+          {/* The one place the full grouped rail stands. A row opens the tab
+              that owns its subject (`studio-process-tabs`). */}
+          {tabPanel(
+            "checks",
+            <ChecksRail
+              validation={validation}
+              canPublish={canPublish}
+              narrowedTo={checksNarrowedTo}
+              onShowEvery={() => setChecksStepId(undefined)}
+              onOpenIssue={(issue) => openTabFromRow(checkTarget(issue, steps))}
+            />,
+          )}
+          {/* The Settings tab: the process's own settings, its data
+              sources, its contract and its access lists, four views under
+              one sub-row. */}
+          {tabPanel(
+            "settings",
+            <SettingsTab
+              view={settingsView}
+              onOpenView={(next) => goToTab("settings", next)}
+              token={token}
+              roles={roles}
+              processId={processId}
+              go={go}
+              visible={!jsonOpen && openTab === "settings"}
+              onUnauthorized={stashOnUnauthorized}
+            />,
+          )}
+        </div>
       </main>
     </PublishedFieldIdsProvider>
   );

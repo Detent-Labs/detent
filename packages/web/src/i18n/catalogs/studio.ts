@@ -693,8 +693,6 @@ export const en = {
   "stepSections.setInitialStep": "Set as the process's first step",
   "stepSections.outcomePlaceholder": "choose how it ended…",
   "stepSections.isInitialStep": "This is the process's first step.",
-  "stepSections.viewBuildForm": "Build the form",
-  "stepSections.viewFieldsConfigured": "fields configured",
   "stepSections.noSelection": "Select a step or a way out to edit it.",
   "stepSections.renameLabel": "Step name",
   "stepSections.keyField": "Key",

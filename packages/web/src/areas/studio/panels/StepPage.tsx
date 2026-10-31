@@ -24,7 +24,8 @@ import { IssueItems, NotCheckedBadge } from "./shared/IssueList";
 import { LocalizedTextInput } from "./shared/LocalizedTextInput";
 import { parseChildProcessJson } from "../draft/io";
 import { missingTranslationWarning } from "../draft/localized-text";
-import { nextStepKey, configuredFieldCount, nextCollaborationOverride } from "./stepsPanelLogic.js";
+import { nextStepKey, nextCollaborationOverride } from "./stepsPanelLogic.js";
+import { formCounts, formSizeText } from "./formCardRows.js";
 import { sectionColumns, sectionsFor, type SectionName } from "./sectionsFor.js";
 import { headingIssues, sectionOfIssue } from "./sectionIssues.js";
 
@@ -434,8 +435,7 @@ interface Props {
   /** The path a canvas edge click selected: resolves to this step (its
    * source) and highlights that row in the Ways out section. */
   selectedPathId?: string;
-  /** Navigates to the form editor's routed page for a step: the Form
-   * section's "Build the form" control. */
+  /** Opens the form editor for a step: the Form section's control. */
   navigate: (stepId: string) => void;
   /** The processes a subprocess step may call. Empty until the fetch
    * resolves, and after a failed one. */
@@ -605,19 +605,21 @@ export function StepPage({
           </label>
         );
       }
-      case "form":
-        // The count and one control. The editor itself lives on its own
-        // routed page, so nothing here mounts it.
+      case "form": {
+        // The form's size in the Forms card's words, and one control. The
+        // editor itself stands in this tab's body once opened, so nothing
+        // here mounts it.
+        const { fieldCount, requiredCount } = formCounts(step, fields);
+        const sizeText = formSizeText(fieldCount, requiredCount);
         return (
           <div {...stylex.props(styles.formSummary)}>
-            <span>
-              {configuredFieldCount(step.view?.fields)} / {fields.length} {t("stepSections.viewFieldsConfigured")}
-            </span>
+            <span>{sizeText ?? t("formsTab.miniatureEmpty")}</span>
             <button type="button" className="btn btn-secondary" onClick={() => navigate(step.id!)}>
-              {t("stepSections.viewBuildForm")}
+              {t(sizeText === undefined ? "formsTab.startForm" : "formsTab.openForm")}
             </button>
           </div>
         );
+      }
       case "collaboration":
         return (
           <>
