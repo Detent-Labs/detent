@@ -147,6 +147,9 @@ editor has no tab row", lapses.
 route and drops `formStepId`. A press on the current tab therefore leaves
 the editor as well.
 
+Leaving the editor clears `formOrigin`, so a later Back onto the form's
+address stands Steps current.
+
 `openFormEditor(target, from)` also calls `onSelectStep(target)`. An effect
 keyed on `formStepId` does the same on a direct load, when the step exists.
 The step crumb and a return to the Steps tab then land on the form's own
@@ -199,9 +202,12 @@ A group card's legend takes the same `CardNameInput` in place of its
 draggable name button. Its move and Remove controls, its members and its
 tail slot stay.
 
-The input variant renders when `naming === ref`, or when
-`resolveDraftLocalizedText(label, contentLocale, baseLocale)` is empty. A
-card whose label exists in the base locale alone therefore keeps its body.
+The input variant renders in two cases. One is `naming === ref`. The other
+is a label whose `contentLocale` and `baseLocale` entries are both empty.
+
+The helper `resolveDraftLocalizedText` cannot decide this. It keeps an
+empty string, so it reads a cleared translation as no label. A card whose
+label exists in the base locale alone therefore keeps its body.
 The strip's translation warning reports the gap.
 
 An effect focuses the input when `naming` changes. The wrapper `<div>` takes
@@ -396,6 +402,9 @@ Each entry names the risk, then its mitigation.
   even after a Forms card opened it. The spec names a direct load as Steps.
 - The choice values `choice_1` and `choice_2` are machine words. They stay
   behind the Fields tab's options editor. A label rename leaves them alone.
+- A minted field has no span, so on a two-column form its card is
+  narrow. The input card wraps its controls onto a second row (D3). The
+  browser check measures the input there.
 - The restore notice now stands over the editor. A restore can remove the
   open step. The editor already says "This step no longer exists in the
   draft" then.

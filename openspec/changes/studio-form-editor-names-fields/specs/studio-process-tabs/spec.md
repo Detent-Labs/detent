@@ -16,7 +16,8 @@ The form editor and the step target SHALL stay their own sub-states. The form
 editor SHALL keep winning where both arrive.
 
 On the form editor's address, the tab row SHALL stand Steps current. An open
-from a Forms card SHALL stand Forms current until the address changes. A
+from a Forms card SHALL stand Forms current until the author leaves the
+editor. A
 reload of the form editor's address stands Steps current
 (`studio-form-editor`).
 
