@@ -353,7 +353,8 @@ export function conjuncts(node: CelNode, joiner: string): CelNode[] {
 
 /**
  * Read stored CEL into rows. `null` means the source does not parse, which is
- * the builder's one closed state: the site opens in CEL mode instead.
+ * the builder's one closed state: the site draws a notice in place of the rows
+ * and opens its Developer view on the CEL text.
  */
 export function fromCel(src: string | undefined, operands: Operand[]): Condition | null {
   if (!src?.trim()) return { joiner: "&&", rows: [] };

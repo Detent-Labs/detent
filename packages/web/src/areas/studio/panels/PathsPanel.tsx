@@ -375,7 +375,7 @@ export function PathsPanel({
               <p {...stylex.props(styles.note)}>{t("paths.manualGuardNote")}</p>
             )}
             {/* A div, not a label: a label here would give the builder's own
-                buttons a name run together from the hint and the readout. */}
+                buttons a name run together from the hint and the sentence. */}
             <div>
               <p {...stylex.props(styles.note)}>
                 {path.trigger === "automatic" ? t("paths.automaticGuardHint") : t("paths.manualGuardHint")}
@@ -384,7 +384,6 @@ export function PathsPanel({
                 value={path.guard}
                 stepId={stepId}
                 onChange={(guard) => updatePath(index, { guard })}
-                toggleVariant="disclosure"
               />
             </div>
           </fieldset>

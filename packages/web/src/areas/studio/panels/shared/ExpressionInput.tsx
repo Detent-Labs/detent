@@ -8,12 +8,14 @@ interface Props {
   placeholder?: string;
 }
 
-/** Raw CEL text entry — no non-CEL condition-builder abstraction. */
+/** Raw CEL text entry — no non-CEL condition-builder abstraction. The text is
+ * a machine value, so it carries `translate="no"`. */
 export function ExpressionInput({ value, onChange, placeholder }: Props) {
   return (
     <input
       type="text"
       className="cel-input"
+      translate="no"
       placeholder={placeholder ?? t("expression.placeholder")}
       value={value?.src ?? ""}
       onChange={(e) => {

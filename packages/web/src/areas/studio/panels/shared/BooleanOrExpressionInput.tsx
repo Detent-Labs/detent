@@ -23,9 +23,10 @@ interface Props {
  * A view override (visible/required/readonly) is `boolean | Expression`; this
  * toggles between the two representations.
  *
- * That select stays the outer mode. `ConditionInput` renders the CEL arm and
- * carries its own builder/CEL toggle inside it, so the site never shows two
- * controls for one choice.
+ * That select stays the outer mode. `ConditionInput` renders the CEL arm: the
+ * builder, its sentence and the CEL text input. The form editor already stands
+ * this control inside its own Developer view, so the CEL input draws inline,
+ * with no second disclosure.
  *
  * The chosen arm is remembered rather than read back off the value: the value
  * reads `undefined` while no row is complete, and deriving the mode from that
@@ -67,7 +68,7 @@ export function BooleanOrExpressionInput({ label, value, flagKey, onChange, tabI
           onChange={(e) => onChange(e.target.checked)}
         />
       ) : (
-        <ConditionInput value={isExpression(value) ? value : undefined} onChange={onChange} />
+        <ConditionInput value={isExpression(value) ? value : undefined} onChange={onChange} cel="inline" />
       )}
     </span>
   );

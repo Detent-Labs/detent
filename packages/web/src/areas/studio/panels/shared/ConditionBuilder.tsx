@@ -16,11 +16,6 @@ import {
 } from "./conditionLogic";
 
 const styles = stylex.create({
-  conditionEmpty: {
-    margin: 0,
-    color: colors.textMuted,
-    fontSize: "0.9rem",
-  },
   conditionRows: {
     listStyle: "none",
     margin: 0,
@@ -87,6 +82,9 @@ interface Props {
   condition: Condition;
   operands: Operand[];
   onChange: (next: Condition) => void;
+  /** The id of the sentence that reads the rows, set on the rows' list as
+   * `aria-describedby`. */
+  describedBy?: string;
 }
 
 const GROUP_ORDER: readonly OperandGroup[] = ["fields", "child", "case", "person"];
@@ -186,7 +184,7 @@ function ValueEditor({
  * state, not body state — `toCel` leaves it out, so a half-written
  * `data.amount > ` never reaches the draft and never lands in the IssueList.
  */
-export function ConditionBuilder({ condition, operands, onChange }: Props) {
+export function ConditionBuilder({ condition, operands, onChange, describedBy }: Props) {
   const byPath = new Map(operands.map((o) => [o.path, o]));
 
   const setRows = (rows: Row[]) => onChange({ ...condition, rows });
@@ -200,86 +198,77 @@ export function ConditionBuilder({ condition, operands, onChange }: Props) {
 
   const flipJoiner = () => onChange({ ...condition, joiner: condition.joiner === "&&" ? "||" : "&&" });
 
-  if (!condition.rows.length) {
-    return (
-      <div className="condition-builder">
-        <p {...stylex.props(styles.conditionEmpty)}>{t("condition.empty")}</p>
-        <button type="button" className="btn btn-ghost condition-add" onClick={addRow} disabled={!operands.length}>
-          {t("condition.addRow")}
-        </button>
-      </div>
-    );
-  }
-
   return (
     <div className="condition-builder">
-      <ol {...stylex.props(styles.conditionRows)}>
-        {condition.rows.map((row, index) => {
-          const operand = row.kind === "cmp" ? byPath.get(row.operand) : undefined;
-          const complete = isComplete(row, byPath);
-          return (
-            <li key={index} {...stylex.props(styles.conditionRow, !complete && styles.conditionRowIncomplete)}>
-              {index > 0 && (
-                <button type="button" {...stylex.props(styles.conditionJoiner)} onClick={flipJoiner} title={t("condition.joinerHint")}>
-                  {t(condition.joiner === "&&" ? "condition.joiner.and" : "condition.joiner.or")}
+      {condition.rows.length > 0 && (
+        <ol {...stylex.props(styles.conditionRows)} aria-describedby={describedBy}>
+          {condition.rows.map((row, index) => {
+            const operand = row.kind === "cmp" ? byPath.get(row.operand) : undefined;
+            const complete = isComplete(row, byPath);
+            return (
+              <li key={index} {...stylex.props(styles.conditionRow, !complete && styles.conditionRowIncomplete)}>
+                {index > 0 && (
+                  <button type="button" {...stylex.props(styles.conditionJoiner)} onClick={flipJoiner} title={t("condition.joinerHint")}>
+                    {t(condition.joiner === "&&" ? "condition.joiner.and" : "condition.joiner.or")}
+                  </button>
+                )}
+
+                {row.kind === "raw" ? (
+                  <span {...stylex.props(styles.conditionRawSentence)}>{t("condition.rawRowSentence")}</span>
+                ) : (
+                  <>
+                    <select
+                      {...stylex.props(styles.conditionControl)}
+                      aria-label={t("condition.operandLabel")}
+                      value={row.operand}
+                      onChange={(e) => {
+                        const next = byPath.get(e.target.value);
+                        // The operand's type governs the operators and the literal,
+                        // so a switch resets both rather than keeping a stale pair.
+                        updateRow(index, {
+                          kind: "cmp",
+                          operand: e.target.value,
+                          op: operatorsFor(next?.celType ?? "string")[0],
+                          value: undefined,
+                        });
+                      }}
+                    >
+                      <option value="">{t("condition.selectOperand")}</option>
+                      <OperandOptions operands={operands} />
+                    </select>
+
+                    <select
+                      {...stylex.props(styles.conditionControl)}
+                      aria-label={t("condition.operatorLabel")}
+                      value={row.op}
+                      onChange={(e) => updateRow(index, { ...row, op: e.target.value as CmpOp })}
+                    >
+                      {operatorsFor(operand?.celType ?? "string").map((op) => (
+                        <option key={op} value={op}>
+                          {t(`condition.op.${OP_NAMES[op]}`)}
+                        </option>
+                      ))}
+                    </select>
+
+                    <ValueEditor row={row} operand={operand} onChange={(value) => updateRow(index, { ...row, value })} />
+                  </>
+                )}
+
+                {!complete && <span {...stylex.props(styles.conditionFlag)}>{t("condition.incomplete")}</span>}
+
+                <button
+                  type="button"
+                  {...stylex.props(styles.conditionRemove)}
+                  aria-label={t("condition.removeRow")}
+                  onClick={() => removeRow(index)}
+                >
+                  ×
                 </button>
-              )}
-
-              {row.kind === "raw" ? (
-                <span {...stylex.props(styles.conditionRawSentence)}>{t("condition.rawRowSentence")}</span>
-              ) : (
-                <>
-                  <select
-                    {...stylex.props(styles.conditionControl)}
-                    aria-label={t("condition.operandLabel")}
-                    value={row.operand}
-                    onChange={(e) => {
-                      const next = byPath.get(e.target.value);
-                      // The operand's type governs the operators and the literal,
-                      // so a switch resets both rather than keeping a stale pair.
-                      updateRow(index, {
-                        kind: "cmp",
-                        operand: e.target.value,
-                        op: operatorsFor(next?.celType ?? "string")[0],
-                        value: undefined,
-                      });
-                    }}
-                  >
-                    <option value="">{t("condition.selectOperand")}</option>
-                    <OperandOptions operands={operands} />
-                  </select>
-
-                  <select
-                    {...stylex.props(styles.conditionControl)}
-                    aria-label={t("condition.operatorLabel")}
-                    value={row.op}
-                    onChange={(e) => updateRow(index, { ...row, op: e.target.value as CmpOp })}
-                  >
-                    {operatorsFor(operand?.celType ?? "string").map((op) => (
-                      <option key={op} value={op}>
-                        {t(`condition.op.${OP_NAMES[op]}`)}
-                      </option>
-                    ))}
-                  </select>
-
-                  <ValueEditor row={row} operand={operand} onChange={(value) => updateRow(index, { ...row, value })} />
-                </>
-              )}
-
-              {!complete && <span {...stylex.props(styles.conditionFlag)}>{t("condition.incomplete")}</span>}
-
-              <button
-                type="button"
-                {...stylex.props(styles.conditionRemove)}
-                aria-label={t("condition.removeRow")}
-                onClick={() => removeRow(index)}
-              >
-                ×
-              </button>
-            </li>
-          );
-        })}
-      </ol>
+              </li>
+            );
+          })}
+        </ol>
+      )}
 
       <button type="button" className="btn btn-ghost condition-add" onClick={addRow} disabled={!operands.length}>
         {t("condition.addRow")}

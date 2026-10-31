@@ -77,7 +77,7 @@ interface Props {
 /**
  * `rule`'s surface (task 4.5, `studio-field-validation-form`): the row
  * builder, its CEL readout, and a "Developer view" disclosure holding the
- * raw CEL input — `ConditionInput`'s own shape, over `ruleLogic` instead of
+ * raw CEL input — `ConditionInput`'s row model, over `ruleLogic` instead of
  * `conditionLogic`. Stays a separate component per design.md: this site's
  * default operand and its field-against-field comparison have no
  * counterpart on a path guard or a view override.
@@ -112,10 +112,10 @@ export function RuleInput({ field, value, onChange }: Props) {
     setCondition(fromRuleCel(src, operands));
   }
 
-  // Seeded from whether the source parsed at mount, the same reasoning
-  // `ConditionInput`'s `celMode` state carries. `unparseable` stays the null
-  // guard below: `src` can also turn unreadable from outside, through the
-  // JSON surface.
+  // Seeded from whether the source parsed at mount, so a rule that opens
+  // unreadable stays on the CEL input while the author repairs it.
+  // `unparseable` stays the null guard below: `src` can also turn unreadable
+  // from outside, through the JSON surface.
   const [devOpen, setDevOpen] = useState(condition === null);
   const unparseable = condition === null;
   // While no row contributes, the draft may still hold a rule that an

@@ -1044,7 +1044,6 @@ function FieldEditor({
                 <ConditionInput
                   value={visibleState.kind === "uniform" ? visibleState.value : undefined}
                   onChange={writeVisible}
-                  toggleVariant="link"
                   clearLabel={clearSteps ? clearConditionLabel(clearSteps.map((id) => usageStepLabel(usage, id))) : undefined}
                 />
               </>

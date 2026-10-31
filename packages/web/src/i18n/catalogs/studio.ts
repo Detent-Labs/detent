@@ -403,8 +403,9 @@ export const en = {
   "formEditor.tab": "Tab",
   "formEditor.tabFromGroup": "The group decides the tab.",
 
-  // The condition builder. Only its captions read words: its readout prints
-  // the CEL source beside the rows ("Writes <code>…</code>").
+  // The condition builder. Its rows and its sentence read words; the CEL
+  // stands only in its Developer view. `rawRow`, `unparseable`, `celReadout`
+  // and `celEmpty` serve the rule builder, which keeps a CEL readout.
   "condition.empty": "No condition yet: this always matches.",
   "condition.addRow": "+ Add row",
   "condition.removeRow": "Remove row",
@@ -414,7 +415,6 @@ export const en = {
   "condition.valueLabel": "value",
   "condition.valuePlaceholder": "value…",
   "condition.selectValue": "(select a value)",
-  "condition.contains": "contains",
   "condition.yes": "yes",
   "condition.no": "no",
   "condition.rawRow": "Written by hand. Edit it as CEL.",
@@ -422,8 +422,6 @@ export const en = {
   "condition.joinerHint": "How the rows combine. Click to flip.",
   "condition.celReadout": "Writes",
   "condition.celEmpty": "nothing yet",
-  "condition.editAsCel": "Edit as CEL",
-  "condition.useBuilder": "Use the builder",
   "condition.unparseable": "This does not parse as CEL, so the builder cannot open it.",
   "condition.developerView": "Developer view",
   "condition.onlyWhenHeading": "Only when",

@@ -189,7 +189,9 @@ describe("a way out's heading sentence", () => {
 
 describe("a way out's key", () => {
   const html = render({});
-  const details = html.indexOf("<details");
+  // The row's own disclosure closes the row. The guard's Developer view, over
+  // its CEL, stands before it inside "Only when".
+  const details = html.lastIndexOf("<details");
 
   it("stands inside the row's own Developer view, closed until opened", () => {
     expect(details).toBeGreaterThan(-1);
@@ -201,7 +203,7 @@ describe("a way out's key", () => {
     const keyInput = html.indexOf('value="approve"');
 
     expect(keyInput).toBeGreaterThan(details);
-    expect(keyInput).toBeLessThan(html.indexOf("</details>"));
+    expect(keyInput).toBeLessThan(html.lastIndexOf("</details>"));
     expect(html.slice(0, details)).not.toContain('value="approve"');
   });
 

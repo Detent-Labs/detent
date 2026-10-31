@@ -68,8 +68,7 @@ interface Props {
 
 /**
  * `FieldDef.default`'s editor: a literal input matching the field's own
- * type, or — behind a link-styled toggle mirroring `ConditionInput`'s own —
- * a raw CEL expression. Deliberately not `ConditionInput` itself: a default
+ * type, or — behind a link-styled toggle — a raw CEL expression. Deliberately not `ConditionInput` itself: a default
  * is a value of the field's own type, not a boolean (design.md Decision 3).
  */
 export function DefaultValueEditor({ field, onChange }: Props) {
