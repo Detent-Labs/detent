@@ -152,6 +152,13 @@ describe("the open view's sub-state of the edit route", () => {
     expect(matchRoute("/processes/proc_1/edit/nonsense/matrix")).toEqual({ name: "edit", processId: "proc_1" });
   });
 
+  it("writes the tab alone when the route carries a view the tab does not hold", () => {
+    // Without the guard, the writer would print `/edit/steps/matrix` and
+    // `/edit/fields/sources`, addresses the matcher then drops a segment of.
+    expect(routePath({ name: "edit", processId: "proc_1", tab: "steps", view: "matrix" })).toBe("/processes/proc_1/edit/steps");
+    expect(routePath({ name: "edit", processId: "proc_1", tab: "fields", view: "sources" })).toBe("/processes/proc_1/edit/fields");
+  });
+
   it("writes the tab alone when the route carries no view", () => {
     expect(routePath({ name: "edit", processId: "proc_1", tab: "settings" })).toBe("/processes/proc_1/edit/settings");
   });

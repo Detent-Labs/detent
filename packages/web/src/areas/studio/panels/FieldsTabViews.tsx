@@ -1,7 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
 import { t } from "../catalog.js";
 import { HeldDraft } from "../draft/held-while-hidden.js";
-import type { TabView } from "../routing.js";
+import type { FieldsView, TabView } from "../routing.js";
 import { FieldsTab } from "./EntityTabs.js";
 import { FieldMatrixPanel } from "./FieldMatrixPanel.js";
 import { SubRow, subTabDomId, subTabPanelDomId } from "./SubRow.js";
@@ -29,8 +29,7 @@ const styles = stylex.create({
 });
 
 interface Props {
-  /** The open view: `catalog` or `matrix`. */
-  view: TabView;
+  view: FieldsView;
   onOpenView: (view: TabView) => void;
   token: string;
   /** True while the Fields tab stands open and the JSON surface does not. */

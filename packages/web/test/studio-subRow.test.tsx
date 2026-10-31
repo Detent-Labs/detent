@@ -73,8 +73,10 @@ describe("The sub-row", () => {
   it("prints each label as the whole text of its entry, with no count inside", () => {
     const html = render();
 
-    expect(html).toContain(">Catalog</button>");
-    expect(html).toContain(">Where fields appear</button>");
+    // The whole button, from its opening tag to its close: a count element
+    // beside the label would break the match on either side.
+    expect(html).toMatch(/<button[^>]*>Catalog<\/button>/);
+    expect(html).toMatch(/<button[^>]*>Where fields appear<\/button>/);
   });
 
   it("takes no entry out of the tab order, since each entry is a plain stop", () => {

@@ -28,15 +28,20 @@ export type SettingsView = "process" | "sources" | "contract" | "access";
 /** A view of a tab that carries a sub-row. */
 export type TabView = FieldsView | SettingsView;
 
+/** The Fields tab's views, in sub-row order. */
+export const FIELDS_VIEWS: readonly FieldsView[] = ["catalog", "matrix"];
+/** The Settings tab's views, in sub-row order. */
+export const SETTINGS_VIEWS: readonly SettingsView[] = ["process", "sources", "contract", "access"];
+
 /** Each tab's views, in sub-row order. A tab with no sub-row lists none. The
  * first entry is the view an address naming the tab alone opens. */
 export const TAB_VIEWS: Record<ProcessTab, readonly TabView[]> = {
   map: [],
   steps: [],
-  fields: ["catalog", "matrix"],
+  fields: FIELDS_VIEWS,
   forms: [],
   checks: [],
-  settings: ["process", "sources", "contract", "access"],
+  settings: SETTINGS_VIEWS,
 };
 
 const tabHoldsView = (tab: ProcessTab, view: string): view is TabView => (TAB_VIEWS[tab] as readonly string[]).includes(view);

@@ -52,8 +52,7 @@ const styles = stylex.create({
 });
 
 interface Props {
-  /** The open view: `process`, `sources`, `contract` or `access`. */
-  view: TabView;
+  view: SettingsView;
   onOpenView: (view: TabView) => void;
   token: string;
   /** The calling actor's own roles, for the access lists' add and delete

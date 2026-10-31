@@ -23,7 +23,7 @@ import { seedLocalizedText } from "../draft/localized-text";
 import { getDraft, listProcesses } from "../api/client.js";
 import { useFetchOnce } from "../panels/shared/useFetchOnce.js";
 import type { DraftRecord, PublishResult } from "../api/types.js";
-import { DEFAULT_TAB, TAB_VIEWS, type ProcessTab, type Route, type TabView } from "../routing.js";
+import { DEFAULT_TAB, FIELDS_VIEWS, SETTINGS_VIEWS, type ProcessTab, type Route, type TabView } from "../routing.js";
 import { checkTarget, formEditorReturnTab, processTabCounts, type CheckTarget } from "../draft/process-tabs.js";
 import { checksDotState, groupChecksBySource } from "../draft/checksRail.js";
 import { showsStructuralBanner } from "../draft/startGaps.js";
@@ -396,12 +396,11 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
   const [checksStepId, setChecksStepId] = useState<string | undefined>(undefined);
   const openTab = tab ?? DEFAULT_TAB;
   // The view a tab with a sub-row shows: the address's view while that tab is
-  // open, otherwise the tab's first view. The matcher already drops a view
-  // the tab does not hold.
-  const viewOf = (owner: ProcessTab): TabView | undefined =>
-    openTab === owner && view !== undefined ? view : TAB_VIEWS[owner][0];
-  const fieldsView = viewOf("fields") ?? "catalog";
-  const settingsView = viewOf("settings") ?? "process";
+  // open and holds it, otherwise the tab's first view.
+  const viewOf = <V extends TabView>(owner: ProcessTab, views: readonly V[]): V =>
+    views.find((v) => openTab === owner && v === view) ?? views[0]!;
+  const fieldsView = viewOf("fields", FIELDS_VIEWS);
+  const settingsView = viewOf("settings", SETTINGS_VIEWS);
   // The processes a subprocess step may call. One fetch per mount, read by
   // the step page's own picker.
   const processes = useFetchOnce(token, listProcesses);
