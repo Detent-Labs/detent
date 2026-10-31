@@ -112,24 +112,21 @@ process, and an end.
 - **THEN** the draft carries one more end step
 - **AND** the step page holds the new step
 
-### Requirement: The step page names its step and renames it in place
+### Requirement: The step page names its step and keeps its key in the Developer view
 
-The step page SHALL open with a kicker naming the step's number and its kind.
-The step's label SHALL sit under that kicker as a writable line. Typing in
-that line SHALL rename the step in the draft.
+The step page SHALL open with a kicker naming the step's number and its
+kind. The step's name SHALL sit under that kicker as a writable line
+captioned "Name", at the page's full width. "Description" SHALL follow it.
+Typing in the name line SHALL rename the step. The masthead SHALL have no
+key input.
 
-The step's label and its key SHALL stand side by side in one row, the label
-in the wider column. Under the step page's narrow-viewport breakpoint the row
-SHALL collapse to one column, label over key. The label's missing-translation
-warning SHALL stand under the label's own column, never spanning the row
-under the key.
-
-The page SHALL mark the draft's first step. The page SHALL carry one control
-that removes the step.
+The step's key input SHALL stand inside the Developer view under "Key",
+and typing there SHALL write the key. The page SHALL mark the first step
+and carry one control that removes the step.
 
 #### Scenario: Renaming the step on the page
 
-- **WHEN** an author types a new label in the step page's name line
+- **WHEN** an author types a new name in the step page's name line
 - **THEN** the draft carries the new label
 - **AND** the rail row for that step reads the new label
 
@@ -138,66 +135,61 @@ that removes the step.
 - **WHEN** the step page holds the draft's initial step
 - **THEN** the page carries a mark naming it the first step
 
-#### Scenario: The label and key stand in one row
+#### Scenario: The masthead has no key input
 
-- **WHEN** an author opens a step on a wide viewport
-- **THEN** the label and its key stand in one row
-- **AND** the label's column is wider than the key's column
+- **WHEN** an author opens a step on the step page
+- **THEN** the masthead carries the name line and the description
+- **AND** no input in the masthead holds the step's key
 
-#### Scenario: The row collapses under the narrow breakpoint
+#### Scenario: The key stands in the Developer view and still writes
 
-- **WHEN** an author opens a step under the step page's narrow-viewport
-  breakpoint
-- **THEN** the label stands over the key, each its own full-width row
+- **WHEN** an author opens the Developer view and types a new key
+- **THEN** the draft carries the new key for that step
+- **AND** the JSON in the same disclosure shows it
 
-#### Scenario: A missing-translation warning stays under the label
+#### Scenario: A missing-translation warning stays under the name
 
 - **WHEN** the step's label is missing a translation for the content locale
-- **THEN** the warning stands under the label's own column
-- **AND** the warning does not span the width of the key's column
+- **THEN** the warning stands under the name line
 
-### Requirement: The Path to section stands each path's Label and Key side by side
+### Requirement: A way out reads as a sentence and keeps its key in its own Developer view
 
-Each path row in the Path to section SHALL stand its Label and Key fields
-side by side. The row SHALL use two columns, the label in the wider one.
+Each row in the Ways out section SHALL open with a heading, such as
+"Approve → Done". The heading reads the way out's name, an arrow and the
+name of the target step. An unnamed way out SHALL read "(unnamed way out)" there,
+and a way out with no target "(no step yet)". The row's "Name" input and
+its "Leads to" select SHALL follow. The row SHALL hold a "Developer view"
+disclosure, closed until opened, holding the way out's key input under
+"Key". No key input SHALL stand outside it.
 
-Under the step page's narrow-viewport breakpoint the row SHALL collapse to
-one column, label over key. This is the same row pattern the step's own
-Label and Key already use in the masthead.
+#### Scenario: A way out heads its row as a sentence
 
-The row's "to" field SHALL stand in its own full-width row below Label and
-Key. It SHALL stand outside the Label/Key row.
+- **WHEN** a step carries a way out labelled "Approve" leading to a step
+  labelled "Done"
+- **THEN** that row's heading reads "Approve → Done"
 
-#### Scenario: A path's Label and Key stand in one row
+#### Scenario: An unnamed way out says so in its heading
 
-- **WHEN** an author opens the Path to section on a wide viewport
-- **THEN** a path row's label and its key stand in one row
-- **AND** the label's column is wider than the key's column
+- **WHEN** a way out has an empty label
+- **THEN** its heading reads "(unnamed way out)" before the arrow
 
-#### Scenario: A path row collapses under the narrow breakpoint
+#### Scenario: A way out's key stands in its Developer view
 
-- **WHEN** an author opens the Path to section under the step page's
-  narrow-viewport breakpoint
-- **THEN** a path row stands the label over the key, each its own
-  full-width row
-
-#### Scenario: The "to" field stays on its own row
-
-- **WHEN** an author opens the Path to section on a wide viewport
-- **THEN** a path row's "to" field stands on its own row below the label
-  and key row
+- **WHEN** an author opens a way out's row
+- **THEN** no key input is visible until the row's Developer view opens
+- **AND** typing a key inside that disclosure writes the way out's key
 
 ### Requirement: The step page stands its sections open in two columns
 
 The step page SHALL lay its sections in two columns. No section SHALL
-collapse. The leading column SHALL carry Path to, Assignment, Cancellable,
+collapse. The leading column SHALL carry Ways out, Who acts, Cancellable,
 Which process it calls, and How the case ends. The trailing column SHALL
-carry On entry, On exit, Time limit, Step form fields, and Collaboration.
+carry When entered, When left, Time limit, Form, and Collaboration.
 
 A section SHALL stand only where the step's kind declares it. A task step
-carries Assignment. A subprocess step carries Which process it calls. An end
-step carries How the case ends. It has no outgoing path, so it carries
-neither On exit nor Time limit.
+carries Who acts. A subprocess step carries Which process it calls. An end
+step carries How the case ends. It has no way out, so it carries
+neither When left nor Time limit.
 
 A task step and a subprocess step both carry Cancellable. An end step has no
 Cancellable section. An instance resting on a terminal step has already left
@@ -213,8 +205,8 @@ reads every setting of one step without opening anything.
 #### Scenario: A task step carries the task sections
 
 - **WHEN** the step page holds a task step that is not an end
-- **THEN** the page carries Path to, Assignment, Cancellable, On entry, On
-  exit, Time limit, Step form fields and Collaboration
+- **THEN** the page carries Ways out, Who acts, Cancellable, When entered,
+  When left, Time limit, Form and Collaboration
 - **AND** the page has no Which process it calls section
 
 <!-- Why: this heading is what a future MODIFIED delta against this
@@ -224,7 +216,7 @@ reads every setting of one step without opening anything.
 
 - **WHEN** the step page holds an end step
 - **THEN** the page carries How the case ends
-- **AND** the page has no Path to section, no On exit section, no Time
+- **AND** the page has no Ways out section, no When left section, no Time
   limit section and no Cancellable section
 
 #### Scenario: Every section stands open
@@ -299,9 +291,9 @@ might read as "Currently: on", for example.
 ### Requirement: A section prints its own open issues beside its heading
 
 Each section SHALL print the open issues that belong to it, beside its own
-heading. An issue about the assignment SHALL stand at Assignment. An issue
-about an outgoing path SHALL stand at Path to. An issue about the form SHALL
-stand at Step form fields.
+heading. An issue about the assignment SHALL stand at Who acts. An issue
+about a way out SHALL stand at Ways out. An issue about the form SHALL
+stand at Form.
 
 An issue SHALL stand at exactly one section. The Checks tab SHALL keep listing
 every issue, including those a section already prints.
@@ -309,11 +301,11 @@ every issue, including those a section already prints.
 #### Scenario: An unassigned step prints its issue at Assignment
 
 - **WHEN** a task step declares no assignment
-- **THEN** the Assignment section prints that issue beside its heading
+- **THEN** the Who acts section prints that issue beside its heading
 
 #### Scenario: The Checks tab keeps the same issue
 
-- **WHEN** the Assignment section prints an issue
+- **WHEN** the Who acts section prints an issue
 - **THEN** the Checks tab still lists that issue
 
 ### Requirement: The step page walks to the previous and the next step
@@ -338,12 +330,13 @@ The control SHALL refuse the press at the end of the walk it belongs to.
 
 The step page SHALL carry a Developer view disclosure at its foot. The
 disclosure SHALL stand closed until an author opens it. An open disclosure
-SHALL carry the step's own JSON and the step's `id`.
+SHALL carry the step's key input, the step's `id` and the step's own JSON.
 
 <!-- antislop: allow synonym-rotation -->
 <!-- Why: "JSON surface" is this codebase's fixed UI-glossary term for the raw definition-editing screen (.claude/rules/ui-glossary.md), not a rotated synonym for a display/show/carry verb used elsewhere in this file. -->
 The JSON SHALL be read-only here. The JSON surface stays the one place for
-hand-authoring a definition.
+hand-authoring a definition. The key input is the one writable control in
+the disclosure.
 
 #### Scenario: The Developer view carries the step's JSON
 
