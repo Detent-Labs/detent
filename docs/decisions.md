@@ -1807,6 +1807,37 @@ this section.
     `:3055`, `:3066` and `:3160`.
   - In the same spec, "Paths tab" stands at `:273`, `:1623` and `:3030`.
 
+- **The Settings tab's inherited bodies still speak the engine's words.** The
+  `/impeccable critique` of `studio-six-tabs` (2026-10-31) found the sub-row
+  in the author's words and three bodies under it in the engine's. Where
+  values come from opens on the heading "Data sources", a mono key, a plugin
+  row with labels beside the controls, and a "Settings (JSON)" text area.
+  What it takes in and gives back opens on "Contract", then `inputFields`
+  and `outputFields` as a wall of checkboxes. Access asks for `user_xxx or
+  group_xxx`. Change 11 (`studio-field-card`) moves the sources into the
+  Fields sub-row. No change in stage 64 owns the contract editor or the
+  access lists. The critique's sketch: one checkbox sentence "Another
+  process can call this one", two fieldsets in the entity-rail row style,
+  outcomes as ruled rows; a picker over users and groups by display name.
+- **The add-locale input has no label.** `panels/shared/ContentLocaleSwitcher.tsx`
+  gives it a placeholder alone, "add locale (e.g. de)". `studio-six-tabs`
+  moved it onto the Settings tab's Process view without changing it. The
+  `/impeccable audit` of 2026-10-31 rates it P2. The critique proposes one
+  "Languages" fieldset: "Written first in" as a select of language names,
+  the added languages as ruled rows, "Add a language" as a labelled select.
+- **Forced colors drop the open mark on every tab strip.** Under
+  `forced-colors: active` the sub-row's inset `box-shadow` and the tab
+  row's `::after` bar both vanish, and weight 800 stays the only cue. The
+  audit of 2026-10-31 counts eight sites with the same technique. A fix
+  draws the mark with a border or an outline, which forced colors keep.
+- **"Show on the canvas" names the Map tab's surface.** The field catalog's
+  "Used in" rows read "Show on the canvas" (`fieldCatalog.showOnCanvas`),
+  and the spec names the control by that string. The tab reads Map since
+  `studio-six-tabs`. Change 5 (`studio-map-labels`) owns the Map's words
+  and takes the rename, with the spec sentence in `studio-app`. The matrix
+  row headers still print keys alone beside the Catalog's labels; change 11
+  owns the matrix's words.
+
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 
 Each entry below names a cut somebody proposed, the reason a reviewer refused
