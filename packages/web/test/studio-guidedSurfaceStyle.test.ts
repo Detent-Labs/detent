@@ -183,10 +183,10 @@ describe("what StyleX drops", () => {
   });
 });
 
-describe("the path row's label leads key, both stacked, and the target select is styled", () => {
+describe("the path row's name leads its key, and the target select is styled", () => {
   const FILE = "src/areas/studio/panels/PathsPanel.tsx";
 
-  it("renders the label field before the key field, both in the masthead's stacked pattern", () => {
+  it("renders the name field before the key field", () => {
     const source = stripComments(read(FILE));
 
     const labelIndex = source.indexOf("paths.labelCaption");
@@ -197,7 +197,7 @@ describe("the path row's label leads key, both stacked, and the target select is
     expect(labelIndex).toBeLessThan(keyIndex);
   });
 
-  it("gives the key field's control the mono treatment the masthead gives a step's own key", () => {
+  it("gives the key field's control the mono treatment the step's own key takes", () => {
     const source = stripComments(read(FILE));
 
     const keyIndex = source.indexOf("paths.keyCaption");

@@ -11,7 +11,7 @@ import { StepPage } from "../src/areas/studio/panels/StepPage.js";
 
 /**
  * The Steps tab's wide page (`studio-step-page`: "The step page names its
- * step and renames it in place", "The step page stands its sections open in
+ * step and keeps its key in the Developer view", "The step page stands its sections open in
  * two columns", "The step page walks to the previous and the next step", "The
  * step page carries a Developer view of the step").
  *
@@ -114,11 +114,17 @@ describe("The step page's masthead", () => {
     expect(html).toContain("A step someone works");
   });
 
-  it("carries the step's label as a writable line, and its key beside it", () => {
+  it("carries the step's label as a writable line, and keeps its key in the Developer view", () => {
     const html = render();
+    // The step's own disclosure stands at the page foot, after the way-out
+    // rows' own Developer views.
+    const developer = html.slice(html.lastIndexOf("<details"));
 
     expect(html).toContain('value="Intake"');
-    expect(html).toContain('value="intake"');
+    expect(html.slice(0, html.indexOf("<details"))).not.toContain('value="intake"');
+    expect(developer).toContain('value="intake"');
+    expect(developer.indexOf('value="intake"')).toBeLessThan(developer.indexOf("<pre"));
+    expect(developer).toContain("&quot;intake&quot;");
   });
 
   it("marks the draft's first step, and offers no set-first control there", () => {
@@ -183,11 +189,11 @@ describe("The step page's section set", () => {
   });
 
   it("stands every section open, so none carries a disclosure of its own", () => {
-    // A collapsible register would carry `aria-expanded` on each heading. Two
-    // disclosures sit elsewhere on the page, both labelled "Developer view":
-    // the native `<details>` pair over the step's read-only JSON, and the
-    // guard editor's own button, which `ConditionInput.tsx` builds for each
-    // automatic path.
+    // A collapsible register would carry `aria-expanded` on each heading.
+    // Disclosures labelled "Developer view" sit elsewhere on the page: the
+    // native `<details>` over the step's key and read-only JSON, one
+    // `<details>` per way-out row over its key, and the guard editor's own
+    // button, which `ConditionInput.tsx` builds for each automatic path.
     const headings = render().match(/<h3[^>]*>/g) ?? [];
 
     expect(headings.length).toBeGreaterThan(0);
@@ -365,8 +371,9 @@ describe("The step page's Developer view", () => {
     // A `<pre>` is not a control. Were the JSON editable here, the disclosure
     // would carry a `<textarea>` the way the JSON surface does.
     const html = render();
-    const disclosure = html.slice(html.indexOf("<details"));
+    const disclosure = html.slice(html.lastIndexOf("<details"));
 
+    expect(disclosure).toContain("Developer view");
     expect(disclosure).toContain("<pre");
     expect(disclosure).not.toContain("<textarea");
   });

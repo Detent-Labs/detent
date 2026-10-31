@@ -11,7 +11,8 @@ import { PathsPanel } from "../src/areas/studio/panels/PathsPanel.js";
  * `studio-condition-builder`: "A way out's row shows a "How it is taken"
  * control" and "A way out's guard stands under "Only when" for either trigger".
  * A manual path shows its guard editor and no `priority` input; an automatic
- * path keeps both. The context is hand-built, as in
+ * path keeps both. `studio-step-page`: "A way out reads as a sentence and
+ * keeps its key in its own Developer view". The context is hand-built, as in
  * `studio-actionListEditor-registryBadge.test.tsx`: a live `DraftProvider`
  * resolves its fetches async and never settles under `renderToStaticMarkup`.
  */
@@ -42,7 +43,7 @@ const FIELDS = [
 
 const STEPS = [
   { id: "step_a", key: "intake", type: "task" },
-  { id: "step_b", key: "approved", type: "task" },
+  { id: "step_b", key: "approved", type: "task", label: { en: "Done" } },
 ] as unknown as DraftStep[];
 
 const context: DraftContextValue = {
@@ -128,5 +129,56 @@ describe("an automatic path", () => {
   it("prints no JSON property name in a code element", () => {
     expect(html).not.toMatch(/<code[^>]*>priority<\/code>/);
     expect(html).not.toMatch(/<code[^>]*>onPath<\/code>/);
+  });
+});
+
+/** The `<h4>` heading each row opens with, or `undefined` where none stands. */
+function rowHeading(html: string): string | undefined {
+  return html.match(/<h4[^>]*>([^<]*)<\/h4>/)?.[1];
+}
+
+describe("a way out's heading sentence", () => {
+  it("reads the way out's name, an arrow and the target step's name", () => {
+    expect(rowHeading(render({}))).toBe("Approve → Done");
+  });
+
+  it("opens the row, ahead of the Name caption", () => {
+    const html = render({});
+
+    expect(html.indexOf("<h4")).toBeGreaterThan(-1);
+    expect(html.indexOf("<h4")).toBeLessThan(html.indexOf(">Name<"));
+  });
+
+  it("says an unnamed way out is unnamed", () => {
+    expect(rowHeading(render({ label: "" }))).toBe("(unnamed way out) → Done");
+    expect(rowHeading(render({ label: "   " }))).toBe("(unnamed way out) → Done");
+  });
+
+  it("falls to the target's key where the target has no name", () => {
+    expect(rowHeading(render({ to: "step_a" }))).toBe("Approve → intake");
+  });
+
+  it("says no step is chosen yet where the way out leads nowhere", () => {
+    expect(rowHeading(render({ to: undefined }))).toBe("Approve → (no step yet)");
+    expect(rowHeading(render({ to: "step_gone" }))).toBe("Approve → (no step yet)");
+  });
+});
+
+describe("a way out's key", () => {
+  const html = render({});
+  const details = html.indexOf("<details");
+
+  it("stands inside the row's own Developer view, closed until opened", () => {
+    expect(details).toBeGreaterThan(-1);
+    expect(html).not.toMatch(/<details[^>]*\sopen/);
+    expect(html.slice(details)).toMatch(/^<details[^>]*><summary[^>]*>Developer view<\/summary>/);
+  });
+
+  it("has no key input outside that disclosure", () => {
+    const keyInput = html.indexOf('value="approve"');
+
+    expect(keyInput).toBeGreaterThan(details);
+    expect(keyInput).toBeLessThan(html.indexOf("</details>"));
+    expect(html.slice(0, details)).not.toContain('value="approve"');
   });
 });

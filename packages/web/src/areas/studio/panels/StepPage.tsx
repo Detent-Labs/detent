@@ -216,7 +216,7 @@ const styles = stylex.create({
     boxShadow: `inset 0 -2px 0 ${colors.accent}`,
   },
   // The two columns. The leading one takes about three fifths: it carries
-  // Path to and Assignment, the pair an author reads first and changes most.
+  // Ways out and Who acts, the pair an author reads first and changes most.
   // The 1px track between them is the ledger rule (design.md).
   columns: {
     display: "grid",
@@ -234,19 +234,6 @@ const styles = stylex.create({
   gutter: {
     display: { default: "block", [NARROW]: "none" },
     backgroundColor: colors.border,
-  },
-  // LABEL carries prose that can run up to 40% longer in German; KEY carries
-  // a short slug. LABEL gets the wider column.
-  labelKeyRow: {
-    display: "grid",
-    gridTemplateColumns: { default: "minmax(0, 2fr) minmax(0, 1fr)", [NARROW]: "minmax(0, 1fr)" },
-    columnGap: space.s4,
-    rowGap: space.s2,
-  },
-  labelKeyColumn: {
-    display: "flex",
-    flexDirection: "column",
-    gap: space.s2,
   },
   // The 2px divider between sections down each column, the structural rule.
   section: {
@@ -278,7 +265,7 @@ const styles = stylex.create({
     minWidth: 0,
     marginBlock: 0,
   },
-  // The one word the Assignment section leads with. Mono only where it falls
+  // The one word the Who acts section leads with. Mono only where it falls
   // back to a registry type, which is a value the engine matches.
   plainWord: {
     marginBlock: 0,
@@ -319,6 +306,11 @@ const styles = stylex.create({
     textTransform: "uppercase",
     letterSpacing: "0.1em",
     color: colors.textMuted,
+  },
+  // The key input under the summary: the one writable control in the
+  // disclosure.
+  developerKey: {
+    marginBlockStart: space.s2,
   },
   developerId: {
     fontFamily: fonts.mono,
@@ -440,10 +432,10 @@ interface Props {
   onSelectStep: (stepId: string) => void;
   onRemoveStep: (stepId: string) => void;
   /** The path a canvas edge click selected: resolves to this step (its
-   * source) and highlights that row in the Path to section. */
+   * source) and highlights that row in the Ways out section. */
   selectedPathId?: string;
-  /** Navigates to the form editor's routed page for a step: the Step form
-   * fields section's "Build the form" control. */
+  /** Navigates to the form editor's routed page for a step: the Form
+   * section's "Build the form" control. */
   navigate: (stepId: string) => void;
   /** The processes a subprocess step may call. Empty until the fetch
    * resolves, and after a failed one. */
@@ -777,30 +769,18 @@ export function StepPage({
           </button>
         </div>
 
-        <div {...stylex.props(styles.labelKeyRow)}>
-          <div {...stylex.props(styles.labelKeyColumn)}>
-            <label {...stylex.props(styles.fieldLabel)}>
-              <span {...stylex.props(styles.fieldLabelText)}>{t("stepSections.labelField")}</span>
-              <LocalizedTextInput value={step.label} onChange={updateStepLabel} />
-            </label>
-            {/* Sibling of the label, never nested inside it: a <label> takes
-                phrasing content, and the design language keeps a field's own
-                messages beside the label. */}
-            {missingTranslationWarning(step.label, contentLocale, draft.baseLocale) && (
-              <p {...stylex.props(styles.warning)}>{missingTranslationWarning(step.label, contentLocale, draft.baseLocale)}</p>
-            )}
-          </div>
-
-          <label {...stylex.props(styles.fieldLabel)}>
-            <span {...stylex.props(styles.fieldLabelText)}>{t("stepSections.keyField")}</span>
-            <input
-              type="text"
-              {...stylex.props(styles.monoInput)}
-              value={step.key ?? ""}
-              onChange={(e) => updateStep({ key: e.target.value })}
-            />
-          </label>
-        </div>
+        {/* The name line takes the page's full width. The step's key stands
+            in the Developer view at the page foot. */}
+        <label {...stylex.props(styles.fieldLabel)}>
+          <span {...stylex.props(styles.fieldLabelText)}>{t("stepSections.labelField")}</span>
+          <LocalizedTextInput value={step.label} onChange={updateStepLabel} />
+        </label>
+        {/* Sibling of the label, never nested inside it: a <label> takes
+            phrasing content, and the design language keeps a field's own
+            messages beside the label. */}
+        {missingTranslationWarning(step.label, contentLocale, draft.baseLocale) && (
+          <p {...stylex.props(styles.warning)}>{missingTranslationWarning(step.label, contentLocale, draft.baseLocale)}</p>
+        )}
 
         <label {...stylex.props(styles.fieldLabel)}>
           <span {...stylex.props(styles.fieldLabelText)}>{t("stepSections.descriptionField")}</span>
@@ -878,7 +858,7 @@ export function StepPage({
         <div {...stylex.props(styles.column)}>{columns.trailing.map(renderSection)}</div>
       </div>
 
-      {/* Where Path to and Time limit stood on a step that is not an end. */}
+      {/* Where Ways out and Time limit stand on a step that is not an end. */}
       {performedBy === "terminal" && <p {...stylex.props(styles.note)}>{t("stepSections.terminalNoPathsOrTimers")}</p>}
 
       <nav {...stylex.props(styles.walk)} aria-label={t("stepPage.walkLabel")}>
@@ -902,12 +882,23 @@ export function StepPage({
         </button>
       </nav>
 
-      {/* The step's own JSON, read-only. A `<pre>` accepts no typing, so the
-          JSON surface stays the one place for hand-authoring a definition
-          (`studio-step-page`). The disclosure stands closed until an author
-          opens it, which is `<details>`'s own default. */}
+      {/* The step's key and its own JSON. The key input is the one writable
+          control here, and the JSON re-renders from the draft as it changes.
+          A `<pre>` accepts no typing, so the JSON surface stays the one place
+          for hand-authoring a definition (`studio-step-page`). The disclosure
+          stands closed until an author opens it, which is `<details>`'s own
+          default. */}
       <details {...stylex.props(styles.developer)}>
         <summary {...stylex.props(styles.developerSummary)}>{t("stepPage.developerView")}</summary>
+        <label {...stylex.props(styles.fieldLabel, styles.developerKey)}>
+          <span {...stylex.props(styles.fieldLabelText)}>{t("stepSections.keyField")}</span>
+          <input
+            type="text"
+            {...stylex.props(styles.monoInput)}
+            value={step.key ?? ""}
+            onChange={(e) => updateStep({ key: e.target.value })}
+          />
+        </label>
         <p {...stylex.props(styles.developerId)}>
           {t("stepSections.idField")} {step.id}
         </p>

@@ -7,6 +7,7 @@ import type { DraftOf } from "../draft/types";
 import type { DraftField } from "../draft/fields";
 import { newPath, pathWithTrigger, triggerForNewPath } from "../draft/createPath";
 import { removeAt, replaceAt, updateAt } from "../draft/list-ops";
+import { resolveDraftLocalizedText } from "../draft/localized-text";
 import { t } from "../catalog.js";
 import { ConditionInput } from "./shared/ConditionInput";
 import { IssueList } from "./shared/IssueList";
@@ -15,11 +16,6 @@ import type { ConfigFieldDescriptor } from "../api/types.js";
 
 type DraftPath = DraftOf<Path>;
 type DraftStep = DraftOf<Step>;
-
-/** The width below which two columns are too narrow. The page falls to one,
- * and the gutter rule goes with the second column. The steps rail turns at
- * this same width (design.md). */
-const NARROW = "@media (max-width: 64rem)";
 
 const styles = stylex.create({
   pathsPanel: {
@@ -56,15 +52,35 @@ const styles = stylex.create({
     fontFamily: fonts.mono,
     fontSize: "0.8rem",
   },
-  // Copied from `StepPage.tsx`'s masthead rather than imported: compiled
-  // StyleX styles stay beside their own module (design.md). LABEL carries
-  // prose that can run up to 40% longer in German; KEY carries a short slug.
-  // LABEL gets the wider column.
-  labelKeyRow: {
-    display: "grid",
-    gridTemplateColumns: { default: "minmax(0, 2fr) minmax(0, 1fr)", [NARROW]: "minmax(0, 1fr)" },
-    columnGap: space.s4,
-    rowGap: space.s2,
+  // The row's heading sentence: the way out's name, an arrow, the target
+  // step. Body face, bold; text, not a control.
+  rowHeading: {
+    marginBlockStart: 0,
+    marginBlockEnd: space.s2,
+    marginInline: 0,
+    fontFamily: fonts.body,
+    fontSize: "1rem",
+    fontWeight: 800,
+    overflowWrap: "anywhere",
+  },
+  // Copied from `StepPage.tsx`'s Developer view rather than imported:
+  // compiled StyleX styles stay beside their own module (design.md).
+  developer: {
+    paddingBlock: space.s2,
+    marginBlock: space.s2,
+    borderTopWidth: 1,
+    borderTopStyle: "solid",
+    borderTopColor: colors.border,
+  },
+  developerSummary: {
+    cursor: "pointer",
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: "0.1em",
+    color: colors.textMuted,
+  },
+  developerKey: {
+    marginBlockStart: space.s2,
   },
   // The studio select: a native `<select>` with its UA chevron dropped in
   // favor of a decorative `ChevronDown` layered over the trailing edge.
@@ -235,6 +251,19 @@ export function PathsPanel({
     setNewPathTarget("");
   };
 
+  /** The row's heading sentence (design.md D4). The target reads its label in
+   * the content locale, then its key, then its id, the way the select prints
+   * a step. */
+  const rowHeading = (path: DraftPath): string => {
+    const pathLabel = path.label?.trim() ? path.label : t("paths.unnamedPath");
+    const target = path.to === undefined || path.to === "" ? undefined : steps.find((s) => s.id === path.to);
+    const targetLabel =
+      target === undefined
+        ? t("paths.noTargetYet")
+        : resolveDraftLocalizedText(target.label, contentLocale, baseLocale)?.trim() || target.key || target.id || t("paths.noTargetYet");
+    return t("paths.rowHeading").replace("{path}", pathLabel).replace("{step}", targetLabel);
+  };
+
   const removePath = (index: number) => onChange(removeAt(list, index));
   const updatePath = (index: number, patch: Partial<DraftPath>) => onChange(updateAt(list, index, patch));
   // A whole-path replace, not a patch: `updateAt` merges, so it cannot drop
@@ -249,29 +278,18 @@ export function PathsPanel({
           {...stylex.props(styles.pathRow, path.id !== undefined && path.id === selectedPathId && styles.pathRowSelected)}
           key={path.id ?? index}
         >
-          <div {...stylex.props(styles.labelKeyRow)}>
-            <label {...stylex.props(styles.fieldLabel)}>
-              <span {...stylex.props(styles.fieldLabelText)}>
-                {t("paths.labelCaption")}
-              </span>
-              <input
-                type="text"
-                value={path.label ?? ""}
-                onChange={(e) => updatePath(index, { label: e.target.value })}
-              />
-            </label>
-            <label {...stylex.props(styles.fieldLabel)}>
-              <span {...stylex.props(styles.fieldLabelText)}>
-                {t("paths.keyCaption")}
-              </span>
-              <input
-                type="text"
-                {...stylex.props(styles.monoInput)}
-                value={path.key ?? ""}
-                onChange={(e) => updatePath(index, { key: e.target.value })}
-              />
-            </label>
-          </div>
+          {/* An h4: the step page's section heading above is an h3. */}
+          <h4 {...stylex.props(styles.rowHeading)}>{rowHeading(path)}</h4>
+          <label {...stylex.props(styles.fieldLabel)}>
+            <span {...stylex.props(styles.fieldLabelText)}>
+              {t("paths.labelCaption")}
+            </span>
+            <input
+              type="text"
+              value={path.label ?? ""}
+              onChange={(e) => updatePath(index, { label: e.target.value })}
+            />
+          </label>
           <label {...stylex.props(styles.fieldLabel)}>
             <span {...stylex.props(styles.fieldLabelText)}>
               {t("paths.toCaption")}
@@ -297,7 +315,7 @@ export function PathsPanel({
             </span>
           </label>
 
-          {/* "triggered by": a two-option restyle of the existing `trigger`
+          {/* "How it is taken": a two-option restyle of the existing `trigger`
               field (studio-condition-builder). Sets the same field the plain
               select used to set; adds nothing new. */}
           <fieldset {...stylex.props(styles.studioSegmented)} aria-label={t("paths.triggeredByLabel")}>
@@ -365,6 +383,24 @@ export function PathsPanel({
           />
 
           <IssueList entityId={path.id} />
+
+          {/* The way out's key, one disclosure away and still writable. It
+              stands closed until an author opens it, `<details>`'s own
+              default. */}
+          <details {...stylex.props(styles.developer)}>
+            <summary {...stylex.props(styles.developerSummary)}>{t("paths.developerView")}</summary>
+            <label {...stylex.props(styles.fieldLabel, styles.developerKey)}>
+              <span {...stylex.props(styles.fieldLabelText)}>
+                {t("paths.keyCaption")}
+              </span>
+              <input
+                type="text"
+                {...stylex.props(styles.monoInput)}
+                value={path.key ?? ""}
+                onChange={(e) => updatePath(index, { key: e.target.value })}
+              />
+            </label>
+          </details>
 
           <button type="button" className="btn btn-secondary" onClick={() => removePath(index)}>
             {t("paths.removePath")}
