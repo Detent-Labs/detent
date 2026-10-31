@@ -78,8 +78,8 @@ function render(path: Record<string, unknown>): string {
   );
 }
 
-// The caption: plain words, then the JSON property in a mono `<code>` (`ui-string-overrides`).
-const PRIORITY_INPUT = /<label>Tried in this order, lowest first <code[^>]*>priority<\/code><input/;
+// A caption prints its catalog words alone; no `<code>` JSON property follows (`ui-string-overrides`).
+const PRIORITY_INPUT = /<label>Tried in this order, lowest first<input/;
 const NOTE = "The person sees this way out&#x27;s button only while the condition holds.";
 
 describe("a manual path with a guard", () => {
@@ -123,5 +123,10 @@ describe("an automatic path", () => {
   it("carries no manual-path note", () => {
     expect(html).not.toContain(NOTE);
     expect(html).not.toContain("Leave it empty to always offer this way out.");
+  });
+
+  it("prints no JSON property name in a code element", () => {
+    expect(html).not.toMatch(/<code[^>]*>priority<\/code>/);
+    expect(html).not.toMatch(/<code[^>]*>onPath<\/code>/);
   });
 });

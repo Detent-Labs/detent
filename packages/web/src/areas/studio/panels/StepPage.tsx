@@ -21,7 +21,6 @@ import { childVersionFor } from "../draft/subprocessSpec";
 import { PathsPanel } from "./PathsPanel";
 import { TimersPanel } from "./TimersPanel";
 import { IssueItems, NotCheckedBadge } from "./shared/IssueList";
-import { KeyCaption } from "./shared/KeyCaption";
 import { LocalizedTextInput } from "./shared/LocalizedTextInput";
 import { parseChildProcessJson } from "../draft/io";
 import { missingTranslationWarning } from "../draft/localized-text";
@@ -557,7 +556,7 @@ export function StepPage({
       case "entry":
         return (
           <ActionListEditor
-            label={<KeyCaption text={t("steps.onEntryLegend")} jsonKey="onEntry" />}
+            label={t("steps.onEntryLegend")}
             actions={step.onEntry}
             fields={fields}
             registryTypes={registry?.actionTypes}
@@ -674,7 +673,7 @@ export function StepPage({
         return (
           <>
             <ActionListEditor
-              label={<KeyCaption text={t("steps.onExitLegend")} jsonKey="onExit" />}
+              label={t("steps.onExitLegend")}
               actions={step.onExit}
               fields={fields}
               registryTypes={registry?.actionTypes}
@@ -682,7 +681,7 @@ export function StepPage({
               onChange={(onExit) => updateStep({ onExit })}
             />
             <ActionListEditor
-              label={<KeyCaption text={t("steps.onCancelLegend")} jsonKey="onCancel" />}
+              label={t("steps.onCancelLegend")}
               actions={step.onCancel}
               fields={fields}
               registryTypes={registry?.actionTypes}
