@@ -31,7 +31,7 @@ export function collectFieldIds(body: unknown): Set<string> {
 /**
  * Fetches one version body and reports its field ids through `onLoaded`.
  * Answers the cancel function an effect cleanup calls: a response that lands
- * after it reports nothing, the way `ChangesView.tsx` guards its own fetch.
+ * after it reports nothing, the way `PublishChanges.tsx` guards its own fetch.
  * A failed fetch reports nothing, so the caller keeps reading `undefined`.
  */
 export function watchPublishedFieldIds(

@@ -1,6 +1,6 @@
 /**
- * The Access tab's body: a process's Developer, Owner and Reader lists
- * (`studio-app`'s Access-surface requirement). Reaching this tab at all
+ * The Settings tab's Access view: a process's Developer, Owner and Reader
+ * lists (`studio-app`'s Access-surface requirement). Reaching this view at all
  * already needs Developer-list-or-admin standing, per the edit screen's own
  * gate (`process-drafts`) — this panel adds no visibility gate of its own. It
  * only decides which lists offer add/delete controls, from the actor's own
@@ -21,7 +21,7 @@ import type { AccessKind, MyProcessAccess, ProcessAccessLists } from "../api/typ
 
 /**
  * The `.studio-empty` and `.studio-error-banner*` shapes, both from
- * `app.css`. Duplicated on purpose, the same as `ChangesView.tsx` (D9):
+ * `app.css`. Duplicated on purpose (D9):
  * component styles compile per file, and this same shape already appears
  * near-identically in other studio files.
  */

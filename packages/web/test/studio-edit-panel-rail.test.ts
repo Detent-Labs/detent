@@ -2,8 +2,6 @@ import { describe, expect, it } from "bun:test";
 import {
   flattenRailFields,
   issueCountForEntityId,
-  issueCountForSource,
-  panelEntityCounts,
   stepEntityIds,
 } from "../src/areas/studio/draft/panel-rail.js";
 import type { DraftField } from "../src/areas/studio/draft/fields.js";
@@ -109,31 +107,6 @@ describe("stepEntityIds", () => {
   });
 });
 
-describe("issueCountForSource", () => {
-  it("counts only issues with the given source", () => {
-    // A `checkViewFlags` finding and an engine finding can share `entityType:
-    // "step"`, a collision an `entityType` filter cannot resolve for the
-    // field matrix's rail badge.
-    const issues = [
-      issue("step", STEP, "view"),
-      issue("step", STEP, "cel"),
-      issue("path", PATH, "view"),
-      issue("step", STEP, "structural"),
-    ];
-    expect(issueCountForSource(issues, "view")).toBe(2);
-    expect(issueCountForSource(issues, "cel")).toBe(1);
-  });
-
-  it("reads zero for a draft with no issue of that source", () => {
-    expect(issueCountForSource([issue("step", STEP, "cel")], "view")).toBe(0);
-  });
-
-  it("counts a field-anchored view finding toward the field matrix's badge, technical-field-marker's unwritten-technical-field finding included", () => {
-    const issues = [issue("field", LEAF, "view"), issue("step", STEP, "cel")];
-    expect(issueCountForSource(issues, "view")).toBe(1);
-  });
-});
-
 describe("issueCountForEntityId", () => {
   it("counts only issues resolved to the given entity", () => {
     const issues = [issue("field", LEAF), issue("field", LEAF), issue("field", OUTER)];
@@ -143,28 +116,5 @@ describe("issueCountForEntityId", () => {
 
   it("reads zero for an entity with no issue", () => {
     expect(issueCountForEntityId([issue("field", LEAF)], OUTER)).toBe(0);
-  });
-});
-
-describe("panelEntityCounts", () => {
-  it("counts the matrix's live cells as the total field-entry count across every step, a note raising none of it", () => {
-    const draft = {
-      fields: [{ id: LEAF, key: "city", type: "string" }],
-      dataSources: [],
-      contract: { outcomes: [] },
-      workflow: {
-        steps: [
-          { view: { fields: [{ ref: LEAF }, { ref: LEAF }, { kind: "note", text: { en: "Note" } }] } },
-          { view: { fields: [{ ref: LEAF }] } },
-          {},
-        ],
-      },
-    } as any;
-    expect(panelEntityCounts(draft).matrix).toBe(3);
-  });
-
-  it("reads zero for a draft with no view entries anywhere", () => {
-    const draft = { fields: [], dataSources: [], contract: {}, workflow: { steps: [{}, {}] } } as any;
-    expect(panelEntityCounts(draft).matrix).toBe(0);
   });
 });

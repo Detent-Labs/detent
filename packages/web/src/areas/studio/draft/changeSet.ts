@@ -1,5 +1,5 @@
 /**
- * The change list both the Changes tab and the Versions screen show: two
+ * The change list the publish dialog and the Versions screen show: two
  * process bodies turned into grouped, worded entity rows (`studio-app`'s
  * Changes-view requirement, `process-version-inspection`).
  *
@@ -1024,7 +1024,7 @@ function contractRows(sb: Side, sa: Side): ChangeRow[] {
   out.properties.push(...keyProperties(b, a, CONTRACT_LISTS, ctx));
   out.raw.push(...rawOf(omit(b, CONTRACT_LISTS), omit(a, CONTRACT_LISTS), ctx));
   if (b && a && out.properties.length === 0) return [];
-  return [row("contract", "contract", kindOf(b, a), t("tabs.contract"), out)];
+  return [row("contract", "contract", kindOf(b, a), t("changeList.group.contract"), out)];
 }
 
 function processRows(sb: Side, sa: Side): ChangeRow[] {

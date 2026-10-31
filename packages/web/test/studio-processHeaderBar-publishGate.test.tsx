@@ -117,12 +117,12 @@ function renderHeader(over: {
         conflict={over.conflict ?? false}
         actions={{ ...noActions, ...over.actions }}
         canPublish={over.canPublish ?? true}
-        baseVersion={over.baseVersion ?? 3}
+        baseVersion={over.baseVersion === undefined ? 3 : over.baseVersion}
         validation={validationOf(over.issues ?? [], over.zodValid ?? true)}
         processLabel="Expense approval"
         structureActive={true}
         processId="proc_a"
-        go={() => {}}
+        token="token"
         onToggleJson={() => {}}
         onVersions={() => {}}
         onPlayer={() => {}}
@@ -240,6 +240,19 @@ describe("The publish dialog", () => {
   it("states the unsaved-changes sentence only when the draft is dirty", () => {
     expect(renderHeader({ actions: { pendingDialog: "publish" } })).not.toContain("Publishing saves them first");
     expect(renderHeader({ isDirty: true, actions: { pendingDialog: "publish" } })).toContain("Publishing saves them first");
+  });
+
+  // A static render fires no effect, so the base body's read never starts and
+  // the row stands in its reading state.
+  it("carries the Changes row: reading the base version, or a first version", () => {
+    const reading = renderHeader({ actions: { pendingDialog: "publish" } });
+    expect(reading).toContain(">Changes<");
+    expect(reading).toContain("Reading version 3…");
+    expect(reading).not.toContain("<details");
+
+    const first = renderHeader({ baseVersion: null, actions: { pendingDialog: "publish" } });
+    expect(first).toContain("This publish mints the first version.");
+    expect(first).not.toContain("<details");
   });
 
   it("renders a refusal inside the open dialog, never behind it", () => {

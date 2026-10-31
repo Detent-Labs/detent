@@ -83,7 +83,7 @@ describe("The checks rail's start state", () => {
     noStepYet: true,
     dimensions: { ...clear.dimensions, duration: "not-run", structural: "not-run" },
   };
-  const SENTENCE = "No step yet. Add the first step on the Canvas or the Steps tab.";
+  const SENTENCE = "No step yet. Add the first step on the Map tab or the Steps tab.";
 
   it("renders the sentence alone, with no group and no validator name", () => {
     const html = renderToStaticMarkup(<ChecksRail validation={stepless} canPublish={true} />);

@@ -1,13 +1,13 @@
 /**
- * The change list: the folded register the Changes tab and the Versions
- * screen draw over `describeChanges`' rows (`studio-app`'s Changes-view
- * requirement, `process-version-inspection`).
+ * The change list: the folded register the publish dialog and the Versions
+ * screen draw over `describeChanges`' rows (`studio-app`'s change-list
+ * requirements, `process-version-inspection`).
  *
  * One row per changed entity, under its group's heading. A row is a native
  * `<details>`. Its `<summary>` is the row's one place in the tab order and its
- * disclosure control, so nothing interactive sits inside it: the open command
- * is a separate button inside the open row. A folded row still carries its
- * content in markup, and the browser hides it.
+ * disclosure control, so nothing interactive sits inside it. A row offers no
+ * command that opens a tab. A folded row still carries its content in markup,
+ * and the browser hides it.
  *
  * The open state is a set of row keys held here. A caller that stays mounted
  * keeps it across a recompute, and a key that leaves the list stops matching.
@@ -27,13 +27,6 @@ import {
 } from "../draft/changeSet.js";
 import type { DiffEntry } from "../screens/versionDiffLogic.js";
 
-// The open command's button pulls back by this sum so its text stands flush
-// with the property names: `.btn-ghost`'s inline padding (`space.s1`) plus
-// `.btn`'s 1px border. `openCommandFlush` and `body`'s narrow-width padding
-// both read this one constant, so the pull-back and its restore cannot drift
-// apart.
-const OPEN_COMMAND_PULL_BACK = `${space.s1} + 1px`;
-
 const styles = stylex.create({
   headingLine: {
     display: "flex",
@@ -48,9 +41,8 @@ const styles = stylex.create({
   },
   // The authoring command (`DESIGN.md` Buttons): a ghost button in slate,
   // mono at 11px. It composes over `btn btn-ghost`, whose accent it replaces.
-  // An open command names a mono key that can outrun a 400px column, so its
-  // label wraps anywhere. Under the pointer and while pressed its text turns
-  // to ink, `colors.text`, over the hover wash and the press wash.
+  // Its label wraps anywhere. Under the pointer and while pressed its text
+  // turns to ink, `colors.text`, over the hover wash and the press wash.
   command: {
     fontFamily: fonts.mono,
     fontSize: 11,
@@ -177,17 +169,13 @@ const styles = stylex.create({
   chevron: {
     flex: "none",
   },
-  // Below 40rem, `openCommandFlush` pulls the open command's button back by
-  // `OPEN_COMMAND_PULL_BACK`, past the tab body's own padding, which
-  // otherwise grants every control in this box the ring's reach
-  // (`EditScreen.tsx`'s `tabBody`). This padding restores that same amount
-  // for the pulled-back button, moving the property names over by it too so
-  // the two stay flush.
+  // The body's values line up under the identity column. Below 40rem they
+  // start at the row's own edge.
   body: {
     paddingBlockEnd: space.s3,
     paddingInlineStart: {
       default: `calc(5.5rem + ${space.s4})`,
-      "@media (max-width: 40rem)": `calc(${OPEN_COMMAND_PULL_BACK})`,
+      "@media (max-width: 40rem)": 0,
     },
   },
   // Name, before, arrow, after. Each value column takes its widest value up to
@@ -242,15 +230,6 @@ const styles = stylex.create({
   },
   quiet: {
     color: colors.textMuted,
-  },
-  openCommand: {
-    marginBlockStart: space.s2,
-  },
-  // `.btn-ghost`'s inline padding and `.btn`'s 1px border would set the open
-  // command's text right of the property names. This command alone pulls
-  // back by `OPEN_COMMAND_PULL_BACK`, so its text stands flush left.
-  openCommandFlush: {
-    marginInlineStart: `calc(-1 * (${OPEN_COMMAND_PULL_BACK}))`,
   },
   developer: {
     marginBlockStart: space.s2,
@@ -308,26 +287,16 @@ const styles = stylex.create({
   },
 });
 
-/** Six headings repeat the tab names, read through the tab row's own keys. */
+/** Three headings repeat a tab's name through the tab row's own key. The
+ * other four read the change list's own words. */
 const GROUP_HEADING: Record<ChangeGroup, CatalogKey> = {
   process: "changeList.group.process",
   fields: "tabs.fields",
-  dataSources: "tabs.dataSources",
+  dataSources: "changeList.group.dataSources",
   steps: "tabs.steps",
-  paths: "tabs.paths",
+  paths: "changeList.group.paths",
   forms: "tabs.forms",
-  contract: "tabs.contract",
-};
-
-/** No single tab holds the process's own keys, so the Process row has none. */
-const OPEN_COMMAND: Record<ChangeGroup, CatalogKey | undefined> = {
-  process: undefined,
-  fields: "changeList.open.fields",
-  dataSources: "changeList.open.dataSources",
-  steps: "changeList.open.steps",
-  paths: "changeList.open.paths",
-  forms: "changeList.open.forms",
-  contract: "changeList.open.contract",
+  contract: "changeList.group.contract",
 };
 
 const STAMP: Record<ChangeKind, { word: CatalogKey; tone: stylex.StyleXStyles }> = {
@@ -341,19 +310,19 @@ const FOLDED_NAMES = 4;
 
 interface Props {
   rows: ChangeRow[];
-  /** The line naming the comparison, its version numbers already filled. */
-  heading: string;
-  /** What a row's open command does. Without it no row offers one. */
-  onOpenRow?: (row: ChangeRow) => void;
+  /** The line naming the comparison, its version numbers already filled.
+   * Omitted, the list renders no heading element: the publish dialog's
+   * Changes row names the version in its sentence. */
+  heading?: string;
 }
 
 // ponytail: every row renders its body and its Developer view's JSON into
 // markup, folded or not, with no windowing. Ceiling: a very large diff, such
 // as hundreds of rows after an import, renders slowly. Upgrade: window the
 // rows, or mount a row's body only while it stands open (design D6, Risks).
-// A `memo` component: `ChangesView` holds its props while the Changes tab is
-// hidden, so the list skips every keystroke on another tab.
-export const ChangeList = memo(function ChangeList({ rows, heading, onOpenRow }: Props) {
+// A `memo` component: a caller that memoizes its rows keeps the list from
+// re-rendering on a render that leaves them as they were.
+export const ChangeList = memo(function ChangeList({ rows, heading }: Props) {
   const listId = useId();
   const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set());
   const allOpen = rows.length > 0 && rows.every((row) => open.has(row.key));
@@ -372,7 +341,7 @@ export const ChangeList = memo(function ChangeList({ rows, heading, onOpenRow }:
   return (
     <div>
       <div {...stylex.props(styles.headingLine)}>
-        <h2 {...stylex.props(styles.heading)}>{heading}</h2>
+        {heading !== undefined && <h2 {...stylex.props(styles.heading)}>{heading}</h2>}
         {rows.length > 0 && (
           <button
             type="button"
@@ -398,7 +367,7 @@ export const ChangeList = memo(function ChangeList({ rows, heading, onOpenRow }:
               <ul {...stylex.props(styles.list)}>
                 {groupRows.map((row) => (
                   <li key={row.key} {...stylex.props(styles.item)}>
-                    <Row row={row} open={open.has(row.key)} onToggle={(next) => toggle(row.key, next)} onOpenRow={onOpenRow} />
+                    <Row row={row} open={open.has(row.key)} onToggle={(next) => toggle(row.key, next)} />
                   </li>
                 ))}
               </ul>
@@ -414,14 +383,12 @@ interface RowProps {
   row: ChangeRow;
   open: boolean;
   onToggle: (open: boolean) => void;
-  onOpenRow?: (row: ChangeRow) => void;
 }
 
-function Row({ row, open, onToggle, onOpenRow }: RowProps) {
+function Row({ row, open, onToggle }: RowProps) {
   const stamp = STAMP[row.kind];
   const named = row.properties.slice(0, FOLDED_NAMES);
   const more = row.properties.length - named.length;
-  const openKey = onOpenRow ? OPEN_COMMAND[row.group] : undefined;
   const Chevron = open ? ChevronDown : ChevronRight;
 
   return (
@@ -463,14 +430,6 @@ function Row({ row, open, onToggle, onOpenRow }: RowProps) {
               <PropertyEntry key={i} property={property} />
             ))}
           </dl>
-        )}
-        {openKey !== undefined && onOpenRow && (
-          <div {...stylex.props(styles.openCommand)}>
-            <button type="button" {...ghost(styles.command, styles.openCommandFlush)} onClick={() => onOpenRow(row)}>
-              {/* A function fills each slot, so a `$` pattern in a label prints as written. */}
-              {t(openKey).replace("{label}", () => row.label)}
-            </button>
-          </div>
         )}
         <details {...stylex.props(styles.developer)}>
           <summary {...stylex.props(styles.developerSummary)}>{t("changeList.developerView")}</summary>

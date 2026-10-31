@@ -559,13 +559,6 @@ word. `ROADMAP.md` carries stage-by-stage status.
   still gives the way out's key the masthead's mono treatment inside the row.
   The key sits in the row's Developer view now, and the spec sweep covers that
   prose too. A spec sweep wants its own OpenSpec change.
-- **The glossary and the live spec name the Access tab differently.**
-  `.claude/rules/ui-glossary.md` names it "Access tab", over
-  `panels/AccessPanel.tsx`. `openspec/specs/studio-app/spec.md:4675`,
-  `:4677` and `:4695` say "Access surface" instead, and so does the catalog
-  comment at `packages/web/src/i18n/catalogs/studio.ts:1062`. This change
-  leaves the spec and the comment as they stand. A spec sweep to match the
-  glossary wants its own OpenSpec change.
 - **Five literal `#726e6e` sites want the new `colors.dormant` role.**
   `changes-tab-entity-change-list` gave the dormant tone a token,
   `--color-dormant` in `tokens.css` and `colors.dormant` in
@@ -1792,6 +1785,58 @@ this section.
 - **START-3: the name sentence names no locale.** It misleads when
   `baseLocale` is not `en`. An author who typed an English name still reads
   "The process needs a name". Change 12's message map should carry the locale.
+
+## Open from studio-six-tabs (needs its own OpenSpec change)
+
+- **Live specs still name the retired tabs.** The sync of `studio-six-tabs`
+  rewrites only the requirements its delta names. The others still say
+  "Canvas tab", "Field matrix tab" or "Paths tab". The line numbers below
+  hold before that sync, and the sync shifts them. A spec sweep wants its own
+  OpenSpec change.
+  - In `openspec/specs/studio-app/spec.md`, five field matrix requirements
+    say "Field matrix tab". They are the bulk toggles at `:2255` and the
+    toolbar at `:2395`. The legend stands at `:2464` and `:2483`, and the
+    empty result at `:4266`. The height stands at `:4338`, `:4353`,
+    `:4358`, `:4365` and `:4371`.
+  - In the same spec, the form editor's load requirement says "Canvas tab"
+    at `:4965`.
+  - In `openspec/specs/studio-canvas/spec.md`, "Canvas tab" stands at
+    `:1115`, `:1146`, `:1154`, `:1161`, `:1172`, `:1179` and `:1190`. It
+    also stands at `:1201`, `:1204`, `:1206`, `:1218`, `:1227`, `:1233` and
+    `:1237`. The last seven sites are `:1276`, `:1357`, `:1436`, `:1623`,
+    `:3055`, `:3066` and `:3160`.
+  - In the same spec, "Paths tab" stands at `:273`, `:1623` and `:3030`.
+
+- **The Settings tab's inherited bodies still speak the engine's words.** The
+  `/impeccable critique` of `studio-six-tabs` (2026-10-31) found the sub-row
+  in the author's words and three bodies under it in the engine's. Where
+  values come from opens on the heading "Data sources", a mono key, a plugin
+  row with labels beside the controls, and a "Settings (JSON)" text area.
+  What it takes in and gives back opens on "Contract", then `inputFields`
+  and `outputFields` as a wall of checkboxes. Access asks for `user_xxx or
+  group_xxx`. Change 11 (`studio-field-card`) moves the sources into the
+  Fields sub-row. No change in stage 64 owns the contract editor or the
+  access lists. The critique's sketch: one checkbox sentence "Another
+  process can call this one", two fieldsets in the entity-rail row style,
+  outcomes as ruled rows; a picker over users and groups by display name.
+- **The add-locale input has no label.** `panels/shared/ContentLocaleSwitcher.tsx`
+  gives it a placeholder alone, "add locale (e.g. de)". `studio-six-tabs`
+  moved it onto the Settings tab's Process view without changing it. The
+  `/impeccable audit` of 2026-10-31 rates it P2. The critique proposes one
+  "Languages" fieldset: "Written first in" as a select of language names,
+  the added languages as ruled rows, "Add a language" as a labelled select.
+- **Forced colors drop the open mark on every tab strip.** Under
+  `forced-colors: active` the sub-row's inset `box-shadow` and the tab
+  row's `::after` bar both vanish, and weight 800 stays the only cue. The
+  audit of 2026-10-31 counts eight sites with the same technique. A fix
+  draws the mark with a border or an outline, which forced colors keep.
+- **"Show on the canvas" names the Map tab's surface.** The field catalog's
+  "Used in" rows read "Show on the canvas" (`fieldCatalog.showOnCanvas`),
+  and the spec names the control by that string. The tab reads Map since
+  `studio-six-tabs`. Change 5 (`studio-map-labels`) owns the Map's words
+  and takes the rename, with the spec sentence in `studio-app`. The matrix
+  row headers still print keys alone beside the Catalog's labels; change 11
+  owns the matrix's words.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 

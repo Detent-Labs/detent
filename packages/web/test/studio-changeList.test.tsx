@@ -5,11 +5,11 @@ import type { ChangeProperty, ChangeRow } from "../src/areas/studio/draft/change
 
 /**
  * The folded register `panels/ChangeList.tsx` draws (`studio-app`'s
- * Changes-view requirement, design D6 and D9).
+ * change-list requirements, `studio-six-tabs` design D7).
  *
  * A folded `<details>` still carries its content in markup, so a static render
- * reads every row's open command. Each negative case also asserts its row
- * drew, so empty markup passes none of them.
+ * reads every row's body. Each negative case also asserts its row drew, so
+ * empty markup passes none of them.
  */
 
 function changed(name: string): ChangeProperty {
@@ -75,26 +75,32 @@ describe("The change list", () => {
     expect(text).toContain("Forwarding address forwarding_address");
   });
 
-  it("offers no open command without onOpenRow", () => {
-    const html = renderToStaticMarkup(<ChangeList rows={[fieldRow]} heading={HEADING} />);
+  it("offers no open command in any row: the one button is Expand all", () => {
+    const rows = [processRow, fieldRow, formRow];
+    const html = renderToStaticMarkup(<ChangeList rows={rows} heading={HEADING} />);
 
-    expect(html).toContain("Forwarding address");
-    expect(html).not.toContain("in the Fields tab");
+    for (const row of rows) expect(html).toContain(row.label);
+    expect(html).not.toContain("Open ");
+    expect(html).not.toContain(" tab<");
     expect(buttons(html)).toBe(1);
+    expect(html).toMatch(/<button\b[^>]*>Expand all<\/button>/);
   });
 
-  it("offers no open command on the Process row, even with onOpenRow", () => {
-    const html = renderToStaticMarkup(<ChangeList rows={[processRow]} heading={HEADING} onOpenRow={() => {}} />);
+  it("heads the data source, path and contract groups with the change list's own words", () => {
+    const row = (group: ChangeRow["group"], label: string): ChangeRow => ({
+      key: `${group}:${label}`,
+      group,
+      kind: "added",
+      label,
+      properties: [],
+      raw: [],
+    });
+    const html = renderToStaticMarkup(
+      <ChangeList rows={[row("dataSources", "people"), row("paths", "Send"), row("contract", "Contract")]} heading={HEADING} />,
+    );
+    const headings = [...html.matchAll(/<h3\b[^>]*>(.*?)<span/g)].map((m) => m[1]);
 
-    expect(html).toContain("Employee exit");
-    expect(buttons(html)).toBe(1);
-  });
-
-  it("carries the Fields row's open command in its folded markup when onOpenRow is given", () => {
-    const html = renderToStaticMarkup(<ChangeList rows={[fieldRow]} heading={HEADING} onOpenRow={() => {}} />);
-
-    expect(html).toContain("Open Forwarding address in the Fields tab");
-    expect(buttons(html)).toBe(2);
+    expect(headings).toEqual(["Where values come from", "Ways out", "What it takes in and gives back"]);
   });
 
   it("prints a label and a step name holding a `$` pattern as written", () => {
@@ -108,9 +114,9 @@ describe("The change list", () => {
       properties: [changed("Target")],
       raw: [],
     };
-    const html = renderToStaticMarkup(<ChangeList rows={[priced, sent]} heading={HEADING} onOpenRow={() => {}} />);
+    const html = renderToStaticMarkup(<ChangeList rows={[priced, sent]} heading={HEADING} />);
 
-    expect(html).toContain("Open Price in $&#x27;s in the Fields tab");
+    expect(html).toContain("Price in $&#x27;s");
     expect(html).toContain("From Step $&amp;");
   });
 
@@ -122,5 +128,21 @@ describe("The change list", () => {
     expect(command).toContain('aria-expanded="false"');
     expect(controls).toBeDefined();
     expect(html).toContain(`id="${controls}"`);
+  });
+
+  it("renders its heading as an h2 when a caller passes one", () => {
+    const html = renderToStaticMarkup(<ChangeList rows={[fieldRow]} heading={HEADING} />);
+
+    expect(html).toContain(`<h2`);
+    expect(html).toContain(HEADING);
+  });
+
+  it("renders no h2 when the caller passes no heading, as the publish dialog does", () => {
+    const html = renderToStaticMarkup(<ChangeList rows={[fieldRow]} />);
+
+    // The row drew, so empty markup cannot pass.
+    expect(html).toContain("Forwarding");
+    expect(html).not.toContain("<h2");
+    expect(html).not.toContain(HEADING);
   });
 });

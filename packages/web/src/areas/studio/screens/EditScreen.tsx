@@ -13,14 +13,9 @@ import { useDraftToolbarActions } from "../panels/DraftToolbar.js";
 import { ProcessHeaderBar } from "../panels/ProcessHeaderBar.js";
 import { ProcessTabRow, scrollTabIntoRow, tabDomId, tabPanelDomId } from "../panels/ProcessTabRow.js";
 import { ChecksRail } from "../panels/ChecksRail.js";
-import { FieldsTab, DataSourcesTab } from "../panels/EntityTabs.js";
-import { ContractPanel } from "../panels/ContractPanel.js";
-import { FieldMatrixPanel } from "../panels/FieldMatrixPanel.js";
-import { ChangesView } from "../panels/ChangesView.js";
-import { HeldDraft } from "../draft/held-while-hidden.js";
-import { PathsView } from "../panels/PathsView.js";
+import { FieldsTabViews } from "../panels/FieldsTabViews.js";
+import { SettingsTab } from "../panels/SettingsTab.js";
 import { FormsTab } from "../panels/FormsTab.js";
-import { AccessPanel } from "../panels/AccessPanel.js";
 import { RestoreNotice } from "../panels/RestoreNotice.js";
 import { clearStash, readRestorable, stashDraft, tabStorage } from "../draft/draftStash.js";
 import { stepEntityIds } from "../draft/panel-rail.js";
@@ -28,8 +23,8 @@ import { seedLocalizedText } from "../draft/localized-text";
 import { getDraft, listProcesses } from "../api/client.js";
 import { useFetchOnce } from "../panels/shared/useFetchOnce.js";
 import type { DraftRecord, PublishResult } from "../api/types.js";
-import { DEFAULT_TAB, type ProcessTab, type Route } from "../routing.js";
-import { formEditorReturnTab, processTabCounts, tabForChangeGroup, tabForIssue } from "../draft/process-tabs.js";
+import { DEFAULT_TAB, FIELDS_VIEWS, SETTINGS_VIEWS, type ProcessTab, type Route, type TabView } from "../routing.js";
+import { checkTarget, formEditorReturnTab, processTabCounts, type CheckTarget } from "../draft/process-tabs.js";
 import { checksDotState, groupChecksBySource } from "../draft/checksRail.js";
 import { showsStructuralBanner } from "../draft/startGaps.js";
 import { initialSaveState, type DraftSaveState } from "./draftSaveLogic.js";
@@ -64,7 +59,7 @@ import type { NavigateOptions } from "../../../shell/routing.js";
  * turns its own rail at this same width, for the same reason. */
 const NARROW = "@media (max-width: 64rem)";
 
-/** The Canvas tab's body: what a canvas bar drop resolves the live canvas
+/** The Map tab's canvas body: what a canvas bar drop resolves the live canvas
  * through, and what a press measures its centre against. */
 const CANVAS_BODY_ID = "studio-canvas-body";
 
@@ -171,7 +166,7 @@ const styles = stylex.create({
     color: colors.refusal,
   },
   // The waiting line while the form editor's chunk loads: one muted line where
-  // the editor will stand, the same line `ChangesView` prints while it reads.
+  // the editor will stand.
   screenLoading: {
     marginBlock: 0,
     color: colors.textMuted,
@@ -231,7 +226,7 @@ const styles = stylex.create({
   // A tab body. It fills the height the header rows and the tab row leave and
   // scrolls inside itself, above the floor its own content declares.
   //
-  // All eleven bodies stay mounted and ten hide, so a body keeps its half-typed
+  // All six bodies stay mounted and five hide, so a body keeps its half-typed
   // values across a tab switch. `hidden` alone would lose against this
   // compiled `display`, since an author sheet beats the UA one, so the hidden
   // state picks its own named style from the same flag the element carries.
@@ -254,7 +249,7 @@ const styles = stylex.create({
   tabBodyHidden: {
     display: "none",
   },
-  // The Canvas tab: the canvas alone, filling the width and the height the
+  // The Map tab: the canvas alone, filling the width and the height the
   // canvas bar leaves, above a 36rem floor. No band stands over it and no
   // control changes its height (`studio-canvas`).
   canvasRegion: {
@@ -283,23 +278,24 @@ const styles = stylex.create({
 interface EditScreenProps {
   processId: string;
   /** The `edit` route's optional sub-states. `formStepId` renders in place of
-   * the tab row and its body. `tab` names the open tab, Canvas when the
+   * the tab row and its body. `tab` names the open tab, Map when the
+   * address names none, and `view` the open tab's view, its first when the
    * address names none. The form editor wins when both arrive, which
    * `routePath` already encodes. `stepId` is a one-shot canvas target ("Show
    * on the canvas") — it never replaces a tab, and `ProcessSurface` clears it
    * from the address once read (`unified-shell`'s navigation requirement). */
   formStepId?: string;
   tab?: ProcessTab;
+  view?: TabView;
   stepId?: string;
   token: string;
-  /** The calling actor's own roles, for the Access tab's own add/delete
-   * gating (`studio-app`'s Access-surface requirement). Nothing else on
-   * this screen reads it. */
+  /** The calling actor's own roles, for the Settings tab's access lists and
+   * their add/delete gating (`studio-app`'s Access-surface requirement).
+   * Nothing else on this screen reads it. */
   roles: readonly string[];
-  /** Cross-area navigation, threaded down to `ProcessHeaderBar`'s "Manage
-   * assignment groups for this process" link (design.md: "Threading `go`
-   * down to the link"). `token`, `navigate`, and `onUnauthorized` already
-   * take the same shape through this chain. */
+  /** Cross-area navigation, threaded down to the Settings tab's "Manage
+   * assignment groups for this process" link. `token`, `navigate`, and
+   * `onUnauthorized` already take the same shape through this chain. */
   go: (href: string, opts?: NavigateOptions) => void;
   navigate: (route: Route, opts?: NavigateOptions) => void;
   /** The signed-in actor. The stash of unsaved work a 401 leaves behind is
@@ -316,13 +312,15 @@ interface ProcessSurfaceProps {
   processId: string;
   formStepId?: string;
   tab?: ProcessTab;
+  view?: TabView;
   stepId?: string;
   token: string;
   roles: readonly string[];
   go: (href: string, opts?: NavigateOptions) => void;
   initialRevision: number;
   initialLayout: Record<string, unknown>;
-  /** The published version this draft sits on, for the Changes tab.
+  /** The published version this draft sits on, for the publish dialog and
+   * the published-field lookup.
    * Not `initialBaseVersion`: `initialRevision` and `initialLayout` seed a
    * useState, and this one seeds nothing. `EditScreen` never refreshes the
    * loaded record — `load` depends on processId/token/onUnauthorized alone —
@@ -364,12 +362,12 @@ function focusTabButton(tab: ProcessTab): void {
  * `useDraftToolbarActions` (below) is the one remaining direct consumer of
  * `DraftToolbarProps`; `DraftToolbar` itself no longer mounts here.
  *
- * All eleven tab bodies stay mounted and ten hide. A body keeps its half-typed
+ * All six tab bodies stay mounted and five hide. A body keeps its half-typed
  * values across a tab switch: the contract panel holds an outcome name in
  * component state, the data sources panel fetched its list keys on mount, and
  * the field matrix holds its selected cell.
  */
-function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, initialRevision, initialLayout, loadedBaseVersion, loadedCanPublish, navigate, actorId, onUnauthorized, onDirtyChange }: ProcessSurfaceProps) {
+function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles, go, initialRevision, initialLayout, loadedBaseVersion, loadedCanPublish, navigate, actorId, onUnauthorized, onDirtyChange }: ProcessSurfaceProps) {
   const { draft, mutate, validation, replace, contentLocale } = useDraft();
   const baseLocale = draft.baseLocale ?? "en";
   const [saveState, setSaveState] = useState<DraftSaveState>(() => initialSaveState(initialRevision, initialLayout));
@@ -397,11 +395,12 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
   // cleared by the rail's own "show every check" control.
   const [checksStepId, setChecksStepId] = useState<string | undefined>(undefined);
   const openTab = tab ?? DEFAULT_TAB;
-  // The Changes count. It is the difference against the base version, which no
-  // draft-only expression can produce: it needs a fetch, so the tab reports its
-  // own count up. `useCallback`: it is an effect dependency inside the view.
-  const [changesCount, setChangesCount] = useState<number | undefined>(undefined);
-  const onChangesCount = useCallback((count: number | undefined) => setChangesCount(count), []);
+  // The view a tab with a sub-row shows: the address's view while that tab is
+  // open and holds it, otherwise the tab's first view.
+  const viewOf = <V extends TabView>(owner: ProcessTab, views: readonly V[]): V =>
+    views.find((v) => openTab === owner && v === view) ?? views[0]!;
+  const fieldsView = viewOf("fields", FIELDS_VIEWS);
+  const settingsView = viewOf("settings", SETTINGS_VIEWS);
   // The processes a subprocess step may call. One fetch per mount, read by
   // the step page's own picker.
   const processes = useFetchOnce(token, listProcesses);
@@ -585,7 +584,7 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
   // alone, not on mount: the surface stays mounted across a tab switch, so a
   // mount-only read would never fire on this navigation. An unknown id selects
   // nothing, the same rule an unknown tab name already follows. The effect then
-  // replaces the address with the plain `edit` route, which opens Canvas — a
+  // replaces the address with the plain `edit` route, which opens Map — a
   // push here would leave `/edit/step/:stepId` as a live history entry that
   // re-selects the step, and re-pushes itself, on every Back, so Back could
   // never reach the tab the navigation came from (unified-shell's navigation
@@ -740,7 +739,7 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
   /** The rail foot's three add controls, through the same creation path the
    * canvas bar's own drop uses. The new step opens on the page at once
    * (`studio-step-page`). It gets no position of its own: the Steps tab shows
-   * no canvas, so `autoPlaceSteps` places it when the Canvas tab next draws. */
+   * no canvas, so `autoPlaceSteps` places it when the Map tab next draws. */
   const onAddStep = (kind: StepKind) => {
     const created = newStep(kind, seedLocalizedText(contentLocale));
     appendStep(created);
@@ -868,34 +867,42 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
   // waits for the answer, or a restore would drop the stored revision.
   const requestRunning = actions.saving || actions.publishing;
 
-  const counts = processTabCounts(draft, validation.issues, changesCount);
+  const counts = processTabCounts(draft, validation.issues);
   // The Checks tab's own count reads this color when the draft's worst open
   // issue is a blocker (`studio-process-tabs`); no other tab's count does.
   const checksBlocked = checksDotState(groupChecksBySource(validation), validation.noStepYet) === "blocker";
-  const goToTab = (target: ProcessTab) => {
+  /** Opens a tab, and one of its views when `targetView` names one. A tab
+   * with a sub-row and no view opens on its first view. */
+  const goToTab = (target: ProcessTab, targetView?: TabView) => {
     // The narrowing belongs to one visit to the Checks tab. Leaving it drops
     // the filter, so a later press on the Checks control opens the whole list.
     if (target !== "checks") setChecksStepId(undefined);
-    navigate({ name: "edit", processId, tab: target });
+    navigate(
+      targetView === undefined
+        ? { name: "edit", processId, tab: target }
+        : { name: "edit", processId, tab: target, view: targetView },
+    );
   };
-  // The pending focus target for `openTabFromRow` below (D10): the tab a row
-  // command asked to open, until the effect below moves focus there.
+  // The pending focus target for `openTabFromRow` below: the tab a Checks row
+  // asked to open, until the effect below moves focus there.
   const [pendingTabFocus, setPendingTabFocus] = useState<ProcessTab | undefined>(undefined);
-  // A row command hands focus to the tab it opens (`studio-process-tabs`).
+  // A Checks row hands focus to the tab it opens (`studio-process-tabs`).
   // A target already open takes focus at once and records nothing: the
   // effect below only fires on a tab switch, and this target's tab is not
   // switching. Any other target goes through `goToTab` and becomes the
   // pending focus. `openTab` follows the route on a later render, and the
   // effect waits for that render, so focus lands on a tab button that
   // already carries `aria-selected="true"` rather than on one still
-  // unselected.
-  const openTabFromRow = (target: ProcessTab) => {
-    if (target === openTab) {
-      focusTabButton(target);
-      return;
+  // unselected. A target naming a step selects it, and the way out it names,
+  // so the step page opens on that step with that row marked.
+  const openTabFromRow = (target: CheckTarget) => {
+    if (target.tab === openTab) {
+      focusTabButton(target.tab);
+    } else {
+      goToTab(target.tab, target.view);
+      setPendingTabFocus(target.tab);
     }
-    goToTab(target);
-    setPendingTabFocus(target);
+    if (target.stepId !== undefined) onSelectStep(target.stepId, target.pathId);
   };
   // Moves focus onto the open tab only while it is the pending target, and
   // clears the pending value either way, so a stale value never pulls focus
@@ -927,7 +934,7 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
   const processLabel =
     resolveDraftLocalizedText(draft.label, contentLocale, baseLocale) ?? t("headerBar.unnamedProcess");
 
-  /** One tab body. Every one of the eleven renders; ten hide. `hidden` is the
+  /** One tab body. Every one of the six renders; five hide. `hidden` is the
    * mechanism, so a hidden body leaves both the tab order and the
    * accessibility tree while keeping its own state. */
   const tabPanel = (target: ProcessTab, body: ReactNode) => {
@@ -968,9 +975,9 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
         {showsStructuralBanner(validation) && <p {...stylex.props(styles.draftIncomplete)}>{t("app.draftIncomplete")}</p>}
         {/* Renders on both surfaces (studio-json-view: the content-locale
             switcher "SHALL remain visible and usable regardless of which
-            surface is active") — only its "Process, saved with the draft" menu
-            group is surface-gated, via `structureActive`, since that group's
-            controls mutate the draft body. Save, Discard draft and Publish
+            surface is active") — only its process label input is
+            surface-gated, via `structureActive`, since it mutates the draft
+            body. Save, Discard draft and Publish
             render here too now (`studio-process-tabs`) and share that same
             unconditional visibility — nothing about their presence depends on
             `structureActive`. */}
@@ -987,7 +994,7 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
           processLabel={processLabel}
           structureActive={!jsonOpen}
           processId={processId}
-          go={go}
+          token={token}
           onToggleJson={() => setJsonOpen((open) => !open)}
           onVersions={() => navigate({ name: "versions", processId })}
           onPlayer={() => navigate({ name: "play", processId })}
@@ -1026,13 +1033,13 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
             />
             {/* The JSON surface stands in place of every tab body, never beside
                 one: no draft-body-writing control may stay reachable while it is
-                open (`studio-json-view`). The eleven bodies below stay mounted and
+                open (`studio-json-view`). The six bodies below stay mounted and
                 hidden, and a `hidden` subtree reaches neither the tab order nor
                 the accessibility tree. */}
             {jsonOpen && <JsonView draft={draft} onApply={replace} />}
 
             {tabPanel(
-              "canvas",
+              "map",
               <>
                 {/* The canvas bar, then the canvas filling the body it leaves.
                     `styles.tabBody` is a column flex, so the bar stacks above
@@ -1066,7 +1073,7 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
                     groups={groups}
                     onGroupsChange={onGroupsChange}
                     insertTargetPathId={insertTargetPathId}
-                    visible={!jsonOpen && openTab === "canvas"}
+                    visible={!jsonOpen && openTab === "map"}
                   />
                 </div>
               </>,
@@ -1100,16 +1107,18 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
               </div>,
             )}
 
+            {/* The Fields tab: the catalog and the field matrix, two views
+                under one sub-row. */}
             {tabPanel(
               "fields",
-              <FieldsTab
+              <FieldsTabViews
+                view={fieldsView}
+                onOpenView={(next) => goToTab("fields", next)}
                 token={token}
                 visible={!jsonOpen && openTab === "fields"}
                 onShowStep={(target) => navigate({ name: "edit", processId, stepId: target })}
               />,
             )}
-            {tabPanel("dataSources", <DataSourcesTab token={token} visible={!jsonOpen && openTab === "dataSources"} />)}
-            {tabPanel("paths", <PathsView draft={draft} contentLocale={contentLocale} />)}
             {/* The Forms tab: one plate per step that declares a view
                 (`studio-forms-overview`). A plate's control opens the form
                 editor, and its badge opens Checks on that step alone. */}
@@ -1123,38 +1132,6 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
                 }}
               />,
             )}
-            {/* The matrix derives from the whole draft. While hidden it reads
-                the draft it last drew, so typing on another tab skips it
-                (`studio-app`). */}
-            {tabPanel(
-              "matrix",
-              <HeldDraft visible={!jsonOpen && openTab === "matrix"}>
-                <FieldMatrixPanel />
-              </HeldDraft>,
-            )}
-            {tabPanel("contract", <ContractPanel />)}
-            {tabPanel(
-              "changes",
-              <ChangesView
-                processId={processId}
-                token={token}
-                draft={draft}
-                baseVersion={changesBaseVersion}
-                contentLocale={contentLocale}
-                onCount={onChangesCount}
-                visible={!jsonOpen && openTab === "changes"}
-                onOpenRow={(row) => {
-                  // ponytail: the open command opens the owning tab and selects
-                  // nothing inside it, so the author finds the entity there by
-                  // eye. Ceiling: a tab holding many entities of the row's kind.
-                  // Upgrade: hand the row's anchor to the target tab's own
-                  // selection (the steps rail's step, the entity rail's field)
-                  // beside `openTabFromRow`.
-                  const tab = tabForChangeGroup(row.group);
-                  if (tab) openTabFromRow(tab);
-                }}
-              />,
-            )}
             {/* The one place the full grouped rail stands. A row opens the tab
                 that owns its subject (`studio-process-tabs`). */}
             {tabPanel(
@@ -1164,12 +1141,24 @@ function ProcessSurface({ processId, formStepId, tab, stepId, token, roles, go, 
                 canPublish={canPublish}
                 narrowedTo={checksNarrowedTo}
                 onShowEvery={() => setChecksStepId(undefined)}
-                onOpenIssue={(issue) => openTabFromRow(tabForIssue(issue.entityType))}
+                onOpenIssue={(issue) => openTabFromRow(checkTarget(issue, steps))}
               />,
             )}
+            {/* The Settings tab: the process's own settings, its data
+                sources, its contract and its access lists, four views under
+                one sub-row. */}
             {tabPanel(
-              "access",
-              <AccessPanel processId={processId} token={token} roles={roles} onUnauthorized={stashOnUnauthorized} />,
+              "settings",
+              <SettingsTab
+                view={settingsView}
+                onOpenView={(next) => goToTab("settings", next)}
+                token={token}
+                roles={roles}
+                processId={processId}
+                go={go}
+                visible={!jsonOpen && openTab === "settings"}
+                onUnauthorized={stashOnUnauthorized}
+              />,
             )}
           </div>
         )}
@@ -1189,7 +1178,7 @@ type EditLoadState =
   | { kind: "error"; message: string }
   | { kind: "loaded"; record: DraftRecord };
 
-export function EditScreen({ processId, formStepId, tab, stepId, token, roles, go, navigate, actorId, onUnauthorized, onDirtyChange }: EditScreenProps) {
+export function EditScreen({ processId, formStepId, tab, view, stepId, token, roles, go, navigate, actorId, onUnauthorized, onDirtyChange }: EditScreenProps) {
   const [state, setState] = useState<EditLoadState>({ kind: "loading" });
   const fail = useFail(onUnauthorized, (e) => setState({ kind: "error", message: describeCaughtError(e) }));
 
@@ -1251,6 +1240,7 @@ export function EditScreen({ processId, formStepId, tab, stepId, token, roles, g
         processId={processId}
         formStepId={formStepId}
         tab={tab}
+        view={view}
         stepId={stepId}
         token={token}
         roles={roles}

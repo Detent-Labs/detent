@@ -604,8 +604,9 @@ stamp. The steps rail and the form card carry it.
 
 ### The Tab Row
 
-Three strips share one tab language. The process surface has the tab row.
+Four strips share one tab language. The process surface has the tab row.
 The form editor has the form tab strip, and the step form has its own tabs.
+The Fields and Settings tabs have the sub-row.
 
 - **Row:** one line that scrolls sideways, with the 2px divider under it. The
   row jumps to keep the open tab whole in view. That tab keeps 32px clear of

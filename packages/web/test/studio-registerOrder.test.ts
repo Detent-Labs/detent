@@ -10,8 +10,8 @@ import { reachableStepIds } from "../src/areas/studio/draft/registerOrder.js";
 type DraftStep = DraftOf<Step>;
 
 /** Branded ids (`StepId`, `PathId`) are `string & $brand<...>`, so a literal
- * fixture cannot satisfy them directly. `studio-pathRows.test.ts` sets the
- * convention: build the literal loosely, then cast once. */
+ * fixture cannot satisfy them directly: build the literal loosely, then cast
+ * once. */
 function ds(entry: Record<string, unknown>): DraftStep {
   return entry as DraftStep;
 }

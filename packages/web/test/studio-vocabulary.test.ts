@@ -4,7 +4,7 @@ import { t, type CatalogKey } from "../src/areas/studio/catalog";
 /**
  * `studio-guided-vocabulary`: the studio catalog reads the vocabulary table's
  * words at the keys the step page, the way-out rows, the timers, the actions,
- * the form editor, the Paths tab and the Changes tab read.
+ * the form editor, the step page's Ways out section and the change list read.
  */
 
 type Row = readonly [CatalogKey, string];
@@ -146,20 +146,8 @@ describe("flag vocabulary", () => {
   });
 });
 
-describe("Paths tab and Changes tab vocabulary", () => {
-  it("names the Paths tab headings in the way-out words", () => {
-    expectRows([
-      ["pathsView.trigger", "How it is taken"],
-      ["pathsView.priority", "Tried"],
-      ["pathsView.guard", "Only if"],
-      ["pathsView.target", "Leads to"],
-      ["pathsView.noPriority", "No order"],
-      ["pathsView.noGuard", "Always"],
-    ]);
-    expect(t("pathsView.empty").startsWith("This process has no way out yet. ")).toBe(true);
-  });
-
-  it("names the Changes tab properties in the same words", () => {
+describe("Change list vocabulary", () => {
+  it("names the change list's properties in the way-out words", () => {
     expectRows([
       ["changeList.prop.assignment", "Who acts"],
       ["changeList.prop.to", "Leads to"],
@@ -176,7 +164,7 @@ describe("Paths tab and Changes tab vocabulary", () => {
     ]);
   });
 
-  it("names the Changes tab's entry rows and order rows in the same words", () => {
+  it("names the change list's entry rows and order rows in the same words", () => {
     expectRows([
       ["changeList.name.timer", "Time limit {n}"],
       ["changeList.name.onEntry", "When entered · {type}"],

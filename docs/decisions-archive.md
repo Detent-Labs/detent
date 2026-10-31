@@ -898,3 +898,13 @@ system that resulted; this file explains why it took that shape.
   above are those of `37f11867`). It added one table in the
   tenant's own database and one upsert that checks and counts together. It
   also closed audit finding C-7.
+- **The glossary and the live spec name the Access tab differently.**
+  `.claude/rules/ui-glossary.md` names it "Access tab", over
+  `panels/AccessPanel.tsx`. `openspec/specs/studio-app/spec.md:4675`,
+  `:4677` and `:4695` say "Access surface" instead, and so does the catalog
+  comment at `packages/web/src/i18n/catalogs/studio.ts:1062`. This change
+  leaves the spec and the comment as they stand. A spec sweep to match the
+  glossary wants its own OpenSpec change.
+
+  Resolved by `studio-six-tabs` on 2026-10-31: the spec names the Access view
+  of the Settings tab, and so does the glossary.

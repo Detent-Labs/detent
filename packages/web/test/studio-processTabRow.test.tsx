@@ -4,6 +4,7 @@ import { announcementAfter, ProcessTabRow, tabDomId, tabPanelDomId } from "../sr
 // The scroll and fade helpers read through the namespace: a missing export
 // fails each assertion below while the module and every other case still load.
 import * as tabRow from "../src/areas/studio/panels/ProcessTabRow.js";
+import { t } from "../src/areas/studio/catalog.js";
 import { PROCESS_TABS, type ProcessTab } from "../src/areas/studio/routing.js";
 import { tabStops } from "./studio-fieldMatrixTabStops.test.js";
 
@@ -11,7 +12,7 @@ import { tabStops } from "./studio-fieldMatrixTabStops.test.js";
  * The tab row follows `spa-accessibility`'s roving-tabindex pattern, its
  * named exception for a tab set carrying many tabs in one line that scrolls
  * sideways: a `tablist` of buttons with `aria-selected` on the open one, one
- * `tabindex="0"` among eleven, and arrow keys that move focus without opening.
+ * `tabindex="0"` among six, and arrow keys that move focus without opening.
  *
  * `development-toolchain`'s split rule decides what lands here. The roles,
  * the states, the counts and the per-tab `tabindex` are all properties of the
@@ -39,7 +40,7 @@ function render(
 ): string {
   return renderToStaticMarkup(
     <ProcessTabRow
-      open={over.open ?? "canvas"}
+      open={over.open ?? "map"}
       counts={{ ...NO_COUNTS, ...over.counts }}
       checksBlocked={over.checksBlocked ?? false}
       onOpen={() => {}}
@@ -62,20 +63,20 @@ function buttonTags(html: string): string[] {
   return html.match(/<button[^>]*>/g) ?? [];
 }
 
-describe("The tab row's eleven tabs", () => {
+describe("The tab row's six tabs", () => {
   it("groups them in a tablist", () => {
     expect(render()).toContain('role="tablist"');
   });
 
-  it("renders one button carrying the tab role per tab, and no twelfth", () => {
+  it("renders one button carrying the tab role per tab, and no seventh", () => {
     const tabs = buttonTags(render()).filter((b) => b.includes('role="tab"'));
 
-    expect(tabs).toHaveLength(11);
+    expect(tabs).toHaveLength(6);
   });
 
   it("names each tab in authoring order", () => {
     const html = render();
-    const order = ["Canvas", "Steps", "Fields", "Data sources", "Paths", "Forms", "Field matrix", "Contract", "Changes", "Checks", "Access"];
+    const order = ["Map", "Steps", "Fields", "Forms", "Checks", "Settings"];
     let cursor = -1;
 
     for (const name of order) {
@@ -84,39 +85,54 @@ describe("The tab row's eleven tabs", () => {
       cursor = at;
     }
   });
+
+  it("reads the Map and Settings labels off the catalog", () => {
+    const html = render();
+
+    expect(html).toContain(`>${t("tabs.map")}</span>`);
+    expect(html).toContain(`>${t("tabs.settings")}</span>`);
+  });
+
+  it("names no retired tab", () => {
+    const html = render();
+
+    for (const name of ["Canvas", "Data sources", "Paths", "Field matrix", "Contract", "Changes", "Access"]) {
+      expect(html).not.toContain(`>${name}<`);
+    }
+  });
 });
 
 describe("The tab row's keyboard model", () => {
-  it("gives the open tab the roving stop and takes the other ten out", () => {
-    const html = render({ open: "paths" });
+  it("gives the open tab the roving stop and takes the other five out", () => {
+    const html = render({ open: "forms" });
 
     expect(html.match(/tabindex="0"/g) ?? []).toHaveLength(1);
-    expect(html.match(/tabindex="-1"/g) ?? []).toHaveLength(10);
-    expect(buttonTags(html).find((b) => b.includes(`id="${tabDomId("paths")}"`))).toContain('tabindex="0"');
+    expect(html.match(/tabindex="-1"/g) ?? []).toHaveLength(5);
+    expect(buttonTags(html).find((b) => b.includes(`id="${tabDomId("forms")}"`))).toContain('tabindex="0"');
   });
 
   it("stands one tab stop for the whole row", () => {
-    // The row's trailing edge is the last tab, so nothing beside the eleven
-    // takes a stop of its own. Eleven plain stops is what this replaces.
+    // The row's trailing edge is the last tab, so nothing beside the six
+    // takes a stop of its own. Six plain stops is what this replaces.
     expect(tabStops(render())).toBe(1);
   });
 
-  it("would count eleven stops for the plain-button markup this replaces", () => {
+  it("would count six stops for the plain-button markup this replaces", () => {
     // The violating input, kept as markup rather than as a reverted branch:
     // the retired model gave every tab its own stop, so the assertion above
     // passes on the roving model alone.
     const plain = PROCESS_TABS.map((tab) => `<button role="tab" id="${tabDomId(tab)}">${tab}</button>`).join("");
 
-    expect(tabStops(plain)).toBe(11);
+    expect(tabStops(plain)).toBe(6);
   });
 
   it("marks the open tab selected, and only that one", () => {
-    const html = render({ open: "paths" });
+    const html = render({ open: "settings" });
     const selected = buttonTags(html).filter((b) => b.includes('aria-selected="true"'));
 
     expect(selected).toHaveLength(1);
-    expect(html).toContain(`id="${tabDomId("paths")}"`);
-    expect(selected[0]).toContain(tabDomId("paths"));
+    expect(html).toContain(`id="${tabDomId("settings")}"`);
+    expect(selected[0]).toContain(tabDomId("settings"));
   });
 
   it("points each tab at the body it controls", () => {
@@ -135,12 +151,13 @@ describe("Each tab's count", () => {
   });
 
   it("prints a name alone where the tab has no count", () => {
-    const canvas = buttonTags(render({ counts: { steps: 4 } })).find((b) => b.includes(tabDomId("canvas")));
+    const map = buttonTags(render({ counts: { steps: 4 } })).find((b) => b.includes(tabDomId("map")));
 
-    expect(canvas).toBeDefined();
-    // The Canvas tab draws a graph, and Contract holds one editor: neither has
-    // a total to report.
-    expect(render({ counts: { steps: 4 } })).toContain(">Canvas</span>");
+    expect(map).toBeDefined();
+    // The Map tab draws a graph, and Settings holds four views of settings:
+    // neither has a total to report.
+    expect(render({ counts: { steps: 4 } })).toContain(">Map</span>");
+    expect(render({ counts: { steps: 4 } })).toContain(">Settings</span>");
   });
 
   it("prints a zero rather than hiding it, so an emptied tab still reads its state", () => {
@@ -216,7 +233,7 @@ describe("The tab row's live region", () => {
 
 describe("Tab selection while the JSON surface is open", () => {
   it("marks no tab selected while the JSON surface stands open", () => {
-    const html = render({ open: "paths", jsonOpen: true });
+    const html = render({ open: "settings", jsonOpen: true });
 
     expect(html).not.toContain('aria-selected="true"');
   });
@@ -358,7 +375,7 @@ describe("Whether a resize report moved an element's width", () => {
  */
 describe("Whether a tab's focus scrolls the row", () => {
   const forms = { tab: "forms" };
-  const changes = { tab: "changes" };
+  const checks = { tab: "checks" };
 
   it("scrolls on a keyboard focus", () => {
     expect(tabRow.focusScrollsRow(null, forms, true)).toBe(true);
@@ -373,6 +390,6 @@ describe("Whether a tab's focus scrolls the row", () => {
   });
 
   it("scrolls on a keyboard focus of another button after the window left", () => {
-    expect(tabRow.focusScrollsRow(forms, changes, true)).toBe(true);
+    expect(tabRow.focusScrollsRow(forms, checks, true)).toBe(true);
   });
 });

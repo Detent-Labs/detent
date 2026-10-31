@@ -68,10 +68,9 @@ export function ContentLocaleBadge() {
 }
 
 /**
- * The add-locale input and button alone, split out for the `⋮` menu's
- * "Process, saved with the draft" group (design.md) — declaring a new
- * content locale is itself a draft-scoped concern, the same as the process
- * key and the base locale it now sits beside.
+ * The add-locale input and button alone, for the Settings tab's Process view.
+ * Declaring a new content locale is a draft-scoped concern, the same as the
+ * base locale it sits beside.
  */
 export function AddLocaleControl() {
   const { setContentLocale } = useDraft();

@@ -56,13 +56,14 @@ context: |
   imports from another area — only upward into `shell/`, `api/`, `i18n/`.
   The studio area is Process Studio, the developer's product: server-persisted
   drafts (the `drafts` table, optimistic concurrency on a `revision` column),
-  one tabbed process surface holding eleven tabs (canvas, steps, fields, data
-  sources, paths, forms, field matrix, contract, changes, checks, access), a
-  routed form editor, a replacing JSON surface, publish, published versions
+  one tabbed process surface holding six tabs (map, steps, fields, forms,
+  checks, settings), with the field matrix as a view of Fields and the data
+  sources, contract and access lists as views of Settings, a routed form
+  editor, a replacing JSON surface, publish, published versions
   compared as a change list, migration-plan authoring, a
   registry/CEL-scratchpad Tools screen, a Player beside the merged instance
   record, and a Templates screen
-  holding the reusable bodies a new process seeds from. The canvas tab keeps
+  holding the reusable bodies a new process seeds from. The map tab keeps
   drag-to-move and drag-to-connect; the steps tab pairs a numbered rail with
   one step page. Studio routes admit `system:author` or `system:developer`.
   Tools stays behind `system:developer` alone, migration-plan authoring

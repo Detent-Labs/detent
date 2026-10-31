@@ -85,10 +85,9 @@ describe("the held bodies skip on an unchanged provider value", () => {
     }
   });
 
-  it("EditScreen wraps the matrix in HeldDraft and hands ChangesView its visibility", () => {
-    const src = readFileSync(new URL("../src/areas/studio/screens/EditScreen.tsx", import.meta.url), "utf8");
-    expect(src).toMatch(/<HeldDraft visible=\{!jsonOpen && openTab === "matrix"\}>\s*<FieldMatrixPanel \/>\s*<\/HeldDraft>/);
-    expect(src).toContain('visible={!jsonOpen && openTab === "changes"}');
+  it("the Fields tab wraps the matrix view in HeldDraft, visible only while that view is open", () => {
+    const src = readFileSync(new URL("../src/areas/studio/panels/FieldsTabViews.tsx", import.meta.url), "utf8");
+    expect(src).toMatch(/<HeldDraft visible=\{visible && view === "matrix"\}>\s*<FieldMatrixPanel \/>\s*<\/HeldDraft>/);
   });
 
   // React 19 propagates a context change lazily. A bail-out under HeldDraft

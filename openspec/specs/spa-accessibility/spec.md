@@ -316,17 +316,22 @@ A tab set carrying many tabs in one line that scrolls sideways MAY
 instead follow the roving-tabindex pattern. The row is one stop in the
 page's tab order. Exactly one tab carries `tabindex="0"`, and the rest
 `tabindex="-1"`. That one is the active tab until an arrow key moves
-focus, and the focused tab afterwards. The left and right arrow keys move
-focus one tab at a time within the row. They do not activate the newly
-focused tab. Enter or Space still activates it.
+focus, and the focused tab afterwards.
+
+The left and right arrow keys move focus one tab at a time within the row.
+They do not activate the newly focused tab. Enter or Space still activates
+it.
 
 This is the WAI-ARIA tabs pattern's roving-tabindex variant. It exists for
 a row wide enough to need it. One plain Tab stop per tab would cost a
 keyboard user many presses to cross such a row. This governs
-`studio-process-tabs`' own eleven-tab row, the one tab set of this shape in
-the browser packages today. A future tab set that takes this route
-SHALL follow this same pattern rather than inventing a second one. Every
-other tab set keeps the plain-button pattern.
+`studio-process-tabs`' own six-tab row, the one tab set of this shape in
+the browser packages today. That row keeps the pattern after its cut from
+eleven tabs, so an author relearns nothing.
+
+A future tab set that takes this route SHALL follow this same pattern
+rather than inventing a second one. Every other tab set keeps the
+plain-button pattern.
 
 #### Scenario: A tab activates with Enter
 

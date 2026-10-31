@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { layout, colors, fonts, space } from "form-ui/tokens.stylex";
 import { listVersions, getVersionBody, getDraft } from "../api/client.js";
-import type { VersionSummary } from "../api/types.js";
+import type { DraftRecord, VersionSummary } from "../api/types.js";
 import type { ProcessBody } from "workflow-engine/schema";
 import { stripCompiledContent } from "workflow-engine/schema/strip-compiled";
 import { canDiff, type VersionSelection } from "./versionDiffLogic.js";
@@ -155,6 +155,45 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized }: V
   const failLoad = useFail(onUnauthorized, (e) => setLoadError(describeCaughtError(e)));
   const fail = useFail(onUnauthorized, (e) => setError(describeCaughtError(e)));
 
+  /**
+   * Compares the saved draft with the published version it sits on. The load
+   * passes the draft record it already read; the control's press reads it
+   * afresh. `fail` keeps one identity, so this callback changes only with the
+   * process or the token.
+   */
+  const compareWithBase = useCallback(
+    async (version: number, loadedDraft?: DraftRecord) => {
+      const compare = ++latestCompare.current;
+      setError(null);
+      setComparison(undefined);
+      setWaiting(true);
+      try {
+        const [draft, baseBody] = await Promise.all([
+          loadedDraft ?? getDraft(processId, token),
+          getVersionBody(processId, version, token),
+        ]);
+        if (compare !== latestCompare.current) return;
+        // A draft is authored-shape, a published body compiled. Comparing them
+        // raw reports the compile pass's cancel-sink injection as a change the
+        // author neither made nor can act on — it is re-injected at the next
+        // publish. Strip the base so both sides are the same kind of artifact.
+        // The base reads as before, the draft as after (D7).
+        const rows = describeChanges(stripCompiledContent(baseBody as ProcessBody), draft?.body);
+        setWaiting(false);
+        setComparison({
+          key: `base-${version}`,
+          heading: t("changeList.heading.draft").replace("{version}", () => String(version)),
+          rows,
+        });
+      } catch (e) {
+        if (compare !== latestCompare.current) return;
+        setWaiting(false);
+        fail(e);
+      }
+    },
+    [processId, token, fail],
+  );
+
   const load = useCallback(() => {
     let cancelled = false;
     setLoading(true);
@@ -165,6 +204,9 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized }: V
         setVersions(vs);
         setBaseVersion(draft?.baseVersion ?? null);
         setCanPlanMigration(draft?.canPlanMigration ?? false);
+        // The draft's changes stand under the table as soon as the screen
+        // opens (process-version-inspection, D11).
+        if (draft && draft.baseVersion !== null) void compareWithBase(draft.baseVersion, draft);
       })
       .catch((e: unknown) => {
         if (cancelled) return;
@@ -175,8 +217,13 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized }: V
       });
     return () => {
       cancelled = true;
+      // The compare this load started belongs to the same process and token:
+      // taking the next number drops its late answer, and the waiting line
+      // it raised goes with it.
+      latestCompare.current++;
+      setWaiting(false);
     };
-  }, [processId, token, failLoad]);
+  }, [processId, token, failLoad, compareWithBase]);
 
   useEffect(() => load(), [load]);
 
@@ -211,32 +258,8 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized }: V
     }
   };
 
-  const diffAgainstBase = async () => {
-    if (baseVersion === null) return;
-    const compare = ++latestCompare.current;
-    setError(null);
-    setComparison(undefined);
-    setWaiting(true);
-    try {
-      const [draft, baseBody] = await Promise.all([getDraft(processId, token), getVersionBody(processId, baseVersion, token)]);
-      if (compare !== latestCompare.current) return;
-      // A draft is authored-shape, a published body compiled. Comparing them
-      // raw reports the compile pass's cancel-sink injection as a change the
-      // author neither made nor can act on — it is re-injected at the next
-      // publish. Strip the base so both sides are the same kind of artifact.
-      // The base reads as before, the draft as after (D7).
-      const rows = describeChanges(stripCompiledContent(baseBody as ProcessBody), draft?.body);
-      setWaiting(false);
-      setComparison({
-        key: `base-${baseVersion}`,
-        heading: t("changeList.heading.draft").replace("{version}", () => String(baseVersion)),
-        rows,
-      });
-    } catch (e) {
-      if (compare !== latestCompare.current) return;
-      setWaiting(false);
-      fail(e);
-    }
+  const diffAgainstBase = () => {
+    if (baseVersion !== null) void compareWithBase(baseVersion);
   };
 
   /**
@@ -348,7 +371,7 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized }: V
           </div>
         </>
       )}
-      {/* A diff or export failure reports where the change list would appear, as the Changes tab's does. */}
+      {/* A diff or export failure reports where the change list would appear. */}
       {error && (
         <div {...stylex.props(styles.errorBanner)} role="alert">
           <span {...stylex.props(styles.errorBannerStamp)}>{t("error.failed")}</span>

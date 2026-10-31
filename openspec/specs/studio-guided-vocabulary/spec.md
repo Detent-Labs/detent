@@ -218,6 +218,13 @@ SHALL carry the same rows.
 | data source | where values come from |
 | outcome | how it ended |
 | required / readonly / visible | Required / Read-only / Asked |
+| contract | what this process takes in and gives back |
+
+#### Scenario: The contract reads as what the process takes in and gives back
+
+- **WHEN** an author reads the Settings tab's sub-row
+- **THEN** the contract's view reads "What it takes in and gives back"
+- **AND** the change list's contract group reads the same words
 
 #### Scenario: The glossary carries the remaining rows
 

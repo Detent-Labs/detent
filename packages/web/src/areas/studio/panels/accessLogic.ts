@@ -1,6 +1,6 @@
 /**
- * The Access tab's own add/delete gating (`studio-app`'s Access-surface
- * requirement): which of the three lists a viewing actor may add to or
+ * The add/delete gating of the Settings tab's Access view (`studio-app`'s
+ * Access-surface requirement): which of the three lists a viewing actor may add to or
  * delete from, given the actor's own standing and roles.
  *
  * Pulled out of `AccessPanel.tsx` so the four scenarios test against plain

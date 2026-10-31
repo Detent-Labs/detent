@@ -319,7 +319,7 @@ describe("describeChanges: anchors", () => {
     contract.contract.inputFields.push("field_email");
     contract.contract.outcomes = [];
     const contractRow = only(describeChanges(base(), contract));
-    expect(contractRow).toMatchObject({ key: "contract:contract", group: "contract", kind: "changed", label: "Contract" });
+    expect(contractRow).toMatchObject({ key: "contract:contract", group: "contract", kind: "changed", label: "What it takes in and gives back" });
     expect(contractRow.properties).toMatchObject([
       { name: "Input fields", kind: "added" },
       { name: "Outcomes", kind: "removed" },

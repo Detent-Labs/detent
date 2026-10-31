@@ -3,9 +3,11 @@ import {
   matchRoute,
   routePath,
   ROUTE_ROLE,
-  PANEL_VIEWS,
-  PANEL_VIEW_TAB,
+  PANEL_VIEW_TARGET,
   PROCESS_TABS,
+  RETIRED_TAB_TARGET,
+  TAB_VIEWS,
+  type PanelView,
   type Route,
 } from "../src/areas/studio/routing.js";
 import { mayEnter } from "../src/shell/areas.js";
@@ -26,6 +28,7 @@ const EVERY_ROUTE: Route[] = [
   { name: "edit", processId: "proc_1" },
   { name: "edit", processId: "proc_1", formStepId: "step_1" },
   { name: "edit", processId: "proc_1", tab: "fields" },
+  { name: "edit", processId: "proc_1", tab: "settings", view: "contract" },
   { name: "edit", processId: "proc_1", stepId: "step_1" },
   { name: "versions", processId: "proc_1" },
   { name: "migrate", processId: "proc_1", from: "1", to: "2" },
@@ -79,30 +82,18 @@ describe("the open tab's sub-state of the edit route", () => {
     }
   });
 
-  it("holds eleven tabs, in authoring order", () => {
-    expect(PROCESS_TABS).toEqual([
-      "canvas",
-      "steps",
-      "fields",
-      "dataSources",
-      "paths",
-      "forms",
-      "matrix",
-      "contract",
-      "changes",
-      "checks",
-      "access",
-    ]);
+  it("holds six tabs, in authoring order", () => {
+    expect(PROCESS_TABS).toEqual(["map", "steps", "fields", "forms", "checks", "settings"]);
   });
 
   it("falls back to the plain edit route on an unrecognized tab name", () => {
-    // A typo lands on the canvas, not on a dead end. The top-level table
+    // A typo lands on Map, not on a dead end. The top-level table
     // answers an unrecognized path with the process list; this is that rule
     // one level down.
     expect(matchRoute("/processes/proc_1/edit/nonsense")).toEqual({ name: "edit", processId: "proc_1" });
   });
 
-  it("opens the canvas for an address naming no tab", () => {
+  it("opens Map for an address naming no tab", () => {
     expect(matchRoute("/processes/proc_1/edit")).toEqual({ name: "edit", processId: "proc_1" });
   });
 
@@ -121,19 +112,127 @@ describe("the open tab's sub-state of the edit route", () => {
   });
 });
 
+describe("the open view's sub-state of the edit route", () => {
+  it("lists views for Fields and Settings alone, in sub-row order", () => {
+    expect(TAB_VIEWS).toEqual({
+      map: [],
+      steps: [],
+      fields: ["catalog", "matrix"],
+      forms: [],
+      checks: [],
+      settings: ["process", "sources", "contract", "access"],
+    });
+  });
+
+  it("round-trips /processes/:id/edit/:tab/:view, for every view a tab holds", () => {
+    let seen = 0;
+    for (const tab of PROCESS_TABS) {
+      for (const view of TAB_VIEWS[tab]) {
+        const route: Route = { name: "edit", processId: "proc_1", tab, view };
+        expect(routePath(route)).toBe(`/processes/proc_1/edit/${tab}/${view}`);
+        expect(matchRoute(routePath(route))).toEqual(route);
+        seen++;
+      }
+    }
+    // An empty `TAB_VIEWS` would pass the loop above with nothing checked.
+    expect(seen).toBe(6);
+  });
+
+  it("drops a view the tab does not hold and keeps the tab", () => {
+    expect(matchRoute("/processes/proc_1/edit/settings/nonsense")).toEqual({ name: "edit", processId: "proc_1", tab: "settings" });
+    expect(matchRoute("/processes/proc_1/edit/fields/sources")).toEqual({ name: "edit", processId: "proc_1", tab: "fields" });
+  });
+
+  it("drops a view on a tab that holds none", () => {
+    expect(matchRoute("/processes/proc_1/edit/map/matrix")).toEqual({ name: "edit", processId: "proc_1", tab: "map" });
+    expect(matchRoute("/processes/proc_1/edit/steps/catalog")).toEqual({ name: "edit", processId: "proc_1", tab: "steps" });
+  });
+
+  it("falls back to the plain edit route for a view under an unrecognized tab", () => {
+    expect(matchRoute("/processes/proc_1/edit/nonsense/matrix")).toEqual({ name: "edit", processId: "proc_1" });
+  });
+
+  it("writes the tab alone when the route carries a view the tab does not hold", () => {
+    // Without the guard, the writer would print `/edit/steps/matrix` and
+    // `/edit/fields/sources`, addresses the matcher then drops a segment of.
+    expect(routePath({ name: "edit", processId: "proc_1", tab: "steps", view: "matrix" })).toBe("/processes/proc_1/edit/steps");
+    expect(routePath({ name: "edit", processId: "proc_1", tab: "fields", view: "sources" })).toBe("/processes/proc_1/edit/fields");
+  });
+
+  it("writes the tab alone when the route carries no view", () => {
+    expect(routePath({ name: "edit", processId: "proc_1", tab: "settings" })).toBe("/processes/proc_1/edit/settings");
+  });
+
+  it("keeps the form path winning over a tab and a view", () => {
+    const route: Route = { name: "edit", processId: "proc_1", formStepId: "step_1", tab: "fields", view: "matrix" };
+    expect(routePath(route)).toBe("/processes/proc_1/edit/form/step_1");
+  });
+});
+
+describe("the retired tab addresses", () => {
+  it("lands each retired tab literal on its new place", () => {
+    expect(RETIRED_TAB_TARGET).toEqual({
+      canvas: { tab: "map" },
+      paths: { tab: "steps" },
+      matrix: { tab: "fields", view: "matrix" },
+      dataSources: { tab: "settings", view: "sources" },
+      contract: { tab: "settings", view: "contract" },
+      access: { tab: "settings", view: "access" },
+    });
+    for (const [literal, target] of Object.entries(RETIRED_TAB_TARGET)) {
+      expect(matchRoute(`/processes/proc_1/edit/${literal}`)).toEqual({ name: "edit", processId: "proc_1", ...target });
+    }
+  });
+
+  it("opens /edit/canvas on Map and /edit/dataSources on Where values come from", () => {
+    expect(matchRoute("/processes/proc_1/edit/canvas")).toEqual({ name: "edit", processId: "proc_1", tab: "map" });
+    expect(matchRoute("/processes/proc_1/edit/dataSources")).toEqual({
+      name: "edit",
+      processId: "proc_1",
+      tab: "settings",
+      view: "sources",
+    });
+  });
+
+  it("names a tab the row holds and a view that tab holds, for every retired literal", () => {
+    for (const target of Object.values(RETIRED_TAB_TARGET)) {
+      expect(PROCESS_TABS).toContain(target.tab);
+      if (target.view !== undefined) expect(TAB_VIEWS[target.tab]).toContain(target.view);
+    }
+  });
+
+  it("opens the Versions screen for the retired Changes address", () => {
+    expect(matchRoute("/processes/proc_1/edit/changes")).toEqual({ name: "versions", processId: "proc_1" });
+  });
+});
+
 describe("the retired panels address", () => {
-  it("maps each old view name onto the tab that holds it now", () => {
-    for (const view of PANEL_VIEWS) {
+  it("maps each old view name onto the place that holds it now", () => {
+    expect(PANEL_VIEW_TARGET).toEqual({
+      fields: { tab: "fields" },
+      dataSources: { tab: "settings", view: "sources" },
+      contract: { tab: "settings", view: "contract" },
+      matrix: { tab: "fields", view: "matrix" },
+      paths: { tab: "steps" },
+    });
+    for (const view of Object.keys(PANEL_VIEW_TARGET) as Exclude<PanelView, "changes">[]) {
       expect(matchRoute(`/processes/proc_1/edit/panels/${view}`)).toEqual({
         name: "edit",
         processId: "proc_1",
-        tab: PANEL_VIEW_TAB[view],
+        ...PANEL_VIEW_TARGET[view],
       });
     }
   });
 
-  it("names a tab the row actually holds, for every one of the six", () => {
-    for (const view of PANEL_VIEWS) expect(PROCESS_TABS).toContain(PANEL_VIEW_TAB[view]);
+  it("opens the Versions screen for the old changes view", () => {
+    expect(matchRoute("/processes/proc_1/edit/panels/changes")).toEqual({ name: "versions", processId: "proc_1" });
+  });
+
+  it("names a tab the row holds and a view that tab holds, for every old view name", () => {
+    for (const target of Object.values(PANEL_VIEW_TARGET)) {
+      expect(PROCESS_TABS).toContain(target.tab);
+      if (target.view !== undefined) expect(TAB_VIEWS[target.tab]).toContain(target.view);
+    }
   });
 
   it("falls back to the plain edit route on an unrecognized view", () => {
@@ -142,6 +241,7 @@ describe("the retired panels address", () => {
 
   it("emits no panels path any more, so nothing writes the retired address", () => {
     expect(routePath({ name: "edit", processId: "proc_1", tab: "fields" })).not.toContain("/panels/");
+    expect(routePath({ name: "edit", processId: "proc_1", tab: "fields", view: "matrix" })).not.toContain("/panels/");
   });
 });
 

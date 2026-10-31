@@ -46,6 +46,17 @@ export const en = {
   "draftToolbar.publishDialogOpenIssues": "Open issues",
   "draftToolbar.publishDialogBlocked": "The engine refuses this publish until somebody fixes a blocking issue.",
   "draftToolbar.publishDialogImmutable": "A published version can never change. To correct it, publish a new one.",
+  // The publish dialog's Changes row (`studio-publish`): one sentence per
+  // state of the base-version fetch, then a disclosure over the change list.
+  "draftToolbar.publishDialogChanges": "Changes",
+  "draftToolbar.publishDialogFirstVersion": "This publish mints the first version.",
+  "draftToolbar.publishDialogChangesReading": "Reading version {version}…",
+  "draftToolbar.publishDialogChangesFailed": "Could not read version {version}: {message}",
+  "draftToolbar.publishDialogChangesNone": "No changes since version {version}.",
+  "draftToolbar.publishDialogChangesOne": "1 change since version {version}.",
+  "draftToolbar.publishDialogChangesMany": "{count} changes since version {version}.",
+  "draftToolbar.publishDialogChangesShow": "Show",
+  "draftToolbar.publishDialogChangesHide": "Hide",
   "draftToolbar.discardDialogHeading": "Discard this draft",
   "draftToolbar.discardDialogLastSaved": "Last saved",
   "draftToolbar.discardDialogKeepsPublished": "The published versions stay. Only the unpublished draft goes.",
@@ -461,17 +472,12 @@ export const en = {
   "contentLocale.add": "+ add locale",
 
   "tabs.rowLabel": "Process surface",
-  "tabs.canvas": "Canvas",
+  "tabs.map": "Map",
+  "tabs.settings": "Settings",
   "tabs.steps": "Steps",
   "tabs.fields": "Fields",
-  "tabs.dataSources": "Data sources",
-  "tabs.paths": "Paths",
   "tabs.forms": "Forms",
-  "tabs.matrix": "Field matrix",
-  "tabs.contract": "Contract",
-  "tabs.changes": "Changes",
   "tabs.checks": "Checks",
-  "tabs.access": "Access",
   // Visually-hidden text appended to the Checks tab's count when it carries
   // the blocker color, so the state reaches a screen reader too — color
   // alone conveys nothing there (`studio-process-tabs`).
@@ -480,6 +486,28 @@ export const en = {
   // clear to blocker. A full sentence, unlike the fragment above: a live
   // region reads on its own rather than joining an accessible name.
   "tabs.checksBlockingAnnounced": "A blocking issue appeared in Checks.",
+
+  // The Fields tab's sub-row (`studio-process-tabs`).
+  "fieldsViews.rowLabel": "Views of the fields",
+  "fieldsViews.catalog": "Catalog",
+  "fieldsViews.matrix": "Where fields appear",
+
+  // The Settings tab: its sub-row, then the Process view's controls
+  // (`studio-process-tabs`).
+  "settings.rowLabel": "Views of the settings",
+  "settings.process": "Process",
+  "settings.sources": "Where values come from",
+  "settings.contract": "What it takes in and gives back",
+  "settings.access": "Access",
+  "settings.baseLocale": "Base language",
+  "settings.cancellable": "A case can be cancelled while it runs",
+  "settings.collaborationLegend": "Collaboration",
+  "settings.comments": "Participants can comment on a case",
+  "settings.attachments": "Participants can attach files to a case",
+  "settings.developerView": "Developer view",
+  "settings.key": "Key",
+  "settings.processId": "Process id",
+  "settings.manageGroups": "Manage assignment groups for this process",
 
   // The Forms tab: one plate per step that declares a view
   // (`studio-forms-overview`).
@@ -732,28 +760,16 @@ export const en = {
   "headerBar.saved": "Saved",
   "headerBar.lastSaved": "Last saved",
   "headerBar.published": "Published",
-  "headerBar.keyCaption": "Key",
-  "headerBar.baseLocaleCaption": "Base language",
   "headerBar.findingPrefix": "Stale reference in",
   "headerBar.findingCarriedBy": "carried by",
   "headerBar.findingLiveElsewhere": "live instance(s) elsewhere",
   "headerBar.findingCarriedByNone": "not carried by any live version",
   "headerBar.menuTrigger": "More actions",
-  "headerBar.menuGroupDraft": "Process, saved with the draft",
-  "headerBar.cancellable": "Cancellable",
-  "headerBar.manageGroups": "Manage assignment groups for this process",
   "headerBar.menuGroupViews": "Views",
   "headerBar.jsonOpen": "Open the JSON surface",
   "headerBar.jsonLeave": "Leave the JSON surface",
   "headerBar.versions": "Versions",
   "headerBar.player": "Player",
-  // The process-wide collaboration defaults (`studio-process-tabs`): two
-  // checkboxes in the header bar's `⋮` menu, after baseLocale.
-  // The legend names the pair for a screen reader; it renders visually
-  // hidden, so it carries no length pressure against the compact row.
-  "headerBar.collaborationLegend": "Collaboration",
-  "headerBar.collaborationComments": "Comment",
-  "headerBar.collaborationAttachments": "Attachments",
 
   // The Player screen. Its own strings are still mostly inline English; this
   // one is a catalog key because it is an accessible name.
@@ -767,7 +783,7 @@ export const en = {
   // The validation verdict alone. The rail runs checks; it holds no
   // permission, so it says nothing here about who may publish.
   "checksRail.allClear": "No open issues.",
-  "checksRail.noStepYet": "No step yet. Add the first step on the Canvas or the Steps tab.",
+  "checksRail.noStepYet": "No step yet. Add the first step on the Map tab or the Steps tab.",
   // The permission verdict, from the loaded draft's own `canPublish` report.
   // One of the two follows the sentence above, inside the same box.
   "checksRail.clearReadyToPublish": "This draft is ready to publish.",
@@ -837,10 +853,6 @@ export const en = {
   "canvas.pathLabelNoTrigger": "trigger not set",
   "canvas.groupDisclosure": "Steps in {group}",
   "canvas.svgLabel": "Process graph",
-
-  "changesView.firstPublish": "Nothing to compare yet. Publishing this draft would be the first version.",
-  "changesView.none": "This draft matches the version it sits on.",
-  "changesView.loading": "Reading the published version…",
 
   // The words `draft/changeSet.ts` returns for the change list. `prop.*` names
   // a declared key of the definition contract; a key with no entry reads under
@@ -956,12 +968,15 @@ export const en = {
   "changeList.value.timeLimit": "{count} {unit}",
   // The copy `panels/ChangeList.tsx` draws around those words. The heading
   // line names the comparison and never counts; each caller fills its own
-  // version numbers. The Fields to Contract headings read the `tabs.*` names.
+  // version numbers. The Fields, Steps and Forms headings read the `tabs.*` names.
   // On the Versions screen `{after}` is side B's version, `{before}` side A's.
-  "changeList.heading.base": "Compared with version {version}",
   "changeList.heading.versions": "Version {after} compared with version {before}",
   "changeList.heading.draft": "Draft compared with version {version}",
   "changeList.group.process": "Process",
+  // The three groups whose tab the six-tab row no longer holds.
+  "changeList.group.dataSources": "Where values come from",
+  "changeList.group.paths": "Ways out",
+  "changeList.group.contract": "What it takes in and gives back",
   // A capitalized word; the stamp's own style sets it in capitals.
   "changeList.stamp.added": "Added",
   "changeList.stamp.changed": "Changed",
@@ -975,28 +990,11 @@ export const en = {
   // Visually hidden before each value of an open row's property.
   "changeList.before": "Before:",
   "changeList.after": "After:",
-  // One open command per group, naming its entity, so a long list never
-  // repeats one accessible name. The Process row carries none.
-  "changeList.open.fields": "Open {label} in the Fields tab",
-  "changeList.open.dataSources": "Open {label} in the Data sources tab",
-  "changeList.open.steps": "Open {label} in the Steps tab",
-  "changeList.open.paths": "Open {label} in the Paths tab",
-  "changeList.open.forms": "Open {label} in the Forms tab",
-  "changeList.open.contract": "Open {label} in the Contract tab",
   "changeList.developerView": "Developer view",
 
   // The Versions screen's own waiting line, shown where its change list will
   // stand while both compared bodies are in flight (process-version-inspection).
   "versionsScreen.waiting": "Reading both versions…",
-
-  "pathsView.source": "Source step",
-  "pathsView.trigger": "How it is taken",
-  "pathsView.priority": "Tried",
-  "pathsView.guard": "Only if",
-  "pathsView.target": "Leads to",
-  "pathsView.noPriority": "No order",
-  "pathsView.noGuard": "Always",
-  "pathsView.empty": "This process has no way out yet. Drag from a step on the canvas to make one.",
 
   "expression.placeholder": "CEL expression",
   "mapping.unlistedKey": "(not in the list)",

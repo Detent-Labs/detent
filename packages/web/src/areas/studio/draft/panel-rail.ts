@@ -1,46 +1,9 @@
 import type { Step } from "workflow-engine/schema";
 import type { DraftOf } from "./types";
 import type { DraftField } from "./fields";
-import { isDraftViewField, type DraftViewEntry } from "./view-layout";
-import type { EditorIssue, IssueSource } from "./issues";
-import type { PanelView } from "../routing";
+import type { EditorIssue } from "./issues";
 
 type DraftStep = DraftOf<Step>;
-
-/**
- * How many entities each process-wide view holds, for the count beside its
- * name. Two rails read it — the panels screen's index rail and the canvas edit
- * rail's Process section — and both showed the same number from their own copy
- * of these three expressions before this lived here.
- *
- * `fields` counts rail rows, not catalog entries: a group field contributes
- * itself and its children, which is what either rail lists.
- *
- * `matrix` counts live cells: every field entry across every step, the same
- * total the field matrix's grid draws one live cell per. A note occupies no
- * cell, so it raises this count by none.
- */
-export function panelEntityCounts(draft: {
-  fields?: DraftField[];
-  dataSources?: unknown[];
-  contract?: { outcomes?: unknown[] };
-  workflow?: { steps?: { view?: { fields?: DraftViewEntry[] }; paths?: unknown[] }[] };
-}): Record<PanelView, number> {
-  return {
-    fields: flattenRailFields(draft.fields).length,
-    dataSources: (draft.dataSources ?? []).length,
-    contract: (draft.contract?.outcomes ?? []).length,
-    matrix: (draft.workflow?.steps ?? []).reduce(
-      (sum, step) => sum + (step.view?.fields?.filter(isDraftViewField).length ?? 0),
-      0,
-    ),
-    // The Changes count is the difference against the base version, which no
-    // draft-only expression can produce: it needs a fetch. `ChangesView`
-    // reports its own count up to the rail, and 0 stands until that lands.
-    changes: 0,
-    paths: (draft.workflow?.steps ?? []).reduce((sum, step) => sum + (step.paths?.length ?? 0), 0),
-  };
-}
 
 /** One row of the Fields tab's entity rail. `depth` is capped at 1: a group
  * field's children indent once, and anything deeper takes a top-level row
@@ -76,21 +39,6 @@ export function flattenRailFields(fields: DraftField[] | undefined): RailFieldRo
   };
   if (fields) walk(fields, 0);
   return rows;
-}
-
-/** The field matrix's own issue count, filtered by `source` rather than
- * `entityType`: `checkViewFlags` issues carry `entityType: "step"`, the same
- * type every other per-step issue (a path's CEL issue, an action's registry
- * issue) already carries, so an `entityType` filter cannot isolate them.
- *
- * Since technical-field-marker, the `view` source also holds
- * `checkUnwrittenTechnicalFields`' finding, which anchors on the field
- * (`entityType: "field"`) rather than a step. This count therefore
- * over-reports by one per such field, with nothing in the grid to point at —
- * an accepted trade-off (design.md Risks). The field catalog's per-row mark,
- * `issueCountForEntityId`, surfaces that finding correctly. */
-export function issueCountForSource(issues: readonly EditorIssue[], source: IssueSource): number {
-  return issues.filter((i) => i.source === source).length;
 }
 
 /** How many issues resolved to one specific entity — an entity rail row's own
