@@ -15,9 +15,9 @@ export function holdWhileHidden<T>(held: T, value: T, visible: boolean): T {
  * otherwise. A body that mounts hidden holds its first value. The hook reads
  * `visible` during render, so the commit that reveals a body draws the live
  * value. A held value keeps its identity, so a `memo` consumer skips every
- * render while its tab stays hidden.
+ * render while its tab stays hidden. `HeldDraft` is its one reader.
  */
-export function useHeldWhileHidden<T>(value: T, visible: boolean): T {
+function useHeldWhileHidden<T>(value: T, visible: boolean): T {
   const held = useRef(value);
   const shown = holdWhileHidden(held.current, value, visible);
   held.current = shown;

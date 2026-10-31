@@ -35,8 +35,7 @@ export function panelEntityCounts(draft: {
       0,
     ),
     // The Changes count is the difference against the base version, which no
-    // draft-only expression can produce: it needs a fetch. `ChangesView`
-    // reports its own count up to the rail, and 0 stands until that lands.
+    // draft-only expression can produce: it needs a fetch, so it reads 0.
     changes: 0,
     paths: (draft.workflow?.steps ?? []).reduce((sum, step) => sum + (step.paths?.length ?? 0), 0),
   };

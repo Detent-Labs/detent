@@ -75,6 +75,7 @@ function renderHeader(findings: PublishFinding[]): string {
         processLabel="Expense approval"
         structureActive={true}
         processId="proc_a"
+        token="token"
         onToggleJson={() => {}}
         onVersions={() => {}}
         onPlayer={() => {}}

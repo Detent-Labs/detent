@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { FileJson, History, MoreVertical, Play } from "lucide-react";
-import { colors, fonts, space, shadow } from "form-ui/tokens.stylex";
+import { colors, focus, fonts, space, shadow } from "form-ui/tokens.stylex";
 import { t } from "../catalog.js";
 import { useDraft } from "../draft/store.js";
 import { missingTranslationWarning, resolveDraftLocalizedText } from "../draft/localized-text";
@@ -10,11 +10,13 @@ import { ContentLocaleBadge } from "./shared/ContentLocaleSwitcher.js";
 import { LocalizedTextInput } from "./shared/LocalizedTextInput.js";
 import { IssueList } from "./shared/IssueList.js";
 import { useConfirmDialog } from "./shared/confirmDialog.js";
+import { PublishChanges } from "./PublishChanges.js";
 import { checksDotState, groupChecksBySource } from "../draft/checksRail.js";
 import { publishAvailability, nextVersionLabel } from "../screens/draftToolbarState.js";
 import type { DraftToolbarActions } from "./DraftToolbar.js";
 import type { ValidationResult } from "../draft/validation.js";
 import type { PublishResult } from "../api/types.js";
+import type { Draft } from "../draft/types.js";
 
 /** Every class this file's own markup renders, from `app.css`. */
 const styles = stylex.create({
@@ -137,13 +139,18 @@ const styles = stylex.create({
     color: colors.refusal,
   },
   // `::backdrop` stays a literal fallback in `app.css`, which the
-  // `studio-dialog` class beside this compiled style keeps matching.
+  // `studio-dialog` class beside this compiled style keeps matching. A long
+  // change list scrolls inside the dialog, so its controls stay reachable.
+  // The scroll box keeps the focus ring's reach clear at every edge.
   dialog: {
     maxWidth: "34rem",
+    maxHeight: "85vh",
+    overflowY: "auto",
     borderWidth: 2,
     borderStyle: "solid",
     borderColor: colors.divider,
-    padding: space.s4,
+    padding: `max(${space.s4}, ${focus.reach})`,
+    scrollPadding: focus.reach,
     backgroundColor: colors.surface,
     color: colors.text,
     overscrollBehavior: "contain",
@@ -403,6 +410,10 @@ interface ConfirmDialogProps {
 function PublishConfirmDialog({
   processLabel,
   processId,
+  token,
+  baseVersion,
+  draft,
+  contentLocale,
   revision,
   nextVersion,
   dirty,
@@ -415,6 +426,10 @@ function PublishConfirmDialog({
   onConfirm,
 }: ConfirmDialogProps & {
   processId: string;
+  token: string;
+  baseVersion: number | null;
+  draft: Draft;
+  contentLocale: string;
   nextVersion: string;
   dirty: boolean;
   openIssues: number;
@@ -453,6 +468,7 @@ function PublishConfirmDialog({
             so the dialog and the control can never disagree. */}
         <dt {...stylex.props(styles.dialogFactsDt)}>{t("draftToolbar.publishDialogOpenIssues")}</dt>
         <dd {...stylex.props(styles.dialogFactsDd)}>{openIssues}</dd>
+        <PublishChanges processId={processId} token={token} baseVersion={baseVersion} draft={draft} contentLocale={contentLocale} />
       </dl>
       {blocked && <p {...stylex.props(styles.dialogBlocked)}>{t("draftToolbar.publishDialogBlocked")}</p>}
       {dirty && <p {...stylex.props(styles.dialogNote)}>{t("draftToolbar.publishDialogUnsaved")}</p>}
@@ -562,7 +578,8 @@ interface Props {
   /** Gates the Publish control and names the reason when unavailable
    * (`studio-publish`). */
   canPublish: boolean;
-  /** The version a publish would mint, shown in the publish dialog. */
+  /** The published version the draft sits on. The publish dialog names the
+   * version a publish would mint from it, and compares the draft with it. */
   baseVersion: number | null;
   /** Feeds the publish dialog's open-issue count and its blocked state — the
    * same groups the area nav's Checks control reads, so the two can never
@@ -579,6 +596,8 @@ interface Props {
   structureActive: boolean;
   /** The open process's id, named in the publish dialog. */
   processId: string;
+  /** The session token the publish dialog's base-body read sends. */
+  token: string;
   /** Flips the JSON surface. `ProcessTabRow` keeps its own `jsonOpen` prop —
    * this menu derives the same fact from `structureActive` (`= !jsonOpen`)
    * instead of taking a second, redundant copy. */
@@ -612,7 +631,8 @@ interface Props {
  * (`useDraftToolbarActions`, called once by `EditScreen.tsx`) the error
  * banner below already reads. Both confirmation dialogs render here too, so
  * focus returns to the pressed button when either closes: Publish names the
- * process, its id, the revision, the next version and the open issue count;
+ * process, its id, the revision, the next version, the open issue count and
+ * the changes since the base version;
  * Discard names the process, the revision and the last-saved time.
  *
  * `DraftToolbar`'s error message and its save-conflict banner render as
@@ -639,6 +659,7 @@ export function ProcessHeaderBar({
   processLabel,
   structureActive,
   processId,
+  token,
   onToggleJson,
   onVersions,
   onPlayer,
@@ -852,6 +873,10 @@ export function ProcessHeaderBar({
         <PublishConfirmDialog
           processLabel={processLabel}
           processId={processId}
+          token={token}
+          baseVersion={baseVersion}
+          draft={draft}
+          contentLocale={contentLocale}
           revision={revision}
           nextVersion={nextVersionLabel(baseVersion)}
           dirty={isDirty}

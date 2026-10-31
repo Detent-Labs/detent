@@ -994,6 +994,7 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
           processLabel={processLabel}
           structureActive={!jsonOpen}
           processId={processId}
+          token={token}
           onToggleJson={() => setJsonOpen((open) => !open)}
           onVersions={() => navigate({ name: "versions", processId })}
           onPlayer={() => navigate({ name: "play", processId })}

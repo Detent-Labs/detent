@@ -21,7 +21,7 @@ import type { AccessKind, MyProcessAccess, ProcessAccessLists } from "../api/typ
 
 /**
  * The `.studio-empty` and `.studio-error-banner*` shapes, both from
- * `app.css`. Duplicated on purpose, the same as `ChangesView.tsx` (D9):
+ * `app.css`. Duplicated on purpose (D9):
  * component styles compile per file, and this same shape already appears
  * near-identically in other studio files.
  */
