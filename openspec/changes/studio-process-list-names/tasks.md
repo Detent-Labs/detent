@@ -63,10 +63,11 @@
 - [ ] 5.1 In `e2e/publish.e2e.ts`, replace `PROCESS_KEY` with `DRAFT_NAME = "E2E draft"`, the label `scripts/e2e.ts` writes.
 - [ ] 5.1a Open the draft with `page.getByRole("link", { name: DRAFT_NAME, exact: true }).click()`. Drop the row filter and the Open click.
 - [ ] 5.2 Add one entry to `docs/browser-checks.md`: the name link with a modified click, the hidden input's chooser and the Developer view.
-- [ ] 5.3 In `ROADMAP.md` stage 64, mark item 8 shipped and name the shipped changes in the status line.
+- [ ] 5.3 In `ROADMAP.md` stage 64, append "Shipped <date>." to item 8.
+- [ ] 5.3a Make the stage's status line read "CHANGES 1, 2 AND 8 DONE, REST NOT STARTED".
 - [ ] 5.4 In `docs/decisions.md`, entry "The studio's six remaining `confirm()` prompts", fix the sentence on hardcoded English.
 - [ ] 5.4a It reads: "One hardcodes English rather than reading the catalog, in `TemplatesScreen.tsx`."
-- [ ] 5.5 In `.claude/rules/ui-glossary.md`, Developer view row, add "So does each process list row." to the text.
+- [ ] 5.5 In `.claude/rules/ui-glossary.md`, Developer view row, add "Each process list row holds one." after "The change-list row holds one."
 - [ ] 5.5b In that row, the meaning gains machine values. It reads: "a disclosure over raw JSON, CEL or machine values".
 - [ ] 5.5a In the same row, add `screens/ProcessesScreen.tsx` to its Lives in column.
 

@@ -252,7 +252,8 @@ another file's style on purpose, and the change list lives in another
 module.
 
 Alternative: one screen-wide "Keys" toggle. It would be a new pattern
-beside six existing per-row Developer views. Rejected.
+beside the per-row Developer views of the change list and the way-out rows.
+Rejected.
 
 ### D7. The cells
 
