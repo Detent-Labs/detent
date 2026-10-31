@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { Path, Step } from "workflow-engine/schema";
@@ -8,10 +9,11 @@ import { DraftContext, type DraftContextValue } from "../src/areas/studio/draft/
 import { PathsPanel } from "../src/areas/studio/panels/PathsPanel.js";
 
 /**
- * `studio-condition-builder`: "The path inspector shows a "triggered by"
- * control, and the guard for either trigger under an "Only when" heading".
+ * `studio-condition-builder`: "A way out's row shows a "How it is taken"
+ * control" and "A way out's guard stands under "Only when" for either trigger".
  * A manual path shows its guard editor and no `priority` input; an automatic
- * path keeps both. The context is hand-built, as in
+ * path keeps both. `studio-step-page`: "A way out reads as a sentence and
+ * keeps its key in its own Developer view". The context is hand-built, as in
  * `studio-actionListEditor-registryBadge.test.tsx`: a live `DraftProvider`
  * resolves its fetches async and never settles under `renderToStaticMarkup`.
  */
@@ -42,7 +44,7 @@ const FIELDS = [
 
 const STEPS = [
   { id: "step_a", key: "intake", type: "task" },
-  { id: "step_b", key: "approved", type: "task" },
+  { id: "step_b", key: "approved", type: "task", label: { en: "Done" } },
 ] as unknown as DraftStep[];
 
 const context: DraftContextValue = {
@@ -78,9 +80,15 @@ function render(path: Record<string, unknown>): string {
   );
 }
 
-// The caption: plain words, then the JSON property in a mono `<code>` (`ui-string-overrides`).
-const PRIORITY_INPUT = /<label>Order among automatic paths <code[^>]*>priority<\/code><input/;
-const NOTE = "The participant sees this path&#x27;s button only while the condition holds.";
+// A caption prints its catalog words alone; no `<code>` JSON property follows (`ui-string-overrides`).
+const PRIORITY_INPUT = /<label>Tried in this order, lowest first<input/;
+const NOTE = "The person sees this way out&#x27;s button only while the condition holds.";
+
+/** True where `text` stands inside an open `<label>` element. */
+function insideLabel(html: string, text: string): boolean {
+  const before = html.slice(0, html.indexOf(text));
+  return before.lastIndexOf("<label") > before.lastIndexOf("</label>");
+}
 
 describe("a manual path with a guard", () => {
   const html = render({ trigger: "manual", guard: GUARD });
@@ -93,7 +101,12 @@ describe("a manual path with a guard", () => {
 
   it("says the participant sees the button only while the condition holds", () => {
     expect(html).toContain(NOTE);
-    expect(html).toContain("leave empty to always offer this path");
+    expect(html).toContain("Leave it empty to always offer this way out.");
+  });
+
+  it("prints the hint as a note, outside any label", () => {
+    expect(html).toMatch(/<p[^>]*>Leave it empty to always offer this way out\.<\/p>/);
+    expect(insideLabel(html, "Leave it empty to always offer this way out.")).toBe(false);
   });
 
   it("shows no priority input", () => {
@@ -106,7 +119,7 @@ describe("a manual path with no guard", () => {
     const html = render({ trigger: "manual" });
 
     expect(html).toContain("Only when");
-    expect(html).toContain("leave empty to always offer this path");
+    expect(html).toContain("Leave it empty to always offer this way out.");
     expect(html).not.toMatch(PRIORITY_INPUT);
   });
 });
@@ -117,11 +130,90 @@ describe("an automatic path", () => {
   it("shows the priority input beside the guard", () => {
     expect(html).toContain("Only when");
     expect(html).toMatch(PRIORITY_INPUT);
-    expect(html).toContain("guard (omit for the default/else path)");
+    expect(html).toContain("Leave it empty on the one way out taken when nothing else matches.");
+  });
+
+  it("prints the hint as a note, outside any label", () => {
+    const hint = "Leave it empty on the one way out taken when nothing else matches.";
+
+    expect(html).toMatch(new RegExp(`<p[^>]*>${hint.replace(/\./g, "\\.")}</p>`));
+    expect(insideLabel(html, hint)).toBe(false);
   });
 
   it("carries no manual-path note", () => {
     expect(html).not.toContain(NOTE);
-    expect(html).not.toContain("leave empty to always offer this path");
+    expect(html).not.toContain("Leave it empty to always offer this way out.");
+  });
+
+  it("prints no JSON property name in a code element", () => {
+    expect(html).not.toMatch(/<code[^>]*>priority<\/code>/);
+    expect(html).not.toMatch(/<code[^>]*>onPath<\/code>/);
+  });
+});
+
+/** The `<h4>` heading each row opens with, or `undefined` where none stands. */
+function rowHeading(html: string): string | undefined {
+  return html.match(/<h4[^>]*>([^<]*)<\/h4>/)?.[1];
+}
+
+describe("a way out's heading sentence", () => {
+  it("reads the way out's name, an arrow and the target step's name", () => {
+    expect(rowHeading(render({}))).toBe("Approve → Done");
+  });
+
+  it("opens the row, ahead of the Name caption", () => {
+    const html = render({});
+
+    expect(html.indexOf("<h4")).toBeGreaterThan(-1);
+    expect(html.indexOf("<h4")).toBeLessThan(html.indexOf(">Name<"));
+  });
+
+  it("says an unnamed way out is unnamed", () => {
+    expect(rowHeading(render({ label: "" }))).toBe("(unnamed way out) → Done");
+    expect(rowHeading(render({ label: "   " }))).toBe("(unnamed way out) → Done");
+  });
+
+  it("prints a name holding a placeholder or a replacement pattern verbatim", () => {
+    expect(rowHeading(render({ label: "A {step} $&" }))).toBe("A {step} $&amp; → Done");
+  });
+
+  it("falls to the target's key where the target has no name", () => {
+    expect(rowHeading(render({ to: "step_a" }))).toBe("Approve → intake");
+  });
+
+  it("says no step is chosen yet where the way out leads nowhere", () => {
+    expect(rowHeading(render({ to: undefined }))).toBe("Approve → (no step yet)");
+    expect(rowHeading(render({ to: "step_gone" }))).toBe("Approve → (no step yet)");
+  });
+});
+
+describe("a way out's key", () => {
+  const html = render({});
+  const details = html.indexOf("<details");
+
+  it("stands inside the row's own Developer view, closed until opened", () => {
+    expect(details).toBeGreaterThan(-1);
+    expect(html).not.toMatch(/<details[^>]*\sopen/);
+    expect(html.slice(details)).toMatch(/^<details[^>]*><summary[^>]*>Developer view<\/summary>/);
+  });
+
+  it("has no key input outside that disclosure", () => {
+    const keyInput = html.indexOf('value="approve"');
+
+    expect(keyInput).toBeGreaterThan(details);
+    expect(keyInput).toBeLessThan(html.indexOf("</details>"));
+    expect(html.slice(0, details)).not.toContain('value="approve"');
+  });
+
+  it("writes the key from the input inside that disclosure", () => {
+    const source = readFileSync(new URL("../src/areas/studio/panels/PathsPanel.tsx", import.meta.url), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/^\s*\/\/.*$/gm, "");
+    const start = source.indexOf("<details");
+    const block = source.slice(start, source.indexOf("</details>", start));
+
+    expect(start).toBeGreaterThan(-1);
+    expect(block).toContain("updatePath(index, { key: e.target.value })");
+    expect(source.slice(0, start)).not.toContain("updatePath(index, { key: e.target.value })");
   });
 });

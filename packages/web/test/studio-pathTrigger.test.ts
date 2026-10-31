@@ -7,8 +7,9 @@ import { replaceAt, updateAt } from "../src/areas/studio/draft/list-ops.js";
 
 /**
  * `studio-canvas`: "A new path takes the trigger its source step already
- * uses", and `studio-condition-builder`: choosing "a participant's choice"
- * keeps the guard and drops `priority`. Both rules are pure, so they are
+ * uses", and `studio-condition-builder` ("A way out's row shows a "How it is
+ * taken" control"): choosing "A person chooses" keeps the guard and drops
+ * `priority`. Both rules are pure, so they are
  * tested here; the two call sites are pinned by a source scan below.
  */
 

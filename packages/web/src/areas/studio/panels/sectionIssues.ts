@@ -69,7 +69,7 @@ function locKeys(loc: string): string[] {
 
 /**
  * One issue's section, or `undefined` where it belongs to none of the
- * sections this step's kind stands. An end step carries no On exit section,
+ * sections this step's kind stands. An end step carries no When left section,
  * so an `onExit` issue on one lands nowhere rather than at a heading the page
  * does not draw.
  */

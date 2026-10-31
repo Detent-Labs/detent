@@ -23,7 +23,7 @@ export type SectionName =
   | "collaboration";
 
 /** The leading column, in reading order. It takes about three fifths of the
- * page: Path to and Assignment carry the routing and the actor, the pair an
+ * page: Ways out and Who acts carry the routing and the actor, the pair an
  * author reads first and changes most (design.md). */
 const LEADING: SectionName[] = ["paths", "assignment", "cancellable", "subprocess", "howItEnds"];
 
@@ -39,9 +39,9 @@ const SUBPROCESS: SectionName[] = ["paths", "cancellable", "subprocess", "entry"
  * section SHALL stand only where the step's kind declares it").
  *
  * An end step carries How the case ends, and no outgoing path: it therefore
- * carries neither On exit nor Time limit, nor Cancellable — an instance
+ * carries neither When left nor Time limit, nor Cancellable — an instance
  * resting on a terminal step has already left the running state that field
- * governs. A subprocess step drops Assignment and Step form fields and gains
+ * governs. A subprocess step drops Who acts and Form and gains
  * Which process it calls, since it is a wait-state with no participant form.
  * A subprocess step carries no Collaboration section either: it is an
  * automatic wait-state with no participant-facing task screen for the

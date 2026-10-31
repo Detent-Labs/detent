@@ -85,9 +85,9 @@ Every other term below belongs to one tab.
 | steps rail | the Steps tab's left column: one numbered row per step, in the draft's own order | `panels/StepsRail.tsx` |
 | grip | the steps rail's own drag control, trailing each row | `panels/StepsRail.tsx` (`GripVertical`) |
 | step page | the Steps tab's wide right column, open on the one selected step | `panels/StepPage.tsx` |
-| masthead | the step page's top zone. It holds the step number, the kind phrase, the name, the key, the description, and the issues no section claims | `panels/StepPage.tsx` |
+| masthead | the step page's top zone. It holds the step number, the kind phrase, the name, the description, and the issues no section claims | `panels/StepPage.tsx` |
 | section | one subject group on the step page, standing open in one of two columns | `panels/sectionsFor.ts` |
-| Developer view | a disclosure over raw JSON or CEL. The step page and the change-list row each hold one. So does a field's own editor, the form editor, and a condition or rule input. It stands closed on open | `panels/StepPage.tsx`, `panels/ChangeList.tsx`, `panels/FieldCatalogPanel.tsx`, `screens/FormEditorScreen.tsx`, `panels/shared/ConditionInput.tsx`, `panels/shared/RuleInput.tsx` |
+| Developer view | a disclosure over raw JSON or CEL. The step page's holds the step's key input and its JSON. Each way-out row on the step page holds one with that way out's key input. The change-list row holds one. So does a field's own editor, the form editor, and a condition or rule input. It stands closed on open | `panels/StepPage.tsx`, `panels/PathsPanel.tsx`, `panels/ChangeList.tsx`, `panels/FieldCatalogPanel.tsx`, `screens/FormEditorScreen.tsx`, `panels/shared/ConditionInput.tsx`, `panels/shared/RuleInput.tsx` |
 | entity rail | the Fields and Data sources tabs' own left column: one row per entity | `panels/EntityTabs.tsx` |
 | field catalog | the Fields tab's editor over the process's field definitions | `panels/FieldCatalogPanel.tsx` |
 | data sources | the Data sources tab's editor over the process's data source definitions | `panels/DataSourcesPanel.tsx` |
@@ -212,9 +212,13 @@ section body on the step page, or as a whole tab's own body elsewhere
 
 ## 2. Domain terms as the UI shows them
 
-The JSON definition is the definition contract. Its words win in UI text, in
-commit messages, and in conversation. A rendering layer may hold a different
+The JSON definition is the definition contract. Its words win in docs, specs,
+commit messages and conversation. UI text prints the author's word per the
+author's-word table below. A rendering layer may hold a different
 word internally, and that word stays inside the layer.
+
+The first table's "The word we use" column binds docs, specs, code and
+conversation.
 
 | JSON term | The word we use | The layer's own word | Rule |
 |---|---|---|---|
@@ -222,10 +226,31 @@ word internally, and that word stays inside the layer.
 | Path | path | `edge` (canvas geometry) | never *edge* outside `canvas/` |
 | Expression | CEL | `CelNode` (the parsed AST) | *CEL* names the source text |
 
-These rules bind UI text, docs, specs, commit messages and conversation. A
-code identifier stays out of scope: `EdgeStyle` in
-`studio/screens/EditScreen.tsx:41` and the key `stepsRail.dragHandle` are
-code, and the rule above does not reach them.
+An authoring control prints the author's word. The contract's word stands
+only in a Developer view. A caption never prints a JSON property name.
+
+| Contract word | Author's word |
+|---|---|
+| path | way out |
+| guard | only if |
+| trigger manual / automatic | A person chooses / Happens by itself |
+| priority | tried in this order |
+| assignment | who acts |
+| timer | time limit |
+| onEntry / onExit actions | what happens when entered / when left |
+| terminal step | an end |
+| subprocess step | a call to another process |
+| data source | where values come from |
+| outcome | how it ended |
+| required / readonly / visible | Required / Read-only / Asked |
+
+The capability `studio-guided-vocabulary` carries the same table. A change to
+one changes the other.
+
+These rules bind docs, specs, commit messages and conversation. UI text
+follows the author's-word table. A code identifier stays out of scope:
+`EdgeStyle` in `studio/screens/EditScreen.tsx:41` and the key
+`stepsRail.dragHandle` are code, and the rule above does not reach them.
 
 `canvas/geometry.ts` measures rectangles and knows nothing about steps.
 `NODE_WIDTH` is the honest name for a width. The canvas renders a step as a

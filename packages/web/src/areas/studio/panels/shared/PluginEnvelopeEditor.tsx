@@ -5,7 +5,6 @@ import type { Plugin } from "workflow-engine/schema";
 import type { DraftOf } from "../../draft/types";
 import type { ConfigFieldDescriptor } from "../../api/types.js";
 import { t, type CatalogKey } from "../../catalog.js";
-import { KeyCaption } from "./KeyCaption";
 import { parsedConfigBase, shownConfig, type ConfigEdit } from "./pluginConfigText.js";
 
 const styles = stylex.create({
@@ -259,7 +258,7 @@ export function PluginEnvelopeEditor({
     <fieldset className="plugin-envelope">
       <legend>{label}</legend>
       <label>
-        <KeyCaption text={t("plugin.typeCaption")} jsonKey="type" />
+        {t("plugin.typeCaption")}
         {selectableTypes ? (
           <select
             value={currentType}
@@ -316,7 +315,7 @@ export function PluginEnvelopeEditor({
       ) : (
         <>
           <label>
-            <KeyCaption text={t("plugin.configCaption")} jsonKey="config" />
+            {t("plugin.configCaption")}
             <textarea rows={3} value={configText} onChange={(e) => commitConfig(e.target.value)} />
           </label>
           {configError && (
@@ -333,7 +332,7 @@ export function PluginEnvelopeEditor({
       )}
 
       <label>
-        <KeyCaption text={t("plugin.descriptionCaption")} jsonKey="description" />
+        {t("plugin.descriptionCaption")}
         <input
           type="text"
           value={value?.description ?? ""}

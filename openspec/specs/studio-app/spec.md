@@ -1472,19 +1472,25 @@ The Changes tab SHALL print its number of rows as its own count.
 
 ### Requirement: The panels screen's Paths view lists every path in the process
 
+<!-- Why: "How it is taken" quotes the catalog value word for word; the passive is the UI string, not this sentence. -->
+<!-- antislop: allow passive-voice -->
 The Paths tab SHALL carry one row per path across the whole draft. The five
-columns are source step, trigger, priority, guard and target. A canvas draws a
-path as a line, and a line hides those five values.
+columns are source step, trigger, priority, guard and target. Their headings
+SHALL read the author's words: "Source step", "How it is taken", "Tried",
+"Only if" and "Leads to". A canvas draws a path as a line, and a line hides
+those five values.
 
 Rows SHALL follow the draft's own order. The steps order the rows first, and each
 step's own path order orders the rows inside it.
 
-A path with no guard SHALL read as such, and so SHALL a path with no priority.
-The tab states each absence rather than leaving a blank cell unexplained. A guard
-is independent of the trigger. A manual path can carry one. That guard decides
-whether the participant may take the path, so the tab SHALL carry it.
+A path with no guard SHALL read "Always", and a path with no priority SHALL
+read "No order". The tab states each absence rather than leaving a blank
+cell unexplained. A guard is independent of the trigger. A manual path can
+carry one. That guard decides whether the participant may take the path, so
+the tab SHALL carry it.
 
-A draft with no path at all SHALL carry an empty state naming that fact.
+A draft with no path at all SHALL carry an empty state naming that fact, in
+the words "way out".
 
 The row derivation SHALL live in a pure module with `bun:test` coverage, the
 convention `packages/web/src/areas/app/screens/inboxLogic.ts` sets. It takes the
@@ -1506,7 +1512,8 @@ The Paths tab SHALL print the path count as its own count.
 #### Scenario: A manual path with no guard reads as carrying none
 
 - **WHEN** a step's manual paths carry no guard and no priority
-- **THEN** each of their rows reads as carrying no priority and no guard
+- **THEN** each of their rows reads "Always" under "Only if" and "No order"
+  under "Tried"
 
 #### Scenario: A manual path carrying a guard shows it
 
@@ -1522,7 +1529,7 @@ The Paths tab SHALL print the path count as its own count.
 #### Scenario: A draft with no path shows an empty state
 
 - **WHEN** the author opens the Paths tab on a draft holding no path
-- **THEN** the tab says the process has no path yet
+- **THEN** the tab says the process has no way out yet
 
 #### Scenario: The row derivation holds without rendering
 

@@ -11,7 +11,6 @@ import { maxTimeLimitCount, timeLimitDuration, timeLimitInRange, timeLimitParts,
 import { t, type CatalogKey } from "../catalog.js";
 import { ExpressionInput } from "./shared/ExpressionInput";
 import { IssueList } from "./shared/IssueList";
-import { KeyCaption } from "./shared/KeyCaption";
 import { ActionListEditor } from "./ActionListEditor";
 import type { ConfigFieldDescriptor } from "../api/types.js";
 
@@ -171,7 +170,7 @@ export function TimersPanel({ timers, paths, fields, onChange, registryTypes, re
         return (
           <div className="timer-row" key={timer.id ?? index}>
             <label>
-              <KeyCaption text={t("timers.descriptionCaption")} jsonKey="description" />
+              {t("timers.descriptionCaption")}
               <input
                 type="text"
                 value={timer.description ?? ""}
@@ -180,7 +179,7 @@ export function TimersPanel({ timers, paths, fields, onChange, registryTypes, re
             </label>
 
             <label>
-              <KeyCaption text={t("timers.kindCaption")} />
+              {t("timers.kindCaption")}
               <select
                 value={mode}
                 onChange={(e) => {
@@ -197,13 +196,13 @@ export function TimersPanel({ timers, paths, fields, onChange, registryTypes, re
               <TimeLimitInput value={timer.duration} onChange={(duration) => updateTimer(index, { duration })} />
             ) : (
               <label>
-                <KeyCaption text={t("timers.deadlineCaption")} jsonKey="deadline" />
+                {t("timers.deadlineCaption")}
                 <ExpressionInput value={timer.deadline} onChange={(deadline) => updateTimer(index, deadlinePatch(deadline))} />
               </label>
             )}
 
             <label>
-              <KeyCaption text={t("timers.targetPathCaption")} jsonKey="onFire.targetPath" />
+              {t("timers.targetPathCaption")}
               <select
                 value={timer.onFire?.targetPath ?? ""}
                 onChange={(e) =>
@@ -225,7 +224,7 @@ export function TimersPanel({ timers, paths, fields, onChange, registryTypes, re
             </label>
 
             <ActionListEditor
-              label={<KeyCaption text={t("timers.onFireActionsLegend")} jsonKey="onFire.actions" />}
+              label={t("timers.onFireActionsLegend")}
               actions={timer.onFire?.actions}
               onChange={(actions) => updateTimer(index, { onFire: { ...timer.onFire, actions } })}
               fields={fields}

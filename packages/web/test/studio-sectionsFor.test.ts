@@ -53,7 +53,7 @@ describe("sectionsFor", () => {
     expect(sectionsFor("participant")).not.toContain("howItEnds");
   });
 
-  it("gives an end step How the case ends, and no outgoing path", () => {
+  it("gives an end step How the case ends, and no way out", () => {
     const sections = sectionsFor("terminal");
 
     expect(sections).toContain("howItEnds");
@@ -62,7 +62,7 @@ describe("sectionsFor", () => {
     expect(sections).not.toContain("timers");
   });
 
-  it("omits Assignment, Step form fields and Collaboration on a subprocess step, which has no participant form", () => {
+  it("omits Who acts, Form and Collaboration on a subprocess step, which has no participant form", () => {
     const sections = sectionsFor("subprocess");
 
     expect(sections).toContain("subprocess");

@@ -37,7 +37,7 @@ const step = ds({
 });
 
 describe("sectionOfIssue routes by the entity an issue resolved to", () => {
-  it("lands a path's guard issue at Path to", () => {
+  it("lands a path's guard issue at Ways out", () => {
     expect(sectionOfIssue(step, issue("path", "path_1"), PARTICIPANT)).toBe("paths");
   });
 
@@ -59,13 +59,13 @@ describe("sectionOfIssue routes by the entity an issue resolved to", () => {
 });
 
 describe("sectionOfIssue routes a step-level issue by its loc", () => {
-  it("stands an assignment issue at Assignment", () => {
+  it("stands an assignment issue at Who acts", () => {
     const at = issue("step", "step_a", "workflow.steps[0].assignment.strategy.config.groupId");
 
     expect(sectionOfIssue(step, at, PARTICIPANT)).toBe("assignment");
   });
 
-  it("stands a view issue at Step form fields", () => {
+  it("stands a view issue at Form", () => {
     const at = issue("step", "step_a", "workflow.steps[0].view.fields[1].required");
 
     expect(sectionOfIssue(step, at, PARTICIPANT)).toBe("form");
@@ -92,7 +92,7 @@ describe("sectionOfIssue routes a step-level issue by its loc", () => {
   });
 
   it("names no section a step's own kind does not stand", () => {
-    // An end step carries no On exit section, so an `onExit` issue on one
+    // An end step carries no When left section, so an `onExit` issue on one
     // lands nowhere rather than at a heading the page does not draw.
     const ends = ds({ id: "step_a", terminal: true });
     const at = issue("step", "step_a", "workflow.steps[0].onExit[0].type");

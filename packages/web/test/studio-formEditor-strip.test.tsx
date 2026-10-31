@@ -45,20 +45,20 @@ const render = (technicalFieldIds: Set<string>) =>
 describe("FormEditorStrip", () => {
   it("emits no required or readonly control for a technical field, and keeps visible/span, and no group control", () => {
     const html = render(new Set(["field_amount"]));
-    expect(html).toContain(">visible<");
-    expect(html).not.toContain(">required<");
-    expect(html).not.toContain(">readonly<");
-    expect(html).toContain(">span<");
-    expect(html).not.toContain(">group<");
+    expect(html).toContain(">Asked<");
+    expect(html).not.toContain(">Required<");
+    expect(html).not.toContain(">Read-only<");
+    expect(html).toContain(">Width<");
+    expect(html).not.toContain(">Group<");
   });
 
   it("emits every override control for a non-technical field, and no group control", () => {
     const html = render(new Set());
-    expect(html).toContain(">visible<");
-    expect(html).toContain(">required<");
-    expect(html).toContain(">readonly<");
-    expect(html).toContain(">span<");
-    expect(html).not.toContain(">group<");
+    expect(html).toContain(">Asked<");
+    expect(html).toContain(">Required<");
+    expect(html).toContain(">Read-only<");
+    expect(html).toContain(">Width<");
+    expect(html).not.toContain(">Group<");
   });
 });
 
@@ -134,7 +134,7 @@ describe("the strip's tab picker", () => {
   it("lists the form's tabs, and selects the one the entry names", () => {
     const html = renderTabbed({ tabValue: "tab_2" });
 
-    expect(html).toContain(">tab<");
+    expect(html).toContain(">Tab<");
     expect(html).toContain("Details");
     expect(html).toContain("Approval");
     expect(html).toContain('value="tab_2"');
@@ -148,8 +148,8 @@ describe("the strip's tab picker", () => {
   it("carries the tab picker and no group control: the field catalog owns a field's group", () => {
     const html = renderTabbed({ tabValue: "tab_1" });
 
-    expect(html).toContain(">tab<");
-    expect(html).not.toContain(">group<");
+    expect(html).toContain(">Tab<");
+    expect(html).not.toContain(">Group<");
   });
 
   it("shows a member its group's tab, inert, with the reason beside it", () => {
@@ -157,13 +157,13 @@ describe("the strip's tab picker", () => {
 
     expect(html).toMatch(/<option value="tab_2" selected="">Approval<\/option>/);
     expect(html).toContain("The group decides the tab.");
-    expect(html).not.toContain(">group<");
+    expect(html).not.toContain(">Group<");
   });
 
   it("draws no picker at all on an untabbed form", () => {
     const html = renderTabbed({ tabOptions: [] });
 
-    expect(html).not.toContain(">tab<");
+    expect(html).not.toContain(">Tab<");
   });
 
   it("stays inert for an entry naming a group, and says why", () => {
@@ -240,7 +240,7 @@ describe("the note strip on a tabbed form", () => {
       </DraftContext.Provider>,
     );
 
-    expect(html).toContain(">group<");
-    expect(html).toContain(">tab<");
+    expect(html).toContain(">Group<");
+    expect(html).toContain(">Tab<");
   });
 });

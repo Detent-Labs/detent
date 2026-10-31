@@ -536,17 +536,17 @@ word. `ROADMAP.md` carries stage-by-stage status.
   rewording untouched prose would exceed the delta and put new text under the
   prose ratchet. A sweep of the stale word wants its own change, together
   with the six requirements that still say "edit rail".
-- **Retired UI words still sit in live specs and in the studio catalog.**
+- **Retired UI words still sit in live specs.**
   `openspec/specs/studio-app/spec.md:841` and
   `openspec/specs/studio-canvas/spec.md:1113`, `:3005` and `:3053` still
   read "panels screen", "ribbon", "bench", "steps register", "configuration
   pane" and "inspector". `studio-canvas/spec.md:2110` names an "edit rail"
-  and a `canvas/EditRail.tsx` that no longer exists.
-
-  Two dead catalog keys, `ribbon.expand` and `ribbon.collapse`, sit at
-  `packages/web/src/i18n/catalogs/studio.ts:839-840`. One displayed string
-  says "finding" where the rest of the UI says "issue" (`studio.ts:558`). A
-  spec sweep and a catalog cleanup each want their own OpenSpec change.
+  and a `canvas/EditRail.tsx` that no longer exists. The same spec still
+  names the step page's "Path to" section at `:875`, `:1133`, `:3007`,
+  `:3032`, `:3040` and `:3047`. `openspec/specs/studio-canvas/spec.md:3005-3020`
+  still gives the way out's key the masthead's mono treatment inside the row.
+  The key sits in the row's Developer view now, and the spec sweep covers that
+  prose too. A spec sweep wants its own OpenSpec change.
 - **The glossary and the live spec name the Access tab differently.**
   `.claude/rules/ui-glossary.md` names it "Access tab", over
   `panels/AccessPanel.tsx`. `openspec/specs/studio-app/spec.md:4675`,

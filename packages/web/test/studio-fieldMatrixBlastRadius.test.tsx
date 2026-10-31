@@ -57,14 +57,14 @@ describe("a bulk badge's blast radius", () => {
 
   it("gives two badges for one flag different names", () => {
     // The defect this fixes: both of these were "required" before.
-    const required = labels.filter((l) => l.startsWith("required."));
+    const required = labels.filter((l) => l.startsWith("Required."));
     expect(required.length).toBeGreaterThan(1);
     expect(new Set(required).size).toBe(required.length);
   });
 
   it("states both counts on a mixed target", () => {
     // The field's row spans two cells and one already carries `required`.
-    const row = labels.find((l) => l.startsWith("required.") && l.includes("field vendor"));
+    const row = labels.find((l) => l.startsWith("Required.") && l.includes("field vendor"));
     expect(row).toBeDefined();
     expect(row).toContain("Cells it writes: 2");
     expect(row).toContain("Already set: 1");
@@ -73,7 +73,7 @@ describe("a bulk badge's blast radius", () => {
   it("states the clearing count on a full target", () => {
     // `capture`'s column holds one live cell and it carries `required`, so a
     // press there clears rather than sets.
-    const col = labels.find((l) => l.startsWith("required.") && l.includes("step Capture"));
+    const col = labels.find((l) => l.startsWith("Required.") && l.includes("step Capture"));
     // One eligible cell, and the wording still reads: no "1 cells".
     expect(col).toContain("Cells it writes: 1");
     expect(col).not.toContain("1 cells");
@@ -81,7 +81,7 @@ describe("a bulk badge's blast radius", () => {
 
   it("puts the same sentence in the title a pointer user reads", () => {
     const titles = [...html.matchAll(/title="([^"]*)"/g)].map((m) => m[1]!);
-    const row = labels.find((l) => l.startsWith("required.") && l.includes("field vendor"))!;
+    const row = labels.find((l) => l.startsWith("Required.") && l.includes("field vendor"))!;
     expect(titles).toContain(row);
   });
 
@@ -89,9 +89,9 @@ describe("a bulk badge's blast radius", () => {
     // The catalog rule forbids building one sentence out of fragments. The
     // flag word stays a complete label, and the count sentence carries no
     // flag inside it.
-    for (const l of labels.filter((x) => x.startsWith("required."))) {
-      expect(l.split(". ")[0]).toBe("required");
-      expect(l.slice("required. ".length)).not.toContain("required");
+    for (const l of labels.filter((x) => x.startsWith("Required."))) {
+      expect(l.split(". ")[0]).toBe("Required");
+      expect(l.slice("Required. ".length)).not.toContain("Required");
     }
   });
 });
