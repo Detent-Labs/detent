@@ -24,22 +24,22 @@ wherever the studio edits one. That includes the field catalog's
 row edits a field's `visible` override across every step view that references
 the field.
 
-Below the rows the builder SHALL show the CEL it produces, on a
-read-only line.
+Below the rows the builder SHALL show the condition as a sentence. The
+requirement "The builder reads the condition as a sentence" states it.
 
 That row's operand picker SHALL withhold `child.outcome` and
 `child.data`. It writes one expression across steps of mixed type. The
 requirement "A subprocess step's path guards offer the child's contract as
 operands" scopes those operands. Only a path guard on the subprocess step
-itself offers them. The row keeps the CEL toggle presentation every
-view-override site takes.
+itself offers them. The row keeps its CEL in the same Developer view every
+site takes.
 
 A timer deadline is not a condition and keeps its text input.
 
 #### Scenario: A path guard opens on the builder
 
 - **WHEN** a developer opens a path's guard editor
-- **THEN** the row builder appears, with the CEL it produces below it
+- **THEN** the row builder appears, with its sentence below it
 
 #### Scenario: A view override opens on the builder
 
@@ -59,23 +59,69 @@ A timer deadline is not a condition and keeps its text input.
 - **WHEN** a developer opens a timer's deadline expression
 - **THEN** the plain CEL text input appears, unchanged
 
+### Requirement: The builder reads the condition as a sentence
+
+Under the rows the builder SHALL print the condition in words, in place of
+its CEL. Each complete row SHALL read as one clause: the operand's label, the
+operator's words and the value. The joiner SHALL read "and" or "or".
+
+A closed list's value SHALL print as the option's label. A boolean's SHALL
+print as "yes" or "no", and a number's as a formatted number. Free text SHALL print
+in curly quotes. With no row and no stored condition, the sentence SHALL say
+that the condition always matches.
+
+#### Scenario: A two-row guard reads as one sentence
+
+- **WHEN** a guard reads `data.amount > 1000.0 && data.status == "approved"`
+- **AND** `status` offers the option "approved" labeled "Approved"
+<!-- antislop: allow passive-voice -->
+<!-- Why: the quoted sentence is the builder's own output, and "is Approved" names a value. -->
+- **THEN** the sentence reads "Amount is greater than 1,000 and Status is
+  Approved."
+- **AND** the builder site prints no CEL outside its Developer view
+
+#### Scenario: A boolean row reads yes or no
+
+- **WHEN** a guard reads `data.approved == false`
+- **THEN** the sentence reads "Approved is no."
+
+#### Scenario: Free text stands in quotes
+
+- **WHEN** a guard reads `data.city == "Bern"` on a text field labeled "City"
+- **THEN** the sentence reads "City is “Bern”."
+
+#### Scenario: An empty site says it always matches
+
+- **WHEN** a condition site has no expression and no row
+- **THEN** the sentence reads "No condition yet: this always matches."
+
+#### Scenario: The Fields tab's divergent state says the steps disagree
+
+- **WHEN** the steps that ask a field hold different `visible` overrides
+- **AND** a developer opens "Only ask this when" on the Fields tab
+- **THEN** the sentence reads "The steps hold different conditions. Build
+  one here to set it on every step."
+- **AND** it does not read "this always matches"
+
 ### Requirement: The CEL surface stays reachable from every builder site
 
-The builder SHALL carry a toggle to a CEL text input holding the same
-expression. The chosen mode SHALL NOT persist to the draft or to the published
-body.
+Every builder site SHALL carry a CEL text input holding the same expression,
+inside the site's Developer view. Editing that text SHALL re-read the rows.
+Whether the Developer view stands open SHALL NOT persist to the draft or to
+the published body.
 
 #### Scenario: An author switches to CEL and back
 
-- **WHEN** a developer toggles to the CEL surface at a condition site
-- **THEN** the text input holds the same expression the rows produced, and
-  toggling back reads it into rows again
+- **WHEN** a developer opens the Developer view at a condition site
+- **THEN** its text input holds the same expression the rows produced
+- **AND** a parseable edit of that text shows as rows above it
 
 #### Scenario: The mode is not stored
 
-- **WHEN** a developer leaves a condition site in CEL mode and returns to it
-- **THEN** the site opens on the builder again, and no part of the draft records
-  the earlier mode
+- **WHEN** a developer opens a condition site's Developer view and reloads
+  the draft
+- **THEN** the Developer view stands closed again, and no part of the draft
+  records the earlier state
 
 ### Requirement: An existing condition reads back into the builder
 
@@ -120,22 +166,29 @@ A raw row SHALL gain parentheses when the condition holds a second row.
 - **THEN** the builder shows it as a raw row with its text unchanged
 - **AND** the existing validation reports the unknown variable as it does today
 
-### Requirement: Source that does not parse holds the builder closed
+### Requirement: Source that does not parse opens the Developer view
 
-The stored source may not parse. The site SHALL then open on the CEL text input,
-with the toggle disabled. It SHALL show the parse message as the hint. The
-toggle SHALL become available as soon as the source parses.
+The stored source may not parse. The site SHALL then open with its Developer
+view open on the CEL text input. A line in place of the rows and the sentence
+SHALL say that the condition cannot show as rows. It SHALL say where to fix
+it, as a status message.
 
-#### Scenario: An unparseable guard opens in CEL mode
+Once the source parses, the rows and the sentence SHALL return. The Developer
+view SHALL stay open.
+
+#### Scenario: An unparseable guard opens on the Developer view
 
 - **WHEN** a developer opens a condition whose source does not parse
-- **THEN** the CEL text input appears, the builder toggle stays disabled, and
-  the site shows the parse message
+- **THEN** the Developer view stands open, with the CEL text input holding the
+  source
+- **AND** the site says the condition cannot show as rows and points to the
+  Developer view
 
-#### Scenario: Fixing the syntax frees the toggle
+#### Scenario: Fixing the syntax brings the rows back
 
 - **WHEN** the developer corrects the source so it parses
-- **THEN** the builder toggle becomes available
+- **THEN** the rows and the sentence appear above the Developer view
+- **AND** the Developer view stays open
 
 ### Requirement: Only an authoring action writes the expression
 
@@ -209,14 +262,24 @@ change made through the JSON surface therefore still shows.
 
 The picker SHALL offer every leaf field of the draft's catalog as `data.<key>`.
 A group therefore contributes its leaves and not itself. Each entry SHALL show
-the field's label with its key beside it.
+the field's label and no key. A field with no label SHALL read "(unnamed
+field)". Where two fields share a label, the second and later SHALL add a
+count, such as "Name (2)".
 
 Beyond the catalog the picker SHALL read the engine's declared instance and
 actor context. It SHALL hide four entries: `instance.id`,
 `instance.currentStepId`, `instance.transitionSeq` and `actor.id`. None of the
 four can express a guard that means anything at a condition site.
 
-The picker is a suggestion list, not a permission gate. The CEL surface SHALL
+The context entries SHALL read in the author's words: "The case's status" for
+`instance.status` and "The person's roles" for `actor.roles`. The case's
+status SHALL offer its four values as words.
+
+The picker SHALL list the catalog's fields first. The called process's
+entries follow where the site offers them, then the case, then the person. Each list
+SHALL stand under its own heading, and a list with no entry SHALL draw none.
+
+The picker is a suggestion list and no permission gate. The CEL surface SHALL
 still reach every variable the engine registers.
 
 #### Scenario: A grouped field contributes its leaves
@@ -227,14 +290,32 @@ still reach every variable the engine registers.
 #### Scenario: The four hidden entries do not appear
 
 - **WHEN** a developer opens the operand picker
-- **THEN** `instance.status` and `actor.roles` appear
+- **THEN** "The case's status" and "The person's roles" appear
 - **AND** `instance.id`, `instance.currentStepId`, `instance.transitionSeq` and
   `actor.id` do not
 
 #### Scenario: The CEL surface still reaches a hidden variable
 
-- **WHEN** a developer types `actor.id == "usr_x"` in the CEL surface
+- **WHEN** a developer types `actor.id == "usr_x"` in the Developer view's CEL
+  input
 - **THEN** the expression stays valid exactly as it is today
+
+#### Scenario: A field entry shows its label alone
+
+- **WHEN** the catalog declares a field labeled "Amount" with the key `amount`
+- **THEN** the picker's entry reads "Amount", with no key beside it
+
+#### Scenario: Two fields sharing a label stay apart
+
+- **WHEN** the catalog declares two fields both labeled "Name"
+- **THEN** the picker offers "Name" and "Name (2)", in catalog order
+
+#### Scenario: The case and the person come last
+
+- **WHEN** a developer opens the operand picker on a draft with two fields
+- **THEN** the two fields stand first, under the heading "Fields"
+- **AND** "The case's status" follows under "The case", and "The person's
+  roles" under "The person"
 
 ### Requirement: A subprocess step's path guards offer the child's contract as operands
 
@@ -283,10 +364,16 @@ offers the six ordering and equality operators, whether it reports `double` or
 `int`. A string and a boolean offer equality only. A list offers a contains
 operator, which emits `in`.
 
+The operator select SHALL print each operator in words, and no CEL symbol.
+The words read "is", "is not", "is less than", "is at most", "is greater
+than", "is at least" and "contains".
+
 The value editor SHALL follow the operand's type and the field's own declared
 `format`. A field declaring options in the body SHALL show those options by
 label and write the option value. A boolean SHALL offer yes, no and an empty
-choice. A row on a boolean operand starts on the empty choice. The row
+choice.
+
+A row on a boolean operand starts on the empty choice. The row
 stays incomplete until the author picks yes or no. Picking "No" from the empty
 choice SHALL write the row. A number
 SHALL use a native number input, and a `format: "date"` or
@@ -337,6 +424,38 @@ resolves those values.
 
 - **WHEN** a developer picks "No" in the value select of that new row
 - **THEN** the builder writes `data.approved == false`
+
+#### Scenario: The operator select reads words
+
+- **WHEN** a developer picks a `number` field as the operand
+- **THEN** the operator select lists six options in words, from "is" to "is
+  at least"
+- **AND** no option prints `==`, `!=`, `<`, `<=`, `>` or `>=`
+
+### Requirement: The builder's rows print no CEL
+
+The joiner control SHALL read "and" or "or", and flipping it SHALL keep its
+behavior. A raw row SHALL print a sentence in place of its fragment's text.
+That sentence SHALL point to the Developer view. The row SHALL keep the
+fragment unchanged in the written expression, and its remove control SHALL
+stay. In the condition's sentence, a raw row SHALL read "a hand-written
+rule". The canvas edge label keeps the fragment's text.
+
+#### Scenario: The joiner reads a word
+
+- **WHEN** a guard holds two rows joined by `||`
+- **THEN** the joiner control reads "or"
+- **AND** pressing it makes the joiner read "and" and writes `&&`
+
+#### Scenario: A raw row reads as a sentence
+
+- **WHEN** a guard reads `data.tags.exists(t, t == "vip") && data.amount > 1000.0`
+- **THEN** the raw row reads "A hand-written rule. The Developer view holds
+  its text."
+- **AND** the page shows `data.tags.exists(t, t == "vip")` only inside the
+  Developer view
+- **AND** the sentence reads "A hand-written rule and Amount is greater than
+  1,000."
 
 ### Requirement: The written literal follows the operand's declared type
 
@@ -398,11 +517,9 @@ boolean operand as an explicit comparison against `true`.
 <!-- Why: copied byte for byte from the live requirement. -->
 ### Requirement: An incomplete row is held in the builder and not written
 
-<!-- antislop: allow negation-habit -->
-<!-- Why: copied byte for byte from the live requirement. -->
-A row may name an operand and carry no value. The builder SHALL then keep the
+A row may name an operand and have no value. The builder SHALL then keep the
 row visible and marked incomplete. It SHALL leave that row out of the written
-expression, and SHALL NOT emit a fragment that does not parse.
+expression. It SHALL never emit a fragment that fails to parse.
 
 When rows exist and none contributes, the builder SHALL write nothing. The
 expression the draft holds, if any, SHALL stand as it was.
@@ -412,8 +529,10 @@ that leaves no complete row SHALL remove the condition, the same as clearing
 the text input. A removal at a site whose draft has no condition SHALL leave
 the draft as it was.
 
-The readout line under the rows SHALL show the expression the draft holds while
-no row contributes.
+While no row contributes, the sentence under the rows SHALL read the
+condition the draft holds. It SHALL say that the condition stays until the
+author finishes the row. A site that holds nothing SHALL ask the author to
+finish a row instead.
 
 #### Scenario: A half-filled row does not reach the draft
 
@@ -434,12 +553,20 @@ no row contributes.
   row without a value
 - **THEN** the row stays visible and marked incomplete
 - **AND** the guard still reads `data.amount > 1000.0`
+- **AND** the sentence reads "Until you finish the row, the condition
+  stays: Amount is greater than 1,000."
 
 #### Scenario: Removing a row added to an empty site changes nothing
 
 - **WHEN** a condition site has no expression
 - **AND** an author adds a row and then removes it
 - **THEN** the site writes nothing
+
+#### Scenario: An unfinished row over nothing says so
+
+- **WHEN** a condition site has no expression
+- **AND** an author adds a row and leaves it without a value
+- **THEN** the sentence reads "Finish a row to set the condition."
 
 ### Requirement: The builder reads back every literal it writes
 
@@ -568,29 +695,32 @@ the person gets the button. The row SHALL say so beside the guard. The
 - **THEN** the "Only when" heading and the `ConditionBuilder` row UI render
 - **AND** no `priority` input renders
 
-### Requirement: The path-guard site's CEL toggle is a labeled "Developer view" disclosure
+### Requirement: Every condition site keeps its CEL in a Developer view
 
-The path-guard condition site's CEL toggle SHALL become a collapsible
-disclosure labeled "Developer view". This SHALL hold on the canvas edit
-screen only. This is the same toggle "The CEL surface stays reachable
-from every builder site" describes.
+Every condition site SHALL hold its CEL in a disclosure labeled "Developer
+view" under the builder. The disclosure SHALL stand closed on open, except
+over source that does not parse. The rows and the sentence SHALL stay
+visible while it stands open. Other specs name this disclosure the site's
+CEL toggle.
 
-The toggle's label and placement change at this one site. Its behavior
-does not: the mode still does not persist to the draft or to the
-published body.
+One site already stands inside a Developer view: the form editor's flag
+override. It SHALL show the CEL text input with no second disclosure.
 
-This requirement covers the path-guard site only. The view-override
-sites (`visible`, `required`, `readonly`) keep their existing toggle
-presentation; they sit outside this change's scope.
+#### Scenario: A way out's guard holds its CEL in a Developer view
 
-#### Scenario: The path-guard site's toggle reads "Developer view"
+- **WHEN** a developer opens a way out's "Only when" on the Steps tab
+- **THEN** a closed "Developer view" disclosure stands under the sentence
+- **AND** opening it shows the CEL text input, with the rows still above it
 
-- **WHEN** a developer opens a path's guard editor on the canvas edit
-  screen
-- **THEN** the CEL toggle appears as a "Developer view" disclosure
+#### Scenario: The field catalog's condition row holds its CEL in a Developer view
 
-#### Scenario: The toggle's mode still does not persist
+- **WHEN** a developer opens "Only ask this when" on the Fields tab
+- **THEN** a closed "Developer view" disclosure stands under the sentence
+- **AND** no "Edit as CEL" control appears
 
-- **WHEN** a developer opens the "Developer view" disclosure, reads the
-  CEL, and navigates away
-- **THEN** no part of the draft records that the disclosure was open
+#### Scenario: The form editor's override shows no second disclosure
+
+- **WHEN** a developer opens a flag's Developer view in the form editor and
+  picks CEL
+- **THEN** the builder, the sentence and the CEL text input appear, with no
+  second "Developer view" disclosure
