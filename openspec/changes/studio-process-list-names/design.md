@@ -343,6 +343,16 @@ tracks the gap in `docs/decisions.md`.
 | `processList.loading` | `Loading…` |
 | `processList.empty` | `No processes yet.` |
 
+### D11. The browser-check sweep
+
+Today 25 lines of `docs/browser-checks.md` find a process-list row by its
+key, or read its old cells and buttons. After the sweep, this search over
+that file prints nothing:
+
+```sh
+grep -nE 'Discard" on|reads an em dash|em dash under|beside Open|beside "Versions"|[Ff]ind (the row )?.(it_offboarding|access_request|laptop_inventory)|row\("(it_offboarding|access_request)"|.(it_offboarding|access_request|laptop_inventory). (and|row)' docs/browser-checks.md
+```
+
 ## Risks / Trade-offs
 
 - [A shared label] → Their Developer views tell the two rows

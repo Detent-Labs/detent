@@ -40,7 +40,7 @@ confirmation that names the process by its name. It SHALL call
 `DELETE /drafts/:processId`, leaving published versions untouched.
 
 The import action SHALL be a secondary button that opens the file chooser.
-The screen SHALL print no native file input.
+The native file input SHALL stay hidden.
 
 #### Scenario: A never-published process appears
 

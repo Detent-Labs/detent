@@ -56,6 +56,7 @@
 - [ ] 4.11a Strip the tags and the `<details>`. Assert the remaining text has no process id, key, revision, account id or hash.
 - [ ] 4.11f Use fixture values the row never prints otherwise: revision `4711`, key `pl_dev_key`, account id `user_fixture_saver`.
 - [ ] 4.11g The fixture hash is `hash_fixture_full`. Assert each of those four strings is absent from that text.
+- [ ] 4.11h Assert the `<details>` has no `open` attribute. Assert the four fixture values and the process id sit inside it.
 - [ ] 4.11b The `href` attribute carries the process id by design (D5), so the 4.11a check reads text only.
 - [ ] 4.11c Feed a view with `saved: { by: null, at: <now − 2h> }`. Assert the text "Saved 2 hours ago".
 - [ ] 4.11d Feed a view with `name: ""`. Assert "Untitled process" inside the link.
@@ -70,7 +71,8 @@
 - [ ] 5.2a In `docs/browser-checks.md`, re-point every process-list step that finds a row by its key or reads its old cells.
 - [ ] 5.2b Name the rows "IT Offboarding", "Access Request" and "Laptop Inventory", the button "Discard draft", the empty cell "No draft".
 - [ ] 5.2c In the `process-list-create-once` probe, pass the process name to `row(...)`.
-- [ ] 5.2d Then `grep -n 'choose "Discard" on\|em dash under Draft' docs/browser-checks.md` prints nothing.
+- [ ] 5.2d Drop "beside Open" and "Open is the plain control". Drop "beside Versions" from the discard pass condition.
+- [ ] 5.2e Then the D11 search prints nothing.
 - [ ] 5.3 In `ROADMAP.md` stage 64, append "Shipped <date>." to item 8.
 - [ ] 5.3a Make the stage's status line read "CHANGES 1, 2 AND 8 DONE, REST NOT STARTED".
 - [ ] 5.4 In `docs/decisions.md`, entry "The studio's six remaining `confirm()` prompts", fix the sentence on hardcoded English.
