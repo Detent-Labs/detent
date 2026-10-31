@@ -8,6 +8,7 @@ import {
   fieldLabelInputId,
   focusAfterRemove,
   groupTargetsFor,
+  labelChangePatch,
   moveFieldToGroup,
   moveTargetsFor,
   neighbourAfterRemove,
@@ -25,7 +26,7 @@ import type { Draft } from "../src/areas/studio/draft/types.js";
 
 describe("nextFieldKey", () => {
   it("derives a newly-minted top-level field's key (key '') from its label", () => {
-    const field = mintCatalogField("text", undefined);
+    const field = mintCatalogField("text", undefined, "en");
     expect(field.key).toBe("");
 
     const label = mergeLocalizedTextEntry(undefined, "en", "Requested amount");
@@ -609,5 +610,20 @@ describe("removalAnnouncement", () => {
     expect(removalAnnouncement("Cost $&", 0)).toBe("Cost $& removed.");
     expect(removalAnnouncement("Cost $&", 1)).toBe("Cost $& removed, with the one field inside it.");
     expect(removalAnnouncement("Cost $&", 2)).toBe("Cost $& removed, with the 2 fields inside it.");
+  });
+});
+
+describe("labelChangePatch beside a key-less field", () => {
+  it("derives the plain key when another field has no key yet", () => {
+    const draft = {
+      baseLocale: "en",
+      fields: [
+        { id: "field_new", key: "", type: "string", label: { en: "" } },
+        { id: "field_other", key: "", type: "string", label: { en: "" } },
+      ],
+    } as unknown as Draft;
+    const patch = labelChangePatch(draft, draft.fields![0] as DraftField, { en: "Amount" }, "en", new Set());
+
+    expect(patch).toEqual({ label: { en: "Amount" }, key: "amount" });
   });
 });

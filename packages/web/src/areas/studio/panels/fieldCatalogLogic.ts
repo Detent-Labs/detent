@@ -60,7 +60,8 @@ export function isFieldKeyLocked(draft: Draft, field: DraftField, published: Rea
 /**
  * The patch a label change writes to a field that is not a `group`: the new
  * label, plus the key `nextFieldKey` derives while the lock leaves
- * auto-fill live. A group's label goes through `view-group-sync.ts::
+ * auto-fill live. `taken` leaves out the empty key a minted field carries, so
+ * a label beside any key-less field does not derive `_2`. A group's label goes through `view-group-sync.ts::
  * writeGroupLabel` instead, which rewrites the view entries naming its key.
  */
 export function labelChangePatch(
@@ -70,7 +71,7 @@ export function labelChangePatch(
   baseLocale: string,
   published: ReadonlySet<string> | undefined,
 ): Partial<DraftField> {
-  const taken = new Set(draftFields(draft).filter((f) => f.id !== field.id).map((f) => f.key ?? ""));
+  const taken = new Set(draftFields(draft).filter((f) => f.id !== field.id).map((f) => f.key ?? "").filter((key) => key !== ""));
   const derivedKey = nextFieldKey(field.key ?? "", field.label, label, baseLocale, taken, isFieldKeyLocked(draft, field, published));
   return derivedKey === undefined ? { label } : { label, key: derivedKey };
 }

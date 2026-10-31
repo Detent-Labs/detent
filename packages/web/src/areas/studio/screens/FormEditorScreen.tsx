@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState, type DragEvent, type ReactNode } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { colors, focus, fonts, space } from "form-ui/tokens.stylex";
-import type { FieldId, Step, View, ViewNote } from "workflow-engine/schema";
+import type { FieldId, FieldKindName, Step, View, ViewNote } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
 import type { DraftField } from "../draft/fields";
 import { useDraft } from "../draft/store";
-import { t, type CatalogKey } from "../catalog.js";
+import { t } from "../catalog.js";
 import { updateInDraftArray } from "../draft/draft-array-crud";
 import {
   addViewTab,
@@ -43,7 +43,7 @@ import {
   type DragScope,
   type ViewTreeNode,
 } from "../draft/view-tree";
-import { PALETTE_FIELD_KINDS, mintCatalogField, type PaletteFieldKind } from "../draft/mintField";
+import { PALETTE_FIELD_KINDS, mintCatalogField } from "../draft/mintField";
 import { seedLocalizedText, missingTranslationWarning, resolveDraftLocalizedText, type DraftLocalizedText } from "../draft/localized-text";
 import { BooleanOrExpressionInput } from "../panels/shared/BooleanOrExpressionInput";
 import { LocalizedTextInput } from "../panels/shared/LocalizedTextInput";
@@ -51,7 +51,7 @@ import { isExpression, type BoolOrExpr } from "../panels/shared/overrideMode";
 import { effectiveFlag, gatedKeys, setFlag, writtenFieldCounts, type FlagKey, type WrittenAccessor } from "../draft/view-flags";
 import { PanelsRailFieldRow } from "../panels/EntityTabs";
 import { flattenRailFields } from "../draft/panel-rail";
-import { fieldKindIcon, fieldKindWord } from "../draft/field-type-labels";
+import { fieldKindIcon, fieldKindLabel, fieldKindWord } from "../draft/field-type-labels";
 import { FormPreview } from "../panels/FormPreview";
 import { FormTabStrip, formTabDomId, formTabPanelDomId } from "../panels/FormTabStrip";
 import { scrollKeyboardFocusIntoView } from "../focusScroll.js";
@@ -531,7 +531,7 @@ const styles = stylex.create({
  * existing catalog field or mints a new one; a card drag reorders one. All
  * three land on the same drop targets, so the payload says which array
  * change to make. */
-type Dragging = { kind: "palette"; ref: FieldId } | { kind: "card"; index: number } | { kind: "mint"; fieldKind: PaletteFieldKind };
+type Dragging = { kind: "palette"; ref: FieldId } | { kind: "card"; index: number } | { kind: "mint"; fieldKind: FieldKindName };
 
 /** A field's `type` is either a literal type name or a `{ type, config }`
  * plugin envelope. A card shows the envelope's own `type`, and nothing at all
@@ -559,14 +559,6 @@ function ghost(...style: stylex.StyleXStyles[]) {
   const compiled = stylex.props(...style);
   return { ...compiled, className: `btn btn-ghost ${compiled.className ?? ""}`.trim() };
 }
-
-const MINT_KIND_LABEL: Record<PaletteFieldKind, CatalogKey> = {
-  text: "formEditor.mintText",
-  choice: "formEditor.mintChoice",
-  date: "formEditor.mintDate",
-  file: "formEditor.mintFile",
-  section: "formEditor.mintSection",
-};
 
 /** One override field: a plain checkbox, always reachable, and a
  * "Developer view" disclosure holding the same field's CEL escape hatch —
@@ -961,9 +953,9 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
    * mutation: both the new `fields` entry and the new `view`
    * row commit together, so a mid-mutation reader never sees one without
    * the other. */
-  const mintAndPlace = (kind: PaletteFieldKind, slot: number) => {
+  const mintAndPlace = (kind: FieldKindName, slot: number) => {
     mutate((d) => {
-      const field = mintCatalogField(kind, seedLocalizedText(contentLocale));
+      const field = mintCatalogField(kind, seedLocalizedText(contentLocale), baseLocale);
       d.fields ??= [];
       d.fields.push(field);
       const s = d.workflow?.steps?.[index];
@@ -1389,7 +1381,7 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
                   onDragEnd={() => setDragging(undefined)}
                   onClick={() => mintAndPlace(kind, rows.length)}
                 >
-                  <span {...stylex.props(styles.formPaletteKey)}>{t(MINT_KIND_LABEL[kind])}</span>
+                  <span {...stylex.props(styles.formPaletteKey)}>{fieldKindLabel(kind).name}</span>
                 </button>
               </li>
             ))}
