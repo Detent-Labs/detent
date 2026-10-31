@@ -36,24 +36,24 @@ describe("KindSwitchDialog's fact rows", () => {
   it("prints one row per non-zero count, with its number", () => {
     const html = renderDialog("terminal", { subprocess: 1, paths: 3, timers: 1, onExit: 1, onCancel: 2, cancellable: 1 });
     expect(factRows(html)).toEqual([
-      ["Subprocess call", "1"],
-      ["Outgoing paths", "3"],
+      ["The call to another process", "1"],
+      ["Ways out", "3"],
       ["Time limits", "1"],
-      ["Exit actions", "1"],
-      ["Cancel actions", "2"],
+      ["What happens when left", "1"],
+      ["What happens when cancelled", "2"],
       ["Cancellable setting", "1"],
     ]);
   });
 
   it("prints the outcome row", () => {
-    expect(factRows(renderDialog("participant", { outcome: 1 }))).toEqual([["Outcome", "1"]]);
+    expect(factRows(renderDialog("participant", { outcome: 1 }))).toEqual([["How it ended", "1"]]);
   });
 
   it("prints no row for a zero or absent count", () => {
     const html = renderDialog("terminal", { paths: 3, timers: 0 });
-    expect(factRows(html)).toEqual([["Outgoing paths", "3"]]);
+    expect(factRows(html)).toEqual([["Ways out", "3"]]);
     expect(html).not.toContain("Time limits");
-    expect(html).not.toContain("Exit actions");
+    expect(html).not.toContain("What happens when left");
   });
 });
 

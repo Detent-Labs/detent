@@ -132,14 +132,16 @@ describe("a step with no spec", () => {
     expect(html).toContain(studioCatalog.en["subprocess.processLabel"]);
     expect(html).not.toContain(studioCatalog.en["subprocess.bindingLegend"]);
     expect(html).not.toContain(studioCatalog.en["subprocess.pinnedVersionLabel"]);
-    expect(html).not.toContain("inputMapping");
-    expect(html).not.toContain("outputMapping");
+    expect(html).not.toContain(studioCatalog.en["subprocess.inputMappingLegend"]);
+    expect(html).not.toContain(studioCatalog.en["subprocess.outputMappingLegend"]);
     expect(html).not.toContain(studioCatalog.en["subprocess.addInputMapping"]);
   });
 });
 
 describe("the inputMapping editor", () => {
   const addInput = studioCatalog.en["subprocess.addInputMapping"];
+  const inputLegend = studioCatalog.en["subprocess.inputMappingLegend"];
+  const outputLegend = studioCatalog.en["subprocess.outputMappingLegend"];
   const addDisabled = (html: string) =>
     new RegExp(`<button[^>]*disabled=""[^>]*>${addInput.replace(/\W/g, "\\$&")}</button>`).test(html);
 
@@ -150,7 +152,7 @@ describe("the inputMapping editor", () => {
     );
     expect(html).toContain('<option value="fld_amount" selected="">amount</option>');
     expect(html).toContain('<option value="fld_applicant">applicant</option>');
-    const inputFieldset = html.slice(html.indexOf("inputMapping"), html.indexOf("outputMapping"));
+    const inputFieldset = html.slice(html.indexOf(inputLegend), html.indexOf(outputLegend));
     expect(inputFieldset).not.toContain("parent_only");
   });
 
@@ -159,7 +161,7 @@ describe("the inputMapping editor", () => {
       { ...PINNED, outputMapping: { fld_parent_only: CEL("child.data.x") } as never },
       { status: "ready", fields: CHILD_FIELDS },
     );
-    expect(html.slice(html.indexOf("outputMapping"))).toContain(">parent_only</option>");
+    expect(html.slice(html.indexOf(outputLegend))).toContain(">parent_only</option>");
   });
 
   it("enables + add when the child is ready and lists a free field", () => {

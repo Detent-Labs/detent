@@ -4,10 +4,9 @@
  * Deliberately NOT translated: literal schema enum values ("manual",
  * "automatic", "task", "subprocess") that an option prints as its own value.
  *
- * A field caption reads as plain words from this catalog. When it names a JSON
- * property of the definition, the property's name follows the plain words in
- * the mono face, through `panels/shared/KeyCaption.tsx`. That name is an engine
- * value and has no key here (`ui-string-overrides`).
+ * A caption reads words, never a JSON property. The property's own name stays
+ * in the Developer view, which prints the JSON and holds the step's and each
+ * way out's key input (`studio-guided-vocabulary`).
  *
  * The guided-vocabulary layer (`studio-guided-vocabulary`) carves out the
  * authoring controls an author with no JSON meets: a step's kind, its
@@ -137,8 +136,8 @@ export const en = {
   "fieldCatalog.keyReadByOne":
     "Read by 1 expression. The label no longer sets this key, and changing the key does not touch it.",
   "fieldCatalog.keyPublished": "This field is in a published version. The label no longer sets its key.",
-  "fieldCatalog.dataSourceLabel": "Data source",
-  "fieldCatalog.requiredLabel": "A participant must fill this in",
+  "fieldCatalog.dataSourceLabel": "Values come from",
+  "fieldCatalog.requiredLabel": "Required",
   "fieldCatalog.requiredNoSteps": "No step asks for this field yet, so there is nothing to require.",
   "fieldCatalog.requiredTechnicalNote":
     "The process writes this field itself, so no step view may ask a participant for it.",
@@ -258,43 +257,45 @@ export const en = {
   "steps.crossProcessLegend": "cross-process check (checkSubprocessChildRefs)",
   "steps.crossProcessChecked": "checked against loaded child —",
   "steps.unload": "unload",
-  "steps.onEntryLegend": "Actions on entry",
-  "steps.onExitLegend": "Actions on exit",
-  "steps.onCancelLegend": "Actions on cancel",
+  "steps.onEntryLegend": "What happens when entered",
+  "steps.onExitLegend": "What happens when left",
+  "steps.onCancelLegend": "What happens when cancelled",
   "steps.loadChildError": "failed to load child process JSON",
-  "steps.pathsHeading": "Paths",
-  "steps.timersHeading": "Timers",
   "steps.assignmentLabel": "Who can act on this step",
 
-  "paths.empty": "No paths.",
-  "paths.addPath": "+ Add path",
-  "paths.newPathTargetLabel": "new path's target",
-  "paths.removePath": "Remove path",
-  "paths.selectTargetStep": "(select target step)",
-  "paths.triggeredByLabel": "triggered by",
-  "paths.triggeredByManual": "a participant's choice",
-  "paths.triggeredByAutomatic": "a condition",
+  "paths.empty": "No way out yet.",
+  "paths.addPath": "+ Add a way out",
+  "paths.newPathTargetLabel": "Where the new way out leads",
+  "paths.removePath": "Remove this way out",
+  "paths.selectTargetStep": "(choose a step)",
+  "paths.triggeredByLabel": "How it is taken",
+  "paths.triggeredByManual": "A person chooses",
+  "paths.triggeredByAutomatic": "Happens by itself",
   // A manual path's guard: the runtime offers the button only while it holds.
-  "paths.manualGuardNote": "The participant sees this path's button only while the condition holds.",
-  "paths.manualGuardHint": "guard (leave empty to always offer this path)",
-  "paths.automaticGuardHint": "guard (omit for the default/else path)",
-  "paths.labelCaption": "Label",
+  "paths.manualGuardNote": "The person sees this way out's button only while the condition holds.",
+  "paths.manualGuardHint": "Leave it empty to always offer this way out.",
+  "paths.automaticGuardHint": "Leave it empty on the one way out taken when nothing else matches.",
+  "paths.labelCaption": "Name",
   "paths.keyCaption": "Key",
-  "paths.toCaption": "Goes to",
-  "paths.priorityCaption": "Order among automatic paths",
-  "paths.onPathLegend": "Actions when the path fires",
+  "paths.toCaption": "Leads to",
+  "paths.priorityCaption": "Tried in this order, lowest first",
+  "paths.onPathLegend": "What happens when it is taken",
+  "paths.rowHeading": "{path} → {step}",
+  "paths.unnamedPath": "(unnamed way out)",
+  "paths.noTargetYet": "(no step yet)",
+  "paths.developerView": "Developer view",
 
-  "timers.empty": "No timers.",
-  "timers.addTimer": "+ Add timer",
-  "timers.removeTimer": "Remove timer",
-  "timers.durationOption": "A time limit",
-  "timers.deadlineOption": "A deadline a condition computes (CEL)",
-  "timers.reminderOption": "(reminder — no transition)",
+  "timers.empty": "No time limit.",
+  "timers.addTimer": "+ Add a time limit",
+  "timers.removeTimer": "Remove this time limit",
+  "timers.durationOption": "After a set time",
+  "timers.deadlineOption": "At a moment written as CEL",
+  "timers.reminderOption": "(a reminder: the case stays put)",
   "timers.descriptionCaption": "Description",
-  "timers.kindCaption": "When it fires",
+  "timers.kindCaption": "When it runs out",
   "timers.deadlineCaption": "Deadline (CEL)",
-  "timers.targetPathCaption": "Path it takes when it fires (skips that path's condition)",
-  "timers.onFireActionsLegend": "Actions when it fires",
+  "timers.targetPathCaption": "The way out it takes when it runs out, skipping that way out's condition",
+  "timers.onFireActionsLegend": "What happens when it runs out",
 
   // The time-limit control: a number and a unit over `Timer.duration`
   // (`studio-guided-vocabulary`). It writes the ISO-8601 duration the
@@ -307,16 +308,16 @@ export const en = {
   "timeLimit.written": "This time limit is written out, so a number and a unit cannot state it.",
   "timeLimit.tooFar": "That reaches further ahead than a time limit can go.",
 
-  "actions.empty": "No actions.",
-  "actions.addAction": "+ Add action",
-  "actions.removeAction": "Remove action",
+  "actions.empty": "Nothing happens yet.",
+  "actions.addAction": "+ Add an action",
+  "actions.removeAction": "Remove this action",
   "actions.typePlaceholder": "action type (e.g. http.call)",
-  "actions.pluginLabel": "action",
+  "actions.pluginLabel": "Action",
   "common.invalidJson": "invalid JSON",
   "common.configErrorPrefix": "config:",
-  "actions.outputMappingLabel": "output mapping",
-  "actions.addOutputMapping": "+ Add output mapping",
-  "actions.removeOutputMapping": "remove",
+  "actions.outputMappingLabel": "Values it writes back",
+  "actions.addOutputMapping": "+ Add a value it writes back",
+  "actions.removeOutputMapping": "Remove",
   "actions.resultCelPlaceholder": "result CEL",
 
   "contract.heading": "Contract",
@@ -329,8 +330,9 @@ export const en = {
   "contract.addOutcome": "+ Add outcome",
 
   // The form editor. It replaced the override-row list, so the old `view.*`
-  // keys went with it. "visible"/"required"/"readonly"/"span"/"group" stay
-  // untranslated, per this file's header: they name the JSON being edited.
+  // keys went with it. The strip's captions read words ("Asked", "Required",
+  // "Read-only", "Width"), and the JSON property each one writes stays in the
+  // Developer view.
   "formEditor.heading": "Form",
   "formEditor.back": "← Back to the process",
   "formEditor.stepNotFound": "This step no longer exists in the draft.",
@@ -356,29 +358,28 @@ export const en = {
   "formEditor.moveDown": "Move down",
   "formEditor.remove": "Remove",
   "formEditor.removeGroup": "Remove ({count})",
-  "formEditor.markRequired": "required",
-  "formEditor.markReadonly": "readonly",
+  "formEditor.markRequired": "Required",
+  "formEditor.markReadonly": "Read-only",
   "formEditor.markCel": "CEL",
   "formEditor.stripLabel": "Selected field",
   "formEditor.selectAField": "Choose a field on the canvas to edit how this step presents it.",
-  "formEditor.visible": "visible",
-  "formEditor.required": "required",
-  "formEditor.readonly": "readonly",
-  "formEditor.span": "span",
-  "formEditor.group": "group",
+  "formEditor.visible": "Asked",
+  "formEditor.required": "Required",
+  "formEditor.readonly": "Read-only",
+  "formEditor.span": "Width",
+  "formEditor.group": "Group",
   "formEditor.noGroup": "(none)",
   "formEditor.unnamedField": "(unnamed field)",
   "formEditor.noteSectionHeading": "Notes",
   "formEditor.addNote": "Add a note",
   "formEditor.noteHeading": "Note",
-  "formEditor.noteText": "text",
+  "formEditor.noteText": "Text",
   "formEditor.newNoteText": "New note",
   "formEditor.noteType": "note",
   "formEditor.emptyNote": "(empty note)",
 
-  // The form's own tab strip, above the canvas. "tab" is the picker's label
-  // beside "group" and "span", and stays lowercase with them: all three name
-  // the JSON key they write.
+  // The form's own tab strip, above the canvas. "Tab" is the picker's label
+  // beside "Group" and "Width".
   "formEditor.tabRowLabel": "Form tabs",
   "formEditor.addTab": "Add a tab",
   "formEditor.renameTab": "Rename",
@@ -388,12 +389,11 @@ export const en = {
   "formEditor.tabName": "Tab name",
   "formEditor.newTabName": "New tab",
   "formEditor.unnamedTab": "(unnamed tab)",
-  "formEditor.tab": "tab",
+  "formEditor.tab": "Tab",
   "formEditor.tabFromGroup": "The group decides the tab.",
 
-  // The condition builder. "guard", "visible"/"required"/"readonly" and the CEL
-  // operators stay untranslated, per this file's header: they name the JSON the
-  // author is editing.
+  // The condition builder. Only its captions read words: its readout prints
+  // the CEL source beside the rows ("Writes <code>…</code>").
   "condition.empty": "No condition — this always matches.",
   "condition.addRow": "+ Add row",
   "condition.removeRow": "Remove row",
@@ -419,8 +419,8 @@ export const en = {
 
   // The rule-row builder (`field.validation.rule`). A new component, not a
   // ConditionBuilder instance (design.md), with its own operand and
-  // developer-view copy: "value"/"field"/"operator" stay untranslated
-  // per this file's header, the JSON the author is editing.
+  // developer-view copy. Only its captions read words: its readout prints
+  // the CEL source beside the rows ("Writes <code>…</code>").
   "ruleBuilder.thisAnswer": "this answer",
   "ruleBuilder.empty": "No rule — nothing is checked.",
   "ruleBuilder.and": "and",
@@ -436,7 +436,7 @@ export const en = {
   "subprocess.processLabel": "Which process it calls",
   "subprocess.selectProcess": "(choose a process)",
   "subprocess.unknownProcess": "(a process you cannot open)",
-  "subprocess.legend": "Subprocess",
+  "subprocess.legend": "The call to another process",
   "subprocess.contractRefCaption": "Child contract hash",
   "subprocess.inputMappingLegend": "Values passed to the child",
   "subprocess.outputMappingLegend": "Values copied back from the child",
@@ -507,11 +507,11 @@ export const en = {
   // explains the miniature's marks"). `legendLabel` names the list. Each
   // other key holds the words beside one sample, in `FORMS_LEGEND`'s order.
   "formsTab.legendLabel": "What the marks mean",
-  "formsTab.legendField": "field",
-  "formsTab.legendRequired": "required",
-  "formsTab.legendConditional": "required if a condition holds",
-  "formsTab.legendSection": "section",
-  "formsTab.legendHeight": "taller asks for more",
+  "formsTab.legendField": "Field",
+  "formsTab.legendRequired": "Required",
+  "formsTab.legendConditional": "Required if a condition holds",
+  "formsTab.legendSection": "Section",
+  "formsTab.legendHeight": "Taller asks for more",
 
   // The form editor's trailing pane: what a participant meets
   // (`studio-form-editor`).
@@ -556,7 +556,7 @@ export const en = {
   "fieldMatrix.legendDefault": "A control left at its default writes no key.",
   "fieldMatrix.legendCel": "CEL marks an expression, not a fixed value.",
   "fieldMatrix.legendBlank": "A dash marks a field this step does not declare.",
-  "fieldMatrix.legendFlagged": "A flagged cell already produces a Checks finding.",
+  "fieldMatrix.legendFlagged": "A flagged cell already stands in Checks as an issue.",
   "fieldMatrix.legendTechnical": "The technical marker means the engine, not a participant, writes this field.",
   "fieldMatrix.legendColors": "Each checkbox's color names its own flag:",
   "fieldMatrix.columnInertNote": "No view — inert",
@@ -591,45 +591,42 @@ export const en = {
   // The step page's nine section headings (`studio-step-page`). "Time
   // limit" is the word for a timer everywhere an author reads one; the
   // contract's own `deadline` key stays in the step's raw JSON.
-  "stepSections.entry": "On entry",
-  "stepSections.assignment": "Assignment",
+  "stepSections.entry": "When entered",
+  "stepSections.assignment": "Who acts",
   "stepSections.cancellable": "Cancellable",
-  // The Cancellable section's own field label stays the raw, lowercase key
-  // name, matching keyField/labelField/descriptionField/outcomeField below —
-  // the section heading above already carries the guided phrase.
-  "stepSections.cancellableField": "cancellable",
+  // The Cancellable section's own field label reads words, like the other
+  // field captions below.
+  "stepSections.cancellableField": "Cancelling the case here",
   "stepSections.cancellableInherit": "Inherit from process",
   "stepSections.cancellableYes": "Cancellable",
   "stepSections.cancellableNo": "Not cancellable",
   "stepSections.cancellableResolvesYes": "Resolves to: cancellable.",
   "stepSections.cancellableResolvesNo": "Resolves to: not cancellable.",
-  "stepSections.form": "Step form fields",
-  "stepSections.paths": "Path to",
+  "stepSections.form": "Form",
+  "stepSections.paths": "Ways out",
   "stepSections.timers": "Time limit",
-  "stepSections.exit": "On exit",
+  "stepSections.exit": "When left",
   "stepSections.howItEnds": "How the case ends",
   "stepSections.collaboration": "Collaboration",
-  "stepSections.terminalNoPathsOrTimers": "A step that ends the process has no outgoing path and no time limit.",
+  "stepSections.terminalNoPathsOrTimers": "A step that ends the process has no way out and no time limit.",
   "stepSections.noAssignmentWarning":
-    "This step has no assignment. Only the starter or an admin can act on it, and it stays out of everyone's My-tasks inbox. Publishing still works.",
-  "stepSections.actions": "Actions",
+    "Nobody is set to act on this step. Only the starter or an admin can act on it, and it stays out of everyone's My-tasks inbox. Publishing still works.",
   "stepSections.subprocess": "Which process it calls",
-  "stepSections.behaviorZoneLabel": "Behavior",
-  "stepSections.pathsEmptyTerminal": "A step that ends the process has no outgoing path.",
+  "stepSections.pathsEmptyTerminal": "A step that ends the process has no way out.",
   "stepSections.noIssues": "No issues on this step.",
   "stepSections.setInitialStep": "Set as the process's first step",
-  "stepSections.outcomePlaceholder": "choose an outcome…",
+  "stepSections.outcomePlaceholder": "choose how it ended…",
   "stepSections.isInitialStep": "This is the process's first step.",
   "stepSections.viewBuildForm": "Build the form",
   "stepSections.viewFieldsConfigured": "fields configured",
-  "stepSections.noSelection": "Select a step or a path to edit it.",
+  "stepSections.noSelection": "Select a step or a way out to edit it.",
   "stepSections.renameLabel": "Step name",
-  "stepSections.keyField": "key",
-  "stepSections.labelField": "label",
-  "stepSections.idField": "id",
-  "stepSections.descriptionField": "description",
-  "stepSections.outcomeField": "outcome",
-  "stepSections.outcomeHint": "An outcome binds only on a contracted process.",
+  "stepSections.keyField": "Key",
+  "stepSections.labelField": "Name",
+  "stepSections.idField": "Id",
+  "stepSections.descriptionField": "Description",
+  "stepSections.outcomeField": "How it ended",
+  "stepSections.outcomeHint": "The name counts only when another process calls this one.",
 
   // The Collaboration section's per-field three-state control
   // (`studio-step-page`: "The Collaboration section offers a three-state
@@ -672,7 +669,7 @@ export const en = {
   "stepPage.nextNone": "Next step",
   "stepPage.developerView": "Developer view",
   "stepPage.developerViewNote":
-    "Read-only here. The JSON surface stays the one place for hand-authoring a definition.",
+    "The JSON is read-only here. The JSON surface stays the one place for hand-authoring a definition.",
 
   // The role a step's stamp reads, in the steps register and in the
   // configuration pane's masthead. `draft/roleStamp.ts` picks which one.
@@ -691,13 +688,13 @@ export const en = {
   "stepKind.subprocess": "A call to another process",
   "stepKind.terminal": "An end",
   "kindSwitch.heading": "Switch to “{kind}”?",
-  "kindSwitch.subprocessTerm": "Subprocess call",
-  "kindSwitch.pathsTerm": "Outgoing paths",
+  "kindSwitch.subprocessTerm": "The call to another process",
+  "kindSwitch.pathsTerm": "Ways out",
   "kindSwitch.timersTerm": "Time limits",
-  "kindSwitch.onExitTerm": "Exit actions",
-  "kindSwitch.onCancelTerm": "Cancel actions",
+  "kindSwitch.onExitTerm": "What happens when left",
+  "kindSwitch.onCancelTerm": "What happens when cancelled",
   "kindSwitch.cancellableTerm": "Cancellable setting",
-  "kindSwitch.outcomeTerm": "Outcome",
+  "kindSwitch.outcomeTerm": "How it ended",
   "kindSwitch.noUndo": "The studio has no undo.",
   "kindSwitch.confirm": "Switch and remove",
 
@@ -706,9 +703,9 @@ export const en = {
   // renders its two entries, subprocess and terminal. `participant` stays:
   // `newStepNote` maps every kind of `guided-labels.ts`'s own closed union,
   // not only the ones the menu draws.
-  "stepKindNote.participant": "Someone fills its form and picks a path.",
-  "stepKindNote.subprocess": "Waits for it and routes on its outcome.",
-  "stepKindNote.terminal": "Closes the case with a named outcome.",
+  "stepKindNote.participant": "Someone fills its form and picks a way out.",
+  "stepKindNote.subprocess": "Waits for it and routes on how it ended.",
+  "stepKindNote.terminal": "Closes the case and names how it ended.",
 
   // The four assignment strategies the engine registers: `static` in
   // `src/engine/registry.ts`'s createStaticAssignmentRegistry, and the three
@@ -841,9 +838,6 @@ export const en = {
   "canvas.groupDisclosure": "Steps in {group}",
   "canvas.svgLabel": "Process graph",
 
-  "ribbon.expand": "Expand the canvas",
-  "ribbon.collapse": "Collapse the canvas",
-
   "changesView.firstPublish": "Nothing to compare yet. Publishing this draft would be the first version.",
   "changesView.none": "This draft matches the version it sits on.",
   "changesView.loading": "Reading the published version…",
@@ -860,18 +854,18 @@ export const en = {
   "changeList.prop.initialStep": "Initial step",
   "changeList.prop.type": "Type",
   "changeList.prop.terminal": "End",
-  "changeList.prop.outcome": "Outcome",
-  "changeList.prop.subprocess": "Subprocess",
-  "changeList.prop.assignment": "Assignment",
+  "changeList.prop.outcome": "How it ended",
+  "changeList.prop.subprocess": "The call to another process",
+  "changeList.prop.assignment": "Who acts",
   "changeList.prop.collaboration": "Collaboration",
-  "changeList.prop.to": "Target",
-  "changeList.prop.trigger": "Trigger",
-  "changeList.prop.guard": "Guard",
-  "changeList.prop.priority": "Priority",
-  "changeList.prop.duration": "Duration",
+  "changeList.prop.to": "Leads to",
+  "changeList.prop.trigger": "How it is taken",
+  "changeList.prop.guard": "Only if",
+  "changeList.prop.priority": "Tried",
+  "changeList.prop.duration": "Time limit",
   "changeList.prop.deadline": "Deadline",
-  "changeList.prop.onFire": "On fire",
-  "changeList.prop.targetPath": "Target path",
+  "changeList.prop.onFire": "When it runs out",
+  "changeList.prop.targetPath": "Way out it takes",
   "changeList.prop.config": "Config",
   "changeList.prop.output": "Output",
   "changeList.prop.execution": "Execution",
@@ -887,7 +881,7 @@ export const en = {
   "changeList.prop.inputMapping": "Input mapping",
   "changeList.prop.outputMapping": "Output mapping",
   "changeList.prop.ref": "Field",
-  "changeList.prop.visible": "Visible",
+  "changeList.prop.visible": "Asked",
   "changeList.prop.required": "Required",
   "changeList.prop.readonly": "Read-only",
   "changeList.prop.group": "Group",
@@ -903,7 +897,7 @@ export const en = {
   "changeList.prop.outcomes": "Outcomes",
   "changeList.prop.format": "Format",
   "changeList.prop.control": "Control",
-  "changeList.prop.dataSource": "Data source",
+  "changeList.prop.dataSource": "Where values come from",
   "changeList.prop.columnMapping": "Column mapping",
   "changeList.prop.default": "Default",
   "changeList.prop.technical": "Technical",
@@ -921,12 +915,12 @@ export const en = {
   "changeList.name.group": "Group",
   "changeList.name.kind": "Kind",
   "changeList.name.from": "From",
-  "changeList.name.timer": "Timer {n}",
-  "changeList.name.onEntry": "On entry · {type}",
-  "changeList.name.onExit": "On exit · {type}",
-  "changeList.name.onCancel": "On cancel · {type}",
-  "changeList.name.onPath": "On path · {type}",
-  "changeList.name.onFire": "On fire · {type}",
+  "changeList.name.timer": "Time limit {n}",
+  "changeList.name.onEntry": "When entered · {type}",
+  "changeList.name.onExit": "When left · {type}",
+  "changeList.name.onCancel": "When cancelled · {type}",
+  "changeList.name.onPath": "When taken · {type}",
+  "changeList.name.onFire": "When it runs out · {type}",
   "changeList.name.option": "Option {value}",
   "changeList.name.note": "Note {n}",
   "changeList.name.tab": "Tab {key}",
@@ -935,22 +929,22 @@ export const en = {
   "changeList.name.leaf": "{property} · {leaf}",
   // One order property per list whose members differ only in position.
   "changeList.order.fields": "Field order",
-  "changeList.order.dataSources": "Data source order",
+  "changeList.order.dataSources": "Order of where values come from",
   "changeList.order.steps": "Step order",
   "changeList.order.allowedGroups": "Allowed group order",
   "changeList.order.options": "Option order",
-  "changeList.order.paths": "Path order",
-  "changeList.order.timers": "Timer order",
-  "changeList.order.onEntry": "On-entry order",
-  "changeList.order.onExit": "On-exit order",
-  "changeList.order.onCancel": "On-cancel order",
-  "changeList.order.onPath": "On-path order",
-  "changeList.order.onFire": "On-fire order",
+  "changeList.order.paths": "Way out order",
+  "changeList.order.timers": "Time limit order",
+  "changeList.order.onEntry": "When entered order",
+  "changeList.order.onExit": "When left order",
+  "changeList.order.onCancel": "When cancelled order",
+  "changeList.order.onPath": "When taken order",
+  "changeList.order.onFire": "When it runs out order",
   "changeList.order.form": "Form order",
   "changeList.order.tabs": "Tab order",
   "changeList.order.inputFields": "Input field order",
   "changeList.order.outputFields": "Output field order",
-  "changeList.order.outcomes": "Outcome order",
+  "changeList.order.outcomes": "Order of how it can end",
   "changeList.value.none": "none",
   "changeList.value.yes": "yes",
   "changeList.value.no": "no",
@@ -996,13 +990,13 @@ export const en = {
   "versionsScreen.waiting": "Reading both versions…",
 
   "pathsView.source": "Source step",
-  "pathsView.trigger": "Trigger",
-  "pathsView.priority": "Priority",
-  "pathsView.guard": "Guard",
-  "pathsView.target": "Target",
-  "pathsView.noPriority": "No priority",
-  "pathsView.noGuard": "No guard",
-  "pathsView.empty": "This process has no path yet. Drag from a step on the canvas to make one.",
+  "pathsView.trigger": "How it is taken",
+  "pathsView.priority": "Tried",
+  "pathsView.guard": "Only if",
+  "pathsView.target": "Leads to",
+  "pathsView.noPriority": "No order",
+  "pathsView.noGuard": "Always",
+  "pathsView.empty": "This process has no way out yet. Drag from a step on the canvas to make one.",
 
   "expression.placeholder": "CEL expression",
   "mapping.unlistedKey": "(not in the list)",

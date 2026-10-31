@@ -9,7 +9,6 @@ import { PluginEnvelopeEditor } from "./shared/PluginEnvelopeEditor";
 import { useRegistry } from "./shared/useRegistry.js";
 import { useDataLists } from "./shared/useDataLists.js";
 import { IssueList } from "./shared/IssueList";
-import { KeyCaption } from "./shared/KeyCaption";
 import { DB_LIST_TYPE, keyOptions, listKeyOf, unknownListKeyWarning } from "./dataListKeysLogic.js";
 import { INSTANCE_QUERY_TYPE } from "./instanceQueryTypeLogic.js";
 import { removeDataSourceControlId } from "./dataSourceRailLogic.js";
@@ -72,7 +71,7 @@ function DataSourceRow({ ds, listKeys, registryTypes, registrySchemas, token, ow
   return (
     <div {...stylex.props(styles.dataSourceRow)}>
       <label {...stylex.props(styles.dataSourceRowLabel)}>
-        <KeyCaption text={t("dataSources.keyCaption")} jsonKey="key" />
+        {t("dataSources.keyCaption")}
         <input
           type="text"
           {...stylex.props(styles.studioMono)}
@@ -81,7 +80,7 @@ function DataSourceRow({ ds, listKeys, registryTypes, registrySchemas, token, ow
         />
       </label>
       <PluginEnvelopeEditor
-        label={<KeyCaption text={t("dataSources.pluginLegend")} />}
+        label={t("dataSources.pluginLegend")}
         value={ds}
         onChange={onChange}
         registryTypes={registryTypes}

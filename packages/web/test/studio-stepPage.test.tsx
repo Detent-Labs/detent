@@ -11,7 +11,7 @@ import { StepPage } from "../src/areas/studio/panels/StepPage.js";
 
 /**
  * The Steps tab's wide page (`studio-step-page`: "The step page names its
- * step and renames it in place", "The step page stands its sections open in
+ * step and keeps its key in the Developer view", "The step page stands its sections open in
  * two columns", "The step page walks to the previous and the next step", "The
  * step page carries a Developer view of the step").
  *
@@ -114,11 +114,17 @@ describe("The step page's masthead", () => {
     expect(html).toContain("A step someone works");
   });
 
-  it("carries the step's label as a writable line, and its key beside it", () => {
+  it("carries the step's label as a writable line, and keeps its key in the Developer view", () => {
     const html = render();
+    // The step's own disclosure stands at the page foot, after the way-out
+    // rows' own Developer views.
+    const developer = html.slice(html.lastIndexOf("<details"));
 
     expect(html).toContain('value="Intake"');
-    expect(html).toContain('value="intake"');
+    expect(html.slice(0, html.indexOf("<details"))).not.toContain('value="intake"');
+    expect(developer).toContain('value="intake"');
+    expect(developer.indexOf('value="intake"')).toBeLessThan(developer.indexOf("<pre"));
+    expect(developer).toContain("&quot;intake&quot;");
   });
 
   it("marks the draft's first step, and offers no set-first control there", () => {
@@ -140,36 +146,36 @@ describe("The step page's masthead", () => {
 });
 
 describe("The step page's section set", () => {
-  it("gives a task step Path to, Assignment, Cancellable, On entry, On exit, Time limit, Step form fields and Collaboration", () => {
+  it("gives a task step Ways out, Who acts, Cancellable, When entered, When left, Time limit, Form and Collaboration", () => {
     const html = render();
 
-    for (const heading of ["Path to", "Assignment", "Cancellable", "On entry", "On exit", "Time limit", "Step form fields", "Collaboration"]) {
+    for (const heading of ["Ways out", "Who acts", "Cancellable", "When entered", "When left", "Time limit", "Form", "Collaboration"]) {
       expect(html).toContain(`>${heading}<`);
     }
     expect(html).not.toContain(">Which process it calls<");
   });
 
-  it("gives an end step How the case ends, and no outgoing path", () => {
+  it("gives an end step How the case ends, and no way out", () => {
     const ends = { ...TASK_STEP, terminal: true, paths: undefined } as unknown as DraftStep;
     const html = render({ step: ends });
 
     expect(html).toContain(">How the case ends<");
-    expect(html).not.toContain(">Path to<");
-    expect(html).not.toContain(">On exit<");
+    expect(html).not.toContain(">Ways out<");
+    expect(html).not.toContain(">When left<");
     expect(html).not.toContain(">Time limit<");
-    expect(html).toContain("A step that ends the process has no outgoing path and no time limit.");
+    expect(html).toContain("A step that ends the process has no way out and no time limit.");
     // An end step still resolves an InstanceView and its collaboration field,
     // so its Collaboration section stays (design.md).
     expect(html).toContain(">Collaboration<");
   });
 
-  it("gives a subprocess step Which process it calls, and no Assignment or form section", () => {
+  it("gives a subprocess step Which process it calls, and no Who acts or form section", () => {
     const calls = { ...TASK_STEP, type: "subprocess" } as unknown as DraftStep;
     const html = render({ step: calls });
 
     expect(html).toContain(">Which process it calls<");
-    expect(html).not.toContain(">Assignment<");
-    expect(html).not.toContain(">Step form fields<");
+    expect(html).not.toContain(">Who acts<");
+    expect(html).not.toContain(">Form<");
   });
 
   it("gives a subprocess step no Collaboration section", () => {
@@ -183,11 +189,11 @@ describe("The step page's section set", () => {
   });
 
   it("stands every section open, so none carries a disclosure of its own", () => {
-    // A collapsible register would carry `aria-expanded` on each heading. Two
-    // disclosures sit elsewhere on the page, both labelled "Developer view":
-    // the native `<details>` pair over the step's read-only JSON, and the
-    // guard editor's own button, which `ConditionInput.tsx` builds for each
-    // automatic path.
+    // A collapsible register would carry `aria-expanded` on each heading.
+    // Disclosures labelled "Developer view" sit elsewhere on the page: the
+    // native `<details>` over the step's key and read-only JSON, one
+    // `<details>` per way-out row over its key, and the guard editor's own
+    // button, which `ConditionInput.tsx` builds for each automatic path.
     const headings = render().match(/<h3[^>]*>/g) ?? [];
 
     expect(headings.length).toBeGreaterThan(0);
@@ -270,7 +276,7 @@ describe("The step page's Collaboration section", () => {
 });
 
 describe("A step page section's own open issues", () => {
-  it("prints an issue about the assignment beside the Assignment heading", () => {
+  it("prints an issue about the assignment beside the Who acts heading", () => {
     const issues: EditorIssue[] = [
       {
         entityType: "step",
@@ -287,7 +293,7 @@ describe("A step page section's own open issues", () => {
     expect(html.match(/no such group/g)).toHaveLength(1);
   });
 
-  it("prints an issue about the form beside the Step form fields heading", () => {
+  it("prints an issue about the form beside the Form heading", () => {
     const issues: EditorIssue[] = [
       {
         entityType: "step",
@@ -309,7 +315,7 @@ describe("A step page section's own open issues", () => {
     expect(render({ issues }).match(/key is not a slug/g)).toHaveLength(1);
   });
 
-  it("leaves a path's own issue to the row that names it, inside Path to", () => {
+  it("leaves a path's own issue to the row that names it, inside Ways out", () => {
     // `PathsPanel` mounts an `IssueList` per path row, so the heading would
     // otherwise say the same sentence twice, two inches apart.
     const issues: EditorIssue[] = [
@@ -365,10 +371,23 @@ describe("The step page's Developer view", () => {
     // A `<pre>` is not a control. Were the JSON editable here, the disclosure
     // would carry a `<textarea>` the way the JSON surface does.
     const html = render();
-    const disclosure = html.slice(html.indexOf("<details"));
+    const disclosure = html.slice(html.lastIndexOf("<details"));
 
+    expect(disclosure).toContain("Developer view");
     expect(disclosure).toContain("<pre");
     expect(disclosure).not.toContain("<textarea");
+  });
+
+  it("writes the key from the input inside it", () => {
+    const source = readFileSync(SRC + "panels/StepPage.tsx", "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/^\s*\/\/.*$/gm, "");
+    const start = source.indexOf("<details");
+    const block = source.slice(start, source.indexOf("</details>", start));
+
+    expect(start).toBeGreaterThan(-1);
+    expect(block).toContain("onChange={(e) => updateStep({ key: e.target.value })}");
+    expect(source.slice(0, start)).not.toContain("updateStep({ key: e.target.value })");
   });
 });
 

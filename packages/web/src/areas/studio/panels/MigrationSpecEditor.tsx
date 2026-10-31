@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { t } from "../catalog.js";
-import { KeyCaption } from "./shared/KeyCaption.js";
 import {
   checkPlan,
   isUnresolved,
@@ -312,7 +311,7 @@ export function MigrationSpecEditor({ rows, catalogs, onChange }: Props) {
       <Section legend={t("migrationForm.unmappableLegend")} hint={t("migrationForm.unmappableHint")}>
         <div {...stylex.props(styles.studioMapRow)}>
           <label>
-            <KeyCaption text={t("migrationForm.unmappableCaption")} jsonKey="onUnmappable" />
+            {t("migrationForm.unmappableCaption")}
             <select value={rows.onUnmappable} onChange={(e) => setPolicy(e.target.value as UnmappablePolicy)}>
               <option value="">{t("migrationForm.policyNone")}</option>
               <option value="reject-and-pin">reject-and-pin</option>

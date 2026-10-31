@@ -215,14 +215,11 @@ describe("the literal-text scan itself", () => {
     expect(findLiterals(`export const X = () => <Foo legend="${key}"><span>CEL</span><span>v</span></Foo>;`)).toEqual([]);
   });
 
-  it("fails a literal text prop on KeyCaption and NotCheckedBadge", () => {
-    expect(findLiterals('export const X = () => <KeyCaption text="Order" jsonKey="priority" />;').map((f) => f.kind)).toEqual([
-      "attribute-text",
-    ]);
+  it("fails a literal text prop on NotCheckedBadge", () => {
     expect(findLiterals('export const X = () => <NotCheckedBadge text="Registry config: not checked" />;').map((f) => f.kind)).toEqual([
       "attribute-text",
     ]);
-    expect(findLiterals('export const X = () => <KeyCaption text={t("paths.keyCaption")} jsonKey="key" />;')).toEqual([]);
+    expect(findLiterals('export const X = () => <NotCheckedBadge text={t("plugin.notChecked")} />;')).toEqual([]);
   });
 
   it("decodes entities in JSX text and JSX attribute strings only", () => {
