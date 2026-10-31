@@ -1,66 +1,82 @@
 import { safeMatch } from "../../shell/safeMatch.js";
 
-/** The six process-wide views, in rail order. `PANEL_VIEW_TAB` maps each
- * onto its tab, and `panelEntityCounts` still keys on this set; routing owns
- * it so neither needs an import from a component. */
+/** The six names the retired `edit/panels/:view` address carried.
+ * `PANEL_VIEW_TARGET` maps each onto the place that holds it now, and
+ * `panelEntityCounts` still keys on this set; routing owns it so neither
+ * needs an import from a component. */
 export type PanelView = "fields" | "dataSources" | "contract" | "matrix" | "changes" | "paths";
 
 export const PANEL_VIEWS: PanelView[] = ["fields", "dataSources", "contract", "matrix", "changes", "paths"];
 
-const isPanelView = (v: string): v is PanelView => (PANEL_VIEWS as string[]).includes(v);
-
-/** The process surface's eleven tabs, in authoring order (`studio-process-tabs`).
+/** The process surface's six tabs, in authoring order (`studio-process-tabs`).
  * The route type names them, so routing owns the list the same way it owns
  * `PanelView`. */
-export type ProcessTab =
-  | "canvas"
-  | "steps"
-  | "fields"
-  | "dataSources"
-  | "paths"
-  | "forms"
-  | "matrix"
-  | "contract"
-  | "changes"
-  | "checks"
-  | "access";
+export type ProcessTab = "map" | "steps" | "fields" | "forms" | "checks" | "settings";
 
-export const PROCESS_TABS: ProcessTab[] = [
-  "canvas",
-  "steps",
-  "fields",
-  "dataSources",
-  "paths",
-  "forms",
-  "matrix",
-  "contract",
-  "changes",
-  "checks",
-  "access",
-];
+export const PROCESS_TABS: ProcessTab[] = ["map", "steps", "fields", "forms", "checks", "settings"];
 
 /** The tab an address naming none opens, and the tab an unknown name falls
  * back to. */
-export const DEFAULT_TAB: ProcessTab = "canvas";
+export const DEFAULT_TAB: ProcessTab = "map";
 
 const isProcessTab = (v: string): v is ProcessTab => (PROCESS_TABS as string[]).includes(v);
 
-/** Each old `edit/panels/:view` name, on the tab that holds it now. The six
- * names survive the move unchanged, so this reads as an identity map — it is
- * written out anyway, so a later tab rename cannot silently strand an old
- * address (design.md: "The old panel routes map onto their tabs"). */
-export const PANEL_VIEW_TAB: Record<PanelView, ProcessTab> = {
-  fields: "fields",
-  dataSources: "dataSources",
-  contract: "contract",
-  matrix: "matrix",
-  changes: "changes",
-  paths: "paths",
+/** The Fields tab's views, in sub-row order. */
+export type FieldsView = "catalog" | "matrix";
+/** The Settings tab's views, in sub-row order. */
+export type SettingsView = "process" | "sources" | "contract" | "access";
+/** A view of a tab that carries a sub-row. */
+export type TabView = FieldsView | SettingsView;
+
+/** Each tab's views, in sub-row order. A tab with no sub-row lists none. The
+ * first entry is the view an address naming the tab alone opens. */
+export const TAB_VIEWS: Record<ProcessTab, readonly TabView[]> = {
+  map: [],
+  steps: [],
+  fields: ["catalog", "matrix"],
+  forms: [],
+  checks: [],
+  settings: ["process", "sources", "contract", "access"],
 };
+
+const tabHoldsView = (tab: ProcessTab, view: string): view is TabView => (TAB_VIEWS[tab] as readonly string[]).includes(view);
+
+/** Where an address names a tab, and optionally one of its views. */
+export interface TabTarget {
+  tab: ProcessTab;
+  view?: TabView;
+}
+
+/** Each tab literal the eleven-tab row answered and the six-tab row does not,
+ * on the place that holds its subject now. The retired `changes` literal is
+ * absent: the change list lives on the Versions screen, so the matcher sends
+ * it to the `versions` route instead. */
+export const RETIRED_TAB_TARGET: Record<"canvas" | "paths" | "matrix" | "dataSources" | "contract" | "access", TabTarget> = {
+  canvas: { tab: "map" },
+  paths: { tab: "steps" },
+  matrix: { tab: "fields", view: "matrix" },
+  dataSources: { tab: "settings", view: "sources" },
+  contract: { tab: "settings", view: "contract" },
+  access: { tab: "settings", view: "access" },
+};
+
+const isRetiredTab = (v: string): v is keyof typeof RETIRED_TAB_TARGET => Object.hasOwn(RETIRED_TAB_TARGET, v);
+
+/** Each old `edit/panels/:view` name, on the place that holds it now. The
+ * `changes` name is absent for the reason `RETIRED_TAB_TARGET` gives. */
+export const PANEL_VIEW_TARGET: Record<Exclude<PanelView, "changes">, TabTarget> = {
+  fields: { tab: "fields" },
+  dataSources: { tab: "settings", view: "sources" },
+  contract: { tab: "settings", view: "contract" },
+  matrix: { tab: "fields", view: "matrix" },
+  paths: { tab: "steps" },
+};
+
+const isPanelTarget = (v: string): v is keyof typeof PANEL_VIEW_TARGET => Object.hasOwn(PANEL_VIEW_TARGET, v);
 
 export type Route =
   | { name: "processes" }
-  | { name: "edit"; processId: string; formStepId?: string; tab?: ProcessTab; stepId?: string }
+  | { name: "edit"; processId: string; formStepId?: string; tab?: ProcessTab; view?: TabView; stepId?: string }
   | { name: "versions"; processId: string }
   | { name: "migrate"; processId: string; from: string; to: string }
   | { name: "tools" }
@@ -76,6 +92,15 @@ export type Route =
  */
 export const matchRoute = safeMatch(matchPath, { name: "processes" });
 
+/** The edit route on a tab target, with the view key absent rather than
+ * `undefined` when the target names none, so a matched route equals its
+ * literal. */
+function editOn(processId: string, target: TabTarget): Route {
+  return target.view === undefined
+    ? { name: "edit", processId, tab: target.tab }
+    : { name: "edit", processId, tab: target.tab, view: target.view };
+}
+
 function matchPath(path: string): Route {
   if (path === "/tools") return { name: "tools" };
   if (path === "/templates") return { name: "templates" };
@@ -90,18 +115,18 @@ function matchPath(path: string): Route {
       formStepId: decodeURIComponent(editFormMatch[2]!),
     };
   }
-  // The retired `edit/panels/:view` address, kept so an open view survives the
-  // move onto the tab row. An unrecognized view falls through to the plain edit
-  // route below, so a typo lands on the canvas rather than a dead end.
+  // The retired `edit/panels/:view` address, kept so an old link still lands.
+  // `changes` opens the Versions screen, where the change list lives. An
+  // unrecognized view falls through to the plain edit route, so a typo lands
+  // on Map rather than a dead end.
   const editPanelMatch = /^\/processes\/([^/]+)\/edit\/panels\/([^/]+)$/.exec(path);
-  if (editPanelMatch && isPanelView(editPanelMatch[2]!)) {
-    return {
-      name: "edit",
-      processId: decodeURIComponent(editPanelMatch[1]!),
-      tab: PANEL_VIEW_TAB[editPanelMatch[2]],
-    };
+  if (editPanelMatch) {
+    const processId = decodeURIComponent(editPanelMatch[1]!);
+    const view = editPanelMatch[2]!;
+    if (view === "changes") return { name: "versions", processId };
+    if (isPanelTarget(view)) return editOn(processId, PANEL_VIEW_TARGET[view]);
+    return { name: "edit", processId };
   }
-  if (editPanelMatch) return { name: "edit", processId: decodeURIComponent(editPanelMatch[1]!) };
   // The step target (`unified-shell`'s replace-mode navigation): a third
   // sub-state of `edit`, at its own path segment ranked after the two above.
   // A malformed tail — no id, or more than one segment — falls back to the
@@ -114,15 +139,32 @@ function matchPath(path: string): Route {
     if (tail) return { name: "edit", processId: decodeURIComponent(editStepPrefix[1]!), stepId: decodeURIComponent(tail[1]!) };
     return { name: "edit", processId: decodeURIComponent(editStepPrefix[1]!) };
   }
-  // The open tab, the sub-state every other one is ranked before: its tail is
-  // one segment, so it cannot swallow a two-segment form, panels or step
-  // address. An unrecognized name falls through to the plain edit route, which
-  // opens Canvas.
-  const editTabMatch = /^\/processes\/([^/]+)\/edit\/([^/]+)$/.exec(path);
-  if (editTabMatch && isProcessTab(editTabMatch[2]!)) {
-    return { name: "edit", processId: decodeURIComponent(editTabMatch[1]!), tab: editTabMatch[2] };
+  // A tab and one of its views. The form, panels and step addresses above
+  // already took their own two-segment forms. A view the tab does not hold
+  // drops, and the tab opens on its first view. An unrecognized tab falls
+  // back to the plain edit route, which opens Map.
+  const editViewMatch = /^\/processes\/([^/]+)\/edit\/([^/]+)\/([^/]+)$/.exec(path);
+  if (editViewMatch) {
+    const processId = decodeURIComponent(editViewMatch[1]!);
+    const tab = editViewMatch[2]!;
+    const view = editViewMatch[3]!;
+    if (!isProcessTab(tab)) return { name: "edit", processId };
+    return editOn(processId, tabHoldsView(tab, view) ? { tab, view } : { tab });
   }
-  if (editTabMatch) return { name: "edit", processId: decodeURIComponent(editTabMatch[1]!) };
+  // The open tab, the sub-state every other one is ranked before: its tail is
+  // one segment, so it cannot swallow a two-segment address. A retired tab
+  // literal lands on the place that holds its subject now, and `changes` on
+  // the Versions screen. An unrecognized name falls through to the plain edit
+  // route, which opens Map.
+  const editTabMatch = /^\/processes\/([^/]+)\/edit\/([^/]+)$/.exec(path);
+  if (editTabMatch) {
+    const processId = decodeURIComponent(editTabMatch[1]!);
+    const tab = editTabMatch[2]!;
+    if (isProcessTab(tab)) return { name: "edit", processId, tab };
+    if (tab === "changes") return { name: "versions", processId };
+    if (isRetiredTab(tab)) return editOn(processId, RETIRED_TAB_TARGET[tab]);
+    return { name: "edit", processId };
+  }
   const editMatch = /^\/processes\/([^/]+)\/edit$/.exec(path);
   if (editMatch) return { name: "edit", processId: decodeURIComponent(editMatch[1]!) };
   const versionsMatch = /^\/processes\/([^/]+)\/versions$/.exec(path);
@@ -142,7 +184,9 @@ export function routePath(route: Route): string {
     case "edit":
       if (route.formStepId)
         return `/processes/${encodeURIComponent(route.processId)}/edit/form/${encodeURIComponent(route.formStepId)}`;
-      // `tab` needs no encoding: it is one of ten literals, not user input.
+      // Neither `tab` nor `view` needs encoding: each is one of a fixed set of
+      // literals, not user input.
+      if (route.tab && route.view) return `/processes/${encodeURIComponent(route.processId)}/edit/${route.tab}/${route.view}`;
       if (route.tab) return `/processes/${encodeURIComponent(route.processId)}/edit/${route.tab}`;
       if (route.stepId) return `/processes/${encodeURIComponent(route.processId)}/edit/step/${encodeURIComponent(route.stepId)}`;
       return `/processes/${encodeURIComponent(route.processId)}/edit`;

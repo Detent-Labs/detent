@@ -46,6 +46,17 @@ export const en = {
   "draftToolbar.publishDialogOpenIssues": "Open issues",
   "draftToolbar.publishDialogBlocked": "The engine refuses this publish until somebody fixes a blocking issue.",
   "draftToolbar.publishDialogImmutable": "A published version can never change. To correct it, publish a new one.",
+  // The publish dialog's Changes row (`studio-publish`): one sentence per
+  // state of the base-version fetch, then a disclosure over the change list.
+  "draftToolbar.publishDialogChanges": "Changes",
+  "draftToolbar.publishDialogFirstVersion": "This publish mints the first version.",
+  "draftToolbar.publishDialogChangesReading": "Reading version {version}…",
+  "draftToolbar.publishDialogChangesFailed": "Could not read version {version}: {message}",
+  "draftToolbar.publishDialogChangesNone": "No changes since version {version}.",
+  "draftToolbar.publishDialogChangesOne": "1 change since version {version}.",
+  "draftToolbar.publishDialogChangesMany": "{count} changes since version {version}.",
+  "draftToolbar.publishDialogChangesShow": "Show",
+  "draftToolbar.publishDialogChangesHide": "Hide",
   "draftToolbar.discardDialogHeading": "Discard this draft",
   "draftToolbar.discardDialogLastSaved": "Last saved",
   "draftToolbar.discardDialogKeepsPublished": "The published versions stay. Only the unpublished draft goes.",
@@ -461,6 +472,8 @@ export const en = {
   "contentLocale.add": "+ add locale",
 
   "tabs.rowLabel": "Process surface",
+  "tabs.map": "Map",
+  "tabs.settings": "Settings",
   "tabs.canvas": "Canvas",
   "tabs.steps": "Steps",
   "tabs.fields": "Fields",
@@ -480,6 +493,28 @@ export const en = {
   // clear to blocker. A full sentence, unlike the fragment above: a live
   // region reads on its own rather than joining an accessible name.
   "tabs.checksBlockingAnnounced": "A blocking issue appeared in Checks.",
+
+  // The Fields tab's sub-row (`studio-process-tabs`).
+  "fieldsViews.rowLabel": "Views of the fields",
+  "fieldsViews.catalog": "Catalog",
+  "fieldsViews.matrix": "Where fields appear",
+
+  // The Settings tab: its sub-row, then the Process view's controls
+  // (`studio-process-tabs`).
+  "settings.rowLabel": "Views of the settings",
+  "settings.process": "Process",
+  "settings.sources": "Where values come from",
+  "settings.contract": "What it takes in and gives back",
+  "settings.access": "Access",
+  "settings.baseLocale": "Base language",
+  "settings.cancellable": "A case can be cancelled while it runs",
+  "settings.collaborationLegend": "Collaboration",
+  "settings.comments": "Participants can comment on a case",
+  "settings.attachments": "Participants can attach files to a case",
+  "settings.developerView": "Developer view",
+  "settings.key": "Key",
+  "settings.processId": "Process id",
+  "settings.manageGroups": "Manage assignment groups for this process",
 
   // The Forms tab: one plate per step that declares a view
   // (`studio-forms-overview`).
@@ -962,6 +997,10 @@ export const en = {
   "changeList.heading.versions": "Version {after} compared with version {before}",
   "changeList.heading.draft": "Draft compared with version {version}",
   "changeList.group.process": "Process",
+  // The three groups whose tab the six-tab row no longer holds.
+  "changeList.group.dataSources": "Where values come from",
+  "changeList.group.paths": "Ways out",
+  "changeList.group.contract": "What it takes in and gives back",
   // A capitalized word; the stamp's own style sets it in capitals.
   "changeList.stamp.added": "Added",
   "changeList.stamp.changed": "Changed",

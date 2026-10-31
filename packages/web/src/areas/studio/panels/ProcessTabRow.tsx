@@ -12,17 +12,12 @@ export const tabDomId = (tab: ProcessTab) => `studio-tab-${tab}`;
 export const tabPanelDomId = (tab: ProcessTab) => `studio-tabpanel-${tab}`;
 
 const TAB_LABEL: Record<ProcessTab, CatalogKey> = {
-  canvas: "tabs.canvas",
+  map: "tabs.map",
   steps: "tabs.steps",
   fields: "tabs.fields",
-  dataSources: "tabs.dataSources",
-  paths: "tabs.paths",
   forms: "tabs.forms",
-  matrix: "tabs.matrix",
-  contract: "tabs.contract",
-  changes: "tabs.changes",
   checks: "tabs.checks",
-  access: "tabs.access",
+  settings: "tabs.settings",
 };
 
 /** Forced colors promise system contrast for every visible letter, and a fade
@@ -31,7 +26,7 @@ const TAB_LABEL: Record<ProcessTab, CatalogKey> = {
 const FORCED_COLORS = "@media (forced-colors: active)";
 
 const styles = stylex.create({
-  // The row scrolls sideways rather than wrapping: eleven tabs overflow a narrow
+  // The row scrolls sideways rather than wrapping: six tabs overflow a narrow
   // window, and a second line would move the body down a row on every resize
   // (design.md Risks). The 2px divider under it is the structural rule between
   // the row and the body.
@@ -288,16 +283,16 @@ export function focusScrollsRow<T>(windowBlurred: T | null, button: T, visible: 
 }
 
 /**
- * The process surface's tab row (`studio-process-tabs`). Eleven tabs in
+ * The process surface's tab row (`studio-process-tabs`). Six tabs in
  * authoring order, and nothing else — the trailing edge is the last tab.
  *
  * The keyboard model is roving-tabindex, per `spa-accessibility`'s own named
  * exception for a tab set carrying many tabs in one line that scrolls
  * sideways. This row is the one tab set of that shape in the browser
  * packages. The whole row is one stop in the page's tab order: the focused
- * tab carries `tabindex="0"` and the other ten `tabindex="-1"`. The left and
+ * tab carries `tabindex="0"` and the other five `tabindex="-1"`. The left and
  * right arrow keys move focus, wrapping at the row's ends, and Enter or Space
- * opens the focused tab. Eleven plain stops would cost a keyboard user eleven Tab
+ * opens the focused tab. Six plain stops would cost a keyboard user six Tab
  * presses to cross the row. Every other tab set keeps the plain-button model.
  */
 export function ProcessTabRow({ open, counts, checksBlocked, onOpen, jsonOpen }: Props) {
@@ -334,7 +329,7 @@ export function ProcessTabRow({ open, counts, checksBlocked, onOpen, jsonOpen }:
     openRests.current = openTabRests(rowRef.current, button);
   }, [open]);
 
-  // One observer over the row and its eleven buttons. A window resize moves the
+  // One observer over the row and its six buttons. A window resize moves the
   // row's width, and a count's digits move a button's. The callback writes
   // the band the fade mask sizes its gradient to, and recomputes the fade.
   // A row width change scrolls the open tab back into view. A button width
@@ -388,7 +383,7 @@ export function ProcessTabRow({ open, counts, checksBlocked, onOpen, jsonOpen }:
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
     if (step === 0) return;
-    // A key event from anything but one of the ten tab buttons is not ours.
+    // A key event from anything but one of the six tab buttons is not ours.
     const from = PROCESS_TABS.findIndex((tab) => tabRefs.current.get(tab) === e.target);
     if (from === -1) return;
     // `preventDefault` on the two arrow keys alone, so the row's own sideways

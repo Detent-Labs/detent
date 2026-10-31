@@ -1,10 +1,10 @@
 import { describe, expect, it } from "bun:test";
-import { formEditorReturnTab, processTabCounts, tabForChangeGroup, tabForIssue } from "../src/areas/studio/draft/process-tabs.js";
-import { CHANGE_GROUPS } from "../src/areas/studio/draft/changeSet.js";
+import { checkTarget, formEditorReturnTab, processTabCounts, type TabCountStep } from "../src/areas/studio/draft/process-tabs.js";
+import * as processTabs from "../src/areas/studio/draft/process-tabs.js";
 import { checksDotState, groupChecksBySource } from "../src/areas/studio/draft/checksRail.js";
 import type { EditorIssue, EntityType } from "../src/areas/studio/draft/issues.js";
 import type { ValidationResult } from "../src/areas/studio/draft/validation.js";
-import { PROCESS_TABS } from "../src/areas/studio/routing.js";
+import { PROCESS_TABS, TAB_VIEWS } from "../src/areas/studio/routing.js";
 
 const FIELD = "field_00000000-0000-4000-8000-0000000000a1";
 const GROUP = "field_00000000-0000-4000-8000-0000000000a2";
@@ -31,116 +31,117 @@ const draft = {
 } as any;
 
 describe("processTabCounts", () => {
-  it("prints a number for every tab that has one to print", () => {
-    const counts = processTabCounts(draft, [], undefined);
+  it("answers exactly the six tabs, in the row's order", () => {
+    expect(Object.keys(processTabCounts(draft, []))).toEqual([...PROCESS_TABS]);
+  });
+
+  it("counts the steps and the catalog's fields, groups and their members included", () => {
+    const counts = processTabCounts(draft, []);
 
     expect(counts.steps).toBe(3);
     expect(counts.fields).toBe(3);
-    expect(counts.dataSources).toBe(2);
-    expect(counts.paths).toBe(2);
   });
 
-  it("prints no number on Canvas and none on Contract", () => {
-    const counts = processTabCounts(draft, [], undefined);
+  it("prints no number on Map and none on Settings", () => {
+    const counts = processTabCounts(draft, []);
 
-    expect(counts.canvas).toBeUndefined();
-    expect(counts.contract).toBeUndefined();
+    expect(counts.map).toBeUndefined();
+    expect(counts.settings).toBeUndefined();
   });
 
   it("counts every step that carries a view under Forms", () => {
     // `studio-process-tabs`: "Forms counts the steps that carry a view". The
     // second step's view holds a note alone and still carries a view, so it
     // counts and the Forms tab plates it; the third declares none.
-    expect(processTabCounts(draft, [], undefined).forms).toBe(2);
-  });
-
-  it("counts the field matrix's own view findings, not its declared entries", () => {
-    const counts = processTabCounts(draft, [issue("step", "view"), issue("field", "view"), issue("step", "cel")], undefined);
-
-    expect(counts.matrix).toBe(2);
+    expect(processTabCounts(draft, []).forms).toBe(2);
   });
 
   it("counts every open issue under Checks", () => {
-    expect(processTabCounts(draft, [issue("step"), issue("field")], undefined).checks).toBe(2);
-  });
-
-  it("takes the Changes count from the fetch, and prints nothing until it lands", () => {
-    expect(processTabCounts(draft, [], undefined).changes).toBeUndefined();
-    expect(processTabCounts(draft, [], 4).changes).toBe(4);
+    expect(processTabCounts(draft, [issue("step"), issue("field", "view")]).checks).toBe(2);
   });
 
   // The count follows an edit at once, with no reload: it is derived from the
   // draft the surface holds, never fetched or cached.
   it("raises the Steps count by one when an author adds a step", () => {
-    const before = processTabCounts(draft, [], undefined).steps;
-    const after = processTabCounts(
-      { ...draft, workflow: { steps: [...draft.workflow.steps, { id: "step_new" }] } },
-      [],
-      undefined,
-    ).steps;
+    const before = processTabCounts(draft, []).steps;
+    const after = processTabCounts({ ...draft, workflow: { steps: [...draft.workflow.steps, { id: "step_new" }] } }, []).steps;
 
     expect(after).toBe((before ?? 0) + 1);
   });
-
-  it("names every tab the row holds, so no tab is left without an answer", () => {
-    const counts = processTabCounts(draft, [], undefined);
-
-    for (const tab of PROCESS_TABS) expect(tab in counts).toBe(true);
-  });
 });
 
-describe("tabForIssue", () => {
-  it("sends a step's issue to the Steps tab", () => {
-    expect(tabForIssue("step")).toBe("steps");
+/** Three steps carrying every position an action, a timer or a path can
+ * hold, so each lookup below has one right answer and two wrong ones. */
+const STEPS: TabCountStep[] = [
+  { id: "step_a", onEntry: [{ id: "act_entry" }], onExit: [{ id: "act_exit" }] },
+  {
+    id: "step_b",
+    onCancel: [{ id: "act_cancel" }],
+    paths: [{ id: "path_b1", onPath: [{ id: "act_path" }] }],
+    timers: [{ id: "timer_b1", onFire: { actions: [{ id: "act_fire" }] } }],
+  },
+  { id: "step_c", paths: [{ id: "path_c1" }], timers: [{ id: "timer_c1" }] },
+];
+
+const target = (entityType: EntityType, entityId: string) => checkTarget({ entityType, entityId }, STEPS);
+
+describe("checkTarget", () => {
+  it("opens the Steps tab on the step a step issue names", () => {
+    expect(target("step", "step_b")).toEqual({ tab: "steps", stepId: "step_b" });
   });
 
-  it("sends a field's issue to the Fields tab", () => {
-    expect(tabForIssue("field")).toBe("fields");
+  it("opens the Steps tab on the step that carries a timer", () => {
+    expect(target("timer", "timer_b1")).toEqual({ tab: "steps", stepId: "step_b" });
+    expect(target("timer", "timer_c1")).toEqual({ tab: "steps", stepId: "step_c" });
   });
 
-  it("sends a path's issue to the Paths tab", () => {
-    expect(tabForIssue("path")).toBe("paths");
+  it("opens the Steps tab on the step that carries an action, at each of the five positions", () => {
+    expect(target("action", "act_entry")).toEqual({ tab: "steps", stepId: "step_a" });
+    expect(target("action", "act_exit")).toEqual({ tab: "steps", stepId: "step_a" });
+    expect(target("action", "act_cancel")).toEqual({ tab: "steps", stepId: "step_b" });
+    expect(target("action", "act_path")).toEqual({ tab: "steps", stepId: "step_b" });
+    expect(target("action", "act_fire")).toEqual({ tab: "steps", stepId: "step_b" });
   });
 
-  it("sends a timer's and an action's issue to the step they hang off", () => {
-    expect(tabForIssue("timer")).toBe("steps");
-    expect(tabForIssue("action")).toBe("steps");
+  it("opens the Steps tab on the step a path leaves, naming the path", () => {
+    expect(target("path", "path_c1")).toEqual({ tab: "steps", stepId: "step_c", pathId: "path_c1" });
   });
 
-  it("sends a data source's and the contract's issue to their own tabs", () => {
-    expect(tabForIssue("dataSource")).toBe("dataSources");
-    expect(tabForIssue("contract")).toBe("contract");
+  it("opens the Steps tab alone for a subject the draft no longer holds", () => {
+    for (const entityType of ["step", "timer", "action", "path"] as const) {
+      expect(target(entityType, "gone")).toEqual({ tab: "steps" });
+    }
+  });
+
+  it("opens the Fields tab's Catalog view for a field issue", () => {
+    expect(target("field", FIELD)).toEqual({ tab: "fields", view: "catalog" });
+  });
+
+  it("opens the Settings tab's sources view for a data source issue", () => {
+    expect(target("dataSource", "ds_1")).toEqual({ tab: "settings", view: "sources" });
+  });
+
+  it("opens the Settings tab's contract view for a contract issue", () => {
+    expect(target("contract", "contract")).toEqual({ tab: "settings", view: "contract" });
   });
 
   it("leaves a process-level issue on Checks, since the header bar carries it on every tab", () => {
-    expect(tabForIssue("process")).toBe("checks");
+    expect(target("process", "process")).toEqual({ tab: "checks" });
   });
 
-  it("names a tab the row actually holds, for every entity type", () => {
+  it("names a tab the row holds and a view that tab holds, for every entity type", () => {
     const every: EntityType[] = ["process", "field", "dataSource", "step", "path", "timer", "action", "contract"];
 
-    for (const entityType of every) expect(PROCESS_TABS).toContain(tabForIssue(entityType));
-  });
-});
-
-describe("tabForChangeGroup", () => {
-  it("maps every change group to the tab owning its rows, and the Process group to none", () => {
-    expect(CHANGE_GROUPS.map((group) => [group, tabForChangeGroup(group)])).toEqual([
-      ["process", undefined],
-      ["fields", "fields"],
-      ["dataSources", "dataSources"],
-      ["steps", "steps"],
-      ["paths", "paths"],
-      ["forms", "forms"],
-      ["contract", "contract"],
-    ]);
-  });
-
-  it("names a tab the row actually holds, for every group that has one", () => {
-    for (const group of CHANGE_GROUPS.filter((g) => g !== "process")) {
-      const tab = tabForChangeGroup(group);
-      expect(tab !== undefined && PROCESS_TABS.includes(tab)).toBe(true);
+    for (const entityType of every) {
+      const found = target(entityType, "x");
+      expect(PROCESS_TABS).toContain(found.tab);
+      if (found.view !== undefined) expect(TAB_VIEWS[found.tab]).toContain(found.view);
     }
+  });
+
+  it("leaves the retired hand-offs out of the module", () => {
+    expect("tabForIssue" in processTabs).toBe(false);
+    expect("tabForChangeGroup" in processTabs).toBe(false);
   });
 });
 
