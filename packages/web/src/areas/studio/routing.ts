@@ -47,10 +47,10 @@ export interface TabTarget {
   view?: TabView;
 }
 
-/** Each tab literal the eleven-tab row answered and the six-tab row does not,
- * on the place that holds its subject now. The retired `changes` literal is
- * absent: the change list lives on the Versions screen, so the matcher sends
- * it to the `versions` route instead. */
+/** Each tab literal an address may carry that names no tab, on the place
+ * that holds its subject. The `changes` literal is absent: the change list
+ * lives on the Versions screen, so the matcher sends it to the `versions`
+ * route instead. */
 export const RETIRED_TAB_TARGET: Record<"canvas" | "paths" | "matrix" | "dataSources" | "contract" | "access", TabTarget> = {
   canvas: { tab: "map" },
   paths: { tab: "steps" },
@@ -186,7 +186,8 @@ export function routePath(route: Route): string {
         return `/processes/${encodeURIComponent(route.processId)}/edit/form/${encodeURIComponent(route.formStepId)}`;
       // Neither `tab` nor `view` needs encoding: each is one of a fixed set of
       // literals, not user input.
-      if (route.tab && route.view) return `/processes/${encodeURIComponent(route.processId)}/edit/${route.tab}/${route.view}`;
+      // A view the tab does not hold drops, the same rule the matcher applies.
+      if (route.tab && route.view && tabHoldsView(route.tab, route.view)) return `/processes/${encodeURIComponent(route.processId)}/edit/${route.tab}/${route.view}`;
       if (route.tab) return `/processes/${encodeURIComponent(route.processId)}/edit/${route.tab}`;
       if (route.stepId) return `/processes/${encodeURIComponent(route.processId)}/edit/step/${encodeURIComponent(route.stepId)}`;
       return `/processes/${encodeURIComponent(route.processId)}/edit`;

@@ -1,13 +1,12 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import * as stylex from "@stylexjs/stylex";
-import { FileJson, History, MoreVertical, Play, Users2 } from "lucide-react";
+import { FileJson, History, MoreVertical, Play } from "lucide-react";
 import { colors, fonts, space, shadow } from "form-ui/tokens.stylex";
 import { t } from "../catalog.js";
 import { useDraft } from "../draft/store.js";
-import { resolveBaseLocaleChange } from "../screens/processHeaderLogic.js";
 import { missingTranslationWarning, resolveDraftLocalizedText } from "../draft/localized-text";
 import { deriveKey, shouldAutoDeriveKey } from "../draft/deriveKey.js";
-import { ContentLocaleBadge, AddLocaleControl } from "./shared/ContentLocaleSwitcher.js";
+import { ContentLocaleBadge } from "./shared/ContentLocaleSwitcher.js";
 import { LocalizedTextInput } from "./shared/LocalizedTextInput.js";
 import { IssueList } from "./shared/IssueList.js";
 import { useConfirmDialog } from "./shared/confirmDialog.js";
@@ -16,7 +15,6 @@ import { publishAvailability, nextVersionLabel } from "../screens/draftToolbarSt
 import type { DraftToolbarActions } from "./DraftToolbar.js";
 import type { ValidationResult } from "../draft/validation.js";
 import type { PublishResult } from "../api/types.js";
-import { areaHref, type NavigateOptions } from "../../../shell/routing.js";
 
 /** Every class this file's own markup renders, from `app.css`. */
 const styles = stylex.create({
@@ -206,22 +204,12 @@ const styles = stylex.create({
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
-  // No top border: the panel's own border already divides this group from
-  // whatever is above the menu. `headerBarMenuGroup` below carries the
-  // divider instead, for every group after the first.
-  headerBarMenuGroupFirst: {
-    display: "flex",
-    flexDirection: "column",
-    gap: space.s1,
-  },
+  // The menu's one group. No top border: the panel's own border already
+  // divides it from whatever is above the menu.
   headerBarMenuGroup: {
     display: "flex",
     flexDirection: "column",
     gap: space.s1,
-    paddingTop: space.s2,
-    borderTopWidth: 2,
-    borderTopStyle: "solid",
-    borderTopColor: colors.divider,
   },
   headerBarMenuLabel: {
     fontFamily: fonts.body,
@@ -230,55 +218,6 @@ const styles = stylex.create({
     letterSpacing: "0.1em",
     color: colors.textMuted,
   },
-  headerBarMenuRow: {
-    display: "flex",
-    flexDirection: "column",
-    gap: space.s1,
-    fontSize: "0.85rem",
-  },
-  // The process-wide collaboration defaults (`studio-process-tabs`): a row of
-  // related controls at the Filter Bar's 8px spacing, sitting after
-  // baseLocale in this same group. A `<fieldset>`, so the two checkboxes
-  // carry a group name for a screen-reader user — the same reason
-  // `StepPage.tsx`'s Segmented Control uses one. A bare fieldset draws UA
-  // chrome (a 2px groove border, its own margin and padding), the same trap
-  // that file's own `segmented` style documents; the longhand resets below
-  // clear it so the row still reads as this header's own compact cluster.
-  collaborationRow: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: space.s2,
-    borderStyle: "none",
-    margin: 0,
-    padding: 0,
-  },
-  // Off screen, never `display: none`: a hidden node is announced by no
-  // engine. Names what the two collaboration checkboxes configure, for a
-  // screen-reader user, with no visible text in the header bar's compact
-  // inline cluster (`ProcessTabRow.tsx`'s own `visuallyHidden` style is the
-  // precedent for this exact pattern in this area).
-  visuallyHidden: {
-    position: "absolute",
-    width: 1,
-    height: 1,
-    margin: -1,
-    padding: 0,
-    overflow: "hidden",
-    clipPath: "inset(50%)",
-    whiteSpace: "nowrap",
-    borderWidth: 0,
-  },
-  collaborationOption: {
-    display: "flex",
-    alignItems: "center",
-    gap: space.s1,
-    fontSize: "0.85rem",
-  },
-  // DESIGN.md: "A checkbox or radio drops the border and takes `accent-color`."
-  collaborationCheckbox: {
-    accentColor: colors.accent,
-  },
   headerBarMenuLink: {
     display: "flex",
     alignItems: "center",
@@ -286,8 +225,8 @@ const styles = stylex.create({
     gap: space.s2,
     width: "100%",
     // Overrides the global `.btn` class's centered text: the flex row above
-    // already left-aligns the icon and label as items, but a label long
-    // enough to wrap (`manageGroups`) still centers its own wrapped line
+    // already left-aligns the icon and label as items, but a label
+    // long enough to wrap still centers its own wrapped line
     // without this, since text-align governs a flex item's own inline
     // content independently of the row's justify-content.
     textAlign: "left",
@@ -632,20 +571,14 @@ interface Props {
   /** The draft's resolved display label, named in both confirmation
    * dialogs. */
   processLabel: string;
-  /** True while a tab stands open. Gates the "Process, saved with the draft"
-   * menu group alone: the process key, base locale, label, and add-locale
-   * control all call `mutate()` directly, and `studio-json-view` requires
-   * every draft-body-mutating control stay unreachable while the JSON surface
-   * is open. The content-locale switch mutates nothing that surface edits, so
-   * that spec names it exempt and this component renders it either way. */
+  /** True while a tab stands open, false while the JSON surface does. It
+   * picks the JSON entry's label, and disables the process label input:
+   * `studio-json-view` requires every draft-body-mutating control stay
+   * unreachable while the JSON surface is open. The content-locale badge
+   * mutates nothing that surface edits, so it renders either way. */
   structureActive: boolean;
-  /** The open process's id, threaded down for the "Manage assignment groups
-   * for this process" link's `processId` query parameter (design.md:
-   * "Threading `go` down to the link"). */
+  /** The open process's id, named in the publish dialog. */
   processId: string;
-  /** Cross-area navigation. The link is the only user: it calls
-   * `go(href)` to reach the admin area's Groups screen — never a mutation. */
-  go: (href: string, opts?: NavigateOptions) => void;
   /** Flips the JSON surface. `ProcessTabRow` keeps its own `jsonOpen` prop —
    * this menu derives the same fact from `structureActive` (`= !jsonOpen`)
    * instead of taking a second, redundant copy. */
@@ -661,19 +594,17 @@ interface Props {
  * version stay a read-only pass-through of state the process surface owns —
  * no logic of their own.
  *
- * The `⋮` menu carries two groups. "Process, saved with the draft" holds
- * the editable key, the base locale, the add-locale control and the link to
- * the admin area's assignment groups. "Views" holds the JSON surface toggle,
- * Versions and Player — navigation to other views of this process, so
- * unlike the first group it stays reachable whichever surface is active.
- * The menu carries no Save, no Discard and no Publish — those three stand
+ * The `⋮` menu carries one group, "Views": the JSON surface toggle,
+ * Versions and Player, navigation to other views of this process that stays
+ * reachable whichever surface is active. The process settings stand on the
+ * Settings tab. The menu carries no Save, no Discard and no Publish — those three stand
  * in this row instead, right-aligned ahead of the menu trigger
  * (`studio-process-tabs`). The studio's area nav carries no draft control:
  * the Checks tab's own count reports that state instead.
  *
- * The panel mixes form fields with command buttons in its first group, so
- * it carries no `role="menu"`; the trigger's `aria-haspopup="true"` names a
- * plain disclosure instead. Escape closes the panel and returns focus to
+ * The panel implements no arrow-key navigation, so it carries no
+ * `role="menu"`; the trigger's `aria-haspopup="true"` names a plain
+ * disclosure instead. Escape closes the panel and returns focus to
  * the trigger, the one thing a keyboard-only dismissal must do that an
  * outside click has no equivalent for.
  *
@@ -691,13 +622,9 @@ interface Props {
  * needs attention (design.md).
  *
  * The process label's own `LocalizedTextInput` and missing-translation
- * warning — `ProcessHeader`'s third field, beside key and baseLocale — stay
- * in the header row's own `<h1>`, not the menu (studio-app: "Every inline
+ * warning stay in the header row's own `<h1>` (studio-app: "Every inline
  * missing-translation warning SHALL survive the move ... the process label,
- * which stays on the screen"). Unlike key and baseLocale, the label is one
- * of the six sites that requirement names as staying always visible, not
- * moving into a disclosure — so it is the one field this menu does NOT
- * carry.
+ * which stays on the screen").
  */
 export function ProcessHeaderBar({
   revision,
@@ -712,12 +639,11 @@ export function ProcessHeaderBar({
   processLabel,
   structureActive,
   processId,
-  go,
   onToggleJson,
   onVersions,
   onPlayer,
 }: Props) {
-  const { draft, mutate, contentLocale, setContentLocale } = useDraft();
+  const { draft, mutate, contentLocale } = useDraft();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -750,18 +676,6 @@ export function ProcessHeaderBar({
       document.removeEventListener("keydown", onKey);
     };
   }, [menuOpen]);
-
-  /** Same decision `EditScreen.tsx`'s `ProcessHeader` makes today, reused
-   * here via the same pure `resolveBaseLocaleChange` rather than
-   * reimplemented (see that function's own doc for why a malformed typed
-   * value leaves the content locale where it is). */
-  const changeBaseLocale = (typed: string) => {
-    const change = resolveBaseLocaleChange(typed, contentLocale);
-    mutate((d) => {
-      d.baseLocale = change.baseLocale;
-    });
-    setContentLocale(change.contentLocale);
-  };
 
   const runMenuAction = (action: () => void) => {
     setMenuOpen(false);
@@ -823,8 +737,8 @@ export function ProcessHeaderBar({
       {missingTranslationWarning(draft.label, contentLocale, draft.baseLocale) && (
         <p {...stylex.props(styles.warning)}>{missingTranslationWarning(draft.label, contentLocale, draft.baseLocale)}</p>
       )}
-      {/* Read-only; the editable key control lives in the ⋮ menu's "Process,
-          saved with the draft" group. studio-canvas's header-bar requirement
+      {/* Read-only; the editable key control lives in the Settings tab's
+          Developer view. studio-canvas's header-bar requirement
           names this display explicitly: "the process name and the key in
           the mono face." */}
       {draft.key && <span {...stylex.props(styles.headerBarKey)}>{draft.key}</span>}
@@ -892,138 +806,13 @@ export function ProcessHeaderBar({
           </button>
           {menuOpen && (
             <div {...stylex.props(styles.headerBarMenuPanel)}>
-              {/* Two groups (`studio-header-menu-merge`): process-identity
-                  settings here, then Views below. Neither Save, Discard
-                  draft, Publish nor Checks stands in this menu at all — the
-                  three sit in this row instead, and Checks stays in the area
-                  nav. Neither group is a command-only list either — this one
-                  mixes form fields with buttons — so the panel carries no
-                  `role="menu"`/`menuitem` pair; a real ARIA menu widget must
-                  hold only commands and would promise arrow-key navigation
-                  this panel does not implement. AddLocaleControl renders on
-                  both surfaces: add-locale only calls setContentLocale (view
-                  state), never mutate() — studio-json-view names "the
-                  content-locale switcher" exempt from the JSON-surface
-                  reachability ban. Only key and baseLocale actually mutate
-                  the draft body, so only they are structureActive-gated, and
-                  by `disabled` rather than by unmounting: the process label
-                  field right above this menu (in the header row's own
-                  `<h1>`) uses the same disabled-in-place pattern for the
-                  same gate, and a group whose heading stays put while its
-                  rows silently vanish reads as broken, not as gated. */}
-              <div {...stylex.props(styles.headerBarMenuGroupFirst)}>
-                <span {...stylex.props(styles.headerBarMenuLabel)}>{t("headerBar.menuGroupDraft")}</span>
-                <label {...stylex.props(styles.headerBarMenuRow)}>
-                  {t("headerBar.keyCaption")}
-                  <input
-                    type="text"
-                    disabled={!structureActive}
-                    value={draft.key ?? ""}
-                    onChange={(e) =>
-                      mutate((d) => {
-                        d.key = e.target.value;
-                      })
-                    }
-                  />
-                </label>
-                {/* Before label: baseLocale decides which entry of every
-                    LocalizedText below it is mandatory, so the declaration
-                    precedes the first localized value it governs (same
-                    ordering the old ProcessHeader fieldset used). */}
-                <label {...stylex.props(styles.headerBarMenuRow)}>
-                  {t("headerBar.baseLocaleCaption")}
-                  <input
-                    type="text"
-                    disabled={!structureActive}
-                    value={draft.baseLocale ?? ""}
-                    onChange={(e) => changeBaseLocale(e.target.value)}
-                  />
-                </label>
-                {/* Plain two-state checkbox, unlike the step-level override's
-                    three-state <select>: ProcessBody.cancellable sits at the
-                    root of the inheritance chain, so there is no parent
-                    default for a third "inherit" state to name (design.md).
-                    Defaults to checked when the draft carries no key yet,
-                    matching today's actual unconditional-cancel behavior. */}
-                <label {...stylex.props(styles.headerBarMenuRow)}>
-                  {t("headerBar.cancellable")}
-                  <input
-                    type="checkbox"
-                    disabled={!structureActive}
-                    checked={draft.cancellable ?? true}
-                    onChange={(e) =>
-                      mutate((d) => {
-                        d.cancellable = e.target.checked;
-                      })
-                    }
-                  />
-                </label>
-                {/* The process-wide collaboration defaults
-                    (`studio-process-tabs`). Both call `mutate()` directly, so
-                    both are `structureActive`-gated like key and baseLocale
-                    above them — `studio-json-view` bans every draft-body-
-                    mutating control from the header bar while the JSON
-                    surface is open. Absent reads as checked: the schema
-                    resolves an unset key to `true` (design.md). A
-                    `<fieldset>`/visually-hidden `<legend>` pair names the
-                    group for a screen reader, matching this row's own
-                    compact inline look for a sighted user. */}
-                <fieldset {...stylex.props(styles.collaborationRow)}>
-                  <legend {...stylex.props(styles.visuallyHidden)}>{t("headerBar.collaborationLegend")}</legend>
-                  <label {...stylex.props(styles.collaborationOption)}>
-                    <input
-                      type="checkbox"
-                      {...stylex.props(styles.collaborationCheckbox)}
-                      disabled={!structureActive}
-                      checked={draft.collaboration?.comments ?? true}
-                      onChange={(e) =>
-                        mutate((d) => {
-                          d.collaboration ??= {};
-                          d.collaboration.comments = e.target.checked;
-                        })
-                      }
-                    />
-                    {t("headerBar.collaborationComments")}
-                  </label>
-                  <label {...stylex.props(styles.collaborationOption)}>
-                    <input
-                      type="checkbox"
-                      {...stylex.props(styles.collaborationCheckbox)}
-                      disabled={!structureActive}
-                      checked={draft.collaboration?.attachments ?? true}
-                      onChange={(e) =>
-                        mutate((d) => {
-                          d.collaboration ??= {};
-                          d.collaboration.attachments = e.target.checked;
-                        })
-                      }
-                    />
-                    {t("headerBar.collaborationAttachments")}
-                  </label>
-                </fieldset>
-                <AddLocaleControl />
-                {/* Pure navigation, never gated by `structureActive`: it
-                    mutates nothing the JSON surface itself edits, the same
-                    exemption the content-locale switch already carries
-                    (studio-json-view). It renders for
-                    any signed-in actor regardless of role — following it
-                    without `system:admin` is the admin area's own
-                    `mayEnter`/`ROUTE_ROLE` gate to decide, not this link's
-                    concern (studio-canvas). */}
-                <button
-                  type="button"
-                  className={`btn btn-secondary ${headerBarMenuLinkProps.className}`}
-                  style={headerBarMenuLinkProps.style}
-                  onClick={() => runMenuAction(() => go(`${areaHref("admin", "/groups")}?processId=${encodeURIComponent(processId)}`))}
-                >
-                  <Users2 size={18} strokeWidth={1.75} aria-hidden="true" />
-                  {t("headerBar.manageGroups")}
-                </button>
-              </div>
-              {/* What the tab row's own overflow menu carried before this
-                  menu absorbed it: navigation to other views of the same
+              {/* One group, Views: navigation to other views of this
                   process, never a draft-body mutation, so it stays reachable
-                  whichever surface is active — unlike the group above. */}
+                  whichever surface is active. Save, Discard draft and Publish
+                  stand in this row instead, and the process settings on the
+                  Settings tab (`studio-process-tabs`). The panel holds command
+                  buttons alone but implements no arrow-key navigation, so it
+                  carries no `role="menu"`/`menuitem` pair. */}
               <div {...stylex.props(styles.headerBarMenuGroup)}>
                 <span {...stylex.props(styles.headerBarMenuLabel)}>{t("headerBar.menuGroupViews")}</span>
                 <button

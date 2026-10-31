@@ -8,7 +8,7 @@ import { PROCESS_TABS } from "../src/areas/studio/routing.js";
  * No harness in this package can mount the surface: `DraftProvider` fetches on
  * mount and `renderToStaticMarkup` never resolves those effects, which is why
  * every other test over this component renders a hand-built `DraftContext`
- * instead. So the facts a mount would show — that all ten bodies render, that
+ * instead. So the facts a mount would show — that all six bodies render, that
  * none unmounts on a tab switch, that the two screens collapsed into one — are
  * asserted the way `studio-no-confirm.test.ts` asserts its own: read the file,
  * match a pattern.
@@ -32,12 +32,13 @@ describe("the two screens collapsed into one surface", () => {
     expect(existsSync(`${ROOT}src/areas/studio/screens/PanelsScreen.tsx`)).toBe(false);
   });
 
-  it("renders one body per tab, all ten of them", () => {
+  it("renders one body per tab, all six of them", () => {
     const code = stripComments(read(SURFACE));
     // Every `tabPanel("<name>"` call the surface makes, whatever line the
     // argument sits on.
     const mounted = [...code.matchAll(/tabPanel\(\s*"([a-zA-Z]+)"/g)].map((m) => m[1]);
 
+    expect(mounted).toHaveLength(PROCESS_TABS.length);
     expect(mounted.sort()).toEqual([...PROCESS_TABS].sort());
   });
 
@@ -78,7 +79,7 @@ describe("what the surface no longer carries", () => {
     expect(code).not.toContain('role="tablist"');
   });
 
-  it("keeps the header bar menu clear of Save, Discard draft and Publish", () => {
+  it("keeps the header bar menu to the Views group, clear of Save, Discard draft and Publish", () => {
     const code = stripComments(read("src/areas/studio/panels/ProcessHeaderBar.tsx"));
     // The three stand in the header row itself now, ahead of the menu
     // trigger — scope the "clear of" assertion to the menu's own slice, or a
@@ -96,11 +97,12 @@ describe("what the surface no longer carries", () => {
     expect(menu).not.toContain("actions.save");
     expect(menu).not.toContain("actions.discard");
     expect(menu).not.toContain("actions.publish");
-    // The menu keeps its one group: the process key, the base locale, the
-    // add-locale control and the admin groups link.
-    expect(menu).toContain("headerBar.menuGroupDraft");
-    expect(menu).toContain("AddLocaleControl");
-    expect(menu).toContain("headerBar.manageGroups");
+    // The menu keeps one group, Views. The process settings and the admin
+    // groups link stand on the Settings tab.
+    expect(menu).toContain("headerBar.menuGroupViews");
+    expect(menu).not.toContain("headerBar.menuGroupDraft");
+    expect(menu).not.toContain("AddLocaleControl");
+    expect(menu).not.toContain("headerBar.manageGroups");
     // They render somewhere in the file — the header row's own top-level code.
     expect(code).toContain("actions.save");
     expect(code).toContain("actions.discard");
@@ -156,6 +158,10 @@ describe("every new component's styles compile", () => {
     "src/areas/studio/panels/EntityTabs.tsx",
     "src/areas/studio/panels/StepsRail.tsx",
     "src/areas/studio/panels/StepPage.tsx",
+    "src/areas/studio/panels/SubRow.tsx",
+    "src/areas/studio/panels/FieldsTabViews.tsx",
+    "src/areas/studio/panels/SettingsTab.tsx",
+    "src/areas/studio/panels/ProcessSettingsPanel.tsx",
   ];
 
   for (const file of NEW_FILES) {

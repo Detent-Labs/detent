@@ -70,7 +70,7 @@ describe("The sub-row", () => {
     expect(subTabPanelDomId("settings", "sources")).toBe("studio-subtabpanel-settings-sources");
   });
 
-  it("prints the labels and no count", () => {
+  it("prints each label as the whole text of its entry, with no count inside", () => {
     const html = render();
 
     expect(html).toContain(">Catalog</button>");

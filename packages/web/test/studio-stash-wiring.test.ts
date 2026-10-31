@@ -8,7 +8,8 @@ import { describe, expect, it } from "bun:test";
  * `ProcessSurface` wraps the shell's `onUnauthorized` as `stashOnUnauthorized`.
  * A 401 from a request of either consumer then keeps unsaved work. The two
  * consumers are `useDraftToolbarActions` (save, discard, publish) and the
- * `AccessPanel`. A raw callback on either one lets that request end the
+ * `SettingsTab`, which hands it to its `AccessPanel` unchanged. A raw callback
+ * on either one lets that request end the
  * session and lose the draft, with every type check still green. Other
  * requests on the screen never reach `onUnauthorized`. The wrapper writes the
  * stash only while the draft is dirty, so a clean draft stores nothing.
@@ -103,10 +104,10 @@ function scan(source: string): string[] {
     if (drop < 0 || leave < 0 || drop > leave) violations.push("onDiscarded does not call dropStash before navigate");
   }
 
-  const access = openingTag(code, "AccessPanel");
-  if (access === undefined) violations.push("AccessPanel element not found");
-  else if (propValue(access.tag, "onUnauthorized") !== "stashOnUnauthorized") {
-    violations.push("AccessPanel onUnauthorized is not stashOnUnauthorized");
+  const settings = openingTag(code, "SettingsTab");
+  if (settings === undefined) violations.push("SettingsTab element not found");
+  else if (propValue(settings.tag, "onUnauthorized") !== "stashOnUnauthorized") {
+    violations.push("SettingsTab onUnauthorized is not stashOnUnauthorized");
   }
 
   const notice = openingTag(code, "RestoreNotice");
@@ -175,9 +176,16 @@ describe("EditScreen.tsx wires the unsaved-draft stash", () => {
     expect(scan(raw)).toEqual(["useDraftToolbarActions onUnauthorized is not stashOnUnauthorized"]);
   });
 
-  it("a raw onUnauthorized on the AccessPanel is flagged", () => {
-    const raw = mutate(real, /(<AccessPanel[^>]*?)onUnauthorized=\{stashOnUnauthorized\}/, "$1onUnauthorized={onUnauthorized}");
-    expect(scan(raw)).toEqual(["AccessPanel onUnauthorized is not stashOnUnauthorized"]);
+  it("a raw onUnauthorized on the SettingsTab is flagged", () => {
+    const raw = mutate(real, /(<SettingsTab[\s\S]*?)onUnauthorized=\{stashOnUnauthorized\}/, "$1onUnauthorized={onUnauthorized}");
+    expect(scan(raw)).toEqual(["SettingsTab onUnauthorized is not stashOnUnauthorized"]);
+  });
+
+  it("the SettingsTab hands its onUnauthorized to the AccessPanel unchanged", () => {
+    const settings = stripComments(readFileSync(new URL("../src/areas/studio/panels/SettingsTab.tsx", import.meta.url).pathname, "utf8"));
+    const access = openingTag(settings, "AccessPanel");
+    expect(access).toBeDefined();
+    expect(propValue(access!.tag, "onUnauthorized")).toBe("onUnauthorized");
   });
 
   it("a successful save that keeps the stash is flagged", () => {
@@ -276,10 +284,10 @@ describe("EditScreen.tsx wires the unsaved-draft stash", () => {
   });
 
   it("whitespace and line breaks inside a prop change no verdict", () => {
-    const spreadWrapper = mutate(real, /<AccessPanel([^>]*?)onUnauthorized=\{stashOnUnauthorized\}/, "<AccessPanel$1onUnauthorized =\n  {\n    stashOnUnauthorized\n  }");
+    const spreadWrapper = mutate(real, /<SettingsTab([\s\S]*?)onUnauthorized=\{stashOnUnauthorized\}/, "<SettingsTab$1onUnauthorized =\n  {\n    stashOnUnauthorized\n  }");
     expect(scan(spreadWrapper)).toEqual([]);
-    const spreadRaw = mutate(real, /<AccessPanel([^>]*?)onUnauthorized=\{stashOnUnauthorized\}/, "<AccessPanel$1onUnauthorized =\n  {\n    onUnauthorized\n  }");
-    expect(scan(spreadRaw)).toEqual(["AccessPanel onUnauthorized is not stashOnUnauthorized"]);
+    const spreadRaw = mutate(real, /<SettingsTab([\s\S]*?)onUnauthorized=\{stashOnUnauthorized\}/, "<SettingsTab$1onUnauthorized =\n  {\n    onUnauthorized\n  }");
+    expect(scan(spreadRaw)).toEqual(["SettingsTab onUnauthorized is not stashOnUnauthorized"]);
     const spreadKey = mutate(real, /\bonUnauthorized:\s*stashOnUnauthorized\b/, "onUnauthorized\n  :\n  stashOnUnauthorized");
     expect(scan(spreadKey)).toEqual([]);
   });

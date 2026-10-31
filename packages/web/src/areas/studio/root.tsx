@@ -198,6 +198,7 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
               processId={route.processId}
               formStepId={route.formStepId}
               tab={route.tab}
+              view={route.view}
               stepId={route.stepId}
               token={session.token}
               roles={session.roles}

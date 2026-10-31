@@ -2,7 +2,7 @@ import type { Step } from "workflow-engine/schema";
 import type { DraftOf } from "./types";
 import type { DraftField } from "./fields";
 import { isDraftViewField, type DraftViewEntry } from "./view-layout";
-import type { EditorIssue, IssueSource } from "./issues";
+import type { EditorIssue } from "./issues";
 import type { PanelView } from "../routing";
 
 type DraftStep = DraftOf<Step>;
@@ -76,21 +76,6 @@ export function flattenRailFields(fields: DraftField[] | undefined): RailFieldRo
   };
   if (fields) walk(fields, 0);
   return rows;
-}
-
-/** The field matrix's own issue count, filtered by `source` rather than
- * `entityType`: `checkViewFlags` issues carry `entityType: "step"`, the same
- * type every other per-step issue (a path's CEL issue, an action's registry
- * issue) already carries, so an `entityType` filter cannot isolate them.
- *
- * Since technical-field-marker, the `view` source also holds
- * `checkUnwrittenTechnicalFields`' finding, which anchors on the field
- * (`entityType: "field"`) rather than a step. This count therefore
- * over-reports by one per such field, with nothing in the grid to point at —
- * an accepted trade-off (design.md Risks). The field catalog's per-row mark,
- * `issueCountForEntityId`, surfaces that finding correctly. */
-export function issueCountForSource(issues: readonly EditorIssue[], source: IssueSource): number {
-  return issues.filter((i) => i.source === source).length;
 }
 
 /** How many issues resolved to one specific entity — an entity rail row's own

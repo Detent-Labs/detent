@@ -2,7 +2,6 @@ import { describe, expect, it } from "bun:test";
 import {
   flattenRailFields,
   issueCountForEntityId,
-  issueCountForSource,
   panelEntityCounts,
   stepEntityIds,
 } from "../src/areas/studio/draft/panel-rail.js";
@@ -106,31 +105,6 @@ describe("stepEntityIds", () => {
   it("skips an entity with no id", () => {
     const partial = { id: STEP, paths: [{ trigger: "manual" }] } as DraftOf<Step>;
     expect(stepEntityIds(partial)).toEqual([STEP]);
-  });
-});
-
-describe("issueCountForSource", () => {
-  it("counts only issues with the given source", () => {
-    // A `checkViewFlags` finding and an engine finding can share `entityType:
-    // "step"`, a collision an `entityType` filter cannot resolve for the
-    // field matrix's rail badge.
-    const issues = [
-      issue("step", STEP, "view"),
-      issue("step", STEP, "cel"),
-      issue("path", PATH, "view"),
-      issue("step", STEP, "structural"),
-    ];
-    expect(issueCountForSource(issues, "view")).toBe(2);
-    expect(issueCountForSource(issues, "cel")).toBe(1);
-  });
-
-  it("reads zero for a draft with no issue of that source", () => {
-    expect(issueCountForSource([issue("step", STEP, "cel")], "view")).toBe(0);
-  });
-
-  it("counts a field-anchored view finding toward the field matrix's badge, technical-field-marker's unwritten-technical-field finding included", () => {
-    const issues = [issue("field", LEAF, "view"), issue("step", STEP, "cel")];
-    expect(issueCountForSource(issues, "view")).toBe(1);
   });
 });
 

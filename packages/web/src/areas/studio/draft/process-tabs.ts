@@ -2,7 +2,7 @@ import type { DraftField } from "./fields";
 import type { DraftViewEntry } from "./view-layout";
 import type { EditorIssue } from "./issues";
 import { flattenRailFields } from "./panel-rail";
-import type { ProcessTab, TabView } from "../routing";
+import type { ProcessTab, TabTarget } from "../routing";
 
 /** An action as the Checks hand-off reads it: its id alone. */
 interface TabCountAction {
@@ -52,9 +52,7 @@ export function processTabCounts(draft: TabCountDraft, issues: readonly EditorIs
 
 /** Where a press on a Checks row lands: the tab, its view, and the step and
  * the way out the tab selects. */
-export interface CheckTarget {
-  tab: ProcessTab;
-  view?: TabView;
+export interface CheckTarget extends TabTarget {
   stepId?: string;
   pathId?: string;
 }
