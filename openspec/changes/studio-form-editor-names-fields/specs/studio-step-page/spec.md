@@ -8,7 +8,8 @@ entry and a note add nothing. Where a counted entry declares `required:
 true`, the sentence SHALL state how many do. A view with no counted entry,
 and a step with no view, SHALL read "No fields yet".
 
-The section SHALL print no count of the whole catalog.
+The section SHALL print no count of the whole catalog. The form editor SHALL
+print no count of its own.
 
 #### Scenario: A form with a required field
 
@@ -20,6 +21,21 @@ The section SHALL print no count of the whole catalog.
 
 - **WHEN** a step declares no view
 - **THEN** the Form section reads "No fields yet"
+
+#### Scenario: A note raises no count
+
+- **WHEN** a step's view holds one field entry and three notes
+- **THEN** the Form section reads "1 field"
+
+#### Scenario: A view of notes alone reads as empty
+
+- **WHEN** a step's view holds notes alone
+- **THEN** the Form section reads "No fields yet"
+
+#### Scenario: The form editor shows no count
+
+- **WHEN** the author opens the form editor
+- **THEN** the editor prints no count of the form's fields
 
 ### Requirement: The Form section opens the step's form
 

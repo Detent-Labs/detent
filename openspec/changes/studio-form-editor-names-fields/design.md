@@ -120,11 +120,22 @@ pre-approved every decision for stage 64 and asked for none.
 ### D1. The editor stands inside the origin tab's panel
 
 `EditScreen.tsx` renders the editor inside the `tabPanel` of the origin tab,
-`formEditorReturnTab(formOrigin)`. The tab row's `open` reads the same tab
-while the route carries `formStepId`. That tab's own body stays mounted
-inside a wrapper carrying `hidden`. The step page or the Forms tab thus keeps
-its half-typed state. The glossary's "all six bodies stay mounted" rule holds. The tab
-button's `aria-controls` then names the panel the editor stands in.
+`formEditorReturnTab(formOrigin)`. A new pure helper in
+`draft/process-tabs.ts`, `surfaceTab(routeTab, formStepId, formOrigin)`,
+answers the open tab. It returns the origin tab while the route carries
+`formStepId`, and the route's tab otherwise. The screen's `openTab` itself
+reads `surfaceTab(tab ?? DEFAULT_TAB, formStepId, formOrigin)`.
+
+Every reader of `openTab` then follows it. They are the tab row, each
+`tabPanel`, the `visible` props of the canvas and the views,
+`openTabFromRow` and the pending-focus effect. The canvas
+then never reads itself visible inside a hidden panel.
+`studio-processTabs.test.ts` covers `surfaceTab`.
+
+The origin tab's own body stays mounted inside a wrapper carrying `hidden`.
+The step page or the Forms tab thus keeps its half-typed state. The
+glossary's "all six bodies stay mounted" rule holds. The tab button's
+`aria-controls` then names the panel the editor stands in.
 
 The JSON surface hides the editor through the panel's existing `hidden`
 logic. The "step not found" banner renders in the same panel.
@@ -136,8 +147,14 @@ editor has no tab row", lapses.
 route and drops `formStepId`. A press on the current tab therefore leaves
 the editor as well.
 
-`openFormEditor(target, from)` also calls `onSelectStep(target)`. The step
-crumb and a return to the Steps tab then land on the form's own step.
+`openFormEditor(target, from)` also calls `onSelectStep(target)`. An effect
+keyed on `formStepId` does the same on a direct load, when the step exists.
+The step crumb and a return to the Steps tab then land on the form's own
+step.
+
+The concept says "a breadcrumb in the Steps tab". A Forms card still opens
+the editor under Forms, because the base `studio-forms-overview` rule
+returns the author to the Forms tab. The tab row then names where Back goes.
 
 Alternative: keep the full-screen page and add a breadcrumb only. Rejected:
 D3 option 2 keeps the tab row, and the author would lose the five other tabs.
@@ -173,20 +190,43 @@ it to the new field's id. A leaf card renders one of two explicit variants
 (`vercel-composition-patterns`: explicit variants over a boolean mode):
 
 - `CardBody`: today's draggable `<button>`, now printing label and kind.
-- `CardNameInput`: a `<div>` holding `LocalizedTextInput`
-  (`id={formCardNameInputId(fieldId)}`, `aria-label` "Field name",
-  placeholder "Name this field…", `autoComplete="off"`) and the kind line.
+- `CardNameInput`: a `<div>` holding `LocalizedTextInput` and the kind line.
+  The input carries `id={formCardNameInputId(fieldId)}`, the accessible
+  name "Field name", the placeholder "Name this field…" and
+  `autoComplete="off"`.
 
-The input variant renders when `naming === ref`, or when the field's label
-for the content locale is empty. An effect focuses the input when `naming`
-changes. Enter and Escape call `preventDefault`, clear `naming` and focus the
-card's body button (`formCardBodyId(fieldId)`) on the next frame. An empty
-label keeps the input variant, and the focus then stays in it. Blur clears
-`naming`.
+A group card's legend takes the same `CardNameInput` in place of its
+draggable name button. Its move and Remove controls, its members and its
+tail slot stay.
 
-The input variant is not draggable, so the input keeps text selection. The
-move and remove controls stay beside it. A card in the input variant offers
-no selection, so its strip opens once the field has a name.
+The input variant renders when `naming === ref`, or when
+`resolveDraftLocalizedText(label, contentLocale, baseLocale)` is empty. A
+card whose label exists in the base locale alone therefore keeps its body.
+The strip's translation warning reports the gap.
+
+An effect focuses the input when `naming` changes. The wrapper `<div>` takes
+`onKeyDown` and `onBlur`, since React key and focus events bubble. Enter and
+Escape call `preventDefault`, clear `naming` and focus the card's body button
+(`formCardBodyId(fieldId)`) on the next frame. An empty label keeps the
+input variant, and the focus then stays in it. Blur clears `naming`.
+
+`LocalizedTextInput` gains two optional props, `ariaLabel` and
+`autoComplete`, passed through to its `<input>`. Every other caller omits
+them.
+
+The input variant is not draggable, so the input keeps text selection. A
+card in the input variant offers no selection, so its strip opens once the
+field has a name.
+
+The input variant's card wraps its move and Remove controls onto a second
+row under the input (`flexWrap`). A span-1 card on a two-column form then
+keeps the input wide enough to type in. The controls stay, since the
+keyboard-move requirement needs them.
+
+The card input carries a `translation-warning-exempt` comment. It shows only
+while naming or while no locale holds a label. The strip's Name control
+carries the warning. `boundaries.test.ts` pins the `LocalizedTextInput` site
+count at 7. The two new sites move it to 9, with its comment's site list.
 
 Minting clears the selection, as it does today. The selection is an array
 index the insert shifts. A selected new card would also print a second Name
@@ -203,6 +243,11 @@ The card's input and the strip's Name control both call it through `mutate`.
 
 The Fields tab keeps its own `updateLabel`, which also bumps the usage tint.
 It calls the same two functions, so the key rule cannot drift.
+
+`labelChangePatch` drops `""` from its taken set, as `writeGroupLabel`
+already does. Without it a label beside any key-less field derives `_2`.
+Minting makes key-less fields routine. `docs/decisions.md` records that
+fault; it moves to the archive.
 
 ### D5. The palette lists every curated kind
 
@@ -238,8 +283,9 @@ palette. The Forms tab's legend keeps "Section", recorded as an open point.
 | note | its text + kind word "Note" | as today, kind word in the Label role |
 
 `renderFieldKey`, the `typeLabel` helper, the `formCardKey` style and the
-`span/columns` mark go. `formEditor.markCel` reads "Condition". The strip's
-`OverrideField` prints the same mark. A group legend reads the group's label,
+`span/columns` mark go. The card and the strip's `OverrideField` print
+`formEditor.markCondition`, "Condition". `formEditor.markCel` keeps "CEL"
+for the field matrix (D10). A group legend reads the group's label,
 or `formEditor.unnamedField`.
 
 `labelFor` becomes the resolved label for the content locale. The strip
@@ -249,9 +295,18 @@ heading drops `fonts.mono`.
 
 `FormEditorStrip` gains a first control, `Name`: a `LocalizedTextInput` in
 the strip's field layout. It calls a new `onChangeLabel` prop, which the
-screen wires to `writeFieldLabel`. The Width select's options read
-`formEditor.spanOne` ("One column") and `formEditor.spanBoth` ("Both
-columns"), with the values 1 and 2 unchanged.
+screen wires to `writeFieldLabel`. Beside it the strip prints
+`missingTranslationWarning(label, contentLocale, baseLocale)`, as the Fields
+tab's label control does. The strip takes a new `fieldLabel` prop holding
+the field's whole `LocalizedText` for both.
+
+Both strips' Width selects read `formEditor.spanOne` ("One column") and
+`formEditor.spanBoth` ("Both columns"), with the values 1 and 2 unchanged.
+
+The field strip now reads `useDraft()` through `LocalizedTextInput`, so it
+needs a `DraftContext` around it. The `TabOption` comment that says the
+strip renders with no provider changes with it. Its tests wrap the strip in
+`DraftContext.Provider`.
 
 `NoteEditorStrip`'s `groupKeys: string[]` becomes `groupOptions:
 { key, label }[]`. Each option prints the label and writes the key.
@@ -271,10 +326,10 @@ export `formCounts(step, fields)`. It prints `formSizeText(...)` or
 
 ### D9. "Put this field on a step" opens the form
 
-A new pure helper `firstWorkedStepId(draft)` (`draft/stepKinds.ts`) returns
-the initial step when it is a task step and not an end. Otherwise it returns
-the first such step in draft order, or `undefined`. A task step is one whose
-`type` is `"task"` or absent, without `terminal: true`.
+A new pure helper `firstWorkedStepId(draft)` in `draft/performedBy.ts`
+returns the initial step when a person works it. Otherwise it returns the
+first such step in draft order, or `undefined`. A person works a step when
+`performedByFor(step.type, step.terminal)` answers `"participant"`.
 
 `FieldCatalogPanel` takes a new `onOpenForm(stepId)` prop for the empty
 state's route alone. The used-in rows keep `onShowStep`.
@@ -293,8 +348,12 @@ name"), `formEditor.namePlaceholder` ("Name this field…"),
 
 Removed: `formEditor.mintText`, `formEditor.mintChoice`,
 `formEditor.mintDate`, `formEditor.mintFile`, `formEditor.mintSection`,
-`formEditor.markCel`, `formEditor.noteType`,
+`formEditor.noteType`,
 `stepSections.viewFieldsConfigured`, `stepSections.viewBuildForm`.
+
+`formEditor.markCel` stays: `FieldMatrixGrid.tsx` prints the matrix's own
+CEL stamp from it, and change 11 owns the matrix's words. The form editor
+stops reading it.
 
 `formEditor.back` stays for `FormEditorBoundary`'s fallback button alone.
 The editor's own header no longer reads it. The footer note
@@ -308,11 +367,18 @@ The editor's own header no longer reads it. The footer note
   palette, the flag names and the note strip. The new requirements cover
   the tab row, the breadcrumb and the draft writes. They also cover naming
   on create, the key rule, the strip's Name, and the card's label and kind.
+- `studio-form-editor` also MODIFIES "The form editor renders from compiled
+  styles" and "A live participant preview stands beside the form canvas".
+  Both cite the removed 80rem requirement by name and now cite its
+  successor.
 - `studio-forms-overview`: MODIFIED "A card opens the form editor for its
   step".
 - `studio-step-page`: two ADDED requirements for the Form section.
-- `studio-app`: MODIFIED for the empty-state route and the Form section's
-  count.
+- `studio-app`: MODIFIED for the empty-state route. REMOVED for the Form
+  section's count, whose rule and scenarios move to `studio-step-page`.
+- `studio-process-tabs`: MODIFIED "The open tab stands in the address". On
+  the form editor's address the tab row stands Steps current, or Forms after
+  a card.
 
 At sync, each ADDED successor moves to its removed predecessor's place.
 

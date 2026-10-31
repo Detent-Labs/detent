@@ -78,8 +78,8 @@ The first crumb SHALL return to the current tab. The second SHALL open the
 step's page on the Steps tab. The third SHALL mark the current place and
 take no press.
 
-Leaving the editor SHALL return the author to where they came from. That is
-the Forms tab after a Forms card, and the step's page after the step page.
+Leaving the editor SHALL return the author to the current tab. That is the
+Forms tab after a Forms card, and the step's page in every other case.
 
 #### Scenario: The breadcrumb names the way back
 
@@ -132,15 +132,13 @@ change already lands in the draft.
 ### Requirement: A new field takes its name on its card
 
 A palette kind's press or drop SHALL place the new card with a name input in
-place of its label. The input SHALL take the focus at once, so the first
-keystroke writes the label for the content locale.
+place of its label. A group card takes the input in place of its legend's
+name. The input SHALL take the focus at once, so the first keystroke writes
+the label for the content locale.
 
 Enter or Escape SHALL end the naming and move the focus onto the card's own
 control. Moving the focus elsewhere ends it too. A card whose field has no
-label for the content locale SHALL keep the input.
-
-The input SHALL carry the accessible name "Field name" and the placeholder
-"Name this field…".
+label, in the content locale or the base locale, SHALL keep the input.
 
 #### Scenario: The first keystroke names the field
 
@@ -166,13 +164,38 @@ The input SHALL carry the accessible name "Field name" and the placeholder
 - **WHEN** the author ends the naming with the input empty
 - **THEN** the card keeps the name input
 
+#### Scenario: A new group takes its name on its legend
+
+- **WHEN** the author presses the palette's "Group" kind
+- **THEN** the new group card's legend shows the name input, holding the
+  focus
+
+#### Scenario: An untranslated label keeps its card
+
+- **WHEN** the content locale differs from the base locale
+- **AND** a field carries a label in the base locale alone
+- **THEN** its card prints that label, and shows no name input
+
+### Requirement: The name input states its purpose
+
+The name input SHALL carry the accessible name "Field name" and the
+placeholder "Name this field…".
+
+#### Scenario: A screen reader names the input
+
+- **WHEN** an assistive technology reads a new card's name input
+- **THEN** it reads the name "Field name"
+
 ### Requirement: A name given in the form editor sets the key
 
 A label written on a card or in the strip SHALL set the field's key. It
-follows the rule of the Fields tab's label control. The key follows the label until
-a CEL expression reads the key or a published version holds the field. It
-stays unique across the whole catalog. A group's label also rewrites the
-view entries naming the group's key.
+follows the rule of the Fields tab's label control. A field's key follows
+the label until a CEL expression reads the key or a published version holds
+the field. It stays unique across the whole catalog.
+
+A group's key follows its label the way the Fields tab's group label does,
+and no publish locks it. A group's label also rewrites the view entries
+naming the group's key.
 
 #### Scenario: A new field's key follows its name
 
@@ -453,6 +476,7 @@ value it writes.
 
 - **WHEN** an author selects a note
 - **THEN** the strip's captions read Text, Asked, Width and Group
+- **AND** the Width choices read One column and Both columns
 
 ### Requirement: A note's strip sets its text, its span, its group and its visibility
 
@@ -498,3 +522,104 @@ value the note never holds.
   `baseLocale`
 - **THEN** the editor reports it before publish, rather than letting publish be
   the first place an author learns of it
+
+### Requirement: The form editor renders from compiled styles
+
+<!-- antislop: allow synonym-rotation -->
+<!-- Why: the body is copied from the live requirement with one cited name swapped. -->
+The screen `screens/FormEditorScreen.tsx` SHALL render from compiled
+component styles, reading `form-ui/tokens.stylex`. The rendered result SHALL
+match the previous stylesheet declaration for declaration, apart from the
+width at which the preview turns. The requirement "The preview yields its
+column at 80rem and below" states that width.
+
+The "How it will look" preview has a two-column layout. It SHALL pick
+its style from a parameterized style function, keyed on the column
+count. That is the same pattern `form-ui`'s own field renderer uses
+for its own columns/span choice. The preview MAY still render a
+`data-columns` fact on its container, for a test or another consumer
+to read. No stylesheet SHALL select on it after migration.
+
+#### Scenario: The form editor keeps its look
+
+- **WHEN** a browser renders the form editor
+- **THEN** its computed spacing, color and border equal the values the
+  deleted stylesheet declared
+- **AND** so does its layout, apart from the width at which the preview
+  turns
+
+#### Scenario: The two-column preview switches correctly
+
+- **WHEN** an author toggles a field group between one and two columns
+- **THEN** the preview's computed grid layout matches the deleted
+  stylesheet's own two-column and one-column rules
+- **AND** no compiled or hand-written stylesheet rule selects on a
+  `data-columns` or `data-span` attribute after the migration
+
+### Requirement: A live participant preview stands beside the form canvas
+
+The form editor SHALL carry a preview of what a participant meets. In a
+window wider than 80rem, the preview SHALL stand beside the form canvas, in
+the editor's trailing pane. The requirement "The preview yields its column
+at 80rem and below" states where it stands in a narrower window.
+
+The preview SHALL mount the same `packages/form-ui` renderer the Player mounts.
+No second renderer SHALL exist for it. What an author reads in the preview is
+therefore what a participant gets.
+
+The preview SHALL follow the view's own column count and its label position.
+It SHALL name the process and the step above the fields. Below the fields it
+SHALL carry one control per manual path the step declares, taking each path's
+own label. A step declaring only automatic paths SHALL carry one submit
+control.
+
+A manual path can carry a guard. The runtime offers its control only while
+that guard holds. The preview has no instance data to test the guard against.
+It SHALL still draw the control. It SHALL print a line under the controls that
+names the path and its condition.
+
+The line reads the path's label, then the condition in the words the canvas
+edge uses. A guard the builder cannot read prints its CEL
+text instead. A manual path with no guard SHALL get no line.
+
+The preview SHALL take no keyboard focus and no pointer interaction. It carries
+the `inert` attribute, so a screen reader passes over it. Every change in the
+form canvas SHALL reach the preview at once, without a reload.
+
+#### Scenario: The preview follows the view order
+
+- **WHEN** an author moves a field above another in the form canvas
+- **THEN** the preview prints the two fields in the new order
+
+#### Scenario: The preview follows the column count
+
+- **WHEN** an author sets the form to two columns
+- **THEN** the preview lays its fields in two columns
+
+#### Scenario: The preview names the manual paths
+
+- **WHEN** the step declares two manual paths labelled "Approve" and "Reject"
+- **THEN** the preview carries one control reading "Approve"
+- **AND** the preview carries one control reading "Reject"
+
+#### Scenario: A guarded manual path names its condition
+
+- **WHEN** the step declares a manual path labelled "Approve" with the guard
+  `data.amount > 1000.0`
+- **THEN** the preview carries the control "Approve"
+- **AND** a line under the controls names "Approve" and its condition in words
+
+#### Scenario: An unguarded manual path gets no line
+
+- **WHEN** the step declares a manual path with no guard
+- **THEN** the preview prints no condition line for that path
+
+#### Scenario: The preview takes no focus
+
+- **WHEN** an author walks the form editor with the Tab key
+- **THEN** the focus never lands inside the preview
+
+#### Scenario: A required entry marks itself in the preview
+
+- **WHEN** a view entry declares `required: true`
+- **THEN** the preview marks that entry's label as required

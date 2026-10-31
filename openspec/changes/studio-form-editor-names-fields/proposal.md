@@ -71,22 +71,33 @@ None.
 - `studio-step-page`: the Form section's sentence and its two control
   words.
 - `studio-app`: the effect half's empty-state route opens the form editor
-  in place of the canvas. The Form section's count drops the catalog's size.
+  in place of the canvas. The Form section's count rule moves to
+  `studio-step-page`.
   Section 8 lists no `studio-app` delta for change 6. Both rules live in
   `studio-app` today, so the change needs one.
+- `studio-process-tabs`: the open tab on the form editor's address. The
+  tab row stands Steps current there, or Forms after a card.
 
 ## Impact
 
 - `packages/web/src/areas/studio/screens/FormEditorScreen.tsx` and
   `screens/EditScreen.tsx`.
-- `packages/web/src/areas/studio/draft/mintField.ts`, plus a shared
-  label writer in `draft/`.
+- `packages/web/src/areas/studio/draft/mintField.ts`,
+  `draft/process-tabs.ts` and `draft/performedBy.ts`.
+- One new module: `draft/fieldLabel.ts`.
+- `panels/fieldCatalogLogic.ts`, `panels/stepsPanelLogic.ts` and
+  `panels/shared/LocalizedTextInput.tsx`.
 - `panels/StepPage.tsx`, `panels/FormsTab.tsx`, `panels/formCardRows.ts`,
   `panels/FieldCatalogPanel.tsx`, `panels/EntityTabs.tsx`,
   `panels/FieldsTabViews.tsx`.
 - The studio catalog, `packages/web/src/i18n/catalogs/studio.ts`.
 - `.claude/rules/ui-glossary.md`: the form editor entry, the palette's
   word for a group and the form editor's place under the tab row.
-- `docs/browser-checks.md`, `docs/decisions.md` and `ROADMAP.md`.
+- The docs: `docs/authoring-guide.md`, `docs/browser-checks.md`,
+  `docs/decisions.md`. Also `ROADMAP.md`.
+- `panels/FieldMatrixGrid.tsx` keeps reading `formEditor.markCel`, so the
+  key stays.
 - The tests under `packages/web/test/` that pin the palette, a card's key,
-  the strip or the back control.
+  the strip or the back control. Three more pin a consumer:
+  `studio-stash-wiring.test.ts`, `studio-conditionInput-childOperands.test.tsx`
+  and `boundaries.test.ts`.

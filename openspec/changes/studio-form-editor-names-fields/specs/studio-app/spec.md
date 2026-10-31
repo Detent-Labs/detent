@@ -52,26 +52,12 @@ field no step asks for yet is an unfinished draft, not a broken one.
 - **WHEN** every step of the draft is an end or a call to another process
 - **THEN** the effect half offers no "Put this field on a step" control
 
+## REMOVED Requirements
+
 ### Requirement: The Form section's configured-field count reads field entries alone
 
-The Form section SHALL report how many field entries a step's view holds, in
-the sentence `studio-step-page` states. The count matches a Forms tab card's
-count.
+**Reason**: The Form section states its form's size as a sentence now. The
+rule moved to `studio-step-page`, "The Form section states the form's size in
+words", with both scenarios.
 
-The count SHALL count field entries alone. A note occupies no catalog row, so
-counting one would report a step as asking for more than it does. A group
-entry draws no value of its own, so it adds nothing either. The section
-prints no count of the whole catalog.
-
-This count sits in the Form section. The form editor displays no count of
-its own.
-
-#### Scenario: A note raises no configured-field count
-
-- **WHEN** a step's view holds one field entry and three notes
-- **THEN** the Form section reads "1 field"
-
-#### Scenario: A step holding notes alone reports none configured
-
-- **WHEN** a step's view holds notes alone
-- **THEN** the Form section reads "No fields yet"
+**Migration**: None.
