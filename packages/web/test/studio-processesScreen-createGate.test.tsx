@@ -37,3 +37,23 @@ describe("The create-new-process action's role gate", () => {
     expect(renderScreen(["system:developer", "system:create"])).toContain("Import a promoted version");
   });
 });
+
+/**
+ * studio-app spec, "The import control is one secondary button": the label is
+ * a secondary button, and the native file input it opens stays hidden.
+ */
+describe("The import control", () => {
+  it("is a button with class btn-secondary", () => {
+    const html = renderScreen(["system:developer"]);
+
+    expect(html).toMatch(/<button type="button" class="btn btn-secondary">(?:(?!<\/button>).)*Import a promoted version<\/button>/);
+  });
+
+  it("opens a file input that carries hidden", () => {
+    const input = renderScreen(["system:developer"]).match(/<input[^>]*id="promotion-import"[^>]*>/)?.[0];
+
+    expect(input).toBeDefined();
+    expect(input).toMatch(/\shidden(=""|\s|>)/);
+    expect(input).toContain('type="file"');
+  });
+});

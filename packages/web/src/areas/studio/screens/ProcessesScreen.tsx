@@ -16,17 +16,22 @@ import {
 import {
   createInFlightGuard,
   deriveProcessRows,
+  describeProcessRow,
+  isPlainLeftClick,
   narrowToAccessible,
-  seedVersionFor,
+  relativeAgo,
   seededDraftInput,
+  sortProcessRows,
   templateDraftInput,
   templateDisplayName,
   type ProcessRow,
+  type ProcessRowView,
 } from "./processListLogic.js";
 import type { TemplateSummary } from "../api/types.js";
 import { collidingProcessId, parsePromotionFile, type PromotionPreview } from "./promotionImportLogic.js";
 import { mintId } from "../draft/ids.js";
-import type { Route } from "../routing.js";
+import { routePath, type Route } from "../routing.js";
+import { areaHref } from "../../../shell/routing.js";
 import { describeCaughtError } from "../errors.js";
 import { t } from "../catalog.js";
 import { is401, useFail } from "../../../shell/useFail.js";
@@ -111,16 +116,6 @@ const styles = stylex.create({
     paddingBlock: `${space.s4} ${space.s6}`,
     paddingInline: space.s3,
   },
-  fileLabel: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: space.s1,
-    fontFamily: fonts.body,
-    fontSize: 11,
-    textTransform: "uppercase",
-    letterSpacing: "0.06em",
-    color: colors.textMuted,
-  },
   note: {
     color: colors.textMuted,
     minHeight: "1.25rem",
@@ -182,6 +177,60 @@ const styles = stylex.create({
     borderBottomStyle: "solid",
     borderBottomColor: colors.border,
     verticalAlign: "top",
+  },
+  // The name is the row's one link: ink at the table's size, underlined on hover only.
+  nameLink: {
+    color: colors.text,
+    textDecoration: { default: "none", ":hover": "underline" },
+    overflowWrap: "anywhere",
+  },
+  quiet: {
+    color: colors.textMuted,
+  },
+  mono: {
+    fontFamily: fonts.mono,
+  },
+  commands: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: space.s2,
+  },
+  developer: {
+    marginBlockStart: space.s1,
+  },
+  // `developerSummary` and `developerBox` copy `panels/ChangeList.tsx`'s own
+  // shapes. The box leaves out that file's `position` and `overflowX`: every
+  // value here wraps, so the box never scrolls.
+  developerSummary: {
+    width: "fit-content",
+    paddingBlock: space.s1,
+    fontFamily: fonts.mono,
+    fontSize: 11,
+    color: colors.textMuted,
+    cursor: "pointer",
+  },
+  developerBox: {
+    display: "grid",
+    gridTemplateColumns: "max-content 1fr",
+    gap: `${space.s1} ${space.s3}`,
+    marginBlockStart: space.s1,
+    marginBlockEnd: 0,
+    marginInline: 0,
+    padding: space.s2,
+    backgroundColor: colors.surfaceMuted,
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: colors.border,
+    fontSize: "0.8rem",
+  },
+  developerTerm: {
+    color: colors.textMuted,
+  },
+  developerValue: {
+    margin: 0,
+    minWidth: 0,
+    fontFamily: fonts.mono,
+    overflowWrap: "anywhere",
   },
 });
 
@@ -329,6 +378,130 @@ function StartPickerDialog({ templates, onCancel, onPick }: StartPickerDialogPro
         </button>
       </div>
     </dialog>
+  );
+}
+
+/** A relative time, with the absolute date and time on hover. `now` is the one `Date.now()` the list's pass read. */
+function RelativeTime({ iso, now }: { iso: string; now: number }) {
+  const absolute = new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso));
+  return (
+    <time dateTime={iso} title={absolute}>
+      {relativeAgo(iso, now)}
+    </time>
+  );
+}
+
+/** "Saved by {name}, {when}" or "Saved {when}", with the `<time>` in the `{when}` slot. */
+function SavedLine({ saved, now }: { saved: { by: string | null; at: string }; now: number }) {
+  const template = saved.by === null ? t("processList.savedAnonymous") : t("processList.savedBy");
+  const [before = "", after = ""] = template.split("{when}");
+  // A function fills the slot, so a `$` pattern in a name prints as written.
+  const by = saved.by;
+  const fill = (part: string) => (by === null ? part : part.replace("{name}", () => by));
+  return (
+    <>
+      {fill(before)}
+      <RelativeTime iso={saved.at} now={now} />
+      {fill(after)}
+    </>
+  );
+}
+
+function DeveloperEntry({ term, value }: { term: string; value: string }) {
+  return (
+    <>
+      <dt {...stylex.props(styles.developerTerm)}>{term}</dt>
+      <dd {...stylex.props(styles.developerValue)} translate="no">
+        {value}
+      </dd>
+    </>
+  );
+}
+
+export interface ProcessListRowProps {
+  view: ProcessRowView;
+  /** Epoch milliseconds, read once per pass of the list. */
+  now: number;
+  /** True while this row's Create draft write is in flight. */
+  creating: boolean;
+  onNavigate: (route: Route) => void;
+  onCreateDraft: (view: ProcessRowView) => void;
+  onDiscard: (view: ProcessRowView) => void;
+}
+
+/**
+ * One process-list row, drawn from its `ProcessRowView` alone. The name is the
+ * row's one link; a plain primary click navigates in place, and the browser
+ * keeps every other click. Machine values sit only inside the Developer view.
+ */
+export function ProcessListRow({ view, now, creating, onNavigate, onCreateDraft, onDiscard }: ProcessListRowProps) {
+  const { developer } = view;
+  return (
+    <tr>
+      <td {...stylex.props(styles.tableCell)}>
+        <a
+          href={areaHref("studio", routePath(view.open))}
+          {...stylex.props(styles.nameLink, view.name === "" && styles.quiet)}
+          onClick={(e) => {
+            if (!isPlainLeftClick(e)) return;
+            e.preventDefault();
+            onNavigate(view.open);
+          }}
+        >
+          {view.name || t("processList.untitled")}
+        </a>
+        <details {...stylex.props(styles.developer)}>
+          <summary {...stylex.props(styles.developerSummary)}>{t("processList.developerView")}</summary>
+          <dl {...stylex.props(styles.developerBox)}>
+            <DeveloperEntry term={t("processList.devKey")} value={developer.key ?? "—"} />
+            <DeveloperEntry term={t("processList.devProcessId")} value={developer.processId} />
+            {developer.revision !== undefined && <DeveloperEntry term={t("processList.devRevision")} value={String(developer.revision)} />}
+            {developer.hash !== undefined && <DeveloperEntry term={t("processList.devHash")} value={developer.hash} />}
+            {developer.savedBy !== undefined && <DeveloperEntry term={t("processList.devSavedBy")} value={developer.savedBy} />}
+          </dl>
+        </details>
+      </td>
+      <td {...stylex.props(styles.tableCell)}>
+        {view.saved ? <SavedLine saved={view.saved} now={now} /> : <span {...stylex.props(styles.quiet)}>{t("processList.noDraft")}</span>}
+      </td>
+      <td {...stylex.props(styles.tableCell)}>
+        {view.published ? (
+          <>
+            <span {...stylex.props(styles.mono)} translate="no">
+              v{view.published.version}
+            </span>
+            {" · "}
+            <RelativeTime iso={view.published.at} now={now} />
+          </>
+        ) : (
+          <span {...stylex.props(styles.quiet)}>{t("processList.notPublished")}</span>
+        )}
+      </td>
+      <td {...stylex.props(styles.tableCell)}>
+        <div {...stylex.props(styles.commands)}>
+          {view.commands.map((command) =>
+            command === "createDraft" ? (
+              <button key={command} type="button" className="btn btn-secondary" onClick={() => onCreateDraft(view)} disabled={creating}>
+                {t("processList.createDraft")}
+              </button>
+            ) : command === "versions" ? (
+              <button
+                key={command}
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => onNavigate({ name: "versions", processId: view.processId })}
+              >
+                {t("processList.versions")}
+              </button>
+            ) : (
+              <button key={command} type="button" className="btn btn-secondary btn-destructive" onClick={() => onDiscard(view)}>
+                {t("processList.discard")}
+              </button>
+            ),
+          )}
+        </div>
+      </td>
+    </tr>
   );
 }
 
@@ -503,15 +676,21 @@ export function ProcessesScreen({ token, roles, navigate, onUnauthorized }: Proc
     setImportResult(undefined);
   };
 
-  const discard = async (processId: string) => {
-    if (!confirm(`Discard the draft for ${processId}? Unpublished edits will be lost.`)) return;
+  const discard = async (view: ProcessRowView) => {
+    const name = view.name || t("processList.untitled");
+    // A function fills the slot, so a `$` pattern in a name prints as written.
+    if (!confirm(t("processList.discardConfirm").replace("{name}", () => name))) return;
     try {
-      await deleteDraft(processId, token);
+      await deleteDraft(view.processId, token);
       await load();
     } catch (err) {
       fail(err);
     }
   };
+
+  // One clock read per pass: a list left open does not tick, and its times move on the next load.
+  const now = Date.now();
+  const views = sortProcessRows(rows.map(describeProcessRow));
 
   return (
     <main {...stylex.props(styles.screen)}>
@@ -519,16 +698,17 @@ export function ProcessesScreen({ token, roles, navigate, onUnauthorized }: Proc
       <div {...stylex.props(styles.controls)}>
         {canCreate && (
           <button type="button" className="btn btn-primary" onClick={() => void newProcess()}>
-            + New process
+            {t("processList.newProcess")}
           </button>
         )}
-        <label {...stylex.props(styles.fileLabel)} htmlFor="promotion-import">
+        <button type="button" className="btn btn-secondary" onClick={() => fileInput.current?.click()}>
           <Upload size={18} strokeWidth={1.75} aria-hidden="true" />
-          Import a promoted version
-        </label>
+          {t("processList.import")}
+        </button>
         <input
           id="promotion-import"
           ref={fileInput}
+          hidden
           type="file"
           accept="application/json,.json"
           onChange={(e) => {
@@ -567,60 +747,30 @@ export function ProcessesScreen({ token, roles, navigate, onUnauthorized }: Proc
         </div>
       )}
       {loading && rows.length === 0 ? (
-        <p {...stylex.props(styles.empty)}>Loading…</p>
+        <p {...stylex.props(styles.empty)}>{t("processList.loading")}</p>
       ) : rows.length === 0 ? (
-        !error && <p {...stylex.props(styles.empty)}>No processes yet.</p>
+        !error && <p {...stylex.props(styles.empty)}>{t("processList.empty")}</p>
       ) : (
         <table {...stylex.props(styles.table)}>
           <thead>
             <tr>
-              <th {...stylex.props(styles.tableHeadCell)}>Process</th>
-              <th {...stylex.props(styles.tableHeadCell)}>Draft</th>
-              <th {...stylex.props(styles.tableHeadCell)}>Published</th>
+              <th {...stylex.props(styles.tableHeadCell)}>{t("processList.headProcess")}</th>
+              <th {...stylex.props(styles.tableHeadCell)}>{t("processList.headDraft")}</th>
+              <th {...stylex.props(styles.tableHeadCell)}>{t("processList.headPublished")}</th>
               <th {...stylex.props(styles.tableHeadCell)}></th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
-              <tr key={row.processId}>
-                <td {...stylex.props(styles.tableCell)}>{row.published?.key ?? row.processId}</td>
-                <td {...stylex.props(styles.tableCell)}>
-                  {row.draft ? (
-                    <>
-                      saved by {row.draft.updatedBy} at {new Date(row.draft.updatedAt).toLocaleString()} (rev {row.draft.revision})
-                    </>
-                  ) : (
-                    "—"
-                  )}
-                </td>
-                <td {...stylex.props(styles.tableCell)}>{row.published ? <>v{row.published.version} · {row.published.definitionHash.slice(0, 12)}</> : "—"}</td>
-                <td {...stylex.props(styles.tableCell)}>
-                  {row.draft ? (
-                    <>
-                      <button type="button" className="btn btn-secondary" onClick={() => navigate({ name: "edit", processId: row.processId })}>
-                        Open
-                      </button>
-                      <button type="button" className="btn btn-secondary btn-destructive" onClick={() => void discard(row.processId)}>
-                        Discard
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      onClick={() => void createDraft(row.processId, seedVersionFor(row))}
-                      disabled={creating.has(row.processId)}
-                    >
-                      Create draft
-                    </button>
-                  )}
-                  {row.published && (
-                    <button type="button" className="btn btn-secondary" onClick={() => navigate({ name: "versions", processId: row.processId })}>
-                      Versions
-                    </button>
-                  )}
-                </td>
-              </tr>
+            {views.map((view) => (
+              <ProcessListRow
+                key={view.processId}
+                view={view}
+                now={now}
+                creating={creating.has(view.processId)}
+                onNavigate={navigate}
+                onCreateDraft={(v) => void createDraft(v.processId, v.seedVersion)}
+                onDiscard={(v) => void discard(v)}
+              />
             ))}
           </tbody>
         </table>
