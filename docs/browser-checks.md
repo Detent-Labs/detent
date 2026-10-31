@@ -1263,7 +1263,7 @@ its route. It passes through the waypoint, and it ends on the box's own side.
 ### View flags in the form editor (`studio-view-flags-module`)
 
 Open Studio, `purchase-requisition`, step `finance_review`, the form editor,
-and select the `vendor` field. Pass: the Visible checkbox reads ticked. This
+and select the `vendor` field. Pass: the Asked checkbox reads ticked. This
 field carries no `visible` key, and the old checkbox read this state
 unticked.
 
@@ -1271,19 +1271,19 @@ unticked.
 <!-- Why: `.claude/rules/ui-glossary.md` fixes "JSON surface" as the one name
      for the raw definition view. The rule reads its "surface" as a synonym for
      the "render" this file uses of a browser painting a page. -->
-Untick Visible. Pass: the Required and Read-only checkboxes disable, and any
-tick each held clears. Tick Visible again. Pass: both re-enable, still
+Untick Asked. Pass: the Required and Read-only checkboxes disable, and any
+tick each held clears. Tick Asked again. Pass: both re-enable, still
 unticked. Open the JSON surface. Pass: this field's view entry carries no
 `visible` key, no `required` key and no `readonly` key.
 
-Tick Required, without touching Visible. Open the JSON surface. Pass: the
+Tick Required, without touching Asked. Open the JSON surface. Pass: the
 entry carries `required: true` alone. Untick Required. Pass: the key goes.
 
 Open the checks rail. Pass: a `view` group sits after `duration`, reading
 clear.
 
 The strip itself cannot author `visible: false` beside `required: true`
-anymore: unticking Visible clears Required in the same write. Reach the
+anymore: unticking Asked clears Required in the same write. Reach the
 hidden-required state through the JSON surface instead. Give a view entry
 `visible: false` and `required: true` there. Pass: the checks rail's `view`
 group shows one entry, naming the step and the field: hidden but required.
@@ -1295,7 +1295,7 @@ Pick a step no other step's view lists that field editable on. Pass: the
 reads required and read-only, with nothing writing it. Add that field to
 `Action.output` on any action. Pass: the entry clears.
 
-Repeat the walk in German. Pass: the Visible, Required and Read-only labels
+Repeat the walk in German. Pass: the Asked, Required and Read-only labels
 and the checks rail heading translate. The two new rail messages stay in
 English, the same as every other engine-validator message the rail shows.
 
@@ -1311,11 +1311,11 @@ whether the real screen wires those functions to a click.
 Open Studio, `purchase-requisition`, step `finance_review`, the form
 editor. Pass: the palette carries a "Notes" heading and an "Add a note"
 button, below the catalog field list. Select the existing note card. Pass:
-its own strip opens, reading "Note", with a `text` box, a Visible
-checkbox, a span control and a group control. Only a note's strip carries
+its own strip opens, reading "Note", with Text, Asked, Width and
+group controls. Only a note's strip carries
 that group control: a field's group follows its catalog parent.
 
-Edit the `text` box. Pass: the canvas card's own preview text updates as
+Edit the Text box. Pass: the canvas card's own preview text updates as
 you type. Click Move up. Pass: the card moves one slot toward the front of
 the list, the same slot a drag there would give it. Click Remove. Pass:
 the card leaves the list and the "Add a note" button still offers a fresh
@@ -1323,7 +1323,7 @@ one. Click "Add a note". Pass: a new card appears, seeded with non-empty
 placeholder text, selected, its own strip open.
 
 Read the masthead's issue count. Pass: it still reads issues for this step,
-never blanks. Clear the new note's `text` box to empty and read the count
+never blanks. Clear the new note's Text box to empty and read the count
 again. Pass: it names exactly one Zod issue, the missing base-locale
 entry, and every other check the step already carried still shows. Restore
 the text or remove the card before leaving.
@@ -1431,12 +1431,12 @@ Engage "Hide inert columns". Pass: the grid draws 10 columns, none of
 them `approval_routing`, `issue_po` or `receipt_check`. The count line
 now reads 10 steps and 166 cells. Every row still draws.
 
-Select the "draft" column's `required` bulk badge. Pass: it presses, and
+Select the "draft" column's Required bulk badge. Pass: it presses, and
 every live, non-CEL, non-gated cell in that column reads `required`
 true. Select it again. Pass: every one of those cells clears its
 `required` key.
 
-Click a live cell's Visible checkbox off. Pass: the Required and
+Click a live cell's Asked checkbox off. Pass: the Required and
 Read-only controls in that same cell disable at once, and both clear.
 Click it back on. Pass: both re-enable.
 
@@ -1452,7 +1452,7 @@ Press an arrow key. Pass: focus moves one cell in that direction, and
 the grid stays the page's one tab stop. Press Home, End, Ctrl+Home and
 Ctrl+End. Pass: each moves focus as it did before this change.
 
-Press Enter or Space on a live cell. Pass: its own Visible, Required and
+Press Enter or Space on a live cell. Pass: its own Asked, Required and
 Read-only controls become the grid's only reachable tab stops — three
 checkboxes, one per flag. Press Escape. Pass: focus returns to the
 cell, and the grid is again the page's one tab stop.
@@ -1501,7 +1501,7 @@ checked, and the JSON surface shows no `required` key left on `submit`'s
 view entry for `result`.
 
 Open the form editor's per-step strip for `submit`, `result` selected.
-Pass: the strip offers Visible and Span. It offers no Required or
+Pass: the strip offers Asked and Width. It offers no Required or
 Read-only control. Note how the strip's layout reads with the two
 controls gone — this is the browser-check judgment design.md's Open
 Questions leaves to implementation time.
@@ -1511,7 +1511,7 @@ technical-field marker, visually distinct from the flagged-cell ring
 marker. Note its exact visual form — the matrix's own open judgment.
 No other row carries the marker. `result`'s cell on `submit` shows its
 Required and Read-only checkboxes disabled; its row header offers no
-Required or Read-only bulk badge, but still offers the Visible one.
+Required or Read-only bulk badge, but still offers the Asked one.
 
 Select a `type: "group"` field in the field catalog. Pass: its Technical
 checkbox is disabled. Select one of its children instead. Pass: that
@@ -4328,46 +4328,6 @@ each on its own fresh draft.
    own "Discard draft" does not work, so do not use it here. See the
    `docs/decisions.md` entry DRAFT-1.
 
-### Step page masthead Label and Key row (`step-page-label-key-side-by-side`)
-
-Source: `step-page-label-key-side-by-side` tasks 3.1 to 3.3.
-
-The step page masthead displays a step's LABEL and KEY fields. They now render
-side by side in one row, with LABEL's column visibly wider than KEY's, instead
-of stacked vertically. At narrow viewports (under 64rem), the row collapses to
-LABEL above KEY, each in its own full-width row. A missing-translation warning
-under LABEL remains scoped to LABEL's column.
-
-A compiled StyleX class name is never citable by name
-(`.claude/rules/design-language.md`). No `bun:test` assertion can see this
-grid's layout, so this check lands here.
-
-Build the production bundle and open it on the engine's own port. Seed the
-database, then sign in as `demo-superuser@example.test`, password
-`seed-demo-password`. In the Processes list, find `it_offboarding` and choose
-"Create draft". Studio opens the draft at `/studio/processes/<id>/edit`. On the
-Steps tab, open the "Submit the Exit Notification" step (key `exit_notification`)
-on the step page at `/studio/processes/<id>/edit/steps/<step-id>`.
-
-1. Resize the window to 1440px wide. Pass: the LABEL and KEY fields render in
-   one row side by side. LABEL's column is noticeably wider than KEY's column.
-   The step's label and key appear as one visual identity block.
-
-2. Resize the window to 500px wide, well under the 64rem narrow breakpoint.
-   Pass: the LABEL field and its warning now stack vertically as two full-width
-   rows, one above the other. KEY follows below, in its own row.
-
-3. Open the header bar's `⋮` menu, type `de` into the "add locale" textbox,
-   and choose "+ add locale". That click both adds `de` and selects it as the
-   content locale, which drives the missing-translation state. Scroll to see
-   the LABEL field. Pass: the missing-translation warning appears below
-   LABEL's own column, contained within LABEL's space only. The warning does
-   not span beneath KEY's column.
-
-Go back to the process list and choose "Discard" on the `it_offboarding` row,
-then accept the browser's confirm. Pass: that row reads an em dash under Draft,
-with "Create draft" back beside "Versions".
-
 ### The Forms tab card miniature (`forms-tab-form-strip`)
 
 Source: `forms-tab-form-strip` tasks 3.5 and 3.6, `forms-tab-card-clarity`
@@ -4628,8 +4588,8 @@ database, then sign in as `demo-superuser@example.test`, password
    "+ add locale". Pass: the warning callout beside the process name draws its
    3px rule in `rgb(226, 90, 64)` light and `rgb(255, 151, 131)` dark.
 2. Open the Steps tab and choose "Submit the Exit Notification" in the steps
-   rail. In that step page's "Path to" section, under the first path's
-   "triggered by", choose "a condition". Under "Only when", choose "+ Add row"
+   rail. In that step page's "Ways out" section, choose "Happens by itself"
+   for the first way out's trigger. Under "Only when", choose "+ Add row"
    and leave the row's value empty. Pass: the row's dashed border reads the
    same two colors as the first step.
 3. Open the Changes tab, which lists the path the second step changed. Hover
@@ -5770,12 +5730,12 @@ group's row.
 ### The path row's field order and the target select's chevron (`studio-path-row-field-order`)
 
 Open Studio, a draft of `credit_check`, the Steps tab. Select the `Decide`
-step. It carries two automatic paths. Read its "Path to" section.
+step. It carries two automatic paths. Read its "Ways out" section.
 
-Pass: each path row shows `label` above `key` above `to`. `key` renders in
-the mono face. The path row's `to` select shows a slate chevron in place of
-the browser's own dropdown arrow. The "add path" target selector below the
-path list shows the same chevron. Both sit flush against their select's own
+Pass: each way-out row shows Name above "Leads to". No key shows in the
+mono face beside either caption. The row's "Leads to" select shows a slate
+chevron in place of the browser's own dropdown arrow. The target selector
+under "+ Add a way out" shows the same chevron. Both sit flush against their select's own
 trailing edge.
 
 This walk caught a defect no rendered-string test can see. `selectWrap`
@@ -5930,7 +5890,7 @@ only a live render, at a real width, shows the clearance. The source
 scan test covers only the static half, that the style itself declares
 the room.
 
-### Path guards, held condition rows and Add path (`fix-condition-and-path-builders`)
+### Path guards, held condition rows and Add a way out (`fix-condition-and-path-builders`)
 
 Source: `fix-condition-and-path-builders` task 5.2. A `bun:test` run cannot click
 a control or read a label off a live canvas. The five findings below stay
@@ -5941,10 +5901,10 @@ carries two manual paths, "Submit for approval" and "Withdraw".
 
 #### A manual path keeps its guard (E2-1)
 
-Open the Steps tab and select that first step. In "Path to", open "Submit for
-approval". Set "triggered by" to "a condition". Build one row under "Only
-when": `quantity` greater than 5. Set "triggered by" back to "a participant's
-choice".
+Open the Steps tab and select that first step. In "Ways out", open "Submit for
+approval". Choose "Happens by itself" for its trigger. Build one row under "Only
+when": `quantity` greater than 5. Choose "A person chooses" for the trigger
+again.
 
 Pass: the "Only when" heading and the row stay on screen.
 
@@ -6031,17 +5991,17 @@ Choose "no".
 
 Pass: the JSON surface carries `data.budget_ok == false` in that path's guard.
 
-#### Add path takes the sibling trigger (E2-17)
+#### Add a way out takes the sibling trigger (E2-17)
 
 Open a draft of `credit_check` and select its `Decide` step, which carries two
-automatic paths. Pick a target step and press "+ Add path".
+automatic paths. Pick a target step and press "+ Add a way out".
 
-Pass: the new path's "triggered by" control reads "a condition".
+Pass: the new way out's trigger control reads "Happens by itself".
 
 Open a draft of `loan_application` and select its `check` step, a subprocess
-step. Pick a target step and press "+ Add path".
+step. Pick a target step and press "+ Add a way out".
 
-Pass: that new path's "triggered by" control also reads "a condition".
+Pass: that new way out's trigger control also reads "Happens by itself".
 
 ### The subprocess step editor (`fix-subprocess-step-editor`)
 
@@ -6330,32 +6290,38 @@ Pass: a confirmation names the key. Cancel it. Pass: the network panel shows
 no `PUT /templates/...`, and the form keeps the key and the source. Press
 Create again and confirm. Pass: the list shows the replaced template.
 
-### Studio: captions with a JSON name, and a plugin config message (`catalog-studio-literal-strings`)
+### Studio: no mono name after a caption, and a plugin config message (`catalog-studio-literal-strings`)
 
-Source: `catalog-studio-literal-strings` task 4.2. The guard test
-`packages/web/test/studio-panels-literal-text.test.ts` asserts that no panel
-holds a literal. This walk covers what it cannot judge: the look of the mono
-name beside the plain words. It needs a draft with a step that has an
-automatic path, a timer and an action.
+Source: `catalog-studio-literal-strings` task 4.2, as `studio-vocabulary-no-key-echo`
+revised it. The guard test `packages/web/test/studio-panels-literal-text.test.ts`
+asserts that no panel holds a literal. This walk covers what it cannot judge:
+that no mono name follows a caption. It needs a draft with a step that has an
+automatic way out, a timer and an action.
 
-On the Paths tab, read one path row. Pass: the three captions read Label, Key
-and Goes to. After each one comes `label`, `key` or `to` in the mono face,
-muted, in lower case, after one space. The caption sits in an uppercase
-tracked label, so check that the mono name keeps its own case.
+<!-- antislop: allow passive-voice -->
+<!-- Why: the paragraph quotes the catalog captions "How it is taken" and "What happens when it is taken" word for word. -->
+On the Steps tab, open that step and read one way-out row. Pass: the captions
+read Name, Leads to and "How it is taken". No `<code>` element follows any of
+them. No caption reads `label`, `key` or `to`.
 
-Switch the path to automatic. Pass: the caption above the number input reads
-"Order among automatic paths", then `priority` in mono. The legend over the
-action list reads "Actions when the path fires", then `onPath`.
+<!-- antislop: allow passive-voice -->
+<!-- Why: the paragraph quotes the catalog legend "What happens when it is taken" word for word. -->
+Switch the way out to "Happens by itself". Pass: the caption above the number
+input reads "Tried in this order, lowest first". The legend over the action
+list reads "What happens when it is taken". No mono name follows either.
 
-Open a step with a timer. Pass: the timer's captions read Description, "When
-it fires" with no mono name, and "Path it takes when it fires". The last one
-carries `onFire.targetPath` and wraps without clipping at a 360px width.
+Open a step with a time limit. Pass: its captions read Description and "When
+it runs out". The last caption reads "The way out it takes when it runs out,
+skipping that way out's condition". No mono name follows any caption. The last
+one wraps at a 360px width without clipping.
 
-On the Steps tab, open a step and add an action under "Actions on entry".
-Choose the type `notification.email`. In the `to` field, type `nobody` on one
-line. Pass: the message under the field reads "Enter a valid email address."
-in the error color. Replace the line with `a@example.com`. Pass: the message
-goes.
+On the Steps tab, open a step and add an action under "What happens when
+entered". Pass: the action's captions read "Action" and "Values it writes
+back". No mono name follows either.
+
+Choose the type `notification.email`. In the `to` field, type `nobody` on one line. Pass: the message under the
+field reads "Enter a valid email address." in the error color. Replace the line
+with `a@example.com`. Pass: the message goes.
 
 ### Studio: a fresh draft starts clean (`studio-fresh-draft-starts-clean`)
 
@@ -6380,3 +6346,44 @@ sentence leaves.
 
 **4. The banner returns with a task step.** Add a task step. Pass: the
 banner returns. The change's design expects this.
+
+### Studio: no key beside a caption (`studio-vocabulary-no-key-echo`)
+
+Source: `studio-vocabulary-no-key-echo` group 4. The bun tests assert the
+catalog words. This walk covers what they cannot judge. A key may stand
+beside a caption. A Developer view may lack its key.
+
+Use the production build. Seed a process with a task step, a manual way out, an
+automatic way out and a form.
+
+**1. The captions are words.** On the Steps tab, open the task step. Pass:
+every caption on the step page is a word or a sentence. No `<code>` element
+stands beside a caption. The sections read Ways out, Who acts, When entered,
+When left and Form.
+
+**2. The masthead has no key.** Read the masthead. Pass: it shows Name and
+Description and no key input.
+
+**3. The step's Developer view holds the key.** Open the Developer view at the
+foot of the page. Pass: it shows Key, then the id, then the JSON. Type a new
+key. Pass: the JSON shows the new key at once.
+
+<!-- antislop: allow passive-voice -->
+<!-- Why: the step quotes the catalog captions "How it is taken" and "What happens when it is taken" word for word. -->
+**4. A way out opens with a sentence.** Open the Ways out section. Pass: each
+row opens with a heading that reads "name → step". The row shows Name and
+Leads to. It also shows "How it is taken", with the choices "A person chooses"
+and "Happens by itself". The condition fieldset follows, then "What happens when it is taken".
+
+**5. A way out holds its key one disclosure away.** Read the foot of a row.
+Pass: a closed Developer view stands there. Open it. Pass: it holds Key.
+
+Type a new key. Pass: the draft changes and the row heading stays the same.
+
+**6. The flags read one name.** Open the step's form editor and select a placed
+field. Pass: the strip reads Asked, Required, Read-only and Width. On the
+Fields tab, open the same field. Pass: the "Ask for this" checkbox reads
+Required.
+
+Read the legend on the Forms tab and on the Field matrix tab. Pass: both read
+Required, Read-only and Asked.
