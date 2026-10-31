@@ -32,13 +32,6 @@ export interface ProcessRow {
 }
 
 /**
- * Merges `GET /processes` (the newest published version per process) with
- * `GET /drafts` (one draft per process) into one row per process id. A
- * process may carry either, both, or (transiently, between mint and first
- * save) neither. Sorted by processId for a stable render order — neither
- * source is guaranteed pre-sorted the same way.
- */
-/**
  * The published version a new draft for this row seeds from, or `undefined`
  * for a row with nothing published (a never-published process, or a process id
  * that only a `+ New process` mint has produced). The list already carries the
@@ -283,6 +276,14 @@ export function narrowToAccessible(rows: ProcessRow[], access: { developer: stri
   return rows.filter((row) => accessible.has(row.processId));
 }
 
+/**
+ * Merges `GET /processes` (the newest published version per process) with
+ * `GET /drafts` (one draft per process) into one row per process id. A
+ * process may carry either, both, or (transiently, between mint and first
+ * save) neither. Sorted by processId, a stable base order, since neither
+ * source is guaranteed pre-sorted the same way; the screen sorts the rows by
+ * name through `sortProcessRows`.
+ */
 export function deriveProcessRows(processes: ProcessSummary[], drafts: DraftSummary[]): ProcessRow[] {
   const rows = new Map<string, ProcessRow>();
 

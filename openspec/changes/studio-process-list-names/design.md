@@ -270,6 +270,9 @@ never scrolls. The test `studio-scrollBoxRingRoom.test.ts` admits no scroll
 box outside its exempt list. An area's file may duplicate another file's
 style on purpose, and the change list lives in another module.
 
+The table uses a fixed layout with set column widths, so an open Developer
+view never moves a column.
+
 Alternative: one screen-wide "Keys" toggle. It would be a new pattern
 beside the per-row Developer views of the change list and the way-out rows.
 Rejected.
@@ -324,6 +327,8 @@ tracks the gap in `docs/decisions.md`.
 | `processList.headProcess` | `Process` |
 | `processList.headDraft` | `Draft` |
 | `processList.headPublished` | `Published` |
+| `processList.headCommands` | `Actions` |
+| `processList.tableLabel` | `Processes` |
 | `processList.untitled` | `Untitled process` |
 | `processList.savedBy` | `Saved by {name}, {when}` |
 | `processList.savedAnonymous` | `Saved {when}` |

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { Upload } from "lucide-react";
 import { layout, colors, fonts, space, shadow } from "form-ui/tokens.stylex";
@@ -154,11 +154,18 @@ const styles = stylex.create({
     flex: 1,
     color: colors.text,
   },
+  // A fixed layout with set column widths: an open Developer view wraps its
+  // values inside the Process column and never moves a column.
   table: {
     width: "100%",
+    tableLayout: "fixed",
     borderCollapse: "collapse",
     fontSize: "0.9rem",
   },
+  colProcess: { width: "36%" },
+  colDraft: { width: "26%" },
+  colPublished: { width: "16%" },
+  colCommands: { width: "22%" },
   tableHeadCell: {
     textAlign: "left",
     fontFamily: fonts.body,
@@ -194,6 +201,22 @@ const styles = stylex.create({
     display: "flex",
     flexWrap: "wrap",
     gap: space.s2,
+  },
+  // A narrow cell wraps whole buttons onto a second line, never a label.
+  command: {
+    whiteSpace: "nowrap",
+  },
+  // Copies `panels/ChangeList.tsx`'s `visuallyHidden`.
+  visuallyHidden: {
+    position: "absolute",
+    width: 1,
+    height: 1,
+    margin: -1,
+    padding: 0,
+    overflow: "hidden",
+    clipPath: "inset(50%)",
+    whiteSpace: "nowrap",
+    borderWidth: 0,
   },
   developer: {
     marginBlockStart: space.s1,
@@ -381,9 +404,12 @@ function StartPickerDialog({ templates, onCancel, onPick }: StartPickerDialogPro
   );
 }
 
+/** The absolute date and time a `<time>` shows on hover. */
+const ABSOLUTE_TIME = new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" });
+
 /** A relative time, with the absolute date and time on hover. `now` is the one `Date.now()` the list's pass read. */
 function RelativeTime({ iso, now }: { iso: string; now: number }) {
-  const absolute = new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso));
+  const absolute = ABSOLUTE_TIME.format(new Date(iso));
   return (
     <time dateTime={iso} title={absolute}>
       {relativeAgo(iso, now)}
@@ -436,6 +462,7 @@ export interface ProcessListRowProps {
  */
 export function ProcessListRow({ view, now, creating, onNavigate, onCreateDraft, onDiscard }: ProcessListRowProps) {
   const { developer } = view;
+  const command = stylex.props(styles.command).className;
   return (
     <tr>
       <td {...stylex.props(styles.tableCell)}>
@@ -479,22 +506,22 @@ export function ProcessListRow({ view, now, creating, onNavigate, onCreateDraft,
       </td>
       <td {...stylex.props(styles.tableCell)}>
         <div {...stylex.props(styles.commands)}>
-          {view.commands.map((command) =>
-            command === "createDraft" ? (
-              <button key={command} type="button" className="btn btn-secondary" onClick={() => onCreateDraft(view)} disabled={creating}>
+          {view.commands.map((kind) =>
+            kind === "createDraft" ? (
+              <button key={kind} type="button" className={`btn btn-secondary ${command}`} onClick={() => onCreateDraft(view)} disabled={creating}>
                 {t("processList.createDraft")}
               </button>
-            ) : command === "versions" ? (
+            ) : kind === "versions" ? (
               <button
-                key={command}
+                key={kind}
                 type="button"
-                className="btn btn-secondary"
+                className={`btn btn-secondary ${command}`}
                 onClick={() => onNavigate({ name: "versions", processId: view.processId })}
               >
                 {t("processList.versions")}
               </button>
             ) : (
-              <button key={command} type="button" className="btn btn-secondary btn-destructive" onClick={() => onDiscard(view)}>
+              <button key={kind} type="button" className={`btn btn-secondary btn-destructive ${command}`} onClick={() => onDiscard(view)}>
                 {t("processList.discard")}
               </button>
             ),
@@ -502,6 +529,34 @@ export function ProcessListRow({ view, now, creating, onNavigate, onCreateDraft,
         </div>
       </td>
     </tr>
+  );
+}
+
+/**
+ * The process list's table: its accessible name, its fixed column widths and
+ * its header row. The commands column's header is visually hidden.
+ */
+export function ProcessListTable({ children }: { children: ReactNode }) {
+  return (
+    <table {...stylex.props(styles.table)} aria-label={t("processList.tableLabel")}>
+      <colgroup>
+        <col {...stylex.props(styles.colProcess)} />
+        <col {...stylex.props(styles.colDraft)} />
+        <col {...stylex.props(styles.colPublished)} />
+        <col {...stylex.props(styles.colCommands)} />
+      </colgroup>
+      <thead>
+        <tr>
+          <th {...stylex.props(styles.tableHeadCell)}>{t("processList.headProcess")}</th>
+          <th {...stylex.props(styles.tableHeadCell)}>{t("processList.headDraft")}</th>
+          <th {...stylex.props(styles.tableHeadCell)}>{t("processList.headPublished")}</th>
+          <th {...stylex.props(styles.tableHeadCell)}>
+            <span {...stylex.props(styles.visuallyHidden)}>{t("processList.headCommands")}</span>
+          </th>
+        </tr>
+      </thead>
+      <tbody>{children}</tbody>
+    </table>
   );
 }
 
@@ -751,29 +806,19 @@ export function ProcessesScreen({ token, roles, navigate, onUnauthorized }: Proc
       ) : rows.length === 0 ? (
         !error && <p {...stylex.props(styles.empty)}>{t("processList.empty")}</p>
       ) : (
-        <table {...stylex.props(styles.table)}>
-          <thead>
-            <tr>
-              <th {...stylex.props(styles.tableHeadCell)}>{t("processList.headProcess")}</th>
-              <th {...stylex.props(styles.tableHeadCell)}>{t("processList.headDraft")}</th>
-              <th {...stylex.props(styles.tableHeadCell)}>{t("processList.headPublished")}</th>
-              <th {...stylex.props(styles.tableHeadCell)}></th>
-            </tr>
-          </thead>
-          <tbody>
-            {views.map((view) => (
-              <ProcessListRow
-                key={view.processId}
-                view={view}
-                now={now}
-                creating={creating.has(view.processId)}
-                onNavigate={navigate}
-                onCreateDraft={(v) => void createDraft(v.processId, v.seedVersion)}
-                onDiscard={(v) => void discard(v)}
-              />
-            ))}
-          </tbody>
-        </table>
+        <ProcessListTable>
+          {views.map((view) => (
+            <ProcessListRow
+              key={view.processId}
+              view={view}
+              now={now}
+              creating={creating.has(view.processId)}
+              onNavigate={navigate}
+              onCreateDraft={(v) => void createDraft(v.processId, v.seedVersion)}
+              onDiscard={(v) => void discard(v)}
+            />
+          ))}
+        </ProcessListTable>
       )}
     </main>
   );

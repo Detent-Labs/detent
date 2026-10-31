@@ -74,7 +74,7 @@ describe("deriveProcessRows", () => {
     ]);
   });
 
-  it("sorts rows by processId for a stable render order", () => {
+  it("sorts rows by processId, a stable base order the name sort refines", () => {
     const rows = deriveProcessRows([published], [draftOnly]);
     expect(rows.map((r) => r.processId)).toEqual(["proc_draft", "proc_pub"]);
   });

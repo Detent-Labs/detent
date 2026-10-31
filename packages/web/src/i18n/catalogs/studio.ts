@@ -1076,6 +1076,8 @@ export const en = {
   "processList.headProcess": "Process",
   "processList.headDraft": "Draft",
   "processList.headPublished": "Published",
+  "processList.headCommands": "Actions",
+  "processList.tableLabel": "Processes",
   "processList.untitled": "Untitled process",
   "processList.savedBy": "Saved by {name}, {when}",
   "processList.savedAnonymous": "Saved {when}",

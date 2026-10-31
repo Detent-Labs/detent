@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { ProcessListRow } from "../src/areas/studio/screens/ProcessesScreen.js";
+import { ProcessListRow, ProcessListTable } from "../src/areas/studio/screens/ProcessesScreen.js";
 import type { ProcessRowView } from "../src/areas/studio/screens/processListLogic.js";
 
 /**
@@ -124,5 +124,24 @@ describe("A process-list row", () => {
     expect(html).toContain(`<a href="/studio/processes/${PROCESS_ID}/versions"`);
     expect(textOutsideDeveloperView(html)).toContain("Create draft");
     expect(html).not.toContain(">Versions</button>");
+  });
+});
+
+/** spa-accessibility: the list table carries a name, and every column header carries text. */
+describe("The process-list table", () => {
+  const html = renderToStaticMarkup(<ProcessListTable>{null}</ProcessListTable>);
+
+  it("names the table Processes", () => {
+    expect(html).toMatch(/<table [^>]*aria-label="Processes"/);
+  });
+
+  it("gives every column a header with text, the commands column's visually hidden", () => {
+    const heads = [...html.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/g)].map((m) => (m[1] ?? "").replace(/<[^>]*>/g, ""));
+    expect(heads).toEqual(["Process", "Draft", "Published", "Actions"]);
+    expect(html).toMatch(/<th[^>]*><span class="[^"]+">Actions<\/span><\/th>/);
+  });
+
+  it("sets one width per column, so an open Developer view moves none", () => {
+    expect([...html.matchAll(/<col /g)]).toHaveLength(4);
   });
 });

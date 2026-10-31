@@ -473,6 +473,12 @@ word. `ROADMAP.md` carries stage-by-stage status.
   import result line still print literals. The `ui-string-overrides` catalog
   rule stays unmet on that screen. Change 13 (`studio-one-dialog-form`) moves
   the dialog strings. No change covers the import error or the result line.
+- **The Versions screen's dead end from the process list.** A process with no
+  draft opens Versions from its name on the process list. The Versions heading
+  never names the process. Its "Back to process" control opens the edit route,
+  which then fails with "No draft exists for this process." The process list
+  change left the Versions screen as it was. The old row's Versions button
+  reached the same screen.
 - **The 22 failure renders outside the studio edit screen.**
   `packages/web/src` rendered 27 failure states with no alert role.
   `studio-publish-gate-and-report` fixed five, all in the edit screen's own

@@ -4924,7 +4924,7 @@ async (page) => {
 2. Install the delay. Double-click that row's "Create draft". Read both rows'
    buttons within the 20 seconds. Pass: the pressed button reports
    `disabled`, a computed `opacity` of 0.45 and the accessible name "Create
-   draft". The `access_request` button reports no `disabled`.
+   draft". The "Access Request" row's button reports no `disabled`.
 3. Press the disabled button once more, using `page.mouse.click` for that
    press, then wait for the edit screen. Pass: the log lists one `PUT` to
    `/drafts/<id>`. Before that `PUT` it lists one `GET` of
