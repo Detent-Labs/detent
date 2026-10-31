@@ -89,7 +89,7 @@ None.
 - `.claude/rules/ui-glossary.md`: the Developer view row gains the process
   list row.
 - `docs/browser-checks.md` gains one entry. Its existing entries that find a
-  process-list row by key, or read its old cells, move to the row's name. `ROADMAP.md` marks change 8 of
-  stage 64 shipped.
+  process-list row by key, or read its old cells, move to the row's name.
+- `ROADMAP.md` marks change 8 of stage 64 shipped.
 - No schema, dependency or migration change. `docs/openapi.yaml` excludes
   the draft routes, so it stays as it is.

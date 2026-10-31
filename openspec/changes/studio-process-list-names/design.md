@@ -90,12 +90,16 @@ confirmation round. The mode is Operate.
 
 `listDrafts` selects `body->'key'`, `body->'label'` and
 `body->'baseLocale'` beside the existing columns. The response still carries
-no body. Bun.sql already decodes each column: a jsonb string arrives as a
-JS string, an object as an object, an absent key as `null`.
-`toDraftSummary` therefore never passes them through `parseJsonb`, which
-parses a plain string and throws. The key names stay SQL literals
-(`body->'key'`). A bound parameter there answered `null` for every key
-when measured. `toDraftSummary` narrows each value in TypeScript:
+no body.
+
+Bun.sql already decodes each column. A jsonb string arrives as a JS string.
+An object arrives as an object, and an absent key as `null`. The function
+`toDraftSummary` therefore never calls `parseJsonb` on them. That helper
+parses a plain string and throws. The key names stay SQL literals, as in
+`body->'key'`.
+
+A key name sent as a bound value answered `null` for every key when
+measured. The function `toDraftSummary` narrows each value in TypeScript:
 
 - `key`: the value when it is a string, else `null`.
 - `baseLocale`: the value when it is a string, else `null`.
@@ -231,10 +235,11 @@ The link's `href` is `areaHref("studio", routePath(view.open))`. Its
 plain primary click. The function `isPlainLeftClick(e)` in
 `processListLogic.ts` decides that. It returns `true` for `e.button === 0`
 with `defaultPrevented` false. Each of `metaKey`, `ctrlKey`, `shiftKey` and
-`altKey` must be false too. The browser handles every other click. The
-function stands apart from the component because it guards a documented
-regression class: a modified click must work as a link's, and
-`renderToStaticMarkup` cannot fire a click.
+`altKey` must be false too. The browser handles every other click.
+
+The function stands apart from the component for one reason. It guards a
+documented regression class: a modified click must work as a link's. A
+markup test cannot fire a click, so only a unit test reaches it.
 
 The link takes the ink color and the body text at the table's size. It
 underlines on hover only. A long name wraps through
@@ -259,11 +264,11 @@ ledger ground. It holds two columns of term and value, at 0.8rem:
 
 Each value takes `fonts.mono`, `translate="no"` and
 `overflowWrap: "anywhere"`. The implementer copies the styles into
-`ProcessesScreen.tsx`'s own `stylex.create()`, without `developerBox`'s
-`position` and `overflowX`. Every value wraps, so the box never scrolls,
-and `studio-scrollBoxRingRoom.test.ts` admits no unexempted scroll box. An area's file may duplicate
-another file's style on purpose, and the change list lives in another
-module.
+`ProcessesScreen.tsx`'s own `stylex.create()`. The copy leaves out the
+`position` and `overflowX` of `developerBox`. Every value wraps, so the box
+never scrolls. The test `studio-scrollBoxRingRoom.test.ts` admits no scroll
+box outside its exempt list. An area's file may duplicate another file's
+style on purpose, and the change list lives in another module.
 
 Alternative: one screen-wide "Keys" toggle. It would be a new pattern
 beside the per-row Developer views of the change list and the way-out rows.
@@ -306,8 +311,9 @@ place of a bare id.
 
 All in `packages/web/src/i18n/catalogs/studio.ts`, in a new
 `processList.*` block. Strings outside the table and toolbar stay literal.
-That leaves the catalog rule of `ui-string-overrides` unmet on this screen
-for the two dialogs, the import error and the import result line, as today.
+The catalog rule of `ui-string-overrides` stays unmet on this screen, as
+today. The gap covers the two dialogs, the import error and the import
+result line.
 Change 13 rewrites both dialogs, so their strings move then. Task 5.4b
 tracks the gap in `docs/decisions.md`.
 

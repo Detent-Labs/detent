@@ -41,7 +41,7 @@
 ## 4. The screen (studio-app)
 
 - [ ] 4.1 In `screens/ProcessesScreen.tsx`, narrow, describe, then sort the rows. Draw each row from its `ProcessRowView` alone.
-- [ ] 4.1a Keep the `rows` state as `ProcessRow[]`, since `collidingProcessId` reads it. Derive and sort the views during render.
+- [ ] 4.1a Keep the `rows` state as `ProcessRow[]`, since `collidingProcessId` reads it. Derive and sort the views on each pass of the component.
 - [ ] 4.2 Draw the name as the D5 link, with its style and the slate untitled form.
 - [ ] 4.3 Draw the D6 Developer view in the Process cell, with its styles copied into this file's `stylex.create()`.
 - [ ] 4.3a Leave out `developerBox`'s `position` and `overflowX`, per D6.
