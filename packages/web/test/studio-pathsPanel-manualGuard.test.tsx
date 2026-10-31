@@ -8,8 +8,8 @@ import { DraftContext, type DraftContextValue } from "../src/areas/studio/draft/
 import { PathsPanel } from "../src/areas/studio/panels/PathsPanel.js";
 
 /**
- * `studio-condition-builder`: "The path inspector shows a "triggered by"
- * control, and the guard for either trigger under an "Only when" heading".
+ * `studio-condition-builder`: "A way out's row shows a "How it is taken"
+ * control" and "A way out's guard stands under "Only when" for either trigger".
  * A manual path shows its guard editor and no `priority` input; an automatic
  * path keeps both. The context is hand-built, as in
  * `studio-actionListEditor-registryBadge.test.tsx`: a live `DraftProvider`
@@ -79,8 +79,8 @@ function render(path: Record<string, unknown>): string {
 }
 
 // The caption: plain words, then the JSON property in a mono `<code>` (`ui-string-overrides`).
-const PRIORITY_INPUT = /<label>Order among automatic paths <code[^>]*>priority<\/code><input/;
-const NOTE = "The participant sees this path&#x27;s button only while the condition holds.";
+const PRIORITY_INPUT = /<label>Tried in this order, lowest first <code[^>]*>priority<\/code><input/;
+const NOTE = "The person sees this way out&#x27;s button only while the condition holds.";
 
 describe("a manual path with a guard", () => {
   const html = render({ trigger: "manual", guard: GUARD });
@@ -93,7 +93,7 @@ describe("a manual path with a guard", () => {
 
   it("says the participant sees the button only while the condition holds", () => {
     expect(html).toContain(NOTE);
-    expect(html).toContain("leave empty to always offer this path");
+    expect(html).toContain("Leave it empty to always offer this way out.");
   });
 
   it("shows no priority input", () => {
@@ -106,7 +106,7 @@ describe("a manual path with no guard", () => {
     const html = render({ trigger: "manual" });
 
     expect(html).toContain("Only when");
-    expect(html).toContain("leave empty to always offer this path");
+    expect(html).toContain("Leave it empty to always offer this way out.");
     expect(html).not.toMatch(PRIORITY_INPUT);
   });
 });
@@ -117,11 +117,11 @@ describe("an automatic path", () => {
   it("shows the priority input beside the guard", () => {
     expect(html).toContain("Only when");
     expect(html).toMatch(PRIORITY_INPUT);
-    expect(html).toContain("guard (omit for the default/else path)");
+    expect(html).toContain("Leave it empty on the way out taken when no other matches.");
   });
 
   it("carries no manual-path note", () => {
     expect(html).not.toContain(NOTE);
-    expect(html).not.toContain("leave empty to always offer this path");
+    expect(html).not.toContain("Leave it empty to always offer this way out.");
   });
 });

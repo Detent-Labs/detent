@@ -121,7 +121,7 @@ describe("a gated cell's reason", () => {
     const labels = [...html.matchAll(/aria-label="([^"]*)"/g)].map((m) => m[1]!);
     const gated = labels.filter((l) => l.includes("definition contract"));
     expect(gated.length).toBeGreaterThan(0);
-    for (const l of gated) expect(l).toMatch(/^(required|readonly)\. /);
+    for (const l of gated) expect(l).toMatch(/^(Required|Read-only)\. /);
   });
 });
 

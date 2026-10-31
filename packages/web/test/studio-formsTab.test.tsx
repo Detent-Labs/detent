@@ -283,11 +283,11 @@ describe("The Forms tab's legend", () => {
 
   it("names the five marks in the legend table's order, one item each", () => {
     expect(legendItems(render()).map((item) => splitHidden(item).visible)).toEqual([
-      "field",
-      "required",
-      "required if a condition holds",
-      "section",
-      "taller asks for more",
+      "Field",
+      "Required",
+      "Required if a condition holds",
+      "Section",
+      "Taller asks for more",
     ]);
   });
 

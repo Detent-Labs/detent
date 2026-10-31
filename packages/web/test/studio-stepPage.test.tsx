@@ -140,36 +140,36 @@ describe("The step page's masthead", () => {
 });
 
 describe("The step page's section set", () => {
-  it("gives a task step Path to, Assignment, Cancellable, On entry, On exit, Time limit, Step form fields and Collaboration", () => {
+  it("gives a task step Ways out, Who acts, Cancellable, When entered, When left, Time limit, Form and Collaboration", () => {
     const html = render();
 
-    for (const heading of ["Path to", "Assignment", "Cancellable", "On entry", "On exit", "Time limit", "Step form fields", "Collaboration"]) {
+    for (const heading of ["Ways out", "Who acts", "Cancellable", "When entered", "When left", "Time limit", "Form", "Collaboration"]) {
       expect(html).toContain(`>${heading}<`);
     }
     expect(html).not.toContain(">Which process it calls<");
   });
 
-  it("gives an end step How the case ends, and no outgoing path", () => {
+  it("gives an end step How the case ends, and no way out", () => {
     const ends = { ...TASK_STEP, terminal: true, paths: undefined } as unknown as DraftStep;
     const html = render({ step: ends });
 
     expect(html).toContain(">How the case ends<");
-    expect(html).not.toContain(">Path to<");
-    expect(html).not.toContain(">On exit<");
+    expect(html).not.toContain(">Ways out<");
+    expect(html).not.toContain(">When left<");
     expect(html).not.toContain(">Time limit<");
-    expect(html).toContain("A step that ends the process has no outgoing path and no time limit.");
+    expect(html).toContain("A step that ends the process has no way out and no time limit.");
     // An end step still resolves an InstanceView and its collaboration field,
     // so its Collaboration section stays (design.md).
     expect(html).toContain(">Collaboration<");
   });
 
-  it("gives a subprocess step Which process it calls, and no Assignment or form section", () => {
+  it("gives a subprocess step Which process it calls, and no Who acts or form section", () => {
     const calls = { ...TASK_STEP, type: "subprocess" } as unknown as DraftStep;
     const html = render({ step: calls });
 
     expect(html).toContain(">Which process it calls<");
-    expect(html).not.toContain(">Assignment<");
-    expect(html).not.toContain(">Step form fields<");
+    expect(html).not.toContain(">Who acts<");
+    expect(html).not.toContain(">Form<");
   });
 
   it("gives a subprocess step no Collaboration section", () => {
@@ -270,7 +270,7 @@ describe("The step page's Collaboration section", () => {
 });
 
 describe("A step page section's own open issues", () => {
-  it("prints an issue about the assignment beside the Assignment heading", () => {
+  it("prints an issue about the assignment beside the Who acts heading", () => {
     const issues: EditorIssue[] = [
       {
         entityType: "step",
@@ -287,7 +287,7 @@ describe("A step page section's own open issues", () => {
     expect(html.match(/no such group/g)).toHaveLength(1);
   });
 
-  it("prints an issue about the form beside the Step form fields heading", () => {
+  it("prints an issue about the form beside the Form heading", () => {
     const issues: EditorIssue[] = [
       {
         entityType: "step",
@@ -309,7 +309,7 @@ describe("A step page section's own open issues", () => {
     expect(render({ issues }).match(/key is not a slug/g)).toHaveLength(1);
   });
 
-  it("leaves a path's own issue to the row that names it, inside Path to", () => {
+  it("leaves a path's own issue to the row that names it, inside Ways out", () => {
     // `PathsPanel` mounts an `IssueList` per path row, so the heading would
     // otherwise say the same sentence twice, two inches apart.
     const issues: EditorIssue[] = [

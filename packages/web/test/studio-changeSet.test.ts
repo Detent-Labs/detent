@@ -616,7 +616,7 @@ describe("describeChanges: values", () => {
     const ghost = base();
     ghost.workflow.steps[0].paths[0].to = "step_ghost";
     expect(only(describeChanges(base(), ghost)).properties).toEqual([
-      { name: "Target", kind: "changed", before: { text: "Review", mono: false }, after: { text: "step_ghost", mono: true } },
+      { name: "Leads to", kind: "changed", before: { text: "Review", mono: false }, after: { text: "step_ghost", mono: true } },
     ]);
   });
 
@@ -625,7 +625,7 @@ describe("describeChanges: values", () => {
     after.workflow.steps[1].paths[0].guard = { lang: "cel", src: "data.amount > 10" };
 
     expect(only(describeChanges(base(), after)).properties).toEqual([
-      { name: "Guard", kind: "added", before: none, after: { text: "data.amount > 10", mono: true } },
+      { name: "Only if", kind: "added", before: none, after: { text: "data.amount > 10", mono: true } },
     ]);
   });
 
@@ -662,7 +662,7 @@ describe("describeChanges: values", () => {
 
     expect(only(describeChanges(base(), after)).properties).toEqual([
       {
-        name: "Assignment",
+        name: "Who acts",
         kind: "changed",
         before: { text: "Everyone in a group", mono: false },
         after: { text: "A fixed list of people", mono: false },
@@ -710,8 +710,8 @@ describe("describeChanges: values", () => {
 
     const row = only(describeChanges(before, after));
 
-    expect(row.properties.find((p) => p.name === "Subprocess · Version binding")).toEqual({
-      name: "Subprocess · Version binding",
+    expect(row.properties.find((p) => p.name === "The call to another process · Version binding")).toEqual({
+      name: "The call to another process · Version binding",
       kind: "changed",
       before: { text: t("subprocess.bindingPinned"), mono: false },
       after: { text: t("subprocess.bindingLatest"), mono: false },
