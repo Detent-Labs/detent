@@ -141,7 +141,7 @@ describe("The preview's own controls", () => {
 });
 
 describe("The preview's line for a guarded manual path", () => {
-  const LINE = "Approve: shown only when Amount (amount) is greater than 1000";
+  const LINE = "Approve: shown only when Amount is greater than 1,000";
 
   it("still draws the control, and names the path and its condition under the controls", () => {
     const html = render(

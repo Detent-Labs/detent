@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
 import type { Expression } from "workflow-engine/schema";
@@ -7,7 +7,15 @@ import { useDraft } from "../../draft/store";
 import { t } from "../../catalog.js";
 import { ExpressionInput } from "./ExpressionInput";
 import { ConditionBuilder } from "./ConditionBuilder";
-import { buildOperands, commitDecision, fromCel, operandSignature, toCel, type Condition } from "./conditionLogic";
+import {
+  buildOperands,
+  commitDecision,
+  conditionSentence,
+  fromCel,
+  operandSignature,
+  toCel,
+  type Condition,
+} from "./conditionLogic";
 
 const styles = stylex.create({
   conditionInput: {
@@ -16,41 +24,32 @@ const styles = stylex.create({
     gap: space.s2,
     minWidth: 0,
   },
-  conditionFooter: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "baseline",
-    justifyContent: "space-between",
-    gap: space.s2,
+  // A note (`DESIGN.md` Inputs / Fields): no box, a 2px hairline rule on its
+  // left, 12px from the text, in the written face and in ink.
+  conditionSentence: {
+    margin: 0,
+    paddingLeft: space.s3,
+    borderLeftWidth: 2,
+    borderLeftStyle: "solid",
+    borderLeftColor: colors.border,
+    fontFamily: fonts.body,
+    color: colors.text,
+    minWidth: 0,
+    maxWidth: "60ch",
+    overflowWrap: "anywhere",
   },
-  conditionParseError: {
+  conditionUnparseable: {
     margin: 0,
     color: colors.refusal,
     fontSize: "0.85rem",
-  },
-  conditionMode: {
-    backgroundColor: "transparent",
-    color: colors.accent,
-    padding: 0,
-    flex: "none",
-  },
-  // `.condition-mode-disclosure[aria-expanded="true"]`: a JS-computed choice
-  // reading the same `aria-expanded` the button already carries.
-  conditionModeExpanded: {
-    color: colors.text,
-  },
-  conditionActions: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "baseline",
-    gap: space.s2,
-    minWidth: 0,
   },
   // The authoring command (`DESIGN.md` Buttons): a ghost button in slate, mono
   // at 11px, equal to the change list's command. It composes over
   // `btn btn-ghost`, whose accent it replaces. Its label lists step labels, so
   // it wraps anywhere instead of clipping.
   conditionClear: {
+    alignSelf: "flex-start",
+    maxWidth: "100%",
     fontFamily: fonts.mono,
     fontSize: 11,
     color: {
@@ -66,28 +65,35 @@ const styles = stylex.create({
       ":active": `color-mix(in srgb, ${colors.text} 14%, transparent)`,
     },
   },
-  conditionReadout: {
-    display: "flex",
-    alignItems: "baseline",
-    gap: space.s2,
-    margin: 0,
-    minWidth: 0,
-    flex: "1 1 20ch",
+  // The way out's own Developer view (`PathsPanel.tsx`), duplicated: an area's
+  // component never reads another component's style object.
+  developer: {
+    paddingBlock: space.s2,
+    borderTopWidth: 1,
+    borderTopStyle: "solid",
+    borderTopColor: colors.border,
   },
-  conditionReadoutLabel: {
-    fontFamily: fonts.body,
-    fontSize: "11px",
+  developerSummary: {
+    cursor: "pointer",
+    fontSize: 11,
     textTransform: "uppercase",
-    letterSpacing: "0.06em",
+    letterSpacing: "0.1em",
     color: colors.textMuted,
-    flex: "none",
   },
-  // `.condition-readout code`: a descendant selector on a bare `<code>`.
-  conditionReadoutCode: {
-    fontFamily: fonts.mono,
-    fontSize: "0.85rem",
+  celField: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s1,
     minWidth: 0,
-    overflowWrap: "anywhere",
+  },
+  celFieldInDeveloper: {
+    marginBlockStart: space.s2,
+  },
+  celCaption: {
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: "0.1em",
+    color: colors.textMuted,
   },
 });
 
@@ -100,37 +106,51 @@ interface Props {
   stepId?: string;
   placeholder?: string;
   /**
-   * The CEL toggle's presentation. `"link"` (default) keeps today's plain
-   * "Edit as CEL" / "Use the builder" buttons — every view-override site
-   * (`visible`/`required`/`readonly`) keeps this, unchanged, per
-   * `studio-condition-builder`'s "path-guard site only" scope. `"disclosure"`
-   * relabels the same toggle "Developer view" with `aria-expanded`, for the
-   * path-guard site alone (task 6.3). Neither variant changes the toggle's
-   * behavior: the mode still does not persist to the draft or the published
-   * body.
+   * Where the CEL text input stands. `"disclosure"` (default) puts it in a
+   * closed "Developer view" `<details>` at the site's foot. `"inline"` draws
+   * the caption and the input with no disclosure, for a site that already
+   * stands inside a Developer view: the form editor's flag override.
    */
-  toggleVariant?: "link" | "disclosure";
+  cel?: "disclosure" | "inline";
   /**
-   * The label of a clear command in the footer, beside the CEL toggle. Its
-   * presence shows the command. Pressing it calls `onChange(undefined)` and
-   * empties the local rows. Only a site that can hold a condition the rows do
-   * not show passes it: the Fields tab, where the referencing views can
-   * disagree and `value` reads `undefined` for all of them.
+   * The label of a clear command above the Developer view. Its presence shows
+   * the command. Pressing it calls `onChange(undefined)` and empties the local
+   * rows. Only a site that can hold a condition the rows do not show passes
+   * it: the Fields tab, where the referencing views can disagree and `value`
+   * reads `undefined` for all of them.
    */
   clearLabel?: string;
+  /**
+   * The sentence in place of "No condition yet: this always matches." while
+   * no row stands and no source is stored. The Fields tab passes it when the
+   * referencing views disagree: `value` then reads `undefined`, though some
+   * views hold a condition.
+   */
+  emptySentence?: string;
 }
 
 /**
- * The condition surface: a row builder, the CEL it produces on a read-only
- * line, and a toggle to the raw CEL input.
+ * The condition surface: a row builder, the condition read back as a sentence
+ * under it, and the CEL text input in a Developer view at the foot. Source
+ * that does not parse draws a notice in place of the rows and the sentence,
+ * and opens the Developer view.
  *
  * `onChange` fires on an authoring action that settles the condition: a
- * complete row, the removal of a row that takes a stored source with it, or the
- * clear command. Mounting, reading, switching the mode and an unfinished row
- * never write, so a guard the author only looks at stays byte for byte — the
- * rule that keeps the database from filling with flattened conditions.
+ * complete row, the removal of a row that takes a stored source with it, an
+ * edit of the CEL text, or the clear command. Mounting, reading, opening the
+ * Developer view and an unfinished row never write, so a guard the author only
+ * looks at stays byte for byte — the rule that keeps the database from filling
+ * with flattened conditions.
  */
-export function ConditionInput({ value, onChange, stepId, placeholder, toggleVariant = "link", clearLabel }: Props) {
+export function ConditionInput({
+  value,
+  onChange,
+  stepId,
+  placeholder,
+  cel = "disclosure",
+  clearLabel,
+  emptySentence,
+}: Props) {
   const { draft, loadedChildren, contentLocale } = useDraft();
 
   const operands = useMemo(
@@ -161,36 +181,30 @@ export function ConditionInput({ value, onChange, stepId, placeholder, toggleVar
   const seededFrom = useRef<{ src: string | undefined; signature: string } | null>(null);
   const [condition, setCondition] = useState<Condition | null>(() => fromCel(src, operands));
 
+  /**
+   * Whether the Developer view stands open. It opens on a read that does not
+   * parse, at mount or on a later re-seed (the JSON surface, or another field
+   * of the same editor, can turn the source unreadable). Once the text parses
+   * it stays open, so the input the author types in never moves; only the
+   * author closes it. It never reaches the draft.
+   */
+  const [developerOpen, setDeveloperOpen] = useState(condition === null);
+
   const seeded = seededFrom.current;
   if (!seeded || seeded.src !== src || seeded.signature !== signature) {
     seededFrom.current = { src, signature };
-    setCondition(fromCel(src, operands));
+    const read = fromCel(src, operands);
+    setCondition(read);
+    if (read === null) setDeveloperOpen(true);
   }
 
-  /**
-   * Which surface shows. Seeded from whether the source parsed at mount, so a
-   * guard that opens unreadable stays on the CEL input while the author repairs
-   * it: deriving the surface from `unparseable` alone would swap the field out
-   * mid-keystroke, the moment the text first parses. The author leaves by the
-   * toggle, which frees itself as soon as there is something to toggle to.
-   *
-   * `unparseable` stays in the branch below as the null guard: `src` can also
-   * turn unreadable from outside, through the JSON surface.
-   */
-  const [celMode, setCelMode] = useState(condition === null);
-
-  const unparseable = condition === null;
-  const showsCel = celMode || unparseable;
+  const sentenceId = useId();
 
   // The clear press unmounts the clear command, which would drop focus to
   // <body>; the effect below runs once the next render has drawn the control
   // to land on.
   const rootRef = useRef<HTMLDivElement>(null);
   const [focusAfterClear, setFocusAfterClear] = useState(false);
-
-  // While no row contributes, the draft may still hold a source: an unfinished
-  // edit leaves it standing, and the readout says so.
-  const preview = condition ? (toCel(condition, operands) ?? src) : src;
 
   const commit = (next: Condition) => {
     setCondition(next);
@@ -211,88 +225,69 @@ export function ConditionInput({ value, onChange, stepId, placeholder, toggleVar
     onChange(undefined);
   };
 
+  // The add-row button: a clear leaves no row and no source, so the rows draw.
   useEffect(() => {
     if (!focusAfterClear) return;
     setFocusAfterClear(false);
-    rootRef.current?.querySelector<HTMLElement>(showsCel ? "input.cel-input" : "button.condition-add")?.focus();
-  }, [focusAfterClear, showsCel]);
+    rootRef.current?.querySelector<HTMLElement>("button.condition-add")?.focus();
+  }, [focusAfterClear]);
 
   // `btn btn-ghost` plus the compiled style, joined in one `className`: a
   // `className` written after a spread of `stylex.props` would replace it.
   const clearCompiled = stylex.props(styles.conditionClear);
-  const clearButton = clearLabel !== undefined && (
-    <button
-      type="button"
-      {...clearCompiled}
-      className={`btn btn-ghost ${clearCompiled.className ?? ""}`.trim()}
-      onClick={clear}
-    >
-      {clearLabel}
-    </button>
+
+  const celField = (
+    <label {...stylex.props(styles.celField, cel === "disclosure" && styles.celFieldInDeveloper)}>
+      <span {...stylex.props(styles.celCaption)}>{t("condition.celCaption")}</span>
+      <ExpressionInput
+        value={value}
+        placeholder={placeholder}
+        onChange={(next) => {
+          seededFrom.current = null; // let the builder re-read what was typed
+          onChange(next);
+        }}
+      />
+    </label>
   );
-
-  /** The footer's trailing controls: the clear command, when the site passes
-   * one, then the CEL toggle. */
-  const actions = (toggle: ReactNode) =>
-    clearButton ? (
-      <span {...stylex.props(styles.conditionActions)}>
-        {clearButton}
-        {toggle}
-      </span>
-    ) : (
-      toggle
-    );
-
-  const toggleButton = (expanded: boolean, onClick: () => void, disabled?: boolean) =>
-    toggleVariant === "disclosure" ? (
-      <button
-        type="button"
-        {...stylex.props(styles.conditionMode, expanded && styles.conditionModeExpanded)}
-        aria-expanded={expanded}
-        onClick={onClick}
-        disabled={disabled}
-      >
-        {t("condition.developerView")}
-      </button>
-    ) : (
-      <button type="button" {...stylex.props(styles.conditionMode)} onClick={onClick} disabled={disabled}>
-        {expanded ? t("condition.useBuilder") : t("condition.editAsCel")}
-      </button>
-    );
-
-  if (showsCel) {
-    return (
-      <div ref={rootRef} {...stylex.props(styles.conditionInput)}>
-        <ExpressionInput
-          value={value}
-          placeholder={placeholder}
-          onChange={(next) => {
-            seededFrom.current = null; // let the builder re-read what was typed
-            onChange(next);
-          }}
-        />
-        <div {...stylex.props(styles.conditionFooter)}>
-          {unparseable && (
-            <p {...stylex.props(styles.conditionParseError)} role="status">
-              {t("condition.unparseable")}
-            </p>
-          )}
-          {actions(toggleButton(true, () => setCelMode(false), unparseable))}
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div ref={rootRef} {...stylex.props(styles.conditionInput)}>
-      <ConditionBuilder condition={condition} operands={operands} onChange={commit} />
-      <div {...stylex.props(styles.conditionFooter)}>
-        <p {...stylex.props(styles.conditionReadout)}>
-          <span {...stylex.props(styles.conditionReadoutLabel)}>{t("condition.celReadout")}</span>
-          <code {...stylex.props(styles.conditionReadoutCode)}>{preview ?? t("condition.celEmpty")}</code>
+      {condition === null ? (
+        <p {...stylex.props(styles.conditionUnparseable)} role="status">
+          {t("condition.unparseableRows")}
         </p>
-        {actions(toggleButton(false, () => setCelMode(true)))}
-      </div>
+      ) : (
+        <>
+          <ConditionBuilder condition={condition} operands={operands} onChange={commit} describedBy={sentenceId} />
+          <p id={sentenceId} {...stylex.props(styles.conditionSentence)}>
+            {emptySentence !== undefined && !condition.rows.length && !src?.trim()
+              ? emptySentence
+              : conditionSentence(condition, operands, src)}
+          </p>
+        </>
+      )}
+      {clearLabel !== undefined && (
+        <button
+          type="button"
+          {...clearCompiled}
+          className={`btn btn-ghost ${clearCompiled.className ?? ""}`.trim()}
+          onClick={clear}
+        >
+          {clearLabel}
+        </button>
+      )}
+      {cel === "inline" ? (
+        celField
+      ) : (
+        <details
+          {...stylex.props(styles.developer)}
+          open={developerOpen}
+          onToggle={(e) => setDeveloperOpen(e.currentTarget.open)}
+        >
+          <summary {...stylex.props(styles.developerSummary)}>{t("condition.developerView")}</summary>
+          {celField}
+        </details>
+      )}
     </div>
   );
 }

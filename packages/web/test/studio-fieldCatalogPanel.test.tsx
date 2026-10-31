@@ -335,6 +335,63 @@ describe("FieldCatalogPanel", () => {
 });
 
 /**
+ * `studio-condition-builder`: "The Fields tab's divergent state says the steps
+ * disagree". The steps that ask a field hold different `visible` overrides, so
+ * the condition input reads no single source, yet "this always matches" would
+ * be false for those steps.
+ */
+describe("the Fields tab's \"Only ask this when\" row", () => {
+  const stepsWith = (a: unknown, b: unknown): Draft =>
+    ({
+      baseLocale: "en",
+      fields: [fld("field_a", "a")],
+      workflow: {
+        initialStep: "step_a",
+        steps: [
+          { id: "step_a", key: "sa", label: { en: "A" }, type: "task", view: { fields: [{ ref: "field_a", visible: a }] } },
+          { id: "step_b", key: "sb", label: { en: "B" }, type: "task", view: { fields: [{ ref: "field_a", visible: b }] } },
+        ],
+      },
+    }) as unknown as Draft;
+  const render = (draft: Draft) =>
+    renderToStaticMarkup(
+      <DraftContext.Provider value={contextValue(draft)}>
+        <FieldCatalogPanel
+          token="test-token"
+          selectedId="field_a"
+          onAdd={NOOP}
+          onRemove={NOOP}
+          onShowStep={NOOP}
+          onMoveField={NOOP}
+        />
+      </DraftContext.Provider>,
+    );
+  const DIVERGENT = "The steps hold different conditions. Build one here to set it on every step.";
+
+  it("says the steps hold different conditions, and not that it always matches", () => {
+    const html = render(stepsWith({ lang: "cel", src: "data.a == \"x\"" }, { lang: "cel", src: "data.a == \"y\"" }));
+
+    expect(html).toContain("These steps currently disagree");
+    expect(html).toContain(DIVERGENT);
+    expect(html).not.toContain("this always matches");
+  });
+
+  it("says the same when one step holds a literal beside an expression", () => {
+    const html = render(stepsWith(false, { lang: "cel", src: "data.a == \"x\"" }));
+
+    expect(html).toContain(DIVERGENT);
+    expect(html).not.toContain("this always matches");
+  });
+
+  it("keeps the empty sentence where every step holds no condition", () => {
+    const html = render(stepsWith(undefined, undefined));
+
+    expect(html).toContain("No condition yet: this always matches.");
+    expect(html).not.toContain(DIVERGENT);
+  });
+});
+
+/**
  * What `FieldEditor::updateLabel` writes for a label change. It reads the lock
  * through `labelChangePatch` and `writeGroupLabel`. The panel renders to static
  * markup in this suite, which fires no change event, so these cases call the

@@ -908,3 +908,13 @@ system that resulted; this file explains why it took that shape.
 
   Resolved by `studio-six-tabs` on 2026-10-31: the spec names the Access view
   of the Settings tab, and so does the glossary.
+- **Finding 28, drop `ConditionInput`'s `toggleVariant` prop.** Rejected
+  2026-08-16. Each variant has a live caller. `panels/PathsPanel.tsx` passes
+  `"disclosure"`, `panels/FieldCatalogPanel.tsx` passes `"link"`, and
+  `panels/shared/BooleanOrExpressionInput.tsx` takes the `"link"` default.
+  Dropping the prop changes what one of those sites renders.
+  [`packages/web/src/areas/studio/panels/shared/ConditionInput.tsx`, the
+  `toggleVariant` prop]
+
+  Resolved by `studio-condition-sentence` on 2026-10-31: the change gave every
+  condition site one presentation and dropped the prop.

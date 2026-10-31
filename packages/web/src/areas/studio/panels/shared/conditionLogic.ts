@@ -1,6 +1,7 @@
 /**
  * The condition builder's pure half: read CEL into a flat row model, write it
- * back out, and build the operand list the picker offers.
+ * back out, build the operand list the picker offers, and read the rows back
+ * as a sentence.
  *
  * Read-back is by parse, never by a sidecar. A record of "how this condition
  * was built" cannot live in `ProcessBody` (it would move `definitionHash`) and
@@ -18,16 +19,27 @@ import type { BaseFieldType, ProcessBody } from "workflow-engine/schema";
 import type { DraftField } from "../../draft/fields";
 import { flattenDraftFields } from "../../draft/fields";
 import { resolveDraftLocalizedText } from "../../draft/localized-text";
+import { t, type CatalogKey } from "../../catalog.js";
 
 export interface OperandOption {
   value: string;
   label: string;
 }
 
+/** The picker heading an operand stands under. */
+export type OperandGroup = "fields" | "child" | "case" | "person";
+
 export interface Operand {
   /** The CEL path a row writes, e.g. `data.amount` or `actor.roles`. */
   path: string;
   label: string;
+  /** The label's form inside a clause, where `label` reads as the head of a
+   * sentence. Set on a context operand whose label is a phrase, never on a
+   * field, whose label stays as the author typed it. */
+  clauseLabel?: string;
+  /** Set by `buildOperands`' builders. `fieldOperand` alone sets none, so the
+   * rule builder's operands keep their shape. */
+  group?: OperandGroup;
   /** Governs the operators and the written literal. */
   celType: string;
   /**
@@ -99,12 +111,33 @@ export function inputTypeFor(operand: Pick<Operand, "declaredType" | "format">):
  */
 const DENIED = new Set(["instance.id", "instance.currentStepId", "instance.transitionSeq", "actor.id"]);
 
-/** The engine's instance statuses, for `instance.status`'s value editor. */
-const INSTANCE_STATUSES = ["running", "completed", "cancelled", "faulted"];
+/** The engine's instance statuses, for `instance.status`'s value editor. The
+ * values stay the engine's own; only the labels come from the catalog. */
+const INSTANCE_STATUSES = ["running", "completed", "cancelled", "faulted"] as const;
+
+/** A context entry's label, by path. A path with no entry prints itself. */
+const CONTEXT_LABELS: Record<string, CatalogKey> = {
+  "instance.status": "condition.operand.caseStatus",
+  "actor.roles": "condition.operand.personRoles",
+};
+
+/** A context entry's label inside a clause, by path. */
+const CONTEXT_CLAUSE_LABELS: Record<string, CatalogKey> = {
+  "instance.status": "condition.clauseOperand.caseStatus",
+  "actor.roles": "condition.clauseOperand.personRoles",
+};
+
+const CONTEXT_GROUPS = { instance: "case", actor: "person" } as const;
+
+/** Fill every `{slot}` in one pass. A function fills each slot, so a `$`
+ * pattern or a `{slot}` inside a value prints as written. */
+function fill(template: string, slots: Record<string, string>): string {
+  return template.replace(/\{(\w+)\}/g, (m, k: string) => slots[k] ?? m);
+}
 
 function fieldLabel(f: DraftField, locale: string, baseLocale: string): string {
   const label = f.label ? resolveDraftLocalizedText(f.label, locale, baseLocale) : undefined;
-  return label ? `${label} (${f.key ?? ""})` : (f.key ?? "");
+  return label || t("condition.unnamedField");
 }
 
 /** Exported for `ruleLogic.ts`'s reuse (design.md: the rule-row builder
@@ -139,11 +172,17 @@ export function fieldOperand(f: DraftField, prefix: string, locale: string, base
  * a fully-required `FieldDef[]`, not a mid-edit draft's partial catalog.
  */
 function catalogOperands(fields: DraftField[] | undefined, locale: string, baseLocale: string): Operand[] {
+  // A second and later field sharing a label takes a count, in catalog order.
+  const seen = new Map<string, number>();
   return flattenDraftFields(fields)
     .filter((f) => f.type !== "group")
     .flatMap((f) => {
       const o = fieldOperand(f, "data", locale, baseLocale);
-      return o ? [o] : [];
+      if (!o) return [];
+      const n = (seen.get(o.label) ?? 0) + 1;
+      seen.set(o.label, n);
+      const label = n === 1 ? o.label : fill(t("condition.duplicateLabel"), { label: o.label, n: String(n) });
+      return [{ ...o, label, group: "fields" as const }];
     });
 }
 
@@ -157,8 +196,13 @@ function contextOperands(): Operand[] {
     for (const [key, type] of Object.entries<string>(schema)) {
       const path = `${ns}.${key}`;
       if (DENIED.has(path)) continue;
-      const operand: Operand = { path, label: path, celType: type };
-      if (path === "instance.status") operand.options = INSTANCE_STATUSES.map((v) => ({ value: v, label: v }));
+      const labelKey = CONTEXT_LABELS[path];
+      const operand: Operand = { path, label: labelKey ? t(labelKey) : path, celType: type, group: CONTEXT_GROUPS[ns] };
+      const clauseKey = CONTEXT_CLAUSE_LABELS[path];
+      if (clauseKey) operand.clauseLabel = t(clauseKey);
+      if (path === "instance.status") {
+        operand.options = INSTANCE_STATUSES.map((v) => ({ value: v, label: t(`condition.status.${v}`) }));
+      }
       out.push(operand);
     }
   }
@@ -183,8 +227,11 @@ function childOperands(child: ProcessBody | undefined, locale: string): Operand[
   const out: Operand[] = [
     {
       path: "child.outcome",
-      label: "child.outcome",
+      label: t("condition.operand.childOutcome"),
+      clauseLabel: t("condition.clauseOperand.childOutcome"),
       celType: "string",
+      group: "child",
+      // The child's author typed these names, and none of them is a key.
       options: (child.contract?.outcomes ?? []).map((v) => ({ value: v, label: v })),
     },
   ];
@@ -193,7 +240,7 @@ function childOperands(child: ProcessBody | undefined, locale: string): Operand[
     for (const f of flattenDraftFields(child.fields as DraftField[])) {
       if (f.type === "group" || !f.id || !outputs.has(f.id)) continue;
       const o = fieldOperand(f, "child.data", locale, child.baseLocale);
-      if (o) out.push(o);
+      if (o) out.push({ ...o, label: fill(t("condition.operand.childField"), { label: o.label }), group: "child" });
     }
   }
   return out;
@@ -205,10 +252,11 @@ export function buildOperands(opts: {
   baseLocale: string;
   child?: ProcessBody;
 }): Operand[] {
+  // The picker's order: fields, the called process, the case, the person.
   return [
     ...catalogOperands(opts.fields, opts.locale, opts.baseLocale),
-    ...contextOperands(),
     ...childOperands(opts.child, opts.locale),
+    ...contextOperands(),
   ];
 }
 
@@ -318,7 +366,8 @@ export function conjuncts(node: CelNode, joiner: string): CelNode[] {
 
 /**
  * Read stored CEL into rows. `null` means the source does not parse, which is
- * the builder's one closed state: the site opens in CEL mode instead.
+ * the builder's one closed state: the site draws a notice in place of the rows
+ * and opens its Developer view on the CEL text.
  */
 export function fromCel(src: string | undefined, operands: Operand[]): Condition | null {
   if (!src?.trim()) return { joiner: "&&", rows: [] };
@@ -432,65 +481,95 @@ export function commitDecision(
   return newRowCount < oldRowCount && stored !== undefined ? "clear" : "hold";
 }
 
-// --- plain-English summary (studio-condition-builder) ---------------------
+// --- the condition in words (studio-condition-builder) --------------------
 
-/** One comparison operator's plain-English phrasing. `in` reads as
- * "includes": the literal is the list operand's own member, and "includes"
- * reads the same direction as the operand-first sentence every other row
- * takes, unlike the CEL text (`"manager" in actor.roles`), which puts the
- * literal first. */
-const OP_WORDS: Record<CmpOp, string> = {
-  "==": "is",
-  "!=": "is not",
-  "<": "is less than",
-  "<=": "is at most",
-  ">": "is greater than",
-  ">=": "is at least",
-  in: "includes",
-};
+/** Each operator's catalog name: `condition.op.<name>` is its select word and
+ * `condition.clause.<name>` its clause. */
+export const OP_NAMES = {
+  "==": "eq",
+  "!=": "ne",
+  "<": "lt",
+  "<=": "le",
+  ">": "gt",
+  ">=": "ge",
+  in: "in",
+} as const satisfies Record<CmpOp, string>;
 
-/** The value half of a row's sentence: an option's own label when the
- * operand offers a closed list (so a coded value like `"approved"` reads as
- * whatever label the option carries), the raw value otherwise. */
+/** No digit the author typed goes. */
+const NUMBER = new Intl.NumberFormat("en", { maximumFractionDigits: 20 });
+
+/**
+ * The value half of a clause, in the author's form: an option's label for a
+ * closed list, "yes" or "no" for a boolean, a formatted number, a date or a
+ * date-time as its stored text, and free text in curly quotes.
+ */
 function summarizeValue(row: Extract<Row, { kind: "cmp" }>, operand: Operand | undefined): string {
   const option = operand?.options?.find((o) => o.value === row.value);
   if (option) return option.label;
-  return String(row.value ?? "");
+  if (operand?.celType === "bool") return boolChoiceOf(row.value) === "true" ? t("condition.yes") : t("condition.no");
+  if (operand?.celType === "double" || operand?.celType === "int") return NUMBER.format(Number(row.value));
+  if (operand?.format === "date" || operand?.format === "datetime") return String(row.value ?? "");
+  return `“${String(row.value ?? "")}”`;
 }
 
-/** One row's sentence fragment. A `raw` row falls back to its own CEL text —
- * the same "unbuildable fragment" fallback `toCel` and the builder itself
- * already apply per row, so a mixed condition (some rows readable, one not)
- * degrades gracefully instead of losing the whole summary. */
-function summarizeRow(row: Row, byPath: Map<string, Operand>): string {
-  if (row.kind === "raw") return row.src;
+/** What a raw row reads as: its own CEL text, or the catalog's phrase. */
+export type RawRowReading = "source" | "phrase";
+
+/** One row's clause. A boolean row takes the `eq` or `ne` clause with the
+ * value "yes" or "no". */
+function summarizeRow(row: Row, byPath: Map<string, Operand>, raw: RawRowReading): string {
+  if (row.kind === "raw") return raw === "source" ? row.src : t("condition.clause.raw");
   const operand = byPath.get(row.operand);
-  const label = operand?.label ?? row.operand;
-  // A bare boolean reads as `== true`/`== false` (see `readRow`); the
-  // sentence drops the redundant "is yes"/"is no" and states the fact
-  // directly, negated for false.
-  if (operand?.celType === "bool" && row.op === "==") {
-    return row.value === true ? label : `not ${label}`;
-  }
-  return `${label} ${OP_WORDS[row.op]} ${summarizeValue(row, operand)}`;
+  return fill(t(`condition.clause.${OP_NAMES[row.op]}`), {
+    field: operand?.clauseLabel ?? operand?.label ?? row.operand,
+    value: summarizeValue(row, operand),
+  });
 }
 
 /**
- * A plain-English summary of a guard, for the canvas edge label
- * (`studio-condition-builder` spec). Walks the same `Condition`/`Row` model
- * `ConditionBuilder` already holds — never `celReadout`, which is CEL syntax,
- * not a sentence.
+ * The complete rows' clauses, joined by the condition's joiner: the words the
+ * builder's sentence and the canvas edge label share. Walks the same
+ * `Condition`/`Row` model `ConditionBuilder` holds, never the CEL text.
+ *
+ * `raw` picks what a raw row reads as. The canvas edge and the form preview's
+ * path note keep the fragment's CEL text; the builder's sentence reads the
+ * catalog's phrase.
  *
  * Returns `""` for a condition with no complete row (an empty guard, or one
  * still mid-edit); the caller decides what an empty summary means for its
  * placement.
  */
-export function summarizeCondition(condition: Condition, operands: Operand[]): string {
+export function summarizeCondition(condition: Condition, operands: Operand[], raw: RawRowReading = "source"): string {
   const byPath = new Map(operands.map((o) => [o.path, o]));
-  const usable = condition.rows.filter((r) => isComplete(r, byPath));
-  if (!usable.length) return "";
-  const joinerWord = condition.joiner === "&&" ? "and" : "or";
-  return usable.map((r) => summarizeRow(r, byPath)).join(` ${joinerWord} `);
+  const clauses = condition.rows.filter((r) => isComplete(r, byPath)).map((r) => summarizeRow(r, byPath, raw));
+  if (!clauses.length) return "";
+  const join = t(condition.joiner === "&&" ? "condition.join.and" : "condition.join.or");
+  return clauses.reduce((left, right) => fill(join, { left, right }));
+}
+
+const capitalize = (s: string): string => s.charAt(0).toLocaleUpperCase("en") + s.slice(1);
+
+/**
+ * The builder's sentence under its rows, in one of four states. `condition` is
+ * the parsed rows; the caller handles source that does not parse. `stored` is
+ * the source the draft holds.
+ *
+ * - A complete row: the clauses, ending in a period.
+ * - No row and nothing stored: the condition always matches.
+ * - No complete row over a stored source: the stored condition holds until
+ *   the author finishes the row.
+ * - No complete row over nothing (or over a stored source with no clause to
+ *   read): the author finishes a row first.
+ */
+export function conditionSentence(condition: Condition, operands: Operand[], stored: string | undefined): string {
+  const clauses = summarizeCondition(condition, operands, "phrase");
+  if (clauses) return capitalize(fill(t("condition.sentence"), { condition: clauses }));
+  const hasStored = Boolean(stored?.trim());
+  if (!condition.rows.length && !hasStored) return t("condition.empty");
+  const held = hasStored ? fromCel(stored, operands) : null;
+  const heldClauses = held ? summarizeCondition(held, operands, "phrase") : "";
+  if (heldClauses) return capitalize(fill(t("condition.sentence.held"), { condition: heldClauses }));
+  return t("condition.sentence.none");
 }
 
 /**
@@ -502,8 +581,13 @@ export function summarizeCondition(condition: Condition, operands: Operand[]): s
 export function guardEdgeLabel(src: string, operands: Operand[]): string {
   const condition = fromCel(src, operands);
   if (!condition) return src;
-  const summary = summarizeCondition(condition, operands);
-  return summary || src;
+  const summary = summarizeCondition(condition, operands, "source");
+  if (!summary) return src;
+  // The label reads as the head of a sentence, as the builder's does. A raw
+  // row at the head prints its CEL text, which stays as written.
+  const byPath = new Map(operands.map((o) => [o.path, o]));
+  const head = condition.rows.find((r) => isComplete(r, byPath));
+  return head?.kind === "cmp" ? capitalize(summary) : summary;
 }
 
 /**

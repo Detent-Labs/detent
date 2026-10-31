@@ -33,7 +33,7 @@ describe("guardedManualPathNotes", () => {
     );
 
     expect(notes).toEqual([
-      { pathId: "path_1", label: "Approve", condition: "Amount (amount) is greater than 1000", raw: false },
+      { pathId: "path_1", label: "Approve", condition: "Amount is greater than 1,000", raw: false },
     ]);
   });
 

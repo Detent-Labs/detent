@@ -4372,8 +4372,9 @@ choose "Create draft". Open its Forms tab, at
 10. On the "Prepare the Offboarding" card, choose the open control. In the
     form editor, choose the "Forward to this address" entry, whose card prints
     `forwarding_address`. In the "Selected field" strip that card opens, under
-    required, open the Developer view. Pick CEL in its select. Press "Edit as CEL" and type
-    `data.email_forwarding == true`.
+    required, open the Developer view. Pick CEL in its select. The CEL input
+    stands directly under the builder, with no second disclosure. Type
+    `data.email_forwarding == true` there.
 
     Choose the `forwarding_address` card again, so the strip closes and opens
     fresh for the next entry. Author the same condition on "M365 backup by Fabrikam
@@ -5910,8 +5911,8 @@ appear view, find the `cost_center` row and clear the "visible" box under
 Manager Approval. Open `Cost Center` on the Catalog view. Its "Only ask this when" zone says the
 steps disagree and names Manager Approval.
 
-Pass: a "Clear on <steps>" command stands in the footer beside "Edit as CEL".
-It names every step that asks for the field.
+Pass: a "Clear on <steps>" command stands in the footer, above the Developer
+view. It names every step that asks for the field.
 
 Press "+ Add row". Return to Where fields appear.
 
@@ -5938,11 +5939,13 @@ one row: `Quantity`, `>` and `5`. Then pick `Unit Price` as that row's operand.
 
 Pass: the row turns dashed and shows its incomplete flag.
 
-Pass: the readout under the rows still reads `data.quantity > 5.0`.
+Pass: the sentence under the rows reads "Until you finish the row, the
+condition stays: Quantity is greater than 5."
 
 Open another tab, then return to the Steps tab and the same path.
 
-Pass: the readout still reads `data.quantity > 5.0`.
+Pass: the sentence still reads "Until you finish the row, the condition
+stays: Quantity is greater than 5."
 
 Repeat the edit once on a field with a rule. Open `Quantity` on the Fields tab
 and its Validation zone. Under `rule`, build one row that compares this answer
@@ -5987,6 +5990,71 @@ Open a draft of `loan_application` and select its `check` step, a subprocess
 step. Pick a target step and press "+ Add a way out".
 
 Pass: that new way out's trigger control also reads "Happens by itself".
+
+### The condition builder reads as a sentence (`studio-condition-sentence`)
+
+Source: `studio-condition-sentence` tasks 5.7 to 5.10. A `bun:test` run cannot
+open a disclosure or read a picker's headings off a live page. The four
+findings below stay manual. Use the production build, never `bun run dev`.
+
+Open Studio at `/studio` and a draft of `purchase_requisition`.
+
+#### The rows read back as a sentence
+
+Open the Steps tab and select "Draft Requisition". In the path "Submit for
+approval", open "Only when". Build one row: `Quantity`, "is greater than" and
+`5`. Press "+ Add row" and build a second: `Unit Price`, "is at most" and `100`.
+
+Pass: the operator select lists words, and no `>` or `<=` symbol shows.
+
+Pass: the second row leads with the word "and". Press it, and it flips to "or".
+
+Pass: a sentence stands under the rows and reads in words, ending on a period.
+It names both fields by their labels.
+
+Pass: no CEL, no key and no `data.` text shows on the page.
+
+#### The Developer view holds the CEL
+
+Under the sentence, open the Developer view. Its summary reads "Developer
+view" and stands closed before you press it.
+
+Pass: a "CEL" caption stands above a text input holding the guard.
+
+Replace that text with `data.quantity < 3.0`.
+
+Pass: the rows above redraw as one row, and the sentence reads it in words.
+
+Close the Developer view.
+
+Pass: the rows and the sentence stay as they were. Closing writes nothing to
+the draft.
+
+#### The operand picker lists labels under headings
+
+Open the Fields tab and the Catalog view. Select `Cost Center` and open its
+"Only ask this when" zone. Press "+ Add row". Open the row's field select.
+
+Pass: the headings read "Fields", "The case" and "The person", in that order.
+Under "Fields" the options carry labels alone, with no key in parentheses.
+
+Pass: under "The case" the entry reads "The case's status". Under "The person"
+it reads "The person's roles".
+
+#### Source that does not parse opens the Developer view
+
+On the Steps tab, open any path's Developer view under "Only when". Type
+`data.quantity >` and nothing after it. Press Save. Reload the page. Open
+the same path.
+
+Pass: one line reads "This condition cannot show as rows. Fix it in the
+Developer view below." No row and no sentence stand in its place.
+
+Pass: the Developer view stands open, with the CEL input holding the text.
+
+Type `data.quantity > 5.0` into that input.
+
+Pass: the rows and the sentence return. The Developer view stays open.
 
 ### The subprocess step editor (`fix-subprocess-step-editor`)
 

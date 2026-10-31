@@ -117,7 +117,7 @@ describe("The step page's masthead", () => {
   it("carries the step's label as a writable line, and keeps its key in the Developer view", () => {
     const html = render();
     // The step's own disclosure stands at the page foot, after the way-out
-    // rows' own Developer views.
+    // rows' own Developer views and their guards'.
     const developer = html.slice(html.lastIndexOf("<details"));
 
     expect(html).toContain('value="Intake"');
@@ -192,8 +192,8 @@ describe("The step page's section set", () => {
     // A collapsible register would carry `aria-expanded` on each heading.
     // Disclosures labelled "Developer view" sit elsewhere on the page: the
     // native `<details>` over the step's key and read-only JSON, one
-    // `<details>` per way-out row over its key, and the guard editor's own
-    // button, which `ConditionInput.tsx` builds for each automatic path.
+    // `<details>` per way-out row over its key, and one `<details>` per
+    // way out's guard over its CEL, which `ConditionInput.tsx` builds.
     const headings = render().match(/<h3[^>]*>/g) ?? [];
 
     expect(headings.length).toBeGreaterThan(0);

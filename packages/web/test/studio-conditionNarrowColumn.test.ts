@@ -40,7 +40,8 @@ describe("the builder row's controls", () => {
       expect(block).toContain('maxWidth: "100%"');
       expect(block).toContain("minWidth: 0");
       expect([...source.matchAll(/\{\.\.\.stylex\.props\(styles\.conditionControl\)\}/g)].length).toBe(controls);
-      expect(styleBlock(source, "conditionRaw")).toContain('maxWidth: "100%"');
+      if (file.endsWith("RuleBuilder.tsx")) expect(styleBlock(source, "conditionRaw")).toContain('maxWidth: "100%"');
+      if (file.endsWith("ConditionBuilder.tsx")) expect(styleBlock(source, "conditionRawSentence")).toContain('maxWidth: "100%"');
     });
   }
 });
