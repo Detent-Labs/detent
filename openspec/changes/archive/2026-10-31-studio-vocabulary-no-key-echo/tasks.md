@@ -26,7 +26,7 @@ key and never restates its value.
 - [x] 4.1 In `.claude/rules/ui-glossary.md`, drop the key from the masthead row and add the key input to the Developer view row. Add the vocabulary table with its rule to section 2. Verify: `antislop check` on the file reports no rise.
 - [x] 4.2 In `docs/decisions.md`, find the entry "Retired UI words still sit in live specs and in the studio catalog". Cut its catalog sentences. The spec sweep stays open. Add that `studio-canvas` still names the "Path to" section, at the six lines design Risks cites. Verify: the entry names no catalog key.
 - [x] 4.3 In `docs/browser-checks.md`, rewrite the `catalog-studio-literal-strings` walk to check that no mono name follows a caption. Replace every quoted old caption at the lines design Risks names. Delete the label-and-key row walk whole. Add one walk for this change over the Steps tab. Verify: `grep -n "triggered by\|Path to\|Actions on entry\|Add path" docs/browser-checks.md` prints nothing.
-- [x] 4.4 In `ROADMAP.md`, set stage 64's status line to "CHANGES 1 AND 2 DONE, REST NOT STARTED" and append "Shipped 2026-10-31." to change 2's line. Verify: the two lines read so.
+- [x] 4.4 In `ROADMAP.md`, set stage 64's status line to "CHANGES 1 AND 2 DONE, REST NOT STARTED". Append "Shipped 2026-10-31." to change 2's line. Verify: the two lines read so.
 
 ## 5. Verification
 
