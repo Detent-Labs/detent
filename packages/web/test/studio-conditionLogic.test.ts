@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import {
   buildOperands,
   celLiteral,
+  conditionSentence,
   fromCel,
   guardEdgeLabel,
   operandSignature,
@@ -13,6 +14,7 @@ import {
   type Operand,
 } from "../src/areas/studio/panels/shared/conditionLogic.js";
 import type { DraftField } from "../src/areas/studio/draft/fields.js";
+import { t } from "../src/areas/studio/catalog.js";
 import type { FieldDef, ProcessBody } from "workflow-engine/schema";
 import { checkAgainstFields } from "workflow-engine/cel/check";
 
@@ -306,9 +308,20 @@ describe("the operand picker", () => {
     expect(checkAgainstFields("instance.transitionSeq > 3", fields)).toEqual({ ok: true });
   });
 
-  it("instance.status offers the engine's four statuses", () => {
+  it("instance.status offers the engine's four statuses, labeled from the catalog", () => {
     const status = catalog([]).find((o) => o.path === "instance.status")!;
-    expect(status.options?.map((o) => o.value)).toEqual(["running", "completed", "cancelled", "faulted"]);
+    expect(status.options).toEqual([
+      { value: "running", label: t("condition.status.running") },
+      { value: "completed", label: t("condition.status.completed") },
+      { value: "cancelled", label: t("condition.status.cancelled") },
+      { value: "faulted", label: t("condition.status.faulted") },
+    ]);
+  });
+
+  it("labels the case's status and the person's roles in words", () => {
+    const ops = catalog([]);
+    expect(ops.find((o) => o.path === "instance.status")!.label).toBe("The case's status");
+    expect(ops.find((o) => o.path === "actor.roles")!.label).toBe("The person's roles");
   });
 
   // No `options` IS the free-text path: `ValueEditor` branches on
@@ -337,8 +350,39 @@ describe("the operand picker", () => {
     expect(paths).not.toContain("data.addr");
   });
 
-  it("an entry shows the field's label with its key beside it", () => {
-    expect(catalog([field("amount", "number")]).find((o) => o.path === "data.amount")!.label).toBe("amount (amount)");
+  it("an entry shows the field's label alone, with no key beside it", () => {
+    const ops = catalog([{ id: "field_amount", key: "amount", label: { en: "Amount" }, type: "number" } as never]);
+    expect(ops.find((o) => o.path === "data.amount")!.label).toBe("Amount");
+  });
+
+  it("a field with no label reads as an unnamed field, not as its key", () => {
+    const ops = catalog([
+      { id: "field_a", key: "a", type: "string" } as never,
+      { id: "field_b", key: "b", label: { en: "" }, type: "string" } as never,
+    ]);
+    expect(ops.find((o) => o.path === "data.a")!.label).toBe("(unnamed field)");
+    // A second unnamed field shares that label, so it takes a count too.
+    expect(ops.find((o) => o.path === "data.b")!.label).toBe("(unnamed field) (2)");
+  });
+
+  it("two fields sharing a label stay apart, counted in catalog order", () => {
+    const ops = catalog([
+      { id: "field_n1", key: "first_name", label: { en: "Name" }, type: "string" } as never,
+      { id: "field_n2", key: "last_name", label: { en: "Name" }, type: "string" } as never,
+      { id: "field_n3", key: "nick_name", label: { en: "Name" }, type: "string" } as never,
+      { id: "field_c", key: "city", label: { en: "City" }, type: "string" } as never,
+    ]);
+    expect(ops.filter((o) => o.group === "fields").map((o) => o.label)).toEqual(["Name", "Name (2)", "Name (3)", "City"]);
+  });
+
+  it("lists the fields first, then the case, then the person, each under its group", () => {
+    const ops = catalog([field("amount", "number"), field("note", "string")]);
+    expect(ops.map((o) => [o.path, o.group])).toEqual([
+      ["data.amount", "fields"],
+      ["data.note", "fields"],
+      ["instance.status", "case"],
+      ["actor.roles", "person"],
+    ]);
   });
 
   it("operators follow the operand's CEL type", () => {
@@ -373,6 +417,21 @@ describe("a subprocess step's child operands", () => {
     const paths = operandsOf(parent, narrowed).map((o) => o.path);
     expect(paths).toContain("child.outcome");
     expect(paths.some((p) => p.startsWith("child.data."))).toBe(false);
+  });
+
+  it("the child's operands stand between the fields and the case, under their own group", () => {
+    const ops = operandsOf(parent, child);
+    const groups = ops.map((o) => o.group);
+    const firstChild = groups.indexOf("child");
+    expect(groups.lastIndexOf("fields")).toBeLessThan(firstChild);
+    expect(groups.lastIndexOf("child")).toBeLessThan(groups.indexOf("case"));
+    expect(groups.indexOf("case")).toBeLessThan(groups.indexOf("person"));
+  });
+
+  it("labels the child's outcome and its fields in words", () => {
+    const ops = operandsOf(parent, child);
+    expect(ops.find((o) => o.path === "child.outcome")!.label).toBe("How the called process ended");
+    expect(ops.find((o) => o.path === "child.data.amount")!.label).toBe("Amount, from the called process");
   });
 
   it("an unresolved child yields neither operand", () => {
@@ -425,10 +484,10 @@ describe("operandSignature", () => {
 });
 
 describe("summarizeCondition", () => {
-  it("summarizes a single comparison row in plain English", () => {
+  it("summarizes a single comparison row in the clause's words", () => {
     const operands = catalog([field("amount", "number")]);
     const condition = fromCel("data.amount > 1000.0", operands)!;
-    expect(summarizeCondition(condition, operands)).toBe("amount (amount) is greater than 1000");
+    expect(summarizeCondition(condition, operands)).toBe("amount is greater than 1,000");
   });
 
   it("uses an option's own label for a coded value", () => {
@@ -441,27 +500,66 @@ describe("summarizeCondition", () => {
       }),
     ]);
     const condition = fromCel('data.status == "approved"', operands)!;
-    expect(summarizeCondition(condition, operands)).toBe("status (status) is Approved");
+    expect(summarizeCondition(condition, operands)).toBe("status is Approved");
   });
 
-  it("reads a bare boolean row as the label alone, negated when false", () => {
+  it("reads a boolean row with the is or is not clause and the value yes or no", () => {
     const operands = catalog([field("flagged", "boolean")]);
-    expect(summarizeCondition(fromCel("data.flagged", operands)!, operands)).toBe("flagged (flagged)");
-    expect(summarizeCondition(fromCel("data.flagged == false", operands)!, operands)).toBe("not flagged (flagged)");
+    expect(summarizeCondition(fromCel("data.flagged", operands)!, operands)).toBe("flagged is yes");
+    expect(summarizeCondition(fromCel("data.flagged == false", operands)!, operands)).toBe("flagged is no");
+    expect(summarizeCondition(fromCel("data.flagged != true", operands)!, operands)).toBe("flagged is not yes");
   });
 
-  it("joins two rows with the condition's own joiner, in English", () => {
+  it("reads every operator through its own clause", () => {
+    const operands = catalog([field("amount", "number")]);
+    const read = (src: string) => summarizeCondition(fromCel(src, operands)!, operands);
+    expect(read("data.amount == 5.0")).toBe("amount is 5");
+    expect(read("data.amount != 5.0")).toBe("amount is not 5");
+    expect(read("data.amount < 5.0")).toBe("amount is less than 5");
+    expect(read("data.amount <= 5.0")).toBe("amount is at most 5");
+    expect(read("data.amount > 5.0")).toBe("amount is greater than 5");
+    expect(read("data.amount >= 5.0")).toBe("amount is at least 5");
+    expect(read('"manager" in actor.roles')).toBe("The person's roles contains “manager”");
+  });
+
+  it("formats a number with no digit lost, and keeps a date's stored text", () => {
+    const operands = catalog([field("amount", "number"), field("due", "string", { format: "date" })]);
+    const read = (src: string) => summarizeCondition(fromCel(src, operands)!, operands);
+    expect(read("data.amount > 1234567.125")).toBe("amount is greater than 1,234,567.125");
+    expect(read("data.amount > 1.5e-7")).toBe("amount is greater than 0.00000015");
+    expect(read('data.due == "2026-10-31"')).toBe("due is 2026-10-31");
+  });
+
+  it("puts free text in curly quotes", () => {
+    const operands = catalog([field("city", "string")]);
+    expect(summarizeCondition(fromCel('data.city == "Bern"', operands)!, operands)).toBe("city is “Bern”");
+  });
+
+  it("reads a case status value as its catalog word", () => {
+    const operands = catalog([]);
+    expect(summarizeCondition(fromCel('instance.status == "running"', operands)!, operands)).toBe("The case's status is running");
+  });
+
+  it("joins two rows with the condition's own joiner, in words", () => {
     const operands = catalog([field("amount", "number"), field("flagged", "boolean")]);
     const condition = fromCel("data.amount > 1000.0 || data.flagged", operands)!;
-    expect(summarizeCondition(condition, operands)).toBe("amount (amount) is greater than 1000 or flagged (flagged)");
+    expect(summarizeCondition(condition, operands)).toBe("amount is greater than 1,000 or flagged is yes");
   });
 
-  it("falls back to a raw row's own CEL text", () => {
+  it("prints a raw row's own CEL text by default, or the catalog's phrase on request", () => {
     const operands = catalog([field("amount", "number")]);
     const src = "data.amount * 2.0 > 1000.0";
     const condition = fromCel(src, operands)!;
     expect(condition.rows[0].kind).toBe("raw");
     expect(summarizeCondition(condition, operands)).toBe(src);
+    expect(summarizeCondition(condition, operands, "source")).toBe(src);
+    expect(summarizeCondition(condition, operands, "phrase")).toBe("a hand-written rule");
+  });
+
+  it("fills a value holding a placeholder or a $ pattern as written", () => {
+    const operands = catalog([field("note", "string")]);
+    const condition: Condition = { joiner: "&&", rows: [{ kind: "cmp", operand: "data.note", op: "==", value: "{right} $& {field}" }] };
+    expect(summarizeCondition(condition, operands)).toBe("note is “{right} $& {field}”");
   });
 
   it("returns an empty string for a condition with no complete row", () => {
@@ -470,9 +568,15 @@ describe("summarizeCondition", () => {
 });
 
 describe("guardEdgeLabel", () => {
-  it("prefers the plain-English summary when the guard parses", () => {
+  it("prefers the clause words when the guard parses", () => {
     const operands = catalog([field("amount", "number")]);
-    expect(guardEdgeLabel("data.amount > 1000.0", operands)).toBe("amount (amount) is greater than 1000");
+    expect(guardEdgeLabel("data.amount > 1000.0", operands)).toBe("amount is greater than 1,000");
+  });
+
+  it("keeps a raw row's CEL text beside a readable row", () => {
+    const operands = catalog([field("tags", "list"), field("amount", "number")]);
+    const src = 'data.tags.exists(t, t == "vip") && data.amount > 1000.0';
+    expect(guardEdgeLabel(src, operands)).toBe('data.tags.exists(t, t == "vip") and amount is greater than 1,000');
   });
 
   it("falls back to raw CEL for a fragment the builder cannot represent at all", () => {
@@ -481,5 +585,66 @@ describe("guardEdgeLabel", () => {
     const condition = fromCel(src, operands)!;
     expect(condition.rows).toEqual([{ kind: "raw", src }]);
     expect(guardEdgeLabel(src, operands)).toBe(src);
+  });
+
+  it("returns the source itself when the guard does not parse", () => {
+    expect(guardEdgeLabel("data.amount >", catalog([field("amount", "number")]))).toBe("data.amount >");
+  });
+});
+
+describe("conditionSentence", () => {
+  const operands = catalog([
+    { id: "field_amount", key: "amount", label: { en: "Amount" }, type: "number" } as never,
+    {
+      id: "field_status",
+      key: "status",
+      label: { en: "Status" },
+      type: "string",
+      options: [{ value: "approved", label: { en: "Approved" } }],
+    } as never,
+    { id: "field_approved", key: "approved", label: { en: "Approved" }, type: "boolean" } as never,
+    { id: "field_city", key: "city", label: { en: "City" }, type: "string" } as never,
+    { id: "field_tags", key: "tags", label: { en: "Tags" }, type: "list" } as never,
+  ]);
+  const read = (src: string) => conditionSentence(fromCel(src, operands)!, operands, src);
+
+  it("reads a complete two-row guard as one sentence, ending in a period", () => {
+    expect(read('data.amount > 1000.0 && data.status == "approved"')).toBe("Amount is greater than 1,000 and Status is Approved.");
+  });
+
+  it("reads a boolean row as yes or no", () => {
+    expect(read("data.approved == false")).toBe("Approved is no.");
+  });
+
+  it("puts free text in curly quotes", () => {
+    expect(read('data.city == "Bern"')).toBe("City is “Bern”.");
+  });
+
+  it("reads a raw row as a hand-written rule, capitalized at the head", () => {
+    expect(read('data.tags.exists(t, t == "vip") && data.amount > 1000.0')).toBe(
+      "A hand-written rule and Amount is greater than 1,000.",
+    );
+  });
+
+  it("says an empty site always matches", () => {
+    expect(conditionSentence({ joiner: "&&", rows: [] }, operands, undefined)).toBe("No condition yet: this always matches.");
+    expect(conditionSentence({ joiner: "&&", rows: [] }, operands, "  ")).toBe("No condition yet: this always matches.");
+  });
+
+  it("holds the stored condition while no row is finished", () => {
+    const unfinished: Condition = { joiner: "&&", rows: [{ kind: "cmp", operand: "data.city", op: "==", value: undefined }] };
+    expect(conditionSentence(unfinished, operands, "data.amount > 1000.0")).toBe(
+      "Until you finish the new row, the condition stays: Amount is greater than 1,000.",
+    );
+  });
+
+  it("asks for a finished row when nothing is stored", () => {
+    const unfinished: Condition = { joiner: "&&", rows: [{ kind: "cmp", operand: "data.amount", op: ">", value: undefined }] };
+    expect(conditionSentence(unfinished, operands, undefined)).toBe("Finish a row to set the condition.");
+  });
+
+  it("asks for a finished row when the stored source does not parse", () => {
+    const unfinished: Condition = { joiner: "&&", rows: [{ kind: "cmp", operand: "data.amount", op: ">", value: undefined }] };
+    expect(conditionSentence(unfinished, operands, "data.amount >")).toBe("Finish a row to set the condition.");
   });
 });

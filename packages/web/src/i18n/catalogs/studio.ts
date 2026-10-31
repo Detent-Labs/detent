@@ -405,7 +405,7 @@ export const en = {
 
   // The condition builder. Only its captions read words: its readout prints
   // the CEL source beside the rows ("Writes <code>…</code>").
-  "condition.empty": "No condition — this always matches.",
+  "condition.empty": "No condition yet: this always matches.",
   "condition.addRow": "+ Add row",
   "condition.removeRow": "Remove row",
   "condition.selectOperand": "(select a field)",
@@ -427,6 +427,48 @@ export const en = {
   "condition.unparseable": "This does not parse as CEL, so the builder cannot open it.",
   "condition.developerView": "Developer view",
   "condition.onlyWhenHeading": "Only when",
+  // The operator select's words, one per operator.
+  "condition.op.eq": "is",
+  "condition.op.ne": "is not",
+  "condition.op.lt": "is less than",
+  "condition.op.le": "is at most",
+  "condition.op.gt": "is greater than",
+  "condition.op.ge": "is at least",
+  "condition.op.in": "contains",
+  // One clause per operator, so a translator sees the whole clause.
+  "condition.clause.eq": "{field} is {value}",
+  "condition.clause.ne": "{field} is not {value}",
+  "condition.clause.lt": "{field} is less than {value}",
+  "condition.clause.le": "{field} is at most {value}",
+  "condition.clause.gt": "{field} is greater than {value}",
+  "condition.clause.ge": "{field} is at least {value}",
+  "condition.clause.in": "{field} contains {value}",
+  "condition.clause.raw": "a hand-written rule",
+  "condition.join.and": "{left} and {right}",
+  "condition.join.or": "{left} or {right}",
+  "condition.joiner.and": "and",
+  "condition.joiner.or": "or",
+  "condition.sentence": "{condition}.",
+  "condition.sentence.held": "Until you finish the new row, the condition stays: {condition}.",
+  "condition.sentence.none": "Finish a row to set the condition.",
+  "condition.rawRowSentence": "A hand-written rule. The Developer view holds its text.",
+  "condition.unparseableRows": "This condition cannot show as rows. Fix it in the Developer view below.",
+  "condition.celCaption": "CEL",
+  // The operand picker's entries and headings.
+  "condition.unnamedField": "(unnamed field)",
+  "condition.duplicateLabel": "{label} ({n})",
+  "condition.operand.caseStatus": "The case's status",
+  "condition.operand.personRoles": "The person's roles",
+  "condition.operand.childOutcome": "How the called process ended",
+  "condition.operand.childField": "{label}, from the called process",
+  "condition.group.fields": "Fields",
+  "condition.group.child": "The called process",
+  "condition.group.case": "The case",
+  "condition.group.person": "The person",
+  "condition.status.running": "running",
+  "condition.status.completed": "completed",
+  "condition.status.cancelled": "cancelled",
+  "condition.status.faulted": "faulted",
 
   // The rule-row builder (`field.validation.rule`). A new component, not a
   // ConditionBuilder instance (design.md), with its own operand and

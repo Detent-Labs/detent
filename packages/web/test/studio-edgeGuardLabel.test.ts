@@ -29,12 +29,12 @@ const GUARD = { lang: "cel", src: "data.amount > 1000.0" };
 describe("edgeGuardLabel", () => {
   it("labels an automatic path's guard in words", () => {
     expect(edgeGuardLabel(path({ trigger: "automatic", priority: 1, guard: GUARD }), operands)).toBe(
-      "Amount (amount) is greater than 1000",
+      "Amount is greater than 1,000",
     );
   });
 
   it("labels a manual path's guard in the same words", () => {
-    expect(edgeGuardLabel(path({ trigger: "manual", guard: GUARD }), operands)).toBe("Amount (amount) is greater than 1000");
+    expect(edgeGuardLabel(path({ trigger: "manual", guard: GUARD }), operands)).toBe("Amount is greater than 1,000");
   });
 
   it("gives no label to a path with no guard, for either trigger", () => {
@@ -60,14 +60,14 @@ describe("a path's accessible name", () => {
     const manual = path({ trigger: "manual", guard: GUARD });
     const name = pathName(manual, "Intake", "Approved", edgeGuardLabel(manual, operands));
 
-    expect(name).toBe("Approve, from Intake to Approved, manual, Amount (amount) is greater than 1000");
+    expect(name).toBe("Approve, from Intake to Approved, manual, Amount is greater than 1,000");
   });
 
   it("carries an automatic path's readable guard and its priority", () => {
     const automatic = path({ trigger: "automatic", priority: 2, guard: GUARD });
     const name = pathName(automatic, "Intake", "Approved", edgeGuardLabel(automatic, operands));
 
-    expect(name).toContain("Amount (amount) is greater than 1000");
+    expect(name).toContain("Amount is greater than 1,000");
     expect(name).toContain("2");
   });
 });
