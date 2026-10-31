@@ -120,8 +120,11 @@ function in `conditionLogic.ts`. It covers five states:
 | rows, none complete, nothing stored | "Finish a row to set the condition." |
 | unparseable source | the notice of D4 in place of the rows and the sentence |
 
-The rows' group carries `aria-describedby` pointing at the sentence. A
-screen reader then hears the result when it enters the group. A live
+The input component draws the sentence in every state. The builder
+component drops its own empty-state paragraph, so the empty sentence shows
+once. The builder takes a `describedBy` prop: the sentence's `useId` id.
+Its rows' list carries it as `aria-describedby`. A screen reader then hears
+the result when it enters the rows. A live
 region would speak on every keystroke in a value input, so the sentence
 takes none.
 
@@ -133,14 +136,15 @@ readout is the CEL that principle 2 sends behind the Developer view.
 Each operator gets a select word (`condition.op.<name>`) and a clause
 template (`condition.clause.<name>`, such as "{field} is greater than
 {value}"). The joiners get `condition.join.and` ("{left} and {right}") and
-`condition.join.or`. A boolean row reads "{field} is yes" or "{field} is
-no", matching the value select. The list operator keeps the word
+`condition.join.or`. A boolean row takes the `eq` or `ne` clause with the
+value word "yes" or "no", matching the value select. The list operator keeps the word
 "contains", which the base spec names.
 
 The value prints in the author's form:
 
 - an option's label, for a closed list;
-- a number through `Intl.NumberFormat("en")`;
+- a number through `Intl.NumberFormat("en", { maximumFractionDigits: 20 })`,
+  so no digit the author typed goes;
 - free text in curly quotes, “like this”;
 - a date or a date-time as the stored text.
 
@@ -189,8 +193,11 @@ rows. Fix it in the Developer view below." The `<details>` mounts open.
 Once the text parses, the rows and the sentence return. The `<details>`
 stays open, so the field the author types in never moves.
 
-The open state is local `useState`, seeded from the mount's parse and
-synced by `onToggle`.
+The open state is local `useState`, synced by `onToggle`. The re-seed
+block opens it whenever its read returns `null`. That covers the mount. It
+also covers a source that turns unparseable from outside: the JSON view or
+another field in the same editor. A close by the author holds until the
+next re-seed.
 
 ### D5. A raw row prints a sentence in place of its source
 
@@ -219,8 +226,12 @@ control.
 - `actor.roles` reads "The person's roles".
 - `buildOperands` returns the catalog, then the child, then the case, then
   the person. The picker groups them under `<optgroup>` headings: "Fields",
-  "The called process", "The case", "The person". `Operand` gains a
-  `group` member for that. A group with no member draws no heading.
+  "The called process", "The case", "The person". `Operand` gains an
+  optional `group` member for that. A group with no member draws no
+  heading.
+- The three operand builders set `group`, and `fieldOperand` sets none.
+  The rule builder's operands keep their shape. Its test pins that shape
+  with `toEqual`.
 
 The context labels come from a lookup by path. A new entry in either
 schema of the engine therefore still reaches the picker. A path with
@@ -245,7 +256,6 @@ changes these keys. A placeholder stands in braces.
 | `condition.clause.lt` / `.le` | {field} is less than {value} / {field} is at most {value} |
 | `condition.clause.gt` / `.ge` | {field} is greater than {value} / {field} is at least {value} |
 | `condition.clause.in` | {field} contains {value} |
-| `condition.clause.yes` / `.no` | {field} is yes / {field} is no |
 | `condition.clause.raw` | a hand-written rule |
 | `condition.join.and` / `.or` | {left} and {right} / {left} or {right} |
 | `condition.joiner.and` / `.or` | and / or |
@@ -275,6 +285,14 @@ Two keys go: `condition.editAsCel` and `condition.useBuilder`. So does
 the rule builder, which still reads them. They are `condition.rawRow`,
 `condition.unparseable`, `condition.celReadout` and `condition.celEmpty`.
 
+### D9. `toggleVariant` goes, against a refused simplification
+
+`docs/decisions.md` refused dropping `toggleVariant` on 2026-08-16, item 12
+of "Refused simplifications". The refusal held because each variant drew a
+different site. This change gives every site one presentation, so the
+reason lapses. Task 4.5b moves the item into `docs/decisions-archive.md`
+word for word, with a line naming this change.
+
 ## Risks / Trade-offs
 
 - **The sentence and the canvas share clause keys.** The edge label
@@ -292,3 +310,13 @@ the rule builder, which still reads them. They are `condition.rawRow`,
 - **The rule builder keeps its CEL readout.** → Two builders then read
   differently on the Fields tab. `docs/decisions.md` records it for change
   11.
+
+## Migration Plan
+
+Nothing persists. The builder writes the same CEL as before. The open
+state of a Developer view lives in the component alone. A rollback reverts
+the commit.
+
+## Open Questions
+
+None.

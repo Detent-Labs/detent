@@ -67,7 +67,8 @@ None.
 - `.claude/rules/ui-glossary.md`: the Developer view entry names the
   condition input's view.
 - `docs/authoring-guide.md` and `docs/browser-checks.md` name the old CEL
-  link today.
+  link today. `docs/decisions.md` and `docs/decisions-archive.md` take the
+  open points and the lapsed refusal. `ROADMAP.md` takes the stage status.
 - The tests under `packages/web/test/` that pin the readout, the toggle or
   an operand label.
 - The rule builder (`RuleInput.tsx`) keeps its readout. It shares the

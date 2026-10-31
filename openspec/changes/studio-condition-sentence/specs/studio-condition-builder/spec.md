@@ -63,8 +63,8 @@ the published body.
 
 #### Scenario: The mode is not stored
 
-- **WHEN** a developer leaves a condition site with its Developer view open
-  and returns to it
+- **WHEN** a developer opens a condition site's Developer view and reloads
+  the draft
 - **THEN** the Developer view stands closed again, and no part of the draft
   records the earlier state
 
@@ -349,7 +349,8 @@ view SHALL stay open.
 Every condition site SHALL hold its CEL in a disclosure labeled "Developer
 view" under the builder. The disclosure SHALL stand closed on open, except
 over source that does not parse. The rows and the sentence SHALL stay
-visible while it stands open.
+visible while it stands open. Other specs name this disclosure the site's
+CEL toggle.
 
 One site already stands inside a Developer view: the form editor's flag
 override. It SHALL show the CEL text input with no second disclosure.
