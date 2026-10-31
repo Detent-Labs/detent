@@ -582,7 +582,12 @@ export function guardEdgeLabel(src: string, operands: Operand[]): string {
   const condition = fromCel(src, operands);
   if (!condition) return src;
   const summary = summarizeCondition(condition, operands, "source");
-  return summary || src;
+  if (!summary) return src;
+  // The label reads as the head of a sentence, as the builder's does. A raw
+  // row at the head prints its CEL text, which stays as written.
+  const byPath = new Map(operands.map((o) => [o.path, o]));
+  const head = condition.rows.find((r) => isComplete(r, byPath));
+  return head?.kind === "cmp" ? capitalize(summary) : summary;
 }
 
 /**

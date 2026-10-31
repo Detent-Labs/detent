@@ -37,6 +37,20 @@ describe("edgeGuardLabel", () => {
     expect(edgeGuardLabel(path({ trigger: "manual", guard: GUARD }), operands)).toBe("Amount is greater than 1,000");
   });
 
+  it("capitalizes a head clause that reads a context operand", () => {
+    const status = { lang: "cel", src: 'instance.status == "running" && data.amount > 1000.0' };
+    expect(edgeGuardLabel(path({ trigger: "automatic", priority: 1, guard: status }), operands)).toBe(
+      "The case's status is running and Amount is greater than 1,000",
+    );
+  });
+
+  it("keeps a raw row's CEL text at the head as written", () => {
+    const raw = { lang: "cel", src: "data.amount * 2.0 > 1000.0 && data.amount > 5.0" };
+    expect(edgeGuardLabel(path({ trigger: "manual", guard: raw }), operands)).toBe(
+      "data.amount * 2.0 > 1000.0 and Amount is greater than 5",
+    );
+  });
+
   it("gives no label to a path with no guard, for either trigger", () => {
     expect(edgeGuardLabel(path({ trigger: "manual" }), operands)).toBeUndefined();
     expect(edgeGuardLabel(path({ trigger: "automatic" }), operands)).toBeUndefined();

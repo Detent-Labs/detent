@@ -578,7 +578,7 @@ describe("summarizeCondition", () => {
 describe("guardEdgeLabel", () => {
   it("prefers the clause words when the guard parses", () => {
     const operands = catalog([field("amount", "number")]);
-    expect(guardEdgeLabel("data.amount > 1000.0", operands)).toBe("amount is greater than 1,000");
+    expect(guardEdgeLabel("data.amount > 1000.0", operands)).toBe("Amount is greater than 1,000");
   });
 
   it("keeps a raw row's CEL text beside a readable row", () => {
