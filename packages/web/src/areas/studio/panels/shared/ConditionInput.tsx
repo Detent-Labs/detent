@@ -120,6 +120,13 @@ interface Props {
    * reads `undefined` for all of them.
    */
   clearLabel?: string;
+  /**
+   * The sentence in place of "No condition yet: this always matches." while
+   * no row stands and no source is stored. The Fields tab passes it when the
+   * referencing views disagree: `value` then reads `undefined`, though some
+   * views hold a condition.
+   */
+  emptySentence?: string;
 }
 
 /**
@@ -135,7 +142,15 @@ interface Props {
  * looks at stays byte for byte — the rule that keeps the database from filling
  * with flattened conditions.
  */
-export function ConditionInput({ value, onChange, stepId, placeholder, cel = "disclosure", clearLabel }: Props) {
+export function ConditionInput({
+  value,
+  onChange,
+  stepId,
+  placeholder,
+  cel = "disclosure",
+  clearLabel,
+  emptySentence,
+}: Props) {
   const { draft, loadedChildren, contentLocale } = useDraft();
 
   const operands = useMemo(
@@ -183,7 +198,6 @@ export function ConditionInput({ value, onChange, stepId, placeholder, cel = "di
     if (read === null) setDeveloperOpen(true);
   }
 
-  const unparseable = condition === null;
   const sentenceId = useId();
 
   // The clear press unmounts the clear command, which would drop focus to
@@ -211,12 +225,12 @@ export function ConditionInput({ value, onChange, stepId, placeholder, cel = "di
     onChange(undefined);
   };
 
-  // The add-row button, or the CEL input where the source draws no rows.
+  // The add-row button: a clear leaves no row and no source, so the rows draw.
   useEffect(() => {
     if (!focusAfterClear) return;
     setFocusAfterClear(false);
-    rootRef.current?.querySelector<HTMLElement>(unparseable ? "input.cel-input" : "button.condition-add")?.focus();
-  }, [focusAfterClear, unparseable]);
+    rootRef.current?.querySelector<HTMLElement>("button.condition-add")?.focus();
+  }, [focusAfterClear]);
 
   // `btn btn-ghost` plus the compiled style, joined in one `className`: a
   // `className` written after a spread of `stylex.props` would replace it.
@@ -246,7 +260,9 @@ export function ConditionInput({ value, onChange, stepId, placeholder, cel = "di
         <>
           <ConditionBuilder condition={condition} operands={operands} onChange={commit} describedBy={sentenceId} />
           <p id={sentenceId} {...stylex.props(styles.conditionSentence)}>
-            {conditionSentence(condition, operands, src)}
+            {emptySentence !== undefined && !condition.rows.length && !src?.trim()
+              ? emptySentence
+              : conditionSentence(condition, operands, src)}
           </p>
         </>
       )}

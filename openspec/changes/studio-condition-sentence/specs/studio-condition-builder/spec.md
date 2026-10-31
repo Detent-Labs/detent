@@ -295,6 +295,14 @@ that the condition always matches.
 - **WHEN** a condition site has no expression and no row
 - **THEN** the sentence reads "No condition yet: this always matches."
 
+#### Scenario: The Fields tab's divergent state says the steps disagree
+
+- **WHEN** the steps that ask a field hold different `visible` overrides
+- **AND** a developer opens "Only ask this when" on the Fields tab
+- **THEN** the sentence reads "The steps hold different conditions. Build
+  one here to set it on every step."
+- **AND** it does not read "this always matches"
+
 ### Requirement: The builder's rows print no CEL
 
 The joiner control SHALL read "and" or "or", and flipping it SHALL keep its

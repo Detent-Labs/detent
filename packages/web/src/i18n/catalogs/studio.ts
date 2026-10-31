@@ -449,6 +449,7 @@ export const en = {
   "condition.sentence": "{condition}.",
   "condition.sentence.held": "Until you finish the new row, the condition stays: {condition}.",
   "condition.sentence.none": "Finish a row to set the condition.",
+  "condition.sentence.divergent": "The steps hold different conditions. Build one here to set it on every step.",
   "condition.rawRowSentence": "A hand-written rule. The Developer view holds its text.",
   "condition.unparseableRows": "This condition cannot show as rows. Fix it in the Developer view below.",
   "condition.celCaption": "CEL",

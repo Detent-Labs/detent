@@ -139,6 +139,17 @@ describe("the sentence under the rows", () => {
     expect(html).not.toContain("<ol");
   });
 
+  it("prints a site's own empty sentence in place of the default, with no row and no source", () => {
+    const empty = "The steps hold different conditions.";
+    const withEmpty = (value: DraftOf<Expression> | undefined) =>
+      inContext(<ConditionInput value={value} onChange={() => {}} emptySentence={empty} />);
+
+    expect(sentence(withEmpty(undefined))).toBe(empty);
+    expect(withEmpty(undefined)).not.toContain("this always matches");
+    // A stored source reads as itself: the override stands only for the empty state.
+    expect(sentence(withEmpty(cel("data.amount > 1000.0")))).toBe("Amount is greater than 1,000.");
+  });
+
   it("reads the sentence from the local rows and the stored source", () => {
     // The held and unfinished states: the rows the author edits, over the
     // source the draft still holds.
@@ -161,8 +172,20 @@ describe("the Developer view", () => {
     const details = developerView(html);
 
     expect(details).toMatch(/^<details(?![^>]*\sopen)[^>]*><summary[^>]*>Developer view<\/summary>/);
-    expect(details).toMatch(/<label[^>]*><span[^>]*>CEL<\/span><input[^>]*class="cel-input"/);
+    expect(details).toMatch(/<label[^>]*><span[^>]*>CEL<\/span><input[^>]*class="cel-input celInput"/);
     expect(details).toMatch(/<input[^>]*translate="no"[^>]*value="data.amount &gt; 1000.0"/);
+  });
+
+  // Design-language rule 4: CEL prints in mono. The stylex stub renders a
+  // style's key as its class, so the markup names the compiled style and the
+  // source pins what it declares.
+  it("prints the CEL in mono, keeping the literal class beside the compiled one", () => {
+    const source = readFileSync(new URL("../src/areas/studio/panels/shared/ExpressionInput.tsx", import.meta.url), "utf-8");
+    const start = source.indexOf("  celInput: {");
+
+    expect(start).toBeGreaterThan(-1);
+    expect(source.slice(start, source.indexOf("\n  },", start))).toContain("fontFamily: fonts.mono");
+    expect(developerView(render(cel("data.amount > 1000.0")))).toMatch(/<input[^>]*class="cel-input celInput"/);
   });
 
   it("stands closed over an empty site", () => {
@@ -206,8 +229,8 @@ describe("the inline variant, inside the form editor's own Developer view", () =
   );
 
   it("draws one CEL input, captioned, with no disclosure of its own", () => {
-    expect(html.match(/class="cel-input"/g)).toHaveLength(1);
-    expect(html).toMatch(/<span[^>]*>CEL<\/span><input[^>]*class="cel-input"/);
+    expect(html.match(/class="cel-input celInput"/g)).toHaveLength(1);
+    expect(html).toMatch(/<span[^>]*>CEL<\/span><input[^>]*class="cel-input celInput"/);
     expect(html).not.toContain("<details");
     expect(html).not.toContain("Developer view");
   });

@@ -42,7 +42,7 @@ const styles = stylex.create({
   conditionJoiner: {
     backgroundColor: "transparent",
     color: colors.accent,
-    fontWeight: 600,
+    fontWeight: 800,
     paddingBlock: 0,
     paddingInline: space.s1,
     minWidth: "2.5ch",

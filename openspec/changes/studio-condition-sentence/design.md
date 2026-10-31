@@ -110,15 +110,20 @@ pre-approved every decision for stage 64 and asked for none.
 ### D1. The sentence replaces the readout, under the rows
 
 The sentence renders from the same `Condition` the rows show, through one
-function in `conditionLogic.ts`. It covers five states:
+function in `conditionLogic.ts`. It covers five states. The input adds a
+sixth for the Fields tab:
 
 | State | Sentence |
 |---|---|
 | no row, no stored source | "No condition yet: this always matches." (`condition.empty`, reworded) |
+| no row, no stored source, the steps disagree (Fields tab) | "The steps hold different conditions. Build one here to set it on every step." (`condition.sentence.divergent`) |
 | a complete row | the clauses joined by "and" or "or", ending in a period |
 | rows, none complete, a stored source | "Until you finish the new row, the condition stays: {sentence}" |
 | rows, none complete, nothing stored | "Finish a row to set the condition." |
 | unparseable source | the notice of D4 in place of the rows and the sentence |
+
+The Fields tab passes the input an `emptySentence` prop in its divergent
+state, and that text replaces the empty sentence there.
 
 The input component draws the sentence in every state. The builder
 component drops its own empty-state paragraph, so the empty sentence shows
@@ -210,8 +215,8 @@ the author edits a raw fragment in the Developer view's text.
 
 The operator select prints the `condition.op.*` words. The joiner button
 prints "and" or "or" in the written face and keeps its flip behavior and
-its hint. The accent and the 600 weight stay, since the joiner is a
-control.
+its hint. The accent stays, since the joiner is a control. Its weight
+moves from 600 to 800, a weight the written face takes.
 
 ### D7. Operand labels and order
 
@@ -262,6 +267,7 @@ changes these keys. A placeholder stands in braces.
 | `condition.sentence` | {condition}. |
 | `condition.sentence.held` | Until you finish the new row, the condition stays: {condition}. |
 | `condition.sentence.none` | Finish a row to set the condition. |
+| `condition.sentence.divergent` | The steps hold different conditions. Build one here to set it on every step. |
 | `condition.empty` (reworded) | No condition yet: this always matches. |
 | `condition.rawRowSentence` | A hand-written rule. The Developer view holds its text. |
 | `condition.unparseableRows` | This condition cannot show as rows. Fix it in the Developer view below. |

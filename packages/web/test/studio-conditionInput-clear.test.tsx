@@ -85,19 +85,19 @@ describe("ConditionInput's clear command", () => {
 describe("focus after the clear press", () => {
   // The press unmounts the command itself. No harness here can press it, so
   // this pins the wiring: the press raises a flag, and an effect moves focus
-  // to the control the next render draws: the add-row button, or the CEL input
-  // where the source draws no rows.
+  // to the control the next render draws: the add-row button. A clear leaves
+  // no row and no source, so the rows always draw.
   const source = readFileSync(new URL("../src/areas/studio/panels/shared/ConditionInput.tsx", import.meta.url), "utf-8");
 
   it("raises the flag in the clear handler", () => {
     expect(source).toMatch(/const clear = \(\) => \{\n(?: {4}.*\n)*? {4}setFocusAfterClear\(true\);\n/);
   });
 
-  it("lands on the add-row button, or on the CEL input over source that does not parse", () => {
-    expect(source).toContain('querySelector<HTMLElement>(unparseable ? "input.cel-input" : "button.condition-add")?.focus()');
+  it("lands on the add-row button, which a clear always draws", () => {
+    expect(source).toContain('querySelector<HTMLElement>("button.condition-add")?.focus()');
   });
 
-  it("hangs the ref on the one root, which holds both targets", () => {
+  it("hangs the ref on the one root, which holds the target", () => {
     expect([...source.matchAll(/<div ref=\{rootRef\}/g)].length).toBe(1);
   });
 });
