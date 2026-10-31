@@ -816,21 +816,21 @@ the draft. `PUT /drafts/:processId` saves it and carries the revision the load
 call returned.
 
 The screen's layout SHALL be one tabbed process surface. The
-`studio-process-tabs` capability states the tab row and its eleven tabs. The
-canvas stands on the Canvas tab. A steps rail and a step page stand on the
+`studio-process-tabs` capability states the tab row and its six tabs. The
+canvas stands on the Map tab. A steps rail and a step page stand on the
 Steps tab, and the `studio-step-page` capability states both.
 
-Seven tabs carry a process-wide subject. They are Fields, Data sources, Paths,
-Forms, Field matrix, Contract and Changes. Checks takes the tenth tab. Access
-takes the eleventh. Each tab stays reachable whether or not the author has
-picked a step.
+Four tabs carry a process-wide subject. They are Fields, Forms, Checks and
+Settings. Fields holds the catalog and the field matrix as two views.
+Settings holds four views: the process settings, the data sources, the
+contract and the access lists. Each tab stays reachable whether or not the
+author has picked a step.
 
-The process header's `⋮` overflow menu SHALL carry `baseLocale`. This capability
-requires an author to declare a non-English base locale without leaving the
-process surface. No tab SHALL hold that control.
+The Settings tab SHALL carry `baseLocale`. This capability requires an author
+to declare a non-English base locale without leaving the process surface.
 
 The tab row SHALL belong to the Structure surface alone. The surface SHALL stand
-no tab while the JSON surface is open. Four tabs write the draft body, and the
+no tab while the JSON surface is open. Every tab but Checks writes the draft body, and the
 `studio-json-view` capability requires that no draft-body-writing control stays
 reachable there.
 
@@ -881,7 +881,7 @@ version number and `definitionHash`.
 
 - **WHEN** the author loads a draft, repositions a step, connects it to
   another step, then saves and reloads it
-- **THEN** the Canvas tab draws the new position and path identically
+- **THEN** the Map tab draws the new position and path identically
 
 #### Scenario: An invalid draft is still saveable
 
@@ -891,7 +891,7 @@ version number and `definitionHash`.
 
 #### Scenario: A Structure-surface link opens the panels screen
 
-- **WHEN** the author picks one of the seven process-wide tabs
+- **WHEN** the author picks one of the four process-wide tabs
 - **THEN** the surface opens that tab, and the address bar carries that
   tab's own path
 
@@ -928,16 +928,16 @@ version number and `definitionHash`.
 
 ### Requirement: The panels screen is a routed sub-state of the edit screen
 
-The eleven tabs SHALL sit on a routed surface, not behind a dialog. The path
-SHALL read `/processes/:id/edit/:tab`. Here `:tab` is one of `canvas`,
-`steps`, `fields`, `dataSources`, `paths`, `forms`, `matrix`, `contract`,
-`changes`, `checks` or `access`.
+The six tabs SHALL sit on a routed surface, not behind a dialog. The path
+SHALL read `/processes/:id/edit/:tab`. Here `:tab` is one of `map`, `steps`,
+`fields`, `forms`, `checks` or `settings`. A view of the Fields or Settings
+tab rides as a further segment, `/processes/:id/edit/:tab/:view`.
 
 That path SHALL be a sub-state of the `edit` route. It rides as an optional field
 on the same route object, the shape `formStepId` already takes. The
 `studio-form-editor` capability routes its own screen that way.
 
-An unrecognized `:tab` SHALL fall back to the Canvas tab. The routing table
+An unrecognized `:tab` SHALL fall back to the Map tab. The routing table
 already answers an unrecognized path with the process list, and this is that rule
 one level down.
 
@@ -955,8 +955,8 @@ matches.
 
 <!-- "Show on the canvas" repeats the control's own name, so the word stays. -->
 <!-- antislop: allow synonym-rotation -->
-Choosing a "Show on the canvas" control SHALL open the Canvas tab with that step
-preselected. The Canvas tab SHALL read the target whenever it changes, not only
+Choosing a "Show on the canvas" control SHALL open the Map tab with that step
+preselected. The Map tab SHALL read the target whenever it changes, not only
 once on mount. Reaching it from another tab therefore still selects the step.
 
 Once read, the surface SHALL replace that history entry with the plain `edit`
@@ -987,39 +987,40 @@ body, and no empty band sits below it.
 
 #### Scenario: A view has its own address
 
-- **WHEN** the author opens the Data sources tab
-- **THEN** the address bar reads that tab's path, and loading that path
-  directly opens the same tab
+- **WHEN** the author opens Where values come from on the Settings tab
+- **THEN** the address bar reads `/processes/:id/edit/settings/sources`, and
+  loading that path directly opens the same view
 
 #### Scenario: The Changes and Paths views have addresses too
 
-- **WHEN** the author opens the Changes tab
-- **THEN** the address bar reads `/processes/:id/edit/changes`, and loading
-  it directly opens the same tab
+- **WHEN** the author loads `/processes/:id/edit/changes`
+- **THEN** the Versions screen opens, where the change list stands now
+- **AND** loading `/processes/:id/edit/paths` opens the Steps tab
 
 #### Scenario: A reload keeps the open view
 
-- **WHEN** the author reloads the browser on the Contract tab
-- **THEN** the surface reopens on the Contract tab, not on Canvas
+- **WHEN** the author reloads the browser on the Settings tab's What it takes
+  in and gives back view
+- **THEN** the surface reopens on that view, with Map closed
 
 <!-- The scenario name repeats the live spec's wording verbatim, so a delta can match it. -->
 <!-- antislop: allow synonym-rotation -->
 #### Scenario: Back leaves the screen rather than the process
 
-- **WHEN** the author reaches the Fields tab from the Canvas tab and presses
+- **WHEN** the author reaches the Fields tab from the Map tab and presses
   the browser's Back control
-- **THEN** the Canvas tab returns, and the draft keeps every change
+- **THEN** the Map tab returns, and the draft keeps every change
 
 #### Scenario: Show on the canvas preselects a step
 
 - **WHEN** the author picks "Show on the canvas" on a used-in row of the
   Fields tab
-- **THEN** the Canvas tab opens and selects the step that row named
+- **THEN** the Map tab opens and selects the step that row named
 
 #### Scenario: An unknown view falls back to the canvas
 
 - **WHEN** the author loads `/processes/:id/edit/nonsense`
-- **THEN** the Canvas tab opens, and the surface reports no issue
+- **THEN** the Map tab opens, and the surface reports no issue
 
 <!-- The heading repeats the live spec's wording verbatim, so a delta can match it. -->
 
@@ -1041,20 +1042,17 @@ leaving a tab never reads as a discard.
 A tab's own unsubmitted input SHALL survive a switch between tabs. The contract
 panel holds a half-typed outcome name in component state. The data sources panel
 fetches its list keys on mount. The field matrix holds its selected cell in
-component state. All four tabs SHALL therefore stay mounted for as long as the
-process surface is open. Switching a tab SHALL reveal and hide them, rather than
-mount them.
+component state. Every tab and every view SHALL therefore stay mounted for as
+long as the process surface is open. Switching a tab or a view SHALL reveal
+and hide them, rather than mount them.
 
-Each of those four tabs SHALL carry two numbers, and they SHALL read as different
-things. The entity count says how many fields, data sources, outcomes or live
-cells the tab holds. The `studio-process-tabs` capability states which tab prints
-one. The issue count says how many of them are wrong. Only the issue count takes
-the refusal tone. A tab SHALL have no issue count while its subject has no
-issue.
+The Fields tab's count says how many fields the catalog holds. A rail row's
+issue mark says whether that entity is wrong. Only the issue mark takes the
+refusal tone. A row SHALL have no issue mark while its entity has no issue.
 
-The Fields tab and the Data sources tab SHALL each stand an entity rail beside
-the open editor. The rail SHALL list that tab's own entities, and an Add entry
-too. Choosing an entity SHALL select it. The tab SHALL open that one entity's
+Two views SHALL each stand an entity rail beside the open editor. They are
+the Fields tab's Catalog view and the Settings tab's Where values come from
+view. The rail SHALL list that view's own entities, and an Add entry too. Choosing an entity SHALL select it. The tab SHALL open that one entity's
 editor.
 
 The Add entry SHALL add an entity, through the call the panel's own add control
@@ -1067,10 +1065,11 @@ editor carries that control. The move requirement below states the drag, its
 keyboard route and what the move writes. Data source entries SHALL take no
 part in a move, since a data source nests under nothing.
 
-Contract holds a single editor, so its tab SHALL stand no entity rail. The field
-matrix draws a grid, so its tab SHALL stand none either.
+The contract holds a single editor, so its view SHALL stand no entity rail.
+The field matrix draws a grid, so its view SHALL stand none either.
 
-A tab SHALL stand its own rail alone. No tab SHALL list another tab's entities.
+A view SHALL stand its own rail alone. No view SHALL list another view's
+entities.
 
 Choosing a field nested inside a group SHALL select that field. The tab SHALL
 open that field's own editor, the same one a top-level field opens. The rail
@@ -1135,21 +1134,21 @@ empty-key field did before.
 #### Scenario: Leaving the screen keeps every change
 
 - **WHEN** the author adds a field on the Fields tab and then opens the
-  Canvas tab
+  Map tab
 - **THEN** the draft still carries that field, and the area nav still reports
   unsaved changes
 
 #### Scenario: Switching views keeps a half-typed outcome name
 
-- **WHEN** the author types an outcome name on the Contract tab, opens the
+- **WHEN** the author types an outcome name on the contract view, opens the
   Fields tab without adding it, then returns
 - **THEN** the typed text is still in the input
 
 #### Scenario: Switching views keeps the field matrix's selected cell
 
-- **WHEN** the author moves roving focus to a live cell on the Field matrix
-  tab and activates it
-- **AND** the author opens the Contract tab, then returns
+- **WHEN** the author moves roving focus to a live cell on Where fields
+  appear and activates it
+- **AND** the author opens the Settings tab, then returns
 - **THEN** the same cell still holds roving focus, and it is still activated
 
 #### Scenario: The screen offers no Save of its own
@@ -1161,20 +1160,20 @@ empty-key field did before.
 #### Scenario: The rail lists each view with its entity count
 
 - **WHEN** a draft carries three fields, two data sources, and a contract
-- **THEN** the Fields tab reads three, the Data sources tab reads two, and
-  the Contract tab stands no entity rail
+- **THEN** the Fields tab reads three, the Settings tab prints no count, and
+  the contract view stands no entity rail
 
 #### Scenario: The rail's issue count is separate from its entity count
 
 - **WHEN** a draft carries three fields and one of them holds a validation
   issue
-- **THEN** the Fields tab reads three for its entity count and one for its
-  issue count. Only the issue count takes the refusal tone
+- **THEN** the Fields tab reads three, and that field's rail row carries an
+  issue mark. Only the mark takes the refusal tone
 
 #### Scenario: A view with no issue shows no issue count
 
 - **WHEN** a draft's two data sources both validate
-- **THEN** the Data sources tab reads two and has no issue count
+- **THEN** no data source rail row carries an issue mark
 
 #### Scenario: A twice-nested group field takes its own rail entry
 
@@ -1193,14 +1192,14 @@ empty-key field did before.
 
 - **WHEN** a draft carries two data sources and the author picks the second
   in the rail
-- **THEN** the Data sources tab renders that data source's editor, and it
+- **THEN** Where values come from renders that data source's editor, and it
   renders no other
 
 #### Scenario: The rail sub-list follows the open view
 
-- **WHEN** the author opens the Data sources tab on a draft that carries both
-  fields and data sources
-- **THEN** that tab's rail lists the data sources, and it lists no field
+- **WHEN** the author opens Where values come from on a draft that carries
+  both fields and data sources
+- **THEN** that view's rail lists the data sources, and it lists no field
 
 <!-- The heading keeps the live spec's wording, since a MODIFIED block keeps every scenario; the child now opens its own editor. -->
 #### Scenario: A group child selects its group
@@ -1274,9 +1273,9 @@ empty-key field did before.
 
 #### Scenario: The Data sources rail adds a data source
 
-- **WHEN** the author picks the rail's Add entry on the Data sources tab
+- **WHEN** the author picks the rail's Add entry on Where values come from
 - **THEN** the draft carries one more data source, the rail lists it, and the
-  tab renders that new data source
+  view renders that new data source
 
 #### Scenario: Removing a data source selects its neighbour
 
@@ -1287,8 +1286,8 @@ empty-key field did before.
 
 #### Scenario: A reload selects the first data source
 
-- **WHEN** the author reloads the browser on the Data sources tab
-- **THEN** the tab renders the first data source in the draft
+- **WHEN** the author reloads the browser on Where values come from
+- **THEN** the view renders the first data source in the draft
 
 #### Scenario: Each entity entry marks its own issue
 
@@ -1357,110 +1356,44 @@ empty-key field did before.
 - **THEN** the rail entry shows the key truncated on its one line. It
   prints no character of it on a line of its own
 
-<!-- The heading repeats the live spec's wording verbatim, so a delta can match it. -->
-<!-- antislop: allow synonym-rotation -->
+### Requirement: The change list states what a publish would change
 
-### Requirement: The panels screen's Changes view shows what a publish would change
+The change list SHALL state the difference between a draft and the version
+it sits on. It SHALL stand in two places. The Publish dialog holds it over
+the draft as the editor holds it. The Versions screen holds it over the saved
+draft.
 
-The Changes tab SHALL state the difference between the draft and the version the
-draft sits on. It answers the question a publish raises.
+Both SHALL use one difference computation. The base version is the before
+side and the draft the after side. The list SHALL strip the compiled content
+from the base body first. A row SHALL offer no command that opens a tab.
 
-The tab SHALL read the draft as the editor holds it, including changes the
-author has not saved. The `process-version-inspection` capability's versions
-screen reads the saved draft from the server instead.
+#### Scenario: The dialog's list reads the unsaved draft
 
-Both screens SHALL use one difference computation. The tab SHALL pass the base
-version as the before side and the draft as the after side. Every row then runs
-from the published value toward the draft value, the direction a publish moves.
-
-The tab SHALL list one row per changed entity. A row names its entity by label
-and by key. A data source has no label, so its row names its key alone. A row
-carries one stamp, reading added, changed or removed.
-
-Rows SHALL stand under seven group headings, in this order: Process, Fields,
-Data sources, Steps, Paths, Forms, Contract. A group holding no row SHALL NOT
-appear.
-
-A list SHALL pair its members by anchor. Steps, fields,
-paths, timers, actions and data sources pair by `id`. Fields pair across the
-whole catalog, so a field moved into another group stays one row. A form entry
-pairs by its `ref`, a form tab by its `key`, and a field option by its `value`.
-A note has no anchor, so notes pair by their position among the view's
-notes.
-
-Each group owns a fixed set of rows:
-
-- Process holds one row for the process's own keys and its initial step.
-- Fields holds one row per field. The group a field sits in is one of its
-  properties.
-- Data sources holds one row per data source.
-- Steps holds one row per step. A step's assignment, timers and actions are its
-  properties.
-- Paths holds one row per path. The row names the step the path leaves.
-- Forms holds one row per step whose view differs. Its entries, tabs, notes and
-  columns are that row's properties.
-- Contract holds one row for the input fields, output fields and outcomes.
-
-A list whose members differ only in position SHALL add one order property to
-the row owning that list. The property SHALL name that list, such as Step order
-or Form order. It SHALL add no row for a moved member.
-
-A step the draft adds SHALL also add a row under Paths for each of its paths. It
-SHALL add a row under Forms for its view. A step the draft drops SHALL do the
-same with removed rows.
-
-Every row SHALL stand folded when the change list first appears. Leaving the tab
-and returning to it SHALL keep each row's open state. A folded row SHALL name the
-properties that differ, four at most, and then state how many more differ. An
-open row SHALL show each property's value before and after.
-
-A value SHALL read in words where the tab has a word for the property. A
-localized text reads in the editor's content locale, falling back to the base
-locale. A difference in any other locale reads as a property of
-its own, named with that locale. A yes-or-no value reads as yes or no. A
-reference to another entity reads as that entity's label. A CEL expression reads
-as its source text.
-
-A property the tab has no word for SHALL read under its JSON key, with its
-values printed as JSON. No difference SHALL drop out of the list for want of a
-word.
-
-An open row SHALL offer a command opening the tab that owns its entity. The
-Process row SHALL offer none: no single tab holds the process's own keys. Every
-open row SHALL hold a Developer view, listing the row's JSON paths with their
-values before and after. The tab SHALL offer one command that opens every row, and folds them
-all again.
-
-A row SHALL keep its open state across a later draft change that leaves its
-entity in the list.
-
-<!-- The compile pass's cancel sink is the engine's own term. -->
-<!-- antislop: allow synonym-rotation -->
-The tab SHALL strip the compiled content from the base version's body first. The
-versions screen gives that body the same treatment. The compile pass injects a
-cancel sink, and no author wrote it.
-
-A process with no base version SHALL read as a first publish. The tab says so,
-and it has no difference.
-
-An empty difference SHALL read as such. The tab says the draft matches its base
-version.
-
-The Changes tab SHALL print its number of rows as its own count.
-
-#### Scenario: A draft over a published version shows its difference
-
-- **WHEN** the author opens the Changes tab on a draft of a published process
-- **THEN** the tab states what the draft changes against its base version
-
-<!-- The scenario name repeats the live spec's wording verbatim, so a delta can match it. -->
-<!-- antislop: allow synonym-rotation -->
-#### Scenario: An unsaved edit reaches the view
-
-- **WHEN** the author renames a step and opens the Changes tab without saving
+- **WHEN** the author renames a step and opens the Publish dialog without
+  saving
 - **THEN** the Steps group holds one changed row for that step
 - **AND** opening the row shows the published label before and the unsaved
   label after
+
+#### Scenario: A row offers no open command
+
+- **WHEN** the author opens a row under Fields in the dialog's change list
+- **THEN** the row shows its property values and its Developer view
+- **AND** it offers no command opening a tab
+
+#### Scenario: A publish moves the base and the list follows it
+
+- **WHEN** the author publishes the draft and opens the Publish dialog again
+- **THEN** the dialog compares the draft with the newly published version
+- **AND** it reports no change since that version
+
+### Requirement: The change list groups its rows by subject
+
+The list SHALL carry one row per changed entity. A row names its entity by
+label and by key, and carries one stamp reading added, changed or removed.
+Rows SHALL stand under seven group headings in a fixed order. They read
+Process, Fields, Where values come from, Steps, Ways out, Forms, and What it
+takes in and gives back. A group holding no row SHALL NOT appear.
 
 #### Scenario: One added field reads as one added row
 
@@ -1486,7 +1419,37 @@ The Changes tab SHALL print its number of rows as its own count.
 
 - **WHEN** the author adds a step carrying two paths and a view
 - **THEN** the Steps group holds one added row for the step
-- **AND** the Paths group holds two added rows, and the Forms group holds one
+- **AND** the Ways out group holds two added rows, and the Forms group holds
+  one
+
+#### Scenario: A data source row stands under the author's word
+
+- **WHEN** the author adds a data source
+- **THEN** its added row stands under the heading Where values come from
+
+### Requirement: The change list pairs its rows by anchor
+
+A list SHALL pair its members by anchor. Steps, fields, paths, timers,
+actions and data sources pair by `id`. A form entry pairs by its `ref`, a
+form tab by its `key`, and a field option by its `value`. A note pairs by
+its position among the view's notes. A list whose members differ only in
+position SHALL read as one order property on the row owning that list. It
+SHALL add no row for a moved member.
+
+#### Scenario: Two steps swapped read as one order property
+
+- **WHEN** the author swaps two steps and changes nothing else
+- **THEN** the Process row carries one Step order property
+- **AND** no row names either moved step
+
+### Requirement: A change list row folds
+
+Every row SHALL stand folded when the list first appears. A folded row SHALL
+name the properties that differ, four at most, then state how many more
+differ. An open row SHALL show each property's value before and after. Every
+open row SHALL hold a Developer view listing the row's JSON paths with their
+raw values. The list SHALL offer one command that opens every row and folds
+them all again.
 
 #### Scenario: A folded row names four properties at most
 
@@ -1494,123 +1457,39 @@ The Changes tab SHALL print its number of rows as its own count.
 - **THEN** that step's folded row under Forms names four of them
 - **AND** it states that two more differ
 
-#### Scenario: A label reads in the content locale
+### Requirement: A change list value reads in words
 
-- **WHEN** the author sets the editor's content locale to German, and renames a
-  field's German label
-- **THEN** the field's open row shows the German label before and after
+A value SHALL read in words where the list has a word for the property. A
+localized text reads in the content locale, falling back to the base locale.
+A yes-or-no value reads as yes or no. A reference to another entity reads as
+that entity's label. A CEL expression reads as its source text. A property
+the list has no word for SHALL read under its JSON key, with its values
+printed as JSON.
 
 #### Scenario: A property with no word reads under its JSON key
 
-- **WHEN** the draft adds a key to a step that the tab has no word for
+- **WHEN** the draft adds a key to a step that the list has no word for
 - **THEN** the step's row lists that key as a property
 - **AND** its value prints as JSON
 
-#### Scenario: An open row opens the tab owning its entity
+#### Scenario: A label reads in the content locale
 
-- **WHEN** the author opens a row under Paths and presses its open command
-- **THEN** the Paths tab opens
-
-#### Scenario: An open row stays open after a further change
-
-- **WHEN** the author opens a field's row, then changes another field on the
-  Fields tab
-- **THEN** the first field's row still stands open on the Changes tab
-
-#### Scenario: A publish moves the base and the view follows it
-
-- **WHEN** the author publishes the draft from the header bar and returns to
-  the Changes tab
-- **THEN** the tab reads the newly published version, with no reload
-- **AND** it reports that the draft matches that version
+- **WHEN** the author sets the editor's content locale to German, renames a
+  field's German label and opens the Publish dialog
+- **THEN** the field's open row shows the German label before and after
 
 #### Scenario: A never-published process reads as a first publish
 
-- **WHEN** the author opens the Changes tab on a process with no base version
-- **THEN** the tab says the publish would be the first one, and it has no
-  difference
+- **WHEN** the author opens the Publish dialog on a process with no base
+  version
+- **THEN** the dialog says this publish mints the first version, and shows
+  no change list
 
-#### Scenario: A draft matching its base reads as no difference
+#### Scenario: A draft matching its base reads as no change
 
-- **WHEN** the author opens the Changes tab on a draft nobody has changed
+- **WHEN** the author opens the Publish dialog on a draft nobody has changed
   since it seeded from its base version
-- **THEN** the tab says the draft matches that version
-
-#### Scenario: The count counts rows
-
-- **WHEN** a draft renames one field and adds one path
-- **THEN** the Changes tab's count reads 2
-
-<!-- The heading repeats the live spec's wording verbatim, so a delta can match it. -->
-
-<!-- antislop: allow synonym-rotation -->
-
-### Requirement: The panels screen's Paths view lists every path in the process
-
-<!-- Why: "How it is taken" quotes the catalog value word for word; the passive is the UI string, not this sentence. -->
-<!-- antislop: allow passive-voice -->
-The Paths tab SHALL carry one row per path across the whole draft. The five
-columns are source step, trigger, priority, guard and target. Their headings
-SHALL read the author's words: "Source step", "How it is taken", "Tried",
-"Only if" and "Leads to". A canvas draws a path as a line, and a line hides
-those five values.
-
-Rows SHALL follow the draft's own order. The steps order the rows first, and each
-step's own path order orders the rows inside it.
-
-A path with no guard SHALL read "Always", and a path with no priority SHALL
-read "No order". The tab states each absence rather than leaving a blank
-cell unexplained. A guard is independent of the trigger. A manual path can
-carry one. That guard decides whether the participant may take the path, so
-the tab SHALL carry it.
-
-A draft with no path at all SHALL carry an empty state naming that fact, in
-the words "way out".
-
-The row derivation SHALL live in a pure module with `bun:test` coverage, the
-convention `packages/web/src/areas/app/screens/inboxLogic.ts` sets. It takes the
-draft's steps and returns the rows. The test needs no DOM and no rendering.
-
-The Paths tab SHALL print the path count as its own count.
-
-#### Scenario: Every path takes a row
-
-- **WHEN** the author opens the Paths tab on a draft holding four steps and
-  five paths
-- **THEN** the tab carries five rows
-
-#### Scenario: A row names its source step and its target step
-
-- **WHEN** the tab carries a path's row
-- **THEN** that row names the step the path leaves and the step it enters
-
-#### Scenario: A manual path with no guard reads as carrying none
-
-- **WHEN** a step's manual paths carry no guard and no priority
-- **THEN** each of their rows reads "Always" under "Only if" and "No order"
-  under "Tried"
-
-#### Scenario: A manual path carrying a guard shows it
-
-- **WHEN** a manual path carries a guard
-- **THEN** its row carries that guard's CEL source
-
-#### Scenario: An automatic path shows its priority and its guard source
-
-- **WHEN** a step carries two automatic paths, one guarded
-- **THEN** each row carries that path's priority
-- **AND** the guarded row carries its guard's CEL source
-
-#### Scenario: A draft with no path shows an empty state
-
-- **WHEN** the author opens the Paths tab on a draft holding no path
-- **THEN** the tab says the process has no way out yet
-
-#### Scenario: The row derivation holds without rendering
-
-- **WHEN** a test gives the row derivation a list of steps
-- **THEN** it returns one row per path, in the draft's own order
-- **AND** the test needs no DOM or canvas rendering
+- **THEN** the dialog says the draft has no changes since that version
 
 <!-- The heading repeats the live spec's wording verbatim, so a delta can match it. -->
 
@@ -2631,38 +2510,16 @@ grid.
 - **THEN** the field matrix returns to being one stop in the page's
   tab order
 
-<!-- antislop: allow synonym-rotation -->
+### Requirement: The field matrix's count line counts field entries
 
-### Requirement: The field matrix's rail entry counts field entries and view findings
-
-The `studio-process-tabs` capability gives the Field matrix tab no entity count.
-The toolbar's own count line carries that number instead, as the first of its
-four. That number is the total of field entries across every step in the draft. A
-live cell represents one of that same total.
-
-A note entry SHALL count as none of them. The count answers how much a step binds
-to the catalog, and a note binds to nothing. Counting one would report a step as
-busier than its data says.
-
-This is the matrix's analogue of two other counts. The Fields tab counts catalog
-rows. The Contract tab counts outcomes.
-
-The Field matrix tab SHALL carry an issue count. It SHALL equal the number of
-open findings carrying the `view` source over the whole draft. Those are the
-findings the `studio-checks-rail` capability's rail groups under that name. Since
-this change, that set holds one finding anchored on a field rather than a cell:
-an unwritten technical field. The count therefore over-reports by one per such
-field, with nothing to find in the grid.
-
-The field catalog's own badge, which counts by entity type, carries that finding
-correctly.
-
-The count SHALL NOT come from the step entity type. A per-step view finding
-shares that entity type with every other per-step issue in the draft.
+The matrix toolbar's count line SHALL lead with the total of field entries
+across every step in the draft. A live cell represents one of that same
+total. A note entry SHALL count as none of them. The count answers how much
+a step binds to the catalog, and a note binds to nothing.
 
 #### Scenario: The entity count matches the live-cell total
 
-- **WHEN** the author opens the Field matrix tab on a draft with 54 field
+- **WHEN** the author opens Where fields appear on a draft with 54 field
   entries across its steps
 - **THEN** the toolbar's count line reads 54 field entries
 
@@ -2676,19 +2533,6 @@ shares that entity type with every other per-step issue in the draft.
 
 - **WHEN** a draft holds one step whose view carries notes alone
 - **THEN** that step raises the toolbar's field-entry count by none
-
-#### Scenario: The issue count reflects only view-source findings
-
-- **WHEN** the draft carries one `checkViewFlags` finding and several
-  unrelated issues on the same steps, from other sources
-- **THEN** the Field matrix tab carries an issue count of 1, not a count
-  including the unrelated issues
-
-#### Scenario: An unwritten technical field raises the matrix issue count
-
-- **WHEN** the draft carries one unwritten-technical-field finding and no
-  other `view`-source finding
-- **THEN** the Field matrix tab carries an issue count of 1
 
 <!-- The heading repeats the live spec's wording verbatim, so a delta can match it. -->
 
@@ -2715,51 +2559,20 @@ displays no count of its own.
 - **WHEN** a step's view holds notes alone
 - **THEN** the Form section reports that step's configured fields as 0
 
-### Requirement: The process header declares the process's base locale
+### Requirement: The Settings tab declares the process's base locale
 
-The process header's `⋮` overflow menu SHALL carry a control that reads
-and writes the process's `baseLocale`. An author SHALL be able to
-declare a non-English base locale without leaving the Structure surface.
+The Settings tab's Process view SHALL carry a control that reads and writes
+the process's `baseLocale`. An author SHALL be able to declare a non-English
+base locale without leaving the structure surface. The control SHALL write
+the typed value through, unvalidated. Live validation reports a value that is
+not a well-formed locale code, the route every other malformed authored
+value takes. The control SHALL NOT reject or correct the keystroke.
 
-`baseLocale` decides which entry of every `LocalizedText` in the body is
-mandatory, and publish requires it. Leaving it to the JSON surface alone made
-a process authored only through the structural panels unpublishable.
-
-The control SHALL write the typed value through, unvalidated. Live
-validation reports a value that is not a well-formed locale code. That
-is the route every other malformed authored value takes. The menu SHALL
-NOT reject or correct the keystroke.
-
-When the typed value is a well-formed locale code, the studio SHALL also move
-the edited content locale to it.
-
-Without that move, the control opens a trap. The edited content locale decides
-which entry every text input writes. It also decides which entry a newly
-created step or field seeds. An author who declares `de` and keeps typing
-would write every value under the previous locale. Each new entity would then
-report a missing `de` entry while visibly holding text.
-
-The studio SHALL NOT move the edited content locale for a value that is not a
-well-formed locale code. A part-typed value would otherwise become a real
-locale key. One character typed into any text field is enough.
-
-#### Scenario: The header shows the draft's declared base locale
+#### Scenario: The Settings tab shows the draft's declared base locale
 
 - **WHEN** the edit screen loads a draft declaring `baseLocale: "de"`
-- **THEN** opening the process header's `⋮` menu shows a base-locale
-  control reading `de`
-
-#### Scenario: Declaring a base locale moves the edited content locale
-
-- **WHEN** an author changes the process header's base-locale control to `de`
-- **THEN** the draft body's `baseLocale` is `de`, and the edited content
-  locale is `de`. A step created next seeds its label under `de`
-
-#### Scenario: A part-typed base locale leaves the content locale alone
-
-- **WHEN** an author has typed `d` on the way to `de`
-- **THEN** the draft body's `baseLocale` is `d`, and the edited content locale
-  is whatever it was before
+- **THEN** the Settings tab's Process view shows a base-language control
+  reading `de`
 
 #### Scenario: Existing text without an entry for the new base locale reports
 
@@ -2774,6 +2587,27 @@ locale key. One character typed into any text field is enough.
   not a well-formed locale code
 - **THEN** the draft body carries that value, and live validation
   reports the issue against `baseLocale`
+
+### Requirement: Declaring a base locale moves the edited content locale
+
+A well-formed base locale SHALL also move the edited content locale to it.
+The edited content locale decides which entry every text input writes. It
+also decides which entry a new step or field seeds. Without the move an
+author who declares `de` would keep writing under the previous locale. The
+studio SHALL NOT move the content locale for a malformed locale code. A
+part-typed value would otherwise become a real locale key.
+
+#### Scenario: Declaring a base locale moves the edited content locale
+
+- **WHEN** an author changes the Process view's base-language control to `de`
+- **THEN** the draft body's `baseLocale` is `de`, and the edited content
+  locale is `de`. A step created next seeds its label under `de`
+
+#### Scenario: A part-typed base locale leaves the content locale alone
+
+- **WHEN** an author has typed `d` on the way to `de`
+- **THEN** the draft body's `baseLocale` is `d`, and the edited content locale
+  is whatever it was before
 
 <!-- antislop: allow sentence-length run-ons passive-voice em-dash -->
 <!-- Base wording stays verbatim in a MODIFIED block. -->
@@ -4773,8 +4607,10 @@ this requirement, per its existing, unchanged layout.
 
 ### Requirement: A process's Access surface manages its Developer, Owner and Reader lists
 
-A process's edit screen SHALL offer an Access surface to an actor listed as
-its Developer or its Owner. That listing follows the `process-access-roles`
+The process surface's Settings tab SHALL offer an Access view. It opens for
+an actor listed as the process's Developer or its Owner. This requirement
+calls that view the Access surface. The view SHALL also carry the link to the admin
+area's assignment groups for this process. That listing follows the `process-access-roles`
 capability. The surface SHALL render that process's Developer, Owner and
 Reader lists, each as users and groups.
 
@@ -4817,9 +4653,9 @@ names, regardless of that actor's own Developer or Owner entry.
   of their own, opens a process's Access surface
 - **THEN** the surface offers every control this requirement names
 
-### Requirement: The Contract tab stores an outcome trimmed
+### Requirement: The contract editor stores an outcome trimmed
 
-The Contract tab SHALL store a new outcome without leading or trailing white
+The contract editor SHALL store a new outcome without leading or trailing white
 space. It SHALL compare the trimmed text against the declared outcomes, so
 `approved` and ` approved ` count as one outcome. An outcome that trims to
 nothing SHALL add nothing.
@@ -4914,43 +4750,31 @@ After a removal, keyboard focus SHALL land on the rail row that becomes current.
 
 ### Requirement: A hidden tab body that derives from the whole draft shows its last visible draft
 
-The field matrix tab and the change list SHALL stay mounted while their tab is
-hidden. While hidden, each SHALL draw the draft as it stood when the tab was
-last visible. The commit that reveals the tab SHALL draw the live draft.
+The field matrix view SHALL stay mounted while it is hidden. A hidden view
+SHALL draw the draft as it stood when the view was last visible. The commit
+that reveals the view SHALL draw the live draft.
 
 Hiding SHALL discard no state. A selected matrix cell SHALL survive the switch
 away and back.
 
 #### Scenario: Typing on the Fields tab does not redraw the hidden matrix
 
-- **WHEN** the Fields tab is open and the author types a character into a
+- **WHEN** the Catalog view is open and the author types a character into a
   field's label
-- **THEN** the field matrix tab does not re-render, and the tab body keeps the
-  draft it last drew
+- **THEN** the field matrix view does not re-render, and it keeps the draft
+  it last drew
 
 #### Scenario: Revealing the matrix draws the live draft
 
-- **WHEN** the author changes a field's label on the Fields tab and then opens
-  the field matrix tab
+- **WHEN** the author changes a field's label on the Catalog view and then
+  opens Where fields appear
 - **THEN** the matrix prints the new label in the commit that reveals it
 
 #### Scenario: A selected cell survives a round trip
 
 - **WHEN** the author selects a matrix cell, opens another tab, changes the
-  draft there and returns to the matrix tab
+  draft there and returns to the matrix view
 - **THEN** the same cell stays selected. The matrix prints the changed draft.
-
-### Requirement: The Changes tab computes its rows while hidden
-
-The Changes tab SHALL compute its change rows from the live draft whether or not
-the tab is visible. The tab row's Changes count SHALL equal the number of those
-rows.
-
-#### Scenario: The badge counts a hidden tab's rows
-
-- **WHEN** the author changes a field's label on the Fields tab
-- **THEN** the Changes count updates while the Fields tab stays open. The change
-  list shows that row once the tab opens.
 
 ### Requirement: The form editor and the player load when their screen opens
 
