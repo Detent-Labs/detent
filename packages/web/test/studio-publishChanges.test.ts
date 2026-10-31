@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "bun:test";
 import { changesSentence } from "../src/areas/studio/panels/publishChangesLogic.js";
 
@@ -31,5 +32,30 @@ describe("changesSentence", () => {
 
   it("counts several changes in the plural", () => {
     expect(changesSentence({ kind: "loaded", count: 12 }, 4)).toBe("12 changes since version 4.");
+  });
+});
+
+/**
+ * The Changes row's disclosure mounts the change list. The harness mounts no
+ * DOM and the list draws only once the base body loads, so these read the
+ * component's source.
+ */
+describe("The publish dialog's change list", () => {
+  const source = readFileSync(new URL("../src/areas/studio/panels/PublishChanges.tsx", import.meta.url), "utf8");
+
+  it("mounts the list with no heading of its own, so the dialog's title stays its one h2", () => {
+    const mount = source.match(/<ChangeList\b[^>]*\/>/)?.[0] ?? "";
+
+    expect(mount).toContain("rows={rows}");
+    expect(mount).not.toContain("heading=");
+  });
+
+  it("scrolls the list inside its own box, capped at 40vh", () => {
+    const box = source.match(/listBox:\s*\{([^}]*)\}/)?.[1] ?? "";
+
+    expect(box).toContain('maxHeight: "40vh"');
+    expect(box).toContain('overflowY: "auto"');
+    expect(box).toContain('overscrollBehavior: "contain"');
+    expect(source).toMatch(/<div \{\.\.\.stylex\.props\(styles\.listBox\)\}>\s*<ChangeList\b/);
   });
 });

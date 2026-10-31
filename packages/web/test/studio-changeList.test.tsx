@@ -129,4 +129,20 @@ describe("The change list", () => {
     expect(controls).toBeDefined();
     expect(html).toContain(`id="${controls}"`);
   });
+
+  it("renders its heading as an h2 when a caller passes one", () => {
+    const html = renderToStaticMarkup(<ChangeList rows={[fieldRow]} heading={HEADING} />);
+
+    expect(html).toContain(`<h2`);
+    expect(html).toContain(HEADING);
+  });
+
+  it("renders no h2 when the caller passes no heading, as the publish dialog does", () => {
+    const html = renderToStaticMarkup(<ChangeList rows={[fieldRow]} />);
+
+    // The row drew, so empty markup cannot pass.
+    expect(html).toContain("Forwarding");
+    expect(html).not.toContain("<h2");
+    expect(html).not.toContain(HEADING);
+  });
 });

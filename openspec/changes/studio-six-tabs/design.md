@@ -230,10 +230,10 @@ With one or more changes a `<details>` follows the sentence.
 <!-- Why: "Show" is the summary's own UI string from D10, and "surface" names the process surface. -->
 Its `<summary>` reads "Show" or "Hide" by its open state, the two UI strings
 of D10. Its
-body mounts `ChangeList` with
-the "Compared with version K" heading. The dialog style gains `maxHeight: 85vh`
-and `overflowY: auto`, so a long list scrolls inside the dialog and the
-controls stay reachable.
+body mounts `ChangeList` with no heading of its own, since the sentence names
+the version. The list scrolls in a box capped at `40vh`, so an open list keeps
+the dialog's controls in view. The dialog style also gains `maxHeight: 85vh`
+and `overflowY: auto` as a fallback.
 
 The dialog mounts only while pending, so the fetch runs once per opening.
 A failure never blocks the publish: the sentence states it, and the two

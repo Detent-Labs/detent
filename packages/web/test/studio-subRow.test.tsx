@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { SubRow, subTabDomId, subTabPanelDomId } from "../src/areas/studio/panels/SubRow.js";
@@ -86,5 +87,17 @@ describe("The sub-row", () => {
 
     expect(html).not.toContain('tabindex="-1"');
     expect(html).not.toContain("tabindex");
+  });
+});
+
+describe("The sub-row's open entry", () => {
+  // The scroll runs in a layout effect, which a static render never runs, so
+  // this reads the source; the browser check covers the scroll itself.
+  const source = readFileSync(new URL("../src/areas/studio/panels/SubRow.tsx", import.meta.url), "utf8");
+
+  it("scrolls the open entry's button into view in a layout effect keyed on the open view", () => {
+    expect(source).toMatch(
+      /useLayoutEffect\(\(\) => \{\s*tabRefs\.current\.get\(open\)\?\.scrollIntoView\(\{ block: "nearest", inline: "nearest", behavior: "instant" \}\);\s*\}, \[open\]\);/,
+    );
   });
 });

@@ -15,7 +15,7 @@ import { useEffect, useId, useMemo, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
 import type { ProcessBody } from "workflow-engine/schema";
 import { stripCompiledContent } from "workflow-engine/schema/strip-compiled";
-import { colors, fonts, space } from "form-ui/tokens.stylex";
+import { colors, focus, fonts, space } from "form-ui/tokens.stylex";
 import { t } from "../catalog.js";
 import { getVersionBody } from "../api/client.js";
 import { describeCaughtError } from "../errors.js";
@@ -50,6 +50,16 @@ const styles = stylex.create({
     gridColumn: "1 / -1",
     margin: 0,
     minWidth: 0,
+  },
+  // The list scrolls inside the disclosure, so an open list keeps the
+  // dialog's Publish and Cancel controls in view. `focus.reach` pads the box
+  // and its scroll padding, so a row's focus ring stays clear of the clip.
+  listBox: {
+    maxHeight: "40vh",
+    overflowY: "auto",
+    overscrollBehavior: "contain",
+    padding: focus.reach,
+    scrollPadding: focus.reach,
   },
   summary: {
     width: "fit-content",
@@ -130,7 +140,11 @@ export function PublishChanges({ processId, token, baseVersion, draft, contentLo
             <summary aria-describedby={sentenceId} {...stylex.props(styles.summary)}>
               {t(open ? "draftToolbar.publishDialogChangesHide" : "draftToolbar.publishDialogChangesShow")}
             </summary>
-            <ChangeList rows={rows} heading={t("changeList.heading.base").replace("{version}", () => String(baseVersion))} />
+            {/* No heading of its own: the Changes row's sentence names the
+                version, and the dialog's own title is its one `<h2>`. */}
+            <div {...stylex.props(styles.listBox)}>
+              <ChangeList rows={rows} />
+            </div>
           </details>
         </dd>
       )}

@@ -970,7 +970,6 @@ export const en = {
   // line names the comparison and never counts; each caller fills its own
   // version numbers. The Fields, Steps and Forms headings read the `tabs.*` names.
   // On the Versions screen `{after}` is side B's version, `{before}` side A's.
-  "changeList.heading.base": "Compared with version {version}",
   "changeList.heading.versions": "Version {after} compared with version {before}",
   "changeList.heading.draft": "Draft compared with version {version}",
   "changeList.group.process": "Process",

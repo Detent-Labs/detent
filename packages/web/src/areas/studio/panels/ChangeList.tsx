@@ -310,8 +310,10 @@ const FOLDED_NAMES = 4;
 
 interface Props {
   rows: ChangeRow[];
-  /** The line naming the comparison, its version numbers already filled. */
-  heading: string;
+  /** The line naming the comparison, its version numbers already filled.
+   * Omitted, the list renders no heading element: the publish dialog's
+   * Changes row names the version in its sentence. */
+  heading?: string;
 }
 
 // ponytail: every row renders its body and its Developer view's JSON into
@@ -339,7 +341,7 @@ export const ChangeList = memo(function ChangeList({ rows, heading }: Props) {
   return (
     <div>
       <div {...stylex.props(styles.headingLine)}>
-        <h2 {...stylex.props(styles.heading)}>{heading}</h2>
+        {heading !== undefined && <h2 {...stylex.props(styles.heading)}>{heading}</h2>}
         {rows.length > 0 && (
           <button
             type="button"

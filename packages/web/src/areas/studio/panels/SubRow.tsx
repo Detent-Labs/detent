@@ -1,4 +1,4 @@
-import type { KeyboardEvent } from "react";
+import { useLayoutEffect, useRef, type KeyboardEvent } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { nextTabIndex } from "form-ui";
 import { colors, focus, space } from "form-ui/tokens.stylex";
@@ -83,6 +83,16 @@ interface Props {
  * prints no count.
  */
 export function SubRow({ tab, views, open, onOpen, label }: Props) {
+  const tabRefs = useRef(new Map<TabView, HTMLButtonElement>());
+
+  // The open entry rests in view on mount and on every view switch: at a
+  // narrow width the row scrolls sideways, and a deep link can name an entry
+  // past its right edge. `ProcessTabRow.tsx`'s `scrollTabIntoRow` makes the
+  // same call.
+  useLayoutEffect(() => {
+    tabRefs.current.get(open)?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "instant" });
+  }, [open]);
+
   // Arrow keys, `Home` and `End` move focus alone; they open no view.
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     const buttons = Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
@@ -100,6 +110,10 @@ export function SubRow({ tab, views, open, onOpen, label }: Props) {
         return (
           <button
             key={view.id}
+            ref={(el) => {
+              if (el === null) tabRefs.current.delete(view.id);
+              else tabRefs.current.set(view.id, el);
+            }}
             id={subTabDomId(tab, view.id)}
             type="button"
             role="tab"
