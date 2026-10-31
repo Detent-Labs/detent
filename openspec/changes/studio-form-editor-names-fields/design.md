@@ -234,6 +234,14 @@ while naming or while no locale holds a label. The strip's Name control
 carries the warning. `boundaries.test.ts` pins the `LocalizedTextInput` site
 count at 7. The two new sites move it to 9, with its comment's site list.
 
+`mintCatalogField` seeds the label with the kind's name in the base
+locale, and the focused input selects it. The first keystroke replaces the
+name. A field with an empty base-locale label fails the Zod schema's
+localization refinement. That blanks every later check and raises the
+structural banner. The browser check showed that on every mint, so the seed
+keeps a fresh field clean. Focusing the input also sets `naming`, so a
+second visit keeps the input mounted while the author types.
+
 Minting clears the selection, as it does today. The selection is an array
 index the insert shifts. A selected new card would also print a second Name
 input in the strip.

@@ -133,8 +133,8 @@ change already lands in the draft.
 
 A palette kind's press or drop SHALL place the new card with a name input in
 place of its label. A group card takes the input in place of its legend's
-name. The input SHALL take the focus at once, so the first keystroke writes
-the label for the content locale.
+name. The input SHALL take the focus with its text selected. The first
+keystroke then replaces that text.
 
 Enter or Escape SHALL end the naming and move the focus onto the card's own
 control. Moving the focus elsewhere ends it too. A card whose field has no
@@ -175,6 +175,18 @@ label, in the content locale or the base locale, SHALL keep the input.
 - **WHEN** the content locale differs from the base locale
 - **AND** a field carries a label in the base locale alone
 - **THEN** its card prints that label, and shows no name input
+
+### Requirement: A new field starts with its kind's name
+
+A minted field's label SHALL start as the kind's name in the base locale.
+The draft then never holds a field without a label. No structural check
+result appears while the author names it.
+
+#### Scenario: A new field starts clean
+
+- **WHEN** the author presses the palette's "Date" kind
+- **THEN** the new field's label reads "Date" in the base locale
+- **AND** the draft shows no structural check result for it
 
 ### Requirement: The name input states its purpose
 
