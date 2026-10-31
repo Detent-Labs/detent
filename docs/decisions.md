@@ -1840,8 +1840,9 @@ this section.
 
 ## Open from studio-condition-sentence (needs its own OpenSpec change)
 
-The change made the condition builder read as a sentence. It left five
-points to later changes. The SENTENCE tag is local to this section.
+The change made the condition builder read as a sentence. It left eleven
+points to later changes. Its critique and audit of 2026-10-31 raised the
+last six. The SENTENCE tag is local to this section.
 
 - **SENTENCE-1: the rule builder keeps its CEL readout and toggle.**
   `panels/shared/RuleInput.tsx` still prints its "Writes" line and its CEL
@@ -1861,6 +1862,28 @@ points to later changes. The SENTENCE tag is local to this section.
   clause takes the value word "yes" or "no" from the value select. The phrase
   is stiff but exact. A later wording pass can give booleans their own pair
   of clauses.
+- **SENTENCE-6: the divergent "Only ask this when" names no condition.**
+  When the steps disagree, the zone names the steps and nothing else. The
+  Developer view's CEL box stands empty. An author who builds a row then
+  replaces conditions they cannot read. Change 11's field card can list
+  each step's condition as a sentence.
+- **SENTENCE-7: a row wraps at 1440px.** The field select sizes to its
+  longest label, so the value drops to a second line in the two-column step
+  page. The joiner also indents every row after the first. Change 10's
+  single column gives the row its width back.
+- **SENTENCE-8: the unparseable notice does not name the fault.** It says
+  the condition cannot show as rows and points to the Developer view. The
+  parse message itself never shows, and "+ Add row" goes with the rows.
+- **SENTENCE-9: the joiner explains itself in a tooltip alone.** Its flip
+  changes every row at once, and a screen reader hears only "and" or "or".
+  Each row's controls take the names "field", "operator" and "value", the
+  same in every row. The status notice mounts with its text already in
+  place, so a screen reader may skip it.
+- **SENTENCE-10: "+ Add row" keeps the focus after the press.** The new
+  row's field select would be the next thing an author sets.
+- **SENTENCE-11: the Ways out hint repeats the empty sentence.** "Leave it
+  empty to always offer this way out" stands above "No condition yet: this
+  always matches." One of the two can go.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 
