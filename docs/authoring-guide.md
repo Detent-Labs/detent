@@ -781,8 +781,9 @@ that ignores `child` also waits for the return.
 
 The studio writes a guard for you. Its condition builder offers the catalog
 fields and emits the CEL. So this section tells you what the text means, not
-what you must type. The text input is still there behind `Edit as CEL`, and a
-guard you write by hand opens in the builder afterwards.
+what you must type. The builder reads the guard back as a sentence. The CEL
+text input stands in the builder's Developer view. A guard you write by hand
+opens in the builder afterwards.
 
 Every CEL expression, including a guard, stays under a structural bound. It
 holds at most 2,000 AST nodes and a parse depth of at most 64. It nests at

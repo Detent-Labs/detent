@@ -1838,6 +1838,30 @@ this section.
   row headers still print keys alone beside the Catalog's labels; change 11
   owns the matrix's words.
 
+## Open from studio-condition-sentence (needs its own OpenSpec change)
+
+The change made the condition builder read as a sentence. It left five
+points to later changes. The SENTENCE tag is local to this section.
+
+- **SENTENCE-1: the rule builder keeps its CEL readout and toggle.**
+  `panels/shared/RuleInput.tsx` still prints its "Writes" line and its CEL
+  toggle. The Fields tab then holds two builders that read differently.
+  Change 11 owns the rule builder and brings it to the sentence.
+- **SENTENCE-2: a list clause is not good grammar.** It reads "The person's
+  roles contains “manager”". The clause cannot know whether a label is
+  plural. Change 16 revisits the phrasing of list clauses.
+- **SENTENCE-3: the canvas edge label keeps a raw fragment's CEL text.** The
+  form preview's path note does the same. Both read the shared clause keys
+  for every other row. Change 5 owns the canvas and decides their wording.
+- **SENTENCE-4: the rule builder's other-field picker shows labels alone.**
+  The shared `fieldOperand` drops the key, and it adds none of the condition
+  picker's duplicate numbering. Two fields with one label then read the same
+  there. Change 11 can number them, or show the field card's names.
+- **SENTENCE-5: a boolean `!=` row reads "Approved is not yes".** The `ne`
+  clause takes the value word "yes" or "no" from the value select. The phrase
+  is stiff but exact. A later wording pass can give booleans their own pair
+  of clauses.
+
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 
 Each entry below names a cut somebody proposed, the reason a reviewer refused
@@ -1848,8 +1872,8 @@ against the tree on 2026-09-10. A line number appears only where no symbol
 identifies the site: gate script lines, test assertions and spec lines. A dated
 count is history and stays as measured.
 
-Entries 1 to 9 come from the 2026-08-16 survey. Entries 10 to 46 are the
-deliberate refusals, all of them. Entries 47 to 51 come from the library
+Entries 1 to 9 come from the 2026-08-16 survey. Entries 10 to 45 are the
+deliberate refusals, all of them. Entries 46 to 50 come from the library
 audit of 2026-09-10.
 
 1. Five dependencies each earn their place. `@dagrejs/dagre` drives a layered
@@ -1899,31 +1923,24 @@ audit of 2026-09-10.
     operand and the field-against-field comparison have no counterpart on a
     path guard. [`packages/web/src/areas/studio/panels/shared/RuleInput.tsx`
     and `ConditionInput.tsx` beside it]
-12. **Finding 28, drop `ConditionInput`'s `toggleVariant` prop.** Rejected
-    2026-08-16. Each variant has a live caller. `panels/PathsPanel.tsx` passes
-    `"disclosure"`, `panels/FieldCatalogPanel.tsx` passes `"link"`, and
-    `panels/shared/BooleanOrExpressionInput.tsx` takes the `"link"` default.
-    Dropping the prop changes what one of those sites renders.
-    [`packages/web/src/areas/studio/panels/shared/ConditionInput.tsx`, the
-    `toggleVariant` prop]
-13. **Finding 22, `Intl.NumberFormat` for `formatDuration`.** Rejected
+12. **Finding 22, `Intl.NumberFormat` for `formatDuration`.** Rejected
     2026-08-16. The test file
     `packages/web/test/reporting-reportingLogic.test.ts:90-110` pins 13
     strings across `en` and `de`, among them `"4.5 s"` and `"5,5 Std"`. The
     formatter renders `"4.5 sec"` and `"5,5 Std."` instead.
     [`packages/web/src/areas/reporting/screens/reportingLogic.ts`,
     `formatDuration`]
-14. **`Intl.RelativeTimeFormat` for `waitingLabel`.** Rejected 2026-08-05, after
+13. **`Intl.RelativeTimeFormat` for `waitingLabel`.** Rejected 2026-08-05, after
     surviving five scans as a finding. Four tests in
     `packages/web/test/inboxLogic.test.ts` pin `"5m"`, `"3h"`, `"2d"` and
     `"just now"`. Narrow style renders `"5 min. ago"`, and no style renders
     `"5m"`. Re-file it as a design change, never as a standard-library swap.
     [`packages/web/src/areas/app/screens/inboxLogic.ts`, `waitingLabel`]
-15. **A shared changed-file collector for `prose.sh` and `whitespace.sh`.**
+14. **A shared changed-file collector for `prose.sh` and `whitespace.sh`.**
     Rejected 2026-08-05. Only `prose.sh` runs `git diff --name-status -M`, and
     it does so to read a renamed file's baseline at its old path.
     [`scripts/gates/prose.sh:90`, `scripts/gates/whitespace.sh:55`]
-16. **Delete the unused registry seams.** Rejected. That set is
+15. **Delete the unused registry seams.** Rejected. That set is
     `devHeaderResolver`, the action `Registry`, the `DataSourceRegistry`, the
     `AssignmentRegistry`'s multi-strategy handlers, `exampleRegistry.ts` with
     `RegistryPanel.tsx`, and `Action.execution`'s reserved enum. The enum has
@@ -1931,56 +1948,56 @@ audit of 2026-09-10.
     records the reserved enum and the dev-header seam as v1 boundaries, and
     the registries as the plugin seam. The two studio files have
     since left the tree on their own change, on 2026-08-18; the rest stand.
-17. **Delete `Action.execution` specifically.** Rejected on a second ground. It
+16. **Delete `Action.execution` specifically.** Rejected on a second ground. It
     sits inside `ProcessBody`, so removing it moves the `definitionHash` of
     every stored body carrying it. The field `definitionStatus` sits outside the
     body, so it does not.
-18. **Replace the `migrateInstances` and `findOrphanKeys` keyset loop.**
+17. **Replace the `migrateInstances` and `findOrphanKeys` keyset loop.**
     Declined 2026-07-26. [`src/engine/migration.ts`]
-19. **Collapse `requireRole` and the role constants.** Rejected. The call sites
+18. **Collapse `requireRole` and the role constants.** Rejected. The call sites
     ask about genuinely different roles. [`src/auth/authorize.ts`,
     `requireRole`]
-20. **Reduce `checkAndRecordAttempt`'s parameters.** Rejected. Tests exercise
+19. **Reduce `checkAndRecordAttempt`'s parameters.** Rejected. Tests exercise
     each with different values. The signature read `(map, email, now)` when
     the cut was proposed; it has since grown a `maxAttempts` and a `capacity`
     parameter. [`src/auth/login.ts`, `checkAndRecordAttempt`]
-21. **Collapse the two `ActorResolver` implementations.** Rejected. Both
+20. **Collapse the two `ActorResolver` implementations.** Rejected. Both
     `src/auth/jwt.ts` and `src/auth/resolve.ts` are real implementations.
-22. **Collapse the i18n catalogs into one.** Rejected. The JSON contract is
+21. **Collapse the i18n catalogs into one.** Rejected. The JSON contract is
     multi-locale by construction, and the app area ships a real `de` in
     `packages/web/src/i18n/catalogs/app.ts`. Finding 20 cuts unused keys
     instead.
-23. **Drop `optionText`'s `if (!attributes) return label` guard.** Rejected
+22. **Drop `optionText`'s `if (!attributes) return label` guard.** Rejected
     2026-08-16. The `attributes` parameter types as `Record<...> | undefined`,
     and `Object.values(undefined)` throws a `TypeError`. Only the guard's
     sibling was dead, the `parts.length === 0` branch, and that branch is cut.
     [`packages/form-ui/src/FieldForm.tsx`, `optionText`]
-24. **Finding 39, merge `isGroup` and `isGroupField`.** Rejected 2026-08-16.
+23. **Finding 39, merge `isGroup` and `isGroupField`.** Rejected 2026-08-16.
     Both bodies read `field.field.type === "group"`. The only module both call
     sites import at runtime is `types.ts`, which emits no JavaScript and
     reaches them through `import type`. Hosting the predicate there turns a
     type-only module into a runtime one, for three duplicated lines.
     [`packages/form-ui/src/FieldForm.tsx`, `isGroup`;
     `packages/form-ui/src/submit.ts`, `isGroupField`]
-25. **Finding 9, delete `parseJsonb` as dead.** Rejected. A separate
+24. **Finding 9, delete `parseJsonb` as dead.** Rejected. A separate
     `parseJsonb` exports from `src/engine/host.ts`. `src/http/admin-routes.ts`
     names it on six lines, and `test/data-list-columns.test.ts` imports it. It
     returns `undefined` on a parse error, where the `src/engine/drafts.ts`
     export the `templates.ts` mapper shares lets that error throw.
-26. **Finding 9, merge `toTemplate` and `toDraft`.** Rejected. The two map
+25. **Finding 9, merge `toTemplate` and `toDraft`.** Rejected. The two map
     different columns. One question stays filed and unresolved: does `Bun.sql`
     ever hand back raw text on the `drafts` and `templates` columns? A negative
     answer kills the string guard and ten further inline sites.
     [`src/engine/templates.ts`, `toTemplate`; `src/engine/drafts.ts`,
     `toDraft`]
-27. **Finding 26, a shared `requireAnyRole(actor, ...roles)`.** Rejected
+26. **Finding 26, a shared `requireAnyRole(actor, ...roles)`.** Rejected
     2026-08-16. The comment above `requireAuthoring` in
     `src/http/studio-routes.ts` rejects it and names one specific pair on
     purpose. `requireStudioRead`, in the same file, binds to the same rule by
     reference. The three helpers also raise three different messages, each
     naming its own role set. [`src/http/admin-routes.ts`,
     `requireDataListRead`]
-28. **Finding 39, merge `requireNonBlank` and `requireString`.** Rejected
+27. **Finding 39, merge `requireNonBlank` and `requireString`.** Rejected
     2026-08-16. They differ three ways. `requireNonBlank` rejects
     `!value.trim()` and returns the untrimmed value, because trimming a password
     would store a secret the operator never typed. `requireString` rejects
@@ -1988,76 +2005,76 @@ audit of 2026-09-10.
     differ too, `must not be empty` against `is required`. The input `"   "`
     passes `requireString` today and would fail a merged rule.
     [`src/http/admin-routes.ts`, `requireNonBlank` and `requireString`]
-29. **Finding 54, inline `resolveBaseLocaleChange`.** Declined 2026-08-18. It
+28. **Finding 54, inline `resolveBaseLocaleChange`.** Declined 2026-08-18. It
     exports on purpose: `studio-processHeaderLogic.test.ts` drives it as a pure
     function, and `ProcessHeaderBar` has no DOM test harness. The extraction is
     the only way to reach the base-locale sync regression it guards.
     [`packages/web/src/areas/studio/screens/processHeaderLogic.ts`]
-30. **Finding 39, inline `resolveActor(req, resolver, db)`.** Rejected
+29. **Finding 39, inline `resolveActor(req, resolver, db)`.** Rejected
     2026-08-16. Its body is one line, `resolver(req.headers, db)`. The command
     `git grep -o 'resolveActor(' -- src | wc -l` prints 22, the declaration
     among them. The archived change `2026-08-05-dedup-server-helpers` created
     the helper by collapsing four copies, and the doc comment above it says
     so. Inlining would reverse that change to save three lines.
     [`src/http/routes.ts`, `resolveActor`]
-31. **Finding 39, inline `accountName.ts` into `Chrome.tsx`.** Rejected
+30. **Finding 39, inline `accountName.ts` into `Chrome.tsx`.** Rejected
     2026-08-16. The file is 15 lines with one call site, and it carries its own
     three-case test. Inlining moves the logic into a React component, so those
     three cases need a render to reach. The test then dies or grows a renderer.
     The change `2026-08-16-ponytail-cleanup-fetch-hooks-and-imports` declined
     finding 37 on this same ground. [`packages/web/src/shell/accountName.ts`]
-32. **Finding 39, derive `onGoToArea` and `onGoToProfile` from the `go` prop.**
+31. **Finding 39, derive `onGoToArea` and `onGoToProfile` from the `go` prop.**
     Rejected 2026-08-16. Two derivations exist, not one. Each of the four area
     roots builds its own href as `/${a}`. The file `shell/App.tsx` passes
     `areaHref(a, "/")` at both of its `onGoToArea` sites, and `Chrome` serves
     both callers. [`packages/web/src/shell/App.tsx`]
-33. **Finding 39, merge `listComments` and `listAttachments`.** Rejected
+32. **Finding 39, merge `listComments` and `listAttachments`.** Rejected
     2026-08-16. The two differ in path segment and in return type, a comment
     page against an attachment page. A merged function needs a type parameter
     and a segment argument, and would run longer than the pair it replaces.
     [`packages/web/src/areas/app/screens/TaskScreen.tsx`, the two `await`
     call sites]
-34. **Finding 8, cut the 45-line comment above `armStepTimers`.** Rejected
+33. **Finding 8, cut the 45-line comment above `armStepTimers`.** Rejected
     2026-08-16. The block states facts: totality, the CEL evaluation contract,
     and a magnitude bound from a real overflow analysis. None of it is process
     history, which is what the comment rule targets.
     [`src/engine/duration.ts`, the doc comment above `armStepTimers`]
-35. **Finding 24, a generic `NamedError` base class.** Rejected 2026-08-16.
+34. **Finding 24, a generic `NamedError` base class.** Rejected 2026-08-16.
     Only `RequestShapeError` and `NotFoundError` are name-only.
     `InstanceNotRunningError` and `InstanceRunningError` each carry
     `instanceId` and `status` as readable state, and a caller distinguishes
     outcomes on it. A shared base would drop that state.
     [`src/errors.ts`, the four classes named]
-36. **Finding 27, delete `BINARY_ROUTES`.** Rejected 2026-08-16. The
+35. **Finding 27, delete `BINARY_ROUTES`.** Rejected 2026-08-16. The
     requirement "`BINARY_ROUTES` declares every route that returns stored
     bytes" in `openspec/specs/http-wrapper/spec.md` names it. Its own comment
     says a person keeps the list in sync by hand, since no static walk of
     `routes` can derive it. Deleting it deletes a spec requirement written
     after a measured `/admin/*` route collision.
     [`src/http/server.ts`, `BINARY_ROUTES`]
-37. **Finding 29, cut four thin delegates in `src/cel/eval.ts`.** Rejected
+36. **Finding 29, cut four thin delegates in `src/cel/eval.ts`.** Rejected
     2026-08-16 for two of the four. The function `buildTransformContext`
     re-keys the context against the source catalog rather than delegating. The
     comment on `buildOutputContext` explains why its namespace stays separate
     from the guard context. The other two, `evalTransforms` and `evalFieldMap`,
     are genuine delegates and stay a finding.
     [`src/cel/eval.ts`, the four functions named]
-38. **Finding 34, dedupe the two pagination helper sets.** Rejected 2026-08-16
+37. **Finding 34, dedupe the two pagination helper sets.** Rejected 2026-08-16
     as a whole. The comments above `MAX_LIST_LIMIT` in `src/runtime/internal.ts`
     and in `src/engine/admin-queries.ts` both call the duplication deliberate.
     The first reads "the numbers agree today by coincidence, not by contract."
     Only `Page<T>` is an unexplained duplicate, and it stays a possible future
     finding.
-39. **Finding 35, `Map.groupBy` for `groupMs`.** Rejected 2026-08-16. It would
+38. **Finding 35, `Map.groupBy` for `groupMs`.** Rejected 2026-08-16. It would
     replace nine lines, and it needs `tsconfig.json`'s `lib` raised from
     `ES2022` to `ES2024` repo-wide. That blast radius is disproportionate.
     [`src/engine/reporting.ts`, `groupMs`]
-40. **Finding 40, drop `JwtResolverConfig.localRolesClaim`.** Rejected
+39. **Finding 40, drop `JwtResolverConfig.localRolesClaim`.** Rejected
     2026-08-16. A call at `test/auth-jwt.test.ts:121` passes
     `localRolesClaim: "groups"`. The `?? "roles"` fallback inside
     `jwtResolver` is a default rather than dead code. [`src/auth/jwt.ts`,
     `JwtResolverConfig.localRolesClaim`]
-41. **Finding 41, drop ten `src/` exports whose only importer is a test.**
+40. **Finding 41, drop ten `src/` exports whose only importer is a test.**
     Rejected 2026-08-16. A test importer is an importer, and `export` is how the
     test reaches the symbol. The ten are `singleTenantSource`,
     `parseExpression`, `projectInstance`, `managerOfStarterStrategyDef`, the
@@ -2065,22 +2082,22 @@ audit of 2026-09-10.
     `clientAddressOf`, `parseAuthIssuers`, `MAX_OVERRIDE_VALUE_LENGTH` and
     `countUiStringOverrides`. Two symbols with no importer at all,
     `checkTemplateKey` and `SUPPORTED_LOCALES`, lost their `export` instead.
-42. **Finding 14, a copy-pasted `tFill`.** Rejected 2026-08-16. Only
+41. **Finding 14, a copy-pasted `tFill`.** Rejected 2026-08-16. Only
     `areas/admin/catalog.ts` declares `tFill`, and only
     `areas/reporting/catalog.ts` declares `tCount`. The bodies differ: `tFill`
     walks `Object.entries(values)` with `replaceAll`, and `tCount` runs one
     `replace` on `{n}`. Each has one declaration, so neither is duplication.
-43. **Finding 17, four area clients declare `listProcesses`.** Rejected
+42. **Finding 17, four area clients declare `listProcesses`.** Rejected
     2026-08-16 as a dedup. Three of the four agree exactly. The reporting
     area's version reads a different route, `/reporting/processes`, and
     unwraps `{processes}` from the body. It stayed its own function.
     [`packages/web/src/areas/reporting/api/client.ts`]
-44. **Finding 17, `getInstanceRecord` is byte-identical.** Not a refusal: a
+43. **Finding 17, `getInstanceRecord` is byte-identical.** Not a refusal: a
     correction, kept because the claim recurs. The two bodies differed by one
     local name, `query` against `params`, so "byte-identical" did not hold.
     The merge still landed, in the archived change
     `2026-08-17-ponytail-web-client-catalog-dedup`.
-45. **Finding 17, route three types through the engine's exports map.**
+44. **Finding 17, route three types through the engine's exports map.**
     Rejected 2026-08-16. `HistoryEntry` reaches `packages/web` through the
     `./schema` entry. Of the three types named, `VersionSummary` lives in
     `src/engine/definitions.ts` and `InstanceRecordElement` in
@@ -2089,14 +2106,14 @@ audit of 2026-09-10.
     package's public surface is an engine decision, and a `packages/web`
     refactor does not get to make it. The three moved to
     `packages/web/src/api/types.ts` instead.
-46. **Finding 13, the `useFail(onUnauthorized, setError, describe)` signature.**
+45. **Finding 13, the `useFail(onUnauthorized, setError, describe)` signature.**
     Rejected 2026-08-16. That shape misses `shell/ProfilePage.tsx`, whose two
     sites answer with `setLoadFailed(true)` and `setSaveFailed(true)`. The
     shipped shape is `useFail(onUnauthorized, onError)`, taking the failure
     handler itself. Further sites, `TaskScreen.tsx` and `PlayerScreen.tsx`
     among them, kept their own ladder and share only the `is401` predicate.
     [`packages/web/src/shell/useFail.ts`]
-47. **Replace the SMTP client with nodemailer.** Rejected 2026-09-10.
+46. **Replace the SMTP client with nodemailer.** Rejected 2026-09-10.
     `nodemailer` 10.0.3 runs under Bun 1.3.11 and delivers to Mailpit. It
     still cannot serve here. Its connection sends `DATA` once any recipient
     is accepted, and reports the rest as rejected. No option turns that off.
@@ -2105,7 +2122,7 @@ audit of 2026-09-10.
     code stays with it. [`src/handlers/notification-email.ts`,
     `openspec/specs/notification-email-action-handler/spec.md`, "Every
     recipient is accepted before the message is sent"]
-48. **Route through `Bun.serve({ routes })`.** Rejected 2026-09-10. The
+47. **Route through `Bun.serve({ routes })`.** Rejected 2026-09-10. The
     hand router is `seg`, `match` and one loop, about 25 lines. The rest of
     the dispatch stays under either router: the navigation check before the
     match, the tenant handle per request, the preflight derived from the
@@ -2113,16 +2130,16 @@ audit of 2026-09-10.
     answers only through a listening server, so the 16 suites that call
     `createServer` with a bare `Request` would each need a port.
     [`src/http/server.ts`]
-49. **Parse CLI arguments with `node:util.parseArgs`.** Rejected 2026-09-10.
+48. **Parse CLI arguments with `node:util.parseArgs`.** Rejected 2026-09-10.
     Both CLIs take positionals only, and `parseArgs` hands the same array
     back under `positionals`. The four scripts read one `process.argv` entry
     each. Nothing shrinks. [`src/auth/cli.ts`, `src/tenancy/cli.ts`]
-50. **Format durations with `Intl.DurationFormat`.** Rejected 2026-09-10.
+49. **Format durations with `Intl.DurationFormat`.** Rejected 2026-09-10.
     The formatter renders every non-zero field. It cannot print `5.5 h`, and
     German comes out as `Std.`, against the catalog's `Std`. The largest-unit
     selection stays hand-written either way. [`formatDuration`,
     `packages/web/src/areas/reporting/screens/reportingLogic.ts`]
-51. **Move the web area's fetching onto TanStack Query.** Deferred
+50. **Move the web area's fetching onto TanStack Query.** Deferred
     2026-09-10, undecided. The tree holds 88 `useEffect` fetches and 49
     loading flags across the four areas. A query cache would earn its place
     only through invalidation after a mutation. That is the stale-UI defect
