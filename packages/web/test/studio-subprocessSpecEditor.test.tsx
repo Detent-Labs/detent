@@ -20,6 +20,7 @@ const PROCESSES: ProcessSummary[] = [
     key: "credit-check",
     label: { en: "Credit check", de: "Bonitätsprüfung" },
     baseLocale: "en",
+    publishedAt: "2026-07-01T00:00:00.000Z",
   },
   {
     processId: "proc_22222222-2222-4222-8222-222222222222",
@@ -28,6 +29,7 @@ const PROCESSES: ProcessSummary[] = [
     key: "vendor-onboarding",
     label: { en: "Vendor onboarding" },
     baseLocale: "en",
+    publishedAt: "2026-07-02T00:00:00.000Z",
   },
 ];
 

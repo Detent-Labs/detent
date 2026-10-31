@@ -191,6 +191,34 @@ test.skipIf(!DB)("listDrafts carries no body", async () => {
   expect(entry?.updatedBy).toBe("user_a");
 });
 
+test.skipIf(!DB)("listDrafts carries the draft's key, label and baseLocale", async () => {
+  const processId = pid();
+  const body = { ...(invalidBody("x") as object), key: "laptop_pool", label: { en: "Laptop Pool" }, baseLocale: "en" };
+  await saveDraft(processId, { body, layout: {}, revision: 0, updatedBy: "user_a" }, sql);
+  const entry = (await listDrafts(sql)).find((d) => d.processId === processId);
+  expect(entry?.key).toBe("laptop_pool");
+  expect(entry?.label).toEqual({ en: "Laptop Pool" });
+  expect(entry?.baseLocale).toBe("en");
+});
+
+test.skipIf(!DB)("listDrafts reads a malformed name field as null", async () => {
+  const processId = pid();
+  const { baseLocale: _omitted, ...rest } = invalidBody("x") as { baseLocale: string };
+  await saveDraft(processId, { body: { ...rest, key: 7, label: ["x"] }, layout: {}, revision: 0, updatedBy: "user_a" }, sql);
+  const entry = (await listDrafts(sql)).find((d) => d.processId === processId);
+  expect(entry?.key).toBeNull();
+  expect(entry?.label).toBeNull();
+  expect(entry?.baseLocale).toBeNull();
+});
+
+test.skipIf(!DB)("listDrafts drops a label entry that is not a string", async () => {
+  const processId = pid();
+  const body = { ...(invalidBody("x") as object), label: { en: "Pool", de: 3 } };
+  await saveDraft(processId, { body, layout: {}, revision: 0, updatedBy: "user_a" }, sql);
+  const entry = (await listDrafts(sql)).find((d) => d.processId === processId);
+  expect(entry?.label).toEqual({ en: "Pool" });
+});
+
 test.skipIf(!DB)("deleteDraft leaves published versions intact", async () => {
   const processId = pid();
   const version = await publishBody(processId, validBody("published"), reg, dataSourceReg, sql);

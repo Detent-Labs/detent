@@ -6,14 +6,13 @@
 import type { Locator, Page } from "@playwright/test";
 import { test, expect } from "./fixtures.js";
 
-const PROCESS_KEY = "laptop_inventory";
+const DRAFT_NAME = "E2E draft";
 const REFUSAL = "Refused by the smoke suite.";
 
 /** Opens the suite's draft from the studio's process list and opens the publish dialog on it. */
 async function openPublishDialog(page: Page): Promise<Locator> {
   await page.goto("/studio");
-  const row = page.getByRole("row").filter({ has: page.getByRole("cell", { name: PROCESS_KEY, exact: true }) });
-  await row.getByRole("button", { name: "Open", exact: true }).click();
+  await page.getByRole("link", { name: DRAFT_NAME, exact: true }).click();
   await page.getByRole("button", { name: "Publish", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Publish this draft" });
   await expect(dialog).toBeVisible();

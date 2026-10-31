@@ -454,12 +454,13 @@ word. `ROADMAP.md` carries stage-by-stage status.
     a per-author preference store, which no area has today.
 - **The studio's six remaining `confirm()` prompts.**
   `studio-publish-gate-and-report` converted the two on the publish path to
-  the application's own modal dialog. The others stay:
+  the application's own modal dialog, and the others stay:
   `packages/web/src/areas/studio/root.tsx:95`, `EditScreen.tsx`'s arrange gate,
   `ProcessesScreen.tsx`'s draft discard, `TemplatesScreen.tsx`'s template
-  discard, and two in `FieldCatalogPanel.tsx`. Two hardcode English rather
-  than reading the catalog, in `ProcessesScreen.tsx` and
-  `TemplatesScreen.tsx`. The navigation prompt at `packages/web/src/areas/studio/root.tsx:95` is the odd one
+  discard, and two in `FieldCatalogPanel.tsx`. Of these, `TemplatesScreen.tsx`'s template
+  discard hardcodes English rather than reading the catalog. Its
+  template-replace prompt (`TemplatesScreen.tsx:131`), outside the six, does
+  too. The navigation prompt at `packages/web/src/areas/studio/root.tsx:95` is the odd one
   out: `studio-app` states the `confirm()`/`t()` pattern for it as a
   requirement, so converting it rewrites that requirement and every scenario
   under it. The other five belong to `studio-form-editor` and `studio-app`, and
@@ -467,6 +468,17 @@ word. `ROADMAP.md` carries stage-by-stage status.
   Deferred 2026-09-02, on capability ownership and effort, not on
   reversibility: two of the five discard server state and the studio carries no
   undo.
+- **The process list's literal strings.** The process list's table and
+  toolbar read the studio catalog. Its two dialogs, its import error and its
+  import result line still print literals. The `ui-string-overrides` catalog
+  rule stays unmet on that screen. Change 13 (`studio-one-dialog-form`) moves
+  the dialog strings. No change covers the import error or the result line.
+- **The Versions screen's dead end from the process list.** A process with no
+  draft opens Versions from its name on the process list. The Versions heading
+  never names the process. Its "Back to process" control opens the edit route,
+  which then fails with "No draft exists for this process." The process list
+  change left the Versions screen as it was. The old row's Versions button
+  reached the same screen.
 - **The 22 failure renders outside the studio edit screen.**
   `packages/web/src` rendered 27 failure states with no alert role.
   `studio-publish-gate-and-report` fixed five, all in the edit screen's own
