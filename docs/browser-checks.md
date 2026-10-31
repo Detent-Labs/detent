@@ -2255,19 +2255,19 @@ browser drives, which those two files cannot observe.
 
 ### The field matrix's checkbox colors (`field-matrix-checkbox-colors`)
 
-Open `purchase_requisition`'s draft, the panels screen's Field matrix view.
+Open `purchase_requisition`'s draft, the Field matrix tab.
 Pass: the legend's seventh line reads "Each checkbox's color names its own
-flag:" followed by three swatches, one per `visible`/`required`/`readonly`.
+flag:" followed by three swatches. They read Asked, Required and Read-only.
 
-Pass: every live cell's checked `visible` checkbox renders the same blue.
-Every checked `required` checkbox renders the same gold-brown, and every
-checked `readonly` checkbox the same violet. Each swatch's color matches
+Pass: every live cell's checked Asked checkbox renders the same blue.
+Every checked Required checkbox renders the same gold-brown, and every
+checked Read-only checkbox the same violet. Each swatch's color matches
 the grid's own.
 
 Through the JSON surface, give a view entry `required: true` and
 `visible: false` directly. This bypasses the checkbox's own gating, which
 would otherwise clear `required` the moment `visible` goes false. Pass:
-back on the grid, that cell's `required` checkbox reads checked. It shows
+back on the grid, that cell's Required checkbox reads checked. It shows
 its own gold color, at reduced opacity, not neutral gray.
 
 Click that checkbox with the mouse. Pass: the click has no effect. The
@@ -2278,7 +2278,7 @@ write here. It refuses the click itself, the same job the old native
 
 A technical field's row never carries the readonly color at all
 (`checkUnwrittenTechnicalFields`'s own walk above names one, `result`).
-Its `readonly` checkbox renders unchecked, dimmed, and uncolored.
+Its Read-only checkbox renders unchecked, dimmed, and uncolored.
 `FLAG_DEFAULT.readonly` reads `false` for an absent key. That holds
 regardless of the engine's own forced `true` for that field.
 `design.md`'s Non-Goals section names this as a pre-existing gap, out of
@@ -6350,8 +6350,8 @@ banner returns. The change's design expects this.
 ### Studio: no key beside a caption (`studio-vocabulary-no-key-echo`)
 
 Source: `studio-vocabulary-no-key-echo` group 4. The bun tests assert the
-catalog words. This walk covers what they cannot judge. A key may stand
-beside a caption. A Developer view may lack its key.
+catalog words. This walk covers what they cannot judge. It catches two
+defects. A key stands beside a caption. A Developer view lacks its key.
 
 Use the production build. Seed a process with a task step, a manual way out, an
 automatic way out and a form.

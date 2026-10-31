@@ -212,8 +212,9 @@ section body on the step page, or as a whole tab's own body elsewhere
 
 ## 2. Domain terms as the UI shows them
 
-The JSON definition is the definition contract. Its words win in UI text, in
-commit messages, and in conversation. A rendering layer may hold a different
+The JSON definition is the definition contract. Its words win in docs, specs,
+commit messages and conversation. UI text prints the author's word per the
+table below. A rendering layer may hold a different
 word internally, and that word stays inside the layer.
 
 | JSON term | The word we use | The layer's own word | Rule |
