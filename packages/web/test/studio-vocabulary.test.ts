@@ -4,7 +4,7 @@ import { t, type CatalogKey } from "../src/areas/studio/catalog";
 /**
  * `studio-guided-vocabulary`: the studio catalog reads the vocabulary table's
  * words at the keys the step page, the way-out rows, the timers, the actions,
- * the form editor, the Paths tab and the Changes tab read.
+ * the form editor, the step page's Ways out section and the change list read.
  */
 
 type Row = readonly [CatalogKey, string];

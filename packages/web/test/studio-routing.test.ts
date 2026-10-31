@@ -3,11 +3,11 @@ import {
   matchRoute,
   routePath,
   ROUTE_ROLE,
-  PANEL_VIEWS,
   PANEL_VIEW_TARGET,
   PROCESS_TABS,
   RETIRED_TAB_TARGET,
   TAB_VIEWS,
+  type PanelView,
   type Route,
 } from "../src/areas/studio/routing.js";
 import { mayEnter } from "../src/shell/areas.js";
@@ -215,11 +215,11 @@ describe("the retired panels address", () => {
       matrix: { tab: "fields", view: "matrix" },
       paths: { tab: "steps" },
     });
-    for (const view of PANEL_VIEWS.filter((v) => v !== "changes")) {
+    for (const view of Object.keys(PANEL_VIEW_TARGET) as Exclude<PanelView, "changes">[]) {
       expect(matchRoute(`/processes/proc_1/edit/panels/${view}`)).toEqual({
         name: "edit",
         processId: "proc_1",
-        ...PANEL_VIEW_TARGET[view as Exclude<typeof view, "changes">],
+        ...PANEL_VIEW_TARGET[view],
       });
     }
   });

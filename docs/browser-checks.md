@@ -6321,7 +6321,7 @@ on the page reads "zod". The Checks tab's count reads 0.
 
 The reason line beside Publish states "Publish needs a first step". The Checks
 tab body shows "No step yet. Add the first
-step on the Canvas or the Steps tab."
+step on the Map tab or the Steps tab."
 
 **2. A name sentence stands beside the name.** Add an end step and give it a
 name. Leave the process unnamed. Pass: "The process needs a name. Type it in the name field
@@ -6465,12 +6465,22 @@ Open the Process view's Developer view. Pass: the key input and the process
 id stand there, in the mono face. Open each of the other three views in turn.
 Pass: each view opens its own editor, and the sub-row marks the open entry.
 
-**4. The data sources rail.** Open Where values come from in a 1280x600
+<!-- antislop: allow passive-voice -- the quote is the checkbox's own label -->
+**4. The Process view writes.** Open the Process view. Clear "A case can be
+cancelled while it runs" and "Participants can attach files to a case". Open
+the JSON surface from the `⋮` menu. Pass: the body reads `"cancellable": false`
+and `"collaboration": { "attachments": false }`. Pass: `comments` is absent or
+reads `true`.
+
+Leave the JSON surface and check both boxes again. Open the JSON surface once
+more. Pass: both keys read `true`.
+
+**5. The data sources rail.** Open Where values come from in a 1280x600
 window. Add data sources until the rail runs past its box. Scroll the rail.
 Pass: the rail scrolls inside its own box, and the editor beside it holds
 still.
 
-**5. The retired addresses.** Load each address below on the draft, in turn.
+**6. The retired addresses.** Load each address below on the draft, in turn.
 Pass: each one lands on the place beside it.
 
 | Address | Lands on |
@@ -6487,14 +6497,14 @@ Repeat with `/edit/panels/paths`, `/edit/panels/matrix`,
 `/edit/panels/dataSources`, `/edit/panels/contract` and
 `/edit/panels/changes`. Pass: each one lands where its `/edit/` twin lands.
 
-**6. A check about a path.** On the Steps tab, open a step's Ways out section.
+**7. A check about a path.** On the Steps tab, open a step's Ways out section.
 Clear one way out's key in its Developer view. Open Checks. Reach the row
 that names that way out by keyboard.
 
 Press Enter. Pass: Steps opens on the owning step, with that way out
 selected. Pass: focus stands on the Steps tab's own button in the tab row.
 
-**7. The publish dialog's Changes row.** Restore the way out's key. Rename one
+**8. The publish dialog's Changes row.** Restore the way out's key. Rename one
 field's label on the Catalog view, then press Publish. Pass: the dialog's
 facts list carries a Changes row reading "1 change since version K". K is the
 draft's base version. Pass: focus opens on Cancel.
@@ -6506,7 +6516,7 @@ description in devtools. Pass: it reads the Changes row's sentence.
 Press Enter. Pass: the summary reads Hide, and the change list names the
 renamed field in one row. Press Cancel.
 
-**8. Versions.** Press Save. Open the `⋮` menu and choose Versions. Pass: the
+**9. Versions.** Press Save. Open the `⋮` menu and choose Versions. Pass: the
 draft's change list stands under the table with no press, and it names the
 renamed field.
 

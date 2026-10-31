@@ -1,5 +1,5 @@
 /**
- * The change list both the Changes tab and the Versions screen show: two
+ * The change list the publish dialog and the Versions screen show: two
  * process bodies turned into grouped, worded entity rows (`studio-app`'s
  * Changes-view requirement, `process-version-inspection`).
  *

@@ -783,7 +783,7 @@ export const en = {
   // The validation verdict alone. The rail runs checks; it holds no
   // permission, so it says nothing here about who may publish.
   "checksRail.allClear": "No open issues.",
-  "checksRail.noStepYet": "No step yet. Add the first step on the Canvas or the Steps tab.",
+  "checksRail.noStepYet": "No step yet. Add the first step on the Map tab or the Steps tab.",
   // The permission verdict, from the loaded draft's own `canPublish` report.
   // One of the two follows the sentence above, inside the same box.
   "checksRail.clearReadyToPublish": "This draft is ready to publish.",

@@ -356,7 +356,7 @@ export function FieldsTab({
   onShowStep,
 }: {
   token: string;
-  /** False while the Fields tab hides. Every tab body stays mounted and nine
+  /** False while the Fields tab hides. Every tab body stays mounted and five
    * hide, so a browser Back can hide this tab while its removal dialog stands
    * open. A hide declines that removal. */
   visible: boolean;
@@ -687,7 +687,7 @@ interface DataSourceRemoval {
 }
 
 /**
- * The Data sources tab: the declared sources' own entity rail beside the open
+ * The Settings tab's Where values come from view: the declared sources' own entity rail beside the open
  * source's editor. A data source nests under nothing, so no entry carries a
  * move control.
  */
@@ -696,9 +696,10 @@ export function DataSourcesTab({
   visible,
 }: {
   token: string;
-  /** False while the Data sources tab hides. Every tab body stays mounted, so
-   * a browser Back can hide this tab while its removal dialog stands open. A
-   * hide declines that removal, the way `FieldsTab` does. */
+  /** False while the Settings tab's Where values come from view hides. Every
+   * tab body and view stays mounted, so a browser Back can hide this view
+   * while its removal dialog stands open. A hide declines that removal, the
+   * way `FieldsTab` does. */
   visible: boolean;
 }) {
   const { draft, mutate, validation } = useDraft();

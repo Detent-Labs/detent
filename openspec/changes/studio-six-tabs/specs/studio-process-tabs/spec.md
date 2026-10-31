@@ -331,8 +331,8 @@ open, and `hidden` reveals one. A sub-row entry SHALL print no count.
 #### Scenario: A sub-row entry is a plain tab stop
 
 - **WHEN** a keyboard user presses Tab from the tab row on the Fields tab
-- **THEN** focus lands on the sub-row's open entry
-- **AND** a further Tab press lands on the next entry
+- **THEN** focus lands on the sub-row's first entry
+- **AND** a further Tab press lands on its second entry
 
 #### Scenario: A hidden view keeps its state
 

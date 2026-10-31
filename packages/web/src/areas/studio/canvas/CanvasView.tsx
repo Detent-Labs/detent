@@ -417,7 +417,7 @@ interface Props {
    * over an `end` step. Drawn as the drop-target state on the matching edge
    * group and its guard label; adds no permanent control. */
   insertTargetPathId?: string;
-  /** False while the Canvas tab hides. Every tab body stays mounted and nine
+  /** False while the Map tab hides. Every tab body stays mounted and five
    * hide, so this canvas can mount inside a `hidden` subtree, where the SVG
    * measures zero and the auto-fit below would frame nothing and then latch.
    * The fit waits for the tab to open instead. Defaults to true, so a caller

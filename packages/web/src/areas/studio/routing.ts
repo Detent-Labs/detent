@@ -1,12 +1,10 @@
 import { safeMatch } from "../../shell/safeMatch.js";
 
-/** The six names the retired `edit/panels/:view` address carried, the
- * matcher's own vocabulary for that address. `PANEL_VIEW_TARGET` maps five
- * onto the place that holds them now; the matcher sends `changes` to the
- * Versions screen. */
+/** The six names the retired `edit/panels/:view` address carried. The
+ * matcher compares the segment with `changes` and sends it to the Versions
+ * screen. It looks every other segment up in `PANEL_VIEW_TARGET`, and a
+ * segment absent there falls back to the plain edit route. */
 export type PanelView = "fields" | "dataSources" | "contract" | "matrix" | "changes" | "paths";
-
-export const PANEL_VIEWS: PanelView[] = ["fields", "dataSources", "contract", "matrix", "changes", "paths"];
 
 /** The process surface's six tabs, in authoring order (`studio-process-tabs`).
  * The route type names them, so routing owns the list the same way it owns

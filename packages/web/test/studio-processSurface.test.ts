@@ -63,9 +63,9 @@ describe("what the surface no longer carries", () => {
   });
 
   it("stands no index rail of view names", () => {
-    // The Fields and Data sources tabs keep their own entity rails: a field
-    // still moves into a group and out of it from a row. The rail of view
-    // names is what the tab row replaced.
+    // The Catalog and Where values come from views keep their own entity
+    // rails: a field still moves into a group and out of it from a row. The
+    // tab row stands where a rail of view names would.
     const code = stripComments(read(SURFACE));
 
     expect(code).not.toContain("panelsRail");

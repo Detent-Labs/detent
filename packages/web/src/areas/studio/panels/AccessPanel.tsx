@@ -1,6 +1,6 @@
 /**
- * The Access tab's body: a process's Developer, Owner and Reader lists
- * (`studio-app`'s Access-surface requirement). Reaching this tab at all
+ * The Settings tab's Access view: a process's Developer, Owner and Reader
+ * lists (`studio-app`'s Access-surface requirement). Reaching this view at all
  * already needs Developer-list-or-admin standing, per the edit screen's own
  * gate (`process-drafts`) — this panel adds no visibility gate of its own. It
  * only decides which lists offer add/delete controls, from the actor's own
