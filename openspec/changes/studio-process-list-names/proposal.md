@@ -39,6 +39,9 @@ other change.
   `updatedByDisplayName`: the saving account's resolved display name, or
   `null` when no local account matches.
   The body still stays out of the response.
+- The `studio-app` requirement stops calling `GET /drafts` unfiltered. The
+  route already narrows to the actor's Developer list, per `process-drafts`.
+  The spec now says so.
 - `src/schema/definition.ts` stays as it is. The definition hash and the
   stored draft stay as they are.
 
@@ -81,10 +84,12 @@ None.
 - `e2e/publish.e2e.ts` opens its draft by the Open button today. It moves to
   the name link.
 - `docs/decisions.md`: the process list leaves the `confirm()` entry's
-  count of prompts in hardcoded English.
+  count of prompts in hardcoded English. A new entry tracks the screen's
+  remaining literal strings.
 - `.claude/rules/ui-glossary.md`: the Developer view row gains the process
   list row.
-- `docs/browser-checks.md` gains one entry. `ROADMAP.md` marks change 8 of
+- `docs/browser-checks.md` gains one entry. Its existing entries that find a
+  process-list row by key, or read its old cells, move to the row's name. `ROADMAP.md` marks change 8 of
   stage 64 shipped.
 - No schema, dependency or migration change. `docs/openapi.yaml` excludes
   the draft routes, so it stays as it is.

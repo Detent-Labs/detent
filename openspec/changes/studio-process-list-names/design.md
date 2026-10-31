@@ -90,7 +90,12 @@ confirmation round. The mode is Operate.
 
 `listDrafts` selects `body->'key'`, `body->'label'` and
 `body->'baseLocale'` beside the existing columns. The response still carries
-no body. `toDraftSummary` narrows each value in TypeScript:
+no body. Bun.sql already decodes each column: a jsonb string arrives as a
+JS string, an object as an object, an absent key as `null`.
+`toDraftSummary` therefore never passes them through `parseJsonb`, which
+parses a plain string and throws. The key names stay SQL literals
+(`body->'key'`). A bound parameter there answered `null` for every key
+when measured. `toDraftSummary` narrows each value in TypeScript:
 
 - `key`: the value when it is a string, else `null`.
 - `baseLocale`: the value when it is a string, else `null`.
@@ -114,7 +119,8 @@ sends no query. Its one reader today is the person-field option resolution
 in `src/runtime/fields.ts`. This change adds a second reader and names it in
 the function's doc comment.
 
-`handleListDrafts` filters first, then calls `displayNamesForUserIds` over
+`handleListDrafts` filters first, then calls `displayNamesForUserIds(ids, db)`,
+with the handler's own tenant `db`, over
 the de-duplicated `updatedBy` values of the remaining drafts. It answers each entry as the summary
 plus `updatedByDisplayName: map.get(updatedBy) ?? null`. The engine's
 `DraftSummary` gains no display name; the HTTP layer adds it. The route's
@@ -170,8 +176,11 @@ The rules, in order:
 - `commands`, in this order: `createDraft` when no draft exists; `versions`
   when both a draft and a version exist; `discard` when a draft exists.
 
-The new export `localizedText(label, locale)` returns `label?.[locale]` when
-it is non-empty. Otherwise it returns the first non-empty value, or
+The new export `localizedText(label, locale)` returns
+`resolveDraftLocalizedText(label ?? undefined, locale, locale)` when that is
+non-empty, per `authored-content-localization`. The process list has no
+content locale, since no draft is open there, so the caller passes the base
+locale. Otherwise it returns the first non-empty value, or
 `undefined`. The function `templateDisplayName` becomes
 `localizedText(label, locale) ?? templateKey`. Its results stay the same,
 with one exception. An empty entry for the shown locale now falls through
@@ -198,7 +207,7 @@ Seconds `s = floor((now - Date.parse(iso)) / 1000)`, clamped at 0:
 | under 60 minutes | `rtf.format(-minutes, "minute")` |
 | under 24 hours | `rtf.format(-hours, "hour")` |
 | under 30 days | `rtf.format(-days, "day")` |
-| under 365 days | `rtf.format(-floor(days / 30), "month")` |
+| under 365 days | `rtf.format(-Math.min(11, floor(days / 30)), "month")` |
 | otherwise | `rtf.format(-floor(days / 365), "year")` |
 
 `rtf` is `new Intl.RelativeTimeFormat("en", { numeric: "always" })`, so
@@ -222,7 +231,10 @@ The link's `href` is `areaHref("studio", routePath(view.open))`. Its
 plain primary click. The function `isPlainLeftClick(e)` in
 `processListLogic.ts` decides that. It returns `true` for `e.button === 0`
 with `defaultPrevented` false. Each of `metaKey`, `ctrlKey`, `shiftKey` and
-`altKey` must be false too. The browser handles every other click.
+`altKey` must be false too. The browser handles every other click. The
+function stands apart from the component because it guards a documented
+regression class: a modified click must work as a link's, and
+`renderToStaticMarkup` cannot fire a click.
 
 The link takes the ink color and the body text at the table's size. It
 underlines on hover only. A long name wraps through
@@ -247,7 +259,9 @@ ledger ground. It holds two columns of term and value, at 0.8rem:
 
 Each value takes `fonts.mono`, `translate="no"` and
 `overflowWrap: "anywhere"`. The implementer copies the styles into
-`ProcessesScreen.tsx`'s own `stylex.create()`. An area's file may duplicate
+`ProcessesScreen.tsx`'s own `stylex.create()`, without `developerBox`'s
+`position` and `overflowX`. Every value wraps, so the box never scrolls,
+and `studio-scrollBoxRingRoom.test.ts` admits no unexempted scroll box. An area's file may duplicate
 another file's style on purpose, and the change list lives in another
 module.
 
@@ -292,6 +306,10 @@ place of a bare id.
 
 All in `packages/web/src/i18n/catalogs/studio.ts`, in a new
 `processList.*` block. Strings outside the table and toolbar stay literal.
+That leaves the catalog rule of `ui-string-overrides` unmet on this screen
+for the two dialogs, the import error and the import result line, as today.
+Change 13 rewrites both dialogs, so their strings move then. Task 5.4b
+tracks the gap in `docs/decisions.md`.
 
 | Key | Text |
 |---|---|
@@ -329,7 +347,7 @@ All in `packages/web/src/i18n/catalogs/studio.ts`, in a new
   its profile page.
 - [The e2e flow finds its row by the key] → Task 5 points it at a link.
   The link reads "E2E draft". `scripts/e2e.ts` gives the suite's draft that label.
-- [`relativeAgo` floors months at 30 days] → "11 months ago" for day 359 is
+- [`relativeAgo` floors months at 30 days] → "11 months ago" up to day 364 is
   honest enough for a list. The `title` carries the exact time.
 - [A hidden file input could stop opening in a future browser] → The browser
   check covers it. The button falls back to nothing silently, so the check
