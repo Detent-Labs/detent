@@ -119,12 +119,16 @@ describe("time limit and action vocabulary", () => {
 describe("flag vocabulary", () => {
   it("names the form editor strip and marks in words", () => {
     expectRows([
+      ["formEditor.nameLabel", "Name"],
       ["formEditor.visible", "Asked"],
       ["formEditor.required", "Required"],
       ["formEditor.readonly", "Read-only"],
       ["formEditor.markRequired", "Required"],
       ["formEditor.markReadonly", "Read-only"],
+      ["formEditor.markCondition", "Condition"],
       ["formEditor.span", "Width"],
+      ["formEditor.spanOne", "One column"],
+      ["formEditor.spanBoth", "Both columns"],
       ["formEditor.group", "Group"],
       ["formEditor.tab", "Tab"],
       ["formEditor.noteText", "Text"],

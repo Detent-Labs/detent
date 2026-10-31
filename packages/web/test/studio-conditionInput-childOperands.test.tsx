@@ -106,12 +106,14 @@ describe("a subprocess step's view overrides", () => {
   const stripProps = {
     row: { ref: "field_l_amount" as never, visible: condition, required: condition, readonly: condition },
     label: "Requested amount",
+    fieldLabel: { en: "Requested amount" },
     ownStepIndex: 1,
     written: () => 1,
     technicalFieldIds: new Set<string>(),
     isGroup: false,
     tabOptions: [],
     tabValue: undefined,
+    onChangeLabel: () => {},
     onChangeFlag: () => {},
     onChangeSpan: () => {},
     onChangeTab: () => {},
@@ -131,7 +133,7 @@ describe("a subprocess step's view overrides", () => {
         row={{ kind: "note", text: { en: "Heads up" }, visible: condition }}
         {...staleCaller}
         baseLocale="en"
-        groupKeys={[]}
+        groupOptions={[]}
         tabOptions={[]}
         tabValue={undefined}
         onChangeText={() => {}}

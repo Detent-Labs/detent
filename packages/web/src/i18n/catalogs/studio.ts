@@ -344,7 +344,7 @@ export const en = {
   // keys went with it. The strip's captions read words ("Asked", "Required",
   // "Read-only", "Width"), and the JSON property each one writes stays in the
   // Developer view.
-  "formEditor.heading": "Form",
+  "formEditor.heading": "The form for {step}",
   "formEditor.back": "← Back to the process",
   "formEditor.breadcrumb": "Breadcrumb",
   "formEditor.crumbForm": "Form",
@@ -358,16 +358,11 @@ export const en = {
   "formEditor.noteKind": "Note",
   "formEditor.stepNotFound": "This step no longer exists in the draft.",
   "formEditor.loadFailed": "The form editor could not load. Your draft is unchanged: go back, save it, then reload the page.",
-  "formEditor.navigateAwayKeepsChanges": "Every change is already in the draft. Save, Discard and Publish stay on the toolbar.",
+  "formEditor.navigateAwayKeepsChanges": "Every change is already in the draft. Save, Discard and Publish stay on the header bar.",
   "formEditor.paletteLabel": "Catalog fields not on this form",
   "formEditor.paletteHeading": "Available fields",
   "formEditor.paletteEmpty": "Every catalog field is on this form.",
   "formEditor.mintHeading": "Add a field to the process",
-  "formEditor.mintText": "Text",
-  "formEditor.mintChoice": "Choice",
-  "formEditor.mintDate": "Date",
-  "formEditor.mintFile": "File",
-  "formEditor.mintSection": "Section",
   "formEditor.developerView": "Developer view",
   "formEditor.canvasLabel": "Form layout",
   "formEditor.canvasEmpty": "No fields yet. Drag one from the list, or choose it there.",
@@ -396,7 +391,6 @@ export const en = {
   "formEditor.noteHeading": "Note",
   "formEditor.noteText": "Text",
   "formEditor.newNoteText": "New note",
-  "formEditor.noteType": "note",
   "formEditor.emptyNote": "(empty note)",
 
   // The form's own tab strip, above the canvas. "Tab" is the picker's label

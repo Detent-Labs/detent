@@ -147,48 +147,6 @@ function tabbedDraft(order: ["review", "decision"] | ["decision", "review"]): Dr
   return draft as unknown as Draft;
 }
 
-/** A minimal, self-contained draft covering `renderFieldKey`'s cases: a
- * single underscore, no underscore, adjacent underscores, and the
- * `email_address` example the field-label-wrapping change itself names.
- * Kept apart from `DRAFT` above, whose fixture keys are deliberately
- * underscore-free. */
-const FULL_NAME = "field_00000000-0000-4000-8000-0000000000c1";
-const PLAIN_KEY = "field_00000000-0000-4000-8000-0000000000c2";
-const ADJACENT = "field_00000000-0000-4000-8000-0000000000c3";
-const EMAIL_ADDRESS = "field_00000000-0000-4000-8000-0000000000c4";
-
-const KEY_WRAP_DRAFT = {
-  baseLocale: "en",
-  fields: [
-    { id: FULL_NAME, key: "full_name", type: "string", label: { en: "Full name" } },
-    { id: PLAIN_KEY, key: "plain", type: "string", label: { en: "Plain" } },
-    { id: ADJACENT, key: "a__b", type: "string", label: { en: "Adjacent" } },
-    { id: EMAIL_ADDRESS, key: "email_address", type: "string", label: { en: "Email address" } },
-  ],
-  workflow: {
-    initialStep: "step_a",
-    steps: [
-      {
-        id: "step_a",
-        key: "intake",
-        label: { en: "Intake" },
-        type: "task",
-        view: {
-          fields: [
-            { ref: FULL_NAME },
-            { ref: PLAIN_KEY },
-            { ref: ADJACENT },
-            { ref: EMAIL_ADDRESS },
-            { kind: "note", text: { en: "full_name appears above" } },
-          ],
-        },
-        paths: [{ id: "path_1", to: "step_b", trigger: "automatic", priority: 1 }],
-      },
-      { id: "step_b", key: "review", label: { en: "Review" }, type: "task", terminal: true },
-    ],
-  },
-} as unknown as Draft;
-
 /** Renders the screen with the field list `EditScreen.tsx` hands it: the
  * whole catalog, flattened through `draftFields`. */
 function render(draft: Draft = DRAFT): string {
@@ -293,35 +251,26 @@ function buttonTagFor(block: string, label: string): string {
   return block.slice(tagStart, tagEnd);
 }
 
-/** The exact `<wbr/>`-joined text `renderFieldKey` must produce for a key: a
- * break right after every `_`, with no character lost. Built independently
- * of the production helper (not exported, so not callable directly from a
- * test) so the assertion states the contract rather than re-executes its
- * implementation. */
-function wbrWrapped(key: string): string {
-  return key.replace(/_/g, "_<wbr/>");
-}
-
 describe("The canvas draws a group's members inside its own card", () => {
   it("draws every member inside the fieldset, and draws neither root inside it", () => {
-    const billing = fieldsetBlock(canvasHtml(render()), "billing");
-    for (const member of [">beta<", ">address<", ">street<", ">city<", ">delta<"]) expect(billing).toContain(member);
-    expect(billing).not.toContain(">alpha<");
-    expect(billing).not.toContain(">gamma<");
+    const billing = fieldsetBlock(canvasHtml(render()), "Billing");
+    for (const member of [">Beta<", ">Address<", ">Street<", ">City<", ">Delta<"]) expect(billing).toContain(member);
+    expect(billing).not.toContain(">Alpha<");
+    expect(billing).not.toContain(">Gamma<");
   });
 
   it("draws a nested group's own members inside its own fieldset, within the outer one", () => {
-    const address = fieldsetBlock(canvasHtml(render()), "address");
-    expect(address).toContain(">street<");
-    expect(address).toContain(">city<");
-    expect(address).not.toContain(">beta<");
-    expect(address).not.toContain(">delta<");
+    const address = fieldsetBlock(canvasHtml(render()), "Address");
+    expect(address).toContain(">Street<");
+    expect(address).toContain(">City<");
+    expect(address).not.toContain(">Beta<");
+    expect(address).not.toContain(">Delta<");
   });
 
   it("draws the members in the order the preview renders them, despite an unrelated root sitting between them in the array", () => {
     const html = render();
-    const canvas = fieldsetBlock(canvasHtml(html), "billing");
-    const canvasOrder = [">beta<", ">address<", ">street<", ">city<", ">delta<"].map((s) => canvas.indexOf(s));
+    const canvas = fieldsetBlock(canvasHtml(html), "Billing");
+    const canvasOrder = [">Beta<", ">Address<", ">Street<", ">City<", ">Delta<"].map((s) => canvas.indexOf(s));
     expect(canvasOrder).toEqual([...canvasOrder].sort((a, b) => a - b));
 
     const preview = fieldsetBlock(previewHtml(html), "Billing");
@@ -336,14 +285,14 @@ describe("The canvas draws a group's members inside its own card", () => {
 describe("A member's move command stops at its own group's boundary", () => {
   it("disables move-up on the group's first member, and leaves its move-down enabled", () => {
     const html = render();
-    const beta = cardBlock(html, "beta");
+    const beta = cardBlock(canvasHtml(html), "Beta");
     expect(isButtonDisabled(beta, "Move up")).toBe(true);
     expect(isButtonDisabled(beta, "Move down")).toBe(false);
   });
 
   it("disables move-down on the group's last member, and leaves its move-up enabled", () => {
     const html = render();
-    const delta = cardBlock(html, "delta");
+    const delta = cardBlock(canvasHtml(html), "Delta");
     expect(isButtonDisabled(delta, "Move down")).toBe(true);
     expect(isButtonDisabled(delta, "Move up")).toBe(false);
   });
@@ -352,35 +301,35 @@ describe("A member's move command stops at its own group's boundary", () => {
 describe("The group's own remove control", () => {
   it("names how many entries the click takes, a nested group's own members included", () => {
     const canvas = canvasHtml(render());
-    expect(legendBlock(fieldsetBlock(canvas, "billing"))).toContain("Remove (5)");
-    expect(legendBlock(fieldsetBlock(canvas, "address"))).toContain("Remove (2)");
+    expect(legendBlock(fieldsetBlock(canvas, "Billing"))).toContain("Remove (5)");
+    expect(legendBlock(fieldsetBlock(canvas, "Address"))).toContain("Remove (2)");
   });
 });
 
 describe("On a tabbed form, the canvas draws the shown tab's roots, each group card nesting its members", () => {
   it("draws the group card with every member on the group's own tab, and no root from another tab", () => {
     const canvas = canvasHtml(render(tabbedDraft(["review", "decision"])));
-    const billing = fieldsetBlock(canvas, "billing");
-    for (const member of [">beta<", ">address<", ">street<", ">city<", ">delta<"]) expect(billing).toContain(member);
-    expect(fieldsetBlock(canvas, "address")).toContain(">street<");
-    expect(canvas).toContain(">alpha<");
-    expect(canvas).not.toContain(">gamma<");
+    const billing = fieldsetBlock(canvas, "Billing");
+    for (const member of [">Beta<", ">Address<", ">Street<", ">City<", ">Delta<"]) expect(billing).toContain(member);
+    expect(fieldsetBlock(canvas, "Address")).toContain(">Street<");
+    expect(canvas).toContain(">Alpha<");
+    expect(canvas).not.toContain(">Gamma<");
   });
 
   it("draws neither the group card nor any member on a tab the group is not on", () => {
     const canvas = canvasHtml(render(tabbedDraft(["decision", "review"])));
-    expect(canvas).toContain(">gamma<");
-    for (const hidden of [">alpha<", ">billing<", ">beta<", ">address<", ">street<", ">city<", ">delta<"]) expect(canvas).not.toContain(hidden);
+    expect(canvas).toContain(">Gamma<");
+    for (const hidden of [">Alpha<", ">Billing<", ">Beta<", ">Address<", ">Street<", ">City<", ">Delta<"]) expect(canvas).not.toContain(hidden);
   });
 
   it("bounds a root's move commands by the roots its own tab draws", () => {
     const review = canvasHtml(render(tabbedDraft(["review", "decision"])));
-    expect(isButtonDisabled(cardBlock(review, "alpha"), "Move up")).toBe(true);
-    const billing = legendBlock(fieldsetBlock(review, "billing"));
+    expect(isButtonDisabled(cardBlock(review, "Alpha"), "Move up")).toBe(true);
+    const billing = legendBlock(fieldsetBlock(review, "Billing"));
     expect(isButtonDisabled(billing, "Move up")).toBe(false);
     expect(isButtonDisabled(billing, "Move down")).toBe(true);
 
-    const gamma = cardBlock(canvasHtml(render(tabbedDraft(["decision", "review"]))), "gamma");
+    const gamma = cardBlock(canvasHtml(render(tabbedDraft(["decision", "review"]))), "Gamma");
     expect(isButtonDisabled(gamma, "Move up")).toBe(true);
     expect(isButtonDisabled(gamma, "Move down")).toBe(true);
   });
@@ -388,47 +337,17 @@ describe("On a tabbed form, the canvas draws the shown tab's roots, each group c
 
 describe("The migrated move/remove controls drop btn-secondary", () => {
   it("no longer renders btn-secondary on a field card's move, move-down or remove control", () => {
-    const alpha = cardBlock(canvasHtml(render()), "alpha");
+    const alpha = cardBlock(canvasHtml(render()), "Alpha");
     for (const label of ["Move up", "Move down", "Remove"]) {
       expect(buttonTagFor(alpha, label)).not.toContain("btn-secondary");
     }
   });
 
   it("no longer renders btn-secondary on the group's own move controls, while its Remove (count) keeps it", () => {
-    const billing = legendBlock(fieldsetBlock(canvasHtml(render()), "billing"));
+    const billing = legendBlock(fieldsetBlock(canvasHtml(render()), "Billing"));
     expect(buttonTagFor(billing, "Move up")).not.toContain("btn-secondary");
     expect(buttonTagFor(billing, "Move down")).not.toContain("btn-secondary");
     expect(buttonTagFor(billing, "Remove (5)")).toContain("btn-secondary");
-  });
-});
-
-describe("renderFieldKey: how a placed field's key wraps", () => {
-  it("breaks a single underscore, keeping both segments intact", () => {
-    const canvas = canvasHtml(render(KEY_WRAP_DRAFT));
-    expect(canvas).toContain(wbrWrapped("full_name"));
-  });
-
-  it("renders no <wbr> at all for a key with no underscore", () => {
-    const plain = cardBlock(canvasHtml(render(KEY_WRAP_DRAFT)), "plain");
-    expect(plain).not.toContain("<wbr");
-  });
-
-  it("round-trips adjacent underscores, breaking after each one with no character lost", () => {
-    const canvas = canvasHtml(render(KEY_WRAP_DRAFT));
-    expect(canvas).toContain(wbrWrapped("a__b"));
-  });
-
-  it("renders a note's own underscore-containing text with no <wbr>, unlike a field's key", () => {
-    const note = cardBlock(canvasHtml(render(KEY_WRAP_DRAFT)), "full_name appears above");
-    expect(note).not.toContain("<wbr");
-    expect(note).toContain(">full_name appears above<");
-  });
-});
-
-describe("A placed field's key renders a <wbr> node immediately after each underscore", () => {
-  it("breaks email_address immediately after its underscore", () => {
-    const canvas = canvasHtml(render(KEY_WRAP_DRAFT));
-    expect(canvas).toContain(wbrWrapped("email_address"));
   });
 });
 
