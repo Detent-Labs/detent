@@ -1103,16 +1103,37 @@ it belongs in an action.
 
 ### 4. Compose the view for each step
 
-Pick a step on the Steps tab and press **Build the form** in its **Step form
-fields** section. That opens the form editor, a full-screen page over that
-step's view. The **Forms** tab reaches the same editor from a card, one per
-step that already declares a form.
+Pick a step on the Steps tab and look at its **Form** section. It prints the
+form's size, such as `3 fields, 1 required`, or `No fields yet`. Its control
+reads **Open the form**, or **Start the form** while the form is empty. That
+opens the form editor over that step's view.
+
+The editor stands under the tab row. A breadcrumb at its top names the tab it
+came from, the step, then Form. Press the first crumb to return to that tab.
+Press the second to open the step's page. The **Forms** tab reaches the same
+editor from a card, one per step that already declares a form. The editor then
+stands under Forms.
 
 The editor has four parts. On the left, a palette lists every catalog field
 this step's view does not yet name. A second palette section mints a new
-field by type: text, choice, date, file, or section. It places the new field
-on the canvas in the same drag. In the middle, a canvas draws the form's
-layout. Below the canvas, a strip edits whichever card you select.
+field by kind. In the middle, a canvas draws the form's layout. Below the
+canvas, a strip edits whichever card you select.
+
+The palette offers sixteen kinds, each by name:
+
+- Text, Long text and One choice.
+- Date, Date and time, Email address and Person.
+- Number, Whole number, Yes/no and Yes/no buttons.
+- Several choices, Checkboxes, People, File and Group.
+
+Press a kind, or drag it. The new field lands on the canvas. A kind that
+offers choices starts with two, named Choice 1 and Choice 2.
+
+A new card takes its name on the card, in an input that has the focus. The
+first keystroke is the field's label, and the key follows the label. Press
+Enter to accept the name, and the focus moves to the card. A Group kind takes
+its name on its legend. To rename a field later, use the strip's **Name**
+control or the Fields tab.
 
 Drag a field from the palette onto the canvas to add it. Drag a card to
 another position to reorder the view. Each card also carries move-up and
@@ -1127,8 +1148,11 @@ Take a group's box off the canvas and every field inside it returns to the
 palette.
 
 A toggle above the canvas sets the form to one column or two. Select a card
-and the strip sets that field's visible, required, readonly and span. Each
-of the first three takes `true`, `false`, or a CEL expression.
+and the strip sets that field's name, visible, required, readonly and span.
+The strip's first control is **Name**. Its **Width** reads **One column** or
+**Both columns**. Each of visible, required and readonly takes `true`,
+`false`, or a CEL expression. A card marks a field **Required**, **Read-only**
+or **Condition** where the view sets one.
 
 A field's `group` no longer sits in the strip. It follows the field's
 catalog parent, and moving a field between groups happens in the field

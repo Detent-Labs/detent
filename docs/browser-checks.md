@@ -4348,8 +4348,8 @@ choose "Create draft". Open its Forms tab, at
    the form Review the Exit Notification". The foot reads "22 fields, 2
    required", with no miniature node in the tree.
 6. On its card, choose the open control for "Hold and Close the Account".
-   Remove its five field entries. Choose "← Back to the process" without
-   pressing Save. Pass: back on the Forms tab, that card's foot holds
+   Remove its five field entries. Choose the breadcrumb's first crumb, Forms,
+   without pressing Save. Pass: back on the Forms tab, that card's foot holds
    "Start the form" alone, at the row's trailing edge. Its accessibility
    tree reads "No fields yet".
 7. Read the legend's words above the grid. Then read its tree through
@@ -4379,8 +4379,8 @@ choose "Create draft". Open its Forms tab, at
     Choose the `forwarding_address` card again, so the strip closes and opens
     fresh for the next entry. Author the same condition on "M365 backup by Fabrikam
     as standard", whose card prints `m365_backup_confirmed`. That entry is a
-    boolean, so its mark draws 8px. Choose "← Back to the process" without
-    pressing Save. Pass: that card draws two dashed marks in both color
+    boolean, so its mark draws 8px. Choose the breadcrumb's first crumb, Forms,
+    without pressing Save. Pass: that card draws two dashed marks in both color
     schemes, and its foot still reads "16 fields".
 11. Turn forced colors on through a `run-code` call to
     `page.emulateMedia({ forcedColors: "active" })`. Pass: the legend's four
@@ -5172,7 +5172,7 @@ key's computed line height, as `keyLines`.
    `keyLines` reads 1.
 3. Read the result for 1100px. Pass: the three pass lines of step 2 hold
    here too. The key holds one line at this width as well.
-4. Choose "← Back to the process", then "← Back to processes". Choose
+4. Choose the breadcrumb's first crumb, Forms, then "← Back to processes". Choose
    "Discard draft" on the "IT Offboarding" row and accept the browser's confirm.
    Under `playwright-cli`, `dialog-accept` answers it. The header bar's own
    "Discard draft" does not work, per DRAFT-1 in `docs/decisions.md`.
@@ -6591,3 +6591,107 @@ renamed field.
 Go back to the process list and choose "Discard draft" on the "IT
 Offboarding" row. Accept the browser's confirm. The header bar's own "Discard
 draft" does not work, per DRAFT-1 in `docs/decisions.md`.
+
+### The form editor names fields on its cards (`studio-form-editor-names-fields`)
+
+Source: `studio-form-editor-names-fields` tasks 5.6 and 5.6a. The bun tests pin
+the draft writes, the catalog strings and the route helper. A focus move, a
+breadcrumb, a measured width and a tab row beside an editor need a real
+browser.
+
+See this file's "Before you start" section for the build and the address.
+Seed the database and sign in as `demo-superuser@example.test`, password
+`seed-demo-password`. In the Processes list, find the row "IT Offboarding"
+and choose "Create draft". Under `playwright-cli`, pass
+`-s=studio-form-editor-names-fields` on every call. Every step below runs at
+1440x900 unless it names another width.
+
+**1. The Form section.** Open the Steps tab and choose "Confirm the
+Deactivation Date". Read its Form section. Pass: a sentence in the Forms
+card's words gives the count, such as "9 fields". The required count joins
+it when one exists. Pass: the control reads "Open the form".
+
+Pass: neither "Build the form" nor an "N / M fields configured" sentence
+stands there.
+
+Add a step in the steps rail and select it. Pass: its Form section reads "No
+fields yet", and the control reads "Start the form".
+
+**2. The editor under the tab row.** Select "Confirm the Deactivation Date"
+again and press "Open the form". Pass: the tab row stands above the editor,
+with Steps current. Pass: the breadcrumb reads Steps, Confirm the Deactivation
+Date, then Form. Pass: the heading reads "The form for Confirm the
+Deactivation Date" in the body face.
+
+Read every card. Pass: no card prints a key, "string", "boolean" or "CEL".
+Each card reads its label, with its kind word beneath in capitals.
+
+**3. Mint a Number by click.** Under "Add a field to the process", press
+"Number". Pass: a new last card holds an input reading "Name this field…", and
+the focus stands in it. Type "Amount". Pass: the card reads "Amount", with
+NUMBER beneath.
+
+Press Enter. Pass: the input gives way to the card, and the focus stands on
+the card's own body button. Choose the Fields tab and open the Catalog view.
+Choose "Amount", then its Developer view. Pass: the key reads `amount`.
+
+**4. Choice kinds start with two choices.** Choose Steps, then the same step,
+then "Open the form". Press "One choice". Type "Pick" and press Enter.
+
+Then open the Fields tab and choose "Pick". Read its options. Pass: two
+options read "Choice 1" and "Choice 2".
+
+**5. A Group takes its name on its legend.** Back in the editor, press
+"Group". Pass: a group box draws, and its legend holds the same "Name this
+field…" input with the focus. Type "Bank details" and press Enter. Pass: the
+legend reads "Bank details", and the box keeps its Remove control.
+
+**6. The breadcrumb's three crumbs.** Press Tab from the heading's start
+until the breadcrumb takes the focus. Pass: two buttons take a stop, "Steps"
+then "Confirm the Deactivation Date". Pass: the third crumb, "Form", takes
+none, and the accessibility tree marks it as the current page. Pass: the
+landmark's accessible name reads "Breadcrumb".
+
+Press "Steps". Pass: the Steps tab shows the step page of "Confirm the
+Deactivation Date", with that step selected. Press "Open the form" again, then
+the crumb "Confirm the Deactivation Date". Pass: the same step page opens
+under Steps. Pass: the page keeps any text you typed on it before.
+
+**7. The tab row from a Forms card.** Open the Forms tab. On the card headed
+"Submit the Exit Notification", choose "Open the form". Pass: Forms stands
+current in the tab row. Pass: the breadcrumb's first crumb reads "Forms".
+
+Press that crumb. Pass: the Forms tab opens. Open the same card once more.
+Then press the tab "Steps". Pass: the editor leaves, and Steps opens on the step
+that card names.
+
+**8. Put this field on a step.** Open the Fields tab and its Catalog view.
+Press "+ Add field". Name the new field "Spare" and select it. Pass: the "Used in"
+zone reads "No step asks for this field yet." beside "Put this field on a
+step".
+
+Press that control. Pass: the form editor opens for "Submit the Exit
+Notification", the initial step, under Steps current. Pass: the palette's
+first section lists "Spare".
+
+**9. A two-word label at 1100px.** In that editor, press "Text" and type
+"Bank account". Press Enter. Resize the window to 1100x800. Pass: the card
+reads "Bank account" on one line. Pass: no word breaks mid-word.
+
+**10. A new card's input on a two-column form.** At 1440px, set the Columns
+control to Two. Press "Text". Read the new card's input width in devtools
+before you type. Pass: the input stands wide enough to show a twelve-letter
+word whole, with no horizontal scroll inside it.
+
+Pass: the card's move and Remove controls wrap onto a second row under the
+input. Type "Bank account number" and press Enter. Pass: the label stays whole
+on the card.
+
+**11. The palette at 1280px.** Resize the window to 1280x800 and scroll the
+palette. Pass: all sixteen kind rows read in full, each as an icon and a name.
+Pass: the palette's box overlaps neither the canvas nor the preview.
+
+Discard the draft from the process list, on the "IT Offboarding" row, and
+accept the browser's confirm. Under `playwright-cli`, `dialog-accept` answers
+it. The header bar's own "Discard draft" does not work, per DRAFT-1 in
+`docs/decisions.md`.

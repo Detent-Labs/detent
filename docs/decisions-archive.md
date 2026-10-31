@@ -918,3 +918,21 @@ system that resulted; this file explains why it took that shape.
 
   Resolved by `studio-condition-sentence` on 2026-10-31: the change gave every
   condition site one presentation and dropped the prop.
+- **A leaf field's label beside a key-less field derives `_2`.** The leaf
+  label path, `FieldEditor::updateLabel` in `panels/FieldCatalogPanel.tsx`,
+  builds its dedupe set with `""` in it. A label whose key derives empty,
+  such as `!!!`, then takes `_2` instead of its own key. The group path
+  already drops `""` (`draft/view-group-sync.ts`). A leaf key references
+  nothing, so no view breaks.
+
+  Resolved by `studio-form-editor-names-fields`: `labelChangePatch` drops `""`
+  from its taken set, so a label beside a key-less field keeps its own key.
+- **KEYS-1: the form editor still wraps a long key above 80rem.** Three
+  columns leave the canvas 619px at 1300px
+  (`screens/FormEditorScreen.tsx:169`). On "Submit the Exit Notification", 10
+  of 59 canvas keys took two lines there. The last one wrapped at 1381px.
+  Risk (Low): an author reads a long key broken mid-word from 1281px to
+  about 1390px.
+
+  Resolved by `studio-form-editor-names-fields`: cards print labels, so the
+  editor prints no key and the long-key wrap is gone.
