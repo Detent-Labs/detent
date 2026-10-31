@@ -1,7 +1,19 @@
 import * as stylex from "@stylexjs/stylex";
-import { colors, fonts, space } from "form-ui/tokens.stylex";
+import { colors, space } from "form-ui/tokens.stylex";
 import { t } from "../../catalog.js";
-import { boolChoiceOf, boolValueOf, inputTypeFor, isComplete, operatorsFor, type CmpOp, type Condition, type Operand, type Row } from "./conditionLogic";
+import {
+  boolChoiceOf,
+  boolValueOf,
+  inputTypeFor,
+  isComplete,
+  operatorsFor,
+  OP_NAMES,
+  type CmpOp,
+  type Condition,
+  type Operand,
+  type OperandGroup,
+  type Row,
+} from "./conditionLogic";
 
 const styles = stylex.create({
   conditionEmpty: {
@@ -35,17 +47,17 @@ const styles = stylex.create({
   conditionJoiner: {
     backgroundColor: "transparent",
     color: colors.accent,
-    fontFamily: fonts.mono,
     fontWeight: 600,
     paddingBlock: 0,
     paddingInline: space.s1,
     minWidth: "2.5ch",
   },
-  conditionRaw: {
+  conditionRawSentence: {
     flex: "1 1 20ch",
     minWidth: 0,
     maxWidth: "100%",
-    fontFamily: fonts.mono,
+    color: colors.textMuted,
+    fontSize: "0.9rem",
   },
   // A select sizes to its longest option, which can outgrow a narrow column:
   // the row's controls shrink to the row instead.
@@ -77,11 +89,30 @@ interface Props {
   onChange: (next: Condition) => void;
 }
 
-/** Operator labels. `in` reads as a word; the rest are the CEL symbols themselves. */
-function operatorLabel(op: CmpOp): string {
-  return op === "in" ? t("condition.contains") : op;
-}
+const GROUP_ORDER: readonly OperandGroup[] = ["fields", "child", "case", "person"];
 
+/** The operand options, under one `<optgroup>` per group that holds a member.
+ * An operand with no group follows the groups, under no heading. */
+function OperandOptions({ operands }: { operands: Operand[] }) {
+  const option = (o: Operand) => (
+    <option key={o.path} value={o.path}>
+      {o.label}
+    </option>
+  );
+  return (
+    <>
+      {GROUP_ORDER.map((group) => {
+        const members = operands.filter((o) => o.group === group);
+        return members.length ? (
+          <optgroup key={group} label={t(`condition.group.${group}`)}>
+            {members.map(option)}
+          </optgroup>
+        ) : null;
+      })}
+      {operands.filter((o) => !o.group).map(option)}
+    </>
+  );
+}
 
 function ValueEditor({
   row,
@@ -190,20 +221,12 @@ export function ConditionBuilder({ condition, operands, onChange }: Props) {
             <li key={index} {...stylex.props(styles.conditionRow, !complete && styles.conditionRowIncomplete)}>
               {index > 0 && (
                 <button type="button" {...stylex.props(styles.conditionJoiner)} onClick={flipJoiner} title={t("condition.joinerHint")}>
-                  {condition.joiner}
+                  {t(condition.joiner === "&&" ? "condition.joiner.and" : "condition.joiner.or")}
                 </button>
               )}
 
               {row.kind === "raw" ? (
-                <input
-                  type="text"
-                  className={`cel-input ${stylex.props(styles.conditionRaw).className}`}
-                  aria-label={t("condition.rawRow")}
-                  value={row.src}
-                  spellCheck={false}
-                  autoComplete="off"
-                  onChange={(e) => updateRow(index, { kind: "raw", src: e.target.value })}
-                />
+                <span {...stylex.props(styles.conditionRawSentence)}>{t("condition.rawRowSentence")}</span>
               ) : (
                 <>
                   <select
@@ -223,11 +246,7 @@ export function ConditionBuilder({ condition, operands, onChange }: Props) {
                     }}
                   >
                     <option value="">{t("condition.selectOperand")}</option>
-                    {operands.map((o) => (
-                      <option key={o.path} value={o.path}>
-                        {o.label}
-                      </option>
-                    ))}
+                    <OperandOptions operands={operands} />
                   </select>
 
                   <select
@@ -238,7 +257,7 @@ export function ConditionBuilder({ condition, operands, onChange }: Props) {
                   >
                     {operatorsFor(operand?.celType ?? "string").map((op) => (
                       <option key={op} value={op}>
-                        {operatorLabel(op)}
+                        {t(`condition.op.${OP_NAMES[op]}`)}
                       </option>
                     ))}
                   </select>
