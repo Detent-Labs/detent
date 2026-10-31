@@ -156,7 +156,8 @@ The value prints in the author's form:
 A raw row reads "a hand-written rule" in the sentence. `summarizeCondition`
 takes that phrase as a choice. The canvas edge and the form preview keep
 the fragment's CEL text there, as `guardEdgeLabel` does today. Both read
-the same clause keys, so the edge label loses its hardcoded English.
+the same clause keys, so the edge label loses its hardcoded English. The
+edge label capitalizes its head clause as the sentence does.
 
 Alternative: assemble the clause from the operand, the op word and the
 value. Rejected by `design-language.md`: never assemble a sentence from
