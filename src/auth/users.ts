@@ -424,7 +424,9 @@ export async function emailsForUserIds(userIds: string[], db: SQL = sql): Promis
  * caller detects one.
  *
  * The empty set short-circuits without touching the database. Read by
- * `resolveFields`' person-field option resolution (`src/runtime/fields.ts`).
+ * `resolveFields`' person-field option resolution (`src/runtime/fields.ts`)
+ * and by `handleListDrafts` (`src/http/studio-routes.ts`), which names the
+ * account that last saved each draft.
  */
 export async function displayNamesForUserIds(userIds: string[], db: SQL = sql): Promise<Map<string, string>> {
   if (userIds.length === 0) return new Map();

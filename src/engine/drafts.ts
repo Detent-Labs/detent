@@ -28,6 +28,12 @@ export type DraftSummary = {
   baseVersion: number | null;
   updatedBy: string;
   updatedAt: string;
+  /** The body's `key` when it is a string, else `null`. */
+  key: string | null;
+  /** The body's `label` when it is a JSON object, reduced to its string-valued entries, else `null`. */
+  label: Record<string, string> | null;
+  /** The body's `baseLocale` when it is a string, else `null`. */
+  baseLocale: string | null;
 };
 
 export type SaveDraftInput = {
@@ -79,19 +85,32 @@ function toDraft(row: DraftRow): Draft {
   };
 }
 
-function toDraftSummary(row: Omit<DraftRow, "body" | "layout">): DraftSummary {
+/** A JSON object, excluding arrays, `null`, and scalars. */
+function isJsonObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+type DraftSummaryRow = Omit<DraftRow, "body" | "layout"> & {
+  body_key: unknown;
+  body_label: unknown;
+  body_base_locale: unknown;
+};
+
+/** The body is stored as authored, so each name field may hold any JSON type. */
+function toDraftSummary(row: DraftSummaryRow): DraftSummary {
+  const label = row.body_label;
   return {
     processId: row.process_id as ProcessId,
     revision: row.revision,
     baseVersion: row.base_version,
     updatedBy: row.updated_by,
     updatedAt: new Date(row.updated_at).toISOString(),
+    key: typeof row.body_key === "string" ? row.body_key : null,
+    label: isJsonObject(label)
+      ? Object.fromEntries(Object.entries(label).filter((e): e is [string, string] => typeof e[1] === "string"))
+      : null,
+    baseLocale: typeof row.body_base_locale === "string" ? row.body_base_locale : null,
   };
-}
-
-/** A JSON object, excluding arrays, `null`, and scalars. */
-function isJsonObject(v: unknown): v is Record<string, unknown> {
-  return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
 // Sized to the largest plausible legitimate draft (a few megabytes of body and
@@ -237,12 +256,18 @@ export async function saveDraft(processId: ProcessId, input: SaveDraftInput, db:
   return toDraft(updated[0]);
 }
 
-/** One summary per draft, newest-saved first, carrying no body. */
+/**
+ * One summary per draft, newest-saved first, carrying no body. The body's
+ * `key`, `label` and `baseLocale` are read in SQL; the key names are literals,
+ * since a bound key name answers `null`. Bun.sql decodes each jsonb value, so
+ * `toDraftSummary` narrows them without `parseJsonb`.
+ */
 export async function listDrafts(db: SQL = sql): Promise<DraftSummary[]> {
   const rows = (await db`
-    SELECT process_id, revision, base_version, updated_by, updated_at
+    SELECT process_id, revision, base_version, updated_by, updated_at,
+      body->'key' AS body_key, body->'label' AS body_label, body->'baseLocale' AS body_base_locale
     FROM drafts ORDER BY updated_at DESC
-  ` as unknown) as Omit<DraftRow, "body" | "layout">[];
+  ` as unknown) as DraftSummaryRow[];
   return rows.map(toDraftSummary);
 }
 

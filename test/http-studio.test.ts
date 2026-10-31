@@ -17,6 +17,7 @@ import { devHeaderResolver } from "../src/auth/resolve.js";
 import { DEVELOPER_ROLE, PUBLISH_ROLE, TEMPLATES_ROLE, ADMIN_ROLE, REPORTS_ROLE, AUTHOR_ROLE, DATALISTS_ROLE, CREATE_ROLE } from "../src/auth/authorize.js";
 import { matchesAccessList } from "../src/auth/process-access.js";
 import { createGroup, setGroupMembers } from "../src/auth/groups.js";
+import { createUser } from "../src/auth/users.js";
 import type { Actor } from "../src/cel/eval.js";
 import type { ProcessId, ProcessBody } from "../src/schema/definition.js";
 
@@ -166,6 +167,37 @@ test.skipIf(!DB)("an admin sees every draft in the list", async () => {
   const ids = body.map((d) => d.processId);
   expect(ids).toContain(processIdA);
   expect(ids).toContain(processIdB);
+});
+
+/** Saves a draft as `savedBy`, then lists the drafts as that same developer and returns the entry for `processId`. */
+async function listedEntry(savedBy: string, processId: string): Promise<{ updatedBy: string; updatedByDisplayName: string | null } | undefined> {
+  const actor: Actor = { id: savedBy, roles: [DEVELOPER_ROLE, CREATE_ROLE] };
+  const saved = await fetch(authedReq(`http://x/drafts/${processId}`, "PUT", actor, { body: authoredBody("v1"), layout: {}, revision: 0 }));
+  expect(saved.status).toBe(200);
+  const res = await fetch(authedReq("http://x/drafts", "GET", actor));
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { processId: string; updatedBy: string; updatedByDisplayName: string | null }[];
+  return body.find((d) => d.processId === processId);
+}
+
+test.skipIf(!DB)("GET /drafts names the saving account by its display name", async () => {
+  const { userId } = await createUser(`dev-${crypto.randomUUID()}@example.test`, "pw", [], "Demo Superuser");
+  const entry = await listedEntry(userId, pid());
+  expect(entry?.updatedBy).toBe(userId);
+  expect(entry?.updatedByDisplayName).toBe("Demo Superuser");
+});
+
+test.skipIf(!DB)("GET /drafts falls back to the email for an account without a display name", async () => {
+  const email = `dev-${crypto.randomUUID()}@example.test`;
+  const { userId } = await createUser(email, "pw", []);
+  const entry = await listedEntry(userId, pid());
+  expect(entry?.updatedByDisplayName).toBe(email);
+});
+
+test.skipIf(!DB)("GET /drafts answers null for an updatedBy with no local account", async () => {
+  const entry = await listedEntry(`no_such_account_${crypto.randomUUID()}`, pid());
+  expect(entry).toBeDefined();
+  expect(entry?.updatedByDisplayName).toBeNull();
 });
 
 // ============================================================

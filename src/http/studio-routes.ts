@@ -45,6 +45,7 @@ import {
   markDraftPublished,
   hasNoDraftAndNoPublishedVersion,
   type Draft,
+  type DraftSummary,
 } from "../engine/drafts.js";
 import { createProcessInstance } from "../runtime/api.js";
 import { getTemplate, listTemplates, saveTemplate, deleteTemplate } from "../engine/templates.js";
@@ -62,6 +63,7 @@ import { describeConfigSchema, type ConfigFieldDescriptor } from "../engine/conf
 import type { ZodTypeAny } from "zod";
 import type { ActorResolver } from "../auth/resolve.js";
 import { requireRole, requirePermission, can, AuthorizationError, DEVELOPER_ROLE, TEMPLATES_ROLE, AUTHOR_ROLE, ADMIN_ROLE, CREATE_ROLE } from "../auth/authorize.js";
+import { displayNamesForUserIds } from "../auth/users.js";
 import { addAccessPrincipal, deleteAccessPrincipal, getAccessLists, processesMatchingAccessList, matchesAccessList, requireDeveloperListOrAdmin, requirePublishListAccess, type AccessKind } from "../auth/process-access.js";
 import { notFound, RequestShapeError, type HttpResult } from "./errors.js";
 import { route, readJson, parseVersion } from "./routes.js";
@@ -98,6 +100,9 @@ function requireStudioRead(actor: { id: string; roles: readonly string[] }): voi
   );
 }
 
+/** One `GET /drafts` entry: the engine's summary plus the saving account's resolved name, `null` when no local account carries `updatedBy`. */
+export type DraftListEntry = DraftSummary & { updatedByDisplayName: string | null };
+
 /**
  * Narrowed to the actor's own Developer-listed processes
  * (process-access-roles) — `ADMIN_ROLE` sees every draft, same split as
@@ -118,9 +123,15 @@ export async function handleListDrafts(req: Request, resolver: ActorResolver, db
     },
     async (actor) => {
       const all = await listDrafts(db);
-      if (actor.roles.includes(ADMIN_ROLE)) return { status: 200, body: all };
-      const developerProcessIds = new Set(await processesMatchingAccessList(actor, "developer", db));
-      return { status: 200, body: all.filter((d) => developerProcessIds.has(d.processId)) };
+      let visible = all;
+      if (!actor.roles.includes(ADMIN_ROLE)) {
+        const developerProcessIds = new Set(await processesMatchingAccessList(actor, "developer", db));
+        visible = all.filter((d) => developerProcessIds.has(d.processId));
+      }
+      // One query for every saving account's name, over the drafts that remain.
+      const names = await displayNamesForUserIds([...new Set(visible.map((d) => d.updatedBy))], db);
+      const body: DraftListEntry[] = visible.map((d) => ({ ...d, updatedByDisplayName: names.get(d.updatedBy) ?? null }));
+      return { status: 200, body };
     },
   );
 }
