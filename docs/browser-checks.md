@@ -1869,7 +1869,7 @@ No `bun:test` assertion can click a menu, hold a drag or read a native dialog.
 Run these eight checks in a real browser. Open the production bundle on the
 engine's own port. Sign in as `demo-superuser@example.test`, password
 `seed-demo-password`. In the Processes list, choose "Create draft" on the row
-`it_offboarding`.
+"IT Offboarding".
 
 Each check opens `/studio/processes/<id>/edit` for that draft, unless it names
 another route. A native dialog blocks automation. Accept or dismiss each one
@@ -4207,7 +4207,7 @@ Redact data and Delete list also reach a disabled state. Pass: each drops to
 the pointer.
 
 **Processes list.** Create a draft of any process. Its row shows Discard
-beside Open. Open is the plain control.
+draft.
 
 **Draft confirmation dialog.** Open that draft and read Save in the header bar.
 Save is the plain control here, read before the dialog opens. Then choose
@@ -4281,7 +4281,7 @@ Build the production bundle and open it on the engine's own port. Seed the
 database, then sign in as `demo-superuser@example.test`, password
 `seed-demo-password`. The account holds every role the studio needs.
 
-In the Processes list, find the row `it_offboarding` and choose "Create
+In the Processes list, find the row "IT Offboarding" and choose "Create
 draft". Studio opens the draft at
 `/studio/processes/<id>/edit`. Choose the Steps tab, at
 `/studio/processes/<id>/edit/steps`. Resize the window to 1440px wide.
@@ -4302,8 +4302,8 @@ Narrow the window to 420px wide. Pass: the rail stands above the step page,
 capped at 20rem tall, and scrolls inside that cap. Every row still shows
 its number, label and grip, and none show a summary line.
 
-Go back to the process list and choose "Discard" on the `it_offboarding` row.
-Accept the browser's confirm. That leaves no draft behind. The header bar's own
+Go back to the process list and choose "Discard draft" on the "IT Offboarding"
+row. Accept the browser's confirm. That leaves no draft behind. The header bar's own
 "Discard draft" does not work, so do not use it here. See the
 `docs/decisions.md` entry DRAFT-1.
 
@@ -4322,9 +4322,9 @@ each on its own fresh draft.
    `Alt+ArrowUp`. Pass: the rail now reads "Submit the Exit Notification",
    "Review the Exit Notification" and "Execute the Immediate Lock". Rows two
    and three traded places.
-3. Go back to the process list and choose "Discard" on the `it_offboarding`
-   row, then accept the browser's confirm. Pass: that row reads an em dash
-   under Draft, with "Create draft" back beside "Versions". The header bar's
+3. Go back to the process list and choose "Discard draft" on the
+   "IT Offboarding" row, then accept the browser's confirm. Pass: that row
+   reads "No draft" under Draft, with "Create draft" as its one button. The header bar's
    own "Discard draft" does not work, so do not use it here. See the
    `docs/decisions.md` entry DRAFT-1.
 
@@ -4339,7 +4339,7 @@ lands here.
 
 Build the production bundle and open it on the engine's own port. Seed the
 database, then sign in as `demo-superuser@example.test`, password
-`seed-demo-password`. In the Processes list, find `it_offboarding` and
+`seed-demo-password`. In the Processes list, find "IT Offboarding" and
 choose "Create draft". Open its Forms tab, at
 `/studio/processes/<id>/edit/forms`.
 
@@ -4569,7 +4569,7 @@ alpha 0.14, in `color(srgb …)` notation:
 
 Choose "← Back to processes" to return to the process list. Steps 6 and 10
 left the draft dirty, so accept its leave-draft confirm. Then choose
-"Discard" on the `it_offboarding` row, and accept the browser's confirm. The
+"Discard draft" on the "IT Offboarding" row, and accept the browser's confirm. The
 header bar's own "Discard draft" does not work, so do not use it here. See the
 `docs/decisions.md` entry DRAFT-1.
 
@@ -4580,7 +4580,7 @@ library exists here, so each computed color lands in this entry.
 
 Build the production bundle and open it on the engine's own port. Seed the
 database, then sign in as `demo-superuser@example.test`, password
-`seed-demo-password`. In the Processes list, find `it_offboarding` and choose
+`seed-demo-password`. In the Processes list, find "IT Offboarding" and choose
 "Create draft". Under `playwright-cli`, pass `-s=advisory-role` on every call.
 
 1. Open the header bar's `⋮` menu, named "More actions". Type `de` into its
@@ -4716,8 +4716,8 @@ A passing run returns these values:
 ```
 
 Choose "← Back to processes" to return to the process list. Step 2 left the
-draft dirty, so accept its leave-draft confirm. Then choose "Discard" on the
-`it_offboarding` row, and accept the browser's confirm. The header bar's own
+draft dirty, so accept its leave-draft confirm. Then choose "Discard draft" on the
+"IT Offboarding" row, and accept the browser's confirm. The header bar's own
 "Discard draft" does not work, so do not use it here. See the
 `docs/decisions.md` entry DRAFT-1.
 
@@ -4732,7 +4732,7 @@ height. This entry proves the height those declarations produce.
 
 See this file's "Before you start" section for the build and the address.
 Seed the database and sign in as `demo-superuser@example.test`, password
-`seed-demo-password`. In the Processes list, find the row `it_offboarding`
+`seed-demo-password`. In the Processes list, find the row "IT Offboarding"
 and choose "Create draft". Studio opens the draft at
 `/studio/processes/<id>/edit`. Choose the Field matrix tab.
 
@@ -4752,22 +4752,22 @@ and choose "Create draft". Studio opens the draft at
    rows show inside the grid. A mouse wheel over the grid will not scroll
    the tab body back up from here. Use the tab body's own scrollbar or the
    keyboard instead.
-5. Go back to the process list and choose "Discard" on the `it_offboarding`
-   row, then accept the browser's confirm. The header bar's own "Discard
-   draft" does not work, so do not use it here. See the `docs/decisions.md`
-   entry DRAFT-1.
-6. Find the row `access_request` and choose "Create draft". Open its Field
+5. Go back to the process list and choose "Discard draft" on the
+   "IT Offboarding" row, then accept the browser's confirm. The header bar's
+   own "Discard draft" does not work, so do not use it here. See the
+   `docs/decisions.md` entry DRAFT-1.
+6. Find the row "Access Request" and choose "Create draft". Open its Field
    matrix tab at 1440x1200. First confirm the grid's own height sits between
    384px and the height under the toolbar. Pass: the grid's own frame ends
    right under its last row. The grid draws no vertical scrollbar.
-7. Discard the `access_request` draft the same way step 5 discarded the
+7. Discard the "Access Request" draft the same way step 5 discarded the
    first one.
-8. Find the row `laptop_inventory` and choose "Create draft". Open its Field
+8. Find the row "Laptop Inventory" and choose "Create draft". Open its Field
    matrix tab at 1440x900. This step comes from
    `field-matrix-short-grid-frame`, for a grid shorter than the 24rem floor.
    Pass: the grid's frame ends right under its last row, with no empty band
    inside it.
-9. Discard the `laptop_inventory` draft the same way step 5 discarded the
+9. Discard the "Laptop Inventory" draft the same way step 5 discarded the
    first one.
 
 ### Hidden text stays inside its scroll region (visually-hidden-text-page-bounds)
@@ -4865,9 +4865,9 @@ rendered button twice and reads the network log. The check stays here, by
 `development-toolchain`'s split rule.
 
 Seed the database and sign in as `demo-superuser@example.test`, password
-`seed-demo-password`. This entry uses the `it_offboarding` row for the
-pressed button and `access_request` for the other row, both from the seeded
-demo data.
+`seed-demo-password`. Both rows come from the seeded demo data. The "IT
+Offboarding" row holds the pressed button. The "Access Request" row is the
+other.
 
 The check delays each `PUT` to `/drafts/` by 20000 ms. Two ways work. In the
 browser's dev tools, a custom throttling profile with 20000 ms of latency
@@ -4893,9 +4893,9 @@ calls each cost an agent turn, and three turns can outlast the delay. The
 
 ```js
 async (page) => {
-  const row = (key) => page.getByRole("row").filter({ hasText: key });
-  const pressed = row("it_offboarding").getByRole("button", { name: "Create draft", exact: true });
-  const other = row("access_request").getByRole("button", { name: "Create draft", exact: true });
+  const row = (name) => page.getByRole("row").filter({ hasText: name });
+  const pressed = row("IT Offboarding").getByRole("button", { name: "Create draft", exact: true });
+  const other = row("Access Request").getByRole("button", { name: "Create draft", exact: true });
   const read = (button) => button.evaluate((el) => ({ disabled: el.disabled, opacity: getComputedStyle(el).opacity }));
   await pressed.dblclick();
   const result = { pressed: await read(pressed), other: await read(other) };
@@ -4919,7 +4919,7 @@ async (page) => {
 ```
 
 1. Reload `/studio/` so the request log starts empty. Read the
-   `it_offboarding` and `access_request` rows. Pass: each reads an em dash
+   "IT Offboarding" and "Access Request" rows. Pass: each reads "No draft"
    under Draft. Discard a draft first where a row has one.
 2. Install the delay. Double-click that row's "Create draft". Read both rows'
    buttons within the 20 seconds. Pass: the pressed button reports
@@ -4933,11 +4933,11 @@ async (page) => {
 4. Take the delay off. Under `playwright-cli`, a `run-code` call to
    `page.unroute("**/drafts/*")` does that. Edit the process label. Press
    Save. Pass: the header bar reads "Saved". No conflict banner shows.
-5. Go back to the process list. Choose "Discard" on the `it_offboarding` row.
-   Accept the browser's confirm. The header bar's own "Discard draft" does
+5. Go back to the process list. Choose "Discard draft" on the
+   "IT Offboarding" row. Accept the browser's confirm. The header bar's own "Discard draft" does
    nothing, per DRAFT-1 in `docs/decisions.md`.
 6. Install the 500 route. Press that row's "Create draft". Pass: the error
-   banner shows its "Failed" stamp. The row still reads an em dash under
+   banner shows its "Failed" stamp. The row still reads "No draft" under
    Draft. Its button reports no `disabled`.
 7. Take the 500 route off. Under `playwright-cli`, a `run-code` call to
    `page.unroute("**/drafts/*")` does that. Press "Create draft" once more.
@@ -5165,7 +5165,7 @@ out no grid. This entry reads the turn and a key's line count in a browser.
 
 See this file's "Before you start" section for the build and the address.
 Seed the database and sign in as `demo-superuser@example.test`, password
-`seed-demo-password`. In the Processes list, find the row `it_offboarding`
+`seed-demo-password`. In the Processes list, find the row "IT Offboarding"
 and choose "Create draft". Open the Forms tab. On the card headed "Submit the
 Exit Notification", choose "Open the form". Under `playwright-cli`, pass
 `-s=studio-narrow-widths` on every call.
@@ -5185,7 +5185,7 @@ key's computed line height, as `keyLines`.
 3. Read the result for 1100px. Pass: the three pass lines of step 2 hold
    here too. The key holds one line at this width as well.
 4. Choose "← Back to the process", then "← Back to processes". Choose
-   "Discard" on the `it_offboarding` row and accept the browser's confirm.
+   "Discard draft" on the "IT Offboarding" row and accept the browser's confirm.
    Under `playwright-cli`, `dialog-accept` answers it. The header bar's own
    "Discard draft" does not work, per DRAFT-1 in `docs/decisions.md`.
 
@@ -5236,7 +5236,7 @@ one, as the MATRIX-1 run did. Open the session headed, with
 `-s=studio-narrow-widths` on every later call.
 
 Seed the database and sign in as `demo-superuser@example.test`, password
-`seed-demo-password`. In the Processes list, find the row `it_offboarding`
+`seed-demo-password`. In the Processes list, find the row "IT Offboarding"
 and choose "Create draft". Studio opens the draft at
 `/studio/processes/<id>/edit`.
 
@@ -5323,8 +5323,8 @@ returns an object, so an empty printout means it threw.
     - Pass: `grew` reads 40 or more, so the Steps tab widened.
     - Pass: `after` reads 0. A tab's width change leaves the scrolled row
       where it stands.
-14. Go back to the process list and choose "Discard" on the `it_offboarding`
-    row. Accept the browser's confirm, with `dialog-accept` under
+14. Go back to the process list and choose "Discard draft" on the
+    "IT Offboarding" row. Accept the browser's confirm, with `dialog-accept` under
     `playwright-cli`. The header bar's own "Discard draft" does not work, per
     DRAFT-1 in `docs/decisions.md`.
 
@@ -6388,3 +6388,63 @@ Required.
 Read the legend on the Forms tab. Pass: it reads Required. Read the legend on
 the Field matrix tab. Pass: its color entry reads Asked, Required and
 Read-only.
+
+### Studio: the process list names its rows (`studio-process-list-names`)
+
+Source: `studio-process-list-names` group 5. The bun tests assert the row
+logic, the click rule and the markup. A modified click, a file chooser and a
+closed disclosure need a real page.
+
+Use the production bundle and the seeded demo data. Sign in as
+`demo-superuser@example.test`, password `seed-demo-password`. Under
+`playwright-cli`, pass `-s=process-list-names` on every call.
+
+**1. The rows read as words.** Open `/studio`. Pass: the rows "Access
+Request", "IT Offboarding" and "Laptop Inventory" each show their name as one
+link. No row shows a key, an id or a hash.
+
+The Published cell reads "v1" and a time such as "2 days ago". The Draft cell
+reads "No draft". Hover a time. Pass: the tooltip holds the absolute date.
+
+**2. A row without a draft has one button.** Read the "IT Offboarding" row.
+Pass: its one button reads "Create draft". It has no Versions button and no
+Open button.
+
+**3. The name link works as a link.** Click "IT Offboarding" with no
+modifier. Pass: the Versions screen opens in the same tab. Go back.
+
+Click the name with Ctrl held, or Cmd on a Mac. Pass: Versions opens in a new
+tab, and the list stays where it was. Middle-click the name. Pass: the same
+new tab opens.
+
+The `playwright-cli` `click` cannot hold a modifier. Use `run-code` with
+`page.getByRole("link", { name: "IT Offboarding" }).click({ modifiers:
+["Control"] })`. Then read `context.pages()`.
+
+**4. A draft row opens the draft.** Press "Create draft" on the "IT
+Offboarding" row, then go back to `/studio`. Pass: the Draft cell reads
+"Saved by " and the account's name, then a time. The buttons read "Versions"
+and "Discard draft".
+
+Click the name. Pass: the draft opens at `/studio/processes/<id>/edit`.
+
+**5. The Developer view stands closed.** Read the "IT Offboarding" row.
+Pass: a closed "Developer view" sits under the name. Tab from the name link.
+Pass: focus lands on the Developer view, then on the row's buttons.
+
+Open it. Pass: it lists Key, Process id, Draft revision, Published hash and
+Saved by account, in the mono face. A long hash wraps inside the box, and the
+box does not scroll.
+
+**6. The import button opens the chooser.** Read the toolbar. Pass: the
+secondary button "Import a promoted version" stands beside "+ New process",
+which stays the one filled button. No bare file input shows.
+
+Press the import button. Pass: the browser's file chooser opens. Under
+`playwright-cli`, read it with `page.waitForEvent("filechooser")` around the
+click. Cancel it.
+
+**7. The discard text names the process.** Press "Discard draft" on the "IT
+Offboarding" row. Pass: the browser's confirm reads "Discard the draft of
+“IT Offboarding”? You lose its unpublished edits." Accept it. Pass: the Draft
+cell reads "No draft".
