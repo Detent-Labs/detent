@@ -13,8 +13,8 @@ const CREDIT = "proc_11111111-1111-4111-8111-111111111111" as ProcessId;
 const VENDOR = "proc_22222222-2222-4222-8222-222222222222" as ProcessId;
 
 const PROCESSES: ProcessSummary[] = [
-  { processId: CREDIT, version: 3, definitionHash: "h-a", key: "credit-check", label: { en: "Credit check" }, baseLocale: "en" },
-  { processId: VENDOR, version: 7, definitionHash: "h-b", key: "vendor", label: { en: "Vendor" }, baseLocale: "en" },
+  { processId: CREDIT, version: 3, definitionHash: "h-a", key: "credit-check", label: { en: "Credit check" }, baseLocale: "en", publishedAt: "2026-07-01T00:00:00.000Z" },
+  { processId: VENDOR, version: 7, definitionHash: "h-b", key: "vendor", label: { en: "Vendor" }, baseLocale: "en", publishedAt: "2026-07-02T00:00:00.000Z" },
 ];
 
 describe("specForProcess", () => {

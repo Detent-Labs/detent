@@ -75,9 +75,9 @@ describe("parsePromotionFile", () => {
 
 describe("collidingProcessId", () => {
   const rows: ProcessRow[] = [
-    { processId: "proc_other", published: { version: 1, definitionHash: "h1", key: "expense_approval", label: { en: "Other" }, baseLocale: "en" } },
-    { processId: "proc_x", published: { version: 2, definitionHash: "h2", key: "expense_approval", label: { en: "Mine" }, baseLocale: "en" } },
-    { processId: "proc_draft_only", draft: { revision: 1, baseVersion: null, updatedBy: "u", updatedAt: "2026-07-31T00:00:00.000Z" } },
+    { processId: "proc_other", published: { version: 1, definitionHash: "h1", key: "expense_approval", label: { en: "Other" }, baseLocale: "en", publishedAt: "2026-07-01T00:00:00.000Z" } },
+    { processId: "proc_x", published: { version: 2, definitionHash: "h2", key: "expense_approval", label: { en: "Mine" }, baseLocale: "en", publishedAt: "2026-07-02T00:00:00.000Z" } },
+    { processId: "proc_draft_only", draft: { revision: 1, baseVersion: null, updatedBy: "u", updatedAt: "2026-07-31T00:00:00.000Z", key: null, label: null, baseLocale: null, updatedByDisplayName: null } },
   ];
 
   it("reports a different process already publishing under this key", () => {

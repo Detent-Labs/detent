@@ -1,5 +1,8 @@
 import type { DraftSummary, LocaleCode, LocalizedText, ProcessSummary } from "../api/types.js";
 import type { ProcessBody } from "workflow-engine/schema";
+import { t } from "../catalog.js";
+import { resolveDraftLocalizedText } from "../draft/localized-text.js";
+import type { Route } from "../routing.js";
 import { stripCompiledContent } from "workflow-engine/schema/strip-compiled";
 
 export interface ProcessRowDraft {
@@ -7,6 +10,10 @@ export interface ProcessRowDraft {
   baseVersion: number | null;
   updatedBy: string;
   updatedAt: string;
+  key: string | null;
+  label: Record<string, string> | null;
+  baseLocale: string | null;
+  updatedByDisplayName: string | null;
 }
 
 export interface ProcessRowPublished {
@@ -15,6 +22,7 @@ export interface ProcessRowPublished {
   key: string;
   label: LocalizedText;
   baseLocale: LocaleCode;
+  publishedAt: string;
 }
 
 export interface ProcessRow {
@@ -122,8 +130,111 @@ export function templateDisplayName(
   locale: string,
   templateKey: string,
 ): string {
-  if (!label) return templateKey;
-  return label[locale] ?? Object.values(label).find((text) => text !== undefined && text !== "") ?? templateKey;
+  return localizedText(label, locale) ?? templateKey;
+}
+
+/**
+ * The text of `label` for `locale` (the base locale resolves through
+ * `resolveDraftLocalizedText` too), or the first non-empty entry when that
+ * resolves to nothing or to an empty string. `undefined` when no entry holds
+ * text. The process list has no content locale, so callers pass a base locale.
+ */
+export function localizedText(label: Partial<Record<string, string>> | null | undefined, locale: string): string | undefined {
+  const resolved = resolveDraftLocalizedText(label ?? undefined, locale, locale);
+  if (resolved) return resolved;
+  return Object.values(label ?? {}).find((text) => text !== undefined && text !== "");
+}
+
+export type ProcessRowCommand = "createDraft" | "versions" | "discard";
+
+/** What one process-list row shows and offers, decided apart from the component. */
+export interface ProcessRowView {
+  processId: string;
+  /** The label text, or "" for an untitled process; the component prints the catalog's untitled text. */
+  name: string;
+  /** The draft's edit route when a draft exists, else the versions route. */
+  open: Route;
+  saved?: { by: string | null; at: string };
+  published?: { version: number; at: string };
+  /** `seedVersionFor(row)`: the version Create draft seeds from. */
+  seedVersion?: number;
+  developer: { key: string | null; processId: string; revision?: number; hash?: string; savedBy?: string };
+  commands: ProcessRowCommand[];
+}
+
+export function describeProcessRow(row: ProcessRow): ProcessRowView {
+  const { draft, published } = row;
+  const name =
+    localizedText(draft?.label, draft?.baseLocale ?? published?.baseLocale ?? "en") ??
+    localizedText(published?.label, published?.baseLocale ?? "en") ??
+    "";
+  const seedVersion = seedVersionFor(row);
+  const commands: ProcessRowCommand[] = [];
+  if (!draft) commands.push("createDraft");
+  if (draft && published) commands.push("versions");
+  if (draft) commands.push("discard");
+
+  const developer: ProcessRowView["developer"] = { key: draft?.key || published?.key || null, processId: row.processId };
+  if (draft) {
+    developer.revision = draft.revision;
+    developer.savedBy = draft.updatedBy;
+  }
+  if (published) developer.hash = published.definitionHash;
+
+  return {
+    processId: row.processId,
+    name,
+    open: draft ? { name: "edit", processId: row.processId } : { name: "versions", processId: row.processId },
+    ...(draft && { saved: { by: draft.updatedByDisplayName, at: draft.updatedAt } }),
+    ...(published && { published: { version: published.version, at: published.publishedAt } }),
+    ...(seedVersion !== undefined && { seedVersion }),
+    developer,
+    commands,
+  };
+}
+
+/**
+ * Orders views by name, case- and accent-insensitively; an untitled row sorts
+ * as the catalog's untitled text, so it does not lead the list. Ties fall back
+ * to `processId`. Returns a new array.
+ */
+export function sortProcessRows(views: ProcessRowView[]): ProcessRowView[] {
+  const sortName = (view: ProcessRowView) => view.name || t("processList.untitled");
+  return [...views].sort(
+    (a, b) => sortName(a).localeCompare(sortName(b), "en", { sensitivity: "base" }) || a.processId.localeCompare(b.processId),
+  );
+}
+
+/** True for a primary-button click with no modifier that nothing has handled; the browser owns every other click on a link. */
+export function isPlainLeftClick(e: {
+  button: number;
+  defaultPrevented: boolean;
+  metaKey: boolean;
+  ctrlKey: boolean;
+  shiftKey: boolean;
+  altKey: boolean;
+}): boolean {
+  return e.button === 0 && !e.defaultPrevented && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey;
+}
+
+const relativeTime = new Intl.RelativeTimeFormat("en", { numeric: "always" });
+
+/**
+ * How long before `now` (epoch milliseconds) `iso` lies, floored to one unit:
+ * "just now" under a minute, then minutes, hours, days, months (capped at 11)
+ * and years. A time in the future, or one that does not parse, reads "just now".
+ */
+export function relativeAgo(iso: string, now: number): string {
+  const seconds = Math.floor((now - Date.parse(iso)) / 1000);
+  if (!(seconds >= 60)) return t("processList.justNow");
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return relativeTime.format(-minutes, "minute");
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return relativeTime.format(-hours, "hour");
+  const days = Math.floor(hours / 24);
+  if (days < 30) return relativeTime.format(-days, "day");
+  if (days < 365) return relativeTime.format(-Math.min(11, Math.floor(days / 30)), "month");
+  return relativeTime.format(-Math.floor(days / 365), "year");
 }
 
 /**
@@ -178,12 +289,28 @@ export function deriveProcessRows(processes: ProcessSummary[], drafts: DraftSumm
   for (const p of processes) {
     rows.set(p.processId, {
       processId: p.processId,
-      published: { version: p.version, definitionHash: p.definitionHash, key: p.key, label: p.label, baseLocale: p.baseLocale },
+      published: {
+        version: p.version,
+        definitionHash: p.definitionHash,
+        key: p.key,
+        label: p.label,
+        baseLocale: p.baseLocale,
+        publishedAt: p.publishedAt,
+      },
     });
   }
   for (const d of drafts) {
     const existing = rows.get(d.processId);
-    const draft: ProcessRowDraft = { revision: d.revision, baseVersion: d.baseVersion, updatedBy: d.updatedBy, updatedAt: d.updatedAt };
+    const draft: ProcessRowDraft = {
+      revision: d.revision,
+      baseVersion: d.baseVersion,
+      updatedBy: d.updatedBy,
+      updatedAt: d.updatedAt,
+      key: d.key,
+      label: d.label,
+      baseLocale: d.baseLocale,
+      updatedByDisplayName: d.updatedByDisplayName,
+    };
     rows.set(d.processId, existing ? { ...existing, draft } : { processId: d.processId, draft });
   }
 

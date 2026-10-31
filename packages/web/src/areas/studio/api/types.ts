@@ -13,6 +13,7 @@ export interface ProcessSummary {
   key: string;
   label: LocalizedText;
   baseLocale: LocaleCode;
+  publishedAt: string;
 }
 
 /**
@@ -34,13 +35,17 @@ export interface DraftRecord {
   canPublish: boolean;
 }
 
-/** Mirrors src/engine/drafts.ts::DraftSummary — no body. */
+/** Mirrors src/http/studio-routes.ts::DraftListEntry, without the body. */
 export interface DraftSummary {
   processId: string;
   revision: number;
   baseVersion: number | null;
   updatedBy: string;
   updatedAt: string;
+  key: string | null;
+  label: Record<string, string> | null;
+  baseLocale: string | null;
+  updatedByDisplayName: string | null;
 }
 
 /** Mirrors src/auth/process-access.ts::AccessKind. */
