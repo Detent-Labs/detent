@@ -5939,12 +5939,12 @@ one row: `Quantity`, `>` and `5`. Then pick `Unit Price` as that row's operand.
 
 Pass: the row turns dashed and shows its incomplete flag.
 
-Pass: the sentence under the rows reads "Until you finish the new row, the
+Pass: the sentence under the rows reads "Until you finish the row, the
 condition stays: Quantity is greater than 5."
 
 Open another tab, then return to the Steps tab and the same path.
 
-Pass: the sentence still reads "Until you finish the new row, the condition
+Pass: the sentence still reads "Until you finish the row, the condition
 stays: Quantity is greater than 5."
 
 Repeat the edit once on a field with a rule. Open `Quantity` on the Fields tab

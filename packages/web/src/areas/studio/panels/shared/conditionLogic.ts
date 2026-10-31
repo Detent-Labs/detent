@@ -33,6 +33,10 @@ export interface Operand {
   /** The CEL path a row writes, e.g. `data.amount` or `actor.roles`. */
   path: string;
   label: string;
+  /** The label's form inside a clause, where `label` reads as the head of a
+   * sentence. Set on a context operand whose label is a phrase, never on a
+   * field, whose label stays as the author typed it. */
+  clauseLabel?: string;
   /** Set by `buildOperands`' builders. `fieldOperand` alone sets none, so the
    * rule builder's operands keep their shape. */
   group?: OperandGroup;
@@ -117,6 +121,12 @@ const CONTEXT_LABELS: Record<string, CatalogKey> = {
   "actor.roles": "condition.operand.personRoles",
 };
 
+/** A context entry's label inside a clause, by path. */
+const CONTEXT_CLAUSE_LABELS: Record<string, CatalogKey> = {
+  "instance.status": "condition.clauseOperand.caseStatus",
+  "actor.roles": "condition.clauseOperand.personRoles",
+};
+
 const CONTEXT_GROUPS = { instance: "case", actor: "person" } as const;
 
 /** Fill every `{slot}` in one pass. A function fills each slot, so a `$`
@@ -188,6 +198,8 @@ function contextOperands(): Operand[] {
       if (DENIED.has(path)) continue;
       const labelKey = CONTEXT_LABELS[path];
       const operand: Operand = { path, label: labelKey ? t(labelKey) : path, celType: type, group: CONTEXT_GROUPS[ns] };
+      const clauseKey = CONTEXT_CLAUSE_LABELS[path];
+      if (clauseKey) operand.clauseLabel = t(clauseKey);
       if (path === "instance.status") {
         operand.options = INSTANCE_STATUSES.map((v) => ({ value: v, label: t(`condition.status.${v}`) }));
       }
@@ -216,6 +228,7 @@ function childOperands(child: ProcessBody | undefined, locale: string): Operand[
     {
       path: "child.outcome",
       label: t("condition.operand.childOutcome"),
+      clauseLabel: t("condition.clauseOperand.childOutcome"),
       celType: "string",
       group: "child",
       // The child's author typed these names, and none of them is a key.
@@ -508,7 +521,7 @@ function summarizeRow(row: Row, byPath: Map<string, Operand>, raw: RawRowReading
   if (row.kind === "raw") return raw === "source" ? row.src : t("condition.clause.raw");
   const operand = byPath.get(row.operand);
   return fill(t(`condition.clause.${OP_NAMES[row.op]}`), {
-    field: operand?.label ?? row.operand,
+    field: operand?.clauseLabel ?? operand?.label ?? row.operand,
     value: summarizeValue(row, operand),
   });
 }

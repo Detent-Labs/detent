@@ -324,6 +324,13 @@ describe("the operand picker", () => {
     expect(ops.find((o) => o.path === "actor.roles")!.label).toBe("The person's roles");
   });
 
+  it("gives the case's status and the person's roles a lower-case form for a clause", () => {
+    const ops = catalog([field("amount", "number")]);
+    expect(ops.find((o) => o.path === "instance.status")!.clauseLabel).toBe("the case's status");
+    expect(ops.find((o) => o.path === "actor.roles")!.clauseLabel).toBe("the person's roles");
+    expect(ops.find((o) => o.path === "data.amount")!.clauseLabel).toBeUndefined();
+  });
+
   // No `options` IS the free-text path: `ValueEditor` branches on
   // `celType === "bool"` and then on `options?.length`, so an operand with
   // neither takes a plain text input. A `freeText` flag said the same thing
@@ -431,6 +438,7 @@ describe("a subprocess step's child operands", () => {
   it("labels the child's outcome and its fields in words", () => {
     const ops = operandsOf(parent, child);
     expect(ops.find((o) => o.path === "child.outcome")!.label).toBe("How the called process ended");
+    expect(ops.find((o) => o.path === "child.outcome")!.clauseLabel).toBe("how the called process ended");
     expect(ops.find((o) => o.path === "child.data.amount")!.label).toBe("Amount, from the called process");
   });
 
@@ -519,7 +527,7 @@ describe("summarizeCondition", () => {
     expect(read("data.amount <= 5.0")).toBe("amount is at most 5");
     expect(read("data.amount > 5.0")).toBe("amount is greater than 5");
     expect(read("data.amount >= 5.0")).toBe("amount is at least 5");
-    expect(read('"manager" in actor.roles')).toBe("The person's roles contains “manager”");
+    expect(read('"manager" in actor.roles')).toBe("the person's roles contains “manager”");
   });
 
   it("formats a number with no digit lost, and keeps a date's stored text", () => {
@@ -537,7 +545,7 @@ describe("summarizeCondition", () => {
 
   it("reads a case status value as its catalog word", () => {
     const operands = catalog([]);
-    expect(summarizeCondition(fromCel('instance.status == "running"', operands)!, operands)).toBe("The case's status is running");
+    expect(summarizeCondition(fromCel('instance.status == "running"', operands)!, operands)).toBe("the case's status is running");
   });
 
   it("joins two rows with the condition's own joiner, in words", () => {
@@ -626,6 +634,21 @@ describe("conditionSentence", () => {
     );
   });
 
+  it("capitalizes a context operand's clause at the head of the sentence", () => {
+    expect(read('instance.status == "running" && data.amount > 1000.0')).toBe(
+      "The case's status is running and Amount is greater than 1,000.",
+    );
+  });
+
+  it("keeps a context operand's clause lower case mid-sentence", () => {
+    expect(read('data.amount > 1000.0 && instance.status == "running"')).toBe(
+      "Amount is greater than 1,000 and the case's status is running.",
+    );
+    expect(read('data.amount > 1000.0 || "manager" in actor.roles')).toBe(
+      "Amount is greater than 1,000 or the person's roles contains “manager”.",
+    );
+  });
+
   it("says an empty site always matches", () => {
     expect(conditionSentence({ joiner: "&&", rows: [] }, operands, undefined)).toBe("No condition yet: this always matches.");
     expect(conditionSentence({ joiner: "&&", rows: [] }, operands, "  ")).toBe("No condition yet: this always matches.");
@@ -634,7 +657,7 @@ describe("conditionSentence", () => {
   it("holds the stored condition while no row is finished", () => {
     const unfinished: Condition = { joiner: "&&", rows: [{ kind: "cmp", operand: "data.city", op: "==", value: undefined }] };
     expect(conditionSentence(unfinished, operands, "data.amount > 1000.0")).toBe(
-      "Until you finish the new row, the condition stays: Amount is greater than 1,000.",
+      "Until you finish the row, the condition stays: Amount is greater than 1,000.",
     );
   });
 

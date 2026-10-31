@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { colors, space } from "form-ui/tokens.stylex";
 import { t } from "../../catalog.js";
@@ -41,7 +42,8 @@ const styles = stylex.create({
   },
   conditionJoiner: {
     backgroundColor: "transparent",
-    color: colors.accent,
+    // Accent text on the row's muted ground reads the role made for it.
+    color: colors.accentOnMuted,
     fontWeight: 800,
     paddingBlock: 0,
     paddingInline: space.s1,
@@ -174,6 +176,16 @@ function ValueEditor({
 }
 
 /**
+ * The index of the remove control that takes focus once row `removed` is gone
+ * and `remaining` rows stand: the row now at that index, else the one before
+ * it. `null` when no row stands, and the add-row button takes focus.
+ */
+export function removeFocusIndex(removed: number, remaining: number): number | null {
+  if (removed < remaining) return removed;
+  return remaining > 0 ? remaining - 1 : null;
+}
+
+/**
  * A flat list of rows joined by one operator.
  *
  * The joiner sits in the gutter between rows rather than as a per-row control,
@@ -189,7 +201,25 @@ export function ConditionBuilder({ condition, operands, onChange, describedBy }:
 
   const setRows = (rows: Row[]) => onChange({ ...condition, rows });
   const updateRow = (index: number, next: Row) => setRows(condition.rows.map((r, i) => (i === index ? next : r)));
-  const removeRow = (index: number) => setRows(condition.rows.filter((_, i) => i !== index));
+  // A removal unmounts the pressed control, which would drop focus to <body>;
+  // the effect below runs once the next render has drawn the control to land on.
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [focusAfterRemove, setFocusAfterRemove] = useState<number | null>(null);
+
+  const removeRow = (index: number) => {
+    setFocusAfterRemove(index);
+    setRows(condition.rows.filter((_, i) => i !== index));
+  };
+
+  useEffect(() => {
+    if (focusAfterRemove === null) return;
+    setFocusAfterRemove(null);
+    const root = rootRef.current;
+    if (!root) return;
+    const removes = root.querySelectorAll<HTMLElement>("button[data-condition-remove]");
+    const at = removeFocusIndex(focusAfterRemove, removes.length);
+    (at === null ? root.querySelector<HTMLElement>("button.condition-add") : removes.item(at))?.focus();
+  }, [focusAfterRemove]);
 
   const addRow = () => {
     const first = operands[0];
@@ -199,7 +229,7 @@ export function ConditionBuilder({ condition, operands, onChange, describedBy }:
   const flipJoiner = () => onChange({ ...condition, joiner: condition.joiner === "&&" ? "||" : "&&" });
 
   return (
-    <div className="condition-builder">
+    <div ref={rootRef} className="condition-builder">
       {condition.rows.length > 0 && (
         <ol {...stylex.props(styles.conditionRows)} aria-describedby={describedBy}>
           {condition.rows.map((row, index) => {
@@ -260,6 +290,7 @@ export function ConditionBuilder({ condition, operands, onChange, describedBy }:
                   type="button"
                   {...stylex.props(styles.conditionRemove)}
                   aria-label={t("condition.removeRow")}
+                  data-condition-remove=""
                   onClick={() => removeRow(index)}
                 >
                   ×

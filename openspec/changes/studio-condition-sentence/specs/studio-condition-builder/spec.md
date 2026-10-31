@@ -108,7 +108,7 @@ finish a row instead.
   row without a value
 - **THEN** the row stays visible and marked incomplete
 - **AND** the guard still reads `data.amount > 1000.0`
-- **AND** the sentence reads "Until you finish the new row, the condition
+- **AND** the sentence reads "Until you finish the row, the condition
   stays: Amount is greater than 1,000."
 
 #### Scenario: Removing a row added to an empty site changes nothing

@@ -118,7 +118,7 @@ sixth for the Fields tab:
 | no row, no stored source | "No condition yet: this always matches." (`condition.empty`, reworded) |
 | no row, no stored source, the steps disagree (Fields tab) | "The steps hold different conditions. Build one here to set it on every step." (`condition.sentence.divergent`) |
 | a complete row | the clauses joined by "and" or "or", ending in a period |
-| rows, none complete, a stored source | "Until you finish the new row, the condition stays: {sentence}" |
+| rows, none complete, a stored source | "Until you finish the row, the condition stays: {sentence}" |
 | rows, none complete, nothing stored | "Finish a row to set the condition." |
 | unparseable source | the notice of D4 in place of the rows and the sentence |
 
@@ -215,8 +215,9 @@ the author edits a raw fragment in the Developer view's text.
 
 The operator select prints the `condition.op.*` words. The joiner button
 prints "and" or "or" in the written face and keeps its flip behavior and
-its hint. The accent stays, since the joiner is a control. Its weight
-moves from 600 to 800, a weight the written face takes.
+its hint. The accent stays, since the joiner is a control. It reads
+`colors.accentOnMuted`, the role for accent text on the row's muted ground.
+Its weight moves from 600 to 800, a weight the written face takes.
 
 ### D7. Operand labels and order
 
@@ -229,6 +230,11 @@ moves from 600 to 800, a weight the written face takes.
 - `instance.status` reads "The case's status", and its values read
   "running", "completed", "cancelled" and "faulted" from the catalog.
 - `actor.roles` reads "The person's roles".
+- These three labels also have a lower-case form for a clause, set as the
+  optional `Operand.clauseLabel`. A clause reads `clauseLabel` before
+  `label`, so mid-sentence it reads "and the case's status is running". A
+  field label stays as the author typed it, and `fieldOperand` sets no
+  `clauseLabel`.
 - `buildOperands` returns the catalog, then the child, then the case, then
   the person. The picker groups them under `<optgroup>` headings: "Fields",
   "The called process", "The case", "The person". `Operand` gains an
@@ -265,7 +271,7 @@ changes these keys. A placeholder stands in braces.
 | `condition.join.and` / `.or` | {left} and {right} / {left} or {right} |
 | `condition.joiner.and` / `.or` | and / or |
 | `condition.sentence` | {condition}. |
-| `condition.sentence.held` | Until you finish the new row, the condition stays: {condition}. |
+| `condition.sentence.held` | Until you finish the row, the condition stays: {condition}. |
 | `condition.sentence.none` | Finish a row to set the condition. |
 | `condition.sentence.divergent` | The steps hold different conditions. Build one here to set it on every step. |
 | `condition.empty` (reworded) | No condition yet: this always matches. |
@@ -278,6 +284,9 @@ changes these keys. A placeholder stands in braces.
 | `condition.operand.personRoles` | The person's roles |
 | `condition.operand.childOutcome` | How the called process ended |
 | `condition.operand.childField` | {label}, from the called process |
+| `condition.clauseOperand.caseStatus` | the case's status |
+| `condition.clauseOperand.personRoles` | the person's roles |
+| `condition.clauseOperand.childOutcome` | how the called process ended |
 | `condition.group.fields` / `.child` | Fields / The called process |
 | `condition.group.case` / `.person` | The case / The person |
 | `condition.status.running` / `.completed` | running / completed |
