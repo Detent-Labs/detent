@@ -6385,5 +6385,6 @@ field. Pass: the strip reads Asked, Required, Read-only and Width. On the
 Fields tab, open the same field. Pass: the "Ask for this" checkbox reads
 Required.
 
-Read the legend on the Forms tab and on the Field matrix tab. Pass: both read
-Required, Read-only and Asked.
+Read the legend on the Forms tab. Pass: it reads Required. Read the legend on
+the Field matrix tab. Pass: its color entry reads Asked, Required and
+Read-only.

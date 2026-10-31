@@ -377,6 +377,18 @@ describe("The step page's Developer view", () => {
     expect(disclosure).toContain("<pre");
     expect(disclosure).not.toContain("<textarea");
   });
+
+  it("writes the key from the input inside it", () => {
+    const source = readFileSync(SRC + "panels/StepPage.tsx", "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/^\s*\/\/.*$/gm, "");
+    const start = source.indexOf("<details");
+    const block = source.slice(start, source.indexOf("</details>", start));
+
+    expect(start).toBeGreaterThan(-1);
+    expect(block).toContain("onChange={(e) => updateStep({ key: e.target.value })}");
+    expect(source.slice(0, start)).not.toContain("updateStep({ key: e.target.value })");
+  });
 });
 
 describe("The step page's two columns", () => {

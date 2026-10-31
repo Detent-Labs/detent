@@ -136,7 +136,7 @@ export const en = {
   "fieldCatalog.keyReadByOne":
     "Read by 1 expression. The label no longer sets this key, and changing the key does not touch it.",
   "fieldCatalog.keyPublished": "This field is in a published version. The label no longer sets its key.",
-  "fieldCatalog.dataSourceLabel": "Data source",
+  "fieldCatalog.dataSourceLabel": "Values come from",
   "fieldCatalog.requiredLabel": "Required",
   "fieldCatalog.requiredNoSteps": "No step asks for this field yet, so there is nothing to require.",
   "fieldCatalog.requiredTechnicalNote":
@@ -274,7 +274,7 @@ export const en = {
   // A manual path's guard: the runtime offers the button only while it holds.
   "paths.manualGuardNote": "The person sees this way out's button only while the condition holds.",
   "paths.manualGuardHint": "Leave it empty to always offer this way out.",
-  "paths.automaticGuardHint": "Leave it empty on the way out taken when no other matches.",
+  "paths.automaticGuardHint": "Leave it empty on the one way out taken when nothing else matches.",
   "paths.labelCaption": "Name",
   "paths.keyCaption": "Key",
   "paths.toCaption": "Leads to",
@@ -392,8 +392,8 @@ export const en = {
   "formEditor.tab": "Tab",
   "formEditor.tabFromGroup": "The group decides the tab.",
 
-  // The condition builder. Its captions read words, and the CEL it writes
-  // stays in the Developer view, per this file's header.
+  // The condition builder. Only its captions read words: its readout prints
+  // the CEL source beside the rows ("Writes <code>…</code>").
   "condition.empty": "No condition — this always matches.",
   "condition.addRow": "+ Add row",
   "condition.removeRow": "Remove row",
@@ -419,8 +419,8 @@ export const en = {
 
   // The rule-row builder (`field.validation.rule`). A new component, not a
   // ConditionBuilder instance (design.md), with its own operand and
-  // developer-view copy. The CEL it writes stays in the Developer view, per
-  // this file's header.
+  // developer-view copy. Only its captions read words: its readout prints
+  // the CEL source beside the rows ("Writes <code>…</code>").
   "ruleBuilder.thisAnswer": "this answer",
   "ruleBuilder.empty": "No rule — nothing is checked.",
   "ruleBuilder.and": "and",
@@ -703,7 +703,7 @@ export const en = {
   // renders its two entries, subprocess and terminal. `participant` stays:
   // `newStepNote` maps every kind of `guided-labels.ts`'s own closed union,
   // not only the ones the menu draws.
-  "stepKindNote.participant": "Someone fills its form and picks a path.",
+  "stepKindNote.participant": "Someone fills its form and picks a way out.",
   "stepKindNote.subprocess": "Waits for it and routes on how it ended.",
   "stepKindNote.terminal": "Closes the case and names how it ended.",
 
@@ -915,12 +915,12 @@ export const en = {
   "changeList.name.group": "Group",
   "changeList.name.kind": "Kind",
   "changeList.name.from": "From",
-  "changeList.name.timer": "Timer {n}",
-  "changeList.name.onEntry": "On entry · {type}",
-  "changeList.name.onExit": "On exit · {type}",
-  "changeList.name.onCancel": "On cancel · {type}",
-  "changeList.name.onPath": "On path · {type}",
-  "changeList.name.onFire": "On fire · {type}",
+  "changeList.name.timer": "Time limit {n}",
+  "changeList.name.onEntry": "When entered · {type}",
+  "changeList.name.onExit": "When left · {type}",
+  "changeList.name.onCancel": "When cancelled · {type}",
+  "changeList.name.onPath": "When taken · {type}",
+  "changeList.name.onFire": "When it runs out · {type}",
   "changeList.name.option": "Option {value}",
   "changeList.name.note": "Note {n}",
   "changeList.name.tab": "Tab {key}",
@@ -929,22 +929,22 @@ export const en = {
   "changeList.name.leaf": "{property} · {leaf}",
   // One order property per list whose members differ only in position.
   "changeList.order.fields": "Field order",
-  "changeList.order.dataSources": "Data source order",
+  "changeList.order.dataSources": "Order of where values come from",
   "changeList.order.steps": "Step order",
   "changeList.order.allowedGroups": "Allowed group order",
   "changeList.order.options": "Option order",
-  "changeList.order.paths": "Path order",
-  "changeList.order.timers": "Timer order",
-  "changeList.order.onEntry": "On-entry order",
-  "changeList.order.onExit": "On-exit order",
-  "changeList.order.onCancel": "On-cancel order",
-  "changeList.order.onPath": "On-path order",
-  "changeList.order.onFire": "On-fire order",
+  "changeList.order.paths": "Way out order",
+  "changeList.order.timers": "Time limit order",
+  "changeList.order.onEntry": "When entered order",
+  "changeList.order.onExit": "When left order",
+  "changeList.order.onCancel": "When cancelled order",
+  "changeList.order.onPath": "When taken order",
+  "changeList.order.onFire": "When it runs out order",
   "changeList.order.form": "Form order",
   "changeList.order.tabs": "Tab order",
   "changeList.order.inputFields": "Input field order",
   "changeList.order.outputFields": "Output field order",
-  "changeList.order.outcomes": "Outcome order",
+  "changeList.order.outcomes": "Order of how it can end",
   "changeList.value.none": "none",
   "changeList.value.yes": "yes",
   "changeList.value.no": "no",

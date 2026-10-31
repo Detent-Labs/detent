@@ -543,7 +543,10 @@ word. `ROADMAP.md` carries stage-by-stage status.
   pane" and "inspector". `studio-canvas/spec.md:2110` names an "edit rail"
   and a `canvas/EditRail.tsx` that no longer exists. The same spec still
   names the step page's "Path to" section at `:875`, `:1133`, `:3007`,
-  `:3032`, `:3040` and `:3047`. A spec sweep wants its own OpenSpec change.
+  `:3032`, `:3040` and `:3047`. `openspec/specs/studio-canvas/spec.md:3005-3020`
+  still gives the way out's key the masthead's mono treatment inside the row.
+  The key sits in the row's Developer view now, and the spec sweep covers that
+  prose too. A spec sweep wants its own OpenSpec change.
 - **The glossary and the live spec name the Access tab differently.**
   `.claude/rules/ui-glossary.md` names it "Access tab", over
   `panels/AccessPanel.tsx`. `openspec/specs/studio-app/spec.md:4675`,

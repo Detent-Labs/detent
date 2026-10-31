@@ -445,7 +445,8 @@ interface Props {
 /**
  * The Steps tab's wide page (`studio-step-page`). One step, whole: a
  * masthead, every section its kind declares standing open in two columns, the
- * walk to the previous and next step, and a read-only Developer view.
+ * walk to the previous and next step, and a Developer view holding the
+ * writable key input and the read-only JSON.
  *
  * The section bodies are the configuration pane's own, reparented. The
  * collapse chrome and the runtime ordering go: two columns cannot carry one

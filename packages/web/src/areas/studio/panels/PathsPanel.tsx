@@ -53,18 +53,24 @@ const styles = stylex.create({
     fontSize: "0.8rem",
   },
   // The row's heading sentence: the way out's name, an arrow, the target
-  // step. Body face, bold; text, not a control.
+  // step. It follows the Forms tab card name (`FormsTab.tsx`, the `name`
+  // style): a heading carrying an authored name at the body size, in weight
+  // 800. No font size, so it inherits the body step. Text, not a control.
   rowHeading: {
     marginBlockStart: 0,
     marginBlockEnd: space.s2,
     marginInline: 0,
     fontFamily: fonts.body,
-    fontSize: "1rem",
     fontWeight: 800,
     overflowWrap: "anywhere",
   },
-  // Copied from `StepPage.tsx`'s Developer view rather than imported:
-  // compiled StyleX styles stay beside their own module (design.md).
+  // Modeled on `StepPage.tsx`'s Developer view, declared here because
+  // compiled StyleX styles stay beside their own module (design.md). The
+  // step page draws a 2px `colors.divider` top rule; this draws a 1px
+  // `colors.border` one, since the row's own 1px frame would make a 2px rule
+  // read heavier than the frame. The padding is `space.s2` on both edges
+  // where the step page pads `space.s3`, with no focus-ring floor: the
+  // Remove button below, not this block, closes the row.
   developer: {
     paddingBlock: space.s2,
     marginBlock: space.s2,
@@ -81,6 +87,10 @@ const styles = stylex.create({
   },
   developerKey: {
     marginBlockStart: space.s2,
+  },
+  // The gap between the Name label and the Leads to label below it.
+  nameLabel: {
+    marginBlockEnd: space.s2,
   },
   // The studio select: a native `<select>` with its UA chevron dropped in
   // favor of a decorative `ChevronDown` layered over the trailing edge.
@@ -261,7 +271,9 @@ export function PathsPanel({
       target === undefined
         ? t("paths.noTargetYet")
         : resolveDraftLocalizedText(target.label, contentLocale, baseLocale)?.trim() || target.key || target.id || t("paths.noTargetYet");
-    return t("paths.rowHeading").replace("{path}", pathLabel).replace("{step}", targetLabel);
+    // One pass over both placeholders: a label holding `{step}` or `$&`
+    // passes through literally.
+    return t("paths.rowHeading").replace(/\{(path|step)\}/g, (_, k: string) => (k === "path" ? pathLabel : targetLabel));
   };
 
   const removePath = (index: number) => onChange(removeAt(list, index));
@@ -280,7 +292,7 @@ export function PathsPanel({
         >
           {/* An h4: the step page's section heading above is an h3. */}
           <h4 {...stylex.props(styles.rowHeading)}>{rowHeading(path)}</h4>
-          <label {...stylex.props(styles.fieldLabel)}>
+          <label {...stylex.props(styles.fieldLabel, styles.nameLabel)}>
             <span {...stylex.props(styles.fieldLabelText)}>
               {t("paths.labelCaption")}
             </span>
@@ -362,15 +374,19 @@ export function PathsPanel({
             ) : (
               <p {...stylex.props(styles.note)}>{t("paths.manualGuardNote")}</p>
             )}
-            <label>
-              {path.trigger === "automatic" ? t("paths.automaticGuardHint") : t("paths.manualGuardHint")}
+            {/* A div, not a label: a label here would give the builder's own
+                buttons a name run together from the hint and the readout. */}
+            <div>
+              <p {...stylex.props(styles.note)}>
+                {path.trigger === "automatic" ? t("paths.automaticGuardHint") : t("paths.manualGuardHint")}
+              </p>
               <ConditionInput
                 value={path.guard}
                 stepId={stepId}
                 onChange={(guard) => updatePath(index, { guard })}
                 toggleVariant="disclosure"
               />
-            </label>
+            </div>
           </fieldset>
 
           <ActionListEditor

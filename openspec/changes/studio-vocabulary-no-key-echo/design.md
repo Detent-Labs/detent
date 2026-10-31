@@ -155,6 +155,7 @@ Step page sections and masthead:
 | `steps.onCancelLegend` | Actions on cancel | What happens when cancelled |
 | `stepKindNote.subprocess` | Waits for it and routes on its outcome. | Waits for it and routes on how it ended. |
 | `stepKindNote.terminal` | Closes the case with a named outcome. | Closes the case and names how it ended. |
+| `stepKindNote.participant` | Someone fills its form and picks a path. | Someone fills its form and picks a way out. |
 | `kindSwitch.subprocessTerm` | Subprocess call | The call to another process |
 | `kindSwitch.pathsTerm` | Outgoing paths | Ways out |
 | `kindSwitch.onExitTerm` | Exit actions | What happens when left |
@@ -178,7 +179,7 @@ Ways out, with four new keys at the end:
 | `paths.triggeredByAutomatic` | a condition | Happens by itself |
 | `paths.manualGuardNote` | The participant sees this path's button only while the condition holds. | The person sees this way out's button only while the condition holds. |
 | `paths.manualGuardHint` | guard (leave empty to always offer this path) | Leave it empty to always offer this way out. |
-| `paths.automaticGuardHint` | guard (omit for the default/else path) | Leave it empty on the way out taken when no other matches. |
+| `paths.automaticGuardHint` | guard (omit for the default/else path) | Leave it empty on the one way out taken when nothing else matches. |
 | `paths.labelCaption` | Label | Name |
 | `paths.keyCaption` | Key | Key |
 | `paths.toCaption` | Goes to | Leads to |
@@ -238,6 +239,7 @@ Flags and their legends:
 | `formsTab.legendSection` | section | Section |
 | `formsTab.legendHeight` | taller asks for more | Taller asks for more |
 | `fieldMatrix.legendFlagged` | A flagged cell already produces a Checks finding. | A flagged cell already stands in Checks as an issue. |
+| `fieldCatalog.dataSourceLabel` | Data source | Values come from |
 
 The matrix reads `formEditor.visible`, `formEditor.required` and
 `formEditor.readonly` through `FLAG_LABEL_KEY`. Its checkbox names and its
@@ -268,6 +270,21 @@ The Paths tab and the Changes tab:
 | `changeList.prop.subprocess` | Subprocess | The call to another process |
 | `changeList.prop.visible` | Visible | Asked |
 | `changeList.prop.dataSource` | Data source | Where values come from |
+| `changeList.name.timer` | Timer {n} | Time limit {n} |
+| `changeList.name.onEntry` | On entry · {type} | When entered · {type} |
+| `changeList.name.onExit` | On exit · {type} | When left · {type} |
+| `changeList.name.onCancel` | On cancel · {type} | When cancelled · {type} |
+| `changeList.name.onPath` | On path · {type} | When taken · {type} |
+| `changeList.name.onFire` | On fire · {type} | When it runs out · {type} |
+| `changeList.order.paths` | Path order | Way out order |
+| `changeList.order.timers` | Timer order | Time limit order |
+| `changeList.order.onEntry` | On-entry order | When entered order |
+| `changeList.order.onExit` | On-exit order | When left order |
+| `changeList.order.onCancel` | On-cancel order | When cancelled order |
+| `changeList.order.onPath` | On-path order | When taken order |
+| `changeList.order.onFire` | On-fire order | When it runs out order |
+| `changeList.order.dataSources` | Data source order | Order of where values come from |
+| `changeList.order.outcomes` | Outcome order | Order of how it can end |
 
 Six keys go: `ribbon.expand`, `ribbon.collapse`, `steps.pathsHeading`,
 `steps.timersHeading`, `stepSections.actions` and

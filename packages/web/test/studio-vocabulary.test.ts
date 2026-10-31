@@ -37,6 +37,7 @@ describe("step page vocabulary", () => {
       ["steps.onEntryLegend", "What happens when entered"],
       ["steps.onExitLegend", "What happens when left"],
       ["steps.onCancelLegend", "What happens when cancelled"],
+      ["stepKindNote.participant", "Someone fills its form and picks a way out."],
       ["stepKindNote.subprocess", "Waits for it and routes on how it ended."],
       ["stepKindNote.terminal", "Closes the case and names how it ended."],
       ["kindSwitch.subprocessTerm", "The call to another process"],
@@ -70,7 +71,7 @@ describe("way-out vocabulary", () => {
       ["paths.triggeredByAutomatic", "Happens by itself"],
       ["paths.manualGuardNote", "The person sees this way out's button only while the condition holds."],
       ["paths.manualGuardHint", "Leave it empty to always offer this way out."],
-      ["paths.automaticGuardHint", "Leave it empty on the way out taken when no other matches."],
+      ["paths.automaticGuardHint", "Leave it empty on the one way out taken when nothing else matches."],
       ["paths.labelCaption", "Name"],
       ["paths.keyCaption", "Key"],
       ["paths.toCaption", "Leads to"],
@@ -132,6 +133,7 @@ describe("flag vocabulary", () => {
       ["formsTab.legendSection", "Section"],
       ["formsTab.legendHeight", "Taller asks for more"],
       ["fieldMatrix.legendFlagged", "A flagged cell already stands in Checks as an issue."],
+      ["fieldCatalog.dataSourceLabel", "Values come from"],
     ]);
   });
 
@@ -171,6 +173,26 @@ describe("Paths tab and Changes tab vocabulary", () => {
       ["changeList.prop.subprocess", "The call to another process"],
       ["changeList.prop.visible", "Asked"],
       ["changeList.prop.dataSource", "Where values come from"],
+    ]);
+  });
+
+  it("names the Changes tab's entry rows and order rows in the same words", () => {
+    expectRows([
+      ["changeList.name.timer", "Time limit {n}"],
+      ["changeList.name.onEntry", "When entered · {type}"],
+      ["changeList.name.onExit", "When left · {type}"],
+      ["changeList.name.onCancel", "When cancelled · {type}"],
+      ["changeList.name.onPath", "When taken · {type}"],
+      ["changeList.name.onFire", "When it runs out · {type}"],
+      ["changeList.order.paths", "Way out order"],
+      ["changeList.order.timers", "Time limit order"],
+      ["changeList.order.onEntry", "When entered order"],
+      ["changeList.order.onExit", "When left order"],
+      ["changeList.order.onCancel", "When cancelled order"],
+      ["changeList.order.onPath", "When taken order"],
+      ["changeList.order.onFire", "When it runs out order"],
+      ["changeList.order.dataSources", "Order of where values come from"],
+      ["changeList.order.outcomes", "Order of how it can end"],
     ]);
   });
 });

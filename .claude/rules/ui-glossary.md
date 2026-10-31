@@ -214,8 +214,11 @@ section body on the step page, or as a whole tab's own body elsewhere
 
 The JSON definition is the definition contract. Its words win in docs, specs,
 commit messages and conversation. UI text prints the author's word per the
-table below. A rendering layer may hold a different
+author's-word table below. A rendering layer may hold a different
 word internally, and that word stays inside the layer.
+
+The first table's "The word we use" column binds docs, specs, code and
+conversation.
 
 | JSON term | The word we use | The layer's own word | Rule |
 |---|---|---|---|
@@ -244,10 +247,10 @@ only in a Developer view. A caption never prints a JSON property name.
 The capability `studio-guided-vocabulary` carries the same table. A change to
 one changes the other.
 
-These rules bind UI text, docs, specs, commit messages and conversation. A
-code identifier stays out of scope: `EdgeStyle` in
-`studio/screens/EditScreen.tsx:41` and the key `stepsRail.dragHandle` are
-code, and the rule above does not reach them.
+These rules bind docs, specs, commit messages and conversation. UI text
+follows the author's-word table. A code identifier stays out of scope:
+`EdgeStyle` in `studio/screens/EditScreen.tsx:41` and the key
+`stepsRail.dragHandle` are code, and the rule above does not reach them.
 
 `canvas/geometry.ts` measures rectangles and knows nothing about steps.
 `NODE_WIDTH` is the honest name for a width. The canvas renders a step as a

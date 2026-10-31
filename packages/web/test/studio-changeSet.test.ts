@@ -238,7 +238,7 @@ describe("describeChanges: anchors", () => {
     const row = only(describeChanges(base(), after));
 
     expect(row.key).toBe("steps:step_submit");
-    expect(names(row)).toEqual(["On entry · notification.email"]);
+    expect(names(row)).toEqual(["When entered · notification.email"]);
   });
 
   it("pairs a path's actions by id", () => {
@@ -248,7 +248,7 @@ describe("describeChanges: anchors", () => {
     const row = only(describeChanges(base(), after));
 
     expect(row.key).toBe("paths:path_send");
-    expect(names(row)).toEqual(["On path · audit.write"]);
+    expect(names(row)).toEqual(["When taken · audit.write"]);
   });
 
   it("pairs a timer by id and its fire actions by id", () => {
@@ -258,7 +258,7 @@ describe("describeChanges: anchors", () => {
     const row = only(describeChanges(base(), after));
 
     expect(row.key).toBe("steps:step_submit");
-    expect(names(row)).toEqual(["On fire · notification.email"]);
+    expect(names(row)).toEqual(["When it runs out · notification.email"]);
   });
 
   it("pairs a form's field entries by ref", () => {
@@ -474,7 +474,7 @@ describe("describeChanges: order", () => {
   it("names each list's order property on the row owning the list", () => {
     const paths = base();
     paths.workflow.steps[1].paths.reverse();
-    expect(names(only(describeChanges(base(), paths)))).toEqual(["Path order"]);
+    expect(names(only(describeChanges(base(), paths)))).toEqual(["Way out order"]);
 
     const children = base();
     children.fields[0].fields.reverse();
@@ -683,7 +683,7 @@ describe("describeChanges: values", () => {
     const weeks = base();
     weeks.workflow.steps[0].timers[0].duration = "P2W";
     expect(only(describeChanges(base(), weeks)).properties).toEqual([
-      { name: "Timer 1", kind: "changed", before: { text: "3 days", mono: false }, after: { text: "2 weeks", mono: false } },
+      { name: "Time limit 1", kind: "changed", before: { text: "3 days", mono: false }, after: { text: "2 weeks", mono: false } },
     ]);
 
     const written = base();
