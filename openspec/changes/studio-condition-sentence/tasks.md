@@ -61,18 +61,18 @@
 
 ## 5. Verification
 
-- [ ] 5.1 Run `bun run typecheck` in the devcontainer. Expect exit code 0.
-- [ ] 5.2 Run `bun run build` in the devcontainer. Expect exit code 0.
-- [ ] 5.3 Run the full suite: `rtk test sh scripts/dev-exec.sh sh scripts/test-gated.sh bun test`.
-- [ ] 5.4 Read the pass, skip and fail counts off that run. Compare the pass count with `scripts/gates/pass-floor.txt`.
-- [ ] 5.5 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` on the host. Read its exit code.
-- [ ] 5.6 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh` on the host. Read its exit code.
-- [ ] 5.7 On the production bundle, open a way out's "Only when" on Steps. Build two rows; read the sentence.
-- [ ] 5.8 Open its Developer view. The CEL input holds the guard; parseable text typed there redraws the rows.
-- [ ] 5.9 On Fields, open "Only ask this when". The picker lists labels, then the case, then the person.
-- [ ] 5.10 Type unparseable CEL and reload the draft. The notice shows, and the Developer view stands open.
-- [ ] 5.11 Run `/impeccable critique` and `/impeccable audit` on the Steps tab. Run `impeccable detect --json`, since the CSP blocks the overlay.
-- [ ] 5.12 Run `sh scripts/dev-exec.sh bun run e2e` in the devcontainer. Expect every flow to pass.
+- [x] 5.1 Run `bun run typecheck` in the devcontainer. Expect exit code 0.
+- [x] 5.2 Run `bun run build` in the devcontainer. Expect exit code 0.
+- [x] 5.3 Run the full suite: `rtk test sh scripts/dev-exec.sh sh scripts/test-gated.sh bun test`.
+- [x] 5.4 Read the pass, skip and fail counts off that run. Compare the pass count with `scripts/gates/pass-floor.txt`.
+- [x] 5.5 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` on the host. Read its exit code.
+- [x] 5.6 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh` on the host. Read its exit code.
+- [x] 5.7 On the production bundle, open a way out's "Only when" on Steps. Build two rows; read the sentence.
+- [x] 5.8 Open its Developer view. The CEL input holds the guard; parseable text typed there redraws the rows.
+- [x] 5.9 On Fields, open "Only ask this when". The picker lists labels, then the case, then the person.
+- [x] 5.10 Type unparseable CEL and reload the draft. The notice shows, and the Developer view stands open.
+- [x] 5.11 Run `/impeccable critique` and `/impeccable audit` on the Steps tab. Run `impeccable detect --json`, since the CSP blocks the overlay.
+- [x] 5.12 Run `sh scripts/dev-exec.sh bun run e2e` in the devcontainer. Expect every flow to pass.
 
 ## Workflow follow-up
 
