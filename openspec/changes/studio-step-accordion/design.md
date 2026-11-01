@@ -179,7 +179,7 @@ nothing needed draws no mark.
 
 The open header takes the current mark, a 3px accent rule on its leading
 edge. The header's text stands flush left, so the mark stands in the page's
-inline padding, drawn by a `::before` bar offset by that padding, clear of
+inline padding. A `::before` bar draws it, offset by that padding, clear of
 the name. Code picks it from the same flag that sets `aria-expanded`. The open section's name prints in
 ink, and the closed names stay in slate. The ledger hover wash stays on every
 header.
@@ -250,10 +250,11 @@ does.
 value is `defaultOpenSection(...)`. The page remounts per step through its
 `key`, so a new step recomputes it. An effect watches `selectedPathId`: when
 it takes a value, the state moves to `paths`. A header press sets the state
-to `nextOpenSection(openSection, section)`. The render reads
-`openSectionFor(openSection, sections, default)`: a stored section the
-step's new kind no longer stands gives way to the default-open section, so
-a kind switch never leaves every header closed.
+to `nextOpenSection(openSection, section)`.
+
+The render reads `openSectionFor(openSection, sections, default)`. A stored section the
+step's new kind no longer stands gives way to the default-open section. A
+kind switch therefore never leaves every header closed.
 
 Every body renders. The closed ones carry `hidden` with a compiled
 `display: none` style, the tab body's own mechanism. A body therefore keeps
