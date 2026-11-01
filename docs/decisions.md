@@ -2133,7 +2133,7 @@ MAPLABELS tag is local to this section.
 
 The change cut the header bar to back, name, state, Test, Publish and the `⋮`
 menu. It moved the content-locale switcher and the machine values to Settings
-and the Publish dialog. It left the six points below to later changes. The
+and the Publish dialog. It left the seven points below to later changes. The
 HEADER tag is local to this section.
 
 - **HEADER-1: the publish findings list prints raw references.** Each line
@@ -2186,6 +2186,16 @@ HEADER tag is local to this section.
   Upgrade entry: change 12 maps the message, and change 13 drops the revision.
   The strings are `draftToolbar.publishDialogBlocked` and its neighbours in
   `i18n/catalogs/studio.ts`.
+- **HEADER-8: the Developer view's version and hash survive only while the
+  process surface stays mounted.** After a publish in this session, the Process
+  view's Developer view shows the published version and the definition hash.
+  Pressing Versions in the `⋮` menu unmounts the process surface, so returning
+  shows no hash. The Versions screen prints both values. Risk (Low): an author
+  who returns from Versions finds no hash in the Developer view.
+
+  Upgrade entry: hold the session's last publish above the process surface, so
+  a remount still reads it. The Developer view is in
+  `panels/ProcessSettingsPanel.tsx`.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 
